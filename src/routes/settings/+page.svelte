@@ -88,6 +88,10 @@
 		}
 	}
 
+	async function clearClock(): Promise<void> {
+		await app.store?.clearClockBackward();
+	}
+
 	async function confirmErase(): Promise<void> {
 		const store = app.store;
 		if (!store) return;
@@ -140,6 +144,17 @@
 					</div>
 					<button class="settings-row__change" type="button" onclick={startEdit}>
 						{currentEaos ? 'Change' : 'Add'}
+					</button>
+				</div>
+			{/if}
+
+			{#if app.store?.clockBackward}
+				<div class="clock-notice">
+					<p class="clock-notice__msg">
+						Your device clock appears to have moved backward - your timeline dates may be off.
+					</p>
+					<button class="clock-notice__fix" type="button" onclick={() => void clearClock()}>
+						I fixed my clock
 					</button>
 				</div>
 			{/if}
@@ -296,6 +311,31 @@
 		margin: var(--space-s) 0 0;
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+
+	/* Clock-backward reset control (spec 5.6): the deliberate "I fixed my clock" reset the
+	   app-wide ClockBackwardBanner's "Fix this" navigates to. */
+	.clock-notice {
+		margin-top: var(--space-m);
+		padding-top: var(--space-m);
+		border-top: 1px solid var(--color-border);
+	}
+
+	.clock-notice__msg {
+		margin: 0 0 var(--space-s);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.clock-notice__fix {
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 
 	/* Danger zone (spec 5.6): visually separated from benign actions above it. */

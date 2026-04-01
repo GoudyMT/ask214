@@ -2,7 +2,9 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { goto } from '$app/navigation';
 	import AppGate from '$lib/components/AppGate.svelte';
+	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
 	import {
 		initProfileApp,
@@ -98,10 +100,15 @@
 		<nav aria-label="Primary">
 			<a href={resolve('/')} class="brand">Transition Companion</a>
 			<ul>
+				<li><a href={resolve('/settings')}>Settings</a></li>
 				<li><a href={resolve('/about')}>About</a></li>
 			</ul>
 		</nav>
 	</header>
+
+	{#if app.status === 'ready' && app.store?.clockBackward}
+		<ClockBackwardBanner onfix={() => void goto(resolve('/settings'))} />
+	{/if}
 
 	<main id="main-content">
 		{@render children()}
