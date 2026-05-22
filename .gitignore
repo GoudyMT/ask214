@@ -19,9 +19,10 @@
 #
 # ==============================================================================
 
-# ---- Markdown files (only README.md tracked) ----
+# ---- Markdown files (only README.md + docs/engineering/ tracked) ----
 *.md
 !README.md
+!docs/engineering/**/*.md
 
 # ---- CSV Files ----
 *.csv
