@@ -105,6 +105,7 @@ logs/
 .claude/
 .superpowers/
 .cursor/
+.worktrees/
 
 # ---- Content corpus outputs (large generated artifacts) ----
 content-ops/outputs/
