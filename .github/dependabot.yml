@@ -9,28 +9,28 @@ updates:
     groups:
       svelte:
         patterns:
-          - "@sveltejs/*"
-          - "svelte"
-          - "svelte-*"
+          - '@sveltejs/*'
+          - 'svelte'
+          - 'svelte-*'
       testing:
         patterns:
-          - "vitest"
-          - "@vitest/*"
-          - "@playwright/*"
-          - "playwright"
-          - "vitest-*"
+          - 'vitest'
+          - '@vitest/*'
+          - '@playwright/*'
+          - 'playwright'
+          - 'vitest-*'
       linting:
         patterns:
-          - "eslint"
-          - "@eslint/*"
-          - "eslint-*"
-          - "prettier"
-          - "prettier-*"
-          - "typescript-eslint"
+          - 'eslint'
+          - '@eslint/*'
+          - 'eslint-*'
+          - 'prettier'
+          - 'prettier-*'
+          - 'typescript-eslint'
       types:
         patterns:
-          - "@types/*"
-          - "typescript"
+          - '@types/*'
+          - 'typescript'
   - package-ecosystem: github-actions
     directory: /
     schedule:
