@@ -1,0 +1,123 @@
+# ==============================================================================
+# .gitignore - Military Transition Companion
+# ==============================================================================
+#
+# PRIVACY STANCE:
+#   Only README.md is publicly tracked.
+#   All other .md files (governance, design specs, ADRs, plans, research,
+#   templates, archives) are intentionally NOT tracked.
+#
+# RATIONALE:
+#   - Solo dev: the only person who needs the design/methodology is Max
+#   - Competitive intel protection: don't hand competitors the full reasoning
+#   - Selective sharing: specific docs may be shared with future employers
+#     by sending local copies, not by making them public via git history
+#
+# RESULT:
+#   - Public GitHub view: README.md + code + license + standard config
+#   - Local working copy: all governance, specs, ADRs, plans, research
+#
+# ==============================================================================
+
+# ---- Markdown files (only README.md tracked) ----
+*.md
+!README.md
+
+# ---- CSV Files ----
+*.csv
+
+# ---- OS and IDE noise ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- Node.js / PWA build artifacts ----
+node_modules/
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.cache/
+.parcel-cache/
+.turbo/
+.vercel/
+.wrangler/
+
+# ---- Package manager noise ----
+yarn-error.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.npm/
+.yarn/
+.pnpm-store/
+
+# ---- Environment and secrets ----
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.crt
+secrets/
+
+# ---- Python (content-ops pipeline) ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Test outputs ----
+coverage/
+.nyc_output/
+*.lcov
+playwright-report/
+test-results/
+.vitest-cache/
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Claude Code / superpowers session artifacts ----
+.claude/
+.superpowers/
+.cursor/
+
+# ---- Content corpus outputs (large generated artifacts) ----
+content-ops/outputs/
+content-ops/review_queue/
+
+# ---- Misc local-only ----
+TODO.private
+NOTES.private
+*.local
+
+# ==============================================================================
+# What IS tracked (visible in public repo):
+#   - README.md (project introduction)
+#   - LICENSE (open source license, TBD AGPL vs MIT)
+#   - All source code (src/, tests/)
+#   - Package config (package.json, tsconfig.json, etc.)
+#   - CI config (.github/workflows/)
+#   - Build config (vite.config.ts, etc.)
+#   - .gitignore itself
+#   - Public security policy (.well-known/security.txt - when added)
+# ==============================================================================
