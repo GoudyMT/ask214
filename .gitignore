@@ -40,6 +40,7 @@ node_modules/
 dist/
 build/
 out/
+.output/
 .next/
 .nuxt/
 .svelte-kit/
@@ -47,7 +48,10 @@ out/
 .parcel-cache/
 .turbo/
 .vercel/
+.netlify/
 .wrangler/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
 
 # ---- Package manager noise ----
 yarn-error.log
