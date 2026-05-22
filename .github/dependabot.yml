@@ -1,0 +1,37 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      svelte:
+        patterns:
+          - "@sveltejs/*"
+          - "svelte"
+          - "svelte-*"
+      testing:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@playwright/*"
+          - "playwright"
+          - "vitest-*"
+      linting:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "eslint-*"
+          - "prettier"
+          - "prettier-*"
+          - "typescript-eslint"
+      types:
+        patterns:
+          - "@types/*"
+          - "typescript"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
