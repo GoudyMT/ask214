@@ -6,20 +6,21 @@ The foundation phase establishes the development environment, build pipeline, an
 
 ## Stack at a Glance
 
-| Layer                  | Tool                | Version    | Purpose                                              |
-| ---------------------- | ------------------- | ---------- | ---------------------------------------------------- |
-| Framework              | SvelteKit           | 2.x        | Full-stack Svelte 5 application framework            |
-| Language               | TypeScript          | 6.x        | Strict type checking across all source code          |
-| Package manager        | pnpm                | 11.x       | Disk-efficient, fast, reproducible installs          |
-| Build / bundler        | Vite                | 8.x        | Bundled with SvelteKit                               |
-| Unit + component tests | Vitest              | 4.x        | Native Vite integration; browser mode via Playwright |
-| End-to-end tests       | Playwright          | 1.59.x     | Cross-browser E2E (Chromium / Firefox / WebKit)      |
-| Linting                | ESLint              | 10.x       | TypeScript + Svelte rules                            |
-| Formatting             | Prettier            | 3.x        | Consistent code style                                |
-| Pre-commit hooks       | Husky + lint-staged | 9.x / 17.x | Block commits that violate lint, types, or tests     |
-| Node version manager   | fnm                 | 1.39.x     | User-space Node management; auto-switch via `.nvmrc` |
-| Hosting                | Cloudflare Pages    | n/a        | Static PWA hosting with edge distribution            |
-| License                | AGPL-3.0            | n/a        | Strong copyleft for a public-good codebase           |
+| Layer                  | Tool                | Version    | Purpose                                                  |
+| ---------------------- | ------------------- | ---------- | -------------------------------------------------------- |
+| Framework              | SvelteKit           | 2.x        | Full-stack Svelte 5 application framework                |
+| Language               | TypeScript          | 6.x        | Strict type checking across all source code              |
+| Package manager        | pnpm                | 11.x       | Disk-efficient, fast, reproducible installs              |
+| Build / bundler        | Vite                | 8.x        | Bundled with SvelteKit                                   |
+| Unit + component tests | Vitest              | 4.x        | Native Vite integration; browser mode via Playwright     |
+| End-to-end tests       | Playwright          | 1.59.x     | Cross-browser E2E (Chromium / Firefox / WebKit)          |
+| Linting                | ESLint              | 10.x       | TypeScript + Svelte rules                                |
+| Formatting             | Prettier            | 3.x        | Consistent code style                                    |
+| Pre-commit hooks       | Husky + lint-staged | 9.x / 17.x | Block commits that violate lint, types, or tests         |
+| Node version manager   | fnm                 | 1.39.x     | User-space Node management; auto-switch via `.nvmrc`     |
+| Hosting                | Cloudflare Workers  | n/a        | Static assets + Worker on Cloudflare's edge              |
+| Deploy CLI             | wrangler            | 4.x        | Cloudflare deployment tool, consumed via `wrangler.toml` |
+| License                | AGPL-3.0            | n/a        | Strong copyleft for a public-good codebase               |
 
 ## Decisions and Reasoning
 
@@ -91,15 +92,27 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Tradeoffs accepted.** Each commit takes 10-15 seconds while the hook runs. Acceptable for solo development; revisitable as the test suite grows.
 
-### Cloudflare Pages
+### CI Pipeline + Dependency Maintenance
 
-**What it is.** A static site hosting service with global edge distribution and integrated Workers (serverless functions).
+**What it is.** GitHub Actions runs lint, type-check, unit tests, E2E tests, and build on every push to `main` and every pull request. Dependabot opens grouped pull requests weekly for npm dependencies and monthly for GitHub Actions, scanning for known vulnerabilities along the way.
 
-**Why this project uses it.** Generous free tier (unlimited bandwidth, 500 builds per month) covers expected scale through v1.0 launch. Native SvelteKit adapter (`@sveltejs/adapter-cloudflare`) means deploying is a configuration choice, not a porting effort. When the project needs a backend later (for the synthesis API proxy), Workers run on the same platform without migration overhead.
+**Why this project uses them.** Solo development without CI is fine for a week and decays thereafter. The CI workflow is the reproducibility check ("does this still build on a clean machine?") and the security gate ("does any merged change break lint, types, or tests?"). Dependabot grouping prevents pull-request overload by bundling related updates (testing, linting, types, Svelte ecosystem) into single review surfaces instead of one PR per package.
 
-**Considered alternatives.** Vercel (excellent developer experience but more likely to surprise with bills at scale). Netlify (similar to Vercel, smaller CDN footprint).
+**Patterns adopted.** Corepack reads the `packageManager` field from `package.json` to pin pnpm to a single version across local development and CI, eliminating the version-drift class of CI failures. The pnpm `minimumReleaseAge` policy (24-hour cutoff) blocks installation of packages younger than the cutoff, mitigating supply-chain attacks via brand-new package versions and giving the broader ecosystem time to flag malicious releases.
 
-**Tradeoffs accepted.** Some advanced features (deep edge caching, KV-namespace integration) require Cloudflare-specific patterns that do not transfer if the project ever moves hosts.
+**Tradeoffs accepted.** Dependabot occasionally opens pull requests that fail CI on dependency interaction or on the supply-chain age policy; the triage cost is acceptable given the security and freshness benefits.
+
+### Cloudflare Workers + Static Assets
+
+**What it is.** Cloudflare's serverless edge platform with unified static-asset + Worker handling. The platform merged its older "Pages" product into the Workers model through 2025-2026 — static assets serve from edge cache while a single Worker handles dynamic requests.
+
+**Why this project uses it.** Generous free tier covers expected scale through v1.0 launch. Native SvelteKit adapter (`@sveltejs/adapter-cloudflare`) emits the Worker + assets layout directly into `.svelte-kit/cloudflare/`. When v1.1 adds the synthesis API proxy, that Worker lives on the same platform as the frontend — one mental model for both layers.
+
+**Configuration.** `wrangler.toml` at repo root pins Worker name, entry point, compatibility date, and the `nodejs_compat` flag SvelteKit internals require. `wrangler deploy` consumes this config; Cloudflare's CI handles authentication automatically when the project is connected via the dashboard.
+
+**Considered alternatives.** Vercel (excellent developer experience, more likely to surprise with bills at scale). Netlify (smaller CDN footprint, less integrated edge compute story).
+
+**Tradeoffs accepted.** Cloudflare-specific patterns (KV namespaces, Durable Objects) do not transfer cleanly if the project ever moves hosts.
 
 ### AGPL-3.0 License
 
@@ -110,6 +123,14 @@ The foundation phase establishes the development environment, build pipeline, an
 **Considered alternatives.** MIT (maximally permissive, allows commercial closure). Apache 2.0 (permissive with patent grant). BSD (similar to MIT).
 
 **Tradeoffs accepted.** Some contributors avoid AGPL projects. Some commercial relationships are harder to structure. Both acceptable for a public-good project.
+
+### Architecture Decision Records
+
+**What it is.** Each significant architectural decision is captured as an Architecture Decision Record (ADR) in `docs/decisions/` using the MADR template — short documents (300-800 words) recording context, options considered, the chosen path, and consequences.
+
+**Why this project uses them.** Decisions get re-asked. "Why AGPL?" comes up in pull-request reviews, license negotiations, and trademark searches months apart. "Why local-first PII?" comes up in every security review. ADRs are the durable answer: written once when the decision is fresh, referenced thereafter. Status is mutable (accepted, deprecated, superseded) but filenames and numbers are permanent — decisions are immutable history, not erased when superseded.
+
+**Indexing.** `docs/decisions/000-decisions-index.md` lists every ADR by number, title, status, date, and reference to the design spec section that captured the original decision context.
 
 ## How These Pieces Fit Together
 
@@ -142,4 +163,5 @@ Cloudflare Pages was chosen for cost (free at expected scale) and native SvelteK
 
 ## Revision Notes
 
-- 2026-05-22 (initial draft): Phase 0 foundation decisions captured at Tasks 0.1-0.6. Final polish at Phase 0 completion will incorporate lessons from the remaining Tasks 0.7-0.10 (CI, GitHub repo, Cloudflare Pages deploy, ADR authoring).
+- 2026-05-22 (initial draft): Phase 0 foundation decisions captured at Tasks 0.1-0.6.
+- 2026-05-22 (Phase 0 polish): Tasks 0.7-0.10 folded in - CI Pipeline + Dependency Maintenance section, Architecture Decision Records section, Cloudflare Workers + Static Assets update (replaces earlier "Pages" framing per Cloudflare's 2025-2026 platform unification). Stack at a Glance updated; wrangler added as deploy CLI. Knowingly exceeds 1500-word soft cap by ~265 words to capture distinct Phase 0 tooling without compressing previously approved Tasks 0.1-0.6 narratives.
