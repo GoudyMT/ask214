@@ -26,13 +26,13 @@ Plus a deep SkillBridge module (v1.2) and cautious VA-tool outbound linking (nev
 - [ ] v1.0 implementation plan (in progress)
 - [ ] v1.0 code build (~4-5 months solo, starts after plan locked)
 
-**See [`_Master Roadmap.md`](_Master Roadmap.md) for the full versioned plan.**
+**See [`_Master Roadmap.md`](\_Master Roadmap.md) for the full versioned plan.**
 
 ---
 
 ## For Collaborators / AI Agents
 
-**New session? Read [`_Start Here.md`](_Start Here.md) first.** It directs you to the working standards, current state, and resume point.
+**New session? Read [`_Start Here.md`](\_Start Here.md) first.** It directs you to the working standards, current state, and resume point.
 
 ---
 
@@ -74,7 +74,7 @@ Military Transition App/
 
 ## License
 
-TBD - currently choosing between AGPL-3.0 and MIT. See [`_Working Memory.md`](_Working Memory.md) Open Decisions.
+TBD - currently choosing between AGPL-3.0 and MIT. See [`_Working Memory.md`](\_Working Memory.md) Open Decisions.
 
 ---
 
