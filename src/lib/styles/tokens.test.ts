@@ -29,4 +29,11 @@ describe('design tokens', () => {
 		expect(tokens.font.body).toContain(',');
 		expect(tokens.font.mono).toContain(',');
 	});
+
+	it('provides fluid typography clamp() strings for h1/h2/h3', () => {
+		expect(tokens.fontSize.fluid).toBeDefined();
+		expect(tokens.fontSize.fluid.h1).toMatch(/^clamp\(/);
+		expect(tokens.fontSize.fluid.h2).toMatch(/^clamp\(/);
+		expect(tokens.fontSize.fluid.h3).toMatch(/^clamp\(/);
+	});
 });

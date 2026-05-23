@@ -43,7 +43,12 @@ export const tokens = {
 		base: '16px',
 		l: '18px',
 		xl: '22px',
-		xxl: '28px'
+		xxl: '28px',
+		fluid: {
+			h1: 'clamp(28px, 5vw, 40px)',
+			h2: 'clamp(22px, 4vw, 28px)',
+			h3: 'clamp(18px, 3vw, 22px)'
+		}
 	}
 } as const;
 
