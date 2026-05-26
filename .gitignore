@@ -95,6 +95,7 @@ coverage/
 *.lcov
 playwright-report/
 test-results/
+.lighthouseci/
 .vitest-cache/
 
 # ---- Logs ----
