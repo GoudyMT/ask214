@@ -11,6 +11,7 @@
 		"prepare": "husky",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"check:bundle": "size-limit",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",
@@ -26,10 +27,32 @@
 			"prettier --write"
 		]
 	},
+	"size-limit": [
+		{
+			"name": "SvelteKit entry",
+			"path": ".svelte-kit/output/client/_app/immutable/entry/*.js",
+			"limit": "10 KB",
+			"gzip": true
+		},
+		{
+			"name": "SvelteKit chunks",
+			"path": ".svelte-kit/output/client/_app/immutable/chunks/*.js",
+			"limit": "50 KB",
+			"gzip": true
+		},
+		{
+			"name": "SvelteKit nodes",
+			"path": ".svelte-kit/output/client/_app/immutable/nodes/*.js",
+			"limit": "5 KB",
+			"gzip": true
+		}
+	],
 	"devDependencies": {
 		"@eslint/compat": "^2.0.4",
 		"@eslint/js": "^10.0.1",
+		"@lhci/cli": "^0.15.1",
 		"@playwright/test": "^1.59.1",
+		"@size-limit/file": "^12.1.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.8",
 		"@sveltejs/kit": "^2.61.1",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
@@ -44,6 +67,7 @@
 		"playwright": "^1.59.1",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.5.1",
+		"size-limit": "^12.1.0",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
 		"typescript": "^6.0.2",
