@@ -34,6 +34,8 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Tradeoffs accepted.** Smaller hiring pool than React. Some libraries assume React/Vue and need adapters. Svelte 5 runes are recent and best practices are still solidifying.
 
+---
+
 ### TypeScript with strict mode
 
 **What it is.** TypeScript is a typed superset of JavaScript. Strict mode enables checks that prevent common runtime errors: null/undefined access, implicit any, unsafe casts.
@@ -43,6 +45,8 @@ The foundation phase establishes the development environment, build pipeline, an
 **Tightened beyond SvelteKit defaults.** Three additional flags enabled: `noUncheckedIndexedAccess` (array/object access returns `T | undefined` instead of `T`), `noImplicitOverride` (method overrides must be explicit), `noFallthroughCasesInSwitch` (switch cases must terminate or fall through deliberately).
 
 **Tradeoffs accepted.** Friction during prototyping. Some library types are wrong and require local workarounds.
+
+---
 
 ### pnpm
 
@@ -54,6 +58,8 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Tradeoffs accepted.** Some legacy tooling expects npm's flat `node_modules` layout and surfaces phantom-dependency errors under pnpm's stricter structure.
 
+---
+
 ### Vitest + Playwright
 
 **What they are.** Vitest is a Vite-native test runner for unit and component tests. Playwright is an end-to-end browser automation framework that drives Chromium, Firefox, and WebKit.
@@ -64,6 +70,8 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Tradeoffs accepted.** Playwright's browser downloads are ~600 MB total across Chromium, Firefox, and WebKit. One-time cost. Vitest's browser-mode component tests require Playwright installed even for unit-test runs.
 
+---
+
 ### ESLint + Prettier
 
 **What they are.** ESLint is a static analyzer that flags code-quality issues. Prettier is an opinionated formatter that normalizes style.
@@ -71,6 +79,8 @@ The foundation phase establishes the development environment, build pipeline, an
 **Why this project uses them.** Solo development without these is fine for a week and degrades over months. Lint catches real bugs (unused variables, async/await mistakes, accessibility issues). Prettier eliminates style debates. Both run on every commit via the pre-commit hook.
 
 **Tradeoffs accepted.** Two tools instead of one. Configuration overhead when their rules conflict (minimal with the prettier-eslint integration).
+
+---
 
 ### fnm (Fast Node Manager) + Node 22 LTS
 
@@ -82,6 +92,8 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Tradeoffs accepted.** One additional tool to install. PowerShell profile must self-bootstrap fnm's directory in case Windows User PATH does not propagate to fresh shells — an issue encountered during the actual setup.
 
+---
+
 ### Husky + lint-staged
 
 **What they are.** Husky manages Git hooks. lint-staged runs commands only against files staged for commit. Together they create a pre-commit pipeline.
@@ -92,6 +104,8 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Tradeoffs accepted.** Each commit takes 10-15 seconds while the hook runs. Acceptable for solo development; revisitable as the test suite grows.
 
+---
+
 ### CI Pipeline + Dependency Maintenance
 
 **What it is.** GitHub Actions runs lint, type-check, unit tests, E2E tests, and build on every push to `main` and every pull request. Dependabot opens grouped pull requests weekly for npm dependencies and monthly for GitHub Actions, scanning for known vulnerabilities along the way.
@@ -101,6 +115,8 @@ The foundation phase establishes the development environment, build pipeline, an
 **Patterns adopted.** Corepack reads the `packageManager` field from `package.json` to pin pnpm to a single version across local development and CI, eliminating the version-drift class of CI failures. The pnpm `minimumReleaseAge` policy (24-hour cutoff) blocks installation of packages younger than the cutoff, mitigating supply-chain attacks via brand-new package versions and giving the broader ecosystem time to flag malicious releases.
 
 **Tradeoffs accepted.** Dependabot occasionally opens pull requests that fail CI on dependency interaction or on the supply-chain age policy; the triage cost is acceptable given the security and freshness benefits.
+
+---
 
 ### Cloudflare Workers + Static Assets
 
@@ -114,6 +130,8 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Tradeoffs accepted.** Cloudflare-specific patterns (KV namespaces, Durable Objects) do not transfer cleanly if the project ever moves hosts.
 
+---
+
 ### AGPL-3.0 License
 
 **What it is.** The GNU Affero General Public License v3.0 is a strong copyleft license. Anyone running a modified version as a service must publish their modifications under the same terms.
@@ -123,6 +141,8 @@ The foundation phase establishes the development environment, build pipeline, an
 **Considered alternatives.** MIT (maximally permissive, allows commercial closure). Apache 2.0 (permissive with patent grant). BSD (similar to MIT).
 
 **Tradeoffs accepted.** Some contributors avoid AGPL projects. Some commercial relationships are harder to structure. Both acceptable for a public-good project.
+
+---
 
 ### Architecture Decision Records
 
