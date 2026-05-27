@@ -40,13 +40,15 @@ Phase 1 builds the privacy-first PWA application shell on top of the foundation:
 
 ---
 
-### Responsive design + bandwidth-mode architecture
+### Responsive design (bandwidth-mode partially shipped)
 
-**What it is.** Mobile-first CSS with fluid typography via `clamp()`, container-query-friendly layouts, and breakpoint tests at 320 / 375 / 414 / 768 / 1024 / 1280 px. A separate "bandwidth-mode" CSS architecture (`body[data-bandwidth-mode="low"]` selector pattern) is stubbed for a Phase 2 UI toggle.
+**What actually shipped.** Mobile-first CSS with fluid typography via `clamp()`, a 720px container max-width on content routes, and breakpoint Playwright tests at 320 / 375 / 414 / 768 / 1024 / 1280 px. Low-bandwidth visual defaults (system fonts, solid background, no decorative images, no animations) are unconditionally in effect via the design-token layer (Task 1.2).
 
-**Why this project uses it.** The user base includes service members on constrained data plans, transient shared Wi-Fi, or patchy mobile coverage. Fluid typography eliminates the breakpoint-and-pray pattern of fixed-pixel design; the bandwidth-mode foundation positions the project to ship the toggle later without retrofit.
+**What did NOT ship.** The "bandwidth-mode architecture" described in ADR-010 - `body[data-bandwidth-mode="low"]` selector pattern, localStorage hook, JS toggle, container queries (`@container`) - did NOT land in Phase 1. An 8-line CSS comment described the pattern; no implementing code was written. ADR-010 status revised to `partially implemented` (audit T6-A, Session 10).
 
-**Tradeoffs accepted.** The bandwidth-mode architecture lands without a UI toggle - architecture-first investment ahead of user demand. Justified by the cost differential: retrofitting bandwidth-aware styling into a finished design system is expensive; stubbing it now is free. Full rationale in ADR-010 ([`docs/decisions/010-responsive-design.md`](../decisions/010-responsive-design.md)).
+**Why what shipped works.** Fluid typography eliminates the breakpoint-and-pray pattern of fixed-pixel design. Low-bandwidth visual defaults serve service members on constrained data plans, transient shared Wi-Fi, or patchy mobile coverage - by being the unconditional baseline rather than a toggle-gated variant. The audience that benefits gets it whether they toggle anything or not.
+
+**Tradeoffs accepted.** No bandwidth-mode toggle in v1.0; users get the low-bandwidth-by-default visual baseline by default. When a future component needs differentiated heavy/light treatment, the selector pattern + toggle UI will be authored at that time per ADR-010's recorded design ([`docs/decisions/010-responsive-design.md`](../decisions/010-responsive-design.md)). Building the architecture without the payload would have been chrome without value.
 
 ---
 

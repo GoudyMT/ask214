@@ -96,11 +96,5 @@ h3 {
 	margin: var(--space-m) 0 var(--space-s);
 }
 
-/* Bandwidth-mode architecture (ADR-010). v1.0 default IS low-bandwidth: system fonts, */
-/* no decorative images, solid background, no animations (already shipped via Task 1.2). */
-/* Components opt OUT of heavier treatments under `body[data-bandwidth-mode="low"]` as */
-/* later phases add richer content. Phase 1 ships the selector pattern stub only; */
-/* toggle UI deferred to Phase 2 / v1.1 per ADR-010 (no JS to read localStorage yet). */
-/* Example pattern (no active selectors yet - first opt-out lands when a future */
-/* component adds a heavier treatment that needs the low-bandwidth alternative): */
-/* body[data-bandwidth-mode="low"] .some-future-component { ...lighter treatment... } */
+/* Low-bandwidth visual defaults are in effect (system fonts, solid background, no decorative images, no animations) via design tokens (Task 1.2). */
+/* The data-bandwidth-mode selector pattern + localStorage toggle described in ADR-010 did NOT ship in Phase 1; when a future component needs heavy/light variants, see ADR-010 for the original selector design. */
