@@ -43,7 +43,8 @@ export default defineConfig(
 		// 'svelte/button-has-type': 'error'
 		// mtc rule entries are enabled as each rule is implemented.
 		rules: {
-			'mtc/safelog-no-error': 'error'
+			'mtc/safelog-no-error': 'error',
+			'mtc/encrypted-store-registry': 'error'
 		}
 	}
 );

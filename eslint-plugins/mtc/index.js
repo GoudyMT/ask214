@@ -9,6 +9,7 @@
  * Each rule lives in `rules/<rule-name>.js` and is registered in `rules` below.
  */
 import safelogNoError from './rules/safelog-no-error.js';
+import encryptedStoreRegistry from './rules/encrypted-store-registry.js';
 
 export default {
 	meta: {
@@ -16,7 +17,8 @@ export default {
 		version: '0.1.0'
 	},
 	rules: {
-		'safelog-no-error': safelogNoError
+		'safelog-no-error': safelogNoError,
+		'encrypted-store-registry': encryptedStoreRegistry
 	},
 	configs: {}
 };
