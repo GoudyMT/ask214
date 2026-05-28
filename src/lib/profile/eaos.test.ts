@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseEaosCalendar, EaosFormatError, validateEaosAtInput } from './eaos';
+import { parseEaosCalendar, EaosFormatError, validateEaosAtInput, parseEaosAtRead } from './eaos';
 
 describe('parseEaosCalendar', () => {
 	it('parses a valid date', () => {
@@ -112,5 +112,22 @@ describe('validateEaosAtInput', () => {
 	it('accepts exactly 15 years from now', () => {
 		const today = new Date('2026-05-26T12:00:00Z');
 		expect(() => validateEaosAtInput('2041-05-26', today)).not.toThrow();
+	});
+});
+
+describe('parseEaosAtRead', () => {
+	it('accepts calendar-valid dates regardless of range', () => {
+		expect(parseEaosAtRead('2010-01-01')).toBe('2010-01-01');
+		expect(parseEaosAtRead('2099-12-31')).toBe('2099-12-31');
+	});
+
+	it('rejects calendar-invalid dates', () => {
+		expect(() => parseEaosAtRead('2027-02-30')).toThrow(EaosFormatError);
+		expect(() => parseEaosAtRead('not-a-date')).toThrow(EaosFormatError);
+	});
+
+	it('does NOT apply input-range check (out-of-range past loads OK)', () => {
+		// Simulates loading a profile saved 10 years ago
+		expect(() => parseEaosAtRead('2015-01-01')).not.toThrow();
 	});
 });

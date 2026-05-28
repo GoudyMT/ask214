@@ -76,3 +76,12 @@ export function validateEaosAtInput(s: string, today = new Date()): EaosString {
 	}
 	return s as EaosString;
 }
+
+/**
+ * Lenient load-path validator: calendar validity only, NO input-range check.
+ * A profile saved years ago must still load without rejection.
+ */
+export function parseEaosAtRead(s: string): EaosString {
+	parseEaosCalendar(s); // validation only; throws on invalid
+	return s as EaosString;
+}
