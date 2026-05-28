@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseEaosCalendar, EaosFormatError } from './eaos';
+import { parseEaosCalendar, EaosFormatError, validateEaosAtInput } from './eaos';
 
 describe('parseEaosCalendar', () => {
 	it('parses a valid date', () => {
@@ -73,5 +73,44 @@ describe('parseEaosCalendar', () => {
 				}
 			}
 		}
+	});
+});
+
+describe('validateEaosAtInput', () => {
+	it('returns branded EaosString for valid in-range date', () => {
+		const today = new Date('2026-05-26T12:00:00Z');
+		const r = validateEaosAtInput('2027-04-15', today);
+		expect(r).toBe('2027-04-15');
+		// brand check is compile-time only; runtime is the same string
+	});
+
+	it('rejects calendar-invalid input with EaosFormatError', () => {
+		const today = new Date('2026-05-26T12:00:00Z');
+		expect(() => validateEaosAtInput('2027-13-15', today)).toThrow(EaosFormatError);
+	});
+
+	it('rejects too-far-past input (>5 years ago) with year-range cause', () => {
+		const today = new Date('2026-05-26T12:00:00Z');
+		expect(() => validateEaosAtInput('2020-05-25', today)).toThrow(EaosFormatError);
+		try {
+			validateEaosAtInput('2020-05-25', today);
+		} catch (e) {
+			expect((e as EaosFormatError).cause).toBe('year-range');
+		}
+	});
+
+	it('rejects too-far-future input (>15 years out) with year-range cause', () => {
+		const today = new Date('2026-05-26T12:00:00Z');
+		expect(() => validateEaosAtInput('2041-05-27', today)).toThrow(EaosFormatError);
+	});
+
+	it('accepts exactly 5 years ago to the day', () => {
+		const today = new Date('2026-05-26T12:00:00Z');
+		expect(() => validateEaosAtInput('2021-05-26', today)).not.toThrow();
+	});
+
+	it('accepts exactly 15 years from now', () => {
+		const today = new Date('2026-05-26T12:00:00Z');
+		expect(() => validateEaosAtInput('2041-05-26', today)).not.toThrow();
 	});
 });

@@ -53,3 +53,26 @@ export function parseEaosCalendar(s: string): { y: number; m: number; d: number 
 
 	return { y, m, d };
 }
+
+const PAST_YEARS = 5;
+const FUTURE_YEARS = 15;
+
+/**
+ * Strict input-path validator: calendar-valid AND within [today - 5y, today + 15y].
+ *
+ * "today" is read via UTC getters so the comparison is anchored to the same UTC
+ * calendar as the Date.UTC-built input value - no timezone off-by-one (F-C-9).
+ */
+export function validateEaosAtInput(s: string, today = new Date()): EaosString {
+	const { y, m, d } = parseEaosCalendar(s);
+	const inputUTC = Date.UTC(y, m - 1, d);
+	const ty = today.getUTCFullYear();
+	const tm = today.getUTCMonth();
+	const td = today.getUTCDate();
+	const minUTC = Date.UTC(ty - PAST_YEARS, tm, td);
+	const maxUTC = Date.UTC(ty + FUTURE_YEARS, tm, td);
+	if (inputUTC < minUTC || inputUTC > maxUTC) {
+		throw new EaosFormatError('year-range');
+	}
+	return s as EaosString;
+}
