@@ -8,13 +8,15 @@
  *
  * Each rule lives in `rules/<rule-name>.js` and is registered in `rules` below.
  */
+import safelogNoError from './rules/safelog-no-error.js';
+
 export default {
 	meta: {
 		name: 'mtc',
 		version: '0.1.0'
 	},
 	rules: {
-		// Registered as each rule is implemented.
+		'safelog-no-error': safelogNoError
 	},
 	configs: {}
 };
