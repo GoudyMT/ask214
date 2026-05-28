@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { parseEaosCalendar, EaosFormatError, validateEaosAtInput, parseEaosAtRead } from './eaos';
+import {
+	parseEaosCalendar,
+	EaosFormatError,
+	validateEaosAtInput,
+	parseEaosAtRead,
+	daysUntilSeparation,
+	type EaosString
+} from './eaos';
 
 describe('parseEaosCalendar', () => {
 	it('parses a valid date', () => {
@@ -129,5 +136,40 @@ describe('parseEaosAtRead', () => {
 	it('does NOT apply input-range check (out-of-range past loads OK)', () => {
 		// Simulates loading a profile saved 10 years ago
 		expect(() => parseEaosAtRead('2015-01-01')).not.toThrow();
+	});
+});
+
+describe('daysUntilSeparation', () => {
+	it('returns positive integer days for future EAOS', () => {
+		const eaos = '2027-04-15' as EaosString;
+		const today = new Date('2026-05-26T12:00:00Z');
+		expect(daysUntilSeparation(eaos, today)).toBe(324);
+	});
+
+	it('returns negative for past EAOS', () => {
+		const eaos = '2025-05-26' as EaosString;
+		const today = new Date('2026-05-26T12:00:00Z');
+		expect(daysUntilSeparation(eaos, today)).toBe(-365);
+	});
+
+	it('returns 0 for EAOS = today', () => {
+		const eaos = '2026-05-26' as EaosString;
+		const today = new Date('2026-05-26T12:00:00Z');
+		expect(daysUntilSeparation(eaos, today)).toBe(0);
+	});
+
+	it('is timezone-stable: two instants on the same UTC date return the same value', () => {
+		const eaos = '2027-01-01' as EaosString;
+		// 03:00 UTC and 23:00 UTC are the same UTC calendar date (2026-05-26);
+		// UTC anchoring means time-of-day must not shift the day count (F-C-9).
+		const early = new Date('2026-05-26T03:00:00Z');
+		const late = new Date('2026-05-26T23:00:00Z');
+		expect(daysUntilSeparation(eaos, early)).toBe(daysUntilSeparation(eaos, late));
+	});
+
+	it('handles leap-day arithmetic correctly', () => {
+		const eaos = '2028-03-01' as EaosString;
+		const today = new Date('2028-02-28T12:00:00Z');
+		expect(daysUntilSeparation(eaos, today)).toBe(2); // Feb 29 + Mar 1
 	});
 });

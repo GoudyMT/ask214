@@ -85,3 +85,17 @@ export function parseEaosAtRead(s: string): EaosString {
 	parseEaosCalendar(s); // validation only; throws on invalid
 	return s as EaosString;
 }
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Whole-day count from "today" to the EAOS. Both ends are UTC-anchored (the EAOS
+ * via Date.UTC, "today" via UTC getters) so neither timezone nor time-of-day can
+ * shift the result (F-C-9). Positive = future, negative = past, 0 = today.
+ */
+export function daysUntilSeparation(eaos: EaosString, now = new Date()): number {
+	const { y, m, d } = parseEaosCalendar(eaos);
+	const eaosUTC = Date.UTC(y, m - 1, d);
+	const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+	return Math.round((eaosUTC - todayUTC) / MS_PER_DAY);
+}
