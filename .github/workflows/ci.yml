@@ -42,9 +42,7 @@ jobs:
         run: pnpm run check
 
       - name: Install Playwright browsers
-        # Both chromium + webkit installed per Phase 2 audit T6-B (iOS + Android v1.0 support).
-        # Firefox deferred to v1.1+ smoke (~1% mobile share).
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Unit tests
         run: pnpm run test:unit -- --run
