@@ -44,7 +44,8 @@ export default defineConfig(
 		// mtc rule entries are enabled as each rule is implemented.
 		rules: {
 			'mtc/safelog-no-error': 'error',
-			'mtc/encrypted-store-registry': 'error'
+			'mtc/encrypted-store-registry': 'error',
+			'mtc/no-input-in-error': 'error'
 		}
 	}
 );

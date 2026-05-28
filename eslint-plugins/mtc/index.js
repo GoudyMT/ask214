@@ -10,6 +10,7 @@
  */
 import safelogNoError from './rules/safelog-no-error.js';
 import encryptedStoreRegistry from './rules/encrypted-store-registry.js';
+import noInputInError from './rules/no-input-in-error.js';
 
 export default {
 	meta: {
@@ -18,7 +19,8 @@ export default {
 	},
 	rules: {
 		'safelog-no-error': safelogNoError,
-		'encrypted-store-registry': encryptedStoreRegistry
+		'encrypted-store-registry': encryptedStoreRegistry,
+		'no-input-in-error': noInputInError
 	},
 	configs: {}
 };
