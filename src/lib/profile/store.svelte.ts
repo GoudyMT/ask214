@@ -1,4 +1,5 @@
 import type { ProfileV1 } from './types';
+import { derivePersona, type PersonaFilters } from './persona';
 import { computeRecordHmac, verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
 import { decryptProfileRecord, encryptProfileRecord } from './crypto-boundary';
 import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar } from './sidecars';
@@ -60,12 +61,17 @@ function getRow<T>(
 }
 
 export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = {}) {
-	let _profile: ProfileV1 | null = null;
+	let _profile = $state<ProfileV1 | null>(null);
 
 	return {
-		/** Test-only accessor; production reads go through the persona rune (Milestone I). */
+		/** Test-only accessor; production reads go through the reactive `persona` getter. */
 		_getStateForTest(): ProfileV1 | null {
 			return _profile;
+		},
+
+		/** Reactive persona derived from current profile state (re-runs when load/save mutates it). */
+		get persona(): PersonaFilters {
+			return derivePersona(_profile);
 		},
 
 		async load(): Promise<ProfileV1 | null> {

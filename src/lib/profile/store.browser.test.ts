@@ -176,3 +176,16 @@ describe('ProfileStore.save', () => {
 		if (r0 && r0.status === 'rejected') expect(r0.reason).toBeInstanceOf(OccConflictError);
 	});
 });
+
+describe('ProfileStore.persona', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('derives persona from the current profile state', async () => {
+		const store = createProfileStore(db);
+		expect(store.persona.completeness).toBe('none');
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		expect(store.persona.completeness).toBe('eaos-only');
+	});
+});
