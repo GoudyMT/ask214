@@ -197,6 +197,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 
 					// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.
 					await withStores(db, ['profile', 'profile-hwm', 'keystore'], 'readwrite', (tx) => {
+						// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptProfileRecord, under withWriteLocks.
 						tx.objectStore('profile').put({ id: 0, rec: blob });
 						tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
 						tx.objectStore('keystore').put(updatedKs);

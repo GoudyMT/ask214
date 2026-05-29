@@ -7,23 +7,22 @@ const ruleTester = new RuleTester({
 });
 
 describe('mtc/encrypted-store-registry', () => {
-	it('allows registry reads + unencrypted-store writes, forbids direct encrypted-store writes', () => {
+	it('forbids raw-IDB writes to encrypted stores; allows unencrypted-store writes', () => {
 		expect(() =>
 			ruleTester.run('encrypted-store-registry', rule, {
 				valid: [
 					{ code: "import { ENCRYPTED_STORES } from '$lib/db/registry';" },
-					{ code: "await db.table('profile-hwm').put(sidecar);" },
-					{
-						code: "await db.transaction([profile, meta], 'rw', async () => { await profile.put(ct); });"
-					}
+					// Unencrypted stores are not gated.
+					{ code: "tx.objectStore('profile-hwm').put(sidecar);" },
+					{ code: "tx.objectStore('keystore').put(record);" }
 				],
 				invalid: [
 					{
-						code: "await db.table('profile').put({ ct: rawPlaintext });",
+						code: "tx.objectStore('profile').put({ id: 0, rec });",
 						errors: [{ messageId: 'writeUnsanctioned' }]
 					},
 					{
-						code: "await db.table('profile').add(item);",
+						code: "tx.objectStore('profile').add(item);",
 						errors: [{ messageId: 'writeUnsanctioned' }]
 					}
 				]

@@ -47,5 +47,11 @@ export default defineConfig(
 			'mtc/encrypted-store-registry': 'error',
 			'mtc/no-input-in-error': 'error'
 		}
+	},
+	{
+		// Tests stage encrypted-store fixtures directly; the boundary rule guards
+		// production writes only.
+		files: ['**/*.test.ts', '**/*.browser.test.ts'],
+		rules: { 'mtc/encrypted-store-registry': 'off' }
 	}
 );
