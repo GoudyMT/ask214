@@ -1,4 +1,4 @@
-import { hmacSign } from '../crypto/hmac';
+import { hmacSign, hmacVerify } from '../crypto/hmac';
 
 /**
  * Single HMAC-authenticated keystore record - all security-sensitive crypto
@@ -53,15 +53,32 @@ export function canonicalizeKeystore(r: KeystoreCanonicalInput): Uint8Array {
 }
 
 /**
- * Record HMAC with a NIST SP 800-108-style domain-separation prefix (T6-E), so a
+ * Prefixed canonical bytes that BOTH sign and verify run over. The NIST SP
+ * 800-108-style domain-separation prefix (T6-E) is part of the MAC input, so a
  * keystore-record MAC can never validate against sidecar/broadcast canonical
  * bytes of the same shape.
  */
+function recordHmacInput(r: KeystoreCanonicalInput): Uint8Array<ArrayBuffer> {
+	return new TextEncoder().encode(KEYSTORE_HMAC_PREFIX + canonicalString(r));
+}
+
 export function computeRecordHmac(
 	r: KeystoreCanonicalInput,
 	hmacKey: CryptoKey
 ): Promise<ArrayBuffer> {
-	return hmacSign(hmacKey, new TextEncoder().encode(KEYSTORE_HMAC_PREFIX + canonicalString(r)));
+	return hmacSign(hmacKey, recordHmacInput(r));
+}
+
+/**
+ * Verify half of computeRecordHmac (constant-time via subtle.verify). Consumed
+ * by ProfileStore.load for the fail-closed keystore-record integrity check.
+ */
+export function verifyRecordHmac(
+	r: KeystoreCanonicalInput,
+	hmacKey: CryptoKey,
+	mac: ArrayBuffer
+): Promise<boolean> {
+	return hmacVerify(hmacKey, recordHmacInput(r), mac);
 }
 
 function byteHex(b: Uint8Array): string {

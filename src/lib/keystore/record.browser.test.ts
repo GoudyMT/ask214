@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { canonicalizeKeystore, computeRecordHmac, type KeystoreRecordV1 } from './record';
+import {
+	canonicalizeKeystore,
+	computeRecordHmac,
+	verifyRecordHmac,
+	type KeystoreRecordV1
+} from './record';
 
 let hmacKey: CryptoKey;
 
@@ -64,5 +69,29 @@ describe('computeRecordHmac', () => {
 		const a = await computeRecordHmac(baseRecord, hmacKey);
 		const b = await computeRecordHmac({ ...baseRecord, ivCounter: 999 }, hmacKey);
 		expect(Array.from(new Uint8Array(a))).toEqual(Array.from(new Uint8Array(b)));
+	});
+});
+
+describe('verifyRecordHmac', () => {
+	it('accepts a MAC produced by computeRecordHmac for the same record', async () => {
+		const mac = await computeRecordHmac(baseRecord, hmacKey);
+		expect(await verifyRecordHmac(baseRecord, hmacKey, mac)).toBe(true);
+	});
+
+	it('rejects when a covered field is changed after signing', async () => {
+		const mac = await computeRecordHmac(baseRecord, hmacKey);
+		expect(await verifyRecordHmac({ ...baseRecord, keystoreGeneration: 1 }, hmacKey, mac)).toBe(
+			false
+		);
+	});
+
+	it('rejects a MAC computed over a different record', async () => {
+		const foreign = await computeRecordHmac({ ...baseRecord, keystoreGeneration: 9 }, hmacKey);
+		expect(await verifyRecordHmac(baseRecord, hmacKey, foreign)).toBe(false);
+	});
+
+	it('is unaffected by ivCounter (excluded from the HMAC input)', async () => {
+		const mac = await computeRecordHmac(baseRecord, hmacKey);
+		expect(await verifyRecordHmac({ ...baseRecord, ivCounter: 999 }, hmacKey, mac)).toBe(true);
 	});
 });
