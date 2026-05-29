@@ -149,30 +149,24 @@ describe('ProfileStore.save', () => {
 		if (state) expect(state.generation).toBe(1);
 	});
 
-	it('rejects a stale writer via OCC (expectedLastReadGeneration mismatch)', async () => {
+	it('refuses a save from a stale instance instead of clobbering (auto-OCC / H1)', async () => {
 		const storeA = createProfileStore(db);
 		await storeA.save({ eaos: new TextEncoder().encode('2027-01-01') }); // -> gen 1
+		// storeB never loaded, so its _profile is null (simulates a 2nd tab / post-relock).
 		const storeB = createProfileStore(db);
-		await expect(
-			storeB.save(
-				{ eaos: new TextEncoder().encode('2027-02-02') },
-				{ expectedLastReadGeneration: 0 }
-			)
-		).rejects.toThrow(OccConflictError);
+		await expect(storeB.save({ setupIntent: 'completed' })).rejects.toThrow(OccConflictError);
+		// storeA's data must survive - no silent clobber.
+		const loaded = await storeA.load();
+		expect(loaded).not.toBeNull();
+		if (loaded?.eaos) expect(new TextDecoder().decode(loaded.eaos)).toBe('2027-01-01');
 	});
 
 	it('resolves concurrent first-runs: exactly one succeeds', async () => {
 		const storeA = createProfileStore(db);
 		const storeB = createProfileStore(db);
 		const results = await Promise.allSettled([
-			storeA.save(
-				{ eaos: new TextEncoder().encode('2027-01-01') },
-				{ expectedLastReadGeneration: 0 }
-			),
-			storeB.save(
-				{ eaos: new TextEncoder().encode('2027-02-02') },
-				{ expectedLastReadGeneration: 0 }
-			)
+			storeA.save({ eaos: new TextEncoder().encode('2027-01-01') }),
+			storeB.save({ eaos: new TextEncoder().encode('2027-02-02') })
 		]);
 		const fulfilled = results.filter((r) => r.status === 'fulfilled');
 		const rejected = results.filter((r) => r.status === 'rejected');

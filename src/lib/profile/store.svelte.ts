@@ -45,7 +45,6 @@ export type ProfilePatch = Partial<
 
 export type BroadcastEvent = { type: 'profile-updated' };
 export type ProfileStoreOptions = { onBroadcast?: (e: BroadcastEvent) => void };
-export type SaveOptions = { expectedLastReadGeneration?: number };
 
 type KeystoreRow = KeystoreRecordV1 & { id: number };
 type HwmRow = SignedSidecar<ProfileHwmPayload> & { id: number };
@@ -114,7 +113,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			);
 		},
 
-		async save(patch: ProfilePatch, saveOpts: SaveOptions = {}): Promise<{ generation: number }> {
+		async save(patch: ProfilePatch): Promise<{ generation: number }> {
 			let ks: KeystoreRow | undefined;
 			const result = await withWriteLocks(
 				async () => {
@@ -144,11 +143,13 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						keystore.hmacKeyRef
 					);
 
-					// OCC (merged G4 + concurrent first-run G5): reject a stale writer.
-					if (
-						saveOpts.expectedLastReadGeneration !== undefined &&
-						currentHwm.generation !== saveOpts.expectedLastReadGeneration
-					) {
+					// Auto-OCC (merged G4 + concurrent first-run G5): the expected generation is
+					// whatever this store instance last loaded or wrote (0 if it never loaded). A
+					// mismatch means another writer advanced the HWM, or this instance is stale
+					// (e.g. post-relock / a second tab) - so we reject rather than silently clobber.
+					// Always-on; there is no opt-out token.
+					const expectedGeneration = _profile?.generation ?? 0;
+					if (currentHwm.generation !== expectedGeneration) {
 						throw new OccConflictError();
 					}
 
