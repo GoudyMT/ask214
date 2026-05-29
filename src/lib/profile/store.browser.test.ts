@@ -4,7 +4,8 @@ import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import {
 	createProfileStore,
 	KeystoreNotInitializedError,
-	KeystoreHmacMismatchError
+	KeystoreHmacMismatchError,
+	OccConflictError
 } from './store.svelte';
 import { withStores, reqToPromise } from '../db/schema';
 import { encryptProfileRecord } from './crypto-boundary';
@@ -95,5 +96,89 @@ describe('ProfileStore.load', () => {
 		expect(loaded).not.toBeNull();
 		if (loaded?.eaos) expect(new TextDecoder().decode(loaded.eaos)).toBe('2027-04-15');
 		expect(store._getStateForTest()).not.toBeNull();
+	});
+});
+
+describe('ProfileStore.save', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('persists the body and bumps generation to 1', async () => {
+		const store = createProfileStore(db);
+		const r = await store.save({
+			eaos: new TextEncoder().encode('2027-04-15'),
+			setupIntent: 'completed'
+		});
+		expect(r.generation).toBe(1);
+		const body = await readRow('profile');
+		expect(body).toBeDefined();
+		const hwm = await readRow('profile-hwm');
+		expect(hwm).toBeDefined();
+		expect((hwm?.payload as ProfileHwmPayload).generation).toBe(1);
+	});
+
+	it('roundtrips through save + load', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		const loaded = await store.load();
+		expect(loaded).not.toBeNull();
+		if (loaded?.eaos) expect(new TextDecoder().decode(loaded.eaos)).toBe('2027-04-15');
+	});
+
+	it('bumps the keystore ivCounter', async () => {
+		const before = await readRow('keystore');
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const after = await readRow('keystore');
+		expect(after?.ivCounter as number).toBeGreaterThan(before?.ivCounter as number);
+	});
+
+	it('invokes onBroadcast with profile-updated after the lock releases', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		expect(events).toEqual(['profile-updated']);
+	});
+
+	it('commits the rune inside the lock (state observable post-save)', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		const state = store._getStateForTest();
+		expect(state).not.toBeNull();
+		if (state) expect(state.generation).toBe(1);
+	});
+
+	it('rejects a stale writer via OCC (expectedLastReadGeneration mismatch)', async () => {
+		const storeA = createProfileStore(db);
+		await storeA.save({ eaos: new TextEncoder().encode('2027-01-01') }); // -> gen 1
+		const storeB = createProfileStore(db);
+		await expect(
+			storeB.save(
+				{ eaos: new TextEncoder().encode('2027-02-02') },
+				{ expectedLastReadGeneration: 0 }
+			)
+		).rejects.toThrow(OccConflictError);
+	});
+
+	it('resolves concurrent first-runs: exactly one succeeds', async () => {
+		const storeA = createProfileStore(db);
+		const storeB = createProfileStore(db);
+		const results = await Promise.allSettled([
+			storeA.save(
+				{ eaos: new TextEncoder().encode('2027-01-01') },
+				{ expectedLastReadGeneration: 0 }
+			),
+			storeB.save(
+				{ eaos: new TextEncoder().encode('2027-02-02') },
+				{ expectedLastReadGeneration: 0 }
+			)
+		]);
+		const fulfilled = results.filter((r) => r.status === 'fulfilled');
+		const rejected = results.filter((r) => r.status === 'rejected');
+		expect(fulfilled.length).toBe(1);
+		expect(rejected.length).toBe(1);
+		const r0 = rejected[0];
+		if (r0 && r0.status === 'rejected') expect(r0.reason).toBeInstanceOf(OccConflictError);
 	});
 });

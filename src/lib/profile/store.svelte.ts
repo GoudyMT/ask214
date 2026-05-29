@@ -1,7 +1,8 @@
 import type { ProfileV1 } from './types';
-import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
-import { decryptProfileRecord } from './crypto-boundary';
-import { verifySidecar, type ProfileHwmPayload, type SignedSidecar } from './sidecars';
+import { computeRecordHmac, verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
+import { decryptProfileRecord, encryptProfileRecord } from './crypto-boundary';
+import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar } from './sidecars';
+import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
 
@@ -29,6 +30,23 @@ export class KeystoreHmacMismatchError extends Error {
 	}
 }
 
+/** A write lost an optimistic-concurrency race (HWM generation moved under it). */
+export class OccConflictError extends Error {
+	constructor() {
+		super('E_OCC_CONFLICT');
+		this.name = 'OccConflictError';
+	}
+}
+
+/** Caller-supplied profile edits. The computed fields are owned by save(). */
+export type ProfilePatch = Partial<
+	Omit<ProfileV1, 'schemaVersion' | 'generation' | 'lastSeenAt' | 'setupIntentChangedAt'>
+>;
+
+export type BroadcastEvent = { type: 'profile-updated' };
+export type ProfileStoreOptions = { onBroadcast?: (e: BroadcastEvent) => void };
+export type SaveOptions = { expectedLastReadGeneration?: number };
+
 type KeystoreRow = KeystoreRecordV1 & { id: number };
 type HwmRow = SignedSidecar<ProfileHwmPayload> & { id: number };
 type ProfileRow = { id: number; rec: Uint8Array };
@@ -42,7 +60,7 @@ function getRow<T>(
 	);
 }
 
-export function createProfileStore(db: IDBDatabase) {
+export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = {}) {
 	let _profile: ProfileV1 | null = null;
 
 	return {
@@ -94,6 +112,105 @@ export function createProfileStore(db: IDBDatabase) {
 					return _profile;
 				}
 			);
+		},
+
+		async save(patch: ProfilePatch, saveOpts: SaveOptions = {}): Promise<{ generation: number }> {
+			let ks: KeystoreRow | undefined;
+			const result = await withWriteLocks(
+				async () => {
+					ks = await getRow<KeystoreRow>(db, 'keystore');
+					if (!ks) throw new KeystoreNotInitializedError();
+					return ks.keystoreGeneration;
+				},
+				async () => {
+					if (!ks) throw new KeystoreNotInitializedError();
+					const keystore = ks;
+
+					// Fail-closed: verify before trusting/re-signing (prevents laundering a
+					// tampered keystore into a freshly-valid record).
+					if (
+						!keystore.recordHmac ||
+						!(await verifyRecordHmac(keystore, keystore.hmacKeyRef, keystore.recordHmac))
+					) {
+						throw new KeystoreHmacMismatchError();
+					}
+
+					// Read + verify the current HWM under the single hmacKey.
+					const hwmRow = await getRow<HwmRow>(db, 'profile-hwm');
+					if (!hwmRow) throw new Error('E_HWM_MISSING');
+					const currentHwm = await verifySidecar<ProfileHwmPayload>(
+						'profile-hwm',
+						{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
+						keystore.hmacKeyRef
+					);
+
+					// OCC (merged G4 + concurrent first-run G5): reject a stale writer.
+					if (
+						saveOpts.expectedLastReadGeneration !== undefined &&
+						currentHwm.generation !== saveOpts.expectedLastReadGeneration
+					) {
+						throw new OccConflictError();
+					}
+
+					// Stage the next profile from current state + the caller's patch.
+					const nextGen = currentHwm.generation + 1;
+					const now = Date.now();
+					const base: ProfileV1 = _profile ?? {
+						schemaVersion: 1,
+						generation: 0,
+						lastSeenAt: 0,
+						setupIntent: 'pending',
+						setupIntentChangedAt: null,
+						eaos: null
+					};
+					const nextSetupIntent = patch.setupIntent ?? base.setupIntent;
+					const next: ProfileV1 = {
+						...base,
+						...patch,
+						schemaVersion: 1,
+						generation: nextGen,
+						lastSeenAt: Math.max(now, base.lastSeenAt),
+						setupIntent: nextSetupIntent,
+						setupIntentChangedAt:
+							nextSetupIntent !== base.setupIntent ? now : base.setupIntentChangedAt
+					};
+
+					// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
+					const ivBump = bumpIvCounter(keystore.ivCounter);
+					const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
+					updatedKs.recordHmac = await computeRecordHmac(updatedKs, keystore.hmacKeyRef);
+
+					// Encrypt with the UPDATED keystore state bound into the AAD.
+					const blob = await encryptProfileRecord(next, updatedKs);
+
+					// Sign the new HWM under the single hmacKey.
+					const newHwm = await signSidecar(
+						'profile-hwm',
+						{
+							generation: nextGen,
+							keystoreGeneration: keystore.keystoreGeneration,
+							epoch: keystore.epoch,
+							ts: now
+						},
+						keystore.hmacKeyRef
+					);
+
+					// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.
+					await withStores(db, ['profile', 'profile-hwm', 'keystore'], 'readwrite', (tx) => {
+						tx.objectStore('profile').put({ id: 0, rec: blob });
+						tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
+						tx.objectStore('keystore').put(updatedKs);
+					});
+
+					// Commit the rune INSIDE the lock (concurrent tabs are blocked).
+					_profile = next;
+					return { generation: nextGen };
+				}
+			);
+
+			// Broadcast AFTER the lock releases (ADR-012).
+			opts.onBroadcast?.({ type: 'profile-updated' });
+			return result;
 		}
 	};
 }
