@@ -63,6 +63,20 @@ function getRow<T>(
 
 export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = {}) {
 	let _profile = $state<ProfileV1 | null>(null);
+	let saveInFlight = false;
+	let pendingRelock = false;
+
+	// Synchronous relock core: zeroize the in-memory profile bytes, drop the reference,
+	// then signal relocked. Shared by relockSync() (the sync pagehide/freeze handlers),
+	// lock() (async UI / idle / cross-tab), and the deferred-relock path at save() exit.
+	// Zeroizes BEFORE nulling (memory-hygiene order; spec section 11).
+	function relockNow(): void {
+		if (_profile) {
+			freezeRelock(_profile as unknown as Record<string, unknown>);
+			_profile = null;
+		}
+		opts.onBroadcast?.({ type: 'relocked' });
+	}
 
 	return {
 		/** Test-only accessor; production reads go through the reactive `persona` getter. */
@@ -75,18 +89,24 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			return derivePersona(_profile);
 		},
 
-		/**
-		 * Synchronous relock: zeroize the in-memory profile bytes, drop the reference,
-		 * then signal relocked. MUST stay sync (no await) - the app-init layer calls this
-		 * from the pagehide/freeze handlers, which cannot await before scrubbing. App-init
-		 * also owns any cross-tab bus.publish of the relock.
-		 */
+		/** Synchronous relock for the pagehide/freeze handlers (wired at app-init) - no await. */
 		relockSync(): void {
-			if (_profile) {
-				freezeRelock(_profile as unknown as Record<string, unknown>);
-				_profile = null;
+			relockNow();
+		},
+
+		/**
+		 * Async relock for the Settings "Lock" button, idle timeout, and cross-tab signal
+		 * (all wired at app-init). If a save is in flight, the relock is DEFERRED until that
+		 * save finishes (F-3-C-11: never interrupt an in-progress encrypt/write); otherwise it
+		 * runs immediately. Resolves immediately so callers may `await store.lock()`.
+		 */
+		lock(): Promise<void> {
+			if (saveInFlight) {
+				pendingRelock = true;
+			} else {
+				relockNow();
 			}
-			opts.onBroadcast?.({ type: 'relocked' });
+			return Promise.resolve();
 		},
 
 		async load(): Promise<ProfileV1 | null> {
@@ -135,105 +155,115 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		},
 
 		async save(patch: ProfilePatch): Promise<{ generation: number }> {
-			let ks: KeystoreRow | undefined;
-			const result = await withWriteLocks(
-				async () => {
-					ks = await getRow<KeystoreRow>(db, 'keystore');
-					if (!ks) throw new KeystoreNotInitializedError();
-					return ks.keystoreGeneration;
-				},
-				async () => {
-					if (!ks) throw new KeystoreNotInitializedError();
-					const keystore = ks;
+			saveInFlight = true;
+			try {
+				let ks: KeystoreRow | undefined;
+				const result = await withWriteLocks(
+					async () => {
+						ks = await getRow<KeystoreRow>(db, 'keystore');
+						if (!ks) throw new KeystoreNotInitializedError();
+						return ks.keystoreGeneration;
+					},
+					async () => {
+						if (!ks) throw new KeystoreNotInitializedError();
+						const keystore = ks;
 
-					// Fail-closed: verify before trusting/re-signing (prevents laundering a
-					// tampered keystore into a freshly-valid record).
-					if (
-						!keystore.recordHmac ||
-						!(await verifyRecordHmac(keystore, keystore.hmacKeyRef, keystore.recordHmac))
-					) {
-						throw new KeystoreHmacMismatchError();
-					}
+						// Fail-closed: verify before trusting/re-signing (prevents laundering a
+						// tampered keystore into a freshly-valid record).
+						if (
+							!keystore.recordHmac ||
+							!(await verifyRecordHmac(keystore, keystore.hmacKeyRef, keystore.recordHmac))
+						) {
+							throw new KeystoreHmacMismatchError();
+						}
 
-					// Read + verify the current HWM under the single hmacKey.
-					const hwmRow = await getRow<HwmRow>(db, 'profile-hwm');
-					if (!hwmRow) throw new Error('E_HWM_MISSING');
-					const currentHwm = await verifySidecar<ProfileHwmPayload>(
-						'profile-hwm',
-						{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
-						keystore.hmacKeyRef
-					);
+						// Read + verify the current HWM under the single hmacKey.
+						const hwmRow = await getRow<HwmRow>(db, 'profile-hwm');
+						if (!hwmRow) throw new Error('E_HWM_MISSING');
+						const currentHwm = await verifySidecar<ProfileHwmPayload>(
+							'profile-hwm',
+							{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
+							keystore.hmacKeyRef
+						);
 
-					// Auto-OCC (merged G4 + concurrent first-run G5): the expected generation is
-					// whatever this store instance last loaded or wrote (0 if it never loaded). A
-					// mismatch means another writer advanced the HWM, or this instance is stale
-					// (e.g. post-relock / a second tab) - so we reject rather than silently clobber.
-					// Always-on; there is no opt-out token.
-					const expectedGeneration = _profile?.generation ?? 0;
-					if (currentHwm.generation !== expectedGeneration) {
-						throw new OccConflictError();
-					}
+						// Auto-OCC (merged G4 + concurrent first-run G5): the expected generation is
+						// whatever this store instance last loaded or wrote (0 if it never loaded). A
+						// mismatch means another writer advanced the HWM, or this instance is stale
+						// (e.g. post-relock / a second tab) - so we reject rather than silently clobber.
+						// Always-on; there is no opt-out token.
+						const expectedGeneration = _profile?.generation ?? 0;
+						if (currentHwm.generation !== expectedGeneration) {
+							throw new OccConflictError();
+						}
 
-					// Stage the next profile from current state + the caller's patch.
-					const nextGen = currentHwm.generation + 1;
-					const now = Date.now();
-					const base: ProfileV1 = _profile ?? {
-						schemaVersion: 1,
-						generation: 0,
-						lastSeenAt: 0,
-						setupIntent: 'pending',
-						setupIntentChangedAt: null,
-						eaos: null
-					};
-					const nextSetupIntent = patch.setupIntent ?? base.setupIntent;
-					const next: ProfileV1 = {
-						...base,
-						...patch,
-						schemaVersion: 1,
-						generation: nextGen,
-						lastSeenAt: Math.max(now, base.lastSeenAt),
-						setupIntent: nextSetupIntent,
-						setupIntentChangedAt:
-							nextSetupIntent !== base.setupIntent ? now : base.setupIntentChangedAt
-					};
-
-					// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
-					const ivBump = bumpIvCounter(keystore.ivCounter);
-					const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
-					updatedKs.recordHmac = await computeRecordHmac(updatedKs, keystore.hmacKeyRef);
-
-					// Encrypt with the UPDATED keystore state bound into the AAD.
-					const blob = await encryptProfileRecord(next, updatedKs);
-
-					// Sign the new HWM under the single hmacKey.
-					const newHwm = await signSidecar(
-						'profile-hwm',
-						{
+						// Stage the next profile from current state + the caller's patch.
+						const nextGen = currentHwm.generation + 1;
+						const now = Date.now();
+						const base: ProfileV1 = _profile ?? {
+							schemaVersion: 1,
+							generation: 0,
+							lastSeenAt: 0,
+							setupIntent: 'pending',
+							setupIntentChangedAt: null,
+							eaos: null
+						};
+						const nextSetupIntent = patch.setupIntent ?? base.setupIntent;
+						const next: ProfileV1 = {
+							...base,
+							...patch,
+							schemaVersion: 1,
 							generation: nextGen,
-							keystoreGeneration: keystore.keystoreGeneration,
-							epoch: keystore.epoch,
-							ts: now
-						},
-						keystore.hmacKeyRef
-					);
+							lastSeenAt: Math.max(now, base.lastSeenAt),
+							setupIntent: nextSetupIntent,
+							setupIntentChangedAt:
+								nextSetupIntent !== base.setupIntent ? now : base.setupIntentChangedAt
+						};
 
-					// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.
-					await withStores(db, ['profile', 'profile-hwm', 'keystore'], 'readwrite', (tx) => {
-						// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptProfileRecord, under withWriteLocks.
-						tx.objectStore('profile').put({ id: 0, rec: blob });
-						tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
-						tx.objectStore('keystore').put(updatedKs);
-					});
+						// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
+						const ivBump = bumpIvCounter(keystore.ivCounter);
+						const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
+						updatedKs.recordHmac = await computeRecordHmac(updatedKs, keystore.hmacKeyRef);
 
-					// Commit the rune INSIDE the lock (concurrent tabs are blocked).
-					_profile = next;
-					return { generation: nextGen };
+						// Encrypt with the UPDATED keystore state bound into the AAD.
+						const blob = await encryptProfileRecord(next, updatedKs);
+
+						// Sign the new HWM under the single hmacKey.
+						const newHwm = await signSidecar(
+							'profile-hwm',
+							{
+								generation: nextGen,
+								keystoreGeneration: keystore.keystoreGeneration,
+								epoch: keystore.epoch,
+								ts: now
+							},
+							keystore.hmacKeyRef
+						);
+
+						// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.
+						await withStores(db, ['profile', 'profile-hwm', 'keystore'], 'readwrite', (tx) => {
+							// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptProfileRecord, under withWriteLocks.
+							tx.objectStore('profile').put({ id: 0, rec: blob });
+							tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
+							tx.objectStore('keystore').put(updatedKs);
+						});
+
+						// Commit the rune INSIDE the lock (concurrent tabs are blocked).
+						_profile = next;
+						return { generation: nextGen };
+					}
+				);
+
+				// Broadcast AFTER the lock releases (ADR-012).
+				opts.onBroadcast?.({ type: 'profile-updated' });
+				return result;
+			} finally {
+				saveInFlight = false;
+				// A relock requested during the save was deferred; run it now the write is done.
+				if (pendingRelock) {
+					pendingRelock = false;
+					relockNow();
 				}
-			);
-
-			// Broadcast AFTER the lock releases (ADR-012).
-			opts.onBroadcast?.({ type: 'profile-updated' });
-			return result;
+			}
 		}
 	};
 }

@@ -216,3 +216,34 @@ describe('ProfileStore.relockSync', () => {
 		if (eaosRef) expect(eaosRef.every((b) => b === 0)).toBe(true);
 	});
 });
+
+describe('ProfileStore.lock + deferred relock', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('lock() drops state and emits relocked when no save is in flight', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		await store.lock();
+		expect(store._getStateForTest()).toBeNull();
+		expect(events).toContain('relocked');
+	});
+
+	it('defers a relock requested mid-save until the save commits, then relocks', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		const savePromise = store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const lockPromise = store.lock(); // requested while the save is still in flight
+		await Promise.all([savePromise, lockPromise]);
+
+		// the save committed (gen 1 persisted) BEFORE the deferred relock ran
+		const hwm = await readRow('profile-hwm');
+		expect((hwm?.payload as ProfileHwmPayload).generation).toBe(1);
+		// the relock then dropped in-memory state
+		expect(store._getStateForTest()).toBeNull();
+		// order: data saved + announced, THEN relocked
+		expect(events).toEqual(['profile-updated', 'relocked']);
+	});
+});
