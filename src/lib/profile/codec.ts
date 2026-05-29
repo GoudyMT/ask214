@@ -18,7 +18,14 @@ export class ProfileSchemaError extends Error {
 }
 
 function b64encode(b: Uint8Array): string {
-	return btoa(String.fromCharCode(...b));
+	// Chunked to keep the spread well under engine argument limits; one unbounded
+	// `String.fromCharCode(...b)` overflows the stack on large fields.
+	const CHUNK = 0x8000;
+	let bin = '';
+	for (let i = 0; i < b.length; i += CHUNK) {
+		bin += String.fromCharCode(...b.subarray(i, i + CHUNK));
+	}
+	return btoa(bin);
 }
 
 function b64decode(s: string): Uint8Array {

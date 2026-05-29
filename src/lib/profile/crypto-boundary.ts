@@ -45,7 +45,9 @@ export async function encryptProfileRecord(
 	const plaintext = new Uint8Array(encodeProfile(profile));
 	const iv = new Uint8Array(IV_LENGTH);
 	crypto.getRandomValues(iv);
-	const aad = await buildProfileAad(keystore, profile.generation, profile.schemaVersion);
+	// Bind the schema-version CONSTANT (same source decrypt uses), so encrypt and
+	// decrypt can never drift on this AAD field at a future schema bump.
+	const aad = await buildProfileAad(keystore, profile.generation, SCHEMA_VERSION);
 	const ct = await aesGcmEncrypt(keystore.dataKeyRef, iv, aad, plaintext);
 
 	const out = new Uint8Array(iv.length + ct.length);

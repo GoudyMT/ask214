@@ -76,4 +76,11 @@ describe('encodeProfile / decodeProfile', () => {
 		const b = encodeProfile(baseProfile);
 		expect(Array.from(a)).toEqual(Array.from(b));
 	});
+
+	it('roundtrips a large field without overflowing (b64 chunking)', () => {
+		const big = new Uint8Array(100_000).fill(65);
+		const dec = decodeProfile(encodeProfile({ ...baseProfile, rate: big }));
+		expect(dec.rate).toBeDefined();
+		expect(dec.rate?.length).toBe(100_000);
+	});
 });
