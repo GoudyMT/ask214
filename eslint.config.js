@@ -7,6 +7,7 @@ import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import ts from 'typescript-eslint';
 import svelteConfig from './svelte.config.js';
+import mtc from './eslint-plugins/mtc/index.js';
 
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
@@ -37,8 +38,20 @@ export default defineConfig(
 		}
 	},
 	{
+		plugins: { mtc },
 		// Override or add rule settings here, such as:
 		// 'svelte/button-has-type': 'error'
-		rules: {}
+		// mtc rule entries are enabled as each rule is implemented.
+		rules: {
+			'mtc/safelog-no-error': 'error',
+			'mtc/encrypted-store-registry': 'error',
+			'mtc/no-input-in-error': 'error'
+		}
+	},
+	{
+		// Tests stage encrypted-store fixtures directly; the boundary rule guards
+		// production writes only.
+		files: ['**/*.test.ts', '**/*.browser.test.ts'],
+		rules: { 'mtc/encrypted-store-registry': 'off' }
 	}
 );
