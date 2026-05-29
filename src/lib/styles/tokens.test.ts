@@ -16,6 +16,11 @@ describe('design tokens', () => {
 		expect(tokens.color.accent).toMatch(/^#[0-9a-f]{6}$/i);
 	});
 
+	it('provides a surface containment color distinct from the background', () => {
+		expect(tokens.color.surface).toMatch(/^#[0-9a-f]{6}$/i);
+		expect(tokens.color.surface).not.toBe(tokens.color.bg);
+	});
+
 	it('provides spacing tokens as pixel strings ordered xs < s < m < l < xl < xxl', () => {
 		const parse = (px: string) => Number.parseInt(px.replace('px', ''), 10);
 		const order = ['xs', 's', 'm', 'l', 'xl', 'xxl'] as const;

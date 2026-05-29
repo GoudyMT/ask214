@@ -7,12 +7,15 @@
  * - bg + fg: ~14.6:1
  * - bg + fgMuted: ~7.5:1
  * - bg + accent: ~5.4:1
+ * - surface + fg: ~13:1; surface + fgMuted: ~6:1 (surface is one notch lighter
+ *   than bg for card/containment; text on it still exceeds 4.5:1)
  * All exceed the 4.5:1 normal-text threshold.
  */
 
 export const tokens = {
 	color: {
 		bg: '#0f1419',
+		surface: '#171d24',
 		fg: '#e6e8eb',
 		fgMuted: '#9aa3ad',
 		accent: '#4a90e2',
