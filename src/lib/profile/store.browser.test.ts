@@ -175,6 +175,17 @@ describe('ProfileStore.save', () => {
 		const r0 = rejected[0];
 		if (r0 && r0.status === 'rejected') expect(r0.reason).toBeInstanceOf(OccConflictError);
 	});
+
+	it('seeds lastSeenAt to ~now on first save (not clamped) and keeps it monotonic', async () => {
+		const store = createProfileStore(db);
+		const before = Date.now();
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const ls1 = store._getStateForTest()?.lastSeenAt ?? 0;
+		expect(ls1).toBeGreaterThanOrEqual(before);
+		await store.save({ setupIntent: 'completed' });
+		const ls2 = store._getStateForTest()?.lastSeenAt ?? 0;
+		expect(ls2).toBeGreaterThanOrEqual(ls1);
+	});
 });
 
 describe('ProfileStore.persona', () => {

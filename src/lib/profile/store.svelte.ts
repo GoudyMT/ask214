@@ -7,6 +7,7 @@ import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
 import { freezeRelock } from './lifecycle';
+import { updateLastSeen } from './clock';
 
 /**
  * ProfileStore - the orchestration layer over keystore + encryption boundary +
@@ -213,7 +214,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							...patch,
 							schemaVersion: 1,
 							generation: nextGen,
-							lastSeenAt: Math.max(now, base.lastSeenAt),
+							lastSeenAt: updateLastSeen(base.lastSeenAt, now),
 							setupIntent: nextSetupIntent,
 							setupIntentChangedAt:
 								nextSetupIntent !== base.setupIntent ? now : base.setupIntentChangedAt

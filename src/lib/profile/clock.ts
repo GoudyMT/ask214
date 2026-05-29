@@ -23,6 +23,9 @@ const BACKWARD_GRACE_MS = 24 * 3600 * 1000;
  *   The new mark: never below `prev` (monotonic), never above `prev + MAX_FUTURE_MS`.
  */
 export function updateLastSeen(prev: number, now: number = Date.now()): number {
+	// Uninitialized (first write): no prior mark to cap against, so take `now` as-is.
+	// Without this, a 0 prev would clamp the first lastSeenAt to 0 + MAX_FUTURE_MS (~1971).
+	if (prev <= 0) return now;
 	const capped = Math.min(now, prev + MAX_FUTURE_MS);
 	return Math.max(prev, capped);
 }

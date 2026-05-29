@@ -19,6 +19,11 @@ describe('updateLastSeen', () => {
 	it('MAX_FUTURE_MS is 1 year', () => {
 		expect(MAX_FUTURE_MS).toBe(365 * 86_400_000);
 	});
+
+	it('returns now when prev is uninitialized (0): no prior mark to cap against', () => {
+		const now = 1_700_000_000_000; // far beyond MAX_FUTURE_MS; must NOT clamp to ~1971
+		expect(updateLastSeen(0, now)).toBe(now);
+	});
 });
 
 describe('isClockBackward', () => {
