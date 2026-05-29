@@ -6,6 +6,7 @@ import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar 
 import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
+import { freezeRelock } from './lifecycle';
 
 /**
  * ProfileStore - the orchestration layer over keystore + encryption boundary +
@@ -44,7 +45,7 @@ export type ProfilePatch = Partial<
 	Omit<ProfileV1, 'schemaVersion' | 'generation' | 'lastSeenAt' | 'setupIntentChangedAt'>
 >;
 
-export type BroadcastEvent = { type: 'profile-updated' };
+export type BroadcastEvent = { type: 'profile-updated' | 'relocked' };
 export type ProfileStoreOptions = { onBroadcast?: (e: BroadcastEvent) => void };
 
 type KeystoreRow = KeystoreRecordV1 & { id: number };
@@ -72,6 +73,20 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		/** Reactive persona derived from current profile state (re-runs when load/save mutates it). */
 		get persona(): PersonaFilters {
 			return derivePersona(_profile);
+		},
+
+		/**
+		 * Synchronous relock: zeroize the in-memory profile bytes, drop the reference,
+		 * then signal relocked. MUST stay sync (no await) - the app-init layer calls this
+		 * from the pagehide/freeze handlers, which cannot await before scrubbing. App-init
+		 * also owns any cross-tab bus.publish of the relock.
+		 */
+		relockSync(): void {
+			if (_profile) {
+				freezeRelock(_profile as unknown as Record<string, unknown>);
+				_profile = null;
+			}
+			opts.onBroadcast?.({ type: 'relocked' });
 		},
 
 		async load(): Promise<ProfileV1 | null> {

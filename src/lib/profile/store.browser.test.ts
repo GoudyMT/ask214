@@ -189,3 +189,30 @@ describe('ProfileStore.persona', () => {
 		expect(store.persona.completeness).toBe('eaos-only');
 	});
 });
+
+describe('ProfileStore.relockSync', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('drops profile state and emits relocked synchronously', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		expect(store._getStateForTest()).not.toBeNull();
+
+		const r = store.relockSync();
+		expect(r).toBeUndefined(); // synchronous void return
+		expect(store._getStateForTest()).toBeNull();
+		expect(events).toContain('relocked');
+	});
+
+	it('zeroizes the in-memory profile bytes before dropping the reference', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const eaosRef = store._getStateForTest()?.eaos ?? null;
+		expect(eaosRef).not.toBeNull();
+		store.relockSync();
+		if (eaosRef) expect(eaosRef.every((b) => b === 0)).toBe(true);
+	});
+});
