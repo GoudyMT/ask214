@@ -258,3 +258,56 @@ describe('ProfileStore.lock + deferred relock', () => {
 		expect(events).toEqual(['profile-updated', 'relocked']);
 	});
 });
+
+describe('ProfileStore.clockBackward', () => {
+	async function stageFutureProfile(future: number): Promise<void> {
+		const { record } = await bootstrapLocalKeystore(db);
+		const profile: ProfileV1 = {
+			schemaVersion: 1,
+			generation: 1,
+			lastSeenAt: future,
+			setupIntent: 'completed',
+			setupIntentChangedAt: future,
+			eaos: null
+		};
+		const blob = await encryptProfileRecord(profile, record);
+		const hwm = await signSidecar(
+			'profile-hwm',
+			{ generation: 1, keystoreGeneration: 0, epoch: 0, ts: future },
+			record.hmacKeyRef
+		);
+		await withStores(db, ['profile', 'profile-hwm'], 'readwrite', (tx) => {
+			tx.objectStore('profile').put({ id: 0, rec: blob });
+			tx.objectStore('profile-hwm').put({ id: 0, ...hwm });
+		});
+	}
+
+	it('is true when the stored lastSeenAt is in the future (clock moved backward)', async () => {
+		await stageFutureProfile(Date.now() + 48 * 3600 * 1000); // 2 days ahead -> past the 24h grace
+		const store = createProfileStore(db);
+		await store.load();
+		expect(store.clockBackward).toBe(true);
+	});
+
+	it('is false for a recent lastSeenAt', async () => {
+		await bootstrapLocalKeystore(db);
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		expect(store.clockBackward).toBe(false);
+	});
+
+	it('clearClockBackward resets lastSeenAt to now, durably clearing the warning', async () => {
+		await stageFutureProfile(Date.now() + 48 * 3600 * 1000);
+		const store = createProfileStore(db);
+		await store.load();
+		expect(store.clockBackward).toBe(true);
+
+		await store.clearClockBackward();
+		expect(store.clockBackward).toBe(false);
+
+		// durable: a fresh store reloading sees the lowered mark, no warning
+		const store2 = createProfileStore(db);
+		await store2.load();
+		expect(store2.clockBackward).toBe(false);
+	});
+});

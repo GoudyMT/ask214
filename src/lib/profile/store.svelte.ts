@@ -7,7 +7,8 @@ import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
 import { freezeRelock } from './lifecycle';
-import { updateLastSeen } from './clock';
+import { updateLastSeen, isClockBackward } from './clock';
+import { safeLog } from '../log/safelog';
 
 /**
  * ProfileStore - the orchestration layer over keystore + encryption boundary +
@@ -79,7 +80,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		opts.onBroadcast?.({ type: 'relocked' });
 	}
 
-	return {
+	const api = {
 		/** Test-only accessor; production reads go through the reactive `persona` getter. */
 		_getStateForTest(): ProfileV1 | null {
 			return _profile;
@@ -108,6 +109,23 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 				relockNow();
 			}
 			return Promise.resolve();
+		},
+
+		/** Reactive backward-clock signal: true when the stored lastSeenAt sits in the future past the grace window. */
+		get clockBackward(): boolean {
+			return _profile ? isClockBackward(_profile.lastSeenAt) : false;
+		},
+
+		/**
+		 * "I fixed my clock" reset. Forcibly lower lastSeenAt to now - the ONE sanctioned
+		 * retreat of the monotonic mark - and persist it durably (else the stored future mark
+		 * re-triggers the warning on every reload). No-op when no profile is loaded.
+		 */
+		async clearClockBackward(): Promise<void> {
+			if (!_profile) return;
+			_profile.lastSeenAt = Date.now();
+			safeLog({ code: 'E_CLOCK_BACKWARD' });
+			await api.save({});
 		},
 
 		async load(): Promise<ProfileV1 | null> {
@@ -267,4 +285,6 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			}
 		}
 	};
+
+	return api;
 }
