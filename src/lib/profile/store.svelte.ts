@@ -6,7 +6,7 @@ import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar 
 import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
-import { freezeRelock } from './lifecycle';
+import { freezeRelock, cloneField } from './lifecycle';
 import { updateLastSeen, isClockBackward } from './clock';
 import { safeLog } from '../log/safelog';
 
@@ -67,6 +67,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	let _profile = $state<ProfileV1 | null>(null);
 	let saveInFlight = false;
 	let pendingRelock = false;
+	let relockEpoch = 0;
 
 	// Synchronous relock core: zeroize the in-memory profile bytes, drop the reference,
 	// then signal relocked. Shared by relockSync() (the sync pagehide/freeze handlers),
@@ -77,6 +78,9 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			freezeRelock(_profile as unknown as Record<string, unknown>);
 			_profile = null;
 		}
+		// Bump the relock epoch so an in-flight save can detect a relock happened during it
+		// and skip re-populating _profile afterward (PII-residency guard, L1).
+		relockEpoch++;
 		opts.onBroadcast?.({ type: 'relocked' });
 	}
 
@@ -175,6 +179,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 
 		async save(patch: ProfilePatch): Promise<{ generation: number }> {
 			saveInFlight = true;
+			const relockAtStart = relockEpoch;
 			try {
 				let ks: KeystoreRow | undefined;
 				const result = await withWriteLocks(
@@ -238,6 +243,15 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 								nextSetupIntent !== base.setupIntent ? now : base.setupIntentChangedAt
 						};
 
+						// Decouple the staged record from _profile: deep-copy byte fields so a concurrent
+						// relockSync() zeroizing _profile in place cannot corrupt this record before it is
+						// encoded + encrypted (L1 corruption guard).
+						for (const k of Object.keys(next)) {
+							(next as Record<string, unknown>)[k] = cloneField(
+								(next as Record<string, unknown>)[k]
+							);
+						}
+
 						// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
 						const ivBump = bumpIvCounter(keystore.ivCounter);
 						const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
@@ -266,8 +280,13 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							tx.objectStore('keystore').put(updatedKs);
 						});
 
-						// Commit the rune INSIDE the lock (concurrent tabs are blocked).
-						_profile = next;
+						// Commit the rune INSIDE the lock (concurrent tabs are blocked) - but ONLY if
+						// no relock happened during this save. A sync relockSync() (pagehide/freeze)
+						// mid-save must not be undone by re-populating decrypted PII; the IDB write
+						// above still persisted, so the user's edit is not lost (L1 residency guard).
+						if (relockEpoch === relockAtStart) {
+							_profile = next;
+						}
 						return { generation: nextGen };
 					}
 				);

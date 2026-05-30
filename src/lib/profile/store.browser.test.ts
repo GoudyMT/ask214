@@ -311,3 +311,54 @@ describe('ProfileStore.clockBackward', () => {
 		expect(store2.clockBackward).toBe(false);
 	});
 });
+
+describe('ProfileStore relock-vs-save race (L1)', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('a sync relock during an in-flight save does NOT re-populate _profile (PII residency)', async () => {
+		const store = createProfileStore(db);
+		// Start a save, then synchronously relock while it is mid-flight (simulates a
+		// pagehide/freeze handler firing during the save's await).
+		const p = store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		store.relockSync();
+		await p;
+		// Memory must stay relocked - the resuming save must not re-populate decrypted PII.
+		expect(store._getStateForTest()).toBeNull();
+		// But the write persisted durably (the user's edit is not lost).
+		const store2 = createProfileStore(db);
+		const loaded = await store2.load();
+		expect(loaded).not.toBeNull();
+		if (loaded?.eaos) expect(new TextDecoder().decode(loaded.eaos)).toBe('2027-04-15');
+	});
+
+	it('a normal save (no relock) still commits _profile', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		expect(store._getStateForTest()).not.toBeNull();
+	});
+
+	it('decouples the staged record from _profile so a mid-save relock cannot corrupt carried fields', async () => {
+		const store = createProfileStore(db);
+		// gen1 carries eaos + rank.
+		await store.save({
+			eaos: new TextEncoder().encode('2027-04-15'),
+			rank: new TextEncoder().encode('E5')
+		});
+		const oldRank = store._getStateForTest()?.rank ?? null;
+		expect(oldRank).not.toBeNull();
+
+		// A second save carries `rank` over (not in the patch).
+		await store.save({ eaos: new TextEncoder().encode('2028-01-01') });
+		const newRank = store._getStateForTest()?.rank ?? null;
+		expect(newRank).not.toBeNull();
+
+		// The carried field must be a FRESH copy, not shared with the prior profile - so a
+		// concurrent relock zeroizing the prior _profile's arrays in place (simulated here by
+		// fill(0)) cannot reach into the staged record that gets encrypted.
+		expect(newRank).not.toBe(oldRank);
+		if (oldRank) oldRank.fill(0);
+		if (newRank) expect(new TextDecoder().decode(newRank)).toBe('E5');
+	});
+});

@@ -23,6 +23,25 @@ export function zeroizeField(v: unknown): void {
 }
 
 /**
+ * Deep-copy a single ProfileV1 field value so the result shares no memory with the
+ * source. Counterpart to zeroizeField: save() uses it to decouple the staged record
+ * from the live _profile, so a concurrent relock's in-place zeroize cannot corrupt it.
+ *
+ * Args:
+ *   v: a ProfileV1 field value (Uint8Array | Uint8Array[] | primitive).
+ *
+ * Returns:
+ *   A fresh deep copy for byte fields; the value unchanged for primitives.
+ */
+export function cloneField(v: unknown): unknown {
+	if (v instanceof Uint8Array) return new Uint8Array(v);
+	if (Array.isArray(v)) {
+		return v.map((item) => (item instanceof Uint8Array ? new Uint8Array(item) : item));
+	}
+	return v;
+}
+
+/**
  * Registry of sensitive <input> elements to clear on relock. A Set (not a
  * WeakSet) so it is iterable for scrubbing; registration returns an unregister
  * fn the caller invokes on unmount to keep the set leak-free.
