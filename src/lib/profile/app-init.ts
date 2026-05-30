@@ -1,6 +1,7 @@
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import type { CapabilityResult, CapabilityCause } from '../crypto/capability';
 import type { ProfileBus } from '../broadcast/bus';
+import type { IdleTimer, IdleTimerOptions } from './idle-timer';
 
 /**
  * App-init orchestration for the profile subsystem. Pure + dependency-injected so the
@@ -70,4 +71,66 @@ export function subscribeBusToStore(store: BusWiredStore, bus: ProfileBus): () =
 			void store.load();
 		}
 	});
+}
+
+/** User-input events that reset the idle countdown. Passive listeners (no scroll-jank). */
+const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'touchstart'] as const;
+
+/** Structural contract the lifecycle wiring needs from the store. */
+type LifecycleStore = {
+	relockSync: () => void;
+	load: () => Promise<unknown>;
+	lock: () => Promise<void>;
+};
+
+/** Injected so the whole path is unit-testable; +layout supplies window, document, the real
+ * createIdleTimer, and the 15-minute threshold. */
+type ProfileLifecycleDeps = {
+	win: EventTarget;
+	doc: EventTarget;
+	createIdleTimer: (opts: IdleTimerOptions) => IdleTimer;
+	idleThresholdMs: number;
+};
+
+/**
+ * Wire Page-Lifecycle + idle relock behavior onto the injected event targets. `pagehide`
+ * (window) and `freeze` (document) relock the in-memory profile - zeroize PII - when the page
+ * is backgrounded or frozen; a persisted `pageshow` (BFCache restore) re-reads from IDB; user
+ * input resets an idle timer that locks the store after `idleThresholdMs`. Returns a teardown
+ * that stops the timer and removes every listener.
+ *
+ * Source: Phase 2 spec section 8 (idle timer) + section 11 (relock / memory hygiene).
+ */
+export function installProfileLifecycle(
+	store: LifecycleStore,
+	deps: ProfileLifecycleDeps
+): () => void {
+	const idle = deps.createIdleTimer({
+		thresholdMs: deps.idleThresholdMs,
+		onIdle: () => void store.lock()
+	});
+
+	const onHide = (): void => store.relockSync();
+	const onShow = (e: Event): void => {
+		if ((e as PageTransitionEvent).persisted) void store.load();
+	};
+	const onActivity = (): void => idle.recordActivity();
+
+	deps.win.addEventListener('pagehide', onHide);
+	deps.doc.addEventListener('freeze', onHide);
+	deps.win.addEventListener('pageshow', onShow);
+	for (const ev of ACTIVITY_EVENTS) {
+		deps.win.addEventListener(ev, onActivity, { passive: true });
+	}
+	idle.start();
+
+	return () => {
+		idle.stop();
+		deps.win.removeEventListener('pagehide', onHide);
+		deps.doc.removeEventListener('freeze', onHide);
+		deps.win.removeEventListener('pageshow', onShow);
+		for (const ev of ACTIVITY_EVENTS) {
+			deps.win.removeEventListener(ev, onActivity);
+		}
+	};
 }
