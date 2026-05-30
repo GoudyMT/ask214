@@ -307,3 +307,6 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 
 	return api;
 }
+
+/** The wired profile-store instance shape (the createProfileStore return value). */
+export type ProfileStore = ReturnType<typeof createProfileStore>;

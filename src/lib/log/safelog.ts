@@ -28,6 +28,7 @@ export type ErrorCode =
 	| 'E_KDF_CALIBRATION'
 	| 'E_PASSPHRASE_WEAK'
 	| 'E_UNSUPPORTED_BROWSER'
+	| 'E_INIT_FAILED'
 	| 'E_CLOCK_BACKWARD'
 	| 'E_TIMEOUT'
 	| 'E_TEST'; // dev/test only; stripped in prod build via type-check

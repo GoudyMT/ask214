@@ -2,13 +2,51 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import AppGate from '$lib/components/AppGate.svelte';
+	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
+	import { initProfileApp } from '$lib/profile/app-init';
+	import { createProfileStore } from '$lib/profile/store.svelte';
+	import { checkBrowserSupport } from '$lib/crypto/capability';
+	import { openMtcDb } from '$lib/db/schema';
+	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
+	import { safeLog } from '$lib/log/safelog';
 
 	let { children } = $props();
+
+	// App-wide profile container, set synchronously (setContext must run during component
+	// init). Populated by the client-only app-init in onMount below. The shell renders for
+	// every status except `unsupported`; store-dependent UI reads `app.store` once ready.
+	const app = $state<ProfileApp>({ status: 'loading', store: null, cause: null });
+	setProfileApp(app);
 
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/service-worker.js', { type: 'module' });
 		}
+
+		// Client-only: IndexedDB + crypto are browser-only. Store created bus-less here;
+		// L2b adds the cross-tab bus + lifecycle/idle wiring.
+		void initProfileApp({
+			checkSupport: checkBrowserSupport,
+			openDb: () => openMtcDb(),
+			bootstrap: bootstrapLocalKeystore,
+			createStore: (db) => createProfileStore(db)
+		})
+			.then((result) => {
+				if (result.status === 'unsupported') {
+					app.cause = result.cause;
+					app.status = 'unsupported';
+				} else {
+					app.store = result.store;
+					app.status = 'ready';
+				}
+			})
+			.catch(() => {
+				// Hard init failure past the capability gate (e.g. a tampered keystore failing
+				// load()). Opaque log only (no PII). The app shell stays usable; a dedicated
+				// init-error / recovery surface is deferred to v1.1 (see Settings "Wipe" L5).
+				safeLog({ code: 'E_INIT_FAILED' });
+			});
 	});
 </script>
 
@@ -18,31 +56,33 @@
 	<meta name="color-scheme" content="dark light" />
 </svelte:head>
 
-<a class="skip-link" href="#main-content">Skip to content</a>
+<AppGate {app}>
+	<a class="skip-link" href="#main-content">Skip to content</a>
 
-<header>
-	<nav aria-label="Primary">
-		<a href={resolve('/')} class="brand">Transition Companion</a>
-		<ul>
-			<li><a href={resolve('/about')}>About</a></li>
-		</ul>
-	</nav>
-</header>
+	<header>
+		<nav aria-label="Primary">
+			<a href={resolve('/')} class="brand">Transition Companion</a>
+			<ul>
+				<li><a href={resolve('/about')}>About</a></li>
+			</ul>
+		</nav>
+	</header>
 
-<main id="main-content">
-	{@render children()}
-</main>
+	<main id="main-content">
+		{@render children()}
+	</main>
 
-<footer>
-	<p>
-		Independent open-source project. Not affiliated with the US Department of Defense, the
-		Department of Veterans Affairs, or any branch of the US military.
-	</p>
-	<p>
-		<a href={resolve('/about')}>About</a> &middot;
-		<a href="https://github.com/GoudyMT/military-transition-companion" rel="external">Source</a>
-	</p>
-</footer>
+	<footer>
+		<p>
+			Independent open-source project. Not affiliated with the US Department of Defense, the
+			Department of Veterans Affairs, or any branch of the US military.
+		</p>
+		<p>
+			<a href={resolve('/about')}>About</a> &middot;
+			<a href="https://github.com/GoudyMT/military-transition-companion" rel="external">Source</a>
+		</p>
+	</footer>
+</AppGate>
 
 <style>
 	/* Lock #4: sticky header (pure CSS, no JS). Background + z-index prevent */
