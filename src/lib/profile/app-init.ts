@@ -1,5 +1,6 @@
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import type { CapabilityResult, CapabilityCause } from '../crypto/capability';
+import type { ProfileBus } from '../broadcast/bus';
 
 /**
  * App-init orchestration for the profile subsystem. Pure + dependency-injected so the
@@ -47,4 +48,26 @@ export async function initProfileApp<S extends LoadableStore>(
 	const store = deps.createStore(db);
 	await store.load();
 	return { status: 'ready', store, db };
+}
+
+/** Minimal structural contract the cross-tab wiring needs from the store. */
+type BusWiredStore = { relockSync: () => void; load: () => Promise<unknown> };
+
+/**
+ * Wire a cross-tab bus to a store. A `relocked` signal from another tab relocks this tab's
+ * in-memory profile immediately; a `profile-updated` signal re-reads from IDB (load is itself
+ * fail-closed + verified, so a spoofed same-origin signal can at worst trigger a harmless
+ * re-read). Returns the unsubscribe fn for teardown on +layout destroy. DOM-free + bus-
+ * abstracted so it is testable with a real BroadcastChannel pair.
+ *
+ * Source: Phase 2 spec section 7 (cross-tab coordination) + ADR-012 v1.0 scope.
+ */
+export function subscribeBusToStore(store: BusWiredStore, bus: ProfileBus): () => void {
+	return bus.subscribe((signal) => {
+		if (signal.type === 'relocked') {
+			store.relockSync();
+		} else if (signal.type === 'profile-updated') {
+			void store.load();
+		}
+	});
 }
