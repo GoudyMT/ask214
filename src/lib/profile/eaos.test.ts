@@ -5,6 +5,7 @@ import {
 	validateEaosAtInput,
 	parseEaosAtRead,
 	daysUntilSeparation,
+	encodeEaos,
 	type EaosString
 } from './eaos';
 
@@ -171,5 +172,20 @@ describe('daysUntilSeparation', () => {
 		const eaos = '2028-03-01' as EaosString;
 		const today = new Date('2028-02-28T12:00:00Z');
 		expect(daysUntilSeparation(eaos, today)).toBe(2); // Feb 29 + Mar 1
+	});
+});
+
+describe('encodeEaos', () => {
+	it('encodes an EAOS string to UTF-8 bytes that decode back to the same string', () => {
+		const eaos = validateEaosAtInput('2027-04-30', new Date('2026-05-26T12:00:00Z'));
+		const bytes = encodeEaos(eaos);
+		expect(bytes).toBeInstanceOf(Uint8Array);
+		expect(new TextDecoder().decode(bytes)).toBe('2027-04-30');
+	});
+
+	it('produces bytes the read path (parseEaosAtRead) accepts unchanged', () => {
+		const eaos = validateEaosAtInput('2025-12-01', new Date('2026-05-26T12:00:00Z'));
+		const bytes = encodeEaos(eaos);
+		expect(parseEaosAtRead(new TextDecoder().decode(bytes))).toBe('2025-12-01');
 	});
 });

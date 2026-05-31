@@ -86,6 +86,15 @@ export function parseEaosAtRead(s: string): EaosString {
 	return s as EaosString;
 }
 
+/**
+ * Encode a validated EAOS string to UTF-8 bytes for at-rest storage. ProfileV1.eaos is a
+ * Uint8Array (so zeroizeField can wipe it on relock); this is the exact inverse of the
+ * read-path decode (`new TextDecoder().decode(...)`) in derivePersona.
+ */
+export function encodeEaos(eaos: EaosString): Uint8Array {
+	return new TextEncoder().encode(eaos);
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /**
