@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EaosInput from '$lib/components/EaosInput.svelte';
+	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import {
 		validateEaosAtInput,
@@ -14,6 +15,7 @@
 	let draft = $state('');
 	let error = $state<string | null>(null);
 	let saving = $state(false);
+	let unlocking = $state(false);
 
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
@@ -69,6 +71,21 @@
 			saving = false;
 		}
 	}
+
+	async function lock(): Promise<void> {
+		await app.store?.lock();
+	}
+
+	async function unlock(): Promise<void> {
+		const store = app.store;
+		if (!store) return;
+		unlocking = true;
+		try {
+			await store.load();
+		} finally {
+			unlocking = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -78,35 +95,47 @@
 <h1>Settings</h1>
 
 {#if app.status === 'ready'}
-	<section class="settings-section" aria-labelledby="timeline-heading">
-		<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
+	{#if app.store?.locked}
+		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
+	{:else}
+		<section class="settings-section" aria-labelledby="timeline-heading">
+			<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
 
-		{#if editing}
-			<form class="settings-edit" onsubmit={(e) => void save(e)}>
-				<EaosInput
-					value={draft}
-					{error}
-					onchange={onInput}
-					label="Separation date (EAOS)"
-					hint="Your End of Active Obligated Service - the date your current obligation ends."
-				/>
-				<div class="settings-edit__actions">
-					<button class="settings-save" type="submit" disabled={saving}>Save</button>
-					<button class="settings-cancel" type="button" onclick={cancel}>Cancel</button>
+			{#if editing}
+				<form class="settings-edit" onsubmit={(e) => void save(e)}>
+					<EaosInput
+						value={draft}
+						{error}
+						onchange={onInput}
+						label="Separation date (EAOS)"
+						hint="Your End of Active Obligated Service - the date your current obligation ends."
+					/>
+					<div class="settings-edit__actions">
+						<button class="settings-save" type="submit" disabled={saving}>Save</button>
+						<button class="settings-cancel" type="button" onclick={cancel}>Cancel</button>
+					</div>
+				</form>
+			{:else}
+				<div class="settings-row">
+					<div class="settings-row__field">
+						<span class="settings-row__label">Separation date (EAOS)</span>
+						<span class="settings-row__value">{currentEaos ?? 'Not set'}</span>
+					</div>
+					<button class="settings-row__change" type="button" onclick={startEdit}>
+						{currentEaos ? 'Change' : 'Add'}
+					</button>
 				</div>
-			</form>
-		{:else}
-			<div class="settings-row">
-				<div class="settings-row__field">
-					<span class="settings-row__label">Separation date (EAOS)</span>
-					<span class="settings-row__value">{currentEaos ?? 'Not set'}</span>
-				</div>
-				<button class="settings-row__change" type="button" onclick={startEdit}>
-					{currentEaos ? 'Change' : 'Add'}
-				</button>
-			</div>
-		{/if}
-	</section>
+			{/if}
+		</section>
+
+		<section class="settings-section" aria-labelledby="privacy-heading">
+			<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
+			<button class="settings-lock" type="button" onclick={() => void lock()}>Lock</button>
+			<p class="settings-hint">
+				Clears your profile from this screen. Use Unlock to view it again.
+			</p>
+		</section>
+	{/if}
 {/if}
 
 <style>
@@ -119,6 +148,10 @@
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-l);
 		padding: var(--space-l);
+	}
+
+	.settings-section + .settings-section {
+		margin-top: var(--space-l);
 	}
 
 	.settings-section__heading {
@@ -202,5 +235,27 @@
 		font: inherit;
 		text-decoration: underline;
 		cursor: pointer;
+	}
+
+	/* Secondary/protective CTA (primitive 15): border + fg text, not destructive. */
+	.settings-lock {
+		padding: var(--space-s) var(--space-l);
+		background: none;
+		color: var(--color-fg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-m);
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.settings-lock:hover {
+		border-color: var(--color-fg-muted);
+	}
+
+	.settings-hint {
+		margin: var(--space-s) 0 0;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
 	}
 </style>

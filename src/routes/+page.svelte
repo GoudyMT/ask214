@@ -14,7 +14,7 @@
 	/>
 </svelte:head>
 
-{#if app.status === 'ready' && app.store?.persona.completeness === 'none'}
+{#if app.status === 'ready' && !app.store?.locked && app.store?.persona.completeness === 'none'}
 	<SetupCTA />
 {/if}
 
