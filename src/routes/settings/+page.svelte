@@ -169,7 +169,7 @@
 				<button class="wipe-dialog__cancel" type="button" onclick={() => wipeDialog?.close()}>
 					Cancel
 				</button>
-				<button class="danger-cta" type="button" onclick={() => void confirmErase()}>
+				<button class="wipe-dialog__erase" type="button" onclick={() => void confirmErase()}>
 					Erase everything
 				</button>
 			</div>
@@ -345,14 +345,32 @@
 		gap: var(--space-m);
 	}
 
+	/* Cancel is the prominent, focused default (filled primary) so the safe choice is the
+	   obvious one - accidental-wipe defense, especially as the profile grows. */
 	.wipe-dialog__cancel {
 		padding: var(--space-s) var(--space-l);
-		background: none;
-		color: var(--color-fg);
-		border: 1px solid var(--color-border);
+		background: var(--color-accent);
+		color: var(--color-bg);
+		border: none;
 		border-radius: var(--radius-m);
 		font: inherit;
 		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.wipe-dialog__cancel:hover {
+		background: var(--color-accent-muted);
+	}
+
+	/* Destructive confirm de-emphasized (quiet danger text): available, but low-salience so it
+	   takes deliberate aim rather than a reflexive click. */
+	.wipe-dialog__erase {
+		padding: var(--space-s);
+		background: none;
+		border: none;
+		color: var(--color-danger);
+		font: inherit;
+		text-decoration: underline;
 		cursor: pointer;
 	}
 </style>
