@@ -396,3 +396,32 @@ describe('ProfileStore.locked', () => {
 		expect(store.locked).toBe(false);
 	});
 });
+
+describe('ProfileStore.wipe', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('clears all encrypted stores and resets in-memory state', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+
+		await store.wipe();
+
+		expect(await readRow('keystore')).toBeUndefined();
+		expect(await readRow('profile')).toBeUndefined();
+		expect(await readRow('profile-hwm')).toBeUndefined();
+		expect(store._getStateForTest()).toBeNull();
+		expect(store.locked).toBe(false);
+		expect(store.persona.completeness).toBe('none');
+	});
+
+	it('leaves the DB in a first-run state (a subsequent load throws KeystoreNotInitialized)', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+
+		await store.wipe();
+
+		await expect(store.load()).rejects.toThrow(KeystoreNotInitializedError);
+	});
+});

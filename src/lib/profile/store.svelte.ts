@@ -321,6 +321,22 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					relockNow();
 				}
 			}
+		},
+
+		/**
+		 * Destroy all local data: clear the encrypted stores (keys + profile + HWM), reset the
+		 * profile-exists flag, then relock memory. The store is intentionally unusable afterward
+		 * (no keystore) - the caller reloads to bootstrap a fresh first-run. v1.0 alternative to
+		 * profile export (master spec section 7.6).
+		 */
+		async wipe(): Promise<void> {
+			await withStores(db, ['keystore', 'profile', 'profile-hwm'], 'readwrite', (tx) => {
+				tx.objectStore('keystore').clear();
+				tx.objectStore('profile').clear();
+				tx.objectStore('profile-hwm').clear();
+			});
+			hasProfile = false;
+			relockNow();
 		}
 	};
 
