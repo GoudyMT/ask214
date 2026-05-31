@@ -362,3 +362,37 @@ describe('ProfileStore relock-vs-save race (L1)', () => {
 		if (newRank) expect(new TextDecoder().decode(newRank)).toBe('E5');
 	});
 });
+
+describe('ProfileStore.locked', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('is false on a freshly-bootstrapped DB (never set up, not locked)', async () => {
+		const store = createProfileStore(db);
+		await store.load(); // generation 0 -> null
+		expect(store.locked).toBe(false);
+	});
+
+	it('is false while a profile is loaded in memory', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		expect(store.locked).toBe(false);
+	});
+
+	it('is true after relock when a profile exists in storage', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		store.relockSync();
+		expect(store.locked).toBe(true);
+	});
+
+	it('is false again after unlock (reload)', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		store.relockSync();
+		expect(store.locked).toBe(true);
+		await store.load();
+		expect(store.locked).toBe(false);
+	});
+});

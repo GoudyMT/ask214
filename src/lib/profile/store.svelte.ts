@@ -68,6 +68,9 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	let saveInFlight = false;
 	let pendingRelock = false;
 	let relockEpoch = 0;
+	// True once a profile body exists in storage (generation >= 1). Retained across relock
+	// (the encrypted record still exists), so `locked` can distinguish relocked from never-set-up.
+	let hasProfile = false;
 
 	// Synchronous relock core: zeroize the in-memory profile bytes, drop the reference,
 	// then signal relocked. Shared by relockSync() (the sync pagehide/freeze handlers),
@@ -121,6 +124,15 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		},
 
 		/**
+		 * Reactive locked signal: a profile exists in storage but not in memory (relocked).
+		 * Distinguishes "locked - unlock to view" from "never set up" (both have _profile null).
+		 * Unlock is a re-load (load() re-decrypts from the local key; no passphrase in v1.0).
+		 */
+		get locked(): boolean {
+			return hasProfile && _profile === null;
+		},
+
+		/**
 		 * "I fixed my clock" reset. Forcibly lower lastSeenAt to now - the ONE sanctioned
 		 * retreat of the monotonic mark - and persist it durably (else the stored future mark
 		 * re-triggers the warning on every reload). No-op when no profile is loaded.
@@ -165,6 +177,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					// First run: generation 0 = keystore exists, no profile body written yet.
 					if (hwm.generation === 0) {
 						_profile = null;
+						hasProfile = false;
 						return null;
 					}
 
@@ -172,6 +185,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					const profRow = await getRow<ProfileRow>(db, 'profile');
 					if (!profRow) throw new Error('E_PROFILE_BODY_MISSING');
 					_profile = await decryptProfileRecord(profRow.rec, keystore, hwm.generation);
+					hasProfile = true;
 					return _profile;
 				}
 			);
@@ -279,6 +293,11 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
 							tx.objectStore('keystore').put(updatedKs);
 						});
+
+						// A profile body now exists in storage (generation >= 1). Record it so the
+						// locked signal can tell "relocked - unlock to view" from "never set up" even
+						// after a relock nulls _profile.
+						hasProfile = true;
 
 						// Commit the rune INSIDE the lock (concurrent tabs are blocked) - but ONLY if
 						// no relock happened during this save. A sync relockSync() (pagehide/freeze)
