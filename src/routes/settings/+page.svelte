@@ -1,0 +1,206 @@
+<script lang="ts">
+	import EaosInput from '$lib/components/EaosInput.svelte';
+	import { getProfileApp } from '$lib/profile/context';
+	import {
+		validateEaosAtInput,
+		encodeEaos,
+		EaosFormatError,
+		type EaosCause
+	} from '$lib/profile/eaos';
+
+	const app = getProfileApp();
+
+	let editing = $state(false);
+	let draft = $state('');
+	let error = $state<string | null>(null);
+	let saving = $state(false);
+
+	// PII-free, user-facing copy per validation cause (matches the wizard).
+	const ERROR_COPY: Record<EaosCause, string> = {
+		format: 'Please enter your separation date.',
+		'year-range': 'Enter a date within about 15 years from today.',
+		month: 'Please enter a valid date.',
+		day: 'Please enter a valid date.'
+	};
+
+	// Current stored EAOS (string form) via the derived persona, or null when unset.
+	const currentEaos = $derived.by(() => {
+		const p = app.store?.persona;
+		return p && p.completeness !== 'none' ? p.eaos : null;
+	});
+
+	function startEdit(): void {
+		draft = currentEaos ?? '';
+		error = null;
+		editing = true;
+	}
+
+	function cancel(): void {
+		editing = false;
+		error = null;
+	}
+
+	function onInput(next: string): void {
+		draft = next;
+		error = null;
+	}
+
+	async function save(e: SubmitEvent): Promise<void> {
+		e.preventDefault();
+		const store = app.store;
+		if (!store) return;
+
+		let bytes: Uint8Array;
+		try {
+			bytes = encodeEaos(validateEaosAtInput(draft));
+		} catch (err) {
+			if (err instanceof EaosFormatError) {
+				error = ERROR_COPY[err.cause];
+				return;
+			}
+			throw err;
+		}
+
+		saving = true;
+		try {
+			await store.save({ eaos: bytes });
+			editing = false;
+		} finally {
+			saving = false;
+		}
+	}
+</script>
+
+<svelte:head>
+	<title>Settings</title>
+</svelte:head>
+
+<h1>Settings</h1>
+
+{#if app.status === 'ready'}
+	<section class="settings-section" aria-labelledby="timeline-heading">
+		<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
+
+		{#if editing}
+			<form class="settings-edit" onsubmit={(e) => void save(e)}>
+				<EaosInput
+					value={draft}
+					{error}
+					onchange={onInput}
+					label="Separation date (EAOS)"
+					hint="Your End of Active Obligated Service - the date your current obligation ends."
+				/>
+				<div class="settings-edit__actions">
+					<button class="settings-save" type="submit" disabled={saving}>Save</button>
+					<button class="settings-cancel" type="button" onclick={cancel}>Cancel</button>
+				</div>
+			</form>
+		{:else}
+			<div class="settings-row">
+				<div class="settings-row__field">
+					<span class="settings-row__label">Separation date (EAOS)</span>
+					<span class="settings-row__value">{currentEaos ?? 'Not set'}</span>
+				</div>
+				<button class="settings-row__change" type="button" onclick={startEdit}>
+					{currentEaos ? 'Change' : 'Add'}
+				</button>
+			</div>
+		{/if}
+	</section>
+{/if}
+
+<style>
+	h1 {
+		margin: 0 0 var(--space-l);
+	}
+
+	.settings-section {
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-l);
+		padding: var(--space-l);
+	}
+
+	.settings-section__heading {
+		margin: 0 0 var(--space-m);
+	}
+
+	.settings-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-m);
+	}
+
+	.settings-row__field {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-xs);
+	}
+
+	.settings-row__label {
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.settings-row__value {
+		color: var(--color-fg);
+	}
+
+	/* Quiet action link (spec 5.5 primitive 15): accent text, underline. */
+	.settings-row__change {
+		flex: none;
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	.settings-edit {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-m);
+	}
+
+	.settings-edit__actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-m);
+	}
+
+	/* Primary CTA (primitive 15): filled accent + bg-colored text. */
+	.settings-save {
+		padding: var(--space-s) var(--space-l);
+		background: var(--color-accent);
+		color: var(--color-bg);
+		border: none;
+		border-radius: var(--radius-m);
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.settings-save:hover {
+		background: var(--color-accent-muted);
+	}
+
+	.settings-save:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+
+	/* Quiet CTA (primitive 15): muted text, underline. */
+	.settings-cancel {
+		padding: var(--space-s);
+		background: none;
+		border: none;
+		color: var(--color-fg-muted);
+		font: inherit;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+</style>
