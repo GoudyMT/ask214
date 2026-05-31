@@ -1,5 +1,4 @@
 import { render } from 'vitest-browser-svelte';
-import { tick } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
 import ClockBackwardBanner from './ClockBackwardBanner.svelte';
 
@@ -19,10 +18,8 @@ describe('ClockBackwardBanner', () => {
 		expect(onfix).toHaveBeenCalledTimes(1);
 	});
 
-	it('hides itself when dismissed (reappears only on a fresh mount/reload)', async () => {
+	it('has no dismiss control (non-dismissible by design - a wrong clock must keep warning)', () => {
 		const { container } = render(ClockBackwardBanner, { props: { onfix: () => {} } });
-		container.querySelector<HTMLButtonElement>('.clock-banner__dismiss')?.click();
-		await tick();
-		expect(container.querySelector('.clock-banner')).toBeNull();
+		expect(container.querySelector('.clock-banner__dismiss')).toBeNull();
 	});
 });

@@ -17,6 +17,7 @@
 	let saving = $state(false);
 	let unlocking = $state(false);
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
+	let clockFixEl = $state<HTMLButtonElement | null>(null);
 
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
@@ -107,6 +108,22 @@
 		// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
 		window.location.reload();
 	}
+
+	// Draw attention to the clock reset while the clock is backward: move focus to it + scroll
+	// it into view (a static --color-danger highlight in CSS does the visual emphasis). No
+	// animation (no-motion brand register). Fires once per backward episode so it does not
+	// repeatedly steal focus.
+	let clockFocused = false;
+	$effect(() => {
+		const backward = app.store?.clockBackward ?? false;
+		if (backward && clockFixEl && !clockFocused) {
+			clockFocused = true;
+			clockFixEl.scrollIntoView({ block: 'center' });
+			clockFixEl.focus();
+		} else if (!backward) {
+			clockFocused = false;
+		}
+	});
 </script>
 
 <svelte:head>
@@ -153,7 +170,12 @@
 					<p class="clock-notice__msg">
 						Your device clock appears to have moved backward - your timeline dates may be off.
 					</p>
-					<button class="clock-notice__fix" type="button" onclick={() => void clearClock()}>
+					<button
+						bind:this={clockFixEl}
+						class="clock-notice__fix"
+						type="button"
+						onclick={() => void clearClock()}
+					>
 						I fixed my clock
 					</button>
 				</div>
@@ -314,11 +336,14 @@
 	}
 
 	/* Clock-backward reset control (spec 5.6): the deliberate "I fixed my clock" reset the
-	   app-wide ClockBackwardBanner's "Fix this" navigates to. */
+	   app-wide ClockBackwardBanner's "Fix this" navigates to. Static --color-danger highlight
+	   + inset bg makes it stand out among settings without animation (no-motion register). */
 	.clock-notice {
 		margin-top: var(--space-m);
-		padding-top: var(--space-m);
-		border-top: 1px solid var(--color-border);
+		padding: var(--space-m);
+		background: var(--color-bg);
+		border-left: 3px solid var(--color-danger);
+		border-radius: var(--radius-m);
 	}
 
 	.clock-notice__msg {
