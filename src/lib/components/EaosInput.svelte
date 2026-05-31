@@ -9,8 +9,8 @@
 	};
 	let { value, label, hint, onchange, error = null, id = 'eaos-input' }: Props = $props();
 
-	const hintId = `${id}-hint`;
-	const errorId = `${id}-error`;
+	const hintId = $derived(`${id}-hint`);
+	const errorId = $derived(`${id}-error`);
 </script>
 
 <!--
