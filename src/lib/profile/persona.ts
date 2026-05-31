@@ -1,5 +1,5 @@
 import type { ProfileV1 } from './types';
-import { parseEaosAtRead, daysUntilSeparation, type EaosString } from './eaos';
+import { parseEaosAtRead, daysUntilSeparation, decodeEaos, type EaosString } from './eaos';
 
 /**
  * Persona is a discriminated union on `completeness`; consumers MUST narrow before
@@ -36,7 +36,7 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 
 	let eaos: EaosString;
 	try {
-		eaos = parseEaosAtRead(new TextDecoder().decode(profile.eaos));
+		eaos = parseEaosAtRead(decodeEaos(profile.eaos));
 	} catch {
 		return { completeness: 'none' };
 	}

@@ -95,6 +95,14 @@ export function encodeEaos(eaos: EaosString): Uint8Array {
 	return new TextEncoder().encode(eaos);
 }
 
+/**
+ * Decode at-rest EAOS bytes back to string form (e.g. the Settings editor's initial value).
+ * Inverse of encodeEaos; calendar-validity re-checking lives in parseEaosAtRead, not here.
+ */
+export function decodeEaos(bytes: Uint8Array): string {
+	return new TextDecoder().decode(bytes);
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /**
