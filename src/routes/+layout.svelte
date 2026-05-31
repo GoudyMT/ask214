@@ -4,14 +4,24 @@
 	import { resolve } from '$app/paths';
 	import AppGate from '$lib/components/AppGate.svelte';
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
-	import { initProfileApp } from '$lib/profile/app-init';
+	import {
+		initProfileApp,
+		subscribeBusToStore,
+		installProfileLifecycle
+	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
+	import { createProfileBus } from '$lib/broadcast/bus';
+	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 
 	let { children } = $props();
+
+	// Auto-lock the in-memory profile after 15 minutes of no user input (memory hygiene;
+	// unlock is a transparent local-key re-decrypt in v1.0).
+	const IDLE_THRESHOLD_MS = 15 * 60 * 1000;
 
 	// App-wide profile container, set synchronously (setContext must run during component
 	// init). Populated by the client-only app-init in onMount below. The shell renders for
@@ -24,22 +34,41 @@
 			navigator.serviceWorker.register('/service-worker.js', { type: 'module' });
 		}
 
-		// Client-only: IndexedDB + crypto are browser-only. Store created bus-less here;
-		// L2b adds the cross-tab bus + lifecycle/idle wiring.
+		// Cross-tab bus: created up front so the store can publish change/relock signals via
+		// its onBroadcast seam, and so a sibling tab's signals reach this tab's store.
+		const bus = createProfileBus();
+		let destroyed = false;
+		let teardownRuntime: (() => void) | null = null;
+
+		// Client-only: IndexedDB + crypto are browser-only.
 		void initProfileApp({
 			checkSupport: checkBrowserSupport,
 			openDb: () => openMtcDb(),
 			bootstrap: bootstrapLocalKeystore,
-			createStore: (db) => createProfileStore(db)
+			createStore: (db) => createProfileStore(db, { onBroadcast: (e) => bus.publish(e) })
 		})
 			.then((result) => {
+				if (destroyed) return;
 				if (result.status === 'unsupported') {
 					app.cause = result.cause;
 					app.status = 'unsupported';
-				} else {
-					app.store = result.store;
-					app.status = 'ready';
+					return;
 				}
+				app.store = result.store;
+				app.status = 'ready';
+
+				// Wire cross-tab + page-lifecycle + idle relock now the store exists.
+				const offBus = subscribeBusToStore(result.store, bus);
+				const offLifecycle = installProfileLifecycle(result.store, {
+					win: window,
+					doc: document,
+					createIdleTimer,
+					idleThresholdMs: IDLE_THRESHOLD_MS
+				});
+				teardownRuntime = () => {
+					offBus();
+					offLifecycle();
+				};
 			})
 			.catch(() => {
 				// Hard init failure past the capability gate (e.g. a tampered keystore failing
@@ -47,6 +76,12 @@
 				// init-error / recovery surface is deferred to v1.1 (see Settings "Wipe" L5).
 				safeLog({ code: 'E_INIT_FAILED' });
 			});
+
+		return () => {
+			destroyed = true;
+			teardownRuntime?.();
+			bus.close();
+		};
 	});
 </script>
 
