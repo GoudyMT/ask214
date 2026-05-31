@@ -16,6 +16,7 @@
 	let error = $state<string | null>(null);
 	let saving = $state(false);
 	let unlocking = $state(false);
+	let wipeDialog = $state<HTMLDialogElement | null>(null);
 
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
@@ -86,6 +87,22 @@
 			unlocking = false;
 		}
 	}
+
+	async function confirmErase(): Promise<void> {
+		const store = app.store;
+		if (!store) return;
+		wipeDialog?.close();
+		await store.wipe();
+		// Defensive: the app stores no PII outside IndexedDB (ADR-004), but wipe also clears
+		// localStorage + Cache Storage for completeness (master spec section 7.6).
+		window.localStorage.clear();
+		if ('caches' in window) {
+			const keys = await window.caches.keys();
+			await Promise.all(keys.map((key) => window.caches.delete(key)));
+		}
+		// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
+		window.location.reload();
+	}
 </script>
 
 <svelte:head>
@@ -134,7 +151,29 @@
 			<p class="settings-hint">
 				Clears your profile from this screen. Use Unlock to view it again.
 			</p>
+
+			<div class="danger-zone">
+				<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
+					Erase all data on this device
+				</button>
+			</div>
 		</section>
+
+		<dialog bind:this={wipeDialog} class="wipe-dialog" aria-labelledby="wipe-dialog-heading">
+			<h2 id="wipe-dialog-heading" class="wipe-dialog__heading">Erase all data on this device?</h2>
+			<p class="wipe-dialog__body">
+				This permanently erases everything stored on this device - your separation date and any
+				profile details. It can't be undone.
+			</p>
+			<div class="wipe-dialog__actions">
+				<button class="wipe-dialog__cancel" type="button" onclick={() => wipeDialog?.close()}>
+					Cancel
+				</button>
+				<button class="danger-cta" type="button" onclick={() => void confirmErase()}>
+					Erase everything
+				</button>
+			</div>
+		</dialog>
 	{/if}
 {/if}
 
@@ -257,5 +296,63 @@
 		margin: var(--space-s) 0 0;
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+
+	/* Danger zone (spec 5.6): visually separated from benign actions above it. */
+	.danger-zone {
+		margin-top: var(--space-l);
+		padding-top: var(--space-m);
+		border-top: 1px solid var(--color-border);
+	}
+
+	/* Destructive CTA (primitive 14/15): danger border + text, never a filled alarm. */
+	.danger-cta {
+		padding: var(--space-s) var(--space-l);
+		background: none;
+		color: var(--color-danger);
+		border: 1px solid var(--color-danger);
+		border-radius: var(--radius-m);
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.wipe-dialog {
+		max-width: 28rem;
+		padding: var(--space-l);
+		background: var(--color-surface);
+		color: var(--color-fg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-l);
+	}
+
+	.wipe-dialog::backdrop {
+		background: rgb(0 0 0 / 0.5);
+	}
+
+	.wipe-dialog__heading {
+		margin: 0 0 var(--space-m);
+	}
+
+	.wipe-dialog__body {
+		margin: 0 0 var(--space-l);
+		color: var(--color-fg-muted);
+	}
+
+	.wipe-dialog__actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: var(--space-m);
+	}
+
+	.wipe-dialog__cancel {
+		padding: var(--space-s) var(--space-l);
+		background: none;
+		color: var(--color-fg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-m);
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
 	}
 </style>
