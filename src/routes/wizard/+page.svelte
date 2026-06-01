@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import EaosInput from '$lib/components/EaosInput.svelte';
 	import { getProfileApp } from '$lib/profile/context';
+	import { OccConflictError } from '$lib/profile/store.svelte';
 	import {
 		validateEaosAtInput,
 		encodeEaos,
@@ -53,6 +54,15 @@
 		try {
 			await store.save({ eaos: bytes, setupIntent: 'completed' });
 			await goto(resolve('/'));
+		} catch (err) {
+			if (err instanceof OccConflictError) {
+				// Another tab set up the profile first. Reload the authoritative state and ask
+				// the user to review + retry (spec section 7 OCC: reload, don't clobber).
+				await store.load();
+				error = 'This was changed in another tab. We reloaded it - please review and save again.';
+				return;
+			}
+			throw err;
 		} finally {
 			saving = false;
 		}

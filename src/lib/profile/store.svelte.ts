@@ -145,9 +145,17 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 */
 		async clearClockBackward(): Promise<void> {
 			if (!_profile) return;
+			const prev = _profile.lastSeenAt;
 			_profile.lastSeenAt = Date.now();
 			safeLog({ code: 'E_CLOCK_BACKWARD' });
-			await api.save({});
+			try {
+				await api.save({});
+			} catch (e) {
+				// Save failed (e.g. OCC / lock timeout): roll the in-memory mark back so the
+				// monotonic invariant is not left violated in memory; the caller surfaces it.
+				if (_profile) _profile.lastSeenAt = prev;
+				throw e;
+			}
 		},
 
 		async load(): Promise<ProfileV1 | null> {

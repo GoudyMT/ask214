@@ -2,6 +2,7 @@
 	import EaosInput from '$lib/components/EaosInput.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
+	import { OccConflictError } from '$lib/profile/store.svelte';
 	import {
 		validateEaosAtInput,
 		encodeEaos,
@@ -18,6 +19,7 @@
 	let unlocking = $state(false);
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
+	let clockError = $state<string | null>(null);
 
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
@@ -69,6 +71,15 @@
 		try {
 			await store.save({ eaos: bytes });
 			editing = false;
+		} catch (err) {
+			if (err instanceof OccConflictError) {
+				// Reload authoritative state; stay in edit mode so the message + input stay visible
+				// (spec section 7 OCC: reload, don't clobber).
+				await store.load();
+				error = 'This was changed in another tab. We reloaded it - please review and save again.';
+				return;
+			}
+			throw err;
 		} finally {
 			saving = false;
 		}
@@ -90,7 +101,14 @@
 	}
 
 	async function clearClock(): Promise<void> {
-		await app.store?.clearClockBackward();
+		clockError = null;
+		try {
+			await app.store?.clearClockBackward();
+		} catch {
+			// Clear failed (e.g. another tab edited concurrently); the store rolled the in-memory
+			// mark back, so the banner/notice correctly stay up. Tell the user they can retry.
+			clockError = 'Could not update right now - please try again.';
+		}
 	}
 
 	async function confirmErase(): Promise<void> {
@@ -179,6 +197,9 @@
 					>
 						I fixed my clock
 					</button>
+					{#if clockError}
+						<p class="clock-notice__error" role="alert">{clockError}</p>
+					{/if}
 				</div>
 			{/if}
 		</section>
