@@ -43,7 +43,7 @@
 		{
 			"name": "SvelteKit nodes",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/*.js",
-			"limit": "5 KB",
+			"limit": "12 KB",
 			"gzip": true
 		}
 	],

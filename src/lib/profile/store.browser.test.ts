@@ -10,6 +10,7 @@ import {
 import { withStores, reqToPromise } from '../db/schema';
 import { encryptProfileRecord } from './crypto-boundary';
 import { signSidecar, SidecarTamperError, type ProfileHwmPayload } from './sidecars';
+import { registerSecureInput } from './lifecycle';
 import type { ProfileV1 } from './types';
 
 type Store = 'keystore' | 'profile-hwm' | 'profile';
@@ -174,5 +175,293 @@ describe('ProfileStore.save', () => {
 		expect(rejected.length).toBe(1);
 		const r0 = rejected[0];
 		if (r0 && r0.status === 'rejected') expect(r0.reason).toBeInstanceOf(OccConflictError);
+	});
+
+	it('seeds lastSeenAt to ~now on first save (not clamped) and keeps it monotonic', async () => {
+		const store = createProfileStore(db);
+		const before = Date.now();
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const ls1 = store._getStateForTest()?.lastSeenAt ?? 0;
+		expect(ls1).toBeGreaterThanOrEqual(before);
+		await store.save({ setupIntent: 'completed' });
+		const ls2 = store._getStateForTest()?.lastSeenAt ?? 0;
+		expect(ls2).toBeGreaterThanOrEqual(ls1);
+	});
+});
+
+describe('ProfileStore.persona', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('derives persona from the current profile state', async () => {
+		const store = createProfileStore(db);
+		expect(store.persona.completeness).toBe('none');
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		expect(store.persona.completeness).toBe('eaos-only');
+	});
+});
+
+describe('ProfileStore.relockSync', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('drops profile state and emits relocked synchronously', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		expect(store._getStateForTest()).not.toBeNull();
+
+		const r = store.relockSync();
+		expect(r).toBeUndefined(); // synchronous void return
+		expect(store._getStateForTest()).toBeNull();
+		expect(events).toContain('relocked');
+	});
+
+	it('zeroizes the in-memory profile bytes before dropping the reference', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const eaosRef = store._getStateForTest()?.eaos ?? null;
+		expect(eaosRef).not.toBeNull();
+		store.relockSync();
+		if (eaosRef) expect(eaosRef.every((b) => b === 0)).toBe(true);
+	});
+});
+
+describe('ProfileStore.lock + deferred relock', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('lock() drops state and emits relocked when no save is in flight', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		await store.lock();
+		expect(store._getStateForTest()).toBeNull();
+		expect(events).toContain('relocked');
+	});
+
+	it('defers a relock requested mid-save until the save commits, then relocks', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		const savePromise = store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const lockPromise = store.lock(); // requested while the save is still in flight
+		await Promise.all([savePromise, lockPromise]);
+
+		// the save committed (gen 1 persisted) BEFORE the deferred relock ran
+		const hwm = await readRow('profile-hwm');
+		expect((hwm?.payload as ProfileHwmPayload).generation).toBe(1);
+		// the relock then dropped in-memory state
+		expect(store._getStateForTest()).toBeNull();
+		// order: data saved + announced, THEN relocked
+		expect(events).toEqual(['profile-updated', 'relocked']);
+	});
+});
+
+describe('ProfileStore.clockBackward', () => {
+	async function stageFutureProfile(future: number): Promise<void> {
+		const { record } = await bootstrapLocalKeystore(db);
+		const profile: ProfileV1 = {
+			schemaVersion: 1,
+			generation: 1,
+			lastSeenAt: future,
+			setupIntent: 'completed',
+			setupIntentChangedAt: future,
+			eaos: null
+		};
+		const blob = await encryptProfileRecord(profile, record);
+		const hwm = await signSidecar(
+			'profile-hwm',
+			{ generation: 1, keystoreGeneration: 0, epoch: 0, ts: future },
+			record.hmacKeyRef
+		);
+		await withStores(db, ['profile', 'profile-hwm'], 'readwrite', (tx) => {
+			tx.objectStore('profile').put({ id: 0, rec: blob });
+			tx.objectStore('profile-hwm').put({ id: 0, ...hwm });
+		});
+	}
+
+	it('is true when the stored lastSeenAt is in the future (clock moved backward)', async () => {
+		await stageFutureProfile(Date.now() + 48 * 3600 * 1000); // 2 days ahead -> past the 24h grace
+		const store = createProfileStore(db);
+		await store.load();
+		expect(store.clockBackward).toBe(true);
+	});
+
+	it('is false for a recent lastSeenAt', async () => {
+		await bootstrapLocalKeystore(db);
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		expect(store.clockBackward).toBe(false);
+	});
+
+	it('clearClockBackward resets lastSeenAt to now, durably clearing the warning', async () => {
+		await stageFutureProfile(Date.now() + 48 * 3600 * 1000);
+		const store = createProfileStore(db);
+		await store.load();
+		expect(store.clockBackward).toBe(true);
+
+		await store.clearClockBackward();
+		expect(store.clockBackward).toBe(false);
+
+		// durable: a fresh store reloading sees the lowered mark, no warning
+		const store2 = createProfileStore(db);
+		await store2.load();
+		expect(store2.clockBackward).toBe(false);
+	});
+
+	it('restores the in-memory lastSeenAt if the clear save fails (OCC), staying backward', async () => {
+		await stageFutureProfile(Date.now() + 48 * 3600 * 1000);
+		const store = createProfileStore(db);
+		await store.load();
+		expect(store.clockBackward).toBe(true);
+		const before = store._getStateForTest()?.lastSeenAt;
+
+		// Another instance advances the generation so our clear's save() loses the OCC race.
+		const other = createProfileStore(db);
+		await other.load();
+		await other.save({ setupIntent: 'completed' });
+
+		await expect(store.clearClockBackward()).rejects.toThrow(OccConflictError);
+		// The lowered mark must be rolled back (not left violating monotonicity in memory).
+		expect(store._getStateForTest()?.lastSeenAt).toBe(before);
+		expect(store.clockBackward).toBe(true);
+	});
+});
+
+describe('ProfileStore relock-vs-save race (L1)', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('a sync relock during an in-flight save does NOT re-populate _profile (PII residency)', async () => {
+		const store = createProfileStore(db);
+		// Start a save, then synchronously relock while it is mid-flight (simulates a
+		// pagehide/freeze handler firing during the save's await).
+		const p = store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		store.relockSync();
+		await p;
+		// Memory must stay relocked - the resuming save must not re-populate decrypted PII.
+		expect(store._getStateForTest()).toBeNull();
+		// But the write persisted durably (the user's edit is not lost).
+		const store2 = createProfileStore(db);
+		const loaded = await store2.load();
+		expect(loaded).not.toBeNull();
+		if (loaded?.eaos) expect(new TextDecoder().decode(loaded.eaos)).toBe('2027-04-15');
+	});
+
+	it('a normal save (no relock) still commits _profile', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		expect(store._getStateForTest()).not.toBeNull();
+	});
+
+	it('decouples the staged record from _profile so a mid-save relock cannot corrupt carried fields', async () => {
+		const store = createProfileStore(db);
+		// gen1 carries eaos + rank.
+		await store.save({
+			eaos: new TextEncoder().encode('2027-04-15'),
+			rank: new TextEncoder().encode('E5')
+		});
+		const oldRank = store._getStateForTest()?.rank ?? null;
+		expect(oldRank).not.toBeNull();
+
+		// A second save carries `rank` over (not in the patch).
+		await store.save({ eaos: new TextEncoder().encode('2028-01-01') });
+		const newRank = store._getStateForTest()?.rank ?? null;
+		expect(newRank).not.toBeNull();
+
+		// The carried field must be a FRESH copy, not shared with the prior profile - so a
+		// concurrent relock zeroizing the prior _profile's arrays in place (simulated here by
+		// fill(0)) cannot reach into the staged record that gets encrypted.
+		expect(newRank).not.toBe(oldRank);
+		if (oldRank) oldRank.fill(0);
+		if (newRank) expect(new TextDecoder().decode(newRank)).toBe('E5');
+	});
+});
+
+describe('ProfileStore.locked', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('is false on a freshly-bootstrapped DB (never set up, not locked)', async () => {
+		const store = createProfileStore(db);
+		await store.load(); // generation 0 -> null
+		expect(store.locked).toBe(false);
+	});
+
+	it('is false while a profile is loaded in memory', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		expect(store.locked).toBe(false);
+	});
+
+	it('is true after relock when a profile exists in storage', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		store.relockSync();
+		expect(store.locked).toBe(true);
+	});
+
+	it('is false again after unlock (reload)', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		store.relockSync();
+		expect(store.locked).toBe(true);
+		await store.load();
+		expect(store.locked).toBe(false);
+	});
+});
+
+describe('ProfileStore.wipe', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('clears all encrypted stores and resets in-memory state', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+
+		await store.wipe();
+
+		expect(await readRow('keystore')).toBeUndefined();
+		expect(await readRow('profile')).toBeUndefined();
+		expect(await readRow('profile-hwm')).toBeUndefined();
+		expect(store._getStateForTest()).toBeNull();
+		expect(store.locked).toBe(false);
+		expect(store.persona.completeness).toBe('none');
+	});
+
+	it('leaves the DB in a first-run state (a subsequent load throws KeystoreNotInitialized)', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+
+		await store.wipe();
+
+		await expect(store.load()).rejects.toThrow(KeystoreNotInitializedError);
+	});
+});
+
+describe('ProfileStore relock DOM scrub', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('scrubs registered secure inputs on relock even when no profile is loaded (wizard path)', () => {
+		const input = document.createElement('input');
+		input.value = '2027-04-15';
+		const unregister = registerSecureInput(input);
+		try {
+			// Never loaded -> _profile is null (first-run wizard, where a typed EAOS lives only in
+			// the DOM input). A pagehide/freeze relock must still clear it.
+			const store = createProfileStore(db);
+			store.relockSync();
+			expect(input.value).toBe('');
+		} finally {
+			unregister();
+		}
 	});
 });

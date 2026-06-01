@@ -1,5 +1,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import SetupCTA from '$lib/components/SetupCTA.svelte';
+	import { getProfileApp } from '$lib/profile/context';
+
+	const app = getProfileApp();
 </script>
 
 <svelte:head>
@@ -9,6 +13,10 @@
 		content="Privacy-first companion for US transitioning service members."
 	/>
 </svelte:head>
+
+{#if app.status === 'ready' && !app.store?.locked && app.store?.persona.completeness === 'none'}
+	<SetupCTA />
+{/if}
 
 <h1>Transition Companion</h1>
 
