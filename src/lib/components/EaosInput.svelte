@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { registerSecureInput } from '../profile/lifecycle';
+
 	type Props = {
 		value: string;
 		label: string;
@@ -11,6 +13,14 @@
 
 	const hintId = $derived(`${id}-hint`);
 	const errorId = $derived(`${id}-error`);
+
+	// Register the live DOM input so a relock (freezeRelock -> scrubSecureInputs) clears any
+	// typed EAOS cleartext from the DOM (spec section 8). The $effect cleanup unregisters on
+	// unmount. The parent's `value` string copy is a separate, accepted/inherent residual.
+	let inputEl = $state<HTMLInputElement | null>(null);
+	$effect(() => {
+		if (inputEl) return registerSecureInput(inputEl);
+	});
 </script>
 
 <!--
@@ -23,6 +33,7 @@
 	<label class="eaos-field__label" for={id}>{label}</label>
 	<p class="eaos-field__hint" id={hintId}>{hint}</p>
 	<input
+		bind:this={inputEl}
 		{id}
 		class="eaos-field__input"
 		class:eaos-field__input--error={error}

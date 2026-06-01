@@ -10,6 +10,7 @@ import {
 import { withStores, reqToPromise } from '../db/schema';
 import { encryptProfileRecord } from './crypto-boundary';
 import { signSidecar, SidecarTamperError, type ProfileHwmPayload } from './sidecars';
+import { registerSecureInput } from './lifecycle';
 import type { ProfileV1 } from './types';
 
 type Store = 'keystore' | 'profile-hwm' | 'profile';
@@ -423,5 +424,26 @@ describe('ProfileStore.wipe', () => {
 		await store.wipe();
 
 		await expect(store.load()).rejects.toThrow(KeystoreNotInitializedError);
+	});
+});
+
+describe('ProfileStore relock DOM scrub', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('scrubs registered secure inputs on relock even when no profile is loaded (wizard path)', () => {
+		const input = document.createElement('input');
+		input.value = '2027-04-15';
+		const unregister = registerSecureInput(input);
+		try {
+			// Never loaded -> _profile is null (first-run wizard, where a typed EAOS lives only in
+			// the DOM input). A pagehide/freeze relock must still clear it.
+			const store = createProfileStore(db);
+			store.relockSync();
+			expect(input.value).toBe('');
+		} finally {
+			unregister();
+		}
 	});
 });

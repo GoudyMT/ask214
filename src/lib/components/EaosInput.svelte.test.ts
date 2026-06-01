@@ -1,6 +1,8 @@
 import { render } from 'vitest-browser-svelte';
+import { tick } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
 import EaosInput from './EaosInput.svelte';
+import { scrubSecureInputs } from '../profile/lifecycle';
 
 const baseProps = {
 	value: '',
@@ -54,5 +56,14 @@ describe('EaosInput', () => {
 		const input = container.querySelector('input');
 		expect(container.querySelector('[role="alert"]')).toBeNull();
 		expect(input?.getAttribute('aria-invalid')).not.toBe('true');
+	});
+
+	it('registers its input so a relock scrub clears the typed value (spec 8 DOM hygiene)', async () => {
+		const { container } = render(EaosInput, { props: { ...baseProps, value: '2027-04-15' } });
+		const input = container.querySelector('input');
+		await tick(); // let the registration $effect run
+		expect(input?.value).toBe('2027-04-15');
+		scrubSecureInputs();
+		expect(input?.value).toBe('');
 	});
 });

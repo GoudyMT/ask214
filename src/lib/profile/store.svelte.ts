@@ -6,7 +6,7 @@ import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar 
 import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
-import { freezeRelock, cloneField } from './lifecycle';
+import { freezeRelock, cloneField, scrubSecureInputs } from './lifecycle';
 import { updateLastSeen, isClockBackward } from './clock';
 import { safeLog } from '../log/safelog';
 
@@ -70,7 +70,9 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	let relockEpoch = 0;
 	// True once a profile body exists in storage (generation >= 1). Retained across relock
 	// (the encrypted record still exists), so `locked` can distinguish relocked from never-set-up.
-	let hasProfile = false;
+	// $state so `locked` recomputes reactively when it flips without a coincident `_profile` write
+	// (e.g. wipe-while-already-locked; first-save interrupted by a mid-save relock).
+	let hasProfile = $state(false);
 
 	// Synchronous relock core: zeroize the in-memory profile bytes, drop the reference,
 	// then signal relocked. Shared by relockSync() (the sync pagehide/freeze handlers),
@@ -80,6 +82,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		if (_profile) {
 			freezeRelock(_profile as unknown as Record<string, unknown>);
 			_profile = null;
+		} else {
+			// No loaded profile (e.g. first-run wizard), but a typed EAOS may still live in a
+			// registered DOM input - scrub it. (freezeRelock already scrubs when _profile exists.)
+			scrubSecureInputs();
 		}
 		// Bump the relock epoch so an in-flight save can detect a relock happened during it
 		// and skip re-populating _profile afterward (PII-residency guard, L1).
