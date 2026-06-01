@@ -22,4 +22,10 @@ describe('ClockBackwardBanner', () => {
 		const { container } = render(ClockBackwardBanner, { props: { onfix: () => {} } });
 		expect(container.querySelector('.clock-banner__dismiss')).toBeNull();
 	});
+
+	it('announces assertively (role="alert", not "status") - it is an integrity warning', () => {
+		const { container } = render(ClockBackwardBanner, { props: { onfix: () => {} } });
+		expect(container.querySelector('[role="alert"]')).not.toBeNull();
+		expect(container.querySelector('[role="status"]')).toBeNull();
+	});
 });

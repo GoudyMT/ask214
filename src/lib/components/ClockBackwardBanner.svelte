@@ -22,7 +22,7 @@
 				stroke-linejoin="round"
 			/>
 		</svg>
-		<p class="clock-banner__msg" role="status">
+		<p class="clock-banner__msg" role="alert">
 			Your device clock appears to have moved backward - your timeline dates may be off.
 		</p>
 		<button class="clock-banner__fix" type="button" onclick={onfix}>Fix this</button>

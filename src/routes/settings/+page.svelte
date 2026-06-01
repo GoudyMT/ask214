@@ -167,13 +167,14 @@
 
 			{#if app.store?.clockBackward}
 				<div class="clock-notice">
-					<p class="clock-notice__msg">
+					<p id="clock-notice-msg" class="clock-notice__msg">
 						Your device clock appears to have moved backward - your timeline dates may be off.
 					</p>
 					<button
 						bind:this={clockFixEl}
 						class="clock-notice__fix"
 						type="button"
+						aria-describedby="clock-notice-msg"
 						onclick={() => void clearClock()}
 					>
 						I fixed my clock
@@ -196,9 +197,14 @@
 			</div>
 		</section>
 
-		<dialog bind:this={wipeDialog} class="wipe-dialog" aria-labelledby="wipe-dialog-heading">
+		<dialog
+			bind:this={wipeDialog}
+			class="wipe-dialog"
+			aria-labelledby="wipe-dialog-heading"
+			aria-describedby="wipe-dialog-body"
+		>
 			<h2 id="wipe-dialog-heading" class="wipe-dialog__heading">Erase all data on this device?</h2>
-			<p class="wipe-dialog__body">
+			<p id="wipe-dialog-body" class="wipe-dialog__body">
 				This permanently erases everything stored on this device - your separation date and any
 				profile details. It can't be undone.
 			</p>
