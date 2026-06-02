@@ -2,3 +2,9 @@ allowBuilds:
   esbuild: true
   sharp: false
   workerd: false
+
+# Force the patched tmp across the dependency tree (transitive via @lhci/cli).
+# GHSA-ph9p-34f9-6g65 (Path Traversal, high). Floor pin - future patches satisfy it.
+# Retire when @lhci/cli bundles tmp>=0.2.6 natively (Dependabot will surface it).
+overrides:
+  tmp: '>=0.2.6'
