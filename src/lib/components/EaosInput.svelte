@@ -75,6 +75,14 @@
 		font: inherit;
 	}
 
+	/* The native date-picker calendar glyph renders dark and is near-invisible on the dark
+	   input background. Invert it to light (matches --color-fg) so it reads clearly and signals
+	   it is clickable. Webkit pseudo-element covers our v1.0 targets (Chromium + Safari). */
+	.eaos-field__input::-webkit-calendar-picker-indicator {
+		filter: invert(1);
+		cursor: pointer;
+	}
+
 	.eaos-field__input:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
