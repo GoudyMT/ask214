@@ -17,17 +17,29 @@ afterEach(async () => {
 	opened = [];
 });
 
-describe('openMtcDb schema v1', () => {
-	it('opens at version 1 with exactly the 3 v1.0 stores', async () => {
+describe('openMtcDb schema (v2)', () => {
+	it('opens at the current DB_VERSION with exactly the registered stores', async () => {
 		const db = await freshDb();
 		expect(db.version).toBe(DB_VERSION);
-		expect(Array.from(db.objectStoreNames).sort()).toEqual(['keystore', 'profile', 'profile-hwm']);
+		expect(Array.from(db.objectStoreNames).sort()).toEqual([
+			'keystore',
+			'profile',
+			'profile-hwm',
+			'timeline-state',
+			'timeline-state-hwm'
+		]);
 	});
 
 	it('does NOT create the deferred journal/meta stores', async () => {
 		const db = await freshDb();
 		expect(db.objectStoreNames.contains('journal')).toBe(false);
 		expect(db.objectStoreNames.contains('meta')).toBe(false);
+	});
+
+	it('provisions the timeline-state stores (DB_VERSION 2 upgrade)', async () => {
+		const db = await freshDb();
+		expect(db.objectStoreNames.contains('timeline-state')).toBe(true);
+		expect(db.objectStoreNames.contains('timeline-state-hwm')).toBe(true);
 	});
 
 	it('each store uses keyPath "id" (single self-row pattern)', async () => {
@@ -39,7 +51,13 @@ describe('openMtcDb schema v1', () => {
 	});
 
 	it('STORES enumerates exactly the registered stores', () => {
-		expect([...STORES].sort()).toEqual(['keystore', 'profile', 'profile-hwm']);
+		expect([...STORES].sort()).toEqual([
+			'keystore',
+			'profile',
+			'profile-hwm',
+			'timeline-state',
+			'timeline-state-hwm'
+		]);
 	});
 });
 
