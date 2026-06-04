@@ -137,6 +137,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 				);
 
 				await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
+					// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord, under withWriteLocks.
 					tx.objectStore('timeline-state').put({ id: 0, rec: blob });
 					tx.objectStore('timeline-state-hwm').put({ id: 0, ...newHwm });
 				});

@@ -12,8 +12,9 @@ describe('mtc/encrypted-store-registry', () => {
 			ruleTester.run('encrypted-store-registry', rule, {
 				valid: [
 					{ code: "import { ENCRYPTED_STORES } from '$lib/db/registry';" },
-					// Unencrypted stores are not gated.
+					// Unencrypted stores (signed sidecars, keys) are not gated.
 					{ code: "tx.objectStore('profile-hwm').put(sidecar);" },
+					{ code: "tx.objectStore('timeline-state-hwm').put(sidecar);" },
 					{ code: "tx.objectStore('keystore').put(record);" }
 				],
 				invalid: [
@@ -23,6 +24,10 @@ describe('mtc/encrypted-store-registry', () => {
 					},
 					{
 						code: "tx.objectStore('profile').add(item);",
+						errors: [{ messageId: 'writeUnsanctioned' }]
+					},
+					{
+						code: "tx.objectStore('timeline-state').put({ id: 0, rec });",
 						errors: [{ messageId: 'writeUnsanctioned' }]
 					}
 				]

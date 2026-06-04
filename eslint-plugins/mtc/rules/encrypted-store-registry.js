@@ -1,10 +1,10 @@
 /**
  * Forbids direct raw-IndexedDB writes to encrypted stores -
  * `<tx>.objectStore('<encrypted>').{put|add}(...)` - outside the sanctioned
- * ProfileStore path. Direct writes bypass the single encryption boundary
- * (Phase 2 spec section 4, invariant 7): only ProfileStore.save() may write
- * ciphertext to an encrypted store, and that one sanctioned call site carries an
- * inline eslint-disable. Test files that stage fixtures are exempted in
+ * store path. Direct writes bypass the single encryption boundary (Phase 2 spec
+ * section 4, invariant 7): only the sanctioned store paths (ProfileStore.save /
+ * TimelineStateStore) may write ciphertext, each carrying an inline eslint-disable
+ * at its one call site. Test files that stage fixtures are exempted in
  * eslint.config.js.
  *
  * Heuristic: a CallExpression `X.objectStore('<name>').{put|add}(...)` with
@@ -12,7 +12,7 @@
  *
  * Source: Phase 2 spec section 4 (invariant 7); plan v2 F1 (raw IndexedDB, not Dexie).
  */
-const ENCRYPTED_STORES_LITERAL = new Set(['profile']);
+const ENCRYPTED_STORES_LITERAL = new Set(['profile', 'timeline-state']);
 const FORBIDDEN_WRITE_METHODS = new Set(['put', 'add']);
 
 export default {
@@ -24,7 +24,7 @@ export default {
 		},
 		messages: {
 			writeUnsanctioned:
-				'Direct write to an encrypted IDB store bypasses the encryption boundary; route through ProfileStore.save() (withWriteLocks + encryptProfileRecord)'
+				'Direct write to an encrypted IDB store bypasses the encryption boundary; route through the sanctioned store path (withWriteLocks + encryptRecord)'
 		},
 		schema: []
 	},

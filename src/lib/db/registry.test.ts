@@ -3,16 +3,18 @@ import { ENCRYPTED_STORES, isEncryptedStore } from './registry';
 
 describe('ENCRYPTED_STORES registry', () => {
 	it('enumerates all encrypted stores for v1.0', () => {
-		expect(ENCRYPTED_STORES).toEqual(['profile']);
+		expect(ENCRYPTED_STORES).toEqual(['profile', 'timeline-state']);
 	});
 
 	it('isEncryptedStore returns true for registered stores', () => {
 		expect(isEncryptedStore('profile')).toBe(true);
+		expect(isEncryptedStore('timeline-state')).toBe(true);
 	});
 
 	it('isEncryptedStore returns false for unregistered stores', () => {
 		expect(isEncryptedStore('keystore')).toBe(false);
 		expect(isEncryptedStore('profile-hwm')).toBe(false);
+		expect(isEncryptedStore('timeline-state-hwm')).toBe(false);
 		expect(isEncryptedStore('journal')).toBe(false);
 		expect(isEncryptedStore('meta')).toBe(false);
 	});
