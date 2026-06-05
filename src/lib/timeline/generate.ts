@@ -15,6 +15,7 @@ import type { TaskDef, TimelineTaskState, TimelineState, PhaseBucket } from './t
 /** A task definition projected onto absolute UTC calendar dates off the user's EAOS. */
 export type AnchoredTask = {
 	def: TaskDef;
+	effectiveOffset: number; // shifted sort/group key: (recommendedOffset ?? windowStart) - SkillBridge shift
 	targetDate: string; // ISO YYYY-MM-DD: when to act (recommendedOffset, else windowStart)
 	windowStartDate: string; // ISO: window opens
 	windowEndDate: string; // ISO: window closes
@@ -41,26 +42,40 @@ function includeTask(persona: PersonaFilters, def: TaskDef): boolean {
 	return true;
 }
 
-/** TL-3 anchor: project a def's day offsets to absolute UTC dates off the EAOS. */
-function anchorTask(eaos: EaosString, def: TaskDef): AnchoredTask {
-	const recommended = def.recommendedOffset ?? def.windowStart;
+/**
+ * TL-3 anchor + TL-10 shift: project a def's day offsets to absolute UTC dates off the EAOS,
+ * shifted earlier by `shiftDays` (the SkillBridge duration for military-track tasks; 0
+ * otherwise). The shift is uniform across the target + both window edges, so the whole task
+ * moves left as a unit.
+ */
+function anchorTask(eaos: EaosString, def: TaskDef, shiftDays: number): AnchoredTask {
+	const effectiveOffset = (def.recommendedOffset ?? def.windowStart) - shiftDays;
 	return {
 		def,
-		targetDate: eaosOffsetDate(eaos, recommended),
-		windowStartDate: eaosOffsetDate(eaos, def.windowStart),
-		windowEndDate: eaosOffsetDate(eaos, def.windowEnd)
+		effectiveOffset,
+		targetDate: eaosOffsetDate(eaos, effectiveOffset),
+		windowStartDate: eaosOffsetDate(eaos, def.windowStart - shiftDays),
+		windowEndDate: eaosOffsetDate(eaos, def.windowEnd - shiftDays)
 	};
 }
 
 /**
  * Filter the task set by the persona gate (TL-5), then anchor each surviving task to the
- * user's EAOS (TL-3). A 'none' persona has no EAOS to anchor against -> empty list (the
- * route renders the setup CTA upstream). Pure + deterministic.
+ * user's EAOS (TL-3), left-shifting military-track tasks by the approved SkillBridge
+ * duration (TL-10). A 'none' persona has no EAOS to anchor against -> empty list (the route
+ * renders the setup CTA upstream). Pure + deterministic.
  */
 export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): AnchoredTask[] {
 	if (persona.completeness === 'none') return [];
 	const eaos = persona.eaos;
-	return defs.filter((def) => includeTask(persona, def)).map((def) => anchorTask(eaos, def));
+	const skillbridge = persona.skillbridge;
+	return defs
+		.filter((def) => includeTask(persona, def))
+		.map((def) => {
+			const shiftDays =
+				def.track === 'military' && skillbridge?.approved ? skillbridge.durationDays : 0;
+			return anchorTask(eaos, def, shiftDays);
+		});
 }
 
 /** Display status for a task card (TL-7): paired with a text label in the view (never color-only). */
@@ -117,11 +132,6 @@ export type TimelineView = {
 	total: number;
 };
 
-/** Effective anchor offset for sort/group (recommendedOffset, else windowStart). */
-function effectiveOffset(def: TaskDef): number {
-	return def.recommendedOffset ?? def.windowStart;
-}
-
 /**
  * Index of the PHASE_BUCKET that owns an offset. Buckets tile the runway contiguously as
  * half-open [startOffset, endOffset), so "the first bucket whose endOffset exceeds the
@@ -159,7 +169,7 @@ export function generateTimeline(
 				windowEndDate: a.windowEndDate,
 				status: deriveStatus(a, state.tasks[a.def.id], today)
 			} satisfies TimelineItem,
-			offset: effectiveOffset(a.def)
+			offset: a.effectiveOffset
 		}))
 		.sort((x, y) => x.offset - y.offset);
 

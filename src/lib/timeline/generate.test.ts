@@ -97,6 +97,7 @@ describe('filterAndAnchor (TL-5 gate + TL-3 anchor)', () => {
 describe('deriveStatus (TL-7 status + snooze-expiry)', () => {
 	const anchored: AnchoredTask = {
 		def: universal,
+		effectiveOffset: -120,
 		targetDate: '2027-01-15',
 		windowStartDate: '2027-01-01',
 		windowEndDate: '2027-03-01'
@@ -189,5 +190,55 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		const view = generateTimeline({ completeness: 'none' }, [mk('a', -600)], emptyState, today);
 		expect(view.phases).toEqual([]);
 		expect(view.total).toBe(0);
+	});
+});
+
+describe('generateTimeline SkillBridge shift (TL-10)', () => {
+	const emptyState: TimelineState = { schemaVersion: 1, tasks: {} };
+	const today = new Date('2026-06-04T12:00:00Z');
+	const noSkillBridge: PersonaFilters = {
+		completeness: 'eaos-only',
+		eaos: EAOS,
+		daysUntilSeparation: 100
+	};
+	const skillBridge90: PersonaFilters = {
+		completeness: 'eaos-only',
+		eaos: EAOS,
+		daysUntilSeparation: 100,
+		skillbridge: { approved: true, durationDays: 90 }
+	};
+	const militaryTask: TaskDef = {
+		id: 'm1',
+		title: 'Military task',
+		category: 'admin',
+		track: 'military',
+		windowStart: -120,
+		windowEnd: -90,
+		recommendedOffset: -120,
+		why: 'w',
+		value: 'v'
+	};
+	const transitionTask: TaskDef = { ...militaryTask, id: 't1', track: 'transition' };
+
+	const firstItem = (p: PersonaFilters, defs: TaskDef[]) =>
+		generateTimeline(p, defs, emptyState, today).phases.flatMap((ph) => ph.items)[0];
+
+	it('left-shifts a military-track task by the SkillBridge duration', () => {
+		expect(firstItem(noSkillBridge, [militaryTask])?.targetDate).toBe(eaosOffsetDate(EAOS, -120));
+		expect(firstItem(skillBridge90, [militaryTask])?.targetDate).toBe(eaosOffsetDate(EAOS, -210));
+	});
+
+	it('does not shift a transition-track task', () => {
+		expect(firstItem(skillBridge90, [transitionTask])?.targetDate).toBe(eaosOffsetDate(EAOS, -120));
+	});
+
+	it('does not shift when SkillBridge is not approved (baseline)', () => {
+		expect(firstItem(noSkillBridge, [militaryTask])?.targetDate).toBe(eaosOffsetDate(EAOS, -120));
+	});
+
+	it('shifts the window dates uniformly with the target date', () => {
+		const item = firstItem(skillBridge90, [militaryTask]);
+		expect(item?.windowStartDate).toBe(eaosOffsetDate(EAOS, -210));
+		expect(item?.windowEndDate).toBe(eaosOffsetDate(EAOS, -180));
 	});
 });
