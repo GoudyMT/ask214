@@ -24,4 +24,6 @@ export type ProfileV1 = {
 	intendedPath?: Uint8Array;
 	geographicDestination?: Uint8Array;
 	specialSituations?: Uint8Array[];
+	skillbridgeApproved?: number; // 0/1 SkillBridge-approval flag (TL-10); flat numeric, not nested, per the zeroizeField field constraint
+	skillbridgeDurationDays?: number; // SkillBridge length in days; only meaningful when approved
 };

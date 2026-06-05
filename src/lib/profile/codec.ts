@@ -50,6 +50,8 @@ type WireProfile = {
 	intendedPath?: string;
 	geographicDestination?: string;
 	specialSituations?: string[];
+	skillbridgeApproved?: number;
+	skillbridgeDurationDays?: number;
 };
 
 export function encodeProfile(p: ProfileV1): Uint8Array {
@@ -73,6 +75,10 @@ export function encodeProfile(p: ProfileV1): Uint8Array {
 		}),
 		...(p.specialSituations && {
 			specialSituations: p.specialSituations.map(b64encode)
+		}),
+		...(p.skillbridgeApproved !== undefined && { skillbridgeApproved: p.skillbridgeApproved }),
+		...(p.skillbridgeDurationDays !== undefined && {
+			skillbridgeDurationDays: p.skillbridgeDurationDays
 		})
 	};
 	const sortedKeys = Object.keys(wire).sort();
@@ -109,6 +115,12 @@ export function decodeProfile(bytes: Uint8Array): ProfileV1 {
 		}),
 		...(wire.specialSituations && {
 			specialSituations: wire.specialSituations.map(b64decode)
+		}),
+		...(wire.skillbridgeApproved !== undefined && {
+			skillbridgeApproved: wire.skillbridgeApproved
+		}),
+		...(wire.skillbridgeDurationDays !== undefined && {
+			skillbridgeDurationDays: wire.skillbridgeDurationDays
 		})
 	};
 }
