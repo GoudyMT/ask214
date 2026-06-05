@@ -5,6 +5,7 @@ import {
 	validateEaosAtInput,
 	parseEaosAtRead,
 	daysUntilSeparation,
+	eaosOffsetDate,
 	encodeEaos,
 	decodeEaos,
 	type EaosString
@@ -195,5 +196,29 @@ describe('decodeEaos', () => {
 	it('decodes UTF-8 bytes back to the EAOS string (inverse of encodeEaos)', () => {
 		const eaos = validateEaosAtInput('2027-04-30', new Date('2026-05-26T12:00:00Z'));
 		expect(decodeEaos(encodeEaos(eaos))).toBe('2027-04-30');
+	});
+});
+
+describe('eaosOffsetDate', () => {
+	it('projects a negative offset to the calendar date before EAOS', () => {
+		// 2027-04-15 is day-of-year 105 (31+28+31+15); 105 - 90 = day 15 = Jan 15.
+		const eaos = '2027-04-15' as EaosString;
+		expect(eaosOffsetDate(eaos, -90)).toBe('2027-01-15');
+	});
+
+	it('crosses the leap day correctly (2028 is a leap year)', () => {
+		// 2028-03-01 minus 2 days = Feb 28 (Mar 1 -> Feb 29 -> Feb 28).
+		const eaos = '2028-03-01' as EaosString;
+		expect(eaosOffsetDate(eaos, -2)).toBe('2028-02-28');
+	});
+
+	it('returns the EAOS itself for a zero offset', () => {
+		const eaos = '2027-04-15' as EaosString;
+		expect(eaosOffsetDate(eaos, 0)).toBe('2027-04-15');
+	});
+
+	it('projects a positive offset forward across a year boundary', () => {
+		const eaos = '2027-12-31' as EaosString;
+		expect(eaosOffsetDate(eaos, 1)).toBe('2028-01-01');
 	});
 });
