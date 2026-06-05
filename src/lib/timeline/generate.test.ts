@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { filterAndAnchor } from './generate';
+import { filterAndAnchor, deriveStatus, type AnchoredTask } from './generate';
 import { eaosOffsetDate, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
-import type { TaskDef } from './types';
+import type { TaskDef, TimelineTaskState } from './types';
 
 const EAOS = '2027-04-15' as EaosString;
 
@@ -91,5 +91,47 @@ describe('filterAndAnchor (TL-5 gate + TL-3 anchor)', () => {
 
 	it('returns an empty list for a none persona (no EAOS to anchor against)', () => {
 		expect(filterAndAnchor({ completeness: 'none' }, [universal])).toEqual([]);
+	});
+});
+
+describe('deriveStatus (TL-7 status + snooze-expiry)', () => {
+	const anchored: AnchoredTask = {
+		def: universal,
+		targetDate: '2027-01-15',
+		windowStartDate: '2027-01-01',
+		windowEndDate: '2027-03-01'
+	};
+	const inWindow = new Date('2027-02-01T12:00:00Z');
+
+	it('derives "upcoming" before the window opens', () => {
+		expect(deriveStatus(anchored, undefined, new Date('2026-12-01T12:00:00Z'))).toBe('upcoming');
+	});
+
+	it('derives "start-now" inside the window', () => {
+		expect(deriveStatus(anchored, undefined, inWindow)).toBe('start-now');
+	});
+
+	it('derives "overdue" after the window closes', () => {
+		expect(deriveStatus(anchored, undefined, new Date('2027-04-01T12:00:00Z'))).toBe('overdue');
+	});
+
+	it('lets stored "done" win regardless of the date', () => {
+		const stored: TimelineTaskState = { status: 'done' };
+		expect(deriveStatus(anchored, stored, inWindow)).toBe('done');
+	});
+
+	it('lets stored "skipped" win regardless of the date', () => {
+		const stored: TimelineTaskState = { status: 'skipped' };
+		expect(deriveStatus(anchored, stored, inWindow)).toBe('skipped');
+	});
+
+	it('stays "snoozed" while snoozeUntil is in the future', () => {
+		const stored: TimelineTaskState = { status: 'snoozed', snoozeUntil: '2027-12-31' };
+		expect(deriveStatus(anchored, stored, inWindow)).toBe('snoozed');
+	});
+
+	it('auto-reopens to the date-derived status when snoozeUntil has passed', () => {
+		const stored: TimelineTaskState = { status: 'snoozed', snoozeUntil: '2027-01-15' };
+		expect(deriveStatus(anchored, stored, inWindow)).toBe('start-now');
 	});
 });

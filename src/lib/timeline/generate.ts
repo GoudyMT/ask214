@@ -9,7 +9,7 @@
 
 import { eaosOffsetDate, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
-import type { TaskDef } from './types';
+import type { TaskDef, TimelineTaskState } from './types';
 
 /** A task definition projected onto absolute UTC calendar dates off the user's EAOS. */
 export type AnchoredTask = {
@@ -60,4 +60,36 @@ export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): Ancho
 	if (persona.completeness === 'none') return [];
 	const eaos = persona.eaos;
 	return defs.filter((def) => includeTask(persona, def)).map((def) => anchorTask(eaos, def));
+}
+
+/** Display status for a task card (TL-7): paired with a text label in the view (never color-only). */
+export type DisplayStatus = 'upcoming' | 'start-now' | 'overdue' | 'done' | 'skipped' | 'snoozed';
+
+/**
+ * Derive a task's display status (TL-7). Stored terminal/deferred state wins: 'done' and
+ * 'skipped' override the date; 'snoozed' holds only while snoozeUntil is still in the future
+ * and otherwise auto-reopens (spec section 9). With no overriding stored state the status is
+ * date-derived against the anchored window: before it opens = upcoming, inside = start-now,
+ * past = overdue. Both ends are UTC ISO dates so time-of-day cannot shift the result (F-C-9).
+ */
+export function deriveStatus(
+	anchored: AnchoredTask,
+	stored: TimelineTaskState | undefined,
+	today: Date
+): DisplayStatus {
+	const todayIso = today.toISOString().slice(0, 10);
+
+	if (stored?.status === 'done') return 'done';
+	if (stored?.status === 'skipped') return 'skipped';
+	if (
+		stored?.status === 'snoozed' &&
+		stored.snoozeUntil !== undefined &&
+		stored.snoozeUntil > todayIso
+	) {
+		return 'snoozed';
+	}
+
+	if (todayIso < anchored.windowStartDate) return 'upcoming';
+	if (todayIso > anchored.windowEndDate) return 'overdue';
+	return 'start-now';
 }
