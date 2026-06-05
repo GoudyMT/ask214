@@ -7,15 +7,28 @@ import { parseEaosAtRead, daysUntilSeparation, decodeEaos, type EaosString } fro
  *
  * Source: Phase 2 spec section 9 "Persona Derivation".
  */
+/**
+ * SkillBridge approval (TL-10). Surfaced on the persona only when the profile has the
+ * approval flag set AND a positive duration; generation left-shifts military-track tasks
+ * by `durationDays` so their deadlines precede leaving for the civilian employer.
+ */
+export type SkillBridge = { approved: boolean; durationDays: number };
+
 export type PersonaFilters =
 	| { completeness: 'none' }
-	| { completeness: 'eaos-only'; eaos: EaosString; daysUntilSeparation: number }
+	| {
+			completeness: 'eaos-only';
+			eaos: EaosString;
+			daysUntilSeparation: number;
+			skillbridge?: SkillBridge;
+	  }
 	| {
 			completeness: 'partial';
 			eaos: EaosString;
 			daysUntilSeparation: number;
 			rate?: string;
 			rank?: string;
+			skillbridge?: SkillBridge;
 	  }
 	| {
 			completeness: 'complete';
@@ -25,6 +38,7 @@ export type PersonaFilters =
 			rank: string;
 			familyStatus: string;
 			intendedPath: string;
+			skillbridge?: SkillBridge;
 	  };
 
 function decode(u8?: Uint8Array | null): string | undefined {
@@ -42,6 +56,15 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 	}
 	const dus = daysUntilSeparation(eaos, today);
 
+	// SkillBridge surfaces only when explicitly approved with a positive duration; an
+	// unset/zero flag or missing duration means no shift (TL-10).
+	const skillbridge: SkillBridge | undefined =
+		profile.skillbridgeApproved === 1 &&
+		typeof profile.skillbridgeDurationDays === 'number' &&
+		profile.skillbridgeDurationDays > 0
+			? { approved: true, durationDays: profile.skillbridgeDurationDays }
+			: undefined;
+
 	const rate = decode(profile.rate);
 	const rank = decode(profile.rank);
 	const familyStatus = decode(profile.familyStatus);
@@ -55,11 +78,24 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 			rate,
 			rank,
 			familyStatus,
-			intendedPath
+			intendedPath,
+			...(skillbridge && { skillbridge })
 		};
 	}
 	if (rate || rank || familyStatus || intendedPath) {
-		return { completeness: 'partial', eaos, daysUntilSeparation: dus, rate, rank };
+		return {
+			completeness: 'partial',
+			eaos,
+			daysUntilSeparation: dus,
+			rate,
+			rank,
+			...(skillbridge && { skillbridge })
+		};
 	}
-	return { completeness: 'eaos-only', eaos, daysUntilSeparation: dus };
+	return {
+		completeness: 'eaos-only',
+		eaos,
+		daysUntilSeparation: dus,
+		...(skillbridge && { skillbridge })
+	};
 }
