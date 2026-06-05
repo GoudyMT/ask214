@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { filterAndAnchor, deriveStatus, type AnchoredTask } from './generate';
+import { filterAndAnchor, deriveStatus, generateTimeline, type AnchoredTask } from './generate';
 import { eaosOffsetDate, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
-import type { TaskDef, TimelineTaskState } from './types';
+import type { TaskDef, TimelineTaskState, TimelineState } from './types';
 
 const EAOS = '2027-04-15' as EaosString;
 
@@ -133,5 +133,61 @@ describe('deriveStatus (TL-7 status + snooze-expiry)', () => {
 	it('auto-reopens to the date-derived status when snoozeUntil has passed', () => {
 		const stored: TimelineTaskState = { status: 'snoozed', snoozeUntil: '2027-01-15' };
 		expect(deriveStatus(anchored, stored, inWindow)).toBe('start-now');
+	});
+});
+
+describe('generateTimeline (sort + group + assemble)', () => {
+	const mk = (id: string, recommendedOffset: number): TaskDef => ({
+		id,
+		title: id,
+		category: 'admin',
+		track: 'transition',
+		windowStart: recommendedOffset,
+		windowEnd: recommendedOffset + 30,
+		recommendedOffset,
+		why: 'w',
+		value: 'v'
+	});
+	const emptyState: TimelineState = { schemaVersion: 1, tasks: {} };
+	const persona: PersonaFilters = {
+		completeness: 'eaos-only',
+		eaos: EAOS,
+		daysUntilSeparation: 100
+	};
+	const today = new Date('2026-06-04T12:00:00Z');
+
+	it('groups tasks into their phase buckets and drops empty buckets', () => {
+		// -600 -> 24-18mo, -120 -> 6-3mo, 30 -> after; 18-12mo/12-6mo/final90 stay empty.
+		const defs = [mk('a', -600), mk('b', -120), mk('c', 30)];
+		const view = generateTimeline(persona, defs, emptyState, today);
+		expect(view.phases.map((p) => p.bucket.id)).toEqual(['24-18mo', '6-3mo', 'after']);
+	});
+
+	it('sorts furthest-out first across and within buckets', () => {
+		const defs = [mk('c', 30), mk('a', -600), mk('b', -120)];
+		const view = generateTimeline(persona, defs, emptyState, today);
+		const ids = view.phases.flatMap((p) => p.items.map((i) => i.def.id));
+		expect(ids).toEqual(['a', 'b', 'c']);
+	});
+
+	it('exposes per-bucket counts and a total', () => {
+		// -600 and -560 both fall in 24-18mo [-730,-540); -120 in 6-3mo.
+		const defs = [mk('a', -600), mk('a2', -560), mk('b', -120)];
+		const view = generateTimeline(persona, defs, emptyState, today);
+		expect(view.phases[0]?.bucket.id).toBe('24-18mo');
+		expect(view.phases[0]?.count).toBe(2);
+		expect(view.total).toBe(3);
+	});
+
+	it('attaches the derived status to each item', () => {
+		const state: TimelineState = { schemaVersion: 1, tasks: { b: { status: 'done' } } };
+		const view = generateTimeline(persona, [mk('b', -120)], state, today);
+		expect(view.phases[0]?.items[0]?.status).toBe('done');
+	});
+
+	it('returns an empty view for a none persona (route renders the setup CTA)', () => {
+		const view = generateTimeline({ completeness: 'none' }, [mk('a', -600)], emptyState, today);
+		expect(view.phases).toEqual([]);
+		expect(view.total).toBe(0);
 	});
 });

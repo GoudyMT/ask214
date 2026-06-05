@@ -9,7 +9,8 @@
 
 import { eaosOffsetDate, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
-import type { TaskDef, TimelineTaskState } from './types';
+import { PHASE_BUCKETS } from './task-defs';
+import type { TaskDef, TimelineTaskState, TimelineState, PhaseBucket } from './types';
 
 /** A task definition projected onto absolute UTC calendar dates off the user's EAOS. */
 export type AnchoredTask = {
@@ -92,4 +93,86 @@ export function deriveStatus(
 	if (todayIso < anchored.windowStartDate) return 'upcoming';
 	if (todayIso > anchored.windowEndDate) return 'overdue';
 	return 'start-now';
+}
+
+/** One generated, anchored, status-stamped task as rendered in the view. */
+export type TimelineItem = {
+	def: TaskDef;
+	targetDate: string;
+	windowStartDate: string;
+	windowEndDate: string;
+	status: DisplayStatus;
+};
+
+/** A non-empty phase bucket with its (sorted) items and a count for the chip strip. */
+export type TimelinePhase = {
+	bucket: PhaseBucket;
+	items: TimelineItem[];
+	count: number;
+};
+
+/** The full generated timeline projection: ordered non-empty phases + a grand total. */
+export type TimelineView = {
+	phases: TimelinePhase[];
+	total: number;
+};
+
+/** Effective anchor offset for sort/group (recommendedOffset, else windowStart). */
+function effectiveOffset(def: TaskDef): number {
+	return def.recommendedOffset ?? def.windowStart;
+}
+
+/**
+ * Index of the PHASE_BUCKET that owns an offset. Buckets tile the runway contiguously as
+ * half-open [startOffset, endOffset), so "the first bucket whose endOffset exceeds the
+ * offset" is the containing bucket. An offset past the final bucket clamps to the last one
+ * so an in-persona task is never silently dropped (the runway-edge case).
+ */
+function bucketIndexFor(offset: number): number {
+	for (let i = 0; i < PHASE_BUCKETS.length; i++) {
+		const bucket = PHASE_BUCKETS[i];
+		if (bucket && offset < bucket.endOffset) return i;
+	}
+	return PHASE_BUCKETS.length - 1;
+}
+
+/**
+ * Assemble the full timeline projection (spec section 5): filter (TL-5) + anchor (TL-3),
+ * derive status (TL-7), sort furthest-out first (TL-6), group into PHASE_BUCKETS and drop
+ * empty buckets (TL-9). A 'none' persona yields an empty view (the route shows the setup
+ * CTA). Pure + deterministic; stores nothing.
+ */
+export function generateTimeline(
+	persona: PersonaFilters,
+	defs: TaskDef[],
+	state: TimelineState,
+	today: Date
+): TimelineView {
+	const anchored = filterAndAnchor(persona, defs);
+
+	const sorted = anchored
+		.map((a) => ({
+			item: {
+				def: a.def,
+				targetDate: a.targetDate,
+				windowStartDate: a.windowStartDate,
+				windowEndDate: a.windowEndDate,
+				status: deriveStatus(a, state.tasks[a.def.id], today)
+			} satisfies TimelineItem,
+			offset: effectiveOffset(a.def)
+		}))
+		.sort((x, y) => x.offset - y.offset);
+
+	const phases: TimelinePhase[] = [];
+	for (let i = 0; i < PHASE_BUCKETS.length; i++) {
+		const bucket = PHASE_BUCKETS[i];
+		if (!bucket) continue;
+		const items = sorted
+			.filter((entry) => bucketIndexFor(entry.offset) === i)
+			.map((entry) => entry.item);
+		if (items.length === 0) continue;
+		phases.push({ bucket, items, count: items.length });
+	}
+
+	return { phases, total: anchored.length };
 }
