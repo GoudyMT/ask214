@@ -38,4 +38,18 @@ describe('task-defs seed', () => {
 			expect(rec).toBeLessThan(last.endOffset);
 		}
 	});
+
+	// Content placement lock (Session 19): medical documentation must START early - it belongs in
+	// the 18-12mo phase, not 12-6mo, so the VA-claim record has the longest runway. Buckets are
+	// half-open [startOffset, endOffset), so the recommended offset must sit inside 18-12mo.
+	it('schedules "start documenting medical conditions" in the 18-12 month phase', () => {
+		const task = TASK_DEFS.find((t) => t.id === 'document-medical');
+		const bucket = PHASE_BUCKETS.find((b) => b.id === '18-12mo');
+		expect(task).toBeDefined();
+		expect(bucket).toBeDefined();
+		if (!task || !bucket) return;
+		const offset = task.recommendedOffset ?? task.windowStart;
+		expect(offset).toBeGreaterThanOrEqual(bucket.startOffset);
+		expect(offset).toBeLessThan(bucket.endOffset);
+	});
 });

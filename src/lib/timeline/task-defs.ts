@@ -128,7 +128,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		track: 'military',
 		windowStart: -540,
 		windowEnd: -180,
-		recommendedOffset: -365,
+		recommendedOffset: -450,
 		why: 'Conditions documented now build the record your VA claim relies on.',
 		value: 'A documented health history before separation.'
 	},
