@@ -35,6 +35,18 @@ describe('createProfileBus', () => {
 		expect(await received).toEqual({ type: 'profile-updated' });
 	});
 
+	it('delivers a timeline-updated signal to another bus on the same channel', async () => {
+		const name = uniqueName();
+		const tabA = makeBus(name);
+		const tabB = makeBus(name);
+		const received = new Promise<BusSignal | null>((resolve) => {
+			tabB.subscribe((s) => resolve(s));
+			setTimeout(() => resolve(null), 1000);
+		});
+		tabA.publish({ type: 'timeline-updated' });
+		expect(await received).toEqual({ type: 'timeline-updated' });
+	});
+
 	it('does not deliver a published signal back to the publishing bus', async () => {
 		const name = uniqueName();
 		const tabA = makeBus(name);
