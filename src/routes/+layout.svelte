@@ -6,8 +6,15 @@
 	import AppGate from '$lib/components/AppGate.svelte';
 	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
-	import { initProfileApp, subscribeBus, installLifecycle } from '$lib/profile/app-init';
+	import {
+		initProfileApp,
+		provisionTimelineStore,
+		subscribeBus,
+		installLifecycle,
+		type Relockable
+	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
+	import { createTimelineStateStore } from '$lib/timeline';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
@@ -55,12 +62,15 @@
 				app.store = result.store;
 				app.status = 'ready';
 
-				// Wire cross-tab + page-lifecycle + idle relock now the store exists. One shared
-				// relockables list drives both, so a relock relocks every store together.
-				const relockables = [result.store];
+				// Wire the profile's relock/lifecycle FIRST and unconditionally (security: the
+				// decrypted profile must always relock on idle/background). relockables is shared +
+				// mutable, so the timeline store joins it once provisioned (installLifecycle + the
+				// relocked handler read the list at event time).
+				const relockables: Relockable[] = [result.store];
 				const offBus = subscribeBus(bus, {
 					relocked: () => relockables.forEach((r) => r.relockSync()),
-					'profile-updated': () => void result.store.load()
+					'profile-updated': () => void result.store.load(),
+					'timeline-updated': () => void app.timeline?.load()
 				});
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,
@@ -72,6 +82,19 @@
 					offBus();
 					offLifecycle();
 				};
+
+				// Timeline-state store rides on the same db + bus; it joins the relock set once
+				// ready. A timeline init failure degrades to profile-only (never blocks the wiring
+				// above).
+				void provisionTimelineStore(result.db, (db) =>
+					createTimelineStateStore(db, { onBroadcast: (e) => bus.publish(e) })
+				)
+					.then((timeline) => {
+						if (destroyed) return;
+						app.timeline = timeline;
+						relockables.push(timeline);
+					})
+					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
 			})
 			.catch(() => {
 				// Hard init failure past the capability gate (e.g. a tampered keystore failing
