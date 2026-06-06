@@ -91,11 +91,15 @@ export function subscribeBusToStore(store: BusWiredStore, bus: ProfileBus): () =
 /** User-input events that reset the idle countdown. Passive listeners (no scroll-jank). */
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'touchstart'] as const;
 
-/** Structural contract the lifecycle wiring needs from the store. */
-type LifecycleStore = {
+/**
+ * A store the app can relock + reload across the page lifecycle and cross-tab signals. `lock`
+ * is optional: the profile store exposes an async lock(); the timeline store relocks
+ * synchronously (drop-reference) and omits it.
+ */
+export type Relockable = {
 	relockSync: () => void;
 	load: () => Promise<unknown>;
-	lock: () => Promise<void>;
+	lock?: () => Promise<void>;
 };
 
 /** Injected so the whole path is unit-testable; +layout supplies window, document, the real
@@ -108,26 +112,36 @@ type ProfileLifecycleDeps = {
 };
 
 /**
- * Wire Page-Lifecycle + idle relock behavior onto the injected event targets. `pagehide`
- * (window) and `freeze` (document) relock the in-memory profile - zeroize PII - when the page
- * is backgrounded or frozen; a persisted `pageshow` (BFCache restore) re-reads from IDB; user
- * input resets an idle timer that locks the store after `idleThresholdMs`. Returns a teardown
+ * Wire Page-Lifecycle + idle relock behavior onto the injected event targets, for EVERY
+ * relockable store. `pagehide` (window) and `freeze` (document) relock each store - zeroize
+ * PII - when the page is backgrounded or frozen; a persisted `pageshow` (BFCache restore)
+ * re-reads each from IDB; user input resets an idle timer that, on idle, locks stores exposing
+ * lock() and relock-syncs the rest. All stores relock together (atomic). Returns a teardown
  * that stops the timer and removes every listener.
  *
  * Source: Phase 2 spec section 8 (idle timer) + section 11 (relock / memory hygiene).
  */
-export function installProfileLifecycle(
-	store: LifecycleStore,
+export function installLifecycle(
+	relockables: Relockable[],
 	deps: ProfileLifecycleDeps
 ): () => void {
 	const idle = deps.createIdleTimer({
 		thresholdMs: deps.idleThresholdMs,
-		onIdle: () => void store.lock()
+		onIdle: () => {
+			for (const r of relockables) {
+				if (r.lock) void r.lock();
+				else r.relockSync();
+			}
+		}
 	});
 
-	const onHide = (): void => store.relockSync();
+	const onHide = (): void => {
+		for (const r of relockables) r.relockSync();
+	};
 	const onShow = (e: Event): void => {
-		if ((e as PageTransitionEvent).persisted) void store.load();
+		if ((e as PageTransitionEvent).persisted) {
+			for (const r of relockables) void r.load();
+		}
 	};
 	const onActivity = (): void => idle.recordActivity();
 

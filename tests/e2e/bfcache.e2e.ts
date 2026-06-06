@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 // Regression coverage for the Page-Lifecycle relock/restore wiring (Arc 2, Milestone L2b:
-// installProfileLifecycle). On `pagehide`/`freeze` the in-memory profile relocks (PII
+// installLifecycle). On `pagehide`/`freeze` the in-memory profile relocks (PII
 // zeroized, store.locked -> true); on a persisted `pageshow` (the BFCache-restore signal) the
 // store re-reads from IndexedDB. We dispatch the real lifecycle events on window (which the
 // layout wires the handlers to) rather than relying on the browser's BFCache engine, which is

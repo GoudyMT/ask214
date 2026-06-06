@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { subscribeBusToStore, installProfileLifecycle } from './app-init';
+import { subscribeBusToStore, installLifecycle } from './app-init';
 import { createProfileBus, type ProfileBus } from '../broadcast/bus';
 import type { IdleTimerOptions, IdleTimer } from './idle-timer';
 
@@ -81,8 +81,7 @@ function makeLifecycleHarness() {
 	const win = new EventTarget();
 	const doc = new EventTarget();
 	const idleThresholdMs = 900_000;
-	const install = () =>
-		installProfileLifecycle(store, { win, doc, createIdleTimer, idleThresholdMs });
+	const install = () => installLifecycle([store], { win, doc, createIdleTimer, idleThresholdMs });
 	return {
 		store,
 		timer,
@@ -95,7 +94,7 @@ function makeLifecycleHarness() {
 	};
 }
 
-describe('installProfileLifecycle', () => {
+describe('installLifecycle', () => {
 	it('relocks on pagehide', () => {
 		const h = makeLifecycleHarness();
 		h.install();
@@ -150,5 +149,49 @@ describe('installProfileLifecycle', () => {
 		expect(h.timer.stop).toHaveBeenCalledTimes(1);
 		h.win.dispatchEvent(new Event('pagehide'));
 		expect(h.store.relockSync).not.toHaveBeenCalled();
+	});
+
+	it('relocks every store in the list on pagehide', () => {
+		const a = {
+			relockSync: vi.fn(),
+			load: vi.fn().mockResolvedValue(null),
+			lock: vi.fn().mockResolvedValue(undefined)
+		};
+		const b = { relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) };
+		const win = new EventTarget();
+		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		installLifecycle([a, b], {
+			win,
+			doc: new EventTarget(),
+			createIdleTimer: () => timer,
+			idleThresholdMs: 900_000
+		});
+		win.dispatchEvent(new Event('pagehide'));
+		expect(a.relockSync).toHaveBeenCalledTimes(1);
+		expect(b.relockSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('on idle, locks stores that expose lock() and relockSyncs those that do not', () => {
+		const a = {
+			relockSync: vi.fn(),
+			load: vi.fn().mockResolvedValue(null),
+			lock: vi.fn().mockResolvedValue(undefined)
+		};
+		const b = { relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) };
+		let onIdle: (() => void) | undefined;
+		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		installLifecycle([a, b], {
+			win: new EventTarget(),
+			doc: new EventTarget(),
+			createIdleTimer: (opts: IdleTimerOptions) => {
+				onIdle = opts.onIdle;
+				return timer;
+			},
+			idleThresholdMs: 900_000
+		});
+		onIdle?.();
+		expect(a.lock).toHaveBeenCalledTimes(1);
+		expect(a.relockSync).not.toHaveBeenCalled();
+		expect(b.relockSync).toHaveBeenCalledTimes(1);
 	});
 });

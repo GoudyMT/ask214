@@ -6,11 +6,7 @@
 	import AppGate from '$lib/components/AppGate.svelte';
 	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
-	import {
-		initProfileApp,
-		subscribeBusToStore,
-		installProfileLifecycle
-	} from '$lib/profile/app-init';
+	import { initProfileApp, subscribeBusToStore, installLifecycle } from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
@@ -61,7 +57,7 @@
 
 				// Wire cross-tab + page-lifecycle + idle relock now the store exists.
 				const offBus = subscribeBusToStore(result.store, bus);
-				const offLifecycle = installProfileLifecycle(result.store, {
+				const offLifecycle = installLifecycle([result.store], {
 					win: window,
 					doc: document,
 					createIdleTimer,
