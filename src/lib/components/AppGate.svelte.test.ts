@@ -11,20 +11,25 @@ const childSnippet = createRawSnippet(() => ({
 
 describe('AppGate', () => {
 	it('renders the UnsupportedBrowser screen when status is unsupported', () => {
-		const app: ProfileApp = { status: 'unsupported', store: null, cause: 'indexed-db' };
+		const app: ProfileApp = {
+			status: 'unsupported',
+			store: null,
+			timeline: null,
+			cause: 'indexed-db'
+		};
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.textContent).toContain('securely'); // UnsupportedBrowser heading
 		expect(container.querySelector('[data-testid="app-content"]')).toBeNull();
 	});
 
 	it('renders children (the app shell) while loading - the shell is not gated behind ready', () => {
-		const app: ProfileApp = { status: 'loading', store: null, cause: null };
+		const app: ProfileApp = { status: 'loading', store: null, timeline: null, cause: null };
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
 	});
 
 	it('renders children when status is ready', () => {
-		const app: ProfileApp = { status: 'ready', store: null, cause: null };
+		const app: ProfileApp = { status: 'ready', store: null, timeline: null, cause: null };
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
 	});

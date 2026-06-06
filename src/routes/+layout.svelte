@@ -28,7 +28,7 @@
 	// App-wide profile container, set synchronously (setContext must run during component
 	// init). Populated by the client-only app-init in onMount below. The shell renders for
 	// every status except `unsupported`; store-dependent UI reads `app.store` once ready.
-	const app = $state<ProfileApp>({ status: 'loading', store: null, cause: null });
+	const app = $state<ProfileApp>({ status: 'loading', store: null, timeline: null, cause: null });
 	setProfileApp(app);
 
 	onMount(() => {

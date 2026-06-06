@@ -51,6 +51,21 @@ export async function initProfileApp<S extends LoadableStore>(
 	return { status: 'ready', store, db };
 }
 
+/**
+ * Provision the timeline-state store: create it from the already-open db and run the initial
+ * load. Mirrors initProfileApp's create-then-load tail, kept separate so the timeline store
+ * rides on the same db without coupling into initProfileApp's single-store generic. The
+ * +layout calls this after the profile app is ready, passing the db that init returns.
+ */
+export async function provisionTimelineStore<S extends LoadableStore>(
+	db: IDBDatabase,
+	makeStore: (db: IDBDatabase) => S
+): Promise<S> {
+	const store = makeStore(db);
+	await store.load();
+	return store;
+}
+
 /** Minimal structural contract the cross-tab wiring needs from the store. */
 type BusWiredStore = { relockSync: () => void; load: () => Promise<unknown> };
 
