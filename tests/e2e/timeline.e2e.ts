@@ -9,7 +9,8 @@ import { expect, test, type Page } from '@playwright/test';
 // engine is environment-dependent and unforceable in Playwright.
 
 const EAOS = '2027-04-15';
-const SUBLINE = `Anchored to ${EAOS} - tracking your 24-month runway`;
+// Subline shows the human-formatted EAOS (formatTimelineDate: 2027-04-15 -> "Apr 15, 2027").
+const SUBLINE = 'Anchored to Apr 15, 2027 - tracking your 24-month runway';
 
 // First-run wizard saves an encrypted profile with an EAOS, then lands back on Home.
 async function setEaos(page: Page): Promise<void> {
@@ -41,6 +42,7 @@ test('with an EAOS: /timeline shows the anchored header, not the CTA', async ({ 
 	await page.goto('/timeline');
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 	await expect(page.getByText(SUBLINE)).toBeVisible();
+	await expect(page.locator('article.task-card').first()).toBeVisible(); // generated cards render
 	await expect(page.getByRole('link', { name: /get started/i })).toBeHidden();
 });
 

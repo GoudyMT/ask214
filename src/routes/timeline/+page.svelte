@@ -1,16 +1,33 @@
 <script lang="ts">
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
+	import TimelineList from '$lib/components/TimelineList.svelte';
 	import { getProfileApp } from '$lib/profile/context';
+	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
+	import { formatTimelineDate } from '$lib/timeline/format-date';
 
 	const app = getProfileApp();
 
 	let unlocking = $state(false);
 
+	// Until the timeline-state store provisions (async, after the profile store), fall back to
+	// empty state so the timeline still renders with date-derived statuses; stored done/skip/
+	// snooze (set via the C4 actions) layer in once the store loads.
+	const EMPTY_STATE: TimelineState = { schemaVersion: 1, tasks: {} };
+
 	// Stored EAOS (string form) via the derived persona, or null when unset - mirrors Settings.
 	const eaos = $derived.by(() => {
 		const p = app.store?.persona;
 		return p && p.completeness !== 'none' ? p.eaos : null;
+	});
+
+	// The generated timeline projection (pure): re-derives when the persona or the stored
+	// per-task state changes. TASK_DEFS is readonly; generateTimeline takes a mutable array.
+	const view = $derived.by(() => {
+		const persona = app.store?.persona;
+		if (!persona || persona.completeness === 'none') return null;
+		const state = app.timeline?.state ?? EMPTY_STATE;
+		return generateTimeline(persona, [...TASK_DEFS], state, new Date());
 	});
 
 	async function unlock(): Promise<void> {
@@ -36,9 +53,13 @@
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else if app.store?.persona.completeness === 'none'}
 		<SetupCTA />
-	{:else}
-		<p class="timeline-subline">Anchored to {eaos} - tracking your 24-month runway.</p>
-		<!-- C3: TimelineList (phase sections + status task cards) mounts here. -->
+	{:else if eaos}
+		<p class="timeline-subline">
+			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
+		</p>
+		{#if view}
+			<TimelineList {view} />
+		{/if}
 	{/if}
 {/if}
 
