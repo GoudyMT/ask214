@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { subscribeBusToStore, installLifecycle } from './app-init';
+import { subscribeBus, installLifecycle } from './app-init';
 import { createProfileBus, type ProfileBus } from '../broadcast/bus';
 import type { IdleTimerOptions, IdleTimer } from './idle-timer';
 
@@ -28,37 +28,55 @@ afterEach(() => {
 	buses.length = 0;
 });
 
-describe('subscribeBusToStore', () => {
-	it('relays a relocked signal to store.relockSync', async () => {
+describe('subscribeBus', () => {
+	function profileHandlers(store: { relockSync: () => void; load: () => Promise<unknown> }) {
+		return {
+			relocked: () => store.relockSync(),
+			'profile-updated': () => void store.load()
+		};
+	}
+
+	it('routes a relocked signal to its handler', async () => {
 		const name = uniqueName();
 		const tabA = makeBus(name);
 		const tabB = makeBus(name);
 		const store = makeSpyStore();
-		subscribeBusToStore(store, tabB);
+		subscribeBus(tabB, profileHandlers(store));
 		tabA.publish({ type: 'relocked' });
 		await delay(100);
 		expect(store.relockSync).toHaveBeenCalledTimes(1);
 		expect(store.load).not.toHaveBeenCalled();
 	});
 
-	it('relays a profile-updated signal to store.load', async () => {
+	it('routes a profile-updated signal to its handler', async () => {
 		const name = uniqueName();
 		const tabA = makeBus(name);
 		const tabB = makeBus(name);
 		const store = makeSpyStore();
-		subscribeBusToStore(store, tabB);
+		subscribeBus(tabB, profileHandlers(store));
 		tabA.publish({ type: 'profile-updated' });
 		await delay(100);
 		expect(store.load).toHaveBeenCalledTimes(1);
 		expect(store.relockSync).not.toHaveBeenCalled();
 	});
 
-	it('stops relaying after the returned unsubscribe is called', async () => {
+	it('routes a timeline-updated signal to its handler', async () => {
+		const name = uniqueName();
+		const tabA = makeBus(name);
+		const tabB = makeBus(name);
+		const onTimeline = vi.fn();
+		subscribeBus(tabB, { 'timeline-updated': onTimeline });
+		tabA.publish({ type: 'timeline-updated' });
+		await delay(100);
+		expect(onTimeline).toHaveBeenCalledTimes(1);
+	});
+
+	it('stops routing after the returned unsubscribe is called', async () => {
 		const name = uniqueName();
 		const tabA = makeBus(name);
 		const tabB = makeBus(name);
 		const store = makeSpyStore();
-		const off = subscribeBusToStore(store, tabB);
+		const off = subscribeBus(tabB, profileHandlers(store));
 		off();
 		tabA.publish({ type: 'relocked' });
 		await delay(100);

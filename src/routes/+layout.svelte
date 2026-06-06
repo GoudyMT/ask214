@@ -6,7 +6,7 @@
 	import AppGate from '$lib/components/AppGate.svelte';
 	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
-	import { initProfileApp, subscribeBusToStore, installLifecycle } from '$lib/profile/app-init';
+	import { initProfileApp, subscribeBus, installLifecycle } from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
@@ -55,9 +55,14 @@
 				app.store = result.store;
 				app.status = 'ready';
 
-				// Wire cross-tab + page-lifecycle + idle relock now the store exists.
-				const offBus = subscribeBusToStore(result.store, bus);
-				const offLifecycle = installLifecycle([result.store], {
+				// Wire cross-tab + page-lifecycle + idle relock now the store exists. One shared
+				// relockables list drives both, so a relock relocks every store together.
+				const relockables = [result.store];
+				const offBus = subscribeBus(bus, {
+					relocked: () => relockables.forEach((r) => r.relockSync()),
+					'profile-updated': () => void result.store.load()
+				});
+				const offLifecycle = installLifecycle(relockables, {
 					win: window,
 					doc: document,
 					createIdleTimer,
