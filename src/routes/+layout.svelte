@@ -124,6 +124,7 @@
 		<nav aria-label="Primary">
 			<a href={resolve('/')} class="brand">Transition Companion</a>
 			<ul>
+				<li><a href={resolve('/timeline')}>Timeline</a></li>
 				<li><a href={resolve('/settings')}>Settings</a></li>
 				<li><a href={resolve('/about')}>About</a></li>
 			</ul>
@@ -173,7 +174,7 @@
 		margin: 0 auto;
 	}
 
-	/* Lock #7: inline horizontal nav for Phase 1 (2 items: brand + About). */
+	/* Lock #7: inline horizontal nav (brand + 3 links: Timeline/Settings/About). */
 	/* Migrate to bottom-tab-bar pattern when nav reaches 4+ items. */
 	nav ul {
 		list-style: none;
