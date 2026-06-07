@@ -1,8 +1,12 @@
 <script lang="ts">
 	import TaskCard from './TaskCard.svelte';
-	import type { TimelineView } from '$lib/timeline';
+	import type { TimelineView, TaskStatus } from '$lib/timeline';
 
-	let { view }: { view: TimelineView } = $props();
+	let {
+		view,
+		onSetStatus
+	}: { view: TimelineView; onSetStatus: (taskId: string, status: TaskStatus | undefined) => void } =
+		$props();
 </script>
 
 <div class="timeline-list">
@@ -10,7 +14,7 @@
 		<section id={phase.bucket.id} aria-labelledby="{phase.bucket.id}-heading">
 			<h2 id="{phase.bucket.id}-heading" class="timeline-list__phase">{phase.bucket.label}</h2>
 			{#each phase.items as item (item.def.id)}
-				<TaskCard {item} />
+				<TaskCard {item} {onSetStatus} />
 			{/each}
 		</section>
 	{/each}

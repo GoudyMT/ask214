@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { formatTimelineDate } from '$lib/timeline/format-date';
-	import type { TimelineItem, TaskCategory, DisplayStatus } from '$lib/timeline';
+	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
 
-	let { item }: { item: TimelineItem } = $props();
+	let {
+		item,
+		onSetStatus
+	}: {
+		item: TimelineItem;
+		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
+	} = $props();
 
 	const STATUS_LABEL: Record<DisplayStatus, string> = {
 		upcoming: 'Upcoming',
@@ -45,6 +51,10 @@
 				>{CATEGORY_LABEL[item.def.category]}</span
 			>{item.def.why}
 		</p>
+		<div class="task-card__actions">
+			<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
+			<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
+		</div>
 	</div>
 	<div class="task-card__meta">
 		<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
@@ -96,6 +106,28 @@
 		border-radius: var(--radius-s);
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+
+	/* Action row (C4): quiet accent-link buttons (real <button>s for a11y, styled like the
+	   mockup's action links). Snooze + Add note join here in later C4 increments. */
+	.task-card__actions {
+		display: flex;
+		gap: var(--space-m);
+		margin-top: var(--space-s);
+	}
+
+	.task-card__actions button {
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-size: var(--font-size-s);
+		cursor: pointer;
+	}
+
+	.task-card__actions button:hover {
+		text-decoration: underline;
 	}
 
 	.task-card__meta {

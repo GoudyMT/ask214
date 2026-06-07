@@ -1,11 +1,11 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import TaskCard from './TaskCard.svelte';
 import type { TimelineItem, TaskDef } from '$lib/timeline';
 
 // TaskCard renders one generated TimelineItem as an open status card (C3): status-color left
 // edge + text status label (never color-only) + a status-specific date line + category chip +
-// why. Open states only (Upcoming / Start now / Overdue); resolved-state collapse is C4.
+// why. C4 increment 1 adds the action row (Mark done / Skip) wired to onSetStatus.
 
 const DEF: TaskDef = {
 	id: 'skillbridge-hosts',
@@ -18,6 +18,8 @@ const DEF: TaskDef = {
 	value: 'A concrete shortlist before the window opens.'
 };
 
+const noop = () => {};
+
 function makeItem(overrides: Partial<TimelineItem> = {}): TimelineItem {
 	return {
 		def: DEF,
@@ -29,9 +31,13 @@ function makeItem(overrides: Partial<TimelineItem> = {}): TimelineItem {
 	};
 }
 
+function buttonByText(container: Element, text: string): HTMLButtonElement | undefined {
+	return [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
+}
+
 describe('TaskCard (open states)', () => {
 	it('renders the title, category chip, and why', () => {
-		const { container } = render(TaskCard, { props: { item: makeItem() } });
+		const { container } = render(TaskCard, { props: { item: makeItem(), onSetStatus: noop } });
 		expect(container.textContent).toContain('Research SkillBridge hosts');
 		expect(container.textContent).toContain('Career'); // category label, capitalized
 		expect(container.textContent).toContain('Find approved programs that fit your rate.');
@@ -39,7 +45,7 @@ describe('TaskCard (open states)', () => {
 
 	it('upcoming: status-color edge class + "Upcoming" label + the target date', () => {
 		const { container } = render(TaskCard, {
-			props: { item: makeItem({ status: 'upcoming', targetDate: '2027-03-16' }) }
+			props: { item: makeItem({ status: 'upcoming', targetDate: '2027-03-16' }), onSetStatus: noop }
 		});
 		const card = container.querySelector('article');
 		expect(card?.classList.contains('status-upcoming')).toBe(true);
@@ -49,7 +55,10 @@ describe('TaskCard (open states)', () => {
 
 	it('start-now: edge class + "Start now" + "Window to <end>"', () => {
 		const { container } = render(TaskCard, {
-			props: { item: makeItem({ status: 'start-now', windowEndDate: '2026-10-15' }) }
+			props: {
+				item: makeItem({ status: 'start-now', windowEndDate: '2026-10-15' }),
+				onSetStatus: noop
+			}
 		});
 		const card = container.querySelector('article');
 		expect(card?.classList.contains('status-start-now')).toBe(true);
@@ -59,7 +68,10 @@ describe('TaskCard (open states)', () => {
 
 	it('overdue: edge class + "Overdue" + "since <end>"', () => {
 		const { container } = render(TaskCard, {
-			props: { item: makeItem({ status: 'overdue', windowEndDate: '2027-01-15' }) }
+			props: {
+				item: makeItem({ status: 'overdue', windowEndDate: '2027-01-15' }),
+				onSetStatus: noop
+			}
 		});
 		const card = container.querySelector('article');
 		expect(card?.classList.contains('status-overdue')).toBe(true);
@@ -68,16 +80,36 @@ describe('TaskCard (open states)', () => {
 	});
 
 	it('color-codes the category chip via a category-<name> class (text label still present)', () => {
-		const career = render(TaskCard, { props: { item: makeItem() } });
+		const career = render(TaskCard, { props: { item: makeItem(), onSetStatus: noop } });
 		const careerChip = career.container.querySelector('.task-card__chip');
 		expect(careerChip?.classList.contains('category-career')).toBe(true);
 		expect(careerChip?.textContent).toBe('Career'); // color is an aid; the label still carries it
 
 		const medical = render(TaskCard, {
-			props: { item: makeItem({ def: { ...DEF, category: 'medical' } }) }
+			props: { item: makeItem({ def: { ...DEF, category: 'medical' } }), onSetStatus: noop }
 		});
 		expect(
 			medical.container.querySelector('.task-card__chip')?.classList.contains('category-medical')
 		).toBe(true);
+	});
+
+	it('renders Mark done and Skip actions on an open card', () => {
+		const { container } = render(TaskCard, { props: { item: makeItem(), onSetStatus: noop } });
+		expect(buttonByText(container, 'Mark done')).toBeDefined();
+		expect(buttonByText(container, 'Skip')).toBeDefined();
+	});
+
+	it('Mark done calls onSetStatus(id, "done")', () => {
+		const onSetStatus = vi.fn();
+		const { container } = render(TaskCard, { props: { item: makeItem(), onSetStatus } });
+		buttonByText(container, 'Mark done')?.click();
+		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', 'done');
+	});
+
+	it('Skip calls onSetStatus(id, "skipped")', () => {
+		const onSetStatus = vi.fn();
+		const { container } = render(TaskCard, { props: { item: makeItem(), onSetStatus } });
+		buttonByText(container, 'Skip')?.click();
+		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', 'skipped');
 	});
 });

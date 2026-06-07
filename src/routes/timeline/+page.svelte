@@ -3,7 +3,7 @@
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
 	import TimelineList from '$lib/components/TimelineList.svelte';
 	import { getProfileApp } from '$lib/profile/context';
-	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
+	import { generateTimeline, TASK_DEFS, type TimelineState, type TaskStatus } from '$lib/timeline';
 	import { formatTimelineDate } from '$lib/timeline/format-date';
 
 	const app = getProfileApp();
@@ -40,6 +40,19 @@
 			unlocking = false;
 		}
 	}
+
+	// C4: a status action -> the encrypted timeline store. On any write failure (incl. an OCC
+	// conflict from a concurrent tab) reload authoritative state rather than clobber (spec
+	// section 9); the view re-derives. No-op until the store has provisioned.
+	async function setStatus(taskId: string, status: TaskStatus | undefined): Promise<void> {
+		const timeline = app.timeline;
+		if (!timeline) return;
+		try {
+			await timeline.setStatus(taskId, status);
+		} catch {
+			await timeline.load();
+		}
+	}
 </script>
 
 <svelte:head>
@@ -58,7 +71,7 @@
 			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 		</p>
 		{#if view}
-			<TimelineList {view} />
+			<TimelineList {view} onSetStatus={setStatus} />
 		{/if}
 	{/if}
 {/if}

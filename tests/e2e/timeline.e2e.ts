@@ -63,3 +63,18 @@ test('locked: /timeline shows the locked panel; Unlock restores the timeline', a
 	await expect(page.getByText(SUBLINE)).toBeVisible();
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeHidden();
 });
+
+test('marking a task done persists across reload', async ({ page }) => {
+	await setEaos(page);
+	await page.goto('/timeline');
+
+	const firstCard = page.locator('article.task-card').first();
+	await expect(firstCard).toBeVisible();
+	await firstCard.getByRole('button', { name: 'Mark done' }).click();
+	await expect(firstCard.getByText('Done', { exact: true })).toBeVisible(); // status flips to Done
+
+	await page.reload();
+	await expect(
+		page.locator('article.task-card').first().getByText('Done', { exact: true })
+	).toBeVisible(); // re-decrypted from IndexedDB
+});
