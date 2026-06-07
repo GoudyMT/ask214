@@ -243,6 +243,20 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		expect(phase?.counts?.snoozed).toBe(1);
 		expect(phase?.counts?.toDo).toBe(0);
 	});
+
+	it('surfaces a stored note on the timeline item (any status)', () => {
+		const state: TimelineState = {
+			schemaVersion: 1,
+			tasks: { b: { notes: 'Reached out to 3 hosts.' } }
+		};
+		const item = generateTimeline(persona, [mk('b', -120)], state, today).phases[0]?.items[0];
+		expect(item?.note).toBe('Reached out to 3 hosts.');
+	});
+
+	it('omits note when none is stored', () => {
+		const item = generateTimeline(persona, [mk('b', -120)], emptyState, today).phases[0]?.items[0];
+		expect(item?.note).toBeUndefined();
+	});
 });
 
 describe('generateTimeline SkillBridge shift (TL-10)', () => {

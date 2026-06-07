@@ -118,6 +118,7 @@ export type TimelineItem = {
 	windowEndDate: string;
 	status: DisplayStatus;
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
+	note?: string; // the user's saved note for this task, if any (shown on any status)
 };
 
 /** Per-phase progress tally derived from item display status (drives the header count + collapse). */
@@ -207,7 +208,8 @@ export function generateTimeline(
 				status,
 				...(status === 'snoozed' && stored?.snoozeUntil !== undefined
 					? { snoozeUntil: stored.snoozeUntil }
-					: {})
+					: {}),
+				...(stored?.notes !== undefined ? { note: stored.notes } : {})
 			};
 			return { item, offset: a.effectiveOffset };
 		})
