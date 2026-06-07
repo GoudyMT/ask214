@@ -110,6 +110,28 @@
 	});
 </script>
 
+{#snippet noteSection()}
+	{#if noteOpen}
+		<div class="task-card__note">
+			<textarea
+				class="task-card__note-input"
+				bind:value={noteValue}
+				aria-label="Note"
+				placeholder="Add a note..."
+			></textarea>
+			<div class="task-card__note-actions">
+				<button type="button" class="task-card__note-save" onclick={saveNote}>Save</button>
+				<button type="button" class="task-card__note-cancel" onclick={closeNote}>Cancel</button>
+			</div>
+		</div>
+	{:else if item.note}
+		<div class="task-card__note-shown">
+			<span class="task-card__note-label">Your note</span>
+			<span class="task-card__note-text">{item.note}</span>
+		</div>
+	{/if}
+{/snippet}
+
 {#if isResolved && !expanded}
 	<!-- Collapsed resolved line: the whole row is the disclosure control (button + aria-expanded).
 	     Decision A: snoozed shows its date; done/skipped show none. -->
@@ -154,7 +176,9 @@
 			<!-- Decision B: a single unified Restore clears the stored status (un-mark / un-snooze). -->
 			<div class="task-card__actions">
 				<button type="button" onclick={() => onSetStatus(item.def.id, undefined)}>Restore</button>
+				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
+			{@render noteSection()}
 		</div>
 	</article>
 {:else}
@@ -170,7 +194,7 @@
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
 				<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
-				<button type="button" onclick={openNote}>Add note</button>
+				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
 			{#if snoozeOpen}
 				<div class="task-card__snooze">
@@ -201,20 +225,7 @@
 					{/if}
 				</div>
 			{/if}
-			{#if noteOpen}
-				<div class="task-card__note">
-					<textarea
-						class="task-card__note-input"
-						bind:value={noteValue}
-						aria-label="Note"
-						placeholder="Add a note..."
-					></textarea>
-					<div class="task-card__note-actions">
-						<button type="button" class="task-card__note-save" onclick={saveNote}>Save</button>
-						<button type="button" class="task-card__note-cancel" onclick={closeNote}>Cancel</button>
-					</div>
-				</div>
-			{/if}
+			{@render noteSection()}
 		</div>
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
@@ -436,6 +447,28 @@
 		font-size: var(--font-size-s);
 		text-decoration: underline;
 		cursor: pointer;
+	}
+
+	/* Saved note display (C4 increment 4): an inset panel under the why; small uppercase label. */
+	.task-card__note-shown {
+		margin-top: var(--space-s);
+		padding: var(--space-s) var(--space-m);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-s);
+	}
+
+	.task-card__note-label {
+		display: block;
+		margin-bottom: 2px;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+
+	.task-card__note-text {
+		font-size: var(--font-size-s);
 	}
 
 	.task-card__meta {

@@ -309,3 +309,20 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		expect(getComputedStyle(header).touchAction).toBe('manipulation');
 	});
 });
+
+describe('TaskCard (notes display)', () => {
+	it('shows a saved note on an open card, with the action as "Edit note"', () => {
+		const { container } = renderCard(makeItem({ note: 'Reached out to 3 hosts.' }));
+		expect(container.textContent).toContain('Reached out to 3 hosts.');
+		expect(buttonByText(container, 'Edit note')).toBeDefined();
+		expect(buttonByText(container, 'Add note')).toBeUndefined(); // Add -> Edit once a note exists
+	});
+
+	it('shows a saved note on an expanded resolved card', () => {
+		const { container } = renderCard(makeItem({ status: 'done', note: 'Filed via eBenefits.' }));
+		(container.querySelector('button.task-line') as HTMLButtonElement | null)?.click();
+		flushSync();
+		expect(container.textContent).toContain('Filed via eBenefits.');
+		expect(buttonByText(container, 'Edit note')).toBeDefined();
+	});
+});
