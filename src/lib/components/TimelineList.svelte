@@ -28,6 +28,17 @@
 	// Per-phase ephemeral expand state (C4-4): a fully-resolved (collapsible) phase defaults to
 	// collapsed; keyed by bucket id (absent = collapsed). Not persisted (spec section 7).
 	let expanded = $state<Record<string, boolean>>({});
+
+	// A phase that is no longer collapsible (e.g. a task was restored to active) drops its expand
+	// state, so when it becomes fully resolved again it auto-collapses to the default - mirrors the
+	// card-level reset (C4-4). Without this, a stale expanded=true would re-open it.
+	$effect(() => {
+		for (const phase of view.phases) {
+			if (!phase.collapsible && expanded[phase.bucket.id]) {
+				delete expanded[phase.bucket.id];
+			}
+		}
+	});
 </script>
 
 <div class="timeline-list">

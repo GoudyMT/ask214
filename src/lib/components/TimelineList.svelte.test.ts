@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import { flushSync } from 'svelte';
 import TimelineList from './TimelineList.svelte';
-import type { TimelineView, TimelineItem, DisplayStatus } from '$lib/timeline';
+import type { TimelineView, TimelineItem, DisplayStatus, TaskStatus } from '$lib/timeline';
 
 // TimelineList renders a generated TimelineView (C3): one labelled <section> per non-empty
 // phase (h2 = bucket.label, id = bucket.id to seed C5 scroll-spy), each holding a TaskCard per
@@ -181,5 +181,45 @@ describe('TimelineList section auto-collapse (C4-4 B2)', () => {
 		});
 		expect(container.querySelector('button.timeline-list__toggle')).toBeNull();
 		expect(container.textContent).toContain('Request medical records');
+	});
+
+	it('auto-collapses a phase that becomes resolved again (no stale expand after restore)', () => {
+		const props = $state<{
+			view: TimelineView;
+			onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
+			onSetSnooze: (taskId: string, untilIso: string) => void;
+		}>({ view: resolvedView, onSetStatus: noop, onSetSnooze: noop });
+		const { container } = render(TimelineList, { props });
+		const toggle = () => container.querySelector('button.timeline-list__toggle');
+
+		// User expands the collapsed phase.
+		(toggle() as HTMLButtonElement | null)?.click();
+		flushSync();
+		expect(toggle()?.getAttribute('aria-expanded')).toBe('true');
+
+		// A task is restored -> the phase is no longer collapsible (renders open, no toggle).
+		props.view = {
+			phases: [
+				{
+					bucket: { id: 'phase-x', label: '18-12 months out', startOffset: -540, endOffset: -360 },
+					items: [
+						makeItem('Request medical records', 'overdue'),
+						makeItem('Separation physical', 'skipped')
+					],
+					count: 2,
+					counts: { done: 0, skipped: 1, snoozed: 0, toDo: 1 },
+					collapsible: false
+				}
+			],
+			total: 2
+		};
+		flushSync();
+		expect(toggle()).toBeNull();
+
+		// Re-resolved -> collapsible again -> must auto-collapse, NOT reopen stale-expanded.
+		props.view = resolvedView;
+		flushSync();
+		expect(toggle()?.getAttribute('aria-expanded')).toBe('false');
+		expect(container.textContent).not.toContain('Request medical records'); // collapsed = cards hidden
 	});
 });
