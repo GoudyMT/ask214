@@ -1,14 +1,40 @@
 <script lang="ts">
 	import { formatTimelineDate } from '$lib/timeline/format-date';
+	import { SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
 
 	let {
 		item,
-		onSetStatus
+		onSetStatus,
+		onSetSnooze
 	}: {
 		item: TimelineItem;
 		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
+		onSetSnooze: (taskId: string, untilIso: string) => void;
 	} = $props();
+
+	// Inline snooze picker state (ephemeral; not persisted). Snooze toggles it open; a preset or a
+	// picked date commits via onSetSnooze and closes it.
+	let snoozeOpen = $state(false);
+	let showDateInput = $state(false);
+	let dateValue = $state('');
+
+	function snooze(days: number): void {
+		onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days));
+		closeSnooze();
+	}
+
+	function snoozeToDate(): void {
+		if (!dateValue) return;
+		onSetSnooze(item.def.id, dateValue);
+		closeSnooze();
+	}
+
+	function closeSnooze(): void {
+		snoozeOpen = false;
+		showDateInput = false;
+		dateValue = '';
+	}
 
 	const STATUS_LABEL: Record<DisplayStatus, string> = {
 		upcoming: 'Upcoming',
@@ -54,7 +80,37 @@
 		<div class="task-card__actions">
 			<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
 			<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
+			<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
 		</div>
+		{#if snoozeOpen}
+			<div class="task-card__snooze">
+				<span class="task-card__snooze-label">Snooze until</span>
+				<div class="task-card__presets">
+					{#each SNOOZE_PRESETS as preset (preset.days)}
+						<button type="button" class="task-card__preset" onclick={() => snooze(preset.days)}>
+							{preset.label}
+						</button>
+					{/each}
+					<button type="button" class="task-card__preset" onclick={() => (showDateInput = true)}>
+						Pick a date...
+					</button>
+					<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
+						>Cancel</button
+					>
+				</div>
+				{#if showDateInput}
+					<div class="task-card__date-row">
+						<input type="date" bind:value={dateValue} aria-label="Snooze until date" />
+						<button
+							type="button"
+							class="task-card__snooze-go"
+							onclick={snoozeToDate}
+							disabled={!dateValue}>Snooze</button
+						>
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
 	<div class="task-card__meta">
 		<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
@@ -109,7 +165,7 @@
 	}
 
 	/* Action row (C4): quiet accent-link buttons (real <button>s for a11y, styled like the
-	   mockup's action links). Snooze + Add note join here in later C4 increments. */
+	   mockup's action links). Add note joins here in a later C4 increment. */
 	.task-card__actions {
 		display: flex;
 		gap: var(--space-m);
@@ -128,6 +184,91 @@
 
 	.task-card__actions button:hover {
 		text-decoration: underline;
+	}
+
+	/* Inline snooze picker (C4 increment 2, Option B): preset pills + a "Pick a date" date input,
+	   in an inset panel under the action row. */
+	.task-card__snooze {
+		margin-top: var(--space-s);
+		padding: var(--space-s) var(--space-m);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-s);
+	}
+
+	.task-card__snooze-label {
+		display: block;
+		margin-bottom: var(--space-s);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.task-card__presets {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-s);
+		align-items: center;
+	}
+
+	.task-card__preset {
+		padding: var(--space-xs) var(--space-m);
+		background: none;
+		color: var(--color-accent);
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		font: inherit;
+		font-size: var(--font-size-s);
+		cursor: pointer;
+	}
+
+	.task-card__preset:hover {
+		border-color: var(--color-accent);
+	}
+
+	.task-card__snooze-cancel {
+		margin-left: auto;
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-fg-muted);
+		font: inherit;
+		font-size: var(--font-size-s);
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	.task-card__date-row {
+		display: flex;
+		gap: var(--space-s);
+		align-items: center;
+		margin-top: var(--space-s);
+	}
+
+	.task-card__date-row input {
+		background: var(--color-bg);
+		color: var(--color-fg);
+		border: 1px solid var(--color-accent);
+		border-radius: var(--radius-s);
+		padding: var(--space-xs) var(--space-s);
+		font: inherit;
+		font-size: var(--font-size-s);
+	}
+
+	.task-card__snooze-go {
+		padding: var(--space-xs) var(--space-m);
+		background: var(--color-accent);
+		color: var(--color-bg);
+		border: none;
+		border-radius: var(--radius-s);
+		font: inherit;
+		font-size: var(--font-size-s);
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.task-card__snooze-go:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 
 	.task-card__meta {

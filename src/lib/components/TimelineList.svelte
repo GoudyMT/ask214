@@ -4,9 +4,13 @@
 
 	let {
 		view,
-		onSetStatus
-	}: { view: TimelineView; onSetStatus: (taskId: string, status: TaskStatus | undefined) => void } =
-		$props();
+		onSetStatus,
+		onSetSnooze
+	}: {
+		view: TimelineView;
+		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
+		onSetSnooze: (taskId: string, untilIso: string) => void;
+	} = $props();
 </script>
 
 <div class="timeline-list">
@@ -14,7 +18,7 @@
 		<section id={phase.bucket.id} aria-labelledby="{phase.bucket.id}-heading">
 			<h2 id="{phase.bucket.id}-heading" class="timeline-list__phase">{phase.bucket.label}</h2>
 			{#each phase.items as item (item.def.id)}
-				<TaskCard {item} {onSetStatus} />
+				<TaskCard {item} {onSetStatus} {onSetSnooze} />
 			{/each}
 		</section>
 	{/each}

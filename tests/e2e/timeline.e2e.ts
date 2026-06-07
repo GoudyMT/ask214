@@ -78,3 +78,18 @@ test('marking a task done persists across reload', async ({ page }) => {
 		page.locator('article.task-card').first().getByText('Done', { exact: true })
 	).toBeVisible(); // re-decrypted from IndexedDB
 });
+
+test('snoozing a task persists across reload', async ({ page }) => {
+	await setEaos(page);
+	await page.goto('/timeline');
+
+	const firstCard = page.locator('article.task-card').first();
+	await firstCard.getByRole('button', { name: 'Snooze' }).click();
+	await firstCard.getByRole('button', { name: '1 month' }).click();
+	await expect(firstCard.getByText('Snoozed', { exact: true })).toBeVisible();
+
+	await page.reload();
+	await expect(
+		page.locator('article.task-card').first().getByText('Snoozed', { exact: true })
+	).toBeVisible();
+});

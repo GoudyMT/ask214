@@ -53,6 +53,17 @@
 			await timeline.load();
 		}
 	}
+
+	// Snooze a task until an ISO date (increment 2); same OCC-safe reload as setStatus.
+	async function setSnooze(taskId: string, untilIso: string): Promise<void> {
+		const timeline = app.timeline;
+		if (!timeline) return;
+		try {
+			await timeline.setSnooze(taskId, untilIso);
+		} catch {
+			await timeline.load();
+		}
+	}
 </script>
 
 <svelte:head>
@@ -71,7 +82,7 @@
 			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 		</p>
 		{#if view}
-			<TimelineList {view} onSetStatus={setStatus} />
+			<TimelineList {view} onSetStatus={setStatus} onSetSnooze={setSnooze} />
 		{/if}
 	{/if}
 {/if}

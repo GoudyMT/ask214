@@ -46,7 +46,9 @@ const noop = () => {};
 
 describe('TimelineList', () => {
 	it('renders one section per phase, in order, with a scroll-target id', () => {
-		const { container } = render(TimelineList, { props: { view: VIEW, onSetStatus: noop } });
+		const { container } = render(TimelineList, {
+			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
+		});
 		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent);
 		expect(headings).toEqual(['18-12 months out', 'Final 90 days']);
 		expect(container.querySelector('section#phase-18-12')).not.toBeNull();
@@ -54,7 +56,9 @@ describe('TimelineList', () => {
 	});
 
 	it('labels each section by its heading (aria-labelledby) for landmark navigation', () => {
-		const { container } = render(TimelineList, { props: { view: VIEW, onSetStatus: noop } });
+		const { container } = render(TimelineList, {
+			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
+		});
 		const section = container.querySelector('section#phase-18-12');
 		const labelledby = section?.getAttribute('aria-labelledby');
 		expect(labelledby).toBeTruthy();
@@ -62,7 +66,9 @@ describe('TimelineList', () => {
 	});
 
 	it('renders a TaskCard per item across all phases', () => {
-		const { container } = render(TimelineList, { props: { view: VIEW, onSetStatus: noop } });
+		const { container } = render(TimelineList, {
+			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
+		});
 		expect(container.querySelectorAll('article.task-card').length).toBe(3);
 		expect(container.textContent).toContain('Request medical records');
 		expect(container.textContent).toContain('File VA intent-to-file');
