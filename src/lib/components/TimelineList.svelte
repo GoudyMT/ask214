@@ -12,8 +12,9 @@
 		onSetSnooze: (taskId: string, untilIso: string) => void;
 	} = $props();
 
-	// Phase header progress count (C4-4): active phases show what's left ("N to do", Format 1); a
-	// fully-resolved phase shows the done/skipped breakdown. Derived from the engine's per-phase counts.
+	// Phase header progress count (C4-4): an open phase shows what's left = active + snoozed (Format 1
+	// "N to do"; a snoozed task is paused, still pending - not done). A fully-resolved phase shows the
+	// done/skipped breakdown. Derived from the engine's per-phase counts.
 	function phaseCount(phase: TimelineView['phases'][number]): string {
 		if (phase.collapsible) {
 			const parts: string[] = [];
@@ -21,7 +22,7 @@
 			if (phase.counts.skipped > 0) parts.push(`${phase.counts.skipped} skipped`);
 			return parts.join(' - ');
 		}
-		return `${phase.counts.toDo} to do`;
+		return `${phase.counts.toDo + phase.counts.snoozed} to do`;
 	}
 
 	// Per-phase ephemeral expand state (C4-4): a fully-resolved (collapsible) phase defaults to

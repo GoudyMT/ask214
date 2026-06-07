@@ -116,6 +116,25 @@ describe('TimelineList phase progress counts (C4-4 B1)', () => {
 		expect(heading).toContain('3 done');
 		expect(heading).toContain('1 skipped');
 	});
+
+	it('counts snoozed tasks as "to do" (snoozed is paused, not done)', () => {
+		const view: TimelineView = {
+			phases: [
+				{
+					bucket: { id: 'phase-y', label: '12-6 months out', startOffset: -360, endOffset: -180 },
+					items: [makeItem('A', 'overdue'), makeItem('B', 'snoozed'), makeItem('C', 'done')],
+					count: 3,
+					counts: { done: 1, skipped: 0, snoozed: 1, toDo: 1 },
+					collapsible: false
+				}
+			],
+			total: 3
+		};
+		const { container } = render(TimelineList, {
+			props: { view, onSetStatus: noop, onSetSnooze: noop }
+		});
+		expect(container.querySelector('h2')?.textContent).toContain('2 to do'); // 1 active + 1 snoozed
+	});
 });
 
 describe('TimelineList section auto-collapse (C4-4 B2)', () => {
