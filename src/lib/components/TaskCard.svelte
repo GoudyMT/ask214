@@ -19,6 +19,13 @@
 	let showDateInput = $state(false);
 	let dateValue = $state('');
 
+	// C4 increment 3: resolved tasks (done/skipped/snoozed) collapse to a one-line disclosure.
+	// Expansion is ephemeral local state (spec section 7 - collapse state is never stored).
+	let expanded = $state(false);
+	const isResolved = $derived(
+		item.status === 'done' || item.status === 'skipped' || item.status === 'snoozed'
+	);
+
 	function snooze(days: number): void {
 		onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days));
 		closeSnooze();
@@ -54,8 +61,8 @@
 	};
 
 	// Status-specific date line (locked Session 19): upcoming -> when to start (target date);
-	// start-now -> the closing deadline; overdue -> how long past it. Resolved states get the
-	// collapsed treatment in C4; until then they fall back to the target date.
+	// start-now -> the closing deadline; overdue -> how long past it. Resolved states use the
+	// collapsed treatment instead (this line is only read on open cards).
 	const dateLine = $derived.by(() => {
 		const end = formatTimelineDate(item.windowEndDate);
 		switch (item.status) {
@@ -69,54 +76,98 @@
 	});
 </script>
 
-<article class="task-card status-{item.status}">
-	<div class="task-card__body">
-		<h3 class="task-card__title">{item.def.title}</h3>
-		<p class="task-card__why">
-			<span class="task-card__chip category-{item.def.category}"
-				>{CATEGORY_LABEL[item.def.category]}</span
-			>{item.def.why}
-		</p>
-		<div class="task-card__actions">
-			<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
-			<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
-			<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
-		</div>
-		{#if snoozeOpen}
-			<div class="task-card__snooze">
-				<span class="task-card__snooze-label">Snooze until</span>
-				<div class="task-card__presets">
-					{#each SNOOZE_PRESETS as preset (preset.days)}
-						<button type="button" class="task-card__preset" onclick={() => snooze(preset.days)}>
-							{preset.label}
-						</button>
-					{/each}
-					<button type="button" class="task-card__preset" onclick={() => (showDateInput = true)}>
-						Customize
-					</button>
-					<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
-						>Cancel</button
-					>
+{#if isResolved && !expanded}
+	<!-- Collapsed resolved line: the whole row is the disclosure control (button + aria-expanded).
+	     Decision A: snoozed shows its date; done/skipped show none. -->
+	<button
+		type="button"
+		class="task-line line-{item.status}"
+		aria-expanded="false"
+		onclick={() => (expanded = true)}
+	>
+		<span class="task-line__title">{item.def.title}</span>
+		<span class="task-line__status">{STATUS_LABEL[item.status]}</span>
+		{#if item.status === 'snoozed' && item.snoozeUntil}
+			<span class="task-line__date">to {formatTimelineDate(item.snoozeUntil)}</span>
+		{/if}
+		<span class="caret caret--right" aria-hidden="true"></span>
+	</button>
+{:else}
+	<article class="task-card status-{item.status}">
+		<div class="task-card__body">
+			<h3 class="task-card__title">{item.def.title}</h3>
+			<p class="task-card__why">
+				<span class="task-card__chip category-{item.def.category}"
+					>{CATEGORY_LABEL[item.def.category]}</span
+				>{item.def.why}
+			</p>
+			{#if isResolved}
+				<!-- Decision B: a single unified Restore clears the stored status (un-mark / un-snooze). -->
+				<div class="task-card__actions">
+					<button type="button" onclick={() => onSetStatus(item.def.id, undefined)}>Restore</button>
 				</div>
-				{#if showDateInput}
-					<div class="task-card__date-row">
-						<input type="date" bind:value={dateValue} aria-label="Snooze until date" />
-						<button
-							type="button"
-							class="task-card__snooze-go"
-							onclick={snoozeToDate}
-							disabled={!dateValue}>Snooze</button
-						>
+			{:else}
+				<div class="task-card__actions">
+					<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
+					<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
+					<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
+				</div>
+				{#if snoozeOpen}
+					<div class="task-card__snooze">
+						<span class="task-card__snooze-label">Snooze until</span>
+						<div class="task-card__presets">
+							{#each SNOOZE_PRESETS as preset (preset.days)}
+								<button type="button" class="task-card__preset" onclick={() => snooze(preset.days)}>
+									{preset.label}
+								</button>
+							{/each}
+							<button
+								type="button"
+								class="task-card__preset"
+								onclick={() => (showDateInput = true)}
+							>
+								Customize
+							</button>
+							<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
+								>Cancel</button
+							>
+						</div>
+						{#if showDateInput}
+							<div class="task-card__date-row">
+								<input type="date" bind:value={dateValue} aria-label="Snooze until date" />
+								<button
+									type="button"
+									class="task-card__snooze-go"
+									onclick={snoozeToDate}
+									disabled={!dateValue}>Snooze</button
+								>
+							</div>
+						{/if}
 					</div>
 				{/if}
-			</div>
-		{/if}
-	</div>
-	<div class="task-card__meta">
-		<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
-		<span class="task-card__date">{dateLine}</span>
-	</div>
-</article>
+			{/if}
+		</div>
+		<div class="task-card__meta">
+			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
+			{#if isResolved}
+				{#if item.status === 'snoozed' && item.snoozeUntil}
+					<span class="task-card__date">to {formatTimelineDate(item.snoozeUntil)}</span>
+				{/if}
+				<button
+					type="button"
+					class="task-card__collapse"
+					aria-expanded="true"
+					aria-label="Collapse"
+					onclick={() => (expanded = false)}
+				>
+					<span class="caret" aria-hidden="true"></span>
+				</button>
+			{:else}
+				<span class="task-card__date">{dateLine}</span>
+			{/if}
+		</div>
+	</article>
+{/if}
 
 <style>
 	/* Open status card (spec section 7 + timeline-states.html mockup): a surface panel with a
@@ -293,6 +344,101 @@
 	.task-card__date {
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+
+	/* Collapse control on the expanded resolved card: mirrors the line's disclosure (aria-expanded
+	   true) with a down-caret; tapping recollapses. */
+	.task-card__collapse {
+		display: inline-block;
+		margin-top: var(--space-xs);
+		padding: 4px;
+		background: none;
+		border: none;
+		cursor: pointer;
+	}
+
+	/* Collapsed resolved line (C4 increment 3; timeline-states.html mockup): a thinner 2px status
+	   edge vs the open card's 4px; one line of title (truncated) + status label + a right-caret. The
+	   whole line is the disclosure control (button + aria-expanded); tapping expands the full card. */
+	.task-line {
+		display: flex;
+		align-items: center;
+		gap: var(--space-s);
+		width: 100%;
+		text-align: left;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-left-width: 2px;
+		border-radius: var(--radius-m);
+		padding: 6px var(--space-m);
+		margin-bottom: var(--space-s);
+		font: inherit;
+		color: var(--color-fg);
+		cursor: pointer;
+	}
+
+	.task-line__title {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.task-line__status {
+		font-size: var(--font-size-s);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	.task-line__date {
+		font-size: var(--font-size-s);
+		color: var(--color-fg-muted);
+		white-space: nowrap;
+	}
+
+	/* Per-status collapsed edge + label color (mockup ln-*): done = success green; skipped = muted +
+	   dimmed; snoozed = muted with a dashed edge to read as "paused, not closed". */
+	.line-done {
+		border-left-color: var(--color-success);
+	}
+	.line-done .task-line__status {
+		color: var(--color-success);
+	}
+
+	.line-skipped {
+		border-left-color: var(--color-border);
+		opacity: 0.65;
+	}
+	.line-skipped .task-line__status {
+		color: var(--color-fg-muted);
+	}
+
+	.line-snoozed {
+		border-left-color: var(--color-border);
+		border-left-style: dashed;
+	}
+	.line-snoozed .task-line__status {
+		color: var(--color-fg-muted);
+	}
+
+	/* Disclosure caret: right-pointing when collapsed, down (default) on the expanded card's
+	   collapse button. */
+	.caret {
+		width: 0;
+		height: 0;
+		border-left: 4px solid transparent;
+		border-right: 4px solid transparent;
+		border-top: 5px solid var(--color-fg-muted);
+	}
+
+	.caret--right {
+		border-top: 4px solid transparent;
+		border-bottom: 4px solid transparent;
+		border-left: 5px solid var(--color-fg-muted);
+		border-right: none;
 	}
 
 	/* Category chip colors (Option C, Session 19): soft-filled tag - colored text + low-opacity

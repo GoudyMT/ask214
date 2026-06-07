@@ -158,3 +158,73 @@ describe('TaskCard (open states)', () => {
 		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', '2026-08-01');
 	});
 });
+
+// C4 increment 3: resolved tasks (done/skipped/snoozed) collapse to a one-line disclosure
+// (decision A: snoozed shows "to <date>"; done/skipped show no date). Tapping expands to the
+// full card with a unified Restore action (decision B: onSetStatus(id, undefined)). Open states
+// are unchanged. Collapse state is ephemeral local $state.
+describe('TaskCard (resolved / collapsed states)', () => {
+	function lineButton(container: Element): HTMLButtonElement | null {
+		return container.querySelector('button.task-line');
+	}
+
+	it('done: collapses to a disclosure line (aria-expanded=false), no date, why hidden', () => {
+		const { container } = renderCard(makeItem({ status: 'done' }));
+		const line = lineButton(container);
+		expect(line).not.toBeNull();
+		expect(line?.getAttribute('aria-expanded')).toBe('false');
+		expect(line?.textContent).toContain('Research SkillBridge hosts');
+		expect(line?.textContent).toContain('Done');
+		expect(container.querySelector('.task-line__date')).toBeNull(); // decision A: no date for done
+		expect(container.textContent).not.toContain('Find approved programs that fit your rate.');
+	});
+
+	it('snoozed: collapsed line shows "Snoozed" + "to <date>" (decision A)', () => {
+		const { container } = renderCard(makeItem({ status: 'snoozed', snoozeUntil: '2026-08-01' }));
+		expect(lineButton(container)?.textContent).toContain('Snoozed');
+		expect(container.querySelector('.task-line__date')?.textContent).toContain('to Aug 1, 2026');
+	});
+
+	it('skipped: collapsed line shows "Skipped" + no date (decision A)', () => {
+		const { container } = renderCard(makeItem({ status: 'skipped' }));
+		expect(lineButton(container)?.textContent).toContain('Skipped');
+		expect(container.querySelector('.task-line__date')).toBeNull();
+	});
+
+	it('expanding a resolved task reveals the full card + a Restore action', () => {
+		const { container } = renderCard(makeItem({ status: 'done' }));
+		lineButton(container)?.click();
+		flushSync();
+		expect(container.textContent).toContain('Find approved programs that fit your rate.');
+		expect(buttonByText(container, 'Restore')).toBeDefined();
+		expect(container.querySelector('button[aria-expanded="true"]')).not.toBeNull();
+	});
+
+	it('Restore clears the status via onSetStatus(id, undefined) (decision B)', () => {
+		const onSetStatus = vi.fn();
+		const { container } = renderCard(makeItem({ status: 'done' }), { onSetStatus });
+		lineButton(container)?.click();
+		flushSync();
+		buttonByText(container, 'Restore')?.click();
+		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', undefined);
+	});
+
+	it('an expanded resolved card re-collapses back to the line', () => {
+		const { container } = renderCard(makeItem({ status: 'done' }));
+		lineButton(container)?.click();
+		flushSync();
+		const collapse = container.querySelector(
+			'button[aria-expanded="true"]'
+		) as HTMLButtonElement | null;
+		collapse?.click();
+		flushSync();
+		expect(lineButton(container)).not.toBeNull();
+		expect(container.textContent).not.toContain('Find approved programs that fit your rate.');
+	});
+
+	it('open states are not collapsed (upcoming renders the full card immediately)', () => {
+		const { container } = renderCard(makeItem({ status: 'upcoming' }));
+		expect(lineButton(container)).toBeNull();
+		expect(container.textContent).toContain('Find approved programs that fit your rate.');
+	});
+});
