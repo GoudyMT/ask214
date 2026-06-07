@@ -120,11 +120,22 @@ export type TimelineItem = {
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
 };
 
-/** A non-empty phase bucket with its (sorted) items and a count for the chip strip. */
+/** Per-phase progress tally derived from item display status (drives the header count + collapse). */
+export type PhaseCounts = {
+	done: number;
+	skipped: number;
+	snoozed: number;
+	toDo: number; // active: upcoming + start-now + overdue
+};
+
+/** A non-empty phase bucket with its (sorted) items, a chip-strip count, a progress tally, and
+ *  whether it is fully resolved (every task done or skipped -> collapsible). */
 export type TimelinePhase = {
 	bucket: PhaseBucket;
 	items: TimelineItem[];
 	count: number;
+	counts: PhaseCounts;
+	collapsible: boolean;
 };
 
 /** The full generated timeline projection: ordered non-empty phases + a grand total. */
@@ -145,6 +156,27 @@ function bucketIndexFor(offset: number): number {
 		if (bucket && offset < bucket.endOffset) return i;
 	}
 	return PHASE_BUCKETS.length - 1;
+}
+
+/** Tally a phase's items by display status (C4-4: header progress count + the collapse decision). */
+function tallyCounts(items: TimelineItem[]): PhaseCounts {
+	const counts: PhaseCounts = { done: 0, skipped: 0, snoozed: 0, toDo: 0 };
+	for (const item of items) {
+		switch (item.status) {
+			case 'done':
+				counts.done++;
+				break;
+			case 'skipped':
+				counts.skipped++;
+				break;
+			case 'snoozed':
+				counts.snoozed++;
+				break;
+			default:
+				counts.toDo++; // upcoming / start-now / overdue
+		}
+	}
+	return counts;
 }
 
 /**
@@ -189,7 +221,11 @@ export function generateTimeline(
 			.filter((entry) => bucketIndexFor(entry.offset) === i)
 			.map((entry) => entry.item);
 		if (items.length === 0) continue;
-		phases.push({ bucket, items, count: items.length });
+		const counts = tallyCounts(items);
+		// Collapsible only when every task is resolved as done/skipped - any snoozed (paused) or
+		// active task keeps the phase open (C4-4, spec section 7).
+		const collapsible = counts.toDo === 0 && counts.snoozed === 0;
+		phases.push({ bucket, items, count: items.length, counts, collapsible });
 	}
 
 	return { phases, total: anchored.length };

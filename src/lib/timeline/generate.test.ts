@@ -211,6 +211,38 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		expect(view.phases).toEqual([]);
 		expect(view.total).toBe(0);
 	});
+
+	it('marks a phase collapsible when every task is done or skipped, with counts', () => {
+		const defs = [mk('a', -600), mk('a2', -560)]; // both in 24-18mo
+		const state: TimelineState = {
+			schemaVersion: 1,
+			tasks: { a: { status: 'done' }, a2: { status: 'skipped' } }
+		};
+		const phase = generateTimeline(persona, defs, state, today).phases[0];
+		expect(phase?.collapsible).toBe(true);
+		expect(phase?.counts).toEqual({ done: 1, skipped: 1, snoozed: 0, toDo: 0 });
+	});
+
+	it('keeps a phase non-collapsible when an active task remains, counting toDo', () => {
+		const defs = [mk('a', -600), mk('a2', -560)];
+		const state: TimelineState = { schemaVersion: 1, tasks: { a: { status: 'done' } } };
+		const phase = generateTimeline(persona, defs, state, today).phases[0];
+		expect(phase?.collapsible).toBe(false);
+		expect(phase?.counts?.done).toBe(1);
+		expect(phase?.counts?.toDo).toBe(1); // a2 derives active (overdue) -> still "to do"
+	});
+
+	it('keeps a phase non-collapsible when a task is snoozed (paused, not resolved)', () => {
+		const defs = [mk('a', -600), mk('a2', -560)];
+		const state: TimelineState = {
+			schemaVersion: 1,
+			tasks: { a: { status: 'done' }, a2: { status: 'snoozed', snoozeUntil: '2026-12-31' } }
+		};
+		const phase = generateTimeline(persona, defs, state, today).phases[0];
+		expect(phase?.collapsible).toBe(false);
+		expect(phase?.counts?.snoozed).toBe(1);
+		expect(phase?.counts?.toDo).toBe(0);
+	});
 });
 
 describe('generateTimeline SkillBridge shift (TL-10)', () => {

@@ -31,12 +31,16 @@ const VIEW: TimelineView = {
 		{
 			bucket: { id: 'phase-18-12', label: '18-12 months out', startOffset: -540, endOffset: -360 },
 			items: [makeItem('Request medical records')],
-			count: 1
+			count: 1,
+			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 1 },
+			collapsible: false
 		},
 		{
 			bucket: { id: 'phase-final-90', label: 'Final 90 days', startOffset: -90, endOffset: 0 },
 			items: [makeItem('File VA intent-to-file', 'overdue'), makeItem('DD-214 review')],
-			count: 2
+			count: 2,
+			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 2 },
+			collapsible: false
 		}
 	],
 	total: 3
