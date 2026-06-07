@@ -38,13 +38,15 @@ function renderCard(
 	handlers: {
 		onSetStatus?: (taskId: string, status: TaskStatus | undefined) => void;
 		onSetSnooze?: (taskId: string, untilIso: string) => void;
+		onSetNote?: (taskId: string, note: string | undefined) => void;
 	} = {}
 ) {
 	return render(TaskCard, {
 		props: {
 			item,
 			onSetStatus: handlers.onSetStatus ?? noop,
-			onSetSnooze: handlers.onSetSnooze ?? noop
+			onSetSnooze: handlers.onSetSnooze ?? noop,
+			onSetNote: handlers.onSetNote ?? noop
 		}
 	});
 }
@@ -156,6 +158,31 @@ describe('TaskCard (open states)', () => {
 		) as HTMLButtonElement | null;
 		confirm?.click();
 		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', '2026-08-01');
+	});
+
+	it('Add note reveals a textarea; Save calls onSetNote with the text', () => {
+		const onSetNote = vi.fn();
+		const { container } = renderCard(makeItem(), { onSetNote });
+		buttonByText(container, 'Add note')?.click();
+		flushSync();
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement | null;
+		if (!textarea) throw new Error('no note textarea rendered');
+		textarea.value = 'Call the VSO Monday';
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		buttonByText(container, 'Save')?.click();
+		expect(onSetNote).toHaveBeenCalledWith('skillbridge-hosts', 'Call the VSO Monday');
+	});
+
+	it('Cancel closes the note editor without saving', () => {
+		const onSetNote = vi.fn();
+		const { container } = renderCard(makeItem(), { onSetNote });
+		buttonByText(container, 'Add note')?.click();
+		flushSync();
+		buttonByText(container, 'Cancel')?.click();
+		flushSync();
+		expect(onSetNote).not.toHaveBeenCalled();
+		expect(container.querySelector('textarea')).toBeNull();
 	});
 });
 

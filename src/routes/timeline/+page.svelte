@@ -64,6 +64,17 @@
 			await timeline.load();
 		}
 	}
+
+	// Set or clear a free-text note (increment 4); same OCC-safe reload as the other actions.
+	async function setNote(taskId: string, note: string | undefined): Promise<void> {
+		const timeline = app.timeline;
+		if (!timeline) return;
+		try {
+			await timeline.setNote(taskId, note);
+		} catch {
+			await timeline.load();
+		}
+	}
 </script>
 
 <svelte:head>
@@ -82,7 +93,7 @@
 			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 		</p>
 		{#if view}
-			<TimelineList {view} onSetStatus={setStatus} onSetSnooze={setSnooze} />
+			<TimelineList {view} onSetStatus={setStatus} onSetSnooze={setSnooze} onSetNote={setNote} />
 		{/if}
 	{/if}
 {/if}

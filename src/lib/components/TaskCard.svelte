@@ -6,11 +6,13 @@
 	let {
 		item,
 		onSetStatus,
-		onSetSnooze
+		onSetSnooze,
+		onSetNote
 	}: {
 		item: TimelineItem;
 		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
 		onSetSnooze: (taskId: string, untilIso: string) => void;
+		onSetNote?: (taskId: string, note: string | undefined) => void;
 	} = $props();
 
 	// Inline snooze picker state (ephemeral; not persisted). Snooze toggles it open; a preset or a
@@ -53,6 +55,26 @@
 		snoozeOpen = false;
 		showDateInput = false;
 		dateValue = '';
+	}
+
+	// Inline note editor (C4 increment 4): Add/Edit note -> textarea (prefilled with any existing
+	// note); Save commits via onSetNote (empty string clears it); Cancel discards.
+	let noteOpen = $state(false);
+	let noteValue = $state('');
+
+	function openNote(): void {
+		noteValue = item.note ?? '';
+		noteOpen = true;
+	}
+
+	function saveNote(): void {
+		onSetNote?.(item.def.id, noteValue);
+		closeNote();
+	}
+
+	function closeNote(): void {
+		noteOpen = false;
+		noteValue = '';
 	}
 
 	const STATUS_LABEL: Record<DisplayStatus, string> = {
@@ -148,6 +170,7 @@
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
 				<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
+				<button type="button" onclick={openNote}>Add note</button>
 			</div>
 			{#if snoozeOpen}
 				<div class="task-card__snooze">
@@ -176,6 +199,20 @@
 							>
 						</div>
 					{/if}
+				</div>
+			{/if}
+			{#if noteOpen}
+				<div class="task-card__note">
+					<textarea
+						class="task-card__note-input"
+						bind:value={noteValue}
+						aria-label="Note"
+						placeholder="Add a note..."
+					></textarea>
+					<div class="task-card__note-actions">
+						<button type="button" class="task-card__note-save" onclick={saveNote}>Save</button>
+						<button type="button" class="task-card__note-cancel" onclick={closeNote}>Cancel</button>
+					</div>
 				</div>
 			{/if}
 		</div>
@@ -350,6 +387,55 @@
 	.task-card__snooze-go:disabled {
 		opacity: 0.6;
 		cursor: default;
+	}
+
+	/* Inline note editor (C4 increment 4): a full-width textarea + Save/Cancel, styled like the
+	   snooze inset (accent-bordered field; accent Save; quiet Cancel). */
+	.task-card__note {
+		margin-top: var(--space-s);
+	}
+
+	.task-card__note-input {
+		width: 100%;
+		min-height: 56px;
+		resize: vertical;
+		background: var(--color-bg);
+		color: var(--color-fg);
+		border: 1px solid var(--color-accent);
+		border-radius: var(--radius-s);
+		padding: var(--space-s);
+		font: inherit;
+		font-size: var(--font-size-s);
+	}
+
+	.task-card__note-actions {
+		display: flex;
+		gap: var(--space-s);
+		align-items: center;
+		margin-top: var(--space-xs);
+	}
+
+	.task-card__note-save {
+		padding: var(--space-xs) var(--space-m);
+		background: var(--color-accent);
+		color: var(--color-bg);
+		border: none;
+		border-radius: var(--radius-s);
+		font: inherit;
+		font-size: var(--font-size-s);
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.task-card__note-cancel {
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-fg-muted);
+		font: inherit;
+		font-size: var(--font-size-s);
+		text-decoration: underline;
+		cursor: pointer;
 	}
 
 	.task-card__meta {
