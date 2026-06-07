@@ -53,8 +53,8 @@ describe('TimelineList', () => {
 		const { container } = render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
-		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent);
-		expect(headings).toEqual(['18-12 months out', 'Final 90 days']);
+		const ids = [...container.querySelectorAll('section')].map((s) => s.id);
+		expect(ids).toEqual(['phase-18-12', 'phase-final-90']); // one section per phase, in order (ids are count-free)
 		expect(container.querySelector('section#phase-18-12')).not.toBeNull();
 		expect(container.querySelector('section#phase-final-90')).not.toBeNull();
 	});
@@ -66,7 +66,7 @@ describe('TimelineList', () => {
 		const section = container.querySelector('section#phase-18-12');
 		const labelledby = section?.getAttribute('aria-labelledby');
 		expect(labelledby).toBeTruthy();
-		expect(container.querySelector(`#${labelledby}`)?.textContent).toBe('18-12 months out');
+		expect(container.querySelector(`#${labelledby}`)?.textContent).toContain('18-12 months out'); // heading now also carries the progress count (C4-4)
 	});
 
 	it('renders a TaskCard per item across all phases', () => {
@@ -77,5 +77,42 @@ describe('TimelineList', () => {
 		expect(container.textContent).toContain('Request medical records');
 		expect(container.textContent).toContain('File VA intent-to-file');
 		expect(container.textContent).toContain('DD-214 review');
+	});
+});
+
+describe('TimelineList phase progress counts (C4-4 B1)', () => {
+	it('active phase header shows the "N to do" count (Format 1)', () => {
+		const { container } = render(TimelineList, {
+			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
+		});
+		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent);
+		expect(headings[0]).toContain('1 to do'); // phase-18-12: 1 active task
+		expect(headings[1]).toContain('2 to do'); // phase-final-90: 2 active tasks
+	});
+
+	it('resolved phase header shows the done/skipped breakdown', () => {
+		const resolvedView: TimelineView = {
+			phases: [
+				{
+					bucket: { id: 'phase-x', label: '18-12 months out', startOffset: -540, endOffset: -360 },
+					items: [
+						makeItem('A', 'done'),
+						makeItem('B', 'done'),
+						makeItem('C', 'done'),
+						makeItem('D', 'skipped')
+					],
+					count: 4,
+					counts: { done: 3, skipped: 1, snoozed: 0, toDo: 0 },
+					collapsible: true
+				}
+			],
+			total: 4
+		};
+		const { container } = render(TimelineList, {
+			props: { view: resolvedView, onSetStatus: noop, onSetSnooze: noop }
+		});
+		const heading = container.querySelector('h2')?.textContent;
+		expect(heading).toContain('3 done');
+		expect(heading).toContain('1 skipped');
 	});
 });
