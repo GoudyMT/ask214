@@ -1,5 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
+import { flushSync } from 'svelte';
 import TimelineList from './TimelineList.svelte';
 import type { TimelineView, TimelineItem, DisplayStatus } from '$lib/timeline';
 
@@ -114,5 +115,52 @@ describe('TimelineList phase progress counts (C4-4 B1)', () => {
 		const heading = container.querySelector('h2')?.textContent;
 		expect(heading).toContain('3 done');
 		expect(heading).toContain('1 skipped');
+	});
+});
+
+describe('TimelineList section auto-collapse (C4-4 B2)', () => {
+	const resolvedView: TimelineView = {
+		phases: [
+			{
+				bucket: { id: 'phase-x', label: '18-12 months out', startOffset: -540, endOffset: -360 },
+				items: [
+					makeItem('Request medical records', 'done'),
+					makeItem('Separation physical', 'skipped')
+				],
+				count: 2,
+				counts: { done: 1, skipped: 1, snoozed: 0, toDo: 0 },
+				collapsible: true
+			}
+		],
+		total: 2
+	};
+
+	it('collapses a fully-resolved phase by default (disclosure button, cards hidden)', () => {
+		const { container } = render(TimelineList, {
+			props: { view: resolvedView, onSetStatus: noop, onSetSnooze: noop }
+		});
+		const toggle = container.querySelector('button.timeline-list__toggle');
+		expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+		expect(container.textContent).not.toContain('Request medical records'); // cards hidden until expanded
+	});
+
+	it('expands a collapsed phase on tap (cards shown)', () => {
+		const { container } = render(TimelineList, {
+			props: { view: resolvedView, onSetStatus: noop, onSetSnooze: noop }
+		});
+		(container.querySelector('button.timeline-list__toggle') as HTMLButtonElement | null)?.click();
+		flushSync();
+		expect(
+			container.querySelector('button.timeline-list__toggle')?.getAttribute('aria-expanded')
+		).toBe('true');
+		expect(container.textContent).toContain('Request medical records');
+	});
+
+	it('an active phase has no disclosure (no caret/tap), cards shown directly', () => {
+		const { container } = render(TimelineList, {
+			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
+		});
+		expect(container.querySelector('button.timeline-list__toggle')).toBeNull();
+		expect(container.textContent).toContain('Request medical records');
 	});
 });

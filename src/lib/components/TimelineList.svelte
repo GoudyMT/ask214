@@ -23,17 +23,45 @@
 		}
 		return `${phase.counts.toDo} to do`;
 	}
+
+	// Per-phase ephemeral expand state (C4-4): a fully-resolved (collapsible) phase defaults to
+	// collapsed; keyed by bucket id (absent = collapsed). Not persisted (spec section 7).
+	let expanded = $state<Record<string, boolean>>({});
 </script>
 
 <div class="timeline-list">
 	{#each view.phases as phase (phase.bucket.id)}
 		<section id={phase.bucket.id} aria-labelledby="{phase.bucket.id}-heading">
-			<h2 id="{phase.bucket.id}-heading" class="timeline-list__phase">
-				{phase.bucket.label} <span class="timeline-list__count">- {phaseCount(phase)}</span>
-			</h2>
-			{#each phase.items as item (item.def.id)}
-				<TaskCard {item} {onSetStatus} {onSetSnooze} />
-			{/each}
+			{#if phase.collapsible}
+				<h2 id="{phase.bucket.id}-heading" class="timeline-list__phase">
+					<button
+						type="button"
+						class="timeline-list__toggle"
+						aria-expanded={expanded[phase.bucket.id] ?? false}
+						onclick={() => (expanded[phase.bucket.id] = !expanded[phase.bucket.id])}
+					>
+						<span
+							class="timeline-list__caret"
+							class:timeline-list__caret--right={!expanded[phase.bucket.id]}
+							aria-hidden="true"
+						></span>
+						{phase.bucket.label}
+						<span class="timeline-list__count">- {phaseCount(phase)}</span>
+					</button>
+				</h2>
+				{#if expanded[phase.bucket.id]}
+					{#each phase.items as item (item.def.id)}
+						<TaskCard {item} {onSetStatus} {onSetSnooze} />
+					{/each}
+				{/if}
+			{:else}
+				<h2 id="{phase.bucket.id}-heading" class="timeline-list__phase">
+					{phase.bucket.label} <span class="timeline-list__count">- {phaseCount(phase)}</span>
+				</h2>
+				{#each phase.items as item (item.def.id)}
+					<TaskCard {item} {onSetStatus} {onSetSnooze} />
+				{/each}
+			{/if}
 		</section>
 	{/each}
 </div>
@@ -57,6 +85,41 @@
 	.timeline-list__count {
 		text-transform: none;
 		font-weight: 400;
+	}
+
+	/* Collapsible phase disclosure (C4-4): the header becomes a full-width toggle button inside the
+	   <h2> (preserves the heading + aria-labelledby). Tap-safe like the task cards. */
+	.timeline-list__toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-s);
+		width: 100%;
+		padding: 0;
+		background: none;
+		border: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+		touch-action: manipulation;
+		-webkit-user-select: none;
+		user-select: none;
+	}
+
+	/* Disclosure caret: down (default) when expanded, right when collapsed. */
+	.timeline-list__caret {
+		flex: none;
+		width: 0;
+		height: 0;
+		border-left: 4px solid transparent;
+		border-right: 4px solid transparent;
+		border-top: 5px solid var(--color-fg-muted);
+	}
+	.timeline-list__caret--right {
+		border-top: 4px solid transparent;
+		border-bottom: 4px solid transparent;
+		border-left: 5px solid var(--color-fg-muted);
+		border-right: none;
 	}
 
 	/* The first phase sits flush under the route subline (no leading gap). */
