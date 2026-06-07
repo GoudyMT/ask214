@@ -127,7 +127,7 @@ describe('TaskCard (open states)', () => {
 		expect(buttonByText(container, '1 week')).toBeDefined();
 		expect(buttonByText(container, '1 month')).toBeDefined();
 		expect(buttonByText(container, '3 months')).toBeDefined();
-		expect(buttonByText(container, 'Pick a date...')).toBeDefined();
+		expect(buttonByText(container, 'Customize')).toBeDefined();
 	});
 
 	it('a snooze preset calls onSetSnooze with the computed ISO date', () => {
@@ -139,12 +139,12 @@ describe('TaskCard (open states)', () => {
 		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', snoozeUntilIso(new Date(), 7));
 	});
 
-	it('Pick a date reveals a date input; confirming calls onSetSnooze with that date', () => {
+	it('Customize reveals a date input; confirming calls onSetSnooze with that date', () => {
 		const onSetSnooze = vi.fn();
 		const { container } = renderCard(makeItem(), { onSetSnooze });
 		buttonByText(container, 'Snooze')?.click();
 		flushSync();
-		buttonByText(container, 'Pick a date...')?.click();
+		buttonByText(container, 'Customize')?.click();
 		flushSync();
 		const input = container.querySelector('input[type="date"]') as HTMLInputElement | null;
 		if (!input) throw new Error('no date input rendered');

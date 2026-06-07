@@ -92,7 +92,7 @@
 						</button>
 					{/each}
 					<button type="button" class="task-card__preset" onclick={() => (showDateInput = true)}>
-						Pick a date...
+						Customize
 					</button>
 					<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
 						>Cancel</button
@@ -186,7 +186,7 @@
 		text-decoration: underline;
 	}
 
-	/* Inline snooze picker (C4 increment 2, Option B): preset pills + a "Pick a date" date input,
+	/* Inline snooze picker (C4 increment 2, Option B): preset pills + a "Customize" date input,
 	   in an inset panel under the action row. */
 	.task-card__snooze {
 		margin-top: var(--space-s);
