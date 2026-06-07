@@ -126,7 +126,7 @@
 		</div>
 	{:else if item.note}
 		<div class="task-card__note-shown">
-			<span class="task-card__note-label">Your note</span>
+			<span class="task-card__note-label">Notes</span>
 			<span class="task-card__note-text">{item.note}</span>
 		</div>
 	{/if}
@@ -420,6 +420,12 @@
 		padding: var(--space-s);
 		font: inherit;
 		font-size: var(--font-size-s);
+		transition: box-shadow 120ms ease;
+	}
+
+	.task-card__note-input:focus {
+		outline: none;
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
 	}
 
 	.task-card__note-actions {
@@ -466,8 +472,6 @@
 		margin-bottom: 2px;
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
 	}
 
 	.task-card__note-text {
