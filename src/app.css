@@ -9,6 +9,13 @@
 	--color-success: #6fb37a;
 	--color-border: #2a313a;
 
+	/* Category accents for timeline chips (Session 19) - distinct from the status palette. */
+	--color-category-medical: #56b6c2;
+	--color-category-admin: #8895a8;
+	--color-category-benefits: #7e8ce0;
+	--color-category-career: #b07fd0;
+	--color-category-finance: #cbb15e;
+
 	--space-xs: 4px;
 	--space-s: 8px;
 	--space-m: 16px;

@@ -41,7 +41,9 @@
 	<div class="task-card__body">
 		<h3 class="task-card__title">{item.def.title}</h3>
 		<p class="task-card__why">
-			<span class="task-card__chip">{CATEGORY_LABEL[item.def.category]}</span>{item.def.why}
+			<span class="task-card__chip category-{item.def.category}"
+				>{CATEGORY_LABEL[item.def.category]}</span
+			>{item.def.why}
 		</p>
 	</div>
 	<div class="task-card__meta">
@@ -111,6 +113,35 @@
 	.task-card__date {
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+
+	/* Category chip colors (Option C, Session 19): soft-filled tag - colored text + low-opacity
+	   fill + tinted border, per category. Always paired with the category text label (not
+	   color-only). Distinct from the status palette so a chip never reads as a status. */
+	.category-medical {
+		color: var(--color-category-medical);
+		border-color: color-mix(in srgb, var(--color-category-medical) 45%, transparent);
+		background: color-mix(in srgb, var(--color-category-medical) 15%, transparent);
+	}
+	.category-admin {
+		color: var(--color-category-admin);
+		border-color: color-mix(in srgb, var(--color-category-admin) 45%, transparent);
+		background: color-mix(in srgb, var(--color-category-admin) 15%, transparent);
+	}
+	.category-benefits {
+		color: var(--color-category-benefits);
+		border-color: color-mix(in srgb, var(--color-category-benefits) 45%, transparent);
+		background: color-mix(in srgb, var(--color-category-benefits) 15%, transparent);
+	}
+	.category-career {
+		color: var(--color-category-career);
+		border-color: color-mix(in srgb, var(--color-category-career) 45%, transparent);
+		background: color-mix(in srgb, var(--color-category-career) 15%, transparent);
+	}
+	.category-finance {
+		color: var(--color-category-finance);
+		border-color: color-mix(in srgb, var(--color-category-finance) 45%, transparent);
+		background: color-mix(in srgb, var(--color-category-finance) 15%, transparent);
 	}
 
 	/* Status edge + label colors (locked state-color tokens; open states for C3). */

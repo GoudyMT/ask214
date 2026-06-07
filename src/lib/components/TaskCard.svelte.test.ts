@@ -66,4 +66,18 @@ describe('TaskCard (open states)', () => {
 		expect(container.textContent).toContain('Overdue');
 		expect(container.textContent).toContain('since Jan 15, 2027');
 	});
+
+	it('color-codes the category chip via a category-<name> class (text label still present)', () => {
+		const career = render(TaskCard, { props: { item: makeItem() } });
+		const careerChip = career.container.querySelector('.task-card__chip');
+		expect(careerChip?.classList.contains('category-career')).toBe(true);
+		expect(careerChip?.textContent).toBe('Career'); // color is an aid; the label still carries it
+
+		const medical = render(TaskCard, {
+			props: { item: makeItem({ def: { ...DEF, category: 'medical' } }) }
+		});
+		expect(
+			medical.container.querySelector('.task-card__chip')?.classList.contains('category-medical')
+		).toBe(true);
+	});
 });
