@@ -117,6 +117,7 @@ export type TimelineItem = {
 	windowStartDate: string;
 	windowEndDate: string;
 	status: DisplayStatus;
+	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
 };
 
 /** A non-empty phase bucket with its (sorted) items and a count for the chip strip. */
@@ -161,16 +162,23 @@ export function generateTimeline(
 	const anchored = filterAndAnchor(persona, defs);
 
 	const sorted = anchored
-		.map((a) => ({
-			item: {
+		.map((a) => {
+			const stored = state.tasks[a.def.id];
+			const status = deriveStatus(a, stored, today);
+			// snoozeUntil rides the view only while the item is actively snoozed; gating on the
+			// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.
+			const item: TimelineItem = {
 				def: a.def,
 				targetDate: a.targetDate,
 				windowStartDate: a.windowStartDate,
 				windowEndDate: a.windowEndDate,
-				status: deriveStatus(a, state.tasks[a.def.id], today)
-			} satisfies TimelineItem,
-			offset: a.effectiveOffset
-		}))
+				status,
+				...(status === 'snoozed' && stored?.snoozeUntil !== undefined
+					? { snoozeUntil: stored.snoozeUntil }
+					: {})
+			};
+			return { item, offset: a.effectiveOffset };
+		})
 		.sort((x, y) => x.offset - y.offset);
 
 	const phases: TimelinePhase[] = [];

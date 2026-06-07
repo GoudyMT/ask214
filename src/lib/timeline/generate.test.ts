@@ -186,6 +186,26 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		expect(view.phases[0]?.items[0]?.status).toBe('done');
 	});
 
+	it('surfaces snoozeUntil on a snoozed item (decision A: snoozed shows the date)', () => {
+		const state: TimelineState = {
+			schemaVersion: 1,
+			tasks: { b: { status: 'snoozed', snoozeUntil: '2026-12-31' } }
+		};
+		const item = generateTimeline(persona, [mk('b', -120)], state, today).phases[0]?.items[0];
+		expect(item?.status).toBe('snoozed');
+		expect(item?.snoozeUntil).toBe('2026-12-31');
+	});
+
+	it('omits snoozeUntil when the item is not snoozed (no stale date leaks through done)', () => {
+		const state: TimelineState = {
+			schemaVersion: 1,
+			tasks: { b: { status: 'done', snoozeUntil: '2026-12-31' } }
+		};
+		const item = generateTimeline(persona, [mk('b', -120)], state, today).phases[0]?.items[0];
+		expect(item?.status).toBe('done');
+		expect(item?.snoozeUntil).toBeUndefined();
+	});
+
 	it('returns an empty view for a none persona (route renders the setup CTA)', () => {
 		const view = generateTimeline({ completeness: 'none' }, [mk('a', -600)], emptyState, today);
 		expect(view.phases).toEqual([]);
