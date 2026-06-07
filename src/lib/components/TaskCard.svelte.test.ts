@@ -200,6 +200,14 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		expect(container.querySelector('button[aria-expanded="true"]')).not.toBeNull();
 	});
 
+	it('the expanded collapse control is the header row (contains the title), not a bare caret', () => {
+		const { container } = renderCard(makeItem({ status: 'done' }));
+		(container.querySelector('button.task-line') as HTMLButtonElement | null)?.click();
+		flushSync();
+		const toggle = container.querySelector('button[aria-expanded="true"]');
+		expect(toggle?.textContent).toContain('Research SkillBridge hosts'); // tap the whole header, not a caret
+	});
+
 	it('Restore clears the status via onSetStatus(id, undefined) (decision B)', () => {
 		const onSetStatus = vi.fn();
 		const { container } = renderCard(makeItem({ status: 'done' }), { onSetStatus });

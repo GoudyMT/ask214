@@ -92,6 +92,37 @@
 		{/if}
 		<span class="caret caret--right" aria-hidden="true"></span>
 	</button>
+{:else if isResolved}
+	<!-- Expanded resolved card: the header row (title + status + caret) is the disclosure toggle -
+	     tap anywhere on the header to recollapse (decision: not just a bare caret). Restore sits
+	     below as its own control. Status color matches the collapsed line (decision: consistent
+	     across collapse/expand). -->
+	<article class="task-card task-card--resolved status-{item.status}">
+		<button
+			type="button"
+			class="task-card__header"
+			aria-expanded="true"
+			onclick={() => (expanded = false)}
+		>
+			<span class="task-card__header-title">{item.def.title}</span>
+			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
+			{#if item.status === 'snoozed' && item.snoozeUntil}
+				<span class="task-card__date">to {formatTimelineDate(item.snoozeUntil)}</span>
+			{/if}
+			<span class="caret" aria-hidden="true"></span>
+		</button>
+		<div class="task-card__detail">
+			<p class="task-card__why">
+				<span class="task-card__chip category-{item.def.category}"
+					>{CATEGORY_LABEL[item.def.category]}</span
+				>{item.def.why}
+			</p>
+			<!-- Decision B: a single unified Restore clears the stored status (un-mark / un-snooze). -->
+			<div class="task-card__actions">
+				<button type="button" onclick={() => onSetStatus(item.def.id, undefined)}>Restore</button>
+			</div>
+		</div>
+	</article>
 {:else}
 	<article class="task-card status-{item.status}">
 		<div class="task-card__body">
@@ -101,70 +132,44 @@
 					>{CATEGORY_LABEL[item.def.category]}</span
 				>{item.def.why}
 			</p>
-			{#if isResolved}
-				<!-- Decision B: a single unified Restore clears the stored status (un-mark / un-snooze). -->
-				<div class="task-card__actions">
-					<button type="button" onclick={() => onSetStatus(item.def.id, undefined)}>Restore</button>
-				</div>
-			{:else}
-				<div class="task-card__actions">
-					<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
-					<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
-					<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
-				</div>
-				{#if snoozeOpen}
-					<div class="task-card__snooze">
-						<span class="task-card__snooze-label">Snooze until</span>
-						<div class="task-card__presets">
-							{#each SNOOZE_PRESETS as preset (preset.days)}
-								<button type="button" class="task-card__preset" onclick={() => snooze(preset.days)}>
-									{preset.label}
-								</button>
-							{/each}
+			<div class="task-card__actions">
+				<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
+				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
+				<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
+			</div>
+			{#if snoozeOpen}
+				<div class="task-card__snooze">
+					<span class="task-card__snooze-label">Snooze until</span>
+					<div class="task-card__presets">
+						{#each SNOOZE_PRESETS as preset (preset.days)}
+							<button type="button" class="task-card__preset" onclick={() => snooze(preset.days)}>
+								{preset.label}
+							</button>
+						{/each}
+						<button type="button" class="task-card__preset" onclick={() => (showDateInput = true)}>
+							Customize
+						</button>
+						<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
+							>Cancel</button
+						>
+					</div>
+					{#if showDateInput}
+						<div class="task-card__date-row">
+							<input type="date" bind:value={dateValue} aria-label="Snooze until date" />
 							<button
 								type="button"
-								class="task-card__preset"
-								onclick={() => (showDateInput = true)}
-							>
-								Customize
-							</button>
-							<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
-								>Cancel</button
+								class="task-card__snooze-go"
+								onclick={snoozeToDate}
+								disabled={!dateValue}>Snooze</button
 							>
 						</div>
-						{#if showDateInput}
-							<div class="task-card__date-row">
-								<input type="date" bind:value={dateValue} aria-label="Snooze until date" />
-								<button
-									type="button"
-									class="task-card__snooze-go"
-									onclick={snoozeToDate}
-									disabled={!dateValue}>Snooze</button
-								>
-							</div>
-						{/if}
-					</div>
-				{/if}
+					{/if}
+				</div>
 			{/if}
 		</div>
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
-			{#if isResolved}
-				{#if item.status === 'snoozed' && item.snoozeUntil}
-					<span class="task-card__date">to {formatTimelineDate(item.snoozeUntil)}</span>
-				{/if}
-				<button
-					type="button"
-					class="task-card__collapse"
-					aria-expanded="true"
-					aria-label="Collapse"
-					onclick={() => (expanded = false)}
-				>
-					<span class="caret" aria-hidden="true"></span>
-				</button>
-			{:else}
-				<span class="task-card__date">{dateLine}</span>
-			{/if}
+			<span class="task-card__date">{dateLine}</span>
 		</div>
 	</article>
 {/if}
@@ -186,6 +191,12 @@
 		border-radius: var(--radius-m);
 		padding: var(--space-s) var(--space-m);
 		margin-bottom: var(--space-s);
+	}
+
+	/* Expanded resolved card stacks its header + detail vertically (overrides the open card's
+	   two-column flex row). */
+	.task-card--resolved {
+		display: block;
 	}
 
 	.task-card__body {
@@ -346,15 +357,32 @@
 		font-size: var(--font-size-s);
 	}
 
-	/* Collapse control on the expanded resolved card: mirrors the line's disclosure (aria-expanded
-	   true) with a down-caret; tapping recollapses. */
-	.task-card__collapse {
-		display: inline-block;
-		margin-top: var(--space-xs);
-		padding: 4px;
+	/* Expanded resolved header: the disclosure toggle (button reset; full-width tap target). Title
+	   left, status/date/caret right - one large click area to recollapse. */
+	.task-card__header {
+		display: flex;
+		align-items: center;
+		gap: var(--space-s);
+		width: 100%;
+		text-align: left;
 		background: none;
 		border: none;
+		padding: 0;
+		font: inherit;
+		color: inherit;
 		cursor: pointer;
+	}
+
+	.task-card__header-title {
+		flex: 1;
+		min-width: 0;
+		font-size: var(--font-size-base);
+		font-weight: 600;
+		line-height: 1.3;
+	}
+
+	.task-card__detail {
+		margin-top: var(--space-s);
 	}
 
 	/* Collapsed resolved line (C4 increment 3; timeline-states.html mockup): a thinner 2px status
@@ -425,7 +453,7 @@
 	}
 
 	/* Disclosure caret: right-pointing when collapsed, down (default) on the expanded card's
-	   collapse button. */
+	   header toggle. */
 	.caret {
 		width: 0;
 		height: 0;
@@ -470,7 +498,9 @@
 		background: color-mix(in srgb, var(--color-category-finance) 15%, transparent);
 	}
 
-	/* Status edge + label colors (locked state-color tokens; open states for C3). */
+	/* Status edge + label colors. Open states (C3): upcoming / start-now / overdue. Resolved states
+	   (C4 inc 3): done / skipped / snoozed - colors MATCH the collapsed line so a status keeps its
+	   color across collapse/expand (skipped stays full-opacity when expanded - you're reviewing it). */
 	.status-upcoming {
 		border-left-color: var(--color-border);
 	}
@@ -490,5 +520,26 @@
 	}
 	.status-overdue .task-card__status {
 		color: var(--color-danger);
+	}
+
+	.status-done {
+		border-left-color: var(--color-success);
+	}
+	.status-done .task-card__status {
+		color: var(--color-success);
+	}
+
+	.status-skipped {
+		border-left-color: var(--color-border);
+	}
+	.status-skipped .task-card__status {
+		color: var(--color-fg-muted);
+	}
+
+	.status-snoozed {
+		border-left-color: var(--color-border);
+	}
+	.status-snoozed .task-card__status {
+		color: var(--color-fg-muted);
 	}
 </style>
