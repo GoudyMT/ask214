@@ -235,4 +235,50 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		expect(lineButton(container)).toBeNull();
 		expect(container.textContent).toContain('Find approved programs that fit your rate.');
 	});
+
+	it('auto-collapses on a status transition, even from an expanded card (no manual close)', () => {
+		const props = $state<{
+			item: TimelineItem;
+			onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
+			onSetSnooze: (taskId: string, untilIso: string) => void;
+		}>({ item: makeItem({ status: 'done' }), onSetStatus: noop, onSetSnooze: noop });
+		const { container } = render(TaskCard, { props });
+
+		// User deliberately expands the resolved card to review it.
+		(container.querySelector('button.task-line') as HTMLButtonElement | null)?.click();
+		flushSync();
+		expect(container.querySelector('button[aria-expanded="true"]')).not.toBeNull();
+
+		// The parent re-resolves it (e.g. restore -> re-mark, or done -> skipped). The card must snap
+		// back to its collapsed default on its own - the user shouldn't have to close it.
+		props.item = makeItem({ status: 'skipped' });
+		flushSync();
+		expect(container.querySelector('button.task-line')).not.toBeNull();
+		expect(container.textContent).not.toContain('Find approved programs that fit your rate.');
+	});
+
+	it('rapid taps toggle deterministically and never stick (some users will mash it)', () => {
+		const { container } = renderCard(makeItem({ status: 'done' }));
+		const toggle = () =>
+			container.querySelector('button[aria-expanded]') as HTMLButtonElement | null;
+		expect(toggle()?.getAttribute('aria-expanded')).toBe('false');
+		for (let i = 0; i < 6; i++) {
+			toggle()?.click();
+			flushSync();
+		}
+		expect(toggle()?.getAttribute('aria-expanded')).toBe('false'); // even taps -> back to collapsed
+		toggle()?.click();
+		flushSync();
+		expect(toggle()?.getAttribute('aria-expanded')).toBe('true'); // odd -> expanded; never stuck
+	});
+
+	it('disclosure toggles set touch-action: manipulation (no double-tap zoom / tap delay)', () => {
+		const { container } = renderCard(makeItem({ status: 'done' }));
+		const line = container.querySelector('button.task-line') as HTMLElement;
+		expect(getComputedStyle(line).touchAction).toBe('manipulation');
+		line.click();
+		flushSync();
+		const header = container.querySelector('button.task-card__header') as HTMLElement;
+		expect(getComputedStyle(header).touchAction).toBe('manipulation');
+	});
 });

@@ -26,6 +26,17 @@
 		item.status === 'done' || item.status === 'skipped' || item.status === 'snoozed'
 	);
 
+	// Auto-collapse on any status transition (mark done/skip/snooze, or restore -> re-resolve): a
+	// resolved card lands collapsed by default; expanding is the deliberate action. A plain toggle
+	// does not change item.status, so manual expand/collapse is preserved.
+	let lastStatus = $state(item.status);
+	$effect(() => {
+		if (item.status !== lastStatus) {
+			lastStatus = item.status;
+			expanded = false;
+		}
+	});
+
 	function snooze(days: number): void {
 		onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days));
 		closeSnooze();
@@ -371,6 +382,9 @@
 		font: inherit;
 		color: inherit;
 		cursor: pointer;
+		touch-action: manipulation;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	.task-card__header-title {
@@ -403,6 +417,9 @@
 		font: inherit;
 		color: var(--color-fg);
 		cursor: pointer;
+		touch-action: manipulation;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	.task-line__title {
