@@ -254,6 +254,13 @@
 		font-size: var(--font-size-s);
 	}
 
+	/* The native calendar glyph renders dark + near-invisible on the dark input; invert it to
+	   light (matches the EAOS date field). Webkit pseudo-element covers v1.0 (Chromium + Safari). */
+	.task-card__date-row input::-webkit-calendar-picker-indicator {
+		filter: invert(1);
+		cursor: pointer;
+	}
+
 	.task-card__snooze-go {
 		padding: var(--space-xs) var(--space-m);
 		background: var(--color-accent);
