@@ -28,13 +28,14 @@
 
 	// Auto-collapse on any status transition (mark done/skip/snooze, or restore -> re-resolve): a
 	// resolved card lands collapsed by default; expanding is the deliberate action. A plain toggle
-	// does not change item.status, so manual expand/collapse is preserved.
-	let lastStatus = $state(item.status);
+	// does not change item.status, so manual expand/collapse is preserved. prevStatus starts
+	// undefined (NOT snapshotting the prop) so there is no spurious reset on mount.
+	let prevStatus = $state<DisplayStatus | undefined>(undefined);
 	$effect(() => {
-		if (item.status !== lastStatus) {
-			lastStatus = item.status;
+		if (prevStatus !== undefined && item.status !== prevStatus) {
 			expanded = false;
 		}
+		prevStatus = item.status;
 	});
 
 	function snooze(days: number): void {
