@@ -142,6 +142,9 @@
 		onclick={() => (expanded = true)}
 	>
 		<span class="task-line__title">{item.def.title}</span>
+		{#if item.note}
+			<span class="task-line__note-dot" title="Has a note" aria-label="Has a note"></span>
+		{/if}
 		<span class="task-line__status">{STATUS_LABEL[item.status]}</span>
 		{#if item.status === 'snoozed' && item.snoozeUntil}
 			<span class="task-line__date">to {formatTimelineDate(item.snoozeUntil)}</span>
@@ -522,6 +525,15 @@
 	/* Collapsed resolved line (C4 increment 3; timeline-states.html mockup): a thinner 2px status
 	   edge vs the open card's 4px; one line of title (truncated) + status label + a right-caret. The
 	   whole line is the disclosure control (button + aria-expanded); tapping expands the full card. */
+	/* Note-dot on a collapsed resolved line: signals a note exists (expand to read it). */
+	.task-line__note-dot {
+		flex: none;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--color-accent);
+	}
+
 	.task-line {
 		display: flex;
 		align-items: center;

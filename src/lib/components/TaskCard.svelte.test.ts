@@ -325,4 +325,11 @@ describe('TaskCard (notes display)', () => {
 		expect(container.textContent).toContain('Filed via eBenefits.');
 		expect(buttonByText(container, 'Edit note')).toBeDefined();
 	});
+
+	it('marks a collapsed resolved line with a note-dot when a note exists', () => {
+		const withNote = renderCard(makeItem({ status: 'done', note: 'see VSO' }));
+		expect(withNote.container.querySelector('.task-line__note-dot')).not.toBeNull();
+		const without = renderCard(makeItem({ status: 'done' }));
+		expect(without.container.querySelector('.task-line__note-dot')).toBeNull();
+	});
 });
