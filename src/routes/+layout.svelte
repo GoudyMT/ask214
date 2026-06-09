@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import AppGate from '$lib/components/AppGate.svelte';
 	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
@@ -21,8 +22,13 @@
 	import { openMtcDb } from '$lib/db/schema';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
+	import { shellWidthFor } from '$lib/layout/shell-width';
 
 	let { children } = $props();
+
+	// Shell content width per route: the whole shell (nav/main/footer) widens together on a wide
+	// route (timeline -> 1024px) via the --shell-width CSS var; other routes keep the 720px column.
+	const shellWidth = $derived(shellWidthFor(page.route.id));
 
 	// Auto-lock the in-memory profile after 15 minutes of no user input (memory hygiene;
 	// unlock is a transparent local-key re-decrypt in v1.0).
@@ -121,7 +127,7 @@
 	<a class="skip-link" href="#main-content">Skip to content</a>
 
 	<header>
-		<nav aria-label="Primary">
+		<nav aria-label="Primary" style:--shell-width={shellWidth}>
 			<a href={resolve('/')} class="brand">Transition Companion</a>
 			<ul>
 				<li><a href={resolve('/timeline')}>Timeline</a></li>
@@ -135,11 +141,11 @@
 		<ClockBackwardBanner onfix={() => void goto(resolve('/settings'))} />
 	{/if}
 
-	<main id="main-content">
+	<main id="main-content" style:--shell-width={shellWidth}>
 		{@render children()}
 	</main>
 
-	<footer>
+	<footer style:--shell-width={shellWidth}>
 		<p>
 			Independent open-source project. Not affiliated with the US Department of Defense, the
 			Department of Veterans Affairs, or any branch of the US military.
@@ -170,7 +176,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		max-width: 720px;
+		max-width: var(--shell-width, 720px);
 		margin: 0 auto;
 	}
 
@@ -193,7 +199,7 @@
 
 	/* Lock #1 + #9: 720px content container; body content inherits the same width. */
 	main {
-		max-width: 720px;
+		max-width: var(--shell-width, 720px);
 		margin: 0 auto;
 		padding: var(--space-l);
 		min-height: calc(100vh - 160px);
@@ -202,7 +208,7 @@
 	/* Lock #5: 2-line footer content (attribution disclaimer + About/Source links). */
 	/* Lock #6: 14px footer text via --font-size-s (already shipped via app.css). */
 	footer {
-		max-width: 720px;
+		max-width: var(--shell-width, 720px);
 		margin: 0 auto;
 		border-top: 1px solid var(--color-border);
 		padding: var(--space-l);
