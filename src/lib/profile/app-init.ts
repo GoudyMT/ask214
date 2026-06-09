@@ -1,6 +1,6 @@
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import type { CapabilityResult, CapabilityCause } from '../crypto/capability';
-import type { ProfileBus } from '../broadcast/bus';
+import type { ProfileBus, BusSignal } from '../broadcast/bus';
 import type { IdleTimer, IdleTimerOptions } from './idle-timer';
 
 /**
@@ -51,36 +51,51 @@ export async function initProfileApp<S extends LoadableStore>(
 	return { status: 'ready', store, db };
 }
 
-/** Minimal structural contract the cross-tab wiring needs from the store. */
-type BusWiredStore = { relockSync: () => void; load: () => Promise<unknown> };
+/**
+ * Provision the timeline-state store: create it from the already-open db and run the initial
+ * load. Mirrors initProfileApp's create-then-load tail, kept separate so the timeline store
+ * rides on the same db without coupling into initProfileApp's single-store generic. The
+ * +layout calls this after the profile app is ready, passing the db that init returns.
+ */
+export async function provisionTimelineStore<S extends LoadableStore>(
+	db: IDBDatabase,
+	makeStore: (db: IDBDatabase) => S
+): Promise<S> {
+	const store = makeStore(db);
+	await store.load();
+	return store;
+}
 
 /**
- * Wire a cross-tab bus to a store. A `relocked` signal from another tab relocks this tab's
- * in-memory profile immediately; a `profile-updated` signal re-reads from IDB (load is itself
- * fail-closed + verified, so a spoofed same-origin signal can at worst trigger a harmless
- * re-read). Returns the unsubscribe fn for teardown on +layout destroy. DOM-free + bus-
- * abstracted so it is testable with a real BroadcastChannel pair.
+ * Wire a cross-tab bus to a handler map: each incoming signal invokes `handlers[signal.type]`
+ * if present. The +layout maps `relocked` to relock-all and each `*-updated` to that store's
+ * load (load is itself fail-closed + verified, so a spoofed same-origin signal can at worst
+ * trigger a harmless re-read). Returns the unsubscribe fn for teardown. Bus-abstracted so it is
+ * testable with a real BroadcastChannel pair.
  *
  * Source: Phase 2 spec section 7 (cross-tab coordination) + ADR-012 v1.0 scope.
  */
-export function subscribeBusToStore(store: BusWiredStore, bus: ProfileBus): () => void {
+export function subscribeBus(
+	bus: ProfileBus,
+	handlers: Partial<Record<BusSignal['type'], () => void>>
+): () => void {
 	return bus.subscribe((signal) => {
-		if (signal.type === 'relocked') {
-			store.relockSync();
-		} else if (signal.type === 'profile-updated') {
-			void store.load();
-		}
+		handlers[signal.type]?.();
 	});
 }
 
 /** User-input events that reset the idle countdown. Passive listeners (no scroll-jank). */
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'touchstart'] as const;
 
-/** Structural contract the lifecycle wiring needs from the store. */
-type LifecycleStore = {
+/**
+ * A store the app can relock + reload across the page lifecycle and cross-tab signals. `lock`
+ * is optional: the profile store exposes an async lock(); the timeline store relocks
+ * synchronously (drop-reference) and omits it.
+ */
+export type Relockable = {
 	relockSync: () => void;
 	load: () => Promise<unknown>;
-	lock: () => Promise<void>;
+	lock?: () => Promise<void>;
 };
 
 /** Injected so the whole path is unit-testable; +layout supplies window, document, the real
@@ -93,26 +108,36 @@ type ProfileLifecycleDeps = {
 };
 
 /**
- * Wire Page-Lifecycle + idle relock behavior onto the injected event targets. `pagehide`
- * (window) and `freeze` (document) relock the in-memory profile - zeroize PII - when the page
- * is backgrounded or frozen; a persisted `pageshow` (BFCache restore) re-reads from IDB; user
- * input resets an idle timer that locks the store after `idleThresholdMs`. Returns a teardown
+ * Wire Page-Lifecycle + idle relock behavior onto the injected event targets, for EVERY
+ * relockable store. `pagehide` (window) and `freeze` (document) relock each store - zeroize
+ * PII - when the page is backgrounded or frozen; a persisted `pageshow` (BFCache restore)
+ * re-reads each from IDB; user input resets an idle timer that, on idle, locks stores exposing
+ * lock() and relock-syncs the rest. All stores relock together (atomic). Returns a teardown
  * that stops the timer and removes every listener.
  *
  * Source: Phase 2 spec section 8 (idle timer) + section 11 (relock / memory hygiene).
  */
-export function installProfileLifecycle(
-	store: LifecycleStore,
+export function installLifecycle(
+	relockables: Relockable[],
 	deps: ProfileLifecycleDeps
 ): () => void {
 	const idle = deps.createIdleTimer({
 		thresholdMs: deps.idleThresholdMs,
-		onIdle: () => void store.lock()
+		onIdle: () => {
+			for (const r of relockables) {
+				if (r.lock) void r.lock();
+				else r.relockSync();
+			}
+		}
 	});
 
-	const onHide = (): void => store.relockSync();
+	const onHide = (): void => {
+		for (const r of relockables) r.relockSync();
+	};
 	const onShow = (e: Event): void => {
-		if ((e as PageTransitionEvent).persisted) void store.load();
+		if ((e as PageTransitionEvent).persisted) {
+			for (const r of relockables) void r.load();
+		}
 	};
 	const onActivity = (): void => idle.recordActivity();
 

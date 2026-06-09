@@ -11,7 +11,7 @@
  *
  * Source: plan v2 audit T1-E; ADR-012 (v1.1 authenticated version deferred).
  */
-export type BusSignal = { type: 'profile-updated' | 'relocked' };
+export type BusSignal = { type: 'profile-updated' | 'relocked' | 'timeline-updated' };
 
 export type ProfileBus = {
 	publish(signal: BusSignal): void;
@@ -24,7 +24,7 @@ const CHANNEL_NAME = 'mtc-profile';
 function isBusSignal(value: unknown): value is BusSignal {
 	if (typeof value !== 'object' || value === null || !('type' in value)) return false;
 	const t = (value as { type: unknown }).type;
-	return t === 'profile-updated' || t === 'relocked';
+	return t === 'profile-updated' || t === 'relocked' || t === 'timeline-updated';
 }
 
 export function createProfileBus(channelName: string = CHANNEL_NAME): ProfileBus {

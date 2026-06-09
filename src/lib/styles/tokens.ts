@@ -22,7 +22,14 @@ export const tokens = {
 		accentMuted: '#3a6fb2',
 		danger: '#d97757',
 		success: '#6fb37a',
-		border: '#2a313a'
+		border: '#2a313a',
+		category: {
+			medical: '#56b6c2',
+			admin: '#8895a8',
+			benefits: '#7e8ce0',
+			career: '#b07fd0',
+			finance: '#cbb15e'
+		}
 	},
 	space: {
 		xs: '4px',

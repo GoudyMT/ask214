@@ -116,3 +116,20 @@ export function daysUntilSeparation(eaos: EaosString, now = new Date()): number 
 	const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 	return Math.round((eaosUTC - todayUTC) / MS_PER_DAY);
 }
+
+/**
+ * Project an EAOS-relative offset to an absolute UTC calendar date (YYYY-MM-DD).
+ *
+ * The Timeline Engine anchors every task to the separation date: a task's target
+ * date is EAOS shifted by its day offset (negative = before separation). Both ends
+ * are UTC-anchored (EAOS via Date.UTC, output via toISOString) so neither timezone
+ * nor time-of-day can shift the result by a day (F-C-9, same as daysUntilSeparation).
+ *
+ * Returns a plain ISO date string, not a branded EaosString - the projection is a
+ * derived target date, not a user-entered/validated EAOS.
+ */
+export function eaosOffsetDate(eaos: EaosString, offsetDays: number): string {
+	const { y, m, d } = parseEaosCalendar(eaos);
+	const ms = Date.UTC(y, m - 1, d) + offsetDays * MS_PER_DAY;
+	return new Date(ms).toISOString().slice(0, 10);
+}

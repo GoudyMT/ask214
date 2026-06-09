@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { initProfileApp } from './app-init';
+import { initProfileApp, provisionTimelineStore } from './app-init';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 
 const fakeDb = {} as IDBDatabase;
@@ -62,5 +62,16 @@ describe('initProfileApp', () => {
 				createStore: () => makeStore()
 			})
 		).rejects.toThrow('disk full');
+	});
+});
+
+describe('provisionTimelineStore', () => {
+	it('creates the store from the db and loads it', async () => {
+		const store = makeStore();
+		const make = vi.fn(() => store);
+		const result = await provisionTimelineStore(fakeDb, make);
+		expect(make).toHaveBeenCalledWith(fakeDb);
+		expect(store.load).toHaveBeenCalledTimes(1);
+		expect(result).toBe(store);
 	});
 });

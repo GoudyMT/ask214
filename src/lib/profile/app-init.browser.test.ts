@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { subscribeBusToStore, installProfileLifecycle } from './app-init';
+import { subscribeBus, installLifecycle } from './app-init';
 import { createProfileBus, type ProfileBus } from '../broadcast/bus';
 import type { IdleTimerOptions, IdleTimer } from './idle-timer';
 
@@ -28,37 +28,55 @@ afterEach(() => {
 	buses.length = 0;
 });
 
-describe('subscribeBusToStore', () => {
-	it('relays a relocked signal to store.relockSync', async () => {
+describe('subscribeBus', () => {
+	function profileHandlers(store: { relockSync: () => void; load: () => Promise<unknown> }) {
+		return {
+			relocked: () => store.relockSync(),
+			'profile-updated': () => void store.load()
+		};
+	}
+
+	it('routes a relocked signal to its handler', async () => {
 		const name = uniqueName();
 		const tabA = makeBus(name);
 		const tabB = makeBus(name);
 		const store = makeSpyStore();
-		subscribeBusToStore(store, tabB);
+		subscribeBus(tabB, profileHandlers(store));
 		tabA.publish({ type: 'relocked' });
 		await delay(100);
 		expect(store.relockSync).toHaveBeenCalledTimes(1);
 		expect(store.load).not.toHaveBeenCalled();
 	});
 
-	it('relays a profile-updated signal to store.load', async () => {
+	it('routes a profile-updated signal to its handler', async () => {
 		const name = uniqueName();
 		const tabA = makeBus(name);
 		const tabB = makeBus(name);
 		const store = makeSpyStore();
-		subscribeBusToStore(store, tabB);
+		subscribeBus(tabB, profileHandlers(store));
 		tabA.publish({ type: 'profile-updated' });
 		await delay(100);
 		expect(store.load).toHaveBeenCalledTimes(1);
 		expect(store.relockSync).not.toHaveBeenCalled();
 	});
 
-	it('stops relaying after the returned unsubscribe is called', async () => {
+	it('routes a timeline-updated signal to its handler', async () => {
+		const name = uniqueName();
+		const tabA = makeBus(name);
+		const tabB = makeBus(name);
+		const onTimeline = vi.fn();
+		subscribeBus(tabB, { 'timeline-updated': onTimeline });
+		tabA.publish({ type: 'timeline-updated' });
+		await delay(100);
+		expect(onTimeline).toHaveBeenCalledTimes(1);
+	});
+
+	it('stops routing after the returned unsubscribe is called', async () => {
 		const name = uniqueName();
 		const tabA = makeBus(name);
 		const tabB = makeBus(name);
 		const store = makeSpyStore();
-		const off = subscribeBusToStore(store, tabB);
+		const off = subscribeBus(tabB, profileHandlers(store));
 		off();
 		tabA.publish({ type: 'relocked' });
 		await delay(100);
@@ -81,8 +99,7 @@ function makeLifecycleHarness() {
 	const win = new EventTarget();
 	const doc = new EventTarget();
 	const idleThresholdMs = 900_000;
-	const install = () =>
-		installProfileLifecycle(store, { win, doc, createIdleTimer, idleThresholdMs });
+	const install = () => installLifecycle([store], { win, doc, createIdleTimer, idleThresholdMs });
 	return {
 		store,
 		timer,
@@ -95,7 +112,7 @@ function makeLifecycleHarness() {
 	};
 }
 
-describe('installProfileLifecycle', () => {
+describe('installLifecycle', () => {
 	it('relocks on pagehide', () => {
 		const h = makeLifecycleHarness();
 		h.install();
@@ -150,5 +167,49 @@ describe('installProfileLifecycle', () => {
 		expect(h.timer.stop).toHaveBeenCalledTimes(1);
 		h.win.dispatchEvent(new Event('pagehide'));
 		expect(h.store.relockSync).not.toHaveBeenCalled();
+	});
+
+	it('relocks every store in the list on pagehide', () => {
+		const a = {
+			relockSync: vi.fn(),
+			load: vi.fn().mockResolvedValue(null),
+			lock: vi.fn().mockResolvedValue(undefined)
+		};
+		const b = { relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) };
+		const win = new EventTarget();
+		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		installLifecycle([a, b], {
+			win,
+			doc: new EventTarget(),
+			createIdleTimer: () => timer,
+			idleThresholdMs: 900_000
+		});
+		win.dispatchEvent(new Event('pagehide'));
+		expect(a.relockSync).toHaveBeenCalledTimes(1);
+		expect(b.relockSync).toHaveBeenCalledTimes(1);
+	});
+
+	it('on idle, locks stores that expose lock() and relockSyncs those that do not', () => {
+		const a = {
+			relockSync: vi.fn(),
+			load: vi.fn().mockResolvedValue(null),
+			lock: vi.fn().mockResolvedValue(undefined)
+		};
+		const b = { relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) };
+		let onIdle: (() => void) | undefined;
+		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		installLifecycle([a, b], {
+			win: new EventTarget(),
+			doc: new EventTarget(),
+			createIdleTimer: (opts: IdleTimerOptions) => {
+				onIdle = opts.onIdle;
+				return timer;
+			},
+			idleThresholdMs: 900_000
+		});
+		onIdle?.();
+		expect(a.lock).toHaveBeenCalledTimes(1);
+		expect(a.relockSync).not.toHaveBeenCalled();
+		expect(b.relockSync).toHaveBeenCalledTimes(1);
 	});
 });

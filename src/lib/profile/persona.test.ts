@@ -61,4 +61,26 @@ describe('derivePersona', () => {
 		);
 		expect(r.completeness).toBe('complete');
 	});
+
+	it('surfaces SkillBridge when approved with a positive duration (TL-10)', () => {
+		const r = derivePersona(withEaos({ skillbridgeApproved: 1, skillbridgeDurationDays: 180 }));
+		expect(r.completeness).not.toBe('none');
+		if (r.completeness !== 'none') {
+			expect(r.skillbridge).toEqual({ approved: true, durationDays: 180 });
+		}
+	});
+
+	it('omits SkillBridge when the approval flag is not set', () => {
+		const r = derivePersona(withEaos({ skillbridgeApproved: 0, skillbridgeDurationDays: 180 }));
+		if (r.completeness !== 'none') {
+			expect(r.skillbridge).toBeUndefined();
+		}
+	});
+
+	it('omits SkillBridge when approved but the duration is missing', () => {
+		const r = derivePersona(withEaos({ skillbridgeApproved: 1 }));
+		if (r.completeness !== 'none') {
+			expect(r.skillbridge).toBeUndefined();
+		}
+	});
 });

@@ -116,6 +116,7 @@
 		if (!store) return;
 		wipeDialog?.close();
 		await store.wipe();
+		await app.timeline?.wipe();
 		// Defensive: the app stores no PII outside IndexedDB (ADR-004), but wipe also clears
 		// localStorage + Cache Storage for completeness (master spec section 7.6).
 		window.localStorage.clear();
