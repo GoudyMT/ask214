@@ -197,8 +197,8 @@
 		color: var(--color-fg-muted);
 		font-weight: 400;
 	}
-	/* Separator dot in the same muted color as the count; literal spaces in the content string keep
-	   the spacing even and immune to markup whitespace trimming. */
+	/* Separator dot in the same muted color as the count; symmetric margins (not content spaces)
+	   keep the gaps even and immune to inline whitespace collapsing. */
 	.timeline-today__count::before {
 		content: '\00B7';
 		margin: 0 0.4em;

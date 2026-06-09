@@ -64,32 +64,88 @@ test('locked: /timeline shows the locked panel; Unlock restores the timeline', a
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeHidden();
 });
 
-test('marking a task done persists across reload', async ({ page }) => {
+test('marking a task done collapses it to a line and persists across reload', async ({ page }) => {
 	await setEaos(page);
 	await page.goto('/timeline');
 
 	const firstCard = page.locator('article.task-card').first();
 	await expect(firstCard).toBeVisible();
+	const title = (await firstCard.locator('.task-card__title').innerText()).trim();
 	await firstCard.getByRole('button', { name: 'Mark done' }).click();
-	await expect(firstCard.getByText('Done', { exact: true })).toBeVisible(); // status flips to Done
+
+	// A resolved task auto-collapses to a one-line disclosure (button.task-line.line-done).
+	const doneLine = page.locator('button.task-line.line-done', { hasText: title });
+	await expect(doneLine).toBeVisible();
+	await expect(doneLine.getByText('Done', { exact: true })).toBeVisible();
 
 	await page.reload();
-	await expect(
-		page.locator('article.task-card').first().getByText('Done', { exact: true })
-	).toBeVisible(); // re-decrypted from IndexedDB
+	await expect(page.locator('button.task-line.line-done', { hasText: title })).toBeVisible(); // re-decrypted from IndexedDB
 });
 
-test('snoozing a task persists across reload', async ({ page }) => {
+test('snoozing a task collapses it to a line and persists across reload', async ({ page }) => {
 	await setEaos(page);
 	await page.goto('/timeline');
 
 	const firstCard = page.locator('article.task-card').first();
+	const title = (await firstCard.locator('.task-card__title').innerText()).trim();
 	await firstCard.getByRole('button', { name: 'Snooze' }).click();
 	await firstCard.getByRole('button', { name: '1 month' }).click();
-	await expect(firstCard.getByText('Snoozed', { exact: true })).toBeVisible();
+
+	const snoozedLine = page.locator('button.task-line.line-snoozed', { hasText: title });
+	await expect(snoozedLine).toBeVisible();
+	await expect(snoozedLine.getByText('Snoozed', { exact: true })).toBeVisible();
 
 	await page.reload();
+	await expect(page.locator('button.task-line.line-snoozed', { hasText: title })).toBeVisible();
+});
+
+test('a note added to a task persists across reload', async ({ page }) => {
+	await setEaos(page);
+	await page.goto('/timeline');
+
+	const firstCard = page.locator('article.task-card').first();
+	const note = 'Call the VSO on Monday';
+	await firstCard.getByRole('button', { name: 'Add note' }).click();
+	await firstCard.getByLabel('Note').fill(note);
+	await firstCard.getByRole('button', { name: 'Save' }).click();
+	await expect(firstCard.getByText(note)).toBeVisible(); // shows in the Notes inset
+
+	await page.reload();
+	await expect(page.locator('article.task-card').first().getByText(note)).toBeVisible(); // re-decrypted
+});
+
+test('a completed task can be expanded and restored to active', async ({ page }) => {
+	await setEaos(page);
+	await page.goto('/timeline');
+
+	const firstCard = page.locator('article.task-card').first();
+	const title = (await firstCard.locator('.task-card__title').innerText()).trim();
+	await firstCard.getByRole('button', { name: 'Mark done' }).click();
+
+	// Expand the collapsed line, then Restore -> the task returns to an open card with its actions.
+	await page.locator('button.task-line.line-done', { hasText: title }).click();
+	const resolved = page.locator('article.task-card--resolved', { hasText: title });
+	await resolved.getByRole('button', { name: 'Restore' }).click();
 	await expect(
-		page.locator('article.task-card').first().getByText('Snoozed', { exact: true })
+		page.locator('article.task-card', { hasText: title }).getByRole('button', { name: 'Mark done' })
 	).toBeVisible();
+});
+
+test('the timeline shows the phase chip-strip and the Today marker', async ({ page }) => {
+	await setEaos(page);
+	await page.goto('/timeline');
+
+	await expect(page.locator('button.phase-chips__chip').first()).toBeVisible(); // jump-nav chips
+	const today = page.locator('.timeline-today__pill');
+	await expect(today).toBeVisible();
+	await expect(today).toContainText('Today');
+});
+
+test('clicking a phase chip scrolls to its phase section', async ({ page }) => {
+	await setEaos(page);
+	await page.goto('/timeline');
+
+	const chips = page.locator('button.phase-chips__chip');
+	await chips.last().click(); // jump to the furthest-down phase
+	await expect(page.locator('.timeline-list section').last()).toBeInViewport();
 });
