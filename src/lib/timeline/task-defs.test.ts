@@ -26,6 +26,15 @@ describe('task-defs seed', () => {
 		expect(new Set(offsets).size).toBe(offsets.length);
 	});
 
+	it('gives every phase bucket a non-empty short label for the chip-strip (C5)', () => {
+		// The full bucket.label is too long for a nav chip, so each bucket carries a compact
+		// shortLabel. Well-formedness only (per this file's philosophy): editing the text keeps it green.
+		for (const bucket of PHASE_BUCKETS) {
+			expect(bucket.shortLabel).toBeTruthy();
+			expect(typeof bucket.shortLabel).toBe('string');
+		}
+	});
+
 	it('places every task inside the bucketed runway', () => {
 		const first = PHASE_BUCKETS.at(0);
 		const last = PHASE_BUCKETS.at(-1);

@@ -9,12 +9,30 @@ import type { TaskDef, PhaseBucket } from './types';
  * runs out to +730d to hold late post-separation deadlines (e.g. VGLI conversion).
  */
 export const PHASE_BUCKETS: readonly PhaseBucket[] = [
-	{ id: '24-18mo', label: '24-18 months out', startOffset: -730, endOffset: -540 },
-	{ id: '18-12mo', label: '18-12 months out', startOffset: -540, endOffset: -365 },
-	{ id: '12-6mo', label: '12-6 months out', startOffset: -365, endOffset: -180 },
-	{ id: '6-3mo', label: '6-3 months out', startOffset: -180, endOffset: -90 },
-	{ id: 'final90', label: 'Final 90 days', startOffset: -90, endOffset: 0 },
-	{ id: 'after', label: 'After separation', startOffset: 0, endOffset: 730 }
+	{
+		id: '24-18mo',
+		label: '24-18 months out',
+		shortLabel: '24-18 mo',
+		startOffset: -730,
+		endOffset: -540
+	},
+	{
+		id: '18-12mo',
+		label: '18-12 months out',
+		shortLabel: '18-12 mo',
+		startOffset: -540,
+		endOffset: -365
+	},
+	{
+		id: '12-6mo',
+		label: '12-6 months out',
+		shortLabel: '12-6 mo',
+		startOffset: -365,
+		endOffset: -180
+	},
+	{ id: '6-3mo', label: '6-3 months out', shortLabel: '6-3 mo', startOffset: -180, endOffset: -90 },
+	{ id: 'final90', label: 'Final 90 days', shortLabel: 'Final 90', startOffset: -90, endOffset: 0 },
+	{ id: 'after', label: 'After separation', shortLabel: 'After', startOffset: 0, endOffset: 730 }
 ];
 
 /**

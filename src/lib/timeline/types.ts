@@ -65,6 +65,8 @@ export type TaskDef = {
 export type PhaseBucket = {
 	id: string;
 	label: string;
+	/** Compact label for the C5 chip-strip nav (the full label is too long for a chip). */
+	shortLabel?: string;
 	startOffset: number;
 	endOffset: number;
 };
