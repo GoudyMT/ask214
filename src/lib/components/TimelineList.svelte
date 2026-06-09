@@ -44,16 +44,20 @@
 	});
 </script>
 
-{#snippet todayMarker(date: string)}
+{#snippet todayMarker(date: string, daysLeft: number | undefined)}
 	<div class="timeline-today">
-		<span class="timeline-today__pill">Today - {formatTimelineDate(date)}</span>
+		<span class="timeline-today__pill"
+			>Today - {formatTimelineDate(date)}{#if daysLeft !== undefined && daysLeft > 0}<span
+					class="timeline-today__count">{daysLeft} days left</span
+				>{/if}</span
+		>
 	</div>
 {/snippet}
 
 <div class="timeline-list">
 	{#each view.phases as phase, i (phase.bucket.id)}
 		{#if view.todayMarkerIndex === i && view.todayDate}
-			{@render todayMarker(view.todayDate)}
+			{@render todayMarker(view.todayDate, view.daysToSeparation)}
 		{/if}
 		<section id={phase.bucket.id} aria-labelledby="{phase.bucket.id}-heading">
 			{#if phase.collapsible}
@@ -89,7 +93,7 @@
 		</section>
 	{/each}
 	{#if view.todayMarkerIndex === view.phases.length && view.todayDate}
-		{@render todayMarker(view.todayDate)}
+		{@render todayMarker(view.todayDate, view.daysToSeparation)}
 	{/if}
 </div>
 
@@ -185,5 +189,18 @@
 		border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
 		border-radius: 999px;
 		padding: 3px 12px;
+	}
+
+	/* Days-left count: muted text inside the "Today" pill (Option A - one unified capsule; shown
+	   only when separation is in the future). The date leads in accent, the count is the quiet nudge. */
+	.timeline-today__count {
+		color: var(--color-fg-muted);
+		font-weight: 400;
+	}
+	/* Separator dot in the same muted color as the count; literal spaces in the content string keep
+	   the spacing even and immune to markup whitespace trimming. */
+	.timeline-today__count::before {
+		content: '\00B7';
+		margin: 0 0.4em;
 	}
 </style>

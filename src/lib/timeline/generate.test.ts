@@ -6,7 +6,7 @@ import {
 	todayMarkerIndex,
 	type AnchoredTask
 } from './generate';
-import { eaosOffsetDate, type EaosString } from '../profile/eaos';
+import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
 
@@ -381,5 +381,21 @@ describe('generateTimeline Today marker (C5)', () => {
 			new Date('2026-06-19')
 		);
 		expect(view.todayDate).toBeUndefined();
+	});
+
+	it('exposes daysToSeparation (whole days from today to EAOS)', () => {
+		const today = new Date('2026-06-19');
+		const view = generateTimeline(eaosOnly, [universal], { schemaVersion: 1, tasks: {} }, today);
+		expect(view.daysToSeparation).toBe(daysUntilSeparation(EAOS, today));
+	});
+
+	it('omits daysToSeparation for a none persona', () => {
+		const view = generateTimeline(
+			{ completeness: 'none' } as PersonaFilters,
+			[universal],
+			{ schemaVersion: 1, tasks: {} },
+			new Date('2026-06-19')
+		);
+		expect(view.daysToSeparation).toBeUndefined();
 	});
 });

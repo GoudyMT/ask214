@@ -145,6 +145,7 @@ export type TimelineView = {
 	total: number;
 	todayMarkerIndex?: number; // C5: list index for the "Today" divider; absent for a none persona
 	todayDate?: string; // C5: ISO date the view was generated for (the Today marker's label)
+	daysToSeparation?: number; // C5: whole days from today to EAOS (the "X days left" count)
 };
 
 /**
@@ -248,9 +249,10 @@ export function generateTimeline(
 
 	const view: TimelineView = { phases, total: anchored.length };
 	if (persona.completeness !== 'none') {
-		const todayOffset = -daysUntilSeparation(persona.eaos, today);
-		view.todayMarkerIndex = todayMarkerIndex(phases, todayOffset);
+		const daysToSep = daysUntilSeparation(persona.eaos, today);
+		view.todayMarkerIndex = todayMarkerIndex(phases, -daysToSep);
 		view.todayDate = today.toISOString().slice(0, 10);
+		view.daysToSeparation = daysToSep;
 	}
 	return view;
 }

@@ -250,4 +250,30 @@ describe('TimelineList Today marker (C5)', () => {
 		});
 		expect(container.querySelector('.timeline-today')).toBeNull();
 	});
+
+	it('shows the days-left count by the marker when separation is in the future', () => {
+		const view: TimelineView = {
+			...VIEW,
+			todayMarkerIndex: 1,
+			todayDate: '2026-06-09',
+			daysToSeparation: 100
+		};
+		const { container } = render(TimelineList, {
+			props: { view, onSetStatus: noop, onSetSnooze: noop }
+		});
+		expect(container.querySelector('.timeline-today')?.textContent).toContain('100 days left');
+	});
+
+	it('hides the days-left count once separation has passed', () => {
+		const view: TimelineView = {
+			...VIEW,
+			todayMarkerIndex: 2,
+			todayDate: '2027-05-01',
+			daysToSeparation: 0
+		};
+		const { container } = render(TimelineList, {
+			props: { view, onSetStatus: noop, onSetSnooze: noop }
+		});
+		expect(container.querySelector('.timeline-today')?.textContent).not.toContain('days left');
+	});
 });
