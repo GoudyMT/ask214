@@ -362,4 +362,24 @@ describe('generateTimeline Today marker (C5)', () => {
 		);
 		expect(view.todayMarkerIndex).toBeUndefined();
 	});
+
+	it('exposes todayDate (the ISO date the view was generated for)', () => {
+		const view = generateTimeline(
+			eaosOnly,
+			[universal],
+			{ schemaVersion: 1, tasks: {} },
+			new Date('2026-06-19')
+		);
+		expect(view.todayDate).toBe('2026-06-19');
+	});
+
+	it('omits todayDate for a none persona', () => {
+		const view = generateTimeline(
+			{ completeness: 'none' } as PersonaFilters,
+			[universal],
+			{ schemaVersion: 1, tasks: {} },
+			new Date('2026-06-19')
+		);
+		expect(view.todayDate).toBeUndefined();
+	});
 });
