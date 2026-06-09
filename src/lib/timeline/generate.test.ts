@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { filterAndAnchor, deriveStatus, generateTimeline, type AnchoredTask } from './generate';
+import {
+	filterAndAnchor,
+	deriveStatus,
+	generateTimeline,
+	todayMarkerIndex,
+	type AnchoredTask
+} from './generate';
 import { eaosOffsetDate, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
@@ -306,5 +312,54 @@ describe('generateTimeline SkillBridge shift (TL-10)', () => {
 		const item = firstItem(skillBridge90, [militaryTask]);
 		expect(item?.windowStartDate).toBe(eaosOffsetDate(EAOS, -210));
 		expect(item?.windowEndDate).toBe(eaosOffsetDate(EAOS, -180));
+	});
+});
+
+describe('todayMarkerIndex (C5 Today divider placement)', () => {
+	// Phases are ordered furthest-out first; the marker renders before the first phase that is NOT
+	// fully in the past (endOffset > todayOffset). todayOffset = days from EAOS to today (negative =
+	// before separation), the same sign convention as the bucket offsets.
+	const phases = [
+		{ bucket: { endOffset: -540 } },
+		{ bucket: { endOffset: -365 } },
+		{ bucket: { endOffset: -180 } },
+		{ bucket: { endOffset: -90 } },
+		{ bucket: { endOffset: 0 } },
+		{ bucket: { endOffset: 730 } }
+	];
+
+	it('places the marker before the first phase that extends past today', () => {
+		expect(todayMarkerIndex(phases, -300)).toBe(2); // today inside 12-6mo -> marker before it
+	});
+
+	it('places the marker at the top when every phase is still upcoming', () => {
+		expect(todayMarkerIndex(phases, -1000)).toBe(0);
+	});
+
+	it('places the marker after the last phase when every phase is in the past', () => {
+		expect(todayMarkerIndex(phases, 1000)).toBe(phases.length);
+	});
+});
+
+describe('generateTimeline Today marker (C5)', () => {
+	it('exposes todayMarkerIndex between the past phases and the current/upcoming ones', () => {
+		const defs: TaskDef[] = [
+			{ ...universal, id: 'early', recommendedOffset: -400, windowStart: -420, windowEnd: -380 },
+			{ ...universal, id: 'late', recommendedOffset: -100, windowStart: -120, windowEnd: -80 }
+		];
+		const today = new Date('2026-06-19'); // ~300 days before EAOS 2027-04-15
+		const view = generateTimeline(eaosOnly, defs, { schemaVersion: 1, tasks: {} }, today);
+		expect(view.phases.map((p) => p.bucket.id)).toEqual(['18-12mo', '6-3mo']);
+		expect(view.todayMarkerIndex).toBe(1); // marker before the 6-3mo phase (today is in the gap)
+	});
+
+	it('omits todayMarkerIndex for a none persona (empty view, no EAOS)', () => {
+		const view = generateTimeline(
+			{ completeness: 'none' } as PersonaFilters,
+			[universal],
+			{ schemaVersion: 1, tasks: {} },
+			new Date('2026-06-19')
+		);
+		expect(view.todayMarkerIndex).toBeUndefined();
 	});
 });

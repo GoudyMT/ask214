@@ -7,7 +7,7 @@
  * Source: Timeline Engine design spec (2026-06-03) section 5 "Generation Logic".
  */
 
-import { eaosOffsetDate, type EaosString } from '../profile/eaos';
+import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import { PHASE_BUCKETS } from './task-defs';
 import type { TaskDef, TimelineTaskState, TimelineState, PhaseBucket } from './types';
@@ -143,6 +143,7 @@ export type TimelinePhase = {
 export type TimelineView = {
 	phases: TimelinePhase[];
 	total: number;
+	todayMarkerIndex?: number; // C5: list index for the "Today" divider; absent for a none persona
 };
 
 /**
@@ -178,6 +179,20 @@ function tallyCounts(items: TimelineItem[]): PhaseCounts {
 		}
 	}
 	return counts;
+}
+
+/**
+ * Index in the rendered phase list where the C5 "Today" divider renders: before the first phase
+ * that is NOT fully in the past (its endOffset is beyond today). Every phase past -> after the last
+ * (phases.length). todayOffset = days from EAOS to today (negative = before separation), the same
+ * sign convention as the bucket offsets.
+ */
+export function todayMarkerIndex(
+	phases: readonly { bucket: { endOffset: number } }[],
+	todayOffset: number
+): number {
+	const i = phases.findIndex((p) => p.bucket.endOffset > todayOffset);
+	return i === -1 ? phases.length : i;
 }
 
 /**
@@ -230,5 +245,10 @@ export function generateTimeline(
 		phases.push({ bucket, items, count: items.length, counts, collapsible });
 	}
 
-	return { phases, total: anchored.length };
+	const view: TimelineView = { phases, total: anchored.length };
+	if (persona.completeness !== 'none') {
+		const todayOffset = -daysUntilSeparation(persona.eaos, today);
+		view.todayMarkerIndex = todayMarkerIndex(phases, todayOffset);
+	}
+	return view;
 }
