@@ -5,9 +5,9 @@ import PhaseChips from './PhaseChips.svelte';
 import type { TimelineView, TimelineItem } from '$lib/timeline';
 
 // PhaseChips is the C5 jump-nav: one chip per non-empty phase (short label + total task count),
-// clicking a chip smooth-scrolls to that phase's <section id> (jump, NOT filter), and a toggle
-// collapses the strip. Scroll-spy (IntersectionObserver active-state) is covered by the Arc D E2E,
-// not here - a component test can't drive the viewport deterministically.
+// clicking a chip smooth-scrolls to that phase's <section id> (jump, NOT filter). Scroll-spy
+// (IntersectionObserver active-state) is covered by the Arc D E2E, not here - a component test
+// can't drive the viewport deterministically.
 
 function makeItem(title: string): TimelineItem {
 	return {
@@ -106,19 +106,5 @@ describe('PhaseChips', () => {
 
 		expect(scrollSpy).toHaveBeenCalled();
 		section.remove();
-	});
-
-	it('collapses and expands the strip via the toggle', () => {
-		const { container } = render(PhaseChips, { props: { view: VIEW } });
-		const toggle = container.querySelector('button.phase-chips__toggle') as HTMLButtonElement;
-		expect(toggle.getAttribute('aria-expanded')).toBe('true'); // expanded by default
-		expect(container.querySelectorAll('button.phase-chips__chip').length).toBe(2);
-
-		toggle.click();
-		flushSync();
-		expect(
-			container.querySelector('button.phase-chips__toggle')?.getAttribute('aria-expanded')
-		).toBe('false');
-		expect(container.querySelectorAll('button.phase-chips__chip').length).toBe(0); // strip hidden
 	});
 });

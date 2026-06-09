@@ -15,7 +15,6 @@
 		}))
 	);
 
-	let collapsed = $state(false);
 	let activeId = $state<string | null>(null);
 
 	// Click a chip -> smooth-scroll to that phase's <section> (jump-to, NOT filter; spec section 7).
@@ -46,37 +45,25 @@
 </script>
 
 <nav class="phase-chips" aria-label="Jump to timeline phase">
-	<div class="phase-chips__row">
-		{#if !collapsed}
-			<ul class="phase-chips__strip">
-				{#each chips as chip (chip.id)}
-					<li>
-						<button
-							type="button"
-							class="phase-chips__chip"
-							class:phase-chips__chip--active={activeId === chip.id}
-							onclick={() => jumpTo(chip.id)}
-						>
-							{chip.label} <span class="phase-chips__count">{chip.count}</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-		<button
-			type="button"
-			class="phase-chips__toggle"
-			aria-expanded={!collapsed}
-			onclick={() => (collapsed = !collapsed)}
-		>
-			{collapsed ? 'Jump to phase' : 'Hide'}
-		</button>
-	</div>
+	<ul class="phase-chips__strip">
+		{#each chips as chip (chip.id)}
+			<li>
+				<button
+					type="button"
+					class="phase-chips__chip"
+					class:phase-chips__chip--active={activeId === chip.id}
+					onclick={() => jumpTo(chip.id)}
+				>
+					{chip.label} <span class="phase-chips__count">{chip.count}</span>
+				</button>
+			</li>
+		{/each}
+	</ul>
 </nav>
 
 <style>
-	/* Sticky under the title, below the sticky header. The `top` offset clears the header height;
-	   tuned at the visual checkpoint. Opaque background so list content scrolls cleanly beneath. */
+	/* Sticky under the title, below the sticky header. The `top` offset clears the header height
+	   (locked at the C5 visual checkpoint). Opaque background so list content scrolls cleanly beneath. */
 	.phase-chips {
 		position: sticky;
 		top: 3.5rem;
@@ -87,15 +74,8 @@
 		border-bottom: 1px solid var(--color-border);
 	}
 
-	.phase-chips__row {
-		display: flex;
-		align-items: center;
-		gap: var(--space-s);
-	}
-
 	/* On mobile the chips become one horizontally-scrolling row (no wrap, no wasted width). */
 	.phase-chips__strip {
-		flex: 1;
 		display: flex;
 		gap: var(--space-xs);
 		margin: 0;
@@ -134,16 +114,5 @@
 	.phase-chips__count {
 		margin-left: 2px;
 		opacity: 0.65;
-	}
-
-	.phase-chips__toggle {
-		flex: none;
-		font-size: var(--font-size-s);
-		color: var(--color-accent);
-		background: none;
-		border: none;
-		padding: var(--space-xs);
-		cursor: pointer;
-		touch-action: manipulation;
 	}
 </style>

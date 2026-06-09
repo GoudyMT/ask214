@@ -2,6 +2,7 @@
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
 	import TimelineList from '$lib/components/TimelineList.svelte';
+	import PhaseChips from '$lib/components/PhaseChips.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import { generateTimeline, TASK_DEFS, type TimelineState, type TaskStatus } from '$lib/timeline';
 	import { formatTimelineDate } from '$lib/timeline/format-date';
@@ -93,6 +94,7 @@
 			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 		</p>
 		{#if view}
+			<PhaseChips {view} />
 			<TimelineList {view} onSetStatus={setStatus} onSetSnooze={setSnooze} onSetNote={setNote} />
 		{/if}
 	{/if}

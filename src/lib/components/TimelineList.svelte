@@ -136,6 +136,12 @@
 		border-right: none;
 	}
 
+	/* Jump-nav target offset (C5): a chip-strip jump lands the section below the sticky header +
+	   chip strip. Tuned at the visual checkpoint. */
+	.timeline-list section {
+		scroll-margin-top: 6.5rem;
+	}
+
 	/* The first phase sits flush under the route subline (no leading gap). */
 	.timeline-list section:first-of-type .timeline-list__phase {
 		margin-top: 0;
