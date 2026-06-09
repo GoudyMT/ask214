@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TaskCard from './TaskCard.svelte';
+	import { formatTimelineDate } from '$lib/timeline/format-date';
 	import type { TimelineView, TaskStatus } from '$lib/timeline';
 
 	let {
@@ -43,8 +44,17 @@
 	});
 </script>
 
+{#snippet todayMarker(date: string)}
+	<div class="timeline-today">
+		<span class="timeline-today__pill">Today - {formatTimelineDate(date)}</span>
+	</div>
+{/snippet}
+
 <div class="timeline-list">
-	{#each view.phases as phase (phase.bucket.id)}
+	{#each view.phases as phase, i (phase.bucket.id)}
+		{#if view.todayMarkerIndex === i && view.todayDate}
+			{@render todayMarker(view.todayDate)}
+		{/if}
 		<section id={phase.bucket.id} aria-labelledby="{phase.bucket.id}-heading">
 			{#if phase.collapsible}
 				<h2 id="{phase.bucket.id}-heading" class="timeline-list__phase">
@@ -78,6 +88,9 @@
 			{/if}
 		</section>
 	{/each}
+	{#if view.todayMarkerIndex === view.phases.length && view.todayDate}
+		{@render todayMarker(view.todayDate)}
+	{/if}
 </div>
 
 <style>
@@ -145,5 +158,32 @@
 	/* The first phase sits flush under the route subline (no leading gap). */
 	.timeline-list section:first-of-type .timeline-list__phase {
 		margin-top: 0;
+	}
+	/* Today marker (C5, T1): a centered accent pill on a hairline rule, rendered between the
+	   fully-past phases and the current/upcoming ones (position from view.todayMarkerIndex). The
+	   rule is decorative (pseudo-elements); the pill text marks today. */
+	.timeline-today {
+		display: flex;
+		align-items: center;
+		gap: var(--space-m);
+		margin: var(--space-l) 0;
+	}
+	.timeline-today::before,
+	.timeline-today::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+	}
+	.timeline-today__pill {
+		flex: none;
+		font-size: var(--font-size-s);
+		font-weight: 600;
+		color: var(--color-accent);
+		white-space: nowrap;
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+		border-radius: 999px;
+		padding: 3px 12px;
 	}
 </style>

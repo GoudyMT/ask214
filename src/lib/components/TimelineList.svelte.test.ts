@@ -223,3 +223,31 @@ describe('TimelineList section auto-collapse (C4-4 B2)', () => {
 		expect(container.textContent).not.toContain('Request medical records'); // collapsed = cards hidden
 	});
 });
+
+describe('TimelineList Today marker (C5)', () => {
+	it('renders the Today marker before the phase at todayMarkerIndex', () => {
+		const view: TimelineView = { ...VIEW, todayMarkerIndex: 1, todayDate: '2026-06-09' };
+		const { container } = render(TimelineList, {
+			props: { view, onSetStatus: noop, onSetSnooze: noop }
+		});
+		const marker = container.querySelector('.timeline-today');
+		expect(marker).not.toBeNull();
+		expect(marker?.textContent).toContain('Today');
+		expect(marker?.textContent).toContain('Jun 9, 2026'); // formatTimelineDate(todayDate)
+
+		// Position: the marker sits between section[0] (phase-18-12) and section[1] (phase-final-90).
+		const kids = [...(container.querySelector('.timeline-list')?.children ?? [])];
+		const markerIdx = kids.findIndex((el) => el.classList.contains('timeline-today'));
+		const sec0Idx = kids.findIndex((el) => el.id === 'phase-18-12');
+		const sec1Idx = kids.findIndex((el) => el.id === 'phase-final-90');
+		expect(sec0Idx).toBeLessThan(markerIdx);
+		expect(markerIdx).toBeLessThan(sec1Idx);
+	});
+
+	it('renders no Today marker when todayMarkerIndex is absent', () => {
+		const { container } = render(TimelineList, {
+			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
+		});
+		expect(container.querySelector('.timeline-today')).toBeNull();
+	});
+});
