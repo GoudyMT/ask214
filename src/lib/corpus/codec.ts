@@ -1,0 +1,42 @@
+import type { Corpus, CorpusManifest } from './types';
+import { CorpusFormatError, CorpusVersionError } from './errors';
+import { normalize } from './search';
+
+/**
+ * Decode + validate a shipped corpus (manifest + flat Float32 embeddings blob) into the in-memory
+ * Corpus `search` operates on (spec section 5). Pure: receives already-materialized inputs, does no
+ * IO (transport, gzip, integrity-hashing, IndexedDB, CDN are all cycle C's job).
+ *
+ * Gate order (each throws a typed error with an opaque code - mirrors decodeTimelineState):
+ *   1. version (CorpusVersionError)   - a v1.1 corpus on a cached v1.0 client must not silently run
+ *   2. modelId (CorpusFormatError)    - the dim check CANNOT catch a model swap (both candidates 384-dim)
+ *   3. byte length (CorpusFormatError)- gross corruption / truncation
+ *   4. per-chunk slice + unit-normalize; a zero embedding throws E_CORPUS_ZERO_VECTOR (bad vector)
+ */
+
+/** The corpus generation this client build supports. A different version throws (spec 8.6). */
+export const ACCEPTED_CORPUS_VERSION = '1.0';
+
+export function decodeCorpus(
+	manifest: CorpusManifest,
+	embeddingsBuffer: ArrayBuffer,
+	expectedModelId: string
+): Corpus {
+	if (manifest.version !== ACCEPTED_CORPUS_VERSION) {
+		throw new CorpusVersionError('E_CORPUS_VERSION');
+	}
+	if (manifest.modelId !== expectedModelId) {
+		throw new CorpusFormatError('E_CORPUS_MODEL');
+	}
+	const { chunks, dim } = manifest;
+	const expectedBytes = chunks.length * dim * 4;
+	if (embeddingsBuffer.byteLength !== expectedBytes) {
+		throw new CorpusFormatError('E_CORPUS_BYTE_LENGTH');
+	}
+	const flat = new Float32Array(embeddingsBuffer);
+	const embeddings: Float32Array[] = [];
+	for (let i = 0; i < chunks.length; i++) {
+		embeddings.push(normalize(flat.subarray(i * dim, (i + 1) * dim)));
+	}
+	return { version: manifest.version, dim, modelId: manifest.modelId, chunks, embeddings };
+}
