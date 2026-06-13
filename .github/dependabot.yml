@@ -6,6 +6,10 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    # Wait 7 days after a release before proposing it (supply-chain caution; exceeds the 24h
+    # minimumReleaseAge floor, so any version Dependabot proposes already satisfies the install guard).
+    cooldown:
+      default-days: 7
     groups:
       svelte:
         patterns:

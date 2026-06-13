@@ -1,3 +1,8 @@
+# Supply-chain guard: pnpm refuses to RESOLVE a dependency version published less than 1440 min (24h)
+# ago, giving the ecosystem time to flag malicious releases. Gates resolution/updates (local
+# pnpm add/update + Dependabot lockfile regen), NOT frozen-lockfile installs. Fail-closed by default.
+minimumReleaseAge: 1440
+
 allowBuilds:
   esbuild: true
   onnxruntime-node: false
