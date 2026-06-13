@@ -16,7 +16,9 @@ const config = {
 			mode: 'hash',
 			directives: {
 				'default-src': ['self'],
-				'script-src': ['self'],
+				// 'wasm-unsafe-eval' lets the embedding worker compile the self-hosted ONNX WASM
+				// (ADR-014); it does NOT permit JS eval(). connect-src stays 'self' - no third-party fetch.
+				'script-src': ['self', 'wasm-unsafe-eval'],
 				'style-src': ['self', 'unsafe-inline'],
 				'img-src': ['self', 'data:'],
 				'font-src': ['self', 'data:'],

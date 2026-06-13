@@ -16,7 +16,8 @@ const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 const corpus = decodeCorpus(manifest, ab, MODEL_ID);
 const queries = JSON.parse(readFileSync('src/lib/ask/eval/queries.json', 'utf8'));
 
-const extractor = await pipeline('feature-extraction', MODEL_REPO);
+// q8 to match the corpus embed + the browser worker - same precision -> comparable vectors (ADR-014).
+const extractor = await pipeline('feature-extraction', MODEL_REPO, { dtype: 'q8' });
 const ranked = [];
 for (const q of queries) {
 	const out = await extractor(q.query, { pooling: 'mean', normalize: true });

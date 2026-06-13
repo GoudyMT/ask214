@@ -11,7 +11,9 @@ const MODEL_ID = 'all-MiniLM-L6-v2'; // stamped into the manifest; must equal sr
 const VERSION = '1.0';
 
 const chunks = JSON.parse(readFileSync('content/sample-corpus/chunks.json', 'utf8'));
-const extractor = await pipeline('feature-extraction', MODEL_REPO);
+// q8 (model_quantized.onnx, ~23MB) - MUST match the browser worker's dtype so corpus + query vectors
+// align. fp32 (~86MB) busts the ~25MB per-file cap and is hostile to a C1 mobile install (ADR-014/015).
+const extractor = await pipeline('feature-extraction', MODEL_REPO, { dtype: 'q8' });
 
 const vectors = [];
 for (const c of chunks) {
