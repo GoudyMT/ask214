@@ -1,4 +1,5 @@
 import type { ResultCard } from '$lib/corpus';
+import type { AskErrorCode } from './errors';
 
 /** The embedding model C uses for the query. MUST equal the corpus manifest's modelId. */
 export const EMBED_MODEL_ID = 'all-MiniLM-L6-v2';
@@ -17,4 +18,4 @@ export type AskState =
 	| { kind: 'results'; cards: ResultCard[] }
 	| { kind: 'empty' }
 	| { kind: 'offline' }
-	| { kind: 'error'; code: string };
+	| { kind: 'error'; code: AskErrorCode };

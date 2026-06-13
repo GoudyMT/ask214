@@ -16,3 +16,8 @@ export class AskError extends Error {
 		this.code = code;
 	}
 }
+
+/** Runtime narrowing for a code that crossed the worker postMessage boundary (an untrusted wire value). */
+export function isAskErrorCode(value: unknown): value is AskErrorCode {
+	return value === ASK_ERROR.MODEL_LOAD || value === ASK_ERROR.EMBED || value === ASK_ERROR.CORPUS;
+}

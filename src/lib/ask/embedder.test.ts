@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createEmbedder } from './embedder';
 import { AskError } from './errors';
 import type { EmbedRequest, EmbedResponse } from './types';
@@ -38,5 +38,48 @@ describe('createEmbedder', () => {
 		const [a, b] = await Promise.all([embed('x'), embed('y')]);
 		expect(a.length).toBe(3);
 		expect(b.length).toBe(3);
+	});
+
+	it('rejects pending requests with AskError when the worker crashes (onerror)', async () => {
+		const w = {
+			onmessage: null,
+			onerror: null as ((e: ErrorEvent) => void) | null,
+			onmessageerror: null,
+			postMessage() {
+				queueMicrotask(() => w.onerror?.({} as ErrorEvent));
+			},
+			terminate() {}
+		};
+		const embed = createEmbedder(w as unknown as Worker);
+		await expect(embed('x')).rejects.toBeInstanceOf(AskError);
+	});
+
+	it('does not time out the cold model-loading embed but bounds a warm one', async () => {
+		vi.useFakeTimers();
+		let calls = 0;
+		const w = {
+			onmessage: null as ((e: MessageEvent<EmbedResponse>) => void) | null,
+			onerror: null,
+			onmessageerror: null,
+			postMessage(req: EmbedRequest) {
+				calls += 1;
+				if (calls === 1) {
+					queueMicrotask(() =>
+						w.onmessage?.({
+							data: { id: req.id, ok: true, vector: new Float32Array([1]) }
+						} as MessageEvent<EmbedResponse>)
+					);
+				}
+				// the 2nd request stays silent -> simulates a hung warm embed
+			},
+			terminate() {}
+		};
+		const embed = createEmbedder(w as unknown as Worker, 5000);
+		await embed('cold'); // model load: no timeout, resolves -> modelReady = true
+		const warm = embed('warm'); // warm: 5s timeout armed
+		const rejects = expect(warm).rejects.toBeInstanceOf(AskError); // attach handler BEFORE the timer fires
+		await vi.advanceTimersByTimeAsync(5000);
+		await rejects;
+		vi.useRealTimers();
 	});
 });
