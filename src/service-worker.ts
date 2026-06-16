@@ -4,17 +4,21 @@
 /// <reference lib="webworker" />
 
 import { build, files, version } from '$service-worker';
+import { classifyAsset } from '$lib/ask/asset-cache';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 const CACHE = `app-${version}`;
 const ASSETS = [...build, ...files];
+// Precache the app shell + small static assets at install; the heavy model/wasm (classifyAsset -> 'lazy')
+// are EXCLUDED so install stays light + robust, and they cache on first /ask fetch instead (ADR-015).
+const PRECACHE = ASSETS.filter((path) => classifyAsset(path) === 'precache');
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(
 		(async () => {
 			const cache = await caches.open(CACHE);
-			await cache.addAll(ASSETS);
+			await cache.addAll(PRECACHE);
 		})()
 	);
 });
