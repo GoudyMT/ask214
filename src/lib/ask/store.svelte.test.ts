@@ -79,4 +79,16 @@ describe('createAskStore', () => {
 			Object.defineProperty(navigator, 'onLine', { value: original, configurable: true });
 		}
 	});
+
+	it('returns empty when no hit clears the minimum score threshold', async () => {
+		// Query orthogonal to both fixture chunks -> cosine 0 to each -> below MIN_SCORE, so the
+		// threshold gate drops them. Without the gate, search returns both chunks and the store shows
+		// `results`; the gate is what makes `empty` reachable (spec section 9).
+		const store = createAskStore({
+			embed: async () => new Float32Array([0, 0, 1]),
+			corpus: fixtureCorpus()
+		});
+		await store.ask('q');
+		expect(store.state.kind).toBe('empty');
+	});
 });
