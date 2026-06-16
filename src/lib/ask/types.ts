@@ -13,6 +13,7 @@ export type EmbedResponse =
 /** The Ask view state machine (drives the UI). */
 export type AskState =
 	| { kind: 'idle' }
+	| { kind: 'needsSetup'; pendingQuery: string } // soft opt-in: asked, model not set up; query preserved
 	| { kind: 'modelLoading' }
 	| { kind: 'embedding' }
 	| { kind: 'results'; cards: ResultCard[] }

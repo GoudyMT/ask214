@@ -17,8 +17,8 @@ function fixtureCorpus(): Corpus {
 }
 
 describe('createAskStore', () => {
-	// The model-downloaded flag persists across sessions; clear it before each test so every case
-	// starts from a known "not yet downloaded" state (mirrors the store's localStorage key).
+	// The model-downloaded flag persists across sessions; clear it before each test so every case starts
+	// "not set up" (mirrors the store's localStorage key). Tests needing a set-up device set it explicitly.
 	const MODEL_DOWNLOADED_KEY = 'mtc:ask:model-downloaded';
 	beforeEach(() => localStorage.removeItem(MODEL_DOWNLOADED_KEY));
 
@@ -30,33 +30,56 @@ describe('createAskStore', () => {
 		expect(store.state.kind).toBe('idle');
 	});
 
-	it('shows modelLoading on the first query, then results', async () => {
+	it('shows needsSetup with the query preserved on the first query (no auto-download)', async () => {
+		let embedCalls = 0;
+		const embed = async () => {
+			embedCalls++;
+			return new Float32Array([1, 0, 0]);
+		};
+		const store = createAskStore({ embed, corpus: fixtureCorpus() });
+		await store.ask('how do I file a claim');
+		expect(store.state.kind).toBe('needsSetup');
+		if (store.state.kind === 'needsSetup') {
+			expect(store.state.pendingQuery).toBe('how do I file a claim');
+		}
+		expect(embedCalls).toBe(0); // nothing is downloaded or embedded without consent
+	});
+
+	it('setUp() shows modelLoading, answers the preserved query, and persists the flag', async () => {
 		let release: (v: Float32Array) => void = () => {};
 		const embed = () => new Promise<Float32Array>((r) => (release = r));
 		const store = createAskStore({ embed, corpus: fixtureCorpus() });
-		const p = store.ask('how do I file a claim');
-		expect(store.state.kind).toBe('modelLoading'); // synchronous, before embed resolves
+		await store.ask('q'); // -> needsSetup
+		const p = store.setUp();
+		expect(store.state.kind).toBe('modelLoading'); // the one-time download is in progress
 		release(new Float32Array([1, 0, 0]));
 		await p;
 		expect(store.state.kind).toBe('results');
-		if (store.state.kind === 'results') {
-			expect(store.state.cards.length).toBeGreaterThan(0);
-			expect(store.state.cards[0]!.sourceTitle).toBe('S');
-		}
+		expect(localStorage.getItem(MODEL_DOWNLOADED_KEY)).toBe('1');
 	});
 
-	it('shows embedding (not modelLoading) once the model is loaded', async () => {
+	it('dismissSetup() returns to idle', async () => {
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			corpus: fixtureCorpus()
+		});
+		await store.ask('q'); // -> needsSetup
+		store.dismissSetup();
+		expect(store.state.kind).toBe('idle');
+	});
+
+	it('goes straight to embedding (skips needsSetup) when already set up', async () => {
+		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1'); // set up in a prior session
 		let release: (v: Float32Array) => void = () => {};
 		const embed = () => new Promise<Float32Array>((r) => (release = r));
 		const store = createAskStore({ embed, corpus: fixtureCorpus() });
-		const first = store.ask('first');
+		void store.ask('q'); // sets state synchronously before embed resolves
+		expect(store.state.kind).toBe('embedding'); // no needsSetup, no modelLoading
 		release(new Float32Array([1, 0, 0]));
-		await first;
-		void store.ask('second'); // sets state synchronously before its embed resolves
-		expect(store.state.kind).toBe('embedding');
 	});
 
-	it('surfaces error when an online embed fails', async () => {
+	it('surfaces error when an online embed fails (set up)', async () => {
+		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
 		const store = createAskStore({
 			embed: async () => {
 				throw new AskError(ASK_ERROR.EMBED);
@@ -68,7 +91,7 @@ describe('createAskStore', () => {
 		if (store.state.kind === 'error') expect(store.state.code).toBe(ASK_ERROR.EMBED);
 	});
 
-	it('surfaces offline when a first-run embed fails with no network', async () => {
+	it('surfaces offline when the setUp embed fails with no network (first run)', async () => {
 		const original = navigator.onLine;
 		Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
 		try {
@@ -78,42 +101,23 @@ describe('createAskStore', () => {
 				},
 				corpus: fixtureCorpus()
 			});
-			await store.ask('q');
+			await store.ask('q'); // -> needsSetup (not set up)
+			await store.setUp(); // the first-run embed fails with no network
 			expect(store.state.kind).toBe('offline');
 		} finally {
 			Object.defineProperty(navigator, 'onLine', { value: original, configurable: true });
 		}
 	});
 
-	it('returns empty when no hit clears the minimum score threshold', async () => {
-		// Query orthogonal to both fixture chunks -> cosine 0 to each -> below MIN_SCORE, so the
-		// threshold gate drops them. Without the gate, search returns both chunks and the store shows
-		// `results`; the gate is what makes `empty` reachable (spec section 9).
+	it('returns empty when no hit clears the minimum score threshold (set up)', async () => {
+		// Query orthogonal to both fixture chunks -> cosine 0 -> below MIN_SCORE, so the threshold gate
+		// drops them and `empty` is reachable (spec section 9). Set up so ask() takes the embed path.
+		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
 		const store = createAskStore({
 			embed: async () => new Float32Array([0, 0, 1]),
 			corpus: fixtureCorpus()
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('empty');
-	});
-
-	it('skips modelLoading on the first query when the model was downloaded in a prior session', async () => {
-		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
-		let release: (v: Float32Array) => void = () => {};
-		const embed = () => new Promise<Float32Array>((r) => (release = r));
-		const store = createAskStore({ embed, corpus: fixtureCorpus() });
-		void store.ask('q'); // persisted flag -> straight to embedding, no modelLoading
-		expect(store.state.kind).toBe('embedding');
-		release(new Float32Array([1, 0, 0]));
-	});
-
-	it('persists the model-downloaded flag after the first successful embed', async () => {
-		const store = createAskStore({
-			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus()
-		});
-		expect(localStorage.getItem(MODEL_DOWNLOADED_KEY)).toBeNull();
-		await store.ask('q');
-		expect(localStorage.getItem(MODEL_DOWNLOADED_KEY)).toBe('1');
 	});
 });

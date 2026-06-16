@@ -27,10 +27,13 @@ function markModelDownloaded(): void {
 
 /**
  * The Ask view store (Context 1, on-device): holds the `AskState` machine and orchestrates one query.
- * `embed` + `corpus` are injected so the store is unit-testable without a model/worker. The first query
- * shows `modelLoading` (the one-time ~23MB model load is folded into it - Option A, no progress %);
- * subsequent queries show `embedding`. A failed embed while the model is not yet loaded AND the device
- * is offline surfaces `offline` (first-run-offline: connect once to download); any other failure -> `error`.
+ * `embed` + `corpus` are injected so the store is unit-testable without a model/worker.
+ *
+ * Soft opt-in (ADR-015 / spec 9): the ~23MB model is NEVER auto-downloaded. The first query on an
+ * un-set-up device goes to `needsSetup` with the query preserved; the download happens only when the user
+ * consents via `setUp()` (which shows `modelLoading` during the one-time fetch, then answers the preserved
+ * query). A set-up device (persisted flag) skips straight to `embedding`. A failed FIRST embed with no
+ * network surfaces `offline` (connect once to download); any other failure -> `error`.
  */
 export function createAskStore(deps: {
 	embed: (text: string) => Promise<Float32Array>;
@@ -39,8 +42,9 @@ export function createAskStore(deps: {
 	let state = $state<AskState>({ kind: 'idle' });
 	let modelLoaded = readModelDownloaded();
 
-	async function ask(query: string): Promise<void> {
-		if (query.trim() === '') return; // ignore empty submits
+	// The embed -> search -> cards path. The loading state is `modelLoading` on the first run (that embed
+	// triggers the one-time ~23MB download) and `embedding` once set up. Shared by ask() (warm) + setUp().
+	async function runQuery(query: string): Promise<void> {
 		state = modelLoaded ? { kind: 'embedding' } : { kind: 'modelLoading' };
 		try {
 			const vector = await deps.embed(query);
@@ -57,10 +61,35 @@ export function createAskStore(deps: {
 		}
 	}
 
+	async function ask(query: string): Promise<void> {
+		const trimmed = query.trim();
+		if (trimmed === '') return; // ignore empty submits
+		// Un-set-up device: consent-gate the one-time download (never auto-fetch). Preserve the query so
+		// setUp() can answer it; a set-up device runs it straight away.
+		if (!modelLoaded) {
+			state = { kind: 'needsSetup', pendingQuery: trimmed };
+			return;
+		}
+		await runQuery(trimmed);
+	}
+
+	// Consent action: run the one-time download (shown as `modelLoading`) then answer the preserved query.
+	async function setUp(): Promise<void> {
+		if (state.kind !== 'needsSetup') return;
+		await runQuery(state.pendingQuery);
+	}
+
+	// [Not now]: drop the pending query and return to idle.
+	function dismissSetup(): void {
+		if (state.kind === 'needsSetup') state = { kind: 'idle' };
+	}
+
 	return {
 		get state(): AskState {
 			return state;
 		},
-		ask
+		ask,
+		setUp,
+		dismissSetup
 	};
 }
