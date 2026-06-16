@@ -5,9 +5,10 @@ import type { AskState } from './types';
 
 const K = 5; // result cards per query (spec 4.6: 3-5)
 // Minimum cosine score a hit must clear to surface (spec section 9): weak matches are dropped rather
-// than padded in, which is also what makes `empty` reachable. Provisional value, pending grounding in
-// the eval-query score distribution before the live UI is finalized.
-const MIN_SCORE = 0.3;
+// than padded in, which is also what makes `empty` reachable. Calibrated against the eval set - set
+// below the weakest relevant lead so a valid answer is never dropped, and above the off-topic noise
+// tail so unrelated hits collapse. Recalibrate as the corpus scales (spec section 15 #1).
+const MIN_SCORE = 0.4;
 
 // The ~23MB on-device search model is fetched + cached once, then served from cache forever (ADR-014).
 // We persist one non-PII boolean - "was the model downloaded on this device?" - so the "downloading..."
