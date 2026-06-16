@@ -12,6 +12,10 @@ describe('shellWidthFor', () => {
 		expect(shellWidthFor('/timeline')).toBe('1024px');
 	});
 
+	it('returns the 760px width for the /ask route', () => {
+		expect(shellWidthFor('/ask')).toBe('760px');
+	});
+
 	it('returns the default 720px width for non-wide routes', () => {
 		expect(shellWidthFor('/')).toBe('720px');
 		expect(shellWidthFor('/settings')).toBe('720px');
