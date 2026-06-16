@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createAskStore } from './store.svelte';
 import { AskError, ASK_ERROR } from './errors';
 import type { Corpus, CorpusChunk } from '$lib/corpus';
@@ -17,6 +17,11 @@ function fixtureCorpus(): Corpus {
 }
 
 describe('createAskStore', () => {
+	// The model-downloaded flag persists across sessions; clear it before each test so every case
+	// starts from a known "not yet downloaded" state (mirrors the store's localStorage key).
+	const MODEL_DOWNLOADED_KEY = 'mtc:ask:model-downloaded';
+	beforeEach(() => localStorage.removeItem(MODEL_DOWNLOADED_KEY));
+
 	it('starts idle', () => {
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
@@ -90,5 +95,25 @@ describe('createAskStore', () => {
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('empty');
+	});
+
+	it('skips modelLoading on the first query when the model was downloaded in a prior session', async () => {
+		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
+		let release: (v: Float32Array) => void = () => {};
+		const embed = () => new Promise<Float32Array>((r) => (release = r));
+		const store = createAskStore({ embed, corpus: fixtureCorpus() });
+		void store.ask('q'); // persisted flag -> straight to embedding, no modelLoading
+		expect(store.state.kind).toBe('embedding');
+		release(new Float32Array([1, 0, 0]));
+	});
+
+	it('persists the model-downloaded flag after the first successful embed', async () => {
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			corpus: fixtureCorpus()
+		});
+		expect(localStorage.getItem(MODEL_DOWNLOADED_KEY)).toBeNull();
+		await store.ask('q');
+		expect(localStorage.getItem(MODEL_DOWNLOADED_KEY)).toBe('1');
 	});
 });

@@ -9,6 +9,21 @@ const K = 5; // result cards per query (spec 4.6: 3-5)
 // the eval-query score distribution before the live UI is finalized.
 const MIN_SCORE = 0.3;
 
+// The ~23MB on-device search model is fetched + cached once, then served from cache forever (ADR-014).
+// We persist one non-PII boolean - "was the model downloaded on this device?" - so the "downloading..."
+// modelLoading message shows on the first-EVER query only, not once per session (spec section 9). This
+// is a device-capability flag, NOT user data (no query, no profile, nothing personal), so plain
+// localStorage is correct here - ADR-004's encrypted-IDB rule governs PII, which this is not.
+const MODEL_DOWNLOADED_KEY = 'mtc:ask:model-downloaded';
+
+function readModelDownloaded(): boolean {
+	return typeof localStorage !== 'undefined' && localStorage.getItem(MODEL_DOWNLOADED_KEY) === '1';
+}
+
+function markModelDownloaded(): void {
+	if (typeof localStorage !== 'undefined') localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
+}
+
 /**
  * The Ask view store (Context 1, on-device): holds the `AskState` machine and orchestrates one query.
  * `embed` + `corpus` are injected so the store is unit-testable without a model/worker. The first query
@@ -21,7 +36,7 @@ export function createAskStore(deps: {
 	corpus: Corpus;
 }) {
 	let state = $state<AskState>({ kind: 'idle' });
-	let modelLoaded = false;
+	let modelLoaded = readModelDownloaded();
 
 	async function ask(query: string): Promise<void> {
 		if (query.trim() === '') return; // ignore empty submits
@@ -29,6 +44,7 @@ export function createAskStore(deps: {
 		try {
 			const vector = await deps.embed(query);
 			modelLoaded = true;
+			markModelDownloaded();
 			const cards = toResultCards(filterByMinScore(search(vector, deps.corpus, K), MIN_SCORE));
 			state = cards.length > 0 ? { kind: 'results', cards } : { kind: 'empty' };
 		} catch (e) {
