@@ -131,6 +131,7 @@
 			<a href={resolve('/')} class="brand">Transition Companion</a>
 			<ul>
 				<li><a href={resolve('/timeline')}>Timeline</a></li>
+				<li><a href={resolve('/ask')}>Ask</a></li>
 				<li><a href={resolve('/settings')}>Settings</a></li>
 				<li><a href={resolve('/about')}>About</a></li>
 			</ul>
@@ -147,8 +148,9 @@
 
 	<footer style:--shell-width={shellWidth}>
 		<p>
-			Independent open-source project. Not affiliated with the US Department of Defense, the
-			Department of Veterans Affairs, or any branch of the US military.
+			An independent project to help service members navigate the steps to civilian life - not
+			affiliated with the US Department of Defense, the Department of Veterans Affairs, or any
+			branch of the US military.
 		</p>
 		<p>
 			<a href={resolve('/about')}>About</a> &middot;
@@ -180,7 +182,7 @@
 		margin: 0 auto;
 	}
 
-	/* Lock #7: inline horizontal nav (brand + 3 links: Timeline/Settings/About). */
+	/* Lock #7: inline horizontal nav (brand + 4 links: Timeline/Ask/Settings/About). */
 	/* Migrate to bottom-tab-bar pattern when nav reaches 4+ items. */
 	nav ul {
 		list-style: none;

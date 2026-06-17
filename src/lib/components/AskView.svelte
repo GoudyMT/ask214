@@ -48,6 +48,20 @@
 	}
 </script>
 
+{#if showReminder}
+	<div class="ask-reminder">
+		<span>Want to set up Ask and keep planning offline? One-time ~45 MB.</span>
+		<span class="ask-reminder__actions">
+			<button class="ask-reminder__set" type="button" onclick={() => inputEl?.focus()}
+				>Set up</button
+			>
+			<button class="ask-reminder__x" type="button" aria-label="Dismiss" onclick={dismissReminder}
+				>&times;</button
+			>
+		</span>
+	</div>
+{/if}
+
 <h1 class="ask-title">Ask</h1>
 <p class="ask-sub">
 	Plain-language questions, answered from official public sources - with the exact source on every
@@ -75,20 +89,6 @@
 	<button class="ask-search" type="submit" disabled={!ready}>Search</button>
 </form>
 
-{#if showReminder}
-	<div class="ask-reminder">
-		<span>Want to set up Ask and keep planning offline? One-time ~23 MB.</span>
-		<span class="ask-reminder__actions">
-			<button class="ask-reminder__set" type="button" onclick={() => inputEl?.focus()}
-				>Set up</button
-			>
-			<button class="ask-reminder__x" type="button" aria-label="Dismiss" onclick={dismissReminder}
-				>&times;</button
-			>
-		</span>
-	</div>
-{/if}
-
 <div class="ask-result">
 	{#if askState.kind === 'idle'}
 		<div class="ask-examples">
@@ -96,16 +96,13 @@
 				<button class="ask-example" type="button" onclick={() => onAsk(ex)}>{ex}</button>
 			{/each}
 		</div>
-		<p class="ask-idle">Ask a question to search the reference library, or tap an example above.</p>
 	{:else if askState.kind === 'needsSetup'}
 		<div class="ask-setup">
-			<span class="ask-setup__badge">Private - on your device</span>
 			<h2 class="ask-setup__title">One-time setup to answer your question</h2>
 			<p class="ask-setup__query">"{askState.pendingQuery}"</p>
 			<p class="ask-setup__body">
-				Ask searches official sources right on your device - your question never leaves it. To do
-				that it downloads a small search tool once (~23 MB). After that, Ask is instant and works
-				offline.
+				To answer your question, Ask downloads a one-time search tool (about 45 MB). After that it's
+				instant and works fully offline.
 			</p>
 			<div class="ask-setup__actions">
 				<button class="ask-setup__go" type="button" onclick={onSetUp}>Set up &amp; answer</button>
@@ -116,8 +113,8 @@
 		<div class="ask-msg ask-msg--accent">
 			<p class="ask-msg__title"><span class="ask-spinner"></span>Setting up Ask</p>
 			<p class="ask-msg__body">
-				Downloading the on-device search tool (~23 MB), one time only - then answering your
-				question. Afterwards Ask is instant and works offline.
+				Downloading the search tool (about 45 MB), one time only - then answering your question.
+				Afterwards Ask is instant and works offline.
 			</p>
 		</div>
 	{:else if askState.kind === 'embedding'}
@@ -148,7 +145,7 @@
 		<div class="ask-msg ask-msg--accent">
 			<p class="ask-msg__title">You're offline</p>
 			<p class="ask-msg__body">
-				Connect to the internet once to set up Ask (~23 MB). After that it works fully offline.
+				Connect to the internet once to set up Ask (about 45 MB). After that it works fully offline.
 			</p>
 		</div>
 	{:else if askState.kind === 'error'}
@@ -222,11 +219,6 @@
 		color: var(--color-fg-muted);
 		cursor: pointer;
 	}
-	.ask-idle {
-		color: var(--color-fg-muted);
-		font-size: var(--font-size-s);
-		padding: var(--space-m) 0;
-	}
 
 	.ask-result {
 		margin-top: var(--space-l);
@@ -277,18 +269,6 @@
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-l);
 		padding: var(--space-l);
-	}
-	.ask-setup__badge {
-		display: inline-block;
-		font-size: var(--font-size-s);
-		font-weight: 600;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		color: var(--color-success);
-		border: 1px solid var(--color-success);
-		border-radius: 999px;
-		padding: 2px 10px;
-		margin-bottom: var(--space-m);
 	}
 	.ask-setup__title {
 		font-size: var(--font-size-l);
