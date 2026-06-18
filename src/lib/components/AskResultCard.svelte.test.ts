@@ -51,6 +51,16 @@ describe('AskResultCard', () => {
 		expect(text.split(/\s+/).length).toBeLessThanOrEqual(25); // 24 words + the ellipsis token
 	});
 
+	it('lead variant shows a fuller ~120-word excerpt (cap raised above the compact 24)', () => {
+		const long = Array.from({ length: 150 }, (_, i) => `w${i}`).join(' ');
+		const { container } = render(AskResultCard, {
+			props: { card: fullCard({ excerpt: long }), variant: 'lead' }
+		});
+		const text = container.querySelector('.ask-card__excerpt')?.textContent ?? '';
+		expect(text.endsWith('...')).toBe(true);
+		expect(text.split(/\s+/).length).toBe(120); // lead cap is 120 words (was 60)
+	});
+
 	it('omits the meta line when there is no section or page', () => {
 		const minimal: ResultCard = {
 			sourceId: 's',

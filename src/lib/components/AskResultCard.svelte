@@ -5,7 +5,7 @@
 
 	// B passes the full chunk text through as the excerpt (the display truncation it deliberately left to
 	// C). The lead card shows a fuller excerpt; a collapsed "similar" card shows a one-liner.
-	const MAX_WORDS = { lead: 60, compact: 24 } as const;
+	const MAX_WORDS = { lead: 120, compact: 24 } as const;
 	const excerpt = $derived(truncateWords(card.excerpt, MAX_WORDS[variant]));
 
 	// Source descriptor: section and/or page when present (e.g. "How to submit - p. 12").
