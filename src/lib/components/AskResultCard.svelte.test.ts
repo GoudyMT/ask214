@@ -1,4 +1,5 @@
 import { render } from 'vitest-browser-svelte';
+import { flushSync } from 'svelte';
 import { describe, it, expect } from 'vitest';
 import AskResultCard from './AskResultCard.svelte';
 import type { ResultCard } from '$lib/corpus';
@@ -71,5 +72,20 @@ describe('AskResultCard', () => {
 		};
 		const { container } = render(AskResultCard, { props: { card: minimal } });
 		expect(container.querySelector('.ask-card__meta')).toBeNull();
+	});
+
+	it('shows a "Read full source" button (fires onReadSource) and an official-site link', () => {
+		let read = 0;
+		const { container } = render(AskResultCard, {
+			props: { card: fullCard(), variant: 'lead', onReadSource: () => read++ }
+		});
+		expect(container.querySelector('.ask-card__link')?.textContent).toContain(
+			'View on the official site'
+		);
+		const btn = container.querySelector('.ask-card__read') as HTMLButtonElement;
+		expect(btn).not.toBeNull();
+		btn.click();
+		flushSync();
+		expect(read).toBe(1);
 	});
 });

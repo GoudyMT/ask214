@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { ResultCard } from '$lib/corpus';
 
-	let { card, variant = 'compact' }: { card: ResultCard; variant?: 'lead' | 'compact' } = $props();
+	let {
+		card,
+		variant = 'compact',
+		onReadSource
+	}: { card: ResultCard; variant?: 'lead' | 'compact'; onReadSource?: () => void } = $props();
 
 	// B passes the full chunk text through as the excerpt (the display truncation it deliberately left to
 	// C). The lead card shows a fuller excerpt; a collapsed "similar" card shows a one-liner.
@@ -28,11 +32,16 @@
 		{#if meta}<span class="ask-card__meta">{meta}</span>{/if}
 	</div>
 	<p class="ask-card__excerpt">{excerpt}</p>
-	<!-- card.url is an external public-source citation (https), not internal SvelteKit nav; resolve() does not apply. -->
-	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-	<a class="ask-card__link" href={card.url} target="_blank" rel="noopener noreferrer"
-		>Open original</a
-	>
+	<div class="ask-card__actions">
+		{#if onReadSource}
+			<button class="ask-card__read" type="button" onclick={onReadSource}>Read full source</button>
+		{/if}
+		<!-- card.url is an external public-source citation (https), not internal SvelteKit nav; resolve() does not apply. -->
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+		<a class="ask-card__link" href={card.url} target="_blank" rel="noopener noreferrer"
+			>View on the official site</a
+		>
+	</div>
 </article>
 
 <style>
@@ -85,5 +94,23 @@
 	.ask-card__link::after {
 		content: ' >';
 		opacity: 0.6;
+	}
+	.ask-card__actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-m);
+		margin-top: var(--space-s);
+	}
+	.ask-card__read {
+		background: none;
+		border: 1px solid var(--color-accent);
+		color: var(--color-accent);
+		border-radius: var(--radius-s);
+		padding: 6px var(--space-m);
+		font: inherit;
+		font-size: var(--font-size-s);
+		font-weight: 600;
+		cursor: pointer;
 	}
 </style>
