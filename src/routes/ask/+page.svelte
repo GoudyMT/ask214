@@ -3,6 +3,7 @@
 	import AskView from '$lib/components/AskView.svelte';
 	import EmbedWorker from '$lib/ask/embed-worker?worker';
 	import { createAskStore, createEmbedder, loadCorpus, ASK_ERROR, type AskState } from '$lib/ask';
+	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 
 	const CORPUS_BASE = '/corpus/corpus-v1.0';
 
@@ -10,6 +11,7 @@
 	// in-memory Corpus. Until then the input is disabled; a corpus-load failure surfaces as `error`. The
 	// ~23MB model is NOT fetched here - it downloads only when the user opts in (store.setUp), per ADR-015.
 	let store = $state<ReturnType<typeof createAskStore> | null>(null);
+	let sources = $state<Map<string, Source>>(new Map()); // corpus grouped by source for the offline reader
 	let initError = $state(false);
 
 	let askState: AskState = $derived(
@@ -22,6 +24,7 @@
 		void (async () => {
 			try {
 				const corpus = await loadCorpus(fetch, CORPUS_BASE);
+				sources = sourcesFromCorpus(corpus);
 				worker = new EmbedWorker();
 				store = createAskStore({ embed: createEmbedder(worker), corpus });
 			} catch {
@@ -37,6 +40,7 @@
 <AskView
 	{askState}
 	{ready}
+	{sources}
 	onAsk={(q) => store?.ask(q)}
 	onSetUp={() => store?.setUp()}
 	onDismiss={() => store?.dismissSetup()}

@@ -1,25 +1,30 @@
 <script lang="ts">
 	import type { AskState } from '$lib/ask/types';
+	import type { Source } from '$lib/ask/sources';
 	import AskResultCard from './AskResultCard.svelte';
+	import SourceReader from './SourceReader.svelte';
 
 	let {
 		askState,
 		ready,
 		onAsk,
 		onSetUp,
-		onDismiss
+		onDismiss,
+		sources
 	}: {
 		askState: AskState;
 		ready: boolean;
 		onAsk: (query: string) => void;
 		onSetUp: () => void;
 		onDismiss: () => void;
+		sources: Map<string, Source>;
 	} = $props();
 
 	let query = $state('');
 	let showSimilar = $state(false);
 	let setupDismissed = $state(false); // a [Not now] happened this view -> nudge with the reminder
 	let inputEl: HTMLInputElement | undefined = $state();
+	let openSource = $state<Source | null>(null); // the source shown in the offline reader modal, or null
 
 	// The reminder dismissal persists for the tab session (non-PII: just "user hid the Ask download
 	// nudge" - no query, no profile). Plain sessionStorage is fine here (ADR-004 governs PII, not this).
@@ -45,6 +50,10 @@
 	function dismissReminder() {
 		reminderDismissed = true;
 		if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(REMINDER_DISMISSED_KEY, '1');
+	}
+	// "Read full source" -> open the offline reader on the source this card cites (the corpus holds its text).
+	function readSource(sourceId: string) {
+		openSource = sources.get(sourceId) ?? null;
 	}
 </script>
 
@@ -122,16 +131,21 @@
 			<p class="ask-msg__body"><span class="ask-spinner"></span>Finding relevant sources...</p>
 		</div>
 	{:else if askState.kind === 'results'}
+		{@const cards = askState.cards}
 		<p class="ask-count">Top match</p>
-		<AskResultCard card={askState.cards[0]!} variant="lead" />
-		{#if askState.cards.length > 1}
+		<AskResultCard
+			card={cards[0]!}
+			variant="lead"
+			onReadSource={() => readSource(cards[0]!.sourceId)}
+		/>
+		{#if cards.length > 1}
 			<button class="ask-toggle" type="button" onclick={() => (showSimilar = !showSimilar)}>
-				{showSimilar ? 'Hide' : `Show ${askState.cards.length - 1}`} similar sources
+				{showSimilar ? 'Hide' : `Show ${cards.length - 1}`} similar sources
 			</button>
 			{#if showSimilar}
 				<div class="ask-similar">
-					{#each askState.cards.slice(1) as c, i (i)}
-						<AskResultCard card={c} variant="compact" />
+					{#each cards.slice(1) as c, i (i)}
+						<AskResultCard card={c} variant="compact" onReadSource={() => readSource(c.sourceId)} />
 					{/each}
 				</div>
 			{/if}
@@ -155,6 +169,8 @@
 		</div>
 	{/if}
 </div>
+
+<SourceReader source={openSource} onClose={() => (openSource = null)} />
 
 <style>
 	.ask-title {

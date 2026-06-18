@@ -5,6 +5,7 @@ import AskView from './AskView.svelte';
 import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
 import type { ResultCard } from '$lib/corpus';
+import type { Source } from '$lib/ask/sources';
 
 type ViewProps = {
 	askState: AskState;
@@ -12,12 +13,21 @@ type ViewProps = {
 	onAsk: (query: string) => void;
 	onSetUp: () => void;
 	onDismiss: () => void;
+	sources: Map<string, Source>;
 };
 
 const noop = () => {};
 
 function props(state: AskState, over: Partial<ViewProps> = {}): ViewProps {
-	return { askState: state, ready: true, onAsk: noop, onSetUp: noop, onDismiss: noop, ...over };
+	return {
+		askState: state,
+		ready: true,
+		onAsk: noop,
+		onSetUp: noop,
+		onDismiss: noop,
+		sources: new Map(),
+		...over
+	};
 }
 
 function card(over: Partial<ResultCard> = {}): ResultCard {
@@ -116,5 +126,30 @@ describe('AskView', () => {
 		const { container } = render(AskView, { props: props({ kind: 'results', cards: [card()] }) });
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
 		expect(container.querySelector('.ask-toggle')).toBeNull();
+	});
+
+	it('results: "Read full source" opens the offline reader with that source\'s held text', () => {
+		const lead = card({ sourceId: 'va_intent', sourceTitle: 'VA - Intent to File' });
+		const sources = new Map<string, Source>([
+			[
+				'va_intent',
+				{
+					sourceId: 'va_intent',
+					title: 'VA - Intent to File',
+					url: 'https://www.va.gov/',
+					texts: ['Held passage one.', 'Held passage two.']
+				}
+			]
+		]);
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', cards: [lead] }, { sources })
+		});
+		expect(container.querySelector('.reader__title')).toBeNull(); // reader closed initially
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		flushSync();
+		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
+		expect(dialog.open).toBe(true);
+		expect(container.querySelector('.reader__title')?.textContent).toBe('VA - Intent to File');
+		expect(container.querySelectorAll('.reader__passage').length).toBe(2);
 	});
 });
