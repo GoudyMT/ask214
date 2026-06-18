@@ -16,7 +16,8 @@
 		"format": "prettier --write .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
-		"test:e2e": "playwright install && playwright test"
+		"test:e2e": "playwright install && playwright test --grep-invert @slow",
+		"test:e2e:offline": "playwright test --grep @slow"
 	},
 	"lint-staged": {
 		"*.{js,ts,svelte}": [

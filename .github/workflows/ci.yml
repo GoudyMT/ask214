@@ -50,8 +50,8 @@ jobs:
       - name: Unit tests
         run: pnpm run test:unit -- --run
 
-      - name: E2E tests
-        run: pnpm exec playwright test
+      - name: E2E tests (excludes @slow - the heavy offline-model run; see pnpm test:e2e:offline)
+        run: pnpm exec playwright test --grep-invert @slow
 
       - name: Build
         run: pnpm run build
