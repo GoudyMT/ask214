@@ -46,8 +46,7 @@
 		</div>
 		<div class="reader__body">
 			<p class="reader__held">
-				Showing the passages saved on your device from this source. Open the official site for the
-				complete document.
+				Showing a section saved on your device - open the official site for the complete document.
 			</p>
 			<!-- index key: a replace-all list re-rendered per source, never reordered in place -->
 			{#each source.texts as passage, i (i)}
@@ -71,12 +70,15 @@
 		max-height: 86vh;
 		padding: 0;
 		overflow: hidden;
-		display: flex;
-		flex-direction: column;
 		background: var(--color-surface);
 		color: var(--color-fg);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-l);
+	}
+	/* Only an OPEN dialog lays out; a closed <dialog> keeps the UA display:none (no phantom bar in flow). */
+	.reader[open] {
+		display: flex;
+		flex-direction: column;
 	}
 	.reader::backdrop {
 		background: rgba(7, 10, 14, 0.66);

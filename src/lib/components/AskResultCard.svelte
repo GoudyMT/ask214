@@ -34,7 +34,7 @@
 	<p class="ask-card__excerpt">{excerpt}</p>
 	<div class="ask-card__actions">
 		{#if onReadSource}
-			<button class="ask-card__read" type="button" onclick={onReadSource}>Read full source</button>
+			<button class="ask-card__read" type="button" onclick={onReadSource}>Read more</button>
 		{/if}
 		<!-- card.url is an external public-source citation (https), not internal SvelteKit nav; resolve() does not apply. -->
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
@@ -112,5 +112,17 @@
 		font-size: var(--font-size-s);
 		font-weight: 600;
 		cursor: pointer;
+		transition: all 0.12s ease;
+	}
+	.ask-card__read:hover {
+		background: var(--color-accent);
+		color: var(--color-bg);
+	}
+	.ask-card__read:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+	.ask-card__read:active {
+		transform: translateY(1px);
 	}
 </style>

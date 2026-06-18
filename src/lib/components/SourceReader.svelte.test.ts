@@ -60,6 +60,8 @@ describe('SourceReader', () => {
 		flushSync();
 		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
 		expect(dialog.open).toBe(false);
+		// a closed <dialog> must keep the UA display:none - else the empty box paints a bar in page flow
+		expect(getComputedStyle(dialog).display).toBe('none');
 		expect(container.querySelector('.reader__title')).toBeNull();
 	});
 });
