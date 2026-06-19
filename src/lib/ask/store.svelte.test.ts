@@ -109,6 +109,20 @@ describe('createAskStore', () => {
 		}
 	});
 
+	it('surfaces error (not offline) when a first-run embed fails while the device is online', async () => {
+		// Not set up + ONLINE (the browser-test default): a failed first-run embed is a genuine error, not
+		// connectivity. `offline` is reserved for !modelLoaded + no network (the test above).
+		const store = createAskStore({
+			embed: async () => {
+				throw new AskError(ASK_ERROR.EMBED);
+			},
+			corpus: fixtureCorpus()
+		});
+		await store.ask('q'); // -> needsSetup (not set up)
+		await store.setUp(); // first-run embed fails while online -> error
+		expect(store.state.kind).toBe('error');
+	});
+
 	it('returns empty when no hit clears the minimum score threshold (set up)', async () => {
 		// Query orthogonal to both fixture chunks -> cosine 0 -> below MIN_SCORE, so the threshold gate
 		// drops them and `empty` is reachable (spec section 9). Set up so ask() takes the embed path.

@@ -82,4 +82,18 @@ describe('createEmbedder', () => {
 		await rejects;
 		vi.useRealTimers();
 	});
+
+	it('rejects pending requests with AskError when a message is undeserializable (onmessageerror)', async () => {
+		const w = {
+			onmessage: null,
+			onerror: null,
+			onmessageerror: null as ((e: MessageEvent) => void) | null,
+			postMessage() {
+				queueMicrotask(() => w.onmessageerror?.({} as MessageEvent));
+			},
+			terminate() {}
+		};
+		const embed = createEmbedder(w as unknown as Worker);
+		await expect(embed('x')).rejects.toBeInstanceOf(AskError);
+	});
 });
