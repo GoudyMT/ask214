@@ -5,7 +5,14 @@ import type { CorpusChunk } from '$lib/corpus';
 
 const MODEL = 'all-MiniLM-L6-v2';
 function chunk(id: string): CorpusChunk {
-	return { id, text: `text ${id}`, sourceId: 's', sourceTitle: 'S', tags: [], url: 'u' };
+	return {
+		id,
+		text: `text ${id}`,
+		sourceId: 's',
+		sourceTitle: 'S',
+		tags: [],
+		url: 'https://example.gov/'
+	};
 }
 
 describe('buildCorpusArtifact', () => {

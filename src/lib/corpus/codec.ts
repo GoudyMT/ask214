@@ -11,7 +11,8 @@ import { normalize } from './search';
  *   1. version (CorpusVersionError)   - a v1.1 corpus on a cached v1.0 client must not silently run
  *   2. modelId (CorpusFormatError)    - the dim check CANNOT catch a model swap (both candidates 384-dim)
  *   3. byte length (CorpusFormatError)- gross corruption / truncation
- *   4. per-chunk slice + unit-normalize; a zero embedding throws E_CORPUS_ZERO_VECTOR (bad vector)
+ *   4. url scheme (CorpusFormatError) - every citation url must be https (no javascript:/data: card hrefs)
+ *   5. per-chunk slice + unit-normalize; a zero embedding throws E_CORPUS_ZERO_VECTOR (bad vector)
  */
 
 /** The corpus generation this client build supports. A different version throws (spec 8.6). */
@@ -32,6 +33,13 @@ export function decodeCorpus(
 	const expectedBytes = chunks.length * dim * 4;
 	if (embeddingsBuffer.byteLength !== expectedBytes) {
 		throw new CorpusFormatError('E_CORPUS_BYTE_LENGTH');
+	}
+	// Gate 5: every citation url must be https. A non-https (javascript:/data:/http:) url would become a
+	// live href in a result card; users cannot author the corpus, so this guards a build error / tampering.
+	for (const chunk of chunks) {
+		if (!chunk.url.toLowerCase().startsWith('https://')) {
+			throw new CorpusFormatError('E_CORPUS_URL');
+		}
 	}
 	const flat = new Float32Array(embeddingsBuffer);
 	const embeddings: Float32Array[] = [];

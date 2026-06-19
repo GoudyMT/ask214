@@ -11,8 +11,15 @@ function manifest(over: Partial<CorpusManifest> = {}): CorpusManifest {
 		dim: 2,
 		modelId: MODEL,
 		chunks: [
-			{ id: 'a', text: 'A', sourceId: 's', sourceTitle: 'S', tags: [], url: 'u' },
-			{ id: 'b', text: 'B', sourceId: 's', sourceTitle: 'S', tags: [], url: 'u' }
+			{
+				id: 'a',
+				text: 'A',
+				sourceId: 's',
+				sourceTitle: 'S',
+				tags: [],
+				url: 'https://example.gov/'
+			},
+			{ id: 'b', text: 'B', sourceId: 's', sourceTitle: 'S', tags: [], url: 'https://example.gov/' }
 		],
 		...over
 	};
@@ -52,5 +59,29 @@ describe('decodeCorpus', () => {
 
 	it('throws CorpusFormatError when an embedding has zero magnitude', () => {
 		expect(() => decodeCorpus(manifest(), buffer([1, 0, 0, 0]), MODEL)).toThrow(CorpusFormatError);
+	});
+
+	it('throws CorpusFormatError when a chunk url is not https (blocks javascript:/data: hrefs)', () => {
+		const badUrl = manifest({
+			chunks: [
+				{
+					id: 'a',
+					text: 'A',
+					sourceId: 's',
+					sourceTitle: 'S',
+					tags: [],
+					url: 'javascript:alert(1)'
+				},
+				{
+					id: 'b',
+					text: 'B',
+					sourceId: 's',
+					sourceTitle: 'S',
+					tags: [],
+					url: 'https://example.gov/'
+				}
+			]
+		});
+		expect(() => decodeCorpus(badUrl, buffer([1, 0, 0, 1]), MODEL)).toThrow(CorpusFormatError);
 	});
 });

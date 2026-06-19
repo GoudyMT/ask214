@@ -6,7 +6,7 @@ import { AskError } from './errors';
 import type { CorpusChunk } from '$lib/corpus';
 
 function chunk(id: string): CorpusChunk {
-	return { id, text: id, sourceId: 's', sourceTitle: 'S', tags: [], url: 'u' };
+	return { id, text: id, sourceId: 's', sourceTitle: 'S', tags: [], url: 'https://example.gov/' };
 }
 // A fake fetch that serves the artifact from memory at the two expected paths.
 function fakeFetch(manifestJson: string, bin: ArrayBuffer) {
