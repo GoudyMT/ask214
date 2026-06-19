@@ -13,5 +13,12 @@ allowBuilds:
 # Force the patched tmp across the dependency tree (transitive via @lhci/cli).
 # GHSA-ph9p-34f9-6g65 (Path Traversal, high). Floor pin - future patches satisfy it.
 # Retire when @lhci/cli bundles tmp>=0.2.6 natively (Dependabot will surface it).
+#
+# Force patched ws + undici (deep transitives via wrangler>miniflare; ws also via @vitest/browser).
+# Dev/deploy-only - neither ships in the client bundle. GHSA-96hv-2xvq-fx4p (ws DoS, high);
+# GHSA-vmh5-mc38-953g + GHSA-vxpw-j846-p89q (undici TLS-bypass + WS DoS, high). Floor pins - retire
+# when wrangler/miniflare bundle them natively (Dependabot will surface it).
 overrides:
   tmp: '>=0.2.6'
+  ws: '>=8.21.0'
+  undici: '>=7.28.0'
