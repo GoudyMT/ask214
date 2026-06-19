@@ -152,4 +152,36 @@ describe('AskView', () => {
 		expect(container.querySelector('.reader__title')?.textContent).toBe('VA - Intent to File');
 		expect(container.querySelectorAll('.reader__passage').length).toBe(2);
 	});
+
+	it('reminder: appears after [Not now] returns to idle, and the x dismisses it for the session', async () => {
+		sessionStorage.removeItem('mtc:ask:reminder-dismissed'); // start not-yet-dismissed
+		const { container, rerender } = render(AskView, {
+			props: props({ kind: 'needsSetup', pendingQuery: 'q' })
+		});
+		// [Not now] sets the internal "setup dismissed" flag; the reminder still hides while in needsSetup.
+		(container.querySelector('.ask-setup__skip') as HTMLButtonElement).click();
+		flushSync();
+		expect(container.querySelector('.ask-reminder')).toBeNull();
+		// The parent then moves the view to idle; rerender updates the SAME instance, keeping setupDismissed.
+		await rerender(props({ kind: 'idle' }));
+		flushSync();
+		expect(container.querySelector('.ask-reminder')).not.toBeNull(); // the nudge now shows
+		(container.querySelector('.ask-reminder__x') as HTMLButtonElement).click();
+		flushSync();
+		expect(container.querySelector('.ask-reminder')).toBeNull(); // dismissed
+		expect(sessionStorage.getItem('mtc:ask:reminder-dismissed')).toBe('1'); // persisted for the session
+	});
+
+	it('reminder: stays hidden when already dismissed this session', async () => {
+		sessionStorage.setItem('mtc:ask:reminder-dismissed', '1'); // dismissed in a prior view
+		const { container, rerender } = render(AskView, {
+			props: props({ kind: 'needsSetup', pendingQuery: 'q' })
+		});
+		(container.querySelector('.ask-setup__skip') as HTMLButtonElement).click();
+		flushSync();
+		await rerender(props({ kind: 'idle' }));
+		flushSync();
+		expect(container.querySelector('.ask-reminder')).toBeNull(); // reminderDismissed read from sessionStorage
+		sessionStorage.removeItem('mtc:ask:reminder-dismissed'); // cleanup
+	});
 });
