@@ -17,12 +17,13 @@ Bundled / vendored runtime components
    https://github.com/huggingface/transformers.js
    Bundled into the on-device "Ask" embedding Web Worker.
 
-2. ONNX Runtime Web  (onnxruntime-web)
+2. ONNX Runtime Web  (onnxruntime-web, onnxruntime-common)
    Copyright (c) Microsoft Corporation
    License: MIT
    https://github.com/microsoft/onnxruntime
    The WebAssembly runtime files in static/wasm/ are redistributed from this
-   project, byte-for-byte.
+   project, byte-for-byte; the onnxruntime-web / onnxruntime-common glue is
+   bundled via Transformers.js.
 
 3. all-MiniLM-L6-v2  (ONNX, quantized) - Xenova/all-MiniLM-L6-v2
    Derived from sentence-transformers/all-MiniLM-L6-v2
@@ -64,3 +65,33 @@ A copy of the license is available at:
 
 No separate NOTICE file was distributed with those components that requires
 further reproduction here.
+
+================================================================================
+MIT License
+================================================================================
+
+The MIT-licensed components above (ONNX Runtime Web - onnxruntime-web and
+onnxruntime-common - and Svelte / SvelteKit) are distributed under the MIT
+License. Its permission notice is reproduced below and applies to each MIT
+component with its respective copyright holder as named above:
+
+    Copyright (c) Microsoft Corporation (ONNX Runtime Web)
+    Copyright (c) the Svelte contributors (Svelte and SvelteKit)
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
