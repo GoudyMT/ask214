@@ -42,6 +42,10 @@ test('ask answers fully offline after a warm load @slow', async ({ page, context
 	await page.reload();
 	await expect(input).toBeEnabled({ timeout: 30_000 }); // corpus served from cache, no network
 
+	// Confirm the SW (not Playwright's / the browser's HTTP cache) served this offline reload - a genuine
+	// service-worker-cache offline proof, not an incidental cache hit (sweep S26 L4).
+	expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+
 	// A brand-new query, fully offline: the model re-loads from cache into the worker; embed + search
 	// run locally. The persisted "downloaded" flag means no second consent prompt.
 	await input.fill('how can I enroll in VA health care?');
