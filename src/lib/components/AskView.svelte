@@ -36,7 +36,7 @@
 
 	const EXAMPLES = [
 		'How do I lock in my VA claim date before I separate?',
-		'Am I eligible for SkillBridge?',
+		'How do I apply for SkillBridge?',
 		'What do I need to apply for VA health care?'
 	];
 

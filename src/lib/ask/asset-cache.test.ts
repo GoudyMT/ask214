@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { classifyAsset, ASK_ASSET_CACHE, shouldKeepCache } from './asset-cache';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
-// model + ORT WASM (~34MB) are LAZY (cached on first use, never eagerly precached at install); the app
+// model + ORT WASM (~45MB) are LAZY (cached on first use, never eagerly precached at install); the app
 // shell + the tiny corpus are PRECACHE (eager, so the app works offline immediately). See ADR-015 / spec 9.
 describe('classifyAsset', () => {
 	it('marks the heavy model + ORT WASM as lazy (kept out of the install precache)', () => {
