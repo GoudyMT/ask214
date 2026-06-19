@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyAsset } from './asset-cache';
+import { classifyAsset, ASK_ASSET_CACHE, shouldKeepCache } from './asset-cache';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
 // model + ORT WASM (~34MB) are LAZY (cached on first use, never eagerly precached at install); the app
@@ -16,5 +16,24 @@ describe('classifyAsset', () => {
 		expect(classifyAsset('/corpus/corpus-v1.0.json')).toBe('precache');
 		expect(classifyAsset('/corpus/corpus-v1.0.embeddings.bin')).toBe('precache');
 		expect(classifyAsset('/favicon.png')).toBe('precache');
+	});
+});
+
+// The lazy model/wasm live in their OWN unversioned cache so an app update (which deletes stale
+// app-${version} caches) does NOT evict the ~45MB download (sweep S26 H2 - "downloaded once").
+describe('shouldKeepCache (cache partitioning across app updates)', () => {
+	it('keeps the current app-shell cache and the unversioned lazy asset cache', () => {
+		expect(shouldKeepCache('app-v2', 'app-v2')).toBe(true);
+		expect(shouldKeepCache(ASK_ASSET_CACHE, 'app-v2')).toBe(true);
+	});
+
+	it('deletes a stale app-shell cache from a prior version', () => {
+		expect(shouldKeepCache('app-v1', 'app-v2')).toBe(false);
+	});
+
+	it('keeps the lazy asset cache across ANY app version (it is unversioned)', () => {
+		expect(shouldKeepCache(ASK_ASSET_CACHE, 'app-v1')).toBe(true);
+		expect(shouldKeepCache(ASK_ASSET_CACHE, 'app-v99')).toBe(true);
+		expect(ASK_ASSET_CACHE.startsWith('app-')).toBe(false);
 	});
 });
