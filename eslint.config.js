@@ -13,6 +13,9 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
+	// Vendored, committed assets (self-hosted model + ORT wasm glue + corpus) are not source - do not
+	// lint them. Mirrors .prettierignore's /static/; without this, eslint flags the minified ORT .mjs.
+	{ ignores: ['static/**'] },
 	js.configs.recommended,
 	ts.configs.recommended,
 	svelte.configs.recommended,

@@ -1,18 +1,16 @@
 /**
- * Map a SvelteKit route id to the shell content width applied by the root layout (the
- * --shell-width CSS variable on nav/main/footer). The whole shell widens together on a wide route;
- * every other route keeps the default 720px reading column. Pure + deterministic so the width rule
- * is unit-tested independently of the layout's CSS wiring.
- *
- * Source: Timeline Engine design spec (2026-06-03) section 7 (view, Option Y; Session 21 lock).
+ * The shell content width applied by the root layout (the --shell-width CSS var on nav/main/footer).
+ * ONE width for every route (Option 1, locked S25): the earlier per-route widths (Timeline 1024 / Ask
+ * 760 / others 720) were unified after the page-to-page size swap felt jarring. The layout's `max-width`
+ * + auto margins make it responsive - fluid (full width minus gutters) below this cap on phones/tablets,
+ * capped here on larger screens; fluid headings (clamp, app.css) scale large text down on small screens.
  */
+const SHELL_WIDTH = '900px';
 
-const DEFAULT_SHELL_WIDTH = '720px';
-const WIDE_SHELL_WIDTH = '1024px';
-
-// Routes that render at the wider 1024px shell. One entry per wide route (single source of truth).
-const WIDE_ROUTES: ReadonlySet<string> = new Set(['/timeline']);
+// Per-route width overrides - EMPTY now (one width for every route). Add a route here to give it a
+// different width later without touching the layout wiring (keeps the route-aware seam).
+const ROUTE_SHELL_WIDTH: ReadonlyMap<string, string> = new Map();
 
 export function shellWidthFor(routeId: string | null): string {
-	return routeId !== null && WIDE_ROUTES.has(routeId) ? WIDE_SHELL_WIDTH : DEFAULT_SHELL_WIDTH;
+	return (routeId !== null && ROUTE_SHELL_WIDTH.get(routeId)) || SHELL_WIDTH;
 }

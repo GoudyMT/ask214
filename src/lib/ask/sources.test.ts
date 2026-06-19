@@ -1,0 +1,57 @@
+import { describe, it, expect } from 'vitest';
+import { sourcesFromCorpus } from './sources';
+import type { Corpus, CorpusChunk } from '$lib/corpus';
+
+function chunk(over: Partial<CorpusChunk>): CorpusChunk {
+	return { id: 'x', text: 't', sourceId: 's', sourceTitle: 'S', tags: [], url: 'u', ...over };
+}
+function corpusOf(chunks: CorpusChunk[]): Corpus {
+	return {
+		version: '1.0',
+		dim: 3,
+		modelId: 'all-MiniLM-L6-v2',
+		chunks,
+		embeddings: chunks.map(() => new Float32Array([1, 0, 0]))
+	};
+}
+
+describe('sourcesFromCorpus', () => {
+	it('groups chunks by source, collecting the title, url, and all of its passages in order', () => {
+		const corpus = corpusOf([
+			chunk({
+				id: 'a',
+				sourceId: 'va_itf',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://va.gov/itf',
+				text: 'passage A'
+			}),
+			chunk({
+				id: 'b',
+				sourceId: 'va_itf',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://va.gov/itf',
+				text: 'passage B'
+			}),
+			chunk({
+				id: 'c',
+				sourceId: 'dod_sb',
+				sourceTitle: 'DoD SkillBridge',
+				url: 'https://skillbridge.mil',
+				text: 'passage C'
+			})
+		]);
+
+		const sources = sourcesFromCorpus(corpus);
+
+		expect(sources.size).toBe(2);
+		const itf = sources.get('va_itf');
+		expect(itf?.title).toBe('VA - Intent to File');
+		expect(itf?.url).toBe('https://va.gov/itf');
+		expect(itf?.texts).toEqual(['passage A', 'passage B']);
+		expect(sources.get('dod_sb')?.texts).toEqual(['passage C']);
+	});
+
+	it('returns an empty map for an empty corpus', () => {
+		expect(sourcesFromCorpus(corpusOf([])).size).toBe(0);
+	});
+});

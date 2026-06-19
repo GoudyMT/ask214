@@ -112,9 +112,9 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Why this project uses them.** Solo development without CI is fine for a week and decays thereafter. The CI workflow is the reproducibility check ("does this still build on a clean machine?") and the security gate ("does any merged change break lint, types, or tests?"). Dependabot grouping prevents pull-request overload by bundling related updates (testing, linting, types, Svelte ecosystem) into single review surfaces instead of one PR per package.
 
-**Patterns adopted.** Corepack reads the `packageManager` field from `package.json` to pin pnpm to a single version across local development and CI, eliminating the version-drift class of CI failures. The pnpm `minimumReleaseAge` policy (24-hour cutoff) blocks installation of packages younger than the cutoff, mitigating supply-chain attacks via brand-new package versions and giving the broader ecosystem time to flag malicious releases.
+**Patterns adopted.** Corepack reads the `packageManager` field from `package.json` to pin pnpm to a single version across local development and CI, eliminating the version-drift class of CI failures. The pnpm `minimumReleaseAge` policy (1440-minute / 24-hour cutoff, set in `pnpm-workspace.yaml`) makes pnpm refuse to _resolve_ a dependency version published within the last day - mitigating supply-chain attacks via brand-new package versions and giving the broader ecosystem time to flag malicious releases. It gates dependency resolution and updates (local `pnpm add`/`update` and Dependabot's lockfile regeneration), not frozen-lockfile installs, which trust the already-vetted lockfile. Dependabot carries a matching seven-day `cooldown` so it holds fresh releases before opening update pull requests.
 
-**Tradeoffs accepted.** Dependabot occasionally opens pull requests that fail CI on dependency interaction or on the supply-chain age policy; the triage cost is acceptable given the security and freshness benefits.
+**Tradeoffs accepted.** Dependabot occasionally opens pull requests that fail CI on dependency interaction; the release-age guard plus the Dependabot cooldown add a short lag before brand-new versions can be adopted. The triage cost is acceptable given the security and freshness benefits.
 
 ---
 
@@ -185,3 +185,4 @@ Cloudflare Pages was chosen for cost (free at expected scale) and native SvelteK
 
 - 2026-05-22 (initial draft): Phase 0 foundation decisions captured at Tasks 0.1-0.6.
 - 2026-05-22 (Phase 0 polish): Tasks 0.7-0.10 folded in - CI Pipeline + Dependency Maintenance section, Architecture Decision Records section, Cloudflare Workers + Static Assets update (replaces earlier "Pages" framing per Cloudflare's 2025-2026 platform unification). Stack at a Glance updated; wrangler added as deploy CLI. Knowingly exceeds 1500-word soft cap by ~265 words to capture distinct Phase 0 tooling without compressing previously approved Tasks 0.1-0.6 narratives.
+- 2026-06-13: Corrected the `minimumReleaseAge` description - the guard gates dependency _resolution_ (local installs/updates and Dependabot lockfile regeneration), not frozen-lockfile installs. It had been described here but configured nowhere; now set to 1440 in `pnpm-workspace.yaml`, paired with a seven-day Dependabot `cooldown`.

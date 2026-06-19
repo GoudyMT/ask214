@@ -1,0 +1,46 @@
+[
+	{
+		"query": "how do I let the VA know I plan to file a claim later?",
+		"expectedChunkIds": ["va_intent_to_file__what_is_it", "va_intent_to_file__how_to_submit"]
+	},
+	{
+		"query": "how long do I have to finish my claim after submitting an intent to file?",
+		"expectedChunkIds": ["va_intent_to_file__how_to_submit"]
+	},
+	{
+		"query": "what are my options for submitting a VA disability claim?",
+		"expectedChunkIds": ["va_disability_file__ways"]
+	},
+	{
+		"query": "which form do I use to apply for VA disability compensation?",
+		"expectedChunkIds": ["va_disability_file__ways"]
+	},
+	{
+		"query": "how long does the VA take to decide a disability claim?",
+		"expectedChunkIds": ["va_disability_file__timing"]
+	},
+	{
+		"query": "what do I need to gather before signing up for VA health care?",
+		"expectedChunkIds": ["va_health_care_apply__info_needed"]
+	},
+	{
+		"query": "how can I enroll in VA health care?",
+		"expectedChunkIds": ["va_health_care_apply__ways"]
+	},
+	{
+		"query": "how do I sign up for the GI Bill?",
+		"expectedChunkIds": ["va_education_apply__methods"]
+	},
+	{
+		"query": "what should I do before applying for VA education benefits?",
+		"expectedChunkIds": ["va_education_apply__prep"]
+	},
+	{
+		"query": "what is SkillBridge and how long does it last?",
+		"expectedChunkIds": ["dod_skillbridge__overview"]
+	},
+	{
+		"query": "can I get civilian job training before I separate from the military?",
+		"expectedChunkIds": ["dod_skillbridge__overview"]
+	}
+]

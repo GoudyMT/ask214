@@ -1,0 +1,70 @@
+# Sources-of-Truth Registry (master spec section 8.1) - the LEGAL RECORD for every corpus source.
+# 17 USC 105 US-Government public-domain work ONLY. Reviewed at first inclusion + on every change.
+# Cycle C sample corpus: a thin, deliberately-clean set to prove retrieval works end-to-end.
+# DAV guide (nonprofit, copyrighted), TAP curriculum (contractor gray zone), and CAC-gated
+# instructions are EXCLUDED from the sample per section 8.3/8.4 - revisit with verification in cycle A.
+
+- source_id: va_intent_to_file
+  title: 'VA - Your Intent to File a VA Claim'
+  url: 'https://www.va.gov/resources/your-intent-to-file-a-va-claim/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-11
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: 1.0
+
+- source_id: va_disability_file
+  title: 'VA - How to File a VA Disability Claim'
+  url: 'https://www.va.gov/disability/how-to-file-claim/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-11
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: 1.0
+
+- source_id: va_health_care_apply
+  title: 'VA - How to Apply for VA Health Care'
+  url: 'https://www.va.gov/health-care/how-to-apply/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-11
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: 1.0
+
+- source_id: va_education_apply
+  title: 'VA - How to Apply for VA Education Benefits'
+  url: 'https://www.va.gov/education/how-to-apply/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-11
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: 1.0
+
+- source_id: dod_skillbridge
+  title: 'DoD SkillBridge Program'
+  url: 'https://www.militaryonesource.mil/resources/gov/dod-skillbridge/'
+  origin: 'DoD (Military OneSource)'
+  copyright_status: us_government_work_public_domain
+  license_notes: '17 USC 105 - US Government work. Canonical site skillbridge.mil (DoD TLS cert not WebFetch-verifiable); Military OneSource is the fetchable PD source. Expand eligibility detail from skillbridge.mil in cycle A.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-11
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: 1.0

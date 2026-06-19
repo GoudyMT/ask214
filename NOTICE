@@ -1,0 +1,97 @@
+Military Transition Companion
+Copyright (c) 2026 Max Goudy
+
+This product bundles, vendors, and/or redistributes third-party software and
+assets. Their copyright notices and licenses are reproduced below. This list
+covers the components shipped as part of the application (bundled into the client
+or committed as static assets); other build- and dev-time dependencies retain
+their own licenses in their respective node_modules package directories.
+
+================================================================================
+Bundled / vendored runtime components
+================================================================================
+
+1. Transformers.js  (@huggingface/transformers)
+   Copyright (c) The HuggingFace Inc. team
+   License: Apache License, Version 2.0
+   https://github.com/huggingface/transformers.js
+   Bundled into the on-device "Ask" embedding Web Worker.
+
+2. ONNX Runtime Web  (onnxruntime-web, onnxruntime-common)
+   Copyright (c) Microsoft Corporation
+   License: MIT
+   https://github.com/microsoft/onnxruntime
+   The WebAssembly runtime files in static/wasm/ are redistributed from this
+   project, byte-for-byte; the onnxruntime-web / onnxruntime-common glue is
+   bundled via Transformers.js.
+
+3. all-MiniLM-L6-v2  (ONNX, quantized) - Xenova/all-MiniLM-L6-v2
+   Derived from sentence-transformers/all-MiniLM-L6-v2
+   Copyright (c) The Sentence-Transformers authors (UKP Lab, TU Darmstadt)
+   License: Apache License, Version 2.0
+   https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+   https://huggingface.co/Xenova/all-MiniLM-L6-v2
+   The model files in static/models/Xenova/all-MiniLM-L6-v2/ are redistributed
+   (ONNX-converted, quantized to q8).
+
+4. Svelte and SvelteKit
+   Copyright (c) the Svelte contributors
+   License: MIT
+   https://github.com/sveltejs/svelte  |  https://github.com/sveltejs/kit
+   The application framework; compiled into the shipped client bundle.
+
+================================================================================
+Reference content (the offline corpus)
+================================================================================
+
+The reference corpus in static/corpus/ is composed of works of the U.S.
+Government, which are not subject to copyright protection in the United States
+(17 U.S.C. 105). Sources are public pages from va.gov and militaryonesource.mil;
+every result links to its official source.
+
+This product is an independent project. It is not affiliated with, endorsed by,
+or sponsored by the U.S. Department of Veterans Affairs, the U.S. Department of
+Defense, or any U.S. Government agency.
+
+================================================================================
+Apache License 2.0
+================================================================================
+
+The Apache-2.0-licensed components above (Transformers.js and the
+all-MiniLM-L6-v2 model) are distributed under the Apache License, Version 2.0.
+A copy of the license is available at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+No separate NOTICE file was distributed with those components that requires
+further reproduction here.
+
+================================================================================
+MIT License
+================================================================================
+
+The MIT-licensed components above (ONNX Runtime Web - onnxruntime-web and
+onnxruntime-common - and Svelte / SvelteKit) are distributed under the MIT
+License. Its permission notice is reproduced below and applies to each MIT
+component with its respective copyright holder as named above:
+
+    Copyright (c) Microsoft Corporation (ONNX Runtime Web)
+    Copyright (c) the Svelte contributors (Svelte and SvelteKit)
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
