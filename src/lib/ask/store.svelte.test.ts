@@ -134,4 +134,22 @@ describe('createAskStore', () => {
 		await store.ask('q');
 		expect(store.state.kind).toBe('empty');
 	});
+
+	it('ignores a new ask() while a query is already in flight (set up)', async () => {
+		// Two overlapping runQuery calls would race on `state` and the later-resolving one would win
+		// regardless of submit order; the in-flight guard drops the second submit so the first owns the result.
+		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
+		let calls = 0;
+		const store = createAskStore({
+			embed: () => {
+				calls++;
+				return new Promise<Float32Array>(() => {}); // stays pending: the query is in flight
+			},
+			corpus: fixtureCorpus()
+		});
+		void store.ask('first'); // -> embedding, embed #1 in flight
+		expect(store.state.kind).toBe('embedding');
+		void store.ask('second'); // must be ignored while a query is in flight
+		expect(calls).toBe(1); // no second embed started
+	});
 });

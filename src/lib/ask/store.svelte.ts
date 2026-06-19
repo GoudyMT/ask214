@@ -64,6 +64,9 @@ export function createAskStore(deps: {
 	async function ask(query: string): Promise<void> {
 		const trimmed = query.trim();
 		if (trimmed === '') return; // ignore empty submits
+		// Ignore a new submit while a query is already running: overlapping runQuery calls race on `state`
+		// and the later-resolving one would win regardless of submit order.
+		if (state.kind === 'modelLoading' || state.kind === 'embedding') return;
 		// Un-set-up device: consent-gate the one-time download (never auto-fetch). Preserve the query so
 		// setUp() can answer it; a set-up device runs it straight away.
 		if (!modelLoaded) {
