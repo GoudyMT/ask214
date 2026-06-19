@@ -96,4 +96,19 @@ describe('createEmbedder', () => {
 		const embed = createEmbedder(w as unknown as Worker);
 		await expect(embed('x')).rejects.toBeInstanceOf(AskError);
 	});
+
+	it('rejects new embeds after the worker dies during cold load, instead of hanging forever', async () => {
+		// A crash BEFORE the first success leaves modelReady=false, so the warm-timeout is never armed and
+		// a post-crash embed would hang forever (stuck modelLoading). A dead worker must refuse new work.
+		const w = {
+			onmessage: null,
+			onerror: null as ((e: ErrorEvent) => void) | null,
+			onmessageerror: null,
+			postMessage() {}, // a dead worker never replies
+			terminate() {}
+		};
+		const embed = createEmbedder(w as unknown as Worker);
+		w.onerror?.({} as ErrorEvent); // cold-load crash (no successful embed yet)
+		await expect(embed('boot')).rejects.toBeInstanceOf(AskError);
+	}, 2000);
 });

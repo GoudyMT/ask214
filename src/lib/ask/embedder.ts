@@ -13,7 +13,9 @@ const WARM_TIMEOUT_MS = 15_000;
  * Wrap an embedding Web Worker in a promise-returning `embed(text)`. Correlates responses by an
  * incrementing id (concurrent queries are safe). Rejects with AskError on: a worker error response, a
  * worker crash (`onerror`), an undeserializable message (`onmessageerror`), or a warm-embed timeout -
- * so a dead/hung worker never leaves the UI stuck in `embedding`. The worker itself (model load +
+ * so a dead/hung worker never leaves the UI stuck in `embedding`. A crash marks the worker dead, so an
+ * embed issued AFTER the crash rejects at once (the cold path arms no timeout, else it would hang). The
+ * worker itself (model load +
  * inference) is `embed-worker.ts`; this client is model-agnostic and testable with a fake worker.
  */
 export function createEmbedder(
@@ -22,6 +24,7 @@ export function createEmbedder(
 ): (text: string) => Promise<Float32Array> {
 	let nextId = 1;
 	let modelReady = false; // flips true on the first successful response - the model is loaded + warm
+	let dead = false; // set on a worker crash/garble; a dead worker cannot recover, so it must refuse new work
 	type Pending = {
 		resolve: (v: Float32Array) => void;
 		reject: (e: AskError) => void;
@@ -38,6 +41,7 @@ export function createEmbedder(
 	}
 
 	function rejectAll(code: AskErrorCode) {
+		dead = true; // the worker is gone: reject in-flight requests AND refuse any new embed (else it hangs)
 		for (const id of [...pending.keys()]) take(id)?.reject(new AskError(code));
 	}
 
@@ -58,6 +62,8 @@ export function createEmbedder(
 
 	return (text: string) =>
 		new Promise<Float32Array>((resolve, reject) => {
+			// A crashed worker never replies and (on the cold path) has no timeout armed, so refuse new work.
+			if (dead) return reject(new AskError(ASK_ERROR.MODEL_LOAD));
 			const id = nextId++;
 			const timer = modelReady
 				? setTimeout(() => take(id)?.reject(new AskError(ASK_ERROR.EMBED)), warmTimeoutMs)
