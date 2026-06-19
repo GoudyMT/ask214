@@ -20,7 +20,7 @@
 		"test:e2e:offline": "playwright test --grep @slow"
 	},
 	"lint-staged": {
-		"*.{js,ts,svelte}": [
+		"*.{js,mjs,cjs,ts,svelte}": [
 			"eslint --fix",
 			"prettier --write"
 		],

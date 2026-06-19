@@ -45,7 +45,9 @@ queries.forEach((q, i) => {
 	const hit = q.expectedChunkIds.some((id) => top.includes(id));
 	console.log(`  [${hit ? 'HIT ' : 'MISS'}] "${q.query}" -> ${ranked[i][0]}`);
 });
-console.log(`\nrecall@${K}=${r5.toFixed(3)}  MRR=${mrr.toFixed(3)}  (gate: recall@5>=0.8, MRR>=0.6)`);
+console.log(
+	`\nrecall@${K}=${r5.toFixed(3)}  MRR=${mrr.toFixed(3)}  (gate: recall@5>=0.8, MRR>=0.6)`
+);
 
 // --- MIN_SCORE calibration (spec section 9): the store drops hits below a cosine cutoff. Pick it
 // below the lowest RELEVANT (expected) score so no valid lead is dropped, ideally above the
@@ -65,9 +67,15 @@ scored.forEach((results, i) => {
 });
 const minRelevant = Math.min(...relevantScores);
 console.log(`\n[MIN_SCORE calibration]  (MIN_SCORE = ${MIN_SCORE})`);
-console.log(`  min relevant (expected) score : ${minRelevant.toFixed(3)}  <- MIN_SCORE must be BELOW this`);
-console.log(`  max non-relevant score        : ${Math.max(...nonRelevantScores).toFixed(3)}  <- noise ceiling`);
-console.log(`  min top-1 (weakest lead)      : ${Math.min(...scored.map((r) => r[0].score)).toFixed(3)}`);
+console.log(
+	`  min relevant (expected) score : ${minRelevant.toFixed(3)}  <- MIN_SCORE must be BELOW this`
+);
+console.log(
+	`  max non-relevant score        : ${Math.max(...nonRelevantScores).toFixed(3)}  <- noise ceiling`
+);
+console.log(
+	`  min top-1 (weakest lead)      : ${Math.min(...scored.map((r) => r[0].score)).toFixed(3)}`
+);
 
 // Re-gate: MIN_SCORE must stay safely below the weakest valid (relevant) lead, or it starts dropping real
 // answers. If the margin closes (corpus growth compresses scores), fail loudly -> recalibrate (spec 15 #1).
@@ -79,7 +87,9 @@ if (minRelevant <= MIN_SCORE + 0.05) {
 }
 
 if (r5 < 0.8 || mrr < 0.6) {
-	console.error('[FAIL] below the acceptance gate - iterate on chunks/queries or swap to BGE-small');
+	console.error(
+		'[FAIL] below the acceptance gate - iterate on chunks/queries or swap to BGE-small'
+	);
 	process.exit(1);
 }
 console.log('[PASS] meets the acceptance gate');
