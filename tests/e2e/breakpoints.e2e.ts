@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-// Six viewports covering the responsive range per ADR-010. Assertion logic: with
-// box-sizing border-box and `max-width: 720px` on <main>, the element's getBoundingClientRect
-// width includes padding and never exceeds 720px on wide viewports. On narrow viewports
-// (<= 720px) the bounding width equals the viewport width. Either way, <= 720 holds.
+// Six viewports covering the responsive range per ADR-010. The app shell unified to a single
+// responsive 900px max-width across every route (Session 25; shell-width.ts), superseding the old
+// 720px. With box-sizing border-box, <main>'s getBoundingClientRect width never exceeds 900px on wide
+// viewports; on narrow viewports (<= 900px) it equals the viewport width. Either way, <= 900 holds.
 const viewports = [
 	{ width: 320, height: 568, label: 'iPhone SE' },
 	{ width: 375, height: 667, label: 'iPhone 8' },
@@ -14,7 +14,7 @@ const viewports = [
 ];
 
 for (const vp of viewports) {
-	test(`landmarks render and content stays within 720px at ${vp.width}x${vp.height} (${vp.label})`, async ({
+	test(`landmarks render and content stays within 900px at ${vp.width}x${vp.height} (${vp.label})`, async ({
 		page
 	}) => {
 		await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -27,6 +27,6 @@ for (const vp of viewports) {
 		const mainWidth = await page
 			.getByRole('main')
 			.evaluate((el) => el.getBoundingClientRect().width);
-		expect(mainWidth).toBeLessThanOrEqual(720);
+		expect(mainWidth).toBeLessThanOrEqual(900);
 	});
 }
