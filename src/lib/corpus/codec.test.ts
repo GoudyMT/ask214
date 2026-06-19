@@ -84,4 +84,12 @@ describe('decodeCorpus', () => {
 		});
 		expect(() => decodeCorpus(badUrl, buffer([1, 0, 0, 1]), MODEL)).toThrow(CorpusFormatError);
 	});
+
+	it('throws CorpusFormatError when dim is not a positive integer (shape gate before byte-length)', () => {
+		// dim 1.5 x 2 chunks = 12 expected bytes; a 3-float (12-byte) blob sneaks past the byte-length gate,
+		// so without a shape gate the decoder would slice garbage instead of failing loud.
+		expect(() => decodeCorpus(manifest({ dim: 1.5 }), buffer([1, 0, 1]), MODEL)).toThrow(
+			CorpusFormatError
+		);
+	});
 });

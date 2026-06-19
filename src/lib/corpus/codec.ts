@@ -10,9 +10,10 @@ import { normalize } from './search';
  * Gate order (each throws a typed error with an opaque code - mirrors decodeTimelineState):
  *   1. version (CorpusVersionError)   - a v1.1 corpus on a cached v1.0 client must not silently run
  *   2. modelId (CorpusFormatError)    - the dim check CANNOT catch a model swap (both candidates 384-dim)
- *   3. byte length (CorpusFormatError)- gross corruption / truncation
- *   4. url scheme (CorpusFormatError) - every citation url must be https (no javascript:/data: card hrefs)
- *   5. per-chunk slice + unit-normalize; a zero embedding throws E_CORPUS_ZERO_VECTOR (bad vector)
+ *   3. shape (CorpusFormatError)      - dim a positive int + chunks an array, before the byte arithmetic
+ *   4. byte length (CorpusFormatError)- gross corruption / truncation
+ *   5. url scheme (CorpusFormatError) - every citation url must be https (no javascript:/data: card hrefs)
+ *   6. per-chunk slice + unit-normalize; a zero embedding throws E_CORPUS_ZERO_VECTOR (bad vector)
  */
 
 /** The corpus generation this client build supports. A different version throws (spec 8.6). */
@@ -30,6 +31,11 @@ export function decodeCorpus(
 		throw new CorpusFormatError('E_CORPUS_MODEL');
 	}
 	const { chunks, dim } = manifest;
+	// Gate 3: shape - dim a positive integer + chunks an array, BEFORE the byte arithmetic (a fractional or
+	// negative dim could be chosen so chunks.length*dim*4 matches the blob and slip past the length gate).
+	if (!Array.isArray(chunks) || !Number.isInteger(dim) || dim <= 0) {
+		throw new CorpusFormatError('E_CORPUS_SHAPE');
+	}
 	const expectedBytes = chunks.length * dim * 4;
 	if (embeddingsBuffer.byteLength !== expectedBytes) {
 		throw new CorpusFormatError('E_CORPUS_BYTE_LENGTH');
