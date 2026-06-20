@@ -3,13 +3,22 @@
 # Cycle C sample corpus: a thin, deliberately-clean set to prove retrieval works end-to-end.
 # DAV guide (nonprofit, copyrighted), TAP curriculum (contractor gray zone), and CAC-gated
 # instructions are EXCLUDED from the sample per section 8.3/8.4 - revisit with verification in cycle A.
+#
+# A1 schema (2026-06-20): a non-excluded entry requires legal_tier + content_type + a terms-of-use
+# review (terms_reviewed_date/_notes) in addition to the copyright review (reviewed_by/_date). Capture
+# fields (content_hash/captured_path/captured_at/robots_allowed) are populated by A2's real capture.
+# Validate with `pnpm validate:sources`. HTML sources are NEVER re-hosted (served PDFs only, A1-D2).
 
 - source_id: va_intent_to_file
   title: 'VA - Your Intent to File a VA Claim'
   url: 'https://www.va.gov/resources/your-intent-to-file-a-va-claim/'
   origin: VA
   copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
   license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-20
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-11
@@ -22,7 +31,11 @@
   url: 'https://www.va.gov/disability/how-to-file-claim/'
   origin: VA
   copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
   license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-20
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-11
@@ -35,7 +48,11 @@
   url: 'https://www.va.gov/health-care/how-to-apply/'
   origin: VA
   copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
   license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-20
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-11
@@ -48,7 +65,11 @@
   url: 'https://www.va.gov/education/how-to-apply/'
   origin: VA
   copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
   license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-20
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-11
@@ -61,7 +82,11 @@
   url: 'https://www.militaryonesource.mil/resources/gov/dod-skillbridge/'
   origin: 'DoD (Military OneSource)'
   copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
   license_notes: '17 USC 105 - US Government work. Canonical site skillbridge.mil (DoD TLS cert not WebFetch-verifiable); Military OneSource is the fetchable PD source. Expand eligibility detail from skillbridge.mil in cycle A.'
+  terms_reviewed_date: 2026-06-20
+  terms_notes: 'Public militaryonesource.mil (DoD) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-11
