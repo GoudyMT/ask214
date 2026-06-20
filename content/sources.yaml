@@ -24,7 +24,7 @@
   reviewed_date: 2026-06-11
   scrape_method: direct_url
   update_check: monthly
-  corpus_version_first_included: 1.0
+  corpus_version_first_included: '1.0'
 
 - source_id: va_disability_file
   title: 'VA - How to File a VA Disability Claim'
@@ -41,7 +41,7 @@
   reviewed_date: 2026-06-11
   scrape_method: direct_url
   update_check: monthly
-  corpus_version_first_included: 1.0
+  corpus_version_first_included: '1.0'
 
 - source_id: va_health_care_apply
   title: 'VA - How to Apply for VA Health Care'
@@ -58,7 +58,7 @@
   reviewed_date: 2026-06-11
   scrape_method: direct_url
   update_check: monthly
-  corpus_version_first_included: 1.0
+  corpus_version_first_included: '1.0'
 
 - source_id: va_education_apply
   title: 'VA - How to Apply for VA Education Benefits'
@@ -75,7 +75,7 @@
   reviewed_date: 2026-06-11
   scrape_method: direct_url
   update_check: monthly
-  corpus_version_first_included: 1.0
+  corpus_version_first_included: '1.0'
 
 - source_id: dod_skillbridge
   title: 'DoD SkillBridge Program'
@@ -92,4 +92,4 @@
   reviewed_date: 2026-06-11
   scrape_method: direct_url
   update_check: monthly
-  corpus_version_first_included: 1.0
+  corpus_version_first_included: '1.0'
