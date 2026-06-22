@@ -168,4 +168,72 @@ describe('validateSourcesSchema', () => {
 			field: 'source_updated_date'
 		});
 	});
+
+	// F2 (L-06 coverage): the reviewed_by / reviewed_date branch of E_SOURCES_MISSING_REVIEW.
+	it('flags a non-excluded tier missing reviewed_by', () => {
+		const r = validateSourcesSchema([{ ...ok, reviewed_by: undefined }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_MISSING_REVIEW',
+			sourceId: 'va_disability_file',
+			field: 'reviewed_date'
+		});
+	});
+
+	it('flags a non-excluded tier missing reviewed_date', () => {
+		const r = validateSourcesSchema([{ ...ok, reviewed_date: undefined }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_MISSING_REVIEW',
+			sourceId: 'va_disability_file',
+			field: 'reviewed_date'
+		});
+	});
+
+	// F11: the legal boolean flags must be real booleans. A YAML truthy scalar (`served: yes`) parses
+	// as the STRING "yes", which would silently skip the served / redistribution legal gate.
+	it('flags a non-boolean served flag', () => {
+		const r = validateSourcesSchema([{ ...ok, served: 'yes' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_BOOL',
+			sourceId: 'va_disability_file',
+			field: 'served'
+		});
+	});
+
+	it('flags a non-boolean redistribution_cleared flag', () => {
+		const r = validateSourcesSchema([{ ...ok, redistribution_cleared: 'true' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_BOOL',
+			sourceId: 'va_disability_file',
+			field: 'redistribution_cleared'
+		});
+	});
+
+	it('flags a non-boolean robots_allowed flag', () => {
+		const r = validateSourcesSchema([{ ...ok, robots_allowed: 1 }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_BOOL',
+			sourceId: 'va_disability_file',
+			field: 'robots_allowed'
+		});
+	});
+
+	// F12: provenance dates (reviewed_date / terms_reviewed_date) must be real ISO dates - the same
+	// calendar check as source_updated_date. A legal record should not carry a garbage vet date.
+	it('flags a non-ISO reviewed_date', () => {
+		const r = validateSourcesSchema([{ ...ok, reviewed_date: '06/21/2026' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_DATE',
+			sourceId: 'va_disability_file',
+			field: 'reviewed_date'
+		});
+	});
+
+	it('flags a non-ISO terms_reviewed_date', () => {
+		const r = validateSourcesSchema([{ ...ok, terms_reviewed_date: '2026/06/20' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_DATE',
+			sourceId: 'va_disability_file',
+			field: 'terms_reviewed_date'
+		});
+	});
 });

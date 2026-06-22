@@ -43,6 +43,7 @@ const ID_RE = /^[a-z0-9_]+$/;
 const TIERS = new Set(['confident_pd', 'verified_gray_zone', 'excluded']);
 const CONTENT_TYPES = new Set(['html', 'pdf']);
 const CADENCES = new Set(['weekly', 'monthly']);
+const OPTIONAL_BOOLEANS = ['served', 'redistribution_cleared', 'robots_allowed'] as const;
 const REQUIRED_STRINGS = [
 	'source_id',
 	'title',
@@ -110,6 +111,17 @@ export function validateSourcesSchema(entries: unknown[]): ValidationResult {
 			errors.push({ code: 'E_SOURCES_BAD_CADENCE', sourceId: sid, field: 'update_check' });
 		if (typeof e.source_updated_date === 'string' && !isValidIsoDate(e.source_updated_date))
 			errors.push({ code: 'E_SOURCES_BAD_DATE', sourceId: sid, field: 'source_updated_date' });
+		if (typeof e.reviewed_date === 'string' && !isValidIsoDate(e.reviewed_date))
+			errors.push({ code: 'E_SOURCES_BAD_DATE', sourceId: sid, field: 'reviewed_date' });
+		if (typeof e.terms_reviewed_date === 'string' && !isValidIsoDate(e.terms_reviewed_date))
+			errors.push({ code: 'E_SOURCES_BAD_DATE', sourceId: sid, field: 'terms_reviewed_date' });
+
+		// Legal boolean flags must be real booleans - a YAML truthy scalar (`served: yes`) parses as a
+		// string and would silently skip the served / redistribution gate below.
+		for (const field of OPTIONAL_BOOLEANS) {
+			if (e[field] !== undefined && typeof e[field] !== 'boolean')
+				errors.push({ code: 'E_SOURCES_BAD_BOOL', sourceId: sid, field });
+		}
 
 		// A non-excluded tier requires a human copyright review AND a terms-of-use review.
 		if (e.legal_tier !== 'excluded') {
