@@ -44,6 +44,9 @@ jobs:
       - name: Type check
         run: pnpm run check
 
+      - name: Validate sources registry (legal/schema gate)
+        run: pnpm run validate:sources
+
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
