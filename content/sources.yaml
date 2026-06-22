@@ -151,6 +151,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: va_gi_bill_post911
+  source_updated_date: '2026-05-12'
   title: 'VA - Post-9/11 GI Bill (Chapter 33)'
   url: 'https://www.va.gov/education/about-gi-bill-benefits/post-9-11/'
   origin: VA
@@ -168,6 +169,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: va_gi_bill_overview
+  source_updated_date: '2024-11-29'
   title: 'VA - About GI Bill Benefits'
   url: 'https://www.va.gov/education/about-gi-bill-benefits/'
   origin: VA
@@ -219,6 +221,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: va_home_loan_coe
+  source_updated_date: '2025-05-16'
   title: 'VA - How to Request a VA Home Loan Certificate of Eligibility (COE)'
   url: 'https://www.va.gov/housing-assistance/home-loans/how-to-request-coe/'
   origin: VA
@@ -236,6 +239,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: va_dd214
+  source_updated_date: '2026-01-13'
   title: 'VA - Request Your Military Service Records (including DD214)'
   url: 'https://www.va.gov/records/get-military-service-records/'
   origin: VA
@@ -350,6 +354,7 @@
 # Participant Guide, C2E 4.0 Supplement, C2E Presentation, C2E Worksheet.
 
 - source_id: tap_va_benefits_guide
+  source_updated_date: '2025-12-04'
   title: 'TAP - VA Benefits and Services Participant Guide'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -368,6 +373,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_financial_planning
+  source_updated_date: '2026-04-15'
   title: 'TAP - Financial Planning for Transition'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DoW (TAP curriculum)'
@@ -386,6 +392,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_pre_separation_brief
+  source_updated_date: '2026-01-29'
   title: 'TAP - Pre-Separation Brief Resource Guide'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DoW (TAP curriculum)'
@@ -404,6 +411,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_managing_transition
+  source_updated_date: '2026-04-15'
   title: 'TAP - Managing Your Transition'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DoW (TAP curriculum)'
@@ -422,6 +430,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_moc_crosswalk
+  source_updated_date: '2026-05-12'
   title: 'TAP - Military Occupational Code (MOC) Crosswalk'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DoW (TAP curriculum)'
@@ -440,6 +449,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_managing_education
+  source_updated_date: '2026-04-15'
   title: 'TAP - Managing Your Education'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DoW (TAP curriculum)'
@@ -458,6 +468,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_dol_efct
+  source_updated_date: '2025-03-24'
   title: 'TAP - DOL Employment Fundamentals of Career Transition (EFCT) Participant Guide'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DOL (TAP curriculum)'
@@ -476,6 +487,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_dol_employment_workshop
+  source_updated_date: '2026-04-15'
   title: 'TAP - DOL Employment Workshop Participant Guide'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DOL (TAP curriculum)'
@@ -494,6 +506,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_va_womens_health
+  source_updated_date: '2025-12-04'
   title: "TAP - VA Women's Health Transition Training Participant Handbook"
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -512,6 +525,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_interagency_website_guide
+  source_updated_date: '2026-04-15'
   title: 'TAP - Interagency Website Guide (TIWG)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DoW (TAP curriculum)'
@@ -530,6 +544,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_va101
+  source_updated_date: '2025-12-04'
   title: 'TAP - VA Benefits 101 (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -548,6 +563,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_va_disability_comp
+  source_updated_date: '2025-12-04'
   title: 'TAP - VA Disability Compensation (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -566,6 +582,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_va_education_benefits
+  source_updated_date: '2025-12-04'
   title: 'TAP - VA Education Benefits (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -584,6 +601,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_va_education_spouses
+  source_updated_date: '2025-05-21'
   title: 'TAP - VA Education Benefits for Spouses and Dependent Children (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -602,6 +620,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_va_home_loan
+  source_updated_date: '2025-12-04'
   title: 'TAP - VA Home Loan Guaranty Program (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -620,6 +639,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_va_life_insurance
+  source_updated_date: '2025-05-21'
   title: 'TAP - VA Life Insurance Benefits (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -638,6 +658,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_mental_health_families
+  source_updated_date: '2025-03-20'
   title: 'TAP - Mental Health for Families (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DoW (TAP curriculum)'
@@ -656,6 +677,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_reserve_dual_pay
+  source_updated_date: '2025-12-04'
   title: 'TAP - Reserve Component Dual Payments (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'DoW (TAP curriculum)'
@@ -674,6 +696,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_vet_centers
+  source_updated_date: '2023-01-26'
   title: 'TAP - Vet Centers (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -692,6 +715,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_other_than_honorable
+  source_updated_date: '2025-12-04'
   title: 'TAP - Other Than Honorable Online Reference Guide'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'
@@ -710,6 +734,7 @@
   corpus_version_first_included: '1.0'
 
 - source_id: tap_va_reserve_natl_guard
+  source_updated_date: '2025-12-29'
   title: 'TAP - VA Benefits for Reserve and National Guard (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   origin: 'VA (TAP curriculum)'

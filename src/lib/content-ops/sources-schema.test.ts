@@ -134,4 +134,38 @@ describe('validateSourcesSchema', () => {
 			field: 'update_check'
 		});
 	});
+
+	it('accepts an entry with a valid ISO source_updated_date', () => {
+		expect(validateSourcesSchema([{ ...ok, source_updated_date: '2026-04-15' }])).toEqual({
+			valid: true,
+			errors: []
+		});
+	});
+
+	it('flags a non-ISO source_updated_date (MM/DD/YYYY)', () => {
+		const r = validateSourcesSchema([{ ...ok, source_updated_date: '04/15/2026' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_DATE',
+			sourceId: 'va_disability_file',
+			field: 'source_updated_date'
+		});
+	});
+
+	it('flags an impossible month in source_updated_date', () => {
+		const r = validateSourcesSchema([{ ...ok, source_updated_date: '2026-13-01' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_DATE',
+			sourceId: 'va_disability_file',
+			field: 'source_updated_date'
+		});
+	});
+
+	it('flags a non-calendar day in source_updated_date (Feb 30)', () => {
+		const r = validateSourcesSchema([{ ...ok, source_updated_date: '2026-02-30' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_DATE',
+			sourceId: 'va_disability_file',
+			field: 'source_updated_date'
+		});
+	});
 });

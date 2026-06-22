@@ -26,6 +26,7 @@ export type SourceEntry = {
 	access: string;
 	reviewed_by?: string;
 	reviewed_date?: string;
+	source_updated_date?: string; // the SOURCE's own last-updated date (ISO YYYY-MM-DD); distinct from reviewed_date (our vet date). The A5 update-detection key.
 	scrape_method: string;
 	content_hash?: string;
 	captured_path?: string;
@@ -56,6 +57,22 @@ const REQUIRED_STRINGS = [
 	'update_check',
 	'corpus_version_first_included'
 ] as const;
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * True iff `s` is a real calendar date in strict ISO `YYYY-MM-DD` form. Rejects wrong formats
+ * (e.g. `04/15/2026`) AND impossible dates (`2026-13-01`, `2026-02-30`) so A5 can parse + compare.
+ */
+function isValidIsoDate(s: string): boolean {
+	if (!ISO_DATE_RE.test(s)) return false;
+	const parts = s.split('-');
+	const y = Number(parts[0]);
+	const m = Number(parts[1]);
+	const d = Number(parts[2]);
+	const dt = new Date(Date.UTC(y, m - 1, d));
+	return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
 
 export function validateSourcesSchema(entries: unknown[]): ValidationResult {
 	if (!Array.isArray(entries)) return { valid: false, errors: [{ code: 'E_SOURCES_NOT_ARRAY' }] };
@@ -91,6 +108,8 @@ export function validateSourcesSchema(entries: unknown[]): ValidationResult {
 			errors.push({ code: 'E_SOURCES_BAD_CONTENT_TYPE', sourceId: sid, field: 'content_type' });
 		if (typeof e.update_check === 'string' && !CADENCES.has(e.update_check))
 			errors.push({ code: 'E_SOURCES_BAD_CADENCE', sourceId: sid, field: 'update_check' });
+		if (typeof e.source_updated_date === 'string' && !isValidIsoDate(e.source_updated_date))
+			errors.push({ code: 'E_SOURCES_BAD_DATE', sourceId: sid, field: 'source_updated_date' });
 
 		// A non-excluded tier requires a human copyright review AND a terms-of-use review.
 		if (e.legal_tier !== 'excluded') {
