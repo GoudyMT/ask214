@@ -78,15 +78,15 @@
   corpus_version_first_included: '1.0'
 
 - source_id: dod_skillbridge
-  title: 'DoD SkillBridge Program'
+  title: 'DoW SkillBridge Program'
   url: 'https://www.militaryonesource.mil/resources/gov/dod-skillbridge/'
-  origin: 'DoD (Military OneSource)'
+  origin: 'DoW (Military OneSource)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: html
-  license_notes: '17 USC 105 - US Government work. Canonical site skillbridge.mil (DoD TLS cert not WebFetch-verifiable); Military OneSource is the fetchable PD source. Expand eligibility detail from skillbridge.mil in cycle A.'
+  license_notes: '17 USC 105 - US Government work. Canonical site skillbridge.mil (DoW TLS cert not WebFetch-verifiable); Military OneSource is the fetchable PD source. Expand eligibility detail from skillbridge.mil in cycle A.'
   terms_reviewed_date: 2026-06-20
-  terms_notes: 'Public militaryonesource.mil (DoD) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoD.'
+  terms_notes: 'Public militaryonesource.mil (DoW) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoW.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-11
@@ -257,15 +257,15 @@
   corpus_version_first_included: '1.0'
 
 - source_id: mos_separation
-  title: 'DoD - Military Separation Planning and Support (Military OneSource)'
+  title: 'DoW - Military Separation Planning and Support (Military OneSource)'
   url: 'https://www.militaryonesource.mil/transition-retirement/separation/'
-  origin: 'DoD (Military OneSource)'
+  origin: 'DoW (Military OneSource)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: html
-  license_notes: '17 USC 105 - US Government work (DoD). Military OneSource is contractor-operated; content treated as US-Gov work consistent with the dod_skillbridge entry (Max-confirmed S29).'
+  license_notes: '17 USC 105 - US Government work (DoW). Military OneSource is contractor-operated; content treated as US-Gov work consistent with the dod_skillbridge entry (Max-confirmed S29).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public militaryonesource.mil (DoD) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoD.'
+  terms_notes: 'Public militaryonesource.mil (DoW) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoW.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -327,13 +327,13 @@
 - source_id: dfas_final_pay
   title: 'DFAS - Final Military Pay at Separation'
   url: 'https://www.dfas.mil/militaryseparations/FinalPay/'
-  origin: 'DFAS (DoD)'
+  origin: 'DFAS (DoW)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: html
-  license_notes: '17 USC 105 - US Government work (DFAS/DoD).'
+  license_notes: '17 USC 105 - US Government work (DFAS/DoW).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public dfas.mil page; host blocks automated fetch - body confirmed at A2 capture; app is unofficial, not endorsed by DFAS/DoD.'
+  terms_notes: 'Public dfas.mil page; host blocks automated fetch - body confirmed at A2 capture; app is unofficial, not endorsed by DFAS/DoW.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -343,8 +343,11 @@
 
 # --- A1 Task 9 (2026-06-21, Session 29): TAP curriculum PDFs (tapevents.mil) ---
 # Federal-authored TAP participant guides + module resource guides. S29 legal scan
-# (pdftotext extract -> grep): ZERO copyright notices, no distribution statements; the
-# only third-party IP is CareerScope(R) in the C2E vocational docs -> EXCLUDED below.
+# (pdftotext text extract -> grep for copyright notices, distribution statements, AND
+# inline third-party marks (R)/(C)/vendor names): ZERO copyright notices, no distribution
+# statements; the only third-party IP found is CareerScope(R) in the C2E vocational docs
+# -> EXCLUDED below. PD basis = federal authorship (17 USC 105); the notice scan is a
+# corroborating red-flag check, not the basis.
 # content_type: pdf, served: false -> TEXT-ONLY extraction (no images = no third-party-
 # image redistribution / copyright-strike risk); trust-but-verify highlight via the
 # anchor model on app-rendered text (works offline); url = the official TAP documents
@@ -364,7 +367,7 @@
   served: false
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images) - no third-party-image redistribution.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoW.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -383,7 +386,7 @@
   served: false
   license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Financial_Planning_Transition.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Financial_Planning_Transition.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by DoW.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -421,7 +424,7 @@
   served: false
   license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Transition.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Transition.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoW.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -438,9 +441,9 @@
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images). References MilGears (DoD tool).'
+  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images). References MilGears (DoW tool).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MOC_Crosswalk.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MOC_Crosswalk.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoW.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -459,7 +462,7 @@
   served: false
   license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Education.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Education.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoW.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
