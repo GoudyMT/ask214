@@ -93,3 +93,636 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+
+# --- A1 Task 9 (2026-06-21, Session 29): real v1.0 confident-PD source list ---
+# All WebFetch/search-verified live + federal-authored; Max-gated per document.
+# VA pages confirmed live via WebFetch; dol.gov/tsp.gov/mynavyhr/dfas block automated
+# fetch (URL+title+domain confirmed) -> page body verified at A2 capture. HTML only (none served).
+
+- source_id: va_disability_bdd
+  title: 'VA - File a Disability Claim Before Separating (BDD / Pre-Discharge)'
+  url: 'https://www.va.gov/disability/how-to-file-claim/when-to-file/pre-discharge-claim/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: va_disability_evidence
+  title: 'VA - Evidence Needed for Your Disability Claim'
+  url: 'https://www.va.gov/disability/how-to-file-claim/evidence-needed/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: va_health_eligibility
+  title: 'VA - Eligibility for VA Health Care'
+  url: 'https://www.va.gov/health-care/eligibility/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: va_gi_bill_post911
+  title: 'VA - Post-9/11 GI Bill (Chapter 33)'
+  url: 'https://www.va.gov/education/about-gi-bill-benefits/post-9-11/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: va_gi_bill_overview
+  title: 'VA - About GI Bill Benefits'
+  url: 'https://www.va.gov/education/about-gi-bill-benefits/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: va_gi_bill_transfer
+  title: 'VA - Transfer Your Post-9/11 GI Bill Benefits'
+  url: 'https://www.va.gov/education/transfer-post-9-11-gi-bill-benefits/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: va_vgli
+  title: "VA - Veterans' Group Life Insurance (VGLI)"
+  url: 'https://www.va.gov/life-insurance/options-eligibility/vgli/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; SGLI-to-VGLI conversion window is time-sensitive at separation; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: va_home_loan_coe
+  title: 'VA - How to Request a VA Home Loan Certificate of Eligibility (COE)'
+  url: 'https://www.va.gov/housing-assistance/home-loans/how-to-request-coe/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: va_dd214
+  title: 'VA - Request Your Military Service Records (including DD214)'
+  url: 'https://www.va.gov/records/get-military-service-records/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright. Points to the National Archives (NARA) eVetRecs request flow.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: mos_separation
+  title: 'DoD - Military Separation Planning and Support (Military OneSource)'
+  url: 'https://www.militaryonesource.mil/transition-retirement/separation/'
+  origin: 'DoD (Military OneSource)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work (DoD). Military OneSource is contractor-operated; content treated as US-Gov work consistent with the dod_skillbridge entry (Max-confirmed S29).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public militaryonesource.mil (DoD) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoD.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: dol_tap_overview
+  title: 'DOL - Transition Assistance Program (TAP) Overview'
+  url: 'https://www.dol.gov/agencies/vets/programs/tap'
+  origin: 'DOL (VETS)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work (DOL VETS). Program OVERVIEW only; the contractor-developed TAP curriculum modules are excluded per section 8.3.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public dol.gov page; overview scope only (not curriculum); host blocks automated fetch - body confirmed at A2 capture; app is unofficial, not endorsed by DOL.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tsp_separation
+  title: 'TSP - Leaving the Uniformed Services'
+  url: 'https://www.tsp.gov/changes-in-your-career/leaving-uniformed-services/'
+  origin: 'FRTIB (Thrift Savings Plan)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work (FRTIB).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public tsp.gov page; host blocks automated fetch - body confirmed at A2 capture; app is unofficial, not endorsed by FRTIB.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: navy_separation
+  title: 'Navy - Enlisted Separations (MyNavyHR)'
+  url: 'https://www.mynavyhr.navy.mil/Career-Management/Personnel-Conduct-Sep/Enlisted-Separations/'
+  origin: 'Navy (MyNavyHR)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work (Department of the Navy).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public mynavyhr.navy.mil page; host blocks automated fetch - confirm no-CAC + content depth (HTML landing vs MILPERSMAN PDFs) at A2 capture; app is unofficial, not endorsed by the Navy.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: dfas_final_pay
+  title: 'DFAS - Final Military Pay at Separation'
+  url: 'https://www.dfas.mil/militaryseparations/FinalPay/'
+  origin: 'DFAS (DoD)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work (DFAS/DoD).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public dfas.mil page; host blocks automated fetch - body confirmed at A2 capture; app is unofficial, not endorsed by DFAS/DoD.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+# --- A1 Task 9 (2026-06-21, Session 29): TAP curriculum PDFs (tapevents.mil) ---
+# Federal-authored TAP participant guides + module resource guides. S29 legal scan
+# (pdftotext extract -> grep): ZERO copyright notices, no distribution statements; the
+# only third-party IP is CareerScope(R) in the C2E vocational docs -> EXCLUDED below.
+# content_type: pdf, served: false -> TEXT-ONLY extraction (no images = no third-party-
+# image redistribution / copyright-strike risk); trust-but-verify highlight via the
+# anchor model on app-rendered text (works offline); url = the official TAP documents
+# page for online verify (per-doc deep-links resolved at A2 capture). Local PDFs +
+# pdftotext output staged for A2.
+# EXCLUDED (CareerScope(R) third-party, link-out only, never ingested): DOL C2E
+# Participant Guide, C2E 4.0 Supplement, C2E Presentation, C2E Worksheet.
+
+- source_id: tap_va_benefits_guide
+  title: 'TAP - VA Benefits and Services Participant Guide'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images) - no third-party-image redistribution.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_financial_planning
+  title: 'TAP - Financial Planning for Transition'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DoW (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Financial_Planning_Transition.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_pre_separation_brief
+  title: 'TAP - Pre-Separation Brief Resource Guide'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DoW (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DoW/DHS); no copyright notice (S29 scan). Text-only extraction (no images).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (DoW + DHS). File: Pre_Separation_Counseling_Resource_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_managing_transition
+  title: 'TAP - Managing Your Transition'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DoW (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Transition.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_moc_crosswalk
+  title: 'TAP - Military Occupational Code (MOC) Crosswalk'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DoW (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images). References MilGears (DoD tool).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MOC_Crosswalk.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_managing_education
+  title: 'TAP - Managing Your Education'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DoW (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Education.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_dol_efct
+  title: 'TAP - DOL Employment Fundamentals of Career Transition (EFCT) Participant Guide'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DOL (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DOL); no copyright notice (S29 scan). Text-only extraction (no images).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (DOL). File: DOL-1-Day-EFCT.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DOL.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_dol_employment_workshop
+  title: 'TAP - DOL Employment Workshop Participant Guide'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DOL (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DOL); no copyright notice (S29 scan). Text-only extraction (no images).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (DOL). File: Employment-Track-DOL-Employment-Workshop.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DOL.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_va_womens_health
+  title: "TAP - VA Women's Health Transition Training Participant Handbook"
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: VA_WHTT_ParticipantHandbook.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_interagency_website_guide
+  title: 'TAP - Interagency Website Guide (TIWG)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DoW (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (interagency/DoW); no copyright notice (S29 scan). Text-only extraction (no images). A curated directory of official .gov/.mil links.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: TAP_Interagency_Website_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_va101
+  title: 'TAP - VA Benefits 101 (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide (curated links + overview).'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-VA101.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_va_disability_comp
+  title: 'TAP - VA Disability Compensation (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-DC.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_va_education_benefits
+  title: 'TAP - VA Education Benefits (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-EDBEN.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_va_education_spouses
+  title: 'TAP - VA Education Benefits for Spouses and Dependent Children (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-EDSDC.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_va_home_loan
+  title: 'TAP - VA Home Loan Guaranty Program (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-HLGP.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_va_life_insurance
+  title: 'TAP - VA Life Insurance Benefits (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-LIB.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_mental_health_families
+  title: 'TAP - Mental Health for Families (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DoW (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MLC-MHF.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_reserve_dual_pay
+  title: 'TAP - Reserve Component Dual Payments (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'DoW (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MLC-Reserve_Component_Dual.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_vet_centers
+  title: 'TAP - Vet Centers (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-VETCEN.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_other_than_honorable
+  title: 'TAP - Other Than Honorable Online Reference Guide'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: VA_MLC_OTH_ReferenceGuide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
+
+- source_id: tap_va_reserve_natl_guard
+  title: 'TAP - VA Benefits for Reserve and National Guard (Resource Guide)'
+  url: 'https://www.tapevents.mil/resources/documents'
+  origin: 'VA (TAP curriculum)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: pdf
+  served: false
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  terms_reviewed_date: 2026-06-21
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: VA_MLC_RNG_ResourceGuide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-06-21
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0'
