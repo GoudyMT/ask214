@@ -92,4 +92,26 @@ describe('decodeCorpus', () => {
 			CorpusFormatError
 		);
 	});
+
+	it('preserves an optional anchor on the chunk (additive; passes through decode by reference)', () => {
+		const withAnchor = manifest({
+			chunks: [
+				{
+					id: 'a',
+					text: 'a verbatim span here',
+					sourceId: 's',
+					sourceTitle: 'S',
+					tags: [],
+					url: 'https://example.gov/',
+					anchor: { exact: 'verbatim span', prefix: 'a ', suffix: ' here' }
+				}
+			]
+		});
+		const corpus = decodeCorpus(withAnchor, buffer([3, 4]), MODEL);
+		expect(corpus.chunks[0]!.anchor).toEqual({
+			exact: 'verbatim span',
+			prefix: 'a ',
+			suffix: ' here'
+		});
+	});
 });

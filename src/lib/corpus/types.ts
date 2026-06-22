@@ -16,6 +16,12 @@ export type CorpusChunk = {
 	section?: string;
 	tags: string[];
 	url: string; // "Open original" link
+	/**
+	 * Optional W3C TextQuoteSelector over the NORMALIZED captured original (A1-D2). `exact` is a verbatim,
+	 * normalized substring of the source; prefix/suffix disambiguate. PRODUCED by A, validated build-time,
+	 * passed through by B (the codec does not guard it), consumed by the later highlight-viewer runtime cycle.
+	 */
+	anchor?: { exact: string; prefix?: string; suffix?: string };
 };
 
 /** The shipped chunk manifest (corpus-v1.0.json); embeddings ride alongside as a binary blob. */
