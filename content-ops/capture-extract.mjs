@@ -8,13 +8,13 @@
 // users, who only download + read it offline (ADR-018, local-first). A5 (Refresh) will later wrap this same
 // engine in a scheduler - the engine is not rebuilt, just automated.
 //
-// Build-only: pdfjs-dist + child_process(pdftotext) + linkedom + Readability + yaml run HERE, never in a
-// src/ runtime module (the no-third-party-runtime-JS rule; mirrors validate-sources.mjs). The complexity
-// lives in tested pure units under src/lib/content-ops/; this script only does the IO + the library calls.
+// Build-only: pdfjs-dist + child_process(pdftotext) + linkedom + Readability + Playwright + yaml run HERE,
+// never in a src/ runtime module (the no-third-party-runtime-JS rule; mirrors validate-sources.mjs). The
+// complexity lives in tested pure units under src/lib/content-ops/; this script only does the IO + lib calls.
 //
-// AS-BUILT: PDF stage (pdfjs capture/extract + the A2-D6 fidelity cross-check vs pdftotext) + HTML stage
-// (robots + rate-limited fetch + linkedom/Readability + sanitize + off-origin assert). PENDING increments:
-// the 4 fetch-blocked sources (Playwright headless fallback) + the sources.yaml capture-field backfill.
+// AS-BUILT: PDF stage (pdfjs + the A2-D6 fidelity cross-check vs pdftotext) + three HTML capture methods -
+// plain fetch, headless (Playwright, for fetch-blocked-but-renderable), and manual (human-saved HTML for the
+// Akamai-blocked sources, A2-D4 last resort). PENDING: the sources.yaml capture-field backfill.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, delimiter } from 'node:path';
@@ -23,6 +23,7 @@ import { parse } from 'yaml';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
+import { chromium } from 'playwright';
 import { auditCopyRecord } from '../src/lib/content-ops/capture/audit-copy.ts';
 import { assemblePdfText } from '../src/lib/content-ops/extract/pdf-text.ts';
 import { trigramSimilarity } from '../src/lib/content-ops/extract/similarity.ts';
@@ -38,18 +39,16 @@ const SOURCES_YAML = 'content/sources.yaml';
 const STAGING_DIR = process.env.TAP_PDF_DIR ?? 'content-ops/staged'; // where the byte-exact TAP originals sit
 const CAPTURES_DIR = 'content-ops/captures'; // content-addressed audit copies (A2-D5; never served)
 const EXTRACTED_DIR = 'content-ops/extracted'; // per-source extractor output (A3 input)
+const MANUAL_HTML_DIR = 'content-ops/staged/manual-html'; // human-saved page HTML for the Akamai-blocked sources
 
 // Identifying User-Agent for polite scraping (master spec 8.5). Contact URL added once the domain is decided.
 const USER_AGENT = 'MilTransitionCompanion/1.0 (+contact: pending domain)';
 
-// The 4 sources that blocked automated fetch at A1 vetting -> the Playwright headless fallback (pending
-// increment). Skipped by the plain-fetch HTML stage so a full run stays clean until that lands.
-const FETCH_BLOCKED = new Set([
-	'dol_tap_overview',
-	'tsp_separation',
-	'navy_separation',
-	'dfas_final_pay'
-]);
+// The 4 sources whose host blocks a plain fetch (S29 vetting), split by how A2-D4's cascade resolved them
+// (S31 probe): dol renders fine under a real headless browser; tsp/navy/dfas are Akamai-protected and block
+// headless too -> manual capture (the last resort; we do NOT defeat bot-protection - impolite + fragile).
+const CAPTURE_HEADLESS = new Set(['dol_tap_overview']);
+const CAPTURE_MANUAL = new Set(['tsp_separation', 'navy_separation', 'dfas_final_pay']);
 
 // A2-D6 threshold, LOCKED from the full 21-doc distribution (S31): the clean cluster floor is 0.8597 and the
 // highest flagged is 0.7457, so 0.80 sits centered in that gap - passes all 18 clean docs with margin, flags
@@ -169,32 +168,24 @@ function extractHtml(rawHtml, pageOrigin) {
 	return shapeHtmlExtraction(text);
 }
 
-/** Capture + extract one HTML source: robots -> rate-limited fetch -> audit copy -> extract -> extracted JSON. */
-async function captureHtml(entry) {
-	const pageUrl = new URL(entry.url);
-	const origin = pageUrl.origin;
-
-	// robots.txt (honored always, master spec 8.5); unreachable robots = allow (nothing to honor).
+/** Honor robots.txt (master spec 8.5). Unreachable robots = allow (nothing to honor). Rate-limited fetch. */
+async function robotsAllows(origin, pathname) {
 	await limiter.acquire();
-	let robotsAllowed = true;
 	try {
 		const r = await fetch(`${origin}/robots.txt`, { headers: { 'user-agent': USER_AGENT } });
-		if (r.ok) robotsAllowed = isPathAllowed(await r.text(), USER_AGENT, pageUrl.pathname);
+		if (r.ok) return isPathAllowed(await r.text(), USER_AGENT, pathname);
 	} catch {
-		robotsAllowed = true;
+		// unreachable robots.txt -> nothing to honor
 	}
-	if (!robotsAllowed) throw new Error('E_INGEST_ROBOTS_DISALLOWED');
+	return true;
+}
 
-	// page fetch (rate-limited, identifying UA). A non-200 is the fetch-blocked signal -> Playwright (pending).
-	await limiter.acquire();
-	const res = await fetch(entry.url, { headers: { 'user-agent': USER_AGENT } });
-	if (!res.ok) throw new Error('E_INGEST_FETCH_BLOCKED');
-	const bytes = new Uint8Array(await res.arrayBuffer()); // byte-exact audit copy
-	const rawHtml = new TextDecoder('utf-8').decode(bytes); // .gov pages are UTF-8
-
+/** Shared finisher for every HTML capture method (fetch / headless / manual): audit copy + extract + write
+ *  the per-source extracted JSON. `bytes` = the captured bytes (the audit copy); `rawHtml` = those bytes as
+ *  text for extraction; `method` is recorded for provenance. */
+async function writeHtmlArtifacts(entry, origin, bytes, rawHtml, method) {
 	const record = await auditCopyRecord(bytes, 'html');
 	if (!existsSync(record.capturedPath)) writeFileSync(record.capturedPath, bytes);
-
 	const result = extractHtml(rawHtml, origin);
 	writeFileSync(
 		join(EXTRACTED_DIR, `${entry.source_id}.json`),
@@ -204,7 +195,7 @@ async function captureHtml(entry) {
 				content_hash: record.contentHash,
 				extractionMode: result.extractionMode,
 				textLayerPresent: result.textLayerPresent,
-				robots_allowed: robotsAllowed,
+				capture_method: method,
 				blocks: result.blocks,
 				normalizedText: result.normalizedText
 			},
@@ -213,6 +204,55 @@ async function captureHtml(entry) {
 		)
 	);
 	return { id: entry.source_id, chars: result.normalizedText.length };
+}
+
+/** Plain-fetch HTML capture: robots -> rate-limited UA fetch -> shared finisher. */
+async function captureHtml(entry) {
+	const pageUrl = new URL(entry.url);
+	const origin = pageUrl.origin;
+	if (!(await robotsAllows(origin, pageUrl.pathname)))
+		throw new Error('E_INGEST_ROBOTS_DISALLOWED');
+	await limiter.acquire();
+	const res = await fetch(entry.url, { headers: { 'user-agent': USER_AGENT } });
+	if (!res.ok) throw new Error('E_INGEST_FETCH_BLOCKED');
+	const bytes = new Uint8Array(await res.arrayBuffer()); // byte-exact audit copy
+	return writeHtmlArtifacts(entry, origin, bytes, new TextDecoder('utf-8').decode(bytes), 'fetch');
+}
+
+/** Headless HTML capture (A2-D4): a real browser renders a page that blocked the plain fetch. The rendered
+ *  DOM is the audit copy (the raw HTML is a bot-blocked shell). Shares one browser instance across sources. */
+async function captureHtmlHeadless(entry, browser) {
+	const pageUrl = new URL(entry.url);
+	const origin = pageUrl.origin;
+	if (!(await robotsAllows(origin, pageUrl.pathname)))
+		throw new Error('E_INGEST_ROBOTS_DISALLOWED');
+	await limiter.acquire();
+	const page = await browser.newPage({ userAgent: USER_AGENT });
+	try {
+		const res = await page.goto(entry.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+		if (!res || !res.ok()) throw new Error('E_INGEST_HEADLESS_BLOCKED');
+		await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {}); // best-effort settle
+		const rawHtml = await page.content();
+		return writeHtmlArtifacts(
+			entry,
+			origin,
+			new TextEncoder().encode(rawHtml),
+			rawHtml,
+			'headless'
+		);
+	} finally {
+		await page.close();
+	}
+}
+
+/** Manual HTML capture (A2-D4 last resort): ingest a human-saved page HTML for an Akamai-blocked source.
+ *  Throws E_INGEST_MANUAL_HTML_MISSING (handled with on-screen instructions) if the file is not present. */
+async function captureHtmlManual(entry) {
+	const file = join(MANUAL_HTML_DIR, `${entry.source_id}.html`);
+	if (!existsSync(file)) throw new Error('E_INGEST_MANUAL_HTML_MISSING');
+	const bytes = new Uint8Array(readFileSync(file));
+	const origin = new URL(entry.url).origin;
+	return writeHtmlArtifacts(entry, origin, bytes, new TextDecoder('utf-8').decode(bytes), 'manual');
 }
 
 /** PDF stage: per source, capture (hash + audit copy) + pdfjs extract + the A2-D6 fidelity cross-check. */
@@ -288,17 +328,13 @@ async function runPdfStage(pdfs) {
 	console.log(`    flagged@${FIDELITY_THRESHOLD}=${flagged}  ->  ${EXTRACTED_DIR}/`);
 }
 
-/** HTML stage: per source, robots -> rate-limited UA fetch -> audit copy -> linkedom/Readability + sanitize. */
+/** HTML fetch stage: per source, robots -> rate-limited UA fetch -> audit copy -> linkedom/Readability. */
 async function runHtmlStage(htmls) {
 	console.log('\n' + '='.repeat(60));
 	console.log(`A2 INGEST - HTML stage  (${htmls.length} sources)`);
 	console.log('='.repeat(60));
 
 	for (const entry of htmls) {
-		if (FETCH_BLOCKED.has(entry.source_id)) {
-			console.log(`SKIP  ${entry.source_id}  (fetch-blocked -> Playwright fallback, pending)`);
-			continue;
-		}
 		try {
 			const r = await captureHtml(entry);
 			console.log(`PASS  ${r.id}  (${r.chars.toLocaleString()} chars)`);
@@ -311,13 +347,84 @@ async function runHtmlStage(htmls) {
 	console.log(`\n    extracted -> ${EXTRACTED_DIR}/  captures -> ${CAPTURES_DIR}/`);
 }
 
+/** Headless stage (A2-D4): sources that blocked the plain fetch but a real browser can still render. */
+async function runHeadlessStage(sources) {
+	console.log('\n' + '='.repeat(60));
+	console.log(
+		`A2 INGEST - HTML headless stage  (${sources.length} sources, render via Playwright)`
+	);
+	console.log('='.repeat(60));
+	const browser = await chromium.launch({ headless: true });
+	try {
+		for (const entry of sources) {
+			try {
+				const r = await captureHtmlHeadless(entry, browser);
+				console.log(
+					`PASS  ${r.id}  (${r.chars.toLocaleString()} chars)  [headless; VERIFY real public body]`
+				);
+			} catch (err) {
+				console.error(`[FAIL] ${entry.source_id}: ${err.message}`);
+				process.exit(1);
+			}
+		}
+	} finally {
+		await browser.close();
+	}
+}
+
+/** Manual stage (A2-D4 last resort): Akamai-blocked sources captured from human-saved HTML. A missing file is
+ *  NOT a crash - it prints the exact to-do (open URL -> save HTML to MANUAL_HTML_DIR) then fails closed so the
+ *  source is never silently dropped. Full step-by-step instructions live in MANUAL_HTML_DIR/README.txt. */
+async function runManualStage(sources) {
+	console.log('\n' + '='.repeat(60));
+	console.log(
+		`A2 INGEST - HTML manual stage  (${sources.length} Akamai-blocked; human-saved HTML)`
+	);
+	console.log('='.repeat(60));
+	const missing = [];
+	for (const entry of sources) {
+		try {
+			const r = await captureHtmlManual(entry);
+			console.log(`PASS  ${r.id}  (${r.chars.toLocaleString()} chars)  [from saved HTML]`);
+		} catch (err) {
+			if (err.message === 'E_INGEST_MANUAL_HTML_MISSING') missing.push(entry);
+			else {
+				console.error(`[FAIL] ${entry.source_id}: ${err.message}`);
+				process.exit(1);
+			}
+		}
+	}
+	if (missing.length > 0) {
+		console.error(
+			`\n  MANUAL CAPTURE NEEDED (${missing.length}) -> full steps in ${MANUAL_HTML_DIR}/README.txt`
+		);
+		for (const e of missing) {
+			console.error(`    ${e.source_id}:`);
+			console.error(`        1. open ${e.url}`);
+			console.error(
+				`        2. save the page as "HTML only" -> ${MANUAL_HTML_DIR}/${e.source_id}.html`
+			);
+			console.error(`        3. re-run \`pnpm ingest\``);
+		}
+		process.exit(1);
+	}
+}
+
 // --- Run ---
 mkdirSync(CAPTURES_DIR, { recursive: true });
 mkdirSync(EXTRACTED_DIR, { recursive: true });
+mkdirSync(MANUAL_HTML_DIR, { recursive: true });
 
 const entries = parse(readFileSync(SOURCES_YAML, 'utf8'));
 const pdfs = pick(entries.filter((e) => e.content_type === 'pdf'));
 const htmls = pick(entries.filter((e) => e.content_type === 'html'));
+const htmlFetch = htmls.filter(
+	(e) => !CAPTURE_HEADLESS.has(e.source_id) && !CAPTURE_MANUAL.has(e.source_id)
+);
+const htmlHeadless = htmls.filter((e) => CAPTURE_HEADLESS.has(e.source_id));
+const htmlManual = htmls.filter((e) => CAPTURE_MANUAL.has(e.source_id));
 
 if (pdfs.length) await runPdfStage(pdfs);
-if (htmls.length) await runHtmlStage(htmls);
+if (htmlFetch.length) await runHtmlStage(htmlFetch);
+if (htmlHeadless.length) await runHeadlessStage(htmlHeadless);
+if (htmlManual.length) await runManualStage(htmlManual);

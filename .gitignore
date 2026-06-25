@@ -113,6 +113,8 @@ content-ops/outputs/
 content-ops/review_queue/
 # A2 ingest: staged source PDFs (large binaries; re-fetch from tapevents.mil - see content-ops/staged/STAGING.txt)
 content-ops/staged/*.pdf
+# A2 ingest: human-saved HTML for Akamai-blocked sources (see content-ops/staged/manual-html/README.txt)
+content-ops/staged/manual-html/*.html
 # A2 ingest: generated audit copies + extracted text (regeneratable via `pnpm ingest`)
 content-ops/captures/
 content-ops/extracted/
