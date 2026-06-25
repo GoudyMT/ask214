@@ -13,6 +13,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"check:bundle": "size-limit",
 		"validate:sources": "tsx content-ops/validate-sources.mjs",
+		"ingest": "tsx content-ops/capture-extract.mjs",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",

@@ -1,0 +1,22 @@
+TAP curriculum PDFs - staging directory (build-time input for content-ops A2 ingest)
+=====================================================================================
+
+These federal TAP curriculum PDFs are the byte-exact originals downloaded from
+https://www.tapevents.mil/resources/documents  (public; 17 USC 105 US-Government work).
+
+The PDFs in this directory are GITIGNORED (large binaries, reproducible). Only this manifest is
+committed. The AUTHORITATIVE list of what belongs here is content/sources.yaml: every entry with
+`content_type: pdf` carries its staged filename in terms_notes as `File: <name>.pdf`.
+
+(Re)staging on a new machine - download those files from tapevents.mil into this directory, or copy
+an existing staging dir in:
+
+    Copy-Item "<your-tap-pdf-dir>/*.pdf" content-ops/staged/
+
+The ingest engine (`pnpm ingest`) reads from here by default (override with the TAP_PDF_DIR env var),
+and writes content-addressed audit copies to content-ops/captures/ + extracted text to
+content-ops/extracted/.
+
+EXCLUDED from the corpus (do NOT add): the 4 CareerScope(R) C2E vocational docs (third-party IP; the
+legal exclusion locked in Session 29). The ingest reads only the sources.yaml-listed files, so extra
+files in this directory are ignored.

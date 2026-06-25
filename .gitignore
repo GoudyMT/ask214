@@ -111,6 +111,11 @@ logs/
 # ---- Content corpus outputs (large generated artifacts) ----
 content-ops/outputs/
 content-ops/review_queue/
+# A2 ingest: staged source PDFs (large binaries; re-fetch from tapevents.mil - see content-ops/staged/STAGING.txt)
+content-ops/staged/*.pdf
+# A2 ingest: generated audit copies + extracted text (regeneratable via `pnpm ingest`)
+content-ops/captures/
+content-ops/extracted/
 
 # ---- Misc local-only ----
 TODO.private
