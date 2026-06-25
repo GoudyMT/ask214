@@ -35,5 +35,7 @@ export function stampSourcesYaml(
 		const fields = backfillCaptureFields({}, resolveBackfill(existing, incoming, now));
 		for (const [key, value] of Object.entries(fields)) node.set(key, value);
 	}
-	return doc.toString();
+	// lineWidth 0 disables yaml's 80-col wrapping, so long scalars (e.g. terms_notes) are never re-folded -
+	// the diff touches only the entries we actually stamp, keeping the legal-record change reviewable.
+	return doc.toString({ lineWidth: 0 });
 }

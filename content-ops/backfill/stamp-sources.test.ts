@@ -69,4 +69,23 @@ describe('stampSourcesYaml', () => {
 		);
 		expect('content_hash' in tap).toBe(false);
 	});
+
+	test('does not reflow long lines (yaml default 80-col wrapping would corrupt the legal-record diff)', () => {
+		// a >80-char value: yaml's default lineWidth folds it across lines on toString, touching entries we
+		// never stamped. The stamper must keep long scalars on one line so the diff stays minimal.
+		const longNote =
+			'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.';
+		const fixture = `- source_id: keep_me
+  title: 'Keep'
+  content_type: html
+  terms_notes: '${longNote}'
+`;
+		const out = stampSourcesYaml(
+			fixture,
+			{ keep_me: { contentHash: 'x', contentType: 'html' } },
+			NOW
+		);
+		expect(out).toContain(`terms_notes: '${longNote}'`);
+		expect(out).toContain('content_hash: x');
+	});
 });
