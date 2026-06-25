@@ -44,11 +44,12 @@ const MANUAL_HTML_DIR = 'content-ops/staged/manual-html'; // human-saved page HT
 // Identifying User-Agent for polite scraping (master spec 8.5). Contact URL added once the domain is decided.
 const USER_AGENT = 'MilTransitionCompanion/1.0 (+contact: pending domain)';
 
-// The 4 sources whose host blocks a plain fetch (S29 vetting), split by how A2-D4's cascade resolved them
-// (S31 probe): dol renders fine under a real headless browser; tsp/navy/dfas are Akamai-protected and block
-// headless too -> manual capture (the last resort; we do NOT defeat bot-protection - impolite + fragile).
+// Sources whose host blocks a plain fetch (S29 vetting), split by how A2-D4's cascade resolved them (S31):
+// dol renders fine under a real headless browser; tsp is Akamai-protected (blocks headless too) -> manual
+// capture (the last resort; we do NOT defeat bot-protection - impolite + fragile). navy + dfas were also
+// Akamai-blocked but DROPPED at A2 as off-target (navy = ADSEP admin desk; dfas = a link portal, no content).
 const CAPTURE_HEADLESS = new Set(['dol_tap_overview']);
-const CAPTURE_MANUAL = new Set(['tsp_separation', 'navy_separation', 'dfas_final_pay']);
+const CAPTURE_MANUAL = new Set(['tsp_separation']);
 
 // A2-D6 threshold, LOCKED from the full 21-doc distribution (S31): the clean cluster floor is 0.8597 and the
 // highest flagged is 0.7457, so 0.80 sits centered in that gap - passes all 18 clean docs with margin, flags

@@ -307,40 +307,6 @@
   update_check: monthly
   corpus_version_first_included: '1.0'
 
-- source_id: navy_separation
-  title: 'Navy - Enlisted Separations (MyNavyHR)'
-  url: 'https://www.mynavyhr.navy.mil/Career-Management/Personnel-Conduct-Sep/Enlisted-Separations/'
-  origin: 'Navy (MyNavyHR)'
-  copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
-  content_type: html
-  license_notes: '17 USC 105 - US Government work (Department of the Navy).'
-  terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public mynavyhr.navy.mil page; host blocks automated fetch - confirm no-CAC + content depth (HTML landing vs MILPERSMAN PDFs) at A2 capture; app is unofficial, not endorsed by the Navy.'
-  access: open
-  reviewed_by: max
-  reviewed_date: 2026-06-21
-  scrape_method: direct_url
-  update_check: monthly
-  corpus_version_first_included: '1.0'
-
-- source_id: dfas_final_pay
-  title: 'DFAS - Final Military Pay at Separation'
-  url: 'https://www.dfas.mil/militaryseparations/FinalPay/'
-  origin: 'DFAS (DoW)'
-  copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
-  content_type: html
-  license_notes: '17 USC 105 - US Government work (DFAS/DoW).'
-  terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public dfas.mil page; host blocks automated fetch - body confirmed at A2 capture; app is unofficial, not endorsed by DFAS/DoW.'
-  access: open
-  reviewed_by: max
-  reviewed_date: 2026-06-21
-  scrape_method: direct_url
-  update_check: monthly
-  corpus_version_first_included: '1.0'
-
 # --- A1 Task 9 (2026-06-21, Session 29): TAP curriculum PDFs (tapevents.mil) ---
 # Federal-authored TAP participant guides + module resource guides. S29 legal scan
 # (pdftotext text extract -> grep for copyright notices, distribution statements, AND

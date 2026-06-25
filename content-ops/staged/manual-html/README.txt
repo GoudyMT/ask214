@@ -3,8 +3,8 @@ MANUAL HTML CAPTURE  -  content-ops A2 ingest
 
 WHY THIS EXISTS
 ---------------
-A few corpus sources sit behind Akamai bot-protection that blocks BOTH a plain
-fetch AND a real headless browser (verified Session 31). We do NOT try to defeat
+A corpus source can sit behind Akamai bot-protection that blocks BOTH a plain
+fetch AND a real headless browser (e.g. tsp.gov, verified Session 31). We do NOT try to defeat
 bot-protection - it is impolite and fragile. Instead, a human opens the PUBLIC
 page once, saves its HTML, and the ingest engine reads that saved file like any
 other capture. The pages are public; the block is bot-only, so a normal browser
@@ -60,20 +60,9 @@ THE SOURCES TO CAPTURE
 ----------------------
 (save each as the filename shown, into this folder)
 
-  dfas_final_pay.html
-      DFAS - Final Military Pay at Separation
-      https://www.dfas.mil/militaryseparations/FinalPay/
-
   tsp_separation.html
       TSP - Leaving the Uniformed Services
       https://www.tsp.gov/changes-in-your-career/leaving-uniformed-services/
-
-  navy_separation.html
-      Navy - Enlisted Separations (MyNavyHR)
-      https://www.mynavyhr.navy.mil/Career-Management/Personnel-Conduct-Sep/Enlisted-Separations/
-      VERIFY CAREFULLY: this one may be a thin landing page that only points to
-      CAC-gated MILPERSMAN PDFs. If there is no real PUBLIC body content, do NOT
-      save it - skip it per the next section.
 
 
 IF A PAGE HAS NO REAL PUBLIC CONTENT (blocked, CAC-gated, or just a thin shell)
@@ -100,6 +89,9 @@ NOTES
 -----
 - These .html files are GITIGNORED (large, reproducible from the saved pages).
   Only this README is tracked, so the instructions travel with the repo.
+- If your browser saved "Complete" instead of "HTML Only", you'll also get a
+  <source_id>_files/ asset folder next to the .html. It is gitignored and unused
+  (we only read the .html), so it is harmless - delete it if you want a tidy folder.
 - REFRESH (A5): manual sources cannot be auto-refreshed - a human must re-save on
   update. A5 should surface them in its manual review queue on a date/hash signal.
 - The ingest records capture_method:"manual" in each extracted JSON, so it is
