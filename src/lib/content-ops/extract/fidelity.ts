@@ -7,11 +7,9 @@ function isBadChar(code: number): boolean {
 }
 
 /**
- * The A2-D6 gross-failure sanity check (one of the two auto-gate primitives): flags an extraction that is
- * empty, suspiciously thin per page (a parse failure / wrong tool), or garbled (replacement / control
- * chars over a ratio - an encoding failure or binary-as-text). Structured opaque-code result
- * (mtc/no-input-in-error); the build script gates on it and - with trigramSimilarity - decides
- * auto-accept vs flag-for-review. Pure.
+ * Gross-failure sanity check for an extraction: flags it empty, suspiciously thin per page (a parse
+ * failure / wrong tool), or garbled (replacement / control chars over a ratio - an encoding failure or
+ * binary-as-text). Returns a structured opaque-code result with no input echoed back. Pure.
  */
 export function checkExtractionSanity(
 	text: string,

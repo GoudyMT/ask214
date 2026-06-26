@@ -1,22 +1,21 @@
-// content-ops/backfill-sources.mjs
 // Run from the repo root: `pnpm backfill:sources` (= tsx content-ops/backfill-sources.mjs). Pass source_id(s)
 // or a content_type ('pdf' / 'html') as args to scope the run (e.g.
 // `pnpm exec tsx content-ops/backfill-sources.mjs va_intent_to_file` for a single source).
 //
-// A2 BACKFILL. PRODUCER-SIDE / BUILD-TIME ONLY: projects the capture artifacts produced by `pnpm ingest` into
-// the sources.yaml LEGAL RECORD. It stamps content_hash / captured_path / captured_at / robots_allowed onto
-// each entry, reading the canonical hash from the already-written content-ops/extracted/<id>.json - no
-// re-capture, no network. Comment-preserving (the yaml Document API, via stampSourcesYaml) + idempotent (an
-// unchanged hash -> a byte-identical no-op). Fail-closed: a missing extracted artifact or audit copy stops the
-// run BEFORE any write, printing the offending source_id.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+// Build-time only: projects the capture artifacts produced by `pnpm ingest` into the sources.yaml legal
+// record. It stamps content_hash / captured_path / captured_at / robots_allowed onto each entry, reading the
+// canonical hash from the already-written content-ops/extracted/<id>.json - no re-capture, no network.
+// Comment-preserving (via stampSourcesYaml) and idempotent (an unchanged hash -> a byte-identical no-op).
+// Fail-closed: a missing extracted artifact or audit copy stops the run BEFORE any write, printing the
+// offending source_id.
+import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { stampSourcesYaml } from './backfill/stamp-sources.ts';
 
 const SOURCES_YAML = 'content/sources.yaml';
 const EXTRACTED_DIR = 'content-ops/extracted'; // per-source extractor output (carries content_hash)
-const CAPTURES_DIR = 'content-ops/captures'; // content-addressed audit copies (A2-D5; never served)
+const CAPTURES_DIR = 'content-ops/captures'; // content-addressed audit copies; never served
 
 // Optional CLI args (source_id(s) and/or a content_type) scope the run; no args = the whole corpus.
 const ARGS = process.argv.slice(2);
@@ -26,18 +25,24 @@ const pick = (list) =>
 		: list;
 
 console.log('='.repeat(60));
-console.log('A2 BACKFILL - stamp sources.yaml capture fields from extracted artifacts');
+console.log('BACKFILL - stamp sources.yaml capture fields from extracted artifacts');
 console.log('='.repeat(60));
 
 const before = readFileSync(SOURCES_YAML, 'utf8');
 const entries = parse(before);
 const inScope = pick(entries);
 
-// Build the incoming map + validate fail-closed BEFORE any write: every in-scope source must have an extracted
-// artifact (with a content_hash) AND its content-addressed audit copy on disk (the A2 capture-completeness gate).
+// Validate fail-closed BEFORE any write: every in-scope source must have an extracted artifact (with a
+// content_hash) AND its content-addressed audit copy on disk.
 const incoming = {};
 const problems = [];
 for (const entry of inScope) {
+	// Defense-in-depth: source_id flows into the file paths below; reject anything outside the safe charset
+	// before any join (the schema's ID_RE is also enforced by `pnpm validate:sources` in CI + pre-commit).
+	if (!/^[a-z0-9_]+$/.test(entry.source_id ?? '')) {
+		problems.push(`${JSON.stringify(entry.source_id)}: invalid source_id (expected [a-z0-9_]+)`);
+		continue;
+	}
 	const extractedPath = join(EXTRACTED_DIR, `${entry.source_id}.json`);
 	if (!existsSync(extractedPath)) {
 		problems.push(`${entry.source_id}: no ${extractedPath}`);
@@ -66,7 +71,11 @@ if (problems.length > 0) {
 // Stamp once (comment-preserving) + write once. Idempotent: an unchanged content_hash keeps its captured_at.
 const now = new Date().toISOString();
 const after = stampSourcesYaml(before, incoming, now);
-writeFileSync(SOURCES_YAML, after);
+// Atomic replace: write a temp sibling then rename, so a mid-write crash can never leave the legal record
+// half-written / truncated (rename is atomic on the same filesystem).
+const tmp = SOURCES_YAML + '.tmp';
+writeFileSync(tmp, after);
+renameSync(tmp, SOURCES_YAML);
 
 for (const entry of inScope) {
 	const inc = incoming[entry.source_id];

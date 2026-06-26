@@ -1,20 +1,12 @@
 // content-ops/capture-extract.mjs
-// Run from the repo root: `pnpm ingest` (= tsx content-ops/capture-extract.mjs). Pass source_id(s) or a
-// content_type ('pdf' / 'html') as args to scope the run (e.g.
-// `pnpm exec tsx content-ops/capture-extract.mjs va_intent_to_file` for a single source).
+// Run from the repo root: `pnpm ingest`. Pass source_id(s) or a content_type ('pdf' / 'html') to scope the
+// run, e.g. `pnpm exec tsx content-ops/capture-extract.mjs va_intent_to_file` for a single source.
 //
-// A2 build-time INGEST ENGINE (capture + extract + fidelity). PRODUCER-SIDE / BUILD-TIME ONLY: this never
-// runs on a user device or a live server. It produces the static, content-addressed corpus that ships to
-// users, who only download + read it offline (ADR-018, local-first). A5 (Refresh) will later wrap this same
-// engine in a scheduler - the engine is not rebuilt, just automated.
-//
-// Build-only: pdfjs-dist + child_process(pdftotext) + linkedom + Readability + Playwright + yaml run HERE,
-// never in a src/ runtime module (the no-third-party-runtime-JS rule; mirrors validate-sources.mjs). The
-// complexity lives in tested pure units under src/lib/content-ops/; this script only does the IO + lib calls.
-//
-// AS-BUILT: PDF stage (pdfjs + the A2-D6 fidelity cross-check vs pdftotext) + three HTML capture methods -
-// plain fetch, headless (Playwright, for fetch-blocked-but-renderable), and manual (human-saved HTML for the
-// Akamai-blocked sources, A2-D4 last resort). PENDING: the sources.yaml capture-field backfill.
+// Build-time ingest engine: captures + extracts text from the public-domain sources into a static,
+// content-addressed corpus that ships to users for offline reading. It never runs on a user device or a live
+// server. The complexity lives in the tested pure units under src/lib/content-ops/; this script only does the
+// IO + the library calls. The extraction libraries (pdfjs, linkedom, Readability, Playwright) and yaml run
+// only here, never in a src/ runtime module, so a runtime vuln in one cannot reach a shipped user.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, delimiter } from 'node:path';
@@ -25,6 +17,7 @@ import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 import { chromium } from 'playwright';
 import { auditCopyRecord } from '../src/lib/content-ops/capture/audit-copy.ts';
+import { stagedFileName } from '../src/lib/content-ops/capture/staged-file.ts';
 import { assemblePdfText } from '../src/lib/content-ops/extract/pdf-text.ts';
 import { trigramSimilarity } from '../src/lib/content-ops/extract/similarity.ts';
 import { checkExtractionSanity } from '../src/lib/content-ops/extract/fidelity.ts';
@@ -34,40 +27,35 @@ import { isPathAllowed } from '../src/lib/content-ops/capture/robots.ts';
 import { createRateLimiter } from '../src/lib/content-ops/capture/rate-limit.ts';
 import { normalizeText } from '../src/lib/corpus/normalize.ts';
 
-// Config - resolved, never machine-hardcoded (env override wins; sensible repo-relative defaults).
+// Config (env override wins; repo-relative defaults).
 const SOURCES_YAML = 'content/sources.yaml';
-const STAGING_DIR = process.env.TAP_PDF_DIR ?? 'content-ops/staged'; // where the byte-exact TAP originals sit
-const CAPTURES_DIR = 'content-ops/captures'; // content-addressed audit copies (A2-D5; never served)
-const EXTRACTED_DIR = 'content-ops/extracted'; // per-source extractor output (A3 input)
-const MANUAL_HTML_DIR = 'content-ops/staged/manual-html'; // human-saved page HTML for the Akamai-blocked sources
+const STAGING_DIR = process.env.TAP_PDF_DIR ?? 'content-ops/staged'; // the byte-exact staged PDF originals
+const CAPTURES_DIR = 'content-ops/captures'; // content-addressed audit copies (never served)
+const EXTRACTED_DIR = 'content-ops/extracted'; // per-source extractor output
+const MANUAL_HTML_DIR = 'content-ops/staged/manual-html'; // human-saved page HTML for bot-blocked sources
 
-// Identifying User-Agent for polite scraping (master spec 8.5). Contact URL added once the domain is decided.
+// Identifying User-Agent for polite scraping; contact URL added once the domain is decided.
 const USER_AGENT = 'MilTransitionCompanion/1.0 (+contact: pending domain)';
 
-// Sources whose host blocks a plain fetch (S29 vetting), split by how A2-D4's cascade resolved them (S31):
-// dol renders fine under a real headless browser; tsp is Akamai-protected (blocks headless too) -> manual
-// capture (the last resort; we do NOT defeat bot-protection - impolite + fragile). navy + dfas were also
-// Akamai-blocked but DROPPED at A2 as off-target (navy = ADSEP admin desk; dfas = a link portal, no content).
+// Sources whose host blocks a plain fetch: dol renders under a real headless browser; tsp is Akamai-protected
+// (blocks headless too) -> manual saved-HTML, the last resort (we do not defeat bot-protection).
 const CAPTURE_HEADLESS = new Set(['dol_tap_overview']);
 const CAPTURE_MANUAL = new Set(['tsp_separation']);
 
-// A2-D6 threshold, LOCKED from the full 21-doc distribution (S31): the clean cluster floor is 0.8597 and the
-// highest flagged is 0.7457, so 0.80 sits centered in that gap - passes all 18 clean docs with margin, flags
-// the 3 most structurally-complex (TOC/columnar/interactive) for human review. Below it = flagged, never
-// silently shipped. The metric is order-sensitive by design (it scores layout divergence, not just
-// corruption) - the safe bias for a fidelity gate; a v2.x refinement could add auto-escalation (spec-deferred).
+// Cross-tool agreement threshold, set from the real distribution: the clean cluster floors at 0.86 and the
+// worst flagged is 0.75, so 0.80 sits in the gap - passing the clean docs, flagging the structurally-complex
+// ones for human review. Below it = flagged, never silently shipped. Order-sensitive by design (it scores
+// layout divergence, not just corruption) - the safe bias for a fidelity gate.
 const FIDELITY_THRESHOLD = 0.8;
 
-// Optional CLI args (source_id(s) and/or a content_type) scope the run; no args = the whole corpus. Lets a
-// single source be verified before a full run (incremental, Max-gated).
+// Optional CLI args (source_id(s) and/or a content_type) scope the run; no args = the whole corpus.
 const ARGS = process.argv.slice(2);
 const pick = (list) =>
 	ARGS.length
 		? list.filter((e) => ARGS.includes(e.source_id) || ARGS.includes(e.content_type))
 		: list;
 
-// One rate limiter shared across the whole run (1 req/sec, master spec 8.5). Real clock here; the unit test
-// injects a fake one.
+// One shared rate limiter (1 req/sec). Real clock here; the unit test injects a fake one.
 const limiter = createRateLimiter(1000, {
 	now: () => Date.now(),
 	sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -77,14 +65,14 @@ const limiter = createRateLimiter(1000, {
  *  plain 'pdftotext' ENOENTs even when on PATH. Env override wins; else scan PATH (+ PATHEXT on win). */
 function resolvePdftotext() {
 	const name = process.platform === 'win32' ? 'pdftotext.exe' : 'pdftotext';
-	// 1. Explicit override (the portable escape hatch; also what CI sets).
+	// Explicit override wins (the portable escape hatch; also what CI sets).
 	if (process.env.PDFTOTEXT_BIN) return process.env.PDFTOTEXT_BIN;
-	// 2. On PATH (Linux/CI poppler-utils; any Windows install that put it on PATH).
+	// Else scan PATH (Linux/CI poppler-utils; any Windows install that put it on PATH).
 	for (const dir of (process.env.PATH ?? '').split(delimiter)) {
 		if (dir && existsSync(join(dir, name))) return join(dir, name);
 	}
-	// 3. Known fallbacks: the Xpdf/poppler build bundled with Git for Windows lives in mingw64\bin, which is
-	//    on Git Bash's PATH but NOT PowerShell's - so the PATH scan above misses it on a normal Windows shell.
+	// Git for Windows bundles poppler in mingw64\bin, which is on Git Bash's PATH but NOT PowerShell's - so
+	// the PATH scan above misses it on a normal Windows shell.
 	const fallbacks = [
 		'C:/Program Files/Git/mingw64/bin/pdftotext.exe',
 		'C:/Program Files (x86)/Git/mingw64/bin/pdftotext.exe'
@@ -96,7 +84,7 @@ function resolvePdftotext() {
 }
 const PDFTOTEXT = resolvePdftotext();
 
-/** pdfjs (our extractor, A2-D2): captured bytes -> per-page text items -> the pure assemblePdfText. */
+/** pdfjs extract: captured bytes -> per-page text items -> the pure assemblePdfText. */
 async function extractPdfjs(bytes) {
 	const loadingTask = getDocument({ data: bytes, isEvalSupported: false, verbosity: 0 });
 	const doc = await loadingTask.promise;
@@ -114,7 +102,7 @@ async function extractPdfjs(bytes) {
 	return assemblePdfText(pages);
 }
 
-/** pdftotext (independent cross-check, A2-D6): raw text -> the SAME normalizeText, for a fair compare. */
+/** pdftotext (independent cross-check): raw text -> the same normalizeText, for a fair compare. */
 function extractPdftotext(path) {
 	const raw = execFileSync(PDFTOTEXT, ['-q', '-enc', 'UTF-8', path, '-'], {
 		encoding: 'utf8',
@@ -123,14 +111,8 @@ function extractPdftotext(path) {
 	return normalizeText(raw);
 }
 
-/** Pull the staged filename from an entry's terms_notes ("...File: <name>.pdf..."). */
-function stagedFileName(entry) {
-	const m = /File:\s*(\S+\.pdf)/i.exec(entry.terms_notes ?? '');
-	return m ? m[1] : null;
-}
-
-/** Remove active/embeddable elements + off-origin asset elements from a linkedom document (privacy: the
- *  extracted artifact must emit zero off-origin requests if rendered). Same-origin + relative assets stay. */
+/** Remove active/embeddable elements + off-origin asset elements from a linkedom document, so the extracted
+ *  artifact emits zero off-origin requests if rendered. Same-origin + relative assets stay. */
 function sanitizeDocument(document, pageOrigin) {
 	for (const el of document.querySelectorAll('script, iframe, object, embed, noscript'))
 		el.remove();
@@ -146,7 +128,7 @@ function sanitizeDocument(document, pageOrigin) {
 	}
 }
 
-/** linkedom + Readability extract (A2-D3): parse -> sanitize -> main article -> off-origin assert -> shape. */
+/** linkedom + Readability extract: parse -> sanitize -> main article -> off-origin assert -> shape. */
 function extractHtml(rawHtml, pageOrigin) {
 	const { document } = parseHTML(rawHtml);
 	sanitizeDocument(document, pageOrigin); // strip scripts/embeds + off-origin assets so the article is clean
@@ -154,22 +136,21 @@ function extractHtml(rawHtml, pageOrigin) {
 	if (!article || !article.textContent || article.textContent.trim().length === 0)
 		throw new Error('E_INGEST_HTML_NO_ARTICLE');
 	const text = article.textContent;
-	// Success-Charter HARD GATE: zero off-origin asset URLs in the EXTRACTED artifact (the text we ship). The
-	// raw page's own analytics/RUM (e.g. Datadog) lives in the byte-exact audit copy only - never served
-	// (A2-D5 / A1-D2 served:false) - so it is not the check surface. The shipped text is plain prose, so this
-	// is a defense-in-depth tripwire against extraction ever embedding raw asset markup.
+	// Hard gate: zero off-origin asset URLs in the extracted text we ship. The raw page's own trackers live
+	// only in the audit copy (never served), so the shipped prose stays a defense-in-depth tripwire against
+	// extraction ever embedding raw asset markup.
 	const offOrigin = findOffOriginUrls(text, pageOrigin);
 	if (offOrigin.length > 0) {
 		console.error(`    off-origin assets in extracted text: ${offOrigin.slice(0, 8).join(' | ')}`);
 		throw new Error('E_INGEST_HTML_OFF_ORIGIN');
 	}
-	// FLAG (A4 retrieval eval): Readability's `.textContent` runs inline elements together at structural
-	// boundaries ("disabilityPension", "page.Use") - core sentence text is correctly spaced, only link/list/
-	// heading seams are affected. Refine the extractor here if it measurably hurts recall.
+	// Known: Readability's `.textContent` runs inline elements together at structural seams
+	// ("disabilityPension", "page.Use") - sentence text is correctly spaced, only link/list/heading seams.
+	// Refine here if it measurably hurts recall.
 	return shapeHtmlExtraction(text);
 }
 
-/** Honor robots.txt (master spec 8.5). Unreachable robots = allow (nothing to honor). Rate-limited fetch. */
+/** Honor robots.txt. Unreachable robots = allow (nothing to honor). Rate-limited fetch. */
 async function robotsAllows(origin, pathname) {
 	await limiter.acquire();
 	try {
@@ -182,8 +163,8 @@ async function robotsAllows(origin, pathname) {
 }
 
 /** Shared finisher for every HTML capture method (fetch / headless / manual): audit copy + extract + write
- *  the per-source extracted JSON. `bytes` = the captured bytes (the audit copy); `rawHtml` = those bytes as
- *  text for extraction; `method` is recorded for provenance. */
+ *  the per-source extracted JSON. `bytes` = the captured bytes; `rawHtml` = those bytes as text for
+ *  extraction; `method` is recorded for provenance. */
 async function writeHtmlArtifacts(entry, origin, bytes, rawHtml, method) {
 	const record = await auditCopyRecord(bytes, 'html');
 	if (!existsSync(record.capturedPath)) writeFileSync(record.capturedPath, bytes);
@@ -220,8 +201,8 @@ async function captureHtml(entry) {
 	return writeHtmlArtifacts(entry, origin, bytes, new TextDecoder('utf-8').decode(bytes), 'fetch');
 }
 
-/** Headless HTML capture (A2-D4): a real browser renders a page that blocked the plain fetch. The rendered
- *  DOM is the audit copy (the raw HTML is a bot-blocked shell). Shares one browser instance across sources. */
+/** Headless HTML capture: a real browser renders a page that blocked the plain fetch. The rendered DOM is the
+ *  audit copy (the raw HTML is a bot-blocked shell). Shares one browser instance across sources. */
 async function captureHtmlHeadless(entry, browser) {
 	const pageUrl = new URL(entry.url);
 	const origin = pageUrl.origin;
@@ -246,21 +227,31 @@ async function captureHtmlHeadless(entry, browser) {
 	}
 }
 
-/** Manual HTML capture (A2-D4 last resort): ingest a human-saved page HTML for an Akamai-blocked source.
- *  Throws E_INGEST_MANUAL_HTML_MISSING (handled with on-screen instructions) if the file is not present. */
+/** Manual HTML capture (last resort): ingest a human-saved page HTML for an Akamai-blocked source. Throws
+ *  E_INGEST_MANUAL_HTML_MISSING (handled with on-screen instructions) if the file is absent. */
 async function captureHtmlManual(entry) {
 	const file = join(MANUAL_HTML_DIR, `${entry.source_id}.html`);
 	if (!existsSync(file)) throw new Error('E_INGEST_MANUAL_HTML_MISSING');
+	const pageUrl = new URL(entry.url);
+	// Honor robots.txt even for a manually-saved source, so robots_allowed reflects a real check (unreachable
+	// robots.txt -> allowed = "nothing to honor"); keeps the fail-closed-on-disallow invariant on every path.
+	if (!(await robotsAllows(pageUrl.origin, pageUrl.pathname)))
+		throw new Error('E_INGEST_ROBOTS_DISALLOWED');
 	const bytes = new Uint8Array(readFileSync(file));
-	const origin = new URL(entry.url).origin;
-	return writeHtmlArtifacts(entry, origin, bytes, new TextDecoder('utf-8').decode(bytes), 'manual');
+	return writeHtmlArtifacts(
+		entry,
+		pageUrl.origin,
+		bytes,
+		new TextDecoder('utf-8').decode(bytes),
+		'manual'
+	);
 }
 
-/** PDF stage: per source, capture (hash + audit copy) + pdfjs extract + the A2-D6 fidelity cross-check. */
+/** PDF stage: per source, capture (hash + audit copy) + pdfjs extract + the fidelity cross-check. */
 async function runPdfStage(pdfs) {
 	console.log('='.repeat(60));
 	console.log(
-		`A2 INGEST - PDF stage  (${pdfs.length} sources, fidelity threshold ${FIDELITY_THRESHOLD})`
+		`INGEST - PDF stage  (${pdfs.length} sources, fidelity threshold ${FIDELITY_THRESHOLD})`
 	);
 	console.log(`staging: ${STAGING_DIR}`);
 	console.log('='.repeat(60));
@@ -268,8 +259,12 @@ async function runPdfStage(pdfs) {
 	const results = [];
 	for (const entry of pdfs) {
 		try {
-			const file = stagedFileName(entry);
+			const file = stagedFileName(entry.terms_notes);
 			if (!file) throw new Error('E_INGEST_NO_FILE_REF');
+			// The staged name comes from our registry's terms_notes but must never contain a path separator
+			// / '..' that could escape STAGING_DIR.
+			if (file.includes('/') || file.includes('\\') || file.includes('..'))
+				throw new Error('E_INGEST_BAD_STAGED_NAME');
 			const srcPath = join(STAGING_DIR, file);
 			if (!existsSync(srcPath)) throw new Error('E_INGEST_STAGED_MISSING');
 
@@ -279,6 +274,16 @@ async function runPdfStage(pdfs) {
 			if (!existsSync(record.capturedPath)) writeFileSync(record.capturedPath, bytes);
 
 			const ours = await extractPdfjs(bytes);
+			// Parity smoke (sampled): pdfjs must be deterministic - the first PDF is re-extracted and must
+			// round-trip byte-identical, else a pdfjs nondeterminism / version drift would silently invalidate
+			// the downstream anchors. Fail closed. (Cross-version drift is also caught by the cross-tool
+			// fidelity check + the per-ingest content review.)
+			if (results.length === 0) {
+				// pdfjs transfers (detaches) the input buffer, so re-read fresh bytes for the re-extract.
+				const reExtract = await extractPdfjs(new Uint8Array(readFileSync(srcPath)));
+				if (reExtract.normalizedText !== ours.normalizedText)
+					throw new Error('E_INGEST_PDF_PARITY_DRIFT');
+			}
 			const poppler = extractPdftotext(srcPath);
 			const similarity = trigramSimilarity(ours.normalizedText, poppler);
 			const sanity = checkExtractionSanity(ours.normalizedText, { pages: ours.blocks.length });
@@ -307,16 +312,15 @@ async function runPdfStage(pdfs) {
 					`(${ours.blocks.length}p, ${ours.extractionMode}${sanity.ok ? '' : ', ' + sanity.issues.join('/')})`
 			);
 		} catch (err) {
-			// Fail-closed (A2): never silently drop a source - print the id + reason and stop the build.
+			// Fail closed: never silently drop a source - print the id + reason and stop the build.
 			console.error(`[FAIL] ${entry.source_id}: ${err.message}`);
 			process.exit(1);
 		}
 	}
 
-	// Distribution -> the A2-D6 threshold sits just below the clean cluster.
 	const sims = results.map((r) => r.similarity).sort((a, b) => a - b);
 	console.log('\n' + '='.repeat(60));
-	console.log('A2-D6 FIDELITY DISTRIBUTION (sorted ascending)');
+	console.log('FIDELITY DISTRIBUTION (sorted ascending)');
 	console.log('='.repeat(60));
 	for (const r of [...results].sort((a, b) => a.similarity - b.similarity)) {
 		console.log(`    ${r.similarity.toFixed(4)}  ${r.pass ? '    ' : 'FLAG'}  ${r.id}`);
@@ -332,7 +336,7 @@ async function runPdfStage(pdfs) {
 /** HTML fetch stage: per source, robots -> rate-limited UA fetch -> audit copy -> linkedom/Readability. */
 async function runHtmlStage(htmls) {
 	console.log('\n' + '='.repeat(60));
-	console.log(`A2 INGEST - HTML stage  (${htmls.length} sources)`);
+	console.log(`INGEST - HTML stage  (${htmls.length} sources)`);
 	console.log('='.repeat(60));
 
 	for (const entry of htmls) {
@@ -340,7 +344,7 @@ async function runHtmlStage(htmls) {
 			const r = await captureHtml(entry);
 			console.log(`PASS  ${r.id}  (${r.chars.toLocaleString()} chars)`);
 		} catch (err) {
-			// Fail-closed (A2): never silently drop a source - print the id + reason and stop the build.
+			// Fail closed: never silently drop a source - print the id + reason and stop the build.
 			console.error(`[FAIL] ${entry.source_id}: ${err.message}`);
 			process.exit(1);
 		}
@@ -348,12 +352,10 @@ async function runHtmlStage(htmls) {
 	console.log(`\n    extracted -> ${EXTRACTED_DIR}/  captures -> ${CAPTURES_DIR}/`);
 }
 
-/** Headless stage (A2-D4): sources that blocked the plain fetch but a real browser can still render. */
+/** Headless stage: sources that blocked the plain fetch but a real browser can still render. */
 async function runHeadlessStage(sources) {
 	console.log('\n' + '='.repeat(60));
-	console.log(
-		`A2 INGEST - HTML headless stage  (${sources.length} sources, render via Playwright)`
-	);
+	console.log(`INGEST - HTML headless stage  (${sources.length} sources, render via Playwright)`);
 	console.log('='.repeat(60));
 	const browser = await chromium.launch({ headless: true });
 	try {
@@ -373,14 +375,12 @@ async function runHeadlessStage(sources) {
 	}
 }
 
-/** Manual stage (A2-D4 last resort): Akamai-blocked sources captured from human-saved HTML. A missing file is
- *  NOT a crash - it prints the exact to-do (open URL -> save HTML to MANUAL_HTML_DIR) then fails closed so the
+/** Manual stage (last resort): Akamai-blocked sources captured from human-saved HTML. A missing file is NOT a
+ *  crash - it prints the exact to-do (open URL -> save HTML to MANUAL_HTML_DIR) then fails closed so the
  *  source is never silently dropped. Full step-by-step instructions live in MANUAL_HTML_DIR/README.txt. */
 async function runManualStage(sources) {
 	console.log('\n' + '='.repeat(60));
-	console.log(
-		`A2 INGEST - HTML manual stage  (${sources.length} Akamai-blocked; human-saved HTML)`
-	);
+	console.log(`INGEST - HTML manual stage  (${sources.length} Akamai-blocked; human-saved HTML)`);
 	console.log('='.repeat(60));
 	const missing = [];
 	for (const entry of sources) {

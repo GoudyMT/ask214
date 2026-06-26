@@ -9,10 +9,11 @@ function wordTrigrams(text: string): Set<string> {
 }
 
 /**
- * Word-trigram Jaccard similarity (0-1) - the A2-D6 cross-tool agreement metric. Two extractions of the
- * same PDF (pdfjs vs poppler) with high overlap means both tools independently agree on the content AND
- * local word order (a strong fidelity signal); low overlap means they disagree (dropped / garbled /
- * reordered) -> flag for human review. Whitespace-independent (operates on words). Pure.
+ * Word-trigram Jaccard similarity (0-1) used as a cross-tool agreement metric. Two extractions of the
+ * same PDF (e.g. pdfjs vs poppler) with high overlap means both tools independently agree on the content
+ * AND local word order (a strong fidelity signal); low overlap means they disagree (dropped / garbled /
+ * reordered) and the source should be flagged for human review. Whitespace-independent (operates on
+ * words). Pure.
  */
 export function trigramSimilarity(a: string, b: string): number {
 	const ga = wordTrigrams(a);

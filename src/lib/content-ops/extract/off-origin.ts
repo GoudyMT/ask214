@@ -1,11 +1,10 @@
 const SRC_RE = /\bsrc\s*=\s*["']([^"']+)["']/gi;
 
 /**
- * PURE off-origin asset detector (A2-D3 / spec section 6): scans an HTML string for resource-loading
- * `src=` URLs (img / script / iframe / audio / video / source) whose origin differs from the page's.
- * Navigation `<a href>` links are intentionally NOT flagged - an off-origin .gov link is wanted, not an
- * asset load. The build script asserts this returns [] on the sanitized audit copy (it must emit no
- * network request if rendered). Same-origin + relative URLs are allowed.
+ * Scans an HTML string for resource-loading `src=` URLs (img / script / iframe / audio / video / source)
+ * whose origin differs from the page's. Navigation `<a href>` links are intentionally NOT flagged - an
+ * off-origin .gov link is wanted, not an asset load. Used to assert the sanitized audit copy emits no
+ * network request if rendered. Same-origin + relative URLs are allowed. Pure.
  */
 export function findOffOriginUrls(html: string, pageOrigin: string): string[] {
 	const out: string[] = [];

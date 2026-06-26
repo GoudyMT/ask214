@@ -8,11 +8,11 @@ export type IncomingBySourceId = Record<
 >;
 
 /**
- * Stamp the A2 capture fields onto matching `sources.yaml` entries WITHOUT disturbing the file's comments
+ * Stamp the capture fields onto matching `sources.yaml` entries WITHOUT disturbing the file's comments
  * (the legal-record header + any per-entry notes). It edits the parsed Document's nodes in place and
- * re-serializes, instead of parse -> object -> stringify, which would drop every comment. Idempotent via
- * `resolveBackfill`: re-running with unchanged hashes is a byte-for-byte no-op. `now` is injected so the
- * stamp is deterministic. Pure (text in, text out); the orchestrator owns the IO + the fail-closed gates.
+ * re-serializes, instead of parse -> object -> stringify, which would drop every comment. Idempotent:
+ * re-running with unchanged hashes is a byte-for-byte no-op. `now` is injected so the stamp is deterministic.
+ * Pure (text in, text out); the caller owns the IO + the fail-closed gates.
  */
 export function stampSourcesYaml(
 	yamlText: string,

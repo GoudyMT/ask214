@@ -6,8 +6,8 @@ export type BackfillInput = {
 };
 
 /**
- * Return a copy of a `sources.yaml` entry with the A2 capture fields populated (A2-D5). Pure - the input
- * is not mutated and the actual YAML write is the build script's job; existing fields are preserved.
+ * Return a copy of a `sources.yaml` entry with the capture fields populated. Pure - the input is not
+ * mutated and the actual YAML write is the caller's job; existing fields are preserved.
  */
 export function backfillCaptureFields(
 	entry: Record<string, unknown>,
@@ -25,15 +25,15 @@ export function backfillCaptureFields(
 /** The source entry's current capture state, read from `sources.yaml` (values are `unknown` until checked). */
 export type ExistingCaptureState = { content_hash?: unknown; captured_at?: unknown };
 
-/** A fresh capture result for one source: the content hash (from extracted/<id>.json) + its content type. */
+/** A fresh capture result for one source: the content hash plus its content type. */
 export type IncomingCapture = { contentHash: string; contentType: 'pdf' | 'html' };
 
 /**
- * Resolve the four capture fields for one source, idempotently (A2-D5). `captured_at` refreshes to `now` only
+ * Resolve the four capture fields for one source, idempotently. `captured_at` refreshes to `now` only
  * when the content changed - a new or different hash, or a prior partial backfill that left no timestamp; an
  * unchanged hash keeps its existing `captured_at`, so a re-run is a no-op. `captured_path` is the
- * content-addressed audit-copy path (identical to `auditCopyRecord`); `robots_allowed` is always true (a
- * disallowed source fails closed before capture, so anything with an artifact was allowed).
+ * content-addressed audit-copy path; `robots_allowed` is always true (a disallowed source fails closed
+ * before capture, so anything with an artifact was allowed).
  */
 export function resolveBackfill(
 	existing: ExistingCaptureState,

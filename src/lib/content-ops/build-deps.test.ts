@@ -2,11 +2,9 @@ import { describe, test, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-// The A2 build-only libs must NEVER be imported by a src/ runtime module: they execute only at build
-// time on dev/CI (in content-ops/capture-extract.mjs), so a runtime vuln in one of them cannot reach a
-// shipped user. Mirrors A1's `yaml` isolation. This guards against a future regression that pulls one
-// into the runtime surface.
-const BUILD_ONLY = ['pdfjs-dist', '@mozilla/readability', 'linkedom'];
+// The build-only libs must NEVER be imported by a src/ runtime module: they execute only at build time on
+// dev/CI (the content-ops/*.mjs scripts), so a runtime vuln in one of them cannot reach a shipped user.
+const BUILD_ONLY = ['pdfjs-dist', '@mozilla/readability', 'linkedom', 'yaml', 'playwright'];
 
 function tsFiles(dir: string): string[] {
 	const out: string[] = [];
@@ -24,8 +22,11 @@ describe('build-only dependency isolation', () => {
 		for (const file of tsFiles('src')) {
 			const text = readFileSync(file, 'utf8');
 			for (const dep of BUILD_ONLY) {
-				if (text.includes(`'${dep}'`) || text.includes(`"${dep}"`))
-					offenders.push(`${file} -> ${dep}`);
+				// Match the bare specifier OR a subpath import (dep followed by a closing quote or a '/'), so
+				// e.g. 'pdfjs-dist/legacy/build/pdf.mjs' is caught, not just 'pdfjs-dist'. (The deps carry no
+				// regex-special chars, so no escaping is needed.)
+				const re = new RegExp('[\'"]' + dep + '([\'"/])');
+				if (re.test(text)) offenders.push(`${file} -> ${dep}`);
 			}
 		}
 		expect(offenders).toEqual([]);

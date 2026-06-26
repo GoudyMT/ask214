@@ -1,9 +1,9 @@
 /**
- * Minimal robots.txt allow check (master spec 8.5: honor robots.txt always). Picks the group naming our
- * User-agent (substring match) else the `*` group, then applies the longest-matching path rule (an Allow
- * overrides a broader Disallow). Deliberately NOT a full RFC 9309 engine - our sources are direct-url
- * .gov/.mil pages; this covers their robots.txt without the complexity (YAGNI per A2-D1). The build
- * script records the result as `robots_allowed` and hard-stops a disallowed source.
+ * Minimal robots.txt allow check (honor robots.txt always). Picks the group whose name is a prefix of
+ * our product token (the UA before "/") else the `*` group, then applies the longest-matching path rule
+ * (an Allow overrides a broader Disallow). Deliberately NOT a full robots engine - our sources are
+ * direct-url .gov/.mil pages; this covers their robots.txt without the complexity. The build script
+ * records the result as `robots_allowed` and hard-stops a disallowed source.
  */
 
 type Rule = { allow: boolean; path: string };
@@ -32,8 +32,11 @@ function parse(robotsTxt: string): Map<string, Rule[]> {
 
 export function isPathAllowed(robotsTxt: string, userAgent: string, path: string): boolean {
 	const groups = parse(robotsTxt);
-	const ua = userAgent.toLowerCase();
-	const key = [...groups.keys()].find((k) => k !== '*' && ua.includes(k)) ?? '*';
+	// Match on the product token (the part before "/"), not the whole UA string - otherwise a robots group
+	// naming any substring of our UA comment (e.g. "contact" / "pending") could hijack the decision and flip
+	// a Disallow to allow (fail-open). A group matches when our product token starts with its name.
+	const product = (userAgent.toLowerCase().split('/')[0] ?? '').trim();
+	const key = [...groups.keys()].find((k) => k !== '*' && product.startsWith(k)) ?? '*';
 	const rules = groups.get(key) ?? [];
 	let decision = true;
 	let matchLen = -1;
