@@ -25,6 +25,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 36d4dda3fb262d42357b378fb9bd5e02c648957b4dd6671b06ee5caa74f0b551
+  captured_path: content-ops/captures/36d4dda3fb262d42357b378fb9bd5e02c648957b4dd6671b06ee5caa74f0b551.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_disability_file
   title: 'VA - How to File a VA Disability Claim'
@@ -42,6 +46,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: d59ecf10c9517c274396312a7b2bda4d4e8d5330e6ff9c2ffad750a0a5553a94
+  captured_path: content-ops/captures/d59ecf10c9517c274396312a7b2bda4d4e8d5330e6ff9c2ffad750a0a5553a94.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_health_care_apply
   title: 'VA - How to Apply for VA Health Care'
@@ -59,6 +67,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 4748840edabaf7a17338377c340c8f62f4a9b01b5a47a4fe21b17091d1b73868
+  captured_path: content-ops/captures/4748840edabaf7a17338377c340c8f62f4a9b01b5a47a4fe21b17091d1b73868.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_education_apply
   title: 'VA - How to Apply for VA Education Benefits'
@@ -76,6 +88,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 54d913c0a2255f2dcee35afd803ffb8030f07e95bc1ee28ec7ea7adc8f6f071b
+  captured_path: content-ops/captures/54d913c0a2255f2dcee35afd803ffb8030f07e95bc1ee28ec7ea7adc8f6f071b.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: dod_skillbridge
   title: 'DoW SkillBridge Program'
@@ -93,6 +109,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 6e616b38b59f1f67540526524fd1dc876c526fdbb206249fe5a76b8fa2de41b7
+  captured_path: content-ops/captures/6e616b38b59f1f67540526524fd1dc876c526fdbb206249fe5a76b8fa2de41b7.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 # --- A1 Task 9 (2026-06-21, Session 29): real v1.0 confident-PD source list ---
 # All WebFetch/search-verified live + federal-authored; Max-gated per document.
@@ -115,6 +135,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 70ca10a7594e84a1d9dfc90b9f8a2abd00e53b2d83a982a0bd69ed2e935777fc
+  captured_path: content-ops/captures/70ca10a7594e84a1d9dfc90b9f8a2abd00e53b2d83a982a0bd69ed2e935777fc.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_disability_evidence
   title: 'VA - Evidence Needed for Your Disability Claim'
@@ -132,6 +156,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: f5bca7e47a5abc9c7ce564db04a058d22af217b2ecbe9a029d7128fbab309d8c
+  captured_path: content-ops/captures/f5bca7e47a5abc9c7ce564db04a058d22af217b2ecbe9a029d7128fbab309d8c.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_health_eligibility
   title: 'VA - Eligibility for VA Health Care'
@@ -149,6 +177,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 333d76305150b20244a8a94cb2a02429f1872b8e3871dacd83a9f8b4135b3c70
+  captured_path: content-ops/captures/333d76305150b20244a8a94cb2a02429f1872b8e3871dacd83a9f8b4135b3c70.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_gi_bill_post911
   source_updated_date: '2026-05-12'
@@ -167,6 +199,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 92ca4c37477d3045a7f4574e8a538d0ca5522cfd64c6cbf1ca34535b5ee84500
+  captured_path: content-ops/captures/92ca4c37477d3045a7f4574e8a538d0ca5522cfd64c6cbf1ca34535b5ee84500.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_gi_bill_overview
   source_updated_date: '2024-11-29'
@@ -185,6 +221,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: a350594d85d514cbed0d88243a3ecd05e68418c3fe9987afe26a9b15eb730690
+  captured_path: content-ops/captures/a350594d85d514cbed0d88243a3ecd05e68418c3fe9987afe26a9b15eb730690.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_gi_bill_transfer
   title: 'VA - Transfer Your Post-9/11 GI Bill Benefits'
@@ -202,6 +242,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: ddb3776210934e7caa7567460c651f0529f7c2f23dc080e9feaf01d1a0da7d55
+  captured_path: content-ops/captures/ddb3776210934e7caa7567460c651f0529f7c2f23dc080e9feaf01d1a0da7d55.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_vgli
   title: "VA - Veterans' Group Life Insurance (VGLI)"
@@ -219,6 +263,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: a976245e0c9c0c483bf9ad250e4f0b43bfe91212174f7749c311785a26d97a7d
+  captured_path: content-ops/captures/a976245e0c9c0c483bf9ad250e4f0b43bfe91212174f7749c311785a26d97a7d.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_home_loan_coe
   source_updated_date: '2025-05-16'
@@ -237,6 +285,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 60dba92e0a837e950ca6b4638975bfb3a51dfef36fe9ca307c3d8152a2de6145
+  captured_path: content-ops/captures/60dba92e0a837e950ca6b4638975bfb3a51dfef36fe9ca307c3d8152a2de6145.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: va_dd214
   source_updated_date: '2026-01-13'
@@ -255,6 +307,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 700edc5e2a9c06674018418c1d60ca6b470daa44b5f4a259d0bbbb589abcec71
+  captured_path: content-ops/captures/700edc5e2a9c06674018418c1d60ca6b470daa44b5f4a259d0bbbb589abcec71.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: mos_separation
   title: 'DoW - Military Separation Planning and Support (Military OneSource)'
@@ -272,6 +328,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 32500b784a03d6c86a361a0984a02d3820501d4f8b15c235dc6097e33e73329e
+  captured_path: content-ops/captures/32500b784a03d6c86a361a0984a02d3820501d4f8b15c235dc6097e33e73329e.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: dol_tap_overview
   title: 'DOL - Transition Assistance Program (TAP) Overview'
@@ -289,6 +349,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 030a3aa47440ba6929fcefc2a4a3b015172524fee21bf6c70c8ee5cf9efd7314
+  captured_path: content-ops/captures/030a3aa47440ba6929fcefc2a4a3b015172524fee21bf6c70c8ee5cf9efd7314.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tsp_separation
   title: 'TSP - Leaving the Uniformed Services'
@@ -306,40 +370,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
-
-- source_id: navy_separation
-  title: 'Navy - Enlisted Separations (MyNavyHR)'
-  url: 'https://www.mynavyhr.navy.mil/Career-Management/Personnel-Conduct-Sep/Enlisted-Separations/'
-  origin: 'Navy (MyNavyHR)'
-  copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
-  content_type: html
-  license_notes: '17 USC 105 - US Government work (Department of the Navy).'
-  terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public mynavyhr.navy.mil page; host blocks automated fetch - confirm no-CAC + content depth (HTML landing vs MILPERSMAN PDFs) at A2 capture; app is unofficial, not endorsed by the Navy.'
-  access: open
-  reviewed_by: max
-  reviewed_date: 2026-06-21
-  scrape_method: direct_url
-  update_check: monthly
-  corpus_version_first_included: '1.0'
-
-- source_id: dfas_final_pay
-  title: 'DFAS - Final Military Pay at Separation'
-  url: 'https://www.dfas.mil/militaryseparations/FinalPay/'
-  origin: 'DFAS (DoW)'
-  copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
-  content_type: html
-  license_notes: '17 USC 105 - US Government work (DFAS/DoW).'
-  terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public dfas.mil page; host blocks automated fetch - body confirmed at A2 capture; app is unofficial, not endorsed by DFAS/DoW.'
-  access: open
-  reviewed_by: max
-  reviewed_date: 2026-06-21
-  scrape_method: direct_url
-  update_check: monthly
-  corpus_version_first_included: '1.0'
+  content_hash: d5d3f5c61e891ff7b2a18945425a36c4d4e0f9f7d2d3e700a03484921f0144cf
+  captured_path: content-ops/captures/d5d3f5c61e891ff7b2a18945425a36c4d4e0f9f7d2d3e700a03484921f0144cf.html
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 # --- A1 Task 9 (2026-06-21, Session 29): TAP curriculum PDFs (tapevents.mil) ---
 # Federal-authored TAP participant guides + module resource guides. S29 legal scan
@@ -374,6 +408,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 9c0baacc06cf18482f21bd086bdc3f25a37c5c5dad5ccbe9797ea4e7e9a3a742
+  captured_path: content-ops/captures/9c0baacc06cf18482f21bd086bdc3f25a37c5c5dad5ccbe9797ea4e7e9a3a742.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_financial_planning
   source_updated_date: '2026-04-15'
@@ -393,6 +431,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: ac30f8e97336fdbb0a1b4673d79a6a4d28c0140d7315ac1cad093318fdf65b06
+  captured_path: content-ops/captures/ac30f8e97336fdbb0a1b4673d79a6a4d28c0140d7315ac1cad093318fdf65b06.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_pre_separation_brief
   source_updated_date: '2026-01-29'
@@ -412,6 +454,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: ac120dd1bb3fc8377ad5fa0e9c08944872f75680e319c1f840f70556277ece34
+  captured_path: content-ops/captures/ac120dd1bb3fc8377ad5fa0e9c08944872f75680e319c1f840f70556277ece34.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_managing_transition
   source_updated_date: '2026-04-15'
@@ -431,6 +477,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 581dd6dd275f79d8fbbf1d4c9c2cd15d75a8126b53b3b969721c37e4475e9b15
+  captured_path: content-ops/captures/581dd6dd275f79d8fbbf1d4c9c2cd15d75a8126b53b3b969721c37e4475e9b15.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_moc_crosswalk
   source_updated_date: '2026-05-12'
@@ -450,6 +500,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 03a55a88dd92f3a15afbf8dc62cb118d48476306f95eae07a745c0bffa0051b4
+  captured_path: content-ops/captures/03a55a88dd92f3a15afbf8dc62cb118d48476306f95eae07a745c0bffa0051b4.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_managing_education
   source_updated_date: '2026-04-15'
@@ -469,6 +523,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: c088ac54a71f23eec04c428104a49580781090bba88063a45193240f405ed290
+  captured_path: content-ops/captures/c088ac54a71f23eec04c428104a49580781090bba88063a45193240f405ed290.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_dol_efct
   source_updated_date: '2025-03-24'
@@ -488,6 +546,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 1a95b1b978d736b19f71df5731dbf4d25ebe4c82b7d9a780639f151f3c5de973
+  captured_path: content-ops/captures/1a95b1b978d736b19f71df5731dbf4d25ebe4c82b7d9a780639f151f3c5de973.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_dol_employment_workshop
   source_updated_date: '2026-04-15'
@@ -507,6 +569,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: cdc1a520f7331f2e327851b9fce4ff428ec5286f33ff274296cbbc2dee86bc54
+  captured_path: content-ops/captures/cdc1a520f7331f2e327851b9fce4ff428ec5286f33ff274296cbbc2dee86bc54.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_va_womens_health
   source_updated_date: '2025-12-04'
@@ -526,6 +592,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: d0182e0f1dd0fea6c96fbea92af617fe607380fababbb9e872fa694744cee57a
+  captured_path: content-ops/captures/d0182e0f1dd0fea6c96fbea92af617fe607380fababbb9e872fa694744cee57a.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_interagency_website_guide
   source_updated_date: '2026-04-15'
@@ -545,6 +615,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 452b32242a2e477258b801dd41bd4481e8e9fed6c16ed30b7d8e3546646ae10c
+  captured_path: content-ops/captures/452b32242a2e477258b801dd41bd4481e8e9fed6c16ed30b7d8e3546646ae10c.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_va101
   source_updated_date: '2025-12-04'
@@ -564,6 +638,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: be4487f5a73ff066f2216a4d682527893cbd8dfc80b1bbb19bf3948ab5442326
+  captured_path: content-ops/captures/be4487f5a73ff066f2216a4d682527893cbd8dfc80b1bbb19bf3948ab5442326.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_va_disability_comp
   source_updated_date: '2025-12-04'
@@ -583,6 +661,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 4bf49a25c3c2cbc79a1c2f3db079c8ffccf1c710db43ae31c05128cc268844c7
+  captured_path: content-ops/captures/4bf49a25c3c2cbc79a1c2f3db079c8ffccf1c710db43ae31c05128cc268844c7.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_va_education_benefits
   source_updated_date: '2025-12-04'
@@ -602,6 +684,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: df209bc37aa15ab21ef79c8e7b369653d82d0fc22464de5555973e1b4a8cc325
+  captured_path: content-ops/captures/df209bc37aa15ab21ef79c8e7b369653d82d0fc22464de5555973e1b4a8cc325.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_va_education_spouses
   source_updated_date: '2025-05-21'
@@ -621,6 +707,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 9c7e290f81268649e9411ad68320840bd6ffcaba3065921a24ae8f98ee611fb6
+  captured_path: content-ops/captures/9c7e290f81268649e9411ad68320840bd6ffcaba3065921a24ae8f98ee611fb6.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_va_home_loan
   source_updated_date: '2025-12-04'
@@ -640,6 +730,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 102d6fef9bdb4a7fd2641ecddb0171b79ccf0fe9cf7e25e2497c7ac0ac7337ca
+  captured_path: content-ops/captures/102d6fef9bdb4a7fd2641ecddb0171b79ccf0fe9cf7e25e2497c7ac0ac7337ca.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_va_life_insurance
   source_updated_date: '2025-05-21'
@@ -659,6 +753,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: dbeb7777d2b7d7c26d28f52e380a07c706b779553e92fb5b82cb24a8d50f4eb9
+  captured_path: content-ops/captures/dbeb7777d2b7d7c26d28f52e380a07c706b779553e92fb5b82cb24a8d50f4eb9.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_mental_health_families
   source_updated_date: '2025-03-20'
@@ -678,6 +776,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 2d4b9d96a1ceba48137857279d4341b60dfa174aebe1b70989799ace02a0338a
+  captured_path: content-ops/captures/2d4b9d96a1ceba48137857279d4341b60dfa174aebe1b70989799ace02a0338a.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_reserve_dual_pay
   source_updated_date: '2025-12-04'
@@ -697,6 +799,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 7dede06d7c8f8dfd6a9439364c23959013267a1bad20074252095ec71f407c1f
+  captured_path: content-ops/captures/7dede06d7c8f8dfd6a9439364c23959013267a1bad20074252095ec71f407c1f.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_vet_centers
   source_updated_date: '2023-01-26'
@@ -716,6 +822,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: f1fde799f74b911d9d565d5568dd589ca415ccc4d5fa499a2beed8dfdcead9cd
+  captured_path: content-ops/captures/f1fde799f74b911d9d565d5568dd589ca415ccc4d5fa499a2beed8dfdcead9cd.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_other_than_honorable
   source_updated_date: '2025-12-04'
@@ -735,6 +845,10 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 7c5827752a10e1f91a9e3223ab214853b7435b89c7ed4161ebbae79ecee32aab
+  captured_path: content-ops/captures/7c5827752a10e1f91a9e3223ab214853b7435b89c7ed4161ebbae79ecee32aab.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
 
 - source_id: tap_va_reserve_natl_guard
   source_updated_date: '2025-12-29'
@@ -754,3 +868,7 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
+  content_hash: 12c4f462f29dab043c9085ccc38a76dfba17d0a78a00aec957386807670a7f62
+  captured_path: content-ops/captures/12c4f462f29dab043c9085ccc38a76dfba17d0a78a00aec957386807670a7f62.pdf
+  captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true

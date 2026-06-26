@@ -4,6 +4,9 @@
 	"version": "0.0.1",
 	"type": "module",
 	"packageManager": "pnpm@11.2.2",
+	"engines": {
+		"node": ">=22.13"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -13,6 +16,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"check:bundle": "size-limit",
 		"validate:sources": "tsx content-ops/validate-sources.mjs",
+		"ingest": "tsx content-ops/capture-extract.mjs",
+		"backfill:sources": "tsx content-ops/backfill-sources.mjs",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",
@@ -53,6 +58,7 @@
 		"@eslint/compat": "^2.0.4",
 		"@eslint/js": "^10.0.1",
 		"@lhci/cli": "^0.15.1",
+		"@mozilla/readability": "^0.6.0",
 		"@playwright/test": "^1.59.1",
 		"@size-limit/file": "^12.1.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.8",
@@ -65,7 +71,9 @@
 		"eslint-plugin-svelte": "^3.19.0",
 		"globals": "^17.4.0",
 		"husky": "^9.1.7",
+		"linkedom": "^0.18.12",
 		"lint-staged": "^17.0.7",
+		"pdfjs-dist": "^6.0.227",
 		"playwright": "^1.59.1",
 		"prettier": "^3.8.4",
 		"prettier-plugin-svelte": "^4.1.0",
