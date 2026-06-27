@@ -4,8 +4,8 @@ import { normalize } from './search';
 
 /**
  * Decode + validate a shipped corpus (manifest + flat Float32 embeddings blob) into the in-memory
- * Corpus `search` operates on (spec section 5). Pure: receives already-materialized inputs, does no
- * IO (transport, gzip, integrity-hashing, IndexedDB, CDN are all cycle C's job).
+ * Corpus `search` operates on. Pure: receives already-materialized inputs, does no
+ * IO (transport, gzip, integrity-hashing, IndexedDB, CDN are all the Ask feature's job).
  *
  * Gate order (each throws a typed error with an opaque code - mirrors decodeTimelineState):
  *   1. version (CorpusVersionError)   - a v1.1 corpus on a cached v1.0 client must not silently run
@@ -16,7 +16,7 @@ import { normalize } from './search';
  *   6. per-chunk slice + unit-normalize; a zero embedding throws E_CORPUS_ZERO_VECTOR (bad vector)
  */
 
-/** The corpus generation this client build supports. A different version throws (spec 8.6). */
+/** The corpus generation this client build supports. A different version throws. */
 export const ACCEPTED_CORPUS_VERSION = '1.0';
 
 export function decodeCorpus(

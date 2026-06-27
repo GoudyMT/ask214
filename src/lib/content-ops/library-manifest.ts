@@ -1,5 +1,5 @@
 /**
- * The docs-library manifest type + builder (A1-D4, producer-side). Distinct from the shipped
+ * The docs-library manifest type + builder (producer-side). Distinct from the shipped
  * CorpusManifest (chunks): this is the version/integrity index for the CAPTURED ORIGINALS, served
  * same-origin and (later) consumed by the runtime sync cycle. Pure builder; no IO.
  */

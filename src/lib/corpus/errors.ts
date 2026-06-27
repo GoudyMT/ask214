@@ -10,7 +10,7 @@ export class CorpusFormatError extends Error {
 	}
 }
 
-/** The shipped corpus generation is not one this client build supports (spec section 8.6). */
+/** The shipped corpus generation is not one this client build supports. */
 export class CorpusVersionError extends Error {
 	constructor(message: string) {
 		super(message);

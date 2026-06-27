@@ -1,6 +1,6 @@
 // Run from the repo root: `npx tsx content-ops/run-eval.mjs` (after the embed script has written the
 // artifact). Loads the shipped corpus, embeds each eval query with MiniLM, ranks chunks via B.search,
-// and reports recall@5 + MRR (+ per-query hits) against the acceptance gate (spec section 2.2).
+// and reports recall@5 + MRR (+ per-query hits) against the acceptance gate.
 import { readFileSync } from 'node:fs';
 import { pipeline } from '@huggingface/transformers';
 import { decodeCorpus, search } from '../src/lib/corpus/index.ts';
@@ -21,11 +21,11 @@ const queries = JSON.parse(readFileSync('src/lib/ask/eval/queries.json', 'utf8')
 
 if (corpus.chunks.length < 50) {
 	console.warn(
-		`[WARN] corpus is small (${corpus.chunks.length} chunks) - recall@5 is near-automatic at this size; recall@5, MRR, and MIN_SCORE MUST be recalibrated as the corpus scales (spec section 15 #1).`
+		`[WARN] corpus is small (${corpus.chunks.length} chunks) - recall@5 is near-automatic at this size; recall@5, MRR, and MIN_SCORE MUST be recalibrated as the corpus scales.`
 	);
 }
 
-// q8 to match the corpus embed + the browser worker - same precision -> comparable vectors (ADR-014).
+// q8 to match the corpus embed + the browser worker - same precision -> comparable vectors.
 const extractor = await pipeline('feature-extraction', MODEL_REPO, { dtype: 'q8' });
 const ranked = [];
 const scored = []; // full RetrievalResult[] per query (id + score) for the MIN_SCORE calibration dump
@@ -49,7 +49,7 @@ console.log(
 	`\nrecall@${K}=${r5.toFixed(3)}  MRR=${mrr.toFixed(3)}  (gate: recall@5>=0.8, MRR>=0.6)`
 );
 
-// --- MIN_SCORE calibration (spec section 9): the store drops hits below a cosine cutoff. Pick it
+// --- MIN_SCORE calibration: the store drops hits below a cosine cutoff. Pick it
 // below the lowest RELEVANT (expected) score so no valid lead is dropped, ideally above the
 // non-relevant tail so weak matches collapse. Prints the real per-query distribution to choose from.
 const relevantScores = [];
@@ -78,7 +78,7 @@ console.log(
 );
 
 // Re-gate: MIN_SCORE must stay safely below the weakest valid (relevant) lead, or it starts dropping real
-// answers. If the margin closes (corpus growth compresses scores), fail loudly -> recalibrate (spec 15 #1).
+// answers. If the margin closes (corpus growth compresses scores), fail loudly -> recalibrate.
 if (minRelevant <= MIN_SCORE + 0.05) {
 	console.error(
 		`[FAIL] weakest relevant score ${minRelevant.toFixed(3)} is within 0.05 of MIN_SCORE ${MIN_SCORE} - recalibrate the threshold.`

@@ -22,9 +22,9 @@ function countOccurrences(haystack: string, needle: string): number {
 }
 
 /**
- * Build-time corpus <-> registry cross-reference (A1; CI gate from A3 onward). Pure: takes the built
+ * Build-time corpus <-> registry cross-reference (the CI gate once chunks exist). Pure: takes the built
  * chunks, the parsed registry, and a sourceId -> extracted-text map. Verifies legal-cleanliness (every
- * sourceId resolves to a non-excluded entry), id hygiene (unique + the A1-D6 pattern), and citation
+ * sourceId resolves to a non-excluded entry), id hygiene (unique + the canonical chunk-id format), and citation
  * integrity (every anchor UNIQUELY resolves as a normalized substring of its source). Structured result.
  */
 export function validateCorpusAgainstRegistry(

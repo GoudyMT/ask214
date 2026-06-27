@@ -2,7 +2,7 @@ import { CorpusFormatError } from './errors';
 import type { Corpus, RetrievalResult } from './types';
 
 /**
- * Vector math + cosine top-k search for the retrieval core (spec sections 6). Pure + deterministic.
+ * Vector math + cosine top-k search for the retrieval core. Pure + deterministic.
  * Owns `normalize` (the codec reuses it to pre-normalize corpus embeddings).
  */
 

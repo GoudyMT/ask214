@@ -1,7 +1,7 @@
 // Run from the repo root: `npx tsx content-ops/embed-sample-corpus.mjs` (downloads MiniLM on first run).
 // Embeds the sample chunks with the SAME model the browser embeds queries with, then writes the
 // artifact B.decodeCorpus reads. Transformers.js v3 (@huggingface/transformers). Confirm the pipeline
-// API against the huggingface-skills:transformers-js skill if the first run errors.
+// API against the Transformers.js docs if the first run errors.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pipeline } from '@huggingface/transformers';
 import { buildCorpusArtifact } from '../src/lib/ask/corpus-artifact.ts';
@@ -12,7 +12,7 @@ const VERSION = '1.0';
 
 const chunks = JSON.parse(readFileSync('content/sample-corpus/chunks.json', 'utf8'));
 // q8 (model_quantized.onnx, ~23MB) - MUST match the browser worker's dtype so corpus + query vectors
-// align. fp32 (~86MB) busts the ~25MB per-file cap and is hostile to a C1 mobile install (ADR-014/015).
+// align. fp32 (~86MB) busts the ~25MB per-file cap and is hostile to an on-device mobile install.
 const extractor = await pipeline('feature-extraction', MODEL_REPO, { dtype: 'q8' });
 
 const vectors = [];

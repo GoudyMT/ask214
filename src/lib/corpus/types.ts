@@ -1,25 +1,23 @@
 /**
- * Corpus Retrieval Core (B) data model. The chunk + its citation metadata, the shipped manifest,
+ * Corpus Retrieval Core data model. The chunk + its citation metadata, the shipped manifest,
  * the decoded in-memory corpus, and the retrieval result / card shapes.
- *
- * Source: Corpus Retrieval Core design spec (2026-06-09).
  */
 
 /** One retrievable chunk + everything a citation card needs. */
 export type CorpusChunk = {
 	id: string; // stable, unique within a corpus version
 	text: string; // the ~500-token chunk text (retrieval unit + default excerpt)
-	excerpt?: string; // optional display excerpt: PRODUCED by A, truncated by C, passed through by B
-	sourceId: string; // -> sources.yaml entry (the legal record, spec 8.1)
+	excerpt?: string; // optional display excerpt: produced build-time, truncated by the Ask UI, passed through by retrieval
+	sourceId: string; // -> sources.yaml entry (the legal record)
 	sourceTitle: string;
 	page?: number;
 	section?: string;
 	tags: string[];
 	url: string; // "Open original" link
 	/**
-	 * Optional W3C TextQuoteSelector over the NORMALIZED captured original (A1-D2). `exact` is a verbatim,
-	 * normalized substring of the source; prefix/suffix disambiguate. PRODUCED by A, validated build-time,
-	 * passed through by B (the codec does not guard it), consumed by the later highlight-viewer runtime cycle.
+	 * Optional W3C TextQuoteSelector over the NORMALIZED captured original. `exact` is a verbatim,
+	 * normalized substring of the source; prefix/suffix disambiguate. Produced and validated build-time,
+	 * passed through by retrieval (the codec does not guard it), consumed by the later highlight-viewer runtime cycle.
 	 */
 	anchor?: { exact: string; prefix?: string; suffix?: string };
 };
@@ -47,13 +45,13 @@ export type RetrievalResult = {
 	score: number;
 };
 
-/** Citation-complete card view-model the Ask UI (C) renders. */
+/** Citation-complete card view-model the Ask UI renders. */
 export type ResultCard = {
 	sourceId: string;
 	sourceTitle: string;
 	page?: number;
 	section?: string;
-	excerpt: string; // chunk.excerpt ?? chunk.text (B passes through; C truncates for display)
+	excerpt: string; // chunk.excerpt ?? chunk.text (retrieval passes through; the Ask UI truncates for display)
 	url: string;
 	score: number;
 };
