@@ -5,7 +5,7 @@
 // Build-time ingest engine: captures + extracts text from the public-domain sources into a static,
 // content-addressed corpus that ships to users for offline reading. It never runs on a user device or a live
 // server. The complexity lives in the tested pure units under src/lib/content-ops/; this script only does the
-// IO + the library calls. The extraction libraries (pdfjs, linkedom, Readability, Playwright) and yaml run
+// IO + the library calls. The extraction libraries (pdfjs, linkedom, Playwright) and yaml run
 // only here, never in a src/ runtime module, so a runtime vuln in one cannot reach a shipped user.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -14,14 +14,13 @@ import { parse } from 'yaml';
 // legacy = the Node build; the default build constructs `new DOMMatrix()` (a browser global) at load.
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { parseHTML } from 'linkedom';
-import { Readability } from '@mozilla/readability';
 import { chromium } from 'playwright';
 import { auditCopyRecord } from '../src/lib/content-ops/capture/audit-copy.ts';
 import { stagedFileName } from '../src/lib/content-ops/capture/staged-file.ts';
 import { assemblePdfText } from '../src/lib/content-ops/extract/pdf-text.ts';
 import { trigramSimilarity } from '../src/lib/content-ops/extract/similarity.ts';
 import { checkExtractionSanity } from '../src/lib/content-ops/extract/fidelity.ts';
-import { shapeHtmlExtraction } from '../src/lib/content-ops/extract/html-text.ts';
+import { shapeHtmlBlocks } from '../src/lib/content-ops/extract/html-blocks.ts';
 import { findOffOriginUrls } from '../src/lib/content-ops/extract/off-origin.ts';
 import { isPathAllowed } from '../src/lib/content-ops/capture/robots.ts';
 import { createRateLimiter } from '../src/lib/content-ops/capture/rate-limit.ts';
@@ -111,10 +110,13 @@ function extractPdftotext(path) {
 	return normalizeText(raw);
 }
 
-/** Remove active/embeddable elements + off-origin asset elements from a linkedom document, so the extracted
- *  artifact emits zero off-origin requests if rendered. Same-origin + relative assets stay. */
+/** Strip non-content + active/embeddable elements (script/style/template/iframe/object/embed/noscript) and
+ *  off-origin asset elements from a linkedom document, so the extracted text is content-only and emits zero
+ *  off-origin requests if rendered. Same-origin + relative assets stay. */
 function sanitizeDocument(document, pageOrigin) {
-	for (const el of document.querySelectorAll('script, iframe, object, embed, noscript'))
+	for (const el of document.querySelectorAll(
+		'script, style, template, iframe, object, embed, noscript'
+	))
 		el.remove();
 	for (const el of document.querySelectorAll('img, source, video, audio, track')) {
 		const src = el.getAttribute('src') ?? '';
@@ -128,26 +130,89 @@ function sanitizeDocument(document, pageOrigin) {
 	}
 }
 
-/** linkedom + Readability extract: parse -> sanitize -> main article -> off-origin assert -> shape. */
+// Content-bearing block elements. A nested block (a <p> inside a <li>) is captured by its OUTERMOST
+// block's textContent, so we keep only blocks with no block ancestor inside the region (de-nesting) -
+// otherwise the inner text would be counted twice.
+const BLOCK_TAGS = [
+	'p',
+	'li',
+	'h1',
+	'h2',
+	'h3',
+	'h4',
+	'h5',
+	'h6',
+	'blockquote',
+	'dt',
+	'dd',
+	'td',
+	'figcaption'
+];
+// Inline tags prefixed with a LEADING space so a CTA/link abutting the prior text with no source whitespace
+// ("...different page.Use the VA Portal") does not fuse. Leading-only (not trailing), so a link right before
+// punctuation ("711)") gains no stray space before it. Links are never mid-word, so the space (collapsed
+// later by normalizeText) cannot split a word; emphasis tags (strong/em/sup/span) are NOT padded.
+const SPACING_INLINE = new Set(['a', 'button']);
+
+/** Pick the article region semantically (<main> then <article>); fail closed if neither exists, then
+ *  drop in-region nav/aside/footer/header so only real content survives. */
+function selectContentRegion(document) {
+	const region = document.querySelector('main') ?? document.querySelector('article');
+	if (!region) throw new Error('E_INGEST_NO_CONTENT_REGION');
+	for (const el of region.querySelectorAll('nav, aside, footer, header')) el.remove();
+	return region;
+}
+
+/** True if `el` has a block-element ancestor between it and the region (so its text is already counted
+ *  by that outer block). */
+function hasBlockAncestor(el, region) {
+	for (let p = el.parentElement; p && p !== region; p = p.parentElement) {
+		if (BLOCK_TAGS.includes(p.tagName.toLowerCase())) return true;
+	}
+	return false;
+}
+
+/** A block's text, depth-first like textContent but prefixing link/button text with a LEADING space so an
+ *  inline CTA abutting the prior text does not fuse ("page.Use" -> "page. Use"); leading-only avoids a stray
+ *  space before trailing punctuation. normalizeText later collapses the space. */
+function blockText(node) {
+	let out = '';
+	for (const child of node.childNodes) {
+		if (child.nodeType === 3)
+			out += child.nodeValue ?? ''; // text node
+		else if (child.nodeType === 1) {
+			// element: recurse; prefix link-like inline tags with a space so a CTA does not glue onto prior text
+			const inner = blockText(child);
+			out += SPACING_INLINE.has(child.tagName.toLowerCase()) ? ` ${inner}` : inner;
+		}
+	}
+	return out;
+}
+
+/** De-nested block walk: outermost content-bearing blocks in document order -> { text, tag }. */
+function walkBlocks(region) {
+	const seq = [];
+	for (const el of region.querySelectorAll(BLOCK_TAGS.join(','))) {
+		if (hasBlockAncestor(el, region)) continue;
+		const text = blockText(el).trim();
+		if (text) seq.push({ text, tag: el.tagName.toLowerCase() });
+	}
+	return seq;
+}
+
+/** linkedom block-aware extract: parse -> sanitize -> select region -> de-nested walk -> shape -> off-origin assert. */
 function extractHtml(rawHtml, pageOrigin) {
 	const { document } = parseHTML(rawHtml);
-	sanitizeDocument(document, pageOrigin); // strip scripts/embeds + off-origin assets so the article is clean
-	const article = new Readability(document).parse();
-	if (!article || !article.textContent || article.textContent.trim().length === 0)
-		throw new Error('E_INGEST_HTML_NO_ARTICLE');
-	const text = article.textContent;
-	// Hard gate: zero off-origin asset URLs in the extracted text we ship. The raw page's own trackers live
-	// only in the audit copy (never served), so the shipped prose stays a defense-in-depth tripwire against
-	// extraction ever embedding raw asset markup.
-	const offOrigin = findOffOriginUrls(text, pageOrigin);
+	sanitizeDocument(document, pageOrigin); // strip scripts/embeds + off-origin assets first
+	const region = selectContentRegion(document);
+	const result = shapeHtmlBlocks(walkBlocks(region));
+	// Hard gate: zero off-origin asset URLs in the extracted text we ship (defense-in-depth tripwire).
+	const offOrigin = findOffOriginUrls(result.normalizedText, pageOrigin);
 	if (offOrigin.length > 0) {
 		console.error(`    off-origin assets in extracted text: ${offOrigin.slice(0, 8).join(' | ')}`);
 		throw new Error('E_INGEST_HTML_OFF_ORIGIN');
 	}
-	// Known: Readability's `.textContent` runs inline elements together at structural seams
-	// ("disabilityPension", "page.Use") - sentence text is correctly spaced, only link/list/heading seams.
-	// Refine here if it measurably hurts recall.
-	return shapeHtmlExtraction(text);
+	return result;
 }
 
 /** Honor robots.txt. Unreachable robots = allow (nothing to honor). Rate-limited fetch. */
@@ -333,7 +398,7 @@ async function runPdfStage(pdfs) {
 	console.log(`    flagged@${FIDELITY_THRESHOLD}=${flagged}  ->  ${EXTRACTED_DIR}/`);
 }
 
-/** HTML fetch stage: per source, robots -> rate-limited UA fetch -> audit copy -> linkedom/Readability. */
+/** HTML fetch stage: per source, robots -> rate-limited UA fetch -> audit copy -> linkedom block-aware. */
 async function runHtmlStage(htmls) {
 	console.log('\n' + '='.repeat(60));
 	console.log(`INGEST - HTML stage  (${htmls.length} sources)`);
