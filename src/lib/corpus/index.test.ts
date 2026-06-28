@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as corpus from './index';
 
-// Smoke-test the public surface so an export typo fails CI rather than the first consumer (cycle C).
+// Smoke-test the public surface so an export typo fails CI rather than the first consumer.
 describe('corpus barrel', () => {
 	it('re-exports the public functions', () => {
 		expect(typeof corpus.decodeCorpus).toBe('function');

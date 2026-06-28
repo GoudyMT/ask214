@@ -169,7 +169,7 @@ describe('validateSourcesSchema', () => {
 		});
 	});
 
-	// F2 (L-06 coverage): the reviewed_by / reviewed_date branch of E_SOURCES_MISSING_REVIEW.
+	// the reviewed_by / reviewed_date branch of E_SOURCES_MISSING_REVIEW.
 	it('flags a non-excluded tier missing reviewed_by', () => {
 		const r = validateSourcesSchema([{ ...ok, reviewed_by: undefined }]);
 		expect(r.errors).toContainEqual({
@@ -188,7 +188,7 @@ describe('validateSourcesSchema', () => {
 		});
 	});
 
-	// F11: the legal boolean flags must be real booleans. A YAML truthy scalar (`served: yes`) parses
+	// the legal boolean flags must be real booleans. A YAML truthy scalar (`served: yes`) parses
 	// as the STRING "yes", which would silently skip the served / redistribution legal gate.
 	it('flags a non-boolean served flag', () => {
 		const r = validateSourcesSchema([{ ...ok, served: 'yes' }]);
@@ -217,7 +217,7 @@ describe('validateSourcesSchema', () => {
 		});
 	});
 
-	// F12: provenance dates (reviewed_date / terms_reviewed_date) must be real ISO dates - the same
+	// provenance dates (reviewed_date / terms_reviewed_date) must be real ISO dates - the same
 	// calendar check as source_updated_date. A legal record should not carry a garbage vet date.
 	it('flags a non-ISO reviewed_date', () => {
 		const r = validateSourcesSchema([{ ...ok, reviewed_date: '06/21/2026' }]);

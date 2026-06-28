@@ -1,5 +1,5 @@
 /**
- * The single canonical text normalizer (A1-D5). Anchors + chunk ids are computed in NORMALIZED space,
+ * The single canonical text normalizer. Anchors + chunk ids are computed in NORMALIZED space,
  * and the future highlight viewer MUST apply this same function before searching - so a text-quote anchor
  * resolves deterministically across the extracted-text / PDF.js-text-layer / app-rendered-HTML surfaces.
  * The job is DETERMINISM (same input -> same output, applied identically on both the stored anchor and

@@ -1,9 +1,9 @@
 import type { RetrievalResult, ResultCard } from './types';
 
 /**
- * Map retrieval hits to citation-complete card view-models the Ask UI (C) renders. Pure pass-through:
+ * Map retrieval hits to citation-complete card view-models the Ask UI renders. Pure pass-through:
  * excerpt is `chunk.excerpt ?? chunk.text` - NO truncation, sentence handling, or word-count here
- * (all display shaping is C's job; this keeps a lossy 200-word decision out of the core). Optional
+ * (all display shaping is the Ask UI's job; this keeps a lossy 200-word decision out of the core). Optional
  * page/section are conditionally spread so a missing value never becomes an `undefined` key
  * (exactOptionalPropertyTypes). Every card carries its full citation - citations can never be dropped.
  */

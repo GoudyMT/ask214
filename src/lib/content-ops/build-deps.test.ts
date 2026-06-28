@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 // The build-only libs must NEVER be imported by a src/ runtime module: they execute only at build time on
 // dev/CI (the content-ops/*.mjs scripts), so a runtime vuln in one of them cannot reach a shipped user.
-const BUILD_ONLY = ['pdfjs-dist', '@mozilla/readability', 'linkedom', 'yaml', 'playwright'];
+const BUILD_ONLY = ['pdfjs-dist', 'linkedom', 'yaml', 'playwright'];
 
 function tsFiles(dir: string): string[] {
 	const out: string[] = [];
