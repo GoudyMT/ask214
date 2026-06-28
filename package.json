@@ -17,6 +17,7 @@
 		"check:bundle": "size-limit",
 		"validate:sources": "tsx content-ops/validate-sources.mjs",
 		"ingest": "tsx content-ops/capture-extract.mjs",
+		"chunk": "tsx content-ops/chunk-sources.mjs",
 		"backfill:sources": "tsx content-ops/backfill-sources.mjs",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",

@@ -119,6 +119,8 @@ content-ops/staged/manual-html/*_files/
 # A2 ingest: generated audit copies + extracted text (regeneratable via `pnpm ingest`)
 content-ops/captures/
 content-ops/extracted/
+# A3 chunk: per-source CorpusChunk arrays (regeneratable via `pnpm chunk`)
+content-ops/chunks/
 
 # ---- Misc local-only ----
 TODO.private
