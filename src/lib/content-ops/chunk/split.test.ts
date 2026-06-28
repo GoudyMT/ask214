@@ -63,6 +63,22 @@ describe('splitIntoSpans', () => {
 		expect(spans.map((s) => s.text).join(' ')).toBe('w1 w2 w3 w4 w5');
 	});
 
+	it('throws E_CHUNK_BLOCK_NOT_LOCATED when a block is not a verbatim substring of normalizedText', () => {
+		const blocks: Block[] = [{ text: 'beta', section: 'S' }];
+		expect(() => splitIntoSpans('alpha gamma', blocks, words, { targetTokens: 100 })).toThrow(
+			'E_CHUNK_BLOCK_NOT_LOCATED'
+		);
+	});
+
+	it('force-emits a single word that alone exceeds the target (token-window progress guarantee)', () => {
+		// 1 token per non-space char, so each 4-char word exceeds target 3 and must be forced out alone.
+		const chars = (t: string): number => t.replaceAll(' ', '').length;
+		const blocks: Block[] = [{ text: 'aaaa bbbb', section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, chars, { targetTokens: 3 });
+		expect(spans.map((s) => s.text)).toEqual(['aaaa', 'bbbb']);
+		expect(spans.every((s) => s.brokeAtTokenLevel === true)).toBe(true);
+	});
+
 	it('leaves a short trailing chunk as its own span when merging it would exceed the window', () => {
 		const blocks: Block[] = [
 			{ text: 'a b c d', section: 'S' },

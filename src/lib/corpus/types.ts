@@ -6,7 +6,7 @@
 /** One retrievable chunk + everything a citation card needs. */
 export type CorpusChunk = {
 	id: string; // stable, unique within a corpus version
-	text: string; // the ~500-token chunk text (retrieval unit + default excerpt)
+	text: string; // the ~256-token chunk text (retrieval unit + default excerpt)
 	excerpt?: string; // optional display excerpt: produced build-time, truncated by the Ask UI, passed through by retrieval
 	sourceId: string; // -> sources.yaml entry (the legal record)
 	sourceTitle: string;
