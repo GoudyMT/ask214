@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeAnchor } from './anchor';
+import { normalizeText } from '../../corpus/normalize';
 
 describe('computeAnchor', () => {
 	it('returns exact-only when the slice occurs once in the source', () => {
@@ -32,5 +33,21 @@ describe('computeAnchor', () => {
 		const a = computeAnchor(nt, 0, 'unique'.length);
 		expect(Object.prototype.hasOwnProperty.call(a, 'prefix')).toBe(false);
 		expect(Object.prototype.hasOwnProperty.call(a, 'suffix')).toBe(false);
+	});
+
+	it('mirrors the resolver: a window unique only by boundary whitespace is not treated as unique', () => {
+		// 'the office' occurs twice; only a trailing space distinguishes the first occurrence in raw text, but the
+		// build-time resolver searches normalizeText(prefix+exact+suffix) - which trims that space - so the
+		// raw-unique window ' the office ' resolves to BOTH. computeAnchor must mirror the resolver (grow further
+		// here), never hand back an anchor the cross-ref gate would reject as ambiguous.
+		const nt = 'visit the office today and the office.';
+		const start = nt.indexOf('the office');
+		const end = start + 'the office'.length;
+		const a = computeAnchor(nt, start, end);
+		expect(a).not.toBeNull();
+		const resolved = normalizeText((a?.prefix ?? '') + (a?.exact ?? '') + (a?.suffix ?? ''));
+		let count = 0;
+		for (let i = nt.indexOf(resolved); i !== -1; i = nt.indexOf(resolved, i + 1)) count++;
+		expect(count).toBe(1);
 	});
 });
