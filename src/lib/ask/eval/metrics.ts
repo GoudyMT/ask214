@@ -15,6 +15,9 @@ export function recallAtK(ranked: string[][], expected: string[][], k: number): 
 	return hits / ranked.length;
 }
 
+/** Honest alias of recallAtK: "hit-rate @ k" - the fraction of queries with >=1 expected id in the top-k. */
+export const hitRateAtK = recallAtK;
+
 /** Mean of 1/(rank of the first expected id); a query with no expected id in the list contributes 0. */
 export function meanReciprocalRank(ranked: string[][], expected: string[][]): number {
 	if (ranked.length === 0) return 0;
