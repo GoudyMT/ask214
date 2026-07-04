@@ -1,8 +1,19 @@
 import { normalizeText } from '../../corpus/normalize';
 import type { CorpusChunk } from '$lib/corpus';
 
-/** A positive eval item: the answer IS in the corpus. The snippet is a verbatim locator into `sourceId`. */
-export type GroundTruthQuery = { query: string; sourceId: string; answerSnippet: string };
+/**
+ * A positive eval item: the answer IS in the corpus. `sourceId` + `answerSnippet` is the primary
+ * (chunk-resolvable) ground truth; `altSources` are additional sources that ALSO validly answer the query -
+ * the corpus has genuine content overlap (a comprehensive guide + a specific page both answer many
+ * questions), so a hit = ANY valid source in top-k (standard IR multi-relevant). altSources are credited at
+ * SOURCE level only (no snippet).
+ */
+export type GroundTruthQuery = {
+	query: string;
+	sourceId: string;
+	answerSnippet: string;
+	altSources?: string[];
+};
 /** An adversarial item: the answer is NOT in the corpus; success = the search returns nothing above MIN_SCORE. */
 export type HardNegativeQuery = { query: string; expectEmpty: true };
 export type EvalQuery = GroundTruthQuery | HardNegativeQuery;

@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 // 15 #1). The eval re-gate (content-ops/run-eval.mjs) that re-confirms the margin is manual-only and not
 // wired into CI, so this tripwire fails the build on ANY corpus-size change: when it fails, re-run the
 // eval, re-confirm the margin holds (or recalibrate MIN_SCORE), THEN bump CALIBRATED_CHUNK_COUNT.
-const CALIBRATED_CHUNK_COUNT = 9;
+// Re-confirmed 2026-07-04 (A4) at the real 2125-chunk corpus: run-eval's MIN_SCORE calibration shows 0.4
+// still holds the held-out ranking floor (srcHitRate 0.800 / srcMRR 0.610) - the margin survives the growth.
+const CALIBRATED_CHUNK_COUNT = 2125;
 
 const corpusPath = fileURLToPath(
 	new URL('../../../static/corpus/corpus-v1.0.json', import.meta.url)

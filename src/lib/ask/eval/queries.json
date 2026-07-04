@@ -1,46 +1,271 @@
 [
 	{
-		"query": "how do I let the VA know I plan to file a claim later?",
-		"expectedChunkIds": ["va_intent_to_file__what_is_it", "va_intent_to_file__how_to_submit"]
+		"query": "should I file an intent to file before my actual disability claim?",
+		"sourceId": "va_disability_file",
+		"answerSnippet": "you may want to submit an intent to file form first"
 	},
 	{
-		"query": "how long do I have to finish my claim after submitting an intent to file?",
-		"expectedChunkIds": ["va_intent_to_file__how_to_submit"]
+		"query": "how soon before I get out can I start my VA disability claim?",
+		"sourceId": "va_disability_bdd",
+		"answerSnippet": "You have a known separation date with 180 to 90 days left on active duty"
 	},
 	{
-		"query": "what are my options for submitting a VA disability claim?",
-		"expectedChunkIds": ["va_disability_file__ways"]
+		"query": "what paperwork do I need to back up my VA disability claim?",
+		"sourceId": "va_disability_evidence",
+		"answerSnippet": "Your DD214 or other separation documents Your service treatment records"
 	},
 	{
-		"query": "which form do I use to apply for VA disability compensation?",
-		"expectedChunkIds": ["va_disability_file__ways"]
+		"query": "do I need a special form to file a PTSD claim?",
+		"sourceId": "va_disability_evidence",
+		"answerSnippet": "Statement in Support of Claimed Mental Health Disorder(s) Due to an In-Service Traumatic Event(s)"
 	},
 	{
-		"query": "how long does the VA take to decide a disability claim?",
-		"expectedChunkIds": ["va_disability_file__timing"]
+		"query": "how long do I have to file my claim after I submit an intent to file?",
+		"sourceId": "va_intent_to_file",
+		"answerSnippet": "you have 1 year to complete and file your claim"
 	},
 	{
-		"query": "what do I need to gather before signing up for VA health care?",
-		"expectedChunkIds": ["va_health_care_apply__info_needed"]
+		"query": "how do I get a copy of my DD214 online?",
+		"sourceId": "va_dd214",
+		"answerSnippet": "sign in with an identity-verified ID.me account"
 	},
 	{
-		"query": "how can I enroll in VA health care?",
-		"expectedChunkIds": ["va_health_care_apply__ways"]
+		"query": "what's the difference between BDD and a regular claim timeline-wise?",
+		"sourceId": "tap_va_disability_comp",
+		"answerSnippet": "Benefits Delivery at Discharge (BDD) Claims (from 90 to 180 days until separation)",
+		"altSources": ["va_disability_bdd"]
 	},
 	{
-		"query": "how do I sign up for the GI Bill?",
-		"expectedChunkIds": ["va_education_apply__methods"]
+		"query": "what's VR&E and how is it different from regular VA education benefits?",
+		"sourceId": "tap_va101",
+		"answerSnippet": "Veteran Readiness and Employment (VR&E) (VA Chapter 31)"
+	},
+
+	{
+		"query": "what documents do I need to have ready before I apply for VA health care",
+		"sourceId": "va_health_care_apply",
+		"answerSnippet": "Your military discharge papers (DD214 or other separation documents), military service history information"
 	},
 	{
-		"query": "what should I do before applying for VA education benefits?",
-		"expectedChunkIds": ["va_education_apply__prep"]
+		"query": "how long do I need to have served to qualify for VA health care",
+		"sourceId": "va_health_eligibility",
+		"answerSnippet": "served 24 continuous months or the full period for which you were called"
 	},
 	{
-		"query": "what is SkillBridge and how long does it last?",
-		"expectedChunkIds": ["dod_skillbridge__overview"]
+		"query": "are Vet Centers actually free and confidential or will it go on my record",
+		"sourceId": "tap_vet_centers",
+		"answerSnippet": "provide a wide range of social, emotional and psychological services for Service members, Veterans",
+		"altSources": ["tap_va_benefits_guide"]
 	},
 	{
-		"query": "can I get civilian job training before I separate from the military?",
-		"expectedChunkIds": ["dod_skillbridge__overview"]
-	}
+		"query": "is there an app my spouse and I can use to work on our relationship after I get out",
+		"sourceId": "tap_mental_health_families",
+		"answerSnippet": "PTSD Family Coach"
+	},
+	{
+		"query": "at what age should I start getting mammograms through VA",
+		"sourceId": "tap_va_womens_health",
+		"answerSnippet": "biannually after age 55"
+	},
+	{
+		"query": "I'm pregnant and getting out soon, will my health care coverage continue after I have the baby",
+		"sourceId": "tap_va_womens_health",
+		"answerSnippet": "eligible to extend in-service health care benefits through one year following delivery"
+	},
+	{
+		"query": "what form do I fill out to apply for the GI Bill by mail",
+		"sourceId": "va_education_apply",
+		"answerSnippet": "using an Application for VA Education Benefits (VA Form 22-1990)"
+	},
+	{
+		"query": "besides Post-9/11 what other GI Bill programs might I qualify for",
+		"sourceId": "va_gi_bill_overview",
+		"answerSnippet": "find out if you qualify for benefits under the Montgomery GI Bill Active Duty program"
+	},
+	{
+		"query": "do I have enough active duty time to qualify for the Post-9/11 GI Bill",
+		"sourceId": "va_gi_bill_post911",
+		"answerSnippet": "You served at least 90 days on active duty"
+	},
+	{
+		"query": "how many years do I have to reenlist for to transfer my GI Bill to my kids",
+		"sourceId": "va_gi_bill_transfer",
+		"answerSnippet": "completed at least 6 years of service on the date your request is approved"
+	},
+	{
+		"query": "what number do I call if I have questions about my GI Bill",
+		"sourceId": "tap_va_education_benefits",
+		"answerSnippet": "GI Bill hotline: 1-888-GIBILL-1 OR 1-888-442-4551"
+	},
+	{
+		"query": "what education benefits can my kids get if something happens to me in the service",
+		"sourceId": "tap_va_education_spouses",
+		"answerSnippet": "Educational Assistance (DEA) Program"
+	},
+	{
+		"query": "can my military training count as college credit",
+		"sourceId": "tap_managing_education",
+		"answerSnippet": "Your Joint Services Transcript (JST) outlines the recommendations made by the American Council on Education (ACE)"
+	},
+	{
+		"query": "I'm still active duty and want to start the VA home loan process before I get out, what do I need for the eligibility certificate?",
+		"sourceId": "va_home_loan_coe",
+		"answerSnippet": "signed by your commander, adjutant, or personnel officer"
+	},
+	{
+		"query": "what's the difference between a regular VA purchase loan and a refinance loan?",
+		"sourceId": "tap_va_home_loan",
+		"answerSnippet": "Interest Rate Reduction Refinance Loan (IRRRL)"
+	},
+	{
+		"query": "how long after I get out do I have to sign up for VGLI before I have to prove I'm healthy?",
+		"sourceId": "va_vgli",
+		"answerSnippet": "you won't need to prove you're in good health"
+	},
+	{
+		"query": "who do I actually call if I have a question about my SGLI or VGLI coverage?",
+		"sourceId": "tap_va_life_insurance",
+		"answerSnippet": "Questions about SGLI, Family SGLI, TSGLI or VGLI: 1-800-419-1473"
+	},
+	{
+		"query": "if I use VR&E first, does that eat into my GI Bill months?",
+		"sourceId": "tap_va_benefits_guide",
+		"answerSnippet": "can still use up to 48 total months of the other education assistance benefit programs"
+	},
+	{
+		"query": "as a Guard member, what number do I call if I'm in crisis?",
+		"sourceId": "tap_va_reserve_natl_guard",
+		"answerSnippet": "Dial 988, then press 1"
+	},
+	{
+		"query": "how much time can I get off to do a SkillBridge internship before I get out?",
+		"sourceId": "dod_skillbridge",
+		"answerSnippet": "up to 180 days of permissive duty with approval from their unit commander"
+	},
+	{
+		"query": "is there someone I can talk to one-on-one about my transition plan and what benefits I actually qualify for?",
+		"sourceId": "mos_separation",
+		"answerSnippet": "Get help identifying goals, learn about benefits available to you",
+		"altSources": ["tap_pre_separation_brief"]
+	},
+	{
+		"query": "what's the difference between the one-day and two-day DOL TAP classes?",
+		"sourceId": "dol_tap_overview",
+		"answerSnippet": "EFCT is a one-day foundational workshop that introduces the essential tools"
+	},
+	{
+		"query": "how do I turn my military job title into something a civilian resume will actually make sense of?",
+		"sourceId": "tap_dol_efct",
+		"answerSnippet": "Translate this military term into a civilian term"
+	},
+	{
+		"query": "how do I actually write my resume bullet points so they don't sound like a duty description?",
+		"sourceId": "tap_dol_employment_workshop",
+		"answerSnippet": "illustrate your achievements with the STAR method"
+	},
+	{
+		"query": "what is a Gap Analysis in TAP and how does it work?",
+		"sourceId": "tap_moc_crosswalk",
+		"answerSnippet": "documents the gap between what you possess currently (left column) and what you need to acquire to qualify for your chosen civilian occupation"
+	},
+	{
+		"query": "which TAP classes are actually mandatory versus optional?",
+		"sourceId": "tap_pre_separation_brief",
+		"answerSnippet": "Lays the foundation for a successful job search by providing the essential tools and resources to identify a career, create a resume, and transition from military to civilian employment"
+	},
+	{
+		"query": "how early should I start TAP before I get out?",
+		"sourceId": "tap_managing_transition",
+		"answerSnippet": "begin TAP 24 months before retirement or 18 months before separation"
+	},
+	{
+		"query": "when do I need to file my disability claim before I separate to use BDD?",
+		"sourceId": "tap_interagency_website_guide",
+		"answerSnippet": "How to file a claim for disability benefits 180 to 90 days before leaving the military",
+		"altSources": ["va_disability_bdd"]
+	},
+	{
+		"query": "I got an other than honorable discharge, can I get it upgraded?",
+		"sourceId": "tap_other_than_honorable",
+		"answerSnippet": "Character of Discharge Upgrade Tool",
+		"altSources": ["tap_va_benefits_guide"]
+	},
+	{
+		"query": "how do I waive my VA compensation so I can get paid for drill weekend?",
+		"sourceId": "tap_reserve_dual_pay",
+		"answerSnippet": "Notice of Waiver of VA Compensation or Pension to Receive Military Pay and Allowances"
+	},
+	{
+		"query": "what debt-to-income ratio is considered too high before I get out?",
+		"sourceId": "tap_financial_planning",
+		"answerSnippet": "Less than 35%: Favorable"
+	},
+	{
+		"query": "how long can I keep TRICARE-like coverage after I separate if I don't have a job lined up yet?",
+		"sourceId": "tap_financial_planning",
+		"answerSnippet": "Offers coverage for up to 18 months upon separation from service"
+	},
+	{
+		"query": "do I have to pay off my TSP loan before I leave the military?",
+		"sourceId": "tsp_separation",
+		"answerSnippet": "pay them off within 90 days of your separation"
+	},
+	{
+		"query": "what is form 21-526EZ for",
+		"sourceId": "va_disability_file",
+		"answerSnippet": "an Application for Disability Compensation and Related Compensation Benefits (VA Form 21-526EZ)"
+	},
+	{
+		"query": "can I file my disability claim before I actually get out of the military",
+		"sourceId": "va_disability_bdd",
+		"answerSnippet": "This claim process is called the Benefits Delivery at Discharge (BDD) program"
+	},
+	{
+		"query": "does my Chapter 33 GI Bill expire if I got out before 2013",
+		"sourceId": "va_gi_bill_post911",
+		"answerSnippet": "Post-9/11 GI Bill (Chapter 33) benefits will expire 15 years after your last separation"
+	},
+	{
+		"query": "which form do I need to sign up for VGLI life insurance after separation",
+		"sourceId": "va_vgli",
+		"answerSnippet": "Fill out the Application for Veterans' Group Life Insurance (SGLV 8714)"
+	},
+	{
+		"query": "what is form 21-0966 used for",
+		"sourceId": "va_intent_to_file",
+		"answerSnippet": "Survivors Pension and/or DIC (VA Form 21-0966)"
+	},
+	{
+		"query": "how do I get my JST for college credit",
+		"sourceId": "tap_moc_crosswalk",
+		"answerSnippet": "Army, Coast Guard, Navy, Marine Corps Joint Service Transcript (JST)",
+		"altSources": ["tap_managing_education"]
+	},
+
+	{ "query": "how do I file my state income tax return?", "expectEmpty": true },
+	{ "query": "what stocks or funds should I pick inside my TSP?", "expectEmpty": true },
+	{ "query": "what's the VA disability rating percentage for tinnitus?", "expectEmpty": true },
+	{ "query": "how do I renew my driver's license in my new state?", "expectEmpty": true },
+	{
+		"query": "what civilian jobs are best for someone with my security clearance?",
+		"expectEmpty": true
+	},
+	{
+		"query": "how do I buy a house with a conventional mortgage and no down payment?",
+		"expectEmpty": true
+	},
+	{ "query": "how do I start a franchise business with an SBA loan?", "expectEmpty": true },
+	{ "query": "are there travel or flight discounts for veterans?", "expectEmpty": true },
+	{ "query": "how do I sign up for Medicare?", "expectEmpty": true },
+	{ "query": "what's the pay scale for a GS-12 federal job?", "expectEmpty": true },
+	{ "query": "how do I get a US passport?", "expectEmpty": true },
+	{ "query": "how do I write a will and set up an estate plan?", "expectEmpty": true },
+	{ "query": "what's the best rewards credit card for veterans?", "expectEmpty": true },
+	{ "query": "how do I buy individual stocks in a brokerage account?", "expectEmpty": true },
+	{ "query": "what's today's mortgage interest rate?", "expectEmpty": true },
+	{ "query": "can I use a VA loan to buy a boat or an RV?", "expectEmpty": true },
+	{ "query": "how do I get a military discount at hardware stores?", "expectEmpty": true },
+	{ "query": "how do I enroll my kids in DoDEA schools overseas?", "expectEmpty": true },
+	{ "query": "how do I find a civilian job working at the VA?", "expectEmpty": true },
+	{ "query": "what free gym or fitness memberships do veterans get?", "expectEmpty": true }
 ]
