@@ -9,6 +9,12 @@
 // the v1.1 lever (form-number queries + the correct-empty guarantee, which no client-side threshold can
 // deliver - the A4 charter Measured Result); it is intentionally NOT used here because v1.0 ships dense.
 // Pure logic lives in the tested units under src/lib/**; this file only injects the real model + orchestrates.
+//
+// NOTE (A4 sweep M1/L4): the held-out split is small (~15 positives), so the ranking floor is a knife-edge -
+// 0.800 is exactly 12/15, and the MIN_SCORE calibration is flat across 0-0.4 (no held-out lead near the 0.4
+// cutoff). If a future A5 refresh marginally misses, GROW the eval set (more positives per source, incl. a
+// deliberately weak-scoring lead near the cutoff) BEFORE touching the model/thresholds - a one-query swing is
+// sample noise, not a retrieval regression. See docs/sweeps/2026-07-04-content-ops-a4.md.
 import { readFileSync } from 'node:fs';
 import { pipeline } from '@huggingface/transformers';
 import { decodeCorpus, cosineSimilarity } from '../src/lib/corpus/index.ts';
@@ -82,20 +88,22 @@ console.log(
 	`[split] tune ${tuneCache.length} (${nPos(tuneCache)}pos/${nNeg(tuneCache)}neg)  held-out ${heldCache.length} (${nPos(heldCache)}pos/${nNeg(heldCache)}neg)`
 );
 
-// --- MIN_SCORE calibration: the HIGHEST display cutoff that still holds the held-out ranking floor (hides
-// weak results without dropping real answers). Reported on held-out (the honest, leakage-free set).
-console.log('\n[MIN_SCORE calibration - dense, held-out]');
+// --- MIN_SCORE calibration: the HIGHEST display cutoff that still holds the ranking floor, SELECTED on the
+// TUNE split (never the held-out set - the gate below must stay a leakage-free unseen-data estimate). Since
+// minScore is a monotone display cutoff (a higher cutoff only drops results, never adds a hit), this picks
+// the max cutoff that does not erode tune ranking; the held-out gate then re-tests at that fixed value.
+console.log('\n[MIN_SCORE calibration - dense, TUNE split (gated on held-out below)]');
 let calibrated = 0;
 for (const ms of MIN_SCORE_CANDIDATES) {
-	const h = evalUnderParams(heldCache, chunkSourceIds, DENSE(ms), K);
-	const pass = h.srcHitRate >= FLOOR.srcHitRate && h.srcMRR >= FLOOR.srcMRR;
+	const t = evalUnderParams(tuneCache, chunkSourceIds, DENSE(ms), K);
+	const pass = t.srcHitRate >= FLOOR.srcHitRate && t.srcMRR >= FLOOR.srcMRR;
 	console.log(
-		`  minScore ${ms.toFixed(2)}  held-out srcHitRate=${h.srcHitRate.toFixed(3)} srcMRR=${h.srcMRR.toFixed(3)}  ${pass ? 'PASS' : 'fail'}`
+		`  minScore ${ms.toFixed(2)}  tune srcHitRate=${t.srcHitRate.toFixed(3)} srcMRR=${t.srcMRR.toFixed(3)}  ${pass ? 'PASS' : 'fail'}`
 	);
 	if (pass) calibrated = ms;
 }
 console.log(
-	`[calibrated MIN_SCORE] ${calibrated.toFixed(2)}  (highest cutoff holding the held-out floor)`
+	`[calibrated MIN_SCORE] ${calibrated.toFixed(2)}  (highest cutoff holding the TUNE floor; gated on held-out)`
 );
 const params = DENSE(calibrated);
 

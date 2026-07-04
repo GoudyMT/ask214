@@ -1,3 +1,6 @@
+// v1.1 LEVER - built + tested, NOT on the v1.0 dense retrieval path. Deferred per the A4 charter Measured
+// Result (BM25 did not improve ranking at the client-shippable scale; the tuner rejected the lexical gate).
+// Kept for the v1.1 exact-term / form-number + correct-empty work. Imported only by the eval + tests.
 /**
  * Okapi BM25 lexical scoring over the corpus chunk texts. Pure + dependency-free. Used alongside the dense
  * cosine search in the hybrid retriever: BM25 grounds relevance in actual keyword overlap, so an off-corpus

@@ -1,3 +1,6 @@
+// v1.1 LEVER - built + tested, NOT on the v1.0 dense retrieval path. Deferred per the A4 charter Measured
+// Result. In the v1.0 eval, fuseHybrid is called with alpha=1 + a zero BM25 array, i.e. pure dense; the
+// lexical-fusion path here is exercised only by the tests + reserved for the v1.1 work. Producer-only.
 /**
  * Hybrid fusion of dense cosine + lexical BM25 into one ranked, filtered result list. Pure; operates on the
  * two score arrays (aligned to the corpus chunk order). Two jobs:
