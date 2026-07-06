@@ -28,9 +28,16 @@ import { normalizeText } from '../src/lib/corpus/normalize.ts';
 
 // Config (env override wins; repo-relative defaults).
 const SOURCES_YAML = 'content/sources.yaml';
+// When REFRESH_STAGING_ROOT is set, the OUTPUT dirs (captures + extracted) redirect under it so
+// `pnpm refresh` can re-capture a fresh copy for change-detection WITHOUT clobbering the shipped baseline.
+// Inputs (staged PDFs + manual HTML) stay at their real paths. Unset = normal ingest (byte-identical behavior).
+const REFRESH_STAGING_ROOT = process.env.REFRESH_STAGING_ROOT;
+const REFRESH_MODE = REFRESH_STAGING_ROOT !== undefined;
 const STAGING_DIR = process.env.TAP_PDF_DIR ?? 'content-ops/staged'; // the byte-exact staged PDF originals
-const CAPTURES_DIR = 'content-ops/captures'; // content-addressed audit copies (never served)
-const EXTRACTED_DIR = 'content-ops/extracted'; // per-source extractor output
+const CAPTURES_DIR = REFRESH_MODE ? join(REFRESH_STAGING_ROOT, 'captures') : 'content-ops/captures'; // content-addressed audit copies (never served)
+const EXTRACTED_DIR = REFRESH_MODE
+	? join(REFRESH_STAGING_ROOT, 'extracted')
+	: 'content-ops/extracted'; // per-source extractor output
 const MANUAL_HTML_DIR = 'content-ops/staged/manual-html'; // human-saved page HTML for bot-blocked sources
 
 // Identifying User-Agent for polite scraping; contact URL added once the domain is decided.
@@ -232,7 +239,10 @@ async function robotsAllows(origin, pathname) {
  *  extraction; `method` is recorded for provenance. */
 async function writeHtmlArtifacts(entry, origin, bytes, rawHtml, method) {
 	const record = await auditCopyRecord(bytes, 'html');
-	if (!existsSync(record.capturedPath)) writeFileSync(record.capturedPath, bytes);
+	// Path from CAPTURES_DIR (not record.capturedPath) so the staging redirect applies; normal mode
+	// is byte-identical (CAPTURES_DIR = content-ops/captures).
+	const capturedPath = join(CAPTURES_DIR, `${record.contentHash}.html`);
+	if (!existsSync(capturedPath)) writeFileSync(capturedPath, bytes);
 	const result = extractHtml(rawHtml, origin);
 	writeFileSync(
 		join(EXTRACTED_DIR, `${entry.source_id}.json`),
@@ -336,7 +346,9 @@ async function runPdfStage(pdfs) {
 			const bytes = new Uint8Array(readFileSync(srcPath));
 			const record = await auditCopyRecord(bytes, 'pdf');
 			// Idempotent: content-addressed -> identical bytes give the same path; write only if absent.
-			if (!existsSync(record.capturedPath)) writeFileSync(record.capturedPath, bytes);
+			// Path from CAPTURES_DIR so the staging redirect applies (normal mode byte-identical).
+			const capturedPath = join(CAPTURES_DIR, `${record.contentHash}.pdf`);
+			if (!existsSync(capturedPath)) writeFileSync(capturedPath, bytes);
 
 			const ours = await extractPdfjs(bytes);
 			// Parity smoke (sampled): pdfjs must be deterministic - the first PDF is re-extracted and must
@@ -490,7 +502,9 @@ const htmlFetch = htmls.filter(
 const htmlHeadless = htmls.filter((e) => CAPTURE_HEADLESS.has(e.source_id));
 const htmlManual = htmls.filter((e) => CAPTURE_MANUAL.has(e.source_id));
 
-if (pdfs.length) await runPdfStage(pdfs);
+// In refresh mode, capture ONLY the auto-fetchable sources (plain fetch + headless). PDFs (tapevents SPA) and
+// Akamai-blocked manual sources are `manual-check-required` for detection - refresh.mjs surfaces them instead.
+if (pdfs.length && !REFRESH_MODE) await runPdfStage(pdfs);
 if (htmlFetch.length) await runHtmlStage(htmlFetch);
 if (htmlHeadless.length) await runHeadlessStage(htmlHeadless);
-if (htmlManual.length) await runManualStage(htmlManual);
+if (htmlManual.length && !REFRESH_MODE) await runManualStage(htmlManual);

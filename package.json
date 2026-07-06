@@ -20,6 +20,7 @@
 		"chunk": "tsx content-ops/chunk-sources.mjs",
 		"embed": "tsx content-ops/build-corpus.mjs",
 		"eval": "tsx content-ops/run-eval.mjs",
+		"refresh": "tsx content-ops/refresh.mjs",
 		"backfill:sources": "tsx content-ops/backfill-sources.mjs",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
