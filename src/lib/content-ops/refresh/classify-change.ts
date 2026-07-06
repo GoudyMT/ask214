@@ -22,7 +22,7 @@ export type ChangeRecord = {
 	reason: string;
 };
 
-// date = trigger signal, hash = change-confirm (A1 spec note 8): a source is `changed` if its freshly-fetched
+// date = trigger signal, hash = change-confirm: a source is `changed` if its freshly-fetched
 // content hash differs from the stored baseline, OR its own last-updated date is newer than the stored date.
 export function classifyChange(baseline: SourceBaseline, fresh: FreshSignal): ChangeRecord {
 	const { sourceId, contentHash: oldHash } = baseline;
