@@ -9,9 +9,6 @@
  * AES-GCM keygen implicitly covers secure-context + SubtleCrypto (crypto.subtle
  * is undefined outside a secure context). BroadcastChannel is intentionally NOT
  * gated: v1.0 multi-tab is best-effort, so its absence must not block core use.
- *
- * Source: Phase 2 spec section 6 "Fail-closed capability checks"; ADR-009
- * amended; plan v2 audit T3-C (single exercise-based gate).
  */
 import { hmacSign, hmacVerify } from './hmac';
 

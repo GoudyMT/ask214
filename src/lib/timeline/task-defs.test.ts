@@ -26,7 +26,7 @@ describe('task-defs seed', () => {
 		expect(new Set(offsets).size).toBe(offsets.length);
 	});
 
-	it('gives every phase bucket a non-empty short label for the chip-strip (C5)', () => {
+	it('gives every phase bucket a non-empty short label for the chip-strip', () => {
 		// The full bucket.label is too long for a nav chip, so each bucket carries a compact
 		// shortLabel. Well-formedness only (per this file's philosophy): editing the text keeps it green.
 		for (const bucket of PHASE_BUCKETS) {
@@ -48,7 +48,7 @@ describe('task-defs seed', () => {
 		}
 	});
 
-	// Content placement lock (Session 19): medical documentation must START early - it belongs in
+	// Content placement: medical documentation must START early - it belongs in
 	// the 18-12mo phase, not 12-6mo, so the VA-claim record has the longest runway. Buckets are
 	// half-open [startOffset, endOffset), so the recommended offset must sit inside 18-12mo.
 	it('schedules "start documenting medical conditions" in the 18-12 month phase', () => {

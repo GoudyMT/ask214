@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SNOOZE_PRESETS, snoozeUntilIso } from './snooze';
 
-// Snooze presets + date math (C4 increment 2). snoozeUntilIso projects "today + N days" to a
+// Snooze presets + date math. snoozeUntilIso projects "today + N days" to a
 // UTC-anchored ISO date (same pattern as eaosOffsetDate), so the result never shifts by the
 // runtime timezone. Presets are day-based (1 month = 30d, 3 months = 90d) - deterministic and
 // matching the engine's day-offset model; the snoozed card shows the exact resulting date.

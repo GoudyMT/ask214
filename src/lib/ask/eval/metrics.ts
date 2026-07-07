@@ -1,5 +1,5 @@
 /**
- * Retrieval-quality metrics for the Ask acceptance gate (spec section 2.2 / 11). Pure: operate on
+ * Retrieval-quality metrics for the Ask acceptance gate. Pure: operate on
  * already-ranked chunk-id lists (best first) + the expected relevant ids per query. No model here.
  */
 

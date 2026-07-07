@@ -12,8 +12,6 @@ import type { KeystoreRecordV1 } from '../keystore/record';
  * ciphertext to its store context, write generation, schema, and full keystore
  * state, so a relocated (different storeName/recordId), replayed (wrong generation),
  * or keystore-diverged record fails authentication.
- *
- * Source: Phase 2 spec sections 4-5; plan v2 T3-A/T3-B; Timeline plan A1 (extract).
  */
 const IV_LENGTH = 12;
 

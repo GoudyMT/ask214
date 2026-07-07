@@ -1,5 +1,5 @@
 // Run from the repo root: `pnpm embed`. Build-time producer (never ships to a device). Reads the per-source
-// A3 chunk arrays, embeds each chunk with the SAME q8 MiniLM the browser embeds queries with, and writes the
+// chunk arrays, embeds each chunk with the SAME q8 MiniLM the browser embeds queries with, and writes the
 // versioned corpus artifact the runtime decoder reads. Downloads the model from HF on first run (build-time
 // only; the runtime self-hosts the model). Confirm the transformers API against the installed version if the
 // first run errors.
@@ -14,7 +14,7 @@ const OUT_DIR = 'static/corpus';
 const MODEL_REPO = 'Xenova/all-MiniLM-L6-v2';
 const MODEL_ID = 'all-MiniLM-L6-v2'; // stamped into the manifest; must equal the runtime EMBED_MODEL_ID + decodeCorpus expectedModelId
 const VERSION = '1.0';
-const SIZE_BUDGET_BYTES = 300 * 1024 * 1024; // the C1 on-device total corpus budget
+const SIZE_BUDGET_BYTES = 300 * 1024 * 1024; // the on-device total corpus budget
 const PER_FILE_CAP_BYTES = 25 * 1024 * 1024; // Cloudflare Workers Assets per-file asset cap
 
 // Read + concatenate every per-source chunk array (each file is a JSON array of chunks). Sorted for a

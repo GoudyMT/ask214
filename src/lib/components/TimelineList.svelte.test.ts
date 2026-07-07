@@ -4,8 +4,8 @@ import { flushSync } from 'svelte';
 import TimelineList from './TimelineList.svelte';
 import type { TimelineView, TimelineItem, DisplayStatus, TaskStatus } from '$lib/timeline';
 
-// TimelineList renders a generated TimelineView (C3): one labelled <section> per non-empty
-// phase (h2 = bucket.label, id = bucket.id to seed C5 scroll-spy), each holding a TaskCard per
+// TimelineList renders a generated TimelineView: one labelled <section> per non-empty
+// phase (h2 = bucket.label, id = bucket.id to seed scroll-spy), each holding a TaskCard per
 // item. Empty/locked/no-EAOS states are handled by the route, not here.
 
 function makeItem(title: string, status: DisplayStatus = 'upcoming'): TimelineItem {
@@ -67,7 +67,7 @@ describe('TimelineList', () => {
 		const section = container.querySelector('section#phase-18-12');
 		const labelledby = section?.getAttribute('aria-labelledby');
 		expect(labelledby).toBeTruthy();
-		expect(container.querySelector(`#${labelledby}`)?.textContent).toContain('18-12 months out'); // heading now also carries the progress count (C4-4)
+		expect(container.querySelector(`#${labelledby}`)?.textContent).toContain('18-12 months out'); // heading now also carries the progress count
 	});
 
 	it('renders a TaskCard per item across all phases', () => {
@@ -81,7 +81,7 @@ describe('TimelineList', () => {
 	});
 });
 
-describe('TimelineList phase progress counts (C4-4 B1)', () => {
+describe('TimelineList phase progress counts', () => {
 	it('active phase header shows the "N to do" count (Format 1)', () => {
 		const { container } = render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
@@ -137,7 +137,7 @@ describe('TimelineList phase progress counts (C4-4 B1)', () => {
 	});
 });
 
-describe('TimelineList section auto-collapse (C4-4 B2)', () => {
+describe('TimelineList section auto-collapse', () => {
 	const resolvedView: TimelineView = {
 		phases: [
 			{
@@ -224,7 +224,7 @@ describe('TimelineList section auto-collapse (C4-4 B2)', () => {
 	});
 });
 
-describe('TimelineList Today marker (C5)', () => {
+describe('TimelineList Today marker', () => {
 	it('renders the Today marker before the phase at todayMarkerIndex', () => {
 		const view: TimelineView = { ...VIEW, todayMarkerIndex: 1, todayDate: '2026-06-09' };
 		const { container } = render(TimelineList, {

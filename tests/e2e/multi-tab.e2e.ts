@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// Regression coverage for the cross-tab profile broadcast (Arc 2, Milestone L2b:
-// subscribeBus). Saving the profile in one tab fires a BroadcastChannel
+// Regression coverage for the cross-tab profile broadcast (subscribeBus). Saving
+// the profile in one tab fires a BroadcastChannel
 // 'profile-updated' signal; other same-origin tabs re-load from IndexedDB and re-render.
 // Both pages share ONE browser context, so they share IndexedDB and the BroadcastChannel.
 // A publisher does not receive its own message (BroadcastChannel self-exclusion), so two

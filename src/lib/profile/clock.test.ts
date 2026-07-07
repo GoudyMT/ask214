@@ -10,7 +10,7 @@ describe('updateLastSeen', () => {
 		expect(updateLastSeen(2000, 1000)).toBe(2000);
 	});
 
-	it('caps now at prev + MAX_FUTURE_MS (resolves F-C-7)', () => {
+	it('caps now at prev + MAX_FUTURE_MS', () => {
 		const prev = 1000;
 		const malicious = prev + MAX_FUTURE_MS * 2;
 		expect(updateLastSeen(prev, malicious)).toBe(prev + MAX_FUTURE_MS);

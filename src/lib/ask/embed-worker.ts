@@ -3,10 +3,10 @@ import { pipeline, env, type FeatureExtractionPipeline } from '@huggingface/tran
 import type { EmbedRequest, EmbedResponse } from './types';
 import { ASK_ERROR } from './errors';
 
-// Self-host both the model and the ORT WASM as same-origin static assets (ADR-014): NO runtime HF-CDN /
+// Self-host both the model and the ORT WASM as same-origin static assets: NO runtime HF-CDN /
 // jsDelivr fetch -> connect-src 'self' holds, the query never leaves the device, and the flow works
 // offline after the (same-origin) first load. Configure env BEFORE pipeline(). Single-threaded SIMD WASM,
-// no cross-origin isolation / COEP (spec C-3). Output is mean-pooled + L2-normalized (384-d).
+// no cross-origin isolation / COEP. Output is mean-pooled + L2-normalized (384-d).
 env.allowLocalModels = true;
 env.allowRemoteModels = false;
 env.localModelPath = '/models/'; // -> /models/Xenova/all-MiniLM-L6-v2/

@@ -1,15 +1,13 @@
 /**
- * Best-effort cross-tab signal over a raw BroadcastChannel. v1.0 (plan v2 T1-E)
+ * Best-effort cross-tab signal over a raw BroadcastChannel. v1.0
  * carries NO state and NO authentication: the message is an opaque event type, and
  * on receive a tab simply re-reads from IDB (ProfileStore.load, itself fail-closed
  * + verified). A same-origin spoofed signal can at worst trigger a harmless extra
  * re-read - it cannot inject or read state. The authenticated-envelope design
- * (HMAC + replay defense + derived channel name) is deferred to v1.1 per ADR-012.
+ * (HMAC + replay defense + derived channel name) is deferred to v1.1.
  *
  * BroadcastChannel is intentionally NOT gated by the capability check (multi-tab is
  * best-effort), so its absence degrades to a no-op bus rather than blocking core use.
- *
- * Source: plan v2 audit T1-E; ADR-012 (v1.1 authenticated version deferred).
  */
 export type BusSignal = { type: 'profile-updated' | 'relocked' | 'timeline-updated' };
 

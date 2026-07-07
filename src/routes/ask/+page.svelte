@@ -9,7 +9,7 @@
 
 	// The store is created once the corpus (a small same-origin static asset) loads - it needs the
 	// in-memory Corpus. Until then the input is disabled; a corpus-load failure surfaces as `error`. The
-	// ~23MB model is NOT fetched here - it downloads only when the user opts in (store.setUp), per ADR-015.
+	// ~23MB model is NOT fetched here - it downloads only when the user opts in (store.setUp).
 	let store = $state<ReturnType<typeof createAskStore> | null>(null);
 	let sources = $state<Map<string, Source>>(new Map()); // corpus grouped by source for the offline reader
 	let initError = $state(false);

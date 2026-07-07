@@ -3,7 +3,7 @@ import { canonicalizeKeystore, type KeystoreCanonicalInput } from '../keystore/r
 /**
  * AAD (Additional Authenticated Data) binds AES-GCM profile ciphertext to its
  * context so a record cannot be silently relocated, downgraded, or replayed.
- * v1.0 AAD is 6 fields (plan v2 T3-B dropped `userHandle` [single-user] and
+ * v1.0 AAD is 6 fields (dropped `userHandle` [single-user] and
  * `mode` [passphrase deferred]):
  *
  *   storeName | recordId | keystoreGeneration | generation | sv{schemaVersion} | <recordHashHex>
@@ -13,8 +13,6 @@ import { canonicalizeKeystore, type KeystoreCanonicalInput } from '../keystore/r
  * - generation:           per-record write counter (closes cross-generation replay)
  * - schemaVersion:        record format
  * - keystoreRecordHash:   fingerprint of the full keystore security state
- *
- * Source: Phase 2 spec section 5 "AAD"; plan v2 T3-B.
  */
 export type AADParams = {
 	storeName: string;

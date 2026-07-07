@@ -10,8 +10,7 @@ export type AppStatus = 'loading' | 'ready' | 'unsupported';
  * at component init, since setContext must run during init), then populated by the async
  * app-init. Components read it via getProfileApp() and react to status/store changes.
  *
- * Source: Milestone L2 app-init wiring (Option B: store provisioned via context, not a
- * module singleton).
+ * Design (Option B): the store is provisioned via context, not a module singleton.
  */
 export type ProfileApp = {
 	status: AppStatus;

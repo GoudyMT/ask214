@@ -15,9 +15,6 @@ export class KeystoreAlreadyExistsError extends Error {
  * with the initial profile-hwm sidecar in ONE transaction so a partial first
  * run can never persist. Atomic idempotency: the keystore-exists check runs
  * inside that same write transaction, closing the TOCTOU window.
- *
- * Source: Phase 2 spec section 6; ADR-009 v1.0 scope; plan v2 T6-E (2 keys,
- * single hmacKey) + F1 raw-IDB layer.
  */
 export async function bootstrapLocalKeystore(
 	db: IDBDatabase

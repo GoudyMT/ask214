@@ -15,7 +15,7 @@
 	const errorId = $derived(`${id}-error`);
 
 	// Register the live DOM input so a relock (freezeRelock -> scrubSecureInputs) clears any
-	// typed EAOS cleartext from the DOM (spec section 8). The $effect cleanup unregisters on
+	// typed EAOS cleartext from the DOM. The $effect cleanup unregisters on
 	// unmount. The parent's `value` string copy is a separate, accepted/inherent residual.
 	let inputEl = $state<HTMLInputElement | null>(null);
 	$effect(() => {
@@ -24,10 +24,10 @@
 </script>
 
 <!--
-  EAOS date field (master spec 5.6). Presentational + controlled: the parent owns `value`,
+  EAOS date field. Presentational + controlled: the parent owns `value`,
   validation, and the `error` message; this renders the native date picker, label, hint, and
   an accessible inline error. Native <input type="date"> = a11y + native mobile picker +
-  zero-JS + zero added bytes (spec 5.6). Copy is injected, so it is reused by wizard + Settings.
+  zero-JS + zero added bytes. Copy is injected, so it is reused by wizard + Settings.
 -->
 <div class="eaos-field">
 	<label class="eaos-field__label" for={id}>{label}</label>
@@ -88,7 +88,7 @@
 		outline-offset: 2px;
 	}
 
-	/* State-color convention (spec 5.5 primitive 14): danger as border/text accent only,
+	/* State-color convention: danger as border/text accent only,
 	   never a full-bleed alarm fill. */
 	.eaos-field__input--error {
 		border-color: var(--color-danger);

@@ -6,9 +6,9 @@
 </script>
 
 <!--
-  Hard-stop capability-failure screen (master spec 5.6). Full-takeover (the layout renders
+  Hard-stop capability-failure screen. Full-takeover (the layout renders
   ONLY this when the bootstrap capability gate fails - no polyfill, no fallback, no in-app
-  action per ADR-009). Neutral/informational tone (capability mismatch, not user error); the
+  action). Neutral/informational tone (capability mismatch, not user error); the
   specific cause is preserved but demoted to a muted technical-detail line.
 -->
 <div class="unsupported">

@@ -1,10 +1,8 @@
 /**
  * Timeline generation engine - pure, IO-free, deterministic given its inputs.
  *
- * Accretes across Arc B: B3 = filter (TL-5 persona gate) + anchor (TL-3 EAOS projection);
- * B4 adds status derivation; B5 sorts + groups into the bucketed view.
- *
- * Source: Timeline Engine design spec (2026-06-03) section 5 "Generation Logic".
+ * The pipeline: filter (persona gate) + anchor (EAOS projection), derive status, then
+ * sort + group into the bucketed view.
  */
 
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
@@ -22,7 +20,7 @@ export type AnchoredTask = {
 };
 
 /**
- * TL-5 persona gate. A task with no `requires` is universal. A gated task shows only when
+ * Persona gate. A task with no `requires` is universal. A gated task shows only when
  * every gate key is satisfied: the persona field must be SET (only the 'complete' persona
  * surfaces intendedPath/familyStatus) AND its value must be in the allowed list. Any
  * unsatisfied key hides the task - conservative, never show a task we cannot confirm applies.
@@ -43,7 +41,7 @@ function includeTask(persona: PersonaFilters, def: TaskDef): boolean {
 }
 
 /**
- * TL-3 anchor + TL-10 shift: project a def's day offsets to absolute UTC dates off the EAOS,
+ * Anchor + SkillBridge shift: project a def's day offsets to absolute UTC dates off the EAOS,
  * shifted earlier by `shiftDays` (the SkillBridge duration for military-track tasks; 0
  * otherwise). The shift is uniform across the target + both window edges, so the whole task
  * moves left as a unit.
@@ -60,9 +58,9 @@ function anchorTask(eaos: EaosString, def: TaskDef, shiftDays: number): Anchored
 }
 
 /**
- * Filter the task set by the persona gate (TL-5), then anchor each surviving task to the
- * user's EAOS (TL-3), left-shifting military-track tasks by the approved SkillBridge
- * duration (TL-10). A 'none' persona has no EAOS to anchor against -> empty list (the route
+ * Filter the task set by the persona gate, then anchor each surviving task to the
+ * user's EAOS, left-shifting military-track tasks by the approved SkillBridge
+ * duration. A 'none' persona has no EAOS to anchor against -> empty list (the route
  * renders the setup CTA upstream). Pure + deterministic.
  */
 export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): AnchoredTask[] {
@@ -78,15 +76,15 @@ export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): Ancho
 		});
 }
 
-/** Display status for a task card (TL-7): paired with a text label in the view (never color-only). */
+/** Display status for a task card: paired with a text label in the view (never color-only). */
 export type DisplayStatus = 'upcoming' | 'start-now' | 'overdue' | 'done' | 'skipped' | 'snoozed';
 
 /**
- * Derive a task's display status (TL-7). Stored terminal/deferred state wins: 'done' and
+ * Derive a task's display status. Stored terminal/deferred state wins: 'done' and
  * 'skipped' override the date; 'snoozed' holds only while snoozeUntil is still in the future
- * and otherwise auto-reopens (spec section 9). With no overriding stored state the status is
+ * and otherwise auto-reopens. With no overriding stored state the status is
  * date-derived against the anchored window: before it opens = upcoming, inside = start-now,
- * past = overdue. Both ends are UTC ISO dates so time-of-day cannot shift the result (F-C-9).
+ * past = overdue. Both ends are UTC ISO dates so time-of-day cannot shift the result.
  */
 export function deriveStatus(
 	anchored: AnchoredTask,
@@ -143,9 +141,9 @@ export type TimelinePhase = {
 export type TimelineView = {
 	phases: TimelinePhase[];
 	total: number;
-	todayMarkerIndex?: number; // C5: list index for the "Today" divider; absent for a none persona
-	todayDate?: string; // C5: ISO date the view was generated for (the Today marker's label)
-	daysToSeparation?: number; // C5: whole days from today to EAOS (the "X days left" count)
+	todayMarkerIndex?: number; // list index for the "Today" divider; absent for a none persona
+	todayDate?: string; // ISO date the view was generated for (the Today marker's label)
+	daysToSeparation?: number; // whole days from today to EAOS (the "X days left" count)
 };
 
 /**
@@ -162,7 +160,7 @@ function bucketIndexFor(offset: number): number {
 	return PHASE_BUCKETS.length - 1;
 }
 
-/** Tally a phase's items by display status (C4-4: header progress count + the collapse decision). */
+/** Tally a phase's items by display status (header progress count + the collapse decision). */
 function tallyCounts(items: TimelineItem[]): PhaseCounts {
 	const counts: PhaseCounts = { done: 0, skipped: 0, snoozed: 0, toDo: 0 };
 	for (const item of items) {
@@ -184,7 +182,7 @@ function tallyCounts(items: TimelineItem[]): PhaseCounts {
 }
 
 /**
- * Index in the rendered phase list where the C5 "Today" divider renders: before the first phase
+ * Index in the rendered phase list where the "Today" divider renders: before the first phase
  * that is NOT fully in the past (its endOffset is beyond today). Every phase past -> after the last
  * (phases.length). todayOffset = days from EAOS to today (negative = before separation), the same
  * sign convention as the bucket offsets.
@@ -198,9 +196,9 @@ export function todayMarkerIndex(
 }
 
 /**
- * Assemble the full timeline projection (spec section 5): filter (TL-5) + anchor (TL-3),
- * derive status (TL-7), sort furthest-out first (TL-6), group into PHASE_BUCKETS and drop
- * empty buckets (TL-9). A 'none' persona yields an empty view (the route shows the setup
+ * Assemble the full timeline projection: filter + anchor,
+ * derive status, sort furthest-out first, group into PHASE_BUCKETS and drop
+ * empty buckets. A 'none' persona yields an empty view (the route shows the setup
  * CTA). Pure + deterministic; stores nothing.
  */
 export function generateTimeline(
@@ -242,7 +240,7 @@ export function generateTimeline(
 		if (items.length === 0) continue;
 		const counts = tallyCounts(items);
 		// Collapsible only when every task is resolved as done/skipped - any snoozed (paused) or
-		// active task keeps the phase open (C4-4, spec section 7).
+		// active task keeps the phase open.
 		const collapsible = counts.toDo === 0 && counts.snoozed === 0;
 		phases.push({ bucket, items, count: items.length, counts, collapsible });
 	}

@@ -1,14 +1,12 @@
 /**
  * EAOS (End of Active Obligated Service) date validation primitives.
  *
- * Two validation paths per spec section 10:
+ * Two validation paths:
  * - validateEaosAtInput: STRICT (input/edit; range-checked against today)
  * - parseEaosAtRead: LENIENT (load path; no range check; only calendar validity)
  *
  * Errors are PII-free: cause enum, never includes input string.
- * Date math is UTC-anchored to eliminate timezone off-by-one (F-C-9).
- *
- * Source: Phase 2 spec section 10 (EAOS validation contract).
+ * Date math is UTC-anchored to eliminate timezone off-by-one.
  */
 
 export type EaosString = string & { readonly __brand: 'EaosString' };
@@ -61,7 +59,7 @@ const FUTURE_YEARS = 15;
  * Strict input-path validator: calendar-valid AND within [today - 5y, today + 15y].
  *
  * "today" is read via UTC getters so the comparison is anchored to the same UTC
- * calendar as the Date.UTC-built input value - no timezone off-by-one (F-C-9).
+ * calendar as the Date.UTC-built input value - no timezone off-by-one.
  */
 export function validateEaosAtInput(s: string, today = new Date()): EaosString {
 	const { y, m, d } = parseEaosCalendar(s);
@@ -108,7 +106,7 @@ const MS_PER_DAY = 86_400_000;
 /**
  * Whole-day count from "today" to the EAOS. Both ends are UTC-anchored (the EAOS
  * via Date.UTC, "today" via UTC getters) so neither timezone nor time-of-day can
- * shift the result (F-C-9). Positive = future, negative = past, 0 = today.
+ * shift the result. Positive = future, negative = past, 0 = today.
  */
 export function daysUntilSeparation(eaos: EaosString, now = new Date()): number {
 	const { y, m, d } = parseEaosCalendar(eaos);
@@ -123,7 +121,7 @@ export function daysUntilSeparation(eaos: EaosString, now = new Date()): number 
  * The Timeline Engine anchors every task to the separation date: a task's target
  * date is EAOS shifted by its day offset (negative = before separation). Both ends
  * are UTC-anchored (EAOS via Date.UTC, output via toISOString) so neither timezone
- * nor time-of-day can shift the result by a day (F-C-9, same as daysUntilSeparation).
+ * nor time-of-day can shift the result by a day (same as daysUntilSeparation).
  *
  * Returns a plain ISO date string, not a branded EaosString - the projection is a
  * derived target date, not a user-entered/validated EAOS.

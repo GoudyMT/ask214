@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { formatTimelineDate } from './format-date';
 
 // formatTimelineDate turns an engine ISO date (YYYY-MM-DD, UTC-anchored from eaosOffsetDate)
-// into the human "Mon D, YYYY" form the timeline cards + the route subline display (locked
-// Session 19: mockup uses human dates; raw ISO is for storage/anchoring only).
+// into the human "Mon D, YYYY" form the timeline cards + the route subline display
+// (mockup uses human dates; raw ISO is for storage/anchoring only).
 
 describe('formatTimelineDate', () => {
 	it('formats an ISO date as "Mon D, YYYY"', () => {

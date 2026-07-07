@@ -5,9 +5,9 @@ import TaskCard from './TaskCard.svelte';
 import { snoozeUntilIso } from '$lib/timeline/snooze';
 import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
 
-// TaskCard renders one generated TimelineItem as an open status card (C3): status-color left
+// TaskCard renders one generated TimelineItem as an open status card: status-color left
 // edge + text status label (never color-only) + a status-specific date line + category chip +
-// why. C4 adds the action row: Mark done / Skip (increment 1) + Snooze (increment 2).
+// why. The action row: Mark done / Skip + Snooze.
 
 const DEF: TaskDef = {
 	id: 'skillbridge-hosts',
@@ -186,7 +186,7 @@ describe('TaskCard (open states)', () => {
 	});
 });
 
-// C4 increment 3: resolved tasks (done/skipped/snoozed) collapse to a one-line disclosure
+// Resolved tasks (done/skipped/snoozed) collapse to a one-line disclosure
 // (decision A: snoozed shows "to <date>"; done/skipped show no date). Tapping expands to the
 // full card with a unified Restore action (decision B: onSetStatus(id, undefined)). Open states
 // are unchanged. Collapse state is ephemeral local $state.

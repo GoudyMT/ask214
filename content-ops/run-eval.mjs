@@ -7,14 +7,14 @@
 //
 // The hybrid experiment (src/lib/corpus/bm25.ts + hybrid.ts + the tune gridSearch) is retained + tested as
 // the v1.1 lever (form-number queries + the correct-empty guarantee, which no client-side threshold can
-// deliver - the A4 charter Measured Result); it is intentionally NOT used here because v1.0 ships dense.
+// deliver - the retrieval charter's measured result); it is intentionally NOT used here because v1.0 ships dense.
 // Pure logic lives in the tested units under src/lib/**; this file only injects the real model + orchestrates.
 //
-// NOTE (A4 sweep M1/L4): the held-out split is small (~15 positives), so the ranking floor is a knife-edge -
+// NOTE: the held-out split is small (~15 positives), so the ranking floor is a knife-edge -
 // 0.800 is exactly 12/15, and the MIN_SCORE calibration is flat across 0-0.4 (no held-out lead near the 0.4
-// cutoff). If a future A5 refresh marginally misses, GROW the eval set (more positives per source, incl. a
+// cutoff). If a future refresh marginally misses, GROW the eval set (more positives per source, incl. a
 // deliberately weak-scoring lead near the cutoff) BEFORE touching the model/thresholds - a one-query swing is
-// sample noise, not a retrieval regression. See docs/sweeps/2026-07-04-content-ops-a4.md.
+// sample noise, not a retrieval regression.
 import { readFileSync } from 'node:fs';
 import { pipeline } from '@huggingface/transformers';
 import { decodeCorpus, cosineSimilarity } from '../src/lib/corpus/index.ts';

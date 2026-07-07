@@ -6,7 +6,7 @@
 
 	// One chip per non-empty phase (the engine already drops empty buckets). Each chip carries the
 	// bucket's scroll-target id, a compact label (full label only as a fallback), and the total task
-	// count in that phase - a stable "size of each phase" nav signal (locked C5).
+	// count in that phase - a stable "size of each phase" nav signal.
 	const chips = $derived(
 		view.phases.map((p) => ({
 			id: p.bucket.id,
@@ -17,14 +17,14 @@
 
 	let activeId = $state<string | null>(null);
 
-	// Click a chip -> smooth-scroll to that phase's <section> (jump-to, NOT filter; spec section 7).
+	// Click a chip -> smooth-scroll to that phase's <section> (jump-to, NOT filter).
 	// The sections are rendered by TimelineList (siblings in the route); we reach them by bucket id.
 	function jumpTo(id: string): void {
 		document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
 
 	// Scroll-spy: highlight the in-view phase as the user scrolls. Browser-only (IntersectionObserver);
-	// the active-state is verified by the Arc D E2E, not the component test. Observes the section set
+	// the active-state is verified by the E2E, not the component test. Observes the section set
 	// once at mount - the phase sections are stable for the session (status changes never remove items).
 	onMount(() => {
 		const sections = chips
@@ -63,7 +63,7 @@
 
 <style>
 	/* Sticky under the title, below the sticky header. The `top` offset clears the header height
-	   (locked at the C5 visual checkpoint). Opaque background so list content scrolls cleanly beneath. */
+	   (locked at the visual checkpoint). Opaque background so list content scrolls cleanly beneath. */
 	.phase-chips {
 		position: sticky;
 		top: 3.5rem;

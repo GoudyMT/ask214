@@ -58,7 +58,7 @@ describe('EaosInput', () => {
 		expect(input?.getAttribute('aria-invalid')).not.toBe('true');
 	});
 
-	it('registers its input so a relock scrub clears the typed value (spec 8 DOM hygiene)', async () => {
+	it('registers its input so a relock scrub clears the typed value (DOM hygiene)', async () => {
 		const { container } = render(EaosInput, { props: { ...baseProps, value: '2027-04-15' } });
 		const input = container.querySelector('input');
 		await tick(); // let the registration $effect run

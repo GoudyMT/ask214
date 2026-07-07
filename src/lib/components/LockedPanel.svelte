@@ -4,7 +4,7 @@
 </script>
 
 <!--
-  Locked-state panel (master spec 5.6). Presentational: a PII surface (e.g. Settings) renders
+  Locked-state panel. Presentational: a PII surface (e.g. Settings) renders
   this when store.locked is true and wires onunlock to a re-load (load() re-decrypts from the
   local key; no passphrase in v1.0). Shared app-wide PII-surface pattern, defined here once.
 -->
@@ -40,7 +40,7 @@
 		color: var(--color-fg-muted);
 	}
 
-	/* Primary CTA (spec 5.5 primitive 15): filled accent + bg-colored text. */
+	/* Primary CTA: filled accent + bg-colored text. */
 	.locked-panel__unlock {
 		padding: var(--space-s) var(--space-l);
 		background: var(--color-accent);

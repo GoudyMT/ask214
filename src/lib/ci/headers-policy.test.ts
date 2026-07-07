@@ -24,7 +24,7 @@ describe('_headers policy (P1b)', () => {
 
 	it('profile-touching routes set Cache-Control: no-store (BFCache opt-out)', () => {
 		// PII routes must not be cached / BFCache-restored with decrypted state in memory
-		// (ADR-009 memory hygiene). /settings/security is NOT included - it does not exist in
+		// (memory hygiene). /settings/security is NOT included - it does not exist in
 		// v1.0 (passphrase route deferred to v1.1).
 		for (const path of ['/wizard', '/settings', '/settings/*']) {
 			expect(headers.get(path)?.['Cache-Control'], `${path} must set no-store`).toBe('no-store');

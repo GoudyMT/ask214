@@ -16,14 +16,14 @@ const config = {
 			mode: 'hash',
 			directives: {
 				'default-src': ['self'],
-				// 'wasm-unsafe-eval' lets the embedding worker compile the self-hosted ONNX WASM
-				// (ADR-014); it does NOT permit JS eval(). connect-src stays 'self' - no third-party fetch.
+				// 'wasm-unsafe-eval' lets the embedding worker compile the self-hosted ONNX WASM;
+				// it does NOT permit JS eval(). connect-src stays 'self' - no third-party fetch.
 				'script-src': ['self', 'wasm-unsafe-eval'],
 				'style-src': ['self', 'unsafe-inline'],
 				'img-src': ['self', 'data:'],
 				'font-src': ['self', 'data:'],
-				// connect-src restricted to 'self' for Phase 1. Google hosts will be added in
-				// Task 1.7 (Google Calendar OAuth) with an ADR documenting the exact host
+				// connect-src restricted to 'self' for Phase 1. Google hosts will be added
+				// when Google Calendar OAuth lands, with an ADR documenting the exact host
 				// list (accounts.google.com, oauth2.googleapis.com, www.googleapis.com).
 				// Pre-allowing them now would widen attack surface for zero current benefit.
 				'connect-src': ['self'],

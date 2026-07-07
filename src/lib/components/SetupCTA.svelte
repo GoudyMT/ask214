@@ -3,7 +3,7 @@
 </script>
 
 <!--
-  Shared profile-setup CTA (master spec 5.6). One element, identical copy in every
+  Shared profile-setup CTA. One element, identical copy in every
   context (Home re-engagement prompt + feature-route empty state) so it cannot leak
   which route the user is on. Presentational; the parent positions it.
 -->

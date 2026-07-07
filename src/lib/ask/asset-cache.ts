@@ -4,7 +4,7 @@ export type CacheStrategy = 'precache' | 'lazy';
  * Decide how the service worker caches a same-origin static asset. The heavy on-device search model +
  * ORT WASM (~45MB total: model + asyncify WASM) are cached LAZILY - fetched + cached on first use (first /ask), never eagerly
  * precached at install - so SW install stays light + robust (a flaky connection can't fail the whole
- * install on the ~45MB) and the model downloads only when the user opts into Ask (ADR-015 / spec section 9).
+ * install on the ~45MB) and the model downloads only when the user opts into Ask.
  * Everything else (the app shell + the tiny corpus) is precached so the app works offline immediately.
  *
  * The lazy prefixes mirror the worker's self-host config: `localModelPath = '/models/'` and
@@ -19,7 +19,7 @@ export function classifyAsset(pathname: string): CacheStrategy {
  * The lazy model + ORT WASM (~45MB) live in this OWN, UNVERSIONED cache - separate from the versioned
  * app-shell cache (`app-${version}`). The SW's activate cleanup deletes stale app-shell caches on every
  * update; keeping the heavy download here means an app update does NOT evict it (so the "downloaded once,
- * works offline" promise holds - sweep S26 H2). Cleared only by an explicit wipe.
+ * works offline" promise holds). Cleared only by an explicit wipe.
  */
 export const ASK_ASSET_CACHE = 'ask-assets';
 

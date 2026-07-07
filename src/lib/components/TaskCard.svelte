@@ -21,8 +21,8 @@
 	let showDateInput = $state(false);
 	let dateValue = $state('');
 
-	// C4 increment 3: resolved tasks (done/skipped/snoozed) collapse to a one-line disclosure.
-	// Expansion is ephemeral local state (spec section 7 - collapse state is never stored).
+	// Resolved tasks (done/skipped/snoozed) collapse to a one-line disclosure.
+	// Expansion is ephemeral local state (collapse state is never stored).
 	let expanded = $state(false);
 	const isResolved = $derived(
 		item.status === 'done' || item.status === 'skipped' || item.status === 'snoozed'
@@ -57,7 +57,7 @@
 		dateValue = '';
 	}
 
-	// Inline note editor (C4 increment 4): Add/Edit note -> textarea (prefilled with any existing
+	// Inline note editor: Add/Edit note -> textarea (prefilled with any existing
 	// note); Save commits via onSetNote (empty string clears it); Cancel discards.
 	let noteOpen = $state(false);
 	let noteValue = $state('');
@@ -94,7 +94,7 @@
 		finance: 'Finance'
 	};
 
-	// Status-specific date line (locked Session 19): upcoming -> when to start (target date);
+	// Status-specific date line: upcoming -> when to start (target date);
 	// start-now -> the closing deadline; overdue -> how long past it. Resolved states use the
 	// collapsed treatment instead (this line is only read on open cards).
 	const dateLine = $derived.by(() => {
@@ -238,7 +238,7 @@
 {/if}
 
 <style>
-	/* Open status card (spec section 7 + timeline-states.html mockup): a surface panel with a
+	/* Open status card (timeline-states.html mockup): a surface panel with a
 	   status-colored 4px left edge; content-left (title / category chip + why), meta-right
 	   (status label in the status color + date). Status is ALWAYS color + text label (WCAG, no
 	   color-only). Reuses the locked state-color + size tokens (the mockup's sub-14px sizes are
@@ -289,8 +289,8 @@
 		font-size: var(--font-size-s);
 	}
 
-	/* Action row (C4): quiet accent-link buttons (real <button>s for a11y, styled like the
-	   mockup's action links). Add note joins here in a later C4 increment. */
+	/* Action row: quiet accent-link buttons (real <button>s for a11y, styled like the
+	   mockup's action links). Add note joins here later. */
 	.task-card__actions {
 		display: flex;
 		gap: var(--space-m);
@@ -311,7 +311,7 @@
 		text-decoration: underline;
 	}
 
-	/* Inline snooze picker (C4 increment 2, Option B): preset pills + a "Customize" date input,
+	/* Inline snooze picker (Option B): preset pills + a "Customize" date input,
 	   in an inset panel under the action row. */
 	.task-card__snooze {
 		margin-top: var(--space-s);
@@ -403,7 +403,7 @@
 		cursor: default;
 	}
 
-	/* Inline note editor (C4 increment 4): a full-width textarea + Save/Cancel, styled like the
+	/* Inline note editor: a full-width textarea + Save/Cancel, styled like the
 	   snooze inset (accent-bordered field; accent Save; quiet Cancel). */
 	.task-card__note {
 		margin-top: var(--space-s);
@@ -458,7 +458,7 @@
 		cursor: pointer;
 	}
 
-	/* Saved note display (C4 increment 4): an inset panel under the why; small uppercase label. */
+	/* Saved note display: an inset panel under the why; small uppercase label. */
 	.task-card__note-shown {
 		margin-top: var(--space-s);
 		padding: var(--space-s) var(--space-m);
@@ -526,7 +526,7 @@
 		margin-top: var(--space-s);
 	}
 
-	/* Collapsed resolved line (C4 increment 3; timeline-states.html mockup): a thinner 2px status
+	/* Collapsed resolved line (timeline-states.html mockup): a thinner 2px status
 	   edge vs the open card's 4px; one line of title (truncated) + status label + a right-caret. The
 	   whole line is the disclosure control (button + aria-expanded); tapping expands the full card. */
 	/* Note-dot on a collapsed resolved line: signals a note exists (expand to read it). */
@@ -622,7 +622,7 @@
 		border-right: none;
 	}
 
-	/* Category chip colors (Option C, Session 19): soft-filled tag - colored text + low-opacity
+	/* Category chip colors (Option C): soft-filled tag - colored text + low-opacity
 	   fill + tinted border, per category. Always paired with the category text label (not
 	   color-only). Distinct from the status palette so a chip never reads as a status. */
 	.category-medical {
@@ -651,8 +651,8 @@
 		background: color-mix(in srgb, var(--color-category-finance) 15%, transparent);
 	}
 
-	/* Status edge + label colors. Open states (C3): upcoming / start-now / overdue. Resolved states
-	   (C4 inc 3): done / skipped / snoozed - colors MATCH the collapsed line so a status keeps its
+	/* Status edge + label colors. Open states: upcoming / start-now / overdue. Resolved states:
+	   done / skipped / snoozed - colors MATCH the collapsed line so a status keeps its
 	   color across collapse/expand (skipped stays full-opacity when expanded - you're reviewing it). */
 	.status-upcoming {
 		border-left-color: var(--color-border);

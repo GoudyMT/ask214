@@ -164,7 +164,7 @@ describe('daysUntilSeparation', () => {
 	it('is timezone-stable: two instants on the same UTC date return the same value', () => {
 		const eaos = '2027-01-01' as EaosString;
 		// 03:00 UTC and 23:00 UTC are the same UTC calendar date (2026-05-26);
-		// UTC anchoring means time-of-day must not shift the day count (F-C-9).
+		// UTC anchoring means time-of-day must not shift the day count.
 		const early = new Date('2026-05-26T03:00:00Z');
 		const late = new Date('2026-05-26T23:00:00Z');
 		expect(daysUntilSeparation(eaos, early)).toBe(daysUntilSeparation(eaos, late));

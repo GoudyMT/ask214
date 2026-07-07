@@ -4,7 +4,7 @@
 // valid-source SET), lexical/form-number (BM25's job), or a genuine retrieval miss.
 //
 // Run: pnpm exec tsx content-ops/audit-misses.mjs  (the standing miss-audit tool; re-run after a corpus or
-// query change to re-classify misses - it produced the altSources multi-valid-source finding in A4).
+// query change to re-classify misses - it produced the altSources multi-valid-source finding).
 import { readFileSync } from 'node:fs';
 import { pipeline } from '@huggingface/transformers';
 import { decodeCorpus, cosineSimilarity } from '../src/lib/corpus/index.ts';

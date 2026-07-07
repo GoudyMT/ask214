@@ -6,7 +6,7 @@ import type { Block } from '../extract/pdf-text';
 // (the real WordPiece tokenizer is injected only in the orchestrator).
 const words = (t: string): number => (t.trim() === '' ? 0 : t.trim().split(/\s+/).length);
 
-// Build the normalizedText the way A2.5 does: per-block normalized text joined by single spaces.
+// Build the normalizedText the way the block extractor does: per-block normalized text joined by single spaces.
 function nt(blocks: Block[]): string {
 	return blocks.map((b) => b.text).join(' ');
 }

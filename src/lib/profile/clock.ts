@@ -4,10 +4,8 @@
  *
  * `updateLastSeen` keeps the mark MONOTONIC and caps forward jumps at one year - a
  * malicious or broken clock cannot ratchet it to `Number.MAX_SAFE_INTEGER` and
- * poison every future comparison (resolves F-C-7). `isClockBackward` flags a clock
+ * poison every future comparison. `isClockBackward` flags a clock
  * that moved meaningfully backward so the UI can warn instead of silently corrupting.
- *
- * Source: Phase 2 spec section 12 ("Clock-Sanity Policy").
  */
 export const MAX_FUTURE_MS = 365 * 86_400_000;
 const BACKWARD_GRACE_MS = 24 * 3600 * 1000;

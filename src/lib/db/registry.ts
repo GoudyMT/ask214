@@ -6,8 +6,6 @@
  *
  * Rotation/migration manifests enumerate this registry; adding a new encrypted
  * store therefore requires registering it here.
- *
- * Source: Phase 2 spec section 4 (invariant 7: encrypted-store enumeration).
  */
 export const ENCRYPTED_STORES = Object.freeze(['profile', 'timeline-state'] as const);
 

@@ -9,8 +9,6 @@ import type { KeystoreRecordV1 } from '../keystore/record';
  * the original profile-specific implementation ([iv:12][ct+tag], no plaintext header;
  * schemaVersion lives in the encrypted JSON and is checked by decodeProfile post-auth;
  * 6-field AAD binds location + write generation + schema + keystore state).
- *
- * Source: Phase 2 spec sections 4-5; plan v2 T3-A + T3-B; Timeline plan A1 (extract).
  */
 const PROFILE_CTX: RecordCtx = { storeName: 'profile', recordId: 'self', schemaVersion: 1 };
 

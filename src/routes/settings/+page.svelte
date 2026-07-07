@@ -74,7 +74,7 @@
 		} catch (err) {
 			if (err instanceof OccConflictError) {
 				// Reload authoritative state; stay in edit mode so the message + input stay visible
-				// (spec section 7 OCC: reload, don't clobber).
+				// (OCC: reload, don't clobber).
 				await store.load();
 				error = 'This was changed in another tab. We reloaded it - please review and save again.';
 				return;
@@ -117,8 +117,8 @@
 		wipeDialog?.close();
 		await store.wipe();
 		await app.timeline?.wipe();
-		// Defensive: the app stores no PII outside IndexedDB (ADR-004), but wipe also clears
-		// localStorage + Cache Storage for completeness (master spec section 7.6).
+		// Defensive: the app stores no PII outside IndexedDB, but wipe also clears
+		// localStorage + Cache Storage for completeness.
 		window.localStorage.clear();
 		if ('caches' in window) {
 			const keys = await window.caches.keys();
@@ -284,7 +284,7 @@
 		color: var(--color-fg);
 	}
 
-	/* Quiet action link (spec 5.5 primitive 15): accent text, underline. */
+	/* Quiet action link: accent text, underline. */
 	.settings-row__change {
 		flex: none;
 		padding: 0;
@@ -309,7 +309,7 @@
 		gap: var(--space-m);
 	}
 
-	/* Primary CTA (primitive 15): filled accent + bg-colored text. */
+	/* Primary CTA: filled accent + bg-colored text. */
 	.settings-save {
 		padding: var(--space-s) var(--space-l);
 		background: var(--color-accent);
@@ -330,7 +330,7 @@
 		cursor: default;
 	}
 
-	/* Quiet CTA (primitive 15): muted text, underline. */
+	/* Quiet CTA: muted text, underline. */
 	.settings-cancel {
 		padding: var(--space-s);
 		background: none;
@@ -341,7 +341,7 @@
 		cursor: pointer;
 	}
 
-	/* Secondary/protective CTA (primitive 15): border + fg text, not destructive. */
+	/* Secondary/protective CTA: border + fg text, not destructive. */
 	.settings-lock {
 		padding: var(--space-s) var(--space-l);
 		background: none;
@@ -363,7 +363,7 @@
 		font-size: var(--font-size-s);
 	}
 
-	/* Clock-backward reset control (spec 5.6): the deliberate "I fixed my clock" reset the
+	/* Clock-backward reset control: the deliberate "I fixed my clock" reset the
 	   app-wide ClockBackwardBanner's "Fix this" navigates to. Static --color-danger highlight
 	   + inset bg makes it stand out among settings without animation (no-motion register). */
 	.clock-notice {
@@ -391,14 +391,14 @@
 		cursor: pointer;
 	}
 
-	/* Danger zone (spec 5.6): visually separated from benign actions above it. */
+	/* Danger zone: visually separated from benign actions above it. */
 	.danger-zone {
 		margin-top: var(--space-l);
 		padding-top: var(--space-m);
 		border-top: 1px solid var(--color-border);
 	}
 
-	/* Destructive CTA (primitive 14/15): danger border + text, never a filled alarm. */
+	/* Destructive CTA: danger border + text, never a filled alarm. */
 	.danger-cta {
 		padding: var(--space-s) var(--space-l);
 		background: none;

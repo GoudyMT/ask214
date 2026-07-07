@@ -7,8 +7,6 @@ import { hmacSign, hmacVerify } from '../crypto/hmac';
  *
  * CryptoKey refs are stored via IDB structured-clone (extractable:false) and are
  * not serialized into the canonical form (SubtleCrypto does not expose key bytes).
- *
- * Source: Phase 2 spec sections 5-6; ADR-009 amended (v1.0 scope); plan v2 T6-E.
  */
 export type KeystoreRecordV1 = {
 	v: 1;
@@ -54,7 +52,7 @@ export function canonicalizeKeystore(r: KeystoreCanonicalInput): Uint8Array {
 
 /**
  * Prefixed canonical bytes that BOTH sign and verify run over. The NIST SP
- * 800-108-style domain-separation prefix (T6-E) is part of the MAC input, so a
+ * 800-108-style domain-separation prefix is part of the MAC input, so a
  * keystore-record MAC can never validate against sidecar/broadcast canonical
  * bytes of the same shape.
  */

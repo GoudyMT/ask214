@@ -9,8 +9,6 @@
  * Ring buffer is in-memory only (never persisted; no PII storage); sized 64
  * entries. No public accessor in production - getDiagnosticsForTest is gated
  * by a build-time flag.
- *
- * Source: Phase 2 spec section 11 ("Privacy Boundaries", No PII in logs).
  */
 export type ErrorCode =
 	| 'E_EAOS_FORMAT'

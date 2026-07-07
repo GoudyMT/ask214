@@ -4,10 +4,8 @@
  * app-init layer binds DOM activity events to `recordActivity()` and points `onIdle`
  * at the relock action - this factory stays free of any DOM dependency.
  *
- * No timestamp quantization (plan v2 T3-E): `lastActivity` is module-private, never
+ * No timestamp quantization: `lastActivity` is module-private, never
  * exported or broadcast, so the keystroke-cadence side-channel does not exist.
- *
- * Source: Phase 2 spec section 8 ("Idle timer") + plan v2 T3-E.
  */
 export type IdleTimerOptions = {
 	thresholdMs: number;

@@ -4,7 +4,7 @@ import { AskError, ASK_ERROR } from './errors';
 
 /**
  * Fetch the bundled corpus artifact (`<basePath>.json` + `<basePath>.embeddings.bin`) and decode it
- * via B into the in-memory `Corpus` (spec section 8). No IndexedDB / CDN in v1.0 - the artifact is a
+ * into the in-memory `Corpus`. No IndexedDB / CDN in v1.0 - the artifact is a
  * same-origin static asset served (and service-worker-cached) by the app. `fetchFn` is injected for
  * testability. Any transport or decode failure -> AskError(E_ASK_CORPUS) (never leaks input).
  */

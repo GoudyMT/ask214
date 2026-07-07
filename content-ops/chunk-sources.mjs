@@ -1,7 +1,7 @@
 // content-ops/chunk-sources.mjs
 // Run from the repo root: `pnpm chunk` (optionally one or more source_ids to scope the run). Build-time
-// chunker: reads A2's per-source extracted text, cuts it into ~256-token verbatim CorpusChunks with citation
-// anchors, and writes chunks/<id>.json for A4 to embed. Never runs on a user device. The logic lives in the
+// chunker: reads the per-source extracted text, cuts it into ~256-token verbatim CorpusChunks with citation
+// anchors, and writes chunks/<id>.json for the embed step. Never runs on a user device. The logic lives in the
 // tested pure units under src/lib/content-ops/chunk/; this script does the IO and loads the real WordPiece
 // tokenizer (the same MiniLM the Ask embedder uses, so the token budget matches the model that embeds them).
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
@@ -40,7 +40,7 @@ const extractions = {};
 const flags = [];
 
 console.log('='.repeat(60));
-console.log('CONTENT-OPS A3 - CHUNK + ANCHOR');
+console.log('CONTENT-OPS - CHUNK + ANCHOR');
 console.log('='.repeat(60));
 
 for (const file of files) {

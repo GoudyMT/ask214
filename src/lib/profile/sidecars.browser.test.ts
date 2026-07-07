@@ -62,7 +62,7 @@ describe('signSidecar / verifySidecar', () => {
 		await expect(verifySidecar('other-name', signed, hmacKey)).rejects.toThrow(SidecarTamperError);
 	});
 
-	it('cross-domain (T6-E): a sidecar MAC does not collide with a keystore-record HMAC for matching content', async () => {
+	it('cross-domain: a sidecar MAC does not collide with a keystore-record HMAC for matching content', async () => {
 		// Same key + overlapping fields; the mtc-v1|sidecar| vs mtc-v1|keystore-record|
 		// domain prefixes (and distinct canonical formats) keep the two MAC domains
 		// disjoint, so a stolen sidecar MAC can never authenticate a keystore record.

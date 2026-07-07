@@ -4,9 +4,9 @@
 </script>
 
 <!--
-  Backward-clock warning (master spec 5.6). Presentational + non-blocking: the parent
+  Backward-clock warning. Presentational + non-blocking: the parent
   (+layout) mounts this only while store.clockBackward is true. NON-DISMISSIBLE by design
-  (Session 15) - a wrong clock corrupts every timeline date, so the only ways it clears are
+  - a wrong clock corrupts every timeline date, so the only ways it clears are
   correcting the device clock or the deliberate "I fixed my clock" reset in Settings (onfix).
   Full-width strip; content centered in the 720px column to align with the header/main.
 -->
