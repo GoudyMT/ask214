@@ -26,7 +26,11 @@ export function backfillCaptureFields(
 export type ExistingCaptureState = { content_hash?: unknown; captured_at?: unknown };
 
 /** A fresh capture result for one source: the content hash plus its content type. */
-export type IncomingCapture = { contentHash: string; contentType: 'pdf' | 'html' };
+export type IncomingCapture = {
+	contentHash: string;
+	contentType: 'pdf' | 'html';
+	sourceUpdatedDate?: string;
+};
 
 /**
  * Resolve the four capture fields for one source, idempotently. `captured_at` refreshes to `now` only

@@ -18,6 +18,7 @@ export type PendingSource = {
 	oldHash: string;
 	newHash?: string;
 	stagedPath?: string;
+	sourceUpdatedDate?: string;
 	decision: 'pending' | 'approved';
 };
 
@@ -86,6 +87,7 @@ export function buildReviewReport(inputs: ReviewInput[], buildDate: string): Rev
 			};
 			if (i.newHash !== undefined) s.newHash = i.newHash;
 			if (i.stagedPath !== undefined) s.stagedPath = i.stagedPath;
+			if (i.newDate !== undefined) s.sourceUpdatedDate = i.newDate;
 			return s;
 		})
 	};

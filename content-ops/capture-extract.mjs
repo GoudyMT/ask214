@@ -237,7 +237,7 @@ async function robotsAllows(origin, pathname) {
 /** Shared finisher for every HTML capture method (fetch / headless / manual): audit copy + extract + write
  *  the per-source extracted JSON. `bytes` = the captured bytes; `rawHtml` = those bytes as text for
  *  extraction; `method` is recorded for provenance. */
-async function writeHtmlArtifacts(entry, origin, bytes, rawHtml, method) {
+async function writeHtmlArtifacts(entry, origin, bytes, rawHtml, method, lastModified) {
 	const record = await auditCopyRecord(bytes, 'html');
 	// Path from CAPTURES_DIR (not record.capturedPath) so the staging redirect applies; normal mode
 	// is byte-identical (CAPTURES_DIR = content-ops/captures).
@@ -254,7 +254,8 @@ async function writeHtmlArtifacts(entry, origin, bytes, rawHtml, method) {
 				textLayerPresent: result.textLayerPresent,
 				capture_method: method,
 				blocks: result.blocks,
-				normalizedText: result.normalizedText
+				normalizedText: result.normalizedText,
+				...(lastModified ? { last_modified: lastModified } : {})
 			},
 			null,
 			2
@@ -273,7 +274,17 @@ async function captureHtml(entry) {
 	const res = await fetch(entry.url, { headers: { 'user-agent': USER_AGENT } });
 	if (!res.ok) throw new Error('E_INGEST_FETCH_BLOCKED');
 	const bytes = new Uint8Array(await res.arrayBuffer()); // byte-exact audit copy
-	return writeHtmlArtifacts(entry, origin, bytes, new TextDecoder('utf-8').decode(bytes), 'fetch');
+	const lm = res.headers.get('last-modified');
+	const d = lm ? new Date(lm) : null;
+	const lastModified = d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : undefined;
+	return writeHtmlArtifacts(
+		entry,
+		origin,
+		bytes,
+		new TextDecoder('utf-8').decode(bytes),
+		'fetch',
+		lastModified
+	);
 }
 
 /** Headless HTML capture: a real browser renders a page that blocked the plain fetch. The rendered DOM is the
@@ -290,12 +301,16 @@ async function captureHtmlHeadless(entry, browser) {
 		if (!res || !res.ok()) throw new Error('E_INGEST_HEADLESS_BLOCKED');
 		await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {}); // best-effort settle
 		const rawHtml = await page.content();
+		const lm = res.headers()['last-modified'];
+		const d = lm ? new Date(lm) : null;
+		const lastModified = d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : undefined;
 		return writeHtmlArtifacts(
 			entry,
 			origin,
 			new TextEncoder().encode(rawHtml),
 			rawHtml,
-			'headless'
+			'headless',
+			lastModified
 		);
 	} finally {
 		await page.close();

@@ -51,4 +51,17 @@ describe('buildReviewReport', () => {
 		expect(manifest.sources.map((s) => s.decision)).toEqual(['pending', 'pending']);
 		expect(manifest.sources[0]?.sourceId).toBe('va_intent_to_file');
 	});
+
+	it('carries the detected source updated date into the manifest when the change record has one', () => {
+		const withDate: ReviewInput = { ...changed, newDate: '2026-05-01' };
+		const { manifest } = buildReviewReport([withDate], '2026-07-06');
+		expect(manifest.sources[0]?.sourceUpdatedDate).toBe('2026-05-01');
+	});
+
+	it('omits sourceUpdatedDate (no undefined key) when the change record has none', () => {
+		const { manifest } = buildReviewReport([changed], '2026-07-06');
+		expect(Object.prototype.hasOwnProperty.call(manifest.sources[0], 'sourceUpdatedDate')).toBe(
+			false
+		);
+	});
 });

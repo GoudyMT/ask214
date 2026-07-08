@@ -88,4 +88,22 @@ describe('stampSourcesYaml', () => {
 		expect(out).toContain(`terms_notes: '${longNote}'`);
 		expect(out).toContain('content_hash: x');
 	});
+
+	test('sets source_updated_date when the incoming carries one, leaving other entries untouched', () => {
+		const out = stampSourcesYaml(
+			FIXTURE,
+			{ va_x: { contentHash: 'aaa', contentType: 'html', sourceUpdatedDate: '2026-05-01' } },
+			NOW
+		);
+		const va = parse(out).find((e) => e.source_id === 'va_x');
+		expect(va.source_updated_date).toBe('2026-05-01');
+		expect(va.content_hash).toBe('aaa'); // the capture fields are still stamped in the same pass
+		const tap = parse(out).find((e) => e.source_id === 'tap_y');
+		expect('source_updated_date' in tap).toBe(false);
+	});
+
+	test('omits source_updated_date when the incoming does not carry one (existing callers unaffected)', () => {
+		const va = parse(stampSourcesYaml(FIXTURE, incoming, NOW)).find((e) => e.source_id === 'va_x');
+		expect('source_updated_date' in va).toBe(false);
+	});
 });

@@ -1,11 +1,12 @@
 import { parseDocument, isMap, isSeq } from 'yaml';
-import { resolveBackfill, backfillCaptureFields } from '../../src/lib/content-ops/capture/backfill';
+import {
+	resolveBackfill,
+	backfillCaptureFields,
+	type IncomingCapture
+} from '../../src/lib/content-ops/capture/backfill';
 
-/** Per-source fresh capture results, keyed by source_id: the content hash + its content type. */
-export type IncomingBySourceId = Record<
-	string,
-	{ contentHash: string; contentType: 'pdf' | 'html' }
->;
+/** Per-source fresh capture results, keyed by source_id. */
+export type IncomingBySourceId = Record<string, IncomingCapture>;
 
 /**
  * Stamp the capture fields onto matching `sources.yaml` entries WITHOUT disturbing the file's comments
@@ -34,6 +35,8 @@ export function stampSourcesYaml(
 		};
 		const fields = backfillCaptureFields({}, resolveBackfill(existing, incoming, now));
 		for (const [key, value] of Object.entries(fields)) node.set(key, value);
+		if (incoming.sourceUpdatedDate !== undefined)
+			node.set('source_updated_date', incoming.sourceUpdatedDate);
 	}
 	// lineWidth 0 disables yaml's 80-col wrapping, so long scalars (e.g. terms_notes) are never re-folded -
 	// the diff touches only the entries we actually stamp, keeping the legal-record change reviewable.
