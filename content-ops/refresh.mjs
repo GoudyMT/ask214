@@ -29,6 +29,12 @@ import { stagedFileName } from '../src/lib/content-ops/capture/staged-file.ts';
 import { applyApproval } from '../src/lib/content-ops/refresh/approval.ts';
 import { stampSourcesYaml } from './backfill/stamp-sources.ts';
 
+/** @typedef {import('../src/lib/content-ops/sources-schema.ts').SourceEntry} SourceEntry */
+/** @typedef {import('../src/lib/content-ops/refresh/review-report.ts').ReviewInput} ReviewInput */
+/** @typedef {import('../src/lib/content-ops/refresh/review-report.ts').PendingManifest} PendingManifest */
+/** @typedef {import('./backfill/stamp-sources.ts').IncomingBySourceId} IncomingBySourceId */
+/** @typedef {{ content_hash: string, blocks: { text: string, tag?: string }[], normalizedText: string, last_modified?: string }} ExtractedDoc */
+
 const SOURCES_YAML = 'content/sources.yaml';
 const BASELINE_EXTRACTED = 'content-ops/extracted'; // the shipped baseline extractions (blocks + content_hash)
 const STAGING_ROOT = 'content-ops/refresh/staging'; // the fresh re-capture lands here, never the baseline
@@ -39,7 +45,8 @@ const OUT_DIR = 'content-ops/refresh'; // review-<date>.md + pending-<date>.json
 const DATE = new Date().toISOString().slice(0, 10);
 
 /** The self-contained manual-check runbook per source type - paths mirror capture-extract's real conventions
- *  (staged PDFs under content-ops/staged/<name>; saved HTML under content-ops/staged/manual-html/<id>.html). */
+ *  (staged PDFs under content-ops/staged/<name>; saved HTML under content-ops/staged/manual-html/<id>.html).
+ *  @param {SourceEntry} entry */
 function manualRunbook(entry) {
 	if (entry.content_type === 'pdf') {
 		const file = stagedFileName(entry.terms_notes) ?? `${entry.source_id}.pdf`;
@@ -55,13 +62,17 @@ function manualRunbook(entry) {
 	};
 }
 
-/** Read a per-source extracted JSON ({ content_hash, blocks, normalizedText }) or null if absent. */
+/** Read a per-source extracted JSON ({ content_hash, blocks, normalizedText }) or null if absent.
+ *  @param {string} dir @param {string} sourceId @returns {ExtractedDoc | null} */
 function readExtract(dir, sourceId) {
 	const path = join(dir, `${sourceId}.json`);
-	return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
+	return existsSync(path)
+		? /** @type {ExtractedDoc} */ (JSON.parse(readFileSync(path, 'utf8')))
+		: null;
 }
 
-/** SHA-256 hex of the extracted-content fingerprint (normalizedText) - the change-detection signal. */
+/** SHA-256 hex of the extracted-content fingerprint (normalizedText) - the change-detection signal.
+ *  @param {string} s @returns {string} */
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
 function detect() {
@@ -87,12 +98,13 @@ function detect() {
 	}
 
 	// Step 3: classify every source - a staging extract present -> auto (hash-compare); absent -> manual-check-required.
-	const registry = parse(readFileSync(SOURCES_YAML, 'utf8'));
+	const registry = /** @type {SourceEntry[]} */ (parse(readFileSync(SOURCES_YAML, 'utf8')));
+	/** @type {ReviewInput[]} */
 	const changes = [];
 	for (const entry of registry) {
 		const baseline = {
 			sourceId: entry.source_id,
-			contentHash: entry.content_hash,
+			contentHash: entry.content_hash ?? '', // an uncaptured source has no baseline hash yet -> '' sentinel
 			...(entry.source_updated_date ? { sourceUpdatedDate: entry.source_updated_date } : {})
 		};
 		const common = {
@@ -122,6 +134,7 @@ function detect() {
 			hash: sha256(staged.normalizedText),
 			...(staged.last_modified ? { updatedDate: staged.last_modified } : {})
 		});
+		/** @type {ReviewInput} */
 		const input = {
 			...record,
 			...common,
@@ -150,6 +163,7 @@ function detect() {
 }
 
 const ARGS = process.argv.slice(2);
+/** @param {string[]} args */
 const RUN_PNPM = (args) =>
 	execFileSync('pnpm', args, { stdio: 'inherit', shell: process.platform === 'win32' });
 
@@ -164,7 +178,7 @@ function latestManifestPath() {
 
 function approve() {
 	const path = latestManifestPath();
-	const manifest = JSON.parse(readFileSync(path, 'utf8'));
+	const manifest = /** @type {PendingManifest} */ (JSON.parse(readFileSync(path, 'utf8')));
 	const ids = ARGS.includes('--approve-all')
 		? manifest.sources.map((s) => s.sourceId)
 		: ARGS.slice(ARGS.indexOf('--approve') + 1).filter((a) => !a.startsWith('--'));
@@ -175,8 +189,8 @@ function approve() {
 
 function apply() {
 	const path = latestManifestPath();
-	const manifest = JSON.parse(readFileSync(path, 'utf8'));
-	const registry = parse(readFileSync(SOURCES_YAML, 'utf8'));
+	const manifest = /** @type {PendingManifest} */ (JSON.parse(readFileSync(path, 'utf8')));
+	const registry = /** @type {SourceEntry[]} */ (parse(readFileSync(SOURCES_YAML, 'utf8')));
 	const byId = new Map(registry.map((e) => [e.source_id, e]));
 	const approved = manifest.sources.filter((s) => s.decision === 'approved' && s.stagedPath);
 	if (approved.length === 0) {
@@ -186,6 +200,7 @@ function apply() {
 
 	// Promote the reviewed staged artifacts -> real dirs VERBATIM (no re-fetch). Fail-closed: a missing
 	// staged artifact for an approved source stops the run (never silently thin the corpus).
+	/** @type {IncomingBySourceId} */
 	const incoming = {};
 	for (const s of approved) {
 		const ext = byId.get(s.sourceId)?.content_type === 'pdf' ? 'pdf' : 'html';

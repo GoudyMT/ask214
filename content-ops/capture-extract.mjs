@@ -26,6 +26,8 @@ import { isPathAllowed } from '../src/lib/content-ops/capture/robots.ts';
 import { createRateLimiter } from '../src/lib/content-ops/capture/rate-limit.ts';
 import { normalizeText } from '../src/lib/corpus/normalize.ts';
 
+/** @typedef {import('../src/lib/content-ops/sources-schema.ts').SourceEntry} SourceEntry */
+
 // Config (env override wins; repo-relative defaults).
 const SOURCES_YAML = 'content/sources.yaml';
 // When REFRESH_STAGING_ROOT is set, the OUTPUT dirs (captures + extracted) redirect under it so
@@ -56,6 +58,7 @@ const FIDELITY_THRESHOLD = 0.8;
 
 // Optional CLI args (source_id(s) and/or a content_type) scope the run; no args = the whole corpus.
 const ARGS = process.argv.slice(2);
+/** @param {SourceEntry[]} list @returns {SourceEntry[]} */
 const pick = (list) =>
 	ARGS.length
 		? list.filter((e) => ARGS.includes(e.source_id) || ARGS.includes(e.content_type))
@@ -90,25 +93,30 @@ function resolvePdftotext() {
 }
 const PDFTOTEXT = resolvePdftotext();
 
-/** pdfjs extract: captured bytes -> per-page text items -> the pure assemblePdfText. */
+/** pdfjs extract: captured bytes -> per-page text items -> the pure assemblePdfText.
+ *  @param {Uint8Array} bytes */
 async function extractPdfjs(bytes) {
-	const loadingTask = getDocument({ data: bytes, isEvalSupported: false, verbosity: 0 });
+	// pdfjs v6 removed the eval codepath (and the old isEvalSupported flag), so there is nothing to disable.
+	const loadingTask = getDocument({ data: bytes, verbosity: 0 });
 	const doc = await loadingTask.promise;
 	const pages = [];
 	for (let n = 1; n <= doc.numPages; n++) {
 		const page = await doc.getPage(n);
 		const content = await page.getTextContent();
 		// pdfjs yields TextItem ({str,hasEOL}) + TextMarkedContent (no str) - keep only real text items.
-		const items = content.items
-			.filter((it) => typeof it.str === 'string')
-			.map((it) => ({ str: it.str, hasEOL: it.hasEOL === true }));
+		const items = [];
+		for (const it of content.items) {
+			if (!('str' in it)) continue; // TextMarkedContent has no str
+			items.push({ str: it.str, hasEOL: it.hasEOL === true });
+		}
 		pages.push(items);
 	}
 	await loadingTask.destroy(); // cleanup lives on the loading task (PDFDocumentProxy has no public destroy)
 	return assemblePdfText(pages);
 }
 
-/** pdftotext (independent cross-check): raw text -> the same normalizeText, for a fair compare. */
+/** pdftotext (independent cross-check): raw text -> the same normalizeText, for a fair compare.
+ *  @param {string} path */
 function extractPdftotext(path) {
 	const raw = execFileSync(PDFTOTEXT, ['-q', '-enc', 'UTF-8', path, '-'], {
 		encoding: 'utf8',
@@ -119,7 +127,8 @@ function extractPdftotext(path) {
 
 /** Strip non-content + active/embeddable elements (script/style/template/iframe/object/embed/noscript) and
  *  off-origin asset elements from a linkedom document, so the extracted text is content-only and emits zero
- *  off-origin requests if rendered. Same-origin + relative assets stay. */
+ *  off-origin requests if rendered. Same-origin + relative assets stay.
+ *  @param {Document} document @param {string} pageOrigin */
 function sanitizeDocument(document, pageOrigin) {
 	for (const el of document.querySelectorAll(
 		'script, style, template, iframe, object, embed, noscript'
@@ -162,7 +171,8 @@ const BLOCK_TAGS = [
 const SPACING_INLINE = new Set(['a', 'button']);
 
 /** Pick the article region semantically (<main> then <article>); fail closed if neither exists, then
- *  drop in-region nav/aside/footer/header so only real content survives. */
+ *  drop in-region nav/aside/footer/header so only real content survives.
+ *  @param {Document} document */
 function selectContentRegion(document) {
 	const region = document.querySelector('main') ?? document.querySelector('article');
 	if (!region) throw new Error('E_INGEST_NO_CONTENT_REGION');
@@ -171,7 +181,8 @@ function selectContentRegion(document) {
 }
 
 /** True if `el` has a block-element ancestor between it and the region (so its text is already counted
- *  by that outer block). */
+ *  by that outer block).
+ *  @param {Element} el @param {Element} region */
 function hasBlockAncestor(el, region) {
 	for (let p = el.parentElement; p && p !== region; p = p.parentElement) {
 		if (BLOCK_TAGS.includes(p.tagName.toLowerCase())) return true;
@@ -181,7 +192,8 @@ function hasBlockAncestor(el, region) {
 
 /** A block's text, depth-first like textContent but prefixing link/button text with a LEADING space so an
  *  inline CTA abutting the prior text does not fuse ("page.Use" -> "page. Use"); leading-only avoids a stray
- *  space before trailing punctuation. normalizeText later collapses the space. */
+ *  space before trailing punctuation. normalizeText later collapses the space.
+ *  @param {Node} node */
 function blockText(node) {
 	let out = '';
 	for (const child of node.childNodes) {
@@ -189,14 +201,16 @@ function blockText(node) {
 			out += child.nodeValue ?? ''; // text node
 		else if (child.nodeType === 1) {
 			// element: recurse; prefix link-like inline tags with a space so a CTA does not glue onto prior text
-			const inner = blockText(child);
-			out += SPACING_INLINE.has(child.tagName.toLowerCase()) ? ` ${inner}` : inner;
+			const el = /** @type {Element} */ (child); // nodeType 1 == element node (has tagName)
+			const inner = blockText(el);
+			out += SPACING_INLINE.has(el.tagName.toLowerCase()) ? ` ${inner}` : inner;
 		}
 	}
 	return out;
 }
 
-/** De-nested block walk: outermost content-bearing blocks in document order -> { text, tag }. */
+/** De-nested block walk: outermost content-bearing blocks in document order -> { text, tag }.
+ *  @param {Element} region */
 function walkBlocks(region) {
 	const seq = [];
 	for (const el of region.querySelectorAll(BLOCK_TAGS.join(','))) {
@@ -207,7 +221,8 @@ function walkBlocks(region) {
 	return seq;
 }
 
-/** linkedom block-aware extract: parse -> sanitize -> select region -> de-nested walk -> shape -> off-origin assert. */
+/** linkedom block-aware extract: parse -> sanitize -> select region -> de-nested walk -> shape -> off-origin assert.
+ *  @param {string} rawHtml @param {string} pageOrigin */
 function extractHtml(rawHtml, pageOrigin) {
 	const { document } = parseHTML(rawHtml);
 	sanitizeDocument(document, pageOrigin); // strip scripts/embeds + off-origin assets first
@@ -222,7 +237,8 @@ function extractHtml(rawHtml, pageOrigin) {
 	return result;
 }
 
-/** Honor robots.txt. Unreachable robots = allow (nothing to honor). Rate-limited fetch. */
+/** Honor robots.txt. Unreachable robots = allow (nothing to honor). Rate-limited fetch.
+ *  @param {string} origin @param {string} pathname */
 async function robotsAllows(origin, pathname) {
 	await limiter.acquire();
 	try {
@@ -236,7 +252,9 @@ async function robotsAllows(origin, pathname) {
 
 /** Shared finisher for every HTML capture method (fetch / headless / manual): audit copy + extract + write
  *  the per-source extracted JSON. `bytes` = the captured bytes; `rawHtml` = those bytes as text for
- *  extraction; `method` is recorded for provenance. */
+ *  extraction; `method` is recorded for provenance.
+ *  @param {SourceEntry} entry @param {string} origin @param {Uint8Array} bytes @param {string} rawHtml
+ *  @param {string} method @param {string} [lastModified] */
 async function writeHtmlArtifacts(entry, origin, bytes, rawHtml, method, lastModified) {
 	const record = await auditCopyRecord(bytes, 'html');
 	// Path from CAPTURES_DIR (not record.capturedPath) so the staging redirect applies; normal mode
@@ -264,7 +282,8 @@ async function writeHtmlArtifacts(entry, origin, bytes, rawHtml, method, lastMod
 	return { id: entry.source_id, chars: result.normalizedText.length };
 }
 
-/** Plain-fetch HTML capture: robots -> rate-limited UA fetch -> shared finisher. */
+/** Plain-fetch HTML capture: robots -> rate-limited UA fetch -> shared finisher.
+ *  @param {SourceEntry} entry */
 async function captureHtml(entry) {
 	const pageUrl = new URL(entry.url);
 	const origin = pageUrl.origin;
@@ -288,7 +307,8 @@ async function captureHtml(entry) {
 }
 
 /** Headless HTML capture: a real browser renders a page that blocked the plain fetch. The rendered DOM is the
- *  audit copy (the raw HTML is a bot-blocked shell). Shares one browser instance across sources. */
+ *  audit copy (the raw HTML is a bot-blocked shell). Shares one browser instance across sources.
+ *  @param {SourceEntry} entry @param {import('playwright').Browser} browser */
 async function captureHtmlHeadless(entry, browser) {
 	const pageUrl = new URL(entry.url);
 	const origin = pageUrl.origin;
@@ -318,7 +338,8 @@ async function captureHtmlHeadless(entry, browser) {
 }
 
 /** Manual HTML capture (last resort): ingest a human-saved page HTML for an Akamai-blocked source. Throws
- *  E_INGEST_MANUAL_HTML_MISSING (handled with on-screen instructions) if the file is absent. */
+ *  E_INGEST_MANUAL_HTML_MISSING (handled with on-screen instructions) if the file is absent.
+ *  @param {SourceEntry} entry */
 async function captureHtmlManual(entry) {
 	const file = join(MANUAL_HTML_DIR, `${entry.source_id}.html`);
 	if (!existsSync(file)) throw new Error('E_INGEST_MANUAL_HTML_MISSING');
@@ -337,7 +358,8 @@ async function captureHtmlManual(entry) {
 	);
 }
 
-/** PDF stage: per source, capture (hash + audit copy) + pdfjs extract + the fidelity cross-check. */
+/** PDF stage: per source, capture (hash + audit copy) + pdfjs extract + the fidelity cross-check.
+ *  @param {SourceEntry[]} pdfs */
 async function runPdfStage(pdfs) {
 	console.log('='.repeat(60));
 	console.log(
@@ -405,12 +427,15 @@ async function runPdfStage(pdfs) {
 			);
 		} catch (err) {
 			// Fail closed: never silently drop a source - print the id + reason and stop the build.
-			console.error(`[FAIL] ${entry.source_id}: ${err.message}`);
+			console.error(
+				`[FAIL] ${entry.source_id}: ${err instanceof Error ? err.message : String(err)}`
+			);
 			process.exit(1);
 		}
 	}
 
 	const sims = results.map((r) => r.similarity).sort((a, b) => a - b);
+	if (sims.length === 0) return; // no PDF sources in scope -> nothing to summarize
 	console.log('\n' + '='.repeat(60));
 	console.log('FIDELITY DISTRIBUTION (sorted ascending)');
 	console.log('='.repeat(60));
@@ -418,14 +443,17 @@ async function runPdfStage(pdfs) {
 		console.log(`    ${r.similarity.toFixed(4)}  ${r.pass ? '    ' : 'FLAG'}  ${r.id}`);
 	}
 	const flagged = results.filter((r) => !r.pass).length;
+	// length > 0 guaranteed above; ?? satisfies the strict index type without inventing a value.
+	const median = sims[Math.floor(sims.length / 2)] ?? 0;
 	console.log(
-		`\n    min=${sims[0].toFixed(4)}  median=${sims[Math.floor(sims.length / 2)].toFixed(4)}  ` +
-			`max=${sims[sims.length - 1].toFixed(4)}`
+		`\n    min=${Math.min(...sims).toFixed(4)}  median=${median.toFixed(4)}  ` +
+			`max=${Math.max(...sims).toFixed(4)}`
 	);
 	console.log(`    flagged@${FIDELITY_THRESHOLD}=${flagged}  ->  ${EXTRACTED_DIR}/`);
 }
 
-/** HTML fetch stage: per source, robots -> rate-limited UA fetch -> audit copy -> linkedom block-aware. */
+/** HTML fetch stage: per source, robots -> rate-limited UA fetch -> audit copy -> linkedom block-aware.
+ *  @param {SourceEntry[]} htmls */
 async function runHtmlStage(htmls) {
 	console.log('\n' + '='.repeat(60));
 	console.log(`INGEST - HTML stage  (${htmls.length} sources)`);
@@ -437,14 +465,17 @@ async function runHtmlStage(htmls) {
 			console.log(`PASS  ${r.id}  (${r.chars.toLocaleString()} chars)`);
 		} catch (err) {
 			// Fail closed: never silently drop a source - print the id + reason and stop the build.
-			console.error(`[FAIL] ${entry.source_id}: ${err.message}`);
+			console.error(
+				`[FAIL] ${entry.source_id}: ${err instanceof Error ? err.message : String(err)}`
+			);
 			process.exit(1);
 		}
 	}
 	console.log(`\n    extracted -> ${EXTRACTED_DIR}/  captures -> ${CAPTURES_DIR}/`);
 }
 
-/** Headless stage: sources that blocked the plain fetch but a real browser can still render. */
+/** Headless stage: sources that blocked the plain fetch but a real browser can still render.
+ *  @param {SourceEntry[]} sources */
 async function runHeadlessStage(sources) {
 	console.log('\n' + '='.repeat(60));
 	console.log(`INGEST - HTML headless stage  (${sources.length} sources, render via Playwright)`);
@@ -458,7 +489,9 @@ async function runHeadlessStage(sources) {
 					`PASS  ${r.id}  (${r.chars.toLocaleString()} chars)  [headless; VERIFY real public body]`
 				);
 			} catch (err) {
-				console.error(`[FAIL] ${entry.source_id}: ${err.message}`);
+				console.error(
+					`[FAIL] ${entry.source_id}: ${err instanceof Error ? err.message : String(err)}`
+				);
 				process.exit(1);
 			}
 		}
@@ -469,7 +502,8 @@ async function runHeadlessStage(sources) {
 
 /** Manual stage (last resort): Akamai-blocked sources captured from human-saved HTML. A missing file is NOT a
  *  crash - it prints the exact to-do (open URL -> save HTML to MANUAL_HTML_DIR) then fails closed so the
- *  source is never silently dropped. Full step-by-step instructions live in MANUAL_HTML_DIR/README.txt. */
+ *  source is never silently dropped. Full step-by-step instructions live in MANUAL_HTML_DIR/README.txt.
+ *  @param {SourceEntry[]} sources */
 async function runManualStage(sources) {
 	console.log('\n' + '='.repeat(60));
 	console.log(`INGEST - HTML manual stage  (${sources.length} Akamai-blocked; human-saved HTML)`);
@@ -480,9 +514,10 @@ async function runManualStage(sources) {
 			const r = await captureHtmlManual(entry);
 			console.log(`PASS  ${r.id}  (${r.chars.toLocaleString()} chars)  [from saved HTML]`);
 		} catch (err) {
-			if (err.message === 'E_INGEST_MANUAL_HTML_MISSING') missing.push(entry);
+			const msg = err instanceof Error ? err.message : String(err);
+			if (msg === 'E_INGEST_MANUAL_HTML_MISSING') missing.push(entry);
 			else {
-				console.error(`[FAIL] ${entry.source_id}: ${err.message}`);
+				console.error(`[FAIL] ${entry.source_id}: ${msg}`);
 				process.exit(1);
 			}
 		}
@@ -508,7 +543,7 @@ mkdirSync(CAPTURES_DIR, { recursive: true });
 mkdirSync(EXTRACTED_DIR, { recursive: true });
 mkdirSync(MANUAL_HTML_DIR, { recursive: true });
 
-const entries = parse(readFileSync(SOURCES_YAML, 'utf8'));
+const entries = /** @type {SourceEntry[]} */ (parse(readFileSync(SOURCES_YAML, 'utf8')));
 const pdfs = pick(entries.filter((e) => e.content_type === 'pdf'));
 const htmls = pick(entries.filter((e) => e.content_type === 'html'));
 const htmlFetch = htmls.filter(

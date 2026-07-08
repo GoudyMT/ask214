@@ -14,6 +14,8 @@ import { computeAnchor } from '../src/lib/content-ops/chunk/anchor.ts';
 import { toChunk } from '../src/lib/content-ops/chunk/to-chunk.ts';
 import { validateCorpusAgainstRegistry } from '../src/lib/content-ops/corpus-crossref.ts';
 
+/** @typedef {import('../src/lib/content-ops/sources-schema.ts').SourceEntry} SourceEntry */
+
 const SOURCES_YAML = 'content/sources.yaml';
 const EXTRACTED_DIR = 'content-ops/extracted';
 const CHUNKS_DIR = 'content-ops/chunks';
@@ -24,18 +26,21 @@ const TARGET_TOKENS = 254; // the 256 model window minus the [CLS] + [SEP] speci
 const TINY_TOKENS = 40; // chunks below this are surfaced (not failed) by the quality signal
 
 const ARGS = process.argv.slice(2);
+/** @param {string} id */
 const pick = (id) => ARGS.length === 0 || ARGS.includes(id);
 
 mkdirSync(CHUNKS_DIR, { recursive: true });
-const registry = parse(readFileSync(SOURCES_YAML, 'utf8'));
+const registry = /** @type {SourceEntry[]} */ (parse(readFileSync(SOURCES_YAML, 'utf8')));
 const byId = new Map(registry.map((e) => [e.source_id, e]));
 
 // content tokens only (exclude the [CLS]/[SEP] specials); encode(...) returns the token-id array
 const tokenizer = await AutoTokenizer.from_pretrained(MODEL_REPO);
+/** @param {string} text @returns {number} */
 const countTokens = (text) => tokenizer.encode(text, { add_special_tokens: false }).length;
 
 const files = readdirSync(EXTRACTED_DIR).filter((f) => f.endsWith('.json'));
 const allChunks = [];
+/** @type {Record<string, string>} */
 const extractions = {};
 const flags = [];
 
@@ -87,7 +92,7 @@ for (const file of files) {
 			`[PASS] ${sourceId}  ${String(spans.length).padStart(3)} chunks  (min ${Math.min(...sizes)} / max ${Math.max(...sizes)} tok)`
 		);
 	} catch (err) {
-		console.error(`[FAIL] ${sourceId}: ${err.message}`);
+		console.error(`[FAIL] ${sourceId}: ${err instanceof Error ? err.message : String(err)}`);
 		process.exit(1);
 	}
 }

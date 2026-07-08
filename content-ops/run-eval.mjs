@@ -34,6 +34,7 @@ const TARGET = { srcHitRate: 0.9, srcMRR: 0.75 };
 // MIN_SCORE candidates (display cutoff): pick the HIGHEST that still holds the held-out floor.
 const MIN_SCORE_CANDIDATES = [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4];
 // v1.0 retrieval = pure dense (alpha 1, no BM25 gate); minScore is the only knob (the display cutoff).
+/** @param {number} minScore */
 const DENSE = (minScore) => ({ alpha: 1, minScore, minBm25: 0 });
 
 const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.json', 'utf8'));
@@ -52,6 +53,7 @@ for (const c of corpus.chunks) {
 }
 
 const extractor = await pipeline('feature-extraction', MODEL_REPO, { dtype: 'q8' });
+/** @param {string} text */
 const embed = async (text) => {
 	const out = await extractor(text, { pooling: 'mean', normalize: true });
 	return Float32Array.from(out.data);
@@ -82,7 +84,9 @@ const { tune } = partitionEvalSet(queries, HELD_OUT_PCT);
 const tuneSet = new Set(tune.map((q) => q.query));
 const tuneCache = cache.filter((c) => tuneSet.has(c.item.query));
 const heldCache = cache.filter((c) => !tuneSet.has(c.item.query));
+/** @param {{ item: import('../src/lib/ask/eval/resolve-ground-truth.ts').EvalQuery }[]} list */
 const nPos = (list) => list.filter((c) => !isHardNegative(c.item)).length;
+/** @param {{ item: import('../src/lib/ask/eval/resolve-ground-truth.ts').EvalQuery }[]} list */
 const nNeg = (list) => list.filter((c) => isHardNegative(c.item)).length;
 console.log(
 	`[split] tune ${tuneCache.length} (${nPos(tuneCache)}pos/${nNeg(tuneCache)}neg)  held-out ${heldCache.length} (${nPos(heldCache)}pos/${nNeg(heldCache)}neg)`
@@ -111,6 +115,7 @@ const params = DENSE(calibrated);
 const tuneM = evalUnderParams(tuneCache, chunkSourceIds, params, K);
 const heldM = evalUnderParams(heldCache, chunkSourceIds, params, K);
 const fullM = evalUnderParams(cache, chunkSourceIds, params, K);
+/** @param {ReturnType<typeof evalUnderParams>} m */
 const fmt = (m) => `srcHitRate@${K}=${m.srcHitRate.toFixed(3)}  srcMRR=${m.srcMRR.toFixed(3)}`;
 console.log(`\n[dense @ MIN_SCORE ${calibrated.toFixed(2)}]`);
 console.log(`  TUNE      ${fmt(tuneM)}`);

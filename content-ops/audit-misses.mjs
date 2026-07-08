@@ -18,13 +18,21 @@ const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.json', 'utf8
 const bin = readFileSync('static/corpus/corpus-v1.0.embeddings.bin');
 const ab = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
 const corpus = decodeCorpus(manifest, ab, MODEL_ID);
-const positives = JSON.parse(readFileSync('src/lib/ask/eval/queries.json', 'utf8')).filter(
-	(q) => !isHardNegative(q)
-);
+const allQueries =
+	/** @type {import('../src/lib/ask/eval/resolve-ground-truth.ts').EvalQuery[]} */ (
+		JSON.parse(readFileSync('src/lib/ask/eval/queries.json', 'utf8'))
+	);
+// After dropping hard-negatives, the rest are ground-truth positives (they carry sourceId + answerSnippet).
+const positives =
+	/** @type {import('../src/lib/ask/eval/resolve-ground-truth.ts').GroundTruthQuery[]} */ (
+		allQueries.filter((q) => !isHardNegative(q))
+	);
 
 const extractor = await pipeline('feature-extraction', MODEL_REPO, { dtype: 'q8' });
+/** @param {string} t */
 const embed = async (t) =>
 	Float32Array.from((await extractor(t, { pooling: 'mean', normalize: true })).data);
+/** @param {string} s @param {number} n */
 const head = (s, n) => s.replace(/\s+/g, ' ').trim().slice(0, n);
 
 let misses = 0;

@@ -1,4 +1,4 @@
-import { parseDocument, isMap, isSeq } from 'yaml';
+import { parseDocument, isMap, isSeq, type YAMLMap } from 'yaml';
 import {
 	resolveBackfill,
 	backfillCaptureFields,
@@ -34,9 +34,11 @@ export function stampSourcesYaml(
 			captured_at: node.get('captured_at')
 		};
 		const fields = backfillCaptureFields({}, resolveBackfill(existing, incoming, now));
-		for (const [key, value] of Object.entries(fields)) node.set(key, value);
+		// The parsed map narrows its key type to ParsedNode; the base YAMLMap type accepts the plain string keys.
+		const map = node as YAMLMap;
+		for (const [key, value] of Object.entries(fields)) map.set(key, value);
 		if (incoming.sourceUpdatedDate !== undefined)
-			node.set('source_updated_date', incoming.sourceUpdatedDate);
+			map.set('source_updated_date', incoming.sourceUpdatedDate);
 	}
 	// lineWidth 0 disables yaml's 80-col wrapping, so long scalars (e.g. terms_notes) are never re-folded -
 	// the diff touches only the entries we actually stamp, keeping the legal-record change reviewable.

@@ -13,12 +13,16 @@ import { join } from 'node:path';
 import { parse } from 'yaml';
 import { stampSourcesYaml } from './backfill/stamp-sources.ts';
 
+/** @typedef {import('../src/lib/content-ops/sources-schema.ts').SourceEntry} SourceEntry */
+/** @typedef {import('./backfill/stamp-sources.ts').IncomingBySourceId} IncomingBySourceId */
+
 const SOURCES_YAML = 'content/sources.yaml';
 const EXTRACTED_DIR = 'content-ops/extracted'; // per-source extractor output (carries content_hash)
 const CAPTURES_DIR = 'content-ops/captures'; // content-addressed audit copies; never served
 
 // Optional CLI args (source_id(s) and/or a content_type) scope the run; no args = the whole corpus.
 const ARGS = process.argv.slice(2);
+/** @param {SourceEntry[]} list @returns {SourceEntry[]} */
 const pick = (list) =>
 	ARGS.length
 		? list.filter((e) => ARGS.includes(e.source_id) || ARGS.includes(e.content_type))
@@ -29,11 +33,12 @@ console.log('BACKFILL - stamp sources.yaml capture fields from extracted artifac
 console.log('='.repeat(60));
 
 const before = readFileSync(SOURCES_YAML, 'utf8');
-const entries = parse(before);
+const entries = /** @type {SourceEntry[]} */ (parse(before));
 const inScope = pick(entries);
 
 // Validate fail-closed BEFORE any write: every in-scope source must have an extracted artifact (with a
 // content_hash) AND its content-addressed audit copy on disk.
+/** @type {IncomingBySourceId} */
 const incoming = {};
 const problems = [];
 for (const entry of inScope) {
@@ -79,6 +84,7 @@ renameSync(tmp, SOURCES_YAML);
 
 for (const entry of inScope) {
 	const inc = incoming[entry.source_id];
+	if (!inc) continue; // every in-scope entry was populated above (validation passed); guards the strict index type
 	const state = !entry.content_hash
 		? 'new'
 		: entry.content_hash === inc.contentHash
