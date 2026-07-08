@@ -9,8 +9,6 @@
  *
  * Heuristic: a CallExpression `X.objectStore('<name>').{put|add}(...)` with
  * <name> in the ENCRYPTED_STORES registry flags as a violation.
- *
- * Source: Phase 2 spec section 4 (invariant 7); plan v2 F1 (raw IndexedDB, not Dexie).
  */
 const ENCRYPTED_STORES_LITERAL = new Set(['profile', 'timeline-state']);
 const FORBIDDEN_WRITE_METHODS = new Set(['put', 'add']);

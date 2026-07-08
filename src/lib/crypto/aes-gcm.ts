@@ -4,8 +4,6 @@
  * IV: 12 bytes (96 bits); spec-mandated CSPRNG per call.
  * Tag length: 128 bits (default).
  * AAD: required; callers pass the AAD bytes per ProfileStore.buildAAD().
- *
- * Source: Phase 2 spec section 6 "AES-GCM encryption operation".
  */
 
 const IV_LENGTH = 12;
@@ -67,7 +65,7 @@ export async function aesGcmDecrypt(
 	} catch {
 		// SubtleCrypto throws OperationError for any auth failure (AAD mismatch,
 		// ciphertext mutation, wrong key, wrong IV). Map to a typed error; never
-		// include the original error message (PII risk per spec section 11).
+		// include the original error message (PII risk).
 		throw new AesGcmAuthError();
 	}
 }

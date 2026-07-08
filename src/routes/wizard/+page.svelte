@@ -17,7 +17,7 @@
 	let error = $state<string | null>(null);
 	let saving = $state(false);
 
-	// Device clock display feeds the spec 3.2 implicit clock check (read-only, not PII).
+	// Device clock display feeds the implicit clock check (read-only, not PII).
 	const todayDisplay = new Date().toLocaleDateString();
 
 	// PII-free, user-facing copy for each validation cause. Native <input type="date"> makes
@@ -57,7 +57,7 @@
 		} catch (err) {
 			if (err instanceof OccConflictError) {
 				// Another tab set up the profile first. Reload the authoritative state and ask
-				// the user to review + retry (spec section 7 OCC: reload, don't clobber).
+				// the user to review + retry (OCC: reload, don't clobber).
 				await store.load();
 				error = 'This was changed in another tab. We reloaded it - please review and save again.';
 				return;
@@ -141,7 +141,7 @@
 		gap: var(--space-m);
 	}
 
-	/* Primary CTA (spec 5.5 primitive 15): filled accent + bg-colored text. */
+	/* Primary CTA: filled accent + bg-colored text. */
 	.wizard__save {
 		padding: var(--space-s) var(--space-l);
 		background: var(--color-accent);
@@ -162,7 +162,7 @@
 		cursor: default;
 	}
 
-	/* Quiet CTA (primitive 15): muted text, underline. De-emphasized but clearly visible. */
+	/* Quiet CTA: muted text, underline. De-emphasized but clearly visible. */
 	.wizard__skip {
 		padding: var(--space-s);
 		background: none;

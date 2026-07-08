@@ -45,7 +45,7 @@ describe('canonicalizeKeystore', () => {
 		expect(Array.from(a)).not.toEqual(Array.from(b));
 	});
 
-	it('EXCLUDES ivCounter (operational, not security-relevant per spec 5 + T6-E)', () => {
+	it('EXCLUDES ivCounter (operational, not security-relevant)', () => {
 		const a = canonicalizeKeystore(baseRecord);
 		const b = canonicalizeKeystore({ ...baseRecord, ivCounter: 999 });
 		expect(Array.from(a)).toEqual(Array.from(b));

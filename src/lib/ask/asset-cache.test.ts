@@ -3,7 +3,7 @@ import { classifyAsset, ASK_ASSET_CACHE, shouldKeepCache } from './asset-cache';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
 // model + ORT WASM (~45MB) are LAZY (cached on first use, never eagerly precached at install); the app
-// shell + the tiny corpus are PRECACHE (eager, so the app works offline immediately). See ADR-015 / spec 9.
+// shell + the tiny corpus are PRECACHE (eager, so the app works offline immediately).
 describe('classifyAsset', () => {
 	it('marks the heavy model + ORT WASM as lazy (kept out of the install precache)', () => {
 		expect(classifyAsset('/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx')).toBe('lazy');
@@ -20,7 +20,7 @@ describe('classifyAsset', () => {
 });
 
 // The lazy model/wasm live in their OWN unversioned cache so an app update (which deletes stale
-// app-${version} caches) does NOT evict the ~45MB download (sweep S26 H2 - "downloaded once").
+// app-${version} caches) does NOT evict the ~45MB download (downloaded once).
 describe('shouldKeepCache (cache partitioning across app updates)', () => {
 	it('keeps the current app-shell cache and the unversioned lazy asset cache', () => {
 		expect(shouldKeepCache('app-v2', 'app-v2')).toBe(true);

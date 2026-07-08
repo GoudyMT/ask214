@@ -28,6 +28,11 @@ export type CorpusManifest = {
 	dim: number; // embedding dimension (384 for MiniLM / BGE-small)
 	modelId: string; // the embedding model that produced the vectors
 	chunks: CorpusChunk[]; // index-aligned with the embeddings blob
+	/**
+	 * Producer-side content-freshness stamp: build date + a content hash over the chunks. Optional - older
+	 * corpora omit it, and the decoder ignores it (it is not part of the runtime retrieval contract).
+	 */
+	contentRevision?: { buildDate: string; contentHash: string };
 };
 
 /** The decoded, validated, in-memory corpus `search` operates on. */

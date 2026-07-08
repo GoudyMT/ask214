@@ -242,6 +242,142 @@
 		"altSources": ["tap_managing_education"]
 	},
 
+	{
+		"query": "is there a form to request my military records if I have to do it by mail?",
+		"sourceId": "va_dd214",
+		"answerSnippet": "Fill out a Request Pertaining to Military Records (Standard Form 180)."
+	},
+	{
+		"query": "I got out of the Navy in the 90s, can I pull my DD214 straight from the DOD?",
+		"sourceId": "va_dd214",
+		"answerSnippet": "If you were in the Navy and discharged after January 1, 1995"
+	},
+	{
+		"query": "is there a number I can call for help filling out the VA health care application?",
+		"sourceId": "va_health_care_apply",
+		"answerSnippet": "Call our toll-free hotline at 877-222-8387 to get help with your application.",
+		"altSources": ["va_health_eligibility"]
+	},
+	{
+		"query": "my insurance changed since I applied for VA health care, is there a form to update it?",
+		"sourceId": "va_health_care_apply",
+		"answerSnippet": "fill out a Health Benefits Update Form (VA Form 10-10EZR)."
+	},
+	{
+		"query": "I just got back from a combat deployment, how long do I get free VA care for it?",
+		"sourceId": "va_health_eligibility",
+		"answerSnippet": "you can receive free medical care for any condition related to your service in Iraq or Afghanistan for 10 years after discharge"
+	},
+	{
+		"query": "I was stationed at Camp Lejeune in the 80s, does that affect my health care eligibility?",
+		"sourceId": "va_health_eligibility",
+		"answerSnippet": "You served at least 30 days at Camp Lejeune between August 1, 1953, and December 31, 1987."
+	},
+	{
+		"query": "I used up my Post-9/11 GI Bill but I'm in a STEM program, is there extra money?",
+		"sourceId": "va_education_apply",
+		"answerSnippet": "you'll get up to 9 months of additional benefits (or $30,000, whichever comes first)."
+	},
+	{
+		"query": "I never used the GI Bill before, can I still qualify for VET TEC?",
+		"sourceId": "va_education_apply",
+		"answerSnippet": "You don't need to have qualified for any VA education benefit in the past to be able to participate in VET TEC 2.0."
+	},
+	{
+		"query": "my tuition is more than the GI Bill pays, is there anything to cover the gap?",
+		"sourceId": "va_gi_bill_overview",
+		"answerSnippet": "Find out if your school participates in the Yellow Ribbon Program, which can help pay tuition costs that the Post-9/11 GI Bill doesn't cover."
+	},
+	{
+		"query": "my spouse never served, can they still get education benefits through me?",
+		"sourceId": "va_gi_bill_overview",
+		"answerSnippet": "If you're a dependent spouse or child of a Veteran, find out if you qualify for education benefits to help you pay for school",
+		"altSources": ["va_gi_bill_transfer"]
+	},
+	{
+		"query": "I got a Purple Heart, do I still need 6 years of service to transfer my GI Bill?",
+		"sourceId": "va_gi_bill_transfer",
+		"answerSnippet": "If you received a Purple Heart, you don't need to meet a service requirement."
+	},
+	{
+		"query": "how many months of my GI Bill can I transfer to my kids?",
+		"sourceId": "va_gi_bill_transfer",
+		"answerSnippet": "You can request to transfer up to a total of 36 months of your remaining education benefits to your dependents."
+	},
+	{
+		"query": "can my lender pull my COE for me instead of me requesting it myself?",
+		"sourceId": "va_home_loan_coe",
+		"answerSnippet": "Your lender may be able to use an online system (called Web LGY) to get your COE."
+	},
+	{
+		"query": "is there a number to call for VA home loan questions my lender can't answer?",
+		"sourceId": "va_home_loan_coe",
+		"answerSnippet": "you can call us at 877-827-3702"
+	},
+	{
+		"query": "is there a special VA home loan program for Native Americans?",
+		"sourceId": "tap_va_home_loan",
+		"answerSnippet": "Native American Direct Loan (NADL) Program"
+	},
+	{
+		"query": "is there a VA grant to help adapt my home if I have a disability?",
+		"sourceId": "tap_va_home_loan",
+		"answerSnippet": "Special Home Adaptation (SHA) grant",
+		"altSources": ["tap_va_benefits_guide"]
+	},
+	{
+		"query": "what documents do I need to convert my SGLI to a commercial policy after I separate?",
+		"sourceId": "tap_va_life_insurance",
+		"answerSnippet": "Service member's Final Leave and Earnings Statement (LES)"
+	},
+	{
+		"query": "do I have to close out my TSP when I get out or can I leave the money in?",
+		"sourceId": "tsp_separation",
+		"answerSnippet": "if your account balance is $200 or more, you can leave it in the TSP when you leave the uniformed services"
+	},
+	{
+		"query": "I changed my address in myPay, why isn't my TSP address updated?",
+		"sourceId": "tsp_separation",
+		"answerSnippet": "Just make sure that you log in and go to the TSP section to change your TSP address"
+	},
+	{
+		"query": "can my spouse or a National Guard buddy use a SkillBridge partner's training too?",
+		"sourceId": "dod_skillbridge",
+		"answerSnippet": "Many SkillBridge authorized partners also offer pathways to training and employment to veterans, National Guard, reserve and military spouses"
+	},
+	{
+		"query": "what's the absolute latest I can start TAP before I get out?",
+		"sourceId": "tap_managing_transition",
+		"answerSnippet": "it is mandatory for all Service members to begin TAP no later than 365 days prior to their separation"
+	},
+	{
+		"query": "does the VA actually reach out to check on me after I separate?",
+		"sourceId": "tap_managing_transition",
+		"answerSnippet": "Attempts to contact veterans 90, 180, and 365 days post-separation",
+		"altSources": ["tap_va_benefits_guide"]
+	},
+	{
+		"query": "what is an ATS and how does it decide whether a human sees my resume?",
+		"sourceId": "tap_dol_employment_workshop",
+		"answerSnippet": "An ATS can use different algorithms and even varying degrees of artificial intelligence (AI) to sort large numbers of applications"
+	},
+	{
+		"query": "should I avoid a functional resume format if I want it to pass an ATS?",
+		"sourceId": "tap_dol_employment_workshop",
+		"answerSnippet": "Avoid the functional resume format because it doesn't have dates and can confuse the ATS"
+	},
+	{
+		"query": "what's the general VA benefits hotline if I don't know who else to call?",
+		"sourceId": "tap_va101",
+		"answerSnippet": "VA benefits hotline: 1-800-827-1000"
+	},
+	{
+		"query": "is there a number to call if I end up homeless after I get out?",
+		"sourceId": "tap_va101",
+		"answerSnippet": "National Call Center for Homeless Veterans: 1-877-4AID-VET (1-877-424-3838)",
+		"altSources": ["tap_pre_separation_brief"]
+	},
+
 	{ "query": "how do I file my state income tax return?", "expectEmpty": true },
 	{ "query": "what stocks or funds should I pick inside my TSP?", "expectEmpty": true },
 	{ "query": "what's the VA disability rating percentage for tinnitus?", "expectEmpty": true },

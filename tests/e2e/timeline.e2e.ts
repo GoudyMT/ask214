@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// E2E coverage for the /timeline route shell (Arc C, Task C2): the Model-B render guard
+// E2E coverage for the /timeline route shell: the Model-B render guard
 // (LockedPanel when locked / SetupCTA when no EAOS / the EAOS-anchored header otherwise) plus the
 // primary-nav Timeline link. Each test runs in a fresh browser context, so IndexedDB starts empty.
-// The full timeline flow (mark done / collapse / notes / snooze) is covered in D1, once the list
-// components (C3-C5) exist. Lock state is driven by dispatching the real `pagehide` lifecycle event
+// The full timeline flow (mark done / collapse / notes / snooze) is covered in the E2E suite, once the list
+// components exist. Lock state is driven by dispatching the real `pagehide` lifecycle event
 // on window (the layout wires relock to it), mirroring bfcache.e2e.ts - the browser's own BFCache
 // engine is environment-dependent and unforceable in Playwright.
 

@@ -4,9 +4,9 @@ import { flushSync } from 'svelte';
 import PhaseChips from './PhaseChips.svelte';
 import type { TimelineView, TimelineItem } from '$lib/timeline';
 
-// PhaseChips is the C5 jump-nav: one chip per non-empty phase (short label + total task count),
+// PhaseChips is the jump-nav: one chip per non-empty phase (short label + total task count),
 // clicking a chip smooth-scrolls to that phase's <section id> (jump, NOT filter). Scroll-spy
-// (IntersectionObserver active-state) is covered by the Arc D E2E, not here - a component test
+// (IntersectionObserver active-state) is covered by the E2E, not here - a component test
 // can't drive the viewport deterministically.
 
 function makeItem(title: string): TimelineItem {

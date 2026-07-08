@@ -13,7 +13,7 @@
 
 	// Until the timeline-state store provisions (async, after the profile store), fall back to
 	// empty state so the timeline still renders with date-derived statuses; stored done/skip/
-	// snooze (set via the C4 actions) layer in once the store loads.
+	// snooze (set via the status actions) layer in once the store loads.
 	const EMPTY_STATE: TimelineState = { schemaVersion: 1, tasks: {} };
 
 	// Stored EAOS (string form) via the derived persona, or null when unset - mirrors Settings.
@@ -42,9 +42,9 @@
 		}
 	}
 
-	// C4: a status action -> the encrypted timeline store. On any write failure (incl. an OCC
-	// conflict from a concurrent tab) reload authoritative state rather than clobber (spec
-	// section 9); the view re-derives. No-op until the store has provisioned.
+	// A status action -> the encrypted timeline store. On any write failure (incl. an OCC
+	// conflict from a concurrent tab) reload authoritative state rather than clobber; the
+	// view re-derives. No-op until the store has provisioned.
 	async function setStatus(taskId: string, status: TaskStatus | undefined): Promise<void> {
 		const timeline = app.timeline;
 		if (!timeline) return;
@@ -55,7 +55,7 @@
 		}
 	}
 
-	// Snooze a task until an ISO date (increment 2); same OCC-safe reload as setStatus.
+	// Snooze a task until an ISO date; same OCC-safe reload as setStatus.
 	async function setSnooze(taskId: string, untilIso: string): Promise<void> {
 		const timeline = app.timeline;
 		if (!timeline) return;
@@ -66,7 +66,7 @@
 		}
 	}
 
-	// Set or clear a free-text note (increment 4); same OCC-safe reload as the other actions.
+	// Set or clear a free-text note; same OCC-safe reload as the other actions.
 	async function setNote(taskId: string, note: string | undefined): Promise<void> {
 		const timeline = app.timeline;
 		if (!timeline) return;

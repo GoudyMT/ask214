@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * Guard (ADR-014): every ORT runtime file vendored into static/wasm/ (the `.wasm` binaries + the `.mjs`
+ * Guard: every ORT runtime file vendored into static/wasm/ (the `.wasm` binaries + the `.mjs`
  * glue) must be byte-identical to the file the installed onnxruntime-web ships, so an onnxruntime-web
  * version bump that forgets to re-vendor fails loudly in CI. onnxruntime-web is a TRANSITIVE dep (of
  * @huggingface/transformers) and its package.json is not an exported subpath, so we cannot
@@ -11,7 +11,7 @@ import { join } from 'node:path';
  * node_modules/.pnpm/onnxruntime-web@<version>/node_modules/onnxruntime-web/dist - located here by scan.
  *
  * ORT loads the `asyncify` variant at runtime (its `.mjs` glue + `.wasm`); a missing asyncify file 404s
- * mid-load (the failure this guard now prevents - S25). The base `.wasm` is also kept. JSPI-capable
+ * mid-load (the failure this guard now prevents). The base `.wasm` is also kept. JSPI-capable
  * browsers may request the `jspi` variant instead - that is deferred to the cross-browser launch gate.
  */
 const PNPM = 'node_modules/.pnpm';
@@ -27,7 +27,7 @@ function vendoredOrtFiles(): string[] {
 		: [];
 }
 
-describe('vendored ORT runtime matches the installed onnxruntime-web (ADR-014)', () => {
+describe('vendored ORT runtime matches the installed onnxruntime-web', () => {
 	it('locates the installed onnxruntime-web dist', () => {
 		expect(ortPkgDir, 'onnxruntime-web not found under node_modules/.pnpm').toBeDefined();
 		expect(existsSync(ortDist)).toBe(true);

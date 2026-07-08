@@ -14,7 +14,7 @@ function countOccurrences(haystack: string, needle: string): number {
 }
 
 /**
- * Compute a W3C TextQuoteSelector for the chunk at `[start, end)` of `normalizedText` (A1 section 6). `exact`
+ * Compute a W3C TextQuoteSelector for the chunk at `[start, end)` of `normalizedText`. `exact`
  * is the verbatim slice; if it is not unique, grow `prefix` + `suffix` from the chunk's surrounding text until
  * `prefix + exact + suffix` occurs exactly once, bounded at `bound` chars each side; if still ambiguous,
  * return `null` (the chunk then ships page/section only - never a wrong highlight). Mirrors the build-time

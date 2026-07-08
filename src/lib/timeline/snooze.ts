@@ -1,5 +1,5 @@
 /**
- * Snooze presets + date math (C4 increment 2). snoozeUntilIso projects "today + N days" to a
+ * Snooze presets + date math. snoozeUntilIso projects "today + N days" to a
  * UTC-anchored ISO date (YYYY-MM-DD), the same pattern as eaosOffsetDate, so the snooze-until
  * date never shifts by the runtime timezone. Presets are day-based ("1 month" = 30d, "3 months"
  * = 90d) - deterministic and matching the engine's day-offset model; the snoozed card shows the

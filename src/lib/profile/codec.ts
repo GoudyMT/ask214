@@ -5,8 +5,7 @@ import type { ProfileV1 } from './types';
  * base64-encoded in transit through JSON and decoded back on read. Top-level
  * keys are sorted so the PLAINTEXT encoding is deterministic for identical
  * inputs (AES-GCM ciphertext is never deterministic - fresh random IV per write).
- *
- * Source: Phase 2 spec section 5; plan v2 T3-A (schemaVersion lives in ciphertext).
+ * schemaVersion lives in the ciphertext.
  */
 export type { ProfileV1 } from './types';
 

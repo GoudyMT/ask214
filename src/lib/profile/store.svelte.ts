@@ -13,12 +13,10 @@ import { safeLog } from '../log/safelog';
 /**
  * ProfileStore - the orchestration layer over keystore + encryption boundary +
  * IDB. Profile state is held in the factory closure (`_profile`), never exported;
- * Milestone I derives the persona rune from the app's single store instance.
+ * Derives the persona rune from the app's single store instance.
  *
  * load() runs under the hierarchical write locks and is fail-closed: it verifies
  * the keystore-record HMAC, then the signed HWM, BEFORE attempting any decrypt.
- *
- * Source: Phase 2 spec section 4 (invariants) + section 7 (lock ordering).
  */
 export class KeystoreNotInitializedError extends Error {
 	constructor() {
@@ -77,7 +75,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	// Synchronous relock core: zeroize the in-memory profile bytes, drop the reference,
 	// then signal relocked. Shared by relockSync() (the sync pagehide/freeze handlers),
 	// lock() (async UI / idle / cross-tab), and the deferred-relock path at save() exit.
-	// Zeroizes BEFORE nulling (memory-hygiene order; spec section 11).
+	// Zeroizes BEFORE nulling (memory-hygiene order).
 	function relockNow(): void {
 		if (_profile) {
 			freezeRelock(_profile as unknown as Record<string, unknown>);
@@ -324,7 +322,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					}
 				);
 
-				// Broadcast AFTER the lock releases (ADR-012).
+				// Broadcast AFTER the lock releases.
 				opts.onBroadcast?.({ type: 'profile-updated' });
 				return result;
 			} finally {
@@ -341,7 +339,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 * Destroy all local data: clear the encrypted stores (keys + profile + HWM), reset the
 		 * profile-exists flag, then relock memory. The store is intentionally unusable afterward
 		 * (no keystore) - the caller reloads to bootstrap a fresh first-run. v1.0 alternative to
-		 * profile export (master spec section 7.6).
+		 * profile export.
 		 */
 		async wipe(): Promise<void> {
 			await withStores(db, ['keystore', 'profile', 'profile-hwm'], 'readwrite', (tx) => {

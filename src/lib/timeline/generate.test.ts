@@ -65,13 +65,13 @@ const completeSchool: PersonaFilters = {
 
 const completeWork: PersonaFilters = { ...completeSchool, intendedPath: 'employment' };
 
-describe('filterAndAnchor (TL-5 gate + TL-3 anchor)', () => {
+describe('filterAndAnchor (gate + anchor)', () => {
 	it('includes universal tasks for any persona with an EAOS', () => {
 		const ids = filterAndAnchor(eaosOnly, [universal, gatedSchool]).map((i) => i.def.id);
 		expect(ids).toContain('u1');
 	});
 
-	it('hides a gated task when the persona field is unset (TL-5 hide-when-unset)', () => {
+	it('hides a gated task when the persona field is unset (hide-when-unset)', () => {
 		const ids = filterAndAnchor(eaosOnly, [universal, gatedSchool]).map((i) => i.def.id);
 		expect(ids).not.toContain('g1');
 	});
@@ -100,7 +100,7 @@ describe('filterAndAnchor (TL-5 gate + TL-3 anchor)', () => {
 	});
 });
 
-describe('deriveStatus (TL-7 status + snooze-expiry)', () => {
+describe('deriveStatus (status + snooze-expiry)', () => {
 	const anchored: AnchoredTask = {
 		def: universal,
 		effectiveOffset: -120,
@@ -265,7 +265,7 @@ describe('generateTimeline (sort + group + assemble)', () => {
 	});
 });
 
-describe('generateTimeline SkillBridge shift (TL-10)', () => {
+describe('generateTimeline SkillBridge shift', () => {
 	const emptyState: TimelineState = { schemaVersion: 1, tasks: {} };
 	const today = new Date('2026-06-04T12:00:00Z');
 	const noSkillBridge: PersonaFilters = {
@@ -315,7 +315,7 @@ describe('generateTimeline SkillBridge shift (TL-10)', () => {
 	});
 });
 
-describe('todayMarkerIndex (C5 Today divider placement)', () => {
+describe('todayMarkerIndex (Today divider placement)', () => {
 	// Phases are ordered furthest-out first; the marker renders before the first phase that is NOT
 	// fully in the past (endOffset > todayOffset). todayOffset = days from EAOS to today (negative =
 	// before separation), the same sign convention as the bucket offsets.
@@ -341,7 +341,7 @@ describe('todayMarkerIndex (C5 Today divider placement)', () => {
 	});
 });
 
-describe('generateTimeline Today marker (C5)', () => {
+describe('generateTimeline Today marker', () => {
 	it('exposes todayMarkerIndex between the past phases and the current/upcoming ones', () => {
 		const defs: TaskDef[] = [
 			{ ...universal, id: 'early', recommendedOffset: -400, windowStart: -420, windowEnd: -380 },

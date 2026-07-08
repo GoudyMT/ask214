@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-// Regression coverage for the shipped wizard flow (Arc 2, Milestones L3/L4). The Home setup CTA
+// Regression coverage for the shipped wizard flow. The Home setup CTA
 // appears only when there is no EAOS yet; saving an EAOS removes it; skipping leaves it in place
-// (soft gate, audit T3-D). Each test runs in a fresh browser context, so IndexedDB starts empty.
+// (soft gate). Each test runs in a fresh browser context, so IndexedDB starts empty.
 
 test('wizard happy path: Get started -> save EAOS -> Home drops the setup CTA', async ({
 	page

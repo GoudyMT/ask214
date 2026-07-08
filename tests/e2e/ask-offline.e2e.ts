@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// C4 acceptance: the offline "Ask" must answer with NO network after a one-time warm load - the whole
-// privacy + offline premise (ADR-015, Context 1). Real model, no stub: a stubbed embed would not test
+// Acceptance: the offline "Ask" must answer with NO network after a one-time warm load - the whole
+// privacy + offline premise (Context 1). Real model, no stub: a stubbed embed would not test
 // offline inference, which is the thing under test. Heavy (~45MB model + ORT wasm + in-browser ONNX, plus
 // an offline reload that must re-initialize from the service-worker cache), so it is tagged @slow and kept
 // out of the fast/default + CI runs (run on demand via `pnpm test:e2e:offline`). Queries are taken from
@@ -43,7 +43,7 @@ test('ask answers fully offline after a warm load @slow', async ({ page, context
 	await expect(input).toBeEnabled({ timeout: 30_000 }); // corpus served from cache, no network
 
 	// Confirm the SW (not Playwright's / the browser's HTTP cache) served this offline reload - a genuine
-	// service-worker-cache offline proof, not an incidental cache hit (sweep S26 L4).
+	// service-worker-cache offline proof, not an incidental cache hit.
 	expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
 
 	// A brand-new query, fully offline: the model re-loads from cache into the worker; embed + search

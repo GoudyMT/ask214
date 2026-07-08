@@ -44,6 +44,9 @@ jobs:
       - name: Type check
         run: pnpm run check
 
+      - name: Type check (content-ops build scripts)
+        run: pnpm run check:content-ops
+
       - name: Validate sources registry (legal/schema gate)
         run: pnpm run validate:sources
 

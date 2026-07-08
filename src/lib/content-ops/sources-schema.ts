@@ -1,5 +1,5 @@
 /**
- * The `sources.yaml` schema + pure validator (A1, the legal foundation). Takes ALREADY-PARSED entries
+ * The `sources.yaml` schema + pure validator (the legal foundation). Takes ALREADY-PARSED entries
  * (the `yaml` parse happens in content-ops/validate-sources.mjs, the only place that dep is imported -
  * keeping it out of `src/` per the no-third-party-runtime-JS rule). Returns a STRUCTURED result rather
  * than throwing interpolated messages, so opaque codes satisfy `mtc/no-input-in-error` and the offending
@@ -26,7 +26,7 @@ export type SourceEntry = {
 	access: string;
 	reviewed_by?: string;
 	reviewed_date?: string;
-	source_updated_date?: string; // the SOURCE's own last-updated date (ISO YYYY-MM-DD); distinct from reviewed_date (our vet date). The A5 update-detection key.
+	source_updated_date?: string; // the SOURCE's own last-updated date (ISO YYYY-MM-DD); distinct from reviewed_date (our vet date). The refresh update-detection key.
 	scrape_method: string;
 	content_hash?: string;
 	captured_path?: string;
@@ -63,7 +63,7 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * True iff `s` is a real calendar date in strict ISO `YYYY-MM-DD` form. Rejects wrong formats
- * (e.g. `04/15/2026`) AND impossible dates (`2026-13-01`, `2026-02-30`) so A5 can parse + compare.
+ * (e.g. `04/15/2026`) AND impossible dates (`2026-13-01`, `2026-02-30`) so the refresh step can parse + compare.
  */
 function isValidIsoDate(s: string): boolean {
 	if (!ISO_DATE_RE.test(s)) return false;

@@ -1,0 +1,33 @@
+{
+	// Build-time content-ops scripts run under tsx (Node), NOT the browser - so they get their own
+	// Node-oriented type-check instead of joining the SvelteKit/svelte-check program (which is DOM-typed).
+	// Same strictness bar as the app (strict + noUncheckedIndexedAccess). Run via `pnpm check:content-ops`.
+	"compilerOptions": {
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"target": "esnext",
+		// esnext for the language; dom/dom.iterable because the HTML extractor manipulates DOM-shaped nodes
+		// via linkedom (querySelectorAll / childNodes / getAttribute). @types/node coexists with dom cleanly.
+		"lib": ["esnext", "dom", "dom.iterable"],
+		"types": ["node"],
+		// The .mjs orchestrators import a few src/lib units that use the $lib alias; map it so the graph resolves.
+		"paths": {
+			"$lib": ["./src/lib"],
+			"$lib/*": ["./src/lib/*"]
+		},
+		"allowJs": true,
+		"checkJs": true,
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"noFallthroughCasesInSwitch": true,
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		// The scripts import their pure units with explicit .ts extensions (a tsx idiom); allow it under noEmit.
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
+		"noEmit": true
+	},
+	"include": ["content-ops/**/*.mjs", "content-ops/**/*.ts"],
+	"exclude": ["content-ops/**/*.test.ts", "content-ops/**/*.spec.ts"]
+}

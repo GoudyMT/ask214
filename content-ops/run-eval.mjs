@@ -7,14 +7,15 @@
 //
 // The hybrid experiment (src/lib/corpus/bm25.ts + hybrid.ts + the tune gridSearch) is retained + tested as
 // the v1.1 lever (form-number queries + the correct-empty guarantee, which no client-side threshold can
-// deliver - the A4 charter Measured Result); it is intentionally NOT used here because v1.0 ships dense.
+// deliver - the retrieval charter's measured result); it is intentionally NOT used here because v1.0 ships dense.
 // Pure logic lives in the tested units under src/lib/**; this file only injects the real model + orchestrates.
 //
-// NOTE (A4 sweep M1/L4): the held-out split is small (~15 positives), so the ranking floor is a knife-edge -
-// 0.800 is exactly 12/15, and the MIN_SCORE calibration is flat across 0-0.4 (no held-out lead near the 0.4
-// cutoff). If a future A5 refresh marginally misses, GROW the eval set (more positives per source, incl. a
-// deliberately weak-scoring lead near the cutoff) BEFORE touching the model/thresholds - a one-query swing is
-// sample noise, not a retrieval regression. See docs/sweeps/2026-07-04-content-ops-a4.md.
+// NOTE: the held-out split was deliberately grown (from a ~15-positive knife-edge to ~24 positives) so a
+// single-query swing no longer crosses the 0.80 floor; the script prints the live split counts at runtime.
+// The MIN_SCORE calibration is still flat across 0-0.4 (no held-out lead near the 0.4 cutoff). If a future
+// refresh marginally misses, GROW the eval set further (more positives per source, incl. a deliberately
+// weak-scoring lead near the cutoff) BEFORE touching the model/thresholds - a one-query swing on a split this
+// size is sample noise, not a retrieval regression.
 import { readFileSync } from 'node:fs';
 import { pipeline } from '@huggingface/transformers';
 import { decodeCorpus, cosineSimilarity } from '../src/lib/corpus/index.ts';
@@ -34,6 +35,7 @@ const TARGET = { srcHitRate: 0.9, srcMRR: 0.75 };
 // MIN_SCORE candidates (display cutoff): pick the HIGHEST that still holds the held-out floor.
 const MIN_SCORE_CANDIDATES = [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4];
 // v1.0 retrieval = pure dense (alpha 1, no BM25 gate); minScore is the only knob (the display cutoff).
+/** @param {number} minScore */
 const DENSE = (minScore) => ({ alpha: 1, minScore, minBm25: 0 });
 
 const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.json', 'utf8'));
@@ -52,6 +54,7 @@ for (const c of corpus.chunks) {
 }
 
 const extractor = await pipeline('feature-extraction', MODEL_REPO, { dtype: 'q8' });
+/** @param {string} text */
 const embed = async (text) => {
 	const out = await extractor(text, { pooling: 'mean', normalize: true });
 	return Float32Array.from(out.data);
@@ -82,7 +85,9 @@ const { tune } = partitionEvalSet(queries, HELD_OUT_PCT);
 const tuneSet = new Set(tune.map((q) => q.query));
 const tuneCache = cache.filter((c) => tuneSet.has(c.item.query));
 const heldCache = cache.filter((c) => !tuneSet.has(c.item.query));
+/** @param {{ item: import('../src/lib/ask/eval/resolve-ground-truth.ts').EvalQuery }[]} list */
 const nPos = (list) => list.filter((c) => !isHardNegative(c.item)).length;
+/** @param {{ item: import('../src/lib/ask/eval/resolve-ground-truth.ts').EvalQuery }[]} list */
 const nNeg = (list) => list.filter((c) => isHardNegative(c.item)).length;
 console.log(
 	`[split] tune ${tuneCache.length} (${nPos(tuneCache)}pos/${nNeg(tuneCache)}neg)  held-out ${heldCache.length} (${nPos(heldCache)}pos/${nNeg(heldCache)}neg)`
@@ -111,6 +116,7 @@ const params = DENSE(calibrated);
 const tuneM = evalUnderParams(tuneCache, chunkSourceIds, params, K);
 const heldM = evalUnderParams(heldCache, chunkSourceIds, params, K);
 const fullM = evalUnderParams(cache, chunkSourceIds, params, K);
+/** @param {ReturnType<typeof evalUnderParams>} m */
 const fmt = (m) => `srcHitRate@${K}=${m.srcHitRate.toFixed(3)}  srcMRR=${m.srcMRR.toFixed(3)}`;
 console.log(`\n[dense @ MIN_SCORE ${calibrated.toFixed(2)}]`);
 console.log(`  TUNE      ${fmt(tuneM)}`);

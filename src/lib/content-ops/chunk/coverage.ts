@@ -3,7 +3,7 @@ import type { ChunkSpan } from './split';
 export type CoverageResult = { ok: true } | { ok: false; reason: 'gap' | 'overlap'; at: number };
 
 /**
- * A3-D6.1 lossless coverage: assert the chunk spans cover every NON-whitespace character of `normalizedText`
+ * Lossless coverage: assert the chunk spans cover every NON-whitespace character of `normalizedText`
  * exactly once. Boundaries may fall only on collapsed whitespace (the single-space gaps between chunks). A
  * dropped non-whitespace run -> `gap`; a backwards/overlapping span -> `overlap`. Pure.
  */

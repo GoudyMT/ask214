@@ -7,9 +7,6 @@
  * Flags `throw new <X>Error(<msg>)` (constructor name matching /Error$/) when
  * <msg> is a template literal with interpolation, a bare identifier, or a '+'
  * concatenation involving a non-literal.
- *
- * Source: Phase 2 spec section 11 (privacy boundaries; no PII in errors);
- * ADR-004 amendment (error sanitization with opaque codes).
  */
 export default {
 	meta: {

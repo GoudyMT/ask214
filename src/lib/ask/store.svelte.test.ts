@@ -125,7 +125,7 @@ describe('createAskStore', () => {
 
 	it('returns empty when no hit clears the minimum score threshold (set up)', async () => {
 		// Query orthogonal to both fixture chunks -> cosine 0 -> below MIN_SCORE, so the threshold gate
-		// drops them and `empty` is reachable (spec section 9). Set up so ask() takes the embed path.
+		// drops them and `empty` is reachable. Set up so ask() takes the embed path.
 		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
 		const store = createAskStore({
 			embed: async () => new Float32Array([0, 0, 1]),

@@ -6,8 +6,6 @@ import type { TimelineState } from './types';
  * plain JSON encode - no base64, and no key-sorting (nothing hashes the plaintext, so
  * deterministic encoding is unnecessary here). schemaVersion lives INSIDE the encrypted
  * JSON and is checked by decode AFTER AES-GCM authentication (no plaintext header).
- *
- * Source: Timeline Engine design spec (2026-06-03) section 6; plan A3.
  */
 const SCHEMA_VERSION = 1;
 

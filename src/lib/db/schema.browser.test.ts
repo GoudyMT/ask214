@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { withStores, reqToPromise, STORES, DB_VERSION } from './schema';
 import { openTestDb, deleteTestDb } from './_test-helpers';
 
-// Real IndexedDB in the Chromium `client` Vitest project (T6-C). Each test opens
+// Real IndexedDB in the Chromium `client` Vitest project. Each test opens
 // a uniquely-named DB; afterEach deletes them so DBs don't leak across the suite.
 let opened: IDBDatabase[] = [];
 

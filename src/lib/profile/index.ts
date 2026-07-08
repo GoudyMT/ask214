@@ -4,8 +4,6 @@
  * The decrypted profile state (`_profile`) is NOT exported - it is private to the
  * ProfileStore factory closure (structural encapsulation, stronger than a lint
  * rule). Read it only through the reactive `persona` getter on a store instance.
- *
- * Source: Phase 2 spec section 4 (structural encapsulation) + section 9 (persona).
  */
 export {
 	createProfileStore,

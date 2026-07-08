@@ -1,14 +1,14 @@
 /**
- * PII-policy guard (Phase 2 plan Milestone Q1; spec section 15).
+ * PII-policy guard.
  *
- * Project hard rule + ADR-004: PII never leaves the device. Server-side SvelteKit
+ * Project hard rule: PII never leaves the device. Server-side SvelteKit
  * source (`+server.ts`, `*.server.ts`, `hooks.server.ts`) must never reference a
  * ProfileV1 PII field. v1.0 ships ZERO server files, so this is a forward guard for
  * Phase 3+ backend work - it fails the test suite (pre-commit + CI) the moment a
  * server file names a profile PII field.
  *
- * Implemented as a vitest test rather than a bash CI step (Session 16 Q1 lock):
- * cross-platform, runs in pre-commit AND CI, TDD-native. See spec section 15.
+ * Implemented as a vitest test rather than a bash CI step:
+ * cross-platform, runs in pre-commit AND CI, TDD-native.
  */
 
 /**

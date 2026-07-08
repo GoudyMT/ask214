@@ -2,14 +2,12 @@
  * HMAC-SHA-256 sign + verify wrappers.
  *
  * Used by:
- * - KeystoreRecordV1.recordHmac (Milestone E)
- * - SignedSidecar.mac (Milestone E)
- * - BroadcastEnvelope.sig (v1.1; per ADR-012, deferred)
+ * - KeystoreRecordV1.recordHmac
+ * - SignedSidecar.mac
+ * - BroadcastEnvelope.sig (v1.1, deferred)
  *
  * Key MUST be a non-extractable HMAC key with usages including
  * 'sign' (for hmacSign) or 'verify' (for hmacVerify).
- *
- * Source: Phase 2 spec sections 5, 6; ADR-012.
  */
 
 /**

@@ -11,8 +11,6 @@
  *
  * Raw IndexedDB (no Dexie) honors the v2 audit "0 new prod deps" lock; the schema
  * is trivial (single-row stores, no indexes/queries) so a library adds no value.
- *
- * Source: Phase 2 spec section 4; plan v2 audit (3 stores, 0 deps).
  */
 export const DB_NAME = 'mtc';
 export const DB_VERSION = 2; // 1 -> 2: adds the timeline-state stores (the upgrade loop creates missing stores; v1 profile data survives)

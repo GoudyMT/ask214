@@ -84,7 +84,7 @@ describe('encodeProfile / decodeProfile', () => {
 		expect(dec.rate?.length).toBe(100_000);
 	});
 
-	it('roundtrips the SkillBridge flat numeric fields (TL-10)', () => {
+	it('roundtrips the SkillBridge flat numeric fields', () => {
 		const withSkillBridge: ProfileV1 = {
 			...baseProfile,
 			skillbridgeApproved: 1,
@@ -95,7 +95,7 @@ describe('encodeProfile / decodeProfile', () => {
 		expect(dec.skillbridgeDurationDays).toBe(180);
 	});
 
-	it('omits the SkillBridge fields when unset (forward-compat with pre-TL-10 blobs)', () => {
+	it('omits the SkillBridge fields when unset (forward-compat with older blobs)', () => {
 		const dec = decodeProfile(encodeProfile(baseProfile));
 		expect(dec.skillbridgeApproved).toBeUndefined();
 		expect(dec.skillbridgeDurationDays).toBeUndefined();

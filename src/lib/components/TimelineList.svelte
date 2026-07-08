@@ -15,7 +15,7 @@
 		onSetNote?: (taskId: string, note: string | undefined) => void;
 	} = $props();
 
-	// Phase header progress count (C4-4): an open phase shows what's left = active + snoozed (Format 1
+	// Phase header progress count: an open phase shows what's left = active + snoozed (Format 1
 	// "N to do"; a snoozed task is paused, still pending - not done). A fully-resolved phase shows the
 	// done/skipped breakdown. Derived from the engine's per-phase counts.
 	function phaseCount(phase: TimelineView['phases'][number]): string {
@@ -28,13 +28,13 @@
 		return `${phase.counts.toDo + phase.counts.snoozed} to do`;
 	}
 
-	// Per-phase ephemeral expand state (C4-4): a fully-resolved (collapsible) phase defaults to
-	// collapsed; keyed by bucket id (absent = collapsed). Not persisted (spec section 7).
+	// Per-phase ephemeral expand state: a fully-resolved (collapsible) phase defaults to
+	// collapsed; keyed by bucket id (absent = collapsed). Not persisted.
 	let expanded = $state<Record<string, boolean>>({});
 
 	// A phase that is no longer collapsible (e.g. a task was restored to active) drops its expand
 	// state, so when it becomes fully resolved again it auto-collapses to the default - mirrors the
-	// card-level reset (C4-4). Without this, a stale expanded=true would re-open it.
+	// card-level reset. Without this, a stale expanded=true would re-open it.
 	$effect(() => {
 		for (const phase of view.phases) {
 			if (!phase.collapsible && expanded[phase.bucket.id]) {
@@ -112,13 +112,13 @@
 	}
 
 	/* Progress count appended to the phase label - normal case + weight so it reads as a quiet
-	   sub-label rather than part of the uppercase heading (C4-4). */
+	   sub-label rather than part of the uppercase heading. */
 	.timeline-list__count {
 		text-transform: none;
 		font-weight: 400;
 	}
 
-	/* Collapsible phase disclosure (C4-4): the header becomes a full-width toggle button inside the
+	/* Collapsible phase disclosure: the header becomes a full-width toggle button inside the
 	   <h2> (preserves the heading + aria-labelledby). Tap-safe like the task cards. */
 	.timeline-list__toggle {
 		display: inline-flex;
@@ -153,7 +153,7 @@
 		border-right: none;
 	}
 
-	/* Jump-nav target offset (C5): a chip-strip jump lands the section below the sticky header +
+	/* Jump-nav target offset: a chip-strip jump lands the section below the sticky header +
 	   chip strip. Tuned at the visual checkpoint. */
 	.timeline-list section {
 		scroll-margin-top: 6.5rem;
@@ -163,7 +163,7 @@
 	.timeline-list section:first-of-type .timeline-list__phase {
 		margin-top: 0;
 	}
-	/* Today marker (C5, T1): a centered accent pill on a hairline rule, rendered between the
+	/* Today marker: a centered accent pill on a hairline rule, rendered between the
 	   fully-past phases and the current/upcoming ones (position from view.todayMarkerIndex). The
 	   rule is decorative (pseudo-elements); the pill text marks today. */
 	.timeline-today {

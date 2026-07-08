@@ -7,12 +7,9 @@
  * - `rotateOrUpgrade` takes `mtc-keystore` EXCLUSIVE, excluding all normal
  *   writes (the v1.1 key-rotation / passphrase-upgrade seam; harmless in v1.0).
  *
- * Every acquisition is bounded by `AbortSignal.timeout` (spec invariant 6: no
+ * Every acquisition is bounded by `AbortSignal.timeout` (no
  * silent lock drops). A timed-out acquisition surfaces as `LockAcquisitionTimeout`,
  * never a hang and never a silent skip.
- *
- * Source: Phase 2 spec section 7 "Hierarchical lock ordering" + section 4
- * (invariants 5, 6).
  */
 export const LOCK_TIMEOUT_MS = 10_000;
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// Six viewports covering the responsive range per ADR-010. The app shell unified to a single
-// responsive 900px max-width across every route (Session 25; shell-width.ts), superseding the old
+// Six viewports covering the responsive range. The app shell unified to a single
+// responsive 900px max-width across every route (shell-width.ts), superseding the old
 // 720px. With box-sizing border-box, <main>'s getBoundingClientRect width never exceeds 900px on wide
 // viewports; on narrow viewports (<= 900px) it equals the viewport width. Either way, <= 900 holds.
 const viewports = [

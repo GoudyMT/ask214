@@ -2,9 +2,6 @@
  * Forbids passing Error objects or properties (.message, .stack, .name) into
  * safeLog argument positions. Tests cannot leak via toString or property
  * access; only opaque error codes + scalar/boolean/code-enum fields allowed.
- *
- * Source: Phase 2 spec section 11 "No PII in logs"; ADR-004 amendment
- * "error sanitization with opaque codes".
  */
 export default {
 	meta: {

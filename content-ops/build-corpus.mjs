@@ -1,20 +1,21 @@
 // Run from the repo root: `pnpm embed`. Build-time producer (never ships to a device). Reads the per-source
-// A3 chunk arrays, embeds each chunk with the SAME q8 MiniLM the browser embeds queries with, and writes the
+// chunk arrays, embeds each chunk with the SAME q8 MiniLM the browser embeds queries with, and writes the
 // versioned corpus artifact the runtime decoder reads. Downloads the model from HF on first run (build-time
 // only; the runtime self-hosts the model). Confirm the transformers API against the installed version if the
 // first run errors.
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pipeline } from '@huggingface/transformers';
 import { buildCorpusArtifact } from '../src/lib/ask/corpus-artifact.ts';
 import { decodeCorpus } from '../src/lib/corpus/index.ts';
+import { computeContentRevision } from '../src/lib/content-ops/refresh/content-revision.ts';
 
 const CHUNKS_DIR = 'content-ops/chunks';
 const OUT_DIR = 'static/corpus';
 const MODEL_REPO = 'Xenova/all-MiniLM-L6-v2';
 const MODEL_ID = 'all-MiniLM-L6-v2'; // stamped into the manifest; must equal the runtime EMBED_MODEL_ID + decodeCorpus expectedModelId
 const VERSION = '1.0';
-const SIZE_BUDGET_BYTES = 300 * 1024 * 1024; // the C1 on-device total corpus budget
+const SIZE_BUDGET_BYTES = 300 * 1024 * 1024; // the on-device total corpus budget
 const PER_FILE_CAP_BYTES = 25 * 1024 * 1024; // Cloudflare Workers Assets per-file asset cap
 
 // Read + concatenate every per-source chunk array (each file is a JSON array of chunks). Sorted for a
@@ -36,7 +37,27 @@ for (const c of chunks) {
 	if (++done % 200 === 0) console.log(`  embedded ${done}/${chunks.length}`);
 }
 
-const { manifest, embeddingsBuffer } = buildCorpusArtifact(chunks, vectors, MODEL_ID, VERSION);
+// Content-revision stamp: a stable content fingerprint over the chunks. Preserve the buildDate when the
+// content is byte-identical to the committed artifact (so re-embedding unchanged content does not churn
+// corpus-v1.0.json); stamp today only on a real content change.
+const { contentHash } = computeContentRevision(
+	chunks.map((c) => ({ id: c.id, text: c.text })),
+	''
+);
+const manifestPath = join(OUT_DIR, 'corpus-v1.0.json');
+let buildDate = new Date().toISOString().slice(0, 10);
+if (existsSync(manifestPath)) {
+	const prev = JSON.parse(readFileSync(manifestPath, 'utf8'));
+	if (prev.contentRevision?.contentHash === contentHash) buildDate = prev.contentRevision.buildDate;
+}
+const contentRevision = { buildDate, contentHash };
+const { manifest, embeddingsBuffer } = buildCorpusArtifact(
+	chunks,
+	vectors,
+	MODEL_ID,
+	VERSION,
+	contentRevision
+);
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'corpus-v1.0.json'), JSON.stringify(manifest));
 writeFileSync(join(OUT_DIR, 'corpus-v1.0.embeddings.bin'), Buffer.from(embeddingsBuffer));

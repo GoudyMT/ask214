@@ -1,9 +1,9 @@
 import type { TaskDef, PhaseBucket } from './types';
 
 /**
- * Phase buckets for the timeline view (TL-9): the 24-month runway, furthest-out first.
+ * Phase buckets for the timeline view: the 24-month runway, furthest-out first.
  * A task is grouped into the bucket whose [startOffset, endOffset) contains its
- * recommendedOffset; empty buckets are dropped at render (generation, B5).
+ * recommendedOffset; empty buckets are dropped at render (generation).
  *
  * Offsets are days relative to EAOS (negative = before separation). The 'after' bucket
  * runs out to +730d to hold late post-separation deadlines (e.g. VGLI conversion).
@@ -39,15 +39,14 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
  * v1.0 SEED task definitions (US Navy AD Enlisted ETS), research-reconciled against
  * current DoD/VA/DoL/Navy sources (2024-2026). Timing is the BASELINE (no-SkillBridge)
  * path anchored to EAOS; the generation engine applies the SkillBridge shift to
- * `track: 'military'` tasks when the profile has SkillBridge approved (TL-10).
+ * `track: 'military'` tasks when the profile has SkillBridge approved.
  *
  * `track`: 'military' = must finish on the military side (shifts with SkillBridge);
  * 'transition' = anchored to the real EAOS / VA process. Tasks with no authoritative
  * fixed date use a wide early window (best-practice prep). `requires` gates a task on a
  * persona field (hidden until set + matched).
  *
- * Source: Timeline Engine design spec (2026-06-03); master spec 4.2; research pass
- * (Session 17). Max-authored/confirmed from lived Navy-ETS experience.
+ * Authored and confirmed from lived Navy-ETS experience, backed by a research pass.
  */
 export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Early prep (no authoritative fixed date; recommended 18-24 months out) ----

@@ -9,7 +9,8 @@ export function buildCorpusArtifact(
 	chunks: CorpusChunk[],
 	vectors: Float32Array[],
 	modelId: string,
-	version: string
+	version: string,
+	contentRevision?: { buildDate: string; contentHash: string }
 ): { manifest: CorpusManifest; embeddingsBuffer: ArrayBuffer } {
 	if (chunks.length !== vectors.length) {
 		throw new Error('E_ASK_ARTIFACT_LENGTH'); // build-time only, never user-facing
@@ -22,5 +23,6 @@ export function buildCorpusArtifact(
 		flat.set(v, i * dim);
 	}
 	const manifest: CorpusManifest = { version, dim, modelId, chunks };
+	if (contentRevision !== undefined) manifest.contentRevision = contentRevision;
 	return { manifest, embeddingsBuffer: flat.buffer };
 }

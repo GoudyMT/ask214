@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { scanForPiiTokens } from './pii-policy';
 
 // Server-side SvelteKit source: anything that can execute on a server. v1.0 ships
-// none of these; the guard protects Phase 3+ backend work (ADR-004: PII stays on device).
+// none of these; the guard protects Phase 3+ backend work (PII stays on device).
 const SERVER_FILE_PATTERN =
 	/(\+server\.[jt]s|\+page\.server\.[jt]s|\+layout\.server\.[jt]s|hooks\.server\.[jt]s)$/;
 

@@ -4,10 +4,8 @@ import { hmacSign, hmacVerify } from '../crypto/hmac';
  * Signed sidecar pattern. Plaintext metadata in IDB is FORGEABLE (the encryption
  * boundary protects ciphertext, not adjacent stores). Sidecars carry monotonic
  * counters + epoch + timestamps; integrity is enforced by HMAC under the single
- * keystore hmacKey, with a NIST SP 800-108-style domain-separation prefix (T6-E)
+ * keystore hmacKey, with a NIST SP 800-108-style domain-separation prefix
  * so a sidecar MAC can never validate as a keystore-record (or broadcast) MAC.
- *
- * Source: Phase 2 spec section 5 "Signed metadata (sidecars)"; plan v2 T6-E.
  */
 const SIDECAR_HMAC_PREFIX = 'mtc-v1|sidecar|';
 

@@ -62,7 +62,7 @@ describe('derivePersona', () => {
 		expect(r.completeness).toBe('complete');
 	});
 
-	it('surfaces SkillBridge when approved with a positive duration (TL-10)', () => {
+	it('surfaces SkillBridge when approved with a positive duration', () => {
 		const r = derivePersona(withEaos({ skillbridgeApproved: 1, skillbridgeDurationDays: 180 }));
 		expect(r.completeness).not.toBe('none');
 		if (r.completeness !== 'none') {

@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * Integrity guard (design spec section 12, sweep M-c): the self-hosted MiniLM model files (ADR-014) are
+ * Integrity guard: the self-hosted MiniLM model files are
  * the feature's novel supply-chain surface - committed binaries with no installed package to diff against
  * (unlike the ORT wasm, guarded byte-for-byte in wasm-vendor.test.ts). A committed SHA-256 manifest pins
  * their exact bytes: any change to a model file must deliberately update the manifest (a review
@@ -24,7 +24,7 @@ function sha256(path: string): string {
 	return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
-describe('self-hosted model integrity (SHA-256 manifest, spec section 12)', () => {
+describe('self-hosted model integrity (SHA-256 manifest)', () => {
 	it('commits a manifest covering exactly the self-loaded model files', () => {
 		expect(existsSync(MANIFEST), `${MANIFEST} missing - generate the model SHA-256 manifest`).toBe(
 			true

@@ -6,7 +6,7 @@ import type { Anchor } from './anchor';
 type SourceEntry = { source_id: string; title: string; url: string; origin: string };
 
 /**
- * Assemble one `CorpusChunk` from a span + its registry entry + its computed anchor. The id is the A1
+ * Assemble one `CorpusChunk` from a span + its registry entry + its computed anchor. The id is the
  * content-derived `deriveChunkId` (async); an intra-source exact-duplicate text is disambiguated by appending
  * `-<n>` using the `seen` counter (first occurrence keeps the bare id). `tags` seeds `[origin lowercased]`;
  * `excerpt` is intentionally omitted (v1.1). Optional fields are set only when present (exactOptionalPropertyTypes).

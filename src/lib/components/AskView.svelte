@@ -27,7 +27,7 @@
 	let openSource = $state<Source | null>(null); // the source shown in the offline reader modal, or null
 
 	// The reminder dismissal persists for the tab session (non-PII: just "user hid the Ask download
-	// nudge" - no query, no profile). Plain sessionStorage is fine here (ADR-004 governs PII, not this).
+	// nudge" - no query, no profile). Plain sessionStorage is fine here (the encrypted-IDB rule governs PII, not this).
 	const REMINDER_DISMISSED_KEY = 'mtc:ask:reminder-dismissed';
 	let reminderDismissed = $state(
 		typeof sessionStorage !== 'undefined' && sessionStorage.getItem(REMINDER_DISMISSED_KEY) === '1'

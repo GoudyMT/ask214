@@ -1,5 +1,5 @@
 /**
- * Cloudflare `_headers` policy parser (Phase 2 plan Milestone P1b).
+ * Cloudflare `_headers` policy parser.
  *
  * Closes the "_headers has ZERO automated coverage" gap: the edge headers (HSTS,
  * Referrer-Policy, per-route Cache-Control) are applied by Cloudflare at deploy and are NOT

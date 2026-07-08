@@ -4,8 +4,6 @@
  * ProfileV1 field type constraint (enforced by TypeScript): every field is
  * `Uint8Array | Uint8Array[] | number | null | undefined`. This helper handles
  * the two byte-bearing variants; primitives need no zeroization.
- *
- * Source: Phase 2 spec section 8 ("Relock action") + section 11 ("Memory hygiene").
  */
 export function zeroizeField(v: unknown): void {
 	if (v instanceof Uint8Array) {
@@ -81,8 +79,6 @@ export function scrubSecureInputs(): void {
  *
  * Args:
  *   profile: the in-memory profile object whose fields are zeroized in place.
- *
- * Source: Phase 2 spec section 8 ("Relock action") + section 11 ("Memory hygiene").
  */
 export function freezeRelock(profile: Record<string, unknown>): void {
 	for (const value of Object.values(profile)) {

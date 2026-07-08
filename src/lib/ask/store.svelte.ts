@@ -3,18 +3,18 @@ import { filterByMinScore } from './threshold';
 import { AskError, ASK_ERROR } from './errors';
 import type { AskState } from './types';
 
-const K = 5; // result cards per query (spec 4.6: 3-5)
-// Minimum cosine score a hit must clear to surface (spec section 9): weak matches are dropped rather
+const K = 5; // result cards per query (3-5)
+// Minimum cosine score a hit must clear to surface: weak matches are dropped rather
 // than padded in, which is also what makes `empty` reachable. Calibrated against the eval set - set
 // below the weakest relevant lead so a valid answer is never dropped, and above the off-topic noise
-// tail so unrelated hits collapse. Recalibrate as the corpus scales (spec section 15 #1).
+// tail so unrelated hits collapse. Recalibrate as the corpus scales.
 const MIN_SCORE = 0.4;
 
-// The ~23MB on-device search model is fetched + cached once, then served from cache forever (ADR-014).
+// The ~23MB on-device search model is fetched + cached once, then served from cache forever.
 // We persist one non-PII boolean - "was the model downloaded on this device?" - so the "downloading..."
-// modelLoading message shows on the first-EVER query only, not once per session (spec section 9). This
+// modelLoading message shows on the first-EVER query only, not once per session. This
 // is a device-capability flag, NOT user data (no query, no profile, nothing personal), so plain
-// localStorage is correct here - ADR-004's encrypted-IDB rule governs PII, which this is not.
+// localStorage is correct here - the encrypted-IDB rule governs PII, which this is not.
 const MODEL_DOWNLOADED_KEY = 'mtc:ask:model-downloaded';
 
 function readModelDownloaded(): boolean {
@@ -29,7 +29,7 @@ function markModelDownloaded(): void {
  * The Ask view store (Context 1, on-device): holds the `AskState` machine and orchestrates one query.
  * `embed` + `corpus` are injected so the store is unit-testable without a model/worker.
  *
- * Soft opt-in (ADR-015 / spec 9): the ~23MB model is NEVER auto-downloaded. The first query on an
+ * Soft opt-in: the ~23MB model is NEVER auto-downloaded. The first query on an
  * un-set-up device goes to `needsSetup` with the query preserved; the download happens only when the user
  * consents via `setUp()` (which shows `modelLoading` during the one-time fetch, then answers the preserved
  * query). A set-up device (persisted flag) skips straight to `embedding`. A failed FIRST embed with no

@@ -27,8 +27,7 @@ import { withStores, reqToPromise } from '../db/schema';
  * strings; cannot be byte-zeroized - documented residual); the on-disk record stays
  * encrypted.
  *
- * Source: Timeline Engine design spec (2026-06-03) sections 3 + 6; plan A4.
- * Deviation (plan A4): reuses `withWriteLocks` (profile-write exclusive) rather than a
+ * Deviation: reuses `withWriteLocks` (profile-write exclusive) rather than a
  * dedicated `timeline-write` lock - safe full-serialization for a single-user app,
  * no change to shipped lock code. HWM domain-separation is via the sidecar `name`
  * ('timeline-state-hwm'), so no new HMAC prefix is needed.

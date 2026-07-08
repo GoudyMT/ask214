@@ -26,7 +26,7 @@ const hex = (b: Uint8Array): string =>
 		.join('');
 
 describe('buildAAD', () => {
-	it('serializes exactly the 6 v1.0 fields in order (T3-B)', async () => {
+	it('serializes exactly the 6 v1.0 fields in order', async () => {
 		const rh = await computeKeystoreRecordHash(baseInput());
 		const aStr = new TextDecoder().decode(buildAAD(baseParams(rh)));
 		expect(aStr).toBe(`profile|self|0|5|sv1|${hex(rh)}`);

@@ -9,7 +9,7 @@
 	--color-success: #6fb37a;
 	--color-border: #2a313a;
 
-	/* Category accents for timeline chips (Session 19) - distinct from the status palette. */
+	/* Category accents for timeline chips - distinct from the status palette. */
 	--color-category-medical: #56b6c2;
 	--color-category-admin: #8895a8;
 	--color-category-benefits: #7e8ce0;
@@ -85,7 +85,7 @@ input:focus-visible,
 	left: var(--space-s);
 }
 
-/* Fluid typography (design spec section 5.2 lock #8, ADR-010). */
+/* Fluid typography. */
 h1 {
 	font-size: var(--font-size-h1-fluid);
 	line-height: 1.2;
@@ -104,5 +104,5 @@ h3 {
 	margin: var(--space-m) 0 var(--space-s);
 }
 
-/* Low-bandwidth visual defaults are in effect (system fonts, solid background, no decorative images, no animations) via design tokens (Task 1.2). */
-/* The data-bandwidth-mode selector pattern + localStorage toggle described in ADR-010 did NOT ship in Phase 1; when a future component needs heavy/light variants, see ADR-010 for the original selector design. */
+/* Low-bandwidth visual defaults are in effect (system fonts, solid background, no decorative images, no animations) via design tokens. */
+/* The data-bandwidth-mode selector pattern + localStorage toggle did NOT ship in Phase 1; when a future component needs heavy/light variants, revisit the original selector design. */

@@ -4,11 +4,9 @@ import { parseEaosAtRead, daysUntilSeparation, decodeEaos, type EaosString } fro
 /**
  * Persona is a discriminated union on `completeness`; consumers MUST narrow before
  * reading optional fields (TS-strict enforces it). Pure + deterministic given `today`.
- *
- * Source: Phase 2 spec section 9 "Persona Derivation".
  */
 /**
- * SkillBridge approval (TL-10). Surfaced on the persona only when the profile has the
+ * SkillBridge approval. Surfaced on the persona only when the profile has the
  * approval flag set AND a positive duration; generation left-shifts military-track tasks
  * by `durationDays` so their deadlines precede leaving for the civilian employer.
  */
@@ -57,7 +55,7 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 	const dus = daysUntilSeparation(eaos, today);
 
 	// SkillBridge surfaces only when explicitly approved with a positive duration; an
-	// unset/zero flag or missing duration means no shift (TL-10).
+	// unset/zero flag or missing duration means no shift.
 	const skillbridge: SkillBridge | undefined =
 		profile.skillbridgeApproved === 1 &&
 		typeof profile.skillbridgeDurationDays === 'number' &&

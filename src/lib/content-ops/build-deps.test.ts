@@ -17,7 +17,7 @@ function tsFiles(dir: string): string[] {
 }
 
 describe('build-only dependency isolation', () => {
-	test('no src/ module imports an A2 build-only lib', () => {
+	test('no src/ module imports a build-only lib', () => {
 		const offenders: string[] = [];
 		for (const file of tsFiles('src')) {
 			const text = readFileSync(file, 'utf8');

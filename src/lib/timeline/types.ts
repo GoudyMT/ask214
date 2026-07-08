@@ -1,9 +1,6 @@
 /**
- * Timeline domain types. This file accretes across the build: A3 adds the encrypted
- * per-task state types; B1 adds the task-definition types (TaskDef, PersonaGate,
- * TaskCategory, PhaseBucket) and the generated-view types.
- *
- * Source: Timeline Engine design spec (2026-06-03) sections 4-6.
+ * Timeline domain types: the encrypted per-task state types, plus the task-definition
+ * types (TaskDef, PersonaGate, TaskCategory, PhaseBucket) and the generated-view types.
  */
 
 /** Terminal/deferred states the user sets explicitly. Absence of an entry = active. */
@@ -28,14 +25,14 @@ export type TaskCategory = 'medical' | 'admin' | 'benefits' | 'career' | 'financ
 /**
  * Which side of separation a task lives on. 'military' tasks must finish before the
  * member leaves for SkillBridge, so generation shifts them earlier by the approved
- * SkillBridge duration; 'transition' tasks anchor to the real EAOS (TL-10).
+ * SkillBridge duration; 'transition' tasks anchor to the real EAOS.
  */
 export type TaskTrack = 'military' | 'transition';
 
 /**
  * Optional persona gate. No gate = universal (shows for everyone). A gated task shows
- * only when the persona field is SET and its value is in the list (hide-when-unset,
- * TL-5). Extensible: v2.0 adds branch/component keys.
+ * only when the persona field is SET and its value is in the list (hide-when-unset).
+ * Extensible: v2.0 adds branch/component keys.
  */
 export type PersonaGate = Partial<{
 	intendedPath: string[];
@@ -65,7 +62,7 @@ export type TaskDef = {
 export type PhaseBucket = {
 	id: string;
 	label: string;
-	/** Compact label for the C5 chip-strip nav (the full label is too long for a chip). */
+	/** Compact label for the chip-strip nav (the full label is too long for a chip). */
 	shortLabel?: string;
 	startOffset: number;
 	endOffset: number;
