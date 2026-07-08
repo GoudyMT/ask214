@@ -32,6 +32,7 @@ import { stampSourcesYaml } from './backfill/stamp-sources.ts';
 /** @typedef {import('../src/lib/content-ops/sources-schema.ts').SourceEntry} SourceEntry */
 /** @typedef {import('../src/lib/content-ops/refresh/review-report.ts').ReviewInput} ReviewInput */
 /** @typedef {import('../src/lib/content-ops/refresh/review-report.ts').PendingManifest} PendingManifest */
+/** @typedef {import('../src/lib/content-ops/refresh/review-report.ts').PendingSource} PendingSource */
 /** @typedef {import('./backfill/stamp-sources.ts').IncomingBySourceId} IncomingBySourceId */
 /** @typedef {{ content_hash: string, blocks: { text: string, tag?: string }[], normalizedText: string, last_modified?: string }} ExtractedDoc */
 
@@ -192,59 +193,131 @@ function apply() {
 	const manifest = /** @type {PendingManifest} */ (JSON.parse(readFileSync(path, 'utf8')));
 	const registry = /** @type {SourceEntry[]} */ (parse(readFileSync(SOURCES_YAML, 'utf8')));
 	const byId = new Map(registry.map((e) => [e.source_id, e]));
-	const approved = manifest.sources.filter((s) => s.decision === 'approved' && s.stagedPath);
+	// Approved sources split: those with a staged capture (auto-applicable) vs those without. Manual-check
+	// sources carry no stagedPath, so warn on them - an operator must never be told "applied N" while an
+	// approved source was silently dropped.
+	const approvedAll = manifest.sources.filter((s) => s.decision === 'approved');
+	const skipped = approvedAll.filter((s) => !s.stagedPath);
+	const approved = approvedAll.filter((s) => s.stagedPath);
+	if (skipped.length > 0) {
+		console.warn(
+			`[refresh] WARNING: ${skipped.length} approved source(s) have no staged capture and are NOT applied here ` +
+				`(re-ingest them manually per the runbook): ${skipped.map((s) => s.sourceId).join(', ')}`
+		);
+	}
 	if (approved.length === 0) {
 		console.log('[refresh] nothing approved with a staged capture to apply.');
 		return;
 	}
 
-	// Promote the reviewed staged artifacts -> real dirs VERBATIM (no re-fetch). Fail-closed: a missing
-	// staged artifact for an approved source stops the run (never silently thin the corpus).
-	/** @type {IncomingBySourceId} */
-	const incoming = {};
+	// Pre-validate EVERY approved source BEFORE promoting any: charset-guard the id + content_hash (both flow
+	// into file paths and a shell subprocess) and confirm the staged extract + capture exist. A bad id or a
+	// missing artifact fails closed with the working tree untouched, so there is never a half-promoted baseline.
+	/** @type {{ s: PendingSource, ext: 'pdf' | 'html', staged: ExtractedDoc, stagedCap: string }[]} */
+	const validated = [];
 	for (const s of approved) {
+		if (!/^[a-z0-9_]+$/.test(s.sourceId)) throw new Error('E_REFRESH_BAD_SOURCE_ID');
 		const ext = byId.get(s.sourceId)?.content_type === 'pdf' ? 'pdf' : 'html';
 		const staged = readExtract(STAGING_EXTRACTED, s.sourceId);
 		if (!staged) throw new Error('E_REFRESH_FETCH_FAILED');
+		if (!/^[0-9a-f]{64}$/.test(staged.content_hash)) throw new Error('E_REFRESH_BAD_CONTENT_HASH');
 		const stagedCap = join(STAGING_ROOT, 'captures', `${staged.content_hash}.${ext}`);
 		if (!existsSync(stagedCap)) throw new Error('E_REFRESH_FETCH_FAILED');
-		copyFileSync(
-			join(STAGING_EXTRACTED, `${s.sourceId}.json`),
-			join(BASELINE_EXTRACTED, `${s.sourceId}.json`)
-		);
-		copyFileSync(stagedCap, join('content-ops/captures', `${staged.content_hash}.${ext}`));
-		incoming[s.sourceId] = {
-			contentHash: staged.content_hash,
-			contentType: ext,
-			...(s.sourceUpdatedDate ? { sourceUpdatedDate: s.sourceUpdatedDate } : {})
-		};
-		console.log(`[refresh] promoted ${s.sourceId}; re-chunking ...`);
-		RUN_PNPM(['chunk', s.sourceId]);
+		validated.push({ s, ext, staged, stagedCap });
 	}
 
-	// Whole-corpus re-embed (+ contentRevision) then the eval gate. Fail-closed: below-floor eval must NOT
-	// ship - stop before the sources.yaml bump; the operator reverts the working tree via git.
-	RUN_PNPM(['embed']);
+	// Snapshot every baseline file the promote + re-embed will overwrite (the tracked shipped corpus + each
+	// source's untracked extract/chunk), so ANY failure below - a mid-run throw OR a below-floor eval - rolls
+	// the working tree back to exactly its pre-apply state. Without this a rejected refresh leaves the corpus
+	// regressed AND the extracted baseline overwritten, which a later detect would then read as "unchanged".
+	const ROLLBACK = join(OUT_DIR, '.rollback');
+	rmSync(ROLLBACK, { recursive: true, force: true });
+	mkdirSync(join(ROLLBACK, 'extracted'), { recursive: true });
+	mkdirSync(join(ROLLBACK, 'chunks'), { recursive: true });
+	mkdirSync(join(ROLLBACK, 'corpus'), { recursive: true });
+	/** @type {{ live: string, backup: string, existed: boolean }[]} */
+	const snaps = [];
+	/** @param {string} live @param {string} backup */
+	const snap = (live, backup) => {
+		const existed = existsSync(live);
+		if (existed) copyFileSync(live, backup);
+		snaps.push({ live, backup, existed });
+	};
+	snap('static/corpus/corpus-v1.0.json', join(ROLLBACK, 'corpus', 'corpus-v1.0.json'));
+	snap(
+		'static/corpus/corpus-v1.0.embeddings.bin',
+		join(ROLLBACK, 'corpus', 'corpus-v1.0.embeddings.bin')
+	);
+	/** @type {string[]} */
+	const newCaptures = [];
+	for (const v of validated) {
+		snap(
+			join(BASELINE_EXTRACTED, `${v.s.sourceId}.json`),
+			join(ROLLBACK, 'extracted', `${v.s.sourceId}.json`)
+		);
+		snap(
+			join('content-ops/chunks', `${v.s.sourceId}.json`),
+			join(ROLLBACK, 'chunks', `${v.s.sourceId}.json`)
+		);
+		const capPath = join('content-ops/captures', `${v.staged.content_hash}.${v.ext}`);
+		if (!existsSync(capPath)) newCaptures.push(capPath); // a genuinely new capture -> delete on rollback
+	}
+	const restore = () => {
+		for (const { live, backup, existed } of snaps) {
+			if (existed) copyFileSync(backup, live);
+			else if (existsSync(live)) rmSync(live, { force: true });
+		}
+		for (const cap of newCaptures) if (existsSync(cap)) rmSync(cap, { force: true });
+	};
+
+	// Promote (verbatim, no re-fetch) -> re-chunk -> whole-corpus re-embed -> eval gate, all under the guard.
+	/** @type {IncomingBySourceId} */
+	const incoming = {};
+	let evalRegressed = false;
 	try {
-		RUN_PNPM(['eval']);
-	} catch {
+		for (const v of validated) {
+			copyFileSync(
+				join(STAGING_EXTRACTED, `${v.s.sourceId}.json`),
+				join(BASELINE_EXTRACTED, `${v.s.sourceId}.json`)
+			);
+			copyFileSync(v.stagedCap, join('content-ops/captures', `${v.staged.content_hash}.${v.ext}`));
+			incoming[v.s.sourceId] = {
+				contentHash: v.staged.content_hash,
+				contentType: v.ext,
+				...(v.s.sourceUpdatedDate ? { sourceUpdatedDate: v.s.sourceUpdatedDate } : {})
+			};
+			console.log(`[refresh] promoted ${v.s.sourceId}; re-chunking ...`);
+			RUN_PNPM(['chunk', v.s.sourceId]);
+		}
+		RUN_PNPM(['embed']);
+		try {
+			RUN_PNPM(['eval']);
+		} catch {
+			evalRegressed = true;
+			throw new Error('E_REFRESH_EVAL_REGRESSION');
+		}
+	} catch (err) {
+		restore();
+		rmSync(ROLLBACK, { recursive: true, force: true });
+		const reason = evalRegressed
+			? 'E_REFRESH_EVAL_REGRESSION: re-embedded corpus is below the eval floor.'
+			: `apply failed (${err instanceof Error ? err.message : String(err)}).`;
 		console.error(
-			'[refresh] E_REFRESH_EVAL_REGRESSION: re-embedded corpus is below the eval floor. NOT shipping. ' +
-				'Revert with: git checkout -- static/corpus content-ops/extracted content-ops/captures'
+			`[refresh] ${reason} Rolled back - the working tree is restored to its pre-apply state; nothing shipped.`
 		);
 		process.exit(1);
 	}
 
-	// Bump the legal record (content_hash + capture fields + source_updated_date) on the approved entries,
-	// comment-preserving via the tested stampSourcesYaml (lineWidth 0, no reflow).
+	// Success: bump the legal record (comment-preserving via the tested stampSourcesYaml), then drop the snapshot.
 	const stamped = stampSourcesYaml(
 		readFileSync(SOURCES_YAML, 'utf8'),
 		incoming,
 		new Date().toISOString()
 	);
 	writeFileSync(SOURCES_YAML, stamped);
+	rmSync(ROLLBACK, { recursive: true, force: true });
 	console.log(
-		`[refresh] applied ${approved.length} source(s); re-embedded, eval passed, sources.yaml stamped.`
+		`[refresh] applied ${validated.length} source(s); re-embedded, eval passed, sources.yaml stamped.`
 	);
 }
 
