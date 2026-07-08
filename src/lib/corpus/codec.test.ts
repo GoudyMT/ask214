@@ -114,4 +114,13 @@ describe('decodeCorpus', () => {
 			suffix: ' here'
 		});
 	});
+
+	it('tolerates an added contentRevision manifest field (producer metadata) without surfacing it', () => {
+		const withRevision = manifest({
+			contentRevision: { buildDate: '2026-07-08', contentHash: 'a'.repeat(64) }
+		});
+		const corpus = decodeCorpus(withRevision, buffer([3, 4, 0, 5]), MODEL);
+		expect(corpus.chunks.map((c) => c.id)).toEqual(['a', 'b']);
+		expect('contentRevision' in corpus).toBe(false);
+	});
 });

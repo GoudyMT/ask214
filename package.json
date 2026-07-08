@@ -15,6 +15,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"check:bundle": "size-limit",
+		"check:embed-determinism": "tsx content-ops/check-embed-determinism.mjs",
 		"validate:sources": "tsx content-ops/validate-sources.mjs",
 		"ingest": "tsx content-ops/capture-extract.mjs",
 		"chunk": "tsx content-ops/chunk-sources.mjs",

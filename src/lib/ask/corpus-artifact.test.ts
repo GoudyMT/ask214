@@ -36,4 +36,32 @@ describe('buildCorpusArtifact', () => {
 	it('throws on a chunks/vectors length mismatch', () => {
 		expect(() => buildCorpusArtifact([chunk('a')], [], MODEL, '1.0')).toThrow();
 	});
+
+	it('embeds contentRevision in the manifest when provided', () => {
+		const chunks = [chunk('a'), chunk('b')];
+		const vectors = [new Float32Array([3, 4]), new Float32Array([0, 5])];
+		const rev = { buildDate: '2026-07-08', contentHash: 'a'.repeat(64) };
+		const { manifest } = buildCorpusArtifact(chunks, vectors, MODEL, '1.0', rev);
+		expect(manifest.contentRevision).toEqual(rev);
+	});
+
+	it('omits contentRevision (no undefined key) when it is not provided', () => {
+		const { manifest } = buildCorpusArtifact(
+			[chunk('a')],
+			[new Float32Array([1, 0])],
+			MODEL,
+			'1.0'
+		);
+		expect(Object.prototype.hasOwnProperty.call(manifest, 'contentRevision')).toBe(false);
+	});
+
+	it('is deterministic: identical inputs yield a byte-identical blob and an equal manifest', () => {
+		const chunks = [chunk('a'), chunk('b')];
+		const vectors = [new Float32Array([3, 4]), new Float32Array([0, 5])];
+		const rev = { buildDate: '2026-07-08', contentHash: 'b'.repeat(64) };
+		const a = buildCorpusArtifact(chunks, vectors, MODEL, '1.0', rev);
+		const b = buildCorpusArtifact(chunks, vectors, MODEL, '1.0', rev);
+		expect(new Uint8Array(a.embeddingsBuffer)).toEqual(new Uint8Array(b.embeddingsBuffer));
+		expect(a.manifest).toEqual(b.manifest);
+	});
 });

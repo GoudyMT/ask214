@@ -3,11 +3,12 @@
 // versioned corpus artifact the runtime decoder reads. Downloads the model from HF on first run (build-time
 // only; the runtime self-hosts the model). Confirm the transformers API against the installed version if the
 // first run errors.
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pipeline } from '@huggingface/transformers';
 import { buildCorpusArtifact } from '../src/lib/ask/corpus-artifact.ts';
 import { decodeCorpus } from '../src/lib/corpus/index.ts';
+import { computeContentRevision } from '../src/lib/content-ops/refresh/content-revision.ts';
 
 const CHUNKS_DIR = 'content-ops/chunks';
 const OUT_DIR = 'static/corpus';
@@ -36,7 +37,27 @@ for (const c of chunks) {
 	if (++done % 200 === 0) console.log(`  embedded ${done}/${chunks.length}`);
 }
 
-const { manifest, embeddingsBuffer } = buildCorpusArtifact(chunks, vectors, MODEL_ID, VERSION);
+// Content-revision stamp: a stable content fingerprint over the chunks. Preserve the buildDate when the
+// content is byte-identical to the committed artifact (so re-embedding unchanged content does not churn
+// corpus-v1.0.json); stamp today only on a real content change.
+const { contentHash } = computeContentRevision(
+	chunks.map((c) => ({ id: c.id, text: c.text })),
+	''
+);
+const manifestPath = join(OUT_DIR, 'corpus-v1.0.json');
+let buildDate = new Date().toISOString().slice(0, 10);
+if (existsSync(manifestPath)) {
+	const prev = JSON.parse(readFileSync(manifestPath, 'utf8'));
+	if (prev.contentRevision?.contentHash === contentHash) buildDate = prev.contentRevision.buildDate;
+}
+const contentRevision = { buildDate, contentHash };
+const { manifest, embeddingsBuffer } = buildCorpusArtifact(
+	chunks,
+	vectors,
+	MODEL_ID,
+	VERSION,
+	contentRevision
+);
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'corpus-v1.0.json'), JSON.stringify(manifest));
 writeFileSync(join(OUT_DIR, 'corpus-v1.0.embeddings.bin'), Buffer.from(embeddingsBuffer));
