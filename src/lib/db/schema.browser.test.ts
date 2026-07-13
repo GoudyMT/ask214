@@ -17,11 +17,13 @@ afterEach(async () => {
 	opened = [];
 });
 
-describe('openMtcDb schema (v2)', () => {
+describe('openMtcDb schema (v3)', () => {
 	it('opens at the current DB_VERSION with exactly the registered stores', async () => {
 		const db = await freshDb();
 		expect(db.version).toBe(DB_VERSION);
 		expect(Array.from(db.objectStoreNames).sort()).toEqual([
+			'calendar-sync',
+			'calendar-sync-hwm',
 			'keystore',
 			'profile',
 			'profile-hwm',
@@ -52,6 +54,8 @@ describe('openMtcDb schema (v2)', () => {
 
 	it('STORES enumerates exactly the registered stores', () => {
 		expect([...STORES].sort()).toEqual([
+			'calendar-sync',
+			'calendar-sync-hwm',
 			'keystore',
 			'profile',
 			'profile-hwm',

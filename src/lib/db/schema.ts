@@ -1,6 +1,6 @@
 /**
  * MTC v1 IndexedDB schema + the thin promise/transaction layer that is the ONLY
- * place raw IndexedDB request/transaction plumbing lives. v1.0 ships 5 stores
+ * place raw IndexedDB request/transaction plumbing lives. v1.0 ships 7 stores
  * (journal + meta deferred to v1.1 with key rotation):
  *
  *   - profile             ciphertext, single self-row (id = 0)
@@ -8,18 +8,22 @@
  *   - keystore            KeystoreRecordV1, single row (id = 0)
  *   - timeline-state      ciphertext (task state + notes), single self-row (id = 0)
  *   - timeline-state-hwm  signed HWM sidecar for timeline-state (id = 0)
+ *   - calendar-sync       ciphertext (calendar exclusion set), single self-row (id = 0)
+ *   - calendar-sync-hwm   signed HWM sidecar for calendar-sync (id = 0)
  *
  * Raw IndexedDB (no Dexie) honors the v2 audit "0 new prod deps" lock; the schema
  * is trivial (single-row stores, no indexes/queries) so a library adds no value.
  */
 export const DB_NAME = 'mtc';
-export const DB_VERSION = 2; // 1 -> 2: adds the timeline-state stores (the upgrade loop creates missing stores; v1 profile data survives)
+export const DB_VERSION = 3; // 2 -> 3: adds the calendar-sync stores (the upgrade loop creates missing stores; prior data survives)
 export const STORES = [
 	'profile',
 	'profile-hwm',
 	'keystore',
 	'timeline-state',
-	'timeline-state-hwm'
+	'timeline-state-hwm',
+	'calendar-sync',
+	'calendar-sync-hwm'
 ] as const;
 export type StoreName = (typeof STORES)[number];
 

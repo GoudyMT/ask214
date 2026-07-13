@@ -7,7 +7,11 @@
  * Rotation/migration manifests enumerate this registry; adding a new encrypted
  * store therefore requires registering it here.
  */
-export const ENCRYPTED_STORES = Object.freeze(['profile', 'timeline-state'] as const);
+export const ENCRYPTED_STORES = Object.freeze([
+	'profile',
+	'timeline-state',
+	'calendar-sync'
+] as const);
 
 export type EncryptedStoreName = (typeof ENCRYPTED_STORES)[number];
 
