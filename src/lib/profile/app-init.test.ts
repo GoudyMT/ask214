@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { initProfileApp, provisionTimelineStore } from './app-init';
+import { initProfileApp, provisionStore } from './app-init';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 
 const fakeDb = {} as IDBDatabase;
@@ -65,11 +65,11 @@ describe('initProfileApp', () => {
 	});
 });
 
-describe('provisionTimelineStore', () => {
+describe('provisionStore', () => {
 	it('creates the store from the db and loads it', async () => {
 		const store = makeStore();
 		const make = vi.fn(() => store);
-		const result = await provisionTimelineStore(fakeDb, make);
+		const result = await provisionStore(fakeDb, make);
 		expect(make).toHaveBeenCalledWith(fakeDb);
 		expect(store.load).toHaveBeenCalledTimes(1);
 		expect(result).toBe(store);

@@ -9,13 +9,14 @@
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
 	import {
 		initProfileApp,
-		provisionTimelineStore,
+		provisionStore,
 		subscribeBus,
 		installLifecycle,
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
 	import { createTimelineStateStore } from '$lib/timeline';
+	import { createCalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
@@ -37,7 +38,13 @@
 	// App-wide profile container, set synchronously (setContext must run during component
 	// init). Populated by the client-only app-init in onMount below. The shell renders for
 	// every status except `unsupported`; store-dependent UI reads `app.store` once ready.
-	const app = $state<ProfileApp>({ status: 'loading', store: null, timeline: null, cause: null });
+	const app = $state<ProfileApp>({
+		status: 'loading',
+		store: null,
+		timeline: null,
+		calendar: null,
+		cause: null
+	});
 	setProfileApp(app);
 
 	onMount(() => {
@@ -76,7 +83,8 @@
 				const offBus = subscribeBus(bus, {
 					relocked: () => relockables.forEach((r) => r.relockSync()),
 					'profile-updated': () => void result.store.load(),
-					'timeline-updated': () => void app.timeline?.load()
+					'timeline-updated': () => void app.timeline?.load(),
+					'calendar-updated': () => void app.calendar?.load()
 				});
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,
@@ -92,13 +100,25 @@
 				// Timeline-state store rides on the same db + bus; it joins the relock set once
 				// ready. A timeline init failure degrades to profile-only (never blocks the wiring
 				// above).
-				void provisionTimelineStore(result.db, (db) =>
+				void provisionStore(result.db, (db) =>
 					createTimelineStateStore(db, { onBroadcast: (e) => bus.publish(e) })
 				)
 					.then((timeline) => {
 						if (destroyed) return;
 						app.timeline = timeline;
 						relockables.push(timeline);
+					})
+					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
+
+				// Calendar-sync store rides on the same db + bus and joins the relock set the same
+				// way; an init failure degrades to calendar-off, never blocking the wiring above.
+				void provisionStore(result.db, (db) =>
+					createCalendarSyncStore(db, { onBroadcast: (e) => bus.publish(e) })
+				)
+					.then((calendar) => {
+						if (destroyed) return;
+						app.calendar = calendar;
+						relockables.push(calendar);
 					})
 					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
 			})

@@ -15,6 +15,7 @@ describe('AppGate', () => {
 			status: 'unsupported',
 			store: null,
 			timeline: null,
+			calendar: null,
 			cause: 'indexed-db'
 		};
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
@@ -23,13 +24,25 @@ describe('AppGate', () => {
 	});
 
 	it('renders children (the app shell) while loading - the shell is not gated behind ready', () => {
-		const app: ProfileApp = { status: 'loading', store: null, timeline: null, cause: null };
+		const app: ProfileApp = {
+			status: 'loading',
+			store: null,
+			timeline: null,
+			calendar: null,
+			cause: null
+		};
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
 	});
 
 	it('renders children when status is ready', () => {
-		const app: ProfileApp = { status: 'ready', store: null, timeline: null, cause: null };
+		const app: ProfileApp = {
+			status: 'ready',
+			store: null,
+			timeline: null,
+			calendar: null,
+			cause: null
+		};
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
 	});

@@ -50,12 +50,12 @@ export async function initProfileApp<S extends LoadableStore>(
 }
 
 /**
- * Provision the timeline-state store: create it from the already-open db and run the initial
- * load. Mirrors initProfileApp's create-then-load tail, kept separate so the timeline store
- * rides on the same db without coupling into initProfileApp's single-store generic. The
- * +layout calls this after the profile app is ready, passing the db that init returns.
+ * Provision a secondary store on the already-open db: create it, then run the initial load.
+ * Mirrors initProfileApp's create-then-load tail, kept separate so a store can ride on the same
+ * db without coupling into initProfileApp's single-store generic. The +layout calls this after
+ * the profile app is ready (for the timeline + calendar stores), passing the db that init returns.
  */
-export async function provisionTimelineStore<S extends LoadableStore>(
+export async function provisionStore<S extends LoadableStore>(
 	db: IDBDatabase,
 	makeStore: (db: IDBDatabase) => S
 ): Promise<S> {

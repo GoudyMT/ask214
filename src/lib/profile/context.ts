@@ -2,6 +2,7 @@ import { getContext, setContext } from 'svelte';
 import type { CapabilityCause } from '../crypto/capability';
 import type { ProfileStore } from './store.svelte';
 import type { TimelineStateStore } from '../timeline';
+import type { CalendarSyncStore } from '../calendar/store.svelte';
 
 export type AppStatus = 'loading' | 'ready' | 'unsupported';
 
@@ -16,6 +17,7 @@ export type ProfileApp = {
 	status: AppStatus;
 	store: ProfileStore | null;
 	timeline: TimelineStateStore | null;
+	calendar: CalendarSyncStore | null;
 	cause: CapabilityCause | null;
 };
 

@@ -117,6 +117,7 @@
 		wipeDialog?.close();
 		await store.wipe();
 		await app.timeline?.wipe();
+		await app.calendar?.wipe();
 		// Defensive: the app stores no PII outside IndexedDB, but wipe also clears
 		// localStorage + Cache Storage for completeness.
 		window.localStorage.clear();
