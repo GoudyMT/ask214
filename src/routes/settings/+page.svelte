@@ -9,6 +9,9 @@
 		EaosFormatError,
 		type EaosCause
 	} from '$lib/profile/eaos';
+	import CalendarPanel from '$lib/components/CalendarPanel.svelte';
+	import { downloadTextFile } from '$lib/calendar/download';
+	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
 
 	const app = getProfileApp();
 
@@ -33,6 +36,21 @@
 	const currentEaos = $derived.by(() => {
 		const p = app.store?.persona;
 		return p && p.completeness !== 'none' ? p.eaos : null;
+	});
+
+	// Until the timeline-state store provisions, fall back to empty state so the calendar panel
+	// still lists date-derived pending tasks; stored done/skip/snooze layer in once it loads.
+	const EMPTY_STATE: TimelineState = { schemaVersion: 1, tasks: {} };
+
+	// The flat pending-task list the calendar panel projects to events - the timeline route's
+	// generation, flattened across phases. Empty until a persona with an EAOS exists.
+	const calendarItems = $derived.by(() => {
+		const persona = app.store?.persona;
+		if (!persona || persona.completeness === 'none') return [];
+		const state = app.timeline?.state ?? EMPTY_STATE;
+		return generateTimeline(persona, [...TASK_DEFS], state, new Date()).phases.flatMap(
+			(p) => p.items
+		);
 	});
 
 	function startEdit(): void {
@@ -219,6 +237,14 @@
 				</button>
 			</div>
 		</section>
+
+		<CalendarPanel
+			items={calendarItems}
+			exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
+			onSetExclusions={(next) =>
+				void app.calendar?.setExclusions(next).catch(() => app.calendar?.load())}
+			onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
+		/>
 
 		<dialog
 			bind:this={wipeDialog}
