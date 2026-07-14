@@ -1,4 +1,10 @@
 :root {
+	/* The palette is dark-only today, so declare it. The browser then draws native controls
+	   (date-picker glyphs, checkboxes, scrollbars) dark-appropriate, instead of drawing them for
+	   whichever scheme the OS happens to prefer and disagreeing with the surface around them.
+	   Becomes `light dark` when the light palette + theme control ship. */
+	color-scheme: dark;
+
 	--color-bg: #0f1419;
 	--color-surface: #171d24;
 	--color-fg: #e6e8eb;

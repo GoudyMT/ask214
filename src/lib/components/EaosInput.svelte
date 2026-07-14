@@ -75,11 +75,10 @@
 		font: inherit;
 	}
 
-	/* The native date-picker calendar glyph renders dark and is near-invisible on the dark
-	   input background. Invert it to light (matches --color-fg) so it reads clearly and signals
-	   it is clickable. Webkit pseudo-element covers our v1.0 targets (Chromium + Safari). */
+	/* The root declares `color-scheme: dark`, so the browser already draws the native date-picker
+	   glyph light against the dark input. Do NOT invert it here - inverting assumes the glyph is
+	   drawn dark, which flips a correct glyph to black on dark-preference systems. */
 	.eaos-field__input::-webkit-calendar-picker-indicator {
-		filter: invert(1);
 		cursor: pointer;
 	}
 

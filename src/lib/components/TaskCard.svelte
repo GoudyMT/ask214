@@ -379,10 +379,9 @@
 		font-size: var(--font-size-s);
 	}
 
-	/* The native calendar glyph renders dark + near-invisible on the dark input; invert it to
-	   light (matches the EAOS date field). Webkit pseudo-element covers v1.0 (Chromium + Safari). */
+	/* The root declares `color-scheme: dark`, so the browser already draws the native glyph light
+	   against the dark input (matches the EAOS date field). Do NOT invert it - see EaosInput. */
 	.task-card__date-row input::-webkit-calendar-picker-indicator {
-		filter: invert(1);
 		cursor: pointer;
 	}
 
