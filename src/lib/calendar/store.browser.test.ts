@@ -75,4 +75,35 @@ describe('calendar-sync store', () => {
 		expect(b.exclusions).toEqual({ taskIds: [], categories: [] });
 		await deleteTestDb(db);
 	});
+
+	it('dismissCard persists the timestamp and increments the count', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.dismissCard(1_000);
+		await a.dismissCard(2_000);
+
+		const b = createCalendarSyncStore(db);
+		await b.load();
+		expect(b.card).toEqual({ dismissedAt: 2_000, dismissCount: 2 });
+		await deleteTestDb(db);
+	});
+
+	it('the setters do not clobber each other - exclusions and the card share one record', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.dismissCard(1_000);
+		await a.setExclusions({ taskIds: [], categories: ['medical'] });
+
+		const b = createCalendarSyncStore(db);
+		await b.load();
+		expect(b.card).toEqual({ dismissedAt: 1_000, dismissCount: 1 }); // survived setExclusions
+		expect(b.exclusions).toEqual({ taskIds: [], categories: ['medical'] });
+		await deleteTestDb(db);
+	});
 });

@@ -1,4 +1,5 @@
 import type { TaskCategory } from '../timeline/types';
+import type { CardDismissal } from './card-visibility';
 
 /** Tasks/categories the user excludes from ALL calendar output (zero egress). */
 export type TaskExclusions = {
@@ -15,6 +16,8 @@ export type TaskExclusions = {
 export type CalendarSyncState = {
 	schemaVersion: 1;
 	exclusions: TaskExclusions;
+	/** Timeline card dismissal bookkeeping; absent until the user first dismisses the card. */
+	card?: CardDismissal;
 };
 
 /** One all-day event in the shared desired-set (feeds both the .ics file and, later, Google). */

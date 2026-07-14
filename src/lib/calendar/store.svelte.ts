@@ -1,4 +1,5 @@
 import type { CalendarSyncState, TaskExclusions } from './types';
+import type { CardDismissal } from './card-visibility';
 import { encodeCalendarSyncState, decodeCalendarSyncState } from './codec';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
@@ -131,10 +132,25 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		opts.onBroadcast?.({ type: 'calendar-updated' });
 	}
 
+	/**
+	 * Merge a partial change over the CURRENT record so one setter never clobbers the other's
+	 * field - exclusions and the card dismissal share the single self-row.
+	 */
+	function nextState(patch: Partial<Omit<CalendarSyncState, 'schemaVersion'>>): CalendarSyncState {
+		const exclusions = patch.exclusions ?? _state?.exclusions ?? { taskIds: [], categories: [] };
+		const card = patch.card ?? _state?.card;
+		return { schemaVersion: 1, exclusions, ...(card ? { card } : {}) };
+	}
+
 	const api = {
 		/** Reactive exclusion set; EMPTY before load / when relocked. */
 		get exclusions(): TaskExclusions {
 			return _state?.exclusions ?? { taskIds: [], categories: [] };
+		},
+
+		/** Reactive card-dismissal bookkeeping; EMPTY before load / when relocked. */
+		get card(): CardDismissal {
+			return _state?.card ?? {};
 		},
 
 		async load(): Promise<void> {
@@ -162,9 +178,15 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 			);
 		},
 
-		/** Replace the exclusion set. */
+		/** Replace the exclusion set (preserves the card dismissal state). */
 		setExclusions(exclusions: TaskExclusions): Promise<void> {
-			return persist({ schemaVersion: 1, exclusions });
+			return persist(nextState({ exclusions }));
+		},
+
+		/** Record a card dismissal at `now`, incrementing the count (preserves exclusions). */
+		dismissCard(now: number): Promise<void> {
+			const dismissCount = (_state?.card?.dismissCount ?? 0) + 1;
+			return persist(nextState({ card: { dismissedAt: now, dismissCount } }));
 		},
 
 		/** Sync relock for the pagehide/freeze handlers (wired at app-init) - drop the reference. */
