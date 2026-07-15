@@ -16,7 +16,8 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
-			cause: 'indexed-db'
+			cause: 'indexed-db',
+			wipeAll: null
 		};
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.textContent).toContain('securely'); // UnsupportedBrowser heading
@@ -29,7 +30,8 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
-			cause: null
+			cause: null,
+			wipeAll: null
 		};
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
@@ -41,7 +43,8 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
-			cause: null
+			cause: null,
+			wipeAll: null
 		};
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();

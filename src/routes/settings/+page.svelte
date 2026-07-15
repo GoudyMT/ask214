@@ -135,12 +135,12 @@
 	}
 
 	async function confirmErase(): Promise<void> {
-		const store = app.store;
-		if (!store) return;
+		// Fail closed on an explicit gate, not an optional chain: a silently-skipped erase is how a
+		// store's rows outlive the keystore they were signed under.
+		const wipeAll = app.wipeAll;
+		if (!wipeAll) return;
 		wipeDialog?.close();
-		await store.wipe();
-		await app.timeline?.wipe();
-		await app.calendar?.wipe();
+		await wipeAll();
 		// Defensive: the app stores no PII outside IndexedDB, but wipe also clears
 		// localStorage + Cache Storage for completeness.
 		window.localStorage.clear();

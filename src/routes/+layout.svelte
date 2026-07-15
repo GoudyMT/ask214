@@ -22,6 +22,7 @@
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
+	import { wipeAllStores } from '$lib/db/wipe';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { shellWidthFor } from '$lib/layout/shell-width';
@@ -44,7 +45,8 @@
 		store: null,
 		timeline: null,
 		calendar: null,
-		cause: null
+		cause: null,
+		wipeAll: null
 	});
 	setProfileApp(app);
 
@@ -77,6 +79,9 @@
 					return;
 				}
 				app.store = result.store;
+				// Registry-driven, so the erase covers stores that never provisioned - they are the ones
+				// whose orphaned rows would otherwise block their own recovery.
+				app.wipeAll = () => wipeAllStores(result.db);
 				app.status = 'ready';
 
 				// Wire the profile's relock/lifecycle FIRST and unconditionally (security: the
