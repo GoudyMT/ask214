@@ -6,6 +6,9 @@
 	import { getProfileApp } from '$lib/profile/context';
 	import { generateTimeline, TASK_DEFS, type TimelineState, type TaskStatus } from '$lib/timeline';
 	import { formatTimelineDate } from '$lib/timeline/format-date';
+	import CalendarCard from '$lib/components/CalendarCard.svelte';
+	import { downloadTextFile } from '$lib/calendar/download';
+	import { shouldShowCalendarCard } from '$lib/calendar/card-visibility';
 
 	const app = getProfileApp();
 
@@ -30,6 +33,16 @@
 		const state = app.timeline?.state ?? EMPTY_STATE;
 		return generateTimeline(persona, [...TASK_DEFS], state, new Date());
 	});
+
+	// The flat pending-task list the calendar card projects to events (same shared projection the
+	// Settings panel uses, so both surfaces egress identically).
+	const calendarItems = $derived(view ? view.phases.flatMap((p) => p.items) : []);
+
+	// The card is the discoverable entry point for the calendar add. It respects the dismissal
+	// cooldown + cap, and stays hidden when there is nothing to add.
+	const showCalendarCard = $derived(
+		calendarItems.length > 0 && shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
+	);
 
 	async function unlock(): Promise<void> {
 		const store = app.store;
@@ -94,6 +107,14 @@
 			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 		</p>
 		{#if view}
+			{#if showCalendarCard}
+				<CalendarCard
+					items={calendarItems}
+					exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
+					onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
+					onDismiss={() => void app.calendar?.dismissCard(Date.now())}
+				/>
+			{/if}
 			<PhaseChips {view} />
 			<TimelineList {view} onSetStatus={setStatus} onSetSnooze={setSnooze} onSetNote={setNote} />
 		{/if}

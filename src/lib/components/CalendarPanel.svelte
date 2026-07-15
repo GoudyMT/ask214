@@ -2,9 +2,7 @@
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskCategory } from '$lib/timeline/types';
 	import type { TaskExclusions } from '$lib/calendar/types';
-	import { computeDesiredEvents } from '$lib/calendar/desired';
-	import { computeIcsUid } from '$lib/calendar/uid';
-	import { serializeIcs } from '$lib/calendar/ics';
+	import { buildIcs } from '$lib/calendar/build-ics';
 
 	type Props = {
 		items: TimelineItem[];
@@ -34,15 +32,7 @@
 	async function addToCalendar(): Promise<void> {
 		building = true;
 		try {
-			const desired = computeDesiredEvents(items, exclusions);
-			const events = await Promise.all(
-				desired.map(async (d) => ({
-					title: d.title,
-					isoDate: d.isoDate,
-					uid: await computeIcsUid(d.taskId)
-				}))
-			);
-			onDownload(serializeIcs(events, new Date()));
+			onDownload(await buildIcs(items, exclusions, new Date()));
 		} finally {
 			building = false;
 		}
