@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createTimelineStateStore } from './state.svelte';
+import { createTimelineStateStore, TimelineRelockedError } from './state.svelte';
 import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
@@ -60,6 +60,68 @@ describe('timeline-state store', () => {
 		await a.setStatus('x', 'done');
 		a.relockSync();
 		expect(a.state.tasks).toEqual({});
+		await deleteTestDb(db);
+	});
+
+	it('a write while relocked cannot erase the saved timeline', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+		await a.setNote('y', 'reached out to 3 hosts');
+
+		// The idle timer relocks the store while the record stays on disk. relock deliberately
+		// leaves _generation intact, so OCC alone cannot catch a write built from null state - and
+		// a null state must mean "unknown", never "the user has done nothing".
+		a.relockSync();
+		// Attempt the write; whether it refuses loudly or no-ops is the store's choice. What is not
+		// negotiable is the line below: the user's record survives either way.
+		await a.setStatus('z', 'done').catch(() => {});
+
+		// Every task the user had recorded must still be on disk, byte for byte.
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({
+			x: { status: 'done' },
+			y: { notes: 'reached out to 3 hosts' }
+		});
+		await deleteTestDb(db);
+	});
+
+	it('a relocked write rejects, so the caller can reload rather than clobber', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+		a.relockSync();
+		await expect(a.setStatus('y', 'done')).rejects.toThrow(TimelineRelockedError);
+		await deleteTestDb(db);
+	});
+
+	it('merges concurrent actions against a fresh base - the second does not drop the first', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+
+		// Fire both WITHOUT awaiting the first: the merge must happen inside the write lock, or the
+		// second action builds on a base the first has already superseded and silently drops it.
+		// OCC cannot catch this - the first write advances the generation the second compares to.
+		const first = a.setStatus('x', 'done');
+		const second = a.setNote('y', 'reached out to 3 hosts');
+		await Promise.allSettled([first, second]);
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({
+			x: { status: 'done' },
+			y: { notes: 'reached out to 3 hosts' }
+		});
 		await deleteTestDb(db);
 	});
 

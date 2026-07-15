@@ -33,6 +33,14 @@ import { withStores, reqToPromise } from '../db/schema';
  * ('timeline-state-hwm'), so no new HMAC prefix is needed.
  */
 
+/** A write was attempted against unloaded/relocked state, where the current record is UNKNOWN. */
+export class TimelineRelockedError extends Error {
+	constructor() {
+		super('E_TIMELINE_RELOCKED');
+		this.name = 'TimelineRelockedError';
+	}
+}
+
 const TIMELINE_CTX: RecordCtx = { storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 };
 
 /** Default returned before load / when relocked. Frozen so a consumer cannot mutate the shared default. */
@@ -102,7 +110,16 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		return hwm.generation;
 	}
 
-	async function persist(next: TimelineState): Promise<void> {
+	/**
+	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
+	 * lock, after the OCC check, so a concurrent action cannot build on a base that a write which
+	 * already landed has superseded (every task shares one self-row, so two quick status clicks
+	 * would otherwise drop one). A null `_state` means "not loaded / relocked" - never "no tasks
+	 * recorded" - and a write against it is refused: relock deliberately leaves `_generation`
+	 * intact, so OCC cannot catch such a write, and it would silently persist an empty timeline
+	 * over every status, snooze, and note the user has saved.
+	 */
+	async function persist(mutate: (base: TimelineState) => TimelineState): Promise<void> {
 		const relockAtStart = relockEpoch;
 		let ks: KeystoreRow | undefined;
 		await withWriteLocks(
@@ -116,7 +133,9 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 
 				const currentGen = await readCurrentGeneration(keystore);
 				if (currentGen !== _generation) throw new OccConflictError();
+				if (_state === null) throw new TimelineRelockedError();
 
+				const next = mutate(_state);
 				const nextGen = currentGen + 1;
 				const blob = await encryptRecord(
 					TIMELINE_CTX,
@@ -150,15 +169,16 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		opts.onBroadcast?.({ type: 'timeline-updated' });
 	}
 
-	async function update(taskId: string, patch: Partial<TimelineTaskState>): Promise<void> {
-		const cur = _state ?? { schemaVersion: 1 as const, tasks: {} };
-		const merged = cleanTaskState({ ...cur.tasks[taskId], ...patch });
-		const nextTasks: Record<string, TimelineTaskState> = {};
-		for (const [id, st] of Object.entries(cur.tasks)) {
-			if (id !== taskId) nextTasks[id] = st;
-		}
-		if (Object.keys(merged).length > 0) nextTasks[taskId] = merged;
-		await persist({ schemaVersion: 1, tasks: nextTasks });
+	function update(taskId: string, patch: Partial<TimelineTaskState>): Promise<void> {
+		return persist((base) => {
+			const merged = cleanTaskState({ ...base.tasks[taskId], ...patch });
+			const nextTasks: Record<string, TimelineTaskState> = {};
+			for (const [id, st] of Object.entries(base.tasks)) {
+				if (id !== taskId) nextTasks[id] = st;
+			}
+			if (Object.keys(merged).length > 0) nextTasks[taskId] = merged;
+			return { schemaVersion: 1, tasks: nextTasks };
+		});
 	}
 
 	const api = {
