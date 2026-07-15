@@ -12,6 +12,7 @@
 		provisionStore,
 		subscribeBus,
 		installLifecycle,
+		createRelockEcho,
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
@@ -55,6 +56,9 @@
 		// Cross-tab bus: created up front so the store can publish change/relock signals via
 		// its onBroadcast seam, and so a sibling tab's signals reach this tab's store.
 		const bus = createProfileBus();
+		// Every store broadcasts through this seam so a relock answering a peer stays local; without
+		// it each hop multiplies by (stores x tabs) and the channel saturates.
+		const echo = createRelockEcho(bus);
 		let destroyed = false;
 		let teardownRuntime: (() => void) | null = null;
 
@@ -63,7 +67,7 @@
 			checkSupport: checkBrowserSupport,
 			openDb: () => openMtcDb(),
 			bootstrap: bootstrapLocalKeystore,
-			createStore: (db) => createProfileStore(db, { onBroadcast: (e) => bus.publish(e) })
+			createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
 		})
 			.then((result) => {
 				if (destroyed) return;
@@ -81,7 +85,7 @@
 				// relocked handler read the list at event time).
 				const relockables: Relockable[] = [result.store];
 				const offBus = subscribeBus(bus, {
-					relocked: () => relockables.forEach((r) => r.relockSync()),
+					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync())),
 					'profile-updated': () => void result.store.load(),
 					'timeline-updated': () => void app.timeline?.load(),
 					'calendar-updated': () => void app.calendar?.load()
@@ -101,7 +105,7 @@
 				// ready. A timeline init failure degrades to profile-only (never blocks the wiring
 				// above).
 				void provisionStore(result.db, (db) =>
-					createTimelineStateStore(db, { onBroadcast: (e) => bus.publish(e) })
+					createTimelineStateStore(db, { onBroadcast: (e) => echo.publish(e) })
 				)
 					.then((timeline) => {
 						if (destroyed) return;
@@ -113,7 +117,7 @@
 				// Calendar-sync store rides on the same db + bus and joins the relock set the same
 				// way; an init failure degrades to calendar-off, never blocking the wiring above.
 				void provisionStore(result.db, (db) =>
-					createCalendarSyncStore(db, { onBroadcast: (e) => bus.publish(e) })
+					createCalendarSyncStore(db, { onBroadcast: (e) => echo.publish(e) })
 				)
 					.then((calendar) => {
 						if (destroyed) return;

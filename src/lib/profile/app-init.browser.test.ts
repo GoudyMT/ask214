@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { subscribeBus, installLifecycle } from './app-init';
+import { subscribeBus, installLifecycle, createRelockEcho } from './app-init';
 import { createProfileBus, type ProfileBus } from '../broadcast/bus';
 import type { IdleTimerOptions, IdleTimer } from './idle-timer';
 
@@ -26,6 +26,44 @@ function makeSpyStore() {
 afterEach(() => {
 	for (const bus of buses) bus.close();
 	buses.length = 0;
+});
+
+describe('createRelockEcho over a real BroadcastChannel', () => {
+	/**
+	 * Wires a tab the way +layout does: three stores that each signal `relocked`, and a bus handler
+	 * that relocks all of them when a peer signals. Returns what this tab HEARS from its peer.
+	 */
+	function wireTab(name: string): { bus: ProfileBus; heard: string[] } {
+		const bus = makeBus(name);
+		const echo = createRelockEcho(bus);
+		const heard: string[] = [];
+		subscribeBus(bus, {
+			relocked: () => {
+				heard.push('relocked');
+				// The real handler: relock every store. Each store signals through the echo seam.
+				echo.answer(() => {
+					for (let i = 0; i < 3; i++) echo.publish({ type: 'relocked' });
+				});
+			}
+		});
+		return { bus, heard };
+	}
+
+	it('a pagehide relock does not ping-pong between two tabs', async () => {
+		const name = uniqueName();
+		const a = wireTab(name);
+		const b = wireTab(name);
+
+		// Tab A backgrounds: its three stores relock and signal. Without the seam, B answers with 3,
+		// A answers those with 9, B with 27 - the channel saturates and both tabs wedge.
+		const echoA = createRelockEcho(a.bus);
+		for (let i = 0; i < 3; i++) echoA.publish({ type: 'relocked' });
+		await delay(200);
+
+		// B hears A's three and relocks. A hears NOTHING back: the storm never starts.
+		expect(b.heard).toEqual(['relocked', 'relocked', 'relocked']);
+		expect(a.heard).toEqual([]);
+	});
 });
 
 describe('subscribeBus', () => {

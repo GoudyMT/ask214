@@ -65,6 +65,41 @@ export async function provisionStore<S extends LoadableStore>(
 }
 
 /**
+ * Guards the cross-tab relock signal against self-amplification.
+ *
+ * Every store signals `relocked` when it relocks, and every tab relocks EVERY store when it hears
+ * one. So a tab that answers a peer by re-signalling multiplies the traffic by (stores x tabs) on
+ * each hop - one `pagehide` with 3 stores and 2 tabs goes 3 -> 9 -> 27 until the channel saturates
+ * and both tabs wedge. Nothing needs the answer: the originator's signal already reached every tab.
+ *
+ * `publish` is the seam every store broadcasts through; `answer` marks the peer-driven relock so the
+ * signals it raises stay local. Provenance is why this lives here and not in the stores - a store
+ * cannot know WHY it is being relocked, only the wiring can.
+ */
+export function createRelockEcho(bus: ProfileBus): {
+	publish: (signal: BusSignal) => void;
+	answer: (relockAll: () => void) => void;
+} {
+	let answering = false;
+	return {
+		publish(signal: BusSignal): void {
+			if (answering && signal.type === 'relocked') return;
+			bus.publish(signal);
+		},
+		answer(relockAll: () => void): void {
+			answering = true;
+			try {
+				relockAll();
+			} finally {
+				// finally, not a trailing assignment: one store throwing mid-relock must not wedge the
+				// seam shut for the rest of the tab's life.
+				answering = false;
+			}
+		}
+	};
+}
+
+/**
  * Wire a cross-tab bus to a handler map: each incoming signal invokes `handlers[signal.type]`
  * if present. The +layout maps `relocked` to relock-all and each `*-updated` to that store's
  * load (load is itself fail-closed + verified, so a spoofed same-origin signal can at worst
