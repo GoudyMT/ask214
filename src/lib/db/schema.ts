@@ -38,7 +38,15 @@ export function openMtcDb(name: string = DB_NAME): Promise<IDBDatabase> {
 				}
 			}
 		};
-		req.onsuccess = () => resolve(req.result);
+		req.onsuccess = () => {
+			const db = req.result;
+			// This connection is held for the tab's whole lifetime, and IndexedDB will not upgrade a
+			// database while any connection stays open: the other tab gets `blocked`, not an upgrade.
+			// Step aside so a tab on a newer bundle can migrate instead of deadlocking. Reads after
+			// this throw InvalidStateError, which is correct - that bundle's schema is stale.
+			db.onversionchange = () => db.close();
+			resolve(db);
+		};
 		req.onerror = () => reject(req.error ?? new Error('idb-open-failed'));
 		req.onblocked = () => reject(new Error('idb-open-blocked'));
 	});
