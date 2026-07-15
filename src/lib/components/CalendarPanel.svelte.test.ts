@@ -35,6 +35,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items,
 				exclusions: { taskIds: [], categories: ['medical'] },
+				ready: true,
 				onSetExclusions: vi.fn(),
 				onDownload
 			}
@@ -52,6 +53,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
+				ready: true,
 				onSetExclusions: vi.fn(),
 				onDownload: vi.fn()
 			}
@@ -62,12 +64,33 @@ describe('CalendarPanel', () => {
 		expect(container.querySelector('input[value="medical"]')).not.toBeNull(); // expanded in place
 	});
 
+	it('fails closed when the store is not ready: no export against an unknown exclusion set', () => {
+		const onDownload = vi.fn();
+		const { container } = render(CalendarPanel, {
+			props: {
+				items: [item(def('a', 'admin'))],
+				exclusions: { taskIds: [], categories: [] }, // the empty DEFAULT, not a real record
+				ready: false,
+				onSetExclusions: vi.fn(),
+				onDownload
+			}
+		});
+		// An unknown exclusion set must never be treated as "the user excluded nothing".
+		expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(true);
+		expect((container.querySelector('.cal-customize__toggle') as HTMLButtonElement).disabled).toBe(
+			true
+		);
+		expect(container.textContent).toContain('could not be loaded');
+		expect(onDownload).not.toHaveBeenCalled();
+	});
+
 	it('toggling a category once expanded calls onSetExclusions with the updated set', () => {
 		const onSetExclusions = vi.fn();
 		const { container } = render(CalendarPanel, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
+				ready: true,
 				onSetExclusions,
 				onDownload: vi.fn()
 			}

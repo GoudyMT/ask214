@@ -40,8 +40,14 @@
 
 	// The card is the discoverable entry point for the calendar add. It respects the dismissal
 	// cooldown + cap, and stays hidden when there is nothing to add.
+	//
+	// Fail closed on `ready`: until the store loads, both the dismissal state and the exclusion set
+	// are UNKNOWN, not empty. Rendering then would nag a user who already answered AND offer a
+	// one-tap export built from an exclusion set we cannot vouch for.
 	const showCalendarCard = $derived(
-		calendarItems.length > 0 && shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
+		calendarItems.length > 0 &&
+			(app.calendar?.ready ?? false) &&
+			shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
 	);
 
 	async function unlock(): Promise<void> {
@@ -50,6 +56,12 @@
 		unlocking = true;
 		try {
 			await store.load();
+			// The secondary stores relock alongside the profile on idle/pagehide but are not part of
+			// the profile's load. Without this they stay unloaded behind an unlocked UI, and their
+			// empty defaults would read as real state - exporting excluded tasks and clobbering the
+			// record on the next write. allSettled: a secondary failure must not block the unlock;
+			// its store simply stays not-ready, which the UI fails closed on.
+			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
 		} finally {
 			unlocking = false;
 		}

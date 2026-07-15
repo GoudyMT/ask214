@@ -28,6 +28,14 @@ import { withStores, reqToPromise } from '../db/schema';
  * sidecar name ('calendar-sync-hwm').
  */
 
+/** A write was attempted against unloaded/relocked state, where the current record is UNKNOWN. */
+export class CalendarRelockedError extends Error {
+	constructor() {
+		super('E_CALENDAR_RELOCKED');
+		this.name = 'CalendarRelockedError';
+	}
+}
+
 const CALENDAR_CTX: RecordCtx = { storeName: 'calendar-sync', recordId: 'self', schemaVersion: 1 };
 
 type CalendarHwmPayload = {
@@ -85,7 +93,15 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		return hwm.generation;
 	}
 
-	async function persist(next: CalendarSyncState): Promise<void> {
+	/**
+	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
+	 * lock, after the OCC check, so a concurrent setter cannot build on a base that a write which
+	 * already landed has superseded (exclusions and the card share one self-row, so a stale base
+	 * drops the other field). A null `_state` means "not loaded / relocked" - never "empty" - and a
+	 * write against it is refused: relock deliberately leaves `_generation` intact, so OCC cannot
+	 * catch such a write, and it would silently persist defaults over the user's real record.
+	 */
+	async function persist(mutate: (base: CalendarSyncState) => CalendarSyncState): Promise<void> {
 		const relockAtStart = relockEpoch;
 		let ks: KeystoreRow | undefined;
 		await withWriteLocks(
@@ -99,7 +115,9 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 
 				const currentGen = await readCurrentGeneration(keystore);
 				if (currentGen !== _generation) throw new OccConflictError();
+				if (_state === null) throw new CalendarRelockedError();
 
+				const next = mutate(_state);
 				const nextGen = currentGen + 1;
 				const blob = await encryptRecord(
 					CALENDAR_CTX,
@@ -132,18 +150,17 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		opts.onBroadcast?.({ type: 'calendar-updated' });
 	}
 
-	/**
-	 * Merge a partial change over the CURRENT record so one setter never clobbers the other's
-	 * field - exclusions and the card dismissal share the single self-row.
-	 */
-	function nextState(patch: Partial<Omit<CalendarSyncState, 'schemaVersion'>>): CalendarSyncState {
-		const exclusions = patch.exclusions ?? _state?.exclusions ?? { taskIds: [], categories: [] };
-		const card = patch.card ?? _state?.card;
-		return { schemaVersion: 1, exclusions, ...(card ? { card } : {}) };
-	}
-
 	const api = {
-		/** Reactive exclusion set; EMPTY before load / when relocked. */
+		/**
+		 * Whether the record is loaded and writable. FALSE before the first load and after a relock,
+		 * when the current record is UNKNOWN. Callers MUST gate on this and fail closed rather than
+		 * read the empty defaults below as "the user excluded nothing".
+		 */
+		get ready(): boolean {
+			return _state !== null;
+		},
+
+		/** Reactive exclusion set; EMPTY before load / when relocked - gate on `ready` first. */
 		get exclusions(): TaskExclusions {
 			return _state?.exclusions ?? { taskIds: [], categories: [] };
 		},
@@ -180,13 +197,15 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 
 		/** Replace the exclusion set (preserves the card dismissal state). */
 		setExclusions(exclusions: TaskExclusions): Promise<void> {
-			return persist(nextState({ exclusions }));
+			return persist((base) => ({ ...base, exclusions }));
 		},
 
 		/** Record a card dismissal at `now`, incrementing the count (preserves exclusions). */
 		dismissCard(now: number): Promise<void> {
-			const dismissCount = (_state?.card?.dismissCount ?? 0) + 1;
-			return persist(nextState({ card: { dismissedAt: now, dismissCount } }));
+			return persist((base) => ({
+				...base,
+				card: { dismissedAt: now, dismissCount: (base.card?.dismissCount ?? 0) + 1 }
+			}));
 		},
 
 		/** Sync relock for the pagehide/freeze handlers (wired at app-init) - drop the reference. */

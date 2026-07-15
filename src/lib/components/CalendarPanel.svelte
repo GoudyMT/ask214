@@ -7,11 +7,18 @@
 	type Props = {
 		items: TimelineItem[];
 		exclusions: TaskExclusions;
+		/**
+		 * Whether `exclusions` reflects the persisted record. FALSE while the store is unloaded or
+		 * relocked, when the real exclusion set is UNKNOWN. Required (no default) so a caller cannot
+		 * silently fail open: exporting against an unknown set would leak the categories the user
+		 * deliberately kept off their calendar.
+		 */
+		ready: boolean;
 		onSetExclusions: (next: TaskExclusions) => void;
 		/** Injected so the serialized .ics is testable and the actual download stays the caller's concern. */
 		onDownload: (ics: string) => void;
 	};
-	let { items, exclusions, onSetExclusions, onDownload }: Props = $props();
+	let { items, exclusions, ready, onSetExclusions, onDownload }: Props = $props();
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
@@ -43,14 +50,27 @@
 	<h2 id="calendar-heading" class="cal-section__heading">Calendar</h2>
 	<p class="cal-hint">Add your transition deadlines to the calendar you already check.</p>
 
-	<button class="cal-add" type="button" disabled={building} onclick={() => void addToCalendar()}>
+	<button
+		class="cal-add"
+		type="button"
+		disabled={building || !ready}
+		onclick={() => void addToCalendar()}
+	>
 		Add to Apple / device calendar
 	</button>
+
+	{#if !ready}
+		<p class="cal-hint cal-hint--unavailable">
+			Your calendar settings could not be loaded, so adding is unavailable right now. Reload the app
+			to try again.
+		</p>
+	{/if}
 
 	<div class="cal-customize">
 		<button
 			class="cal-customize__toggle"
 			type="button"
+			disabled={!ready}
 			aria-expanded={expanded}
 			aria-controls="cal-excl-list"
 			onclick={() => (expanded = !expanded)}
@@ -58,7 +78,7 @@
 			<span class="cal-chevron" class:cal-chevron--open={expanded} aria-hidden="true"></span>
 			<span>Customize what's included</span>
 			<span class="cal-customize__summary">
-				{hiddenCount === 0 ? 'All included' : `${hiddenCount} kept off`}
+				{!ready ? 'Unavailable' : hiddenCount === 0 ? 'All included' : `${hiddenCount} kept off`}
 			</span>
 		</button>
 
@@ -111,6 +131,16 @@
 		background: var(--color-accent-muted);
 	}
 	.cal-add:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+	/* Shown only when the exclusion set is unknown - the export is refused rather than run against
+	   defaults, so the user is told why instead of silently getting everything. */
+	.cal-hint--unavailable {
+		margin: var(--space-s) 0 0;
+		color: var(--color-danger);
+	}
+	.cal-customize__toggle:disabled {
 		opacity: 0.6;
 		cursor: default;
 	}

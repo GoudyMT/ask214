@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createCalendarSyncStore } from './store.svelte';
+import { createCalendarSyncStore, CalendarRelockedError } from './store.svelte';
 import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
@@ -88,6 +88,65 @@ describe('calendar-sync store', () => {
 		const b = createCalendarSyncStore(db);
 		await b.load();
 		expect(b.card).toEqual({ dismissedAt: 2_000, dismissCount: 2 });
+		await deleteTestDb(db);
+	});
+
+	it('refuses to write while relocked, so a dismissal cannot erase the saved exclusions', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: [], categories: ['medical'] });
+
+		// The idle timer relocks the calendar store while the record stays on disk. _generation is
+		// deliberately NOT reset by relock, so OCC alone cannot catch a write built from null state.
+		a.relockSync();
+		expect(a.ready).toBe(false);
+		await expect(a.dismissCard(1_000)).rejects.toThrow(CalendarRelockedError);
+
+		// The user's exclusion set must be intact on disk.
+		const b = createCalendarSyncStore(db);
+		await b.load();
+		expect(b.exclusions).toEqual({ taskIds: [], categories: ['medical'] });
+		await deleteTestDb(db);
+	});
+
+	it('refuses setExclusions while relocked', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.dismissCard(1_000);
+		a.relockSync();
+		await expect(a.setExclusions({ taskIds: ['t1'], categories: [] })).rejects.toThrow(
+			CalendarRelockedError
+		);
+
+		const b = createCalendarSyncStore(db);
+		await b.load();
+		expect(b.card).toEqual({ dismissedAt: 1_000, dismissCount: 1 });
+		await deleteTestDb(db);
+	});
+
+	it('merges concurrent setters against a fresh base - the second write does not drop the first', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createCalendarSyncStore(db);
+		await a.load();
+
+		// Fire both WITHOUT awaiting the first: the merge must happen inside the write lock, or the
+		// second write builds on a stale base and silently drops the first field.
+		const first = a.setExclusions({ taskIds: [], categories: ['medical'] });
+		const second = a.dismissCard(2_000);
+		await Promise.allSettled([first, second]);
+
+		const b = createCalendarSyncStore(db);
+		await b.load();
+		expect(b.exclusions).toEqual({ taskIds: [], categories: ['medical'] });
+		expect(b.card).toEqual({ dismissedAt: 2_000, dismissCount: 1 });
 		await deleteTestDb(db);
 	});
 

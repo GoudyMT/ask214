@@ -113,6 +113,11 @@
 		unlocking = true;
 		try {
 			await store.load();
+			// The secondary stores relock alongside the profile on idle/pagehide but are not part of
+			// the profile's load; without this they stay unloaded behind an unlocked UI (see the
+			// timeline route for the full reasoning). allSettled so a secondary failure leaves that
+			// store not-ready rather than blocking the unlock.
+			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
 		} finally {
 			unlocking = false;
 		}
@@ -241,6 +246,7 @@
 		<CalendarPanel
 			items={calendarItems}
 			exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
+			ready={app.calendar?.ready ?? false}
 			onSetExclusions={(next) =>
 				void app.calendar?.setExclusions(next).catch(() => app.calendar?.load())}
 			onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
