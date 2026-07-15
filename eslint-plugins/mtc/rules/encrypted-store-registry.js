@@ -1,16 +1,22 @@
 /**
  * Forbids direct raw-IndexedDB writes to encrypted stores -
  * `<tx>.objectStore('<encrypted>').{put|add}(...)` - outside the sanctioned
- * store path. Direct writes bypass the single encryption boundary (Phase 2 spec
- * section 4, invariant 7): only the sanctioned store paths (ProfileStore.save /
- * TimelineStateStore) may write ciphertext, each carrying an inline eslint-disable
- * at its one call site. Test files that stage fixtures are exempted in
- * eslint.config.js.
+ * store path. Direct writes bypass the single encryption boundary: only the
+ * sanctioned store paths (the profile, timeline-state, and calendar-sync stores)
+ * may write ciphertext, each carrying an inline eslint-disable at its one call
+ * site. Test files that stage fixtures are exempted in eslint.config.js.
  *
  * Heuristic: a CallExpression `X.objectStore('<name>').{put|add}(...)` with
- * <name> in the ENCRYPTED_STORES registry flags as a violation.
+ * <name> in the set below flags as a violation.
+ *
+ * The set duplicates `src/lib/db/registry.ts` because an ESLint plugin is plain JS
+ * and cannot import the TypeScript registry - and the registry cannot move to JS
+ * without collapsing its EncryptedStoreName literal union to `string`. A store
+ * added there but not here would silently lose its guard, so the duplication is
+ * pinned by a parity test in this rule's own test file; that test is what keeps
+ * this list honest. Exported for it.
  */
-const ENCRYPTED_STORES_LITERAL = new Set(['profile', 'timeline-state']);
+export const ENCRYPTED_STORES_LITERAL = new Set(['profile', 'timeline-state', 'calendar-sync']);
 const FORBIDDEN_WRITE_METHODS = new Set(['put', 'add']);
 
 export default {

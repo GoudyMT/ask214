@@ -137,6 +137,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 				);
 
 				await withStores(db, ['calendar-sync', 'calendar-sync-hwm'], 'readwrite', (tx) => {
+					// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord, under withWriteLocks.
 					tx.objectStore('calendar-sync').put({ id: 0, rec: blob });
 					tx.objectStore('calendar-sync-hwm').put({ id: 0, ...newHwm });
 				});
