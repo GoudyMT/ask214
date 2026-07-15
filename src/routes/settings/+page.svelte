@@ -2,6 +2,7 @@
 	import EaosInput from '$lib/components/EaosInput.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
+	import { eraseEverything } from '$lib/profile/erase';
 	import { OccConflictError } from '$lib/profile/store.svelte';
 	import {
 		validateEaosAtInput,
@@ -135,21 +136,21 @@
 	}
 
 	async function confirmErase(): Promise<void> {
-		// Fail closed on an explicit gate, not an optional chain: a silently-skipped erase is how a
-		// store's rows outlive the keystore they were signed under.
-		const wipeAll = app.wipeAll;
-		if (!wipeAll) return;
 		wipeDialog?.close();
-		await wipeAll();
-		// Defensive: the app stores no PII outside IndexedDB, but wipe also clears
-		// localStorage + Cache Storage for completeness.
-		window.localStorage.clear();
-		if ('caches' in window) {
-			const keys = await window.caches.keys();
-			await Promise.all(keys.map((key) => window.caches.delete(key)));
-		}
-		// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
-		window.location.reload();
+		await eraseEverything({
+			relock: () => app.store?.relockSync(),
+			wipeAll: app.wipeAll,
+			// Defensive: the app stores no PII outside IndexedDB, but the erase clears localStorage +
+			// Cache Storage for completeness.
+			clearStorage: () => window.localStorage.clear(),
+			clearCaches: async () => {
+				if (!('caches' in window)) return;
+				const keys = await window.caches.keys();
+				await Promise.all(keys.map((key) => window.caches.delete(key)));
+			},
+			// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
+			reload: () => window.location.reload()
+		});
 	}
 
 	// Draw attention to the clock reset while the clock is backward: move focus to it + scroll
