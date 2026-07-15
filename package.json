@@ -33,7 +33,7 @@
 	},
 	"lint-staged": {
 		"*.{js,mjs,cjs,ts,svelte}": [
-			"eslint --fix",
+			"eslint --fix --fix-type problem,suggestion,layout",
 			"prettier --write"
 		],
 		"*.{json,css,html,md,yml,yaml}": [
