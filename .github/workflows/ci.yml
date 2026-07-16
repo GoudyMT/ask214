@@ -51,7 +51,10 @@ jobs:
         run: pnpm run validate:sources
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # webkit as well as chromium: it is the only engine available to us that shares a family with
+        # Safari, and it covers what chromium structurally cannot - no `freeze` event, so
+        # visibilitychange is the only relock signal, plus a stricter blob download handoff.
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Unit tests
         run: pnpm run test:unit -- --run
