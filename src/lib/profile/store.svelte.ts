@@ -8,6 +8,7 @@ import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
 import {
 	freezeRelock,
+	zeroizeRecord,
 	cloneField,
 	scrubSecureInputs,
 	nextLockState,
@@ -373,6 +374,13 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						// mid-save must not be undone by re-populating decrypted PII; the IDB write
 						// above still persisted, so the user's edit is not lost.
 						if (relockEpoch === relockAtStart) {
+							// `next` is a deep copy, so the record it replaces holds the same plaintext in
+							// different bytes - dropping it would leave the profile the user just moved on
+							// from sitting in the heap. Zeroize, but do NOT freezeRelock: the user is still
+							// working and that would scrub the input they are typing into.
+							if (_profile && _profile !== next) {
+								zeroizeRecord(_profile as unknown as Record<string, unknown>);
+							}
 							_profile = next;
 							// The plaintext is resident again, so say so. A save re-opens the store just
 							// as a load does, and a store that does not admit it sits holding the profile

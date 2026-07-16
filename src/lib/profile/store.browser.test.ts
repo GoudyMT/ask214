@@ -228,6 +228,24 @@ describe('ProfileStore.relockSync', () => {
 		if (eaosRef) expect(eaosRef.every((b) => b === 0)).toBe(true);
 	});
 
+	// Every save stages a deep copy and swaps it in, so the record it replaces holds the same
+	// plaintext in different bytes. Dropping it hands the collector a profile the user has already
+	// moved on from - the same leak a relock exists to prevent, just on the happy path.
+	it('zeroizes the record a save supersedes, rather than dropping it to the collector', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const superseded = store._getStateForTest()?.eaos ?? null;
+		expect(superseded).not.toBeNull();
+
+		await store.save({ eaos: new TextEncoder().encode('2028-08-20') });
+
+		if (superseded) expect(superseded.every((b) => b === 0)).toBe(true);
+		// The live record is untouched - only the one being replaced is wiped.
+		expect(new TextDecoder().decode(store._getStateForTest()?.eaos ?? undefined)).toBe(
+			'2028-08-20'
+		);
+	});
+
 	// The relocked signal is how one tab tells the others the USER locked. Page hygiene is not that:
 	// this page is going away, the others are not. Telling them turns "you switched tabs" into "every
 	// other tab is now locked", and since a peer relock is not restorable they stay that way.

@@ -113,6 +113,22 @@ export function scrubSecureInputs(): void {
 }
 
 /**
+ * Zeroize every byte-bearing field of a record in place, touching nothing else.
+ *
+ * Use this when the app is DISCARDING a record it is replacing - the user is still working, so their
+ * typed input must survive. Use freezeRelock when the session itself is ending and the DOM has to go
+ * with it. Reaching for freezeRelock here would wipe the input the user is typing into.
+ *
+ * Args:
+ *   rec: the in-memory record whose fields are zeroized in place.
+ */
+export function zeroizeRecord(rec: Record<string, unknown>): void {
+	for (const value of Object.values(rec)) {
+		zeroizeField(value);
+	}
+}
+
+/**
  * Synchronous relock primitive: zeroize every byte-bearing field of the profile
  * in place, then scrub registered DOM inputs. MUST NOT await - this is called from
  * the synchronous pagehide/freeze handlers (wired at app-init). The caller nulls
@@ -122,8 +138,6 @@ export function scrubSecureInputs(): void {
  *   profile: the in-memory profile object whose fields are zeroized in place.
  */
 export function freezeRelock(profile: Record<string, unknown>): void {
-	for (const value of Object.values(profile)) {
-		zeroizeField(value);
-	}
+	zeroizeRecord(profile);
 	scrubSecureInputs();
 }
