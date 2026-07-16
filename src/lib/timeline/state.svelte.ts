@@ -3,6 +3,7 @@ import { encodeTimelineState, decodeTimelineState } from './state-codec';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
+import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
 import {
 	KeystoreNotInitializedError,
 	KeystoreHmacMismatchError,
@@ -32,6 +33,14 @@ import { withStores, reqToPromise } from '../db/schema';
  * no change to shipped lock code. HWM domain-separation is via the sidecar `name`
  * ('timeline-state-hwm'), so no new HMAC prefix is needed.
  */
+
+/** A write was attempted against unloaded/relocked state, where the current record is UNKNOWN. */
+export class TimelineRelockedError extends Error {
+	constructor() {
+		super('E_TIMELINE_RELOCKED');
+		this.name = 'TimelineRelockedError';
+	}
+}
 
 const TIMELINE_CTX: RecordCtx = { storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 };
 
@@ -74,11 +83,16 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	let _state = $state<TimelineState | null>(null);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
+	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
+	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
+	let lockState: LockState = 'unlocked';
 
-	function relockNow(): void {
+	function relockNow(reason: RelockReason): void {
 		_state = null;
 		relockEpoch++;
-		opts.onBroadcast?.({ type: 'relocked' });
+		lockState = nextLockState(lockState, reason);
+		// Only an intentional relock is other tabs' business - see the profile store's relockNow.
+		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	async function readVerifiedKeystore(): Promise<KeystoreRow> {
@@ -102,7 +116,16 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		return hwm.generation;
 	}
 
-	async function persist(next: TimelineState): Promise<void> {
+	/**
+	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
+	 * lock, after the OCC check, so a concurrent action cannot build on a base that a write which
+	 * already landed has superseded (every task shares one self-row, so two quick status clicks
+	 * would otherwise drop one). A null `_state` means "not loaded / relocked" - never "no tasks
+	 * recorded" - and a write against it is refused: relock deliberately leaves `_generation`
+	 * intact, so OCC cannot catch such a write, and it would silently persist an empty timeline
+	 * over every status, snooze, and note the user has saved.
+	 */
+	async function persist(mutate: (base: TimelineState) => TimelineState): Promise<void> {
 		const relockAtStart = relockEpoch;
 		let ks: KeystoreRow | undefined;
 		await withWriteLocks(
@@ -116,7 +139,9 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 
 				const currentGen = await readCurrentGeneration(keystore);
 				if (currentGen !== _generation) throw new OccConflictError();
+				if (_state === null) throw new TimelineRelockedError();
 
+				const next = mutate(_state);
 				const nextGen = currentGen + 1;
 				const blob = await encryptRecord(
 					TIMELINE_CTX,
@@ -144,21 +169,24 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 				_generation = nextGen;
 				// Residency guard: a relockSync() during this save must not be undone by
 				// re-populating decrypted state (the IDB write already persisted the edit).
+				// No lockState update belongs here: the relocked check above means a write only ever
+				// runs on a store load() already opened.
 				if (relockEpoch === relockAtStart) _state = next;
 			}
 		);
 		opts.onBroadcast?.({ type: 'timeline-updated' });
 	}
 
-	async function update(taskId: string, patch: Partial<TimelineTaskState>): Promise<void> {
-		const cur = _state ?? { schemaVersion: 1 as const, tasks: {} };
-		const merged = cleanTaskState({ ...cur.tasks[taskId], ...patch });
-		const nextTasks: Record<string, TimelineTaskState> = {};
-		for (const [id, st] of Object.entries(cur.tasks)) {
-			if (id !== taskId) nextTasks[id] = st;
-		}
-		if (Object.keys(merged).length > 0) nextTasks[taskId] = merged;
-		await persist({ schemaVersion: 1, tasks: nextTasks });
+	function update(taskId: string, patch: Partial<TimelineTaskState>): Promise<void> {
+		return persist((base) => {
+			const merged = cleanTaskState({ ...base.tasks[taskId], ...patch });
+			const nextTasks: Record<string, TimelineTaskState> = {};
+			for (const [id, st] of Object.entries(base.tasks)) {
+				if (id !== taskId) nextTasks[id] = st;
+			}
+			if (Object.keys(merged).length > 0) nextTasks[taskId] = merged;
+			return { schemaVersion: 1, tasks: nextTasks };
+		});
 	}
 
 	const api = {
@@ -167,7 +195,13 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return _state ?? EMPTY_STATE;
 		},
 
+		/**
+		 * Re-read from disk. A relock landing WHILE this runs wins: repopulating decrypted state into
+		 * a tab that has since locked silently undoes the lock, and the idle timer does not fire twice.
+		 * Same residency guard persist() carries.
+		 */
 		async load(): Promise<void> {
+			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
 			await withWriteLocks(
 				async () => {
@@ -180,14 +214,37 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					const gen = await readCurrentGeneration(keystore);
 					_generation = gen;
 					if (gen === 0) {
-						_state = { schemaVersion: 1, tasks: {} };
+						if (relockEpoch === relockAtStart) {
+							_state = { schemaVersion: 1, tasks: {} };
+							lockState = 'unlocked';
+						}
 						return;
 					}
 					const row = await getRow<StateRow>(db, 'timeline-state');
 					if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
-					_state = decodeTimelineState(await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen));
+					const decoded = decodeTimelineState(
+						await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
+					);
+					if (relockEpoch === relockAtStart) {
+						_state = decoded;
+						lockState = 'unlocked';
+					}
 				}
 			);
+		},
+
+		/**
+		 * AUTOMATIC re-read: a peer tab's change, a page restore, recovery from a failed write. It
+		 * DECRYPTS, so it answers to how the plaintext went away, not to whether it is gone.
+		 *
+		 * Refuses only a `locked` store - putting the user's task notes back in memory, and on
+		 * screen, in a tab that locked itself is precisely what it must not do. An `evicted` store
+		 * lost its plaintext to page hygiene on the way out and the page has come back, so the
+		 * re-read is the undo it is owed. An unlocked store re-reads so a peer's change still lands.
+		 */
+		refresh(): Promise<void> {
+			if (lockState === 'locked') return Promise.resolve();
+			return api.load();
 		},
 
 		/** Set or clear a task status (clearing also drops any snooze). */
@@ -206,8 +263,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		},
 
 		/** Sync relock for the pagehide/freeze handlers (wired at app-init) - drop the reference. */
-		relockSync(): void {
-			relockNow();
+		relockSync(reason: RelockReason): void {
+			relockNow(reason);
 		},
 
 		/** Clear the timeline-state + HWM (the keystore is owned by the profile wipe). */
@@ -217,7 +274,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 				tx.objectStore('timeline-state-hwm').clear();
 			});
 			_generation = 0;
-			relockNow();
+			relockNow('user');
 		}
 	};
 

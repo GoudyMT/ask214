@@ -1,4 +1,45 @@
 /**
+ * What a relock left behind, in ascending severity.
+ *
+ * `evicted` and `locked` look identical in memory - the plaintext is gone either way - and that is
+ * exactly the problem this type exists to fix. They differ only in whether an automatic re-read may
+ * undo them, and nothing about the absent plaintext can answer that. `evicted` is hygiene the app
+ * did to itself when the page went away; bringing the page back may undo it. `locked` means the
+ * user asked, or their presence lapsed; undoing that silently reverses their intent.
+ */
+export type LockState = 'unlocked' | 'evicted' | 'locked';
+
+/**
+ * Why a relock is happening, declared by whoever triggers it. A store cannot know this - it sees
+ * only that its plaintext must go - so the caller passes it down.
+ */
+export type RelockReason = 'hygiene' | 'idle' | 'user' | 'peer';
+
+const SEVERITY: Record<LockState, number> = { unlocked: 0, evicted: 1, locked: 2 };
+
+/**
+ * The state a relock for `reason` lands in. Severity only ever climbs; nothing but a user-initiated
+ * load walks it back down.
+ *
+ * That one-way rule is load-bearing twice over. `pagehide` fires after an explicit Lock too, so a
+ * hygiene relock that could rewrite `locked` back to `evicted` would hand the next page restore
+ * permission to undo the Lock the user asked for. And `pagehide` and `freeze` both land here with
+ * an order that is not consistent across browsers, so a second relock of the same kind has to be a
+ * no-op rather than a state change.
+ *
+ * Args:
+ *   current: the state this store is already in.
+ *   reason: why it is being relocked now.
+ *
+ * Returns:
+ *   The more severe of the current state and the one `reason` implies.
+ */
+export function nextLockState(current: LockState, reason: RelockReason): LockState {
+	const target: LockState = reason === 'hygiene' ? 'evicted' : 'locked';
+	return SEVERITY[target] > SEVERITY[current] ? target : current;
+}
+
+/**
  * Recursive zeroization for ProfileV1 field types.
  *
  * ProfileV1 field type constraint (enforced by TypeScript): every field is
@@ -72,6 +113,22 @@ export function scrubSecureInputs(): void {
 }
 
 /**
+ * Zeroize every byte-bearing field of a record in place, touching nothing else.
+ *
+ * Use this when the app is DISCARDING a record it is replacing - the user is still working, so their
+ * typed input must survive. Use freezeRelock when the session itself is ending and the DOM has to go
+ * with it. Reaching for freezeRelock here would wipe the input the user is typing into.
+ *
+ * Args:
+ *   rec: the in-memory record whose fields are zeroized in place.
+ */
+export function zeroizeRecord(rec: Record<string, unknown>): void {
+	for (const value of Object.values(rec)) {
+		zeroizeField(value);
+	}
+}
+
+/**
  * Synchronous relock primitive: zeroize every byte-bearing field of the profile
  * in place, then scrub registered DOM inputs. MUST NOT await - this is called from
  * the synchronous pagehide/freeze handlers (wired at app-init). The caller nulls
@@ -81,8 +138,6 @@ export function scrubSecureInputs(): void {
  *   profile: the in-memory profile object whose fields are zeroized in place.
  */
 export function freezeRelock(profile: Record<string, unknown>): void {
-	for (const value of Object.values(profile)) {
-		zeroizeField(value);
-	}
+	zeroizeRecord(profile);
 	scrubSecureInputs();
 }

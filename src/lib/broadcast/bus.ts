@@ -9,7 +9,9 @@
  * BroadcastChannel is intentionally NOT gated by the capability check (multi-tab is
  * best-effort), so its absence degrades to a no-op bus rather than blocking core use.
  */
-export type BusSignal = { type: 'profile-updated' | 'relocked' | 'timeline-updated' };
+export type BusSignal = {
+	type: 'profile-updated' | 'relocked' | 'timeline-updated' | 'calendar-updated';
+};
 
 export type ProfileBus = {
 	publish(signal: BusSignal): void;
@@ -22,7 +24,12 @@ const CHANNEL_NAME = 'mtc-profile';
 function isBusSignal(value: unknown): value is BusSignal {
 	if (typeof value !== 'object' || value === null || !('type' in value)) return false;
 	const t = (value as { type: unknown }).type;
-	return t === 'profile-updated' || t === 'relocked' || t === 'timeline-updated';
+	return (
+		t === 'profile-updated' ||
+		t === 'relocked' ||
+		t === 'timeline-updated' ||
+		t === 'calendar-updated'
+	);
 }
 
 export function createProfileBus(channelName: string = CHANNEL_NAME): ProfileBus {

@@ -9,17 +9,21 @@
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
 	import {
 		initProfileApp,
-		provisionTimelineStore,
+		provisionStore,
 		subscribeBus,
 		installLifecycle,
+		createRelockEcho,
+		relockAll,
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
 	import { createTimelineStateStore } from '$lib/timeline';
+	import { createCalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
+	import { wipeAllStores } from '$lib/db/wipe';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { shellWidthFor } from '$lib/layout/shell-width';
@@ -37,7 +41,15 @@
 	// App-wide profile container, set synchronously (setContext must run during component
 	// init). Populated by the client-only app-init in onMount below. The shell renders for
 	// every status except `unsupported`; store-dependent UI reads `app.store` once ready.
-	const app = $state<ProfileApp>({ status: 'loading', store: null, timeline: null, cause: null });
+	const app = $state<ProfileApp>({
+		status: 'loading',
+		store: null,
+		timeline: null,
+		calendar: null,
+		cause: null,
+		wipeAll: null,
+		relockAll: null
+	});
 	setProfileApp(app);
 
 	onMount(() => {
@@ -48,6 +60,9 @@
 		// Cross-tab bus: created up front so the store can publish change/relock signals via
 		// its onBroadcast seam, and so a sibling tab's signals reach this tab's store.
 		const bus = createProfileBus();
+		// Every store broadcasts through this seam so a relock answering a peer stays local; without
+		// it each hop multiplies by (stores x tabs) and the channel saturates.
+		const echo = createRelockEcho(bus);
 		let destroyed = false;
 		let teardownRuntime: (() => void) | null = null;
 
@@ -56,7 +71,7 @@
 			checkSupport: checkBrowserSupport,
 			openDb: () => openMtcDb(),
 			bootstrap: bootstrapLocalKeystore,
-			createStore: (db) => createProfileStore(db, { onBroadcast: (e) => bus.publish(e) })
+			createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
 		})
 			.then((result) => {
 				if (destroyed) return;
@@ -66,6 +81,9 @@
 					return;
 				}
 				app.store = result.store;
+				// Registry-driven, so the erase covers stores that never provisioned - they are the ones
+				// whose orphaned rows would otherwise block their own recovery.
+				app.wipeAll = () => wipeAllStores(result.db);
 				app.status = 'ready';
 
 				// Wire the profile's relock/lifecycle FIRST and unconditionally (security: the
@@ -73,14 +91,21 @@
 				// mutable, so the timeline store joins it once provisioned (installLifecycle + the
 				// relocked handler read the list at event time).
 				const relockables: Relockable[] = [result.store];
+				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
+				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
+				app.relockAll = () => relockAll(relockables, 'user');
+				// refresh, not load: a peer's change is not the user asking to unlock, so each store
+				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
-					relocked: () => relockables.forEach((r) => r.relockSync()),
-					'profile-updated': () => void result.store.load(),
-					'timeline-updated': () => void app.timeline?.load()
+					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync('peer'))),
+					'profile-updated': () => void result.store.refresh(),
+					'timeline-updated': () => void app.timeline?.refresh(),
+					'calendar-updated': () => void app.calendar?.refresh()
 				});
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,
 					doc: document,
+					isHidden: () => document.visibilityState === 'hidden',
 					createIdleTimer,
 					idleThresholdMs: IDLE_THRESHOLD_MS
 				});
@@ -89,16 +114,30 @@
 					offLifecycle();
 				};
 
-				// Timeline-state store rides on the same db + bus; it joins the relock set once
-				// ready. A timeline init failure degrades to profile-only (never blocks the wiring
-				// above).
-				void provisionTimelineStore(result.db, (db) =>
-					createTimelineStateStore(db, { onBroadcast: (e) => bus.publish(e) })
+				// Timeline-state store rides on the same db + bus; it joins the relock set the moment
+				// it exists, before its first read decrypts anything. A timeline init failure
+				// degrades to profile-only (never blocks the wiring above).
+				void provisionStore(
+					result.db,
+					(db) => createTimelineStateStore(db, { onBroadcast: (e) => echo.publish(e) }),
+					(timeline) => relockables.push(timeline)
 				)
 					.then((timeline) => {
 						if (destroyed) return;
 						app.timeline = timeline;
-						relockables.push(timeline);
+					})
+					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
+
+				// Calendar-sync store rides on the same db + bus and joins the relock set the same
+				// way; an init failure degrades to calendar-off, never blocking the wiring above.
+				void provisionStore(
+					result.db,
+					(db) => createCalendarSyncStore(db, { onBroadcast: (e) => echo.publish(e) }),
+					(calendar) => relockables.push(calendar)
+				)
+					.then((calendar) => {
+						if (destroyed) return;
+						app.calendar = calendar;
 					})
 					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
 			})
@@ -120,7 +159,7 @@
 <svelte:head>
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 	<meta name="theme-color" content="#0f1419" />
-	<meta name="color-scheme" content="dark light" />
+	<meta name="color-scheme" content="dark" />
 </svelte:head>
 
 <AppGate {app}>

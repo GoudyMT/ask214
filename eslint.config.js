@@ -23,6 +23,13 @@ export default defineConfig(
 	svelte.configs.prettier,
 	{
 		languageOptions: { globals: { ...globals.browser, ...globals.node } },
+		// An eslint-disable that stops matching anything is a signal, not litter: it means the rule it
+		// names went blind to that call site, so a guarded line is now unguarded. The default `warn`
+		// hides that, and lint-staged's --fix deletes the directive outright - which is how a
+		// sanctioned encryption-boundary write silently lost its guard. Error, so it fails the commit
+		// instead. Paired with --fix-type in lint-staged, which withholds the directive autofix so
+		// there is still something left to report.
+		linterOptions: { reportUnusedDisableDirectives: 'error' },
 		rules: {
 			// typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
 			// see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors

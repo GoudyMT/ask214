@@ -213,7 +213,7 @@ describe('ProfileStore.relockSync', () => {
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
 		expect(store._getStateForTest()).not.toBeNull();
 
-		const r = store.relockSync();
+		const r = store.relockSync('user');
 		expect(r).toBeUndefined(); // synchronous void return
 		expect(store._getStateForTest()).toBeNull();
 		expect(events).toContain('relocked');
@@ -224,8 +224,52 @@ describe('ProfileStore.relockSync', () => {
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
 		const eaosRef = store._getStateForTest()?.eaos ?? null;
 		expect(eaosRef).not.toBeNull();
-		store.relockSync();
+		store.relockSync('user');
 		if (eaosRef) expect(eaosRef.every((b) => b === 0)).toBe(true);
+	});
+
+	// Every save stages a deep copy and swaps it in, so the record it replaces holds the same
+	// plaintext in different bytes. Dropping it hands the collector a profile the user has already
+	// moved on from - the same leak a relock exists to prevent, just on the happy path.
+	it('zeroizes the record a save supersedes, rather than dropping it to the collector', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const superseded = store._getStateForTest()?.eaos ?? null;
+		expect(superseded).not.toBeNull();
+
+		await store.save({ eaos: new TextEncoder().encode('2028-08-20') });
+
+		if (superseded) expect(superseded.every((b) => b === 0)).toBe(true);
+		// The live record is untouched - only the one being replaced is wiped.
+		expect(new TextDecoder().decode(store._getStateForTest()?.eaos ?? undefined)).toBe(
+			'2028-08-20'
+		);
+	});
+
+	// The relocked signal is how one tab tells the others the USER locked. Page hygiene is not that:
+	// this page is going away, the others are not. Telling them turns "you switched tabs" into "every
+	// other tab is now locked", and since a peer relock is not restorable they stay that way.
+	it('page hygiene does not tell other tabs to lock - only this page is going away', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+
+		store.relockSync('hygiene');
+
+		expect(store._getStateForTest()).toBeNull();
+		expect(events).not.toContain('relocked');
+	});
+
+	// A save puts the profile back in memory just as surely as a load does. If it does not say so,
+	// the store sits holding plaintext while refusing every automatic re-read - so a peer's change
+	// never lands in a tab that is plainly open.
+	it('saving after a relock leaves the store re-readable, because the plaintext is back', async () => {
+		const store = createProfileStore(db);
+		store.relockSync('user');
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+
+		expect(store._getStateForTest()).not.toBeNull();
+		await expect(store.refresh()).resolves.not.toBeNull();
 	});
 });
 
@@ -238,7 +282,7 @@ describe('ProfileStore.lock + deferred relock', () => {
 		const events: string[] = [];
 		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		await store.lock();
+		await store.lock('user');
 		expect(store._getStateForTest()).toBeNull();
 		expect(events).toContain('relocked');
 	});
@@ -247,7 +291,7 @@ describe('ProfileStore.lock + deferred relock', () => {
 		const events: string[] = [];
 		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
 		const savePromise = store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		const lockPromise = store.lock(); // requested while the save is still in flight
+		const lockPromise = store.lock('user'); // requested while the save is still in flight
 		await Promise.all([savePromise, lockPromise]);
 
 		// the save committed (gen 1 persisted) BEFORE the deferred relock ran
@@ -331,9 +375,28 @@ describe('ProfileStore.clockBackward', () => {
 	});
 });
 
-describe('ProfileStore relock-vs-save race (L1)', () => {
+describe('ProfileStore relock-vs-save race', () => {
 	beforeEach(async () => {
 		await bootstrapLocalKeystore(db);
+	});
+
+	// The first-run branch of load() - keystore present, no profile written yet - resets the store to
+	// open like any other successful read. But on a first-run tab that is the one branch a relock is
+	// most likely to race: there is no profile to show, so nothing looks wrong, and the tab is left
+	// willing to decrypt whatever a peer writes next.
+	it('a relock during a first-run load is not undone by the empty-profile branch', async () => {
+		const peer = createProfileStore(db);
+		const tab = createProfileStore(db);
+
+		const inflight = tab.load();
+		tab.relockSync('user');
+		await inflight;
+
+		// The peer finishes setup. Our tab relocked, so it must not decrypt what the peer wrote.
+		await peer.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		await tab.refresh();
+
+		expect(tab._getStateForTest()).toBeNull();
 	});
 
 	it('a sync relock during an in-flight save does NOT re-populate _profile (PII residency)', async () => {
@@ -341,7 +404,7 @@ describe('ProfileStore relock-vs-save race (L1)', () => {
 		// Start a save, then synchronously relock while it is mid-flight (simulates a
 		// pagehide/freeze handler firing during the save's await).
 		const p = store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		store.relockSync();
+		store.relockSync('hygiene');
 		await p;
 		// Memory must stay relocked - the resuming save must not re-populate decrypted PII.
 		expect(store._getStateForTest()).toBeNull();
@@ -402,14 +465,14 @@ describe('ProfileStore.locked', () => {
 	it('is true after relock when a profile exists in storage', async () => {
 		const store = createProfileStore(db);
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		store.relockSync();
+		store.relockSync('user');
 		expect(store.locked).toBe(true);
 	});
 
 	it('is false again after unlock (reload)', async () => {
 		const store = createProfileStore(db);
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		store.relockSync();
+		store.relockSync('user');
 		expect(store.locked).toBe(true);
 		await store.load();
 		expect(store.locked).toBe(false);
@@ -458,7 +521,7 @@ describe('ProfileStore relock DOM scrub', () => {
 			// Never loaded -> _profile is null (first-run wizard, where a typed EAOS lives only in
 			// the DOM input). A pagehide/freeze relock must still clear it.
 			const store = createProfileStore(db);
-			store.relockSync();
+			store.relockSync('hygiene');
 			expect(input.value).toBe('');
 		} finally {
 			unregister();

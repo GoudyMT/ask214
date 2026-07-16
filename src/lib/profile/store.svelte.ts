@@ -6,7 +6,15 @@ import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar 
 import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
-import { freezeRelock, cloneField, scrubSecureInputs } from './lifecycle';
+import {
+	freezeRelock,
+	zeroizeRecord,
+	cloneField,
+	scrubSecureInputs,
+	nextLockState,
+	type LockState,
+	type RelockReason
+} from './lifecycle';
 import { updateLastSeen, isClockBackward } from './clock';
 import { safeLog } from '../log/safelog';
 
@@ -64,8 +72,14 @@ function getRow<T>(
 export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = {}) {
 	let _profile = $state<ProfileV1 | null>(null);
 	let saveInFlight = false;
-	let pendingRelock = false;
+	// The reason a relock was deferred past an in-flight save, or null if none is pending.
+	let pendingRelock: RelockReason | null = null;
 	let relockEpoch = 0;
+	// How this store came to have no plaintext, which decides whether an automatic re-read may put it
+	// back. `locked` cannot answer that: it is derived state (hasProfile && _profile === null), so it
+	// reads FALSE for a first-run tab that has relocked, and it says nothing about WHY the profile is
+	// absent. See refresh().
+	let lockState: LockState = 'unlocked';
 	// True once a profile body exists in storage (generation >= 1). Retained across relock
 	// (the encrypted record still exists), so `locked` can distinguish relocked from never-set-up.
 	// $state so `locked` recomputes reactively when it flips without a coincident `_profile` write
@@ -76,7 +90,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	// then signal relocked. Shared by relockSync() (the sync pagehide/freeze handlers),
 	// lock() (async UI / idle / cross-tab), and the deferred-relock path at save() exit.
 	// Zeroizes BEFORE nulling (memory-hygiene order).
-	function relockNow(): void {
+	function relockNow(reason: RelockReason): void {
 		if (_profile) {
 			freezeRelock(_profile as unknown as Record<string, unknown>);
 			_profile = null;
@@ -86,9 +100,13 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			scrubSecureInputs();
 		}
 		// Bump the relock epoch so an in-flight save can detect a relock happened during it
-		// and skip re-populating _profile afterward (PII-residency guard, L1).
+		// and skip re-populating _profile afterward, which would undo the zeroize above.
 		relockEpoch++;
-		opts.onBroadcast?.({ type: 'relocked' });
+		lockState = nextLockState(lockState, reason);
+		// The relocked signal means "the user locked - you should too". Page hygiene is not that: THIS
+		// page is going away and the others are not, so telling them turns switching tabs into locking
+		// every other tab, and a peer relock is not one a page restore may undo.
+		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	const api = {
@@ -103,21 +121,22 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		},
 
 		/** Synchronous relock for the pagehide/freeze handlers (wired at app-init) - no await. */
-		relockSync(): void {
-			relockNow();
+		relockSync(reason: RelockReason): void {
+			relockNow(reason);
 		},
 
 		/**
 		 * Async relock for the Settings "Lock" button, idle timeout, and cross-tab signal
 		 * (all wired at app-init). If a save is in flight, the relock is DEFERRED until that
-		 * save finishes (F-3-C-11: never interrupt an in-progress encrypt/write); otherwise it
-		 * runs immediately. Resolves immediately so callers may `await store.lock()`.
+		 * save finishes - interrupting an in-progress encrypt/write would leave the record
+		 * half-written; otherwise it runs immediately. Resolves immediately so callers may
+		 * `await store.lock(reason)`.
 		 */
-		lock(): Promise<void> {
+		lock(reason: RelockReason): Promise<void> {
 			if (saveInFlight) {
-				pendingRelock = true;
+				pendingRelock = reason;
 			} else {
-				relockNow();
+				relockNow(reason);
 			}
 			return Promise.resolve();
 		},
@@ -156,7 +175,31 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			}
 		},
 
+		/**
+		 * AUTOMATIC re-read: a peer tab's change, a page restore, recovery from a failed write. It
+		 * DECRYPTS, so it answers to how the plaintext went away, not to whether it is gone.
+		 *
+		 * Refuses only a `locked` store - the user asked, or their presence lapsed, and putting the
+		 * profile back on screen would reverse that. An `evicted` store is page hygiene the app did
+		 * to itself on the way out, and the page has come back, so the re-read is exactly the undo
+		 * it is owed. An unlocked store re-reads so a peer's change still lands.
+		 *
+		 * Gated on `lockState`, NOT on `locked`. `locked` is derived state, so it reads false for a
+		 * first-run tab that has relocked (hasProfile is still false) - which left exactly that tab
+		 * open to a peer's setup decrypting into it.
+		 */
+		refresh(): Promise<ProfileV1 | null> {
+			if (lockState === 'locked') return Promise.resolve(null);
+			return api.load();
+		},
+
+		/**
+		 * USER-INITIATED re-read + decrypt - this IS the unlock, so it always decrypts. A relock
+		 * landing WHILE it runs still wins: repopulating into a tab that locked mid-decrypt would
+		 * silently undo the lock. Same residency guard save() carries.
+		 */
 		async load(): Promise<ProfileV1 | null> {
+			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
 			return withWriteLocks(
 				async () => {
@@ -190,14 +233,29 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					if (hwm.generation === 0) {
 						_profile = null;
 						hasProfile = false;
+						// Report the store open only if no relock landed while this was in flight. There
+						// is no profile here to leave resident, which is exactly why this branch is easy
+						// to get wrong: walking the relock back costs nothing visible now, and leaves the
+						// tab willing to decrypt whatever a peer writes next.
+						if (relockEpoch === relockAtStart) lockState = 'unlocked';
 						return null;
 					}
 
 					// Read + decrypt the body, binding decrypt to the authoritative HWM generation.
 					const profRow = await getRow<ProfileRow>(db, 'profile');
 					if (!profRow) throw new Error('E_PROFILE_BODY_MISSING');
-					_profile = await decryptProfileRecord(profRow.rec, keystore, hwm.generation);
+					const decrypted = await decryptProfileRecord(profRow.rec, keystore, hwm.generation);
+					// A record exists on disk either way - that is what `locked` reads to tell "locked"
+					// apart from "never set up", and it must stay true through a relock.
 					hasProfile = true;
+					if (relockEpoch !== relockAtStart) {
+						// A relock landed while this was decrypting. Do not repopulate - and do not hand
+						// the plaintext we just produced to the garbage collector.
+						freezeRelock(decrypted as unknown as Record<string, unknown>);
+						return null;
+					}
+					_profile = decrypted;
+					lockState = 'unlocked';
 					return _profile;
 				}
 			);
@@ -314,9 +372,26 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						// Commit the rune INSIDE the lock (concurrent tabs are blocked) - but ONLY if
 						// no relock happened during this save. A sync relockSync() (pagehide/freeze)
 						// mid-save must not be undone by re-populating decrypted PII; the IDB write
-						// above still persisted, so the user's edit is not lost (L1 residency guard).
+						// above still persisted, so the user's edit is not lost.
 						if (relockEpoch === relockAtStart) {
+							// `next` is a deep copy, so the record it replaces holds the same plaintext in
+							// different bytes - dropping it would leave the profile the user just moved on
+							// from sitting in the heap. Zeroize, but do NOT freezeRelock: the user is still
+							// working and that would scrub the input they are typing into.
+							if (_profile && _profile !== next) {
+								zeroizeRecord(_profile as unknown as Record<string, unknown>);
+							}
 							_profile = next;
+							// The plaintext is resident again, so say so. A save re-opens the store just
+							// as a load does, and a store that does not admit it sits holding the profile
+							// while refusing every automatic re-read.
+							lockState = 'unlocked';
+						} else {
+							// A relock landed mid-save, so this record is not going into memory - but its
+							// byte fields are the deep copies made above, which the relock's zeroize could
+							// not reach. Dropping it here would hand the garbage collector the same
+							// plaintext the relock just scrubbed out of _profile.
+							freezeRelock(next as unknown as Record<string, unknown>);
 						}
 						return { generation: nextGen };
 					}
@@ -327,10 +402,12 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 				return result;
 			} finally {
 				saveInFlight = false;
-				// A relock requested during the save was deferred; run it now the write is done.
+				// A relock requested during the save was deferred; run it now the write is done,
+				// carrying the reason it was asked for so a deferred Lock is still a Lock.
 				if (pendingRelock) {
-					pendingRelock = false;
-					relockNow();
+					const reason = pendingRelock;
+					pendingRelock = null;
+					relockNow(reason);
 				}
 			}
 		},
@@ -348,7 +425,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 				tx.objectStore('profile-hwm').clear();
 			});
 			hasProfile = false;
-			relockNow();
+			relockNow('user');
 		}
 	};
 

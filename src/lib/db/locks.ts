@@ -5,7 +5,9 @@
  *   other) but serialize against an EXCLUSIVE keystore holder.
  * - `profile-write` EXCLUSIVE: serializes profile writes against each other.
  * - `rotateOrUpgrade` takes `mtc-keystore` EXCLUSIVE, excluding all normal
- *   writes (the v1.1 key-rotation / passphrase-upgrade seam; harmless in v1.0).
+ *   writes. Two users: the v1.1 key-rotation / passphrase-upgrade seam, and the
+ *   device erase (an unlocked erase clears while a save is mid-encrypt, and that
+ *   save's write then lands after it - resurrecting a row into a wiped store).
  *
  * Every acquisition is bounded by `AbortSignal.timeout` (no
  * silent lock drops). A timed-out acquisition surfaces as `LockAcquisitionTimeout`,

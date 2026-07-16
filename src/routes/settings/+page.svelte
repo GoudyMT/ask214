@@ -2,6 +2,7 @@
 	import EaosInput from '$lib/components/EaosInput.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
+	import { eraseEverything } from '$lib/profile/erase';
 	import { OccConflictError } from '$lib/profile/store.svelte';
 	import {
 		validateEaosAtInput,
@@ -9,6 +10,9 @@
 		EaosFormatError,
 		type EaosCause
 	} from '$lib/profile/eaos';
+	import CalendarPanel from '$lib/components/CalendarPanel.svelte';
+	import { downloadTextFile } from '$lib/calendar/download';
+	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
 
 	const app = getProfileApp();
 
@@ -20,6 +24,7 @@
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
 	let clockError = $state<string | null>(null);
+	let eraseError = $state<string | null>(null);
 
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
@@ -33,6 +38,21 @@
 	const currentEaos = $derived.by(() => {
 		const p = app.store?.persona;
 		return p && p.completeness !== 'none' ? p.eaos : null;
+	});
+
+	// Until the timeline-state store provisions, fall back to empty state so the calendar panel
+	// still lists date-derived pending tasks; stored done/skip/snooze layer in once it loads.
+	const EMPTY_STATE: TimelineState = { schemaVersion: 1, tasks: {} };
+
+	// The flat pending-task list the calendar panel projects to events - the timeline route's
+	// generation, flattened across phases. Empty until a persona with an EAOS exists.
+	const calendarItems = $derived.by(() => {
+		const persona = app.store?.persona;
+		if (!persona || persona.completeness === 'none') return [];
+		const state = app.timeline?.state ?? EMPTY_STATE;
+		return generateTimeline(persona, [...TASK_DEFS], state, new Date()).phases.flatMap(
+			(p) => p.items
+		);
 	});
 
 	function startEdit(): void {
@@ -73,9 +93,10 @@
 			editing = false;
 		} catch (err) {
 			if (err instanceof OccConflictError) {
-				// Reload authoritative state; stay in edit mode so the message + input stay visible
-				// (OCC: reload, don't clobber).
-				await store.load();
+				// Re-read authoritative state; stay in edit mode so the message + input stay visible
+				// (OCC: reload, don't clobber). refresh, not load: the user asked to SAVE, not to
+				// unlock, so if the write lost its race to a relock this must not re-open the store.
+				await store.refresh();
 				error = 'This was changed in another tab. We reloaded it - please review and save again.';
 				return;
 			}
@@ -85,8 +106,10 @@
 		}
 	}
 
-	async function lock(): Promise<void> {
-		await app.store?.lock();
+	function lock(): void {
+		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
+		// leaving them in memory is precisely what this button exists to prevent.
+		app.relockAll?.();
 	}
 
 	async function unlock(): Promise<void> {
@@ -95,6 +118,11 @@
 		unlocking = true;
 		try {
 			await store.load();
+			// The secondary stores relock alongside the profile on idle/pagehide but are not part of
+			// the profile's load; without this they stay unloaded behind an unlocked UI (see the
+			// timeline route for the full reasoning). allSettled so a secondary failure leaves that
+			// store not-ready rather than blocking the unlock.
+			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
 		} finally {
 			unlocking = false;
 		}
@@ -112,20 +140,30 @@
 	}
 
 	async function confirmErase(): Promise<void> {
-		const store = app.store;
-		if (!store) return;
+		eraseError = null;
 		wipeDialog?.close();
-		await store.wipe();
-		await app.timeline?.wipe();
-		// Defensive: the app stores no PII outside IndexedDB, but wipe also clears
-		// localStorage + Cache Storage for completeness.
-		window.localStorage.clear();
-		if ('caches' in window) {
-			const keys = await window.caches.keys();
-			await Promise.all(keys.map((key) => window.caches.delete(key)));
+		try {
+			await eraseEverything({
+				relock: () => app.relockAll?.(),
+				wipeAll: app.wipeAll,
+				// Defensive: the app stores no PII outside IndexedDB, but the erase clears localStorage +
+				// Cache Storage for completeness.
+				clearStorage: () => window.localStorage.clear(),
+				clearCaches: async () => {
+					if (!('caches' in window)) return;
+					const keys = await window.caches.keys();
+					await Promise.all(keys.map((key) => window.caches.delete(key)));
+				},
+				// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
+				reload: () => window.location.reload()
+			});
+		} catch {
+			// The erase refuses before touching disk unless it can clear every store, and the store
+			// wipe is one transaction - so if we are here, nothing was destroyed. Saying so matters
+			// more than usual: the user asked for their data to be gone and would otherwise walk away
+			// believing it was, because the dialog closed and the screen locked.
+			eraseError = 'Could not erase your data. Nothing was deleted - please try again.';
 		}
-		// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
-		window.location.reload();
 	}
 
 	// Draw attention to the clock reset while the clock is backward: move focus to it + scroll
@@ -152,6 +190,13 @@
 <h1>Settings</h1>
 
 {#if app.status === 'ready'}
+	<!-- Outside the locked/unlocked split on purpose: the erase zeroizes memory before it touches
+	     disk, so by the time it can fail the store is already relocked and this whole page has
+	     swapped to the locked panel. Rendered in the section that raised it, this message would be
+	     unmounted before the user ever saw it. -->
+	{#if eraseError}
+		<p class="erase-error" role="alert">{eraseError}</p>
+	{/if}
 	{#if app.store?.locked}
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else}
@@ -207,7 +252,7 @@
 
 		<section class="settings-section" aria-labelledby="privacy-heading">
 			<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-			<button class="settings-lock" type="button" onclick={() => void lock()}>Lock</button>
+			<button class="settings-lock" type="button" onclick={lock}>Lock</button>
 			<p class="settings-hint">
 				Clears your profile from this screen. Use Unlock to view it again.
 			</p>
@@ -218,6 +263,15 @@
 				</button>
 			</div>
 		</section>
+
+		<CalendarPanel
+			items={calendarItems}
+			exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
+			ready={app.calendar?.ready ?? false}
+			onSetExclusions={(next) =>
+				void app.calendar?.setExclusions(next).catch(() => app.calendar?.refresh())}
+			onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
+		/>
 
 		<dialog
 			bind:this={wipeDialog}
@@ -396,6 +450,11 @@
 		margin-top: var(--space-l);
 		padding-top: var(--space-m);
 		border-top: 1px solid var(--color-border);
+	}
+
+	.erase-error {
+		margin: 0 0 var(--space-l);
+		color: var(--color-danger);
 	}
 
 	/* Destructive CTA: danger border + text, never a filled alarm. */
