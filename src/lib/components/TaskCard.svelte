@@ -117,8 +117,7 @@
 				class="task-card__note-input"
 				bind:value={noteValue}
 				aria-label="Note"
-				placeholder="Add a note..."
-			></textarea>
+				placeholder="Add a note..."></textarea>
 			<div class="task-card__note-actions">
 				<button type="button" class="task-card__note-save" onclick={saveNote}>Save</button>
 				<button type="button" class="task-card__note-cancel" onclick={closeNote}>Cancel</button>
