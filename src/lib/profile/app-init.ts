@@ -177,10 +177,14 @@ type ProfileLifecycleDeps = {
 /**
  * Wire Page-Lifecycle + idle relock behavior onto the injected event targets, for EVERY
  * relockable store. `pagehide` (window) and `freeze` (document) relock each store - zeroize
- * PII - when the page is backgrounded or frozen; a persisted `pageshow` (BFCache restore)
- * re-reads each from IDB; user input resets an idle timer that, on idle, locks stores exposing
- * lock() and relock-syncs the rest. All stores relock together (atomic). Returns a teardown
- * that stops the timer and removes every listener.
+ * PII - when the page is backgrounded or frozen; a persisted `pageshow` or a `resume` re-reads
+ * each from IDB; user input resets an idle timer that, on idle, locks stores exposing lock() and
+ * relock-syncs the rest. All stores relock together (atomic). Returns a teardown that stops the
+ * timer and removes every listener.
+ *
+ * Both ways out are paired with both ways back, because they do not come in matched sets: a
+ * browser freezing a quiet background tab dispatches freeze and resume with no navigation at all,
+ * while a Firefox or Safari page hide dispatches pagehide and never freeze.
  */
 export function installLifecycle(
 	relockables: Relockable[],
@@ -199,16 +203,24 @@ export function installLifecycle(
 	};
 	// The page came back. Ask every store to re-read; each answers from how its own plaintext went
 	// away, so an evicted store restores and a locked one stays shut. No policy belongs here.
-	const onShow = (e: Event): void => {
-		if ((e as PageTransitionEvent).persisted) {
-			for (const r of relockables) void r.refresh();
-		}
+	const restore = (): void => {
+		for (const r of relockables) void r.refresh();
 	};
+	// Two ways back in, deliberately routed through the same branch rather than paired by arrival
+	// order: which of these fires, and in what sequence, is not consistent across browsers.
+	// `pageshow` is a restored navigation, so it must be the persisted kind to mean anything here.
+	const onShow = (e: Event): void => {
+		if ((e as PageTransitionEvent).persisted) restore();
+	};
+	// `resume` is a frozen tab waking up - no navigation, no `persisted` flag, and on the browsers
+	// that freeze quiet background tabs it is the ONLY way back from the freeze that relocked us.
+	const onResume = (): void => restore();
 	const onActivity = (): void => idle.recordActivity();
 
 	deps.win.addEventListener('pagehide', onHide);
 	deps.doc.addEventListener('freeze', onHide);
 	deps.win.addEventListener('pageshow', onShow);
+	deps.doc.addEventListener('resume', onResume);
 	for (const ev of ACTIVITY_EVENTS) {
 		deps.win.addEventListener(ev, onActivity, { passive: true });
 	}
@@ -219,6 +231,7 @@ export function installLifecycle(
 		deps.win.removeEventListener('pagehide', onHide);
 		deps.doc.removeEventListener('freeze', onHide);
 		deps.win.removeEventListener('pageshow', onShow);
+		deps.doc.removeEventListener('resume', onResume);
 		for (const ev of ACTIVITY_EVENTS) {
 			deps.win.removeEventListener(ev, onActivity);
 		}

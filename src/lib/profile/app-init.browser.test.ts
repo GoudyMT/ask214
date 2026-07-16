@@ -201,6 +201,27 @@ describe('installLifecycle', () => {
 		expect(h.store.refresh).not.toHaveBeenCalled();
 	});
 
+	// A browser freezing a quiet background tab dispatches freeze and later resume, with no
+	// navigation and therefore no pagehide or pageshow. Relocking on freeze while only pageshow
+	// restores means that tab zeroizes its plaintext and never reads it back - a blank page the user
+	// can only fix by reloading. resume is also not a PageTransitionEvent, so it carries no
+	// `persisted` flag to gate on: being resumed IS the signal.
+	it('re-reads on resume, the counterpart to the freeze that relocked it', () => {
+		const h = makeLifecycleHarness();
+		h.install();
+		h.doc.dispatchEvent(new Event('freeze'));
+		h.doc.dispatchEvent(new Event('resume'));
+		expect(h.store.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it('stops re-reading on resume after teardown', () => {
+		const h = makeLifecycleHarness();
+		const off = h.install();
+		off();
+		h.doc.dispatchEvent(new Event('resume'));
+		expect(h.store.refresh).not.toHaveBeenCalled();
+	});
+
 	it('starts an idle timer at the given threshold whose onIdle locks the store', () => {
 		const h = makeLifecycleHarness();
 		h.install();
