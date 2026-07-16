@@ -82,10 +82,15 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	let _state = $state<TimelineState | null>(null);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
+	// Whether this store has relocked with no user-initiated load since. State cannot answer this:
+	// `_state === null` says the record is not in memory, never WHY - and the two reasons demand
+	// opposite answers from a re-read. See refresh().
+	let relockedSinceLoad = false;
 
 	function relockNow(): void {
 		_state = null;
 		relockEpoch++;
+		relockedSinceLoad = true;
 		opts.onBroadcast?.({ type: 'relocked' });
 	}
 
@@ -206,7 +211,10 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					const gen = await readCurrentGeneration(keystore);
 					_generation = gen;
 					if (gen === 0) {
-						if (relockEpoch === relockAtStart) _state = { schemaVersion: 1, tasks: {} };
+						if (relockEpoch === relockAtStart) {
+							_state = { schemaVersion: 1, tasks: {} };
+							relockedSinceLoad = false;
+						}
 						return;
 					}
 					const row = await getRow<StateRow>(db, 'timeline-state');
@@ -214,9 +222,26 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					const decoded = decodeTimelineState(
 						await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
 					);
-					if (relockEpoch === relockAtStart) _state = decoded;
+					if (relockEpoch === relockAtStart) {
+						_state = decoded;
+						relockedSinceLoad = false;
+					}
 				}
 			);
+		},
+
+		/**
+		 * AUTOMATIC re-read: a peer tab's change, a BFCache restore, recovery from a failed write.
+		 * Refuses once this store has relocked, because none of those is the user asking to unlock and
+		 * a re-read DECRYPTS - it would put the user's task notes back in memory, and on screen, in a
+		 * tab that locked itself. Nothing is lost by refusing: every unlock path calls load().
+		 *
+		 * The split is the point. `load()` means "the user asked"; `refresh()` means "something
+		 * changed". Give an automatic caller load() and it silently un-relocks the tab.
+		 */
+		refresh(): Promise<void> {
+			if (relockedSinceLoad) return Promise.resolve();
+			return api.load();
 		},
 
 		/** Set or clear a task status (clearing also drops any snooze). */

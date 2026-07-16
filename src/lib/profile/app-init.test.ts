@@ -1,11 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-	initProfileApp,
-	provisionStore,
-	createRelockEcho,
-	createPeerReload,
-	relockAll
-} from './app-init';
+import { initProfileApp, provisionStore, createRelockEcho, relockAll } from './app-init';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import type { BusSignal, ProfileBus } from '../broadcast/bus';
 
@@ -23,10 +17,10 @@ function recordingBus(): { bus: ProfileBus; sent: BusSignal[] } {
 describe('relockAll', () => {
 	const profileLike = () => ({
 		relockSync: vi.fn(),
-		load: vi.fn().mockResolvedValue(null),
+		refresh: vi.fn().mockResolvedValue(null),
 		lock: vi.fn().mockResolvedValue(undefined)
 	});
-	const secondaryLike = () => ({ relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) });
+	const secondaryLike = () => ({ relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) });
 
 	it('relocks EVERY store, not just the first', () => {
 		// The regression this exists to prevent: the erase and the Settings Lock each enumerated their
@@ -57,36 +51,12 @@ describe('relockAll', () => {
 			relockSync: vi.fn(() => {
 				throw new Error('relock blew up');
 			}),
-			load: vi.fn()
+			refresh: vi.fn()
 		};
 		const after = secondaryLike();
 		// A store failing to relock must not strand PII in every store after it in the list.
 		expect(() => relockAll([boom, after])).not.toThrow();
 		expect(after.relockSync).toHaveBeenCalledOnce();
-	});
-});
-
-describe('createPeerReload', () => {
-	it('re-reads when the tab is unlocked', () => {
-		const load = vi.fn().mockResolvedValue(null);
-		const reload = createPeerReload(() => false);
-		reload(load);
-		expect(load).toHaveBeenCalledOnce();
-	});
-
-	it('does NOT re-read while the tab is locked', () => {
-		const load = vi.fn().mockResolvedValue(null);
-		const reload = createPeerReload(() => true);
-		reload(load);
-		// A peer tab's ordinary save must not decrypt this tab's profile and task notes back onto the
-		// screen. The idle timer that locked it has already fired and will not fire again, so the tab
-		// would stay unlocked indefinitely. The unlock paths re-read all stores, so nothing is lost.
-		expect(load).not.toHaveBeenCalled();
-	});
-
-	it('tolerates a store that has not provisioned', () => {
-		const reload = createPeerReload(() => false);
-		expect(() => reload(() => undefined)).not.toThrow();
 	});
 });
 

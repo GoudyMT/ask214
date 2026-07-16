@@ -20,7 +20,7 @@ function delay(ms: number): Promise<void> {
 }
 
 function makeSpyStore() {
-	return { relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) };
+	return { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
 }
 
 afterEach(() => {
@@ -67,10 +67,10 @@ describe('createRelockEcho over a real BroadcastChannel', () => {
 });
 
 describe('subscribeBus', () => {
-	function profileHandlers(store: { relockSync: () => void; load: () => Promise<unknown> }) {
+	function profileHandlers(store: { relockSync: () => void; refresh: () => Promise<unknown> }) {
 		return {
 			relocked: () => store.relockSync(),
-			'profile-updated': () => void store.load()
+			'profile-updated': () => void store.refresh()
 		};
 	}
 
@@ -83,7 +83,7 @@ describe('subscribeBus', () => {
 		tabA.publish({ type: 'relocked' });
 		await delay(100);
 		expect(store.relockSync).toHaveBeenCalledTimes(1);
-		expect(store.load).not.toHaveBeenCalled();
+		expect(store.refresh).not.toHaveBeenCalled();
 	});
 
 	it('routes a profile-updated signal to its handler', async () => {
@@ -94,7 +94,7 @@ describe('subscribeBus', () => {
 		subscribeBus(tabB, profileHandlers(store));
 		tabA.publish({ type: 'profile-updated' });
 		await delay(100);
-		expect(store.load).toHaveBeenCalledTimes(1);
+		expect(store.refresh).toHaveBeenCalledTimes(1);
 		expect(store.relockSync).not.toHaveBeenCalled();
 	});
 
@@ -125,7 +125,7 @@ describe('subscribeBus', () => {
 function makeLifecycleHarness() {
 	const store = {
 		relockSync: vi.fn(),
-		load: vi.fn().mockResolvedValue(null),
+		refresh: vi.fn().mockResolvedValue(null),
 		lock: vi.fn().mockResolvedValue(undefined)
 	};
 	const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
@@ -171,14 +171,14 @@ describe('installLifecycle', () => {
 		const e = new Event('pageshow');
 		Object.defineProperty(e, 'persisted', { value: true });
 		h.win.dispatchEvent(e);
-		expect(h.store.load).toHaveBeenCalledTimes(1);
+		expect(h.store.refresh).toHaveBeenCalledTimes(1);
 	});
 
 	it('does not re-read on a non-persisted pageshow', () => {
 		const h = makeLifecycleHarness();
 		h.install();
 		h.win.dispatchEvent(new Event('pageshow'));
-		expect(h.store.load).not.toHaveBeenCalled();
+		expect(h.store.refresh).not.toHaveBeenCalled();
 	});
 
 	it('starts an idle timer at the given threshold whose onIdle locks the store', () => {
@@ -210,10 +210,10 @@ describe('installLifecycle', () => {
 	it('relocks every store in the list on pagehide', () => {
 		const a = {
 			relockSync: vi.fn(),
-			load: vi.fn().mockResolvedValue(null),
+			refresh: vi.fn().mockResolvedValue(null),
 			lock: vi.fn().mockResolvedValue(undefined)
 		};
-		const b = { relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) };
+		const b = { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
 		const win = new EventTarget();
 		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
 		installLifecycle([a, b], {
@@ -230,10 +230,10 @@ describe('installLifecycle', () => {
 	it('on idle, locks stores that expose lock() and relockSyncs those that do not', () => {
 		const a = {
 			relockSync: vi.fn(),
-			load: vi.fn().mockResolvedValue(null),
+			refresh: vi.fn().mockResolvedValue(null),
 			lock: vi.fn().mockResolvedValue(undefined)
 		};
-		const b = { relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) };
+		const b = { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
 		let onIdle: (() => void) | undefined;
 		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
 		installLifecycle([a, b], {

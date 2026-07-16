@@ -65,10 +65,15 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 	let _state = $state<CalendarSyncState | null>(null);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
+	// Whether this store has relocked with no user-initiated load since. State cannot answer this:
+	// `_state === null` says the record is not in memory, never WHY - and the two reasons demand
+	// opposite answers from a re-read. See refresh().
+	let relockedSinceLoad = false;
 
 	function relockNow(): void {
 		_state = null;
 		relockEpoch++;
+		relockedSinceLoad = true;
 		opts.onBroadcast?.({ type: 'relocked' });
 	}
 
@@ -192,6 +197,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 					if (gen === 0) {
 						if (relockEpoch === relockAtStart) {
 							_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
+							relockedSinceLoad = false;
 						}
 						return;
 					}
@@ -200,9 +206,25 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 					const decoded = decodeCalendarSyncState(
 						await decryptRecord(CALENDAR_CTX, row.rec, keystore, gen)
 					);
-					if (relockEpoch === relockAtStart) _state = decoded;
+					if (relockEpoch === relockAtStart) {
+						_state = decoded;
+						relockedSinceLoad = false;
+					}
 				}
 			);
+		},
+
+		/**
+		 * AUTOMATIC re-read: a peer tab's change, a BFCache restore, recovery from a failed write.
+		 * Refuses once this store has relocked - none of those is the user asking to unlock, and a
+		 * re-read DECRYPTS. Nothing is lost: every unlock path calls load().
+		 *
+		 * The split is the point. `load()` means "the user asked"; `refresh()` means "something
+		 * changed". Give an automatic caller load() and it silently un-relocks the tab.
+		 */
+		refresh(): Promise<void> {
+			if (relockedSinceLoad) return Promise.resolve();
+			return api.load();
 		},
 
 		/** Replace the exclusion set (preserves the card dismissal state). */

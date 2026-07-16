@@ -13,7 +13,6 @@
 		subscribeBus,
 		installLifecycle,
 		createRelockEcho,
-		createPeerReload,
 		relockAll,
 		type Relockable
 	} from '$lib/profile/app-init';
@@ -95,14 +94,13 @@
 				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
 				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
 				app.relockAll = () => relockAll(relockables);
-				// A peer's change must never un-relock this tab: the re-read decrypts, and the idle timer
-				// that locked us has already fired and will not fire again.
-				const peerReload = createPeerReload(() => result.store.locked);
+				// refresh, not load: a peer's change is not the user asking to unlock, so each store
+				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
 					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync())),
-					'profile-updated': () => peerReload(() => result.store.load()),
-					'timeline-updated': () => peerReload(() => app.timeline?.load()),
-					'calendar-updated': () => peerReload(() => app.calendar?.load())
+					'profile-updated': () => void result.store.refresh(),
+					'timeline-updated': () => void app.timeline?.refresh(),
+					'calendar-updated': () => void app.calendar?.refresh()
 				});
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,

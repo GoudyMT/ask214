@@ -251,7 +251,7 @@
 			exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
 			ready={app.calendar?.ready ?? false}
 			onSetExclusions={(next) =>
-				void app.calendar?.setExclusions(next).catch(() => app.calendar?.load())}
+				void app.calendar?.setExclusions(next).catch(() => app.calendar?.refresh())}
 			onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
 		/>
 

@@ -146,6 +146,62 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	it('refresh does not re-decrypt into a tab that has relocked', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+		await a.setNote('y', 'PTSD eval 0900 Bldg 12');
+		a.relockSync();
+
+		// An automatic re-read - a peer's signal, a BFCache restore, a failed write's recovery. None
+		// of them is the user asking to unlock, so none may put the notes back on screen.
+		await a.refresh();
+
+		expect(a.state.tasks).toEqual({});
+		await deleteTestDb(db);
+	});
+
+	it('refresh re-reads while the tab is unlocked, so a peer change still lands', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		const b = createTimelineStateStore(db);
+		await a.load();
+		await b.load();
+		await a.setStatus('x', 'done');
+
+		// b never relocked, so the cross-tab re-read must still work - that is the bus's whole point.
+		await b.refresh();
+
+		expect(b.state.tasks['x']?.status).toBe('done');
+		await deleteTestDb(db);
+	});
+
+	it('the user unlocking after a relock still loads - refresh refuses, load does not', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+		a.relockSync();
+		await a.refresh();
+		expect(a.state.tasks).toEqual({});
+
+		// load() IS the unlock. It must always decrypt, or the Unlock button is dead.
+		await a.load();
+		expect(a.state.tasks['x']?.status).toBe('done');
+
+		// And a later automatic re-read must work again now the user has unlocked.
+		await a.refresh();
+		expect(a.state.tasks['x']?.status).toBe('done');
+		await deleteTestDb(db);
+	});
+
 	it('wipe clears the timeline state', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);

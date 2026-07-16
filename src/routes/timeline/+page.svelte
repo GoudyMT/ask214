@@ -78,7 +78,7 @@
 		try {
 			await timeline.setStatus(taskId, status);
 		} catch {
-			await timeline.load();
+			await timeline.refresh();
 		}
 	}
 
@@ -89,7 +89,7 @@
 		try {
 			await timeline.setSnooze(taskId, untilIso);
 		} catch {
-			await timeline.load();
+			await timeline.refresh();
 		}
 	}
 
@@ -100,7 +100,7 @@
 		try {
 			await timeline.setNote(taskId, note);
 		} catch {
-			await timeline.load();
+			await timeline.refresh();
 		}
 	}
 </script>

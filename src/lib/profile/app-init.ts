@@ -100,24 +100,6 @@ export function createRelockEcho(bus: ProfileBus): {
 }
 
 /**
- * Guards the cross-tab re-read against un-relocking a locked tab.
- *
- * A `*-updated` signal means a peer changed the record, so re-read it. But an unconditional re-read
- * DECRYPTS: a peer tab's ordinary save would pull a locked tab's profile and task notes back into
- * memory and onto the screen, silently undoing the lock. Worse, the idle timer that locked it has
- * already fired and is not rescheduled, so the tab stays unlocked indefinitely.
- *
- * A locked tab loses nothing by staying locked - every unlock path re-reads all stores, so it picks
- * up the peer's change the moment the user actually asks for it.
- */
-export function createPeerReload(isLocked: () => boolean) {
-	return (load: () => Promise<unknown> | undefined): void => {
-		if (isLocked()) return;
-		void load();
-	};
-}
-
-/**
  * Wire a cross-tab bus to a handler map: each incoming signal invokes `handlers[signal.type]`
  * if present. The +layout maps `relocked` to relock-all and each `*-updated` to that store's
  * load (load is itself fail-closed + verified, so a spoofed same-origin signal can at worst
@@ -137,13 +119,17 @@ export function subscribeBus(
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'touchstart'] as const;
 
 /**
- * A store the app can relock + reload across the page lifecycle and cross-tab signals. `lock`
+ * A store the app can relock + re-read across the page lifecycle and cross-tab signals. `lock`
  * is optional: the profile store exposes an async lock(); the timeline store relocks
  * synchronously (drop-reference) and omits it.
+ *
+ * `refresh`, not `load`: everything reached through this type is AUTOMATIC (a lifecycle event, a
+ * peer's signal), never the user asking to unlock. load() is deliberately absent - handing it to an
+ * automatic caller is what silently un-relocked tabs.
  */
 export type Relockable = {
 	relockSync: () => void;
-	load: () => Promise<unknown>;
+	refresh: () => Promise<unknown>;
 	lock?: () => Promise<void>;
 };
 
@@ -204,7 +190,9 @@ export function installLifecycle(
 	};
 	const onShow = (e: Event): void => {
 		if ((e as PageTransitionEvent).persisted) {
-			for (const r of relockables) void r.load();
+			// refresh, not load: onHide relocked these on the way out. A BFCache restore is the page
+			// coming back, not the user asking to unlock - reloading here would undo an explicit Lock.
+			for (const r of relockables) void r.refresh();
 		}
 	};
 	const onActivity = (): void => idle.recordActivity();

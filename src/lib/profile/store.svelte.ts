@@ -66,6 +66,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	let saveInFlight = false;
 	let pendingRelock = false;
 	let relockEpoch = 0;
+	// Whether this store has relocked with no user-initiated load since. `locked` cannot answer this:
+	// it is derived state (hasProfile && _profile === null), so it reads FALSE for a first-run tab
+	// that has relocked, and it says nothing about WHY the profile is absent. See refresh().
+	let relockedSinceLoad = false;
 	// True once a profile body exists in storage (generation >= 1). Retained across relock
 	// (the encrypted record still exists), so `locked` can distinguish relocked from never-set-up.
 	// $state so `locked` recomputes reactively when it flips without a coincident `_profile` write
@@ -88,6 +92,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		// Bump the relock epoch so an in-flight save can detect a relock happened during it
 		// and skip re-populating _profile afterward (PII-residency guard, L1).
 		relockEpoch++;
+		relockedSinceLoad = true;
 		opts.onBroadcast?.({ type: 'relocked' });
 	}
 
@@ -157,9 +162,23 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		},
 
 		/**
-		 * Re-read + decrypt from disk (this IS the unlock). A relock landing WHILE this runs wins:
-		 * repopulating decrypted state into a tab that has since locked silently undoes the lock, and
-		 * the idle timer does not fire twice. Same residency guard save() carries.
+		 * AUTOMATIC re-read: a peer tab's change, a BFCache restore, recovery from a failed write.
+		 * Refuses once this store has relocked - none of those is the user asking to unlock, and a
+		 * re-read DECRYPTS. Nothing is lost: every unlock path calls load().
+		 *
+		 * Gated on `relockedSinceLoad`, NOT on `locked`. `locked` is derived state, so it reads false
+		 * for a first-run tab that has relocked (hasProfile is still false) - which left exactly that
+		 * tab open to a peer's setup decrypting into it.
+		 */
+		refresh(): Promise<ProfileV1 | null> {
+			if (relockedSinceLoad) return Promise.resolve(null);
+			return api.load();
+		},
+
+		/**
+		 * USER-INITIATED re-read + decrypt - this IS the unlock, so it always decrypts. A relock
+		 * landing WHILE it runs still wins: repopulating into a tab that locked mid-decrypt would
+		 * silently undo the lock. Same residency guard save() carries.
 		 */
 		async load(): Promise<ProfileV1 | null> {
 			const relockAtStart = relockEpoch;
@@ -196,6 +215,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					if (hwm.generation === 0) {
 						_profile = null;
 						hasProfile = false;
+						relockedSinceLoad = false;
 						return null;
 					}
 
@@ -213,6 +233,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						return null;
 					}
 					_profile = decrypted;
+					relockedSinceLoad = false;
 					return _profile;
 				}
 			);
