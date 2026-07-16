@@ -51,16 +51,24 @@ export async function initProfileApp<S extends LoadableStore>(
 }
 
 /**
- * Provision a secondary store on the already-open db: create it, then run the initial load.
- * Mirrors initProfileApp's create-then-load tail, kept separate so a store can ride on the same
- * db without coupling into initProfileApp's single-store generic. The +layout calls this after
+ * Provision a secondary store on the already-open db: create it, hand it over, then run the initial
+ * load. Mirrors initProfileApp's create-then-load tail, kept separate so a store can ride on the
+ * same db without coupling into initProfileApp's single-store generic. The +layout calls this after
  * the profile app is ready (for the timeline + calendar stores), passing the db that init returns.
+ *
+ * `onCreated` runs BEFORE the load, and the order is the point: load() decrypts, so a caller that
+ * only receives the store once the promise resolves cannot relock it during the read. The lifecycle
+ * handlers are already live by then, so a page hidden mid-startup would zeroize every store except
+ * the one that had just finished reading the user's records into memory. Handing it over early
+ * costs nothing - a relock during the load is caught by the load's own residency guard.
  */
 export async function provisionStore<S extends LoadableStore>(
 	db: IDBDatabase,
-	makeStore: (db: IDBDatabase) => S
+	makeStore: (db: IDBDatabase) => S,
+	onCreated?: (store: S) => void
 ): Promise<S> {
 	const store = makeStore(db);
+	onCreated?.(store);
 	await store.load();
 	return store;
 }

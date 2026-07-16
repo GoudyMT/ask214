@@ -74,11 +74,12 @@ describe('eraseEverything', () => {
 		expect(deps.order).toEqual(['relock', 'wipeAll', 'clearStorage', 'clearCaches', 'reload']);
 	});
 
-	it('does nothing when the store wipe is unavailable', async () => {
+	it('refuses loudly when the store wipe is unavailable', async () => {
 		const deps = makeDeps({ wipeAll: null });
-		await eraseEverything(deps);
-		// Fail closed: a partial erase that clears caches but not the encrypted stores would strand
-		// rows under a keystore epoch nothing can verify again.
+		// Refusing is right - a partial erase that clears caches but not the encrypted stores would
+		// strand rows under a keystore epoch nothing can verify again. Refusing SILENTLY is not: the
+		// user asked for their data to be destroyed and has no way to tell that it was not.
+		await expect(eraseEverything(deps)).rejects.toThrow('E_ERASE_UNAVAILABLE');
 		expect(deps.order).toEqual([]);
 	});
 });

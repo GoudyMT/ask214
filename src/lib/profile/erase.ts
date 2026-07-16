@@ -21,7 +21,8 @@ export type EraseDeps = {
  *
  * Refuses outright when `wipeAll` is unavailable rather than erasing the layers it can reach: a
  * partial erase strands encrypted rows under a keystore epoch nothing can verify again, and the only
- * recovery is the erase itself.
+ * recovery is the erase itself. It throws to refuse rather than returning quietly - the caller asked
+ * for their data to be destroyed, and the one thing worse than not doing it is not saying so.
  *
  * The reload is guaranteed ONCE THE STORES ARE GONE, but not before. Those two halves are different
  * promises: past `wipeAll` the page is displaying a profile that no longer exists - it still believes
@@ -30,7 +31,7 @@ export type EraseDeps = {
  * success for a destructive operation that never happened.
  */
 export async function eraseEverything(deps: EraseDeps): Promise<void> {
-	if (!deps.wipeAll) return;
+	if (!deps.wipeAll) throw new Error('E_ERASE_UNAVAILABLE');
 	deps.relock();
 	await deps.wipeAll();
 	try {

@@ -114,28 +114,30 @@
 					offLifecycle();
 				};
 
-				// Timeline-state store rides on the same db + bus; it joins the relock set once
-				// ready. A timeline init failure degrades to profile-only (never blocks the wiring
-				// above).
-				void provisionStore(result.db, (db) =>
-					createTimelineStateStore(db, { onBroadcast: (e) => echo.publish(e) })
+				// Timeline-state store rides on the same db + bus; it joins the relock set the moment
+				// it exists, before its first read decrypts anything. A timeline init failure
+				// degrades to profile-only (never blocks the wiring above).
+				void provisionStore(
+					result.db,
+					(db) => createTimelineStateStore(db, { onBroadcast: (e) => echo.publish(e) }),
+					(timeline) => relockables.push(timeline)
 				)
 					.then((timeline) => {
 						if (destroyed) return;
 						app.timeline = timeline;
-						relockables.push(timeline);
 					})
 					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
 
 				// Calendar-sync store rides on the same db + bus and joins the relock set the same
 				// way; an init failure degrades to calendar-off, never blocking the wiring above.
-				void provisionStore(result.db, (db) =>
-					createCalendarSyncStore(db, { onBroadcast: (e) => echo.publish(e) })
+				void provisionStore(
+					result.db,
+					(db) => createCalendarSyncStore(db, { onBroadcast: (e) => echo.publish(e) }),
+					(calendar) => relockables.push(calendar)
 				)
 					.then((calendar) => {
 						if (destroyed) return;
 						app.calendar = calendar;
-						relockables.push(calendar);
 					})
 					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
 			})

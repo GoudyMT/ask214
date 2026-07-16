@@ -187,4 +187,18 @@ describe('provisionStore', () => {
 		expect(store.load).toHaveBeenCalledTimes(1);
 		expect(result).toBe(store);
 	});
+
+	// load() decrypts. Handing the store over only after it resolves leaves a window where the
+	// plaintext is in memory but the store is in nobody's relock list - so a page hidden during
+	// startup zeroizes every store except the one that just finished reading the user's notes.
+	it('hands the store over before it decrypts, not after', async () => {
+		const order: string[] = [];
+		const store = { load: vi.fn(async () => void order.push('load')) };
+		await provisionStore(
+			fakeDb,
+			() => store,
+			() => order.push('joined the relock set')
+		);
+		expect(order).toEqual(['joined the relock set', 'load']);
+	});
 });

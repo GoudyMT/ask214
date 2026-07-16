@@ -24,6 +24,7 @@
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
 	let clockError = $state<string | null>(null);
+	let eraseError = $state<string | null>(null);
 
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
@@ -138,21 +139,30 @@
 	}
 
 	async function confirmErase(): Promise<void> {
+		eraseError = null;
 		wipeDialog?.close();
-		await eraseEverything({
-			relock: () => app.relockAll?.(),
-			wipeAll: app.wipeAll,
-			// Defensive: the app stores no PII outside IndexedDB, but the erase clears localStorage +
-			// Cache Storage for completeness.
-			clearStorage: () => window.localStorage.clear(),
-			clearCaches: async () => {
-				if (!('caches' in window)) return;
-				const keys = await window.caches.keys();
-				await Promise.all(keys.map((key) => window.caches.delete(key)));
-			},
-			// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
-			reload: () => window.location.reload()
-		});
+		try {
+			await eraseEverything({
+				relock: () => app.relockAll?.(),
+				wipeAll: app.wipeAll,
+				// Defensive: the app stores no PII outside IndexedDB, but the erase clears localStorage +
+				// Cache Storage for completeness.
+				clearStorage: () => window.localStorage.clear(),
+				clearCaches: async () => {
+					if (!('caches' in window)) return;
+					const keys = await window.caches.keys();
+					await Promise.all(keys.map((key) => window.caches.delete(key)));
+				},
+				// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
+				reload: () => window.location.reload()
+			});
+		} catch {
+			// The erase refuses before touching disk unless it can clear every store, and the store
+			// wipe is one transaction - so if we are here, nothing was destroyed. Saying so matters
+			// more than usual: the user asked for their data to be gone and would otherwise walk away
+			// believing it was, because the dialog closed and the screen locked.
+			eraseError = 'Could not erase your data. Nothing was deleted - please try again.';
+		}
 	}
 
 	// Draw attention to the clock reset while the clock is backward: move focus to it + scroll
@@ -179,6 +189,13 @@
 <h1>Settings</h1>
 
 {#if app.status === 'ready'}
+	<!-- Outside the locked/unlocked split on purpose: the erase zeroizes memory before it touches
+	     disk, so by the time it can fail the store is already relocked and this whole page has
+	     swapped to the locked panel. Rendered in the section that raised it, this message would be
+	     unmounted before the user ever saw it. -->
+	{#if eraseError}
+		<p class="erase-error" role="alert">{eraseError}</p>
+	{/if}
 	{#if app.store?.locked}
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else}
@@ -432,6 +449,11 @@
 		margin-top: var(--space-l);
 		padding-top: var(--space-m);
 		border-top: 1px solid var(--color-border);
+	}
+
+	.erase-error {
+		margin: 0 0 var(--space-l);
+		color: var(--color-danger);
 	}
 
 	/* Destructive CTA: danger border + text, never a filled alarm. */
