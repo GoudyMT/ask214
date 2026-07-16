@@ -105,6 +105,7 @@
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,
 					doc: document,
+					isHidden: () => document.visibilityState === 'hidden',
 					createIdleTimer,
 					idleThresholdMs: IDLE_THRESHOLD_MS
 				});

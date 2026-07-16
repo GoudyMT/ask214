@@ -140,7 +140,10 @@ function makeLifecycleHarness() {
 	const win = new EventTarget();
 	const doc = new EventTarget();
 	const idleThresholdMs = 900_000;
-	const install = () => installLifecycle([store], { win, doc, createIdleTimer, idleThresholdMs });
+	let hidden = false;
+	const isHidden = () => hidden;
+	const install = () =>
+		installLifecycle([store], { win, doc, isHidden, createIdleTimer, idleThresholdMs });
 	return {
 		store,
 		timer,
@@ -149,7 +152,10 @@ function makeLifecycleHarness() {
 		doc,
 		idleThresholdMs,
 		install,
-		getOnIdle: () => onIdle
+		getOnIdle: () => onIdle,
+		setHidden: (v: boolean) => {
+			hidden = v;
+		}
 	};
 }
 
@@ -222,6 +228,38 @@ describe('installLifecycle', () => {
 		expect(h.store.refresh).not.toHaveBeenCalled();
 	});
 
+	// The page being hidden is the only relock signal every browser agrees on. freeze is Chromium
+	// only, and an app-switch on iOS may deliver no pagehide at all - so without this, the plaintext
+	// of a backgrounded tab stays in the heap, which is the one thing it must not do.
+	it('relocks as hygiene when the page becomes hidden', () => {
+		const h = makeLifecycleHarness();
+		h.install();
+		h.setHidden(true);
+		h.doc.dispatchEvent(new Event('visibilitychange'));
+		expect(h.store.relockSync).toHaveBeenCalledWith('hygiene');
+	});
+
+	// visibilitychange carries no persisted flag and fires both ways, so becoming visible IS the
+	// restore signal. Without it, a tab switch away and back would relock and never re-read.
+	it('re-reads when the page becomes visible again', () => {
+		const h = makeLifecycleHarness();
+		h.install();
+		h.setHidden(true);
+		h.doc.dispatchEvent(new Event('visibilitychange'));
+		h.setHidden(false);
+		h.doc.dispatchEvent(new Event('visibilitychange'));
+		expect(h.store.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it('stops relocking on visibilitychange after teardown', () => {
+		const h = makeLifecycleHarness();
+		const off = h.install();
+		off();
+		h.setHidden(true);
+		h.doc.dispatchEvent(new Event('visibilitychange'));
+		expect(h.store.relockSync).not.toHaveBeenCalled();
+	});
+
 	it('starts an idle timer at the given threshold whose onIdle locks the store', () => {
 		const h = makeLifecycleHarness();
 		h.install();
@@ -260,6 +298,7 @@ describe('installLifecycle', () => {
 		installLifecycle([a, b], {
 			win,
 			doc: new EventTarget(),
+			isHidden: () => false,
 			createIdleTimer: () => timer,
 			idleThresholdMs: 900_000
 		});
@@ -280,6 +319,7 @@ describe('installLifecycle', () => {
 		installLifecycle([a, b], {
 			win: new EventTarget(),
 			doc: new EventTarget(),
+			isHidden: () => false,
 			createIdleTimer: (opts: IdleTimerOptions) => {
 				onIdle = opts.onIdle;
 				return timer;

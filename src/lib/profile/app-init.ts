@@ -166,10 +166,12 @@ export function relockAll(relockables: Relockable[], reason: RelockReason): void
 }
 
 /** Injected so the whole path is unit-testable; +layout supplies window, document, the real
- * createIdleTimer, and the 15-minute threshold. */
+ * visibility read, createIdleTimer, and the 15-minute threshold. `isHidden` is injected rather than
+ * read off `document` here so the tests can drive this with bare EventTargets. */
 type ProfileLifecycleDeps = {
 	win: EventTarget;
 	doc: EventTarget;
+	isHidden: () => boolean;
 	createIdleTimer: (opts: IdleTimerOptions) => IdleTimer;
 	idleThresholdMs: number;
 };
@@ -182,9 +184,12 @@ type ProfileLifecycleDeps = {
  * relock-syncs the rest. All stores relock together (atomic). Returns a teardown that stops the
  * timer and removes every listener.
  *
- * Both ways out are paired with both ways back, because they do not come in matched sets: a
- * browser freezing a quiet background tab dispatches freeze and resume with no navigation at all,
- * while a Firefox or Safari page hide dispatches pagehide and never freeze.
+ * Every way out is paired with every way back, because they do not come in matched sets: a browser
+ * freezing a quiet background tab dispatches freeze and resume with no navigation at all, a Firefox
+ * or Safari page hide dispatches pagehide and never freeze, and an app-switch may deliver only
+ * visibilitychange. Each way back asks the stores to re-read and each store answers from its own
+ * state, so firing more than one of them is a no-op rather than a conflict - which is deliberate,
+ * because their relative order is not consistent across browsers.
  */
 export function installLifecycle(
 	relockables: Relockable[],
@@ -215,12 +220,21 @@ export function installLifecycle(
 	// `resume` is a frozen tab waking up - no navigation, no `persisted` flag, and on the browsers
 	// that freeze quiet background tabs it is the ONLY way back from the freeze that relocked us.
 	const onResume = (): void => restore();
+	// The page becoming hidden is the one signal every browser fires, and on the platforms that
+	// suspend a backgrounded page it is the last moment code runs at all - so it is the last chance
+	// to get the plaintext out of the heap. It fires both ways and carries no flag to gate on, so
+	// becoming visible is simply the way back.
+	const onVisibility = (): void => {
+		if (deps.isHidden()) onHide();
+		else restore();
+	};
 	const onActivity = (): void => idle.recordActivity();
 
 	deps.win.addEventListener('pagehide', onHide);
 	deps.doc.addEventListener('freeze', onHide);
 	deps.win.addEventListener('pageshow', onShow);
 	deps.doc.addEventListener('resume', onResume);
+	deps.doc.addEventListener('visibilitychange', onVisibility);
 	for (const ev of ACTIVITY_EVENTS) {
 		deps.win.addEventListener(ev, onActivity, { passive: true });
 	}
@@ -232,6 +246,7 @@ export function installLifecycle(
 		deps.doc.removeEventListener('freeze', onHide);
 		deps.win.removeEventListener('pageshow', onShow);
 		deps.doc.removeEventListener('resume', onResume);
+		deps.doc.removeEventListener('visibilitychange', onVisibility);
 		for (const ev of ACTIVITY_EVENTS) {
 			deps.win.removeEventListener(ev, onActivity);
 		}
