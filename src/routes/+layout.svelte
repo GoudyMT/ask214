@@ -13,6 +13,7 @@
 		subscribeBus,
 		installLifecycle,
 		createRelockEcho,
+		relockAll,
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
@@ -46,7 +47,8 @@
 		timeline: null,
 		calendar: null,
 		cause: null,
-		wipeAll: null
+		wipeAll: null,
+		relockAll: null
 	});
 	setProfileApp(app);
 
@@ -89,6 +91,9 @@
 				// mutable, so the timeline store joins it once provisioned (installLifecycle + the
 				// relocked handler read the list at event time).
 				const relockables: Relockable[] = [result.store];
+				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
+				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
+				app.relockAll = () => relockAll(relockables);
 				const offBus = subscribeBus(bus, {
 					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync())),
 					'profile-updated': () => void result.store.load(),

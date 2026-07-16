@@ -22,12 +22,21 @@ export type EraseDeps = {
  * Refuses outright when `wipeAll` is unavailable rather than erasing the layers it can reach: a
  * partial erase strands encrypted rows under a keystore epoch nothing can verify again, and the only
  * recovery is the erase itself.
+ *
+ * The reload is guaranteed ONCE THE STORES ARE GONE, but not before. Those two halves are different
+ * promises: past `wipeAll` the page is displaying a profile that no longer exists - it still believes
+ * a record is on disk, so it offers an Unlock that can never succeed - and only a reload reaches a
+ * clean first-run. Before `wipeAll` succeeds the data may still be there, and reloading would report
+ * success for a destructive operation that never happened.
  */
 export async function eraseEverything(deps: EraseDeps): Promise<void> {
 	if (!deps.wipeAll) return;
 	deps.relock();
 	await deps.wipeAll();
-	deps.clearStorage();
-	await deps.clearCaches();
-	deps.reload();
+	try {
+		deps.clearStorage();
+		await deps.clearCaches();
+	} finally {
+		deps.reload();
+	}
 }

@@ -25,6 +25,12 @@ export type ProfileApp = {
 	 * outlive the wipe and then block their own recovery. Null until app-init resolves.
 	 */
 	wipeAll: (() => Promise<void>) | null;
+	/**
+	 * Relock every provisioned store. Use this for ANY "lock" or "erase" - never relock stores
+	 * one by one at a call site: a per-site list drifts, and decrypted PII is left behind silently.
+	 * Null until app-init resolves.
+	 */
+	relockAll: (() => void) | null;
 };
 
 const KEY = Symbol('mtc-profile-app');

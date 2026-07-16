@@ -104,8 +104,10 @@
 		}
 	}
 
-	async function lock(): Promise<void> {
-		await app.store?.lock();
+	function lock(): void {
+		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
+		// leaving them in memory is precisely what this button exists to prevent.
+		app.relockAll?.();
 	}
 
 	async function unlock(): Promise<void> {
@@ -138,7 +140,7 @@
 	async function confirmErase(): Promise<void> {
 		wipeDialog?.close();
 		await eraseEverything({
-			relock: () => app.store?.relockSync(),
+			relock: () => app.relockAll?.(),
 			wipeAll: app.wipeAll,
 			// Defensive: the app stores no PII outside IndexedDB, but the erase clears localStorage +
 			// Cache Storage for completeness.
@@ -232,7 +234,7 @@
 
 		<section class="settings-section" aria-labelledby="privacy-heading">
 			<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-			<button class="settings-lock" type="button" onclick={() => void lock()}>Lock</button>
+			<button class="settings-lock" type="button" onclick={lock}>Lock</button>
 			<p class="settings-hint">
 				Clears your profile from this screen. Use Unlock to view it again.
 			</p>

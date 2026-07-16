@@ -23,7 +23,7 @@ describe('eraseEverything', () => {
 		expect(deps.order.indexOf('relock')).toBeLessThan(deps.order.indexOf('wipeAll'));
 	});
 
-	it('still zeroizes when the erase throws partway and the reload is never reached', async () => {
+	it('still zeroizes when a later step throws', async () => {
 		const deps = makeDeps({
 			clearCaches: vi.fn(async () => {
 				throw new Error('cache deletion failed');
@@ -35,7 +35,37 @@ describe('eraseEverything', () => {
 		// The exact regression this guards: with the zeroize riding on the reload, a throw here left
 		// the decrypted profile and any typed input resident on a page whose database was already gone.
 		expect(deps.relock).toHaveBeenCalledOnce();
+	});
+
+	it('reloads anyway once the stores are gone, even if a later layer fails', async () => {
+		const deps = makeDeps({
+			clearCaches: vi.fn(async () => {
+				throw new Error('cache deletion failed');
+			})
+		});
+
+		await expect(eraseEverything(deps)).rejects.toThrow('cache deletion failed');
+
+		// The stores are already cleared, so the page is showing a profile that no longer exists:
+		// hasProfile stays true, `locked` stays true, and Unlock is dead because load() finds no
+		// keystore. Reloading is the only path back to a clean first-run - it must not ride on the
+		// success of a lower-value layer like Cache Storage.
+		expect(deps.reload).toHaveBeenCalledOnce();
+	});
+
+	it('does NOT reload when the store wipe itself failed - the data may still be there', async () => {
+		const deps = makeDeps({
+			wipeAll: vi.fn(async () => {
+				throw new Error('transaction aborted');
+			})
+		});
+
+		await expect(eraseEverything(deps)).rejects.toThrow('transaction aborted');
+
+		// Reloading here would show a clean first-run screen over data that was never erased -
+		// reporting success for a destructive operation that did not happen.
 		expect(deps.reload).not.toHaveBeenCalled();
+		expect(deps.clearStorage).not.toHaveBeenCalled();
 	});
 
 	it('erases every layer, then reloads', async () => {

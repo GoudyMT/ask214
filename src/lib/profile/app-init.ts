@@ -129,6 +129,32 @@ export type Relockable = {
 	lock?: () => Promise<void>;
 };
 
+/**
+ * Relock EVERY store in one pass - the single definition of "relock everything".
+ *
+ * The idle timer, the Settings Lock button, and the erase all walk this one list. Two of those used
+ * to enumerate their own set, and both enumerated only the profile: the timeline's decrypted
+ * free-text task notes stayed resident in memory through a lock and through an erase. A relock set
+ * that lives in more than one place drifts, and the drift is invisible because nothing fails.
+ *
+ * The profile defers via lock() so an in-flight encrypt/write is never interrupted; stores without
+ * one drop their reference synchronously. Each store is isolated: one throwing must not strand PII
+ * in every store after it in the list.
+ *
+ * NOT for the cross-tab bus handler - that path must stay fully synchronous inside the relock echo's
+ * answer() frame, so it calls relockSync directly.
+ */
+export function relockAll(relockables: Relockable[]): void {
+	for (const r of relockables) {
+		try {
+			if (r.lock) void r.lock();
+			else r.relockSync();
+		} catch {
+			/* isolated: the next store's PII still gets zeroized */
+		}
+	}
+}
+
 /** Injected so the whole path is unit-testable; +layout supplies window, document, the real
  * createIdleTimer, and the 15-minute threshold. */
 type ProfileLifecycleDeps = {
@@ -152,12 +178,7 @@ export function installLifecycle(
 ): () => void {
 	const idle = deps.createIdleTimer({
 		thresholdMs: deps.idleThresholdMs,
-		onIdle: () => {
-			for (const r of relockables) {
-				if (r.lock) void r.lock();
-				else r.relockSync();
-			}
-		}
+		onIdle: () => relockAll(relockables)
 	});
 
 	const onHide = (): void => {

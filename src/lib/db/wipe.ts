@@ -1,4 +1,5 @@
 import { STORES, withStores } from './schema';
+import { rotateOrUpgrade } from './locks';
 
 /**
  * Erase every registered store in ONE transaction.
@@ -11,9 +12,16 @@ import { STORES, withStores } from './schema';
  *
  * One transaction so the keystore cannot die while another store's rows survive it - a partial erase
  * strands exactly the same orphan.
+ *
+ * Held under the EXCLUSIVE keystore lock, not merely one transaction. A save holds that lock SHARED
+ * across its whole encrypt-then-write, and its IDB write lands at the END: an unlocked erase clears
+ * first and the save then resurrects its row into a database the user was told was empty. Excluding
+ * normal writes makes the erase the last writer, which is the only ordering that can be total.
  */
 export function wipeAllStores(db: IDBDatabase): Promise<void> {
-	return withStores(db, [...STORES], 'readwrite', (tx) => {
-		for (const store of STORES) tx.objectStore(store).clear();
-	});
+	return rotateOrUpgrade(() =>
+		withStores(db, [...STORES], 'readwrite', (tx) => {
+			for (const store of STORES) tx.objectStore(store).clear();
+		})
+	);
 }

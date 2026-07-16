@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { initProfileApp, provisionStore, createRelockEcho } from './app-init';
+import { initProfileApp, provisionStore, createRelockEcho, relockAll } from './app-init';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import type { BusSignal, ProfileBus } from '../broadcast/bus';
 
@@ -13,6 +13,52 @@ function recordingBus(): { bus: ProfileBus; sent: BusSignal[] } {
 		bus: { publish: (s) => sent.push(s), subscribe: () => () => {}, close: () => {} }
 	};
 }
+
+describe('relockAll', () => {
+	const profileLike = () => ({
+		relockSync: vi.fn(),
+		load: vi.fn().mockResolvedValue(null),
+		lock: vi.fn().mockResolvedValue(undefined)
+	});
+	const secondaryLike = () => ({ relockSync: vi.fn(), load: vi.fn().mockResolvedValue(null) });
+
+	it('relocks EVERY store, not just the first', () => {
+		// The regression this exists to prevent: the erase and the Settings Lock each enumerated their
+		// own relock set and both enumerated only the profile, leaving the timeline's decrypted
+		// free-text notes resident in memory. There is one list; this is the only way to walk it.
+		const profile = profileLike();
+		const timeline = secondaryLike();
+		const calendar = secondaryLike();
+
+		relockAll([profile, timeline, calendar]);
+
+		expect(profile.lock).toHaveBeenCalledOnce();
+		expect(timeline.relockSync).toHaveBeenCalledOnce();
+		expect(calendar.relockSync).toHaveBeenCalledOnce();
+	});
+
+	it('prefers lock() where a store has one, so an in-flight save is not interrupted', () => {
+		const profile = profileLike();
+		relockAll([profile]);
+		// The profile defers its relock past an in-flight encrypt/write; the secondaries have no save
+		// to interrupt and drop synchronously.
+		expect(profile.lock).toHaveBeenCalledOnce();
+		expect(profile.relockSync).not.toHaveBeenCalled();
+	});
+
+	it('relocks the remaining stores even when one throws', () => {
+		const boom = {
+			relockSync: vi.fn(() => {
+				throw new Error('relock blew up');
+			}),
+			load: vi.fn()
+		};
+		const after = secondaryLike();
+		// A store failing to relock must not strand PII in every store after it in the list.
+		expect(() => relockAll([boom, after])).not.toThrow();
+		expect(after.relockSync).toHaveBeenCalledOnce();
+	});
+});
 
 describe('createRelockEcho', () => {
 	it('publishes a locally-initiated relock', () => {

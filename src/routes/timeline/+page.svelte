@@ -57,10 +57,12 @@
 		try {
 			await store.load();
 			// The secondary stores relock alongside the profile on idle/pagehide but are not part of
-			// the profile's load. Without this they stay unloaded behind an unlocked UI, and their
-			// empty defaults would read as real state - exporting excluded tasks and clobbering the
-			// record on the next write. allSettled: a secondary failure must not block the unlock;
-			// its store simply stays not-ready, which the UI fails closed on.
+			// the profile's load. Without this they stay unloaded behind an unlocked UI and their empty
+			// defaults read as real state. allSettled: a secondary failure must not block the unlock.
+			// The calendar then fails closed on `ready`; the TIMELINE DOES NOT - it has no ready gate,
+			// so a failed load here renders an empty timeline as though nothing were done. The store
+			// refuses the write, so nothing is destroyed, but the user is shown a blank slate with no
+			// explanation. Surfacing that is deferred to the v1.1 init-error work.
 			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
 		} finally {
 			unlocking = false;
