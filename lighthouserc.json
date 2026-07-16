@@ -3,8 +3,11 @@
 		"collect": {
 			"startServerCommand": "pnpm run preview",
 			"startServerReadyPattern": "Local:",
-			"url": ["http://localhost:4173/", "http://localhost:4173/about"],
-			"numberOfRuns": 1
+			"url": ["https://localhost:4173/", "https://localhost:4173/about"],
+			"numberOfRuns": 1,
+			"settings": {
+				"chromeFlags": "--ignore-certificate-errors"
+			}
 		},
 		"assert": {
 			"assertions": {

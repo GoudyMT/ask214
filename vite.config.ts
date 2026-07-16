@@ -1,9 +1,16 @@
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
+	// sends `upgrade-insecure-requests` and browsers that honour it rewrite every asset URL to https.
+	// Over plain HTTP that yields a page with no stylesheet at all - which is not a product bug (in
+	// production the directive is a no-op, the origin is already HTTPS) but does make the E2E suite
+	// unable to test the app as it actually ships. The cert is generated on demand and never written
+	// to the repo; a checked-in private key is a liability that protects nothing.
+	plugins: [sveltekit(), basicSsl()],
 	test: {
 		expect: { requireAssertions: true },
 		passWithNoTests: true,

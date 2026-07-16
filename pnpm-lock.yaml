@@ -44,6 +44,9 @@ importers:
       '@types/node':
         specifier: ^26
         version: 26.1.0
+      '@vitejs/plugin-basic-ssl':
+        specifier: ^2.3.0
+        version: 2.3.0(vite@8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))
       '@vitest/browser-playwright':
         specifier: ^4.1.8
         version: 4.1.9(playwright@1.61.1)(vite@8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.9)
@@ -1177,6 +1180,12 @@ packages:
   '@typescript-eslint/visitor-keys@8.63.0':
     resolution: {integrity: sha512-UexrHGnGTpbuQHct2ExOc2ZcFbGUS9FOesCxxqdBGcpI1BxYu/LZ6U8Aq6/72XtF/qRBk9nhuGHFJIXXMhPMdw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@vitejs/plugin-basic-ssl@2.3.0':
+    resolution: {integrity: sha512-bdyo8rB3NnQbikdMpHaML9Z1OZPBu6fFOBo+OtxsBlvMJtysWskmBcnbIDhUqgC8tcxNv/a+BcV5U+2nQMm1OQ==}
+    engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
+    peerDependencies:
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
 
   '@vitest/browser-playwright@4.1.9':
     resolution: {integrity: sha512-Bq1rOGf9waevzG3EOkO/dene6bvKTUsZMVg8S1i+WH3JcMjuXEjiahP9rAqZRELUqjBySOJsvvSWqK/B3wjKQw==}
@@ -4185,6 +4194,10 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 8.63.0
       eslint-visitor-keys: 5.0.1
+
+  '@vitejs/plugin-basic-ssl@2.3.0(vite@8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))':
+    dependencies:
+      vite: 8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0)
 
   '@vitest/browser-playwright@4.1.9(playwright@1.61.1)(vite@8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.9)':
     dependencies:
