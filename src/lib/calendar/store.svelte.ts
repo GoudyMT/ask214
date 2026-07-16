@@ -171,7 +171,13 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 			return _state?.card ?? {};
 		},
 
+		/**
+		 * Re-read from disk. A relock landing WHILE this runs wins: repopulating decrypted state into
+		 * a tab that has since locked silently undoes the lock, and the idle timer does not fire twice.
+		 * Same residency guard persist() carries.
+		 */
 		async load(): Promise<void> {
+			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
 			await withWriteLocks(
 				async () => {
@@ -184,14 +190,17 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 					const gen = await readCurrentGeneration(keystore);
 					_generation = gen;
 					if (gen === 0) {
-						_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
+						if (relockEpoch === relockAtStart) {
+							_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
+						}
 						return;
 					}
 					const row = await getRow<StateRow>(db, 'calendar-sync');
 					if (!row) throw new Error('E_CALENDAR_BODY_MISSING');
-					_state = decodeCalendarSyncState(
+					const decoded = decodeCalendarSyncState(
 						await decryptRecord(CALENDAR_CTX, row.rec, keystore, gen)
 					);
+					if (relockEpoch === relockAtStart) _state = decoded;
 				}
 			);
 		},

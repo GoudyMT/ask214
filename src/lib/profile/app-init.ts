@@ -100,6 +100,24 @@ export function createRelockEcho(bus: ProfileBus): {
 }
 
 /**
+ * Guards the cross-tab re-read against un-relocking a locked tab.
+ *
+ * A `*-updated` signal means a peer changed the record, so re-read it. But an unconditional re-read
+ * DECRYPTS: a peer tab's ordinary save would pull a locked tab's profile and task notes back into
+ * memory and onto the screen, silently undoing the lock. Worse, the idle timer that locked it has
+ * already fired and is not rescheduled, so the tab stays unlocked indefinitely.
+ *
+ * A locked tab loses nothing by staying locked - every unlock path re-reads all stores, so it picks
+ * up the peer's change the moment the user actually asks for it.
+ */
+export function createPeerReload(isLocked: () => boolean) {
+	return (load: () => Promise<unknown> | undefined): void => {
+		if (isLocked()) return;
+		void load();
+	};
+}
+
+/**
  * Wire a cross-tab bus to a handler map: each incoming signal invokes `handlers[signal.type]`
  * if present. The +layout maps `relocked` to relock-all and each `*-updated` to that store's
  * load (load is itself fail-closed + verified, so a spoofed same-origin signal can at worst

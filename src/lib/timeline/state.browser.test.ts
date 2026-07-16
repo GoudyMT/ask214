@@ -125,6 +125,27 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	it('a relock landing during a load is not undone when that load finishes', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+		a.relockSync();
+
+		// The user taps Unlock, then immediately taps Lock (or a peer tab's change triggers a re-read
+		// and the idle timer fires mid-decrypt). The load must not repopulate decrypted state into a
+		// tab that has since relocked - save()/persist() already guard this; load() must too, or the
+		// relock is silently undone and the idle timer will not fire again.
+		const inflight = a.load();
+		a.relockSync();
+		await inflight;
+
+		expect(a.state.tasks).toEqual({});
+		await deleteTestDb(db);
+	});
+
 	it('wipe clears the timeline state', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);

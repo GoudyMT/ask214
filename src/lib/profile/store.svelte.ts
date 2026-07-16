@@ -156,7 +156,13 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			}
 		},
 
+		/**
+		 * Re-read + decrypt from disk (this IS the unlock). A relock landing WHILE this runs wins:
+		 * repopulating decrypted state into a tab that has since locked silently undoes the lock, and
+		 * the idle timer does not fire twice. Same residency guard save() carries.
+		 */
 		async load(): Promise<ProfileV1 | null> {
+			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
 			return withWriteLocks(
 				async () => {
@@ -196,8 +202,17 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					// Read + decrypt the body, binding decrypt to the authoritative HWM generation.
 					const profRow = await getRow<ProfileRow>(db, 'profile');
 					if (!profRow) throw new Error('E_PROFILE_BODY_MISSING');
-					_profile = await decryptProfileRecord(profRow.rec, keystore, hwm.generation);
+					const decrypted = await decryptProfileRecord(profRow.rec, keystore, hwm.generation);
+					// A record exists on disk either way - that is what `locked` reads to tell "locked"
+					// apart from "never set up", and it must stay true through a relock.
 					hasProfile = true;
+					if (relockEpoch !== relockAtStart) {
+						// A relock landed while this was decrypting. Do not repopulate - and do not hand
+						// the plaintext we just produced to the garbage collector.
+						freezeRelock(decrypted as unknown as Record<string, unknown>);
+						return null;
+					}
+					_profile = decrypted;
 					return _profile;
 				}
 			);

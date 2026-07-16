@@ -187,7 +187,13 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return _state ?? EMPTY_STATE;
 		},
 
+		/**
+		 * Re-read from disk. A relock landing WHILE this runs wins: repopulating decrypted state into
+		 * a tab that has since locked silently undoes the lock, and the idle timer does not fire twice.
+		 * Same residency guard persist() carries.
+		 */
 		async load(): Promise<void> {
+			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
 			await withWriteLocks(
 				async () => {
@@ -200,12 +206,15 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					const gen = await readCurrentGeneration(keystore);
 					_generation = gen;
 					if (gen === 0) {
-						_state = { schemaVersion: 1, tasks: {} };
+						if (relockEpoch === relockAtStart) _state = { schemaVersion: 1, tasks: {} };
 						return;
 					}
 					const row = await getRow<StateRow>(db, 'timeline-state');
 					if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
-					_state = decodeTimelineState(await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen));
+					const decoded = decodeTimelineState(
+						await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
+					);
+					if (relockEpoch === relockAtStart) _state = decoded;
 				}
 			);
 		},
