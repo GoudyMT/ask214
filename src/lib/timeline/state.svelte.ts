@@ -168,6 +168,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 				_generation = nextGen;
 				// Residency guard: a relockSync() during this save must not be undone by
 				// re-populating decrypted state (the IDB write already persisted the edit).
+				// No lockState update belongs here: the relocked check above means a write only ever
+				// runs on a store load() already opened.
 				if (relockEpoch === relockAtStart) _state = next;
 			}
 		);

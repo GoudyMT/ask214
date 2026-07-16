@@ -229,7 +229,11 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					if (hwm.generation === 0) {
 						_profile = null;
 						hasProfile = false;
-						lockState = 'unlocked';
+						// Report the store open only if no relock landed while this was in flight. There
+						// is no profile here to leave resident, which is exactly why this branch is easy
+						// to get wrong: walking the relock back costs nothing visible now, and leaves the
+						// tab willing to decrypt whatever a peer writes next.
+						if (relockEpoch === relockAtStart) lockState = 'unlocked';
 						return null;
 					}
 
@@ -364,9 +368,13 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						// Commit the rune INSIDE the lock (concurrent tabs are blocked) - but ONLY if
 						// no relock happened during this save. A sync relockSync() (pagehide/freeze)
 						// mid-save must not be undone by re-populating decrypted PII; the IDB write
-						// above still persisted, so the user's edit is not lost (L1 residency guard).
+						// above still persisted, so the user's edit is not lost.
 						if (relockEpoch === relockAtStart) {
 							_profile = next;
+							// The plaintext is resident again, so say so. A save re-opens the store just
+							// as a load does, and a store that does not admit it sits holding the profile
+							// while refusing every automatic re-read.
+							lockState = 'unlocked';
 						}
 						return { generation: nextGen };
 					}

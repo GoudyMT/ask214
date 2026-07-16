@@ -227,6 +227,18 @@ describe('ProfileStore.relockSync', () => {
 		store.relockSync('user');
 		if (eaosRef) expect(eaosRef.every((b) => b === 0)).toBe(true);
 	});
+
+	// A save puts the profile back in memory just as surely as a load does. If it does not say so,
+	// the store sits holding plaintext while refusing every automatic re-read - so a peer's change
+	// never lands in a tab that is plainly open.
+	it('saving after a relock leaves the store re-readable, because the plaintext is back', async () => {
+		const store = createProfileStore(db);
+		store.relockSync('user');
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+
+		expect(store._getStateForTest()).not.toBeNull();
+		await expect(store.refresh()).resolves.not.toBeNull();
+	});
 });
 
 describe('ProfileStore.lock + deferred relock', () => {
@@ -331,9 +343,28 @@ describe('ProfileStore.clockBackward', () => {
 	});
 });
 
-describe('ProfileStore relock-vs-save race (L1)', () => {
+describe('ProfileStore relock-vs-save race', () => {
 	beforeEach(async () => {
 		await bootstrapLocalKeystore(db);
+	});
+
+	// The first-run branch of load() - keystore present, no profile written yet - resets the store to
+	// open like any other successful read. But on a first-run tab that is the one branch a relock is
+	// most likely to race: there is no profile to show, so nothing looks wrong, and the tab is left
+	// willing to decrypt whatever a peer writes next.
+	it('a relock during a first-run load is not undone by the empty-profile branch', async () => {
+		const peer = createProfileStore(db);
+		const tab = createProfileStore(db);
+
+		const inflight = tab.load();
+		tab.relockSync('user');
+		await inflight;
+
+		// The peer finishes setup. Our tab relocked, so it must not decrypt what the peer wrote.
+		await peer.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		await tab.refresh();
+
+		expect(tab._getStateForTest()).toBeNull();
 	});
 
 	it('a sync relock during an in-flight save does NOT re-populate _profile (PII residency)', async () => {
