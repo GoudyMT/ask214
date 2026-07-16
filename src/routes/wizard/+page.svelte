@@ -56,9 +56,11 @@
 			await goto(resolve('/'));
 		} catch (err) {
 			if (err instanceof OccConflictError) {
-				// Another tab set up the profile first. Reload the authoritative state and ask
-				// the user to review + retry (OCC: reload, don't clobber).
-				await store.load();
+				// Another tab set up the profile first. Re-read the authoritative state and ask
+				// the user to review + retry (OCC: reload, don't clobber). refresh, not load: the
+				// user asked to SAVE, not to unlock, so if the write lost its race to a relock this
+				// must not re-open the store.
+				await store.refresh();
 				error = 'This was changed in another tab. We reloaded it - please review and save again.';
 				return;
 			}

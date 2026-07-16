@@ -93,9 +93,10 @@
 			editing = false;
 		} catch (err) {
 			if (err instanceof OccConflictError) {
-				// Reload authoritative state; stay in edit mode so the message + input stay visible
-				// (OCC: reload, don't clobber).
-				await store.load();
+				// Re-read authoritative state; stay in edit mode so the message + input stay visible
+				// (OCC: reload, don't clobber). refresh, not load: the user asked to SAVE, not to
+				// unlock, so if the write lost its race to a relock this must not re-open the store.
+				await store.refresh();
 				error = 'This was changed in another tab. We reloaded it - please review and save again.';
 				return;
 			}
