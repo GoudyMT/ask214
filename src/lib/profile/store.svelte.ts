@@ -378,6 +378,12 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							// as a load does, and a store that does not admit it sits holding the profile
 							// while refusing every automatic re-read.
 							lockState = 'unlocked';
+						} else {
+							// A relock landed mid-save, so this record is not going into memory - but its
+							// byte fields are the deep copies made above, which the relock's zeroize could
+							// not reach. Dropping it here would hand the garbage collector the same
+							// plaintext the relock just scrubbed out of _profile.
+							freezeRelock(next as unknown as Record<string, unknown>);
 						}
 						return { generation: nextGen };
 					}
