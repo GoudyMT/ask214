@@ -4,6 +4,7 @@ import { encodeCalendarSyncState, decodeCalendarSyncState } from './codec';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
+import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
 import {
 	KeystoreNotInitializedError,
 	KeystoreHmacMismatchError,
@@ -65,15 +66,14 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 	let _state = $state<CalendarSyncState | null>(null);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
-	// Whether this store has relocked with no user-initiated load since. State cannot answer this:
-	// `_state === null` says the record is not in memory, never WHY - and the two reasons demand
-	// opposite answers from a re-read. See refresh().
-	let relockedSinceLoad = false;
+	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
+	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
+	let lockState: LockState = 'unlocked';
 
-	function relockNow(): void {
+	function relockNow(reason: RelockReason): void {
 		_state = null;
 		relockEpoch++;
-		relockedSinceLoad = true;
+		lockState = nextLockState(lockState, reason);
 		opts.onBroadcast?.({ type: 'relocked' });
 	}
 
@@ -197,7 +197,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 					if (gen === 0) {
 						if (relockEpoch === relockAtStart) {
 							_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
-							relockedSinceLoad = false;
+							lockState = 'unlocked';
 						}
 						return;
 					}
@@ -208,22 +208,23 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 					);
 					if (relockEpoch === relockAtStart) {
 						_state = decoded;
-						relockedSinceLoad = false;
+						lockState = 'unlocked';
 					}
 				}
 			);
 		},
 
 		/**
-		 * AUTOMATIC re-read: a peer tab's change, a BFCache restore, recovery from a failed write.
-		 * Refuses once this store has relocked - none of those is the user asking to unlock, and a
-		 * re-read DECRYPTS. Nothing is lost: every unlock path calls load().
+		 * AUTOMATIC re-read: a peer tab's change, a page restore, recovery from a failed write. It
+		 * DECRYPTS, so it answers to how the plaintext went away, not to whether it is gone.
 		 *
-		 * The split is the point. `load()` means "the user asked"; `refresh()` means "something
-		 * changed". Give an automatic caller load() and it silently un-relocks the tab.
+		 * Refuses only a `locked` store - the user asked, or their presence lapsed, and re-reading
+		 * would reverse that. An `evicted` store lost its plaintext to page hygiene on the way out
+		 * and the page has come back, so the re-read is the undo it is owed. An unlocked store
+		 * re-reads so a peer's change still lands.
 		 */
 		refresh(): Promise<void> {
-			if (relockedSinceLoad) return Promise.resolve();
+			if (lockState === 'locked') return Promise.resolve();
 			return api.load();
 		},
 
@@ -241,8 +242,8 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		},
 
 		/** Sync relock for the pagehide/freeze handlers (wired at app-init) - drop the reference. */
-		relockSync(): void {
-			relockNow();
+		relockSync(reason: RelockReason): void {
+			relockNow(reason);
 		},
 
 		/** Clear the calendar-sync + HWM (the keystore is owned by the profile wipe). */
@@ -252,7 +253,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 				tx.objectStore('calendar-sync-hwm').clear();
 			});
 			_generation = 0;
-			relockNow();
+			relockNow('user');
 		}
 	};
 

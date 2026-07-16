@@ -3,6 +3,7 @@ import { encodeTimelineState, decodeTimelineState } from './state-codec';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
+import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
 import {
 	KeystoreNotInitializedError,
 	KeystoreHmacMismatchError,
@@ -82,15 +83,14 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	let _state = $state<TimelineState | null>(null);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
-	// Whether this store has relocked with no user-initiated load since. State cannot answer this:
-	// `_state === null` says the record is not in memory, never WHY - and the two reasons demand
-	// opposite answers from a re-read. See refresh().
-	let relockedSinceLoad = false;
+	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
+	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
+	let lockState: LockState = 'unlocked';
 
-	function relockNow(): void {
+	function relockNow(reason: RelockReason): void {
 		_state = null;
 		relockEpoch++;
-		relockedSinceLoad = true;
+		lockState = nextLockState(lockState, reason);
 		opts.onBroadcast?.({ type: 'relocked' });
 	}
 
@@ -213,7 +213,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					if (gen === 0) {
 						if (relockEpoch === relockAtStart) {
 							_state = { schemaVersion: 1, tasks: {} };
-							relockedSinceLoad = false;
+							lockState = 'unlocked';
 						}
 						return;
 					}
@@ -224,23 +224,23 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					);
 					if (relockEpoch === relockAtStart) {
 						_state = decoded;
-						relockedSinceLoad = false;
+						lockState = 'unlocked';
 					}
 				}
 			);
 		},
 
 		/**
-		 * AUTOMATIC re-read: a peer tab's change, a BFCache restore, recovery from a failed write.
-		 * Refuses once this store has relocked, because none of those is the user asking to unlock and
-		 * a re-read DECRYPTS - it would put the user's task notes back in memory, and on screen, in a
-		 * tab that locked itself. Nothing is lost by refusing: every unlock path calls load().
+		 * AUTOMATIC re-read: a peer tab's change, a page restore, recovery from a failed write. It
+		 * DECRYPTS, so it answers to how the plaintext went away, not to whether it is gone.
 		 *
-		 * The split is the point. `load()` means "the user asked"; `refresh()` means "something
-		 * changed". Give an automatic caller load() and it silently un-relocks the tab.
+		 * Refuses only a `locked` store - putting the user's task notes back in memory, and on
+		 * screen, in a tab that locked itself is precisely what it must not do. An `evicted` store
+		 * lost its plaintext to page hygiene on the way out and the page has come back, so the
+		 * re-read is the undo it is owed. An unlocked store re-reads so a peer's change still lands.
 		 */
 		refresh(): Promise<void> {
-			if (relockedSinceLoad) return Promise.resolve();
+			if (lockState === 'locked') return Promise.resolve();
 			return api.load();
 		},
 
@@ -260,8 +260,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		},
 
 		/** Sync relock for the pagehide/freeze handlers (wired at app-init) - drop the reference. */
-		relockSync(): void {
-			relockNow();
+		relockSync(reason: RelockReason): void {
+			relockNow(reason);
 		},
 
 		/** Clear the timeline-state + HWM (the keystore is owned by the profile wipe). */
@@ -271,7 +271,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 				tx.objectStore('timeline-state-hwm').clear();
 			});
 			_generation = 0;
-			relockNow();
+			relockNow('user');
 		}
 	};
 

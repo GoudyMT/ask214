@@ -213,7 +213,7 @@ describe('ProfileStore.relockSync', () => {
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
 		expect(store._getStateForTest()).not.toBeNull();
 
-		const r = store.relockSync();
+		const r = store.relockSync('user');
 		expect(r).toBeUndefined(); // synchronous void return
 		expect(store._getStateForTest()).toBeNull();
 		expect(events).toContain('relocked');
@@ -224,7 +224,7 @@ describe('ProfileStore.relockSync', () => {
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
 		const eaosRef = store._getStateForTest()?.eaos ?? null;
 		expect(eaosRef).not.toBeNull();
-		store.relockSync();
+		store.relockSync('user');
 		if (eaosRef) expect(eaosRef.every((b) => b === 0)).toBe(true);
 	});
 });
@@ -238,7 +238,7 @@ describe('ProfileStore.lock + deferred relock', () => {
 		const events: string[] = [];
 		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		await store.lock();
+		await store.lock('user');
 		expect(store._getStateForTest()).toBeNull();
 		expect(events).toContain('relocked');
 	});
@@ -247,7 +247,7 @@ describe('ProfileStore.lock + deferred relock', () => {
 		const events: string[] = [];
 		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
 		const savePromise = store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		const lockPromise = store.lock(); // requested while the save is still in flight
+		const lockPromise = store.lock('user'); // requested while the save is still in flight
 		await Promise.all([savePromise, lockPromise]);
 
 		// the save committed (gen 1 persisted) BEFORE the deferred relock ran
@@ -341,7 +341,7 @@ describe('ProfileStore relock-vs-save race (L1)', () => {
 		// Start a save, then synchronously relock while it is mid-flight (simulates a
 		// pagehide/freeze handler firing during the save's await).
 		const p = store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		store.relockSync();
+		store.relockSync('hygiene');
 		await p;
 		// Memory must stay relocked - the resuming save must not re-populate decrypted PII.
 		expect(store._getStateForTest()).toBeNull();
@@ -402,14 +402,14 @@ describe('ProfileStore.locked', () => {
 	it('is true after relock when a profile exists in storage', async () => {
 		const store = createProfileStore(db);
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		store.relockSync();
+		store.relockSync('user');
 		expect(store.locked).toBe(true);
 	});
 
 	it('is false again after unlock (reload)', async () => {
 		const store = createProfileStore(db);
 		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
-		store.relockSync();
+		store.relockSync('user');
 		expect(store.locked).toBe(true);
 		await store.load();
 		expect(store.locked).toBe(false);
@@ -458,7 +458,7 @@ describe('ProfileStore relock DOM scrub', () => {
 			// Never loaded -> _profile is null (first-run wizard, where a typed EAOS lives only in
 			// the DOM input). A pagehide/freeze relock must still clear it.
 			const store = createProfileStore(db);
-			store.relockSync();
+			store.relockSync('hygiene');
 			expect(input.value).toBe('');
 		} finally {
 			unregister();

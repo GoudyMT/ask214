@@ -30,16 +30,29 @@ describe('relockAll', () => {
 		const timeline = secondaryLike();
 		const calendar = secondaryLike();
 
-		relockAll([profile, timeline, calendar]);
+		relockAll([profile, timeline, calendar], 'user');
 
 		expect(profile.lock).toHaveBeenCalledOnce();
 		expect(timeline.relockSync).toHaveBeenCalledOnce();
 		expect(calendar.relockSync).toHaveBeenCalledOnce();
 	});
 
+	it('passes the reason through to every store, however each one relocks', () => {
+		// Three sources converge here - the idle timer, the Lock button, the erase - and the reason
+		// is the only thing that tells a later page restore whether it may undo this. Dropping it on
+		// the way through is how the restore came to undo an explicit Lock.
+		const profile = profileLike();
+		const timeline = secondaryLike();
+
+		relockAll([profile, timeline], 'idle');
+
+		expect(profile.lock).toHaveBeenCalledWith('idle');
+		expect(timeline.relockSync).toHaveBeenCalledWith('idle');
+	});
+
 	it('prefers lock() where a store has one, so an in-flight save is not interrupted', () => {
 		const profile = profileLike();
-		relockAll([profile]);
+		relockAll([profile], 'user');
 		// The profile defers its relock past an in-flight encrypt/write; the secondaries have no save
 		// to interrupt and drop synchronously.
 		expect(profile.lock).toHaveBeenCalledOnce();
@@ -55,7 +68,7 @@ describe('relockAll', () => {
 		};
 		const after = secondaryLike();
 		// A store failing to relock must not strand PII in every store after it in the list.
-		expect(() => relockAll([boom, after])).not.toThrow();
+		expect(() => relockAll([boom, after], 'user')).not.toThrow();
 		expect(after.relockSync).toHaveBeenCalledOnce();
 	});
 });

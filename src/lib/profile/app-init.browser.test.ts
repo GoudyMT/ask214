@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { subscribeBus, installLifecycle, createRelockEcho } from './app-init';
+import { subscribeBus, installLifecycle, createRelockEcho, type Relockable } from './app-init';
 import { createProfileBus, type ProfileBus } from '../broadcast/bus';
 import type { IdleTimerOptions, IdleTimer } from './idle-timer';
 
@@ -20,7 +20,10 @@ function delay(ms: number): Promise<void> {
 }
 
 function makeSpyStore() {
-	return { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
+	return {
+		relockSync: vi.fn<Relockable['relockSync']>(),
+		refresh: vi.fn().mockResolvedValue(null)
+	};
 }
 
 afterEach(() => {
@@ -67,9 +70,9 @@ describe('createRelockEcho over a real BroadcastChannel', () => {
 });
 
 describe('subscribeBus', () => {
-	function profileHandlers(store: { relockSync: () => void; refresh: () => Promise<unknown> }) {
+	function profileHandlers(store: Pick<Relockable, 'relockSync' | 'refresh'>) {
 		return {
-			relocked: () => store.relockSync(),
+			relocked: () => store.relockSync('peer'),
 			'profile-updated': () => void store.refresh()
 		};
 	}
@@ -163,6 +166,23 @@ describe('installLifecycle', () => {
 		h.install();
 		h.doc.dispatchEvent(new Event('freeze'));
 		expect(h.store.relockSync).toHaveBeenCalledTimes(1);
+	});
+
+	// The page going away is hygiene, not a decision - and saying so is the whole difference between
+	// a restore that works and one that never fires. Asserting only that relockSync was CALLED is
+	// what let the restore die unnoticed.
+	it('calls the page-lifecycle relock hygiene, so the restore may undo it', () => {
+		const h = makeLifecycleHarness();
+		h.install();
+		h.win.dispatchEvent(new Event('pagehide'));
+		expect(h.store.relockSync).toHaveBeenCalledWith('hygiene');
+	});
+
+	it('calls the idle relock idle, so the restore may not undo it', () => {
+		const h = makeLifecycleHarness();
+		h.install();
+		h.getOnIdle()?.();
+		expect(h.store.lock).toHaveBeenCalledWith('idle');
 	});
 
 	it('re-reads on a persisted pageshow (BFCache restore)', () => {

@@ -93,11 +93,11 @@
 				const relockables: Relockable[] = [result.store];
 				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
 				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
-				app.relockAll = () => relockAll(relockables);
+				app.relockAll = () => relockAll(relockables, 'user');
 				// refresh, not load: a peer's change is not the user asking to unlock, so each store
 				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
-					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync())),
+					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync('peer'))),
 					'profile-updated': () => void result.store.refresh(),
 					'timeline-updated': () => void app.timeline?.refresh(),
 					'calendar-updated': () => void app.calendar?.refresh()

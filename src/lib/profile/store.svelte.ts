@@ -6,7 +6,14 @@ import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar 
 import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
 import { withStores, reqToPromise } from '../db/schema';
-import { freezeRelock, cloneField, scrubSecureInputs } from './lifecycle';
+import {
+	freezeRelock,
+	cloneField,
+	scrubSecureInputs,
+	nextLockState,
+	type LockState,
+	type RelockReason
+} from './lifecycle';
 import { updateLastSeen, isClockBackward } from './clock';
 import { safeLog } from '../log/safelog';
 
@@ -64,12 +71,14 @@ function getRow<T>(
 export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = {}) {
 	let _profile = $state<ProfileV1 | null>(null);
 	let saveInFlight = false;
-	let pendingRelock = false;
+	// The reason a relock was deferred past an in-flight save, or null if none is pending.
+	let pendingRelock: RelockReason | null = null;
 	let relockEpoch = 0;
-	// Whether this store has relocked with no user-initiated load since. `locked` cannot answer this:
-	// it is derived state (hasProfile && _profile === null), so it reads FALSE for a first-run tab
-	// that has relocked, and it says nothing about WHY the profile is absent. See refresh().
-	let relockedSinceLoad = false;
+	// How this store came to have no plaintext, which decides whether an automatic re-read may put it
+	// back. `locked` cannot answer that: it is derived state (hasProfile && _profile === null), so it
+	// reads FALSE for a first-run tab that has relocked, and it says nothing about WHY the profile is
+	// absent. See refresh().
+	let lockState: LockState = 'unlocked';
 	// True once a profile body exists in storage (generation >= 1). Retained across relock
 	// (the encrypted record still exists), so `locked` can distinguish relocked from never-set-up.
 	// $state so `locked` recomputes reactively when it flips without a coincident `_profile` write
@@ -80,7 +89,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	// then signal relocked. Shared by relockSync() (the sync pagehide/freeze handlers),
 	// lock() (async UI / idle / cross-tab), and the deferred-relock path at save() exit.
 	// Zeroizes BEFORE nulling (memory-hygiene order).
-	function relockNow(): void {
+	function relockNow(reason: RelockReason): void {
 		if (_profile) {
 			freezeRelock(_profile as unknown as Record<string, unknown>);
 			_profile = null;
@@ -90,9 +99,9 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			scrubSecureInputs();
 		}
 		// Bump the relock epoch so an in-flight save can detect a relock happened during it
-		// and skip re-populating _profile afterward (PII-residency guard, L1).
+		// and skip re-populating _profile afterward, which would undo the zeroize above.
 		relockEpoch++;
-		relockedSinceLoad = true;
+		lockState = nextLockState(lockState, reason);
 		opts.onBroadcast?.({ type: 'relocked' });
 	}
 
@@ -108,21 +117,22 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		},
 
 		/** Synchronous relock for the pagehide/freeze handlers (wired at app-init) - no await. */
-		relockSync(): void {
-			relockNow();
+		relockSync(reason: RelockReason): void {
+			relockNow(reason);
 		},
 
 		/**
 		 * Async relock for the Settings "Lock" button, idle timeout, and cross-tab signal
 		 * (all wired at app-init). If a save is in flight, the relock is DEFERRED until that
-		 * save finishes (F-3-C-11: never interrupt an in-progress encrypt/write); otherwise it
-		 * runs immediately. Resolves immediately so callers may `await store.lock()`.
+		 * save finishes - interrupting an in-progress encrypt/write would leave the record
+		 * half-written; otherwise it runs immediately. Resolves immediately so callers may
+		 * `await store.lock(reason)`.
 		 */
-		lock(): Promise<void> {
+		lock(reason: RelockReason): Promise<void> {
 			if (saveInFlight) {
-				pendingRelock = true;
+				pendingRelock = reason;
 			} else {
-				relockNow();
+				relockNow(reason);
 			}
 			return Promise.resolve();
 		},
@@ -162,16 +172,20 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		},
 
 		/**
-		 * AUTOMATIC re-read: a peer tab's change, a BFCache restore, recovery from a failed write.
-		 * Refuses once this store has relocked - none of those is the user asking to unlock, and a
-		 * re-read DECRYPTS. Nothing is lost: every unlock path calls load().
+		 * AUTOMATIC re-read: a peer tab's change, a page restore, recovery from a failed write. It
+		 * DECRYPTS, so it answers to how the plaintext went away, not to whether it is gone.
 		 *
-		 * Gated on `relockedSinceLoad`, NOT on `locked`. `locked` is derived state, so it reads false
-		 * for a first-run tab that has relocked (hasProfile is still false) - which left exactly that
-		 * tab open to a peer's setup decrypting into it.
+		 * Refuses only a `locked` store - the user asked, or their presence lapsed, and putting the
+		 * profile back on screen would reverse that. An `evicted` store is page hygiene the app did
+		 * to itself on the way out, and the page has come back, so the re-read is exactly the undo
+		 * it is owed. An unlocked store re-reads so a peer's change still lands.
+		 *
+		 * Gated on `lockState`, NOT on `locked`. `locked` is derived state, so it reads false for a
+		 * first-run tab that has relocked (hasProfile is still false) - which left exactly that tab
+		 * open to a peer's setup decrypting into it.
 		 */
 		refresh(): Promise<ProfileV1 | null> {
-			if (relockedSinceLoad) return Promise.resolve(null);
+			if (lockState === 'locked') return Promise.resolve(null);
 			return api.load();
 		},
 
@@ -215,7 +229,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					if (hwm.generation === 0) {
 						_profile = null;
 						hasProfile = false;
-						relockedSinceLoad = false;
+						lockState = 'unlocked';
 						return null;
 					}
 
@@ -233,7 +247,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						return null;
 					}
 					_profile = decrypted;
-					relockedSinceLoad = false;
+					lockState = 'unlocked';
 					return _profile;
 				}
 			);
@@ -363,10 +377,12 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 				return result;
 			} finally {
 				saveInFlight = false;
-				// A relock requested during the save was deferred; run it now the write is done.
+				// A relock requested during the save was deferred; run it now the write is done,
+				// carrying the reason it was asked for so a deferred Lock is still a Lock.
 				if (pendingRelock) {
-					pendingRelock = false;
-					relockNow();
+					const reason = pendingRelock;
+					pendingRelock = null;
+					relockNow(reason);
 				}
 			}
 		},
@@ -384,7 +400,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 				tx.objectStore('profile-hwm').clear();
 			});
 			hasProfile = false;
-			relockNow();
+			relockNow('user');
 		}
 	};
 

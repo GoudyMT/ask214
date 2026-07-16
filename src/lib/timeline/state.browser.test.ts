@@ -58,7 +58,7 @@ describe('timeline-state store', () => {
 		const a = createTimelineStateStore(db);
 		await a.load();
 		await a.setStatus('x', 'done');
-		a.relockSync();
+		a.relockSync('idle');
 		expect(a.state.tasks).toEqual({});
 		await deleteTestDb(db);
 	});
@@ -75,7 +75,7 @@ describe('timeline-state store', () => {
 		// The idle timer relocks the store while the record stays on disk. relock deliberately
 		// leaves _generation intact, so OCC alone cannot catch a write built from null state - and
 		// a null state must mean "unknown", never "the user has done nothing".
-		a.relockSync();
+		a.relockSync('idle');
 		// Attempt the write; whether it refuses loudly or no-ops is the store's choice. What is not
 		// negotiable is the line below: the user's record survives either way.
 		await a.setStatus('z', 'done').catch(() => {});
@@ -97,7 +97,7 @@ describe('timeline-state store', () => {
 		const a = createTimelineStateStore(db);
 		await a.load();
 		await a.setStatus('x', 'done');
-		a.relockSync();
+		a.relockSync('user');
 		await expect(a.setStatus('y', 'done')).rejects.toThrow(TimelineRelockedError);
 		await deleteTestDb(db);
 	});
@@ -132,14 +132,14 @@ describe('timeline-state store', () => {
 		const a = createTimelineStateStore(db);
 		await a.load();
 		await a.setStatus('x', 'done');
-		a.relockSync();
+		a.relockSync('user');
 
 		// The user taps Unlock, then immediately taps Lock (or a peer tab's change triggers a re-read
 		// and the idle timer fires mid-decrypt). The load must not repopulate decrypted state into a
 		// tab that has since relocked - save()/persist() already guard this; load() must too, or the
 		// relock is silently undone and the idle timer will not fire again.
 		const inflight = a.load();
-		a.relockSync();
+		a.relockSync('user');
 		await inflight;
 
 		expect(a.state.tasks).toEqual({});
@@ -154,10 +154,46 @@ describe('timeline-state store', () => {
 		await a.load();
 		await a.setStatus('x', 'done');
 		await a.setNote('y', 'PTSD eval 0900 Bldg 12');
-		a.relockSync();
+		a.relockSync('idle');
 
-		// An automatic re-read - a peer's signal, a BFCache restore, a failed write's recovery. None
-		// of them is the user asking to unlock, so none may put the notes back on screen.
+		// An automatic re-read - a peer's signal, a failed write's recovery. Neither is the user
+		// asking to unlock, so neither may put the notes back on screen.
+		await a.refresh();
+
+		expect(a.state.tasks).toEqual({});
+		await deleteTestDb(db);
+	});
+
+	it('refresh restores after page hygiene - the page coming back is not a new decision', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+
+		// What pagehide does is evict, not lock: the app dropped the plaintext because the page was
+		// going away, and the page has now come back. Refusing here is what left every returning
+		// user staring at a blank timeline.
+		a.relockSync('hygiene');
+		await a.refresh();
+
+		expect(a.state.tasks['x']?.status).toBe('done');
+		await deleteTestDb(db);
+	});
+
+	it('page hygiene after an explicit lock does not reopen it', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+
+		// Lock, then background the app: pagehide relocks an already-locked store. If hygiene could
+		// walk the state back to restorable, the next restore would silently undo the user's Lock.
+		a.relockSync('user');
+		a.relockSync('hygiene');
 		await a.refresh();
 
 		expect(a.state.tasks).toEqual({});
@@ -188,7 +224,7 @@ describe('timeline-state store', () => {
 		const a = createTimelineStateStore(db);
 		await a.load();
 		await a.setStatus('x', 'done');
-		a.relockSync();
+		a.relockSync('user');
 		await a.refresh();
 		expect(a.state.tasks).toEqual({});
 

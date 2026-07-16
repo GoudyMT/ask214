@@ -1,5 +1,37 @@
 import { describe, it, expect } from 'vitest';
-import { zeroizeField, freezeRelock } from './lifecycle';
+import { zeroizeField, freezeRelock, nextLockState } from './lifecycle';
+
+describe('nextLockState', () => {
+	it('page hygiene on an open store lands in evicted - a restore may undo it', () => {
+		expect(nextLockState('unlocked', 'hygiene')).toBe('evicted');
+	});
+
+	it('every non-hygiene reason lands in locked - a restore may not undo it', () => {
+		expect(nextLockState('unlocked', 'idle')).toBe('locked');
+		expect(nextLockState('unlocked', 'user')).toBe('locked');
+		expect(nextLockState('unlocked', 'peer')).toBe('locked');
+	});
+
+	// The ladder only descends. pagehide fires after an explicit Lock too, so letting hygiene
+	// rewrite `locked` back to `evicted` is exactly how a persisted pageshow silently undoes the
+	// Lock the user asked for.
+	it('hygiene never downgrades an already-locked store back to restorable', () => {
+		expect(nextLockState('locked', 'hygiene')).toBe('locked');
+	});
+
+	it('an intentional relock upgrades an evicted store, closing the restore', () => {
+		expect(nextLockState('evicted', 'idle')).toBe('locked');
+		expect(nextLockState('evicted', 'user')).toBe('locked');
+		expect(nextLockState('evicted', 'peer')).toBe('locked');
+	});
+
+	// pagehide and freeze both reach the same handler and their order is unsettled across
+	// browsers, so the second fire must be a no-op rather than a state change.
+	it('is idempotent, so a repeated relock of the same kind changes nothing', () => {
+		expect(nextLockState('evicted', 'hygiene')).toBe('evicted');
+		expect(nextLockState('locked', 'user')).toBe('locked');
+	});
+});
 
 describe('zeroizeField', () => {
 	it('fills a Uint8Array with zeros in place', () => {

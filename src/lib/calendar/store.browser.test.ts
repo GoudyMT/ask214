@@ -56,7 +56,7 @@ describe('calendar-sync store', () => {
 		const store = createCalendarSyncStore(db);
 		await store.load();
 		await store.setExclusions({ taskIds: ['t1'], categories: [] });
-		store.relockSync();
+		store.relockSync('user');
 		expect(store.exclusions).toEqual({ taskIds: [], categories: [] });
 		await deleteTestDb(db);
 	});
@@ -101,7 +101,7 @@ describe('calendar-sync store', () => {
 
 		// The idle timer relocks the calendar store while the record stays on disk. _generation is
 		// deliberately NOT reset by relock, so OCC alone cannot catch a write built from null state.
-		a.relockSync();
+		a.relockSync('idle');
 		expect(a.ready).toBe(false);
 		await expect(a.dismissCard(1_000)).rejects.toThrow(CalendarRelockedError);
 
@@ -119,7 +119,7 @@ describe('calendar-sync store', () => {
 		const a = createCalendarSyncStore(db);
 		await a.load();
 		await a.dismissCard(1_000);
-		a.relockSync();
+		a.relockSync('user');
 		await expect(a.setExclusions({ taskIds: ['t1'], categories: [] })).rejects.toThrow(
 			CalendarRelockedError
 		);

@@ -2,6 +2,7 @@ import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import type { CapabilityResult, CapabilityCause } from '../crypto/capability';
 import type { ProfileBus, BusSignal } from '../broadcast/bus';
 import type { IdleTimer, IdleTimerOptions } from './idle-timer';
+import type { RelockReason } from './lifecycle';
 
 /**
  * App-init orchestration for the profile subsystem. Pure + dependency-injected so the
@@ -123,14 +124,19 @@ const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'tou
  * is optional: the profile store exposes an async lock(); the timeline store relocks
  * synchronously (drop-reference) and omits it.
  *
+ * Every relock declares its reason, because a store cannot know why its plaintext is being taken
+ * away - and the reason is the only thing that decides whether a later automatic re-read may put it
+ * back. Nothing here defaults: a new relock source has to say what it means, which is the one
+ * property that stops this from drifting the way a shared set silently does.
+ *
  * `refresh`, not `load`: everything reached through this type is AUTOMATIC (a lifecycle event, a
- * peer's signal), never the user asking to unlock. load() is deliberately absent - handing it to an
- * automatic caller is what silently un-relocked tabs.
+ * peer's signal), never the user asking to unlock. load() is deliberately absent so this seam
+ * cannot decrypt on its own say-so; the store's own gate is what actually enforces it.
  */
 export type Relockable = {
-	relockSync: () => void;
+	relockSync: (reason: RelockReason) => void;
 	refresh: () => Promise<unknown>;
-	lock?: () => Promise<void>;
+	lock?: (reason: RelockReason) => Promise<void>;
 };
 
 /**
@@ -148,11 +154,11 @@ export type Relockable = {
  * NOT for the cross-tab bus handler - that path must stay fully synchronous inside the relock echo's
  * answer() frame, so it calls relockSync directly.
  */
-export function relockAll(relockables: Relockable[]): void {
+export function relockAll(relockables: Relockable[], reason: RelockReason): void {
 	for (const r of relockables) {
 		try {
-			if (r.lock) void r.lock();
-			else r.relockSync();
+			if (r.lock) void r.lock(reason);
+			else r.relockSync(reason);
 		} catch {
 			/* isolated: the next store's PII still gets zeroized */
 		}
@@ -182,16 +188,19 @@ export function installLifecycle(
 ): () => void {
 	const idle = deps.createIdleTimer({
 		thresholdMs: deps.idleThresholdMs,
-		onIdle: () => relockAll(relockables)
+		onIdle: () => relockAll(relockables, 'idle')
 	});
 
+	// The page is going away, so its plaintext goes with it. That is hygiene, not a decision the
+	// user made, so it stays undoable - pagehide and freeze both land here and their order is not
+	// consistent across browsers, which the state ladder absorbs.
 	const onHide = (): void => {
-		for (const r of relockables) r.relockSync();
+		for (const r of relockables) r.relockSync('hygiene');
 	};
+	// The page came back. Ask every store to re-read; each answers from how its own plaintext went
+	// away, so an evicted store restores and a locked one stays shut. No policy belongs here.
 	const onShow = (e: Event): void => {
 		if ((e as PageTransitionEvent).persisted) {
-			// refresh, not load: onHide relocked these on the way out. A BFCache restore is the page
-			// coming back, not the user asking to unlock - reloading here would undo an explicit Lock.
 			for (const r of relockables) void r.refresh();
 		}
 	};
