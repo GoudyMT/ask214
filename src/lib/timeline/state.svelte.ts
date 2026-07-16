@@ -91,7 +91,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		_state = null;
 		relockEpoch++;
 		lockState = nextLockState(lockState, reason);
-		opts.onBroadcast?.({ type: 'relocked' });
+		// Only an intentional relock is other tabs' business - see the profile store's relockNow.
+		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	async function readVerifiedKeystore(): Promise<KeystoreRow> {

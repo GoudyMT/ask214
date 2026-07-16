@@ -102,7 +102,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		// and skip re-populating _profile afterward, which would undo the zeroize above.
 		relockEpoch++;
 		lockState = nextLockState(lockState, reason);
-		opts.onBroadcast?.({ type: 'relocked' });
+		// The relocked signal means "the user locked - you should too". Page hygiene is not that: THIS
+		// page is going away and the others are not, so telling them turns switching tabs into locking
+		// every other tab, and a peer relock is not one a page restore may undo.
+		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	const api = {

@@ -228,6 +228,20 @@ describe('ProfileStore.relockSync', () => {
 		if (eaosRef) expect(eaosRef.every((b) => b === 0)).toBe(true);
 	});
 
+	// The relocked signal is how one tab tells the others the USER locked. Page hygiene is not that:
+	// this page is going away, the others are not. Telling them turns "you switched tabs" into "every
+	// other tab is now locked", and since a peer relock is not restorable they stay that way.
+	it('page hygiene does not tell other tabs to lock - only this page is going away', async () => {
+		const events: string[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e.type) });
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15') });
+
+		store.relockSync('hygiene');
+
+		expect(store._getStateForTest()).toBeNull();
+		expect(events).not.toContain('relocked');
+	});
+
 	// A save puts the profile back in memory just as surely as a load does. If it does not say so,
 	// the store sits holding plaintext while refusing every automatic re-read - so a peer's change
 	// never lands in a tab that is plainly open.
