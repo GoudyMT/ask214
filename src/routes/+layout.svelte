@@ -170,7 +170,6 @@
 			<a href={resolve('/')} class="brand">Ask 214</a>
 			<ul>
 				<li><a href={resolve('/timeline')}>Timeline</a></li>
-				<li><a href={resolve('/ask')}>Ask</a></li>
 				<li><a href={resolve('/settings')}>Settings</a></li>
 				<li><a href={resolve('/about')}>About</a></li>
 			</ul>

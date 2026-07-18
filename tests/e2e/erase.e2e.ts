@@ -27,7 +27,7 @@ test('erase removes the profile and lands on a clean first run', async ({ page }
 
 	// A fresh keystore means first-run: the Home setup CTA is offered again.
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: /get started/i })).toBeVisible();
+	await expect(page.getByRole('link', { name: /set up your timeline/i })).toBeVisible();
 });
 
 test('a failed erase says so, and the data survives', async ({ page }) => {

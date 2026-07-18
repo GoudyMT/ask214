@@ -8,7 +8,7 @@ test('wizard happy path: Get started -> save EAOS -> Home drops the setup CTA', 
 	page
 }) => {
 	await page.goto('/');
-	const cta = page.getByRole('link', { name: /get started/i });
+	const cta = page.getByRole('link', { name: /set up your timeline/i });
 	await expect(cta).toBeVisible();
 
 	await cta.click();
@@ -29,7 +29,7 @@ test('wizard skip is a soft gate: Home keeps the CTA and it re-engages', async (
 	await page.getByRole('button', { name: /skip for now/i }).click();
 
 	// Skipped without saving, so the CTA persists (soft gate).
-	const cta = page.getByRole('link', { name: /get started/i });
+	const cta = page.getByRole('link', { name: /set up your timeline/i });
 	await expect(cta).toBeVisible();
 
 	await cta.click();

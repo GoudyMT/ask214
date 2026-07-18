@@ -22,7 +22,8 @@ async function setEaos(page: Page): Promise<void> {
 
 test('primary nav exposes a Timeline link that routes to /timeline', async ({ page }) => {
 	await page.goto('/');
-	const link = page.getByRole('link', { name: 'Timeline' });
+	// exact: the on-ramp's "Set up your timeline" link would substring-match a loose "Timeline".
+	const link = page.getByRole('link', { name: 'Timeline', exact: true });
 	await expect(link).toBeVisible();
 
 	await link.click();
