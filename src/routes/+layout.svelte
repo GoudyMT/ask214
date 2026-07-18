@@ -167,7 +167,7 @@
 
 	<header>
 		<nav aria-label="Primary" style:--shell-width={shellWidth}>
-			<a href={resolve('/')} class="brand">Transition Companion</a>
+			<a href={resolve('/')} class="brand">Ask 214</a>
 			<ul>
 				<li><a href={resolve('/timeline')}>Timeline</a></li>
 				<li><a href={resolve('/ask')}>Ask</a></li>
