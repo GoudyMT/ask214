@@ -18,8 +18,8 @@ test('wizard happy path: Get started -> save EAOS -> Home drops the setup CTA', 
 	await page.getByRole('button', { name: /save and continue/i }).click();
 
 	// Back on Home, with an EAOS now stored, so the CTA is gone.
-	await expect(page.getByRole('heading', { level: 1, name: 'Transition Companion' })).toBeVisible();
-	await expect(page.getByRole('link', { name: /get started/i })).toBeHidden();
+	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	await expect(page.getByRole('link', { name: /set up your timeline/i })).toBeHidden();
 });
 
 test('wizard skip is a soft gate: Home keeps the CTA and it re-engages', async ({ page }) => {

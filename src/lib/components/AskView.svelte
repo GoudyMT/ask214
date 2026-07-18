@@ -71,15 +71,6 @@
 	</div>
 {/if}
 
-<h1 class="ask-title">Ask</h1>
-<p class="ask-sub">
-	Plain-language questions, answered from official public sources - with the exact source on every
-	result.
-	<br /><span class="ask-private"
-		>Answered on your device - nothing you type is sent to a server or shared.</span
-	>
-</p>
-
 <form
 	class="ask-bar"
 	onsubmit={(e) => {
@@ -97,6 +88,8 @@
 	/>
 	<button class="ask-search" type="submit" disabled={!ready}>Search</button>
 </form>
+
+<p class="ask-private">Answered on your device - nothing you type is sent to a server or shared.</p>
 
 <div class="ask-result">
 	{#if askState.kind === 'idle'}
@@ -173,16 +166,11 @@
 <SourceReader source={openSource} onClose={() => (openSource = null)} />
 
 <style>
-	.ask-title {
-		margin: var(--space-l) 0 2px;
-	}
-	.ask-sub {
-		color: var(--color-fg-muted);
-		margin: 0 0 var(--space-l);
-	}
 	.ask-private {
 		font-size: var(--font-size-s);
 		color: var(--color-success);
+		margin: var(--space-s) 0 0;
+		text-align: center;
 	}
 
 	.ask-bar {
@@ -223,6 +211,7 @@
 	.ask-examples {
 		display: flex;
 		flex-wrap: wrap;
+		justify-content: center;
 		gap: var(--space-xs);
 		margin-top: var(--space-m);
 	}
@@ -238,6 +227,7 @@
 
 	.ask-result {
 		margin-top: var(--space-l);
+		text-align: left;
 	}
 	.ask-count {
 		font-size: var(--font-size-s);
