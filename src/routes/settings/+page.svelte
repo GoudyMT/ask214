@@ -13,8 +13,23 @@
 	import CalendarPanel from '$lib/components/CalendarPanel.svelte';
 	import { downloadTextFile } from '$lib/calendar/download';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	const app = getProfileApp();
+
+	// A fresh no-date profile has nothing to configure here; send it to the front door, where the
+	// on-ramp lives. Gated on `ready` (init awaits the profile load, so a returning user already reads
+	// a non-'none' persona and stays); a locked profile has data too, so it stays and offers unlock.
+	$effect(() => {
+		if (
+			app.status === 'ready' &&
+			app.store?.locked !== true &&
+			app.store?.persona.completeness === 'none'
+		) {
+			void goto(resolve('/'));
+		}
+	});
 
 	let editing = $state(false);
 	let draft = $state('');
