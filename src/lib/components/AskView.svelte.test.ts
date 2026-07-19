@@ -44,11 +44,24 @@ function card(over: Partial<ResultCard> = {}): ResultCard {
 }
 
 describe('AskView', () => {
-	it('idle: renders the query input, example chips, and the privacy line', () => {
+	it('idle: renders the query input, the question feed, and the privacy line', () => {
 		const { container } = render(AskView, { props: props({ kind: 'idle' }) });
 		expect(container.querySelector('.ask-input')).not.toBeNull();
-		expect(container.querySelectorAll('.ask-example').length).toBeGreaterThan(0);
+		expect(container.querySelectorAll('.q-feed__pill').length).toBeGreaterThan(0);
 		expect(container.querySelector('.ask-private')).not.toBeNull();
+	});
+
+	it('idle: clicking a feed pill fills the input and asks that question', () => {
+		let asked: string | null = null;
+		const { container } = render(AskView, {
+			props: props({ kind: 'idle' }, { onAsk: (q: string) => (asked = q) })
+		});
+		const pill = container.querySelector('.q-feed__pill') as HTMLButtonElement;
+		const text = pill.textContent?.trim() ?? '';
+		pill.click();
+		flushSync();
+		expect(asked).toBe(text); // ran the query
+		expect((container.querySelector('.ask-input') as HTMLInputElement).value).toBe(text); // filled the bar
 	});
 
 	it('submitting the query calls onAsk with the typed text', () => {

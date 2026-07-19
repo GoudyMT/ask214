@@ -3,6 +3,7 @@
 	import type { Source } from '$lib/ask/sources';
 	import AskResultCard from './AskResultCard.svelte';
 	import SourceReader from './SourceReader.svelte';
+	import QuestionFeed from './QuestionFeed.svelte';
 
 	let {
 		askState,
@@ -34,14 +35,15 @@
 	);
 	const showReminder = $derived(askState.kind === 'idle' && setupDismissed && !reminderDismissed);
 
-	const EXAMPLES = [
-		'How do I lock in my VA claim date before I separate?',
-		'How do I apply for SkillBridge?',
-		'What do I need to apply for VA health care?'
-	];
-
 	function submit() {
 		if (query.trim() !== '') onAsk(query);
+	}
+
+	// A feed pill behaves exactly like typing the question + Search: fill the visible input, then run
+	// it through the same ask path (so the first query still hits the one-time model opt-in).
+	function pick(q: string) {
+		query = q;
+		onAsk(q);
 	}
 	function skipSetup() {
 		setupDismissed = true;
@@ -93,11 +95,7 @@
 
 <div class="ask-result">
 	{#if askState.kind === 'idle'}
-		<div class="ask-examples">
-			{#each EXAMPLES as ex (ex)}
-				<button class="ask-example" type="button" onclick={() => onAsk(ex)}>{ex}</button>
-			{/each}
-		</div>
+		<QuestionFeed onPick={pick} />
 	{:else if askState.kind === 'needsSetup'}
 		<div class="ask-setup">
 			<h2 class="ask-setup__title">One-time setup to answer your question</h2>
@@ -206,23 +204,6 @@
 	.ask-search:disabled {
 		opacity: 0.6;
 		cursor: default;
-	}
-
-	.ask-examples {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
-		gap: var(--space-xs);
-		margin-top: var(--space-m);
-	}
-	.ask-example {
-		font-size: var(--font-size-s);
-		padding: 4px 12px;
-		border-radius: 999px;
-		border: 1px solid var(--color-border);
-		background: none;
-		color: var(--color-fg-muted);
-		cursor: pointer;
 	}
 
 	.ask-result {
