@@ -3,17 +3,75 @@
 
 	let { onPick }: { onPick: (question: string) => void } = $props();
 
-	// The user can stop the auto-scroll (WCAG 2.2.2). Hover/focus pause is CSS-driven (added with the
-	// motion); this button is the persistent stop, and `paused` gates the animation via the wrapper class.
+	// `paused` = the persistent Pause control. `interacting` = a transient pause while the pointer is
+	// over the feed or a pill holds focus, so reaching for a pill (hover, touch, or Tab) stops the
+	// drift and the target holds still. Auto-scroll runs only when neither holds and motion is allowed.
 	let paused = $state(false);
+	let interacting = $state(false);
+	let maskEl = $state<HTMLDivElement>();
+
+	// Wired here rather than as markup handlers: the row is a plain scroll container and the pills are
+	// the controls, so putting pointer handlers in the markup would claim the container is itself
+	// interactive. Depends only on the element, so flipping `interacting` does not re-bind these.
+	$effect(() => {
+		const mask = maskEl;
+		if (!mask) return;
+		const hold = (): void => {
+			interacting = true;
+		};
+		const release = (): void => {
+			interacting = false;
+		};
+		mask.addEventListener('pointerenter', hold);
+		mask.addEventListener('pointerleave', release);
+		mask.addEventListener('focusin', hold);
+		mask.addEventListener('focusout', release);
+		return () => {
+			mask.removeEventListener('pointerenter', hold);
+			mask.removeEventListener('pointerleave', release);
+			mask.removeEventListener('focusin', hold);
+			mask.removeEventListener('focusout', release);
+		};
+	});
+
+	// Auto-advance scrollLeft while idle. Native overflow scrolling stays on, so a touch-drag or wheel
+	// scrolls manually; this only nudges the position between interactions. The second (aria-hidden)
+	// pill set is the seamless wrap target: at one set's width we subtract it, so the loop has no seam.
+	$effect(() => {
+		const mask = maskEl;
+		if (!mask || paused || interacting) return;
+		const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+		if (mq?.matches) return;
+
+		let raf = 0;
+		let last = 0;
+		const SPEED_PX_PER_S = 24;
+		const tick = (t: number): void => {
+			if (last) {
+				const oneSet = mask.scrollWidth / 2;
+				let next = mask.scrollLeft + (SPEED_PX_PER_S * (t - last)) / 1000;
+				if (oneSet > 0 && next >= oneSet) next -= oneSet;
+				mask.scrollLeft = next;
+			}
+			last = t;
+			raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+	});
 </script>
 
-<div class="q-feed" class:q-feed--paused={paused}>
-	<div class="q-feed__mask">
+<div class="q-feed">
+	<div class="q-feed__mask" bind:this={maskEl}>
 		<ul class="q-feed__track" aria-label="Example questions">
 			{#each EXAMPLE_QUESTIONS as q (q)}
 				<li>
 					<button class="q-feed__pill" type="button" onclick={() => onPick(q)}>{q}</button>
+				</li>
+			{/each}
+			{#each EXAMPLE_QUESTIONS as q, i (i)}
+				<li aria-hidden="true">
+					<button class="q-feed__pill" type="button" tabindex="-1" aria-hidden="true">{q}</button>
 				</li>
 			{/each}
 		</ul>
@@ -24,9 +82,8 @@
 </div>
 
 <style>
-	/* Base = a static, edge-faded, manually-scrollable row (works for everyone, on-brand). The
-	   auto-scroll is layered on with the motion pass and is OFF under prefers-reduced-motion. Pills
-	   are muted pill-outline, matching the retired static example chips. */
+	/* A native scroll row (touch-drag + wheel work), edge-faded, with a JS scrollLeft drift for the
+	   auto-scroll. Pills are muted pill-outline, matching the retired static example chips. */
 	.q-feed {
 		margin-top: var(--space-m);
 	}
@@ -39,12 +96,16 @@
 	.q-feed__mask::-webkit-scrollbar {
 		display: none;
 	}
+	/* margin-right (not gap) so two identical sets tile to an exact period - scrollWidth / 2 is then a
+	   seamless wrap point. */
 	.q-feed__track {
 		display: inline-flex;
-		gap: var(--space-s);
 		list-style: none;
 		margin: 0;
 		padding: var(--space-xs) 0;
+	}
+	.q-feed__track li {
+		margin-right: var(--space-s);
 	}
 	.q-feed__pill {
 		white-space: nowrap;
@@ -70,5 +131,11 @@
 		border-radius: var(--radius-m);
 		color: var(--color-fg-muted);
 		cursor: pointer;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		/* No auto-scroll under reduced motion, so the Pause control has nothing to act on. */
+		.q-feed__pause {
+			display: none;
+		}
 	}
 </style>

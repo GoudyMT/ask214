@@ -184,6 +184,11 @@
 		padding: 12px var(--space-m);
 		font: inherit;
 	}
+	/* Hovering hints the bar is live; focusing promotes it to the accent border + ring, which then
+	   HOLDS for the whole typing session (focus does not lapse while the user types). */
+	.ask-input:hover:not(:focus) {
+		border-color: var(--color-fg-muted);
+	}
 	.ask-input:focus {
 		outline: 2px solid var(--color-accent);
 		border-color: var(--color-accent);
@@ -200,6 +205,9 @@
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;
+	}
+	.ask-search:hover:not(:disabled) {
+		background: var(--color-accent-muted);
 	}
 	.ask-search:disabled {
 		opacity: 0.6;

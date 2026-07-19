@@ -68,6 +68,7 @@
 	/>
 
 	{#if isIdle && showOnramp}
+		<hr class="home-divider" />
 		<section class="home-onramp" aria-labelledby="home-onramp-heading">
 			<h2 id="home-onramp-heading">Make it yours</h2>
 			<p>
@@ -92,8 +93,15 @@
 		line-height: 1.15;
 		margin: var(--space-xl) 0 var(--space-l);
 	}
+	/* Separates the Ask from the below-hero surface. Idle-only: once a query runs the results own the
+	   page and this whole block steps aside. */
+	.home-divider {
+		border: 0;
+		border-top: 1px solid var(--color-border);
+		margin: var(--space-xxl) 0 var(--space-l);
+	}
 	.home-onramp {
-		margin-top: var(--space-xxl);
+		margin-top: 0;
 		background: var(--color-surface);
 		border: 1px solid var(--color-border);
 		border-left: 4px solid var(--color-accent);

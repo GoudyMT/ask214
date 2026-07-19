@@ -230,14 +230,31 @@
 		margin: 0 auto;
 	}
 
-	/* Lock #7: inline horizontal nav (brand + 4 links: Timeline/Ask/Settings/About). */
-	/* Migrate to bottom-tab-bar pattern when nav reaches 4+ items. */
+	/* Lock #7: inline horizontal nav (brand + Timeline/Settings/About; Settings appears only once a
+	   separation date is set). Migrate to bottom-tab-bar pattern when nav reaches 4+ items. */
 	nav ul {
 		list-style: none;
 		padding: 0;
 		margin: 0;
 		display: flex;
 		gap: var(--space-m);
+	}
+
+	/* Quiet by default, promoted on hover/tap: the accent underline gives the press a visible target
+	   state on touch, where there is no hover to rely on. */
+	nav ul a {
+		color: var(--color-fg-muted);
+		text-decoration: none;
+		padding: var(--space-xs) 0;
+		border-bottom: 2px solid transparent;
+	}
+	nav ul a:hover {
+		color: var(--color-fg);
+		border-bottom-color: var(--color-accent);
+	}
+	nav ul a:active {
+		color: var(--color-accent);
+		border-bottom-color: var(--color-accent);
 	}
 
 	/* Lock #3: text wordmark, font-weight 600 (no logo until trademark clears). */
