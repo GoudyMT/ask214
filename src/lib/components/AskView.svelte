@@ -144,7 +144,7 @@
 	{:else if askState.kind === 'empty'}
 		<div class="ask-msg">
 			<p class="ask-msg__title">No close match</p>
-			<p class="ask-msg__body">Try rephrasing your question, or use one of the examples above.</p>
+			<p class="ask-msg__body">Try rephrasing your question, or ask about something else.</p>
 		</div>
 	{:else if askState.kind === 'offline'}
 		<div class="ask-msg ask-msg--accent">
