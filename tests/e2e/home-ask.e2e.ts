@@ -52,3 +52,19 @@ test('a fresh profile hides the Settings tab, and /settings redirects to the fro
 	await expect(page).toHaveURL(/\/$/);
 	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
 });
+
+test('the Ask input is the first focusable control in the page content', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeEnabled();
+	// Spec section 12: the input is the first tab stop. Asserted structurally (WebKit omits links from the
+	// default Tab order, so a keypress probe is engine-dependent): the first focusable element inside
+	// <main> is the Ask input, so nothing steals focus ahead of the hero action.
+	const inputIsFirst = await page.evaluate(() => {
+		const main = document.querySelector('main');
+		const first = main?.querySelector(
+			'a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])'
+		);
+		return first instanceof HTMLElement && first.matches('input.ask-input');
+	});
+	expect(inputIsFirst).toBe(true);
+});
