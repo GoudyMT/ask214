@@ -1,7 +1,7 @@
 {
 	"name": "Ask 214",
 	"short_name": "Ask 214",
-	"description": "Privacy-first companion for US transitioning service members.",
+	"description": "Private, offline-first answers for your military transition, from sources you can trust.",
 	"start_url": "/",
 	"scope": "/",
 	"display": "standalone",
