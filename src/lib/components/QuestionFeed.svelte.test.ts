@@ -19,4 +19,16 @@ describe('QuestionFeed', () => {
 		flushSync();
 		expect(picked).toBe(EXAMPLE_QUESTIONS[0]);
 	});
+
+	it('exposes a persistent pause control that toggles the paused state (WCAG 2.2.2)', () => {
+		// A user who cannot hover (touch/keyboard) and has not set reduced-motion needs an always-present
+		// stop for the auto-scroll; hover/focus-pause alone does not satisfy 2.2.2.
+		const { container } = render(QuestionFeed, { props: { onPick: () => {} } });
+		const pause = container.querySelector('.q-feed__pause') as HTMLButtonElement | null;
+		expect(pause).not.toBeNull();
+		expect(pause!.getAttribute('aria-pressed')).toBe('false');
+		pause!.click();
+		flushSync();
+		expect(pause!.getAttribute('aria-pressed')).toBe('true');
+	});
 });
