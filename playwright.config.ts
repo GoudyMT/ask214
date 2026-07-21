@@ -16,7 +16,10 @@ export default defineConfig({
 		baseURL: 'https://localhost:4173',
 		// The preview cert is self-signed and generated per machine: nothing about it is trustworthy
 		// and nothing needs to be. Production serves a real one.
-		ignoreHTTPSErrors: true
+		ignoreHTTPSErrors: true,
+		// Freeze the home feed's auto-scroll (it honours prefers-reduced-motion) so a moving element
+		// cannot flake interactions, and so the reduced-motion path is what CI exercises.
+		reducedMotion: 'reduce'
 	},
 	// WebKit is not Safari, but it is the same engine family - and without an Apple device it is the
 	// only way to exercise the Safari-side behaviour this app depends on. It reaches what Chromium

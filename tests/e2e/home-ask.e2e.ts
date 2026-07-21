@@ -39,3 +39,16 @@ test('asking on a fresh profile replaces the on-ramp with the setup prompt in pl
 	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
 	await expect(page.getByRole('heading', { name: /make it yours/i })).toHaveCount(0);
 });
+
+test('a fresh profile hides the Settings tab, and /settings redirects to the front door', async ({
+	page
+}) => {
+	await page.goto('/');
+	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeEnabled();
+	// No separation date yet -> nothing in Settings applies, so the tab is hidden...
+	await expect(page.getByRole('link', { name: 'Settings', exact: true })).toHaveCount(0);
+	// ...and a deep link to it bounces to the front door, where the setup on-ramp lives.
+	await page.goto('/settings');
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+});
