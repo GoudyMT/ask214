@@ -1,63 +1,71 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { EXAMPLE_QUESTIONS } from '$lib/ask/example-questions';
 
 	let { onPick }: { onPick: (question: string) => void } = $props();
 
-	// `paused` = the persistent Pause control. `interacting` = a transient pause while the pointer is
-	// over the feed or a pill holds focus, so reaching for a pill (hover, touch, or Tab) stops the
-	// drift and the target holds still. Auto-scroll runs only when neither holds and motion is allowed.
-	let paused = $state(false);
-	let interacting = $state(false);
 	let maskEl = $state<HTMLDivElement>();
 
-	// Wired here rather than as markup handlers: the row is a plain scroll container and the pills are
-	// the controls, so putting pointer handlers in the markup would claim the container is itself
-	// interactive. Depends only on the element, so flipping `interacting` does not re-bind these.
-	$effect(() => {
+	// The drift is wired in onMount, after the bound element exists. Position accumulates in a JS float
+	// and is WRITTEN to scrollLeft (reading it back loses the sub-pixel step - the browser rounds
+	// scrollLeft to an integer, so a ~0.4px/frame nudge rounds to 0 forever). It pauses on hover/focus,
+	// and yields to any real user scroll (touch-drag / wheel), detected by comparing scrollLeft against
+	// the value the drift last wrote - so a native touch scroll is not fought - resuming ~1s after the
+	// user stops. Fully static under prefers-reduced-motion. The second (aria-hidden) pill set is the
+	// wrap target: at one set's width we subtract it, so the loop has no seam.
+	onMount(() => {
 		const mask = maskEl;
 		if (!mask) return;
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+		let hovering = false;
+		let pos = 0;
+		let written = 0;
+		let userScrolledAt = -Infinity;
+		const RESUME_MS = 1000;
+		const SPEED_PX_PER_S = 24;
+
 		const hold = (): void => {
-			interacting = true;
+			hovering = true;
 		};
 		const release = (): void => {
-			interacting = false;
+			hovering = false;
+		};
+		const onScroll = (): void => {
+			if (Math.abs(mask.scrollLeft - written) > 2) {
+				pos = mask.scrollLeft;
+				userScrolledAt = performance.now();
+			}
 		};
 		mask.addEventListener('pointerenter', hold);
 		mask.addEventListener('pointerleave', release);
 		mask.addEventListener('focusin', hold);
 		mask.addEventListener('focusout', release);
-		return () => {
-			mask.removeEventListener('pointerenter', hold);
-			mask.removeEventListener('pointerleave', release);
-			mask.removeEventListener('focusin', hold);
-			mask.removeEventListener('focusout', release);
-		};
-	});
-
-	// Auto-advance scrollLeft while idle. Native overflow scrolling stays on, so a touch-drag or wheel
-	// scrolls manually; this only nudges the position between interactions. The second (aria-hidden)
-	// pill set is the seamless wrap target: at one set's width we subtract it, so the loop has no seam.
-	$effect(() => {
-		const mask = maskEl;
-		if (!mask || paused || interacting) return;
-		const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-		if (mq?.matches) return;
+		mask.addEventListener('scroll', onScroll, { passive: true });
 
 		let raf = 0;
 		let last = 0;
-		const SPEED_PX_PER_S = 24;
 		const tick = (t: number): void => {
-			if (last) {
+			if (last && !hovering && !reduce.matches && t - userScrolledAt > RESUME_MS) {
+				pos += (SPEED_PX_PER_S * (t - last)) / 1000;
 				const oneSet = mask.scrollWidth / 2;
-				let next = mask.scrollLeft + (SPEED_PX_PER_S * (t - last)) / 1000;
-				if (oneSet > 0 && next >= oneSet) next -= oneSet;
-				mask.scrollLeft = next;
+				if (oneSet > 0 && pos >= oneSet) pos -= oneSet;
+				mask.scrollLeft = pos;
+				written = mask.scrollLeft;
 			}
 			last = t;
 			raf = requestAnimationFrame(tick);
 		};
 		raf = requestAnimationFrame(tick);
-		return () => cancelAnimationFrame(raf);
+
+		return () => {
+			cancelAnimationFrame(raf);
+			mask.removeEventListener('pointerenter', hold);
+			mask.removeEventListener('pointerleave', release);
+			mask.removeEventListener('focusin', hold);
+			mask.removeEventListener('focusout', release);
+			mask.removeEventListener('scroll', onScroll);
+		};
 	});
 </script>
 
@@ -76,9 +84,6 @@
 			{/each}
 		</ul>
 	</div>
-	<button class="q-feed__pause" type="button" onclick={() => (paused = !paused)}>
-		{paused ? 'Play' : 'Pause'}
-	</button>
 </div>
 
 <style>
@@ -87,8 +92,10 @@
 	.q-feed {
 		margin-top: var(--space-m);
 	}
+	/* pan-x: horizontal drags scroll this row; vertical gestures fall through to page scroll. */
 	.q-feed__mask {
 		overflow-x: auto;
+		touch-action: pan-x;
 		scrollbar-width: none;
 		-webkit-mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
 		mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
@@ -120,22 +127,5 @@
 	.q-feed__pill:hover {
 		color: var(--color-fg);
 		border-color: var(--color-fg-muted);
-	}
-	.q-feed__pause {
-		display: block;
-		margin: var(--space-s) auto 0;
-		font-size: var(--font-size-s);
-		padding: 2px var(--space-m);
-		background: none;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-m);
-		color: var(--color-fg-muted);
-		cursor: pointer;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		/* No auto-scroll under reduced motion, so the Pause control has nothing to act on. */
-		.q-feed__pause {
-			display: none;
-		}
 	}
 </style>

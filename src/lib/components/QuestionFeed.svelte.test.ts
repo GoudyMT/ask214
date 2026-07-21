@@ -19,13 +19,4 @@ describe('QuestionFeed', () => {
 		flushSync();
 		expect(picked).toBe(EXAMPLE_QUESTIONS[0]);
 	});
-
-	it('the Pause control toggles between Pause and Play', () => {
-		const { container } = render(QuestionFeed, { props: { onPick: () => {} } });
-		const pause = container.querySelector('.q-feed__pause') as HTMLButtonElement;
-		expect(pause.textContent?.trim()).toBe('Pause');
-		pause.click();
-		flushSync();
-		expect(pause.textContent?.trim()).toBe('Play');
-	});
 });
