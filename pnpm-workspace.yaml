@@ -22,3 +22,12 @@ overrides:
   tmp: '>=0.2.6'
   ws: '>=8.21.0'
   undici: '>=7.28.0'
+  # Force patched js-yaml / adm-zip / sharp across the tree (transitive via @lhci/cli, transformers'
+  # onnxruntime-node, and transformers + wrangler>miniflare). Dev/build/test-only - none ship in the
+  # client bundle. GHSA-52cp-r559-cp3m (js-yaml quadratic CPU); GHSA-xcpc-8h2w-3j85 (adm-zip 4GB
+  # alloc); GHSA-f88m-g3jw-g9cj (sharp/libvips CVEs). Targeted range pins - only the vulnerable
+  # ranges are bumped, so any patched consumer is left alone. Retire when the parents bundle the
+  # patched versions natively (Dependabot will surface it).
+  'js-yaml@<3.15.0': '3.15.0'
+  'adm-zip@<0.6.0': '0.6.0'
+  'sharp@<0.35.0': '0.35.3'

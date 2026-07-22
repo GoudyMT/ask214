@@ -3,6 +3,7 @@
 	import type { Source } from '$lib/ask/sources';
 	import AskResultCard from './AskResultCard.svelte';
 	import SourceReader from './SourceReader.svelte';
+	import QuestionFeed from './QuestionFeed.svelte';
 
 	let {
 		askState,
@@ -34,14 +35,15 @@
 	);
 	const showReminder = $derived(askState.kind === 'idle' && setupDismissed && !reminderDismissed);
 
-	const EXAMPLES = [
-		'How do I lock in my VA claim date before I separate?',
-		'How do I apply for SkillBridge?',
-		'What do I need to apply for VA health care?'
-	];
-
 	function submit() {
 		if (query.trim() !== '') onAsk(query);
+	}
+
+	// A feed pill behaves exactly like typing the question + Search: fill the visible input, then run
+	// it through the same ask path (so the first query still hits the one-time model opt-in).
+	function pick(q: string) {
+		query = q;
+		onAsk(q);
 	}
 	function skipSetup() {
 		setupDismissed = true;
@@ -71,15 +73,6 @@
 	</div>
 {/if}
 
-<h1 class="ask-title">Ask</h1>
-<p class="ask-sub">
-	Plain-language questions, answered from official public sources - with the exact source on every
-	result.
-	<br /><span class="ask-private"
-		>Answered on your device - nothing you type is sent to a server or shared.</span
-	>
-</p>
-
 <form
 	class="ask-bar"
 	onsubmit={(e) => {
@@ -98,13 +91,11 @@
 	<button class="ask-search" type="submit" disabled={!ready}>Search</button>
 </form>
 
+<p class="ask-private">Answered on your device - nothing you type is sent to a server or shared.</p>
+
 <div class="ask-result">
 	{#if askState.kind === 'idle'}
-		<div class="ask-examples">
-			{#each EXAMPLES as ex (ex)}
-				<button class="ask-example" type="button" onclick={() => onAsk(ex)}>{ex}</button>
-			{/each}
-		</div>
+		<QuestionFeed onPick={pick} />
 	{:else if askState.kind === 'needsSetup'}
 		<div class="ask-setup">
 			<h2 class="ask-setup__title">One-time setup to answer your question</h2>
@@ -153,7 +144,7 @@
 	{:else if askState.kind === 'empty'}
 		<div class="ask-msg">
 			<p class="ask-msg__title">No close match</p>
-			<p class="ask-msg__body">Try rephrasing your question, or use one of the examples above.</p>
+			<p class="ask-msg__body">Try rephrasing your question, or ask about something else.</p>
 		</div>
 	{:else if askState.kind === 'offline'}
 		<div class="ask-msg ask-msg--accent">
@@ -173,16 +164,11 @@
 <SourceReader source={openSource} onClose={() => (openSource = null)} />
 
 <style>
-	.ask-title {
-		margin: var(--space-l) 0 2px;
-	}
-	.ask-sub {
-		color: var(--color-fg-muted);
-		margin: 0 0 var(--space-l);
-	}
 	.ask-private {
 		font-size: var(--font-size-s);
 		color: var(--color-success);
+		margin: var(--space-s) 0 0;
+		text-align: center;
 	}
 
 	.ask-bar {
@@ -197,6 +183,11 @@
 		border-radius: var(--radius-m);
 		padding: 12px var(--space-m);
 		font: inherit;
+	}
+	/* Hovering hints the bar is live; focusing promotes it to the accent border + ring, which then
+	   HOLDS for the whole typing session (focus does not lapse while the user types). */
+	.ask-input:hover:not(:focus) {
+		border-color: var(--color-fg-muted);
 	}
 	.ask-input:focus {
 		outline: 2px solid var(--color-accent);
@@ -215,29 +206,17 @@
 		font-weight: 600;
 		cursor: pointer;
 	}
+	.ask-search:hover:not(:disabled) {
+		background: var(--color-accent-muted);
+	}
 	.ask-search:disabled {
 		opacity: 0.6;
 		cursor: default;
 	}
 
-	.ask-examples {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-xs);
-		margin-top: var(--space-m);
-	}
-	.ask-example {
-		font-size: var(--font-size-s);
-		padding: 4px 12px;
-		border-radius: 999px;
-		border: 1px solid var(--color-border);
-		background: none;
-		color: var(--color-fg-muted);
-		cursor: pointer;
-	}
-
 	.ask-result {
 		margin-top: var(--space-l);
+		text-align: left;
 	}
 	.ask-count {
 		font-size: var(--font-size-s);

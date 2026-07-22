@@ -11,9 +11,17 @@ test('home page renders with header + main + footer landmarks', async ({ page })
 
 test('skip-to-content link is the first focusable element on the page', async ({ page }) => {
 	await page.goto('/');
-	await page.keyboard.press('Tab');
-	const focused = await page.evaluate(() => document.activeElement?.textContent ?? '');
-	expect(focused.toLowerCase()).toContain('skip');
+	await expect(page.getByRole('banner')).toBeVisible();
+	// Assert the invariant directly - the skip link is the first focusable element in DOM order - rather
+	// than pressing Tab: WebKit excludes links from its default Tab order, so a Tab probe tests Safari's
+	// keyboard behavior, not our page. The skip link stays reachable there via VoiceOver / full keyboard.
+	const firstFocusable = await page.evaluate(() => {
+		const el = document.querySelector(
+			'a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])'
+		);
+		return (el?.textContent ?? '').trim().toLowerCase();
+	});
+	expect(firstFocusable).toContain('skip');
 });
 
 test('About link navigates to /about', async ({ page }) => {

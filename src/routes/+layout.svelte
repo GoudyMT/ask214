@@ -52,6 +52,14 @@
 	});
 	setProfileApp(app);
 
+	// Settings acts only on stored data (the date, calendar, lock, erase). Hide the tab on a fresh
+	// no-date profile so it appears only once there is something to configure; a locked profile has
+	// data (its persona reads 'none' only because the plaintext is sealed), so it still shows.
+	const showSettings = $derived(
+		app.status === 'ready' &&
+			(app.store?.locked === true || app.store?.persona.completeness !== 'none')
+	);
+
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/service-worker.js', { type: 'module' });
@@ -167,11 +175,12 @@
 
 	<header>
 		<nav aria-label="Primary" style:--shell-width={shellWidth}>
-			<a href={resolve('/')} class="brand">Transition Companion</a>
+			<a href={resolve('/')} class="brand">Ask 214</a>
 			<ul>
 				<li><a href={resolve('/timeline')}>Timeline</a></li>
-				<li><a href={resolve('/ask')}>Ask</a></li>
-				<li><a href={resolve('/settings')}>Settings</a></li>
+				{#if showSettings}
+					<li><a href={resolve('/settings')}>Settings</a></li>
+				{/if}
 				<li><a href={resolve('/about')}>About</a></li>
 			</ul>
 		</nav>
@@ -221,14 +230,31 @@
 		margin: 0 auto;
 	}
 
-	/* Lock #7: inline horizontal nav (brand + 4 links: Timeline/Ask/Settings/About). */
-	/* Migrate to bottom-tab-bar pattern when nav reaches 4+ items. */
+	/* Lock #7: inline horizontal nav (brand + Timeline/Settings/About; Settings appears only once a
+	   separation date is set). Migrate to bottom-tab-bar pattern when nav reaches 4+ items. */
 	nav ul {
 		list-style: none;
 		padding: 0;
 		margin: 0;
 		display: flex;
 		gap: var(--space-m);
+	}
+
+	/* Quiet by default, promoted on hover/tap: the accent underline gives the press a visible target
+	   state on touch, where there is no hover to rely on. */
+	nav ul a {
+		color: var(--color-fg-muted);
+		text-decoration: none;
+		padding: var(--space-xs) 0;
+		border-bottom: 2px solid transparent;
+	}
+	nav ul a:hover {
+		color: var(--color-fg);
+		border-bottom-color: var(--color-accent);
+	}
+	nav ul a:active {
+		color: var(--color-accent);
+		border-bottom-color: var(--color-accent);
 	}
 
 	/* Lock #3: text wordmark, font-weight 600 (no logo until trademark clears). */

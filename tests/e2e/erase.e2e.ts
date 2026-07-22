@@ -9,7 +9,7 @@ async function seedProfile(page: import('@playwright/test').Page): Promise<void>
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill('2027-04-15');
 	await page.getByRole('button', { name: /save and continue/i }).click();
-	await expect(page.getByRole('heading', { level: 1, name: 'Transition Companion' })).toBeVisible();
+	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
 }
 
 test('erase removes the profile and lands on a clean first run', async ({ page }) => {
@@ -27,7 +27,7 @@ test('erase removes the profile and lands on a clean first run', async ({ page }
 
 	// A fresh keystore means first-run: the Home setup CTA is offered again.
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: /get started/i })).toBeVisible();
+	await expect(page.getByRole('link', { name: /set up your timeline/i })).toBeVisible();
 });
 
 test('a failed erase says so, and the data survives', async ({ page }) => {

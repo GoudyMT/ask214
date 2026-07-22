@@ -1,9 +1,6 @@
 <svelte:head>
-	<title>About - Transition Companion</title>
-	<meta
-		name="description"
-		content="Mission and privacy stance for the Transition Companion project."
-	/>
+	<title>About - Ask 214</title>
+	<meta name="description" content="Mission and privacy stance for the Ask 214 project." />
 </svelte:head>
 
 <h1>About</h1>

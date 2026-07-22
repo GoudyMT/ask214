@@ -17,12 +17,13 @@ async function setEaos(page: Page): Promise<void> {
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill(EAOS);
 	await page.getByRole('button', { name: /save and continue/i }).click();
-	await expect(page.getByRole('heading', { level: 1, name: 'Transition Companion' })).toBeVisible();
+	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
 }
 
 test('primary nav exposes a Timeline link that routes to /timeline', async ({ page }) => {
 	await page.goto('/');
-	const link = page.getByRole('link', { name: 'Timeline' });
+	// exact: the on-ramp's "Set up your timeline" link would substring-match a loose "Timeline".
+	const link = page.getByRole('link', { name: 'Timeline', exact: true });
 	await expect(link).toBeVisible();
 
 	await link.click();

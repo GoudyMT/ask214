@@ -1,31 +1,133 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import SetupCTA from '$lib/components/SetupCTA.svelte';
+	import AskView from '$lib/components/AskView.svelte';
+	import EmbedWorker from '$lib/ask/embed-worker?worker';
+	import { createAskStore, createEmbedder, loadCorpus, ASK_ERROR, type AskState } from '$lib/ask';
+	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { getProfileApp } from '$lib/profile/context';
 
+	const CORPUS_BASE = '/corpus/corpus-v1.0';
+
 	const app = getProfileApp();
+	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a
+	// timeline exists it is replaced by the returning-user "next deadlines" strip (a later increment).
+	const showOnramp = $derived(
+		app.status === 'ready' && !app.store?.locked && app.store?.persona.completeness === 'none'
+	);
+
+	// Ask store wiring (moved from the old /ask route): the store needs the in-memory corpus, so it is
+	// created after the corpus (a small same-origin static asset) loads. The ~23MB model is NOT fetched
+	// here - it downloads only when the user opts in (store.setUp), via AskView's setup prompt.
+	let store = $state<ReturnType<typeof createAskStore> | null>(null);
+	let sources = $state<Map<string, Source>>(new Map());
+	let initError = $state(false);
+
+	const askState: AskState = $derived(
+		initError ? { kind: 'error', code: ASK_ERROR.CORPUS } : (store?.state ?? { kind: 'idle' })
+	);
+	const ready = $derived(store !== null);
+	// The below-hero band is idle-state content; once a query runs (any non-idle state), the results own
+	// the space and the band steps aside.
+	const isIdle = $derived(askState.kind === 'idle');
+
+	onMount(() => {
+		let worker: Worker | undefined;
+		void (async () => {
+			try {
+				const corpus = await loadCorpus(fetch, CORPUS_BASE);
+				sources = sourcesFromCorpus(corpus);
+				worker = new EmbedWorker();
+				store = createAskStore({ embed: createEmbedder(worker), corpus });
+			} catch {
+				initError = true;
+			}
+		})();
+		return () => worker?.terminate();
+	});
 </script>
 
 <svelte:head>
-	<title>Transition Companion</title>
+	<title>Ask 214</title>
 	<meta
 		name="description"
-		content="Privacy-first companion for US transitioning service members."
+		content="Ask a question about your military transition and get answers backed by official sources, on your device."
 	/>
 </svelte:head>
 
-{#if app.status === 'ready' && !app.store?.locked && app.store?.persona.completeness === 'none'}
-	<SetupCTA />
-{/if}
+<div class="home">
+	<h1 class="home-hero">Answers for your military transition, from sources you can trust.</h1>
 
-<h1>Transition Companion</h1>
+	<AskView
+		{askState}
+		{ready}
+		{sources}
+		onAsk={(q) => store?.ask(q)}
+		onSetUp={() => store?.setUp()}
+		onDismiss={() => store?.dismissSetup()}
+	/>
 
-<p>
-	A privacy-first companion for US transitioning service members. This is the v1.0 scaffold -
-	features arrive in subsequent phases.
-</p>
+	{#if isIdle && showOnramp}
+		<hr class="home-divider" />
+		<section class="home-onramp" aria-labelledby="home-onramp-heading">
+			<h2 id="home-onramp-heading">Make it yours</h2>
+			<p>
+				Add your separation date and Ask 214 builds a timeline of what to do and when - tailored to
+				your date, still fully on your device.
+			</p>
+			<a class="home-onramp__action" href={resolve('/wizard')}>Set up your timeline</a>
+		</section>
+	{/if}
+</div>
 
-<p>
-	Currently in early development. See <a href={resolve('/about')}>About</a> for the project mission and
-	privacy stance.
-</p>
+<style>
+	/* The hero (headline + input + trust + examples) is centered; results render left-aligned inside
+	   AskView for readability. Exact alignment + spacing is deferred-polish (refine against the mockup). */
+	.home {
+		max-width: 640px;
+		margin: 0 auto;
+		text-align: center;
+	}
+	.home-hero {
+		font-size: var(--font-size-h1-fluid);
+		line-height: 1.15;
+		margin: var(--space-xl) 0 var(--space-l);
+	}
+	/* Separates the Ask from the below-hero surface. Idle-only: once a query runs the results own the
+	   page and this whole block steps aside. */
+	.home-divider {
+		border: 0;
+		border-top: 1px solid var(--color-border);
+		margin: var(--space-xxl) 0 var(--space-l);
+	}
+	.home-onramp {
+		margin-top: 0;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-left: 4px solid var(--color-accent);
+		border-radius: var(--radius-m);
+		padding: var(--space-l);
+		text-align: left;
+	}
+	.home-onramp h2 {
+		margin: 0 0 var(--space-xs);
+		font-size: var(--font-size-l);
+	}
+	.home-onramp p {
+		color: var(--color-fg-muted);
+		margin: 0 0 var(--space-m);
+		font-size: var(--font-size-s);
+	}
+	.home-onramp__action {
+		display: inline-block;
+		background: var(--color-accent);
+		color: var(--color-bg);
+		padding: var(--space-s) var(--space-l);
+		border-radius: var(--radius-m);
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.home-onramp__action:hover {
+		background: var(--color-accent-muted);
+	}
+</style>

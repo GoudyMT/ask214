@@ -1,4 +1,4 @@
-const PRODID = '-//Military Transition Companion//Calendar//EN';
+const PRODID = '-//Ask 214//Calendar//EN';
 
 /** Escape an iCalendar TEXT value (RFC 5545 3.3.11): backslash, semicolon, comma, newline. */
 function escapeText(s: string): string {
