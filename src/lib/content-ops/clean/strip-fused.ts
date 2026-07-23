@@ -61,7 +61,23 @@ function digitCount(run: string): number {
 
 function stripLeadingSegments(text: string, segments: string[]): string {
 	let result = text;
+	let first = true;
 	for (const segment of segments) {
+		// Only in front of the FIRST segment can a leading page-number run sit (some guides print the
+		// page number before the header). Skip it ONLY when doing so makes the segment match - never
+		// strip a leading number off a block that simply lacks this header, since that would be content.
+		if (first && !result.startsWith(segment)) {
+			const lead = result.match(VARIABLE_RUN_RE)?.[0] ?? '';
+			if (
+				lead.length > 0 &&
+				digitCount(lead) <= MAX_PAGE_NUMBER_DIGITS &&
+				result.slice(lead.length).startsWith(segment)
+			) {
+				result = result.slice(lead.length);
+			}
+		}
+		first = false;
+
 		if (!result.startsWith(segment)) break;
 		result = result.slice(segment.length);
 		const run = result.match(VARIABLE_RUN_RE)?.[0] ?? '';

@@ -140,7 +140,15 @@ function reverseString(s: string): string {
  *     responsible for reversing each segment (and the array) back when scanning for a suffix.
  */
 function findSegments(texts: string[], total: number, threshold: number): string[] {
-	let active = texts;
+	// Skip a leading page-number run before the first-segment search: some guides print the page number
+	// BEFORE the running header, so the constant text does not start at position 0 and no single first
+	// character clears the support threshold. Bounded to a page-number-shaped run (mirrors the
+	// between-segments skip and strip-fused); a text with no leading page number is unaffected because
+	// the run then matches the empty string.
+	let active = texts.map((s) => {
+		const lead = s.match(VARIABLE_RUN_RE)?.[0] ?? '';
+		return (lead.match(/\d/g) ?? []).length <= MAX_PAGE_NUMBER_DIGITS ? s.slice(lead.length) : s;
+	});
 	const segments: string[] = [];
 
 	for (let i = 0; i < MAX_SEGMENTS; i++) {

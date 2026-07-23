@@ -157,4 +157,15 @@ describe('stripFused', () => {
 			stripFused('Real content here. 12 Footer Beta', { prefix: [], suffix: ['Footer Beta'] })
 		).toBe('Real content here.');
 	});
+
+	it('strips a running header whose page number LEADS the constant text (leading-page shape)', () => {
+		// Some guides print the page number before the header, so the constant segment does not start
+		// at position 0; the leading page number must be skipped for the prefix segment to match.
+		expect(
+			stripFused('5Version 3 0 Womens Health Handbook Real content here.', {
+				prefix: ['Version 3 0 Womens Health Handbook'],
+				suffix: []
+			})
+		).toBe('Real content here.');
+	});
 });

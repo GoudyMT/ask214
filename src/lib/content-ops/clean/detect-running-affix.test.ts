@@ -152,6 +152,63 @@ const CLEAN_HTML_BLOCKS = [
 	}
 ];
 
+// Modeled on tap_va_womens_health.json (12 of its 127 blocks): the extractor fused the running
+// header AFTER each page's own page number - the page number LEADS the constant text rather than
+// trailing or sitting embedded between two constants. (The real header carries a curly apostrophe in
+// "Women's"; dropped here for plain-ASCII test text - detection is apostrophe-agnostic.) The constant
+// "Version 3 0 Released July 2025 Womens Health..." only becomes shared once the leading page number
+// is skipped, which is exactly the shape the detector must learn to catch.
+const WOMENS_HEALTH_LEADING_PAGE_BLOCKS = [
+	{
+		text: '5Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Whole Health starts with you and what matters to you in your life',
+		page: 5
+	},
+	{
+		text: '6Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook The Circle of Health shows the areas that affect your health and',
+		page: 6
+	},
+	{
+		text: '7Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Mindful awareness is paying attention to the present moment with',
+		page: 7
+	},
+	{
+		text: '8Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Working your body through movement and exercise supports your ph',
+		page: 8
+	},
+	{
+		text: '9Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Surroundings are the places where you live, work, learn, and pla',
+		page: 9
+	},
+	{
+		text: '10Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Personal development is about growing and learning throughout y',
+		page: 10
+	},
+	{
+		text: '11Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Food and drink choices are an important part of your whole heal',
+		page: 11
+	},
+	{
+		text: '12Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Recharge covers your sleep and rest, which restore your body an',
+		page: 12
+	},
+	{
+		text: '13Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Family, friends, and coworkers all shape your sense of connecti',
+		page: 13
+	},
+	{
+		text: '14Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Spirit and soul is about what gives your life meaning and purpo',
+		page: 14
+	},
+	{
+		text: '15Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Your professional care team includes the providers who support',
+		page: 15
+	},
+	{
+		text: '16Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook Use this handbook to prepare for your appointments and follow u',
+		page: 16
+	}
+];
+
 describe('detectRunningAffix', () => {
 	it('finds the trailing-page-number running header shared across blocks (tap_managing_transition.json blocks 3-14)', () => {
 		const affix = detectRunningAffix(MANAGING_TRANSITION_BLOCKS);
@@ -185,6 +242,16 @@ describe('detectRunningAffix', () => {
 		const affix = detectRunningAffix(VA_HOME_LOAN_BLOCKS);
 		expect(affix.prefix).toEqual([]);
 		expect(affix.suffix).toEqual([]);
+	});
+
+	it('finds a running header whose page number LEADS the constant text (tap_va_womens_health shape)', () => {
+		// The constant only aligns across blocks once the leading page number is skipped. Without that
+		// skip the first character is the varying page digit, no single char clears the 50% bar, and the
+		// header is never learned - leaving it fused into every content block.
+		const affix = detectRunningAffix(WOMENS_HEALTH_LEADING_PAGE_BLOCKS);
+		expect(affix.prefix.join(' ')).toContain(
+			'Version 3 0 Released July 2025 Womens Health Transition Training Participant Handbook'
+		);
 	});
 
 	it('finds nothing on a clean source with no repeated affix (dod_skillbridge.json blocks 2, 4, 6)', () => {
