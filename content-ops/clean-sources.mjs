@@ -7,18 +7,20 @@
 // to cleaned/<id>.json under the SAME source_id + content_hash as the extraction (so the chunk
 // gate still matches the extraction it was built from). A source with a real edit stays pending
 // until a human approves it via the review report; a source cleaning left untouched auto-approves;
-// a previously-approved source whose content hasn't changed carries its approval forward rather
-// than re-opening the gate. The logic lives in the tested pure unit at
-// src/lib/content-ops/clean/clean-extraction.ts; this script only does IO + the review-gate
-// bookkeeping.
+// a previously-approved source whose CLEANED OUTPUT hash hasn't changed carries its approval
+// forward rather than re-opening the gate - so a cleaning-rules change (same extraction, different
+// cleaned result) correctly flips it back to pending even though nothing was re-ingested. The
+// logic lives in the tested pure unit at src/lib/content-ops/clean/clean-extraction.ts; this
+// script only does IO + the review-gate bookkeeping.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { cleanExtraction } from '../src/lib/content-ops/clean/clean-extraction.ts';
 
 /** @typedef {import('../src/lib/content-ops/extract/pdf-text.ts').Block} Block */
 /** @typedef {import('../src/lib/content-ops/clean/clean-extraction.ts').CleanReport} CleanReport */
 /** @typedef {{ source_id: string, content_hash: string, extractionMode: string, textLayerPresent: boolean, fidelity: unknown, blocks: Block[], normalizedText: string }} ExtractedDoc */
-/** @typedef {{ sourceId: string, contentHash: string, decision: 'pending' | 'approved', dropped: number, stripped: number, review: number }} CleanedSource */
+/** @typedef {{ sourceId: string, contentHash: string, cleanedHash: string, decision: 'pending' | 'approved', dropped: number, stripped: number, review: number }} CleanedSource */
 /** @typedef {{ generatedAt: string, sources: CleanedSource[] }} CleanedManifest */
 
 const EXTRACTED_DIR = 'content-ops/extracted';
@@ -31,6 +33,13 @@ const DATE = new Date().toISOString().slice(0, 10);
 const ARGS = process.argv.slice(2);
 /** @param {string} id */
 const pick = (id) => ARGS.length === 0 || ARGS.includes(id);
+
+/** SHA-256 hex of the cleaned-output fingerprint (normalizedText) - the approval-gate key. A
+ *  cleaning-rules change alters this hash even though the source extraction is untouched, which is
+ *  exactly what must re-open the review gate (chunk-sources.mjs's isCleanApproved reads this same
+ *  field back and fails closed on a mismatch).
+ *  @param {string} s @returns {string} */
+const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
 /** Loads the persisted manifest, or an empty one on the first-ever run.
  *  @returns {CleanedManifest} */
@@ -138,17 +147,21 @@ function clean() {
 				)
 			);
 
+			const cleanedHash = sha256(cleaned.normalizedText);
 			const noEdits = reportIsEmpty(report);
-			// An unchanged source never re-opens the review gate: only a matching prior approval
-			// AND an identical content_hash carry the decision forward without a fresh human look.
-			const carriedForward =
-				prior?.decision === 'approved' && prior.contentHash === ex.content_hash;
+			// An unchanged CLEANED OUTPUT never re-opens the review gate: only a matching prior
+			// approval AND an identical cleanedHash carry the decision forward without a fresh
+			// human look. Keying on cleanedHash (not contentHash) means a cleaning-rules change -
+			// same extraction, different cleaned result - flips a previously-approved source back
+			// to pending, since no human has reviewed THIS exact cleaned output yet.
+			const carriedForward = prior?.decision === 'approved' && prior.cleanedHash === cleanedHash;
 			/** @type {'pending' | 'approved'} */
 			const decision = carriedForward || noEdits ? 'approved' : 'pending';
 
 			sources.push({
 				sourceId,
 				contentHash: ex.content_hash,
+				cleanedHash,
 				decision,
 				dropped: report.dropped.length,
 				stripped: report.stripped.length,
