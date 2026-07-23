@@ -12,10 +12,13 @@
 //
 // NOTE: the held-out split was deliberately grown (from a ~15-positive knife-edge to ~24 positives) so a
 // single-query swing no longer crosses the 0.80 floor; the script prints the live split counts at runtime.
-// The MIN_SCORE calibration is still flat across 0-0.4 (no held-out lead near the 0.4 cutoff). If a future
-// refresh marginally misses, GROW the eval set further (more positives per source, incl. a deliberately
-// weak-scoring lead near the cutoff) BEFORE touching the model/thresholds - a one-query swing on a split this
-// size is sample noise, not a retrieval regression.
+// The store's shipped MIN_SCORE (0.4) is gated DIRECTLY on the held-out split below - not inferred from a
+// flatness assumption: the auto-calibration selects the highest cutoff holding the TUNE floor, but the
+// held-out floor is then re-tested at BOTH that cutoff and the shipped 0.4, so the value that ships is the
+// one that is gated. If a refresh marginally misses on the (larger, more stable) TUNE split, GROW the eval
+// set further (more positives per source, incl. a deliberately weak-scoring lead near the cutoff) BEFORE
+// touching the model/thresholds - a one-query swing on a split this size is sample noise, not a regression,
+// and the held-out gate is the honest arbiter.
 import { readFileSync } from 'node:fs';
 import { pipeline } from '@huggingface/transformers';
 import { decodeCorpus, cosineSimilarity } from '../src/lib/corpus/index.ts';
@@ -34,6 +37,10 @@ const FLOOR = { srcHitRate: 0.8, srcMRR: 0.6 };
 const TARGET = { srcHitRate: 0.9, srcMRR: 0.75 };
 // MIN_SCORE candidates (display cutoff): pick the HIGHEST that still holds the held-out floor.
 const MIN_SCORE_CANDIDATES = [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4];
+// The store's shipped display cutoff (must match src/lib/ask/store.svelte.ts MIN_SCORE). The held-out
+// gate re-tests the floor at THIS exact value, so the cutoff that actually ships is directly validated
+// on this corpus rather than assumed to sit on a flat stretch of the auto-calibration curve.
+const SHIPPED_MIN_SCORE = 0.4;
 // v1.0 retrieval = pure dense (alpha 1, no BM25 gate); minScore is the only knob (the display cutoff).
 /** @param {number} minScore */
 const DENSE = (minScore) => ({ alpha: 1, minScore, minBm25: 0 });
@@ -116,11 +123,18 @@ const params = DENSE(calibrated);
 const tuneM = evalUnderParams(tuneCache, chunkSourceIds, params, K);
 const heldM = evalUnderParams(heldCache, chunkSourceIds, params, K);
 const fullM = evalUnderParams(cache, chunkSourceIds, params, K);
+// Held-out re-tested at the SHIPPED display cutoff (0.4), independent of the tune-selected `calibrated`
+// value - this is the number that certifies what the store actually ships, produced by the script rather
+// than inferred from flatness.
+const heldAtShipped = evalUnderParams(heldCache, chunkSourceIds, DENSE(SHIPPED_MIN_SCORE), K);
 /** @param {ReturnType<typeof evalUnderParams>} m */
 const fmt = (m) => `srcHitRate@${K}=${m.srcHitRate.toFixed(3)}  srcMRR=${m.srcMRR.toFixed(3)}`;
 console.log(`\n[dense @ MIN_SCORE ${calibrated.toFixed(2)}]`);
 console.log(`  TUNE      ${fmt(tuneM)}`);
-console.log(`  HELD-OUT  ${fmt(heldM)}   <- the acceptance gate`);
+console.log(`  HELD-OUT  ${fmt(heldM)}   <- the acceptance gate (calibrated cutoff)`);
+console.log(
+	`  HELD-OUT @ ${SHIPPED_MIN_SCORE.toFixed(2)}  ${fmt(heldAtShipped)}   <- the SHIPPED-cutoff gate`
+);
 console.log(`  FULL      ${fmt(fullM)}`);
 console.log(`  correct-empty (v1.1 metric, not gated at v1.0): ${fullM.correctEmpty.toFixed(3)}`);
 console.log(
@@ -155,13 +169,17 @@ for (const c of cache) {
 const chunkHitRate = hitRateAtK(rankedChunkIdsAll, expectedChunkIdsAll, K);
 console.log(`\n[chunk-level precision readout] chunkHitRate@${K}=${chunkHitRate.toFixed(3)}`);
 
-// --- Gate (fail-closed) on the HELD-OUT ranking floor at the calibrated MIN_SCORE. Never lower the gate.
-if (heldM.srcHitRate < FLOOR.srcHitRate || heldM.srcMRR < FLOOR.srcMRR) {
+// --- Gate (fail-closed) on the HELD-OUT ranking floor at BOTH the calibrated cutoff AND the shipped
+// MIN_SCORE, so the store's actual display cutoff is validated on this corpus - not assumed flat. Never
+// lower the gate; climb the escalation ladder instead.
+/** @param {ReturnType<typeof evalUnderParams>} m */
+const belowFloor = (m) => m.srcHitRate < FLOOR.srcHitRate || m.srcMRR < FLOOR.srcMRR;
+if (belowFloor(heldM) || belowFloor(heldAtShipped)) {
 	console.error(
-		'\n[FAIL] held-out ranking below the floor - climb the escalation ladder, never lower the gate'
+		`\n[FAIL] held-out ranking below the floor (calibrated ${calibrated.toFixed(2)}: ${fmt(heldM)}; shipped ${SHIPPED_MIN_SCORE.toFixed(2)}: ${fmt(heldAtShipped)}) - climb the escalation ladder, never lower the gate`
 	);
 	process.exit(1);
 }
 console.log(
-	`\n[PASS] held-out meets the v1.0 ranking floor at MIN_SCORE ${calibrated.toFixed(2)} (correct-empty is a v1.1 gate)`
+	`\n[PASS] held-out meets the v1.0 ranking floor at both the calibrated (${calibrated.toFixed(2)}) and shipped (${SHIPPED_MIN_SCORE.toFixed(2)}) MIN_SCORE (correct-empty is a v1.1 gate)`
 );
