@@ -31,3 +31,24 @@ export function isCleanApproved(
 		approval.cleanedHash === cleaned.cleanedHash
 	);
 }
+
+/**
+ * Extracted source ids that have no cleaned artifact. The chunker builds its worklist from the
+ * cleaned/ directory, so a source that was extracted but never cleaned would be silently omitted from
+ * the corpus rather than blocked - a completeness hole in the fail-closed gate. Chunking must refuse
+ * to proceed while any of these exist, so a missing source fails loudly like an unapproved one does.
+ *
+ * Args:
+ *     extractedIds: Source ids present in the extraction directory (the sources that must be covered).
+ *     cleanedIds: Source ids that have a cleaned artifact on disk.
+ *
+ * Returns:
+ *     The extractedIds, in order, that have no matching cleaned artifact.
+ */
+export function missingCleanedSources(
+	extractedIds: string[],
+	cleanedIds: Iterable<string>
+): string[] {
+	const cleaned = new Set(cleanedIds);
+	return extractedIds.filter((id) => !cleaned.has(id));
+}

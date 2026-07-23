@@ -19,7 +19,10 @@ import { checkCoverage } from '../src/lib/content-ops/chunk/coverage.ts';
 import { computeAnchor } from '../src/lib/content-ops/chunk/anchor.ts';
 import { toChunk } from '../src/lib/content-ops/chunk/to-chunk.ts';
 import { validateCorpusAgainstRegistry } from '../src/lib/content-ops/corpus-crossref.ts';
-import { isCleanApproved } from '../src/lib/content-ops/clean/clean-approval.ts';
+import {
+	isCleanApproved,
+	missingCleanedSources
+} from '../src/lib/content-ops/clean/clean-approval.ts';
 
 /** @typedef {import('../src/lib/content-ops/sources-schema.ts').SourceEntry} SourceEntry */
 /** @typedef {import('../src/lib/content-ops/extract/pdf-text.ts').Block} Block */
@@ -53,6 +56,34 @@ const byId = new Map(registry.map((e) => [e.source_id, e]));
 
 const files = readdirSync(CLEANED_DIR).filter((f) => f.endsWith('.json') && f !== 'manifest.json');
 const picked = files.filter((f) => pick(f.replace(/\.json$/, '')));
+
+// Completeness (fail-closed on omission, not just on bad content): the chunk worklist is the cleaned/
+// directory, so without this a source that was extracted but never cleaned - or a mistyped id - would
+// silently drop out of the corpus with exit 0 instead of failing. A requested id must be a real
+// extracted source, and every extracted source in scope must have a cleaned artifact.
+const extractedAll = readdirSync(EXTRACTED_DIR)
+	.filter((f) => f.endsWith('.json'))
+	.map((f) => f.replace(/\.json$/, ''));
+const extractedSet = new Set(extractedAll);
+const unknownRequested = ARGS.filter((a) => !a.startsWith('--')).filter(
+	(id) => !extractedSet.has(id)
+);
+if (unknownRequested.length > 0) {
+	console.error(`[FAIL] requested source(s) not found in ${EXTRACTED_DIR}:`);
+	for (const id of unknownRequested) console.error(`    ${id}`);
+	process.exit(1);
+}
+const missingCleaned = missingCleanedSources(
+	extractedAll.filter((id) => pick(id)),
+	files.map((f) => f.replace(/\.json$/, ''))
+);
+if (missingCleaned.length > 0) {
+	console.error(
+		`[FAIL] ${missingCleaned.length} extracted source(s) have no cleaned output: run pnpm run clean`
+	);
+	for (const id of missingCleaned) console.error(`    ${id}`);
+	process.exit(1);
+}
 
 console.log('='.repeat(60));
 console.log('CONTENT-OPS - CHUNK + ANCHOR');

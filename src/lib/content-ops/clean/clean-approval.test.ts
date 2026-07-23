@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isCleanApproved } from './clean-approval';
+import { isCleanApproved, missingCleanedSources } from './clean-approval';
 import type { CleanedRef, CleanApproval } from './clean-approval';
 
 const EXTRACTION_HASH = 'ext-hash-current';
@@ -42,5 +42,19 @@ describe('isCleanApproved', () => {
 
 	it('passes only when cleaned is derived from the current extraction AND approved as this exact cleaned output', () => {
 		expect(isCleanApproved(EXTRACTION_HASH, freshCleaned, matchingApproval)).toBe(true);
+	});
+});
+
+describe('missingCleanedSources', () => {
+	it('flags an extracted source that has no cleaned artifact (would be silently omitted from the corpus)', () => {
+		expect(missingCleanedSources(['a', 'b', 'c'], ['a', 'c'])).toEqual(['b']);
+	});
+
+	it('returns empty when every extracted source has a cleaned artifact', () => {
+		expect(missingCleanedSources(['a', 'b'], ['a', 'b', 'also-cleaned'])).toEqual([]);
+	});
+
+	it('preserves the order of the extracted ids in the missing list', () => {
+		expect(missingCleanedSources(['x', 'y', 'z'], [])).toEqual(['x', 'y', 'z']);
 	});
 });
