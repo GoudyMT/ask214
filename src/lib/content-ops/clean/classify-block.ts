@@ -14,6 +14,19 @@ const TOC_CONTENTS_MARKER_RE = /table of contents|^contents/i;
 const TOC_TOKEN_FRACTION_THRESHOLD = 0.12; // measured: real ToCs run 0.20-0.23; real prose tops out under 0.02
 const TOC_MIN_DOTTED_LEADERS = 3; // a handful of repeated leaders is unambiguous; stray ellipses in prose are 1-2
 const TOC_SCORE_THRESHOLD = 0.5;
+// A multi-page contents section only carries the "Contents" marker on its first page - the
+// continuation pages are just as unambiguously a contents page, but the marker-gated path above
+// never sees them. Measured across every block in this corpus: the highest dotted-leader count in
+// any block that is not part of a confirmed multi-page contents section is 4; the lowest count in
+// a confirmed marker-less contents continuation page is 9. The threshold sits at that lower bound
+// so it uses the full width of the gap - maximal margin above real prose - while still catching
+// every confirmed continuation page. This path fires without requiring the marker at all, so it
+// must clear a much higher bar than the marker-gated path to avoid catching an ordinary numbered
+// or bulleted list; its floor confidence (0.7) matches the orchestrator's auto-drop cutoff exactly,
+// since a block dense enough to clear this bar with no marker support at all is not a borderline
+// call.
+const TOC_MARKERLESS_MIN_DOTTED_LEADERS = 9;
+const TOC_MARKERLESS_BASE_SCORE = 0.7;
 
 // disclaimer: the bare word "disclaimer" is not enough on its own - measured on real data, it
 // shows up as an aside inside otherwise-real content (a note about the PDF form itself, an
@@ -46,12 +59,19 @@ const SENTENCE_TERMINATOR_RE = /[a-zA-Z]{2,}[.!?](?=\s|$)/g;
 
 /** Fraction of the block that reads as a dense list of title-plus-page-number entries. */
 function scoreToc(text: string): number {
-	if (!TOC_CONTENTS_MARKER_RE.test(text)) return 0;
+	const dottedLeaders = (text.match(/\.{3,}/g) || []).length;
+
+	if (!TOC_CONTENTS_MARKER_RE.test(text)) {
+		// No "Contents" marker: only unambiguous dotted-leader density can fire here (a multi-page
+		// contents section's continuation pages carry no marker of their own).
+		if (dottedLeaders < TOC_MARKERLESS_MIN_DOTTED_LEADERS) return 0;
+		const magnitude = Math.min(1, dottedLeaders / (TOC_MARKERLESS_MIN_DOTTED_LEADERS * 2));
+		return TOC_MARKERLESS_BASE_SCORE + (1 - TOC_MARKERLESS_BASE_SCORE) * magnitude;
+	}
 
 	const tokens = text.split(/\s+/).filter((t) => t.length > 0);
 	const pageNumberTokens = tokens.filter((t) => /^\d{1,3}$/.test(t)).length;
 	const fraction = pageNumberTokens / tokens.length;
-	const dottedLeaders = (text.match(/\.{3,}/g) || []).length;
 
 	if (fraction < TOC_TOKEN_FRACTION_THRESHOLD && dottedLeaders < TOC_MIN_DOTTED_LEADERS) return 0;
 

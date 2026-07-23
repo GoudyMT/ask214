@@ -36,6 +36,19 @@ describe('classifyBlock', () => {
 			expect(result.kind).toBe('toc');
 			expect(result.confidence).toBeGreaterThan(0.5);
 		});
+
+		it('classifies a marker-less multi-page toc continuation page purely on dotted-leader density (tap_dol_employment_workshop.json block 5, page 6)', () => {
+			const result = classifyBlock({
+				page: 6,
+				text: 'Section 4: Networking................................................................................................................. 90 Section Objectives............................................................................................................. 90 What is Networking?............................................................................................................... 91 Activity 4.1: Expand Your Network.................................................................................... 91 Reaching Your Network.......................................................................................................... 92 Informal Networking.......................................................................................................... 92 Conduct Informational Interviews............................................................................................ 94 Tips for Setting Up Informational Interviews....................................................................... 94 Activity 4.2: Explore Informational Interviews.................................................................... 95 Formal Networking.................................................................................................................. 96 Join Your Professional or Trade Organizations................................................................. 96 Find a Mentor..................................................................................................................... 96 Attending Networking Events and Job Fairs............................................................................ 97'
+			});
+			// This is page 6 of a multi-page toc - only the FIRST toc page in this document (block 2)
+			// carries the "TABLE OF CONTENTS" marker; this continuation page carries none, but is just
+			// as unambiguously a contents page from its dotted-leader density alone. The orchestrator
+			// auto-drops non-content at confidence >= 0.7, so this path must clear that bar.
+			expect(result.kind).toBe('toc');
+			expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+		});
 	});
 
 	describe('disclaimer', () => {
