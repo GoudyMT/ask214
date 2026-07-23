@@ -7,6 +7,13 @@ import type { RunningAffix } from './detect-running-affix';
 // the byte-verbatim guarantee the next pipeline stage (blocksToNormalizedText) depends on.
 const VARIABLE_RUN_RE = /^\s?\d*\s?/;
 
+// A page number in these guides is at most 3 digits (matching the corpus's own page-number definition -
+// a 4-digit year, or a longer numeric id like a video URL's, is never a page number). The variable run
+// after a constant affix segment is only consumed when its digit run fits this bound; a longer contiguous
+// run is real content glued to the affix, and eating it would silently destroy government content. Mirrors
+// detect-running-affix.ts's own MAX_PAGE_NUMBER_DIGITS so the detector and the stripper skip the identical token.
+const MAX_PAGE_NUMBER_DIGITS = 3;
+
 // A dotted leader is the classic "Title......4" table-of-contents-style page reference: 3+ dots is
 // where real leaders in this corpus start (a stray ellipsis in ordinary prose never runs past 2),
 // optionally trailed by whitespace and the page number itself. Anchored to the string end so this
@@ -47,13 +54,20 @@ function reverseString(s: string): string {
  * Returns:
  *     The text with the leading segments (and their adjoining page-number runs) removed.
  */
+/** Number of digit characters in a matched variable run, used to tell a page number from glued content. */
+function digitCount(run: string): number {
+	return (run.match(/\d/g) ?? []).length;
+}
+
 function stripLeadingSegments(text: string, segments: string[]): string {
 	let result = text;
 	for (const segment of segments) {
 		if (!result.startsWith(segment)) break;
 		result = result.slice(segment.length);
 		const run = result.match(VARIABLE_RUN_RE)?.[0] ?? '';
-		result = result.slice(run.length);
+		// Consume the run only when its digits are page-number-shaped; a longer run (a URL id, a year)
+		// is content glued to the affix and must be left byte-verbatim, not swallowed as a page number.
+		if (digitCount(run) <= MAX_PAGE_NUMBER_DIGITS) result = result.slice(run.length);
 	}
 	return result;
 }

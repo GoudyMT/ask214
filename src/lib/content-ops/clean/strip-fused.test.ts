@@ -127,4 +127,34 @@ describe('stripFused', () => {
 		const t = 'Page 42';
 		expect(stripFused(t, { prefix: [], suffix: [] })).toBe(t);
 	});
+
+	it('preserves a long numeric id glued to content immediately before a suffix affix (not a page-number run)', () => {
+		// A running footer sits right after a content URL whose numeric id (6 digits) is glued to it.
+		// The id is real government content, not a page number - stripping the footer must not eat it.
+		const nav =
+			'SECTION 1 SECTION 2 SECTION 3 SECTION 4 SECTION 5 SECTION 6 SECTION 7 SECTION 8 SECTION 9TOC';
+		expect(
+			stripFused(
+				'Watch the course introduction video at https://www.dvidshub.net/ video/embed/936691 ' +
+					nav,
+				{ prefix: [], suffix: [nav] }
+			)
+		).toBe('Watch the course introduction video at https://www.dvidshub.net/ video/embed/936691');
+	});
+
+	it('preserves a 4-digit year glued to content before a suffix affix (too long to be a page number)', () => {
+		expect(
+			stripFused('members serving on active duty in 2021Footer Beta', {
+				prefix: [],
+				suffix: ['Footer Beta']
+			})
+		).toBe('members serving on active duty in 2021');
+	});
+
+	it('still strips a short (<=3 digit) page number between content and a suffix footer', () => {
+		// The legitimate page-number case must keep working: a bare page number delimited from content.
+		expect(
+			stripFused('Real content here. 12 Footer Beta', { prefix: [], suffix: ['Footer Beta'] })
+		).toBe('Real content here.');
+	});
 });

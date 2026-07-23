@@ -42,6 +42,11 @@ const MAX_SEGMENTS = 4;
 // always matches (possibly the empty string), consuming exactly the token that varies per block.
 const VARIABLE_RUN_RE = /^\s?\d*\s?/;
 
+// A page number is at most 3 digits here (a 4-digit year or a longer numeric id is not one). Only a
+// digit run this short counts as the variable page token to skip between constant segments; a longer run
+// is content, so the shared segment ends there. Mirrors strip-fused.ts's MAX_PAGE_NUMBER_DIGITS exactly.
+const MAX_PAGE_NUMBER_DIGITS = 3;
+
 type CommonPrefixResult = { segment: string; matchedTexts: string[] };
 
 /**
@@ -148,7 +153,10 @@ function findSegments(texts: string[], total: number, threshold: number): string
 
 		active = matchedTexts.map((s) => {
 			const remainder = s.slice(segment.length);
-			const skipLength = remainder.match(VARIABLE_RUN_RE)?.[0]?.length ?? 0;
+			const run = remainder.match(VARIABLE_RUN_RE)?.[0] ?? '';
+			// Only a page-number-shaped digit run is the variable token to skip; a longer run (id/year)
+			// is content, so treat the segment as ending here rather than skipping across real text.
+			const skipLength = (run.match(/\d/g) ?? []).length <= MAX_PAGE_NUMBER_DIGITS ? run.length : 0;
 			return remainder.slice(skipLength);
 		});
 	}
