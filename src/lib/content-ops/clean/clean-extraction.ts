@@ -33,6 +33,15 @@ type DroppedEntry = CleanReport['dropped'][number];
 type StrippedEntry = CleanReport['stripped'][number];
 type ReviewEntry = CleanReport['review'][number];
 
+/** Head+tail snippet of a block for the review diff. A strip can edit either end of a block (a leading
+ *  header or a trailing footer/leader), so a head-only slice would hide a tail edit entirely - showing
+ *  both ends keeps every edit visible to the human reviewer regardless of where in the block it lands. */
+function diffSnippet(text: string): string {
+	if (text.length <= DIFF_SNIPPET_LENGTH) return text;
+	const half = Math.floor(DIFF_SNIPPET_LENGTH / 2);
+	return `${text.slice(0, half)} [...] ${text.slice(-half)}`;
+}
+
 /** Builds a dropped-block report entry; page is only assigned when present, since CleanReport's
  *  optional `page` must be omitted rather than set to a literal undefined. */
 function toDroppedEntry(block: Block, kind: string): DroppedEntry {
@@ -86,8 +95,8 @@ export function cleanExtraction(
 
 		if (stripped !== block.text) {
 			const strippedEntry: StrippedEntry = {
-				before: block.text.slice(0, DIFF_SNIPPET_LENGTH),
-				after: stripped.slice(0, DIFF_SNIPPET_LENGTH)
+				before: diffSnippet(block.text),
+				after: diffSnippet(stripped)
 			};
 			if (block.page !== undefined) strippedEntry.page = block.page;
 			report.stripped.push(strippedEntry);

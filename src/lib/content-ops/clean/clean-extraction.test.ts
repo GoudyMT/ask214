@@ -204,4 +204,22 @@ describe('cleanExtraction', () => {
 
 		assertInOrderSubstring(cleaned.blocks, cleaned.normalizedText);
 	});
+
+	it('shows a tail edit in the review diff so a human can see it, not just the unchanged head', () => {
+		// A long content block whose only edit is a trailing dotted-leader stub past the snippet head.
+		// A head-only before/after snippet would be identical and hide the edit from the review report -
+		// exactly how a tail strip could remove real content unseen.
+		const body =
+			'This is a long line of real government content that continues well past the review snippet head length so the only difference is in the tail';
+		const extraction = {
+			blocks: [{ text: `${body}......20`, page: 8 }],
+			normalizedText: 'ignored - re-derived'
+		};
+
+		const { report } = cleanExtraction(extraction, {});
+
+		expect(report.stripped).toHaveLength(1);
+		expect(report.stripped[0]?.before).not.toBe(report.stripped[0]?.after);
+		expect(report.stripped[0]?.before).toContain('......20');
+	});
 });
