@@ -19,6 +19,7 @@
 		"check:content-ops": "tsc --noEmit -p tsconfig.content-ops.json",
 		"validate:sources": "tsx content-ops/validate-sources.mjs",
 		"ingest": "tsx content-ops/capture-extract.mjs",
+		"clean": "tsx content-ops/clean-sources.mjs",
 		"chunk": "tsx content-ops/chunk-sources.mjs",
 		"embed": "tsx content-ops/build-corpus.mjs",
 		"eval": "tsx content-ops/run-eval.mjs",
