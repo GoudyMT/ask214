@@ -27,6 +27,11 @@ const TOC_SCORE_THRESHOLD = 0.5;
 // call.
 const TOC_MARKERLESS_MIN_DOTTED_LEADERS = 9;
 const TOC_MARKERLESS_BASE_SCORE = 0.7;
+// Corroboration for the marker-less path: a real contents continuation pairs each dotted leader with a
+// page number ("Title .... 90"), so its page-number-token count tracks its dotted-leader count. A dotted
+// fill-in worksheet (blank lines, no page numbers) does not - require the page numbers too, or dotted
+// density alone would auto-drop such a worksheet as if it were a table of contents.
+const TOC_MARKERLESS_MIN_PAGE_NUMBER_RATIO = 0.5;
 
 // disclaimer: the bare word "disclaimer" is not enough on its own - measured on real data, it
 // shows up as an aside inside otherwise-real content (a note about the PDF form itself, an
@@ -60,17 +65,19 @@ const SENTENCE_TERMINATOR_RE = /[a-zA-Z]{2,}[.!?](?=\s|$)/g;
 /** Fraction of the block that reads as a dense list of title-plus-page-number entries. */
 function scoreToc(text: string): number {
 	const dottedLeaders = (text.match(/\.{3,}/g) || []).length;
+	const tokens = text.split(/\s+/).filter((t) => t.length > 0);
+	const pageNumberTokens = tokens.filter((t) => /^\d{1,3}$/.test(t)).length;
 
 	if (!TOC_CONTENTS_MARKER_RE.test(text)) {
 		// No "Contents" marker: only unambiguous dotted-leader density can fire here (a multi-page
-		// contents section's continuation pages carry no marker of their own).
+		// contents section's continuation pages carry no marker of their own), AND only when the leaders
+		// are corroborated by matching page numbers - otherwise a dotted fill-in worksheet would drop.
 		if (dottedLeaders < TOC_MARKERLESS_MIN_DOTTED_LEADERS) return 0;
+		if (pageNumberTokens < dottedLeaders * TOC_MARKERLESS_MIN_PAGE_NUMBER_RATIO) return 0;
 		const magnitude = Math.min(1, dottedLeaders / (TOC_MARKERLESS_MIN_DOTTED_LEADERS * 2));
 		return TOC_MARKERLESS_BASE_SCORE + (1 - TOC_MARKERLESS_BASE_SCORE) * magnitude;
 	}
 
-	const tokens = text.split(/\s+/).filter((t) => t.length > 0);
-	const pageNumberTokens = tokens.filter((t) => /^\d{1,3}$/.test(t)).length;
 	const fraction = pageNumberTokens / tokens.length;
 
 	if (fraction < TOC_TOKEN_FRACTION_THRESHOLD && dottedLeaders < TOC_MIN_DOTTED_LEADERS) return 0;

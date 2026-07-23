@@ -222,4 +222,22 @@ describe('cleanExtraction', () => {
 		expect(report.stripped[0]?.before).not.toBe(report.stripped[0]?.after);
 		expect(report.stripped[0]?.before).toContain('......20');
 	});
+
+	it('fails at the clean stage (E_CLEAN_INVARIANT) if a strip leaves a block that de-hyphenation fuses away, not opaquely at chunk', () => {
+		// stripFused's dotted-leader strip can leave a survivor ending in a hyphen; blocksToNormalizedText's
+		// normalizeText then de-hyphenates the join boundary, so that survivor is no longer an in-order
+		// substring of the re-derived text. Without a clean-stage check this surfaces only as an opaque
+		// E_CHUNK_BLOCK_NOT_LOCATED at the chunk stage - the clean stage should own its own invariant.
+		const extraction = {
+			blocks: [
+				{ text: 'refer to Appendix B-......14', page: 1 },
+				{
+					text: 'requisite guidance continues on the following page with more detail here',
+					page: 2
+				}
+			],
+			normalizedText: 'ignored - re-derived'
+		};
+		expect(() => cleanExtraction(extraction, {})).toThrow('E_CLEAN_INVARIANT');
+	});
 });

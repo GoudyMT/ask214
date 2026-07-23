@@ -166,6 +166,18 @@ describe('classifyBlock', () => {
 			expect(typeof result.confidence).toBe('number');
 		});
 
+		it('keeps a dotted-leader fill-in worksheet as content, not a marker-less toc (no page numbers to corroborate)', () => {
+			// A budget worksheet uses dotted leaders as blank fill-in lines, so it clears the >= 9
+			// dotted-leader bar - but unlike a real contents page its leaders lead to blanks, not page
+			// numbers. Dotted-leader density alone would auto-drop this real government content; the
+			// page-number corroboration keeps it.
+			const result = classifyBlock({
+				page: 40,
+				text: 'MONTHLY SPENDING PLAN WORKSHEET Housing (rent or mortgage).......... Utilities.......... Groceries.......... Transportation.......... Health care.......... Childcare.......... Debt payments.......... Savings and TSP contributions.......... Insurance premiums.......... Entertainment and dining.......... Total monthly expenses..........'
+			});
+			expect(result.kind).toBe('content');
+		});
+
 		it('always returns a confidence within [0, 1], including for content', () => {
 			const result = classifyBlock({ page: 4, text: FUSED_HEADER_CONTENT });
 			expect(result.confidence).toBeGreaterThanOrEqual(0);

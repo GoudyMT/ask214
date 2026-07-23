@@ -51,6 +51,22 @@ function toDroppedEntry(block: Block, kind: string): DroppedEntry {
 }
 
 /**
+ * Verifies every surviving block is a verbatim, in-order substring of the re-derived normalizedText -
+ * the exact contract split.ts's mapBlockOffsets relies on. A strip that leaves a boundary artifact (e.g.
+ * a trailing hyphen that normalizeText fuses across the block join) would otherwise pass here and surface
+ * only as an opaque E_CHUNK_BLOCK_NOT_LOCATED downstream at the chunk stage; failing at the clean stage
+ * makes the responsible stage unambiguous (the clean-sources caller names the source).
+ */
+function assertSurvivorsLocatable(blocks: Block[], normalizedText: string): void {
+	let cursor = 0;
+	for (const b of blocks) {
+		const idx = normalizedText.indexOf(b.text, cursor);
+		if (idx === -1) throw new Error('E_CLEAN_INVARIANT');
+		cursor = idx + b.text.length;
+	}
+}
+
+/**
  * Cleans one extraction: drops whole-block boilerplate (a table of contents, the standard
  * disclaimer, cover front-matter), strips a fused running header/footer from the blocks that
  * survive, and re-derives normalizedText from the result. Every edit is recorded in the returned
@@ -116,5 +132,6 @@ export function cleanExtraction(
 	}
 
 	const normalizedText = blocksToNormalizedText(survivors);
+	assertSurvivorsLocatable(survivors, normalizedText);
 	return { cleaned: { blocks: survivors, normalizedText }, report };
 }
