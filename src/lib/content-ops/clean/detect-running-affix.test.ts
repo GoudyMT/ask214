@@ -209,6 +209,63 @@ const WOMENS_HEALTH_LEADING_PAGE_BLOCKS = [
 	}
 ];
 
+// Twelve genuinely-distinct government-prose blocks (>= MIN_BLOCKS_FOR_AFFIX, so detection actually
+// runs rather than short-circuiting at the block-count floor like the 2- and 3-block fixtures above).
+// A majority (7 of 12) open with "The " but immediately diverge - so findCommonPrefix DOES clear the
+// 0.5 support bar on that short run and grows to "The ", then the cliff-detection stops at the diverging
+// character and MIN_SEGMENT_LENGTH rejects the 3-char "The". This exercises the detector's false-positive
+// resistance ON the real detection path; the earlier no-affix fixtures never reach it.
+const DISTINCT_CONTENT_BLOCKS = [
+	{
+		text: 'The Transition Assistance Program prepares service members for civilian life through counseling.',
+		page: 1
+	},
+	{
+		text: 'The Post-9/11 GI Bill provides education benefits you may use after your separation from service.',
+		page: 2
+	},
+	{
+		text: 'The Department of Labor employment workshop covers job search strategies, resumes, and networking.',
+		page: 3
+	},
+	{
+		text: 'The VA home loan guaranty can help eligible veterans secure favorable terms when buying a home.',
+		page: 4
+	},
+	{
+		text: 'The SkillBridge program lets you gain civilian work experience during your final months of service.',
+		page: 5
+	},
+	{
+		text: 'The disability claim process can begin before separation through Benefits Delivery at Discharge.',
+		page: 6
+	},
+	{
+		text: 'The DD-214 is the single most important document for accessing benefits, so keep it stored safely.',
+		page: 7
+	},
+	{
+		text: 'Veterans health care enrollment depends on your service history, disability rating, and income.',
+		page: 8
+	},
+	{
+		text: 'Employment resources include interview coaching and direct connections to participating employers.',
+		page: 9
+	},
+	{
+		text: 'Financial planning before separation should account for the loss of military allowances entirely.',
+		page: 10
+	},
+	{
+		text: 'Relocation assistance and household goods shipment help you move to your next home after service.',
+		page: 11
+	},
+	{
+		text: 'Consider how your military skills translate to civilian occupations when planning your next career.',
+		page: 12
+	}
+];
+
 describe('detectRunningAffix', () => {
 	it('finds the trailing-page-number running header shared across blocks (tap_managing_transition.json blocks 3-14)', () => {
 		const affix = detectRunningAffix(MANAGING_TRANSITION_BLOCKS);
@@ -254,8 +311,20 @@ describe('detectRunningAffix', () => {
 		);
 	});
 
-	it('finds nothing on a clean source with no repeated affix (dod_skillbridge.json blocks 2, 4, 6)', () => {
+	it('finds nothing below the block-count floor on a clean 3-block source (dod_skillbridge.json blocks 2, 4, 6)', () => {
+		// Only 3 blocks, so this returns empty via the MIN_BLOCKS_FOR_AFFIX short-circuit - it does NOT
+		// exercise findCommonPrefix. The distinct-content test below covers the above-floor path.
 		const affix = detectRunningAffix(CLEAN_HTML_BLOCKS);
+		expect(affix.prefix).toEqual([]);
+		expect(affix.suffix).toEqual([]);
+	});
+
+	it('fabricates no affix from 12 distinct blocks even when a majority share a short leading word', () => {
+		// Above the block-count floor, so detection actually runs: 7 of 12 blocks open with "The ", which
+		// clears the 0.5 support bar, but the run stops at the divergence and "The" is too short to be a
+		// real segment. A regression that dropped the cliff-detection or MIN_SEGMENT_LENGTH would fabricate
+		// a spurious affix here (which strip-fused would then delete from real content) and fail this test.
+		const affix = detectRunningAffix(DISTINCT_CONTENT_BLOCKS);
 		expect(affix.prefix).toEqual([]);
 		expect(affix.suffix).toEqual([]);
 	});
