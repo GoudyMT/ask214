@@ -1,0 +1,347 @@
+{
+	"generatedAt": "2026-07-23",
+	"sources": [
+		{
+			"sourceId": "dod_skillbridge",
+			"contentHash": "d09665505ee6f18e67fdd9a58d5447b9d8e8657a19ee0f644a5ed1b55ac13e41",
+			"cleanedHash": "165d9c90e912723a326f3941103e090fc8ba792a84fe6cad069b36f224fcf34d",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "dol_tap_overview",
+			"contentHash": "92a906d36aaaf8e95bf398dcb649b3e165ef777401daa6f1cc1e5a688ef53eb7",
+			"cleanedHash": "a5742e16dd3e95b68d3c995a7961792092be2aba70df3b45f7941131c1a7b94f",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "mos_separation",
+			"contentHash": "9077edd8aa38af84d5e28c21ced2ad9b5098e21e18f3838380bb09e5544f3f7f",
+			"cleanedHash": "bc8cc3a3db431911cfb287d88001b5c4166856dcede56b686e74e978068857b0",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_dol_efct",
+			"contentHash": "1a95b1b978d736b19f71df5731dbf4d25ebe4c82b7d9a780639f151f3c5de973",
+			"cleanedHash": "aecd68e2c2943853db7bf4a4bfe1f28fc0be9bc1c2d30c646bc11fb32d822cb9",
+			"decision": "approved",
+			"dropped": 6,
+			"stripped": 155,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_dol_employment_workshop",
+			"contentHash": "cdc1a520f7331f2e327851b9fce4ff428ec5286f33ff274296cbbc2dee86bc54",
+			"cleanedHash": "a009f9cc07cd362ddda76d3b84b9b1f1f37699a0212b29306614580f195648b5",
+			"decision": "approved",
+			"dropped": 10,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_financial_planning",
+			"contentHash": "ac30f8e97336fdbb0a1b4673d79a6a4d28c0140d7315ac1cad093318fdf65b06",
+			"cleanedHash": "959c7a6a0008bd7526d88144d6eeb9bbaaae05d616517ce75c7da0c518cef807",
+			"decision": "approved",
+			"dropped": 3,
+			"stripped": 75,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_interagency_website_guide",
+			"contentHash": "452b32242a2e477258b801dd41bd4481e8e9fed6c16ed30b7d8e3546646ae10c",
+			"cleanedHash": "748277b173ad039515d2924e48f413fa1c8a57c523a025f27b6437b003987e7a",
+			"decision": "approved",
+			"dropped": 4,
+			"stripped": 54,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_managing_education",
+			"contentHash": "c088ac54a71f23eec04c428104a49580781090bba88063a45193240f405ed290",
+			"cleanedHash": "e6b79c94d810496919aa8cd399e05a62120ef936ed8f5fceba3e770cb46af2ba",
+			"decision": "approved",
+			"dropped": 4,
+			"stripped": 146,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_managing_transition",
+			"contentHash": "581dd6dd275f79d8fbbf1d4c9c2cd15d75a8126b53b3b969721c37e4475e9b15",
+			"cleanedHash": "1451f5dc654355dcf1e0b33b4f8e80976a1dc227f1cc4906f567a1c8fc60ed14",
+			"decision": "approved",
+			"dropped": 3,
+			"stripped": 24,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_mental_health_families",
+			"contentHash": "2d4b9d96a1ceba48137857279d4341b60dfa174aebe1b70989799ace02a0338a",
+			"cleanedHash": "345aa74682e41d3b46c5522f9bfc8f4ceb775a4c424a9e4b3c3bca2fd7ff4a79",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_moc_crosswalk",
+			"contentHash": "03a55a88dd92f3a15afbf8dc62cb118d48476306f95eae07a745c0bffa0051b4",
+			"cleanedHash": "af0ab5e900bebc2074b208d6fa3d51ea1b16b1913ac14b3a0f21d9a5d25d792c",
+			"decision": "approved",
+			"dropped": 3,
+			"stripped": 54,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_other_than_honorable",
+			"contentHash": "7c5827752a10e1f91a9e3223ab214853b7435b89c7ed4161ebbae79ecee32aab",
+			"cleanedHash": "eada2d6532861b3ca2b78ea685b7ff2bc763614f4e4e68e561391fe31ddd40e8",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_pre_separation_brief",
+			"contentHash": "ac120dd1bb3fc8377ad5fa0e9c08944872f75680e319c1f840f70556277ece34",
+			"cleanedHash": "2da90171d0a34d41e907c462b9d70f3231f7bdb91f41f46598f5886ac1124c48",
+			"decision": "approved",
+			"dropped": 3,
+			"stripped": 46,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_reserve_dual_pay",
+			"contentHash": "7dede06d7c8f8dfd6a9439364c23959013267a1bad20074252095ec71f407c1f",
+			"cleanedHash": "7fa6a2216160d01562fccbe3d2691c456f65a270070324c1c8e6ecc53256b93f",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va101",
+			"contentHash": "be4487f5a73ff066f2216a4d682527893cbd8dfc80b1bbb19bf3948ab5442326",
+			"cleanedHash": "c3d84ed3e6603bc26b8091e5c7ada135e7ef3f516ce8aa2b181ded5bec51d323",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va_benefits_guide",
+			"contentHash": "9c0baacc06cf18482f21bd086bdc3f25a37c5c5dad5ccbe9797ea4e7e9a3a742",
+			"cleanedHash": "0c0541d42ab90f10a6d7c2e27dce861ddbc74bd65910e874bcbb09d00ac29894",
+			"decision": "approved",
+			"dropped": 10,
+			"stripped": 200,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va_disability_comp",
+			"contentHash": "4bf49a25c3c2cbc79a1c2f3db079c8ffccf1c710db43ae31c05128cc268844c7",
+			"cleanedHash": "2ba09b1226627e45aea93ed51bd3a4f41d4473d152de91bfa0f831ef0b092304",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va_education_benefits",
+			"contentHash": "df209bc37aa15ab21ef79c8e7b369653d82d0fc22464de5555973e1b4a8cc325",
+			"cleanedHash": "961b9c8f57d2891e14f75f0ebd5e958ae1616291f1ed79ee00cb7cfeda27cc14",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va_education_spouses",
+			"contentHash": "9c7e290f81268649e9411ad68320840bd6ffcaba3065921a24ae8f98ee611fb6",
+			"cleanedHash": "db751df0d50cb83ccb2dfceedf056300b237dd6b9b3e442054ec06ec273cd16f",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va_home_loan",
+			"contentHash": "102d6fef9bdb4a7fd2641ecddb0171b79ccf0fe9cf7e25e2497c7ac0ac7337ca",
+			"cleanedHash": "2b4a4906e18bc34454c243ccae1c361bd4776c4583148dfaf7110199fa8cffa3",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va_life_insurance",
+			"contentHash": "dbeb7777d2b7d7c26d28f52e380a07c706b779553e92fb5b82cb24a8d50f4eb9",
+			"cleanedHash": "59316b7640f5fc84dd631e3df5110e51c743295bf8ba00d68f90591a1e323f9f",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va_reserve_natl_guard",
+			"contentHash": "12c4f462f29dab043c9085ccc38a76dfba17d0a78a00aec957386807670a7f62",
+			"cleanedHash": "bb123523b34dbf313c950eefbbbea8fec7f7835395c7c89f331e0731686cf1d7",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_va_womens_health",
+			"contentHash": "d0182e0f1dd0fea6c96fbea92af617fe607380fababbb9e872fa694744cee57a",
+			"cleanedHash": "f10aa4818ebd2d6a570ced30c27fa7e6f88381cb3fbc3fcefc2610a942d4d32d",
+			"decision": "approved",
+			"dropped": 6,
+			"stripped": 101,
+			"review": 0
+		},
+		{
+			"sourceId": "tap_vet_centers",
+			"contentHash": "f1fde799f74b911d9d565d5568dd589ca415ccc4d5fa499a2beed8dfdcead9cd",
+			"cleanedHash": "c0be031a5d82d955b3d023bdbf390a43ee8bc283e4bbf7ae5e06c2cbf822f222",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "tsp_separation",
+			"contentHash": "d5d3f5c61e891ff7b2a18945425a36c4d4e0f9f7d2d3e700a03484921f0144cf",
+			"cleanedHash": "c8934ff41cf4b124841dcc6fcd4ca32b41c4231cbae22cc6a8c653a0e1031250",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_dd214",
+			"contentHash": "31cc2e73933692a8577d4c88ed552f07a5f039ecbbb150b2e948ccfe5fdc93ac",
+			"cleanedHash": "3899e16b2eb6355581b31d96582bfca647e15558f176c4a9c44d53d0f604b97b",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_disability_bdd",
+			"contentHash": "666f5a4cfb68505f2a2c7cb1a343a0ba9f55975a716da1ef7a175633aedbeadf",
+			"cleanedHash": "a6622144f98ecf108050aabce18491ab961b549efb0e420a04c0a0872ec3e58d",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_disability_evidence",
+			"contentHash": "b02e4d832977fb0c3dc755051a0a3be234d950d7016e8c8e08228b5ab67b9a33",
+			"cleanedHash": "7c20d7ded2daca156c1c72f8cefb503e215996dbb92d7ee5061a103c61956bb1",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_disability_file",
+			"contentHash": "1300f964d456255d89f96ecab2b475060ec6f2cbac50a41f8ac72b40d5a6fb76",
+			"cleanedHash": "c250b115304ef5d497734d06a7390c365be79b5eee43872bb23bb6ab9e618de8",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_education_apply",
+			"contentHash": "9e7a7e244d85f23d0d19a1cb1b3f6d4aee56cdcabfc3d66a97cba46ad1a28320",
+			"cleanedHash": "4e8b02d67cd9bd94d1cb2c15736ef9a87a6b810330692e090fa35dfbac413a6d",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_gi_bill_overview",
+			"contentHash": "10bab321d99bb1680e2f0bb20b43cb1f6a2af988028c86ce53efa024385359e2",
+			"cleanedHash": "ed98c70e745243ca82acfd76c9f1e6e6041330c5c627bbcf93e81cf4901b8e53",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_gi_bill_post911",
+			"contentHash": "32c1b9c8b885185cd8373c36f11bea52f5e0660789a26d72e334499402745813",
+			"cleanedHash": "94f0e252b6cc172d58f7ac0735b1dca8d2263384259cda7057fbd773c28b1792",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_gi_bill_transfer",
+			"contentHash": "897ebfb216bdc3d4881241085a88a926d9dc630db616b56cda3fbae5e0fd3580",
+			"cleanedHash": "8149b873ac0db07a6c3c84d3fec6dd1662d5faad2a5d4c6fddda1a2185a148c1",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_health_care_apply",
+			"contentHash": "bba5b299990edcaad757e7cb97906c603df5540e95f5db7cea7ae5f6b52646a6",
+			"cleanedHash": "0dfb4ea7a7a862e8c8df7bef1977f670a75f42c9393d391c00deee46a3e14753",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_health_eligibility",
+			"contentHash": "d755b92724f19b6caa10b34b254a554296fbe9fb624d48ddea27607042e01bd3",
+			"cleanedHash": "901885b3545267909dbec96cdab25a772ca292ac9d05334ed72e74df96fc7037",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_home_loan_coe",
+			"contentHash": "e1bb7a38dbfed447c57daa11b7263057c242317937e9e5035c98a2165b452fa7",
+			"cleanedHash": "ed424b8136bf880c1ce6ca9de3ac0d14256c014bd8a6c0b0ae8c7c78c2db78c8",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_intent_to_file",
+			"contentHash": "d446f2d4c058fe06d5799d2fae4beea8fd1c279e279824c908b6a445789748de",
+			"cleanedHash": "26cc2c4eb439cdc34f1b7e85a142d2fa51333c82fbbceaa7638b550820ec0f38",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_vgli",
+			"contentHash": "29b4e69e464ee5d0dec2cc89f96d9d52d30ebee7c897ab02785d44eb3a31ea3b",
+			"cleanedHash": "b1f993892b87b5d7da2d357fe0e0e6ce6d839bd1d5978aa982b2854cdc6741b3",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		}
+	]
+}

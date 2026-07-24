@@ -8,13 +8,13 @@ import { fileURLToPath } from 'node:url';
 // (content-ops/run-eval.mjs) that re-confirms the margin is manual-only and not
 // wired into CI, so this tripwire fails the build on ANY corpus-size change: when it fails, re-run the
 // eval, re-confirm the margin holds (or recalibrate MIN_SCORE), THEN bump CALIBRATED_CHUNK_COUNT.
-// Re-confirmed 2026-07-23 at the real 1901-chunk cleaned corpus: MIN_SCORE 0.4 holds the held-out floor
-// (srcHitRate 0.875 / srcMRR 0.615), up from 0.833 / 0.610 at 0.4 on the pre-cleaning corpus - and run-eval
-// now gates the held-out floor at this shipped 0.4 DIRECTLY (not only at the tune-selected cutoff), so a
-// `pnpm eval` PASS certifies 0.4 on this corpus rather than inferring flatness. The auto-calibration prints
-// 0.00 only because the LARGER, more-stable TUNE split's srcMRR dipped to 0.595 (a one-query swing at this
-// split size, not a held-out regression; grow the eval set before retuning).
-const CALIBRATED_CHUNK_COUNT = 1901;
+// Re-confirmed 2026-07-23 at the real 1889-chunk cleaned corpus (the extraction-quality pass): MIN_SCORE
+// 0.4 holds the held-out floor (srcHitRate 0.875 / srcMRR 0.622), up from 0.833 / 0.610 at 0.4 on the
+// pre-cleaning corpus - and run-eval now gates the held-out floor at this shipped 0.4 DIRECTLY (not only at
+// the tune-selected cutoff), so a `pnpm eval` PASS certifies 0.4 on this corpus. The auto-calibration now
+// selects 0.4 on its own (the TUNE split holds the floor at every cutoff, srcMRR 0.616); the earlier
+// tune-split dip below the floor cleared once the boilerplate noise was cleaned out of the corpus.
+const CALIBRATED_CHUNK_COUNT = 1889;
 
 const corpusPath = fileURLToPath(
 	new URL('../../../static/corpus/corpus-v1.0.json', import.meta.url)
