@@ -41,6 +41,8 @@ const BASELINE_EXTRACTED = 'content-ops/extracted'; // the shipped baseline extr
 const STAGING_ROOT = 'content-ops/refresh/staging'; // the fresh re-capture lands here, never the baseline
 const STAGING_EXTRACTED = join(STAGING_ROOT, 'extracted');
 const OUT_DIR = 'content-ops/refresh'; // review-<date>.md + pending-<date>.json
+const CLEANED_DIR = 'content-ops/cleaned'; // the clean stage's output + approval manifest
+const CLEANED_MANIFEST = join(CLEANED_DIR, 'manifest.json');
 
 // yyyy-mm-dd for the artifact names + the buildDate stamp (a normal build-time clock; not a workflow script).
 const DATE = new Date().toISOString().slice(0, 10);
@@ -234,6 +236,7 @@ function apply() {
 	rmSync(ROLLBACK, { recursive: true, force: true });
 	mkdirSync(join(ROLLBACK, 'extracted'), { recursive: true });
 	mkdirSync(join(ROLLBACK, 'chunks'), { recursive: true });
+	mkdirSync(join(ROLLBACK, 'cleaned'), { recursive: true });
 	mkdirSync(join(ROLLBACK, 'corpus'), { recursive: true });
 	/** @type {{ live: string, backup: string, existed: boolean }[]} */
 	const snaps = [];
@@ -248,6 +251,9 @@ function apply() {
 		'static/corpus/corpus-v1.0.embeddings.bin',
 		join(ROLLBACK, 'corpus', 'corpus-v1.0.embeddings.bin')
 	);
+	// The clean stage (run per source below) rewrites cleaned/<id>.json and the shared approval manifest,
+	// so both must be in the rollback for a failed apply to fully restore the pre-apply state.
+	snap(CLEANED_MANIFEST, join(ROLLBACK, 'cleaned-manifest.json'));
 	/** @type {string[]} */
 	const newCaptures = [];
 	for (const v of validated) {
@@ -258,6 +264,10 @@ function apply() {
 		snap(
 			join('content-ops/chunks', `${v.s.sourceId}.json`),
 			join(ROLLBACK, 'chunks', `${v.s.sourceId}.json`)
+		);
+		snap(
+			join(CLEANED_DIR, `${v.s.sourceId}.json`),
+			join(ROLLBACK, 'cleaned', `${v.s.sourceId}.json`)
 		);
 		const capPath = join('content-ops/captures', `${v.staged.content_hash}.${v.ext}`);
 		if (!existsSync(capPath)) newCaptures.push(capPath); // a genuinely new capture -> delete on rollback
@@ -286,7 +296,19 @@ function apply() {
 				contentType: v.ext,
 				...(v.s.sourceUpdatedDate ? { sourceUpdatedDate: v.s.sourceUpdatedDate } : {})
 			};
-			console.log(`[refresh] promoted ${v.s.sourceId}; re-chunking ...`);
+			console.log(`[refresh] promoted ${v.s.sourceId}; cleaning ...`);
+			// The clean stage sits between extracted/ and chunk. Re-derive the cleaned output for the new
+			// extraction and re-gate it: a source that cleans to nothing (the common HTML case) auto-approves
+			// and proceeds, while one that produces boilerplate edits needs a human's eyes - which this
+			// non-interactive apply() cannot provide, so halt with an actionable message rather than let the
+			// chunk gate reject the stale cleaned output as an opaque rollback.
+			RUN_PNPM(['run', 'clean', v.s.sourceId]);
+			const cleanManifest = /** @type {{ sources: { sourceId: string, decision: string }[] }} */ (
+				JSON.parse(readFileSync(CLEANED_MANIFEST, 'utf8'))
+			);
+			const cleanEntry = cleanManifest.sources.find((s) => s.sourceId === v.s.sourceId);
+			if (cleanEntry?.decision !== 'approved') throw new Error('E_REFRESH_NEEDS_CLEAN_REVIEW');
+			console.log(`[refresh] re-chunking ${v.s.sourceId} ...`);
 			RUN_PNPM(['chunk', v.s.sourceId]);
 		}
 		RUN_PNPM(['embed']);
@@ -299,9 +321,12 @@ function apply() {
 	} catch (err) {
 		restore();
 		rmSync(ROLLBACK, { recursive: true, force: true });
+		const needsReview = err instanceof Error && err.message === 'E_REFRESH_NEEDS_CLEAN_REVIEW';
 		const reason = evalRegressed
 			? 'E_REFRESH_EVAL_REGRESSION: re-embedded corpus is below the eval floor.'
-			: `apply failed (${err instanceof Error ? err.message : String(err)}).`;
+			: needsReview
+				? 'E_REFRESH_NEEDS_CLEAN_REVIEW: a refreshed source produced cleaning edits that need human review. Review content-ops/cleaned/review-<date>.md, approve with `pnpm run clean --approve <id>`, then rebuild the corpus for that source.'
+				: `apply failed (${err instanceof Error ? err.message : String(err)}).`;
 		console.error(
 			`[refresh] ${reason} Rolled back - the working tree is restored to its pre-apply state; nothing shipped.`
 		);

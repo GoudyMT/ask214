@@ -121,6 +121,12 @@ content-ops/captures/
 content-ops/extracted/
 # A3 chunk: per-source CorpusChunk arrays (regeneratable via `pnpm chunk`)
 content-ops/chunks/
+# Clean: the cleaned extractions + the dated review report are regeneratable and stay untracked, but the
+# approval manifest (per-source cleanedHash + decision + dropped/stripped counts) is COMMITTED as the
+# corpus's provenance - its human approval decisions are judgments a fresh `pnpm clean` resets to pending,
+# so they are NOT regeneratable and must live in version control alongside the corpus they gate.
+content-ops/cleaned/*
+!content-ops/cleaned/manifest.json
 # Refresh: staging captures + the review report + pending manifest (regeneratable via `pnpm refresh`)
 content-ops/refresh/
 

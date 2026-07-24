@@ -40,7 +40,7 @@ function renderRunbook(input: ReviewInput): string {
 		`1. Reference: ${input.url}  (cadence: ${input.updateCheck})`,
 		`2. Download: ${r.downloadHow}`,
 		`3. Placement: ${r.placementPath}`,
-		`4. Ingest: pnpm ingest ${input.sourceId} -> pnpm chunk ${input.sourceId} -> pnpm embed`,
+		`4. Ingest: pnpm ingest ${input.sourceId} -> pnpm run clean ${input.sourceId} -> pnpm run clean --approve ${input.sourceId} -> pnpm chunk ${input.sourceId} -> pnpm embed`,
 		`5. Verify: pnpm eval (must clear the floor) + re-confirm 17 USC 105 status`
 	].join('\n');
 }

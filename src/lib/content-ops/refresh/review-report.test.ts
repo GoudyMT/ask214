@@ -42,6 +42,10 @@ describe('buildReviewReport', () => {
 		expect(markdown).toContain('Save Page As');
 		expect(markdown).toContain('content-ops/staged/manual-html/tsp_separation.html');
 		expect(markdown).toContain('pnpm ingest tsp_separation');
+		// the clean + approve step is mandatory between ingest and chunk (the chunk gate fail-closes
+		// without a current, approved cleaned artifact), so the runbook must spell it out
+		expect(markdown).toContain('pnpm run clean tsp_separation');
+		expect(markdown).toContain('pnpm run clean --approve tsp_separation');
 		expect(markdown).toContain('pnpm eval');
 	});
 
