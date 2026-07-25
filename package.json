@@ -24,6 +24,7 @@
 		"embed": "tsx content-ops/build-corpus.mjs",
 		"eval": "tsx content-ops/run-eval.mjs",
 		"refresh": "tsx content-ops/refresh.mjs",
+		"corpus": "tsx content-ops/corpus.mjs",
 		"backfill:sources": "tsx content-ops/backfill-sources.mjs",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
