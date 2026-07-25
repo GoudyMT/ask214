@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { cleanExtraction } from '../src/lib/content-ops/clean/clean-extraction.ts';
+import { buildReviewHtml } from '../src/lib/content-ops/corpus/review-html.ts';
 
 /** @typedef {import('../src/lib/content-ops/extract/pdf-text.ts').Block} Block */
 /** @typedef {import('../src/lib/content-ops/clean/clean-extraction.ts').CleanReport} CleanReport */
@@ -181,6 +182,7 @@ function clean() {
 	writeFileSync(MANIFEST_PATH, JSON.stringify({ generatedAt: DATE, sources }, null, 2));
 	const reviewPath = join(CLEANED_DIR, `review-${DATE}.md`);
 	writeFileSync(reviewPath, buildReviewMarkdown(runCount, withChanges));
+	writeFileSync(join(CLEANED_DIR, 'review.html'), buildReviewHtml(withChanges));
 
 	const totalDropped = sources.reduce((sum, s) => sum + s.dropped, 0);
 	const totalStripped = sources.reduce((sum, s) => sum + s.stripped, 0);
