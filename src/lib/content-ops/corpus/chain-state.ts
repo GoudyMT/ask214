@@ -4,8 +4,6 @@ export type StageDecision = 'run' | 'skip' | 'gate-pending';
 /** The on-disk fingerprints for one source, read by the orchestrator IO layer. */
 export type SourceFingerprint = {
 	sourceId: string;
-	/** sources.yaml content_hash for this source ('' if never captured). */
-	registryContentHash: string;
 	/** extracted/<id>.json content_hash, or null if no extraction on disk. */
 	extractedContentHash: string | null;
 	/** clean manifest entry's contentHash (the extraction the cleaned output was built from), or null. */
@@ -43,8 +41,9 @@ export type ChainState = {
  * from the on-disk fingerprints. Pure: the orchestrator reads disk and passes fingerprints in.
  *
  * Skip rules (the costly stages only, per the locked design):
- *   - ingest: skip when the extraction's content_hash matches the registry's (extracted from the
- *     current capture); otherwise run (re-fetch + re-extract). This is the network saver.
+ *   - ingest: skip when the extraction exists on disk; run only when it is missing. corpus rebuilds
+ *     from the existing extractions and never re-fetches to check for updates (that is refresh's job),
+ *     so a present extraction is never re-ingested. This is the network saver.
  *   - clean: run when the cleaned output was built from a different (or missing) extraction; else
  *     gate-pending when a current cleaned output is still pending approval; else skip.
  *   - chunk: cheap + deterministic -- run whenever clean is not a plain skip, or chunks are absent.
@@ -55,10 +54,7 @@ export type ChainState = {
 export function computeChainState(input: ChainStateInput): ChainState {
 	const reviewGatePending: string[] = [];
 	const sources = input.sources.map((s): SourceStages => {
-		const ingest: StageDecision =
-			s.extractedContentHash !== null && s.extractedContentHash === s.registryContentHash
-				? 'skip'
-				: 'run';
+		const ingest: StageDecision = s.extractedContentHash !== null ? 'skip' : 'run';
 
 		let clean: StageDecision;
 		if (s.cleanedFromContentHash === null || s.cleanedFromContentHash !== s.extractedContentHash) {

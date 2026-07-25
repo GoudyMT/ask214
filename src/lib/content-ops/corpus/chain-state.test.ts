@@ -6,7 +6,6 @@ import type { ChainStateInput } from './chain-state';
 function currentSource(): ChainStateInput['sources'][number] {
 	return {
 		sourceId: 'tap_va_benefits_guide',
-		registryContentHash: 'aaaa',
 		extractedContentHash: 'aaaa',
 		cleanedFromContentHash: 'aaaa',
 		cleanedDecision: 'approved',
@@ -31,18 +30,18 @@ describe('computeChainState', () => {
 		expect(state.reviewGatePending).toEqual([]);
 	});
 
-	it('runs ingest when the extraction is stale vs the registry content hash', () => {
-		const s = { ...currentSource(), extractedContentHash: 'OLD' };
+	it('skips ingest whenever the extraction exists on disk (corpus rebuilds from extractions; refresh detects network change)', () => {
+		const s = { ...currentSource(), extractedContentHash: 'ANY', cleanedFromContentHash: 'OLD' };
 		const state = computeChainState({
 			sources: [s],
 			chunksContentHash: 'Z',
 			corpusContentHash: 'Z'
 		});
-		expect(state.sources[0]?.ingest).toBe('run');
+		expect(state.sources[0]?.ingest).toBe('skip');
 	});
 
-	it('runs ingest when no extraction exists yet', () => {
-		const s = { ...currentSource(), extractedContentHash: null, registryContentHash: '' };
+	it('runs ingest only when no extraction exists yet', () => {
+		const s = { ...currentSource(), extractedContentHash: null };
 		const state = computeChainState({
 			sources: [s],
 			chunksContentHash: 'Z',
