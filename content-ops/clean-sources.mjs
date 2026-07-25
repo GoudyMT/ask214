@@ -179,7 +179,12 @@ function clean() {
 		}
 	}
 
-	writeFileSync(MANIFEST_PATH, JSON.stringify({ generatedAt: DATE, sources }, null, 2));
+	// Preserve the prior generatedAt + the committed tab-indented format when the sources array is
+	// byte-identical, so a no-op re-run leaves the tracked manifest git-clean (build-corpus.mjs does the
+	// same for its buildDate). A real change stamps today's DATE.
+	const generatedAt =
+		JSON.stringify(previous.sources) === JSON.stringify(sources) ? previous.generatedAt : DATE;
+	writeFileSync(MANIFEST_PATH, JSON.stringify({ generatedAt, sources }, null, '\t') + '\n');
 	const reviewPath = join(CLEANED_DIR, `review-${DATE}.md`);
 	writeFileSync(reviewPath, buildReviewMarkdown(runCount, withChanges));
 	writeFileSync(join(CLEANED_DIR, 'review.html'), buildReviewHtml(withChanges));
