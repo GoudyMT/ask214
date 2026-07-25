@@ -168,4 +168,85 @@ describe('stripFused', () => {
 			})
 		).toBe('Real content here.');
 	});
+
+	// --- fused module-navigation catalog (tap_va_womens_health) ---
+	// The womens_health guide fuses a module/appendix nav catalog onto blocks: a run of back-to-back
+	// "Module N"/"Appendix X" tokens glued together with no separator. It is a fixed junk literal, not
+	// a learnable per-page header, so it is stripped by shape (>= 3 consecutive glued nav tokens),
+	// independent of any learned affix.
+
+	it('strips a trailing fused nav catalog, keeping the real content verbatim (womens_health acronyms table)', () => {
+		expect(
+			stripFused(
+				'VA Acronym List * T stands for Trans-identifying Module 1 AcronymsModule 2Module 3Module 4Module 5Appendix AAppendix BAppendix C',
+				{ prefix: [], suffix: [] }
+			)
+		).toBe('VA Acronym List * T stands for Trans-identifying');
+	});
+
+	it('strips the nav catalog off a module-divider block, leaving the section title (womens_health page 5)', () => {
+		expect(
+			stripFused(
+				'Module 1: Shift From Active DutyModule 1Module 1 AcronymsModule 2Module 3Module 4Module 5Appendix AAppendix BAppendix C',
+				{ prefix: [], suffix: [] }
+			)
+		).toBe('Module 1: Shift From Active Duty');
+	});
+
+	it('does NOT strip a real "Module N:" section header on genuine prose (no glued back-to-back run)', () => {
+		// The benefits_guide has 81 real content chunks that legitimately open with "Module N: Title"
+		// followed by prose. A single "Module 1:" is one token, not a >= 3 glued run, so it is kept.
+		const t =
+			'Module 1: Introduction to Benefits and Services Introduction No two transitions are the same.';
+		expect(stripFused(t, { prefix: [], suffix: [] })).toBe(t);
+	});
+
+	it('does NOT strip a real prose list of module references separated by sentences', () => {
+		// Real prose that mentions modules has spaces/sentence text between the tokens, so they are
+		// never a glued run - the space-less concatenation is what marks the extraction-artifact catalog.
+		const t = 'Module 2 covers health. Module 3 covers education. Module 4 covers employment.';
+		expect(stripFused(t, { prefix: [], suffix: [] })).toBe(t);
+	});
+
+	// A second guide (tap_va_benefits_guide) fuses an ALL-CAPS module index ("MODULE 1 CHECKLIST
+	// MODULE 2 MODULE 3 ... APPENDIX A APPENDIX B"), space-separated rather than glued. The all-caps
+	// form is the safety discriminator here: real prose writes "Module 1", never a run of "MODULE"
+	// tokens, so a run of >= 3 uppercase MODULE/APPENDIX/CHECKLIST tokens is unambiguously the index.
+
+	it('strips an uppercase module-index nav strip, keeping the section title (benefits_guide format)', () => {
+		expect(
+			stripFused(
+				'MODULE 1: Introduction to VA Benefits and Services MODULE 1 CHECKLIST MODULE 2 MODULE 3 MODULE 4 MODULE 5 MODULE 6 APPENDIX A APPENDIX B',
+				{ prefix: [], suffix: [] }
+			)
+		).toBe('MODULE 1: Introduction to VA Benefits and Services');
+	});
+
+	it('strips an uppercase nav strip sitting between two real sentences, keeping both (benefits_guide page 2)', () => {
+		expect(
+			stripFused(
+				'Select this arrow button to move to the next page. MODULE 1 MODULE 2 MODULE 3 MODULE 4 MODULE 5 MODULE 6 APPENDIX A APPENDIX B Disclaimer: Fillable content requires a compatible PDF reader.',
+				{ prefix: [], suffix: [] }
+			)
+		).toBe(
+			'Select this arrow button to move to the next page. Disclaimer: Fillable content requires a compatible PDF reader.'
+		);
+	});
+
+	it('does NOT strip a lone uppercase "MODULE 1" heading on real content (no >= 3 token run)', () => {
+		const t = 'MODULE 1 Introduction This module covers your benefits and services in detail.';
+		expect(stripFused(t, { prefix: [], suffix: [] })).toBe(t);
+	});
+
+	it('keeps a 2-token nav run - one below the >= 3-token strip boundary (glued and uppercase)', () => {
+		// The strip fires only on a run of THREE or more back-to-back nav tokens; a 2-token run is left
+		// intact, so a fragment that merely abuts two module/appendix tokens is never eaten. Pins the
+		// boundary: lowering the run requirement to two would strip these and fail here.
+		expect(stripFused('Module 1Module 2 remains here.', { prefix: [], suffix: [] })).toBe(
+			'Module 1Module 2 remains here.'
+		);
+		expect(stripFused('MODULE 1 MODULE 2 remains here.', { prefix: [], suffix: [] })).toBe(
+			'MODULE 1 MODULE 2 remains here.'
+		);
+	});
 });

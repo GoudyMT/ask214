@@ -7,6 +7,7 @@ import { classifyBlock } from './classify-block';
 // String.fromCharCode so this source file itself stays ASCII-only.
 const EM_DASH = String.fromCharCode(0x2014); // U+2014 em dash, as extracted from the source PDF
 const BULLET = String.fromCharCode(0x25a0); // U+25A0 black square, used as a list bullet in the source PDF
+const ANGLE = String.fromCharCode(0x203a); // U+203A single right angle quote, a sub-entry bullet in the source PDF
 
 // Reused across two tests: a real content block whose running header got fused onto the front of
 // the block by the extractor (Class 2 territory, stripped later - not this classifier's job).
@@ -48,6 +49,31 @@ describe('classifyBlock', () => {
 			// auto-drops non-content at confidence >= 0.7, so this path must clear that bar.
 			expect(result.kind).toBe('toc');
 			expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+		});
+
+		it('classifies a marker-ed contents page whose page references are appendix-style, not plain numbers (tap_va_benefits_guide.json, page 12)', () => {
+			// This real contents page lists appendix entries ("A-160", "A-161") in place of bare page
+			// numbers, so the original bare-\d{1,3} page-number signal scored it near zero and kept it
+			// as content. The widened signal counts appendix-style references as page references too, so
+			// the contents page reads as the dense list of title-plus-reference entries it actually is.
+			const result = classifyBlock({
+				page: 12,
+				text:
+					'VA Benefits and Services Participant Guide Table of ContentsxiiVersion 6 1 September 2025 ' +
+					'Appendix A: Additional Resources...................................A-160 VA Resources A-160 ' +
+					'Applying for Disability Compensation A-160 ' +
+					ANGLE +
+					' Disability Compensation, Retired Pay, Separation Pay or Disability Severance Pay A-160 ' +
+					'Burials and Memorials A-160 ' +
+					ANGLE +
+					' Monetary Benefits for Survivors: A-161 ' +
+					ANGLE +
+					' Dependency and Indemnity Compensation A-161 ' +
+					ANGLE +
+					' Survivors Pension A-161 Community Resources A-161 COVID-19 A-162 Dental Care A-162'
+			});
+			expect(result.kind).toBe('toc');
+			expect(result.confidence).toBeGreaterThan(0.5);
 		});
 	});
 

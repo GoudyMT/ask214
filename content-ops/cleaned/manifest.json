@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-07-23",
+	"generatedAt": "2026-07-25",
 	"sources": [
 		{
 			"sourceId": "dod_skillbridge",
@@ -139,10 +139,10 @@
 		{
 			"sourceId": "tap_va_benefits_guide",
 			"contentHash": "9c0baacc06cf18482f21bd086bdc3f25a37c5c5dad5ccbe9797ea4e7e9a3a742",
-			"cleanedHash": "0c0541d42ab90f10a6d7c2e27dce861ddbc74bd65910e874bcbb09d00ac29894",
+			"cleanedHash": "4e2039673094cf2747dc2afa420accc6f03ff87a77afac54b983339d01114691",
 			"decision": "approved",
-			"dropped": 10,
-			"stripped": 200,
+			"dropped": 12,
+			"stripped": 199,
 			"review": 0
 		},
 		{
@@ -202,10 +202,10 @@
 		{
 			"sourceId": "tap_va_womens_health",
 			"contentHash": "d0182e0f1dd0fea6c96fbea92af617fe607380fababbb9e872fa694744cee57a",
-			"cleanedHash": "f10aa4818ebd2d6a570ced30c27fa7e6f88381cb3fbc3fcefc2610a942d4d32d",
+			"cleanedHash": "fbbd744e281f14b926bd6628a236e9fdfdcaed16d8312f664d1e18e69fbf41fe",
 			"decision": "approved",
-			"dropped": 6,
-			"stripped": 101,
+			"dropped": 8,
+			"stripped": 106,
 			"review": 0
 		},
 		{

@@ -28,6 +28,27 @@ const DOTTED_LEADER_STUB_RE = /\.{3,}\s*\d*\s*$/;
 // without risking the corpus's verbatim guarantee.
 const BARE_PAGE_NUMBER_RE = /^\s*\d+\s*$/;
 
+// A fused module-navigation index is a run of "Module N"/"Appendix X" nav tokens - an extraction
+// artifact of the guides that print a module index on their divider and content pages. It is a fixed
+// junk shape, not a per-document learned header, so it is stripped by shape rather than via the affix
+// detector. Two guides fuse it two ways, each with its own content-safety guard, and each replaced by
+// a single space so a strip between two sentences leaves them correctly spaced (preserving the
+// verbatim-substring contract the next stage relies on):
+//
+// 1. Glued, mixed case ("Module 1 AcronymsModule 2Module 3...Appendix C"). The guard is the missing
+//    separator: genuine prose that names modules always has a space or sentence text between them
+//    ("Module 2 covers health. Module 3..."), so it can never form a glued run of three-plus tokens,
+//    while a real "Module 1: Title" section header is a single token, not a run.
+const NAV_CATALOG_RE =
+	/ ?(?:Module \d+(?: Acronyms)?|Appendix [A-Z])(?:Module \d+(?: Acronyms)?|Appendix [A-Z]){2,} ?/g;
+
+// 2. Space-separated, ALL CAPS ("MODULE 1 CHECKLIST MODULE 2 ... APPENDIX A APPENDIX B"), which the
+//    glued guard above cannot catch. Here the all-caps form is the guard instead: genuine prose writes
+//    "Module 1" in title case, never a run of "MODULE"/"APPENDIX"/"CHECKLIST" tokens, so a run of at
+//    least three of them (glued or single-space-separated) is unambiguously the index, not content.
+const NAV_INDEX_RE =
+	/ ?(?:MODULE \d+|APPENDIX [A-Z]|CHECKLIST)(?: ?(?:MODULE \d+|APPENDIX [A-Z]|CHECKLIST)){2,} ?/g;
+
 /**
  * Reverses a string so the suffix side of stripFused can reuse the prefix-stripping walk unmodified
  * - the same trick detect-running-affix.ts uses to find suffix segments in the first place.
@@ -102,6 +123,8 @@ export function stripFused(text: string, affix: RunningAffix): string {
 	const reversedSegments = affix.suffix.slice().reverse().map(reverseString);
 	result = reverseString(stripLeadingSegments(reverseString(result), reversedSegments));
 
+	result = result.replace(NAV_CATALOG_RE, ' ');
+	result = result.replace(NAV_INDEX_RE, ' ');
 	result = result.replace(DOTTED_LEADER_STUB_RE, '');
 	if (BARE_PAGE_NUMBER_RE.test(result)) result = '';
 

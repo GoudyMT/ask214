@@ -31,3 +31,13 @@ overrides:
   'js-yaml@<3.15.0': '3.15.0'
   'adm-zip@<0.6.0': '0.6.0'
   'sharp@<0.35.0': '0.35.3'
+  # Force patched brace-expansion (GHSA-mh99-v99m-4gvg, DoS via unbounded expansion -> OOM crash, high;
+  # transitive dev/build-only via eslint>minimatch@10 and @lhci/cli>rimraf>glob>minimatch@3, never in
+  # the client bundle). Blanket floor, NOT a scoped 5.0.x pin, because pnpm's advisory range (<=5.0.7)
+  # flags even the older brace-expansion@1.1.16 on the minimatch@3 chain, so a scoped pin that leaves 1.x
+  # in place keeps the audit red (verified empirically). The accepted cost: this floor also lifts
+  # minimatch@3's brace-expansion to a 5.x major whose CommonJS is a named export, which minimatch@3
+  # calls as a function - so a BRACE glob routed through that lhci chain would throw. That path is
+  # dev-only AND dormant (lhci's rimraf/glob operate on brace-less temp paths; the build + lighthouse CI
+  # gates pass). Retire when @lhci/cli's chain bundles a patched, minimatch@3-compatible brace-expansion.
+  brace-expansion: '>=5.0.8'

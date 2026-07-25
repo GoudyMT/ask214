@@ -32,6 +32,13 @@ const TOC_MARKERLESS_BASE_SCORE = 0.7;
 // fill-in worksheet (blank lines, no page numbers) does not - require the page numbers too, or dotted
 // density alone would auto-drop such a worksheet as if it were a table of contents.
 const TOC_MARKERLESS_MIN_PAGE_NUMBER_RATIO = 0.5;
+// Some guides' contents pages index appendices with an appendix-style reference ("A-160", "B-111")
+// in place of a bare page number, so the bare-\d{1,3} signal alone scored them near zero and kept
+// them as content. This counts a single capital letter + hyphen + 1-3 digit page number as a page
+// reference too. The word boundary plus single [A-Z] is the guard: it excludes multi-letter acronyms
+// ("MGIB-AD", "COVID-19") and a footer stamp glued mid-word ("GuideA-160"), so only a standalone
+// appendix reference counts.
+const TOC_APPENDIX_REF_RE = /\b[A-Z]-\d{1,3}\b/g;
 
 // disclaimer: the bare word "disclaimer" is not enough on its own - measured on real data, it
 // shows up as an aside inside otherwise-real content (a note about the PDF form itself, an
@@ -67,18 +74,22 @@ function scoreToc(text: string): number {
 	const dottedLeaders = (text.match(/\.{3,}/g) || []).length;
 	const tokens = text.split(/\s+/).filter((t) => t.length > 0);
 	const pageNumberTokens = tokens.filter((t) => /^\d{1,3}$/.test(t)).length;
+	const appendixRefs = (text.match(TOC_APPENDIX_REF_RE) || []).length;
+	// A page reference is either a bare page number or an appendix-style reference; a contents page is
+	// dense with them regardless of which form a given guide uses.
+	const pageRefs = pageNumberTokens + appendixRefs;
 
 	if (!TOC_CONTENTS_MARKER_RE.test(text)) {
 		// No "Contents" marker: only unambiguous dotted-leader density can fire here (a multi-page
 		// contents section's continuation pages carry no marker of their own), AND only when the leaders
-		// are corroborated by matching page numbers - otherwise a dotted fill-in worksheet would drop.
+		// are corroborated by matching page references - otherwise a dotted fill-in worksheet would drop.
 		if (dottedLeaders < TOC_MARKERLESS_MIN_DOTTED_LEADERS) return 0;
-		if (pageNumberTokens < dottedLeaders * TOC_MARKERLESS_MIN_PAGE_NUMBER_RATIO) return 0;
+		if (pageRefs < dottedLeaders * TOC_MARKERLESS_MIN_PAGE_NUMBER_RATIO) return 0;
 		const magnitude = Math.min(1, dottedLeaders / (TOC_MARKERLESS_MIN_DOTTED_LEADERS * 2));
 		return TOC_MARKERLESS_BASE_SCORE + (1 - TOC_MARKERLESS_BASE_SCORE) * magnitude;
 	}
 
-	const fraction = pageNumberTokens / tokens.length;
+	const fraction = pageRefs / tokens.length;
 
 	if (fraction < TOC_TOKEN_FRACTION_THRESHOLD && dottedLeaders < TOC_MIN_DOTTED_LEADERS) return 0;
 
