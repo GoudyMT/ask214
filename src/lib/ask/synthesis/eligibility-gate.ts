@@ -4,8 +4,12 @@
 // positive still yields a correct impersonal answer, while a false negative risks an unlawful
 // personalized eligibility claim.
 const FIRST_OR_SECOND_PERSON = /\b(i|i'm|im|i've|ive|my|me|you|your|we|our)\b/i;
+// Matches an eligibility signal: a keyword, a personalized possessive (my rating / pay / BAH ...), the
+// strong standalone "am i" / "what do i" frames, or an acquisition frame -- "(do|can|will|would) I" joined
+// to an acquisition verb within the same clause, so "will I still receive" is caught while "when do I
+// attend" (no acquisition verb) is not.
 const ELIGIBILITY =
-	/\b(qualif|eligib|entitl|my rating|my claim|am i|do i get|what do i|can i (get|claim|file))/i;
+	/\b(qualif|eligib|entitl|am i|what do i|my (rating|claim|pay|bah|pension)|(do|can|will|would) i\b[^?.!]{0,30}\b(get|receive|qualif|claim|file))/i;
 
 export interface EligibilityIntent {
 	shortCircuit: boolean;
