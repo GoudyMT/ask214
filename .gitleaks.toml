@@ -1,0 +1,25 @@
+# gitleaks secret-scan config. The authoritative gate runs in CI (.github/workflows/ci.yml).
+# Guards a PUBLIC repo (AGPL-3.0): no Cloudflare account id / API token / Worker secret, and no
+# Anthropic key, may ever be committed. See ADR-025 item 9 + the S53 backend red-team (secrets role).
+title = "Ask 214 secret scan"
+
+[extend]
+# Keep gitleaks' built-in rules (Anthropic sk-ant, generic high-entropy API keys, cloud tokens, etc.).
+useDefault = true
+
+[[rules]]
+id = "cloudflare-account-id-in-config"
+description = "A Cloudflare account_id (32-hex) assigned in a committed config file"
+regex = '''(?i)account_id\s*[:=]\s*["']?[0-9a-f]{32}["']?'''
+tags = ["cloudflare", "account"]
+
+[allowlist]
+description = "Generated/provenance data + lockfiles are public content, not secrets"
+paths = [
+  # 76 SHA-256 contentHash/cleanedHash provenance values + other corpus data (public gov content)
+  '''content-ops/.*\.json''',
+  '''static/corpus/.*''',
+  '''pnpm-lock\.yaml''',
+  # test fixtures may contain deliberately-fake tokens
+  '''.*\.test\.ts''',
+]

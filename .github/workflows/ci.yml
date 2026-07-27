@@ -78,3 +78,15 @@ jobs:
           name: lighthouse-reports
           path: .lighthouseci/
           if-no-files-found: warn
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: gitleaks - no committed secrets or Cloudflare account info
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
