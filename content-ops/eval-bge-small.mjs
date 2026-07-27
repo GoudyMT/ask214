@@ -1,4 +1,4 @@
-// Floor-check spike: does bge-small-en-v1.5 clear the v1.0 ranking floor as the server-side (Context 2)
+// Floor-check spike: does bge-small-en-v1.5 clear the v1.0 ranking floor as the server-side
 // embedding model? Mirrors run-eval.mjs but embeds BOTH the corpus and the queries in-memory with bge-small
 // (full precision) rather than loading the shipped q8 all-MiniLM artifact. A PROXY for the Workers AI
 // bge-small serving: same model weights, so a comfortable pass is strong evidence the server path holds the

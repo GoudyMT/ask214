@@ -1,6 +1,6 @@
 # gitleaks secret-scan config. The authoritative gate runs in CI (.github/workflows/ci.yml).
 # Guards a PUBLIC repo (AGPL-3.0): no Cloudflare account id / API token / Worker secret, and no
-# Anthropic key, may ever be committed. See ADR-025 item 9 + the S53 backend red-team (secrets role).
+# Anthropic key, may ever be committed.
 title = "Ask 214 secret scan"
 
 [extend]
