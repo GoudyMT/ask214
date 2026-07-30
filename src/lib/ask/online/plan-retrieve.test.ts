@@ -7,7 +7,7 @@ function deps(over: Partial<PlanDeps> = {}): PlanDeps {
 		maxQueryChars: 512,
 		minScore: 0.65,
 		corpusVersion: '1.0',
-		breakerTripped: false,
+		checkBreaker: async () => false,
 		embed: async () => [0.1, 0.2],
 		search: () => [{ score: 0.9, chunk: { id: 'c1' } }],
 		...over
@@ -27,22 +27,29 @@ describe('planRetrieve', () => {
 		expect(r).toEqual({ kind: 'reject', httpStatus: 403 });
 	});
 
-	it('returns high_demand when the breaker is tripped, without embedding', async () => {
+	it('returns error for a non-string query body, without touching the breaker', async () => {
+		const checkBreaker = vi.fn(async () => false);
+		const r = await planRetrieve({ ...ok, rawQuery: undefined }, deps({ checkBreaker }));
+		expect(r).toEqual({ kind: 'respond', body: { status: 'error' } });
+		expect(checkBreaker).not.toHaveBeenCalled();
+	});
+
+	it('returns empty for a whitespace query, without touching the breaker or embedding', async () => {
+		const checkBreaker = vi.fn(async () => false);
 		const embed = vi.fn(async () => [1]);
-		const r = await planRetrieve({ ...ok, rawQuery: 'x' }, deps({ breakerTripped: true, embed }));
-		expect(r).toEqual({ kind: 'respond', body: { status: 'high_demand' } });
+		const r = await planRetrieve({ ...ok, rawQuery: '   ' }, deps({ checkBreaker, embed }));
+		expect(r).toEqual({ kind: 'respond', body: { status: 'empty', corpusVersion: '1.0' } });
+		expect(checkBreaker).not.toHaveBeenCalled();
 		expect(embed).not.toHaveBeenCalled();
 	});
 
-	it('returns error for a non-string query body', async () => {
-		const r = await planRetrieve({ ...ok, rawQuery: undefined }, deps());
-		expect(r).toEqual({ kind: 'respond', body: { status: 'error' } });
-	});
-
-	it('returns empty for a whitespace-only query, without embedding', async () => {
+	it('returns high_demand when the breaker is tripped, without embedding', async () => {
 		const embed = vi.fn(async () => [1]);
-		const r = await planRetrieve({ ...ok, rawQuery: '   ' }, deps({ embed }));
-		expect(r).toEqual({ kind: 'respond', body: { status: 'empty', corpusVersion: '1.0' } });
+		const r = await planRetrieve(
+			{ ...ok, rawQuery: 'benefits' },
+			deps({ checkBreaker: async () => true, embed })
+		);
+		expect(r).toEqual({ kind: 'respond', body: { status: 'high_demand' } });
 		expect(embed).not.toHaveBeenCalled();
 	});
 
@@ -80,6 +87,18 @@ describe('planRetrieve', () => {
 			deps({
 				embed: async () => {
 					throw new Error('AI down');
+				}
+			})
+		);
+		expect(r).toEqual({ kind: 'respond', body: { status: 'error' } });
+	});
+
+	it('maps a breaker failure to error', async () => {
+		const r = await planRetrieve(
+			{ ...ok, rawQuery: 'boom' },
+			deps({
+				checkBreaker: async () => {
+					throw new Error('DO down');
 				}
 			})
 		);

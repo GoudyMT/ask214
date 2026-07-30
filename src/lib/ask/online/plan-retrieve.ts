@@ -29,26 +29,28 @@ export interface PlanDeps {
 	maxQueryChars: number;
 	minScore: number;
 	corpusVersion: string;
-	breakerTripped: boolean;
+	/** Reserve budget + report whether to degrade. Checked LAZILY -- only for a valid, non-empty query
+	 * that is about to embed -- so malformed/empty requests cannot inflate the counter. */
+	checkBreaker: () => Promise<boolean>;
 	embed: (query: string) => Promise<number[]>;
 	search: (embedding: number[]) => Scored[];
 }
 
 /**
- * The pure retrieve decision path. Global gates first (method, origin, circuit-breaker), then the
- * per-request work (embed + search + MIN_SCORE). Only a genuine below-threshold search returns `empty`;
- * any embed/search failure returns `error` WITHOUT carrying the query. Deps are injected so the whole
- * path is node-testable; the Worker shell binds real Workers AI + the corpus index.
+ * The pure retrieve decision path. Cheap gates first (method, origin), then the query is validated and
+ * capped; only a valid non-empty query touches the circuit-breaker and embeds. Only a genuine
+ * below-threshold search returns `empty`; any breaker/embed/search failure returns `error` WITHOUT
+ * carrying the query. Deps are injected so the whole path is node-testable; the Worker shell binds the
+ * Durable Object breaker, Workers AI, and the corpus index.
  *
  * @param input Method, Origin header, and the raw request-body query (untrusted).
- * @param deps Config + injected embed/search + the circuit-breaker decision.
+ * @param deps Config + injected breaker/embed/search.
  * @returns A hard reject (405/403) or a JSON status body.
  */
 export async function planRetrieve(input: PlanInput, deps: PlanDeps): Promise<RetrieveOutcome> {
 	if (input.method !== 'POST') return { kind: 'reject', httpStatus: 405 };
 	if (!isAllowedOrigin(input.origin, deps.allowedOrigins))
 		return { kind: 'reject', httpStatus: 403 };
-	if (deps.breakerTripped) return { kind: 'respond', body: { status: 'high_demand' } };
 	if (typeof input.rawQuery !== 'string') return { kind: 'respond', body: { status: 'error' } };
 
 	const query = capQuery(input.rawQuery, deps.maxQueryChars);
@@ -57,6 +59,7 @@ export async function planRetrieve(input: PlanInput, deps: PlanDeps): Promise<Re
 	}
 
 	try {
+		if (await deps.checkBreaker()) return { kind: 'respond', body: { status: 'high_demand' } };
 		const embedding = await deps.embed(query);
 		const hits = deps.search(embedding).filter((h) => h.score >= deps.minScore);
 		if (hits.length === 0) {
