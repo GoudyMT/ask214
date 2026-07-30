@@ -17,6 +17,7 @@
 		"check:bundle": "size-limit",
 		"check:embed-determinism": "tsx content-ops/check-embed-determinism.mjs",
 		"check:content-ops": "tsc --noEmit -p tsconfig.content-ops.json",
+		"check:worker": "wrangler types workers/retrieve/worker-configuration.d.ts --config workers/retrieve/wrangler.jsonc && tsc --noEmit -p tsconfig.worker.json",
 		"validate:sources": "tsx content-ops/validate-sources.mjs",
 		"ingest": "tsx content-ops/capture-extract.mjs",
 		"clean": "tsx content-ops/clean-sources.mjs",

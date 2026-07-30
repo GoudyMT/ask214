@@ -1,0 +1,23 @@
+{
+	// The retrieve Worker runs on workerd (NOT the browser/Node) -- it gets its own type-check instead of
+	// joining svelte-check (DOM-typed) or content-ops (Node-typed). The Workers runtime types
+	// (Request/Response, KVNamespace, Ai, DurableObject, the cloudflare:workers module) come from the
+	// generated `workers/retrieve/worker-configuration.d.ts` as globals -- so no DOM lib and no @types.
+	// Same strictness bar as the app. Run via `pnpm check:worker`.
+	"compilerOptions": {
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"target": "esnext",
+		"lib": ["esnext"],
+		"types": [],
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"noFallthroughCasesInSwitch": true,
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"noEmit": true
+	},
+	"include": ["workers/**/*.ts"]
+}

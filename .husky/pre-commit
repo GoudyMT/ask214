@@ -2,4 +2,5 @@ pnpm exec lint-staged
 pnpm run validate:sources
 pnpm run check
 pnpm run check:content-ops
+pnpm run check:worker
 pnpm run test:unit -- --run
