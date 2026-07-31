@@ -24,6 +24,8 @@
 		"chunk": "tsx content-ops/chunk-sources.mjs",
 		"embed": "tsx content-ops/build-corpus.mjs",
 		"eval": "tsx content-ops/run-eval.mjs",
+		"embed:bge": "tsx content-ops/build-corpus-bge.mjs",
+		"eval:bge": "tsx content-ops/eval-corpus-bge.mjs",
 		"refresh": "tsx content-ops/refresh.mjs",
 		"corpus": "tsx content-ops/corpus.mjs",
 		"backfill:sources": "tsx content-ops/backfill-sources.mjs",

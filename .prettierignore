@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Generated server corpus index (built by `pnpm embed:bge`; minified artifact, not source)
+/content-ops/server-index/

@@ -1,0 +1,14 @@
+{
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "ask214-bge-embed",
+	"main": "worker.js",
+	"compatibility_date": "2026-07-01",
+	// Local build-only Worker (never deployed): embeds corpus passages through the Workers AI bge-small
+	// serving so the server index is built from the REAL model weights, not a local proxy. Logging off; the
+	// only binding is the ambient AI one -- no secret, no KV, no Durable Object, no routes, nothing to ship.
+	"observability": { "enabled": false },
+	// `remote: true` hits the REAL Workers AI serving from local dev: the worker runs in stable local
+	// miniflare while embed calls go to production bge-small. This is wrangler's recommended replacement for
+	// `wrangler dev --remote`, whose whole-worker proxy (ProxyWorker) crashed constructing the embed response.
+	"ai": { "binding": "AI", "remote": true }
+}
