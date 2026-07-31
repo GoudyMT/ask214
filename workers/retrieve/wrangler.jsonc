@@ -5,8 +5,10 @@
 	"compatibility_date": "2026-07-01",
 	// Logging OFF so a query is never persisted in edge traces (ADR-025 config-as-invariant).
 	"observability": { "enabled": false },
-	// Workers AI embeds the query server-side (bge-small). Ambient binding -- no secret.
-	"ai": { "binding": "AI" },
+	// Workers AI embeds the query server-side (bge-small). Ambient binding -- no secret. `remote: true` is a
+	// local-dev hint (use the real serving under `wrangler dev`); it is ignored on deploy, where bindings are
+	// already remote, and it avoids `wrangler dev --remote`, whose proxy crashes on the embed response.
+	"ai": { "binding": "AI", "remote": true },
 	// Holds the ~2.9 MB bge index. The `id` here is a NON-SECRET placeholder: the real KV namespace id
 	// is supplied locally at deploy and is NEVER committed (this is a public repo).
 	"kv_namespaces": [{ "binding": "CORPUS_KV", "id": "PLACEHOLDER_SET_REAL_ID_LOCALLY_AT_DEPLOY" }],
