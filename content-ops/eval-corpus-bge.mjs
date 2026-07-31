@@ -1,4 +1,4 @@
-// Run from the repo root: `pnpm eval:bge` (with the bge-embed `wrangler dev --remote` worker running).
+// Run from the repo root: `pnpm eval:bge` (with the bge-embed `wrangler dev` worker running).
 // Floor-gates the SERVER bge index the retrieve Worker will load from KV. It decodes the PERSISTED artifact
 // (so it scores exactly the vectors the Worker searches -- codec-normalized), embeds each eval query WITH the
 // bge instruction prefix through the real Workers AI serving, and gates the held-out ranking floor at rank(0)

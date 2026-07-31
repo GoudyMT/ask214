@@ -1,8 +1,8 @@
-// Run from the repo root: `pnpm embed:bge` (with the bge-embed `wrangler dev --remote` worker running). The
+// Run from the repo root: `pnpm embed:bge` (with the bge-embed `wrangler dev` worker running). The
 // SERVER-side twin of build-corpus.mjs: reads the same per-source chunk arrays, embeds each chunk (as a
 // passage, NO prefix) through the REAL Workers AI bge-small serving via the local build worker, and writes
 // the server corpus index the retrieve Worker loads from KV. Not shipped to the device -- the client uses the
-// MiniLM index in static/. Fork 6: one chunk set, two indexes, same corpusVersion. The manifest + blob are
+// MiniLM index in static/. One chunk set, two indexes, same corpusVersion. The manifest + blob are
 // the exact decode contract `decodeCorpus` (and the retrieve Worker) expect.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

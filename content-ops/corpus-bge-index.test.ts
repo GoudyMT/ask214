@@ -31,7 +31,7 @@ describe('bge server corpus index', () => {
 		expect(bge.dim).toBe(384);
 	});
 
-	it('carries the same chunk set + version as the MiniLM index (Fork 6: one build, two indexes)', () => {
+	it('carries the same chunk set + version as the MiniLM index (one build, both indexes)', () => {
 		expect(bge.chunks.length).toBe(minilm.chunks.length);
 		expect(bge.version).toBe(minilm.version);
 	});
