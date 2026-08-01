@@ -116,6 +116,23 @@ describe('openMtcDb schema (v3)', () => {
 		upgrading.close();
 	});
 
+	it('invokes onVersionChange when a newer bundle upgrades, then steps aside', async () => {
+		const name = 'mtc-test-' + crypto.randomUUID();
+		let notified = 0;
+		const held = await openMtcDb(name, () => {
+			notified++;
+		});
+		opened.push(held);
+
+		// The tab holding the old connection must be told a newer bundle took over - that is what lets
+		// the layout show a reload prompt instead of leaving the tab in a silent, data-less state - AND
+		// it must still step aside so the upgrade is not blocked.
+		const upgrading = await openAtVersion(name, DB_VERSION + 1);
+		expect(upgrading.version).toBe(DB_VERSION + 1);
+		expect(notified).toBe(1);
+		upgrading.close();
+	});
+
 	it('cannot rescue a tab already running the pre-v3 bundle', async () => {
 		// The handler has to exist in the tab doing the BLOCKING, and the deployed v2 bundle opens
 		// without one. Nothing shipped now can change that, so the 2 -> 3 upgrade still blocks while an

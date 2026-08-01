@@ -27,7 +27,10 @@ export const STORES = [
 ] as const;
 export type StoreName = (typeof STORES)[number];
 
-export function openMtcDb(name: string = DB_NAME): Promise<IDBDatabase> {
+export function openMtcDb(
+	name: string = DB_NAME,
+	onVersionChange?: () => void
+): Promise<IDBDatabase> {
 	return new Promise<IDBDatabase>((resolve, reject) => {
 		const req = indexedDB.open(name, DB_VERSION);
 		req.onupgradeneeded = () => {
@@ -43,8 +46,14 @@ export function openMtcDb(name: string = DB_NAME): Promise<IDBDatabase> {
 			// This connection is held for the tab's whole lifetime, and IndexedDB will not upgrade a
 			// database while any connection stays open: the other tab gets `blocked`, not an upgrade.
 			// Step aside so a tab on a newer bundle can migrate instead of deadlocking. Reads after
-			// this throw InvalidStateError, which is correct - that bundle's schema is stale.
-			db.onversionchange = () => db.close();
+			// this throw InvalidStateError, which is correct - that bundle's schema is stale. The
+			// optional callback lets the caller surface a reload prompt before those reads fail; it
+			// only ever fires in a tab whose bundle already carries this handler, so it protects the
+			// NEXT upgrade onward, never the one that ships it.
+			db.onversionchange = () => {
+				onVersionChange?.();
+				db.close();
+			};
 			resolve(db);
 		};
 		req.onerror = () => reject(req.error ?? new Error('idb-open-failed'));

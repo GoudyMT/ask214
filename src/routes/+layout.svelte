@@ -77,7 +77,12 @@
 		// Client-only: IndexedDB + crypto are browser-only.
 		void initProfileApp({
 			checkSupport: checkBrowserSupport,
-			openDb: () => openMtcDb(),
+			openDb: () =>
+				openMtcDb(undefined, () => {
+					// Another tab on a newer bundle upgraded the shared DB and closed this connection;
+					// the takeover offers a reload onto the new bundle instead of a silent, data-less tab.
+					if (!destroyed) app.status = 'stale';
+				}),
 			bootstrap: bootstrapLocalKeystore,
 			createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
 		})
