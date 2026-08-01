@@ -1,5 +1,6 @@
 import { search, toResultCards, type Corpus } from '$lib/corpus';
 import { filterByMinScore } from './threshold';
+import { detectCrisisIntent } from './crisis/detect';
 import { AskError, ASK_ERROR } from './errors';
 import type { AskState } from './types';
 
@@ -64,6 +65,12 @@ export function createAskStore(deps: {
 	async function ask(query: string): Promise<void> {
 		const trimmed = query.trim();
 		if (trimmed === '') return; // ignore empty submits
+		// A crisis / self-harm message short-circuits everything - it is never embedded, retrieved, or
+		// gated on setup; the view routes straight to crisis-line help. The message is never stored or sent.
+		if (detectCrisisIntent(trimmed).crisis) {
+			state = { kind: 'crisis' };
+			return;
+		}
 		// Ignore a new submit while a query is already running: overlapping runQuery calls race on `state`
 		// and the later-resolving one would win regardless of submit order.
 		if (state.kind === 'modelLoading' || state.kind === 'embedding') return;

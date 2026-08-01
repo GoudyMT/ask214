@@ -152,4 +152,29 @@ describe('createAskStore', () => {
 		void store.ask('second'); // must be ignored while a query is in flight
 		expect(calls).toBe(1); // no second embed started
 	});
+
+	it('short-circuits a crisis message to the crisis state without ever embedding (set up)', async () => {
+		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1'); // even a set-up device must not search a crisis message
+		let embedCalls = 0;
+		const store = createAskStore({
+			embed: async () => {
+				embedCalls++;
+				return new Float32Array([1, 0, 0]);
+			},
+			corpus: fixtureCorpus()
+		});
+		await store.ask('I want to kill myself');
+		expect(store.state.kind).toBe('crisis');
+		expect(embedCalls).toBe(0); // never retrieves or synthesizes a crisis message
+	});
+
+	it('routes a crisis message to crisis even when not set up (skips the download gate)', async () => {
+		// A normal first query goes to needsSetup; a crisis message must skip that and route straight to help.
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			corpus: fixtureCorpus()
+		});
+		await store.ask("I don't want to be here anymore after I get out");
+		expect(store.state.kind).toBe('crisis');
+	});
 });

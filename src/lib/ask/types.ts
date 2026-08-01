@@ -18,4 +18,5 @@ export type AskState =
 	| { kind: 'results'; cards: ResultCard[] }
 	| { kind: 'empty' }
 	| { kind: 'offline' }
+	| { kind: 'crisis' } // a crisis / self-harm message: routed straight to help, never retrieved or synthesized
 	| { kind: 'error'; code: AskErrorCode };

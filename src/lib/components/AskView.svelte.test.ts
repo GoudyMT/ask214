@@ -51,6 +51,13 @@ describe('AskView', () => {
 		expect(container.querySelector('.ask-private')).not.toBeNull();
 	});
 
+	it('crisis: renders the crisis-line card, not a normal result state', () => {
+		const { container } = render(AskView, { props: props({ kind: 'crisis' }) });
+		expect(container.querySelector('.crisis')).not.toBeNull();
+		expect(container.querySelector('a[href="tel:988"]')).not.toBeNull();
+		expect(container.querySelector('.ask-msg')).toBeNull();
+	});
+
 	it('idle: clicking a feed pill fills the input and asks that question', () => {
 		let asked: string | null = null;
 		const { container } = render(AskView, {

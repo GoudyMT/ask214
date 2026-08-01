@@ -4,6 +4,7 @@
 	import AskResultCard from './AskResultCard.svelte';
 	import SourceReader from './SourceReader.svelte';
 	import QuestionFeed from './QuestionFeed.svelte';
+	import CrisisCard from './CrisisCard.svelte';
 
 	let {
 		askState,
@@ -158,6 +159,8 @@
 			<p class="ask-msg__title">Something went wrong</p>
 			<p class="ask-msg__body">The search couldn't run. Please try again.</p>
 		</div>
+	{:else if askState.kind === 'crisis'}
+		<CrisisCard />
 	{/if}
 </div>
 
