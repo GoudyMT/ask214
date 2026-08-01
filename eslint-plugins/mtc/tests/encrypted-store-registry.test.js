@@ -43,6 +43,10 @@ describe('mtc/encrypted-store-registry', () => {
 					{
 						code: "tx.objectStore('calendar-sync').put({ id: 0, rec });",
 						errors: [{ messageId: 'writeUnsanctioned' }]
+					},
+					{
+						code: "tx.objectStore('byok').put({ id: 0, rec });",
+						errors: [{ messageId: 'writeUnsanctioned' }]
 					}
 				]
 			})

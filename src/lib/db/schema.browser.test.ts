@@ -44,11 +44,12 @@ function openV2Db(name: string): Promise<IDBDatabase> {
 	});
 }
 
-describe('openMtcDb schema (v3)', () => {
+describe('openMtcDb schema (v4)', () => {
 	it('opens at the current DB_VERSION with exactly the registered stores', async () => {
 		const db = await freshDb();
 		expect(db.version).toBe(DB_VERSION);
 		expect(Array.from(db.objectStoreNames).sort()).toEqual([
+			'byok',
 			'calendar-sync',
 			'calendar-sync-hwm',
 			'keystore',
@@ -65,7 +66,7 @@ describe('openMtcDb schema (v3)', () => {
 		expect(db.objectStoreNames.contains('meta')).toBe(false);
 	});
 
-	it('upgrades a real v2 database to v3, adding the calendar stores without touching prior data', async () => {
+	it('upgrades a real v2 database to the current version, adding the new stores without touching prior data', async () => {
 		const name = 'mtc-test-' + crypto.randomUUID();
 
 		// A returning user's database: v2, with encrypted records already written.
@@ -83,18 +84,19 @@ describe('openMtcDb schema (v3)', () => {
 		v2.close();
 
 		// The upgrade every existing user runs on first load of the new bundle.
-		const v3 = await openMtcDb(name);
-		opened.push(v3);
-		expect(v3.version).toBe(DB_VERSION);
-		expect(v3.objectStoreNames.contains('calendar-sync')).toBe(true);
-		expect(v3.objectStoreNames.contains('calendar-sync-hwm')).toBe(true);
+		const upgraded = await openMtcDb(name);
+		opened.push(upgraded);
+		expect(upgraded.version).toBe(DB_VERSION);
+		expect(upgraded.objectStoreNames.contains('calendar-sync')).toBe(true);
+		expect(upgraded.objectStoreNames.contains('calendar-sync-hwm')).toBe(true);
+		expect(upgraded.objectStoreNames.contains('byok')).toBe(true);
 
 		// The load-bearing half: the upgrade loop must SKIP the stores that already exist. Recreating
 		// one would empty it, and the ciphertext is unrecoverable - there is no server copy.
-		const gotProfile = await withStores(v3, 'profile', 'readonly', (tx) =>
+		const gotProfile = await withStores(upgraded, 'profile', 'readonly', (tx) =>
 			reqToPromise<{ id: number; rec: Uint8Array } | undefined>(tx.objectStore('profile').get(0))
 		);
-		const gotTimeline = await withStores(v3, 'timeline-state', 'readonly', (tx) =>
+		const gotTimeline = await withStores(upgraded, 'timeline-state', 'readonly', (tx) =>
 			reqToPromise<{ id: number; rec: Uint8Array } | undefined>(
 				tx.objectStore('timeline-state').get(0)
 			)
@@ -154,6 +156,7 @@ describe('openMtcDb schema (v3)', () => {
 
 	it('STORES enumerates exactly the registered stores', () => {
 		expect([...STORES].sort()).toEqual([
+			'byok',
 			'calendar-sync',
 			'calendar-sync-hwm',
 			'keystore',

@@ -13,7 +13,8 @@
 export const ENCRYPTED_STORES = Object.freeze([
 	'profile',
 	'timeline-state',
-	'calendar-sync'
+	'calendar-sync',
+	'byok'
 ] as const);
 
 export type EncryptedStoreName = (typeof ENCRYPTED_STORES)[number];

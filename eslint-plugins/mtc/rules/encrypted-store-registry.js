@@ -16,7 +16,12 @@
  * pinned by a parity test in this rule's own test file; that test is what keeps
  * this list honest. Exported for it.
  */
-export const ENCRYPTED_STORES_LITERAL = new Set(['profile', 'timeline-state', 'calendar-sync']);
+export const ENCRYPTED_STORES_LITERAL = new Set([
+	'profile',
+	'timeline-state',
+	'calendar-sync',
+	'byok'
+]);
 const FORBIDDEN_WRITE_METHODS = new Set(['put', 'add']);
 
 export default {
