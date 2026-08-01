@@ -1,4 +1,4 @@
-// The CitedAnswer contract (anti-phishing, red-team C6). Citations are built ONLY from the retrieved
+// The CitedAnswer contract (anti-phishing). Citations are built ONLY from the retrieved
 // chunks the model cited by id; a URL, phone number, or handle the model writes into its prose is NEVER
 // promoted to a clickable link - it is flagged inert so the renderer keeps it as plain text. A
 // scam-targeted audience must never be handed a clickable link the model invented.
