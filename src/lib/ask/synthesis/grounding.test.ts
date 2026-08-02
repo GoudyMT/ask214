@@ -22,4 +22,23 @@ describe('checkNumericGrounding', () => {
 		expect(r.grounded).toBe(true);
 		expect(r.ungrounded).toEqual([]);
 	});
+	it('flags a fabricated number that only appears as a substring of a larger number', () => {
+		// "5" must not count as grounded just because "2025" contains a 5 (standalone-token match).
+		const r = checkNumericGrounding('You are rated at 5%.', 'The 2025 handbook lists ratings.');
+		expect(r.grounded).toBe(false);
+		expect(r.ungrounded).toContain('5');
+	});
+	it('grounds a digit in the answer against a spelled-out number in the source', () => {
+		// A source figure written as a word ("ten") still grounds the digits the model writes ("10").
+		const r = checkNumericGrounding(
+			'You need 10 years of service.',
+			'Retirement requires ten years of service.'
+		);
+		expect(r.grounded).toBe(true);
+		expect(r.ungrounded).toEqual([]);
+	});
+	it('grounds a standalone integer that matches exactly', () => {
+		const r = checkNumericGrounding('The deadline is 30 days.', 'You have 30 days to respond.');
+		expect(r.grounded).toBe(true);
+	});
 });
