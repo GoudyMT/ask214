@@ -37,3 +37,16 @@ export const ASK_ASSET_CACHE = 'ask-assets';
 export function shouldKeepCache(key: string, appCacheName: string): boolean {
 	return key === appCacheName || key === ASK_ASSET_CACHE;
 }
+
+/**
+ * The service worker must never cache the `/api/` namespace: the retrieve endpoint is dynamic and
+ * request-specific, so a cached response could serve stale or another context's data. A matching request
+ * passes straight to the network (the SW does not handle it). The cross-origin browser-direct synthesis
+ * call never reaches the SW's same-origin fetch handler at all.
+ *
+ * @param pathname A same-origin request pathname.
+ * @returns true when the request is in the /api/ namespace and must bypass the SW cache.
+ */
+export function isApiRequest(pathname: string): boolean {
+	return pathname.startsWith('/api/');
+}

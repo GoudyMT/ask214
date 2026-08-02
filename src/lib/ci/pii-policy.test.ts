@@ -52,3 +52,43 @@ describe('pii-policy: server source must not reference ProfileV1 PII fields', ()
 		expect(scanForPiiTokens(files)).toEqual([]);
 	});
 });
+
+// The online path (the server-side retrieve Worker + the client egress + synthesis units) is the only code
+// that can send a request off-device. Beyond the runtime structural allowlist (assertOnlyKeys), this
+// statically forbids any profile PII field or the keystore install identifier from being named there.
+const ONLINE_PATH_DIRS = ['src/lib/ask/online', 'src/lib/ask/synthesis', 'workers/retrieve'];
+
+/** Recursively collect non-test, non-generated .ts source files under a directory. */
+function findSourceFiles(dir: string): string[] {
+	const out: string[] = [];
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		const full = join(dir, entry.name);
+		if (entry.isDirectory()) {
+			out.push(...findSourceFiles(full));
+		} else if (
+			entry.name.endsWith('.ts') &&
+			!entry.name.endsWith('.test.ts') &&
+			!entry.name.endsWith('.d.ts')
+		) {
+			out.push(full);
+		}
+	}
+	return out;
+}
+
+describe('pii-policy: the online egress path must not name PII or the install identifier', () => {
+	it('flags the keystore install identifier', () => {
+		const violations = scanForPiiTokens([
+			{ path: 'src/lib/ask/online/x.ts', content: 'body.id = keystore.installUuid;' }
+		]);
+		expect(violations).toHaveLength(1);
+		expect(violations[0]?.token).toBe('\\binstallUuid\\b');
+	});
+
+	it('the real online-path source contains no PII tokens', () => {
+		const files = ONLINE_PATH_DIRS.flatMap((dir) => findSourceFiles(join(process.cwd(), dir))).map(
+			(path) => ({ path, content: readFileSync(path, 'utf8') })
+		);
+		expect(scanForPiiTokens(files)).toEqual([]);
+	});
+});
