@@ -4,12 +4,13 @@
 // positive still yields a correct impersonal answer, while a false negative risks an unlawful
 // personalized eligibility claim.
 const FIRST_OR_SECOND_PERSON = /\b(i|i'm|im|i've|ive|my|me|you|your|we|our)\b/i;
-// Matches an eligibility signal: a keyword, a personalized possessive (my rating / pay / BAH ...), the
-// strong standalone "am i" / "what do i" frames, or an acquisition frame -- "(do|can|will|would) I" joined
-// to an acquisition verb within the same clause, so "will I still receive" is caught while "when do I
-// attend" (no acquisition verb) is not.
+// Matches an eligibility signal: a keyword, a personalized possessive (my [adjectives] rating / pay / BAH /
+// payment / check ... - an adjective span so "my combined rating" and "my monthly VA pay" short-circuit,
+// not only the adjacent form), the strong standalone "am i" / "what do i" frames, or an acquisition frame
+// -- "(do|can|will|would) I" joined to an acquisition verb within the same clause, so "will I still
+// receive" is caught while "when do I attend" (no acquisition verb) is not.
 const ELIGIBILITY =
-	/\b(qualif|eligib|entitl|am i|what do i|my (rating|claim|pay|bah|pension)|(do|can|will|would) i\b[^?.!]{0,30}\b(get|receive|qualif|claim|file))/i;
+	/\b(qualif|eligib|entitl|am i|what do i|my(?:\s+\S+){0,2}\s+(rating|claim|pay|bah|pension|payment|check|compensation|benefit|amount)|(do|can|will|would) i\b[^?.!]{0,30}\b(get|receive|qualif|claim|file))/i;
 
 export interface EligibilityIntent {
 	shortCircuit: boolean;

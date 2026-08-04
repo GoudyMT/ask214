@@ -30,6 +30,11 @@
 		"query": "Am I eligible for SkillBridge if my command hasn't approved it?",
 		"shortCircuit": true
 	},
+	{ "query": "What will my combined rating be?", "shortCircuit": true },
+	{ "query": "How much is my monthly VA pay?", "shortCircuit": true },
+	{ "query": "What's my current BAH?", "shortCircuit": true },
+	{ "query": "With a 30 percent rating, what would my check be?", "shortCircuit": true },
+	{ "query": "Given my 30% rating, what's my monthly payment?", "shortCircuit": true },
 
 	{ "query": "What is the SkillBridge program?", "shortCircuit": false },
 	{
