@@ -5,6 +5,7 @@
 	import SourceReader from './SourceReader.svelte';
 	import QuestionFeed from './QuestionFeed.svelte';
 	import CrisisCard from './CrisisCard.svelte';
+	import AskSummary from './AskSummary.svelte';
 
 	let {
 		askState,
@@ -12,7 +13,15 @@
 		onAsk,
 		onSetUp,
 		onDismiss,
-		sources
+		sources,
+		onlineCapable = false,
+		mode = 'device',
+		onSetMode = () => {},
+		onConsentOnline = () => {},
+		showNudge = false,
+		onDismissNudge = () => {},
+		onOfferDevice = () => {},
+		onRetryOnline = () => {}
 	}: {
 		askState: AskState;
 		ready: boolean;
@@ -20,6 +29,14 @@
 		onSetUp: () => void;
 		onDismiss: () => void;
 		sources: Map<string, Source>;
+		onlineCapable?: boolean;
+		mode?: 'device' | 'online';
+		onSetMode?: (m: 'device' | 'online') => void;
+		onConsentOnline?: () => void;
+		showNudge?: boolean;
+		onDismissNudge?: () => void;
+		onOfferDevice?: (query: string) => void;
+		onRetryOnline?: (query: string) => void;
 	} = $props();
 
 	let query = $state('');
@@ -74,6 +91,40 @@
 	</div>
 {/if}
 
+{#if showNudge}
+	<div class="ask-reminder">
+		<span
+			>Prefer to keep everything on your device? Set up on-device answers - fully private, works
+			offline.</span
+		>
+		<span class="ask-reminder__actions">
+			<button class="ask-reminder__set" type="button" onclick={() => onSetMode('device')}
+				>On-device</button
+			>
+			<button class="ask-reminder__x" type="button" aria-label="Dismiss" onclick={onDismissNudge}
+				>&times;</button
+			>
+		</span>
+	</div>
+{/if}
+
+{#if onlineCapable}
+	<div class="ask-mode" role="group" aria-label="Answer mode">
+		<button
+			class="ask-mode__opt"
+			aria-pressed={mode === 'online'}
+			type="button"
+			onclick={() => onSetMode('online')}>Online</button
+		>
+		<button
+			class="ask-mode__opt"
+			aria-pressed={mode === 'device'}
+			type="button"
+			onclick={() => onSetMode('device')}>On device</button
+		>
+	</div>
+{/if}
+
 <form
 	class="ask-bar"
 	onsubmit={(e) => {
@@ -92,7 +143,13 @@
 	<button class="ask-search" type="submit" disabled={!ready}>Search</button>
 </form>
 
-<p class="ask-private">Answered on your device - nothing you type is sent to a server or shared.</p>
+<p class="ask-private" class:ask-private--online={onlineCapable && mode === 'online'}>
+	{#if onlineCapable && mode === 'online'}
+		Answered online - only your question is sent; your profile and data stay on your device.
+	{:else}
+		Answered on your device - nothing you type is sent to a server or shared.
+	{/if}
+</p>
 
 <div class="ask-result">
 	{#if askState.kind === 'idle'}
@@ -110,6 +167,21 @@
 				<button class="ask-setup__skip" type="button" onclick={skipSetup}>Not now</button>
 			</div>
 		</div>
+	{:else if askState.kind === 'needsReconsent'}
+		<div class="ask-msg ask-msg--accent">
+			<p class="ask-msg__title">Answer online?</p>
+			<p class="ask-msg__body">
+				Your question is sent to our server to search the official library - nothing else. Your
+				profile and timeline stay on your device. You can switch to fully on-device answers any
+				time.
+			</p>
+			<div class="ask-setup__actions">
+				<button class="ask-setup__go" type="button" onclick={onConsentOnline}>Use online</button>
+				<button class="ask-setup__skip" type="button" onclick={() => onSetMode('device')}
+					>Stay on device</button
+				>
+			</div>
+		</div>
 	{:else if askState.kind === 'modelLoading'}
 		<div class="ask-msg ask-msg--accent">
 			<p class="ask-msg__title"><span class="ask-spinner"></span>Setting up Ask</p>
@@ -124,6 +196,9 @@
 		</div>
 	{:else if askState.kind === 'results'}
 		{@const cards = askState.cards}
+		{#if askState.summary}
+			<AskSummary view={askState.summary} />
+		{/if}
 		<p class="ask-count">Top match</p>
 		<AskResultCard
 			card={cards[0]!}
@@ -159,6 +234,29 @@
 			<p class="ask-msg__title">Something went wrong</p>
 			<p class="ask-msg__body">The search couldn't run. Please try again.</p>
 		</div>
+	{:else if askState.kind === 'degraded'}
+		{@const q = askState.query}
+		<div class="ask-msg ask-msg--warn">
+			{#if askState.rung === 'offer_device'}
+				<p class="ask-msg__title">Online is unavailable right now</p>
+				<p class="ask-msg__body">You can answer this question fully on your device instead.</p>
+				<button class="ask-setup__go" type="button" onclick={() => onOfferDevice(q)}
+					>Answer on your device</button
+				>
+			{:else if askState.rung === 'offer_online'}
+				<p class="ask-msg__title">That didn't work</p>
+				<button class="ask-setup__go" type="button" onclick={() => onRetryOnline(q)}
+					>Try online</button
+				>
+			{:else}
+				<p class="ask-msg__title">We couldn't answer that right now</p>
+				<p class="ask-msg__body">
+					Try the official tools directly: <a href="https://www.va.gov/" rel="external noopener"
+						>va.gov</a
+					>.
+				</p>
+			{/if}
+		</div>
 	{:else if askState.kind === 'crisis'}
 		<CrisisCard />
 	{/if}
@@ -172,6 +270,34 @@
 		color: var(--color-success);
 		margin: var(--space-s) 0 0;
 		text-align: center;
+	}
+	/* Online copy is muted, not the on-device success green - it states egress honestly, without a
+	   reassuring tone the online path has not earned. */
+	.ask-private--online {
+		color: var(--color-fg-muted);
+	}
+
+	/* Mode switch by the bar: always-visible transparency over whether the next question egresses. */
+	.ask-mode {
+		display: flex;
+		gap: var(--space-xs);
+		justify-content: center;
+		margin-bottom: var(--space-s);
+	}
+	.ask-mode__opt {
+		background: var(--color-surface);
+		color: var(--color-fg-muted);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-m);
+		padding: var(--space-xs) var(--space-m);
+		font: inherit;
+		font-size: var(--font-size-s);
+		cursor: pointer;
+	}
+	.ask-mode__opt[aria-pressed='true'] {
+		background: var(--color-accent);
+		color: var(--color-bg);
+		border-color: var(--color-accent);
 	}
 
 	.ask-bar {

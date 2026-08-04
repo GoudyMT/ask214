@@ -6,6 +6,7 @@ import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
 import type { ResultCard } from '$lib/corpus';
 import type { Source } from '$lib/ask/sources';
+import type { SynthesisView } from '$lib/ask/synthesis/synthesis-view';
 
 type ViewProps = {
 	askState: AskState;
@@ -14,6 +15,14 @@ type ViewProps = {
 	onSetUp: () => void;
 	onDismiss: () => void;
 	sources: Map<string, Source>;
+	onlineCapable?: boolean;
+	mode?: 'device' | 'online';
+	onSetMode?: (m: 'device' | 'online') => void;
+	onConsentOnline?: () => void;
+	showNudge?: boolean;
+	onDismissNudge?: () => void;
+	onOfferDevice?: (query: string) => void;
+	onRetryOnline?: (query: string) => void;
 };
 
 const noop = () => {};
@@ -203,5 +212,92 @@ describe('AskView', () => {
 		flushSync();
 		expect(container.querySelector('.ask-reminder')).toBeNull(); // reminderDismissed read from sessionStorage
 		sessionStorage.removeItem('mtc:ask:reminder-dismissed'); // cleanup
+	});
+
+	// --- online affordances (additive; onlineCapable defaults false, so the device tests above are untouched) ---
+
+	it('online-capable: shows the mode switch and the online privacy copy in online mode', () => {
+		const { container } = render(AskView, {
+			props: props({ kind: 'idle' }, { onlineCapable: true, mode: 'online' })
+		});
+		expect(container.querySelector('.ask-mode')).not.toBeNull();
+		expect(container.querySelector('.ask-private')?.textContent).toContain(
+			'only your question is sent'
+		);
+	});
+
+	it('device mode keeps the on-device privacy copy', () => {
+		const { container } = render(AskView, {
+			props: props({ kind: 'idle' }, { onlineCapable: true, mode: 'device' })
+		});
+		expect(container.querySelector('.ask-private')?.textContent).toContain('on your device');
+	});
+
+	it('needsReconsent: shows the blocking consent card; buttons fire onConsentOnline / onSetMode(device)', () => {
+		let consented = 0;
+		let toDevice: string | null = null;
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'needsReconsent' },
+				{
+					onlineCapable: true,
+					onConsentOnline: () => consented++,
+					onSetMode: (m) => (toDevice = m)
+				}
+			)
+		});
+		(container.querySelector('.ask-setup__go') as HTMLButtonElement).click();
+		flushSync();
+		expect(consented).toBe(1);
+		(container.querySelector('.ask-setup__skip') as HTMLButtonElement).click();
+		flushSync();
+		expect(toDevice).toBe('device');
+	});
+
+	it('results: renders the AI summary above the cards when present', () => {
+		const summary: SynthesisView = {
+			kind: 'answer',
+			answer: {
+				text: 'Do X [a].',
+				citations: [{ id: 'a', url: 'https://x.gov', title: 'S' }],
+				inert: [],
+				disclaimer: 'd'
+			}
+		};
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'results', cards: [card()], summary },
+				{ onlineCapable: true, mode: 'online' }
+			)
+		});
+		expect(container.querySelector('.ask-summary')).not.toBeNull();
+		expect(container.querySelector('.ask-card--lead')).not.toBeNull(); // cards still render below
+	});
+
+	it('degraded offer_device: the button re-runs the kept query on the device path', () => {
+		let offered: string | null = null;
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'degraded', rung: 'offer_device', query: 'gi bill' },
+				{ onlineCapable: true, onOfferDevice: (q) => (offered = q) }
+			)
+		});
+		(container.querySelector('.ask-msg--warn button') as HTMLButtonElement).click();
+		flushSync();
+		expect(offered).toBe('gi bill');
+	});
+
+	it('nudge: shows when showNudge and dismisses / switches to device', () => {
+		let dismissed = 0;
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'idle' },
+				{ onlineCapable: true, showNudge: true, onDismissNudge: () => dismissed++ }
+			)
+		});
+		expect(container.querySelector('.ask-reminder')).not.toBeNull();
+		(container.querySelector('.ask-reminder__x') as HTMLButtonElement).click();
+		flushSync();
+		expect(dismissed).toBe(1);
 	});
 });
