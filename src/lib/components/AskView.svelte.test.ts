@@ -60,6 +60,11 @@ describe('AskView', () => {
 		expect(container.querySelector('.ask-private')).not.toBeNull();
 	});
 
+	it('the result region announces state changes to assistive tech (aria-live, WCAG 4.1.3)', () => {
+		const { container } = render(AskView, { props: props({ kind: 'idle' }) });
+		expect(container.querySelector('.ask-result')?.getAttribute('aria-live')).toBe('polite');
+	});
+
 	it('crisis: renders the crisis-line card, not a normal result state', () => {
 		const { container } = render(AskView, { props: props({ kind: 'crisis' }) });
 		expect(container.querySelector('.crisis')).not.toBeNull();

@@ -151,7 +151,9 @@
 	{/if}
 </p>
 
-<div class="ask-result">
+<!-- aria-live so a screen reader hears the answer / "no match" / "online unavailable" / AI summary arrive
+     (WCAG 4.1.3). The crisis card keeps its own stronger role="alert". -->
+<div class="ask-result" aria-live="polite">
 	{#if askState.kind === 'idle'}
 		<QuestionFeed onPick={pick} />
 	{:else if askState.kind === 'needsSetup'}
