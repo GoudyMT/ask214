@@ -177,4 +177,157 @@ describe('createAskStore', () => {
 		await store.ask("I don't want to be here anymore after I get out");
 		expect(store.state.kind).toBe('crisis');
 	});
+
+	// --- online seam (additive; absent deps => device-identical, so the 13 tests above are untouched) ---
+
+	type StoreDeps = Parameters<typeof createAskStore>[0];
+
+	function onlineStore(over: Partial<StoreDeps> = {}) {
+		let consented = false;
+		const base: StoreDeps = {
+			embed: async () => new Float32Array([1, 0, 0]),
+			corpus: fixtureCorpus(),
+			retrieveOnline: async () => ({
+				status: 'results',
+				corpusVersion: '1.0',
+				results: [
+					{
+						score: 0.9,
+						chunk: {
+							id: 'a',
+							text: 'A',
+							sourceId: 's',
+							sourceTitle: 'S',
+							url: 'https://x.gov',
+							tags: []
+						}
+					}
+				]
+			}),
+			onlineConsented: () => consented,
+			markOnlineConsent: () => (consented = true)
+		};
+		return createAskStore({ ...base, ...over });
+	}
+
+	it('defaults to device mode and shows no nudge when no online deps are given', () => {
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			corpus: fixtureCorpus()
+		});
+		expect(store.mode).toBe('device');
+		expect(store.showNudge).toBe(false);
+	});
+
+	it('answers an online query with cards and marks consent on the first disclosed egress', async () => {
+		let consented = false;
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			corpus: fixtureCorpus(),
+			retrieveOnline: async () => ({
+				status: 'results',
+				corpusVersion: '1.0',
+				results: [
+					{
+						score: 0.9,
+						chunk: {
+							id: 'a',
+							text: 'A',
+							sourceId: 's',
+							sourceTitle: 'S',
+							url: 'https://x.gov',
+							tags: []
+						}
+					}
+				]
+			}),
+			onlineConsented: () => consented,
+			markOnlineConsent: () => (consented = true)
+		});
+		await store.ask('how do I transfer GI Bill');
+		expect(store.state.kind).toBe('results');
+		if (store.state.kind === 'results') expect(store.state.cards).toHaveLength(1);
+		expect(consented).toBe(true); // the disclosed default egress records consent
+	});
+
+	it('maps an online empty to empty (a real "no source", not a fault)', async () => {
+		const store = onlineStore({
+			retrieveOnline: async () => ({ status: 'empty', corpusVersion: '1.0' })
+		});
+		await store.ask('obscure');
+		expect(store.state.kind).toBe('empty');
+	});
+
+	it('degrades a transport error to the offer-device rung (device is the fallback)', async () => {
+		const store = onlineStore({ retrieveOnline: async () => ({ status: 'error' }) });
+		await store.ask('q');
+		expect(store.state.kind).toBe('degraded');
+		if (store.state.kind === 'degraded') expect(store.state.rung).toBe('offer_device');
+	});
+
+	it('degrades a high_demand response onto the ladder', async () => {
+		const store = onlineStore({ retrieveOnline: async () => ({ status: 'high_demand' }) });
+		await store.ask('q');
+		expect(store.state.kind).toBe('degraded');
+	});
+
+	it('renders an AI summary above the cards when synthesis is enabled', async () => {
+		const store = onlineStore({
+			synthesisEnabled: () => true,
+			synthesize: async () => ({
+				kind: 'answer',
+				answer: {
+					text: 'A [a].',
+					citations: [{ id: 'a', url: 'https://x.gov', title: 'S' }],
+					inert: [],
+					disclaimer: 'd'
+				}
+			})
+		});
+		await store.ask('q');
+		expect(store.state.kind).toBe('results');
+		if (store.state.kind === 'results') expect(store.state.summary?.kind).toBe('answer');
+	});
+
+	it('omits the summary when synthesis is disabled (raw cards only)', async () => {
+		const store = onlineStore({
+			synthesisEnabled: () => false,
+			synthesize: async () => ({ kind: 'degraded' })
+		});
+		await store.ask('q');
+		if (store.state.kind === 'results') expect(store.state.summary).toBeUndefined();
+	});
+
+	it('blocks a device->online switch behind reconsent and sends nothing until confirmed', async () => {
+		let sent = 0;
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			corpus: fixtureCorpus(),
+			retrieveOnline: async () => {
+				sent++;
+				return { status: 'results', corpusVersion: '1.0', results: [] };
+			},
+			onlineConsented: () => false, // never consented on this device
+			markOnlineConsent: () => {}
+		});
+		store.setMode('device'); // start on device explicitly
+		store.setMode('online'); // switch back up -> must reconsent (not consented)
+		expect(store.state.kind).toBe('needsReconsent');
+		await store.ask('q'); // an ask while reconsent is pending must NOT egress
+		expect(sent).toBe(0);
+		store.consentOnline(); // now confirm
+		expect(store.mode).toBe('online');
+		await store.ask('q');
+		expect(sent).toBe(1);
+	});
+
+	it('shows the private-mode nudge after the threshold and hides it on dismiss', async () => {
+		const store = onlineStore({ nudgeAfter: 2 });
+		await store.ask('one');
+		expect(store.showNudge).toBe(false); // 1 query, below threshold
+		await store.ask('two');
+		expect(store.showNudge).toBe(true); // threshold reached, device not set up
+		store.dismissNudge();
+		expect(store.showNudge).toBe(false);
+	});
 });
