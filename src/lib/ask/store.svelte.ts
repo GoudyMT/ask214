@@ -211,6 +211,9 @@ export function createAskStore(deps: {
 			return;
 		}
 		mode = 'device';
+		// Choosing device also dismisses a pending online-consent modal - otherwise "Stay on device" would
+		// leave `needsReconsent` up, blocking every query with the only exit being to consent (i.e. egress).
+		if (state.kind === 'needsReconsent') state = { kind: 'idle' };
 	}
 
 	// Confirm the online-egress consent: record it, go online, and clear the blocking modal.

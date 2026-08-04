@@ -417,4 +417,14 @@ describe('createAskStore', () => {
 			Object.defineProperty(navigator, 'onLine', { value: original, configurable: true });
 		}
 	});
+
+	it('declining online ("Stay on device") from the reconsent modal clears it and frees the device path', async () => {
+		const store = onlineStore(); // online-capable, not consented by default
+		store.setMode('device'); // start on device
+		store.setMode('online'); // switch up -> needsReconsent (not consented)
+		expect(store.state.kind).toBe('needsReconsent');
+		store.setMode('device'); // "Stay on device" must dismiss the pending switch, not trap the user
+		expect(store.state.kind).toBe('idle');
+		expect(store.mode).toBe('device');
+	});
 });
