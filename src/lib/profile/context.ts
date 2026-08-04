@@ -3,6 +3,7 @@ import type { CapabilityCause } from '../crypto/capability';
 import type { ProfileStore } from './store.svelte';
 import type { TimelineStateStore } from '../timeline';
 import type { CalendarSyncStore } from '../calendar/store.svelte';
+import type { ByokStore } from '../ask/byok/store';
 
 export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale';
 
@@ -18,6 +19,7 @@ export type ProfileApp = {
 	store: ProfileStore | null;
 	timeline: TimelineStateStore | null;
 	calendar: CalendarSyncStore | null;
+	byok: ByokStore | null;
 	cause: CapabilityCause | null;
 	/**
 	 * Erase every store on the device. An app-level act, not a store-level one: it must clear stores

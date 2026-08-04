@@ -16,6 +16,7 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
+			byok: null,
 			cause: 'indexed-db',
 			wipeAll: null,
 			relockAll: null
@@ -31,6 +32,7 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
+			byok: null,
 			cause: null,
 			wipeAll: null,
 			relockAll: null
@@ -45,6 +47,7 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
+			byok: null,
 			cause: null,
 			wipeAll: null,
 			relockAll: null
@@ -59,6 +62,7 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
+			byok: null,
 			cause: null,
 			wipeAll: null,
 			relockAll: null
