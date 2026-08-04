@@ -103,7 +103,10 @@
 			store?.setMode('device');
 			void store?.ask(q);
 		}}
-		onRetryOnline={(q) => void store?.ask(q)}
+		onRetryOnline={(q) => {
+			store?.setMode('online');
+			void store?.ask(q);
+		}}
 	/>
 
 	{#if isIdle && showOnramp}

@@ -427,4 +427,34 @@ describe('createAskStore', () => {
 		expect(store.state.kind).toBe('idle');
 		expect(store.mode).toBe('device');
 	});
+
+	it('a device retrieval failure offers the online path (the ladder device->online direction)', async () => {
+		localStorage.setItem('mtc:ask:model-downloaded', '1'); // set up -> device embeds (not the offline first-run)
+		const store = onlineStore({
+			embed: async () => {
+				throw new AskError(ASK_ERROR.EMBED);
+			}
+		});
+		store.setMode('device');
+		await store.ask('q');
+		expect(store.state.kind).toBe('degraded');
+		if (store.state.kind === 'degraded') expect(store.state.rung).toBe('offer_online');
+	});
+
+	it('once both online and device have failed, the ladder is terminal (outbound hub)', async () => {
+		localStorage.setItem('mtc:ask:model-downloaded', '1');
+		const store = onlineStore({
+			retrieveOnline: async () => ({ status: 'error' }),
+			embed: async () => {
+				throw new AskError(ASK_ERROR.EMBED);
+			}
+		});
+		await store.ask('q'); // online (default) fails -> offer_device
+		expect(store.state.kind).toBe('degraded');
+		if (store.state.kind === 'degraded') expect(store.state.rung).toBe('offer_device');
+		store.setMode('device'); // take the device offer
+		await store.ask('q'); // device also fails -> both failed -> outbound hub
+		expect(store.state.kind).toBe('degraded');
+		if (store.state.kind === 'degraded') expect(store.state.rung).toBe('outbound_hub');
+	});
 });

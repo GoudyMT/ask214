@@ -86,7 +86,15 @@ export function createAskStore(deps: {
 			// Offline only when a first-run (model-not-loaded) embed fails with no network: a warm embed
 			// needs no network, so its failure is a genuine error, not connectivity.
 			const online = typeof navigator === 'undefined' || navigator.onLine;
-			state = !modelLoaded && !online ? { kind: 'offline' } : { kind: 'error', code };
+			if (!modelLoaded && !online) {
+				state = { kind: 'offline' };
+			} else if (onlineCapable) {
+				// A device retrieval failure offers the working online path (or the outbound hub once both
+				// paths have failed this session) - the ladder's device->online direction.
+				state = { kind: 'degraded', rung: rungAfter('device'), query };
+			} else {
+				state = { kind: 'error', code };
+			}
 		}
 	}
 
