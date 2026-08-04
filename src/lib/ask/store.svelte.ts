@@ -78,9 +78,11 @@ export function createAskStore(deps: {
 			modelLoaded = true;
 			markModelDownloaded();
 			const cards = toResultCards(filterByMinScore(search(vector, deps.corpus, K), MIN_SCORE));
-			state = cards.length > 0 ? { kind: 'results', cards } : { kind: 'empty' };
+			commitIfCurrent(cards.length > 0 ? { kind: 'results', cards } : { kind: 'empty' });
 		} catch (e) {
 			const code = e instanceof AskError ? e.code : ASK_ERROR.EMBED;
+			// Superseded mid-embed (a crisis message routed to help, a pending consent modal) - do not clobber.
+			if (state.kind !== 'embedding' && state.kind !== 'modelLoading') return;
 			// Offline only when a first-run (model-not-loaded) embed fails with no network: a warm embed
 			// needs no network, so its failure is a genuine error, not connectivity.
 			const online = typeof navigator === 'undefined' || navigator.onLine;
@@ -97,6 +99,24 @@ export function createAskStore(deps: {
 		return nextRung({ failed, deviceCapable });
 	}
 
+	// A run's terminal write must not clobber a state that superseded it mid-flight - a crisis message
+	// (routed straight to help), a pending consent modal, or a mode change. Only commit if we are still in
+	// the working state this run set; otherwise the superseding transition stands.
+	function commitIfCurrent(next: AskState): void {
+		if (state.kind === 'embedding' || state.kind === 'modelLoading') state = next;
+	}
+
+	// Degrade an online failure onto the ladder, guarding the same supersession + the `failed` mutation.
+	// Offline is a dead end for the ladder (even its outbound hub is unreachable), so surface the offline hint.
+	function degradeOnline(query: string): void {
+		if (state.kind !== 'embedding' && state.kind !== 'modelLoading') return;
+		if (!(typeof navigator === 'undefined' || navigator.onLine)) {
+			state = { kind: 'offline' };
+			return;
+		}
+		state = { kind: 'degraded', rung: rungAfter('online'), query };
+	}
+
 	// The online path: crisis was already ruled out. The default-online egress is disclosed by the UI (mode +
 	// privacy line), so it proceeds without a modal and records consent on the first send. Every transport
 	// fault and high-demand response degrades onto the ladder; only a genuine below-threshold server result
@@ -109,28 +129,35 @@ export function createAskStore(deps: {
 		try {
 			result = await deps.retrieveOnline!(query);
 		} catch {
-			state = { kind: 'degraded', rung: rungAfter('online'), query };
+			degradeOnline(query);
 			return;
 		}
 		if (result.status === 'empty') {
-			state = { kind: 'empty' };
+			commitIfCurrent({ kind: 'empty' });
 			return;
 		}
 		if (result.status !== 'results') {
-			state = { kind: 'degraded', rung: rungAfter('online'), query };
+			degradeOnline(query);
 			return;
 		}
 		const hits = narrowScored(result.results);
 		const cards = toResultCards(hits);
+		// A `results` body that narrows to nothing is a server/protocol fault, not an authoritative
+		// "no official source covers that" - degrade rather than mislead.
 		if (cards.length === 0) {
-			state = { kind: 'empty' };
+			degradeOnline(query);
 			return;
 		}
 		let summary: SynthesisView | undefined;
 		if (deps.synthesize && deps.synthesisEnabled?.()) {
-			summary = toSynthesisView(await deps.synthesize(query, toRetrievedChunks(hits)));
+			try {
+				summary = toSynthesisView(await deps.synthesize(query, toRetrievedChunks(hits)));
+			} catch {
+				// A throwing synthesize must never strand the spinner; fall back to the raw cards.
+				summary = undefined;
+			}
 		}
-		state = summary ? { kind: 'results', cards, summary } : { kind: 'results', cards };
+		commitIfCurrent(summary ? { kind: 'results', cards, summary } : { kind: 'results', cards });
 	}
 
 	async function ask(query: string): Promise<void> {

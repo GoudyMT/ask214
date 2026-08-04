@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createAskStore } from './store.svelte';
 import { AskError, ASK_ERROR } from './errors';
 import type { Corpus, CorpusChunk } from '$lib/corpus';
+import type { RetrieveResult } from './online/outcome';
 
 function chunk(id: string): CorpusChunk {
 	return { id, text: id, sourceId: 's', sourceTitle: 'S', tags: [], url: 'https://example.gov' };
@@ -329,5 +330,91 @@ describe('createAskStore', () => {
 		expect(store.showNudge).toBe(true); // threshold reached, device not set up
 		store.dismissNudge();
 		expect(store.showNudge).toBe(false);
+	});
+
+	// --- run terminal-write robustness: a stale run must never clobber a superseding state ---
+
+	const oneHit: RetrieveResult = {
+		status: 'results',
+		corpusVersion: '1.0',
+		results: [
+			{
+				score: 0.9,
+				chunk: {
+					id: 'a',
+					text: 'A',
+					sourceId: 's',
+					sourceTitle: 'S',
+					url: 'https://x.gov',
+					tags: []
+				}
+			}
+		]
+	};
+
+	it('a crisis submitted during an in-flight online query keeps the crisis state (no clobber)', async () => {
+		let release: (r: RetrieveResult) => void = () => {};
+		const store = onlineStore({
+			retrieveOnline: () => new Promise<RetrieveResult>((r) => (release = r))
+		});
+		const p = store.ask('what benefits am I owed'); // -> embedding, suspended on retrieveOnline
+		expect(store.state.kind).toBe('embedding');
+		await store.ask('I want to kill myself'); // crisis short-circuits (above the in-flight guard)
+		expect(store.state.kind).toBe('crisis');
+		release(oneHit);
+		await p;
+		expect(store.state.kind).toBe('crisis'); // the stale result did NOT tear the crisis card down
+	});
+
+	it('a crisis submitted during an in-flight device query keeps the crisis state', async () => {
+		localStorage.setItem('mtc:ask:model-downloaded', '1'); // set up -> the device path embeds
+		let release: (v: Float32Array) => void = () => {};
+		const store = createAskStore({
+			embed: () => new Promise<Float32Array>((r) => (release = r)),
+			corpus: fixtureCorpus()
+		});
+		const p = store.ask('benign'); // -> embedding, suspended on embed
+		expect(store.state.kind).toBe('embedding');
+		await store.ask('I want to kill myself');
+		expect(store.state.kind).toBe('crisis');
+		release(new Float32Array([1, 0, 0]));
+		await p;
+		expect(store.state.kind).toBe('crisis');
+	});
+
+	it('a throwing synthesize falls back to raw cards instead of stranding the UI', async () => {
+		const store = onlineStore({
+			synthesisEnabled: () => true,
+			synthesize: async () => {
+				throw new Error('boom');
+			}
+		});
+		await store.ask('q');
+		expect(store.state.kind).toBe('results');
+		if (store.state.kind === 'results') expect(store.state.summary).toBeUndefined();
+	});
+
+	it('a results body with no valid hits degrades (a fault is not an authoritative "no source")', async () => {
+		const store = onlineStore({
+			retrieveOnline: async () => ({ status: 'results', corpusVersion: '1.0', results: [] })
+		});
+		await store.ask('q');
+		expect(store.state.kind).toBe('degraded');
+	});
+
+	it('an online query that fails while offline shows the offline hint, not a dead-end degrade', async () => {
+		const original = navigator.onLine;
+		Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+		try {
+			const store = onlineStore({
+				retrieveOnline: async () => {
+					throw new Error('net');
+				}
+			});
+			await store.ask('q');
+			expect(store.state.kind).toBe('offline');
+		} finally {
+			Object.defineProperty(navigator, 'onLine', { value: original, configurable: true });
+		}
 	});
 });
