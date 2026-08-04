@@ -457,4 +457,14 @@ describe('createAskStore', () => {
 		expect(store.state.kind).toBe('degraded');
 		if (store.state.kind === 'degraded') expect(store.state.rung).toBe('outbound_hub');
 	});
+
+	// A device choice lost to storage eviction is indistinguishable from a new user, so it inherits the
+	// online-default + inline disclosure (a blocking re-consent would need a durable signal ITP wipes too).
+	it('the default online mode egresses inline-disclosed, without a blocking modal', async () => {
+		const store = onlineStore(); // no consent, no pref -> online-default (a new OR post-eviction device)
+		expect(store.mode).toBe('online');
+		expect(store.state.kind).not.toBe('needsReconsent'); // no blocking modal on the default path
+		await store.ask('q');
+		expect(store.state.kind).toBe('results'); // it egressed; the inline privacy line discloses it
+	});
 });

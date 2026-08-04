@@ -15,7 +15,7 @@ export type EmbedResponse =
 export type AskState =
 	| { kind: 'idle' }
 	| { kind: 'needsSetup'; pendingQuery: string } // soft opt-in: asked, model not set up; query preserved
-	| { kind: 'needsReconsent'; pendingQuery?: string } // blocking online-egress consent; nothing is sent until confirmed
+	| { kind: 'needsReconsent' } // blocking online-egress consent; nothing is sent until confirmed
 	| { kind: 'modelLoading' }
 	| { kind: 'embedding' } // generic "working" state (device embed OR an online retrieve in flight)
 	| { kind: 'results'; cards: ResultCard[]; summary?: SynthesisView } // summary present only on the online+synthesis path

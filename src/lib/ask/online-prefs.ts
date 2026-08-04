@@ -27,7 +27,10 @@ export function setOnlineConsented(on: boolean): void {
 
 /**
  * The mode Ask opens in. Defaults to online: a new user (no stored choice) gets the instant online answer
- * per the on-ramp decision; only an explicit 'device' choice opens on-device.
+ * per the on-ramp decision; only an explicit 'device' choice opens on-device. A device choice lost to
+ * storage eviction is indistinguishable from a new user here, so it also opens online - the always-shown
+ * inline privacy line discloses the egress. A blocking re-consent would need a durable eviction signal that
+ * ITP wipes alongside these flags, so it is deferred to v1.1 behind installed-PWA detection.
  */
 export function getDefaultMode(): 'device' | 'online' {
 	return typeof localStorage !== 'undefined' && localStorage.getItem(DEFAULT_MODE_KEY) === 'device'

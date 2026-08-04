@@ -57,7 +57,7 @@ export function createAskStore(deps: {
 	nudgeAfter?: number;
 }) {
 	let state = $state<AskState>({ kind: 'idle' });
-	let modelLoaded = readModelDownloaded();
+	let modelLoaded = $state(readModelDownloaded()); // $state so `showNudge` stays reactive to it
 
 	// Online is available only when the route supplied the retrieve closure; that presence (not a global
 	// default) is what keeps the change additive - a device-only construction is identical to before.
