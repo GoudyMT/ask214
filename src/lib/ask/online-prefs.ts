@@ -25,11 +25,14 @@ export function setOnlineConsented(on: boolean): void {
 	write(CONSENTED_KEY, on);
 }
 
-/** The user's chosen default answer mode; 'device' unless they explicitly picked 'online'. */
+/**
+ * The mode Ask opens in. Defaults to online: a new user (no stored choice) gets the instant online answer
+ * per the on-ramp decision; only an explicit 'device' choice opens on-device.
+ */
 export function getDefaultMode(): 'device' | 'online' {
-	return typeof localStorage !== 'undefined' && localStorage.getItem(DEFAULT_MODE_KEY) === 'online'
-		? 'online'
-		: 'device';
+	return typeof localStorage !== 'undefined' && localStorage.getItem(DEFAULT_MODE_KEY) === 'device'
+		? 'device'
+		: 'online';
 }
 
 export function setDefaultMode(mode: 'device' | 'online'): void {

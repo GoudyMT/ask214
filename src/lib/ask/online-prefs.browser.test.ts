@@ -11,18 +11,18 @@ import {
 describe('online-prefs (non-PII device flags)', () => {
 	beforeEach(() => localStorage.clear());
 
-	it('defaults: not consented, device mode, synthesis off', () => {
+	it('defaults: not consented, online mode (the on-ramp default), synthesis off', () => {
 		expect(isOnlineConsented()).toBe(false);
-		expect(getDefaultMode()).toBe('device');
+		expect(getDefaultMode()).toBe('online');
 		expect(isSynthesisEnabled()).toBe(false);
 	});
 
 	it('round-trips each flag through localStorage', () => {
 		setOnlineConsented(true);
-		setDefaultMode('online');
+		setDefaultMode('device'); // the non-default, so this proves the write actually happened
 		setSynthesisEnabled(true);
 		expect(isOnlineConsented()).toBe(true);
-		expect(getDefaultMode()).toBe('online');
+		expect(getDefaultMode()).toBe('device');
 		expect(isSynthesisEnabled()).toBe(true);
 	});
 });

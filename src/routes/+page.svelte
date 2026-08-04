@@ -6,6 +6,14 @@
 	import { createAskStore, createEmbedder, loadCorpus, ASK_ERROR, type AskState } from '$lib/ask';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { getProfileApp } from '$lib/profile/context';
+	import { retrieveOnline } from '$lib/ask/online/retrieve-online';
+	import { synthesize } from '$lib/ask/synthesis/synthesize';
+	import {
+		getDefaultMode,
+		isOnlineConsented,
+		setOnlineConsented,
+		isSynthesisEnabled
+	} from '$lib/ask/online-prefs';
 
 	const CORPUS_BASE = '/corpus/corpus-v1.0';
 
@@ -38,7 +46,27 @@
 				const corpus = await loadCorpus(fetch, CORPUS_BASE);
 				sources = sourcesFromCorpus(corpus);
 				worker = new EmbedWorker();
-				store = createAskStore({ embed: createEmbedder(worker), corpus });
+				store = createAskStore({
+					embed: createEmbedder(worker),
+					corpus,
+					// Route-bound closures keep fetch, the corpus version, and the raw BYO key out of the store.
+					retrieveOnline: (query) =>
+						retrieveOnline(query, { fetch, expectedCorpusVersion: corpus.version }),
+					synthesize: async (query, chunks) => {
+						try {
+							const apiKey = (await app.byok?.readApiKey()) ?? null;
+							if (apiKey === null) return { kind: 'degraded' }; // no key -> raw cards, no summary
+							return await synthesize(query, chunks, { fetch, apiKey });
+						} catch {
+							return { kind: 'degraded' }; // a locked keystore or read failure degrades gracefully
+						}
+					},
+					onlineConsented: isOnlineConsented,
+					markOnlineConsent: () => setOnlineConsented(true),
+					synthesisEnabled: isSynthesisEnabled
+				});
+				// The store opens online when capable (the on-ramp default); honor an explicit device choice.
+				if (getDefaultMode() === 'device') store.setMode('device');
 			} catch {
 				initError = true;
 			}
@@ -62,9 +90,20 @@
 		{askState}
 		{ready}
 		{sources}
+		onlineCapable={true}
+		mode={store?.mode ?? 'device'}
+		showNudge={store?.showNudge ?? false}
 		onAsk={(q) => store?.ask(q)}
 		onSetUp={() => store?.setUp()}
 		onDismiss={() => store?.dismissSetup()}
+		onSetMode={(m) => store?.setMode(m)}
+		onConsentOnline={() => store?.consentOnline()}
+		onDismissNudge={() => store?.dismissNudge()}
+		onOfferDevice={(q) => {
+			store?.setMode('device');
+			void store?.ask(q);
+		}}
+		onRetryOnline={(q) => void store?.ask(q)}
 	/>
 
 	{#if isIdle && showOnramp}

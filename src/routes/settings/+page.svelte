@@ -11,12 +11,33 @@
 		type EaosCause
 	} from '$lib/profile/eaos';
 	import CalendarPanel from '$lib/components/CalendarPanel.svelte';
+	import OnlineAnswersPanel from '$lib/components/OnlineAnswersPanel.svelte';
+	import {
+		getDefaultMode,
+		setDefaultMode,
+		isSynthesisEnabled,
+		setSynthesisEnabled
+	} from '$lib/ask/online-prefs';
 	import { downloadTextFile } from '$lib/calendar/download';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
 	const app = getProfileApp();
+
+	// Online-answers settings: non-PII device prefs + whether a BYO key is stored (presence only).
+	let defaultMode = $state<'device' | 'online'>(getDefaultMode());
+	let synthesisEnabled = $state(isSynthesisEnabled());
+	let hasKey = $state(false);
+	$effect(() => {
+		const locked = app.store?.locked ?? true;
+		if (app.byok && !locked) {
+			void app.byok
+				.readApiKey()
+				.then((k) => (hasKey = k !== null))
+				.catch(() => (hasKey = false));
+		}
+	});
 
 	// A fresh no-date profile has nothing to configure here; send it to the front door, where the
 	// on-ramp lives. Gated on `ready` (init awaits the profile load, so a returning user already reads
@@ -286,6 +307,22 @@
 			onSetExclusions={(next) =>
 				void app.calendar?.setExclusions(next).catch(() => app.calendar?.refresh())}
 			onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
+		/>
+
+		<OnlineAnswersPanel
+			{defaultMode}
+			{synthesisEnabled}
+			{hasKey}
+			onSetDefaultMode={(m) => {
+				defaultMode = m;
+				setDefaultMode(m);
+			}}
+			onToggleSynthesis={(on) => {
+				synthesisEnabled = on;
+				setSynthesisEnabled(on);
+			}}
+			onSaveKey={(k) => void app.byok?.saveApiKey(k).then(() => (hasKey = true))}
+			onClearKey={() => void app.byok?.clearApiKey().then(() => (hasKey = false))}
 		/>
 
 		<dialog
