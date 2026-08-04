@@ -30,6 +30,12 @@ describe('narrowScored', () => {
 		expect(narrowScored([{ chunk: wireHit().chunk }])).toHaveLength(0); // no numeric score
 		expect(narrowScored(['nonsense', 42])).toHaveLength(0);
 	});
+
+	it('drops a hit whose url is not https (defense against a javascript:/http: card href)', () => {
+		expect(narrowScored([wireHit({ url: 'javascript:alert(1)' })])).toHaveLength(0);
+		expect(narrowScored([wireHit({ url: 'http://insecure.gov' })])).toHaveLength(0);
+		expect(narrowScored([wireHit({ url: 'https://ok.gov' })])).toHaveLength(1);
+	});
 });
 
 describe('toRetrievedChunks', () => {

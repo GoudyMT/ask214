@@ -6,8 +6,9 @@
 {#if view.kind === 'answer'}
 	<section class="ask-summary" aria-label="AI-generated summary">
 		<p class="ask-summary__label">AI summary</p>
-		<!-- Plain-text interpolation: prose is auto-escaped and never auto-linked, so any URL/phone the model
-		     wrote is inert. The only links on this surface are the verified citations below. -->
+		<!-- Plain-text interpolation: prose is auto-escaped, so a URL the model wrote stays inert; a phone
+		     number is kept inert by the app-wide format-detection:telephone=no meta (iOS would otherwise
+		     auto-link it). The only links on this surface are the verified citations below. -->
 		<p class="ask-summary__text">{view.answer.text}</p>
 		{#if view.answer.citations.length > 0}
 			<ul class="ask-summary__sources">

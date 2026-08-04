@@ -16,7 +16,10 @@ function narrowOne(entry: unknown): RetrievalResult | null {
 		typeof text !== 'string' ||
 		typeof sourceId !== 'string' ||
 		typeof sourceTitle !== 'string' ||
-		typeof url !== 'string'
+		typeof url !== 'string' ||
+		// Mirror the corpus codec's scheme gate: a server-supplied javascript:/data:/http: url must never
+		// become a clickable card or citation href on this scam-targeted surface.
+		!/^https:\/\//i.test(url)
 	) {
 		return null;
 	}
