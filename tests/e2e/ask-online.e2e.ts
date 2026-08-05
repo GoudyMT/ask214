@@ -37,7 +37,9 @@ test('online default: a retrieve failure degrades to the on-device offer', async
 	await expect(page.getByRole('button', { name: /answer on your device/i })).toBeVisible();
 });
 
-test('a device->online switch re-consents before any query is sent', async ({ page }) => {
+test('a device->online switch flips the mode and egresses nothing until the disclosed ask', async ({
+	page
+}) => {
 	let retrieveCalls = 0;
 	await page.route('**/api/retrieve', (route) => {
 		retrieveCalls++;
@@ -49,17 +51,18 @@ test('a device->online switch re-consents before any query is sent', async ({ pa
 	});
 	await page.goto('/');
 	await expect(askInput(page)).toBeEnabled();
-	// switch down to device, then back up to online: not yet consented -> the blocking consent card
+	// switch down to device, then back up to online: a user-initiated switch is a pure preference flip -
+	// no blocking card, and the switch itself sends nothing (egress is the disclosed ask, not the toggle)
 	await page.getByRole('button', { name: /^on device$/i }).click();
 	await page.getByRole('button', { name: /^online$/i }).click();
-	await expect(page.getByText(/answer online\?/i)).toBeVisible();
-	// asking while the consent card is up must NOT egress
+	await expect(page.getByRole('button', { name: /^online$/i })).toHaveAttribute(
+		'aria-pressed',
+		'true'
+	);
+	await expect(page.getByText(/answer online\?/i)).toHaveCount(0); // no blocking modal on the flip
+	expect(retrieveCalls).toBe(0); // the switch itself egresses nothing
+	// the disclosed ask (online mode + the honest privacy line) is the only egress
 	await askInput(page).fill('test question');
-	await searchButton(page).click();
-	await expect(page.getByText(/answer online\?/i)).toBeVisible(); // still blocked - the card persists
-	expect(retrieveCalls).toBe(0); // and nothing was sent
-	// confirm -> egress is now allowed
-	await page.getByRole('button', { name: /use online/i }).click();
 	await searchButton(page).click();
 	await expect.poll(() => retrieveCalls).toBeGreaterThan(0);
 });

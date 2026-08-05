@@ -206,22 +206,16 @@ export function createAskStore(deps: {
 		if (state.kind === 'needsSetup') state = { kind: 'idle' };
 	}
 
-	// Switching UP to online requires a remembered per-device consent; without it, hold at the blocking
-	// modal and send nothing until consentOnline() confirms. Switching to device needs no consent.
+	// A user-initiated mode switch is a pure preference: it flips instantly and egresses nothing. Online
+	// egress is disclosed by the always-visible toggle + privacy line and consented at the first ask, so
+	// the on-ramp default and an explicit switch behave identically - the feed stays, no blocking modal.
+	// needsReconsent is reserved for a future non-user-initiated flip (a storage-eviction reset the user
+	// did not choose); a toggle never raises it, but choosing device still clears it so such a re-consent
+	// could never trap the user.
 	function setMode(next: 'device' | 'online'): void {
-		if (next === 'online') {
-			if (!onlineCapable) return;
-			if (deps.onlineConsented?.() ?? false) {
-				mode = 'online';
-			} else {
-				state = { kind: 'needsReconsent' };
-			}
-			return;
-		}
-		mode = 'device';
-		// Choosing device also dismisses a pending online-consent modal - otherwise "Stay on device" would
-		// leave `needsReconsent` up, blocking every query with the only exit being to consent (i.e. egress).
-		if (state.kind === 'needsReconsent') state = { kind: 'idle' };
+		if (next === 'online' && !onlineCapable) return;
+		mode = next;
+		if (next === 'device' && state.kind === 'needsReconsent') state = { kind: 'idle' };
 	}
 
 	// Confirm the online-egress consent: record it, go online, and clear the blocking modal.

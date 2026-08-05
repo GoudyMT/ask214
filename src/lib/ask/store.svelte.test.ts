@@ -299,26 +299,40 @@ describe('createAskStore', () => {
 		if (store.state.kind === 'results') expect(store.state.summary).toBeUndefined();
 	});
 
-	it('blocks a device->online switch behind reconsent and sends nothing until confirmed', async () => {
+	it('a user switch to online flips the mode and egresses nothing until the disclosed ask', async () => {
 		let sent = 0;
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
 			corpus: fixtureCorpus(),
 			retrieveOnline: async () => {
 				sent++;
-				return { status: 'results', corpusVersion: '1.0', results: [] };
+				return {
+					status: 'results',
+					corpusVersion: '1.0',
+					results: [
+						{
+							score: 0.9,
+							chunk: {
+								id: 'a',
+								text: 'A',
+								sourceId: 's',
+								sourceTitle: 'S',
+								url: 'https://x.gov',
+								tags: []
+							}
+						}
+					]
+				};
 			},
 			onlineConsented: () => false, // never consented on this device
 			markOnlineConsent: () => {}
 		});
 		store.setMode('device'); // start on device explicitly
-		store.setMode('online'); // switch back up -> must reconsent (not consented)
-		expect(store.state.kind).toBe('needsReconsent');
-		await store.ask('q'); // an ask while reconsent is pending must NOT egress
-		expect(sent).toBe(0);
-		store.consentOnline(); // now confirm
+		store.setMode('online'); // a user-initiated switch: flips instantly, no blocking modal
 		expect(store.mode).toBe('online');
-		await store.ask('q');
+		expect(store.state.kind).toBe('idle'); // the feed persists; the switch itself sends nothing
+		expect(sent).toBe(0);
+		await store.ask('q'); // the disclosed ask is the only egress
 		expect(sent).toBe(1);
 	});
 
@@ -418,14 +432,24 @@ describe('createAskStore', () => {
 		}
 	});
 
-	it('declining online ("Stay on device") from the reconsent modal clears it and frees the device path', async () => {
+	it('toggling online<->device is a pure flip that keeps the feed and never traps the user', () => {
 		const store = onlineStore(); // online-capable, not consented by default
-		store.setMode('device'); // start on device
-		store.setMode('online'); // switch up -> needsReconsent (not consented)
-		expect(store.state.kind).toBe('needsReconsent');
-		store.setMode('device'); // "Stay on device" must dismiss the pending switch, not trap the user
-		expect(store.state.kind).toBe('idle');
+		store.setMode('device');
 		expect(store.mode).toBe('device');
+		expect(store.state.kind).toBe('idle');
+		store.setMode('online'); // flips up cleanly - no blocking modal
+		expect(store.mode).toBe('online');
+		expect(store.state.kind).toBe('idle'); // the feed persists throughout
+		store.setMode('device'); // and back down
+		expect(store.mode).toBe('device');
+		expect(store.state.kind).toBe('idle');
+	});
+
+	it('consentOnline() records consent and switches to online (the reserved re-consent completer)', () => {
+		const store = onlineStore();
+		store.setMode('device'); // go device so the switch to online is observable
+		store.consentOnline();
+		expect(store.mode).toBe('online');
 	});
 
 	it('a device retrieval failure offers the online path (the ladder device->online direction)', async () => {
