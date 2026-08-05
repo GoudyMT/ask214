@@ -84,12 +84,26 @@
 			{/if}
 		</div>
 		<p class="online-hint">
-			Your key is stored encrypted on your device and never sent to us - it goes straight to
-			Anthropic when you ask.
+			Your key is encrypted on this device and sent only to Anthropic - never to us.
 			<a href="https://console.anthropic.com/settings/keys" rel="external noopener">
 				Where do I get a key?
 			</a>
 		</p>
+		<details class="online-key__protect">
+			<summary>How is my key protected?</summary>
+			<ul>
+				<li>
+					Stored encrypted (AES-GCM) in your browser, alongside your other private data - never in
+					plain text.
+				</li>
+				<li>
+					Sent straight to Anthropic when you ask; your browser is set to block it from going
+					anywhere else.
+				</li>
+				<li>It never reaches our servers - we can't see, store, or use it.</li>
+				<li>Remove it any time with the button above.</li>
+			</ul>
+		</details>
 	</div>
 </section>
 
@@ -182,5 +196,21 @@
 	.online-key__clear {
 		color: var(--color-danger);
 		border-color: var(--color-danger);
+	}
+	.online-key__protect {
+		margin-top: var(--space-s);
+		font-size: var(--font-size-s);
+		color: var(--color-fg-muted);
+	}
+	.online-key__protect summary {
+		color: var(--color-accent);
+		cursor: pointer;
+	}
+	.online-key__protect ul {
+		margin: var(--space-s) 0 0;
+		padding-left: var(--space-l);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-xs);
 	}
 </style>

@@ -20,8 +20,6 @@
 	} from '$lib/ask/online-prefs';
 	import { downloadTextFile } from '$lib/calendar/download';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 
 	const app = getProfileApp();
 
@@ -39,18 +37,9 @@
 		}
 	});
 
-	// A fresh no-date profile has nothing to configure here; send it to the front door, where the
-	// on-ramp lives. Gated on `ready` (init awaits the profile load, so a returning user already reads
-	// a non-'none' persona and stays); a locked profile has data too, so it stays and offers unlock.
-	$effect(() => {
-		if (
-			app.status === 'ready' &&
-			app.store?.locked !== true &&
-			app.store?.persona.completeness === 'none'
-		) {
-			void goto(resolve('/'));
-		}
-	});
+	// A no-timeline profile can still configure "Online answers" here, so Settings stays reachable - but the
+	// timeline-dependent sections (separation date, calendar) hide until there is a timeline to manage.
+	const hasTimeline = $derived((app.store?.persona.completeness ?? 'none') !== 'none');
 
 	let editing = $state(false);
 	let draft = $state('');
@@ -236,78 +225,84 @@
 	{#if app.store?.locked}
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else}
-		<section class="settings-section" aria-labelledby="timeline-heading">
-			<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
+		{#if hasTimeline}
+			<section class="settings-section" aria-labelledby="timeline-heading">
+				<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
 
-			{#if editing}
-				<form class="settings-edit" onsubmit={(e) => void save(e)}>
-					<EaosInput
-						value={draft}
-						{error}
-						onchange={onInput}
-						label="Separation date (EAOS)"
-						hint="Your End of Active Obligated Service - the date your current obligation ends."
-					/>
-					<div class="settings-edit__actions">
-						<button class="settings-save" type="submit" disabled={saving}>Save</button>
-						<button class="settings-cancel" type="button" onclick={cancel}>Cancel</button>
+				{#if editing}
+					<form class="settings-edit" onsubmit={(e) => void save(e)}>
+						<EaosInput
+							value={draft}
+							{error}
+							onchange={onInput}
+							label="Separation date (EAOS)"
+							hint="Your End of Active Obligated Service - the date your current obligation ends."
+						/>
+						<div class="settings-edit__actions">
+							<button class="settings-save" type="submit" disabled={saving}>Save</button>
+							<button class="settings-cancel" type="button" onclick={cancel}>Cancel</button>
+						</div>
+					</form>
+				{:else}
+					<div class="settings-row">
+						<div class="settings-row__field">
+							<span class="settings-row__label">Separation date (EAOS)</span>
+							<span class="settings-row__value">{currentEaos ?? 'Not set'}</span>
+						</div>
+						<button class="settings-row__change" type="button" onclick={startEdit}>
+							{currentEaos ? 'Change' : 'Add'}
+						</button>
 					</div>
-				</form>
-			{:else}
-				<div class="settings-row">
-					<div class="settings-row__field">
-						<span class="settings-row__label">Separation date (EAOS)</span>
-						<span class="settings-row__value">{currentEaos ?? 'Not set'}</span>
+				{/if}
+
+				{#if app.store?.clockBackward}
+					<div class="clock-notice">
+						<p id="clock-notice-msg" class="clock-notice__msg">
+							Your device clock appears to have moved backward - your timeline dates may be off.
+						</p>
+						<button
+							bind:this={clockFixEl}
+							class="clock-notice__fix"
+							type="button"
+							aria-describedby="clock-notice-msg"
+							onclick={() => void clearClock()}
+						>
+							I fixed my clock
+						</button>
+						{#if clockError}
+							<p class="clock-notice__error" role="alert">{clockError}</p>
+						{/if}
 					</div>
-					<button class="settings-row__change" type="button" onclick={startEdit}>
-						{currentEaos ? 'Change' : 'Add'}
+				{/if}
+			</section>
+		{/if}
+
+		{#if hasTimeline}
+			<section class="settings-section" aria-labelledby="privacy-heading">
+				<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
+				<button class="settings-lock" type="button" onclick={lock}>Lock</button>
+				<p class="settings-hint">
+					Clears your profile from this screen. Use Unlock to view it again.
+				</p>
+
+				<div class="danger-zone">
+					<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
+						Erase all data on this device
 					</button>
 				</div>
-			{/if}
+			</section>
+		{/if}
 
-			{#if app.store?.clockBackward}
-				<div class="clock-notice">
-					<p id="clock-notice-msg" class="clock-notice__msg">
-						Your device clock appears to have moved backward - your timeline dates may be off.
-					</p>
-					<button
-						bind:this={clockFixEl}
-						class="clock-notice__fix"
-						type="button"
-						aria-describedby="clock-notice-msg"
-						onclick={() => void clearClock()}
-					>
-						I fixed my clock
-					</button>
-					{#if clockError}
-						<p class="clock-notice__error" role="alert">{clockError}</p>
-					{/if}
-				</div>
-			{/if}
-		</section>
-
-		<section class="settings-section" aria-labelledby="privacy-heading">
-			<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-			<button class="settings-lock" type="button" onclick={lock}>Lock</button>
-			<p class="settings-hint">
-				Clears your profile from this screen. Use Unlock to view it again.
-			</p>
-
-			<div class="danger-zone">
-				<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
-					Erase all data on this device
-				</button>
-			</div>
-		</section>
-
-		<CalendarPanel
-			items={calendarItems}
-			exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-			ready={app.calendar?.ready ?? false}
-			onSetExclusions={(next) =>
-				void app.calendar?.setExclusions(next).catch(() => app.calendar?.refresh())}
-			onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
-		/>
+		{#if hasTimeline}
+			<CalendarPanel
+				items={calendarItems}
+				exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
+				ready={app.calendar?.ready ?? false}
+				onSetExclusions={(next) =>
+					void app.calendar?.setExclusions(next).catch(() => app.calendar?.refresh())}
+				onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
+			/>
+		{/if}
 
 		<OnlineAnswersPanel
 			{defaultMode}

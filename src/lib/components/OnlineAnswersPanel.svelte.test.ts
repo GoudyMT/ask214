@@ -23,9 +23,21 @@ const base: Props = {
 };
 
 describe('OnlineAnswersPanel', () => {
-	it('states plainly that the key is stored encrypted on-device and never sent to us', () => {
+	it('states plainly that the key is encrypted on-device and sent only to Anthropic, never to us', () => {
 		const { container } = render(OnlineAnswersPanel, { props: { ...base } });
-		expect(container.textContent?.replace(/\s+/g, ' ')).toContain('never sent to us');
+		expect(container.textContent?.replace(/\s+/g, ' ')).toContain(
+			'sent only to Anthropic - never to us'
+		);
+	});
+
+	it('the "how is my key protected" disclosure names the concrete, provable guarantees', () => {
+		const { container } = render(OnlineAnswersPanel, { props: { ...base } });
+		const details = container.querySelector('.online-key__protect');
+		expect(details).not.toBeNull();
+		const text = details?.textContent?.replace(/\s+/g, ' ') ?? '';
+		expect(text).toContain('encrypted'); // at-rest, AES-GCM
+		expect(text).toContain('block it from going anywhere else'); // the CSP egress lock, in plain words
+		expect(text).toContain("can't see, store, or use it"); // never reaches our servers
 	});
 
 	it('the key input is masked (type=password)', () => {
