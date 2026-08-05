@@ -108,23 +108,6 @@
 	</div>
 {/if}
 
-{#if onlineCapable}
-	<div class="ask-mode" role="group" aria-label="Answer mode">
-		<button
-			class="ask-mode__opt"
-			aria-pressed={mode === 'online'}
-			type="button"
-			onclick={() => onSetMode('online')}>Online</button
-		>
-		<button
-			class="ask-mode__opt"
-			aria-pressed={mode === 'device'}
-			type="button"
-			onclick={() => onSetMode('device')}>On device</button
-		>
-	</div>
-{/if}
-
 <form
 	class="ask-bar"
 	onsubmit={(e) => {
@@ -142,6 +125,23 @@
 	/>
 	<button class="ask-search" type="submit" disabled={!ready}>Search</button>
 </form>
+
+{#if onlineCapable}
+	<div class="ask-mode" role="group" aria-label="Answer mode">
+		<button
+			class="ask-mode__opt"
+			aria-pressed={mode === 'online'}
+			type="button"
+			onclick={() => onSetMode('online')}>Online</button
+		>
+		<button
+			class="ask-mode__opt"
+			aria-pressed={mode === 'device'}
+			type="button"
+			onclick={() => onSetMode('device')}>On device</button
+		>
+	</div>
+{/if}
 
 <p class="ask-private" class:ask-private--online={onlineCapable && mode === 'online'}>
 	{#if onlineCapable && mode === 'online'}
@@ -284,7 +284,7 @@
 		display: flex;
 		gap: var(--space-xs);
 		justify-content: center;
-		margin-bottom: var(--space-s);
+		margin-top: var(--space-s);
 	}
 	.ask-mode__opt {
 		background: var(--color-surface);
@@ -450,6 +450,9 @@
 		border-radius: var(--radius-m);
 		padding: var(--space-s) var(--space-m);
 		margin-top: var(--space-m);
+		/* Match the gap below the banner to the ask-bar's own input<->Search gap so the banner never
+		   sits flush on the boxes below it. */
+		margin-bottom: var(--space-s);
 		font-size: var(--font-size-s);
 	}
 	.ask-reminder__actions {
