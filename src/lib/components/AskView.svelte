@@ -173,9 +173,8 @@
 		<div class="ask-msg ask-msg--accent">
 			<p class="ask-msg__title">Answer online?</p>
 			<p class="ask-msg__body">
-				Your question is sent to our server to search the official library - nothing else. Your
-				profile and timeline stay on your device. You can switch to fully on-device answers any
-				time.
+				Your question is sent to our server to search the official library - never your profile or
+				timeline, which stay on your device. You can switch to fully on-device answers any time.
 			</p>
 			<div class="ask-setup__actions">
 				<button class="ask-setup__go" type="button" onclick={onConsentOnline}>Use online</button>
