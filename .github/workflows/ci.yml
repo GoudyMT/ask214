@@ -93,3 +93,6 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITLEAKS_CONFIG: .gitleaks.toml
+          # gitleaks-action@v2 requires GITHUB_TOKEN to scan pull requests (breaking change); the
+          # automatically-provisioned token is sufficient. No secret value is exposed by this.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
