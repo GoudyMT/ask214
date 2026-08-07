@@ -1,11 +1,14 @@
 import type { RetrievalResult, ResultCard } from './types';
+import { cleanExcerpt } from './clean-excerpt';
 
 /**
- * Map retrieval hits to citation-complete card view-models the Ask UI renders. Pure pass-through:
- * excerpt is `chunk.excerpt ?? chunk.text` - NO truncation, sentence handling, or word-count here
- * (all display shaping is the Ask UI's job; this keeps a lossy 200-word decision out of the core). Optional
- * page/section are conditionally spread so a missing value never becomes an `undefined` key
- * (exactOptionalPropertyTypes). Every card carries its full citation - citations can never be dropped.
+ * Map retrieval hits to citation-complete card view-models the Ask UI renders. The excerpt is
+ * `chunk.excerpt ?? chunk.text` run through cleanExcerpt, which normalizes the residual extraction
+ * artifacts a user sees (inline bullet glyphs, font garbage, a fused version footer) WITHOUT touching
+ * the embedded corpus text - retrieval ranks on the raw text, display shows the cleaned text. No
+ * truncation/word-count here (that display shaping is the Ask UI's job). Optional page/section are
+ * conditionally spread so a missing value never becomes an `undefined` key (exactOptionalPropertyTypes).
+ * Every card carries its full citation - citations can never be dropped.
  */
 export function toResultCards(results: RetrievalResult[]): ResultCard[] {
 	return results.map(({ chunk, score }) => ({
@@ -13,7 +16,7 @@ export function toResultCards(results: RetrievalResult[]): ResultCard[] {
 		sourceTitle: chunk.sourceTitle,
 		...(chunk.page !== undefined ? { page: chunk.page } : {}),
 		...(chunk.section !== undefined ? { section: chunk.section } : {}),
-		excerpt: chunk.excerpt ?? chunk.text,
+		excerpt: cleanExcerpt(chunk.excerpt ?? chunk.text),
 		url: chunk.url,
 		score
 	}));

@@ -1,4 +1,5 @@
 import type { Corpus } from '$lib/corpus';
+import { cleanExcerpt } from '$lib/corpus';
 
 /** All the official text held on-device for one source - the unit the offline reader shows. */
 export type Source = {
@@ -17,15 +18,17 @@ export type Source = {
 export function sourcesFromCorpus(corpus: Corpus): Map<string, Source> {
 	const sources = new Map<string, Source>();
 	for (const chunk of corpus.chunks) {
+		// Clean the residual extraction artifacts for display; the raw chunk.text stays the retrieval unit.
+		const passage = cleanExcerpt(chunk.text);
 		const existing = sources.get(chunk.sourceId);
 		if (existing) {
-			existing.texts.push(chunk.text);
+			existing.texts.push(passage);
 		} else {
 			sources.set(chunk.sourceId, {
 				sourceId: chunk.sourceId,
 				title: chunk.sourceTitle,
 				url: chunk.url,
-				texts: [chunk.text]
+				texts: [passage]
 			});
 		}
 	}
