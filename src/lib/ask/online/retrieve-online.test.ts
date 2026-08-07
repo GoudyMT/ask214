@@ -102,4 +102,22 @@ describe('retrieveOnline', () => {
 		expect(options.credentials).toBe('omit');
 		expect(options.body).toBe(JSON.stringify({ query: 'skillbridge' }));
 	});
+
+	it('aborts and degrades to error when the request exceeds the timeout (no strand)', async () => {
+		// A socket that accepts but never settles, rejecting only when the caller aborts.
+		const hanging = vi.fn<FetchLike>(
+			(_url, options) =>
+				new Promise<Response>((_resolve, reject) => {
+					options.signal?.addEventListener('abort', () =>
+						reject(new DOMException('aborted', 'AbortError'))
+					);
+				})
+		);
+		const r = await retrieveOnline('q', {
+			fetch: hanging,
+			expectedCorpusVersion: VERSION,
+			timeoutMs: 10
+		});
+		expect(r).toEqual({ status: 'error' });
+	});
 });

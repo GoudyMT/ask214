@@ -19,6 +19,9 @@ export interface SynthesizeDeps {
 	// The BYO key travels only in the request header, browser-direct to Anthropic; it never reaches our
 	// servers and is never placed in the request body.
 	apiKey: string;
+	// Bound the request so a hung connection degrades to raw cards instead of stranding the spinner.
+	// Generous (an LLM completion is slower than retrieval); overridable for tests.
+	timeoutMs?: number;
 }
 
 export type SynthesisResult =
@@ -30,6 +33,7 @@ export type SynthesisResult =
 const ENDPOINT = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 1024;
+const SYNTH_TIMEOUT_MS = 30_000;
 
 // A structural allowlist, not a token blocklist: exactly the keys the Messages API needs, and never
 // `metadata` (Anthropic's caller-supplied user-tracking field) or any profile/PII key. A type alias, not
@@ -102,9 +106,11 @@ export async function synthesize(
 	};
 	assertOnlyKeys(body, ['model', 'max_tokens', 'thinking', 'system', 'messages']);
 
-	let res: Response;
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), deps.timeoutMs ?? SYNTH_TIMEOUT_MS);
+	let modelText: string;
 	try {
-		res = await deps.fetch(ENDPOINT, {
+		const res = await deps.fetch(ENDPOINT, {
 			method: 'POST',
 			credentials: 'omit',
 			headers: {
@@ -113,18 +119,16 @@ export async function synthesize(
 				'anthropic-version': '2023-06-01',
 				'anthropic-dangerous-direct-browser-access': 'true'
 			},
-			body: JSON.stringify(body)
+			body: JSON.stringify(body),
+			signal: controller.signal
 		});
-	} catch {
-		return { kind: 'degraded' };
-	}
-	if (!res.ok) return { kind: 'degraded' };
-
-	let modelText: string;
-	try {
+		if (!res.ok) return { kind: 'degraded' };
 		modelText = extractText(await res.json());
 	} catch {
+		// throw / abort (timeout) / unreadable body -> degrade to raw cards
 		return { kind: 'degraded' };
+	} finally {
+		clearTimeout(timer);
 	}
 
 	const citedIds = parseCitedIds(modelText);

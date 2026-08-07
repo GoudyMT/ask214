@@ -106,4 +106,22 @@ describe('synthesize', () => {
 		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
 		expect(result).toEqual({ kind: 'degraded' });
 	});
+
+	it('aborts and degrades to raw cards when the provider request exceeds the timeout', async () => {
+		// A connection that accepts but never settles, rejecting only when the caller aborts.
+		const hanging = vi.fn<FetchLike>(
+			(_url, options) =>
+				new Promise<Response>((_resolve, reject) => {
+					options.signal?.addEventListener('abort', () =>
+						reject(new DOMException('aborted', 'AbortError'))
+					);
+				})
+		);
+		const result = await synthesize('What is SkillBridge?', CHUNKS, {
+			fetch: hanging,
+			apiKey: 'test-key',
+			timeoutMs: 10
+		});
+		expect(result).toEqual({ kind: 'degraded' });
+	});
 });

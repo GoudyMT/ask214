@@ -10,9 +10,13 @@ export interface RetrieveOnlineDeps {
 	// The corpus version the client's citation rendering expects. A server answering on a different version
 	// is treated as unavailable rather than trusted -- a refresh can move or drop a passage the answer cites.
 	expectedCorpusVersion: string;
+	// Bound the whole request so a socket that accepts but never settles degrades onto the ladder instead of
+	// stranding the spinner (mirrors the device embedder's warm-embed timeout). Overridable for tests.
+	timeoutMs?: number;
 }
 
 const RETRIEVE_ENDPOINT = '/api/retrieve';
+const RETRIEVE_TIMEOUT_MS = 15_000;
 
 /**
  * POST a query to the retrieval Worker and return the discriminated outcome.
@@ -31,26 +35,24 @@ export async function retrieveOnline(
 	const body = buildRetrieveBody(query);
 	assertOnlyKeys(body, ['query']); // structural egress guard: the body is exactly {query}
 
-	let res: Response;
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), deps.timeoutMs ?? RETRIEVE_TIMEOUT_MS);
 	try {
-		res = await deps.fetch(RETRIEVE_ENDPOINT, {
+		const res = await deps.fetch(RETRIEVE_ENDPOINT, {
 			method: 'POST',
 			credentials: 'omit',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(body)
+			body: JSON.stringify(body),
+			signal: controller.signal
 		});
+		if (!res.ok) return { status: 'error' };
+		return normalize(await res.json(), deps.expectedCorpusVersion);
 	} catch {
+		// throw / abort (timeout) / malformed JSON -> unavailable, never empty (a fault is not "no source").
 		return { status: 'error' };
+	} finally {
+		clearTimeout(timer);
 	}
-	if (!res.ok) return { status: 'error' };
-
-	let parsed: unknown;
-	try {
-		parsed = await res.json();
-	} catch {
-		return { status: 'error' };
-	}
-	return normalize(parsed, deps.expectedCorpusVersion);
 }
 
 // Map the server JSON to the client union, enforcing the corpus-version handshake on the two status bodies
