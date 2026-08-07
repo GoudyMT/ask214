@@ -57,6 +57,10 @@ describe('pii-policy: server source must not reference ProfileV1 PII fields', ()
 // that can send a request off-device. Beyond the runtime structural allowlist (assertOnlyKeys), this
 // statically forbids any profile PII field or the keystore install identifier from being named there.
 const ONLINE_PATH_DIRS = ['src/lib/ask/online', 'src/lib/ask/synthesis', 'workers/retrieve'];
+// The Ask store and the home route build the egress closures (retrieveOnline/synthesize), so a PII field
+// named there would ride into an off-device request just like one in the units above. They are single files,
+// not directory trees, so the guard names them explicitly.
+const ONLINE_PATH_FILES = ['src/lib/ask/store.svelte.ts', 'src/routes/+page.svelte'];
 
 /** Recursively collect non-test, non-generated .ts source files under a directory. */
 function findSourceFiles(dir: string): string[] {
@@ -76,6 +80,14 @@ function findSourceFiles(dir: string): string[] {
 	return out;
 }
 
+/** Every path in the online-egress guard's scope: the directory trees plus the explicitly-named files. */
+function collectOnlinePathFiles(): string[] {
+	return [
+		...ONLINE_PATH_DIRS.flatMap((dir) => findSourceFiles(join(process.cwd(), dir))),
+		...ONLINE_PATH_FILES.map((file) => join(process.cwd(), file))
+	];
+}
+
 describe('pii-policy: the online egress path must not name PII or the install identifier', () => {
 	it('flags the keystore install identifier', () => {
 		const violations = scanForPiiTokens([
@@ -85,10 +97,17 @@ describe('pii-policy: the online egress path must not name PII or the install id
 		expect(violations[0]?.token).toBe('\\binstallUuid\\b');
 	});
 
+	it('the guard covers the Ask store and the home route that build the egress closures', () => {
+		const scanned = collectOnlinePathFiles();
+		expect(scanned.some((p) => p.endsWith(join('ask', 'store.svelte.ts')))).toBe(true);
+		expect(scanned.some((p) => p.endsWith(join('routes', '+page.svelte')))).toBe(true);
+	});
+
 	it('the real online-path source contains no PII tokens', () => {
-		const files = ONLINE_PATH_DIRS.flatMap((dir) => findSourceFiles(join(process.cwd(), dir))).map(
-			(path) => ({ path, content: readFileSync(path, 'utf8') })
-		);
+		const files = collectOnlinePathFiles().map((path) => ({
+			path,
+			content: readFileSync(path, 'utf8')
+		}));
 		expect(scanForPiiTokens(files)).toEqual([]);
 	});
 });
