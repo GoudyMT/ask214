@@ -85,6 +85,12 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # gitleaks-action@v2 lists the PR's commits through the API to scan them, which needs
+    # pull-requests:read (checkout needs contents:read). The repo's default token is more restrictive,
+    # so grant exactly those two here.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
