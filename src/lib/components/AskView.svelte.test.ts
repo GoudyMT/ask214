@@ -70,6 +70,8 @@ describe('AskView', () => {
 		expect(container.querySelector('.crisis')).not.toBeNull();
 		expect(container.querySelector('a[href="tel:988"]')).not.toBeNull();
 		expect(container.querySelector('.ask-msg')).toBeNull();
+		// The crisis alert must not be nested inside a polite live region (WCAG live-region nesting).
+		expect(container.querySelector('.ask-result')?.getAttribute('aria-live')).not.toBe('polite');
 	});
 
 	it('idle: clicking a feed pill fills the input and asks that question', () => {
@@ -236,6 +238,18 @@ describe('AskView', () => {
 			props: props({ kind: 'idle' }, { onlineCapable: true, mode: 'device' })
 		});
 		expect(container.querySelector('.ask-private')?.textContent).toContain('on your device');
+	});
+
+	it('freezes the mode toggle and the nudge button while a query is in flight', () => {
+		const { container } = render(AskView, {
+			props: props({ kind: 'embedding' }, { onlineCapable: true, mode: 'online', showNudge: true })
+		});
+		const modeButtons = container.querySelectorAll('.ask-mode__opt');
+		expect(modeButtons.length).toBe(2);
+		modeButtons.forEach((b) => expect((b as HTMLButtonElement).disabled).toBe(true));
+		expect((container.querySelector('.ask-reminder__set') as HTMLButtonElement).disabled).toBe(
+			true
+		);
 	});
 
 	it('needsReconsent: shows the blocking consent card; buttons fire onConsentOnline / onSetMode(device)', () => {

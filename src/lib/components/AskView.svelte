@@ -52,6 +52,9 @@
 		typeof sessionStorage !== 'undefined' && sessionStorage.getItem(REMINDER_DISMISSED_KEY) === '1'
 	);
 	const showReminder = $derived(askState.kind === 'idle' && setupDismissed && !reminderDismissed);
+	// A query is in flight: freeze the mode controls so a mid-flight switch can't land the result under the
+	// other mode's privacy line (both the toggle and the nudge's button change egress mode).
+	const inFlight = $derived(askState.kind === 'embedding' || askState.kind === 'modelLoading');
 
 	function submit() {
 		if (query.trim() !== '') onAsk(query);
@@ -98,8 +101,11 @@
 			offline.</span
 		>
 		<span class="ask-reminder__actions">
-			<button class="ask-reminder__set" type="button" onclick={() => onSetMode('device')}
-				>On-device</button
+			<button
+				class="ask-reminder__set"
+				type="button"
+				disabled={inFlight}
+				onclick={() => onSetMode('device')}>On-device</button
 			>
 			<button class="ask-reminder__x" type="button" aria-label="Dismiss" onclick={onDismissNudge}
 				>&times;</button
@@ -132,12 +138,14 @@
 			class="ask-mode__opt"
 			aria-pressed={mode === 'online'}
 			type="button"
+			disabled={inFlight}
 			onclick={() => onSetMode('online')}>Online</button
 		>
 		<button
 			class="ask-mode__opt"
 			aria-pressed={mode === 'device'}
 			type="button"
+			disabled={inFlight}
 			onclick={() => onSetMode('device')}>On device</button
 		>
 	</div>
@@ -152,8 +160,9 @@
 </p>
 
 <!-- aria-live so a screen reader hears the answer / "no match" / "online unavailable" / AI summary arrive
-     (WCAG 4.1.3). The crisis card keeps its own stronger role="alert". -->
-<div class="ask-result" aria-live="polite">
+     (WCAG 4.1.3). On the crisis branch the wrapper drops aria-live so the CrisisCard's stronger
+     role="alert" (assertive) is not nested inside a polite live region. -->
+<div class="ask-result" aria-live={askState.kind === 'crisis' ? undefined : 'polite'}>
 	{#if askState.kind === 'idle'}
 		<QuestionFeed onPick={pick} />
 	{:else if askState.kind === 'needsSetup'}
@@ -299,6 +308,12 @@
 		background: var(--color-accent);
 		color: var(--color-bg);
 		border-color: var(--color-accent);
+	}
+	/* Frozen while a query is in flight (a mid-flight switch would mislabel the completing result). */
+	.ask-mode__opt:disabled,
+	.ask-reminder__set:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 
 	.ask-bar {
