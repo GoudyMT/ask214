@@ -446,10 +446,12 @@ describe('createAskStore', () => {
 	});
 
 	it('consentOnline() records consent and switches to online (the reserved re-consent completer)', () => {
-		const store = onlineStore();
+		let consented = false;
+		const store = onlineStore({ markOnlineConsent: () => (consented = true) });
 		store.setMode('device'); // go device so the switch to online is observable
 		store.consentOnline();
 		expect(store.mode).toBe('online');
+		expect(consented).toBe(true); // consent is recorded, not just the mode flipped
 	});
 
 	it('a device retrieval failure offers the online path (the ladder device->online direction)', async () => {
