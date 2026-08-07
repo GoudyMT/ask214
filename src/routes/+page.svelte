@@ -91,7 +91,7 @@
 		{ready}
 		{sources}
 		onlineCapable={true}
-		mode={store?.mode ?? 'device'}
+		mode={store?.mode ?? getDefaultMode()}
 		showNudge={store?.showNudge ?? false}
 		onAsk={(q) => store?.ask(q)}
 		onSetUp={() => store?.setUp()}
