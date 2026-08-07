@@ -1,5 +1,6 @@
 import { planRetrieve, type PlanDeps } from '../../../src/lib/ask/online/plan-retrieve';
 import { extractInput, serialize } from '../../../src/lib/ask/online/http';
+import { createCachedLoader } from '../../../src/lib/ask/online/corpus-cache';
 import { search as searchCorpus } from '../../../src/lib/corpus/search';
 import { decodeCorpus } from '../../../src/lib/corpus/codec';
 import type { Corpus, CorpusManifest } from '../../../src/lib/corpus/types';
@@ -28,18 +29,19 @@ const MANIFEST_KEY = 'corpus-bge-manifest';
 const EMBEDDINGS_KEY = 'corpus-bge-embeddings';
 
 // The index is loaded once per isolate and held in memory; a cold start pays one KV read, warm requests
-// are instant. The promise is memoized so concurrent cold requests share a single load.
-let corpusPromise: Promise<Corpus> | null = null;
+// are instant. Concurrent cold requests share one load, and a rejected load clears the memo so a later
+// request retries instead of the isolate serving the failure until it recycles.
+let cachedCorpus: (() => Promise<Corpus>) | null = null;
 function loadCorpus(env: Env): Promise<Corpus> {
-	if (corpusPromise === null) {
-		corpusPromise = (async () => {
+	if (cachedCorpus === null) {
+		cachedCorpus = createCachedLoader<Corpus>(async () => {
 			const manifest = await env.CORPUS_KV.get<CorpusManifest>(MANIFEST_KEY, 'json');
 			const buffer = await env.CORPUS_KV.get(EMBEDDINGS_KEY, 'arrayBuffer');
 			if (manifest === null || buffer === null) throw new Error('E_INDEX_MISSING');
 			return decodeCorpus(manifest, buffer, BGE_MODEL_ID);
-		})();
+		});
 	}
-	return corpusPromise;
+	return cachedCorpus();
 }
 
 function utcDay(nowMs: number): string {
