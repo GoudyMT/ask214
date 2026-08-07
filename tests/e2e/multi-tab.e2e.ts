@@ -28,7 +28,11 @@ test('a saved EAOS propagates across tabs: IDB load + live broadcast update', as
 	await expect(tabA.getByText('2027-04-15')).toBeVisible(); // store loaded -> button is "Change"
 	await tabA.getByRole('button', { name: /^change$/i }).click();
 	await tabA.getByLabel(/separation date/i).fill('2028-08-20');
-	await tabA.getByRole('button', { name: /^save$/i }).click();
+	// Scope to the timeline section: Settings now also carries the BYO-key "Save" (Online answers).
+	await tabA
+		.getByLabel('Transition timeline')
+		.getByRole('button', { name: /^save$/i })
+		.click();
 
 	// Tab B (no manual reload): broadcast -> store.load() -> persona -> the value re-renders.
 	await expect(tabB.getByText('2028-08-20')).toBeVisible();
