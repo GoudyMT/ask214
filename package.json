@@ -84,7 +84,7 @@
 		"husky": "^9.1.7",
 		"linkedom": "^0.18.12",
 		"lint-staged": "^17.0.8",
-		"pdfjs-dist": "^6.0.227",
+		"pdfjs-dist": "^6.2.108",
 		"playwright": "^1.61.1",
 		"prettier": "^3.9.5",
 		"prettier-plugin-svelte": "^4.1.1",
