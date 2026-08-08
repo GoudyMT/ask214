@@ -124,4 +124,60 @@ describe('synthesize', () => {
 		});
 		expect(result).toEqual({ kind: 'degraded' });
 	});
+
+	it('feeds the model display-cleaned source text, not the raw extraction artifacts', async () => {
+		// A chunk carrying an inline bullet glyph and a fused publication footer - the exact display
+		// artifacts cleanExcerpt strips. The model must read the cleaned text, never the raw glyph/footer.
+		// Source stays ASCII: the glyph is built from its code point (mirrors clean-excerpt.test.ts).
+		const bullet = String.fromCodePoint(0x2022); // bullet dot
+		const dirty: RetrievedChunk[] = [
+			{
+				id: 'tap_moc_crosswalk',
+				text: `SkillBridge ${bullet} train with an employer before separation. Version 6.1 Released May 2025`,
+				url: 'https://example.gov/skillbridge',
+				title: 'SkillBridge'
+			}
+		];
+		const impl = stubFetch(
+			'SkillBridge lets you train with an employer before separation [tap_moc_crosswalk].'
+		);
+		await synthesize('What is SkillBridge?', dirty, deps(impl));
+		const [, options] = impl.mock.calls[0]!;
+		const system = JSON.parse(options.body as string).system as string;
+		expect(system).toContain('SkillBridge - train with an employer before separation.');
+		expect(system).not.toContain(bullet);
+		expect(system).not.toContain('Version 6.1');
+	});
+
+	it('grounds numbers against the cleaned cited text, not a stripped footer figure', async () => {
+		// The only "2025" lives in the fused footer cleanExcerpt removes. A model figure of 2025 is
+		// ungrounded - the model never saw it as content, so the raw footer must not vouch for it.
+		const dirty: RetrievedChunk[] = [
+			{
+				id: 'tap_moc_crosswalk',
+				text: 'SkillBridge lets you train with an employer. Version 6.1 Released May 2025',
+				url: 'https://example.gov/skillbridge',
+				title: 'SkillBridge'
+			}
+		];
+		const impl = stubFetch('SkillBridge started in 2025 [tap_moc_crosswalk].');
+		const result = await synthesize('What is SkillBridge?', dirty, deps(impl));
+		expect(result).toEqual({ kind: 'refusal', reason: 'ungrounded_number' });
+	});
+
+	it('preserves a real benefit figure through cleaning so a grounded answer is not falsely refused', async () => {
+		// The fused footer is stripped, but the real dollar figure in the prose survives cleaning and still
+		// grounds the model's cited answer. Cleaning must never turn a legitimate figure into a false refusal.
+		const dirty: RetrievedChunk[] = [
+			{
+				id: 'tap_moc_crosswalk',
+				text: 'The relocation allowance is $3,000 for eligible members. Version 6.1 Released May 2025',
+				url: 'https://example.gov/skillbridge',
+				title: 'SkillBridge'
+			}
+		];
+		const impl = stubFetch('The relocation allowance is $3,000 [tap_moc_crosswalk].');
+		const result = await synthesize('What is the relocation allowance?', dirty, deps(impl));
+		expect(result.kind).toBe('answer');
+	});
 });
