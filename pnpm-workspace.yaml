@@ -23,6 +23,9 @@ overrides:
   tmp: '>=0.2.6'
   ws: '>=8.21.0'
   undici: '>=8.9.0'
+  # Force patched nanoid (GHSA-2v37-7h3g-55p8, custom generators loop forever on size 0, high; transitive
+  # dev/build-only via vite>postcss, never in the client bundle). Floor pin.
+  nanoid: '>=3.3.17'
   # Force patched js-yaml / adm-zip / sharp across the tree (transitive via @lhci/cli, transformers'
   # onnxruntime-node, and transformers + wrangler>miniflare). Dev/build/test-only - none ship in the
   # client bundle. GHSA-52cp-r559-cp3m + GHSA-5p4m-2wfm-xmqj (js-yaml quadratic CPU); GHSA-xcpc-8h2w-3j85 (adm-zip 4GB
