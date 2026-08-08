@@ -4,6 +4,7 @@ import { validateCitations } from './citation-validation';
 import { checkNumericGrounding } from './grounding';
 import { toCitedAnswer, type Citation, type CitedAnswer } from './cited-answer';
 import { assertOnlyKeys } from '../online/payload';
+import { cleanExcerpt } from '$lib/corpus';
 import type { FetchLike } from '../online/retrieve-online';
 
 /** A retrieved chunk: the text the model reads plus the fields a rendered citation is built from. */
@@ -93,9 +94,17 @@ export async function synthesize(
 	// SAFETY: a personalized-eligibility query is answered impersonally and never reaches the model.
 	if (detectEligibilityIntent(query).shortCircuit) return { kind: 'eligibility' };
 
+	// Clean the display artifacts (fused publication footers, control-code garbage, bullet glyphs) out of
+	// each chunk ONCE, here at the single chunk-entry point, so the model reads the same text the source
+	// cards show AND numeric grounding checks against exactly what the model read. cleanExcerpt strips only
+	// non-content extraction noise, never an ASCII figure; cleaning the model input and the grounding basis
+	// together keeps them consistent - a number the model takes from a chunk is always present in the
+	// grounding text, so cleaning can never turn a legitimate figure into a false ungrounded refusal.
+	const cleanedChunks = chunks.map((c) => ({ ...c, text: cleanExcerpt(c.text) }));
+
 	const { system, messages } = buildMessages(
 		query,
-		chunks.map((c) => ({ id: c.id, text: c.text }))
+		cleanedChunks.map((c) => ({ id: c.id, text: c.text }))
 	);
 	const body: SynthesisRequestBody = {
 		model: MODEL,
@@ -140,7 +149,8 @@ export async function synthesize(
 	if (citedIds.length === 0) return { kind: 'refusal', reason: 'no_citations' };
 
 	// Ground numbers against the cited chunks only, so a figure in an uncited chunk cannot vouch for one.
-	const citedText = chunks
+	// This is the SAME cleaned text the model read above, so the grounding basis stays consistent with the input.
+	const citedText = cleanedChunks
 		.filter((c) => citedIds.includes(c.id))
 		.map((c) => c.text)
 		.join('\n\n');
