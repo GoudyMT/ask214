@@ -1,0 +1,50 @@
+[
+	{
+		"query": "I have a 30% rating and served 8 years, what am I entitled to?",
+		"shortCircuit": true
+	},
+	{ "query": "Do I qualify for the SAH housing grant?", "shortCircuit": true },
+	{ "query": "I was medically retired -- can I get VR&E?", "shortCircuit": true },
+	{
+		"query": "My EAOS is in March, am I eligible for terminal leave and the GI Bill?",
+		"shortCircuit": true
+	},
+	{ "query": "I served 6 years, do I qualify for the Post-9/11 GI Bill?", "shortCircuit": true },
+	{ "query": "I have tinnitus and a bad knee -- what am I owed?", "shortCircuit": true },
+	{ "query": "Can I file a VA claim if I never went to sick call?", "shortCircuit": true },
+	{ "query": "What benefits do I receive for a 30% disability rating?", "shortCircuit": true },
+	{ "query": "How much disability compensation will I get each month?", "shortCircuit": true },
+	{ "query": "With my discharge, will I still receive VA health care?", "shortCircuit": true },
+	{
+		"query": "I'm being separated with an OTH -- am I eligible for VA benefits?",
+		"shortCircuit": true
+	},
+	{
+		"query": "Can I get concurrent receipt of retirement pay and VA disability?",
+		"shortCircuit": true
+	},
+	{ "query": "What's my BAH going to be after I separate?", "shortCircuit": true },
+	{ "query": "Do I get the GI Bill if I only did 3 years?", "shortCircuit": true },
+	{ "query": "I have PTSD from deployment -- what disability can I claim?", "shortCircuit": true },
+	{
+		"query": "Am I eligible for SkillBridge if my command hasn't approved it?",
+		"shortCircuit": true
+	},
+	{ "query": "What will my combined rating be?", "shortCircuit": true },
+	{ "query": "How much is my monthly VA pay?", "shortCircuit": true },
+	{ "query": "What's my current BAH?", "shortCircuit": true },
+	{ "query": "With a 30 percent rating, what would my check be?", "shortCircuit": true },
+	{ "query": "Given my 30% rating, what's my monthly payment?", "shortCircuit": true },
+
+	{ "query": "What is the SkillBridge program?", "shortCircuit": false },
+	{
+		"query": "What are the eligibility rules for VA disability compensation?",
+		"shortCircuit": false
+	},
+	{ "query": "How does the Post-9/11 GI Bill transfer to dependents work?", "shortCircuit": false },
+	{ "query": "When should I start the VA claim process before separation?", "shortCircuit": false },
+	{ "query": "What documents are needed for a VA disability claim?", "shortCircuit": false },
+	{ "query": "How long does the VA claim process take?", "shortCircuit": false },
+	{ "query": "What is TAP and when do I attend?", "shortCircuit": false },
+	{ "query": "What are the requirements for the VA home loan?", "shortCircuit": false }
+]

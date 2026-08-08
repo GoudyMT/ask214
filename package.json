@@ -17,12 +17,15 @@
 		"check:bundle": "size-limit",
 		"check:embed-determinism": "tsx content-ops/check-embed-determinism.mjs",
 		"check:content-ops": "tsc --noEmit -p tsconfig.content-ops.json",
+		"check:worker": "wrangler types workers/retrieve/worker-configuration.d.ts --config workers/retrieve/wrangler.jsonc && tsc --noEmit -p tsconfig.worker.json",
 		"validate:sources": "tsx content-ops/validate-sources.mjs",
 		"ingest": "tsx content-ops/capture-extract.mjs",
 		"clean": "tsx content-ops/clean-sources.mjs",
 		"chunk": "tsx content-ops/chunk-sources.mjs",
 		"embed": "tsx content-ops/build-corpus.mjs",
 		"eval": "tsx content-ops/run-eval.mjs",
+		"embed:bge": "tsx content-ops/build-corpus-bge.mjs",
+		"eval:bge": "tsx content-ops/eval-corpus-bge.mjs",
 		"refresh": "tsx content-ops/refresh.mjs",
 		"corpus": "tsx content-ops/corpus.mjs",
 		"backfill:sources": "tsx content-ops/backfill-sources.mjs",
@@ -58,7 +61,7 @@
 		{
 			"name": "SvelteKit nodes",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/*.js",
-			"limit": "24 KB",
+			"limit": "34 KB",
 			"gzip": true
 		}
 	],
@@ -81,7 +84,7 @@
 		"husky": "^9.1.7",
 		"linkedom": "^0.18.12",
 		"lint-staged": "^17.0.8",
-		"pdfjs-dist": "^6.0.227",
+		"pdfjs-dist": "^6.2.108",
 		"playwright": "^1.61.1",
 		"prettier": "^3.9.5",
 		"prettier-plugin-svelte": "^4.1.1",

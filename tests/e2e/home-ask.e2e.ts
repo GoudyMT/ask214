@@ -25,7 +25,7 @@ test('the model is NOT downloaded on page load (soft opt-in)', async ({ page }) 
 	expect(flag).toBeNull();
 });
 
-test('asking on a fresh profile replaces the on-ramp with the setup prompt in place', async ({
+test('asking in device mode on a fresh profile replaces the on-ramp with the setup prompt', async ({
 	page
 }) => {
 	await page.goto('/');
@@ -33,24 +33,54 @@ test('asking on a fresh profile replaces the on-ramp with the setup prompt in pl
 	await expect(input).toBeEnabled();
 	// idle + no profile: the on-ramp is visible
 	await expect(page.getByRole('heading', { name: /make it yours/i })).toBeVisible();
-	// ask -> the soft opt-in prompt takes the space; the on-ramp is gone (results own the page)
+	// online is the on-ramp default, so switch to device to exercise the soft opt-in: device mode gates the
+	// one-time ~45MB download on the first query. The prompt takes the space; the on-ramp is gone.
+	await page.getByRole('button', { name: /^on device$/i }).click();
 	await input.fill('How do I apply for SkillBridge?');
 	await page.getByRole('button', { name: /^search$/i }).click();
 	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
 	await expect(page.getByRole('heading', { name: /make it yours/i })).toHaveCount(0);
 });
 
-test('a fresh profile hides the Settings tab, and /settings redirects to the front door', async ({
+test('a fresh profile reaches Settings for online answers, but the timeline sections stay hidden', async ({
 	page
 }) => {
 	await page.goto('/');
 	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeEnabled();
-	// No separation date yet -> nothing in Settings applies, so the tab is hidden...
-	await expect(page.getByRole('link', { name: 'Settings', exact: true })).toHaveCount(0);
-	// ...and a deep link to it bounces to the front door, where the setup on-ramp lives.
+	// Settings is reachable now - the "Online answers" panel is always configurable...
+	await expect(page.getByRole('link', { name: 'Settings', exact: true })).toBeVisible();
 	await page.goto('/settings');
-	await expect(page).toHaveURL(/\/$/);
-	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	await expect(page).toHaveURL(/\/settings$/); // no redirect
+	await expect(page.getByRole('heading', { name: /online answers/i })).toBeVisible();
+	// ...but the timeline-dependent sections stay hidden until there is a timeline to manage - including the
+	// "Privacy and security" lock, which protects encrypted profile data that does not exist yet (V1).
+	await expect(page.getByRole('heading', { name: /transition timeline/i })).toHaveCount(0);
+	await expect(page.getByRole('heading', { name: /privacy and security/i })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Lock', exact: true })).toHaveCount(0);
+	// With everything else hidden, the BYOK trust disclosure is the security surface a no-data user sees.
+	await expect(page.getByText(/how is my key protected/i)).toBeVisible();
+});
+
+test('the mode toggle flips both ways and the question feed stays put (V2)', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeEnabled();
+	const online = page.getByRole('button', { name: 'Online', exact: true });
+	const onDevice = page.getByRole('button', { name: 'On device', exact: true });
+	const feedPill = page.locator('.q-feed__pill').first();
+	const privacy = page.locator('.ask-private');
+	// on-ramp default is online, with the feed showing
+	await expect(online).toHaveAttribute('aria-pressed', 'true');
+	await expect(feedPill).toBeVisible();
+	// -> on device: the toggle flips, the privacy line follows, the feed persists
+	await onDevice.click();
+	await expect(onDevice).toHaveAttribute('aria-pressed', 'true');
+	await expect(privacy).toContainText(/on your device/i);
+	await expect(feedPill).toBeVisible();
+	// -> back to online: flips cleanly (no hang on device), egress copy returns, feed still there
+	await online.click();
+	await expect(online).toHaveAttribute('aria-pressed', 'true');
+	await expect(privacy).toContainText(/only your question is sent/i);
+	await expect(feedPill).toBeVisible();
 });
 
 test('the Ask input is the first focusable control in the page content', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyAsset, ASK_ASSET_CACHE, shouldKeepCache } from './asset-cache';
+import { classifyAsset, ASK_ASSET_CACHE, shouldKeepCache, isApiRequest } from './asset-cache';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
 // model + ORT WASM (~45MB) are LAZY (cached on first use, never eagerly precached at install); the app
@@ -35,5 +35,22 @@ describe('shouldKeepCache (cache partitioning across app updates)', () => {
 		expect(shouldKeepCache(ASK_ASSET_CACHE, 'app-v1')).toBe(true);
 		expect(shouldKeepCache(ASK_ASSET_CACHE, 'app-v99')).toBe(true);
 		expect(ASK_ASSET_CACHE.startsWith('app-')).toBe(false);
+	});
+});
+
+// The service worker must never cache the /api/ namespace: the retrieve endpoint is dynamic + request-
+// specific, so a cached response could serve stale or another context's data. These pass straight to the
+// network.
+describe('isApiRequest (the SW never caches the API namespace)', () => {
+	it('is true for any /api/ path', () => {
+		expect(isApiRequest('/api/retrieve')).toBe(true);
+		expect(isApiRequest('/api/anything/else')).toBe(true);
+	});
+
+	it('is false for app pages and static assets', () => {
+		expect(isApiRequest('/')).toBe(false);
+		expect(isApiRequest('/ask')).toBe(false);
+		expect(isApiRequest('/corpus/corpus-v1.0.json')).toBe(false);
+		expect(isApiRequest('/apidocs')).toBe(false); // not the /api/ namespace
 	});
 });

@@ -22,11 +22,12 @@ const config = {
 				'style-src': ['self', 'unsafe-inline'],
 				'img-src': ['self', 'data:'],
 				'font-src': ['self', 'data:'],
-				// connect-src restricted to 'self' for Phase 1. Google hosts will be added
-				// when Google Calendar OAuth lands, with an ADR documenting the exact host
-				// list (accounts.google.com, oauth2.googleapis.com, www.googleapis.com).
-				// Pre-allowing them now would widen attack surface for zero current benefit.
-				'connect-src': ['self'],
+				// 'self' covers the same-origin retrieve Worker (/api/retrieve). The one cross-origin
+				// egress is browser-direct BYO-key synthesis, path-scoped to api.anthropic.com/v1/messages
+				// (no trailing slash) so the browser blocks every other Anthropic path as defense-in-depth
+				// behind the structural payload allowlist. Google Calendar hosts (accounts.google.com,
+				// oauth2.googleapis.com, www.googleapis.com) join here when OAuth lands - not pre-allowed.
+				'connect-src': ['self', 'https://api.anthropic.com/v1/messages'],
 				'frame-ancestors': ['none'],
 				'base-uri': ['self'],
 				'form-action': ['self'],

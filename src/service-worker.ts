@@ -4,7 +4,12 @@
 /// <reference lib="webworker" />
 
 import { build, files, version } from '$service-worker';
-import { classifyAsset, ASK_ASSET_CACHE, shouldKeepCache } from '$lib/ask/asset-cache';
+import {
+	classifyAsset,
+	ASK_ASSET_CACHE,
+	shouldKeepCache,
+	isApiRequest
+} from '$lib/ask/asset-cache';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -42,6 +47,11 @@ sw.addEventListener('fetch', (event) => {
 
 	// Only handle same-origin requests
 	if (url.origin !== sw.location.origin) return;
+
+	// Never cache the /api/ namespace: it is dynamic + request-specific. Pass it straight to the network
+	// so no query-derived response is ever stored. (A retrieve POST is already skipped by the GET guard
+	// above; this also excludes any same-origin GET under /api/.)
+	if (isApiRequest(url.pathname)) return;
 
 	event.respondWith(
 		(async () => {

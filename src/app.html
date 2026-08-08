@@ -4,6 +4,9 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<!-- Disable iOS / webview phone-number auto-linking app-wide: a model-written number in an AI summary
+		     must never become a tappable tel: link (the CitedAnswer inert-prose contract, a scam-targeted audience). -->
+		<meta name="format-detection" content="telephone=no" />
 		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
 		<link rel="icon" type="image/png" sizes="192x192" href="%sveltekit.assets%/icon-192.png" />
 		<link rel="icon" type="image/png" sizes="512x512" href="%sveltekit.assets%/icon-512.png" />

@@ -12,7 +12,8 @@
  */
 
 /**
- * ProfileV1 PII field accessors (src/lib/profile/types.ts) plus the historical raw
+ * ProfileV1 PII field accessors (src/lib/profile/types.ts), the keystore per-install identifier
+ * (src/lib/keystore/record.ts - a device-tracking value that must never egress), plus the historical raw
  * decrypted-bytes marker. Word-boundary anchored so `.rate` does not match `.rateLimit`.
  */
 export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
@@ -25,7 +26,8 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\.intendedPath\b/,
 	/\.geographicDestination\b/,
 	/\.specialSituations\b/,
-	/\b_profileBytes\b/
+	/\b_profileBytes\b/,
+	/\binstallUuid\b/
 ];
 
 export interface PiiViolation {

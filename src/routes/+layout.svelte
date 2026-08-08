@@ -19,6 +19,7 @@
 	import { createProfileStore } from '$lib/profile/store.svelte';
 	import { createTimelineStateStore } from '$lib/timeline';
 	import { createCalendarSyncStore } from '$lib/calendar/store.svelte';
+	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
@@ -46,6 +47,7 @@
 		store: null,
 		timeline: null,
 		calendar: null,
+		byok: null,
 		cause: null,
 		wipeAll: null,
 		relockAll: null
@@ -55,10 +57,9 @@
 	// Settings acts only on stored data (the date, calendar, lock, erase). Hide the tab on a fresh
 	// no-date profile so it appears only once there is something to configure; a locked profile has
 	// data (its persona reads 'none' only because the plaintext is sealed), so it still shows.
-	const showSettings = $derived(
-		app.status === 'ready' &&
-			(app.store?.locked === true || app.store?.persona.completeness !== 'none')
-	);
+	// Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable, so
+	// even a fresh no-timeline user has something to set there (the timeline sections hide inside Settings).
+	const showSettings = $derived(app.status === 'ready');
 
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
@@ -77,7 +78,12 @@
 		// Client-only: IndexedDB + crypto are browser-only.
 		void initProfileApp({
 			checkSupport: checkBrowserSupport,
-			openDb: () => openMtcDb(),
+			openDb: () =>
+				openMtcDb(undefined, () => {
+					// Another tab on a newer bundle upgraded the shared DB and closed this connection;
+					// the takeover offers a reload onto the new bundle instead of a silent, data-less tab.
+					if (!destroyed) app.status = 'stale';
+				}),
 			bootstrap: bootstrapLocalKeystore,
 			createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
 		})
@@ -92,6 +98,9 @@
 				// Registry-driven, so the erase covers stores that never provisioned - they are the ones
 				// whose orphaned rows would otherwise block their own recovery.
 				app.wipeAll = () => wipeAllStores(result.db);
+				// The BYO-key store rides on the same db; it reads on demand and caches nothing, so it needs
+				// no relock join and no async load - just make it available once the keystore is usable.
+				app.byok = createByokStore(result.db);
 				app.status = 'ready';
 
 				// Wire the profile's relock/lifecycle FIRST and unconditionally (security: the

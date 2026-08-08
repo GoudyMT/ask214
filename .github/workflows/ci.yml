@@ -9,7 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 30, not 15: a full green run through Lighthouse is ~12-14 min, and `playwright install --with-deps`
+    # apt-downloads browser system libs from a mirror that is sometimes slow (a 15-min cap flaked on it).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -47,8 +49,19 @@ jobs:
       - name: Type check (content-ops build scripts)
         run: pnpm run check:content-ops
 
+      - name: Type check (retrieve Worker)
+        run: pnpm run check:worker
+
       - name: Validate sources registry (legal/schema gate)
         run: pnpm run validate:sources
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
         # webkit as well as chromium: it is the only engine available to us that shares a family with
@@ -78,3 +91,24 @@ jobs:
           name: lighthouse-reports
           path: .lighthouseci/
           if-no-files-found: warn
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # gitleaks-action@v2 lists the PR's commits through the API to scan them, which needs
+    # pull-requests:read (checkout needs contents:read). The repo's default token is more restrictive,
+    # so grant exactly those two here.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: gitleaks - no committed secrets or Cloudflare account info
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # gitleaks-action@v2 requires GITHUB_TOKEN to scan pull requests (breaking change); the
+          # automatically-provisioned token is sufficient. No secret value is exposed by this.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

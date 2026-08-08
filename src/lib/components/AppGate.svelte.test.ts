@@ -16,6 +16,7 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
+			byok: null,
 			cause: 'indexed-db',
 			wipeAll: null,
 			relockAll: null
@@ -31,6 +32,7 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
+			byok: null,
 			cause: null,
 			wipeAll: null,
 			relockAll: null
@@ -45,11 +47,28 @@ describe('AppGate', () => {
 			store: null,
 			timeline: null,
 			calendar: null,
+			byok: null,
 			cause: null,
 			wipeAll: null,
 			relockAll: null
 		};
 		const { container } = render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
+	});
+
+	it('renders the AppUpdated takeover when status is stale', () => {
+		const app: ProfileApp = {
+			status: 'stale',
+			store: null,
+			timeline: null,
+			calendar: null,
+			byok: null,
+			cause: null,
+			wipeAll: null,
+			relockAll: null
+		};
+		const { container } = render(AppGate, { props: { app, children: childSnippet } });
+		expect(container.textContent).toContain('updated in another tab');
+		expect(container.querySelector('[data-testid="app-content"]')).toBeNull();
 	});
 });
