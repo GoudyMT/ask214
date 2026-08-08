@@ -9,7 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 30, not 15: a full green run through Lighthouse is ~12-14 min, and `playwright install --with-deps`
+    # apt-downloads browser system libs from a mirror that is sometimes slow (a 15-min cap flaked on it).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -52,6 +54,14 @@ jobs:
 
       - name: Validate sources registry (legal/schema gate)
         run: pnpm run validate:sources
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
         # webkit as well as chromium: it is the only engine available to us that shares a family with
