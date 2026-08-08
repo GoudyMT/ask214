@@ -21,7 +21,15 @@
 
 	function truncateWords(text: string, maxWords: number): string {
 		const words = text.trim().split(/\s+/);
-		return words.length <= maxWords ? text.trim() : words.slice(0, maxWords).join(' ') + '...';
+		if (words.length <= maxWords) return text.trim();
+		// A word-boundary cut can land right after an inline " - " separator (cleanExcerpt turns bullet
+		// glyphs into those); drop the stranded separator so the excerpt reads "...for Women..." not
+		// "...for Women -...".
+		const kept = words
+			.slice(0, maxWords)
+			.join(' ')
+			.replace(/(?: -)+$/, '');
+		return kept + '...';
 	}
 </script>
 

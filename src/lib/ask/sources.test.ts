@@ -54,4 +54,12 @@ describe('sourcesFromCorpus', () => {
 	it('returns an empty map for an empty corpus', () => {
 		expect(sourcesFromCorpus(corpusOf([])).size).toBe(0);
 	});
+
+	it('cleans display artifacts (inline bullet glyphs) from each passage the reader shows', () => {
+		const SQUARE = String.fromCodePoint(0x25a0); // black square list bullet, as extracted
+		const corpus = corpusOf([
+			chunk({ text: 'VA Resources ' + SQUARE + ' myVA ' + SQUARE + ' CWV' })
+		]);
+		expect(sourcesFromCorpus(corpus).get('s')?.texts).toEqual(['VA Resources - myVA - CWV']);
+	});
 });

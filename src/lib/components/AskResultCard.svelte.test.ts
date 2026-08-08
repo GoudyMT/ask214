@@ -52,6 +52,23 @@ describe('AskResultCard', () => {
 		expect(text.split(/\s+/).length).toBeLessThanOrEqual(25); // 24 words + the ellipsis token
 	});
 
+	it('does not leave a stranded " -" separator dangling before the ellipsis when the cut lands on one', () => {
+		// 23 real words, then a " - " separator (word 24), then more: the compact 24-word cut lands right
+		// on the separator, which must be dropped rather than rendered as "...word23 -...".
+		const excerpt = [
+			...Array.from({ length: 23 }, (_, i) => `w${i}`),
+			'-',
+			...Array.from({ length: 20 }, (_, i) => `x${i}`)
+		].join(' ');
+		const { container } = render(AskResultCard, {
+			props: { card: fullCard({ excerpt }), variant: 'compact' }
+		});
+		const text = container.querySelector('.ask-card__excerpt')?.textContent ?? '';
+		expect(text.endsWith('...')).toBe(true);
+		expect(text.endsWith(' -...')).toBe(false);
+		expect(text).toContain('w22...');
+	});
+
 	it('lead variant shows a fuller ~120-word excerpt (cap raised above the compact 24)', () => {
 		const long = Array.from({ length: 150 }, (_, i) => `w${i}`).join(' ');
 		const { container } = render(AskResultCard, {

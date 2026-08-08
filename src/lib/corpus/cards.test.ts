@@ -36,6 +36,14 @@ describe('toResultCards', () => {
 		expect(card!.excerpt).toBe('short excerpt');
 	});
 
+	it('cleans display artifacts (fused version footer, inline bullet glyphs) from the excerpt', () => {
+		const SQUARE = String.fromCodePoint(0x25a0); // black square list bullet, as extracted
+		const [card] = toResultCards([
+			result({ text: 'A-160Version 6 1 September 2025 VA Resources ' + SQUARE + ' myVA' }, 0.9)
+		]);
+		expect(card!.excerpt).toBe('VA Resources - myVA');
+	});
+
 	it('omits page/section entirely when the chunk has none (no undefined keys)', () => {
 		const [card] = toResultCards([result({}, 0.5)]);
 		expect('page' in card!).toBe(false);
