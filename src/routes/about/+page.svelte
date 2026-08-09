@@ -8,8 +8,9 @@
 <h2>What this is</h2>
 <p>
 	A privacy-first companion that helps US transitioning service members navigate the ~24-month
-	period before and after separation. Built by a US Navy veteran. Free, donation-supported, no ads
-	ever.
+	period before and after separation. Ask a question and get answers backed by official sources, or
+	build a timeline of what to do and when. Built by a US Navy veteran. Free, donation-supported, no
+	ads ever.
 </p>
 
 <h2>What this is not</h2>
@@ -28,6 +29,6 @@
 
 <h2>Sources</h2>
 <p>
-	All ingested reference content is public US Government work product (per 17 USC section 105) or
-	used under proper attribution. A full source list will be published when the corpus is built.
+	All reference content is public US Government work product (per 17 USC section 105), used under
+	proper attribution. Every answer cites the exact source it draws from, and links to the original.
 </p>

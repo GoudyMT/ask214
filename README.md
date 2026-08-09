@@ -11,7 +11,7 @@
 The mobile-app layer for transitioning service members is effectively vacant - Military.com's Transition App was silently discontinued circa 2017-2018, and no replacement consolidates timeline + reference + community in one place. This project fills that gap with:
 
 1. **Persona-aware EAOS-anchored timeline** with deep Google + Apple Calendar integration
-2. **Consolidated, locally-searchable reference library** of public TAPS curriculum, VA pamphlets, branch instructions, SkillBridge guidance (retrieval-with-citations as the floor; online generative synthesis with citations as the ceiling in v1.1+)
+2. **Consolidated, locally-searchable reference library** of public TAPS curriculum, VA pamphlets, branch instructions, SkillBridge guidance (retrieval-with-citations as the floor; online generative synthesis with citations as the ceiling, opt-in)
 3. **Curated peer-story layer** threaded to specific timeline tasks (v1.3)
 
 Plus a deep SkillBridge module (v1.2) and cautious VA-tool outbound linking (never recreating official tools; always linking with context).
@@ -40,7 +40,7 @@ Plus a deep SkillBridge module (v1.2) and cautious VA-tool outbound linking (nev
 
 - **Privacy and security ABOVE all else** - PII stays on the user's device by default. No third-party trackers. No ads, ever.
 - **Open source** - public code, public sources index, no hidden behavior. License TBD (AGPL-3.0 or MIT).
-- **Free** - donation-supported from v1.1; no paywalls, no upsells, no premium tier.
+- **Free** - donation-supported (planned); no paywalls, no upsells, no premium tier.
 - **Veteran-built** - the author lived this transition. The product credibility starts there.
 - **Accurate, not impressive** - retrieval-with-citations over confident-sounding generation. Outbound to official tools for anything affecting benefits or money.
 - **Solo + sustainable** - versioned roadmap with honest scope per version. No "all 6 branches at once."

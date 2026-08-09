@@ -79,7 +79,7 @@
 	<title>Ask 214</title>
 	<meta
 		name="description"
-		content="Ask a question about your military transition and get answers backed by official sources, on your device."
+		content="Ask a question about your military transition and get answers backed by official sources, private by default."
 	/>
 </svelte:head>
 
