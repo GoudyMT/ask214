@@ -2,6 +2,7 @@
 	import { formatTimelineDate } from '$lib/timeline/format-date';
 	import { SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
+	import { resourcesForTask } from '$lib/resources';
 
 	let {
 		item,
@@ -76,6 +77,10 @@
 		noteOpen = false;
 		noteValue = '';
 	}
+
+	// Contextual outbound resources: the links curated for this specific task, collapsed by default.
+	const related = $derived(resourcesForTask(item.def.id));
+	let relatedOpen = $state(false);
 
 	const STATUS_LABEL: Record<DisplayStatus, string> = {
 		upcoming: 'Upcoming',
@@ -228,6 +233,32 @@
 				</div>
 			{/if}
 			{@render noteSection()}
+			{#if related.length > 0}
+				<div class="task-card__related">
+					<button
+						type="button"
+						class="task-card__related-toggle"
+						aria-expanded={relatedOpen}
+						onclick={() => (relatedOpen = !relatedOpen)}
+					>
+						Related resources ({related.length})
+						<span class="caret" class:caret--right={!relatedOpen} aria-hidden="true"></span>
+					</button>
+					{#if relatedOpen}
+						<ul class="task-card__related-list">
+							{#each related as r (r.id)}
+								<li>
+									<a href={r.url} target="_blank" rel="noopener noreferrer external">
+										{r.title}<span aria-hidden="true"> &#8599;</span><span class="visually-hidden">
+											(opens in a new tab)</span
+										>
+									</a>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			{/if}
 		</div>
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
@@ -692,5 +723,61 @@
 	}
 	.status-snoozed .task-card__status {
 		color: var(--color-fg-muted);
+	}
+
+	/* Contextual outbound resources: a collapsed disclosure under the open card body; the toggle
+	   reuses the card's accent-link style + the shared caret. */
+	.task-card__related {
+		margin-top: var(--space-s);
+	}
+
+	.task-card__related-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-xs);
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-size: var(--font-size-s);
+		cursor: pointer;
+		touch-action: manipulation;
+	}
+
+	.task-card__related-toggle:hover {
+		text-decoration: underline;
+	}
+
+	.task-card__related-list {
+		list-style: none;
+		margin: var(--space-xs) 0 0;
+		padding: 0;
+	}
+
+	.task-card__related-list li {
+		padding: 2px 0;
+	}
+
+	.task-card__related-list a {
+		color: var(--color-accent);
+		text-decoration: none;
+		font-size: var(--font-size-s);
+	}
+
+	.task-card__related-list a:hover {
+		text-decoration: underline;
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

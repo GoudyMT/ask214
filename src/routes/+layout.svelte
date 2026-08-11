@@ -187,10 +187,10 @@
 			<a href={resolve('/')} class="brand">Ask 214</a>
 			<ul>
 				<li><a href={resolve('/timeline')}>Timeline</a></li>
+				<li><a href={resolve('/resources')}>Resources</a></li>
 				{#if showSettings}
 					<li><a href={resolve('/settings')}>Settings</a></li>
 				{/if}
-				<li><a href={resolve('/about')}>About</a></li>
 			</ul>
 		</nav>
 	</header>
@@ -239,8 +239,9 @@
 		margin: 0 auto;
 	}
 
-	/* Lock #7: inline horizontal nav (brand + Timeline/Settings/About; Settings appears only once a
-	   separation date is set). Migrate to bottom-tab-bar pattern when nav reaches 4+ items. */
+	/* Lock #7: inline horizontal nav (brand + Timeline/Resources/Settings; Settings appears only once a
+	   separation date is set; About lives in the footer). Migrate to a bottom-tab-bar when the nav grows
+	   to 4+ items (e.g. a future Tools section). */
 	nav ul {
 		list-style: none;
 		padding: 0;

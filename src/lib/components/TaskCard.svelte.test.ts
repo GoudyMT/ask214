@@ -63,6 +63,39 @@ describe('TaskCard (open states)', () => {
 		expect(container.textContent).toContain('Find approved programs that fit your rate.');
 	});
 
+	it('shows a collapsed "Related resources (N)" disclosure for a task with mapped resources', () => {
+		const { container } = renderCard(makeItem({ def: { ...DEF, id: 'job-search' } }));
+		const toggle = [...container.querySelectorAll('button')].find((b) =>
+			/^Related resources \(\d+\)/.test(b.textContent?.trim() ?? '')
+		);
+		expect(toggle).toBeTruthy();
+		expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+		expect(container.querySelector('.task-card__related-list')).toBeNull(); // collapsed
+	});
+
+	it('shows no disclosure for a task with no mapped resources', () => {
+		const { container } = renderCard(makeItem({ def: { ...DEF, id: 'dd214-copies' } }));
+		const toggle = [...container.querySelectorAll('button')].find((b) =>
+			/^Related resources/.test(b.textContent?.trim() ?? '')
+		);
+		expect(toggle).toBeUndefined();
+	});
+
+	it('expands to show the mapped resources as safe new-tab links', () => {
+		const { container } = renderCard(makeItem({ def: { ...DEF, id: 'job-search' } }));
+		const toggle = [...container.querySelectorAll('button')].find((b) =>
+			/^Related resources \(\d+\)/.test(b.textContent?.trim() ?? '')
+		);
+		toggle?.click();
+		flushSync();
+		const links = [...container.querySelectorAll('.task-card__related-list a')];
+		expect(links.length).toBeGreaterThan(0);
+		expect(links[0]?.getAttribute('target')).toBe('_blank');
+		const rel = links[0]?.getAttribute('rel') ?? '';
+		expect(rel).toContain('noopener');
+		expect(rel).toContain('noreferrer');
+	});
+
 	it('upcoming: status-color edge class + "Upcoming" label + the target date', () => {
 		const { container } = renderCard(makeItem({ status: 'upcoming', targetDate: '2027-03-16' }));
 		const card = container.querySelector('article');
