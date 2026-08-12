@@ -9,9 +9,9 @@ function source(over: Partial<Source> = {}): Source {
 		sourceId: 'va_intent_to_file',
 		title: 'VA - Intent to File',
 		url: 'https://www.va.gov/',
-		texts: [
-			'An intent to file lets you tell VA that you plan to file a claim.',
-			'Filing one sets a potential effective date for your benefits.'
+		passages: [
+			{ id: 's1', text: 'An intent to file lets you tell VA that you plan to file a claim.' },
+			{ id: 's2', text: 'Filing one sets a potential effective date for your benefits.' }
 		],
 		...over
 	};

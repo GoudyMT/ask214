@@ -46,11 +46,11 @@
 		</div>
 		<div class="reader__body">
 			<p class="reader__held">
-				Showing a section saved on your device - open the official site for the complete document.
+				Showing the text saved on your device - open the official site for the complete original.
 			</p>
-			<!-- index key: a replace-all list re-rendered per source, never reordered in place -->
-			{#each source.texts as passage, i (i)}
-				<p class="reader__passage">{passage}</p>
+			<!-- key by the stable chunk id (unique within a corpus version), not the index -->
+			{#each source.passages as passage (passage.id)}
+				<p class="reader__passage">{passage.text}</p>
 			{/each}
 		</div>
 		<div class="reader__foot">

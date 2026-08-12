@@ -173,7 +173,10 @@ describe('AskView', () => {
 					sourceId: 'va_intent',
 					title: 'VA - Intent to File',
 					url: 'https://www.va.gov/',
-					texts: ['Held passage one.', 'Held passage two.']
+					passages: [
+						{ id: 'h1', text: 'Held passage one.' },
+						{ id: 'h2', text: 'Held passage two.' }
+					]
 				}
 			]
 		]);

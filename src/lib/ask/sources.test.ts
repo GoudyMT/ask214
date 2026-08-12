@@ -47,8 +47,11 @@ describe('sourcesFromCorpus', () => {
 		const itf = sources.get('va_itf');
 		expect(itf?.title).toBe('VA - Intent to File');
 		expect(itf?.url).toBe('https://va.gov/itf');
-		expect(itf?.texts).toEqual(['passage A', 'passage B']);
-		expect(sources.get('dod_sb')?.texts).toEqual(['passage C']);
+		expect(itf?.passages).toEqual([
+			{ id: 'a', text: 'passage A' },
+			{ id: 'b', text: 'passage B' }
+		]);
+		expect(sources.get('dod_sb')?.passages).toEqual([{ id: 'c', text: 'passage C' }]);
 	});
 
 	it('returns an empty map for an empty corpus', () => {
@@ -60,6 +63,19 @@ describe('sourcesFromCorpus', () => {
 		const corpus = corpusOf([
 			chunk({ text: 'VA Resources ' + SQUARE + ' myVA ' + SQUARE + ' CWV' })
 		]);
-		expect(sourcesFromCorpus(corpus).get('s')?.texts).toEqual(['VA Resources - myVA - CWV']);
+		expect(sourcesFromCorpus(corpus).get('s')?.passages).toEqual([
+			{ id: 'x', text: 'VA Resources - myVA - CWV' }
+		]);
+	});
+
+	it('carries each passage id and its page/section for the reader (dividers + highlight match)', () => {
+		const corpus = corpusOf([
+			chunk({ id: 'p1', sourceId: 's', text: 'one', page: 3, section: 'Intro' }),
+			chunk({ id: 'p2', sourceId: 's', text: 'two', page: 4 })
+		]);
+		expect(sourcesFromCorpus(corpus).get('s')?.passages).toEqual([
+			{ id: 'p1', text: 'one', page: 3, section: 'Intro' },
+			{ id: 'p2', text: 'two', page: 4 }
+		]);
 	});
 });
