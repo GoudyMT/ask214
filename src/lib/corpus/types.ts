@@ -54,6 +54,7 @@ export type RetrievalResult = {
 export type ResultCard = {
 	sourceId: string;
 	sourceTitle: string;
+	chunkId?: string; // the cited chunk's id -> the source reader highlights the block that matches it
 	page?: number;
 	section?: string;
 	excerpt: string; // chunk.excerpt ?? chunk.text (retrieval passes through; the Ask UI truncates for display)
