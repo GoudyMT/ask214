@@ -215,6 +215,7 @@ describe('AskView', () => {
 		flushSync();
 		const cited = container.querySelector('.reader__passage--cited');
 		expect(cited?.textContent).toContain('Held passage two.');
+		expect(document.activeElement).toBe(cited); // focus moved to the cited block on the real click path
 	});
 
 	it('reminder: appears after [Not now] returns to idle, and the x dismisses it for the session', async () => {

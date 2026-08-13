@@ -73,15 +73,16 @@
 					<p class="reader__page">Page {passage.page}</p>
 				{/if}
 				{#if passage.id === highlightId}
+					<!-- the "Cited passage" label is a CSS ::before + aria-label (role=group), so it names the
+					     region for a screen reader without joining the copyable text or double-announcing -->
 					<p
 						class="reader__passage reader__passage--cited"
-						role="region"
-						aria-labelledby="reader-cited-label"
+						role="group"
+						aria-label="Cited passage"
 						tabindex="-1"
 						bind:this={citedEl}
 					>
-						<span id="reader-cited-label" class="reader__cited-tag">Cited passage</span
-						>{passage.text}
+						{passage.text}
 					</p>
 				{:else}
 					<p class="reader__passage">{passage.text}</p>
@@ -177,7 +178,9 @@
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
 	}
-	.reader__cited-tag {
+	/* The label is generated content, so it is not selectable/copyable and stays out of the DOM text run. */
+	.reader__passage--cited::before {
+		content: 'Cited passage';
 		display: block;
 		margin-bottom: var(--space-xs);
 		font-size: 11px;

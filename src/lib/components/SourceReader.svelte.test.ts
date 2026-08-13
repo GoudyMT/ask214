@@ -73,10 +73,11 @@ describe('SourceReader', () => {
 		const cited = container.querySelectorAll('.reader__passage--cited');
 		expect(cited.length).toBe(1);
 		expect(cited[0]?.textContent).toContain('effective date'); // the s2 passage
-		expect(cited[0]?.getAttribute('role')).toBe('region');
+		// the "Cited passage" label is a CSS ::before + aria-label, so it is NOT in the copyable text run
+		expect(cited[0]?.textContent).not.toContain('Cited passage');
+		expect(cited[0]?.getAttribute('role')).toBe('group');
+		expect(cited[0]?.getAttribute('aria-label')).toBe('Cited passage');
 		expect(cited[0]?.getAttribute('tabindex')).toBe('-1');
-		expect(cited[0]?.getAttribute('aria-labelledby')).toBe('reader-cited-label');
-		expect(container.querySelector('#reader-cited-label')?.textContent).toBe('Cited passage');
 	});
 
 	it('highlights nothing when highlightId is null or matches no block (graceful fallback)', () => {
