@@ -63,8 +63,9 @@
 			<p class="reader__held">
 				Showing the text saved on your device - open the official site for the complete original.
 			</p>
-			<!-- key by the stable chunk id (unique within a corpus version), not the index -->
-			{#each source.passages as passage, i (passage.id)}
+			<!-- index key: this list is replace-all re-rendered per source and never reordered, so the index
+			     is stable and collision-proof; the highlight matches on passage.id === highlightId, not the key -->
+			{#each source.passages as passage, i (i)}
 				{#if passage.section && passage.section !== source.passages[i - 1]?.section}
 					<h3 class="reader__section">{passage.section}</h3>
 				{/if}
