@@ -24,7 +24,9 @@
 			const cited = citedEl;
 			if (cited) {
 				cited.focus({ preventScroll: true });
-				cited.scrollIntoView({ block: 'center' });
+				// block: 'start' lands the user at the TOP of the cited passage (its label + accent edge); the
+				// common cited block is taller than a phone viewport, so 'center' would push the top off-screen.
+				cited.scrollIntoView({ block: 'start' });
 			}
 		} else if (!source && el.open) {
 			el.close();
