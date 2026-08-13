@@ -22,9 +22,15 @@ export function sourcesFromCorpus(corpus: Corpus): Map<string, Source> {
 	const sources = new Map<string, Source>();
 	for (const chunk of corpus.chunks) {
 		// Clean the residual extraction artifacts for display; the raw chunk.text stays the retrieval unit.
+		let text = cleanExcerpt(chunk.text);
+		// Drop a leading section title the extractor duplicated into the body, so the section divider does
+		// not stutter with the block's first words (display-only; never touches the embedded/retrieval text).
+		if (chunk.section && text.startsWith(chunk.section)) {
+			text = text.slice(chunk.section.length).replace(/^[\s:.-]+/, '');
+		}
 		const passage: SourcePassage = {
 			id: chunk.id,
-			text: cleanExcerpt(chunk.text),
+			text,
 			...(chunk.page !== undefined ? { page: chunk.page } : {}),
 			...(chunk.section !== undefined ? { section: chunk.section } : {})
 		};

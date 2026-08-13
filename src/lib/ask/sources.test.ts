@@ -78,4 +78,36 @@ describe('sourcesFromCorpus', () => {
 			{ id: 'p2', text: 'two', page: 4 }
 		]);
 	});
+
+	it('strips a leading section title the extractor duplicated into the block text (de-stutter)', () => {
+		const corpus = corpusOf([
+			chunk({
+				id: 'p1',
+				sourceId: 's',
+				text: 'Eligibility You must have served 90 days.',
+				section: 'Eligibility'
+			})
+		]);
+		expect(sourcesFromCorpus(corpus).get('s')?.passages).toEqual([
+			{ id: 'p1', text: 'You must have served 90 days.', section: 'Eligibility' }
+		]);
+	});
+
+	it('trims a leading separator left after stripping the section title', () => {
+		const corpus = corpusOf([
+			chunk({ id: 'p3', sourceId: 's', text: 'Benefits: your options', section: 'Benefits' })
+		]);
+		expect(sourcesFromCorpus(corpus).get('s')?.passages).toEqual([
+			{ id: 'p3', text: 'your options', section: 'Benefits' }
+		]);
+	});
+
+	it('keeps the block text when it does not start with the section', () => {
+		const corpus = corpusOf([
+			chunk({ id: 'p2', sourceId: 's', text: 'Some other body.', section: 'Eligibility' })
+		]);
+		expect(sourcesFromCorpus(corpus).get('s')?.passages).toEqual([
+			{ id: 'p2', text: 'Some other body.', section: 'Eligibility' }
+		]);
+	});
 });
