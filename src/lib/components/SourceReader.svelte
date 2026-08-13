@@ -3,17 +3,32 @@
 
 	// Controlled by `source`: non-null opens the modal, null closes it. The corpus IS the on-device
 	// reference library; this shows all the official text held locally for one source, offline.
-	let { source, onClose }: { source: Source | null; onClose: () => void } = $props();
+	let {
+		source,
+		highlightId = null,
+		onClose
+	}: { source: Source | null; highlightId?: string | null; onClose: () => void } = $props();
 
 	let dialogEl = $state<HTMLDialogElement>();
+	let citedEl = $state<HTMLElement>();
 
 	// Sync the native dialog's open-state to the `source` prop. showModal() (not the `open` attribute)
 	// is what gives the focus-trap + Esc + backdrop the modal lock calls for.
 	$effect(() => {
 		const el = dialogEl;
 		if (!el) return;
-		if (source && !el.open) el.showModal();
-		else if (!source && el.open) el.close();
+		if (source && !el.open) {
+			el.showModal();
+			// Land on the cited passage: focus it (so a keyboard / screen-reader user starts where the
+			// sighted user is scrolled) and bring it into view. Instant, per the app's low-motion default.
+			const cited = citedEl;
+			if (cited) {
+				cited.focus({ preventScroll: true });
+				cited.scrollIntoView({ block: 'center' });
+			}
+		} else if (!source && el.open) {
+			el.close();
+		}
 	});
 
 	// Esc / backdrop fire the native `close` event without going through our button; tell the parent so
@@ -49,8 +64,27 @@
 				Showing the text saved on your device - open the official site for the complete original.
 			</p>
 			<!-- key by the stable chunk id (unique within a corpus version), not the index -->
-			{#each source.passages as passage (passage.id)}
-				<p class="reader__passage">{passage.text}</p>
+			{#each source.passages as passage, i (passage.id)}
+				{#if passage.section && passage.section !== source.passages[i - 1]?.section}
+					<h3 class="reader__section">{passage.section}</h3>
+				{/if}
+				{#if passage.page !== undefined && passage.page !== source.passages[i - 1]?.page}
+					<p class="reader__page">Page {passage.page}</p>
+				{/if}
+				{#if passage.id === highlightId}
+					<p
+						class="reader__passage reader__passage--cited"
+						role="region"
+						aria-labelledby="reader-cited-label"
+						tabindex="-1"
+						bind:this={citedEl}
+					>
+						<span id="reader-cited-label" class="reader__cited-tag">Cited passage</span
+						>{passage.text}
+					</p>
+				{:else}
+					<p class="reader__passage">{passage.text}</p>
+				{/if}
 			{/each}
 		</div>
 		<div class="reader__foot">
@@ -130,6 +164,35 @@
 	.reader__passage {
 		margin: 0 0 var(--space-m);
 		line-height: 1.65;
+	}
+	.reader__passage--cited {
+		padding: var(--space-s) var(--space-m);
+		background: rgba(74, 144, 226, 0.16);
+		border-left: 3px solid var(--color-accent);
+		border-radius: var(--radius-s);
+		scroll-margin: var(--space-l) 0;
+	}
+	.reader__passage--cited:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+	.reader__cited-tag {
+		display: block;
+		margin-bottom: var(--space-xs);
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--color-accent);
+	}
+	.reader__section {
+		margin: var(--space-l) 0 var(--space-s);
+		font-size: var(--font-size-base);
+	}
+	.reader__page {
+		margin: var(--space-m) 0 var(--space-s);
+		font-size: var(--font-size-s);
+		color: var(--color-fg-muted);
 	}
 
 	.reader__foot {

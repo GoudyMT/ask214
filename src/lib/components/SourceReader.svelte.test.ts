@@ -64,4 +64,75 @@ describe('SourceReader', () => {
 		expect(getComputedStyle(dialog).display).toBe('none');
 		expect(container.querySelector('.reader__title')).toBeNull();
 	});
+
+	it('marks the block whose id matches highlightId as the cited passage', () => {
+		const { container } = render(SourceReader, {
+			props: { source: source(), highlightId: 's2', onClose: () => {} }
+		});
+		flushSync();
+		const cited = container.querySelectorAll('.reader__passage--cited');
+		expect(cited.length).toBe(1);
+		expect(cited[0]?.textContent).toContain('effective date'); // the s2 passage
+		expect(cited[0]?.getAttribute('role')).toBe('region');
+		expect(cited[0]?.getAttribute('tabindex')).toBe('-1');
+		expect(cited[0]?.getAttribute('aria-labelledby')).toBe('reader-cited-label');
+		expect(container.querySelector('#reader-cited-label')?.textContent).toBe('Cited passage');
+	});
+
+	it('highlights nothing when highlightId is null or matches no block (graceful fallback)', () => {
+		const nullId = render(SourceReader, {
+			props: { source: source(), highlightId: null, onClose: () => {} }
+		});
+		flushSync();
+		expect(nullId.container.querySelectorAll('.reader__passage--cited').length).toBe(0);
+
+		const noMatch = render(SourceReader, {
+			props: { source: source(), highlightId: 'does-not-exist', onClose: () => {} }
+		});
+		flushSync();
+		expect(noMatch.container.querySelectorAll('.reader__passage--cited').length).toBe(0);
+	});
+
+	it('renders a section heading and a page marker where the metadata changes', () => {
+		const src: Source = {
+			sourceId: 's',
+			title: 'S',
+			url: 'https://www.va.gov/',
+			passages: [
+				{ id: 'a', text: 'first', page: 3, section: 'Eligibility' },
+				{ id: 'b', text: 'second', page: 3, section: 'Eligibility' },
+				{ id: 'c', text: 'third', page: 4, section: 'How to apply' }
+			]
+		};
+		const { container } = render(SourceReader, {
+			props: { source: src, highlightId: null, onClose: () => {} }
+		});
+		flushSync();
+		const headings = container.querySelectorAll('h3.reader__section');
+		expect(headings.length).toBe(2); // one per distinct section, not per block
+		expect(headings[0]?.textContent).toBe('Eligibility');
+		expect(headings[1]?.textContent).toBe('How to apply');
+		expect(container.querySelectorAll('.reader__page').length).toBe(2); // page 3, then page 4
+	});
+
+	it('scrolls the cited passage into view and focuses it on open', () => {
+		const passages = Array.from({ length: 24 }, (_, i) => ({
+			id: `p${i}`,
+			text: `Passage number ${i} with enough words to give the reader real height to scroll through.`
+		}));
+		const tall: Source = {
+			sourceId: 's',
+			title: 'Big Source',
+			url: 'https://www.va.gov/',
+			passages
+		};
+		const { container } = render(SourceReader, {
+			props: { source: tall, highlightId: 'p20', onClose: () => {} }
+		});
+		flushSync();
+		const body = container.querySelector('.reader__body') as HTMLElement;
+		const cited = container.querySelector('.reader__passage--cited') as HTMLElement;
+		expect(body.scrollTop).toBeGreaterThan(0); // scrolled down to the cited block, not left at the top
+		expect(document.activeElement).toBe(cited); // focus landed on the cited region
+	});
 });
