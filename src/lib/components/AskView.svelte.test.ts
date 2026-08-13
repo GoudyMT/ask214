@@ -192,6 +192,31 @@ describe('AskView', () => {
 		expect(container.querySelectorAll('.reader__passage').length).toBe(2);
 	});
 
+	it('results: "Read more" opens the reader highlighting the passage the card cited', () => {
+		const lead = card({ sourceId: 'va_intent', chunkId: 'h2' });
+		const sources = new Map<string, Source>([
+			[
+				'va_intent',
+				{
+					sourceId: 'va_intent',
+					title: 'VA - Intent to File',
+					url: 'https://www.va.gov/',
+					passages: [
+						{ id: 'h1', text: 'Held passage one.' },
+						{ id: 'h2', text: 'Held passage two.' }
+					]
+				}
+			]
+		]);
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', cards: [lead] }, { sources })
+		});
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		flushSync();
+		const cited = container.querySelector('.reader__passage--cited');
+		expect(cited?.textContent).toContain('Held passage two.');
+	});
+
 	it('reminder: appears after [Not now] returns to idle, and the x dismisses it for the session', async () => {
 		sessionStorage.removeItem('mtc:ask:reminder-dismissed'); // start not-yet-dismissed
 		const { container, rerender } = render(AskView, {

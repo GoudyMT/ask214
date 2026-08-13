@@ -44,6 +44,7 @@
 	let setupDismissed = $state(false); // a [Not now] happened this view -> nudge with the reminder
 	let inputEl: HTMLInputElement | undefined = $state();
 	let openSource = $state<Source | null>(null); // the source shown in the offline reader modal, or null
+	let openHighlightId = $state<string | null>(null); // the cited chunk id the reader highlights, or null
 
 	// The reminder dismissal persists for the tab session (non-PII: just "user hid the Ask download
 	// nudge" - no query, no profile). Plain sessionStorage is fine here (the encrypted-IDB rule governs PII, not this).
@@ -74,9 +75,11 @@
 		reminderDismissed = true;
 		if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(REMINDER_DISMISSED_KEY, '1');
 	}
-	// "Read full source" -> open the offline reader on the source this card cites (the corpus holds its text).
-	function readSource(sourceId: string) {
+	// "Read more" -> open the offline reader on the source this card cites (the corpus holds its text),
+	// highlighting the cited chunk by id.
+	function readSource(sourceId: string, chunkId?: string) {
 		openSource = sources.get(sourceId) ?? null;
+		openHighlightId = chunkId ?? null;
 	}
 </script>
 
@@ -213,7 +216,7 @@
 		<AskResultCard
 			card={cards[0]!}
 			variant="lead"
-			onReadSource={() => readSource(cards[0]!.sourceId)}
+			onReadSource={() => readSource(cards[0]!.sourceId, cards[0]!.chunkId)}
 		/>
 		{#if cards.length > 1}
 			<button class="ask-toggle" type="button" onclick={() => (showSimilar = !showSimilar)}>
@@ -222,7 +225,11 @@
 			{#if showSimilar}
 				<div class="ask-similar">
 					{#each cards.slice(1) as c, i (i)}
-						<AskResultCard card={c} variant="compact" onReadSource={() => readSource(c.sourceId)} />
+						<AskResultCard
+							card={c}
+							variant="compact"
+							onReadSource={() => readSource(c.sourceId, c.chunkId)}
+						/>
 					{/each}
 				</div>
 			{/if}
@@ -272,7 +279,14 @@
 	{/if}
 </div>
 
-<SourceReader source={openSource} onClose={() => (openSource = null)} />
+<SourceReader
+	source={openSource}
+	highlightId={openHighlightId}
+	onClose={() => {
+		openSource = null;
+		openHighlightId = null;
+	}}
+/>
 
 <style>
 	.ask-private {
