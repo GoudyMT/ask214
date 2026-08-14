@@ -23,12 +23,18 @@ describe('toResultCards', () => {
 		expect(card).toEqual({
 			sourceId: 'va_welcome_kit',
 			sourceTitle: 'VA Welcome Kit',
+			chunkId: 'a',
 			page: 3,
 			section: 'Benefits',
 			excerpt: 'full chunk text',
 			url: 'https://va.gov/x',
 			score: 0.9
 		});
+	});
+
+	it('carries the chunk id so the reader can highlight the cited passage', () => {
+		const [card] = toResultCards([result({ id: 'va_welcome_kit:abc123def456' }, 0.9)]);
+		expect(card!.chunkId).toBe('va_welcome_kit:abc123def456');
 	});
 
 	it('prefers chunk.excerpt over chunk.text when present', () => {

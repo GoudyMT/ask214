@@ -14,6 +14,7 @@ export function toResultCards(results: RetrievalResult[]): ResultCard[] {
 	return results.map(({ chunk, score }) => ({
 		sourceId: chunk.sourceId,
 		sourceTitle: chunk.sourceTitle,
+		chunkId: chunk.id,
 		...(chunk.page !== undefined ? { page: chunk.page } : {}),
 		...(chunk.section !== undefined ? { section: chunk.section } : {}),
 		excerpt: cleanExcerpt(chunk.excerpt ?? chunk.text),

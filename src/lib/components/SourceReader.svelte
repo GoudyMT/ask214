@@ -3,17 +3,34 @@
 
 	// Controlled by `source`: non-null opens the modal, null closes it. The corpus IS the on-device
 	// reference library; this shows all the official text held locally for one source, offline.
-	let { source, onClose }: { source: Source | null; onClose: () => void } = $props();
+	let {
+		source,
+		highlightId = null,
+		onClose
+	}: { source: Source | null; highlightId?: string | null; onClose: () => void } = $props();
 
 	let dialogEl = $state<HTMLDialogElement>();
+	let citedEl = $state<HTMLElement>();
 
 	// Sync the native dialog's open-state to the `source` prop. showModal() (not the `open` attribute)
 	// is what gives the focus-trap + Esc + backdrop the modal lock calls for.
 	$effect(() => {
 		const el = dialogEl;
 		if (!el) return;
-		if (source && !el.open) el.showModal();
-		else if (!source && el.open) el.close();
+		if (source && !el.open) {
+			el.showModal();
+			// Land on the cited passage: focus it (so a keyboard / screen-reader user starts where the
+			// sighted user is scrolled) and bring it into view. Instant, per the app's low-motion default.
+			const cited = citedEl;
+			if (cited) {
+				cited.focus({ preventScroll: true });
+				// block: 'start' lands the user at the TOP of the cited passage (its label + accent edge); the
+				// common cited block is taller than a phone viewport, so 'center' would push the top off-screen.
+				cited.scrollIntoView({ block: 'start' });
+			}
+		} else if (!source && el.open) {
+			el.close();
+		}
 	});
 
 	// Esc / backdrop fire the native `close` event without going through our button; tell the parent so
@@ -46,11 +63,32 @@
 		</div>
 		<div class="reader__body">
 			<p class="reader__held">
-				Showing a section saved on your device - open the official site for the complete document.
+				Showing the text saved on your device - open the official site for the complete original.
 			</p>
-			<!-- index key: a replace-all list re-rendered per source, never reordered in place -->
-			{#each source.texts as passage, i (i)}
-				<p class="reader__passage">{passage}</p>
+			<!-- index key: this list is replace-all re-rendered per source and never reordered, so the index
+			     is stable and collision-proof; the highlight matches on passage.id === highlightId, not the key -->
+			{#each source.passages as passage, i (i)}
+				{#if passage.section && passage.section !== source.passages[i - 1]?.section}
+					<h3 class="reader__section">{passage.section}</h3>
+				{/if}
+				{#if passage.page !== undefined && passage.page !== source.passages[i - 1]?.page}
+					<p class="reader__page">Page {passage.page}</p>
+				{/if}
+				{#if passage.id === highlightId}
+					<!-- the "Cited passage" label is a CSS ::before + aria-label (role=group), so it names the
+					     region for a screen reader without joining the copyable text or double-announcing -->
+					<p
+						class="reader__passage reader__passage--cited"
+						role="group"
+						aria-label="Cited passage"
+						tabindex="-1"
+						bind:this={citedEl}
+					>
+						{passage.text}
+					</p>
+				{:else}
+					<p class="reader__passage">{passage.text}</p>
+				{/if}
 			{/each}
 		</div>
 		<div class="reader__foot">
@@ -130,6 +168,37 @@
 	.reader__passage {
 		margin: 0 0 var(--space-m);
 		line-height: 1.65;
+	}
+	.reader__passage--cited {
+		padding: var(--space-s) var(--space-m);
+		background: rgba(74, 144, 226, 0.16);
+		border-left: 3px solid var(--color-accent);
+		border-radius: var(--radius-s);
+		scroll-margin: var(--space-l) 0;
+	}
+	.reader__passage--cited:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+	/* The label is generated content, so it is not selectable/copyable and stays out of the DOM text run. */
+	.reader__passage--cited::before {
+		content: 'Cited passage';
+		display: block;
+		margin-bottom: var(--space-xs);
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--color-accent);
+	}
+	.reader__section {
+		margin: var(--space-l) 0 var(--space-s);
+		font-size: var(--font-size-base);
+	}
+	.reader__page {
+		margin: var(--space-m) 0 var(--space-s);
+		font-size: var(--font-size-s);
+		color: var(--color-fg-muted);
 	}
 
 	.reader__foot {
