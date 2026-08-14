@@ -49,3 +49,15 @@ overrides:
   # decoded as decimal, high; transitive dev-only via @lhci/cli>lighthouse>puppeteer-core>...>socks>
   # ip-address, never in the client bundle). Floor pin - retire when that chain bundles >=10.3.1.
   ip-address: '>=10.3.1'
+
+# Accepted, unfixable, dev/CI-only advisory (never shipped in the client bundle): extract-zip
+# (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6). extract-zip is frozen at
+# 2.0.1 since 2020 with patched version "None" - no version exists to pin. It is a deep transitive of the
+# Lighthouse-CI dev tool (@lhci/cli>lighthouse>puppeteer-core>@puppeteer/browsers); its only job there is
+# unpacking the Chrome archive @puppeteer/browsers downloads from Google over HTTPS - a trusted source,
+# never attacker-controlled input, and never in the client bundle. Scoped to THIS GHSA only: every other
+# high/critical still fails `pnpm audit --audit-level=high`. Retire when the chain drops extract-zip (a
+# @puppeteer/browsers>=3.0.6 bump replaced it with yauzl; Dependabot will surface it) or a patch ships.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-jmr9-qjv8-65gv
