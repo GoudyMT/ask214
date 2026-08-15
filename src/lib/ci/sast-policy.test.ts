@@ -3,21 +3,21 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 
-// CI invariant: the CodeQL workflow is the launch-gate static-analysis scanner. This test locks its
+// CI invariant: the Semgrep workflow is the launch-gate static-analysis scanner. This test locks its
 // load-bearing config so it cannot silently regress into a no-op - the scan must run on every PR and
-// push to main (plus a weekly re-scan so newly-published queries reach unchanged code), analyze the
-// JavaScript/TypeScript that holds our security-critical logic, and use the higher-recall
-// security-extended suite. Merge-blocking on findings is enforced separately by branch protection
-// (required status check + code scanning), its own launch-gate item; this test locks the SCAN, not
-// the block. Mirrors the lighthouse-policy / headers-policy CI-invariant tests.
+// push to main (plus a weekly re-scan so newly-published rules reach unchanged code), pull rules from
+// a ruleset, and keep telemetry off (--metrics=off) so no scan data leaves the machine. It runs
+// advisory today (semgrep scan exits 0 on findings); the eventual blocking flip (adding --error) is a
+// config change this test still holds through. Mirrors the lighthouse-policy / headers-policy tests.
 
-describe('CodeQL SAST workflow policy', () => {
-	const workflow = parse(readFileSync(join(process.cwd(), '.github/workflows/codeql.yml'), 'utf8'));
+describe('Semgrep SAST workflow policy', () => {
+	const workflow = parse(
+		readFileSync(join(process.cwd(), '.github/workflows/semgrep.yml'), 'utf8')
+	);
 	const on = workflow.on;
-	const analyze = workflow.jobs?.analyze;
-	const initStep = analyze?.steps?.find(
-		(s: { uses?: string }) =>
-			typeof s.uses === 'string' && s.uses.startsWith('github/codeql-action/init')
+	const scanJob = workflow.jobs?.scan;
+	const scanStep = scanJob?.steps?.find(
+		(s: { run?: string }) => typeof s.run === 'string' && s.run.includes('semgrep scan')
 	);
 
 	it('scans on every pull request and push to main', () => {
@@ -25,19 +25,19 @@ describe('CodeQL SAST workflow policy', () => {
 		expect(on?.push?.branches).toContain('main');
 	});
 
-	it('re-scans on a schedule so newly-published queries reach unchanged code', () => {
+	it('re-scans on a schedule so newly-published rules reach unchanged code', () => {
 		expect(Array.isArray(on?.schedule)).toBe(true);
 		expect(on.schedule.length).toBeGreaterThan(0);
 		expect(typeof on.schedule[0].cron).toBe('string');
 	});
 
-	it('grants only the scoped permission CodeQL needs to upload findings, not a repo-wide token', () => {
-		expect(analyze?.permissions?.['security-events']).toBe('write');
+	it('grants only read access - findings stay in the log, nothing is uploaded', () => {
+		expect(scanJob?.permissions?.contents).toBe('read');
 	});
 
-	it('analyzes JavaScript/TypeScript with the security-extended query suite', () => {
-		expect(initStep).toBeDefined();
-		expect(initStep?.with?.languages).toBe('javascript-typescript');
-		expect(initStep?.with?.queries).toBe('security-extended');
+	it('runs semgrep against a ruleset with telemetry disabled', () => {
+		expect(scanStep).toBeDefined();
+		expect(scanStep?.run).toContain('--config');
+		expect(scanStep?.run).toContain('--metrics=off');
 	});
 });
