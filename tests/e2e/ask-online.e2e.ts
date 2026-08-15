@@ -27,6 +27,8 @@ const RESULT_HIT = {
 };
 
 test('online default: a retrieve failure degrades to the on-device offer', async ({ page }) => {
+	// consented device: this spec exercises the degrade path, not the first-egress gate (tested separately)
+	await page.addInitScript(() => localStorage.setItem('mtc:ask:online-consented', '1'));
 	await page.route('**/api/retrieve', (route) => route.fulfill({ status: 500, body: '' }));
 	await page.goto('/');
 	await expect(askInput(page)).toBeEnabled();
@@ -37,7 +39,41 @@ test('online default: a retrieve failure degrades to the on-device offer', async
 	await expect(page.getByRole('button', { name: /answer on your device/i })).toBeVisible();
 });
 
-test('a device->online switch flips the mode and egresses nothing until the disclosed ask', async ({
+test('the first online ask is held behind consent; Use online answers it and is remembered', async ({
+	page
+}) => {
+	let retrieveCalls = 0;
+	await page.route('**/api/retrieve', (route) => {
+		retrieveCalls++;
+		route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				status: 'results',
+				corpusVersion: CORPUS_VERSION,
+				results: [RESULT_HIT]
+			})
+		});
+	});
+	await page.goto('/');
+	await expect(askInput(page)).toBeEnabled();
+	// online is the default, but the first query is HELD - nothing egresses until the user consents
+	await askInput(page).fill('What is SkillBridge?');
+	await searchButton(page).click();
+	await expect(page.getByText(/send your question to answer online/i)).toBeVisible();
+	expect(retrieveCalls).toBe(0); // nothing sent before consent
+	// consenting records the choice and answers the held query
+	await page.getByRole('button', { name: /^use online$/i }).click();
+	await expect(page.getByText(/DoD SkillBridge/i)).toBeVisible();
+	await expect.poll(() => retrieveCalls).toBe(1);
+	// consent is remembered on this device: a second ask egresses directly, no gate
+	await askInput(page).fill('another question');
+	await searchButton(page).click();
+	await expect.poll(() => retrieveCalls).toBe(2);
+	await expect(page.getByText(/send your question to answer online/i)).toHaveCount(0);
+});
+
+test('a user switch to online egresses nothing; the first ask is held at the consent gate', async ({
 	page
 }) => {
 	let retrieveCalls = 0;
@@ -59,15 +95,18 @@ test('a device->online switch flips the mode and egresses nothing until the disc
 		'aria-pressed',
 		'true'
 	);
-	await expect(page.getByText(/answer online\?/i)).toHaveCount(0); // no blocking modal on the flip
-	expect(retrieveCalls).toBe(0); // the switch itself egresses nothing
-	// the disclosed ask (online mode + the honest privacy line) is the only egress
+	await expect(page.getByText(/send your question to answer online/i)).toHaveCount(0); // the flip raises no gate
+	expect(retrieveCalls).toBe(0); // and the switch itself egresses nothing
+	// the first online ask is held at the consent gate - still nothing sent until the user confirms
 	await askInput(page).fill('test question');
 	await searchButton(page).click();
-	await expect.poll(() => retrieveCalls).toBeGreaterThan(0);
+	await expect(page.getByText(/send your question to answer online/i)).toBeVisible();
+	expect(retrieveCalls).toBe(0);
 });
 
 test('online: renders cited result cards from the server', async ({ page }) => {
+	// consented device: this spec exercises card rendering, not the first-egress gate (tested separately)
+	await page.addInitScript(() => localStorage.setItem('mtc:ask:online-consented', '1'));
 	await page.route('**/api/retrieve', (route) =>
 		route.fulfill({
 			status: 200,
@@ -91,7 +130,10 @@ test('synthesis enabled with no key degrades to "summary unavailable" but still 
 }) => {
 	// Turn synthesis on (a non-PII device flag) but store no key: the route reads the key on demand, finds
 	// none, and degrades gracefully rather than blanking.
-	await page.addInitScript(() => localStorage.setItem('mtc:ask:synthesis-enabled', '1'));
+	await page.addInitScript(() => {
+		localStorage.setItem('mtc:ask:synthesis-enabled', '1');
+		localStorage.setItem('mtc:ask:online-consented', '1'); // consented: exercise synthesis-degrade, not the gate
+	});
 	await page.route('**/api/retrieve', (route) =>
 		route.fulfill({
 			status: 200,

@@ -98,6 +98,7 @@
 		onDismiss={() => store?.dismissSetup()}
 		onSetMode={(m) => store?.setMode(m)}
 		onConsentOnline={() => store?.consentOnline()}
+		onStayDevice={() => store?.stayOnDevice()}
 		onDismissNudge={() => store?.dismissNudge()}
 		onOfferDevice={(q) => {
 			store?.setMode('device');

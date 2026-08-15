@@ -21,7 +21,8 @@
 		showNudge = false,
 		onDismissNudge = () => {},
 		onOfferDevice = () => {},
-		onRetryOnline = () => {}
+		onRetryOnline = () => {},
+		onStayDevice = () => {}
 	}: {
 		askState: AskState;
 		ready: boolean;
@@ -37,6 +38,7 @@
 		onDismissNudge?: () => void;
 		onOfferDevice?: (query: string) => void;
 		onRetryOnline?: (query: string) => void;
+		onStayDevice?: () => void;
 	} = $props();
 
 	let query = $state('');
@@ -182,17 +184,20 @@
 			</div>
 		</div>
 	{:else if askState.kind === 'needsReconsent'}
+		{@const pending = askState.pendingQuery}
 		<div class="ask-msg ask-msg--accent">
-			<p class="ask-msg__title">Answer online?</p>
+			<h2 class="ask-msg__title">Send your question to answer online?</h2>
+			{#if pending}
+				<p class="ask-setup__query">"{pending}"</p>
+			{/if}
 			<p class="ask-msg__body">
-				Your question is sent to our server to search the official library - never your profile or
-				timeline, which stay on your device. You can switch to fully on-device answers any time.
+				To answer online, Ask sends your question text to our search server to find official
+				sources. It keeps no account and no logs. Your profile, timeline, and saved answers never
+				leave your device. You can switch to on-device answers any time.
 			</p>
 			<div class="ask-setup__actions">
 				<button class="ask-setup__go" type="button" onclick={onConsentOnline}>Use online</button>
-				<button class="ask-setup__skip" type="button" onclick={() => onSetMode('device')}
-					>Stay on device</button
-				>
+				<button class="ask-setup__skip" type="button" onclick={onStayDevice}>Stay on device</button>
 			</div>
 		</div>
 	{:else if askState.kind === 'modelLoading'}
@@ -410,6 +415,9 @@
 	}
 	.ask-msg__title {
 		font-weight: 600;
+		/* Base size whether the element is a <p> (status cards) or the consent gate's <h2> heading, so
+		   promoting the gate title to a heading for a11y never enlarges it past the app's global h2 rule. */
+		font-size: var(--font-size-base);
 		margin: 0 0 var(--space-xs);
 	}
 	.ask-msg__body {

@@ -184,7 +184,9 @@ describe('createAskStore', () => {
 	type StoreDeps = Parameters<typeof createAskStore>[0];
 
 	function onlineStore(over: Partial<StoreDeps> = {}) {
-		let consented = false;
+		// Default: an already-consented device. Most tests below exercise the POST-consent online path; the
+		// consent gate itself is tested with an explicit onlineConsented:()=>false.
+		let consented = true;
 		const base: StoreDeps = {
 			embed: async () => new Float32Array([1, 0, 0]),
 			corpus: fixtureCorpus(),
@@ -220,7 +222,7 @@ describe('createAskStore', () => {
 		expect(store.showNudge).toBe(false);
 	});
 
-	it('answers an online query with cards and marks consent on the first disclosed egress', async () => {
+	it('the consent gate holds a first online ask, then consentOnline records consent and answers it', async () => {
 		let consented = false;
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
@@ -246,9 +248,12 @@ describe('createAskStore', () => {
 			markOnlineConsent: () => (consented = true)
 		});
 		await store.ask('how do I transfer GI Bill');
-		expect(store.state.kind).toBe('results');
+		expect(store.state.kind).toBe('needsReconsent'); // held at the gate, not sent
+		expect(consented).toBe(false); // merely asking records no consent
+		await store.consentOnline(); // the user confirms
+		expect(consented).toBe(true); // consent is recorded at the gate
+		expect(store.state.kind).toBe('results'); // and the held query is answered
 		if (store.state.kind === 'results') expect(store.state.cards).toHaveLength(1);
-		expect(consented).toBe(true); // the disclosed default egress records consent
 	});
 
 	it('maps an online empty to empty (a real "no source", not a fault)', async () => {
@@ -299,7 +304,7 @@ describe('createAskStore', () => {
 		if (store.state.kind === 'results') expect(store.state.summary).toBeUndefined();
 	});
 
-	it('a user switch to online flips the mode and egresses nothing until the disclosed ask', async () => {
+	it('a user switch to online egresses nothing; the first ask then hits the consent gate', async () => {
 		let sent = 0;
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
@@ -332,8 +337,9 @@ describe('createAskStore', () => {
 		expect(store.mode).toBe('online');
 		expect(store.state.kind).toBe('idle'); // the feed persists; the switch itself sends nothing
 		expect(sent).toBe(0);
-		await store.ask('q'); // the disclosed ask is the only egress
-		expect(sent).toBe(1);
+		await store.ask('q'); // the first online ask hits the consent gate - still no egress
+		expect(store.state.kind).toBe('needsReconsent');
+		expect(sent).toBe(0);
 	});
 
 	it('shows the private-mode nudge after the threshold and hides it on dismiss', async () => {
@@ -433,11 +439,11 @@ describe('createAskStore', () => {
 	});
 
 	it('toggling online<->device is a pure flip that keeps the feed and never traps the user', () => {
-		const store = onlineStore(); // online-capable, not consented by default
+		const store = onlineStore(); // online-capable; consent state irrelevant (no ask() here)
 		store.setMode('device');
 		expect(store.mode).toBe('device');
 		expect(store.state.kind).toBe('idle');
-		store.setMode('online'); // flips up cleanly - no blocking modal
+		store.setMode('online'); // flips up cleanly - no blocking gate
 		expect(store.mode).toBe('online');
 		expect(store.state.kind).toBe('idle'); // the feed persists throughout
 		store.setMode('device'); // and back down
@@ -484,13 +490,92 @@ describe('createAskStore', () => {
 		if (store.state.kind === 'degraded') expect(store.state.rung).toBe('outbound_hub');
 	});
 
-	// A device choice lost to storage eviction is indistinguishable from a new user, so it inherits the
-	// online-default + inline disclosure (a blocking re-consent would need a durable signal ITP wipes too).
-	it('the default online mode egresses inline-disclosed, without a blocking modal', async () => {
-		const store = onlineStore(); // no consent, no pref -> online-default (a new OR post-eviction device)
-		expect(store.mode).toBe('online');
-		expect(store.state.kind).not.toBe('needsReconsent'); // no blocking modal on the default path
+	it('once consented, later online asks egress directly with no gate', async () => {
+		const store = onlineStore(); // helper default: an already-consented device
 		await store.ask('q');
-		expect(store.state.kind).toBe('results'); // it egressed; the inline privacy line discloses it
+		expect(store.state.kind).toBe('results'); // consented -> straight through, no gate
+		await store.ask('another');
+		expect(store.state.kind).toBe('results'); // and it stays gate-free on subsequent asks
+	});
+
+	// --- H1: first-egress consent gate (the first online query on a never-consented device is held) ---
+
+	it('holds the first online query behind the consent gate instead of egressing', async () => {
+		let sent = 0;
+		const store = onlineStore({
+			onlineConsented: () => false, // never consented on this device
+			retrieveOnline: async () => {
+				sent++;
+				return { status: 'empty', corpusVersion: '1.0' };
+			}
+		});
+		await store.ask('how do I transfer my GI Bill');
+		expect(store.state.kind).toBe('needsReconsent');
+		if (store.state.kind === 'needsReconsent') {
+			expect(store.state.pendingQuery).toBe('how do I transfer my GI Bill');
+		}
+		expect(sent).toBe(0); // nothing egressed before consent
+	});
+
+	it('crisis still short-circuits above the consent gate (never egresses, never gates)', async () => {
+		const store = onlineStore({ onlineConsented: () => false }); // online, never consented
+		await store.ask('I want to kill myself');
+		expect(store.state.kind).toBe('crisis'); // crisis wins over the gate
+	});
+
+	it('declining the gate ("stay on device") keeps the question and routes it to the device path', async () => {
+		const store = onlineStore({ onlineConsented: () => false });
+		await store.ask('how do I file a claim'); // -> needsReconsent (held)
+		expect(store.state.kind).toBe('needsReconsent');
+		await store.stayOnDevice(); // decline: switch to device, answer there
+		expect(store.mode).toBe('device');
+		expect(store.state.kind).toBe('needsSetup'); // the device path preserves + gates its own setup
+		if (store.state.kind === 'needsSetup')
+			expect(store.state.pendingQuery).toBe('how do I file a claim');
+	});
+
+	it('the gate fails closed when the consent dep is absent (holds, never egresses)', async () => {
+		// Defense-in-depth: an online-capable store built without an `onlineConsented` dep must HOLD the
+		// first query, not egress it - matching the store's own absent-dep-is-safe convention.
+		let sent = 0;
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			corpus: fixtureCorpus(),
+			retrieveOnline: async () => {
+				sent++;
+				return { status: 'empty', corpusVersion: '1.0' };
+			}
+			// no onlineConsented / markOnlineConsent injected
+		});
+		await store.ask('q');
+		expect(store.state.kind).toBe('needsReconsent'); // fail-closed: held, not sent
+		expect(sent).toBe(0);
+	});
+
+	it('a fresh submit while the gate is open re-arms it with the new query (no stale send)', async () => {
+		const store = onlineStore({ onlineConsented: () => false });
+		await store.ask('first question'); // -> needsReconsent, holds "first question"
+		expect(store.state.kind).toBe('needsReconsent');
+		await store.ask('second question'); // re-submit at the open gate
+		expect(store.state.kind).toBe('needsReconsent');
+		if (store.state.kind === 'needsReconsent') {
+			expect(store.state.pendingQuery).toBe('second question'); // the gate tracks the latest query
+		}
+	});
+
+	it('a crisis message submitted at the open consent gate still routes to crisis (guard ordering)', async () => {
+		let sent = 0;
+		const store = onlineStore({
+			onlineConsented: () => false,
+			retrieveOnline: async () => {
+				sent++;
+				return { status: 'empty', corpusVersion: '1.0' };
+			}
+		});
+		await store.ask('what benefits am I owed'); // -> needsReconsent (gate open)
+		expect(store.state.kind).toBe('needsReconsent');
+		await store.ask('I want to kill myself'); // crisis at the open gate
+		expect(store.state.kind).toBe('crisis'); // crisis wins over the gate guard
+		expect(sent).toBe(0); // and nothing egressed
 	});
 });

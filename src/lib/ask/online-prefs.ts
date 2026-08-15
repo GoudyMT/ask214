@@ -26,11 +26,13 @@ export function setOnlineConsented(on: boolean): void {
 }
 
 /**
- * The mode Ask opens in. Defaults to online: a new user (no stored choice) gets the instant online answer
- * per the on-ramp decision; only an explicit 'device' choice opens on-device. A device choice lost to
- * storage eviction is indistinguishable from a new user here, so it also opens online - the always-shown
- * inline privacy line discloses the egress. A blocking re-consent would need a durable eviction signal that
- * ITP wipes alongside these flags, so it is deferred to v1.1 behind installed-PWA detection.
+ * The mode Ask opens in. Defaults to online: a new user (no stored choice) opens in online mode; only an
+ * explicit 'device' choice opens on-device. Opening in online mode does NOT egress - the first online query
+ * is held behind the first-egress consent gate (the `needsReconsent` state in `store.svelte.ts`), which
+ * records consent per device via `isOnlineConsented`/`setOnlineConsented` below. A device choice lost to
+ * storage eviction is indistinguishable from a new user here, so it also opens online; that user's first
+ * query is then held by the same gate. (A re-consent triggered by a DETECTED eviction - distinct from this
+ * first-run gate - is the deferred v1.1 case, needing a durable eviction signal ITP wipes alongside these flags.)
  */
 export function getDefaultMode(): 'device' | 'online' {
 	return typeof localStorage !== 'undefined' && localStorage.getItem(DEFAULT_MODE_KEY) === 'device'

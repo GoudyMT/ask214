@@ -37,10 +37,10 @@ function markModelDownloaded(): void {
  * injected so the device path is unit-testable without a model/worker.
  *
  * ADDITIVE online seam: when `retrieveOnline` is absent the store is device-only and behaves exactly as
- * before (soft opt-in on-device retrieval). When present, it defaults to online, discloses egress inline,
- * gates a device->online switch behind a blocking re-consent, degrades onto the ladder, and (when synthesis
- * is enabled) attaches an AI-summary view above the cards. The online closures are route-bound so `fetch`,
- * the corpus version, and the raw BYO key never live in the store.
+ * before (soft opt-in on-device retrieval). When present, it defaults to online but holds the FIRST egress
+ * behind an explicit consent gate (remembered per device), degrades onto the ladder, and (when synthesis is
+ * enabled) attaches an AI-summary view above the cards. The online closures are route-bound so `fetch`, the
+ * corpus version, and the raw BYO key never live in the store.
  *
  * Soft opt-in (device path, unchanged): the ~23MB model is NEVER auto-downloaded. The first query on an
  * un-set-up device goes to `needsSetup` with the query preserved; the download happens only when the user
@@ -81,7 +81,7 @@ export function createAskStore(deps: {
 			commitIfCurrent(cards.length > 0 ? { kind: 'results', cards } : { kind: 'empty' });
 		} catch (e) {
 			const code = e instanceof AskError ? e.code : ASK_ERROR.EMBED;
-			// Superseded mid-embed (a crisis message routed to help, a pending consent modal) - do not clobber.
+			// Superseded mid-embed (a crisis message routed to help, a pending consent gate) - do not clobber.
 			if (state.kind !== 'embedding' && state.kind !== 'modelLoading') return;
 			// Offline only when a first-run (model-not-loaded) embed fails with no network: a warm embed
 			// needs no network, so its failure is a genuine error, not connectivity.
@@ -108,7 +108,7 @@ export function createAskStore(deps: {
 	}
 
 	// A run's terminal write must not clobber a state that superseded it mid-flight - a crisis message
-	// (routed straight to help), a pending consent modal, or a mode change. Only commit if we are still in
+	// (routed straight to help), a pending consent gate, or a mode change. Only commit if we are still in
 	// the working state this run set; otherwise the superseding transition stands.
 	function commitIfCurrent(next: AskState): void {
 		if (state.kind === 'embedding' || state.kind === 'modelLoading') state = next;
@@ -125,13 +125,12 @@ export function createAskStore(deps: {
 		state = { kind: 'degraded', rung: rungAfter('online'), query };
 	}
 
-	// The online path: crisis was already ruled out. The default-online egress is disclosed by the UI (mode +
-	// privacy line), so it proceeds without a modal and records consent on the first send. Every transport
-	// fault and high-demand response degrades onto the ladder; only a genuine below-threshold server result
-	// is `empty`. The BYO key is never read here - synthesize is a route closure that reads it on demand.
+	// The online path: consent + crisis were already settled before we get here (the gate in ask() holds the
+	// first egress until consentOnline records it). Every transport fault and high-demand response degrades
+	// onto the ladder; only a genuine below-threshold server result is `empty`. The BYO key is never read
+	// here - synthesize is a route closure that reads it on demand.
 	async function runOnline(query: string): Promise<void> {
 		state = { kind: 'embedding' };
-		deps.markOnlineConsent?.();
 		askedCount++;
 		let result: RetrieveResult;
 		try {
@@ -177,12 +176,25 @@ export function createAskStore(deps: {
 			state = { kind: 'crisis' };
 			return;
 		}
-		// A pending online-consent modal blocks all egress: nothing is sent until the user confirms.
-		if (state.kind === 'needsReconsent') return;
+		// While the consent gate is open, a fresh submit re-arms it with the new query (mirrors the shipped
+		// device-setup gate) so consenting sends what the box shows, never a stale held query. Egress stays
+		// blocked: re-arming sends nothing, and the crisis check above still wins.
+		if (state.kind === 'needsReconsent') {
+			state = { kind: 'needsReconsent', pendingQuery: trimmed };
+			return;
+		}
 		// Ignore a new submit while a query is already running: overlapping runs race on `state`
 		// and the later-resolving one would win regardless of submit order.
 		if (state.kind === 'modelLoading' || state.kind === 'embedding') return;
 		if (mode === 'online' && onlineCapable) {
+			// First-egress consent: the first online query on a device that has never consented is held behind
+			// an explicit gate - the disclosed default is not licence to send words off-device unasked. Consent
+			// is remembered per device, so this fires once. Crisis was already ruled out above. Fail CLOSED when
+			// the consent dep is absent (`?? false`), matching the store's absent-dep-is-safe convention.
+			if (!(deps.onlineConsented?.() ?? false)) {
+				state = { kind: 'needsReconsent', pendingQuery: trimmed };
+				return;
+			}
 			await runOnline(trimmed);
 			return;
 		}
@@ -206,23 +218,34 @@ export function createAskStore(deps: {
 		if (state.kind === 'needsSetup') state = { kind: 'idle' };
 	}
 
-	// A user-initiated mode switch is a pure preference: it flips instantly and egresses nothing. Online
-	// egress is disclosed by the always-visible toggle + privacy line and consented at the first ask, so
-	// the on-ramp default and an explicit switch behave identically - the feed stays, no blocking modal.
-	// needsReconsent is reserved for a future non-user-initiated flip (a storage-eviction reset the user
-	// did not choose); a toggle never raises it, but choosing device still clears it so such a re-consent
-	// could never trap the user.
+	// A user-initiated mode switch is a pure preference: it flips instantly and egresses nothing. Switching
+	// to online never egresses by itself - the first actual ask is what the consent gate holds. Choosing
+	// device clears a pending gate so a decline can never trap the user.
 	function setMode(next: 'device' | 'online'): void {
 		if (next === 'online' && !onlineCapable) return;
 		mode = next;
 		if (next === 'device' && state.kind === 'needsReconsent') state = { kind: 'idle' };
 	}
 
-	// Confirm the online-egress consent: record it, go online, and clear the blocking modal.
-	function consentOnline(): void {
+	// Confirm the online-egress consent from the gate: record it, go online, and run the held query. The
+	// reserved re-consent path (a future non-user-initiated flip) carries no pendingQuery, so it records +
+	// returns to idle.
+	async function consentOnline(): Promise<void> {
 		deps.markOnlineConsent?.();
+		const pending = state.kind === 'needsReconsent' ? state.pendingQuery : undefined;
 		mode = 'online';
 		if (state.kind === 'needsReconsent') state = { kind: 'idle' };
+		if (pending) await runOnline(pending);
+	}
+
+	// Decline the gate: switch to the device path and answer the held query there, so declining never loses
+	// the question (the device path then gates its own one-time setup). Nothing egresses on this path.
+	async function stayOnDevice(): Promise<void> {
+		if (state.kind !== 'needsReconsent') return;
+		const pending = state.pendingQuery;
+		mode = 'device';
+		state = { kind: 'idle' };
+		if (pending) await ask(pending);
 	}
 
 	function dismissNudge(): void {
@@ -246,6 +269,7 @@ export function createAskStore(deps: {
 		dismissSetup,
 		setMode,
 		consentOnline,
+		stayOnDevice,
 		dismissNudge
 	};
 }
