@@ -1,0 +1,41 @@
+name: Semgrep
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly re-scan so newly-published rules reach unchanged code.
+    - cron: '23 4 * * 1'
+
+# Cancel a superseded run when new commits land on the same ref (saves CI minutes).
+concurrency:
+  group: semgrep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan (semgrep OSS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The scan only reads the code. Findings stay in the job log - no code-scanning upload (that needs
+    # paid Advanced Security on a private repo), so no security-events permission.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Semgrep OSS
+        run: pip install semgrep
+
+      - name: Scan
+        # Advisory: semgrep scan exits 0 on findings by default, so findings print to the job log for
+        # triage without failing the build. Code is never uploaded; --metrics=off sends no telemetry.
+        # Flip to blocking with --error once the supply-chain baseline (action-tag pinning, package
+        # release-age) is cleared.
+        run: semgrep scan --config p/default --metrics=off
