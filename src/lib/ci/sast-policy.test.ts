@@ -6,9 +6,9 @@ import { parse } from 'yaml';
 // CI invariant: the Semgrep workflow is the launch-gate static-analysis scanner. This test locks its
 // load-bearing config so it cannot silently regress into a no-op - the scan must run on every PR and
 // push to main (plus a weekly re-scan so newly-published rules reach unchanged code), pull rules from
-// a ruleset, and keep telemetry off (--metrics=off) so no scan data leaves the machine. It runs
-// advisory today (semgrep scan exits 0 on findings); the eventual blocking flip (adding --error) is a
-// config change this test still holds through. Mirrors the lighthouse-policy / headers-policy tests.
+// a ruleset, keep telemetry off (--metrics=off) so no scan data leaves the machine, and block the
+// build on findings (--error). Two reviewed policy rules are excluded (see the workflow comment).
+// Mirrors the lighthouse-policy / headers-policy tests.
 
 describe('Semgrep SAST workflow policy', () => {
 	const workflow = parse(
@@ -39,5 +39,9 @@ describe('Semgrep SAST workflow policy', () => {
 		expect(scanStep).toBeDefined();
 		expect(scanStep?.run).toContain('--config');
 		expect(scanStep?.run).toContain('--metrics=off');
+	});
+
+	it('blocks the build on findings (--error)', () => {
+		expect(scanStep?.run).toContain('--error');
 	});
 });

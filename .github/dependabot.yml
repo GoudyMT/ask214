@@ -39,3 +39,6 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # Wait 7 days before proposing an action bump, matching the npm ecosystem's cooldown.
+    cooldown:
+      default-days: 7

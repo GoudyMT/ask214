@@ -34,8 +34,11 @@ jobs:
         run: pip install semgrep
 
       - name: Scan
-        # Advisory: semgrep scan exits 0 on findings by default, so findings print to the job log for
-        # triage without failing the build. Code is never uploaded; --metrics=off sends no telemetry.
-        # Flip to blocking with --error once the supply-chain baseline (action-tag pinning, package
-        # release-age) is cleared.
-        run: semgrep scan --config p/default --metrics=off
+        # Blocking: --error exits non-zero on findings. Two rules are excluded as reviewed, intentional
+        # policy: our pnpm minimumReleaseAge is a deliberate 24h floor for manual adds (Dependabot
+        # already cools down 7 days), and npm's min-release-age key is inert for a pnpm-only project.
+        # Code is never uploaded; --metrics=off sends no telemetry.
+        run: >-
+          semgrep scan --config p/default --metrics=off --error
+          --exclude-rule package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age
+          --exclude-rule package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age
