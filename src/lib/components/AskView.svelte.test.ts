@@ -23,6 +23,7 @@ type ViewProps = {
 	onDismissNudge?: () => void;
 	onOfferDevice?: (query: string) => void;
 	onRetryOnline?: (query: string) => void;
+	onStayDevice?: () => void;
 };
 
 const noop = () => {};
@@ -281,25 +282,33 @@ describe('AskView', () => {
 		);
 	});
 
-	it('needsReconsent: shows the blocking consent card; buttons fire onConsentOnline / onSetMode(device)', () => {
+	it('needsReconsent: quotes the held query; buttons fire onConsentOnline / onStayDevice', () => {
 		let consented = 0;
-		let toDevice: string | null = null;
+		let stayed = 0;
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'needsReconsent' },
+				{ kind: 'needsReconsent', pendingQuery: 'how do I file a claim' },
 				{
 					onlineCapable: true,
 					onConsentOnline: () => consented++,
-					onSetMode: (m) => (toDevice = m)
+					onStayDevice: () => stayed++
 				}
 			)
 		});
+		// the preserved question is quoted back in the consent card
+		expect(container.querySelector('.ask-msg--accent')?.textContent).toContain(
+			'how do I file a claim'
+		);
+		// the consent gate carries a heading (parity with the device-setup gate, for SR heading-nav)
+		expect(container.querySelector('h2')?.textContent).toContain(
+			'Send your question to answer online'
+		);
 		(container.querySelector('.ask-setup__go') as HTMLButtonElement).click();
 		flushSync();
 		expect(consented).toBe(1);
 		(container.querySelector('.ask-setup__skip') as HTMLButtonElement).click();
 		flushSync();
-		expect(toDevice).toBe('device');
+		expect(stayed).toBe(1);
 	});
 
 	it('results: renders the AI summary above the cards when present', () => {
