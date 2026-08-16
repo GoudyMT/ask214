@@ -35,6 +35,33 @@
 	{ "query": "What's my current BAH?", "shortCircuit": true },
 	{ "query": "With a 30 percent rating, what would my check be?", "shortCircuit": true },
 	{ "query": "Given my 30% rating, what's my monthly payment?", "shortCircuit": true },
+	{ "query": "does that bar me from the GI Bill?", "shortCircuit": true },
+	{ "query": "if I take the OTH, do I keep the GI Bill?", "shortCircuit": true },
+	{ "query": "since I was RIF'd, do I still rate tricare?", "shortCircuit": true },
+	{ "query": "with a bad back, what can I put in for?", "shortCircuit": true },
+	{ "query": "does my discharge change what I can draw?", "shortCircuit": true },
+	{ "query": "will getting out cost me my health care?", "shortCircuit": true },
+	{ "query": "after separation, is the GI Bill still mine?", "shortCircuit": true },
+	{ "query": "with my 30%, what lands in my account each month?", "shortCircuit": true },
+	{ "query": "so where does that leave me for VR&E?", "shortCircuit": true },
+	{ "query": "I'm at 8 years -- what's mine to take when I get out?", "shortCircuit": true },
+	{ "query": "where do I submit a claim after I separate?", "shortCircuit": true },
+	{ "query": "Will I lose my GI Bill if I separate early?", "shortCircuit": true },
+	{ "query": "Won't I lose my education benefits if I go Guard?", "shortCircuit": true },
+	{ "query": "How much back pay does the VA owe me?", "shortCircuit": true },
+	{ "query": "Does my time in service count toward a pension?", "shortCircuit": true },
+	{ "query": "Does Tricare cover me once I retire?", "shortCircuit": true },
+	{ "query": "Will my kids get college covered under my benefits?", "shortCircuit": true },
+	{ "query": "Does a bad-conduct discharge wreck my VA benefits?", "shortCircuit": true },
+	{ "query": "Will an OTH discharge block me from VA disability comp?", "shortCircuit": true },
+	{
+		"query": "Does my bad-conduct discharge disqualify me from the GI Bill?",
+		"shortCircuit": true
+	},
+	{ "query": "Does my OTH make me ineligible for VA health care?", "shortCircuit": true },
+	{ "query": "Could I get VR&E after an OTH?", "shortCircuit": true },
+	{ "query": "What's my paycheck going to be after I separate?", "shortCircuit": true },
+	{ "query": "How big is my payout going to be?", "shortCircuit": true },
 
 	{ "query": "What is the SkillBridge program?", "shortCircuit": false },
 	{
@@ -46,5 +73,20 @@
 	{ "query": "What documents are needed for a VA disability claim?", "shortCircuit": false },
 	{ "query": "How long does the VA claim process take?", "shortCircuit": false },
 	{ "query": "What is TAP and when do I attend?", "shortCircuit": false },
-	{ "query": "What are the requirements for the VA home loan?", "shortCircuit": false }
+	{ "query": "What are the requirements for the VA home loan?", "shortCircuit": false },
+	{ "query": "how long do I have to use the GI Bill?", "shortCircuit": false },
+	{ "query": "how do I read my VA award letter?", "shortCircuit": false },
+	{ "query": "how do I transfer the GI Bill to my kids?", "shortCircuit": false },
+	{ "query": "can veterans keep the GI Bill after an OTH?", "shortCircuit": false },
+	{ "query": "who rates BAH at the E-5 level?", "shortCircuit": false },
+	{ "query": "what can someone put in for with a back injury?", "shortCircuit": false },
+	{ "query": "how does concurrent receipt work?", "shortCircuit": false },
+	{
+		"query": "what's the difference between VA disability and retirement pay?",
+		"shortCircuit": false
+	},
+	{ "query": "Does the transition class leave me enough time to job hunt?", "shortCircuit": false },
+	{ "query": "How much will the copay cost me?", "shortCircuit": false },
+	{ "query": "My buddy got his DD-214 fast -- how long till mine arrives?", "shortCircuit": false },
+	{ "query": "Should I apply to the coal mine hiring near base?", "shortCircuit": false }
 ]
