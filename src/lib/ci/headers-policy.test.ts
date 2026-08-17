@@ -26,7 +26,7 @@ describe('_headers policy (P1b)', () => {
 		// PII routes must not be cached / BFCache-restored with decrypted state in memory
 		// (memory hygiene). /settings/security is NOT included - it does not exist in
 		// v1.0 (passphrase route deferred to v1.1).
-		for (const path of ['/wizard', '/settings', '/settings/*']) {
+		for (const path of ['/wizard', '/settings', '/settings/*', '/timeline']) {
 			expect(headers.get(path)?.['Cache-Control'], `${path} must set no-store`).toBe('no-store');
 		}
 	});
