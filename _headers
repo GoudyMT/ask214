@@ -7,6 +7,9 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
 
+/
+  Cache-Control: no-store
+
 /wizard
   Cache-Control: no-store
 

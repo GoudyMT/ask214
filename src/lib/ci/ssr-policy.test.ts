@@ -25,12 +25,18 @@ describe('disablesSsr', () => {
 // ADR-004: PII renders client-side only. Each profile-touching route must disable SSR so its HTML
 // shell (which the service worker caches network-first for offline) is empty -- never server-rendered
 // personal data. This is the load-bearing control; the SW-cache bypass is optional defense-in-depth.
-const PII_ROUTES = ['wizard', 'settings', 'timeline'];
+// Home '/' reads the profile store + holds the BYO-key closure; the other three render profile/timeline.
+const PII_ROUTES: { label: string; page: string }[] = [
+	{ label: '/', page: 'src/routes/+page.ts' },
+	{ label: '/wizard', page: 'src/routes/wizard/+page.ts' },
+	{ label: '/settings', page: 'src/routes/settings/+page.ts' },
+	{ label: '/timeline', page: 'src/routes/timeline/+page.ts' }
+];
 
 describe('every PII route disables SSR (ADR-004)', () => {
-	for (const route of PII_ROUTES) {
-		it(`/${route} sets ssr = false`, () => {
-			const source = readFileSync(join(process.cwd(), 'src', 'routes', route, '+page.ts'), 'utf8');
+	for (const { label, page } of PII_ROUTES) {
+		it(`${label} sets ssr = false`, () => {
+			const source = readFileSync(join(process.cwd(), page), 'utf8');
 			expect(disablesSsr(source)).toBe(true);
 		});
 	}
