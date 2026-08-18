@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { findPermissionViolations } from './ci-permissions-policy';
@@ -24,13 +24,24 @@ describe('findPermissionViolations', () => {
 		const v = findPermissionViolations({ jobs: { build: { permissions: { contents: 'read' } } } });
 		expect(v).toEqual([]);
 	});
+
+	it('treats a job as covered by a write-free top-level permissions block', () => {
+		const v = findPermissionViolations({ permissions: { contents: 'read' }, jobs: { build: {} } });
+		expect(v).toEqual([]);
+	});
+
+	it('flags a top-level write-all inherited by a block-less job', () => {
+		const v = findPermissionViolations({ permissions: 'write-all', jobs: { build: {} } });
+		expect(v.some((m) => m.includes('write-all'))).toBe(true);
+	});
 });
 
-describe('the committed CI workflow is least-privilege', () => {
-	it('every job in ci.yml declares a read-only permissions block', () => {
-		const workflow = parse(
-			readFileSync(join(process.cwd(), '.github', 'workflows', 'ci.yml'), 'utf8')
-		);
-		expect(findPermissionViolations(workflow)).toEqual([]);
-	});
+describe('every committed workflow is least-privilege', () => {
+	const dir = join(process.cwd(), '.github', 'workflows');
+	for (const file of readdirSync(dir).filter((f) => f.endsWith('.yml'))) {
+		it(`${file} declares a write-free permissions block for every job`, () => {
+			const workflow = parse(readFileSync(join(dir, file), 'utf8'));
+			expect(findPermissionViolations(workflow)).toEqual([]);
+		});
+	}
 });

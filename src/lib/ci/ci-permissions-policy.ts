@@ -4,12 +4,13 @@
  * Closes the "the highest code-exec job has no permissions block" gap: without an explicit
  * `permissions:` block a job's GITHUB_TOKEN inherits the repo/org default, which may grant write
  * across the board, and a future edit could add a write scope unnoticed. This pure checker lets a
- * vitest test assert every job in a workflow declares a least-privilege (write-free) permissions
- * block.
+ * vitest test assert every job has least-privilege (write-free) permissions -- from its own block
+ * or the workflow top-level block.
  */
 
 /** A GitHub Actions workflow, narrowed to the permissions surface this policy inspects. */
 export interface WorkflowConfig {
+	permissions?: unknown;
 	jobs?: Record<string, { permissions?: unknown }>;
 }
 
@@ -30,7 +31,8 @@ export function findPermissionViolations(workflow: WorkflowConfig): string[] {
 	const violations: string[] = [];
 	const jobs = workflow.jobs ?? {};
 	for (const [name, job] of Object.entries(jobs)) {
-		const perms = job.permissions;
+		// A job's effective permissions are its own block, else the workflow top-level block.
+		const perms = job.permissions ?? workflow.permissions;
 		if (perms === undefined) {
 			violations.push(`job "${name}" has no permissions block (token inherits the repo default)`);
 			continue;
