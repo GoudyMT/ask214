@@ -34,11 +34,16 @@ describe('findPermissionViolations', () => {
 		const v = findPermissionViolations({ permissions: 'write-all', jobs: { build: {} } });
 		expect(v.some((m) => m.includes('write-all'))).toBe(true);
 	});
+
+	it('does not throw on an empty workflow file (a null parse)', () => {
+		expect(() => findPermissionViolations(parse(''))).not.toThrow();
+		expect(findPermissionViolations(parse(''))).toEqual([]);
+	});
 });
 
 describe('every committed workflow is least-privilege', () => {
 	const dir = join(process.cwd(), '.github', 'workflows');
-	for (const file of readdirSync(dir).filter((f) => f.endsWith('.yml'))) {
+	for (const file of readdirSync(dir).filter((f) => /\.ya?ml$/.test(f))) {
 		it(`${file} declares a write-free permissions block for every job`, () => {
 			const workflow = parse(readFileSync(join(dir, file), 'utf8'));
 			expect(findPermissionViolations(workflow)).toEqual([]);

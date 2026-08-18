@@ -22,17 +22,18 @@ export interface WorkflowConfig {
  * capability", which is the token power an attacker who compromises the job could abuse.
  *
  * Args:
- *   workflow: the parsed workflow YAML.
+ *   workflow: the parsed workflow YAML (null for an empty document).
  *
  * Returns:
  *   Violation messages; empty when every job is least-privilege.
  */
-export function findPermissionViolations(workflow: WorkflowConfig): string[] {
+export function findPermissionViolations(workflow: WorkflowConfig | null | undefined): string[] {
 	const violations: string[] = [];
-	const jobs = workflow.jobs ?? {};
+	// `parse('')` on an empty or comment-only workflow yields null; treat it as "no jobs".
+	const jobs = workflow?.jobs ?? {};
 	for (const [name, job] of Object.entries(jobs)) {
 		// A job's effective permissions are its own block, else the workflow top-level block.
-		const perms = job.permissions ?? workflow.permissions;
+		const perms = job.permissions ?? workflow?.permissions;
 		if (perms === undefined) {
 			violations.push(`job "${name}" has no permissions block (token inherits the repo default)`);
 			continue;
