@@ -12,6 +12,10 @@ jobs:
     # 30, not 15: a full green run through Lighthouse is ~12-14 min, and `playwright install --with-deps`
     # apt-downloads browser system libs from a mirror that is sometimes slow (a 15-min cap flaked on it).
     timeout-minutes: 30
+    # Least-privilege: the highest code-exec job (installs deps, runs tests/build/lighthouse) only
+    # needs to read the repo. Artifact upload needs no token scope; anything unlisted defaults to none.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 

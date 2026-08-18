@@ -10,7 +10,9 @@ useDefault = true
 [[rules]]
 id = "cloudflare-account-id-in-config"
 description = "A Cloudflare account_id (32-hex) assigned in a committed config file"
-regex = '''(?i)account_id\s*[:=]\s*["']?[0-9a-f]{32}["']?'''
+# Covers snake_case + camelCase, and the JSON ("account_id":), TOML (account_id:) and env
+# (account_id=) forms; the optional quote after the key is what catches the wrangler.jsonc shape.
+regex = '''(?i)account_?id["']?\s*[:=]\s*["']?[0-9a-f]{32}["']?'''
 tags = ["cloudflare", "account"]
 
 [allowlist]

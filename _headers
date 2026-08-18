@@ -7,6 +7,9 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
 
+/
+  Cache-Control: no-store
+
 /wizard
   Cache-Control: no-store
 
@@ -14,6 +17,9 @@
   Cache-Control: no-store
 
 /settings/*
+  Cache-Control: no-store
+
+/timeline
   Cache-Control: no-store
 
 /.well-known/security.txt
