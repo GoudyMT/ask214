@@ -22,7 +22,7 @@
  *   raw: the raw JSONC text.
  *
  * Returns:
- *   Comment-free text safe to pass to `JSON.parse`.
+ *   Comment-free, trailing-comma-free text safe to pass to `JSON.parse`.
  */
 export function stripJsoncComments(raw: string): string {
 	let out = '';
@@ -72,6 +72,11 @@ export function stripJsoncComments(raw: string): string {
 			i++;
 			continue;
 		}
+		if (ch === '}' || ch === ']') {
+			// Drop a trailing comma (legal JSONC, rejected by JSON.parse). Any string's closing quote
+			// already terminated `out`, so this cannot reach a comma inside a string value.
+			out = out.replace(/,\s*$/, '');
+		}
 		out += ch;
 	}
 	return out;
@@ -79,7 +84,11 @@ export function stripJsoncComments(raw: string): string {
 
 /** A parsed wrangler config; only the keys this policy inspects are named. */
 export interface WorkerConfig {
-	observability?: { enabled?: boolean };
+	observability?: {
+		enabled?: boolean;
+		logs?: { enabled?: boolean };
+		traces?: { enabled?: boolean };
+	};
 	logpush?: unknown;
 	[key: string]: unknown;
 }
@@ -87,7 +96,7 @@ export interface WorkerConfig {
 /**
  * Return a message for each retrieve-Worker config invariant that is not met.
  *
- * Invariants (ADR-025 item 7, config surface): edge observability is explicitly OFF; no Logpush;
+ * Invariants (ADR-025 item 7, config surface): edge observability is explicitly OFF (top-level enabled plus the nested logs/traces sub-toggles); no Logpush;
  * no Analytics Engine binding; no tail consumer. Each would route a query into a log or trace the
  * zero-retention model forbids. Observability must be explicitly `false`, not merely absent -- the
  * platform default is not the invariant.
@@ -100,8 +109,14 @@ export interface WorkerConfig {
  */
 export function findWorkerConfigViolations(config: WorkerConfig): string[] {
 	const violations: string[] = [];
-	if (config.observability?.enabled !== false) {
+	const obs = config.observability;
+	if (obs?.enabled !== false) {
 		violations.push('observability.enabled must be explicitly false');
+	}
+	if (obs?.logs?.enabled === true || obs?.traces?.enabled === true) {
+		violations.push(
+			'observability.logs / traces must not be enabled (a query would reach edge logs)'
+		);
 	}
 	if ('tail_consumers' in config) {
 		violations.push('tail_consumers must be absent');

@@ -19,5 +19,7 @@
  *   true when the source exports `ssr = false`.
  */
 export function disablesSsr(source: string): boolean {
-	return /export\s+const\s+ssr\s*=\s*false\b/.test(source);
+	// Strip comments first so a commented-out `// export const ssr = false` does not read as active.
+	const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+	return /export\s+const\s+ssr\s*=\s*false\b/.test(code);
 }

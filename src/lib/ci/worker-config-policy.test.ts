@@ -26,6 +26,16 @@ describe('stripJsoncComments', () => {
 		const raw = '{\n\t// lead comment\n\t"observability": { "enabled": false }\n}';
 		expect(JSON.parse(stripJsoncComments(raw))).toEqual({ observability: { enabled: false } });
 	});
+
+	it('strips a trailing comma before a closing brace or bracket', () => {
+		// Trailing commas are legal JSONC but JSON.parse rejects them; the real config could gain one.
+		expect(JSON.parse(stripJsoncComments('{ "a": 1, }'))).toEqual({ a: 1 });
+		expect(JSON.parse(stripJsoncComments('{ "a": [1, 2, ] }'))).toEqual({ a: [1, 2] });
+	});
+
+	it('does not strip a comma inside a string value', () => {
+		expect(JSON.parse(stripJsoncComments('{ "a": "x," }')).a).toBe('x,');
+	});
 });
 
 describe('findWorkerConfigViolations', () => {
@@ -62,6 +72,20 @@ describe('findWorkerConfigViolations', () => {
 	it('passes a compliant config', () => {
 		expect(findWorkerConfigViolations({ observability: { enabled: false } })).toEqual([]);
 	});
+
+	it('flags nested observability.logs enabled (a query would still reach edge logs)', () => {
+		const v = findWorkerConfigViolations({
+			observability: { enabled: false, logs: { enabled: true } }
+		});
+		expect(v.some((m) => m.includes('observability'))).toBe(true);
+	});
+
+	it('flags nested observability.traces enabled', () => {
+		const v = findWorkerConfigViolations({
+			observability: { enabled: false, traces: { enabled: true } }
+		});
+		expect(v.some((m) => m.includes('observability'))).toBe(true);
+	});
 });
 
 describe('the committed retrieve-Worker holds ADR-025 item 7', () => {
@@ -74,6 +98,9 @@ describe('the committed retrieve-Worker holds ADR-025 item 7', () => {
 		// "no AI Gateway" is a call-site property: it lives in the AI.run(...) options, not the
 		// config. A gateway route logs the prompt (the user query) by default, so guard the source.
 		const source = readFileSync(WORKER_SOURCE, 'utf8');
-		expect(source).not.toMatch(/\bgateway\s*:/i);
+		// Catch the unquoted `gateway:` run() option and the quoted "gateway": key, plus a raw fetch
+		// to the AI Gateway host (which would bypass the AI binding entirely).
+		expect(source).not.toMatch(/\bgateway["']?\s*:/i);
+		expect(source).not.toMatch(/gateway\.ai\.cloudflare\.com/i);
 	});
 });

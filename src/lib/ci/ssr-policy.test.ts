@@ -15,6 +15,11 @@ describe('disablesSsr', () => {
 	it('is false when ssr is explicitly true', () => {
 		expect(disablesSsr('export const ssr = true;')).toBe(false);
 	});
+
+	it('is false when the ssr = false declaration is commented out', () => {
+		expect(disablesSsr('// export const ssr = false')).toBe(false);
+		expect(disablesSsr('/* export const ssr = false */')).toBe(false);
+	});
 });
 
 // ADR-004: PII renders client-side only. Each profile-touching route must disable SSR so its HTML
