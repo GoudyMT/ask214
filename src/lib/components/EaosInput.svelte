@@ -75,9 +75,9 @@
 		font: inherit;
 	}
 
-	/* The root declares `color-scheme: dark`, so the browser already draws the native date-picker
-	   glyph light against the dark input. Do NOT invert it here - inverting assumes the glyph is
-	   drawn dark, which flips a correct glyph to black on dark-preference systems. */
+	/* color-scheme follows the active theme (per app.css), so the browser draws the native
+	   date-picker glyph to match the current surface - light glyph on dark, dark glyph on light.
+	   Do NOT invert it here; inversion assumes a fixed scheme and breaks under the other one. */
 	.eaos-field__input::-webkit-calendar-picker-indicator {
 		cursor: pointer;
 	}

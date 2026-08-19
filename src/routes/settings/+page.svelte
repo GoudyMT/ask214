@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EaosInput from '$lib/components/EaosInput.svelte';
+	import ThemeControl from '$lib/components/ThemeControl.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import { eraseEverything } from '$lib/profile/erase';
@@ -225,6 +226,17 @@
 	{#if app.store?.locked}
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else}
+		<section class="settings-section" aria-labelledby="appearance-heading">
+			<h2 id="appearance-heading" class="settings-section__heading">Appearance</h2>
+			<div class="settings-row">
+				<div class="settings-row__field">
+					<span class="settings-row__label">Theme</span>
+					<span class="settings-row__value">Light, dark, or match your device.</span>
+				</div>
+				<ThemeControl />
+			</div>
+		</section>
+
 		{#if hasTimeline}
 			<section class="settings-section" aria-labelledby="timeline-heading">
 				<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>

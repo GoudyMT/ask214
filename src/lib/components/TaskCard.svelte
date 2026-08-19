@@ -409,8 +409,8 @@
 		font-size: var(--font-size-s);
 	}
 
-	/* The root declares `color-scheme: dark`, so the browser already draws the native glyph light
-	   against the dark input (matches the EAOS date field). Do NOT invert it - see EaosInput. */
+	/* color-scheme follows the active theme, so the browser draws the native glyph to match the
+	   current surface (matches the EAOS date field). Do NOT invert it - see EaosInput. */
 	.task-card__date-row input::-webkit-calendar-picker-indicator {
 		cursor: pointer;
 	}
