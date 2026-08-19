@@ -18,7 +18,15 @@ const config = {
 				'default-src': ['self'],
 				// 'wasm-unsafe-eval' lets the embedding worker compile the self-hosted ONNX WASM;
 				// it does NOT permit JS eval(). connect-src stays 'self' - no third-party fetch.
-				'script-src': ['self', 'wasm-unsafe-eval'],
+				// The sha256 pins the pre-paint theme script in src/app.html (it sets data-theme before
+				// first paint to avoid a flash of the wrong palette). Hash mode auto-hashes only SvelteKit's
+				// own inline scripts, so a hand-added <head> script must be pinned here by hand; recompute
+				// if that script's bytes change.
+				'script-src': [
+					'self',
+					'wasm-unsafe-eval',
+					'sha256-PTImSrhvB2j8WuYiUGnYhan7q+Hc/ZFGv5riOPKpqpY='
+				],
 				'style-src': ['self', 'unsafe-inline'],
 				'img-src': ['self', 'data:'],
 				'font-src': ['self', 'data:'],
