@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EaosInput from '$lib/components/EaosInput.svelte';
+	import ThemeControl from '$lib/components/ThemeControl.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import { eraseEverything } from '$lib/profile/erase';
@@ -222,6 +223,18 @@
 	{#if eraseError}
 		<p class="erase-error" role="alert">{eraseError}</p>
 	{/if}
+	<!-- Above the lock gate on purpose: the theme is a non-PII device preference, so an idle-locked
+	     user can still switch light/dark without unlocking. -->
+	<section class="settings-section" aria-labelledby="appearance-heading">
+		<h2 id="appearance-heading" class="settings-section__heading">Appearance</h2>
+		<div class="settings-row appearance-row">
+			<div class="settings-row__field">
+				<span class="settings-row__label">Theme</span>
+				<span class="settings-row__value">Light, dark, or match your device.</span>
+			</div>
+			<ThemeControl />
+		</div>
+	</section>
 	{#if app.store?.locked}
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else}
@@ -368,6 +381,19 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-m);
+	}
+
+	/* The theme control is wider than the EAOS "Change" link. Let the Appearance row wrap, and on a
+	   phone width stack it so the control drops below the label instead of being clipped. */
+	.appearance-row {
+		flex-wrap: wrap;
+	}
+
+	@media (max-width: 600px) {
+		.appearance-row {
+			flex-direction: column;
+			align-items: flex-start;
+		}
 	}
 
 	.settings-row__field {

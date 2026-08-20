@@ -1,8 +1,7 @@
 :root {
-	/* The palette is dark-only today, so declare it. The browser then draws native controls
-	   (date-picker glyphs, checkboxes, scrollbars) dark-appropriate, instead of drawing them for
-	   whichever scheme the OS happens to prefer and disagreeing with the surface around them.
-	   Becomes `light dark` when the light palette + theme control ship. */
+	/* Dark is the base palette; the light palette overrides it below (an explicit Light choice, or
+	   System on a light-preference OS). color-scheme tracks the active surface so native controls -
+	   date-picker glyphs, checkboxes, scrollbars - match it instead of the OS default. */
 	color-scheme: dark;
 
 	--color-bg: #0f1419;
@@ -17,9 +16,9 @@
 
 	/* Category accents for timeline chips - distinct from the status palette. */
 	--color-category-medical: #56b6c2;
-	--color-category-admin: #8895a8;
-	--color-category-benefits: #7e8ce0;
-	--color-category-career: #b07fd0;
+	--color-category-admin: #8c98ab;
+	--color-category-benefits: #8693e2;
+	--color-category-career: #b384d2;
 	--color-category-finance: #cbb15e;
 
 	--space-xs: 4px;
@@ -45,6 +44,47 @@
 	--font-size-h1-fluid: clamp(28px, 5vw, 40px);
 	--font-size-h2-fluid: clamp(22px, 4vw, 28px);
 	--font-size-h3-fluid: clamp(18px, 3vw, 22px);
+}
+
+/* Light palette. System (no data-theme) is resolved by the media query below; an explicit choice
+   sets data-theme on <html> and wins. Values mirror tokensLight in tokens.ts; the contrast test
+   verifies WCAG AA on both palettes. */
+:root[data-theme='light'] {
+	color-scheme: light;
+	--color-bg: #f5f7fa;
+	--color-surface: #ffffff;
+	--color-fg: #1a1f27;
+	--color-fg-muted: #586471;
+	--color-accent: #1a66c2;
+	--color-accent-muted: #3f7ec4;
+	--color-danger: #c2410c;
+	--color-success: #2f7d40;
+	--color-border: #d5dae1;
+	--color-category-medical: #0d717e;
+	--color-category-admin: #4a5568;
+	--color-category-benefits: #4550b8;
+	--color-category-career: #7c3fab;
+	--color-category-finance: #7e631b;
+}
+
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme]) {
+		color-scheme: light;
+		--color-bg: #f5f7fa;
+		--color-surface: #ffffff;
+		--color-fg: #1a1f27;
+		--color-fg-muted: #586471;
+		--color-accent: #1a66c2;
+		--color-accent-muted: #3f7ec4;
+		--color-danger: #c2410c;
+		--color-success: #2f7d40;
+		--color-border: #d5dae1;
+		--color-category-medical: #0d717e;
+		--color-category-admin: #4a5568;
+		--color-category-benefits: #4550b8;
+		--color-category-career: #7c3fab;
+		--color-category-finance: #7e631b;
+	}
 }
 
 * {

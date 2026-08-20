@@ -28,6 +28,7 @@
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { shellWidthFor } from '$lib/layout/shell-width';
+	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 
 	let { children } = $props();
 
@@ -171,12 +172,25 @@
 			bus.close();
 		};
 	});
+
+	// Theme lifecycle, registered after app-init so this cosmetic side-effect never precedes the
+	// profile/relock wiring: sync the address-bar tint to the persisted choice on load, and follow
+	// theme changes made in other tabs (a `storage` event fires only in OTHER tabs). Client-only.
+	onMount(() => {
+		syncThemeColor(readChoice());
+		window.addEventListener('storage', applyStorageChange);
+		return () => window.removeEventListener('storage', applyStorageChange);
+	});
 </script>
 
 <svelte:head>
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<!-- The media-scoped meta must come first: a browser returns the first theme-color whose media
+	     matches (or has none) in tree order, so a no-media default first would shadow the light one.
+	     syncThemeColor() overrides both for an explicit choice; System leaves this OS-driven pair. -->
+	<meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)" />
 	<meta name="theme-color" content="#0f1419" />
-	<meta name="color-scheme" content="dark" />
+	<meta name="color-scheme" content="light dark" />
 </svelte:head>
 
 <AppGate {app}>

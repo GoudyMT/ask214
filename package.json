@@ -59,9 +59,15 @@
 			"gzip": true
 		},
 		{
-			"name": "SvelteKit nodes",
-			"path": ".svelte-kit/output/client/_app/immutable/nodes/*.js",
-			"limit": "35 KB",
+			"name": "Root layout node (loaded on every page)",
+			"path": ".svelte-kit/output/client/_app/immutable/nodes/0.*.js",
+			"limit": "7 KB",
+			"gzip": true
+		},
+		{
+			"name": "Lazy route nodes (sum; no single page loads all of them)",
+			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
+			"limit": "45 KB",
 			"gzip": true
 		}
 	],

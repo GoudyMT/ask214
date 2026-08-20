@@ -24,4 +24,9 @@ describe('CSP egress contract', () => {
 			);
 		}
 	});
+
+	it('script-src pins the pre-paint theme script hash so it cannot be dropped', () => {
+		const scriptSrc = directives?.['script-src'] ?? [];
+		expect(scriptSrc.some((s) => s.startsWith('sha256-'))).toBe(true);
+	});
 });
