@@ -40,4 +40,9 @@
 		outline: 2px solid var(--color-accent);
 		outline-offset: -2px;
 	}
+	/* On the selected (accent-filled) segment an accent ring would be accent-on-accent and invisible;
+	   use the bg color so the focus indicator stays visible (WCAG 2.4.7 / 1.4.11). */
+	.seg button[aria-pressed='true']:focus-visible {
+		outline-color: var(--color-bg);
+	}
 </style>
