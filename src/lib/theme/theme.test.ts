@@ -7,6 +7,7 @@ import {
 	applyChoice,
 	persistChoice,
 	syncThemeColor,
+	applyStorageChange,
 	BG_DARK,
 	BG_LIGHT,
 	THEME_KEY
@@ -50,6 +51,12 @@ describe('theme DOM/storage side effects degrade safely without a browser', () =
 	});
 	it('syncThemeColor is a no-op (no throw) when document is undefined', () => {
 		expect(() => syncThemeColor('light')).not.toThrow();
+	});
+	it('applyStorageChange ignores unrelated keys and reacts to the theme key + clear', () => {
+		const ev = (key: string | null) => ({ key }) as unknown as StorageEvent;
+		expect(applyStorageChange(ev('mtc:ask:default-mode'))).toBeNull();
+		expect(applyStorageChange(ev('mtc:theme'))).toBe('system');
+		expect(applyStorageChange(ev(null))).toBe('system');
 	});
 });
 

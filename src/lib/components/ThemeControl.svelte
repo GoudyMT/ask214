@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { THEME_CHOICES, readChoice, setTheme, type ThemeChoice } from '$lib/theme/theme';
+	import { onMount } from 'svelte';
+	import {
+		THEME_CHOICES,
+		THEME_KEY,
+		readChoice,
+		setTheme,
+		type ThemeChoice
+	} from '$lib/theme/theme';
 
 	let choice = $state<ThemeChoice>(readChoice());
 	const LABEL: Record<ThemeChoice, string> = { system: 'System', light: 'Light', dark: 'Dark' };
@@ -8,6 +15,16 @@
 		choice = c;
 		setTheme(c);
 	}
+
+	// A theme change in another tab (or an erase) fires a `storage` event; refresh the active segment
+	// so the control never shows a stale choice. The layout re-applies the palette app-wide.
+	onMount(() => {
+		const onStorage = (e: StorageEvent) => {
+			if (e.key === THEME_KEY || e.key === null) choice = readChoice();
+		};
+		window.addEventListener('storage', onStorage);
+		return () => window.removeEventListener('storage', onStorage);
+	});
 </script>
 
 <div class="seg" role="group" aria-label="Theme">

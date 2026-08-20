@@ -28,17 +28,13 @@
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { shellWidthFor } from '$lib/layout/shell-width';
-	import { readChoice, syncThemeColor } from '$lib/theme/theme';
+	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 
 	let { children } = $props();
 
 	// Shell content width per route: the whole shell (nav/main/footer) widens together on a wide
 	// route (timeline -> 1024px) via the --shell-width CSS var; other routes keep the 720px column.
 	const shellWidth = $derived(shellWidthFor(page.route.id));
-
-	// Match the mobile address-bar tint to the persisted theme (the two prefers-color-scheme metas in
-	// <head> handle System; this overrides them for an explicit Light/Dark). Client-only.
-	onMount(() => syncThemeColor(readChoice()));
 
 	// Auto-lock the in-memory profile after 15 minutes of no user input (memory hygiene;
 	// unlock is a transparent local-key re-decrypt in v1.0).
@@ -175,6 +171,15 @@
 			teardownRuntime?.();
 			bus.close();
 		};
+	});
+
+	// Theme lifecycle, registered after app-init so this cosmetic side-effect never precedes the
+	// profile/relock wiring: sync the address-bar tint to the persisted choice on load, and follow
+	// theme changes made in other tabs (a `storage` event fires only in OTHER tabs). Client-only.
+	onMount(() => {
+		syncThemeColor(readChoice());
+		window.addEventListener('storage', applyStorageChange);
+		return () => window.removeEventListener('storage', applyStorageChange);
 	});
 </script>
 

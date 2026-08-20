@@ -74,3 +74,16 @@ export function setTheme(c: ThemeChoice): void {
 	applyChoice(c);
 	syncThemeColor(c);
 }
+
+/**
+ * Re-apply the theme after it changed in another tab. A `storage` event fires only in OTHER tabs -
+ * exactly the cross-tab case - and carries `key: null` on localStorage.clear() (the erase flow).
+ * Returns the resolved choice, or null when the event is unrelated to the theme.
+ */
+export function applyStorageChange(e: StorageEvent): ThemeChoice | null {
+	if (e.key !== THEME_KEY && e.key !== null) return null;
+	const c = readChoice();
+	applyChoice(c);
+	syncThemeColor(c);
+	return c;
+}
