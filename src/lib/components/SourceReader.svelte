@@ -171,7 +171,7 @@
 	}
 	.reader__passage--cited {
 		padding: var(--space-s) var(--space-m);
-		background: rgba(74, 144, 226, 0.16);
+		background: color-mix(in srgb, var(--color-accent) 16%, transparent);
 		border-left: 3px solid var(--color-accent);
 		border-radius: var(--radius-s);
 		scroll-margin: var(--space-l) 0;
