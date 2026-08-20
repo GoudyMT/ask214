@@ -12,8 +12,8 @@
 		<link rel="icon" type="image/png" sizes="512x512" href="%sveltekit.assets%/icon-512.png" />
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon-192.png" />
 		<!-- Apply the persisted light/dark choice before first paint to avoid a flash of the wrong
-		     palette. "System" stores nothing and is resolved by the prefers-color-scheme media query.
-		     This inline script is hash-pinned in the CSP script-src (no unsafe-inline). -->
+		     palette. For System (or no stored choice) this sets no attribute - the prefers-color-scheme
+		     media query resolves it. This inline script is hash-pinned in the CSP script-src (no unsafe-inline). -->
 		<script>
 			(function () {
 				try {
