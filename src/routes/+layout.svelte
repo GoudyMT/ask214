@@ -28,12 +28,17 @@
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { shellWidthFor } from '$lib/layout/shell-width';
+	import { readChoice, syncThemeColor } from '$lib/theme/theme';
 
 	let { children } = $props();
 
 	// Shell content width per route: the whole shell (nav/main/footer) widens together on a wide
 	// route (timeline -> 1024px) via the --shell-width CSS var; other routes keep the 720px column.
 	const shellWidth = $derived(shellWidthFor(page.route.id));
+
+	// Match the mobile address-bar tint to the persisted theme (the two prefers-color-scheme metas in
+	// <head> handle System; this overrides them for an explicit Light/Dark). Client-only.
+	onMount(() => syncThemeColor(readChoice()));
 
 	// Auto-lock the in-memory profile after 15 minutes of no user input (memory hygiene;
 	// unlock is a transparent local-key re-decrypt in v1.0).
@@ -176,6 +181,7 @@
 <svelte:head>
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 	<meta name="theme-color" content="#0f1419" />
+	<meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)" />
 	<meta name="color-scheme" content="light dark" />
 </svelte:head>
 

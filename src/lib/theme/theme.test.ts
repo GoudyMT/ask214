@@ -6,8 +6,12 @@ import {
 	readChoice,
 	applyChoice,
 	persistChoice,
+	syncThemeColor,
+	BG_DARK,
+	BG_LIGHT,
 	THEME_KEY
 } from './theme';
+import { tokens, tokensLight } from '$lib/styles/tokens';
 
 describe('theme choice logic', () => {
 	it('THEME_KEY is the non-PII mtc namespace', () => {
@@ -41,5 +45,15 @@ describe('theme DOM/storage side effects degrade safely without a browser', () =
 	});
 	it('persistChoice is a no-op (no throw) when storage is unavailable', () => {
 		expect(() => persistChoice('dark')).not.toThrow();
+	});
+	it('syncThemeColor is a no-op (no throw) when document is undefined', () => {
+		expect(() => syncThemeColor('light')).not.toThrow();
+	});
+});
+
+describe('theme-color background constants', () => {
+	it('mirror the bg tokens so the address-bar tint cannot drift from the palette', () => {
+		expect(BG_DARK).toBe(tokens.color.bg);
+		expect(BG_LIGHT).toBe(tokensLight.color.bg);
 	});
 });

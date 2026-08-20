@@ -31,3 +31,26 @@ test('theme choice applies, swaps the palette, and survives a reload', async ({ 
 	await page.reload();
 	await expect(page.locator('html')).not.toHaveAttribute('data-theme');
 });
+
+test('the mobile address-bar tint (theme-color) follows the theme', async ({ page }) => {
+	await page.goto('/settings');
+	const theme = page.getByRole('group', { name: 'Theme' });
+	await expect(theme).toBeVisible();
+
+	const themeColors = () =>
+		page
+			.locator('meta[name="theme-color"]')
+			.evaluateAll((ms) => ms.map((m) => (m as HTMLMetaElement).content));
+
+	// Explicit Dark: both metas point at the dark bg, so the bar is dark regardless of the OS.
+	await theme.getByRole('button', { name: 'Dark', exact: true }).click();
+	expect(await themeColors()).toEqual(['#0f1419', '#0f1419']);
+
+	// Explicit Light: both point at the light bg.
+	await theme.getByRole('button', { name: 'Light', exact: true }).click();
+	expect(await themeColors()).toEqual(['#f5f7fa', '#f5f7fa']);
+
+	// System: the OS-driven pair is restored (dark default + a prefers-color-scheme:light override).
+	await theme.getByRole('button', { name: 'System', exact: true }).click();
+	expect(await themeColors()).toEqual(['#0f1419', '#f5f7fa']);
+});
