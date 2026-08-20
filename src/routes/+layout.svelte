@@ -180,8 +180,11 @@
 
 <svelte:head>
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-	<meta name="theme-color" content="#0f1419" />
+	<!-- The media-scoped meta must come first: a browser returns the first theme-color whose media
+	     matches (or has none) in tree order, so a no-media default first would shadow the light one.
+	     syncThemeColor() overrides both for an explicit choice; System leaves this OS-driven pair. -->
 	<meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)" />
+	<meta name="theme-color" content="#0f1419" />
 	<meta name="color-scheme" content="light dark" />
 </svelte:head>
 

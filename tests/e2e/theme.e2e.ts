@@ -50,7 +50,7 @@ test('the mobile address-bar tint (theme-color) follows the theme', async ({ pag
 	await theme.getByRole('button', { name: 'Light', exact: true }).click();
 	expect(await themeColors()).toEqual(['#f5f7fa', '#f5f7fa']);
 
-	// System: the OS-driven pair is restored (dark default + a prefers-color-scheme:light override).
+	// System: the OS-driven pair is restored (prefers-color-scheme:light override + dark default).
 	await theme.getByRole('button', { name: 'System', exact: true }).click();
-	expect(await themeColors()).toEqual(['#0f1419', '#f5f7fa']);
+	expect(await themeColors()).toEqual(['#f5f7fa', '#0f1419']);
 });
