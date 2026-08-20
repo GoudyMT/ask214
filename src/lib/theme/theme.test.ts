@@ -12,6 +12,8 @@ import {
 	THEME_KEY
 } from './theme';
 import { tokens, tokensLight } from '$lib/styles/tokens';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 describe('theme choice logic', () => {
 	it('THEME_KEY is the non-PII mtc namespace', () => {
@@ -55,5 +57,21 @@ describe('theme-color background constants', () => {
 	it('mirror the bg tokens so the address-bar tint cannot drift from the palette', () => {
 		expect(BG_DARK).toBe(tokens.color.bg);
 		expect(BG_LIGHT).toBe(tokensLight.color.bg);
+	});
+});
+
+describe('theme-color head metas mirror the bg constants', () => {
+	const layout = readFileSync(
+		fileURLToPath(new URL('../../routes/+layout.svelte', import.meta.url)),
+		'utf8'
+	);
+	const metaHexes = [...layout.matchAll(/<meta name="theme-color" content="(#[0-9a-f]{6})"/gi)]
+		.map((m) => m[1])
+		.filter((h): h is string => h !== undefined);
+	it('declares exactly two theme-color metas', () => {
+		expect(metaHexes).toHaveLength(2);
+	});
+	it('their hexes are the dark and light backgrounds (no third, un-parity-tested copy)', () => {
+		expect(new Set(metaHexes)).toEqual(new Set([BG_DARK, BG_LIGHT]));
 	});
 });
