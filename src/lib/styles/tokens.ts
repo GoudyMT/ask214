@@ -27,9 +27,9 @@ export const tokens = {
 		border: '#2a313a',
 		category: {
 			medical: '#56b6c2',
-			admin: '#8895a8',
-			benefits: '#7e8ce0',
-			career: '#b07fd0',
+			admin: '#8c98ab',
+			benefits: '#8693e2',
+			career: '#b384d2',
 			finance: '#cbb15e'
 		}
 	},
@@ -80,11 +80,11 @@ export const tokensLight = {
 		success: '#2f7d40',
 		border: '#d5dae1',
 		category: {
-			medical: '#0e7c8a',
+			medical: '#0d717e',
 			admin: '#4a5568',
 			benefits: '#4550b8',
 			career: '#7c3fab',
-			finance: '#8a6d1e'
+			finance: '#7e631b'
 		}
 	}
 } as const;

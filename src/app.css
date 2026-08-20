@@ -16,9 +16,9 @@
 
 	/* Category accents for timeline chips - distinct from the status palette. */
 	--color-category-medical: #56b6c2;
-	--color-category-admin: #8895a8;
-	--color-category-benefits: #7e8ce0;
-	--color-category-career: #b07fd0;
+	--color-category-admin: #8c98ab;
+	--color-category-benefits: #8693e2;
+	--color-category-career: #b384d2;
 	--color-category-finance: #cbb15e;
 
 	--space-xs: 4px;
@@ -60,11 +60,11 @@
 	--color-danger: #c2410c;
 	--color-success: #2f7d40;
 	--color-border: #d5dae1;
-	--color-category-medical: #0e7c8a;
+	--color-category-medical: #0d717e;
 	--color-category-admin: #4a5568;
 	--color-category-benefits: #4550b8;
 	--color-category-career: #7c3fab;
-	--color-category-finance: #8a6d1e;
+	--color-category-finance: #7e631b;
 }
 
 @media (prefers-color-scheme: light) {
@@ -79,11 +79,11 @@
 		--color-danger: #c2410c;
 		--color-success: #2f7d40;
 		--color-border: #d5dae1;
-		--color-category-medical: #0e7c8a;
+		--color-category-medical: #0d717e;
 		--color-category-admin: #4a5568;
 		--color-category-benefits: #4550b8;
 		--color-category-career: #7c3fab;
-		--color-category-finance: #8a6d1e;
+		--color-category-finance: #7e631b;
 	}
 }
 

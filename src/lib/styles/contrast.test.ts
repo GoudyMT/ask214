@@ -17,6 +17,13 @@ function cr(a: string, b: string): number {
 	const lb = lum(b);
 	return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
+// Composite `fg` at `alpha` opacity over opaque `bg` - models color-mix(in srgb, fg alpha%, transparent)
+// rendered on bg, which is how the category chip background is drawn.
+function mix(fg: string, bg: string, alpha: number): string {
+	const ch = (h: string, i: number) => Number.parseInt(h.slice(i, i + 2), 16);
+	const to = (n: number) => Math.round(n).toString(16).padStart(2, '0');
+	return '#' + [1, 3, 5].map((i) => to(alpha * ch(fg, i) + (1 - alpha) * ch(bg, i))).join('');
+}
 
 for (const [name, t] of [
 	['dark', tokens],
@@ -36,16 +43,24 @@ for (const [name, t] of [
 			['fg', c.fg],
 			['fgMuted', c.fgMuted],
 			['danger', c.danger],
-			['success', c.success],
-			['catMedical', c.category.medical],
-			['catAdmin', c.category.admin],
-			['catBenefits', c.category.benefits],
-			['catCareer', c.category.career],
-			['catFinance', c.category.finance]
+			['success', c.success]
 		];
 		for (const [label, hex] of textOnSurface) {
 			it(`${label} on surface >= 4.5:1`, () =>
 				expect(cr(hex, c.surface)).toBeGreaterThanOrEqual(4.5));
+		}
+		// Category chips paint the category color as 14px text over a color-mix(category 15%, surface)
+		// tint of that SAME color (TaskCard), not pure surface. Test the real composited background.
+		const chips: Array<[string, string]> = [
+			['medical', c.category.medical],
+			['admin', c.category.admin],
+			['benefits', c.category.benefits],
+			['career', c.category.career],
+			['finance', c.category.finance]
+		];
+		for (const [label, hex] of chips) {
+			it(`cat ${label} on its 15%-tinted chip bg >= 4.5:1`, () =>
+				expect(cr(hex, mix(hex, c.surface, 0.15))).toBeGreaterThanOrEqual(4.5));
 		}
 		it('accent edge on surface >= 3:1 (UI)', () =>
 			expect(cr(c.accent, c.surface)).toBeGreaterThanOrEqual(3));
