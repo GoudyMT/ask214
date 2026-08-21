@@ -8,7 +8,7 @@ describe('InstallNudge', () => {
 	it('renders as a dismissible card with the durability framing', () => {
 		const { container } = render(InstallNudge, { props: base });
 		expect(container.querySelector('.install-nudge')).not.toBeNull();
-		expect(container.textContent).toContain('stays put');
+		expect(container.textContent).toContain('less likely');
 		expect(container.querySelector('.install-nudge__dismiss')).not.toBeNull();
 	});
 

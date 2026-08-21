@@ -65,6 +65,7 @@
 		canPrompt: false,
 		installed: false,
 		ios: false,
+		persisted: false,
 		promptInstall: () => Promise.resolve('unavailable')
 	});
 	setInstallApp(install);
@@ -196,27 +197,34 @@
 		return () => window.removeEventListener('storage', applyStorageChange);
 	});
 
-	// Request durable storage so the browser keeps this origin's IndexedDB out of the eviction path:
-	// the AES-GCM data key lives non-extractable inside that same database, so an eviction is
-	// unrecoverable loss, and WebKit grants persistence to installed (Home Screen) web apps.
-	// Best-effort and fire-and-forget - requestPersistentStorage never throws. Client-only.
-	onMount(() => {
-		void requestPersistentStorage();
-	});
-
-	// Wire the install controller: capture beforeinstallprompt so a later user gesture can install,
-	// detect iOS + installed state, and mirror them into the reactive context the nudge + Settings
-	// control read. Client-only (all browser APIs).
+	// Durability wiring (client-only). Two independent legs keep the on-device IndexedDB - which holds
+	// the non-extractable AES-GCM key alongside the ciphertext - out of iOS eviction: being installed
+	// exempts it from the 7-day inactivity timer, and a granted persist() exempts it from
+	// storage-pressure eviction. Track BOTH ("installed" alone is not "safe"), and re-request persist()
+	// when the user newly installs - the moment WebKit is most likely to grant it.
 	onMount(() => {
 		install.ios = isIOS();
 		const controller = createInstallController({ target: window, isInstalled });
+
+		const refreshPersistence = async (): Promise<void> => {
+			const outcome = await requestPersistentStorage();
+			install.persisted = outcome === 'granted' || outcome === 'already';
+		};
+
+		// Seed from the current state so the initial sync is not treated as a transition; the
+		// unconditional refreshPersistence() below covers the load-time request.
+		let wasInstalled = controller.snapshot().installed;
 		const sync = (): void => {
 			const s = controller.snapshot();
 			install.canPrompt = s.canPrompt;
 			install.installed = s.installed;
+			if (s.installed && !wasInstalled) void refreshPersistence();
+			wasInstalled = s.installed;
 		};
+
 		sync();
 		install.promptInstall = controller.promptInstall;
+		void refreshPersistence();
 		return controller.subscribe(sync);
 	});
 </script>

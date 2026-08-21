@@ -243,13 +243,19 @@
 	{#if install.installed}
 		<section class="settings-section" aria-labelledby="install-heading">
 			<h2 id="install-heading" class="settings-section__heading">Install</h2>
-			<p class="settings-hint">Ask 214 is installed on this device.</p>
+			{#if install.persisted}
+				<p class="settings-hint">
+					Ask 214 is installed, and its data is set to stay on this device.
+				</p>
+			{:else}
+				<p class="settings-hint">Ask 214 is installed on this device.</p>
+			{/if}
 		</section>
 	{:else}
 		<section class="settings-section" aria-labelledby="install-heading">
 			<h2 id="install-heading" class="settings-section__heading">Install Ask 214</h2>
 			<p class="settings-hint">
-				Install it so it opens like an app and your saved data stays put on this device.
+				Install it so it opens like an app and is less likely to have its data cleared.
 			</p>
 			{#if install.canPrompt || install.ios}
 				<InstallPrompt
@@ -258,7 +264,7 @@
 				/>
 			{:else}
 				<p class="settings-hint">
-					Open your browser's menu and choose "Install" or "Add to Home Screen".
+					If your browser supports it, open its menu and choose Install or Add to Home Screen.
 				</p>
 			{/if}
 		</section>

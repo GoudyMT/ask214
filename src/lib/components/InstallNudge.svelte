@@ -23,7 +23,7 @@
 		{canPrompt ? 'Install Ask 214' : 'Keep Ask 214 on your Home Screen'}
 	</h2>
 	<p class="install-nudge__body">
-		Add it to your device so it opens like an app and your saved data stays put on this device.
+		Add it to your device so it opens like an app and is less likely to have its data cleared.
 	</p>
 	<InstallPrompt {canPrompt} {onInstall} collapsibleSteps />
 </section>

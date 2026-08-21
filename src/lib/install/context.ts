@@ -14,6 +14,12 @@ export type InstallApp = {
 	installed: boolean;
 	/** iOS / iPadOS Safari, where install is manual - the surfaces show Add-to-Home-Screen steps. */
 	ios: boolean;
+	/**
+	 * A persist() grant is in effect. This is the SECOND durability leg: being installed exempts the
+	 * storage from the 7-day inactivity timer, but only a granted persist() exempts it from
+	 * storage-pressure eviction - so "installed" alone is not "safe". WebKit grants by heuristic.
+	 */
+	persisted: boolean;
 	promptInstall: () => Promise<InstallOutcome>;
 };
 
