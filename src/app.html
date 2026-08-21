@@ -22,6 +22,22 @@
 				} catch (e) {}
 			})();
 		</script>
+		<!-- Capture the PWA install prompt as early as possible: beforeinstallprompt can fire during
+		     load (a returning visit with an already-active service worker) before the app hydrates, and
+		     the browser fires it only once - stashing it here lets the install controller find it on init
+		     instead of losing the race. Hash-pinned in the CSP script-src; recompute if the bytes change. -->
+		<script>
+			(function () {
+				window.__installPrompt = null;
+				window.addEventListener('beforeinstallprompt', function (e) {
+					e.preventDefault();
+					window.__installPrompt = e;
+				});
+				window.addEventListener('appinstalled', function () {
+					window.__installPrompt = null;
+				});
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

@@ -29,7 +29,11 @@
 	import { safeLog } from '$lib/log/safelog';
 	import { requestPersistentStorage } from '$lib/storage/persistence';
 	import { setInstallApp, type InstallApp } from '$lib/install/context';
-	import { createInstallController } from '$lib/install/install-prompt';
+	import {
+		createInstallController,
+		readCapturedPrompt,
+		type InstallController
+	} from '$lib/install/install-prompt';
 	import { isInstalled, isIOS } from '$lib/install/install-state';
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
@@ -204,28 +208,37 @@
 	// when the user newly installs - the moment WebKit is most likely to grant it.
 	onMount(() => {
 		install.ios = isIOS();
-		const controller = createInstallController({ target: window, isInstalled });
 
 		const refreshPersistence = async (): Promise<void> => {
 			const outcome = await requestPersistentStorage();
 			install.persisted = outcome === 'granted' || outcome === 'already';
 		};
 
-		// Seed from the current state so the initial sync is not treated as a transition; the
-		// unconditional refreshPersistence() below covers the load-time request.
-		let wasInstalled = controller.snapshot().installed;
+		let controller: InstallController;
+		let wasInstalled = false;
 		const sync = (): void => {
 			const s = controller.snapshot();
 			install.canPrompt = s.canPrompt;
 			install.installed = s.installed;
+			// Re-check persistence on the install transition (not every sync): a fresh install is the
+			// moment persist() flips from likely-denied to likely-granted.
 			if (s.installed && !wasInstalled) void refreshPersistence();
 			wasInstalled = s.installed;
 		};
 
+		controller = createInstallController({
+			target: window,
+			isInstalled,
+			initialPrompt: readCapturedPrompt,
+			onChange: sync
+		});
+		// Seed from the current state so the initial sync is not treated as a transition; the
+		// unconditional refreshPersistence() below covers the load-time request.
+		wasInstalled = controller.snapshot().installed;
 		sync();
 		install.promptInstall = controller.promptInstall;
 		void refreshPersistence();
-		return controller.subscribe(sync);
+		return controller.destroy;
 	});
 </script>
 

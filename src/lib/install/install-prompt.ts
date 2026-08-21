@@ -4,67 +4,93 @@
  * and stashed so a later user gesture can trigger the real prompt; iOS never fires it (install is
  * manual there), so `canPrompt` stays false and the UI falls back to instructions.
  *
- * Pure and dependency-injected: the event target and the installed check are injected, so every
- * path is unit-testable without a browser. The Svelte reactivity is a thin `subscribe` wrapper the
- * composition root wires into a reactive store.
+ * The event can fire during page load - before the app hydrates - and only once, so an app.html
+ * inline script captures it onto window.__installPrompt; this controller reads that on init (via
+ * initialPrompt) AND listens for later firings, so a returning user never loses the race. Pure and
+ * dependency-injected so every path is unit-testable without a browser; onChange notifies the
+ * composition root to re-read snapshot() into its reactive store.
  */
 
 export type InstallOutcome = 'accepted' | 'dismissed' | 'unavailable';
 
-type BeforeInstallPromptEvent = Event & {
+export type BeforeInstallPromptEvent = Event & {
 	prompt: () => Promise<void>;
 	userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
+declare global {
+	interface Window {
+		__installPrompt?: BeforeInstallPromptEvent | null;
+	}
+}
+
+/** Reads the install event the app.html early script may have captured before hydration. */
+export function readCapturedPrompt(): BeforeInstallPromptEvent | null {
+	return window.__installPrompt ?? null;
+}
+
+export type InstallEventTarget = {
+	addEventListener: (type: string, cb: (e: Event) => void) => void;
+	removeEventListener: (type: string, cb: (e: Event) => void) => void;
+};
+
 export type InstallControllerDeps = {
-	target: { addEventListener: (type: string, cb: (e: Event) => void) => void };
+	target: InstallEventTarget;
 	isInstalled: () => boolean;
+	/** An install event captured before this controller existed (the app.html early script). */
+	initialPrompt?: () => BeforeInstallPromptEvent | null;
+	/** Called whenever canPrompt / installed changes, so the caller can re-read snapshot(). */
+	onChange: () => void;
 };
 
 export type InstallSnapshot = { canPrompt: boolean; installed: boolean };
 
 export type InstallController = {
 	snapshot: () => InstallSnapshot;
-	subscribe: (cb: () => void) => () => void;
 	promptInstall: () => Promise<InstallOutcome>;
+	destroy: () => void;
 };
 
 export function createInstallController(deps: InstallControllerDeps): InstallController {
-	let deferred: BeforeInstallPromptEvent | null = null;
+	let deferred = deps.initialPrompt?.() ?? null;
 	let installed = deps.isInstalled();
-	const listeners = new Set<() => void>();
-	const notify = (): void => {
-		for (const l of listeners) l();
-	};
 
-	deps.target.addEventListener('beforeinstallprompt', (e) => {
+	const onBeforeInstallPrompt = (e: Event): void => {
 		// Suppress the browser's own mini-infobar and keep the event for our own gesture-driven prompt.
 		e.preventDefault();
 		deferred = e as BeforeInstallPromptEvent;
-		notify();
-	});
-	deps.target.addEventListener('appinstalled', () => {
+		deps.onChange();
+	};
+	const onAppInstalled = (): void => {
 		deferred = null;
 		installed = true;
-		notify();
-	});
+		deps.onChange();
+	};
+	deps.target.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+	deps.target.addEventListener('appinstalled', onAppInstalled);
 
 	return {
 		snapshot: () => ({ canPrompt: deferred !== null, installed }),
-		subscribe(cb) {
-			listeners.add(cb);
-			return () => listeners.delete(cb);
-		},
 		async promptInstall() {
 			const e = deferred;
 			if (!e) return 'unavailable';
 			// A beforeinstallprompt event can be used once; clear it up front so the button cannot
 			// double-fire while the choice is pending.
 			deferred = null;
-			notify();
-			await e.prompt();
-			const { outcome } = await e.userChoice;
-			return outcome;
+			deps.onChange();
+			try {
+				await e.prompt();
+				const { outcome } = await e.userChoice;
+				return outcome;
+			} catch {
+				// A rejected prompt() (invoked outside a gesture, or already consumed) degrades quietly
+				// rather than surfacing an unhandled rejection at the fire-and-forget call site.
+				return 'unavailable';
+			}
+		},
+		destroy() {
+			deps.target.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+			deps.target.removeEventListener('appinstalled', onAppInstalled);
 		}
 	};
 }
