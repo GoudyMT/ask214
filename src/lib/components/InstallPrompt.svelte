@@ -14,18 +14,27 @@
 	} = $props();
 
 	// Whether the user has opened the iOS steps in the Home card. Settings passes collapsibleSteps
-	// false so the steps show directly; the Home card hides them behind a "Show me how" toggle.
+	// false so the steps show directly; the Home card hides them behind a "Show me how" disclosure.
 	let expanded = $state(false);
-	const showSteps = $derived(!collapsibleSteps || expanded);
 </script>
 
 {#if canPrompt}
 	<button class="install-action" type="button" onclick={onInstall}>Install</button>
-{:else if !showSteps}
-	<button class="install-action" type="button" onclick={() => (expanded = true)}>Show me how</button
-	>
 {:else}
-	<ol class="install-steps">
+	{#if collapsibleSteps}
+		<!-- A real disclosure: the trigger persists (focus is never dropped), announces its state via
+		     aria-expanded, and controls the steps by id - which stay in the DOM, hidden until opened. -->
+		<button
+			class="install-action"
+			type="button"
+			aria-expanded={expanded}
+			aria-controls="install-steps"
+			onclick={() => (expanded = !expanded)}
+		>
+			Show me how
+		</button>
+	{/if}
+	<ol id="install-steps" class="install-steps" hidden={collapsibleSteps && !expanded}>
 		<li>Tap the Share button in your browser toolbar.</li>
 		<li>Choose "Add to Home Screen".</li>
 		<li>Open Ask 214 from your Home Screen.</li>
@@ -50,7 +59,7 @@
 	}
 
 	.install-steps {
-		margin: 0;
+		margin: var(--space-s) 0 0;
 		padding-left: var(--space-l);
 		color: var(--color-fg);
 		font-size: var(--font-size-s);

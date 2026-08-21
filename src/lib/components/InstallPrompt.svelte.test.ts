@@ -14,26 +14,33 @@ describe('InstallPrompt', () => {
 		expect(onInstall).toHaveBeenCalledTimes(1);
 	});
 
-	it('shows the Add-to-Home-Screen steps directly when it cannot prompt (iOS)', () => {
+	it('shows the Add-to-Home-Screen steps directly when it cannot prompt (iOS / Settings)', () => {
 		const { container } = render(InstallPrompt, {
 			props: { canPrompt: false, onInstall: () => {} }
 		});
-		const steps = container.querySelectorAll('.install-steps li');
-		expect(steps.length).toBe(3);
+		const steps = container.querySelector<HTMLOListElement>('.install-steps');
+		expect(steps?.querySelectorAll('li').length).toBe(3);
+		expect(steps?.hidden).toBe(false);
 		expect(container.textContent).toContain('Add to Home Screen');
 		expect(container.querySelector('.install-action')).toBeNull();
 	});
 
-	it('collapses the steps behind "Show me how" when collapsibleSteps is set (the Home card)', () => {
+	it('collapses the steps behind an accessible "Show me how" disclosure (the Home card)', () => {
 		const { container } = render(InstallPrompt, {
 			props: { canPrompt: false, onInstall: () => {}, collapsibleSteps: true }
 		});
 		const toggle = container.querySelector<HTMLButtonElement>('.install-action');
 		expect(toggle?.textContent?.trim()).toBe('Show me how');
-		expect(container.querySelector('.install-steps')).toBeNull();
+		// A proper disclosure: the trigger persists (focus is never dropped), announces its state, and
+		// controls the steps by id; the steps stay in the DOM but hidden until opened.
+		expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+		expect(toggle?.getAttribute('aria-controls')).toBe('install-steps');
+		expect(container.querySelector<HTMLOListElement>('.install-steps')?.id).toBe('install-steps');
+		expect(container.querySelector<HTMLOListElement>('.install-steps')?.hidden).toBe(true);
 
 		toggle?.click();
 		flushSync();
-		expect(container.querySelectorAll('.install-steps li').length).toBe(3);
+		expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+		expect(container.querySelector<HTMLOListElement>('.install-steps')?.hidden).toBe(false);
 	});
 });
