@@ -28,6 +28,9 @@
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { requestPersistentStorage } from '$lib/storage/persistence';
+	import { setInstallApp, type InstallApp } from '$lib/install/context';
+	import { createInstallController } from '$lib/install/install-prompt';
+	import { isInstalled, isIOS } from '$lib/install/install-state';
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 
@@ -55,6 +58,16 @@
 		relockAll: null
 	});
 	setProfileApp(app);
+
+	// Device-level install state (non-PII): populated in onMount since the detection and the
+	// beforeinstallprompt capture are browser-only. The Home nudge and Settings install control read it.
+	const install = $state<InstallApp>({
+		canPrompt: false,
+		installed: false,
+		ios: false,
+		promptInstall: () => Promise.resolve('unavailable')
+	});
+	setInstallApp(install);
 
 	// Settings acts only on stored data (the date, calendar, lock, erase). Hide the tab on a fresh
 	// no-date profile so it appears only once there is something to configure; a locked profile has
@@ -189,6 +202,22 @@
 	// Best-effort and fire-and-forget - requestPersistentStorage never throws. Client-only.
 	onMount(() => {
 		void requestPersistentStorage();
+	});
+
+	// Wire the install controller: capture beforeinstallprompt so a later user gesture can install,
+	// detect iOS + installed state, and mirror them into the reactive context the nudge + Settings
+	// control read. Client-only (all browser APIs).
+	onMount(() => {
+		install.ios = isIOS();
+		const controller = createInstallController({ target: window, isInstalled });
+		const sync = (): void => {
+			const s = controller.snapshot();
+			install.canPrompt = s.canPrompt;
+			install.installed = s.installed;
+		};
+		sync();
+		install.promptInstall = controller.promptInstall;
+		return controller.subscribe(sync);
 	});
 </script>
 

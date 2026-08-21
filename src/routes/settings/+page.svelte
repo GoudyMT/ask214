@@ -1,8 +1,10 @@
 <script lang="ts">
 	import EaosInput from '$lib/components/EaosInput.svelte';
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
+	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
+	import { getInstallApp } from '$lib/install/context';
 	import { eraseEverything } from '$lib/profile/erase';
 	import { OccConflictError } from '$lib/profile/store.svelte';
 	import {
@@ -23,6 +25,7 @@
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
 
 	const app = getProfileApp();
+	const install = getInstallApp();
 
 	// Online-answers settings: non-PII device prefs + whether a BYO key is stored (presence only).
 	let defaultMode = $state<'device' | 'online'>(getDefaultMode());
@@ -235,6 +238,31 @@
 			<ThemeControl />
 		</div>
 	</section>
+	<!-- Install control: non-PII + device-level, so it sits above the lock gate like Appearance.
+	     Permanent (no dismiss) - a user who dismissed the Home nudge can still install from here. -->
+	{#if install.installed}
+		<section class="settings-section" aria-labelledby="install-heading">
+			<h2 id="install-heading" class="settings-section__heading">Install</h2>
+			<p class="settings-hint">Ask 214 is installed on this device.</p>
+		</section>
+	{:else}
+		<section class="settings-section" aria-labelledby="install-heading">
+			<h2 id="install-heading" class="settings-section__heading">Install Ask 214</h2>
+			<p class="settings-hint">
+				Install it so it opens like an app and your saved data stays put on this device.
+			</p>
+			{#if install.canPrompt || install.ios}
+				<InstallPrompt
+					canPrompt={install.canPrompt}
+					onInstall={() => void install.promptInstall()}
+				/>
+			{:else}
+				<p class="settings-hint">
+					Open your browser's menu and choose "Install" or "Add to Home Screen".
+				</p>
+			{/if}
+		</section>
+	{/if}
 	{#if app.store?.locked}
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else}
