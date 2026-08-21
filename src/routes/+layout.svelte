@@ -27,6 +27,7 @@
 	import { wipeAllStores } from '$lib/db/wipe';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
+	import { requestPersistentStorage } from '$lib/storage/persistence';
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 
@@ -180,6 +181,14 @@
 		syncThemeColor(readChoice());
 		window.addEventListener('storage', applyStorageChange);
 		return () => window.removeEventListener('storage', applyStorageChange);
+	});
+
+	// Request durable storage so the browser keeps this origin's IndexedDB out of the eviction path:
+	// the AES-GCM data key lives non-extractable inside that same database, so an eviction is
+	// unrecoverable loss, and WebKit grants persistence to installed (Home Screen) web apps.
+	// Best-effort and fire-and-forget - requestPersistentStorage never throws. Client-only.
+	onMount(() => {
+		void requestPersistentStorage();
 	});
 </script>
 
