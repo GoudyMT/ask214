@@ -26,9 +26,23 @@ describe('createAskStore', () => {
 	it('starts idle', () => {
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		expect(store.state.kind).toBe('idle');
+	});
+
+	it('does not load the corpus until a device query runs (lazy)', async () => {
+		localStorage.setItem('mtc:ask:model-downloaded', '1'); // set-up device: the query runs, not needsSetup
+		let corpusLoads = 0;
+		const getCorpus = async () => {
+			corpusLoads++;
+			return fixtureCorpus();
+		};
+		const store = createAskStore({ embed: async () => new Float32Array([1, 0, 0]), getCorpus });
+		expect(corpusLoads).toBe(0); // construction does not fetch the corpus
+		await store.ask('how do I file a claim');
+		expect(store.state.kind).toBe('results');
+		expect(corpusLoads).toBe(1); // fetched lazily, by the query that needed it
 	});
 
 	it('shows needsSetup with the query preserved on the first query (no auto-download)', async () => {
@@ -37,7 +51,7 @@ describe('createAskStore', () => {
 			embedCalls++;
 			return new Float32Array([1, 0, 0]);
 		};
-		const store = createAskStore({ embed, corpus: fixtureCorpus() });
+		const store = createAskStore({ embed, getCorpus: async () => fixtureCorpus() });
 		await store.ask('how do I file a claim');
 		expect(store.state.kind).toBe('needsSetup');
 		if (store.state.kind === 'needsSetup') {
@@ -49,7 +63,7 @@ describe('createAskStore', () => {
 	it('setUp() shows modelLoading, answers the preserved query, and persists the flag', async () => {
 		let release: (v: Float32Array) => void = () => {};
 		const embed = () => new Promise<Float32Array>((r) => (release = r));
-		const store = createAskStore({ embed, corpus: fixtureCorpus() });
+		const store = createAskStore({ embed, getCorpus: async () => fixtureCorpus() });
 		await store.ask('q'); // -> needsSetup
 		const p = store.setUp();
 		expect(store.state.kind).toBe('modelLoading'); // the one-time download is in progress
@@ -62,7 +76,7 @@ describe('createAskStore', () => {
 	it('dismissSetup() returns to idle', async () => {
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		await store.ask('q'); // -> needsSetup
 		store.dismissSetup();
@@ -73,7 +87,7 @@ describe('createAskStore', () => {
 		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1'); // set up in a prior session
 		let release: (v: Float32Array) => void = () => {};
 		const embed = () => new Promise<Float32Array>((r) => (release = r));
-		const store = createAskStore({ embed, corpus: fixtureCorpus() });
+		const store = createAskStore({ embed, getCorpus: async () => fixtureCorpus() });
 		void store.ask('q'); // sets state synchronously before embed resolves
 		expect(store.state.kind).toBe('embedding'); // no needsSetup, no modelLoading
 		release(new Float32Array([1, 0, 0]));
@@ -85,7 +99,7 @@ describe('createAskStore', () => {
 			embed: async () => {
 				throw new AskError(ASK_ERROR.EMBED);
 			},
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('error');
@@ -100,7 +114,7 @@ describe('createAskStore', () => {
 				embed: async () => {
 					throw new AskError(ASK_ERROR.EMBED);
 				},
-				corpus: fixtureCorpus()
+				getCorpus: async () => fixtureCorpus()
 			});
 			await store.ask('q'); // -> needsSetup (not set up)
 			await store.setUp(); // the first-run embed fails with no network
@@ -117,7 +131,7 @@ describe('createAskStore', () => {
 			embed: async () => {
 				throw new AskError(ASK_ERROR.EMBED);
 			},
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		await store.ask('q'); // -> needsSetup (not set up)
 		await store.setUp(); // first-run embed fails while online -> error
@@ -130,7 +144,7 @@ describe('createAskStore', () => {
 		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
 		const store = createAskStore({
 			embed: async () => new Float32Array([0, 0, 1]),
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('empty');
@@ -146,7 +160,7 @@ describe('createAskStore', () => {
 				calls++;
 				return new Promise<Float32Array>(() => {}); // stays pending: the query is in flight
 			},
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		void store.ask('first'); // -> embedding, embed #1 in flight
 		expect(store.state.kind).toBe('embedding');
@@ -162,7 +176,7 @@ describe('createAskStore', () => {
 				embedCalls++;
 				return new Float32Array([1, 0, 0]);
 			},
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		await store.ask('I want to kill myself');
 		expect(store.state.kind).toBe('crisis');
@@ -173,7 +187,7 @@ describe('createAskStore', () => {
 		// A normal first query goes to needsSetup; a crisis message must skip that and route straight to help.
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		await store.ask("I don't want to be here anymore after I get out");
 		expect(store.state.kind).toBe('crisis');
@@ -189,7 +203,7 @@ describe('createAskStore', () => {
 		let consented = true;
 		const base: StoreDeps = {
 			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus(),
+			getCorpus: async () => fixtureCorpus(),
 			retrieveOnline: async () => ({
 				status: 'results',
 				corpusVersion: '1.0',
@@ -213,10 +227,23 @@ describe('createAskStore', () => {
 		return createAskStore({ ...base, ...over });
 	}
 
+	it('online mode answers without ever loading the corpus', async () => {
+		let corpusLoads = 0;
+		const store = onlineStore({
+			getCorpus: async () => {
+				corpusLoads++;
+				return fixtureCorpus();
+			}
+		});
+		await store.ask('how do I file a claim'); // online is the default + already consented here
+		expect(store.state.kind).toBe('results');
+		expect(corpusLoads).toBe(0); // online retrieval is server-side; the corpus stays unfetched
+	});
+
 	it('defaults to device mode and shows no nudge when no online deps are given', () => {
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		expect(store.mode).toBe('device');
 		expect(store.showNudge).toBe(false);
@@ -226,7 +253,7 @@ describe('createAskStore', () => {
 		let consented = false;
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus(),
+			getCorpus: async () => fixtureCorpus(),
 			retrieveOnline: async () => ({
 				status: 'results',
 				corpusVersion: '1.0',
@@ -308,7 +335,7 @@ describe('createAskStore', () => {
 		let sent = 0;
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus(),
+			getCorpus: async () => fixtureCorpus(),
 			retrieveOnline: async () => {
 				sent++;
 				return {
@@ -391,7 +418,7 @@ describe('createAskStore', () => {
 		let release: (v: Float32Array) => void = () => {};
 		const store = createAskStore({
 			embed: () => new Promise<Float32Array>((r) => (release = r)),
-			corpus: fixtureCorpus()
+			getCorpus: async () => fixtureCorpus()
 		});
 		const p = store.ask('benign'); // -> embedding, suspended on embed
 		expect(store.state.kind).toBe('embedding');
@@ -540,7 +567,7 @@ describe('createAskStore', () => {
 		let sent = 0;
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
-			corpus: fixtureCorpus(),
+			getCorpus: async () => fixtureCorpus(),
 			retrieveOnline: async () => {
 				sent++;
 				return { status: 'empty', corpusVersion: '1.0' };

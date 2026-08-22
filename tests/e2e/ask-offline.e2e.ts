@@ -27,7 +27,10 @@ test('ask answers fully offline after a warm load @slow', async ({ page, context
 	await page.reload();
 
 	const input = page.getByLabel('Ask a question');
-	await expect(input).toBeEnabled({ timeout: 30_000 }); // the store is ready once the corpus loads
+	await expect(input).toBeEnabled({ timeout: 30_000 }); // usable at once; the corpus loads lazily on the query
+
+	// Online is the on-ramp default; this test exercises the on-device offline path, so select it first.
+	await page.getByRole('button', { name: /^on device$/i }).click();
 
 	// --- Warm: opt in so the real model downloads through the SW and is cached (model + wasm + corpus) ---
 	await input.fill('what is SkillBridge and how long does it last?');
@@ -40,7 +43,9 @@ test('ask answers fully offline after a warm load @slow', async ({ page, context
 	// --- Go offline and RELOAD: the app must re-initialize entirely from the SW cache ---
 	await context.setOffline(true);
 	await page.reload();
-	await expect(input).toBeEnabled({ timeout: 30_000 }); // corpus served from cache, no network
+	await expect(input).toBeEnabled({ timeout: 30_000 }); // usable at once, offline; corpus from SW cache on the query
+	// The reload recreates the store at the online default; select device again for the offline query.
+	await page.getByRole('button', { name: /^on device$/i }).click();
 
 	// Confirm the SW (not Playwright's / the browser's HTTP cache) served this offline reload - a genuine
 	// service-worker-cache offline proof, not an incidental cache hit.

@@ -1,4 +1,4 @@
-/** Public surface of the Ask cycle (C). Consumed by the /ask route (and the v1.1 server path later). */
+/** Public surface of the Ask cycle (C). Consumed by the home route's Ask (and the v1.1 server path later). */
 export { createAskStore } from './store.svelte';
 export { createEmbedder } from './embedder';
 export { loadCorpus } from './corpus-load';

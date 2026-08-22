@@ -33,8 +33,9 @@ function markModelDownloaded(): void {
 }
 
 /**
- * The Ask view store: holds the `AskState` machine and orchestrates one query. `embed` + `corpus` are
- * injected so the device path is unit-testable without a model/worker.
+ * The Ask view store: holds the `AskState` machine and orchestrates one query. `embed` + `getCorpus` are
+ * injected so the device path is unit-testable without a model/worker; `getCorpus` is lazy so the corpus
+ * is fetched on the first device query, never at construction (keeping it off the initial page load).
  *
  * ADDITIVE online seam: when `retrieveOnline` is absent the store is device-only and behaves exactly as
  * before (soft opt-in on-device retrieval). When present, it defaults to online but holds the FIRST egress
@@ -48,7 +49,7 @@ function markModelDownloaded(): void {
  */
 export function createAskStore(deps: {
 	embed: (text: string) => Promise<Float32Array>;
-	corpus: Corpus;
+	getCorpus: () => Promise<Corpus>;
 	retrieveOnline?: (query: string) => Promise<RetrieveResult>;
 	synthesize?: (query: string, chunks: RetrievedChunk[]) => Promise<SynthesisResult>;
 	onlineConsented?: () => boolean;
@@ -74,10 +75,13 @@ export function createAskStore(deps: {
 	async function runQuery(query: string): Promise<void> {
 		state = modelLoaded ? { kind: 'embedding' } : { kind: 'modelLoading' };
 		try {
-			const vector = await deps.embed(query);
+			// Load the model (embed) and the corpus in parallel. The corpus is fetched lazily here - only a
+			// device query needs it - so it stays off the initial page load, where a 3.5MB eager fetch would
+			// otherwise pin LCP/TTI to its download time.
+			const [vector, corpus] = await Promise.all([deps.embed(query), deps.getCorpus()]);
 			modelLoaded = true;
 			markModelDownloaded();
-			const cards = toResultCards(filterByMinScore(search(vector, deps.corpus, K), MIN_SCORE));
+			const cards = toResultCards(filterByMinScore(search(vector, corpus, K), MIN_SCORE));
 			commitIfCurrent(cards.length > 0 ? { kind: 'results', cards } : { kind: 'empty' });
 		} catch (e) {
 			const code = e instanceof AskError ? e.code : ASK_ERROR.EMBED;

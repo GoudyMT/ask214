@@ -65,6 +65,39 @@ describe('SourceReader', () => {
 		expect(container.querySelector('.reader__title')).toBeNull();
 	});
 
+	it('opens in a loading state while the source is being fetched (no silent dead button)', () => {
+		const { container } = render(SourceReader, {
+			props: { source: null, loading: true, onClose: () => {} }
+		});
+		flushSync();
+		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
+		expect(dialog.open).toBe(true); // the reader opens immediately, giving the click feedback
+		expect(container.querySelector('.reader__status')?.textContent).toMatch(/loading/i);
+		expect(container.querySelector('.reader__passage')).toBeNull(); // no content yet
+	});
+
+	it('opens in an error state when the source cannot be loaded', () => {
+		const { container } = render(SourceReader, {
+			props: { source: null, error: true, onClose: () => {} }
+		});
+		flushSync();
+		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
+		expect(dialog.open).toBe(true);
+		expect(container.querySelector('.reader__status')?.textContent).toMatch(
+			/could ?n.?t|try again/i
+		);
+	});
+
+	it('error: moves focus to the alert message so a screen reader hears the failure', () => {
+		const { container } = render(SourceReader, {
+			props: { source: null, error: true, onClose: () => {} }
+		});
+		flushSync();
+		const status = container.querySelector('.reader__status') as HTMLElement;
+		expect(status?.getAttribute('role')).toBe('alert');
+		expect(document.activeElement).toBe(status); // focus lands on the alert, matching the success path
+	});
+
 	it('marks the block whose id matches highlightId as the cited passage', () => {
 		const { container } = render(SourceReader, {
 			props: { source: source(), highlightId: 's2', onClose: () => {} }

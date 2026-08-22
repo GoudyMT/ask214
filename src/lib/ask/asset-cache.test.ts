@@ -2,19 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { classifyAsset, ASK_ASSET_CACHE, shouldKeepCache, isApiRequest } from './asset-cache';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
-// model + ORT WASM (~45MB) are LAZY (cached on first use, never eagerly precached at install); the app
-// shell + the tiny corpus are PRECACHE (eager, so the app works offline immediately).
+// model + ORT WASM (~45MB) and the ~3.5MB corpus are LAZY (cached on first use, never eagerly precached at
+// install); the app shell + icons are PRECACHE (eager, so the shell works offline immediately).
 describe('classifyAsset', () => {
-	it('marks the heavy model + ORT WASM as lazy (kept out of the install precache)', () => {
+	it('marks the heavy model, ORT WASM, and the corpus as lazy (kept out of the install precache)', () => {
 		expect(classifyAsset('/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx')).toBe('lazy');
 		expect(classifyAsset('/models/Xenova/all-MiniLM-L6-v2/config.json')).toBe('lazy');
 		expect(classifyAsset('/wasm/ort-wasm-simd-threaded.wasm')).toBe('lazy');
+		// The ~3.5MB corpus is lazy too: fetched on demand (a device query or a "Read more" click) and cached
+		// then, so it never crosses the wire on a passive page load (including the SW install).
+		expect(classifyAsset('/corpus/corpus-v1.0.json')).toBe('lazy');
+		expect(classifyAsset('/corpus/corpus-v1.0.embeddings.bin')).toBe('lazy');
 	});
 
-	it('marks the app shell + tiny corpus + icons as precache', () => {
+	it('marks the app shell + icons as precache', () => {
 		expect(classifyAsset('/_app/immutable/entry/start.js')).toBe('precache');
-		expect(classifyAsset('/corpus/corpus-v1.0.json')).toBe('precache');
-		expect(classifyAsset('/corpus/corpus-v1.0.embeddings.bin')).toBe('precache');
 		expect(classifyAsset('/favicon.png')).toBe('precache');
 	});
 });

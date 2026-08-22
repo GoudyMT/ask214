@@ -2,16 +2,22 @@ export type CacheStrategy = 'precache' | 'lazy';
 
 /**
  * Decide how the service worker caches a same-origin static asset. The heavy on-device search model +
- * ORT WASM (~45MB total: model + asyncify WASM) are cached LAZILY - fetched + cached on first use (first /ask), never eagerly
- * precached at install - so SW install stays light + robust (a flaky connection can't fail the whole
- * install on the ~45MB) and the model downloads only when the user opts into Ask.
- * Everything else (the app shell + the tiny corpus) is precached so the app works offline immediately.
+ * ORT WASM (~45MB total: model + asyncify WASM) AND the ~3.5MB corpus are cached LAZILY - fetched + cached
+ * on first use (a device query or a "Read more" click), never eagerly precached at install. That keeps SW
+ * install light + robust (a flaky connection can't fail the whole install on a multi-megabyte asset), keeps
+ * the corpus off every passive page load (so it never blocks LCP/TTI), and spares online-only users the
+ * corpus download. Everything else (the app shell + icons) is precached so the shell works offline at once.
  *
  * The lazy prefixes mirror the worker's self-host config: `localModelPath = '/models/'` and
- * `wasmPaths = '/wasm/'` (see embed-worker.ts).
+ * `wasmPaths = '/wasm/'` (see embed-worker.ts); `/corpus/` is the versioned corpus artifact.
  */
 export function classifyAsset(pathname: string): CacheStrategy {
-	if (pathname.startsWith('/models/') || pathname.startsWith('/wasm/')) return 'lazy';
+	if (
+		pathname.startsWith('/models/') ||
+		pathname.startsWith('/wasm/') ||
+		pathname.startsWith('/corpus/')
+	)
+		return 'lazy';
 	return 'precache';
 }
 
