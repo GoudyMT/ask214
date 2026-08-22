@@ -3,8 +3,10 @@
 	import { resolve } from '$app/paths';
 	import AskView from '$lib/components/AskView.svelte';
 	import EmbedWorker from '$lib/ask/embed-worker?worker';
-	import { createAskStore, createEmbedder, loadCorpus, ASK_ERROR, type AskState } from '$lib/ask';
+	import { createAskStore, createEmbedder, loadCorpus, type AskState } from '$lib/ask';
+	import { ACCEPTED_CORPUS_VERSION } from '$lib/corpus';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
+	import { createLazyCorpus } from '$lib/ask/corpus-loader';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
@@ -27,16 +29,29 @@
 		app.status === 'ready' && !app.store?.locked && app.store?.persona.completeness === 'none'
 	);
 
-	// Ask store wiring (moved from the old /ask route): the store needs the in-memory corpus, so it is
-	// created after the corpus (a small same-origin static asset) loads. The ~23MB model is NOT fetched
-	// here - it downloads only when the user opts in (store.setUp), via AskView's setup prompt.
+	// Ask store wiring: the store is created immediately (no corpus wait), so the input, mode toggle, and
+	// feed are live at once. The corpus is fetched lazily - only a device query or a "Read more" click needs
+	// it - so the ~3.5MB artifact stays off the initial page load (an eager fetch pins LCP/TTI to its
+	// download). The ~23MB model + its worker are also lazy (created on the first embed, in onMount).
 	let store = $state<ReturnType<typeof createAskStore> | null>(null);
 	let sources = $state<Map<string, Source>>(new Map());
-	let initError = $state(false);
 
-	const askState: AskState = $derived(
-		initError ? { kind: 'error', code: ASK_ERROR.CORPUS } : (store?.state ?? { kind: 'idle' })
+	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
+	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
+	const getCorpus = createLazyCorpus(
+		() => loadCorpus(fetch, CORPUS_BASE),
+		(c) => {
+			sources = sourcesFromCorpus(c);
+		}
 	);
+	// Resolve one source for the offline reader, loading the corpus on demand. Awaited by AskView's "Read
+	// more" (which shows a loading state meanwhile), so the corpus is not fetched until a user reads a source.
+	async function loadSource(sourceId: string): Promise<Source | null> {
+		await getCorpus();
+		return sources.get(sourceId) ?? null;
+	}
+
+	const askState: AskState = $derived(store?.state ?? { kind: 'idle' });
 	const ready = $derived(store !== null);
 	// The below-hero band is idle-state content; once a query runs (any non-idle state), the results own
 	// the space and the band steps aside.
@@ -57,37 +72,38 @@
 	}
 
 	onMount(() => {
+		// The ~23MB model + its embed worker are created lazily, on the first query that needs them - never
+		// on page load (the corpus is likewise lazy, via getCorpus above).
 		let worker: Worker | undefined;
-		void (async () => {
-			try {
-				const corpus = await loadCorpus(fetch, CORPUS_BASE);
-				sources = sourcesFromCorpus(corpus);
-				worker = new EmbedWorker();
-				store = createAskStore({
-					embed: createEmbedder(worker),
-					corpus,
-					// Route-bound closures keep fetch, the corpus version, and the raw BYO key out of the store.
-					retrieveOnline: (query) =>
-						retrieveOnline(query, { fetch, expectedCorpusVersion: corpus.version }),
-					synthesize: async (query, chunks) => {
-						try {
-							const apiKey = (await app.byok?.readApiKey()) ?? null;
-							if (apiKey === null) return { kind: 'degraded' }; // no key -> raw cards, no summary
-							return await synthesize(query, chunks, { fetch, apiKey });
-						} catch {
-							return { kind: 'degraded' }; // a locked keystore or read failure degrades gracefully
-						}
-					},
-					onlineConsented: isOnlineConsented,
-					markOnlineConsent: () => setOnlineConsented(true),
-					synthesisEnabled: isSynthesisEnabled
-				});
-				// The store opens online when capable (the on-ramp default); honor an explicit device choice.
-				if (getDefaultMode() === 'device') store.setMode('device');
-			} catch {
-				initError = true;
-			}
-		})();
+		let embedder: ((text: string) => Promise<Float32Array>) | undefined;
+		const embed = (text: string): Promise<Float32Array> => {
+			worker ??= new EmbedWorker();
+			embedder ??= createEmbedder(worker);
+			return embedder(text);
+		};
+		store = createAskStore({
+			embed,
+			getCorpus,
+			// Route-bound closures keep fetch and the raw BYO key out of the store. A decoded corpus always
+			// carries ACCEPTED_CORPUS_VERSION (the codec rejects any other), so the online handshake uses the
+			// constant, not the loaded object - which lets online mode skip the corpus load entirely.
+			retrieveOnline: (query) =>
+				retrieveOnline(query, { fetch, expectedCorpusVersion: ACCEPTED_CORPUS_VERSION }),
+			synthesize: async (query, chunks) => {
+				try {
+					const apiKey = (await app.byok?.readApiKey()) ?? null;
+					if (apiKey === null) return { kind: 'degraded' }; // no key -> raw cards, no summary
+					return await synthesize(query, chunks, { fetch, apiKey });
+				} catch {
+					return { kind: 'degraded' }; // a locked keystore or read failure degrades gracefully
+				}
+			},
+			onlineConsented: isOnlineConsented,
+			markOnlineConsent: () => setOnlineConsented(true),
+			synthesisEnabled: isSynthesisEnabled
+		});
+		// The store opens online when capable (the on-ramp default); honor an explicit device choice.
+		if (getDefaultMode() === 'device') store.setMode('device');
 		return () => worker?.terminate();
 	});
 </script>
@@ -106,7 +122,7 @@
 	<AskView
 		{askState}
 		{ready}
-		{sources}
+		{loadSource}
 		onlineCapable={true}
 		mode={store?.mode ?? getDefaultMode()}
 		showNudge={store?.showNudge ?? false}

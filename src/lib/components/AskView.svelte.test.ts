@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import AskView from './AskView.svelte';
 import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
@@ -14,7 +14,7 @@ type ViewProps = {
 	onAsk: (query: string) => void;
 	onSetUp: () => void;
 	onDismiss: () => void;
-	sources: Map<string, Source>;
+	loadSource: (sourceId: string) => Promise<Source | null>;
 	onlineCapable?: boolean;
 	mode?: 'device' | 'online';
 	onSetMode?: (m: 'device' | 'online') => void;
@@ -35,7 +35,7 @@ function props(state: AskState, over: Partial<ViewProps> = {}): ViewProps {
 		onAsk: noop,
 		onSetUp: noop,
 		onDismiss: noop,
-		sources: new Map(),
+		loadSource: async () => null,
 		...over
 	};
 }
@@ -102,6 +102,16 @@ describe('AskView', () => {
 		expect(asked).toBe('how do I file a claim');
 	});
 
+	it('not ready: the input stays usable but Search is gated until the corpus loads', () => {
+		const { container } = render(AskView, { props: props({ kind: 'idle' }, { ready: false }) });
+		const input = container.querySelector('.ask-input') as HTMLInputElement;
+		const search = container.querySelector('.ask-search') as HTMLButtonElement;
+		// Usable at once so the first interaction (focus/type) can kick off the deferred corpus load.
+		expect(input.disabled).toBe(false);
+		// Submission waits for the corpus - a disabled default button also blocks Enter-submit.
+		expect(search.disabled).toBe(true);
+	});
+
 	it('needsSetup: shows the consent card with the preserved query; buttons fire onSetUp / onDismiss', () => {
 		let setUp = 0;
 		let dismissed = 0;
@@ -165,58 +175,103 @@ describe('AskView', () => {
 		expect(container.querySelector('.ask-toggle')).toBeNull();
 	});
 
-	it('results: "Read full source" opens the offline reader with that source\'s held text', () => {
+	const heldSource = (): Source => ({
+		sourceId: 'va_intent',
+		title: 'VA - Intent to File',
+		url: 'https://www.va.gov/',
+		passages: [
+			{ id: 'h1', text: 'Held passage one.' },
+			{ id: 'h2', text: 'Held passage two.' }
+		]
+	});
+
+	it('results: "Read full source" loads the source on demand and opens the offline reader', async () => {
 		const lead = card({ sourceId: 'va_intent', sourceTitle: 'VA - Intent to File' });
-		const sources = new Map<string, Source>([
-			[
-				'va_intent',
-				{
-					sourceId: 'va_intent',
-					title: 'VA - Intent to File',
-					url: 'https://www.va.gov/',
-					passages: [
-						{ id: 'h1', text: 'Held passage one.' },
-						{ id: 'h2', text: 'Held passage two.' }
-					]
-				}
-			]
-		]);
+		const loadSource = vi.fn(async () => heldSource());
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', cards: [lead] }, { sources })
+			props: props({ kind: 'results', cards: [lead] }, { loadSource })
 		});
 		expect(container.querySelector('.reader__title')).toBeNull(); // reader closed initially
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
-		flushSync();
-		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
-		expect(dialog.open).toBe(true);
-		expect(container.querySelector('.reader__title')?.textContent).toBe('VA - Intent to File');
+		await vi.waitFor(() => {
+			expect(container.querySelector('.reader__title')?.textContent).toBe('VA - Intent to File');
+		});
+		expect(loadSource).toHaveBeenCalledWith('va_intent');
 		expect(container.querySelectorAll('.reader__passage').length).toBe(2);
 	});
 
-	it('results: "Read more" opens the reader highlighting the passage the card cited', () => {
+	it('results: "Read more" opens the reader highlighting the passage the card cited', async () => {
 		const lead = card({ sourceId: 'va_intent', chunkId: 'h2' });
-		const sources = new Map<string, Source>([
-			[
-				'va_intent',
-				{
-					sourceId: 'va_intent',
-					title: 'VA - Intent to File',
-					url: 'https://www.va.gov/',
-					passages: [
-						{ id: 'h1', text: 'Held passage one.' },
-						{ id: 'h2', text: 'Held passage two.' }
-					]
-				}
-			]
-		]);
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', cards: [lead] }, { sources })
+			props: props({ kind: 'results', cards: [lead] }, { loadSource: async () => heldSource() })
+		});
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		await vi.waitFor(() => {
+			expect(container.querySelector('.reader__passage--cited')?.textContent).toContain(
+				'Held passage two.'
+			);
+		});
+		const cited = container.querySelector('.reader__passage--cited');
+		expect(document.activeElement).toBe(cited); // focus moved to the cited block once content loaded
+	});
+
+	it('results: "Read more" opens the reader in a loading state immediately (no silent dead button)', () => {
+		const lead = card({ sourceId: 'va_intent' });
+		// A pending load: the reader must still open right away and show loading, not do nothing.
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', cards: [lead] }, { loadSource: () => new Promise(() => {}) })
 		});
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
 		flushSync();
-		const cited = container.querySelector('.reader__passage--cited');
-		expect(cited?.textContent).toContain('Held passage two.');
-		expect(document.activeElement).toBe(cited); // focus moved to the cited block on the real click path
+		expect((container.querySelector('dialog.reader') as HTMLDialogElement).open).toBe(true);
+		expect(container.querySelector('.reader__status')?.textContent).toMatch(/loading/i);
+	});
+
+	it('results: closing the reader mid-load does not reopen it when the slow load resolves', async () => {
+		const lead = card({ sourceId: 'va_intent' });
+		let resolveLoad!: (s: Source | null) => void;
+		const loadSource = () => new Promise<Source | null>((r) => (resolveLoad = r));
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', cards: [lead] }, { loadSource })
+		});
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		flushSync();
+		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
+		expect(dialog.open).toBe(true); // opened at once in the loading state
+		(container.querySelector('.reader__close') as HTMLButtonElement).click();
+		flushSync();
+		expect(dialog.open).toBe(false); // dismissed while the load is still pending
+		resolveLoad(heldSource()); // the slow first-corpus load finally resolves
+		for (let i = 0; i < 6; i++) {
+			await Promise.resolve(); // drain the awaited continuation microtasks
+			flushSync(); // and run any scheduled effects
+		}
+		// The superseded write must be dropped: a dismissed reader must not reopen (nor leak content/focus).
+		expect({
+			open: dialog.open,
+			hasPassage: !!container.querySelector('.reader__passage'),
+			title: container.querySelector('.reader__title')?.textContent?.trim() ?? null
+		}).toEqual({ open: false, hasPassage: false, title: null });
+	});
+
+	it('results: a failed source load shows the reader error state, not a silent no-op', async () => {
+		const lead = card({ sourceId: 'va_intent' });
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'results', cards: [lead] },
+				{
+					loadSource: async () => {
+						throw new Error('corpus fetch failed');
+					}
+				}
+			)
+		});
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		await vi.waitFor(() => {
+			expect(container.querySelector('.reader__status')?.textContent).toMatch(
+				/could ?n.?t|try again/i
+			);
+		});
 	});
 
 	it('reminder: appears after [Not now] returns to idle, and the x dismisses it for the session', async () => {

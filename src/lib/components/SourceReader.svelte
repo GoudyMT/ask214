@@ -1,42 +1,59 @@
 <script lang="ts">
 	import type { Source } from '$lib/ask/sources';
 
-	// Controlled by `source`: non-null opens the modal, null closes it. The corpus IS the on-device
-	// reference library; this shows all the official text held locally for one source, offline.
+	// Opens the modal for any of: a loaded `source`, a `loading` fetch in progress, or an `error`. The
+	// corpus IS the on-device reference library; this shows all the official text held locally for one
+	// source, offline. loading/error give the "Read more" click immediate feedback while the corpus (which
+	// is fetched on demand) loads, so the click is never a silent dead button.
 	let {
 		source,
 		highlightId = null,
+		loading = false,
+		error = false,
 		onClose
-	}: { source: Source | null; highlightId?: string | null; onClose: () => void } = $props();
+	}: {
+		source: Source | null;
+		highlightId?: string | null;
+		loading?: boolean;
+		error?: boolean;
+		onClose: () => void;
+	} = $props();
 
 	let dialogEl = $state<HTMLDialogElement>();
 	let citedEl = $state<HTMLElement>();
+	let errorEl = $state<HTMLElement>();
 
-	// Sync the native dialog's open-state to the `source` prop. showModal() (not the `open` attribute)
-	// is what gives the focus-trap + Esc + backdrop the modal lock calls for.
+	const isOpen = $derived(source !== null || loading || error);
+
+	// Sync the native dialog's open-state. showModal() (not the `open` attribute) is what gives the
+	// focus-trap + Esc + backdrop the modal lock calls for.
 	$effect(() => {
 		const el = dialogEl;
 		if (!el) return;
-		if (source && !el.open) {
-			el.showModal();
-			// Land on the cited passage: focus it (so a keyboard / screen-reader user starts where the
-			// sighted user is scrolled) and bring it into view. Instant, per the app's low-motion default.
-			const cited = citedEl;
-			if (cited) {
-				cited.focus({ preventScroll: true });
-				// block: 'start' lands the user at the TOP of the cited passage (its label + accent edge); the
-				// common cited block is taller than a phone viewport, so 'center' would push the top off-screen.
-				cited.scrollIntoView({ block: 'start' });
-			}
-		} else if (!source && el.open) {
-			el.close();
+		if (isOpen && !el.open) el.showModal();
+		else if (!isOpen && el.open) el.close();
+	});
+
+	// Once content is present, land on the cited passage (focus + scroll) - runs on the null->source
+	// transition too, so focus lands when a source resolves after the loading state. Instant, per the
+	// app's low-motion default; block:'start' lands at the TOP of the (often taller-than-viewport) block.
+	$effect(() => {
+		if (source && dialogEl?.open && citedEl) {
+			citedEl.focus({ preventScroll: true });
+			citedEl.scrollIntoView({ block: 'start' });
 		}
 	});
 
+	// On failure, move focus to the alert message - matching the success path's focus move - so a screen
+	// reader reliably hears the failure (the error is a fresh role="alert" node; focusing it is belt-and-braces).
+	$effect(() => {
+		if (error && dialogEl?.open && errorEl) errorEl.focus();
+	});
+
 	// Esc / backdrop fire the native `close` event without going through our button; tell the parent so
-	// it clears `source`. Guard on `source` so our own programmatic close() (source already null) is a no-op.
+	// it resets state. Guard on isOpen so our own programmatic close() (state already cleared) is a no-op.
 	function onNativeClose() {
-		if (source) onClose();
+		if (isOpen) onClose();
 	}
 	// A click whose target is the dialog element itself is a backdrop click (content clicks target children).
 	function onBackdropClick(e: MouseEvent) {
@@ -98,6 +115,29 @@
 				>View on the official site</a
 			>
 			<span class="reader__muted">Held on your device - no connection needed.</span>
+		</div>
+	{:else if loading || error}
+		<div class="reader__head">
+			<div>
+				<p class="reader__src">Source</p>
+				<h2 id="ask-reader-title" class="reader__title">
+					{loading ? 'Loading the source' : 'Source unavailable'}
+				</h2>
+			</div>
+			<button class="reader__close" type="button" aria-label="Close" onclick={onClose}
+				>&times;</button
+			>
+		</div>
+		<div class="reader__body">
+			<!-- Distinct nodes per state: loading->error inserts a FRESH role="alert" node (reliably
+			     announced), rather than mutating a role="status" node's attribute in place. -->
+			{#if loading}
+				<p class="reader__status" role="status">Loading the source held on your device...</p>
+			{:else}
+				<p class="reader__status" role="alert" tabindex="-1" bind:this={errorEl}>
+					This source could not be loaded right now. Check your connection and try again.
+				</p>
+			{/if}
 		</div>
 	{/if}
 </dialog>
@@ -164,6 +204,11 @@
 		background: var(--color-bg);
 		border-left: 3px solid var(--color-success);
 		border-radius: var(--radius-s);
+	}
+	.reader__status {
+		margin: 0;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
 	}
 	.reader__passage {
 		margin: 0 0 var(--space-m);

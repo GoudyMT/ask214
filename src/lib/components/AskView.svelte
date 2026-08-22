@@ -13,7 +13,7 @@
 		onAsk,
 		onSetUp,
 		onDismiss,
-		sources,
+		loadSource,
 		onlineCapable = false,
 		mode = 'device',
 		onSetMode = () => {},
@@ -29,7 +29,7 @@
 		onAsk: (query: string) => void;
 		onSetUp: () => void;
 		onDismiss: () => void;
-		sources: Map<string, Source>;
+		loadSource: (sourceId: string) => Promise<Source | null>;
 		onlineCapable?: boolean;
 		mode?: 'device' | 'online';
 		onSetMode?: (m: 'device' | 'online') => void;
@@ -47,6 +47,12 @@
 	let inputEl: HTMLInputElement | undefined = $state();
 	let openSource = $state<Source | null>(null); // the source shown in the offline reader modal, or null
 	let openHighlightId = $state<string | null>(null); // the cited chunk id the reader highlights, or null
+	let readerLoading = $state(false); // the corpus is loading on demand for this "Read more" click
+	let readerError = $state(false); // the on-demand corpus load failed (or the source is not held locally)
+	// Currency token for the async reader load: bumped on each open and on close, so a slow load resolving
+	// after the user moved on (closed, or opened another card) cannot write stale state - the component
+	// analog of the store's commitIfCurrent guard.
+	let readerReq = 0;
 
 	// The reminder dismissal persists for the tab session (non-PII: just "user hid the Ask download
 	// nudge" - no query, no profile). Plain sessionStorage is fine here (the encrypted-IDB rule governs PII, not this).
@@ -77,11 +83,34 @@
 		reminderDismissed = true;
 		if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(REMINDER_DISMISSED_KEY, '1');
 	}
-	// "Read more" -> open the offline reader on the source this card cites (the corpus holds its text),
-	// highlighting the cited chunk by id.
-	function readSource(sourceId: string, chunkId?: string) {
-		openSource = sources.get(sourceId) ?? null;
+	// "Read more" -> open the offline reader on the source this card cites. The corpus (which holds the
+	// text) is fetched on demand, so the reader opens in a loading state at once and fills when it resolves
+	// - never a silent dead button. A load failure or a source not held locally shows the error state.
+	async function readSource(sourceId: string, chunkId?: string) {
+		const req = ++readerReq; // this open's token
 		openHighlightId = chunkId ?? null;
+		openSource = null;
+		readerError = false;
+		readerLoading = true; // synchronous: the reader opens immediately, before the await
+		try {
+			const src = await loadSource(sourceId);
+			if (req !== readerReq) return; // superseded (closed, or another card opened) - drop this write
+			if (src) openSource = src;
+			else readerError = true;
+		} catch {
+			if (req === readerReq) readerError = true;
+		} finally {
+			if (req === readerReq) readerLoading = false;
+		}
+	}
+	// Close the reader and clear its transient state so the next open starts clean. Bumping the token
+	// invalidates any in-flight load so its late resolution cannot reopen the dismissed reader.
+	function closeReader() {
+		readerReq++;
+		openSource = null;
+		openHighlightId = null;
+		readerLoading = false;
+		readerError = false;
 	}
 </script>
 
@@ -131,7 +160,6 @@
 		bind:value={query}
 		class="ask-input"
 		placeholder="Ask about benefits, SkillBridge, VA health care..."
-		disabled={!ready}
 		aria-label="Ask a question"
 	/>
 	<button class="ask-search" type="submit" disabled={!ready}>Search</button>
@@ -287,10 +315,9 @@
 <SourceReader
 	source={openSource}
 	highlightId={openHighlightId}
-	onClose={() => {
-		openSource = null;
-		openHighlightId = null;
-	}}
+	loading={readerLoading}
+	error={readerError}
+	onClose={closeReader}
 />
 
 <style>
@@ -356,9 +383,6 @@
 	.ask-input:focus {
 		outline: 2px solid var(--color-accent);
 		border-color: var(--color-accent);
-	}
-	.ask-input:disabled {
-		opacity: 0.6;
 	}
 	.ask-search {
 		background: var(--color-accent);
