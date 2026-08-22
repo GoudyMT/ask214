@@ -34,7 +34,10 @@ for (const [name, t] of [
 		const textOnBg: Array<[string, string]> = [
 			['fg', c.fg],
 			['fgMuted', c.fgMuted],
-			['accent', c.accent]
+			['accent', c.accent],
+			// accentMuted is the primary-button HOVER background; it must clear AA against bg too
+			// (the old value regressed to ~3.6:1 dark / ~3.9:1 light).
+			['accentMuted', c.accentMuted]
 		];
 		for (const [label, hex] of textOnBg) {
 			it(`${label} on bg >= 4.5:1`, () => expect(cr(hex, c.bg)).toBeGreaterThanOrEqual(4.5));

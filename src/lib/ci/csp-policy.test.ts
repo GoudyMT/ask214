@@ -25,8 +25,11 @@ describe('CSP egress contract', () => {
 		}
 	});
 
-	it('script-src pins the pre-paint theme script hash so it cannot be dropped', () => {
+	it('script-src pins the two hand-added inline script hashes so they cannot be dropped', () => {
+		// The pre-paint theme script and the early install-prompt capture in src/app.html are hand-added,
+		// so hash mode does not auto-pin them; both sha256 hashes must stay or the scripts are CSP-blocked.
 		const scriptSrc = directives?.['script-src'] ?? [];
-		expect(scriptSrc.some((s) => s.startsWith('sha256-'))).toBe(true);
+		const hashes = scriptSrc.filter((s) => s.startsWith('sha256-'));
+		expect(hashes.length).toBe(2);
 	});
 });

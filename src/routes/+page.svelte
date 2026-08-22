@@ -6,6 +6,9 @@
 	import { createAskStore, createEmbedder, loadCorpus, ASK_ERROR, type AskState } from '$lib/ask';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { getProfileApp } from '$lib/profile/context';
+	import { getInstallApp } from '$lib/install/context';
+	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
+	import InstallNudge from '$lib/components/InstallNudge.svelte';
 	import { retrieveOnline } from '$lib/ask/online/retrieve-online';
 	import { synthesize } from '$lib/ask/synthesis/synthesize';
 	import {
@@ -38,6 +41,20 @@
 	// The below-hero band is idle-state content; once a query runs (any non-idle state), the results own
 	// the space and the band steps aside.
 	const isIdle = $derived(askState.kind === 'idle');
+
+	const install = getInstallApp();
+	// Steer a browser-tab user to install, but only where install is actually possible: a captured
+	// prompt (Chromium) or iOS Safari (manual steps). Installed users already have the storage-eviction
+	// exemption, so they never see it. Dismissal is a non-PII device flag, read synchronously since
+	// this route is client-only.
+	let nudgeDismissed = $state(isNudgeDismissed());
+	const showInstallNudge = $derived(
+		isIdle && !install.installed && !nudgeDismissed && (install.canPrompt || install.ios)
+	);
+	function dismissInstall(): void {
+		dismissNudge();
+		nudgeDismissed = true;
+	}
 
 	onMount(() => {
 		let worker: Worker | undefined;
@@ -110,6 +127,16 @@
 		}}
 	/>
 
+	{#if showInstallNudge}
+		<div class="home-install">
+			<InstallNudge
+				canPrompt={install.canPrompt}
+				onInstall={() => void install.promptInstall()}
+				ondismiss={dismissInstall}
+			/>
+		</div>
+	{/if}
+
 	{#if isIdle && showOnramp}
 		<hr class="home-divider" />
 		<section class="home-onramp" aria-labelledby="home-onramp-heading">
@@ -135,6 +162,11 @@
 		font-size: var(--font-size-h1-fluid);
 		line-height: 1.15;
 		margin: var(--space-xl) 0 var(--space-l);
+	}
+	/* The nudge card holds left-aligned content inside the centered hero column. */
+	.home-install {
+		margin-top: var(--space-xl);
+		text-align: left;
 	}
 	/* Separates the Ask from the below-hero surface. Idle-only: once a query runs the results own the
 	   page and this whole block steps aside. */

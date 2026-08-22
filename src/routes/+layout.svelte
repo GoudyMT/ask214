@@ -27,6 +27,14 @@
 	import { wipeAllStores } from '$lib/db/wipe';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
+	import { requestPersistentStorage } from '$lib/storage/persistence';
+	import { setInstallApp, type InstallApp } from '$lib/install/context';
+	import {
+		createInstallController,
+		readCapturedPrompt,
+		type InstallController
+	} from '$lib/install/install-prompt';
+	import { isInstalled, isIOS } from '$lib/install/install-state';
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 
@@ -54,6 +62,17 @@
 		relockAll: null
 	});
 	setProfileApp(app);
+
+	// Device-level install state (non-PII): populated in onMount since the detection and the
+	// beforeinstallprompt capture are browser-only. The Home nudge and Settings install control read it.
+	const install = $state<InstallApp>({
+		canPrompt: false,
+		installed: false,
+		ios: false,
+		persisted: false,
+		promptInstall: () => Promise.resolve('unavailable')
+	});
+	setInstallApp(install);
 
 	// Settings acts only on stored data (the date, calendar, lock, erase). Hide the tab on a fresh
 	// no-date profile so it appears only once there is something to configure; a locked profile has
@@ -180,6 +199,46 @@
 		syncThemeColor(readChoice());
 		window.addEventListener('storage', applyStorageChange);
 		return () => window.removeEventListener('storage', applyStorageChange);
+	});
+
+	// Durability wiring (client-only). Two independent legs keep the on-device IndexedDB - which holds
+	// the non-extractable AES-GCM key alongside the ciphertext - out of iOS eviction: being installed
+	// exempts it from the 7-day inactivity timer, and a granted persist() exempts it from
+	// storage-pressure eviction. Track BOTH ("installed" alone is not "safe"), and re-request persist()
+	// when the user newly installs - the moment WebKit is most likely to grant it.
+	onMount(() => {
+		install.ios = isIOS();
+
+		const refreshPersistence = async (): Promise<void> => {
+			const outcome = await requestPersistentStorage();
+			install.persisted = outcome === 'granted' || outcome === 'already';
+		};
+
+		let controller: InstallController;
+		let wasInstalled = false;
+		const sync = (): void => {
+			const s = controller.snapshot();
+			install.canPrompt = s.canPrompt;
+			install.installed = s.installed;
+			// Re-check persistence on the install transition (not every sync): a fresh install is the
+			// moment persist() flips from likely-denied to likely-granted.
+			if (s.installed && !wasInstalled) void refreshPersistence();
+			wasInstalled = s.installed;
+		};
+
+		controller = createInstallController({
+			target: window,
+			isInstalled,
+			initialPrompt: readCapturedPrompt,
+			onChange: sync
+		});
+		// Seed from the current state so the initial sync is not treated as a transition; the
+		// unconditional refreshPersistence() below covers the load-time request.
+		wasInstalled = controller.snapshot().installed;
+		sync();
+		install.promptInstall = controller.promptInstall;
+		void refreshPersistence();
+		return controller.destroy;
 	});
 </script>
 
