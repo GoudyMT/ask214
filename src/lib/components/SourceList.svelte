@@ -22,7 +22,9 @@
 							(opens in a new tab)</span
 						>
 					</a>
-					<span class="src-tag">{source.publisher}</span>
+					<span class="src-tag"
+						><span class="visually-hidden">Published by </span>{source.publisher}</span
+					>
 				</li>
 			{/each}
 		</ul>
@@ -52,7 +54,11 @@
 		</p>
 		<ul class="tap-titles">
 			{#each index.tapGuides as guide (guide.title)}
-				<li><span class="src-tag">{guide.publisher}</span><span>{guide.title}</span></li>
+				<li>
+					<span class="src-tag"
+						><span class="visually-hidden">Published by </span>{guide.publisher}</span
+					><span>{guide.title}</span>
+				</li>
 			{/each}
 		</ul>
 	</section>

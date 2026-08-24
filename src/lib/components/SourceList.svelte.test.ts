@@ -41,6 +41,8 @@ describe('SourceList', () => {
 			li.textContent?.includes('DoD - Test')
 		);
 		expect(row?.textContent ?? '').toContain('DoD');
+		const tag = row?.querySelector('.src-tag');
+		expect(tag?.textContent ?? '').toContain('Published by');
 	});
 
 	it('renders exactly one TAP library link', () => {
