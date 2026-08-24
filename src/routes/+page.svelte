@@ -20,7 +20,7 @@
 		isSynthesisEnabled
 	} from '$lib/ask/online-prefs';
 
-	const CORPUS_BASE = '/corpus/corpus-v1.0';
+	const CORPUS_BASE = '/corpus/corpus-v1.0.1';
 
 	const app = getProfileApp();
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a

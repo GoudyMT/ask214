@@ -14,8 +14,8 @@ const MODEL_REPO = 'Xenova/all-MiniLM-L6-v2';
 const MODEL_ID = 'all-MiniLM-L6-v2';
 const K = 5;
 
-const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.json', 'utf8'));
-const bin = readFileSync('static/corpus/corpus-v1.0.embeddings.bin');
+const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.1.json', 'utf8'));
+const bin = readFileSync('static/corpus/corpus-v1.0.1.embeddings.bin');
 const ab = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
 const corpus = decodeCorpus(manifest, ab, MODEL_ID);
 const allQueries =

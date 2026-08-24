@@ -22,7 +22,7 @@ export type CorpusChunk = {
 	anchor?: { exact: string; prefix?: string; suffix?: string };
 };
 
-/** The shipped chunk manifest (corpus-v1.0.json); embeddings ride alongside as a binary blob. */
+/** The shipped chunk manifest (corpus-v1.0.1.json); embeddings ride alongside as a binary blob. */
 export type CorpusManifest = {
 	version: string; // corpus generation, e.g. "1.0"
 	dim: number; // embedding dimension (384 for MiniLM / BGE-small)

@@ -11,8 +11,8 @@ describe('classifyAsset', () => {
 		expect(classifyAsset('/wasm/ort-wasm-simd-threaded.wasm')).toBe('lazy');
 		// The ~3.5MB corpus is lazy too: fetched on demand (a device query or a "Read more" click) and cached
 		// then, so it never crosses the wire on a passive page load (including the SW install).
-		expect(classifyAsset('/corpus/corpus-v1.0.json')).toBe('lazy');
-		expect(classifyAsset('/corpus/corpus-v1.0.embeddings.bin')).toBe('lazy');
+		expect(classifyAsset('/corpus/corpus-v1.0.1.json')).toBe('lazy');
+		expect(classifyAsset('/corpus/corpus-v1.0.1.embeddings.bin')).toBe('lazy');
 	});
 
 	it('marks the app shell + icons as precache', () => {
@@ -52,7 +52,7 @@ describe('isApiRequest (the SW never caches the API namespace)', () => {
 	it('is false for app pages and static assets', () => {
 		expect(isApiRequest('/')).toBe(false);
 		expect(isApiRequest('/ask')).toBe(false);
-		expect(isApiRequest('/corpus/corpus-v1.0.json')).toBe(false);
+		expect(isApiRequest('/corpus/corpus-v1.0.1.json')).toBe(false);
 		expect(isApiRequest('/apidocs')).toBe(false); // not the /api/ namespace
 	});
 });
