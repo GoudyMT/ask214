@@ -94,15 +94,15 @@
   robots_allowed: true
 
 - source_id: dod_skillbridge
-  title: 'DoW SkillBridge Program'
+  title: 'DoD SkillBridge Program'
   url: 'https://www.militaryonesource.mil/resources/gov/dod-skillbridge/'
-  origin: 'DoW (Military OneSource)'
+  origin: 'DoD (Military OneSource)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: html
-  license_notes: '17 USC 105 - US Government work. Canonical site skillbridge.mil (DoW TLS cert not WebFetch-verifiable); Military OneSource is the fetchable PD source. Expand eligibility detail from skillbridge.mil in cycle A.'
+  license_notes: '17 USC 105 - US Government work. Canonical site skillbridge.mil (DoD TLS cert not WebFetch-verifiable); Military OneSource is the fetchable PD source. Expand eligibility detail from skillbridge.mil in cycle A.'
   terms_reviewed_date: 2026-06-20
-  terms_notes: 'Public militaryonesource.mil (DoW) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoW.'
+  terms_notes: 'Public militaryonesource.mil (DoD) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-11
@@ -313,15 +313,15 @@
   robots_allowed: true
 
 - source_id: mos_separation
-  title: 'DoW - Military Separation Planning and Support (Military OneSource)'
+  title: 'DoD - Military Separation Planning and Support (Military OneSource)'
   url: 'https://www.militaryonesource.mil/transition-retirement/separation/'
-  origin: 'DoW (Military OneSource)'
+  origin: 'DoD (Military OneSource)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: html
-  license_notes: '17 USC 105 - US Government work (DoW). Military OneSource is contractor-operated; content treated as US-Gov work consistent with the dod_skillbridge entry (Max-confirmed S29).'
+  license_notes: '17 USC 105 - US Government work (DoD). Military OneSource is contractor-operated; content treated as US-Gov work consistent with the dod_skillbridge entry (Max-confirmed S29).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public militaryonesource.mil (DoW) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoW.'
+  terms_notes: 'Public militaryonesource.mil (DoD) page; no ToS restriction on reading public content; app is unofficial, not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -401,7 +401,7 @@
   served: false
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Text-only extraction (no images) - no third-party-image redistribution.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoW.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -417,14 +417,14 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - Financial Planning for Transition'
   url: 'https://www.tapevents.mil/resources/documents'
-  origin: 'DoW (TAP curriculum)'
+  origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
+  license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Text-only extraction (no images).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Financial_Planning_Transition.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by DoW.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Financial_Planning_Transition.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -440,14 +440,14 @@
   source_updated_date: '2026-01-29'
   title: 'TAP - Pre-Separation Brief Resource Guide'
   url: 'https://www.tapevents.mil/resources/documents'
-  origin: 'DoW (TAP curriculum)'
+  origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (DoW/DHS); no copyright notice (S29 scan). Text-only extraction (no images).'
+  license_notes: '17 USC 105 - US Government work (DoD/DHS); no copyright notice (S29 scan). Text-only extraction (no images).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (DoW + DHS). File: Pre_Separation_Counseling_Resource_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (DoD + DHS). File: Pre_Separation_Counseling_Resource_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -463,14 +463,14 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - Managing Your Transition'
   url: 'https://www.tapevents.mil/resources/documents'
-  origin: 'DoW (TAP curriculum)'
+  origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
+  license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Text-only extraction (no images).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Transition.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoW.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Transition.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -486,14 +486,14 @@
   source_updated_date: '2026-05-12'
   title: 'TAP - Military Occupational Code (MOC) Crosswalk'
   url: 'https://www.tapevents.mil/resources/documents'
-  origin: 'DoW (TAP curriculum)'
+  origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images). References MilGears (DoW tool).'
+  license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Text-only extraction (no images). References MilGears (DoD tool).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MOC_Crosswalk.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoW.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MOC_Crosswalk.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -509,14 +509,14 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - Managing Your Education'
   url: 'https://www.tapevents.mil/resources/documents'
-  origin: 'DoW (TAP curriculum)'
+  origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images).'
+  license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Text-only extraction (no images).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Education.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoW.'
+  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Education.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -601,12 +601,12 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - Interagency Website Guide (TIWG)'
   url: 'https://www.tapevents.mil/resources/documents'
-  origin: 'DoW (TAP curriculum)'
+  origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (interagency/DoW); no copyright notice (S29 scan). Text-only extraction (no images). A curated directory of official .gov/.mil links.'
+  license_notes: '17 USC 105 - US Government work (interagency/DoD); no copyright notice (S29 scan). Text-only extraction (no images). A curated directory of official .gov/.mil links.'
   terms_reviewed_date: 2026-06-21
   terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: TAP_Interagency_Website_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open
@@ -762,12 +762,12 @@
   source_updated_date: '2025-03-20'
   title: 'TAP - Mental Health for Families (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
-  origin: 'DoW (TAP curriculum)'
+  origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
   terms_reviewed_date: 2026-06-21
   terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MLC-MHF.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open
@@ -785,12 +785,12 @@
   source_updated_date: '2025-12-04'
   title: 'TAP - Reserve Component Dual Payments (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
-  origin: 'DoW (TAP curriculum)'
+  origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: false
-  license_notes: '17 USC 105 - US Government work (DoW); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
+  license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Text-only extraction (no images). Module resource guide.'
   terms_reviewed_date: 2026-06-21
   terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MLC-Reserve_Component_Dual.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open

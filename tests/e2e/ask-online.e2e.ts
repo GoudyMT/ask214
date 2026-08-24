@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 // and every online answer degrades. The SW is not what these specs exercise; blocking it lets the mock apply.
 test.use({ serviceWorkers: 'block' });
 
-// Must match the shipped corpus manifest version (static/corpus/corpus-v1.0.json): the client treats a server
+// Must match the shipped corpus manifest version (static/corpus/corpus-v1.0.1.json): the client treats a server
 // answer on a different corpus version as unavailable, so the mock has to echo the exact version.
 const CORPUS_VERSION = '1.0';
 

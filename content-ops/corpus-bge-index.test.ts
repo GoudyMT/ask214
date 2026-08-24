@@ -7,7 +7,7 @@ import type { CorpusManifest } from '$lib/corpus/types';
 const BGE_MODEL_ID = '@cf/baai/bge-small-en-v1.5';
 const BGE_MANIFEST = 'content-ops/server-index/corpus-v1.0.bge.json';
 const BGE_EMBEDDINGS = 'content-ops/server-index/corpus-v1.0.bge.bin';
-const MINILM_MANIFEST = 'static/corpus/corpus-v1.0.json';
+const MINILM_MANIFEST = 'static/corpus/corpus-v1.0.1.json';
 
 function loadManifest(path: string): CorpusManifest {
 	return JSON.parse(readFileSync(path, 'utf8')) as CorpusManifest;

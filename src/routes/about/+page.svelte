@@ -1,3 +1,8 @@
+<script lang="ts">
+	import SourceList from '$lib/components/SourceList.svelte';
+	import { SOURCES_INDEX } from '$lib/sources/sources-index.data';
+</script>
+
 <svelte:head>
 	<title>About - Ask 214</title>
 	<meta name="description" content="Mission and privacy stance for the Ask 214 project." />
@@ -29,6 +34,8 @@
 
 <h2>Sources</h2>
 <p>
-	All reference content is public US Government work product (per 17 USC section 105), used under
-	proper attribution. Every answer cites the exact source it draws from, and links to the original.
+	Every answer is drawn from public US Government work (17 USC section 105) and cites the exact
+	source it uses. Below is every source held in the app, each linked to its original.
 </p>
+
+<SourceList index={SOURCES_INDEX} />

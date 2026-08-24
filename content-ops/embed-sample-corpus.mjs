@@ -23,8 +23,8 @@ for (const c of chunks) {
 
 const { manifest, embeddingsBuffer } = buildCorpusArtifact(chunks, vectors, MODEL_ID, VERSION);
 mkdirSync('static/corpus', { recursive: true });
-writeFileSync('static/corpus/corpus-v1.0.json', JSON.stringify(manifest));
-writeFileSync('static/corpus/corpus-v1.0.embeddings.bin', Buffer.from(embeddingsBuffer));
+writeFileSync('static/corpus/corpus-v1.0.1.json', JSON.stringify(manifest));
+writeFileSync('static/corpus/corpus-v1.0.1.embeddings.bin', Buffer.from(embeddingsBuffer));
 console.log(
 	`[ok] wrote ${chunks.length} chunks, dim ${manifest.dim} -> static/corpus/corpus-v1.0.*`
 );

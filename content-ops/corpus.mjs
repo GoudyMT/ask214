@@ -25,7 +25,7 @@ const SOURCES_YAML = 'content/sources.yaml';
 const EXTRACTED_DIR = 'content-ops/extracted';
 const CLEANED_MANIFEST = 'content-ops/cleaned/manifest.json';
 const CHUNKS_DIR = 'content-ops/chunks';
-const CORPUS_JSON = 'static/corpus/corpus-v1.0.json';
+const CORPUS_JSON = 'static/corpus/corpus-v1.0.1.json';
 // Staged-input dirs must match capture-extract.mjs byte-for-byte so the placement gate checks the exact path
 // ingest reads: the PDF dir honors the same TAP_PDF_DIR override; the manual-HTML dir is fixed under staged/.
 const STAGED_DIR = process.env.TAP_PDF_DIR ?? 'content-ops/staged';

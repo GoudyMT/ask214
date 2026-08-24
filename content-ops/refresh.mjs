@@ -246,10 +246,10 @@ function apply() {
 		if (existed) copyFileSync(live, backup);
 		snaps.push({ live, backup, existed });
 	};
-	snap('static/corpus/corpus-v1.0.json', join(ROLLBACK, 'corpus', 'corpus-v1.0.json'));
+	snap('static/corpus/corpus-v1.0.1.json', join(ROLLBACK, 'corpus', 'corpus-v1.0.1.json'));
 	snap(
-		'static/corpus/corpus-v1.0.embeddings.bin',
-		join(ROLLBACK, 'corpus', 'corpus-v1.0.embeddings.bin')
+		'static/corpus/corpus-v1.0.1.embeddings.bin',
+		join(ROLLBACK, 'corpus', 'corpus-v1.0.1.embeddings.bin')
 	);
 	// The clean stage (run per source below) rewrites cleaned/<id>.json and the shared approval manifest,
 	// so both must be in the rollback for a failed apply to fully restore the pre-apply state.

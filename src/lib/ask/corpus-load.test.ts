@@ -27,7 +27,7 @@ describe('loadCorpus', () => {
 		);
 		const corpus = await loadCorpus(
 			fakeFetch(JSON.stringify(manifest), embeddingsBuffer) as typeof fetch,
-			'/corpus/corpus-v1.0'
+			'/corpus/corpus-v1.0.1'
 		);
 		expect(corpus.chunks.map((c) => c.id)).toEqual(['a', 'b']);
 		expect(corpus.modelId).toBe(EMBED_MODEL_ID);
@@ -35,6 +35,6 @@ describe('loadCorpus', () => {
 
 	it('throws AskError(E_ASK_CORPUS) when a fetch fails', async () => {
 		const fail = (async () => new Response('x', { status: 500 })) as typeof fetch;
-		await expect(loadCorpus(fail, '/corpus/corpus-v1.0')).rejects.toBeInstanceOf(AskError);
+		await expect(loadCorpus(fail, '/corpus/corpus-v1.0.1')).rejects.toBeInstanceOf(AskError);
 	});
 });

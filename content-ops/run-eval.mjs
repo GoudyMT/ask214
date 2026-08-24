@@ -45,8 +45,8 @@ const SHIPPED_MIN_SCORE = 0.4;
 /** @param {number} minScore */
 const DENSE = (minScore) => ({ alpha: 1, minScore, minBm25: 0 });
 
-const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.json', 'utf8'));
-const buf = readFileSync('static/corpus/corpus-v1.0.embeddings.bin');
+const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.1.json', 'utf8'));
+const buf = readFileSync('static/corpus/corpus-v1.0.1.embeddings.bin');
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 const corpus = decodeCorpus(manifest, ab, MODEL_ID);
 const queries = JSON.parse(readFileSync('src/lib/ask/eval/queries.json', 'utf8'));
