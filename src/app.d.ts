@@ -2,11 +2,14 @@
 // for information about these interfaces
 declare global {
 	namespace App {
-		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
+		interface Platform {
+			env?: {
+				// Resend API key - a secret (wrangler secret / .dev.vars); never committed.
+				RESEND_API_KEY?: string;
+				// Cloudflare per-IP rate-limit binding (wrangler.toml [[ratelimits]]).
+				FEEDBACK_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+			};
+		}
 	}
 }
 
