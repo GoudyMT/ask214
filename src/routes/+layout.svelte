@@ -37,6 +37,7 @@
 	import { isInstalled, isIOS } from '$lib/install/install-state';
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
+	import { stashRoute } from '$lib/feedback/context';
 
 	let { children } = $props();
 
@@ -285,6 +286,8 @@
 		<p>
 			<a href={resolve('/about')}>About</a> &middot;
 			<a href="https://github.com/GoudyMT/military-transition-companion" rel="external">Source</a>
+			&middot;
+			<a href={resolve('/feedback')} onclick={() => stashRoute(page.url.pathname)}>Feedback</a>
 		</p>
 	</footer>
 </AppGate>
