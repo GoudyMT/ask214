@@ -13,11 +13,15 @@ const active = readFileSync(join(process.cwd(), 'wrangler.toml'), 'utf8')
 	.filter((line) => !line.trimStart().startsWith('#'))
 	.join('\n');
 
-function limiterField(field: 'limit' | 'period'): number | null {
-	const re = new RegExp(
-		`name\\s*=\\s*"FEEDBACK_LIMITER"[\\s\\S]*?simple\\s*=\\s*\\{[^}]*\\b${field}\\s*=\\s*(\\d+)`
-	);
-	const m = active.match(re);
+// Isolate the FEEDBACK_LIMITER binding's `simple = { ... }` block once, then read each field with a
+// LITERAL regex at the call site. No dynamic `new RegExp` (the ReDoS linter flags a non-literal pattern,
+// and `field` here was only ever the literal 'limit'/'period' anyway); the patterns stay hardcoded and
+// auditable.
+const simpleBlock =
+	active.match(/name\s*=\s*"FEEDBACK_LIMITER"[\s\S]*?simple\s*=\s*\{([^}]*)\}/)?.[1] ?? '';
+
+function fieldValue(pattern: RegExp): number | null {
+	const m = simpleBlock.match(pattern);
 	return m ? Number(m[1]) : null;
 }
 
@@ -28,13 +32,13 @@ describe('feedback rate-limit binding stays configured + tight', () => {
 	});
 
 	it('keeps the per-IP limit tight (1..10 per window)', () => {
-		const limit = limiterField('limit');
+		const limit = fieldValue(/\blimit\s*=\s*(\d+)/);
 		expect(limit).not.toBeNull();
 		expect(limit).toBeGreaterThanOrEqual(1);
 		expect(limit).toBeLessThanOrEqual(10);
 	});
 
 	it('uses a Cloudflare-valid period (10 or 60 seconds)', () => {
-		expect([10, 60]).toContain(limiterField('period'));
+		expect([10, 60]).toContain(fieldValue(/\bperiod\s*=\s*(\d+)/));
 	});
 });
