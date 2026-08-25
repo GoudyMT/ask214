@@ -1,4 +1,4 @@
-import type { CleanFeedback } from './types';
+import { routeLabel, type CleanFeedback } from './types';
 
 export interface FeedbackEmail {
 	subject: string;
@@ -11,7 +11,7 @@ export function composeFeedbackEmail(f: CleanFeedback): FeedbackEmail {
 	const text = [
 		f.message.trim(),
 		'',
-		f.route ? `Page: ${f.route}` : 'Page: (not shared)',
+		f.route ? `Page: ${routeLabel(f.route)}` : 'Page: (not shared)',
 		f.replyEmail ? `Reply-to: ${f.replyEmail}` : 'Reply-to: (none)'
 	].join('\n');
 	const replyTo = f.replyEmail && !/[\r\n]/.test(f.replyEmail) ? f.replyEmail : null;

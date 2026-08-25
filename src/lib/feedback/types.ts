@@ -35,3 +35,18 @@ export function sanitizeRoute(path: string | null | undefined): KnownRoute | nul
 	const clean = path.split('?')[0]?.split('#')[0] ?? '';
 	return (KNOWN_ROUTES as readonly string[]).includes(clean) ? (clean as KnownRoute) : null;
 }
+
+const ROUTE_LABELS: Record<KnownRoute, string> = {
+	'/': 'Home',
+	'/timeline': 'Timeline',
+	'/ask': 'Ask',
+	'/resources': 'Resources',
+	'/settings': 'Settings',
+	'/about': 'About',
+	'/feedback': 'Feedback'
+};
+
+/** Friendly page name for display + the email (e.g. '/' -> 'Home'); null -> null. */
+export function routeLabel(route: KnownRoute | null): string | null {
+	return route ? ROUTE_LABELS[route] : null;
+}

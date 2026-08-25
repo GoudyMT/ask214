@@ -11,10 +11,13 @@ describe('composeFeedbackEmail', () => {
 		expect(e.subject).toBe('Ask 214 feedback');
 		expect(e.text).toContain('the ask page broke');
 	});
-	it('includes the attached page when present, notes absence otherwise', () => {
+	it('includes the attached page as a friendly name, notes absence otherwise', () => {
 		expect(
 			composeFeedbackEmail({ message: 'x', route: '/timeline', replyEmail: null }).text
-		).toContain('Page: /timeline');
+		).toContain('Page: Timeline');
+		expect(composeFeedbackEmail({ message: 'x', route: '/', replyEmail: null }).text).toContain(
+			'Page: Home'
+		);
 		expect(composeFeedbackEmail({ message: 'x', route: null, replyEmail: null }).text).toContain(
 			'Page: (not shared)'
 		);

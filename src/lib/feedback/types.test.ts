@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeRoute } from './types';
+import { sanitizeRoute, routeLabel } from './types';
 
 describe('sanitizeRoute', () => {
 	it('accepts a known app route', () => {
@@ -18,5 +18,16 @@ describe('sanitizeRoute', () => {
 	it('returns null for empty / null', () => {
 		expect(sanitizeRoute('')).toBeNull();
 		expect(sanitizeRoute(null)).toBeNull();
+	});
+});
+
+describe('routeLabel', () => {
+	it('maps each route to a friendly name (no leading slash)', () => {
+		expect(routeLabel('/')).toBe('Home');
+		expect(routeLabel('/timeline')).toBe('Timeline');
+		expect(routeLabel('/about')).toBe('About');
+	});
+	it('returns null for a null route', () => {
+		expect(routeLabel(null)).toBeNull();
 	});
 });
