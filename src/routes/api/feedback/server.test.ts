@@ -5,7 +5,13 @@ type Event = Parameters<typeof POST>[0];
 
 function makeEvent(
 	body: unknown,
-	opts: { ip?: string; limited?: boolean; noKey?: boolean } = {}
+	opts: {
+		ip?: string;
+		limited?: boolean;
+		noKey?: boolean;
+		noFrom?: boolean;
+		noLimiter?: boolean;
+	} = {}
 ): Event {
 	return {
 		request: { json: async () => body },
@@ -14,8 +20,10 @@ function makeEvent(
 			env: {
 				RESEND_API_KEY: opts.noKey ? undefined : 're_test',
 				FEEDBACK_TO: 'inbox@example.com',
-				FEEDBACK_FROM: 'Test <feedback@send.example.com>',
-				FEEDBACK_LIMITER: { limit: async () => ({ success: !opts.limited }) }
+				FEEDBACK_FROM: opts.noFrom ? undefined : 'Test <feedback@send.example.com>',
+				FEEDBACK_LIMITER: opts.noLimiter
+					? undefined
+					: { limit: async () => ({ success: !opts.limited }) }
 			}
 		}
 	} as unknown as Event;
@@ -71,5 +79,34 @@ describe('POST /api/feedback', () => {
 	it('returns 500 when the API key is missing', async () => {
 		const res = await POST(makeEvent({ message: 'hi' }, { noKey: true }));
 		expect(res.status).toBe(500);
+	});
+
+	it('returns 500 when the sender (FEEDBACK_FROM) is missing - no test-sender fallback', async () => {
+		const res = await POST(makeEvent({ message: 'hi' }, { noFrom: true }));
+		expect(res.status).toBe(500);
+	});
+
+	it('returns 502 when the Resend call throws (transport failure)', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNRESET')));
+		const res = await POST(makeEvent({ message: 'hi' }));
+		expect(res.status).toBe(502);
+		expect(await res.json()).toEqual({ ok: false });
+	});
+
+	it('returns 502 when Resend responds non-ok (e.g. quota exhausted)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue(new Response('{"error":"x"}', { status: 500 }))
+		);
+		const res = await POST(makeEvent({ message: 'hi' }));
+		expect(res.status).toBe(502);
+	});
+
+	it('still sends when the rate-limit binding is absent (fails open for local dev)', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(new Response('{"id":"x"}', { status: 200 }));
+		vi.stubGlobal('fetch', fetchMock);
+		const res = await POST(makeEvent({ message: 'hi' }, { noLimiter: true }));
+		expect(res.status).toBe(200);
+		expect(fetchMock).toHaveBeenCalledOnce();
 	});
 });

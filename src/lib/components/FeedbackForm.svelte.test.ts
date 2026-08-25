@@ -11,7 +11,7 @@ function fill(container: Element, selector: string, value: string) {
 }
 
 describe('FeedbackForm', () => {
-	it('renders message, include-page (checked), optional email, submit', () => {
+	it('renders message, include-page (checked), optional email, submit, and a hidden honeypot', () => {
 		const { container } = render(FeedbackForm, {
 			props: { submit: vi.fn(), attachedRoute: '/timeline' }
 		});
@@ -20,24 +20,49 @@ describe('FeedbackForm', () => {
 		expect(check.checked).toBe(true);
 		expect(container.querySelector('input[type="email"]')).toBeTruthy();
 		expect(container.textContent ?? '').toMatch(/Timeline/);
+		// The honeypot exists but is hidden from people (aria-hidden + not tabbable).
+		const hp = container.querySelector('#fb-hp') as HTMLInputElement;
+		expect(hp).toBeTruthy();
+		expect(hp.getAttribute('tabindex')).toBe('-1');
+		expect(container.querySelector('.hp')?.getAttribute('aria-hidden')).toBe('true');
 	});
 
-	it('does not submit an empty message; shows inline validation', () => {
+	it('does not submit an empty message; announces + associates the inline error', () => {
 		const submit = vi.fn();
 		const { container } = render(FeedbackForm, { props: { submit, attachedRoute: '/timeline' } });
 		(container.querySelector('form') as HTMLFormElement).requestSubmit();
 		flushSync();
 		expect(submit).not.toHaveBeenCalled();
-		expect(container.textContent ?? '').toMatch(/enter a message/i);
+		const err = container.querySelector('#fb-msg-error');
+		expect(err?.getAttribute('role')).toBe('alert');
+		expect(err?.textContent ?? '').toMatch(/enter a message/i);
+		const ta = container.querySelector('textarea') as HTMLTextAreaElement;
+		expect(ta.getAttribute('aria-invalid')).toBe('true');
+		expect(ta.getAttribute('aria-describedby')).toBe('fb-msg-error');
 	});
 
-	it('submits message + route when the box is checked', async () => {
+	it('clears the inline error as the user types', () => {
+		const { container } = render(FeedbackForm, {
+			props: { submit: vi.fn(), attachedRoute: '/timeline' }
+		});
+		(container.querySelector('form') as HTMLFormElement).requestSubmit();
+		flushSync();
+		expect(container.querySelector('#fb-msg-error')).toBeTruthy();
+		fill(container, 'textarea', 'x');
+		expect(container.querySelector('#fb-msg-error')).toBeNull();
+	});
+
+	it('submits message + route + honeypot when the box is checked', async () => {
 		const submit = vi.fn().mockResolvedValue({ ok: true });
 		const { container } = render(FeedbackForm, { props: { submit, attachedRoute: '/timeline' } });
 		fill(container, 'textarea', 'hi');
 		(container.querySelector('form') as HTMLFormElement).requestSubmit();
 		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
-		expect(submit.mock.calls[0]?.[0]).toMatchObject({ message: 'hi', route: '/timeline' });
+		expect(submit.mock.calls[0]?.[0]).toMatchObject({
+			message: 'hi',
+			route: '/timeline',
+			honeypot: ''
+		});
 	});
 
 	it('omits the route when the box is unchecked', async () => {
@@ -52,7 +77,7 @@ describe('FeedbackForm', () => {
 		expect(submit.mock.calls[0]?.[0]?.route).toBeNull();
 	});
 
-	it('shows the success panel after a successful submit', async () => {
+	it('shows the success panel and focuses its heading after a successful submit', async () => {
 		const { container } = render(FeedbackForm, {
 			props: { submit: vi.fn().mockResolvedValue({ ok: true }), attachedRoute: '/timeline' }
 		});
@@ -60,7 +85,10 @@ describe('FeedbackForm', () => {
 		(container.querySelector('form') as HTMLFormElement).requestSubmit();
 		await vi.waitFor(() => {
 			flushSync();
-			expect(container.textContent ?? '').toMatch(/your feedback was sent/i);
+			const h2 = container.querySelector('.panel h2');
+			expect(h2?.textContent ?? '').toMatch(/your feedback was sent/i);
+			expect(h2?.getAttribute('tabindex')).toBe('-1');
+			expect(document.activeElement).toBe(h2); // the $effect actually moved focus, not just markup
 		});
 	});
 

@@ -42,4 +42,13 @@ describe('decideFeedback', () => {
 		expect(d.kind).toBe('send');
 		if (d.kind === 'send') expect(d.email.text).toContain('Page: (not shared)');
 	});
+
+	it('rejects a filled honeypot, including a non-string value', async () => {
+		expect(
+			(await decideFeedback({ message: 'hi', honeypot: 'bot' }, { checkLimit: allow })).kind
+		).toBe('reject');
+		expect((await decideFeedback({ message: 'hi', honeypot: 1 }, { checkLimit: allow })).kind).toBe(
+			'reject'
+		);
+	});
 });

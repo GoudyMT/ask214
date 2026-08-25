@@ -12,8 +12,17 @@
 	let message = $state('');
 	let includePage = $state(true);
 	let replyEmail = $state('');
+	let honeypot = $state('');
 	let phase = $state<'idle' | 'submitting' | 'success' | 'error'>('idle');
 	let showEmpty = $state(false);
+
+	// Move focus to the outcome heading when the form swaps to a panel, so keyboard/SR users land on
+	// the result instead of being dropped to <body> (the focused submit button unmounts). Mirrors
+	// SourceReader's focus-the-new-node pattern.
+	let panelHeading = $state<HTMLHeadingElement | null>(null);
+	$effect(() => {
+		if ((phase === 'success' || phase === 'error') && panelHeading) panelHeading.focus();
+	});
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
@@ -26,7 +35,8 @@
 		const input: FeedbackInput = {
 			message,
 			route: includePage ? attachedRoute : null,
-			replyEmail: replyEmail || null
+			replyEmail: replyEmail || null,
+			honeypot
 		};
 		const res = await submit(input).catch(() => ({ ok: false }));
 		phase = res.ok ? 'success' : 'error';
@@ -35,6 +45,7 @@
 	function reset() {
 		message = '';
 		replyEmail = '';
+		honeypot = '';
 		includePage = true;
 		phase = 'idle';
 		showEmpty = false;
@@ -43,13 +54,13 @@
 
 {#if phase === 'success'}
 	<div class="panel" role="status">
-		<h2>Thanks - your feedback was sent.</h2>
+		<h2 bind:this={panelHeading} tabindex="-1">Thanks - your feedback was sent.</h2>
 		<p>I read every message. If you left an email, I'll get back to you.</p>
 		<button type="button" class="btn" onclick={reset}>Send another</button>
 	</div>
 {:else if phase === 'error'}
 	<div class="panel err" role="alert">
-		<h2>That didn't send.</h2>
+		<h2 bind:this={panelHeading} tabindex="-1">That didn't send.</h2>
 		<p>
 			Something went wrong on our end - your message wasn't lost, it just didn't reach me. Try
 			again, or email me directly at <a href="mailto:feedback@ask214.com">feedback@ask214.com</a>.
@@ -60,9 +71,16 @@
 	<form onsubmit={handleSubmit}>
 		<div class="field">
 			<label for="fb-msg">Your message</label>
-			<textarea id="fb-msg" bind:value={message} placeholder="What happened, or what would help?"
-			></textarea>
-			{#if showEmpty}<p class="err-hint">Please enter a message.</p>{/if}
+			<textarea
+				id="fb-msg"
+				bind:value={message}
+				oninput={() => (showEmpty = false)}
+				aria-invalid={showEmpty}
+				aria-describedby={showEmpty ? 'fb-msg-error' : undefined}
+				placeholder="What happened, or what would help?"></textarea>
+			{#if showEmpty}<p id="fb-msg-error" class="err-hint" role="alert">
+					Please enter a message.
+				</p>{/if}
 		</div>
 
 		{#if attachedRoute}
@@ -81,9 +99,16 @@
 			<p class="hint">Only if you'd like a reply. Leave it blank to stay anonymous.</p>
 		</div>
 
+		<!-- Spam trap: off-screen + aria-hidden + not tabbable, so people never see it but naive bots
+		     fill it; a non-empty value is rejected server-side. -->
+		<div class="hp" aria-hidden="true">
+			<label for="fb-hp">Leave this field empty</label>
+			<input id="fb-hp" type="text" tabindex="-1" autocomplete="off" bind:value={honeypot} />
+		</div>
+
 		<p class="privacy">
-			Your message goes to the developer's inbox and is not stored on our servers. Please don't
-			include sensitive personal details.
+			Your message is emailed to the developer and is not stored on our servers. Please don't
+			include sensitive details such as your SSN or medical or financial information.
 		</p>
 
 		<button type="submit" class="btn" disabled={phase === 'submitting'}>
@@ -152,6 +177,13 @@
 	}
 	.route {
 		font-weight: 600;
+	}
+	.hp {
+		position: absolute;
+		left: -9999px;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
 	}
 	.privacy {
 		font-size: var(--font-size-s);
