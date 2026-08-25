@@ -3,14 +3,13 @@ import type { RequestHandler } from './$types';
 import { decideFeedback } from '$lib/feedback/decide';
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-// The Resend-verified sending identity (a subdomain of ask214.com). Confirm this matches the domain
-// verified in Resend before deploy.
-const FROM = 'Ask 214 <feedback@send.ask214.com>';
-const TO = 'ask214.military@gmail.com';
 
 export const POST: RequestHandler = async ({ request, platform, getClientAddress }) => {
 	const env = platform?.env;
-	if (!env?.RESEND_API_KEY) return json({ ok: false }, { status: 500 });
+	// The API key + destination are deployment config (a secret + a var), never committed to the repo.
+	if (!env?.RESEND_API_KEY || !env.FEEDBACK_TO) return json({ ok: false }, { status: 500 });
+	// A verified Resend sender; falls back to Resend's shared test sender for a first smoke.
+	const from = env.FEEDBACK_FROM ?? 'Ask 214 <onboarding@resend.dev>';
 
 	// Per-IP rapid-fire limit (atomic edge binding). Resend's free-tier daily quota is the hard
 	// inbox-flood backstop, so no separate daily counter is needed.
@@ -37,8 +36,8 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 			'content-type': 'application/json'
 		},
 		body: JSON.stringify({
-			from: FROM,
-			to: TO,
+			from,
+			to: env.FEEDBACK_TO,
 			subject: decision.email.subject,
 			text: decision.email.text,
 			...(decision.email.replyTo ? { reply_to: decision.email.replyTo } : {})

@@ -13,6 +13,8 @@ function makeEvent(
 		platform: {
 			env: {
 				RESEND_API_KEY: opts.noKey ? undefined : 're_test',
+				FEEDBACK_TO: 'inbox@example.com',
+				FEEDBACK_FROM: 'Test <feedback@send.example.com>',
 				FEEDBACK_LIMITER: { limit: async () => ({ success: !opts.limited }) }
 			}
 		}
@@ -35,7 +37,8 @@ describe('POST /api/feedback', () => {
 		expect(url).toBe('https://api.resend.com/emails');
 		expect((init.headers as Record<string, string>).authorization).toBe('Bearer re_test');
 		const sent = JSON.parse(init.body as string);
-		expect(sent.to).toBe('ask214.military@gmail.com');
+		expect(sent.to).toBe('inbox@example.com');
+		expect(sent.from).toBe('Test <feedback@send.example.com>');
 		expect(sent.subject).toBe('Ask 214 feedback');
 		expect(sent.text).toContain('the ask page broke');
 		expect(sent.text).toContain('Page: Timeline');
