@@ -159,7 +159,9 @@ describe('AskView', () => {
 			card({ sourceTitle: 'Similar A' }),
 			card({ sourceTitle: 'Similar B' })
 		];
-		const { container } = render(AskView, { props: props({ kind: 'results', cards }) });
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards })
+		});
 		expect(container.querySelector('.ask-card--lead')?.textContent).toContain('Lead Source');
 		const toggle = container.querySelector('.ask-toggle') as HTMLButtonElement;
 		expect(toggle.textContent).toContain('2'); // "Show 2 similar sources"
@@ -170,7 +172,9 @@ describe('AskView', () => {
 	});
 
 	it('results: a single hit shows the lead with no similar toggle', () => {
-		const { container } = render(AskView, { props: props({ kind: 'results', cards: [card()] }) });
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards: [card()] })
+		});
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
 		expect(container.querySelector('.ask-toggle')).toBeNull();
 	});
@@ -189,7 +193,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent', sourceTitle: 'VA - Intent to File' });
 		const loadSource = vi.fn(async () => heldSource());
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', cards: [lead] }, { loadSource })
+			props: props({ kind: 'results', origin: 'device', cards: [lead] }, { loadSource })
 		});
 		expect(container.querySelector('.reader__title')).toBeNull(); // reader closed initially
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
@@ -203,7 +207,10 @@ describe('AskView', () => {
 	it('results: "Read more" opens the reader highlighting the passage the card cited', async () => {
 		const lead = card({ sourceId: 'va_intent', chunkId: 'h2' });
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', cards: [lead] }, { loadSource: async () => heldSource() })
+			props: props(
+				{ kind: 'results', origin: 'device', cards: [lead] },
+				{ loadSource: async () => heldSource() }
+			)
 		});
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
 		await vi.waitFor(() => {
@@ -219,7 +226,10 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent' });
 		// A pending load: the reader must still open right away and show loading, not do nothing.
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', cards: [lead] }, { loadSource: () => new Promise(() => {}) })
+			props: props(
+				{ kind: 'results', origin: 'device', cards: [lead] },
+				{ loadSource: () => new Promise(() => {}) }
+			)
 		});
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
 		flushSync();
@@ -232,7 +242,7 @@ describe('AskView', () => {
 		let resolveLoad!: (s: Source | null) => void;
 		const loadSource = () => new Promise<Source | null>((r) => (resolveLoad = r));
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', cards: [lead] }, { loadSource })
+			props: props({ kind: 'results', origin: 'device', cards: [lead] }, { loadSource })
 		});
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
 		flushSync();
@@ -258,7 +268,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent' });
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', cards: [lead] },
+				{ kind: 'results', origin: 'device', cards: [lead] },
 				{
 					loadSource: async () => {
 						throw new Error('corpus fetch failed');
@@ -325,6 +335,41 @@ describe('AskView', () => {
 		expect(container.querySelector('.ask-private')?.textContent).toContain('on your device');
 	});
 
+	it('the privacy copy follows the answer origin, not the live mode toggle', async () => {
+		// An online answer is on screen; the user then flips the toggle (or the nudge) to "On device". The
+		// displayed answer still egressed, so the privacy line and the reader must NOT relabel it as
+		// on-device - the copy keys off the result's snapshot origin, never the current mode.
+		const lead = card({ sourceId: 'va_intent' });
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'results', origin: 'online', cards: [lead] },
+				{ onlineCapable: true, mode: 'device', loadSource: async () => heldSource() }
+			)
+		});
+		const priv = container.querySelector('.ask-private')?.textContent ?? '';
+		expect(priv).toContain('only your question is sent'); // online-only phrasing
+		expect(priv).not.toContain('nothing you type is sent'); // the device-only phrasing must be absent
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		await vi.waitFor(() => expect(container.querySelector('.reader__title')).not.toBeNull());
+		const readerText = container.querySelector('dialog.reader')?.textContent ?? '';
+		expect(readerText).toMatch(/official source text/i); // the neutral online reader copy
+		expect(readerText).not.toMatch(/no connection needed/i); // never the on-device offline assurance
+	});
+
+	it('a device answer keeps the on-device copy even after the mode flips to online', () => {
+		// The mirror: a genuinely on-device answer keeps its true "nothing sent" assurance, not the neutral
+		// online wording, when the toggle is later moved to online.
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'results', origin: 'device', cards: [card()] },
+				{ onlineCapable: true, mode: 'online' }
+			)
+		});
+		const priv = container.querySelector('.ask-private')?.textContent ?? '';
+		expect(priv).toContain('nothing you type is sent'); // device-only phrasing
+		expect(priv).not.toContain('only your question is sent'); // the online-only phrasing must be absent
+	});
+
 	it('freezes the mode toggle and the nudge button while a query is in flight', () => {
 		const { container } = render(AskView, {
 			props: props({ kind: 'embedding' }, { onlineCapable: true, mode: 'online', showNudge: true })
@@ -378,7 +423,7 @@ describe('AskView', () => {
 		};
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', cards: [card()], summary },
+				{ kind: 'results', origin: 'online', cards: [card()], summary },
 				{ onlineCapable: true, mode: 'online' }
 			)
 		});

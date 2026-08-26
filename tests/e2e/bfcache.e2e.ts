@@ -20,7 +20,7 @@ test('page-lifecycle: pagehide relocks the profile, persisted pageshow restores 
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill('2027-04-15');
 	await page.getByRole('button', { name: /save and continue/i }).click();
-	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 
 	// Settings shows the decrypted value (store loaded, unlocked).
 	await page.goto('/settings');
@@ -48,7 +48,7 @@ test('page-lifecycle: freeze relocks the profile, resume restores it', async ({ 
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill('2027-04-15');
 	await page.getByRole('button', { name: /save and continue/i }).click();
-	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 
 	await page.goto('/settings');
 	await expect(page.getByText('2027-04-15')).toBeVisible();
@@ -71,7 +71,7 @@ test('page-lifecycle: hiding the page relocks the profile, showing it restores',
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill('2027-04-15');
 	await page.getByRole('button', { name: /save and continue/i }).click();
-	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 
 	await page.goto('/settings');
 	await expect(page.getByText('2027-04-15')).toBeVisible();
@@ -98,7 +98,7 @@ test('page-lifecycle: an explicit Lock survives a background and restore', async
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill('2027-04-15');
 	await page.getByRole('button', { name: /save and continue/i }).click();
-	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 
 	await page.goto('/settings');
 	await page.getByRole('button', { name: /^lock$/i }).click();

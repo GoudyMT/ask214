@@ -1,5 +1,5 @@
-Contact: https://github.com/GoudyMT/military-transition-companion/security/advisories/new
+Contact: https://github.com/GoudyMT/ask214/security/advisories/new
 Expires: 2027-05-22T00:00:00.000Z
 Preferred-Languages: en
-Canonical: https://military-transition-companion.goudymt.workers.dev/.well-known/security.txt
-Policy: https://military-transition-companion.goudymt.workers.dev/about
+Canonical: https://ask214.com/.well-known/security.txt
+Policy: https://ask214.com/about

@@ -240,6 +240,24 @@ describe('createAskStore', () => {
 		expect(corpusLoads).toBe(0); // online retrieval is server-side; the corpus stays unfetched
 	});
 
+	it('an online answer records origin online (so the privacy copy cannot mislabel it)', async () => {
+		const store = onlineStore();
+		await store.ask('how do I file a claim'); // online default + already consented
+		expect(store.state.kind).toBe('results');
+		if (store.state.kind === 'results') expect(store.state.origin).toBe('online');
+	});
+
+	it('a device answer records origin device', async () => {
+		localStorage.setItem('mtc:ask:model-downloaded', '1'); // set-up device: the query runs
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			getCorpus: async () => fixtureCorpus()
+		});
+		await store.ask('how do I file a claim');
+		expect(store.state.kind).toBe('results');
+		if (store.state.kind === 'results') expect(store.state.origin).toBe('device');
+	});
+
 	it('defaults to device mode and shows no nudge when no online deps are given', () => {
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),

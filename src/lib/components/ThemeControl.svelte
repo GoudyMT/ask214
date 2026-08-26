@@ -40,6 +40,13 @@
 		border-radius: 999px;
 		overflow: hidden;
 	}
+	/* The keyboard focus ring sits on the container, outset, so it is never clipped by the pill's
+	   overflow:hidden + rounded ends (an inset per-segment ring loses its corners there). The accent
+	   fill still marks which segment is active. WCAG 2.4.7. */
+	.seg:has(:focus-visible) {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
 	.seg button {
 		border: none;
 		background: transparent;
@@ -52,14 +59,5 @@
 	.seg button[aria-pressed='true'] {
 		background: var(--color-accent);
 		color: var(--color-bg);
-	}
-	.seg button:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: -2px;
-	}
-	/* On the selected (accent-filled) segment an accent ring would be accent-on-accent and invisible;
-	   use the bg color so the focus indicator stays visible (WCAG 2.4.7 / 1.4.11). */
-	.seg button[aria-pressed='true']:focus-visible {
-		outline-color: var(--color-bg);
 	}
 </style>

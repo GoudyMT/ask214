@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 // appears only when there is no EAOS yet; saving an EAOS removes it; skipping leaves it in place
 // (soft gate). Each test runs in a fresh browser context, so IndexedDB starts empty.
 
-test('wizard happy path: Get started -> save EAOS -> Home drops the setup CTA', async ({
+test('wizard happy path: Get started -> save EAOS -> lands on the timeline, Home CTA gone', async ({
 	page
 }) => {
 	await page.goto('/');
@@ -17,8 +17,15 @@ test('wizard happy path: Get started -> save EAOS -> Home drops the setup CTA', 
 	await page.getByLabel(/separation date/i).fill('2027-04-15');
 	await page.getByRole('button', { name: /save and continue/i }).click();
 
-	// Back on Home, with an EAOS now stored, so the CTA is gone.
-	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	// Save and continue lands on the timeline the user just set up (not Home).
+	await expect(page).toHaveURL(/\/timeline\/?$/);
+
+	// The client-side transition rendered the anchored timeline itself (generated task cards), not the
+	// setup CTA or the locked panel - the exact SPA path the wizard's save now takes, end to end.
+	await expect(page.locator('article.task-card').first()).toBeVisible();
+
+	// The setup is persisted: Home no longer shows the setup CTA (soft gate satisfied).
+	await page.goto('/');
 	await expect(page.getByRole('link', { name: /set up your timeline/i })).toBeHidden();
 });
 

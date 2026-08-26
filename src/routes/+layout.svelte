@@ -285,7 +285,7 @@
 		</p>
 		<p>
 			<a href={resolve('/about')}>About</a> &middot;
-			<a href="https://github.com/GoudyMT/military-transition-companion" rel="external">Source</a>
+			<a href="https://github.com/GoudyMT/ask214" rel="external">Source</a>
 			&middot;
 			<a href={resolve('/feedback')} onclick={() => stashRoute(page.url.pathname)}>Feedback</a>
 		</p>

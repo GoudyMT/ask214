@@ -82,7 +82,9 @@ export function createAskStore(deps: {
 			modelLoaded = true;
 			markModelDownloaded();
 			const cards = toResultCards(filterByMinScore(search(vector, corpus, K), MIN_SCORE));
-			commitIfCurrent(cards.length > 0 ? { kind: 'results', cards } : { kind: 'empty' });
+			commitIfCurrent(
+				cards.length > 0 ? { kind: 'results', origin: 'device', cards } : { kind: 'empty' }
+			);
 		} catch (e) {
 			const code = e instanceof AskError ? e.code : ASK_ERROR.EMBED;
 			// Superseded mid-embed (a crisis message routed to help, a pending consent gate) - do not clobber.
@@ -168,7 +170,11 @@ export function createAskStore(deps: {
 				summary = undefined;
 			}
 		}
-		commitIfCurrent(summary ? { kind: 'results', cards, summary } : { kind: 'results', cards });
+		commitIfCurrent(
+			summary
+				? { kind: 'results', origin: 'online', cards, summary }
+				: { kind: 'results', origin: 'online', cards }
+		);
 	}
 
 	async function ask(query: string): Promise<void> {

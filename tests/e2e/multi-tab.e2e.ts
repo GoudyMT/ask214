@@ -16,7 +16,7 @@ test('a saved EAOS propagates across tabs: IDB load + live broadcast update', as
 	await tabA.goto('/wizard');
 	await tabA.getByLabel(/separation date/i).fill('2027-04-15');
 	await tabA.getByRole('button', { name: /save and continue/i }).click();
-	await expect(tabA.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	await expect(tabA.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 
 	// Tab B: open Settings; it loads the stored EAOS from IndexedDB (cross-tab read).
 	const tabB = await context.newPage();

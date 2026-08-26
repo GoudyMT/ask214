@@ -12,12 +12,12 @@ const EAOS = '2027-04-15';
 // Subline shows the human-formatted EAOS (formatTimelineDate: 2027-04-15 -> "Apr 15, 2027").
 const SUBLINE = 'Anchored to Apr 15, 2027 - tracking your 24-month runway';
 
-// First-run wizard saves an encrypted profile with an EAOS, then lands back on Home.
+// First-run wizard saves an encrypted profile with an EAOS, then lands on the timeline.
 async function setEaos(page: Page): Promise<void> {
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill(EAOS);
 	await page.getByRole('button', { name: /save and continue/i }).click();
-	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeVisible();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 }
 
 test('primary nav exposes a Timeline link that routes to /timeline', async ({ page }) => {
