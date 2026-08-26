@@ -53,7 +53,9 @@
 		saving = true;
 		try {
 			await store.save({ eaos: bytes, setupIntent: 'completed' });
-			await goto(resolve('/'));
+			// Land on the timeline the user just set up - "Save and continue" continues to the thing
+			// they built. (Skip, below, stays on Home since nothing was set up.)
+			await goto(resolve('/timeline'));
 		} catch (err) {
 			if (err instanceof OccConflictError) {
 				// Another tab set up the profile first. Re-read the authoritative state and ask

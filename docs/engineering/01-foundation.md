@@ -28,7 +28,7 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **What it is.** SvelteKit is a full-stack web framework built on Svelte 5. It handles routing, server-side rendering, prerendering, and bundling. Svelte itself is a compiler-driven UI framework that produces small runtime bundles by shifting work to build time.
 
-**Why this project uses it.** The product ships as a Progressive Web App with offline-first capability and an on-device retrieval pipeline in a later phase. Bundle size matters: smaller bundles mean faster first load on mobile, less context to cache for offline-first, and lower memory pressure when the local ML inference path arrives. Svelte produces a ~20-40 KB runtime — meaningfully smaller than React (~140 KB) or Vue (~80 KB).
+**Why this project uses it.** The product ships as a Progressive Web App with offline-first capability and an on-device retrieval pipeline in a later phase. Bundle size matters: smaller bundles mean faster first load on mobile, less context to cache for offline-first, and lower memory pressure when the local ML inference path arrives. Svelte produces a ~20-40 KB runtime -- meaningfully smaller than React (~140 KB) or Vue (~80 KB).
 
 **Considered alternatives.** Next.js (largest ecosystem, but server-rendering optimizations are misaligned with an offline-first model). SolidStart (similarly small bundles, smaller ecosystem, fewer Cloudflare adapters at production-readiness). Astro (excellent for content sites; our interactivity model is closer to a single-page app).
 
@@ -90,7 +90,7 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Considered alternatives.** nvm-windows (slower, separate binaries per Node version). Volta (auto-switches via `package.json` instead of `.nvmrc`; less common in CI). System Node + npm prefix to user dir (works, but considered an anti-pattern by the community).
 
-**Tradeoffs accepted.** One additional tool to install. PowerShell profile must self-bootstrap fnm's directory in case Windows User PATH does not propagate to fresh shells — an issue encountered during the actual setup.
+**Tradeoffs accepted.** One additional tool to install. PowerShell profile must self-bootstrap fnm's directory in case Windows User PATH does not propagate to fresh shells -- an issue encountered during the actual setup.
 
 ---
 
@@ -120,9 +120,9 @@ The foundation phase establishes the development environment, build pipeline, an
 
 ### Cloudflare Workers + Static Assets
 
-**What it is.** Cloudflare's serverless edge platform with unified static-asset + Worker handling. The platform merged its older "Pages" product into the Workers model through 2025-2026 — static assets serve from edge cache while a single Worker handles dynamic requests.
+**What it is.** Cloudflare's serverless edge platform with unified static-asset + Worker handling. The platform merged its older "Pages" product into the Workers model through 2025-2026 -- static assets serve from edge cache while a single Worker handles dynamic requests.
 
-**Why this project uses it.** Generous free tier covers expected scale through v1.0 launch. Native SvelteKit adapter (`@sveltejs/adapter-cloudflare`) emits the Worker + assets layout directly into `.svelte-kit/cloudflare/`. When v1.1 adds the synthesis API proxy, that Worker lives on the same platform as the frontend — one mental model for both layers.
+**Why this project uses it.** Generous free tier covers expected scale through v1.0 launch. Native SvelteKit adapter (`@sveltejs/adapter-cloudflare`) emits the Worker + assets layout directly into `.svelte-kit/cloudflare/`. When v1.1 adds the synthesis API proxy, that Worker lives on the same platform as the frontend -- one mental model for both layers.
 
 **Configuration.** `wrangler.toml` at repo root pins Worker name, entry point, compatibility date, and the `nodejs_compat` flag SvelteKit internals require. `wrangler deploy` consumes this config; Cloudflare's CI handles authentication automatically when the project is connected via the dashboard.
 
@@ -146,9 +146,9 @@ The foundation phase establishes the development environment, build pipeline, an
 
 ### Architecture Decision Records
 
-**What it is.** Each significant architectural decision is captured as an Architecture Decision Record (ADR) in `docs/decisions/` using the MADR template — short documents (300-800 words) recording context, options considered, the chosen path, and consequences.
+**What it is.** Each significant architectural decision is captured as an Architecture Decision Record (ADR) in `docs/decisions/` using the MADR template -- short documents (300-800 words) recording context, options considered, the chosen path, and consequences.
 
-**Why this project uses them.** Decisions get re-asked. "Why AGPL?" comes up in pull-request reviews, license negotiations, and trademark searches months apart. "Why local-first PII?" comes up in every security review. ADRs are the durable answer: written once when the decision is fresh, referenced thereafter. Status is mutable (accepted, deprecated, superseded) but filenames and numbers are permanent — decisions are immutable history, not erased when superseded.
+**Why this project uses them.** Decisions get re-asked. "Why AGPL?" comes up in pull-request reviews, license negotiations, and trademark searches months apart. "Why local-first PII?" comes up in every security review. ADRs are the durable answer: written once when the decision is fresh, referenced thereafter. Status is mutable (accepted, deprecated, superseded) but filenames and numbers are permanent -- decisions are immutable history, not erased when superseded.
 
 **Indexing.** `docs/decisions/000-decisions-index.md` lists every ADR by number, title, status, date, and reference to the design spec section that captured the original decision context.
 
@@ -158,7 +158,7 @@ The foundation prioritizes speed of iteration without compromising reliability. 
 
 The stack also assumes solo development without compromising on quality. The pre-commit hook is the human reviewer that does not exist. Strict TypeScript is the peer who would have caught the null dereference. Vitest's browser mode replaces the manual component check a QA team would normally perform. Each automation closes a gap that a small team would normally close with people.
 
-Cloudflare Pages was chosen for cost (free at expected scale) and native SvelteKit support (no porting overhead). The AGPL license guards the project against commercial fork-and-outrun.
+Cloudflare Workers (with Static Assets) was chosen for cost (free at expected scale) and native SvelteKit support (no porting overhead). The AGPL license guards the project against commercial fork-and-outrun.
 
 ## Standards Adopted in This Section
 

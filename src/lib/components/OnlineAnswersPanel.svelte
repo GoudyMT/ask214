@@ -133,15 +133,23 @@
 		margin-top: var(--space-m);
 	}
 	.online-mode {
-		display: flex;
-		gap: var(--space-xs);
+		display: inline-flex;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+	/* The keyboard focus ring sits on the container, outset, so it is never clipped by the pill's
+	   overflow:hidden + rounded ends (an inset per-segment ring loses its corners there). The accent
+	   fill still marks which segment is active. WCAG 2.4.7. */
+	.online-mode:has(:focus-visible) {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 	.online-mode__opt {
-		background: var(--color-bg);
+		background: transparent;
 		color: var(--color-fg-muted);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-m);
-		padding: var(--space-xs) var(--space-m);
+		border: none;
+		padding: 6px 15px;
 		font: inherit;
 		font-size: var(--font-size-s);
 		cursor: pointer;
@@ -149,7 +157,6 @@
 	.online-mode__opt[aria-pressed='true'] {
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border-color: var(--color-accent);
 	}
 	.online-synth {
 		margin-top: var(--space-l);
@@ -175,6 +182,9 @@
 	}
 	.online-key__input {
 		flex: 1;
+		/* min-width:0 so the flex input can shrink instead of overflowing the row at narrow widths
+		   (a flex item's default min-width:auto is the input's intrinsic content width). */
+		min-width: 0;
 		background: var(--color-bg);
 		color: var(--color-fg);
 		border: 1px solid var(--color-border);

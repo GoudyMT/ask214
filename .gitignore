@@ -1,5 +1,5 @@
 # ==============================================================================
-# .gitignore - Military Transition Companion
+# .gitignore - Ask 214
 # ==============================================================================
 #
 # PRIVACY STANCE:
@@ -147,7 +147,7 @@ NOTES.private
 # ==============================================================================
 # What IS tracked (visible in public repo):
 #   - README.md (project introduction)
-#   - LICENSE (open source license, TBD AGPL vs MIT)
+#   - LICENSE (GNU AGPL v3.0)
 #   - All source code (src/, tests/)
 #   - Package config (package.json, tsconfig.json, etc.)
 #   - CI config (.github/workflows/)

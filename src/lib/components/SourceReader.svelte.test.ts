@@ -169,4 +169,38 @@ describe('SourceReader', () => {
 		expect(body.scrollTop).toBeGreaterThan(0); // scrolled down to the cited block, not left at the top
 		expect(document.activeElement).toBe(cited); // focus landed on the cited region
 	});
+
+	it('device mode (default): copy references on-device storage and no-connection', () => {
+		const { container } = render(SourceReader, {
+			props: { source: source(), onClose: () => {} }
+		});
+		flushSync();
+		const held = container.querySelector('.reader__held') as HTMLElement;
+		expect(held.textContent).toMatch(/on your device/i);
+		expect(held.classList.contains('reader__held--neutral')).toBe(false);
+		expect(container.querySelector('.reader__muted')?.textContent).toMatch(/no connection needed/i);
+	});
+
+	it('online mode: neutral copy, no on-device / no-connection framing', () => {
+		const { container } = render(SourceReader, {
+			props: { source: source(), online: true, onClose: () => {} }
+		});
+		flushSync();
+		const held = container.querySelector('.reader__held') as HTMLElement;
+		expect(held.textContent).toMatch(/official source text/i);
+		expect(held.textContent).not.toMatch(/on your device/i);
+		expect(held.classList.contains('reader__held--neutral')).toBe(true);
+		// the on-device footer note is omitted for online answers
+		expect(container.querySelector('.reader__muted')).toBeNull();
+	});
+
+	it('online mode loading: status drops the on-device wording', () => {
+		const { container } = render(SourceReader, {
+			props: { source: null, loading: true, online: true, onClose: () => {} }
+		});
+		flushSync();
+		const status = container.querySelector('.reader__status') as HTMLElement;
+		expect(status.textContent).toMatch(/loading the source/i);
+		expect(status.textContent).not.toMatch(/on your device/i);
+	});
 });

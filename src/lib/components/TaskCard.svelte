@@ -328,6 +328,12 @@
 	}
 
 	.task-card__actions button {
+		/* Touch target: these labels are 14px accent links with no padding (~21px tall), under the WCAG
+		   2.5.8 (AA) 24px minimum. min-height promotes the tap area to the 44px touch standard WITHOUT
+		   horizontal padding - so the row width is unchanged and cannot overflow a ~320px screen. */
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
 		padding: 0;
 		background: none;
 		border: none;

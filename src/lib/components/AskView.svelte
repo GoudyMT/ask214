@@ -64,6 +64,12 @@
 	// A query is in flight: freeze the mode controls so a mid-flight switch can't land the result under the
 	// other mode's privacy line (both the toggle and the nudge's button change egress mode).
 	const inFlight = $derived(askState.kind === 'embedding' || askState.kind === 'modelLoading');
+	// The privacy copy must describe the DISPLAYED answer's origin, not the live toggle. With results on
+	// screen it reads the result's snapshot origin; otherwise it is forward-looking about the next query
+	// (the current mode). This stops a post-results mode flip from relabeling where an answer came from.
+	const answeredOnline = $derived(
+		askState.kind === 'results' ? askState.origin === 'online' : onlineCapable && mode === 'online'
+	);
 
 	function submit() {
 		if (query.trim() !== '') onAsk(query);
@@ -184,8 +190,8 @@
 	</div>
 {/if}
 
-<p class="ask-private" class:ask-private--online={onlineCapable && mode === 'online'}>
-	{#if onlineCapable && mode === 'online'}
+<p class="ask-private" class:ask-private--online={answeredOnline}>
+	{#if answeredOnline}
 		Answered online - only your question is sent; your profile and data stay on your device.
 	{:else}
 		Answered on your device - nothing you type is sent to a server or shared.
@@ -317,6 +323,7 @@
 	highlightId={openHighlightId}
 	loading={readerLoading}
 	error={readerError}
+	online={answeredOnline}
 	onClose={closeReader}
 />
 
@@ -368,6 +375,10 @@
 	}
 	.ask-input {
 		flex: 1;
+		/* A flex item defaults to min-width:auto, which for an <input> is its intrinsic content width -
+		   it then refuses to shrink and pushes the Search button past the viewport on a ~320px screen.
+		   min-width:0 lets the input shrink so the input + button stay on one line within the viewport. */
+		min-width: 0;
 		background: var(--color-surface);
 		color: var(--color-fg);
 		border: 1px solid var(--color-border);

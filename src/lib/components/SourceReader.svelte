@@ -10,12 +10,16 @@
 		highlightId = null,
 		loading = false,
 		error = false,
+		online = false,
 		onClose
 	}: {
 		source: Source | null;
 		highlightId?: string | null;
 		loading?: boolean;
 		error?: boolean;
+		// True when the answer came from the online path. The reader shows the local corpus text either
+		// way, but the on-device / no-connection reassurance only applies to on-device answers.
+		online?: boolean;
 		onClose: () => void;
 	} = $props();
 
@@ -79,8 +83,12 @@
 			>
 		</div>
 		<div class="reader__body">
-			<p class="reader__held">
-				Showing the text saved on your device - open the official site for the complete original.
+			<p class="reader__held" class:reader__held--neutral={online}>
+				{#if online}
+					Showing the official source text - open the official site for the complete original.
+				{:else}
+					Showing the text saved on your device - open the official site for the complete original.
+				{/if}
 			</p>
 			<!-- index key: this list is replace-all re-rendered per source and never reordered, so the index
 			     is stable and collision-proof; the highlight matches on passage.id === highlightId, not the key -->
@@ -114,7 +122,9 @@
 			<a class="reader__link" href={source.url} target="_blank" rel="noopener noreferrer"
 				>View on the official site</a
 			>
-			<span class="reader__muted">Held on your device - no connection needed.</span>
+			{#if !online}
+				<span class="reader__muted">Held on your device - no connection needed.</span>
+			{/if}
 		</div>
 	{:else if loading || error}
 		<div class="reader__head">
@@ -132,7 +142,9 @@
 			<!-- Distinct nodes per state: loading->error inserts a FRESH role="alert" node (reliably
 			     announced), rather than mutating a role="status" node's attribute in place. -->
 			{#if loading}
-				<p class="reader__status" role="status">Loading the source held on your device...</p>
+				<p class="reader__status" role="status">
+					{online ? 'Loading the source...' : 'Loading the source held on your device...'}
+				</p>
 			{:else}
 				<p class="reader__status" role="alert" tabindex="-1" bind:this={errorEl}>
 					This source could not be loaded right now. Check your connection and try again.
@@ -204,6 +216,11 @@
 		background: var(--color-bg);
 		border-left: 3px solid var(--color-success);
 		border-radius: var(--radius-s);
+	}
+	/* Online answers did not earn the on-device privacy signal, so the note is neutral, not success green. */
+	.reader__held--neutral {
+		color: var(--color-fg-muted);
+		border-left-color: var(--color-border);
 	}
 	.reader__status {
 		margin: 0;
