@@ -21,6 +21,8 @@ paths = [
   # 76 SHA-256 contentHash/cleanedHash provenance values + other corpus data (public gov content)
   '''content-ops/.*\.json''',
   '''static/corpus/.*''',
+  # model-integrity SHA-256 hashes of the vendored public model files (not secrets)
+  '''src/lib/ask/model-vendor\.manifest\.json''',
   '''pnpm-lock\.yaml''',
   # test fixtures may contain deliberately-fake tokens
   '''.*\.test\.ts''',
