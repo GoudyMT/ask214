@@ -29,7 +29,7 @@
 <h2>Privacy</h2>
 <p>
 	Your personal information stays on your device by default. We do not use third-party trackers,
-	advertising IDs, or fingerprinting. No analytics by default - opt-in only.
+	advertising IDs, fingerprinting, or analytics of any kind.
 </p>
 
 <h2>Sources</h2>
