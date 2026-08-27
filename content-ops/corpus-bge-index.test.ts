@@ -36,3 +36,42 @@ describe('bge server corpus index', () => {
 		expect(bge.version).toBe(minilm.version);
 	});
 });
+
+// Read a top-level `const NAME = ...;` literal straight from a source file, so the assertions below bind
+// to the values the code actually ships, not a copy transcribed into this test.
+function numConst(src: string, name: string): number {
+	const m = new RegExp(`const ${name} = ([\\d.]+);`).exec(src);
+	const v = m?.[1];
+	if (v === undefined) throw new Error('required numeric const not found in source');
+	return Number(v);
+}
+function strConst(src: string, name: string): string {
+	const m = new RegExp(`const ${name} = '([^']*)';`).exec(src);
+	const v = m?.[1];
+	if (v === undefined) throw new Error('required string const not found in source');
+	return v;
+}
+
+// ADR-025 config-as-invariant: bge is asymmetric (the query carries the instruction prefix; passages do
+// not), and MIN_SCORE is a held-out-calibrated cutoff. The retrieve Worker, the bge eval, and the built
+// index must agree on the model id, the query prefix, and the cutoff, or the online path silently drops
+// or admits the wrong results. The Worker states this invariant in a comment; this fails the build when
+// any of the three drifts, so it can never go unenforced. On failure: re-run `pnpm eval:bge`, reconcile.
+describe('retrieve Worker config is bound to the index it serves (ADR-025)', () => {
+	const bge = loadManifest(BGE_MANIFEST);
+	const worker = readFileSync('workers/retrieve/src/index.ts', 'utf8');
+	const bgeEval = readFileSync('content-ops/eval-corpus-bge.mjs', 'utf8');
+
+	it('Worker query + embed model ids match the model the index was built with', () => {
+		expect(strConst(worker, 'BGE_MODEL_ID')).toBe(bge.modelId);
+		expect(strConst(worker, 'EMBED_MODEL')).toBe(bge.modelId);
+	});
+
+	it('Worker MIN_SCORE matches the held-out-calibrated cutoff the eval gates on', () => {
+		expect(numConst(worker, 'MIN_SCORE')).toBe(numConst(bgeEval, 'WORKER_MIN_SCORE'));
+	});
+
+	it('Worker QUERY_PREFIX matches the prefix the index was evaluated with', () => {
+		expect(strConst(worker, 'QUERY_PREFIX')).toBe(strConst(bgeEval, 'QUERY_PREFIX'));
+	});
+});
