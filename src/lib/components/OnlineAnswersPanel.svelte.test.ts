@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect } from 'vitest';
 import OnlineAnswersPanel from './OnlineAnswersPanel.svelte';
+import { scrubSecureInputs } from '../profile/lifecycle';
 
 type Props = {
 	defaultMode: 'device' | 'online';
@@ -64,5 +65,17 @@ describe('OnlineAnswersPanel', () => {
 	it('when a key is stored, offers to clear it and does not show the raw value', () => {
 		const { container } = render(OnlineAnswersPanel, { props: { ...base, hasKey: true } });
 		expect(container.querySelector('.online-key__clear')).not.toBeNull();
+	});
+
+	it('registers the key input so a relock scrub wipes a typed-but-unsaved key (DOM hygiene)', () => {
+		const { container } = render(OnlineAnswersPanel, { props: { ...base } });
+		flushSync(); // let the registration $effect run
+		const input = container.querySelector('.online-key__input') as HTMLInputElement;
+		input.value = 'sk-ant-secret';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		expect(input.value).toBe('sk-ant-secret');
+		scrubSecureInputs();
+		expect(input.value).toBe('');
 	});
 });

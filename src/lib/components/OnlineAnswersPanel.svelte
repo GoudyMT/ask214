@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { registerSecureInput } from '../profile/lifecycle';
+
 	type Props = {
 		defaultMode: 'device' | 'online';
 		synthesisEnabled: boolean;
@@ -19,8 +21,16 @@
 		onClearKey
 	}: Props = $props();
 
-	// Held only long enough to save; cleared on save so a typed secret never lingers in component state.
+	// Held only long enough to save; cleared on save. The live input is also registered below so a
+	// relock scrub wipes any typed-but-unsaved key from the DOM (the JS draft dies with the component).
 	let keyDraft = $state('');
+
+	// Register the key input's DOM node so freezeRelock -> scrubSecureInputs clears any typed-but-unsaved
+	// key on relock - the single highest-value cleartext input, matching the EAOS field. Cleanup on unmount.
+	let keyInputEl = $state<HTMLInputElement | null>(null);
+	$effect(() => {
+		if (keyInputEl) return registerSecureInput(keyInputEl);
+	});
 
 	function save(): void {
 		const key = keyDraft.trim();
@@ -72,6 +82,7 @@
 		<div class="online-key__row">
 			<input
 				id="online-key-input"
+				bind:this={keyInputEl}
 				class="online-key__input"
 				type="password"
 				bind:value={keyDraft}
