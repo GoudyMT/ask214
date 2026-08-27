@@ -37,6 +37,15 @@ export default defineConfig(
 		}
 	},
 	{
+		// The app runtime routes all diagnostics through the type-safe safeLog sink
+		// (src/lib/log/safelog.ts): a raw console.* could leak decrypted PII (e.g. console.error(err)
+		// where err wraps profile data), so console is banned in runtime source. Build-time CLI
+		// scripts (content-ops) and tests keep console.
+		files: ['src/**/*.{ts,svelte}'],
+		ignores: ['src/**/*.test.ts', 'src/**/*.browser.test.ts', 'src/**/*.svelte.test.ts'],
+		rules: { 'no-console': 'error' }
+	},
+	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 		languageOptions: {
 			parserOptions: {
