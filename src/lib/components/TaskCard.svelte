@@ -615,8 +615,9 @@
 		white-space: nowrap;
 	}
 
-	/* Per-status collapsed edge + label color (mockup ln-*): done = success green; skipped = muted +
-	   dimmed; snoozed = muted with a dashed edge to read as "paused, not closed". */
+	/* Per-status collapsed edge + label color: done = success green; skipped = muted edge + label at
+	   full opacity (the text must clear WCAG AA); snoozed = muted with a dashed edge to read as
+	   "paused, not closed". */
 	.line-done {
 		border-left-color: var(--color-success);
 	}
@@ -626,7 +627,6 @@
 
 	.line-skipped {
 		border-left-color: var(--color-border);
-		opacity: 0.65;
 	}
 	.line-skipped .task-line__status {
 		color: var(--color-fg-muted);

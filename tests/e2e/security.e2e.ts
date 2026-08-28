@@ -52,9 +52,8 @@ test('CSP is present and strict (header or meta tag)', async ({ page, request })
 });
 
 test('all external script sources have SRI integrity attributes', async ({ page }) => {
-	// Per _Working Standards.md "Security Standards": SRI on every external asset.
-	// If a future component (or vendored snippet) adds a <script src="https://..."> without
-	// an integrity attribute, this test catches it before merge.
+	// SRI is required on any external <script src>; there are none today (CSP connect-src 'self'), so
+	// this guards against a future component or vendored snippet adding one without integrity.
 	await page.goto('/');
 	const externalScripts = await page.locator('script[src^="http"]').all();
 	for (const s of externalScripts) {

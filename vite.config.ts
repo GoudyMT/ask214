@@ -42,7 +42,8 @@ export default defineConfig({
 					include: [
 						'src/**/*.{test,spec}.{js,ts}',
 						'eslint-plugins/**/*.{test,spec}.{js,ts}',
-						'content-ops/**/*.{test,spec}.{js,ts}'
+						'content-ops/**/*.{test,spec}.{js,ts}',
+						'workers/**/*.{test,spec}.{js,ts}'
 					],
 					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}', 'src/**/*.browser.test.ts']
 				}

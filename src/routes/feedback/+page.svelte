@@ -19,6 +19,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Feedback - Ask 214</title>
+</svelte:head>
+
 <h1>Send feedback</h1>
 <p>
 	Found something wrong, or have an idea to make this better? Send it my way - it goes straight to

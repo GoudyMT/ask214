@@ -29,6 +29,9 @@ export interface PlanDeps {
 	maxQueryChars: number;
 	minScore: number;
 	corpusVersion: string;
+	/** Per-IP rate limit: true = over the limit -> degrade to high_demand. Checked LAZILY (only for a
+	 * valid, non-empty query) and BEFORE the breaker, so a limited request reserves no global budget. */
+	checkRateLimit: () => Promise<boolean>;
 	/** Reserve budget + report whether to degrade. Checked LAZILY -- only for a valid, non-empty query
 	 * that is about to embed -- so malformed/empty requests cannot inflate the counter. */
 	checkBreaker: () => Promise<boolean>;
@@ -59,6 +62,7 @@ export async function planRetrieve(input: PlanInput, deps: PlanDeps): Promise<Re
 	}
 
 	try {
+		if (await deps.checkRateLimit()) return { kind: 'respond', body: { status: 'high_demand' } };
 		if (await deps.checkBreaker()) return { kind: 'respond', body: { status: 'high_demand' } };
 		const embedding = await deps.embed(query);
 		const hits = deps.search(embedding).filter((h) => h.score >= deps.minScore);

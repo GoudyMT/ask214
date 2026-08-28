@@ -21,8 +21,9 @@ describe('classifyAsset', () => {
 	});
 });
 
-// The lazy model/wasm live in their OWN unversioned cache so an app update (which deletes stale
-// app-${version} caches) does NOT evict the ~45MB download (downloaded once).
+// The lazy model/wasm live in their OWN cache, whose name is independent of the app version, so an app
+// update (which deletes stale app-${version} caches) does NOT evict the ~45MB download. The -vN suffix
+// is the cache-bust seam: bump it to re-vendor the model/wasm (their URLs are stable), evicting the old.
 describe('shouldKeepCache (cache partitioning across app updates)', () => {
 	it('keeps the current app-shell cache and the unversioned lazy asset cache', () => {
 		expect(shouldKeepCache('app-v2', 'app-v2')).toBe(true);
@@ -33,10 +34,17 @@ describe('shouldKeepCache (cache partitioning across app updates)', () => {
 		expect(shouldKeepCache('app-v1', 'app-v2')).toBe(false);
 	});
 
-	it('keeps the lazy asset cache across ANY app version (it is unversioned)', () => {
+	it('keeps the lazy asset cache across ANY app version (its name is app-version-independent)', () => {
 		expect(shouldKeepCache(ASK_ASSET_CACHE, 'app-v1')).toBe(true);
 		expect(shouldKeepCache(ASK_ASSET_CACHE, 'app-v99')).toBe(true);
 		expect(ASK_ASSET_CACHE.startsWith('app-')).toBe(false);
+	});
+
+	it('evicts an OLD lazy-cache version once the suffix is bumped (the model/wasm cache-bust)', () => {
+		// A re-vendor of the model/wasm bumps ASK_ASSET_CACHE's -vN suffix; the prior version is no longer
+		// the current name, so activate deletes it and the new bytes are re-fetched on next use.
+		expect(shouldKeepCache('ask-assets-v0', 'app-v2')).toBe(false);
+		expect(ASK_ASSET_CACHE).toMatch(/-v\d+$/);
 	});
 });
 

@@ -21,4 +21,11 @@ describe('About page sources copy is honest', () => {
 		expect(about).toMatch(/17 USC/i);
 		expect(about).toMatch(/cite/i);
 	});
+
+	it('does not imply an opt-in analytics feature (zero telemetry is built, not deferred)', () => {
+		// The opt-in analytics was dropped; no telemetry code exists. "opt-in" copy would promise a
+		// feature the app does not have, so the page must state the no-analytics reality plainly.
+		expect(about).not.toMatch(/opt-in/i);
+		expect(about).toMatch(/analytics of any kind/i);
+	});
 });

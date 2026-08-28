@@ -7,6 +7,7 @@ function deps(over: Partial<PlanDeps> = {}): PlanDeps {
 		maxQueryChars: 512,
 		minScore: 0.65,
 		corpusVersion: '1.0',
+		checkRateLimit: async () => false,
 		checkBreaker: async () => false,
 		embed: async () => [0.1, 0.2],
 		search: () => [{ score: 0.9, chunk: { id: 'c1' } }],
@@ -50,6 +51,18 @@ describe('planRetrieve', () => {
 			deps({ checkBreaker: async () => true, embed })
 		);
 		expect(r).toEqual({ kind: 'respond', body: { status: 'high_demand' } });
+		expect(embed).not.toHaveBeenCalled();
+	});
+
+	it('returns high_demand when the per-IP rate limit is hit, before the breaker or embed', async () => {
+		const checkBreaker = vi.fn(async () => false);
+		const embed = vi.fn(async () => [1]);
+		const r = await planRetrieve(
+			{ ...ok, rawQuery: 'benefits' },
+			deps({ checkRateLimit: async () => true, checkBreaker, embed })
+		);
+		expect(r).toEqual({ kind: 'respond', body: { status: 'high_demand' } });
+		expect(checkBreaker).not.toHaveBeenCalled();
 		expect(embed).not.toHaveBeenCalled();
 	});
 

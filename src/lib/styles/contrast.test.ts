@@ -109,3 +109,44 @@ for (const [blockName, marker] of [
 		}
 	});
 }
+
+// Text `opacity` composites already-muted text toward the background; the token-level checks above
+// never see it, so a dimming opacity can silently push a passing muted pair under AA. Read the real
+// opacity from each component and assert the muted text it dims still clears 4.5:1 as rendered.
+const taskCardCss = readFileSync(
+	fileURLToPath(new URL('../components/TaskCard.svelte', import.meta.url)),
+	'utf8'
+);
+const phaseChipsCss = readFileSync(
+	fileURLToPath(new URL('../components/PhaseChips.svelte', import.meta.url)),
+	'utf8'
+);
+
+// The opacity declared directly on `selector`'s own rule block, or 1 when none is set. Found by a plain
+// string search for `selector {` (no dynamic RegExp); a descendant selector like `.line-skipped .x {`
+// contains `.line-skipped ` not `.line-skipped {`, so it is not matched.
+function opacityOf(css: string, selector: string): number {
+	const at = css.indexOf(`${selector} {`);
+	if (at === -1) return 1;
+	const block = css.slice(at, css.indexOf('}', at));
+	const decl = /opacity:\s*([\d.]+)/.exec(block);
+	const value = decl?.[1];
+	return value ? Number(value) : 1;
+}
+
+for (const [name, t] of [
+	['dark', tokens],
+	['light', tokensLight]
+] as const) {
+	describe(`WCAG AA text opacity - ${name} palette`, () => {
+		const c = t.color;
+		it('collapsed skipped-line muted text (over surface) >= 4.5:1', () =>
+			expect(
+				cr(mix(c.fgMuted, c.surface, opacityOf(taskCardCss, '.line-skipped')), c.surface)
+			).toBeGreaterThanOrEqual(4.5));
+		it('inactive phase-chip count (over bg) >= 4.5:1', () =>
+			expect(
+				cr(mix(c.fgMuted, c.bg, opacityOf(phaseChipsCss, '.phase-chips__count')), c.bg)
+			).toBeGreaterThanOrEqual(4.5));
+	});
+}

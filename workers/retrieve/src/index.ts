@@ -12,6 +12,8 @@ export interface Env {
 	AI: Ai;
 	CORPUS_KV: KVNamespace;
 	BREAKER: DurableObjectNamespace<Breaker>;
+	// Per-IP rate limit (optional: absent in local dev -> the handler fails open).
+	RETRIEVE_LIMITER?: RateLimit;
 }
 
 // Config-as-invariant (ADR-025). bge is asymmetric: the QUERY carries an instruction prefix, passages do
@@ -58,6 +60,14 @@ export default {
 				maxQueryChars: MAX_QUERY_CHARS,
 				minScore: MIN_SCORE,
 				corpusVersion: corpus.version,
+				checkRateLimit: async () => {
+					const limiter = env.RETRIEVE_LIMITER;
+					if (!limiter) return false; // fail open in local dev (no binding)
+					const { success } = await limiter.limit({
+						key: request.headers.get('cf-connecting-ip') ?? 'unknown'
+					});
+					return !success; // true = over the per-IP limit -> degrade to high_demand
+				},
 				checkBreaker: () =>
 					env.BREAKER.getByName('global').reserve(utcDay(Date.now()), EST_NEURONS_PER_QUERY),
 				embed: async (query) => {

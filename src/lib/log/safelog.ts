@@ -3,8 +3,8 @@
  * from passing TypeScript compilation; the mtc/safelog-no-error ESLint rule
  * provides a redundant lint-time check.
  *
- * Production builds strip console.* via esbuild drop; ESLint no-console: error
- * forbids direct console usage. All diagnostic output goes through this sink.
+ * The ESLint no-console rule (error) bans direct console usage in the app runtime, so all
+ * diagnostic output goes through this sink - a raw console could leak decrypted PII.
  *
  * Ring buffer is in-memory only (never persisted; no PII storage); sized 64
  * entries. No public accessor in production - getDiagnosticsForTest is gated

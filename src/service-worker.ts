@@ -32,7 +32,7 @@ sw.addEventListener('activate', (event) => {
 	event.waitUntil(
 		(async () => {
 			for (const key of await caches.keys()) {
-				// Keep the current app-shell cache + the unversioned lazy asset cache; drop stale app caches.
+				// Keep the current app-shell cache + the lazy asset cache; drop stale app caches.
 				if (!shouldKeepCache(key, CACHE)) await caches.delete(key);
 			}
 			await sw.clients.claim();
@@ -55,7 +55,7 @@ sw.addEventListener('fetch', (event) => {
 
 	event.respondWith(
 		(async () => {
-			// Lazy model/wasm -> their own unversioned cache (survives app updates);
+			// Lazy model/wasm -> their own cache (survives app updates);
 			// everything else -> the versioned app-shell cache.
 			const cache = await caches.open(
 				classifyAsset(url.pathname) === 'lazy' ? ASK_ASSET_CACHE : CACHE

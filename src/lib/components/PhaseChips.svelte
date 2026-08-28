@@ -113,6 +113,5 @@
 	}
 	.phase-chips__count {
 		margin-left: 2px;
-		opacity: 0.65;
 	}
 </style>

@@ -30,4 +30,21 @@ describe('_headers policy (P1b)', () => {
 			expect(headers.get(path)?.['Cache-Control'], `${path} must set no-store`).toBe('no-store');
 		}
 	});
+
+	it('the global security headers are locked at their hardened values', () => {
+		// `_headers` applies only at the Cloudflare edge; `vite preview` never serves it, so a weakened
+		// HSTS (dropped preload / lower max-age) or a deleted X-Frame-Options would pass every other unit
+		// gate. Pin the exact values so a regression fails the build here.
+		const global = headers.get('/*');
+		expect(global?.['Strict-Transport-Security']).toBe(
+			'max-age=63072000; includeSubDomains; preload'
+		);
+		expect(global?.['X-Content-Type-Options']).toBe('nosniff');
+		expect(global?.['X-Frame-Options']).toBe('DENY');
+		expect(global?.['Permissions-Policy']).toBe(
+			'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+		);
+		expect(global?.['Cross-Origin-Opener-Policy']).toBe('same-origin');
+		expect(global?.['Cross-Origin-Resource-Policy']).toBe('same-origin');
+	});
 });

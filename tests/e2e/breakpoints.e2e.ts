@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 // Responsive coverage across the app's primary surfaces. The shell unifies to a single 900px
 // max-width across every route (shell-width.ts), so on wide viewports <main> is capped at 900px
@@ -45,6 +45,37 @@ for (const route of ROUTES) {
 			// No horizontal scroll: scrollWidth (content incl. overflow) must not exceed clientWidth
 			// (viewport minus any scrollbar). clientWidth is scrollbar-safe, so a vertical scrollbar
 			// does not false-positive here.
+			const overflow = await page.evaluate(
+				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+			);
+			expect(overflow).toBeLessThanOrEqual(0);
+		});
+	}
+}
+
+// Profile-gated routes: the widest post-setup surfaces (task cards + the phase-chip row + the calendar
+// card on /timeline; the EAOS edit + BYO-key panel on /settings). They render only with a provisioned
+// profile, so the public loop above never reaches them - which is exactly where a long task title or a
+// fixed-width control can overflow a 320px screen. Provision via the wizard, then check overflow.
+const EAOS = '2027-04-15';
+async function setEaos(page: Page): Promise<void> {
+	await page.goto('/wizard');
+	await page.getByLabel(/separation date/i).fill(EAOS);
+	await page.getByRole('button', { name: /save and continue/i }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
+}
+
+const GATED_ROUTES = ['/timeline', '/settings'];
+for (const route of GATED_ROUTES) {
+	for (const vp of MOBILE) {
+		test(`${route} (with profile) - no horizontal overflow at ${vp.width}x${vp.height} (${vp.label})`, async ({
+			page
+		}) => {
+			await page.setViewportSize({ width: vp.width, height: vp.height });
+			await setEaos(page);
+			await page.goto(route);
+
+			await expect(page.getByRole('main')).toBeVisible();
 			const overflow = await page.evaluate(
 				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
 			);
