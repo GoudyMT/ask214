@@ -17,5 +17,12 @@
 	"durable_objects": {
 		"bindings": [{ "name": "BREAKER", "class_name": "Breaker" }]
 	},
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Breaker"] }]
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Breaker"] }],
+	// Per-IP rate limit (atomic edge binding; no namespace resource to create). Caps a single client's
+	// burst so one scripted IP cannot drain the global neuron budget; a limited request degrades to
+	// high_demand (the client falls back to on-device), never an error. Fail-open in local dev (the
+	// handler guards `if (env.RETRIEVE_LIMITER)`). Verify with `wrangler dev` before deploy.
+	"ratelimits": [
+		{ "name": "RETRIEVE_LIMITER", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }
+	]
 }
