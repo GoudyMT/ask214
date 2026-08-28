@@ -93,6 +93,11 @@ describe('retrieve worker fetch wiring', () => {
 		// Read under the EXACT keys the index was written with; a typo -> null -> E_INDEX_MISSING -> error.
 		expect(e.CORPUS_KV.get).toHaveBeenCalledWith('corpus-bge-manifest', 'json');
 		expect(e.CORPUS_KV.get).toHaveBeenCalledWith('corpus-bge-embeddings', 'arrayBuffer');
+		// The bge query MUST carry the instruction prefix + the exact model id (asymmetric bge: the query
+		// prefix wins on MRR). A dropped prefix or a wrong model id would silently degrade retrieval.
+		expect(e.AI.run).toHaveBeenCalledWith('@cf/baai/bge-small-en-v1.5', {
+			text: ['Represent this sentence for searching relevant passages: va disability']
+		});
 	});
 
 	it('maps a missing KV index to error, never a crash (E_INDEX_MISSING)', async () => {
