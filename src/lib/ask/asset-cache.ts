@@ -34,7 +34,7 @@ export const ASK_ASSET_CACHE = 'ask-assets-v1';
 
 /**
  * On service-worker activate, decide whether to keep a cache. Keep the current app-shell cache and the
- * unversioned lazy asset cache; delete everything else (stale app-shell caches from prior versions).
+ * lazy asset cache; delete everything else (stale app-shell caches from prior versions).
  *
  * Args:
  *   key: a cache name from caches.keys()
