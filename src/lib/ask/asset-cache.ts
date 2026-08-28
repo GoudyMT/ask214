@@ -22,12 +22,15 @@ export function classifyAsset(pathname: string): CacheStrategy {
 }
 
 /**
- * The lazy model + ORT WASM (~45MB) live in this OWN, UNVERSIONED cache - separate from the versioned
- * app-shell cache (`app-${version}`). The SW's activate cleanup deletes stale app-shell caches on every
- * update; keeping the heavy download here means an app update does NOT evict it (so the "downloaded once,
- * works offline" promise holds). Cleared only by an explicit wipe.
+ * The lazy model + ORT WASM (~45MB) live in this OWN cache, whose name is INDEPENDENT of the app version -
+ * so an app deploy (which deletes stale `app-${version}` caches) does NOT evict the heavy download (the
+ * "downloaded once, works offline" promise holds). The `-vN` suffix is the ONLY cache-bust seam for the
+ * vendored model + wasm, whose URLs are stable and served cache-first forever: when those bytes are
+ * re-vendored (e.g. an onnxruntime-web security patch), BUMP this suffix - `shouldKeepCache` then evicts
+ * the old cache on activate and the new bytes are re-fetched on next use. (Mirrors the corpus filename
+ * bump, which versions the corpus by URL instead.) Also cleared by an explicit wipe.
  */
-export const ASK_ASSET_CACHE = 'ask-assets';
+export const ASK_ASSET_CACHE = 'ask-assets-v1';
 
 /**
  * On service-worker activate, decide whether to keep a cache. Keep the current app-shell cache and the
