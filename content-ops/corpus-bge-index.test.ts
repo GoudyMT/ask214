@@ -39,14 +39,21 @@ describe('bge server corpus index', () => {
 
 // Read a top-level `const NAME = ...;` literal straight from a source file, so the assertions below bind
 // to the values the code actually ships, not a copy transcribed into this test.
+function constLine(src: string, name: string): string {
+	// Locate the declaration line by a plain string search (the name is interpolated into a STRING, not
+	// a regex - no dynamic RegExp), then extract the literal with a LITERAL regex in the callers below.
+	const line = src.split('\n').find((l) => l.includes(`const ${name} = `));
+	if (line === undefined) throw new Error('required const not found in source');
+	return line;
+}
 function numConst(src: string, name: string): number {
-	const m = new RegExp(`const ${name} = ([\\d.]+);`).exec(src);
+	const m = /= ([\d.]+);/.exec(constLine(src, name));
 	const v = m?.[1];
 	if (v === undefined) throw new Error('required numeric const not found in source');
 	return Number(v);
 }
 function strConst(src: string, name: string): string {
-	const m = new RegExp(`const ${name} = '([^']*)';`).exec(src);
+	const m = /= '([^']*)';/.exec(constLine(src, name));
 	const v = m?.[1];
 	if (v === undefined) throw new Error('required string const not found in source');
 	return v;

@@ -122,12 +122,14 @@ const phaseChipsCss = readFileSync(
 	'utf8'
 );
 
-// The opacity declared directly on `selector`'s own rule block (a descendant selector like
-// `.line-skipped .x` does not match `selector\s*{`), or 1 when none is set.
+// The opacity declared directly on `selector`'s own rule block, or 1 when none is set. Found by a plain
+// string search for `selector {` (no dynamic RegExp); a descendant selector like `.line-skipped .x {`
+// contains `.line-skipped ` not `.line-skipped {`, so it is not matched.
 function opacityOf(css: string, selector: string): number {
-	const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const rule = new RegExp(escaped + '\\s*\\{([^}]*)\\}').exec(css);
-	const decl = rule?.[1] ? /opacity:\s*([\d.]+)/.exec(rule[1]) : null;
+	const at = css.indexOf(`${selector} {`);
+	if (at === -1) return 1;
+	const block = css.slice(at, css.indexOf('}', at));
+	const decl = /opacity:\s*([\d.]+)/.exec(block);
 	const value = decl?.[1];
 	return value ? Number(value) : 1;
 }
