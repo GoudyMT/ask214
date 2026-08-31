@@ -8,8 +8,18 @@
 		onchange: (value: string) => void;
 		error?: string | null;
 		id?: string;
+		/** Visually hide the label (kept for a11y) when a surrounding disclosure already names the field. */
+		hideLabel?: boolean;
 	};
-	let { value, label, hint, onchange, error = null, id = 'eaos-input' }: Props = $props();
+	let {
+		value,
+		label,
+		hint,
+		onchange,
+		error = null,
+		id = 'eaos-input',
+		hideLabel = false
+	}: Props = $props();
 
 	const hintId = $derived(`${id}-hint`);
 	const errorId = $derived(`${id}-error`);
@@ -30,7 +40,9 @@
   zero-JS + zero added bytes. Copy is injected, so it is reused by wizard + Settings.
 -->
 <div class="eaos-field">
-	<label class="eaos-field__label" for={id}>{label}</label>
+	<label class="eaos-field__label" class:eaos-field__label--hidden={hideLabel} for={id}
+		>{label}</label
+	>
 	<p class="eaos-field__hint" id={hintId}>{hint}</p>
 	<input
 		bind:this={inputEl}
@@ -58,6 +70,18 @@
 	.eaos-field__label {
 		font-weight: 600;
 		color: var(--color-fg);
+	}
+
+	.eaos-field__label--hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	.eaos-field__hint {
