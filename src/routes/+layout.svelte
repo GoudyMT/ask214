@@ -304,6 +304,13 @@
 		padding: var(--space-m) var(--space-l);
 	}
 
+	/* Tighter side padding on a phone so the inline nav (brand + links) is not pinched at the edges. */
+	@media (max-width: 480px) {
+		header {
+			padding: var(--space-m);
+		}
+	}
+
 	/* Lock #2: right-aligned nav (brand left, nav right) via flex space-between. */
 	/* Lock #1: 720px content container; 1024px wider variant ships when a */
 	/* dashboard/timeline route lands (Phase 2+). */

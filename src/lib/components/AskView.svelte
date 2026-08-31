@@ -165,10 +165,26 @@
 		bind:this={inputEl}
 		bind:value={query}
 		class="ask-input"
-		placeholder="Ask about benefits, SkillBridge, VA health care..."
+		placeholder="Ask about benefits, SkillBridge, VA..."
 		aria-label="Ask a question"
 	/>
-	<button class="ask-search" type="submit" disabled={!ready}>Search</button>
+	<button class="ask-search" type="submit" disabled={!ready}>
+		<span class="ask-search__label">Search</span>
+		<svg
+			class="ask-search__icon"
+			viewBox="0 0 24 24"
+			width="20"
+			height="20"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			aria-hidden="true"
+			focusable="false"
+		>
+			<circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" />
+		</svg>
+	</button>
 </form>
 
 {#if onlineCapable}
@@ -396,6 +412,9 @@
 		border-color: var(--color-accent);
 	}
 	.ask-search {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		background: var(--color-accent);
 		color: var(--color-bg);
 		border: none;
@@ -404,6 +423,33 @@
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;
+	}
+	.ask-search__icon {
+		display: none;
+	}
+	/* On a narrow screen the "Search" label collapses to a magnifier icon so the input keeps its width.
+	   The label stays in the DOM (visually hidden, not removed) so the button's accessible name is still
+	   "Search". A fixed-width, no-shrink button leaves the rest of the line to the input. */
+	@media (max-width: 480px) {
+		.ask-search {
+			flex: none;
+			width: 48px;
+			padding: 0;
+		}
+		.ask-search__label {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			padding: 0;
+			margin: -1px;
+			overflow: hidden;
+			clip: rect(0, 0, 0, 0);
+			white-space: nowrap;
+			border: 0;
+		}
+		.ask-search__icon {
+			display: inline-flex;
+		}
 	}
 	.ask-search:hover:not(:disabled) {
 		background: var(--color-accent-muted);
