@@ -276,31 +276,36 @@
 			<section class="settings-section" aria-labelledby="timeline-heading">
 				<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
 
-				{#if editing}
-					<form class="settings-edit" onsubmit={(e) => void save(e)}>
-						<EaosInput
-							value={draft}
-							{error}
-							onchange={onInput}
-							label="Separation date (EAOS)"
-							hint="Your End of Active Obligated Service - the date your current obligation ends."
-						/>
-						<div class="settings-edit__actions">
-							<button class="settings-save" type="submit" disabled={saving}>Save</button>
-							<button class="settings-cancel" type="button" onclick={cancel}>Cancel</button>
-						</div>
-					</form>
-				{:else}
-					<div class="settings-row">
-						<div class="settings-row__field">
-							<span class="settings-row__label">Separation date (EAOS)</span>
-							<span class="settings-row__value">{currentEaos ?? 'Not set'}</span>
-						</div>
-						<button class="settings-row__change" type="button" onclick={startEdit}>
-							{currentEaos ? 'Change' : 'Add'}
-						</button>
-					</div>
-				{/if}
+				<div class="settings-disclosure">
+					<button
+						class="settings-disclosure__toggle"
+						type="button"
+						aria-expanded={editing}
+						aria-controls="eaos-edit"
+						onclick={() => (editing ? cancel() : startEdit())}
+					>
+						<span class="settings-chevron" class:settings-chevron--open={editing} aria-hidden="true"
+						></span>
+						<span>Separation date (EAOS)</span>
+						<span class="settings-disclosure__summary">{currentEaos ?? 'Not set'}</span>
+					</button>
+					{#if editing}
+						<form id="eaos-edit" class="settings-edit" onsubmit={(e) => void save(e)}>
+							<EaosInput
+								value={draft}
+								{error}
+								onchange={onInput}
+								label="Separation date (EAOS)"
+								hint="Your End of Active Obligated Service - the date your current obligation ends."
+								hideLabel
+							/>
+							<div class="settings-edit__actions">
+								<button class="settings-save" type="submit" disabled={saving}>Save</button>
+								<button class="settings-cancel" type="button" onclick={cancel}>Cancel</button>
+							</div>
+						</form>
+					{/if}
+				</div>
 
 				{#if app.store?.clockBackward}
 					<div class="clock-notice">
@@ -445,23 +450,43 @@
 		color: var(--color-fg);
 	}
 
-	/* Quiet action link: accent text, underline. */
-	.settings-row__change {
-		flex: none;
+	/* Separation-date disclosure: the same caret-expand idiom as the Calendar "Customize" panel, so both
+	   in-place edits read as siblings. (End-state: a shared Disclosure component; today they mirror by hand.) */
+	.settings-disclosure__toggle {
+		display: flex;
+		align-items: center;
+		gap: var(--space-s);
+		width: 100%;
 		padding: 0;
 		background: none;
 		border: none;
-		color: var(--color-accent);
+		color: var(--color-fg);
 		font: inherit;
-		font-weight: 600;
-		text-decoration: underline;
+		font-size: var(--font-size-s);
 		cursor: pointer;
+		text-align: left;
+	}
+	.settings-disclosure__summary {
+		margin-left: auto;
+		color: var(--color-fg-muted);
+	}
+	.settings-chevron {
+		width: 0;
+		height: 0;
+		border-left: 5px solid currentColor;
+		border-top: 4px solid transparent;
+		border-bottom: 4px solid transparent;
+		flex: none;
+	}
+	.settings-chevron--open {
+		transform: rotate(90deg);
 	}
 
 	.settings-edit {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-m);
+		margin-top: var(--space-m);
 	}
 
 	.settings-edit__actions {

@@ -82,6 +82,13 @@
 		padding: 0;
 		list-style: none;
 		overflow-x: auto;
+		/* Hide the native scrollbar under this compact chip nav (matches the home QuestionFeed); pan-x so a
+		   vertical swipe scrolls the page, not the strip. The overflowing chips themselves signal scrollability. */
+		touch-action: pan-x;
+		scrollbar-width: none;
+	}
+	.phase-chips__strip::-webkit-scrollbar {
+		display: none;
 	}
 
 	/* Pill chip: muted by default, accent border + surface fill when it is the in-view phase. */

@@ -25,8 +25,8 @@ test('a saved EAOS propagates across tabs: IDB load + live broadcast update', as
 
 	// Tab A: change the EAOS in Settings and save (fires the 'profile-updated' broadcast).
 	await tabA.goto('/settings');
-	await expect(tabA.getByText('2027-04-15')).toBeVisible(); // store loaded -> button is "Change"
-	await tabA.getByRole('button', { name: /^change$/i }).click();
+	await expect(tabA.getByText('2027-04-15')).toBeVisible(); // store loaded -> the date shows as the disclosure summary
+	await tabA.getByRole('button', { name: /separation date/i }).click();
 	await tabA.getByLabel(/separation date/i).fill('2028-08-20');
 	// Scope to the timeline section: Settings now also carries the BYO-key "Save" (Online answers).
 	await tabA

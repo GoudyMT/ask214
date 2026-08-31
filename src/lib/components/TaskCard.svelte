@@ -319,32 +319,35 @@
 		font-size: var(--font-size-s);
 	}
 
-	/* Action row: quiet accent-link buttons (real <button>s for a11y, styled like the
-	   mockup's action links). Add note joins here later. */
+	/* Action row: accent pills that wrap. Real <button>s for a11y; the pill shape matches the snooze
+	   preset pills that open inside this same card, so the card speaks one consistent pill language. */
 	.task-card__actions {
 		display: flex;
-		gap: var(--space-m);
+		flex-wrap: wrap;
+		gap: var(--space-s);
 		margin-top: var(--space-s);
 	}
 
 	.task-card__actions button {
-		/* Touch target: these labels are 14px accent links with no padding (~21px tall), under the WCAG
-		   2.5.8 (AA) 24px minimum. min-height promotes the tap area to the 44px touch standard WITHOUT
-		   horizontal padding - so the row width is unchanged and cannot overflow a ~320px screen. */
+		/* Bordered pill; min-height is the 44px touch target. flex-wrap on the row (not a single no-wrap
+		   line) is what keeps the actions from overflowing a ~320px screen - a pill that will not fit drops
+		   to the next line. white-space keeps each label on one line so a pill never wraps internally. */
 		display: inline-flex;
 		align-items: center;
 		min-height: 44px;
-		padding: 0;
+		padding: 0 var(--space-m);
 		background: none;
-		border: none;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
 		color: var(--color-accent);
 		font: inherit;
 		font-size: var(--font-size-s);
+		white-space: nowrap;
 		cursor: pointer;
 	}
 
 	.task-card__actions button:hover {
-		text-decoration: underline;
+		border-color: var(--color-accent);
 	}
 
 	/* Inline snooze picker (Option B): preset pills + a "Customize" date input,

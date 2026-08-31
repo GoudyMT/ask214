@@ -29,6 +29,17 @@ describe('EaosInput', () => {
 		expect(label?.getAttribute('for')).toBe(input?.id);
 	});
 
+	it('hideLabel visually hides the label but keeps it in the DOM and associated', () => {
+		const { container } = render(EaosInput, { props: { ...baseProps, hideLabel: true } });
+		const label = container.querySelector('label');
+		const input = container.querySelector('input');
+		// Visually hidden via the modifier, but retained + associated so the input keeps its accessible
+		// name when a surrounding disclosure already names the field.
+		expect(label?.classList.contains('eaos-field__label--hidden')).toBe(true);
+		expect(container.textContent).toContain('Separation date');
+		expect(label?.getAttribute('for')).toBe(input?.id);
+	});
+
 	it('calls onchange with the new value on input', () => {
 		const onchange = vi.fn();
 		const { container } = render(EaosInput, { props: { ...baseProps, onchange } });
