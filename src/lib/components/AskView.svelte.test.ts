@@ -112,6 +112,15 @@ describe('AskView', () => {
 		expect(search.disabled).toBe(true);
 	});
 
+	it('the Search button keeps the accessible name "Search" (icon-only on mobile stays labelled)', () => {
+		const { container } = render(AskView, { props: props({ kind: 'idle' }) });
+		const search = container.querySelector('.ask-search') as HTMLButtonElement;
+		// The visible label provides the accessible name; the magnifier svg is hidden from AT, so the
+		// name stays "Search" even when the label is visually clipped at narrow widths.
+		expect(search.querySelector('.ask-search__label')?.textContent?.trim()).toBe('Search');
+		expect(search.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+	});
+
 	it('needsSetup: shows the consent card with the preserved query; buttons fire onSetUp / onDismiss', () => {
 		let setUp = 0;
 		let dismissed = 0;
