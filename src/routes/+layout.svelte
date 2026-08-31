@@ -304,9 +304,12 @@
 		padding: var(--space-m) var(--space-l);
 	}
 
-	/* Tighter side padding on a phone so the inline nav (brand + links) is not pinched at the edges. */
+	/* Tighter side padding on a phone: header, content, and footer share a 16px gutter so the nav is not
+	   pinched at the edges AND the brand stays aligned with the body content column. */
 	@media (max-width: 480px) {
-		header {
+		header,
+		main,
+		footer {
 			padding: var(--space-m);
 		}
 	}
