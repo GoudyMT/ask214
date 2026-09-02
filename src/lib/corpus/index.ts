@@ -3,5 +3,6 @@ export { decodeCorpus, ACCEPTED_CORPUS_VERSION } from './codec';
 export { search, cosineSimilarity, normalize } from './search';
 export { toResultCards } from './cards';
 export { cleanExcerpt } from './clean-excerpt';
+export { quoteExcerpt, splitSentences } from './quote-excerpt';
 export { CorpusFormatError, CorpusVersionError } from './errors';
 export type { CorpusChunk, CorpusManifest, Corpus, RetrievalResult, ResultCard } from './types';
