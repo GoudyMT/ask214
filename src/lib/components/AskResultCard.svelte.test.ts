@@ -69,14 +69,55 @@ describe('AskResultCard', () => {
 		expect(text).toContain('w22...');
 	});
 
-	it('lead variant shows a fuller ~120-word excerpt (cap raised above the compact 24)', () => {
+	it('renders the lead excerpt as a quotation attributed to the source document', () => {
+		const { container } = render(AskResultCard, { props: { card: fullCard(), variant: 'lead' } });
+		const quote = container.querySelector('blockquote.ask-card__excerpt');
+		expect(quote).not.toBeNull();
+		// cite attributes the quotation to the document it came from - the trust signal the card exists
+		// to carry. Quote marks are CSS-generated, so textContent stays the verbatim passage.
+		expect(quote?.getAttribute('cite')).toBe('https://www.va.gov/');
+		expect(quote?.textContent?.trim()).toBe(
+			'An intent to file lets you notify VA that you plan to file a claim and sets an effective date.'
+		);
+	});
+
+	it('ends the lead quote at a sentence boundary rather than mid-sentence', () => {
+		// Modelled on real corpus prose: the kept sentence is substantial (median first-sentence length
+		// in this corpus is 29 words) and the follow-on opens with a capital, since a boundary is
+		// terminal punctuation followed by an opening character.
+		const first = 'An intent to file lets you notify VA that you plan to file a claim.';
+		const runOn = Array.from({ length: 60 }, (_, i) => `word${i}`).join(' ');
+		const { container } = render(AskResultCard, {
+			props: {
+				card: fullCard({ excerpt: `${first} Then a far longer one follows ${runOn}.` }),
+				variant: 'lead'
+			}
+		});
+		expect(container.querySelector('.ask-card__excerpt')?.textContent?.trim()).toBe(first);
+	});
+
+	it('renders no quotation when the chunk holds too little quotable content', () => {
+		// Real corpus shape: some chunks are bare section headers. Quoting one word as a passage from
+		// the document is worse than showing none - the card stays a usable signpost via its citation.
+		const { container } = render(AskResultCard, {
+			props: { card: fullCard({ excerpt: 'Benefits' }), variant: 'lead' }
+		});
+		expect(container.querySelector('.ask-card__excerpt')).toBeNull();
+		expect(container.querySelector('.ask-card__title')?.textContent).toBe('VA - Intent to File');
+		expect(container.querySelector('.ask-card__link')).not.toBeNull();
+	});
+
+	it('caps the lead quote at its word budget when the text has no sentence boundary', () => {
+		// Text with no terminal punctuation cannot be sentence-bounded, so the budget applies directly
+		// and the ellipsis marks the cut. Lead budget is 30 words: the card quotes a passage and points
+		// at the document, rather than reproducing it.
 		const long = Array.from({ length: 150 }, (_, i) => `w${i}`).join(' ');
 		const { container } = render(AskResultCard, {
 			props: { card: fullCard({ excerpt: long }), variant: 'lead' }
 		});
 		const text = container.querySelector('.ask-card__excerpt')?.textContent ?? '';
 		expect(text.endsWith('...')).toBe(true);
-		expect(text.split(/\s+/).length).toBe(120); // lead cap is 120 words (was 60)
+		expect(text.split(/\s+/).length).toBe(30);
 	});
 
 	it('omits the meta line when there is no section or page', () => {

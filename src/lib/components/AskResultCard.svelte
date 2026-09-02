@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ResultCard } from '$lib/corpus';
+	import { quoteExcerpt } from '$lib/corpus';
 
 	let {
 		card,
@@ -7,10 +8,19 @@
 		onReadSource
 	}: { card: ResultCard; variant?: 'lead' | 'compact'; onReadSource?: () => void } = $props();
 
-	// B passes the full chunk text through as the excerpt (the display truncation it deliberately left to
-	// C). The lead card shows a fuller excerpt; a collapsed "similar" card shows a one-liner.
-	const MAX_WORDS = { lead: 120, compact: 24 } as const;
-	const excerpt = $derived(truncateWords(card.excerpt, MAX_WORDS[variant]));
+	// The card presents a QUOTATION from the source document, not a summary, so the excerpt is trimmed
+	// to whole sentences: a passage cut mid-clause reads as the mangled extracted text this display
+	// path exists to stop showing. Budgets are deliberately tight - the document itself carries the
+	// detail, the card is the signpost to it.
+	//
+	// The lead carries a ceiling above its target so one long sentence survives whole instead of being
+	// chopped to save a few words. The collapsed "similar sources" line takes no ceiling: it is a
+	// one-line scent marker in a list, where an overflowing entry costs more than a clipped one.
+	const BUDGETS = {
+		lead: { target: 30, ceiling: 45, min: 5 },
+		compact: { target: 24, min: 5 }
+	} as const;
+	const excerpt = $derived(quoteExcerpt(card.excerpt, BUDGETS[variant]));
 
 	// Source descriptor: section and/or page when present (e.g. "How to submit - p. 12").
 	const meta = $derived(
@@ -18,19 +28,6 @@
 			.filter((part): part is string => part !== undefined)
 			.join(' - ')
 	);
-
-	function truncateWords(text: string, maxWords: number): string {
-		const words = text.trim().split(/\s+/);
-		if (words.length <= maxWords) return text.trim();
-		// A word-boundary cut can land right after an inline " - " separator (cleanExcerpt turns bullet
-		// glyphs into those); drop the stranded separator so the excerpt reads "...for Women..." not
-		// "...for Women -...".
-		const kept = words
-			.slice(0, maxWords)
-			.join(' ')
-			.replace(/(?: -)+$/, '');
-		return kept + '...';
-	}
 </script>
 
 <article class="ask-card" class:ask-card--lead={variant === 'lead'}>
@@ -39,7 +36,11 @@
 		<span class="ask-card__title">{card.sourceTitle}</span>
 		{#if meta}<span class="ask-card__meta">{meta}</span>{/if}
 	</div>
-	<p class="ask-card__excerpt">{excerpt}</p>
+	{#if excerpt}
+		<!-- cite attributes the quotation to the document it came from; the quote marks are CSS-generated
+		     so the element's text stays the verbatim passage. -->
+		<blockquote class="ask-card__excerpt" cite={card.url}>{excerpt}</blockquote>
+	{/if}
 	<div class="ask-card__actions">
 		{#if onReadSource}
 			<button class="ask-card__read" type="button" onclick={onReadSource}>Read more</button>
@@ -88,9 +89,23 @@
 		font-size: var(--font-size-s);
 		color: var(--color-fg-muted);
 	}
+	/* Quotation styling: the rule + generated marks are what make it read as the document's words
+	   rather than our paraphrase. Marks come from CSS so the DOM text stays verbatim. */
 	.ask-card__excerpt {
 		margin: var(--space-s) 0;
+		padding-left: var(--space-m);
+		border-left: 3px solid var(--color-border);
 		font-size: var(--font-size-s);
+		quotes: '"' '"';
+		/* Printed URLs are real document content and stay in the quotation, so an unbreakable 100+ char
+		   token must wrap instead of pushing the card wider than the viewport. */
+		overflow-wrap: anywhere;
+	}
+	.ask-card__excerpt::before {
+		content: open-quote;
+	}
+	.ask-card__excerpt::after {
+		content: close-quote;
 	}
 	.ask-card--lead .ask-card__excerpt {
 		font-size: var(--font-size-base);
