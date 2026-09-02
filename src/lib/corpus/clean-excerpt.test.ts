@@ -53,10 +53,37 @@ describe('cleanExcerpt', () => {
 		).toBe('ACTIVITY 1.1: Introductions');
 	});
 
-	it('keeps the real section heading that precedes a running header', () => {
+	// The sibling DOL guide prints the SAME running header without the PAGE keyword
+	// ("EMPLOYMENT WORKSHOP | SECTION 1 | 11"). Anchoring on PAGE alone left 215 of 370 occurrences in
+	// the corpus, several of them visible inside rendered excerpts.
+	it('strips the running header variant that omits the PAGE keyword', () => {
+		expect(cleanExcerpt('EMPLOYMENT WORKSHOP | SECTION 1 | 11 FOCUS OF EACH SECTION')).toBe(
+			'FOCUS OF EACH SECTION'
+		);
+	});
+
+	it('strips the running header when the page number is cut off at a chunk boundary', () => {
+		expect(cleanExcerpt('Develop Your Brand EFCT PARTICIPANT GUIDE | SECTION 4 | PAGE')).toBe(
+			'Develop Your Brand'
+		);
+	});
+
+	it('keeps a mixed-case section heading that precedes a running header', () => {
 		expect(
 			cleanExcerpt('Getting Started EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 8 Take a few minutes')
 		).toBe('Getting Started Take a few minutes');
+	});
+
+	// This guide prints its headings in ALL CAPS, so an unbounded caps prefix swallowed real content -
+	// the same content-destruction class a prior sweep caught shipped. The title match is bounded to at
+	// most three caps words so the heading before it survives.
+	it('keeps an ALL-CAPS section heading that precedes a running header', () => {
+		expect(
+			cleanExcerpt('GAINING MORE SKILLS EFCT PARTICIPANT GUIDE | SECTION 3 | PAGE 52 Consider this')
+		).toBe('GAINING MORE SKILLS Consider this');
+		expect(
+			cleanExcerpt('NOTES EFCT PARTICIPANT GUIDE | SECTION 2 | PAGE 30 Write your answers')
+		).toBe('NOTES Write your answers');
 	});
 
 	it('leaves a pipe used as ordinary punctuation alone', () => {

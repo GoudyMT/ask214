@@ -55,11 +55,17 @@ const VERSION_FORM =
 const BARE_REVISED = ' *,\\s*(?:Released|Revised) +' + MONTHS + ' \\d{4}';
 const VERSION_FOOTER_RE = new RegExp('(?:' + VERSION_FORM + '|' + BARE_REVISED + ')', 'g');
 
-// A pipe-delimited running page header the guide prints on every page ("EFCT PARTICIPANT GUIDE |
-// SECTION 1 | PAGE 14"), which extraction fuses into the body text. Anchored on the literal SECTION
-// and PAGE keywords plus their numbers, and on an ALL-CAPS title run, so a pipe used as ordinary
-// punctuation and any mixed-case heading before the header both survive.
-const RUNNING_HEADER_RE = /\s*[A-Z][A-Z ]{2,}\|\s*SECTION\s+\d+\s*\|\s*PAGE\s+\d+/g;
+// A pipe-delimited running page header the guides print on every page, which extraction fuses into the
+// body text. Two forms occur: "EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 14" and, in the sibling DOL
+// guide, the same header without the PAGE keyword ("EMPLOYMENT WORKSHOP | SECTION 1 | 11"); a chunk
+// boundary can also cut the trailing number off. Anchored on the literal SECTION keyword and its
+// number so an ordinary pipe survives.
+//
+// The title run is bounded to at most THREE caps words. Unbounded, it backtracked across spaces and
+// swallowed the ALL-CAPS heading in front of the header - these guides print their headings in caps,
+// so "GAINING MORE SKILLS <header>" lost the heading. Bounding it keeps real content while still
+// removing every guide title in this corpus (the longest is three words).
+const RUNNING_HEADER_RE = /\s*(?:[A-Z][A-Z]* ){0,3}\|\s*SECTION\s+\d+\s*\|\s*(?:PAGE\s*\d*|\d+)/g;
 
 // Worksheet fill-in-the-blank rules ("My current job is ______") extract as underscore runs that
 // carry no content and read as corruption inside a quotation. Three or more, so an identifier like
