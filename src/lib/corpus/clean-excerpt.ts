@@ -55,6 +55,17 @@ const VERSION_FORM =
 const BARE_REVISED = ' *,\\s*(?:Released|Revised) +' + MONTHS + ' \\d{4}';
 const VERSION_FOOTER_RE = new RegExp('(?:' + VERSION_FORM + '|' + BARE_REVISED + ')', 'g');
 
+// A pipe-delimited running page header the guide prints on every page ("EFCT PARTICIPANT GUIDE |
+// SECTION 1 | PAGE 14"), which extraction fuses into the body text. Anchored on the literal SECTION
+// and PAGE keywords plus their numbers, and on an ALL-CAPS title run, so a pipe used as ordinary
+// punctuation and any mixed-case heading before the header both survive.
+const RUNNING_HEADER_RE = /\s*[A-Z][A-Z ]{2,}\|\s*SECTION\s+\d+\s*\|\s*PAGE\s+\d+/g;
+
+// Worksheet fill-in-the-blank rules ("My current job is ______") extract as underscore runs that
+// carry no content and read as corruption inside a quotation. Three or more, so an identifier like
+// source_id is left alone.
+const BLANK_RULE_RE = /_{3,}/g;
+
 const WHITESPACE_RE = /\s+/g;
 // A separator left stranded at either end (from a leading or trailing marker) is not content.
 const EDGE_SEPARATOR_RE = /^(?:- )+|(?: -)+$/g;
@@ -74,6 +85,8 @@ const EDGE_SEPARATOR_RE = /^(?:- )+|(?: -)+$/g;
 export function cleanExcerpt(text: string): string {
 	let s = text.replace(GARBAGE_RE, '');
 	s = s.replace(VERSION_FOOTER_RE, ' ');
+	s = s.replace(RUNNING_HEADER_RE, ' ');
+	s = s.replace(BLANK_RULE_RE, ' ');
 	s = s.replace(MARKER_RUN_RE, ' - ');
 	s = s.replace(WHITESPACE_RE, ' ').trim();
 	s = s.replace(EDGE_SEPARATOR_RE, '').trim();

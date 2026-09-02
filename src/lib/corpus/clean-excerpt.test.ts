@@ -45,6 +45,38 @@ describe('cleanExcerpt', () => {
 		);
 	});
 
+	// Real corpus shape (tap_dol_efct, 155 occurrences): a pipe-delimited running page header the PDF
+	// prints on every page, which extraction fuses into the body text.
+	it('strips a pipe-delimited running page header', () => {
+		expect(
+			cleanExcerpt('EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 14 ACTIVITY 1.1: Introductions')
+		).toBe('ACTIVITY 1.1: Introductions');
+	});
+
+	it('keeps the real section heading that precedes a running header', () => {
+		expect(
+			cleanExcerpt('Getting Started EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 8 Take a few minutes')
+		).toBe('Getting Started Take a few minutes');
+	});
+
+	it('leaves a pipe used as ordinary punctuation alone', () => {
+		expect(cleanExcerpt('Choose one | two | three from the list')).toBe(
+			'Choose one | two | three from the list'
+		);
+	});
+
+	// Real corpus shape (tap_dol_efct): worksheet fill-in-the-blank rules extract as underscore runs,
+	// which carry no content and read as corruption in a quoted excerpt.
+	it('deletes worksheet blank-line underscore runs', () => {
+		expect(cleanExcerpt('My current job in the military is ______________________ 2.')).toBe(
+			'My current job in the military is 2.'
+		);
+	});
+
+	it('leaves a short underscore inside a token alone', () => {
+		expect(cleanExcerpt('the field source_id is required')).toBe('the field source_id is required');
+	});
+
 	it('deletes font-encoding garbage (Private-Use-Area tofu + broken surrogate)', () => {
 		expect(cleanExcerpt('form ' + PUA + ' and ' + SURROGATE + ' submit')).toBe('form and submit');
 	});
