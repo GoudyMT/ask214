@@ -7,11 +7,15 @@
 		onReadSource
 	}: { card: ResultCard; variant?: 'lead' | 'compact'; onReadSource?: () => void } = $props();
 
-	// The card is a SIGNPOST to the source document, not a reproduction of it, so the excerpt is short
-	// and every cut is marked. The lead cap dropped from 120 words: at 120 the card was a wall of
-	// extracted text whose flattened lists and page furniture read as untrustworthy. The document
-	// itself carries the detail - the citation and "Read more" are how the user reaches it.
-	const MAX_WORDS = { lead: 30, compact: 24 } as const;
+	// The lead card shows a fuller excerpt; a collapsed "similar" card shows a one-liner. Every cut is
+	// marked - an unmarked cut reads as the document's complete statement.
+	//
+	// The lead cap stays at 120 on evidence. Shortening it to 30 was measured against this project's own
+	// benchmark queries (src/lib/ask/eval/queries.json, 117 of 155 resolvable to a chunk) and moved the
+	// share of cards that actually contain the answer from 91.5% to 30.8%. The curve has no knee: a
+	// HEAD window trades length against answer visibility one-for-one, so a shorter card that still
+	// answers needs a query-relevant window, not a smaller cap.
+	const MAX_WORDS = { lead: 120, compact: 24 } as const;
 	const excerpt = $derived(truncateWords(card.excerpt, MAX_WORDS[variant]));
 
 	// Source descriptor: section and/or page when present (e.g. "How to submit - p. 12").
