@@ -70,13 +70,39 @@ describe('AskResultCard', () => {
 	});
 
 	it('lead variant shows a fuller ~120-word excerpt (cap raised above the compact 24)', () => {
+		// 120, not something shorter: measured against the project's own benchmark queries, a 30-word
+		// lead cap leaves the answer visible on 30.8% of resolvable cards versus 91.5% at 120.
 		const long = Array.from({ length: 150 }, (_, i) => `w${i}`).join(' ');
 		const { container } = render(AskResultCard, {
 			props: { card: fullCard({ excerpt: long }), variant: 'lead' }
 		});
 		const text = container.querySelector('.ask-card__excerpt')?.textContent ?? '';
 		expect(text.endsWith('...')).toBe(true);
-		expect(text.split(/\s+/).length).toBe(120); // lead cap is 120 words (was 60)
+		expect(text.split(/\s+/).length).toBe(120);
+	});
+
+	it('wraps an unbreakable long URL instead of pushing the card wider than its container', () => {
+		// Printed URLs are real document content and stay in the excerpt, and a long one carries no
+		// break opportunity. Without overflow-wrap it widens the card past the viewport, which on the
+		// 320px breakpoint scrolls the whole page sideways.
+		const url = 'https://www.dol.gov/agencies/vets/programs/transition/' + 'x'.repeat(90);
+		const { container } = render(AskResultCard, {
+			props: { card: fullCard({ excerpt: url }), variant: 'lead' }
+		});
+		container.style.width = '320px';
+		const para = container.querySelector('.ask-card__excerpt') as HTMLElement;
+		expect(para.clientWidth).toBeGreaterThan(0);
+		expect(para.scrollWidth).toBeLessThanOrEqual(para.clientWidth);
+	});
+
+	it('renders no excerpt paragraph when the chunk cleans to nothing', () => {
+		// Real corpus shape: one chunk is nothing but worksheet blank rules, which cleanExcerpt removes
+		// entirely. An empty paragraph is an empty node in the accessibility tree, so omit it.
+		const { container } = render(AskResultCard, {
+			props: { card: fullCard({ excerpt: '' }), variant: 'lead' }
+		});
+		expect(container.querySelector('.ask-card__excerpt')).toBeNull();
+		expect(container.querySelector('.ask-card__title')?.textContent).toBe('VA - Intent to File');
 	});
 
 	it('omits the meta line when there is no section or page', () => {

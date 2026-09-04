@@ -55,6 +55,27 @@ const VERSION_FORM =
 const BARE_REVISED = ' *,\\s*(?:Released|Revised) +' + MONTHS + ' \\d{4}';
 const VERSION_FOOTER_RE = new RegExp('(?:' + VERSION_FORM + '|' + BARE_REVISED + ')', 'g');
 
+// A pipe-delimited running page header the guides print on every page, which extraction fuses into the
+// body text. Two forms occur: "EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 14" and, in the sibling DOL
+// guide, the same header without the PAGE keyword ("EMPLOYMENT WORKSHOP | SECTION 1 | 11"); a chunk
+// boundary can also cut the title off the front or the number off the end, so both are optional.
+// Anchored on the literal SECTION keyword and its number so an ordinary pipe survives.
+//
+// The title is matched LITERALLY, one alternative per guide. A generic caps-word run cannot work here:
+// the two titles are different lengths (three words and two), so any word-count bound that fits the
+// longer one leaves a free slot in front of the shorter one, and the run then eats the last token of
+// real content ("Expires December 20XX" -> "Expires December 20", "Baltimore, MD" -> "Baltimore,").
+// A literal list fails in the safe direction instead: a guide title not listed here leaves its header
+// visible rather than destroying the words around it. PAGE ends on a word boundary for the same reason,
+// so "PAGEANT" does not lose its head.
+const RUNNING_HEADER_RE =
+	/\s*(?:EFCT PARTICIPANT GUIDE|EMPLOYMENT WORKSHOP)?\s*\|\s*SECTION\s+\d+\s*\|(?:\s*PAGE\b)?(?:\s*\d+)?/g;
+
+// Worksheet fill-in-the-blank rules ("My current job is ______") extract as underscore runs that
+// carry no content and read as corruption on a card. Three or more, so an identifier like source_id
+// is left alone.
+const BLANK_RULE_RE = /_{3,}/g;
+
 const WHITESPACE_RE = /\s+/g;
 // A separator left stranded at either end (from a leading or trailing marker) is not content.
 const EDGE_SEPARATOR_RE = /^(?:- )+|(?: -)+$/g;
@@ -74,6 +95,8 @@ const EDGE_SEPARATOR_RE = /^(?:- )+|(?: -)+$/g;
 export function cleanExcerpt(text: string): string {
 	let s = text.replace(GARBAGE_RE, '');
 	s = s.replace(VERSION_FOOTER_RE, ' ');
+	s = s.replace(RUNNING_HEADER_RE, ' ');
+	s = s.replace(BLANK_RULE_RE, ' ');
 	s = s.replace(MARKER_RUN_RE, ' - ');
 	s = s.replace(WHITESPACE_RE, ' ').trim();
 	s = s.replace(EDGE_SEPARATOR_RE, '').trim();

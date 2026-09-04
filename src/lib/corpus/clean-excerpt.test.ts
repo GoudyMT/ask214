@@ -45,6 +45,99 @@ describe('cleanExcerpt', () => {
 		);
 	});
 
+	// Real corpus shape (tap_dol_efct, 155 occurrences): a pipe-delimited running page header the PDF
+	// prints on every page, which extraction fuses into the body text.
+	it('strips a pipe-delimited running page header', () => {
+		expect(
+			cleanExcerpt('EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 14 ACTIVITY 1.1: Introductions')
+		).toBe('ACTIVITY 1.1: Introductions');
+	});
+
+	// The sibling DOL guide prints the SAME running header without the PAGE keyword
+	// ("EMPLOYMENT WORKSHOP | SECTION 1 | 11"). Anchoring on PAGE alone left 215 of 370 occurrences in
+	// the corpus, several of them visible inside rendered excerpts.
+	it('strips the running header variant that omits the PAGE keyword', () => {
+		expect(cleanExcerpt('EMPLOYMENT WORKSHOP | SECTION 1 | 11 FOCUS OF EACH SECTION')).toBe(
+			'FOCUS OF EACH SECTION'
+		);
+	});
+
+	it('strips the running header when the page number is cut off at a chunk boundary', () => {
+		expect(cleanExcerpt('Develop Your Brand EFCT PARTICIPANT GUIDE | SECTION 4 | PAGE')).toBe(
+			'Develop Your Brand'
+		);
+	});
+
+	it('keeps a mixed-case section heading that precedes a running header', () => {
+		expect(
+			cleanExcerpt('Getting Started EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 8 Take a few minutes')
+		).toBe('Getting Started Take a few minutes');
+	});
+
+	// This guide prints its headings in ALL CAPS, so an unbounded caps prefix swallowed real content -
+	// the same content-destruction class a prior sweep caught shipped. The title match is bounded to at
+	// most three caps words so the heading before it survives.
+	it('keeps an ALL-CAPS section heading that precedes a running header', () => {
+		expect(
+			cleanExcerpt('GAINING MORE SKILLS EFCT PARTICIPANT GUIDE | SECTION 3 | PAGE 52 Consider this')
+		).toBe('GAINING MORE SKILLS Consider this');
+		expect(
+			cleanExcerpt('NOTES EFCT PARTICIPANT GUIDE | SECTION 2 | PAGE 30 Write your answers')
+		).toBe('NOTES Write your answers');
+	});
+
+	// The two guide titles are different LENGTHS (three words and two), so a word-COUNT bound cannot fit
+	// both: bounding the run at three leaves a free slot in front of the two-word title, which then eats
+	// the last token of real content. These four are the real corpus strings that lost a token
+	// (tap_dol_employment_workshop chunks 98652df98874 / b2553578f3e5 / 662b136cde5e / 187a7a97bf3d).
+	it('keeps the token in front of the two-word running header title', () => {
+		expect(cleanExcerpt('Expires December 20XX EMPLOYMENT WORKSHOP | SECTION 2 | 54')).toBe(
+			'Expires December 20XX'
+		);
+		expect(
+			cleanExcerpt('Howard Community College, Baltimore, MD EMPLOYMENT WORKSHOP | SECTION 8 | 193')
+		).toBe('Howard Community College, Baltimore, MD');
+		expect(
+			cleanExcerpt('Best Regards, Andrew Thompson II EMPLOYMENT WORKSHOP | SECTION 8 | 194')
+		).toBe('Best Regards, Andrew Thompson II');
+		expect(
+			cleanExcerpt('APPLY TO JOB EMPLOYMENT WORKSHOP | SECTION 2 | 19 You will not provide')
+		).toBe('APPLY TO JOB You will not provide');
+	});
+
+	// A caps run can also start mid-token, because the title match is preceded by a zero-width-able \s*.
+	it('does not start the header match inside a preceding word', () => {
+		expect(cleanExcerpt('DISCHARGE EMPLOYMENT WORKSHOP | SECTION 1 | 7 next')).toBe(
+			'DISCHARGE next'
+		);
+	});
+
+	// PAGE with no digits after it is the chunk-boundary form, so the keyword must still end on a word
+	// boundary - otherwise a word merely starting with "PAGE" loses its tail.
+	it('does not truncate a word that merely starts with PAGE', () => {
+		expect(cleanExcerpt('EFCT PARTICIPANT GUIDE | SECTION 2 | PAGEANT winners')).toBe(
+			'PAGEANT winners'
+		);
+	});
+
+	it('leaves a pipe used as ordinary punctuation alone', () => {
+		expect(cleanExcerpt('Choose one | two | three from the list')).toBe(
+			'Choose one | two | three from the list'
+		);
+	});
+
+	// Real corpus shape (tap_dol_efct): worksheet fill-in-the-blank rules extract as underscore runs,
+	// which carry no content and read as corruption in a quoted excerpt.
+	it('deletes worksheet blank-line underscore runs', () => {
+		expect(cleanExcerpt('My current job in the military is ______________________ 2.')).toBe(
+			'My current job in the military is 2.'
+		);
+	});
+
+	it('leaves a short underscore inside a token alone', () => {
+		expect(cleanExcerpt('the field source_id is required')).toBe('the field source_id is required');
+	});
+
 	it('deletes font-encoding garbage (Private-Use-Area tofu + broken surrogate)', () => {
 		expect(cleanExcerpt('form ' + PUA + ' and ' + SURROGATE + ' submit')).toBe('form and submit');
 	});
