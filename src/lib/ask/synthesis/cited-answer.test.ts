@@ -14,6 +14,21 @@ describe('toCitedAnswer', () => {
 		expect(ans.citations[0]).toEqual({ id: 'a', url: 'https://www.va.gov/a', title: 'VA A' });
 	});
 
+	// A chunk id ends in 12 hex characters, and the phone pattern below reads a long digit run as a
+	// contact number - 104 of the 1878 shipped ids trip it. Markers are stripped before detection, so the
+	// inert list stays real contact tokens rather than fragments of a hash.
+	it('strips citation markers from the prose and does not read their hex as a phone number', () => {
+		const id = 'dod_skillbridge:71686373cd68';
+		const ans = toCitedAnswer(
+			'Training lasts 180 days [' + id + ']. Call 1-800-827-1000 to confirm.',
+			[id],
+			[{ id, url: 'https://skillbridge.osd.mil/', title: 'DoD SkillBridge' }]
+		);
+		expect(ans.text).toBe('Training lasts 180 days. Call 1-800-827-1000 to confirm.');
+		expect(ans.inert).toContain('1-800-827-1000');
+		expect(ans.inert).not.toContain('71686373');
+	});
+
 	it('never turns a URL or phone the model wrote into a citation (anti-phishing)', () => {
 		const text = 'Call 800-555-1212 or visit http://scam.example to claim, also @scammer.';
 		const ans = toCitedAnswer(text, ['a'], RETRIEVED);

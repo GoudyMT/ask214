@@ -340,6 +340,19 @@ describe('createAskStore', () => {
 		if (store.state.kind === 'results') expect(store.state.summary?.kind).toBe('answer');
 	});
 
+	// A crisis turn routes to help and NOTHING else. The keyword pre-gate already commits `crisis` with no
+	// cards; when the model catches an indirect phrasing the net missed, it has to land in the same place.
+	// Committing it as a summary would have rendered the crisis surface on top of a list of benefits
+	// cards - the wrong answer to the question actually being asked.
+	it('commits a crisis synthesis result as the crisis state, dropping the cards', async () => {
+		const store = onlineStore({
+			synthesisEnabled: () => true,
+			synthesize: async () => ({ kind: 'crisis' })
+		});
+		await store.ask('i dont see a way forward anymore');
+		expect(store.state.kind).toBe('crisis');
+	});
+
 	it('omits the summary when synthesis is disabled (raw cards only)', async () => {
 		const store = onlineStore({
 			synthesisEnabled: () => false,

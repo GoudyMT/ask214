@@ -3,6 +3,8 @@
 // promoted to a clickable link - it is flagged inert so the renderer keeps it as plain text. A
 // scam-targeted audience must never be handed a clickable link the model invented.
 
+import { stripCitations } from './citation-validation';
+
 /** A clickable source. Only ever built from a retrieved chunk, never from model prose. */
 export interface Citation {
 	id: string;
@@ -19,6 +21,14 @@ export interface CitedAnswer {
 
 /** Always attached; the model is also told to end with this, so it survives a model that forgets. */
 export const DISCLAIMER = 'AI-generated - verify against the official sources.';
+
+// The model's own trailing copy of the disclaimer, in the shapes it plausibly writes it (the hyphen may
+// come back as an en dash, and the final period may be dropped). Anchored to the END so a mention inside
+// the body is untouched.
+const TRAILING_DISCLAIMER_RE = new RegExp(
+	'\\s*AI[-\\u2013\\u2014 ]generated\\s*[-\\u2013\\u2014]?\\s*verify against the official sources\\.?\\s*$',
+	'i'
+);
 
 // Best-effort detection of link-like tokens in the prose so the renderer can keep them inert. This is a
 // hint, not the safety boundary - the boundary is that `citations` are built only from retrieved chunks.
@@ -53,5 +63,14 @@ export function toCitedAnswer(
 	const citations = retrieved
 		.filter((c) => cited.has(c.id))
 		.map((c) => ({ id: c.id, url: c.url, title: c.title }));
-	return { text: modelText, citations, inert: detectInert(modelText), disclaimer: DISCLAIMER };
+	// The citation MARKER is machine syntax, not prose. Rendered verbatim it put 12 characters of hash in
+	// front of the reader ("...last 180 days of service [dod_skillbridge:71686373cd68]."), and its hex run
+	// tripped the anti-phishing phone pattern below on 104 of the 1878 shipped ids. Attribution is carried
+	// by `citations`, which is the verified list the UI links. Stripping here uses the same transform the
+	// grounding gate does, so the checked text and the read text are the same string.
+	// The prompt tells the model to END with the disclaimer, and this function attaches it unconditionally
+	// so it survives a model that forgets. Both firing prints the sentence to the reader twice, back to
+	// back. The attached copy is the one that is guaranteed, so the model's trailing copy is dropped.
+	const prose = stripCitations(modelText).replace(TRAILING_DISCLAIMER_RE, '').trim();
+	return { text: prose, citations, inert: detectInert(prose), disclaimer: DISCLAIMER };
 }

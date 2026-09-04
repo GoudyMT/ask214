@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { synthesize, type RetrievedChunk, type SynthesizeDeps } from './synthesize';
 import type { FetchLike } from '../online/retrieve-online';
+import { realChunks, collisionId } from './fixtures';
 
 const CHUNKS: RetrievedChunk[] = [
 	{
@@ -32,6 +33,16 @@ function stubFetch(
 function deps(fetchImpl: FetchLike): SynthesizeDeps {
 	return { fetch: fetchImpl, apiKey: 'test-key' };
 }
+
+// Every id in the shipped corpus is `<sourceId>:<12 hex>`, and 8 carry a `-N` collision suffix. The
+// fixtures above all use a colon-free id, so nothing exercised a REAL one - and the citation parser's
+// character class excluded the colon, so in production every synthesis refused with `no_citations`.
+//
+// The ids are DERIVED by the shipped identity rule, never written down: a hard-coded literal goes
+// stale the moment the corpus is re-cleaned, which is the same fixture-drift that hid the original
+// defect.
+const REAL_ID_CHUNKS = await realChunks();
+const SKILLBRIDGE_ID = REAL_ID_CHUNKS[0]!.id;
 
 describe('synthesize', () => {
 	it('short-circuits a personalized-eligibility query with no provider call', async () => {
@@ -69,6 +80,119 @@ describe('synthesize', () => {
 			'thinking'
 		]);
 		expect(body).not.toHaveProperty('metadata');
+	});
+
+	it('accepts a citation to a real corpus id (sourceId:hash)', async () => {
+		const impl = stubFetch(
+			`SkillBridge lets you train with a civilian employer during your last 180 days of service [${SKILLBRIDGE_ID}].`
+		);
+		const result = await synthesize('What is SkillBridge?', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.citations.map((c) => c.id)).toContain(SKILLBRIDGE_ID);
+		}
+	});
+
+	// The rendered answer must not show the reader 12 characters of hash. Attribution is carried by the
+	// verified `citations` list, not by machine syntax left in the prose. Nothing pinned this, which is
+	// why "...service [dod_skillbridge:71686373cd68]." would have shipped the moment citations parsed.
+	it('renders prose with the citation markers removed', async () => {
+		const impl = stubFetch(
+			`SkillBridge lets you train with a civilian employer during your last 180 days of service [${SKILLBRIDGE_ID}]. Participation requires unit commander approval [${SKILLBRIDGE_ID}].`
+		);
+		const result = await synthesize('What is SkillBridge?', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.text).not.toContain('[');
+			expect(result.answer.text).not.toContain(SKILLBRIDGE_ID);
+			expect(result.answer.text).toContain('last 180 days of service.');
+			// Attribution survives in the verified citation list.
+			expect(result.answer.citations.map((c) => c.id)).toEqual([SKILLBRIDGE_ID]);
+		}
+	});
+
+	it('accepts a citation to a real corpus id carrying a collision suffix', async () => {
+		const suffixed = await collisionId('tap_dol_efct', REAL_ID_CHUNKS[1]!.text, 1);
+		const chunks = [{ ...REAL_ID_CHUNKS[1]!, id: suffixed }];
+		const impl = stubFetch(`The workshop runs for 1 day [${suffixed}].`);
+		const result = await synthesize('How long is EFCT?', chunks, deps(impl));
+		expect(result.kind).toBe('answer');
+	});
+
+	// Markers are REMOVED before grounding, not replaced with a space. Replacing with a space lets a
+	// fabricated figure be spliced across valid markers and tokenized into grounded fragments -
+	// "2[id]0[id]2[id]5" becomes "2 0 2 5", four single digits almost any source contains. Removing the
+	// marker reassembles 2025, which is then checked like any other figure.
+	it('refuses a figure spliced across valid citation markers', async () => {
+		const impl = stubFetch(
+			`Rates change in 2[${SKILLBRIDGE_ID}]0[${SKILLBRIDGE_ID}]2[${SKILLBRIDGE_ID}]5 for all claimants.`
+		);
+		const result = await synthesize('When do rates change?', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('refusal');
+		if (result.kind === 'refusal') expect(result.reason).toBe('ungrounded_number');
+	});
+
+	// Citation markers are stripped before numeric grounding, so a figure hidden inside brackets would
+	// escape the grounding check. It cannot: anything shaped like a citation is ALSO validated against the
+	// retrieved set first, and a bare number is not a retrieved id, so the answer refuses either way.
+	it('refuses a numeric claim hidden inside citation brackets', async () => {
+		const impl = stubFetch(`The monthly rate is [9000] per month [${SKILLBRIDGE_ID}].`);
+		const result = await synthesize('What is the rate?', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('refusal');
+		if (result.kind === 'refusal') expect(result.reason).toBe('invalid_citation');
+	});
+
+	// The prompt's SAFETY FIRST clause tells the model to answer a crisis turn with the crisis line and no
+	// benefits information - so it cites nothing, and 988 / 838255 appear in no cited chunk. Both gates
+	// therefore destroyed it: the user read "we couldn't produce a reliable summary" instead of 988, while
+	// crisis/detect.ts documented this clause as the backstop for the indirect phrasing its keyword net
+	// deliberately misses.
+	it('routes a crisis answer to the crisis surface instead of refusing it', async () => {
+		const impl = stubFetch(
+			'I am really sorry you are carrying this. You can reach the Veterans Crisis Line right now - dial 988 then press 1, or text 838255.'
+		);
+		const result = await synthesize('i dont see a way forward anymore', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('crisis');
+	});
+
+	// 29 of the 1878 shipped chunks legitimately mention the crisis line, so keying on the number alone
+	// would replace a real answer about mental-health resources with a crisis card. Both signals are
+	// required: the answer must reach for the crisis line AND cite nothing.
+	it('does not treat a cited answer that mentions the crisis line as a crisis turn', async () => {
+		const impl = stubFetch(
+			`Support is available and the Veterans Crisis Line can be reached at 988 [${SKILLBRIDGE_ID}].`
+		);
+		const result = await synthesize(
+			'what mental health resources exist?',
+			REAL_ID_CHUNKS,
+			deps(impl)
+		);
+		expect(result.kind).not.toBe('crisis');
+	});
+
+	// Rule 3 orders the model to point at va.gov or 1-800-827-1000 when the sources do not cover the
+	// question. That answer cites nothing and names a number no chunk contains, so it was silently
+	// discarded as `no_citations`.
+	it('routes an uncited official-fallback answer to the not-covered surface', async () => {
+		const impl = stubFetch(
+			'These sources do not cover state income tax. Try va.gov or call 1-800-827-1000.'
+		);
+		// A query with no first-person marker, so the eligibility pre-gate (which fires ahead of this and
+		// needs a personal fact plus an entitlement ask) cannot claim it first.
+		const result = await synthesize(
+			'what is the state income tax deadline',
+			REAL_ID_CHUNKS,
+			deps(impl)
+		);
+		expect(result.kind).toBe('notCovered');
+	});
+
+	// The gate stays strict for everything else: an uncited answer that reaches for neither authorized
+	// contact is still the ungrounded output the gates exist to stop.
+	it('still refuses an uncited answer that is neither authorized shape', async () => {
+		const impl = stubFetch('SkillBridge is a transition program you should look into.');
+		const result = await synthesize('What is SkillBridge?', REAL_ID_CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'refusal', reason: 'no_citations' });
 	});
 
 	it('refuses when the model cites an id that was not retrieved', async () => {

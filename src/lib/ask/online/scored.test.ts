@@ -4,7 +4,9 @@ import { narrowScored, toRetrievedChunks } from './scored';
 const wireHit = (over: Record<string, unknown> = {}) => ({
 	score: 0.82,
 	chunk: {
-		id: 'tap_moc_crosswalk',
+		// A real chunk-id shape. This projection feeds synthesize, whose citation parser could not read a
+		// colon for the life of the feature - a colon-free fixture here is what let that pass review.
+		id: 'tap_moc_crosswalk:0fb72e844a79',
 		text: 'Use the MOC crosswalk.',
 		sourceId: 'tap_moc',
 		sourceTitle: 'MOC Crosswalk',
@@ -20,7 +22,7 @@ describe('narrowScored', () => {
 		const out = narrowScored([wireHit()]);
 		expect(out).toHaveLength(1);
 		expect(out[0]!.score).toBe(0.82);
-		expect(out[0]!.chunk.id).toBe('tap_moc_crosswalk');
+		expect(out[0]!.chunk.id).toBe('tap_moc_crosswalk:0fb72e844a79');
 		expect(out[0]!.chunk.section).toBe('Ch. 2');
 	});
 
@@ -43,7 +45,7 @@ describe('toRetrievedChunks', () => {
 		const chunks = toRetrievedChunks(narrowScored([wireHit()]));
 		expect(chunks).toEqual([
 			{
-				id: 'tap_moc_crosswalk',
+				id: 'tap_moc_crosswalk:0fb72e844a79',
 				text: 'Use the MOC crosswalk.',
 				url: 'https://tapevents.mil/moc',
 				title: 'MOC Crosswalk'
