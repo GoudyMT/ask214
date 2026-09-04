@@ -4,6 +4,13 @@
 // line (a safe outcome); a miss is the failure that matters. It is deliberately NOT comprehensive:
 // indirect or coded expressions will slip, and the synthesis system prompt's safety clause is the
 // backstop for those. On the on-device path a miss shows normal results, never a wrong answer.
+//
+// That backstop is real but ONLINE-ONLY, and it was not real until S77: the model's crisis reply cites
+// nothing, so both synthesis gates rejected it and the user read "we couldn't produce a reliable summary"
+// instead of the crisis line. It now classifies to `{kind:'crisis'}` ahead of the gates and commits the
+// same terminal state this detector does, so both routes land on the same CrisisCard. A miss on the
+// DEVICE path still has no backstop - that path never calls a model - which is the argument for widening
+// the net here rather than relying on the prompt.
 const CRISIS_PATTERNS: RegExp[] = [
 	/\b(suicidal|suicide)\b/i,
 	/\b(kill|hurt|harm)(ing)?\s+(myself|my\s?self)\b/i,

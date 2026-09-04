@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SynthesisView } from '$lib/ask/synthesis/synthesis-view';
+	import CrisisCard from './CrisisCard.svelte';
 	let { view }: { view: SynthesisView } = $props();
 </script>
 
@@ -18,6 +19,22 @@
 			</ul>
 		{/if}
 		<p class="ask-summary__disclaimer">{view.answer.disclaimer}</p>
+	</section>
+{:else if view.kind === 'crisis'}
+	<!-- The model reached for the crisis line. Its own wording is discarded and the shipped CrisisCard is
+	     shown instead, so a person in crisis sees the same verified surface whether the keyword net caught
+	     it or the model did. -->
+	<CrisisCard />
+{:else if view.kind === 'notCovered'}
+	<section class="ask-summary ask-summary--info" aria-label="Not covered by these sources">
+		<p class="ask-summary__text">
+			Ask 214 only answers from the official documents it carries, and none of them cover this. That
+			is a limit of what is in here, not an answer to your question.
+		</p>
+		<p class="ask-summary__sources">
+			<a href="https://www.va.gov/" rel="external noopener">Search va.gov</a>
+			or call the VA benefits hotline at 1-800-827-1000.
+		</p>
 	</section>
 {:else if view.kind === 'eligibility'}
 	<section class="ask-summary ask-summary--info" aria-label="General information">
@@ -59,6 +76,9 @@
 		margin: 0 0 var(--space-s);
 	}
 	.ask-summary__text {
+		/* The prompt asks for 2-3 short paragraphs and the model emits blank lines. Without this the whole
+		   answer renders as one run-on block - never seen, because no answer had ever rendered. */
+		white-space: pre-line;
 		margin: 0 0 var(--space-m);
 	}
 	.ask-summary__sources {

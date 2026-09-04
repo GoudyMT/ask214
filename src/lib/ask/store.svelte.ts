@@ -170,6 +170,14 @@ export function createAskStore(deps: {
 				summary = undefined;
 			}
 		}
+		// A crisis turn routes to help, never to benefits results - the same terminal state the keyword
+		// pre-gate in ask() commits. Rendering the crisis surface ABOVE a list of benefits cards would be
+		// the wrong answer to the question actually being asked, so the cards are dropped entirely and the
+		// two crisis paths converge on one state.
+		if (summary?.kind === 'crisis') {
+			commitIfCurrent({ kind: 'crisis' });
+			return;
+		}
 		commitIfCurrent(
 			summary
 				? { kind: 'results', origin: 'online', cards, summary }

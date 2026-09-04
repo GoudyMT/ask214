@@ -8,6 +8,8 @@ import type { CitedAnswer } from './cited-answer';
 export type SynthesisView =
 	| { kind: 'answer'; answer: CitedAnswer }
 	| { kind: 'eligibility' }
+	| { kind: 'crisis' }
+	| { kind: 'notCovered' }
 	| { kind: 'refusal' }
 	| { kind: 'unavailable' };
 
@@ -15,7 +17,7 @@ export type SynthesisView =
  * Map a synthesis outcome to the banner view the Ask UI renders.
  *
  * @param result The discriminated synthesize outcome.
- * @returns The render-ready view; total over all four SynthesisResult kinds.
+ * @returns The render-ready view; total over every SynthesisResult kind.
  */
 export function toSynthesisView(result: SynthesisResult): SynthesisView {
 	switch (result.kind) {
@@ -23,6 +25,10 @@ export function toSynthesisView(result: SynthesisResult): SynthesisView {
 			return { kind: 'answer', answer: result.answer };
 		case 'eligibility':
 			return { kind: 'eligibility' };
+		case 'crisis':
+			return { kind: 'crisis' };
+		case 'notCovered':
+			return { kind: 'notCovered' };
 		case 'refusal':
 			return { kind: 'refusal' };
 		case 'degraded':
