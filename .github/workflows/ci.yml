@@ -82,6 +82,19 @@ jobs:
       - name: E2E tests (excludes @slow - the heavy offline-model run; see pnpm test:e2e:offline)
         run: pnpm exec playwright test --grep-invert @slow
 
+      # Playwright already writes the failing DOM (error-context.md) and a trace into test-results/, and
+      # this job was discarding them - so a CI-only failure could only ever be read as the number the
+      # assertion printed. The /timeline 320px overflow failed four times across three branches and main
+      # on that basis. Uploaded on failure ONLY, so a green run adds nothing.
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Build
         run: pnpm run build
 

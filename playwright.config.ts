@@ -20,6 +20,12 @@ export default defineConfig({
 		// Freeze the home feed's auto-scroll (it honours prefers-reduced-motion) so a moving element
 		// cannot flake interactions, and so the reduced-motion path is what CI exercises.
 		reducedMotion: 'reduce'
+		// NOTE: `trace: 'retain-on-failure'` was tried here to capture a DOM snapshot for the CI-only
+		// /timeline overflow, and REVERTED. It destabilised the suite - the browser died mid-run
+		// ("browser.newContext: Target page, context or browser has been closed"), 2 of 148 failing and
+		// reproducible across runs, against 148/148 with it off. Playwright already writes
+		// error-context.md for a failing test, which carries the DOM, and CI now uploads it - so the
+		// snapshot is available without paying that instability. Re-measure before trying it again.
 	},
 	// WebKit is not Safari, but it is the same engine family - and without an Apple device it is the
 	// only way to exercise the Safari-side behaviour this app depends on. It reaches what Chromium

@@ -8,6 +8,64 @@ import { expect, test, type Page } from '@playwright/test';
 // past the viewport (a wide table, an unwrapped string, a fixed-width element) horizontal-scrolls
 // the whole page - which the <= 900px main check alone cannot catch on a 320px screen (main is
 // already <= 900 there).
+
+/**
+ * Assert the document does not scroll horizontally, and NAME what does when it fails.
+ *
+ * The bare assertion reported a single integer. `/timeline` at 320px has failed on CI four times with
+ * exactly 7px - three branches and `main` - and every failure gave the same number and no lead, while the
+ * overflow is not reproducible on a Windows dev machine (CI runs Linux, where the system font stack
+ * resolves differently and text measures wider). A number cannot be diagnosed; an element can.
+ *
+ * The walk runs ONLY once overflow is already non-zero, so a green run costs nothing. Elements inside a
+ * horizontal scroll container are skipped: the phase-chip strip legitimately extends past the viewport
+ * and is a red herring that has already cost one investigation.
+ *
+ * The assertion and its threshold are unchanged - this adds a failure message, nothing else. It is
+ * deliberately NOT a poll: four failures at an identical 7px is the opposite of a timing race, and
+ * retrying until it passes would bury a real 320px overflow rather than fix it.
+ *
+ * @param page The page under test, already navigated and settled.
+ */
+async function expectNoHorizontalOverflow(page: Page): Promise<void> {
+	// scrollWidth (content incl. overflow) must not exceed clientWidth (viewport minus any scrollbar).
+	// clientWidth is scrollbar-safe, so a vertical scrollbar does not false-positive here.
+	const { overflow, culprits } = await page.evaluate(() => {
+		const doc = document.documentElement;
+		const amount = doc.scrollWidth - doc.clientWidth;
+		if (amount <= 0) return { overflow: amount, culprits: [] as string[] };
+
+		const vw = doc.clientWidth;
+		const found: string[] = [];
+		for (const el of Array.from(doc.querySelectorAll('*'))) {
+			const r = el.getBoundingClientRect();
+			if (r.right <= vw + 0.5 || r.width < 2) continue;
+			let clipped = false;
+			for (let p = el.parentElement; p; p = p.parentElement) {
+				const ox = getComputedStyle(p).overflowX;
+				if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') {
+					clipped = true;
+					break;
+				}
+			}
+			if (clipped) continue;
+			const e = el as HTMLElement;
+			const cls = String(e.className || '').trim();
+			found.push(
+				`${e.tagName.toLowerCase()}${cls ? '.' + cls.split(/\s+/).join('.') : ''}` +
+					` right=${r.right.toFixed(1)} width=${r.width.toFixed(1)}` +
+					` text=${JSON.stringify((e.textContent ?? '').trim().slice(0, 60))}`
+			);
+		}
+		return { overflow: amount, culprits: found.slice(0, 10) };
+	});
+
+	const detail = culprits.length
+		? `\noverflowing elements (viewport exceeded by ${overflow}px):\n  ${culprits.join('\n  ')}`
+		: `\noverflow is ${overflow}px but no unclipped element exceeds the viewport - suspect a margin, ` +
+			`a transform, or an element the walk skipped as clipped.`;
+	expect(overflow, detail).toBeLessThanOrEqual(0);
+}
 const MOBILE = [
 	{ width: 320, height: 568, label: 'iPhone SE' },
 	{ width: 375, height: 667, label: 'iPhone 8' },
@@ -42,13 +100,7 @@ for (const route of ROUTES) {
 				.evaluate((el) => el.getBoundingClientRect().width);
 			expect(mainWidth).toBeLessThanOrEqual(900);
 
-			// No horizontal scroll: scrollWidth (content incl. overflow) must not exceed clientWidth
-			// (viewport minus any scrollbar). clientWidth is scrollbar-safe, so a vertical scrollbar
-			// does not false-positive here.
-			const overflow = await page.evaluate(
-				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
-			);
-			expect(overflow).toBeLessThanOrEqual(0);
+			await expectNoHorizontalOverflow(page);
 		});
 	}
 }
@@ -76,10 +128,7 @@ for (const route of GATED_ROUTES) {
 			await page.goto(route);
 
 			await expect(page.getByRole('main')).toBeVisible();
-			const overflow = await page.evaluate(
-				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
-			);
-			expect(overflow).toBeLessThanOrEqual(0);
+			await expectNoHorizontalOverflow(page);
 		});
 	}
 }
