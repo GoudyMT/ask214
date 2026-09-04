@@ -138,6 +138,138 @@ describe('cleanExcerpt', () => {
 		expect(cleanExcerpt('the field source_id is required')).toBe('the field source_id is required');
 	});
 
+	// Real corpus shape (tap_va_benefits_guide, 136 occurrences): a "Module N:" running header that
+	// extraction fuses into the body at a page break as well as at a chunk start. Every fixture below is
+	// a real corpus string, addressed by chunk id - an earlier version of these tests invented fixtures
+	// and got the corpus wrong (it paired Course Capstone with Module 4; it is Module 6).
+	it('strips the Module running header at the start of a chunk', () => {
+		expect(
+			cleanExcerpt(
+				'Module 1: Introduction to Benefits and Services Introduction No two transitions'
+			)
+		).toBe('Introduction No two transitions');
+	});
+
+	// tap_va_benefits_guide:ced8134cefca
+	it('strips the Module running header where a page break fused it mid-text', () => {
+		expect(
+			cleanExcerpt(
+				'Servicemember Affairs webpage or scan the QR code Module 5: Finding a Place to Live and Community Resources Housing Assistance'
+			)
+		).toBe('Servicemember Affairs webpage or scan the QR code Housing Assistance');
+	});
+
+	// The Module 5 title CONTAINS the Module 5 title of an earlier draft ("Finding a Place to Live"),
+	// which matched first and left "and Community Resources" fused into the following prose across 17
+	// chunks. The titles are sorted longest-first so a prefix can never win the alternation; this test
+	// fails if that sort is removed or a truncated title is added.
+	it('strips the whole Module title, never a prefix of it', () => {
+		const out = cleanExcerpt(
+			'Module 5: Finding a Place to Live and Community Resources Consider the following questions'
+		);
+		expect(out).toBe('Consider the following questions');
+		expect(out).not.toContain('and Community Resources');
+	});
+
+	// 92 real prose references use "Module N" with NO colon. The colon is the whole safety margin.
+	it('leaves a prose reference to a module untouched', () => {
+		expect(
+			cleanExcerpt('Upon completion of Module 1, you will be able to: Identify key factors')
+		).toBe('Upon completion of Module 1, you will be able to: Identify key factors');
+		expect(cleanExcerpt('Lunch occurs after Module 3, approximately halfway through the day')).toBe(
+			'Lunch occurs after Module 3, approximately halfway through the day'
+		);
+	});
+
+	// tap_va_benefits_guide:250a981c6448 - upper-case MODULE is the guide's TITLE PAGE, and it carries a
+	// different title ("Introduction to VA Benefits and Services"). Matching case-insensitively would
+	// delete real title-page content.
+	it('leaves the upper-case MODULE title page alone', () => {
+		expect(cleanExcerpt('MODULE 1: Introduction to VA Benefits and Services Welcome')).toBe(
+			'MODULE 1: Introduction to VA Benefits and Services Welcome'
+		);
+	});
+
+	// tap_va_womens_health:44992bc64063 - a different guide's contents listing, not a running header.
+	// An unlisted title must keep its header visible rather than lose the words around it.
+	it('leaves a Module header whose title is not listed alone', () => {
+		expect(
+			cleanExcerpt(
+				'postseparation from the military: Module 1: Shift From Active Duty Shifting from'
+			)
+		).toBe('postseparation from the military: Module 1: Shift From Active Duty Shifting from');
+	});
+
+	// Real corpus shape (29 occurrences): the front-matter page token, glued to the guide title with no
+	// space ("page 1Mental Health...") or standing alone at the opening ("page 1 Other Than Honorable").
+	it('strips a front-matter page token glued to the guide title', () => {
+		expect(
+			cleanExcerpt('page 1Mental Health for Families MLC Online Resource Guide Mental Health')
+		).toBe('Mental Health for Families MLC Online Resource Guide Mental Health');
+	});
+
+	it('strips a bare leading front-matter page token', () => {
+		expect(
+			cleanExcerpt('page 1 Other Than Honorable MILITARY LIFE CYCLE ONLINE RESOURCE GUIDE')
+		).toBe('Other Than Honorable MILITARY LIFE CYCLE ONLINE RESOURCE GUIDE');
+	});
+
+	// tap_va_education_benefits:d3dc57093588 - 4 of the 29 sit MID-TEXT, fused at a page break, so the
+	// glued alternative is deliberately not anchored to the string start. Both positive fixtures above
+	// sit at index 0, which is exactly the blind spot that has to be covered explicitly.
+	it('strips a front-matter page token fused mid-text', () => {
+		expect(cleanExcerpt('Courses page 6VA Education Benefits Online Resource Guide')).toBe(
+			'Courses VA Education Benefits Online Resource Guide'
+		);
+	});
+
+	// "Resource Guide" is the name of a REAL document, cited 78 times across 62 chunks, mostly in
+	// ordinary sentences. Only the page token is furniture; the name itself must survive.
+	it('leaves a prose reference to the Resource Guide untouched', () => {
+		expect(
+			cleanExcerpt('The VETS Resource Guide (PDF) contains links to access many online resources')
+		).toBe('The VETS Resource Guide (PDF) contains links to access many online resources');
+		expect(cleanExcerpt('This Online Resource Guide (ORG) provides you with the web links')).toBe(
+			'This Online Resource Guide (ORG) provides you with the web links'
+		);
+	});
+
+	it('leaves a page number used in prose alone', () => {
+		expect(cleanExcerpt('The checklist is continued on page 5 of the handbook')).toBe(
+			'The checklist is continued on page 5 of the handbook'
+		);
+	});
+
+	// Real corpus shape: a Symbol/Wingdings sub-bullet the extractor reduced to a bare letter - 141 of
+	// the 158 standalone lowercase y/o. They separate list items, so they become the same " - " the
+	// other marker glyphs do.
+	it('converts the bare-letter bullet glyphs into separators', () => {
+		expect(cleanExcerpt('Links y 38 CFR 3.12 VA Benefits y VA Mental Health Services')).toBe(
+			'Links - 38 CFR 3.12 VA Benefits - VA Mental Health Services'
+		);
+		expect(cleanExcerpt('work experience, including: o Employer name o Job title')).toBe(
+			'work experience, including: - Employer name - Job title'
+		);
+	});
+
+	// tap_va_benefits_guide:ffbb1fc68cf9 - the Whole Health diagram labels extract letter-spaced, every
+	// letter its own token. A bare y/o rule fires INSIDE these words: "Community" became
+	// "C - m m u n i t -" on 17 real occurrences. A bullet always sits between multi-character tokens;
+	// a tracked-out letter never does, which is what the neighbour constraint keys on.
+	it('leaves letter-spaced text alone', () => {
+		expect(cleanExcerpt('webpage A w a r e n e s s M i n d f u l C o m m u n i t y')).toBe(
+			'webpage A w a r e n e s s M i n d f u l C o m m u n i t y'
+		);
+	});
+
+	// Only y and o. The other single letters in this corpus are multiple-choice answer options
+	// ("...Facilities d Community Living Centers e All of these"), which are real content.
+	it('leaves single letters used as multiple-choice options alone', () => {
+		expect(cleanExcerpt('c Vet Centers d Community Living Centers e All of these')).toBe(
+			'c Vet Centers d Community Living Centers e All of these'
+		);
+	});
+
 	it('deletes font-encoding garbage (Private-Use-Area tofu + broken surrogate)', () => {
 		expect(cleanExcerpt('form ' + PUA + ' and ' + SURROGATE + ' submit')).toBe('form and submit');
 	});
