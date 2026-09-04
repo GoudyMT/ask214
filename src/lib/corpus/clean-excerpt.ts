@@ -58,18 +58,22 @@ const VERSION_FOOTER_RE = new RegExp('(?:' + VERSION_FORM + '|' + BARE_REVISED +
 // A pipe-delimited running page header the guides print on every page, which extraction fuses into the
 // body text. Two forms occur: "EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 14" and, in the sibling DOL
 // guide, the same header without the PAGE keyword ("EMPLOYMENT WORKSHOP | SECTION 1 | 11"); a chunk
-// boundary can also cut the trailing number off. Anchored on the literal SECTION keyword and its
-// number so an ordinary pipe survives.
+// boundary can also cut the title off the front or the number off the end, so both are optional.
+// Anchored on the literal SECTION keyword and its number so an ordinary pipe survives.
 //
-// The title run is bounded to at most THREE caps words. Unbounded, it backtracked across spaces and
-// swallowed the ALL-CAPS heading in front of the header - these guides print their headings in caps,
-// so "GAINING MORE SKILLS <header>" lost the heading. Bounding it keeps real content while still
-// removing every guide title in this corpus (the longest is three words).
-const RUNNING_HEADER_RE = /\s*(?:[A-Z][A-Z]* ){0,3}\|\s*SECTION\s+\d+\s*\|\s*(?:PAGE\s*\d*|\d+)/g;
+// The title is matched LITERALLY, one alternative per guide. A generic caps-word run cannot work here:
+// the two titles are different lengths (three words and two), so any word-count bound that fits the
+// longer one leaves a free slot in front of the shorter one, and the run then eats the last token of
+// real content ("Expires December 20XX" -> "Expires December 20", "Baltimore, MD" -> "Baltimore,").
+// A literal list fails in the safe direction instead: a guide title not listed here leaves its header
+// visible rather than destroying the words around it. PAGE ends on a word boundary for the same reason,
+// so "PAGEANT" does not lose its head.
+const RUNNING_HEADER_RE =
+	/\s*(?:EFCT PARTICIPANT GUIDE|EMPLOYMENT WORKSHOP)?\s*\|\s*SECTION\s+\d+\s*\|(?:\s*PAGE\b)?(?:\s*\d+)?/g;
 
 // Worksheet fill-in-the-blank rules ("My current job is ______") extract as underscore runs that
-// carry no content and read as corruption inside a quotation. Three or more, so an identifier like
-// source_id is left alone.
+// carry no content and read as corruption on a card. Three or more, so an identifier like source_id
+// is left alone.
 const BLANK_RULE_RE = /_{3,}/g;
 
 const WHITESPACE_RE = /\s+/g;

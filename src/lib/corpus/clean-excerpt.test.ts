@@ -86,6 +86,40 @@ describe('cleanExcerpt', () => {
 		).toBe('NOTES Write your answers');
 	});
 
+	// The two guide titles are different LENGTHS (three words and two), so a word-COUNT bound cannot fit
+	// both: bounding the run at three leaves a free slot in front of the two-word title, which then eats
+	// the last token of real content. These four are the real corpus strings that lost a token
+	// (tap_dol_employment_workshop chunks 98652df98874 / b2553578f3e5 / 662b136cde5e / 187a7a97bf3d).
+	it('keeps the token in front of the two-word running header title', () => {
+		expect(cleanExcerpt('Expires December 20XX EMPLOYMENT WORKSHOP | SECTION 2 | 54')).toBe(
+			'Expires December 20XX'
+		);
+		expect(
+			cleanExcerpt('Howard Community College, Baltimore, MD EMPLOYMENT WORKSHOP | SECTION 8 | 193')
+		).toBe('Howard Community College, Baltimore, MD');
+		expect(
+			cleanExcerpt('Best Regards, Andrew Thompson II EMPLOYMENT WORKSHOP | SECTION 8 | 194')
+		).toBe('Best Regards, Andrew Thompson II');
+		expect(
+			cleanExcerpt('APPLY TO JOB EMPLOYMENT WORKSHOP | SECTION 2 | 19 You will not provide')
+		).toBe('APPLY TO JOB You will not provide');
+	});
+
+	// A caps run can also start mid-token, because the title match is preceded by a zero-width-able \s*.
+	it('does not start the header match inside a preceding word', () => {
+		expect(cleanExcerpt('DISCHARGE EMPLOYMENT WORKSHOP | SECTION 1 | 7 next')).toBe(
+			'DISCHARGE next'
+		);
+	});
+
+	// PAGE with no digits after it is the chunk-boundary form, so the keyword must still end on a word
+	// boundary - otherwise a word merely starting with "PAGE" loses its tail.
+	it('does not truncate a word that merely starts with PAGE', () => {
+		expect(cleanExcerpt('EFCT PARTICIPANT GUIDE | SECTION 2 | PAGEANT winners')).toBe(
+			'PAGEANT winners'
+		);
+	});
+
 	it('leaves a pipe used as ordinary punctuation alone', () => {
 		expect(cleanExcerpt('Choose one | two | three from the list')).toBe(
 			'Choose one | two | three from the list'
