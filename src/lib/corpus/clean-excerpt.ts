@@ -1,9 +1,11 @@
 // Runtime display-text cleaner for corpus excerpts. The corpus embeds the RAW extracted text so the
 // retrieval ranking stays exactly at its measured floor (editing the embedded text perturbs the
 // rankings - measured), and this normalizes the residual extraction artifacts the user actually SEES
-// on a result card: inline list-marker glyphs, font-encoding garbage (Private-Use-Area remnants and
-// C0/C1 control runs a decorative glyph row extracts as), and the running publication footer some
-// appendix/front pages fuse onto a chunk. Pure + browser-safe, shared by the result cards, the offline
+// on a result card, in eight passes: font-encoding garbage (Private-Use-Area remnants and C0/C1 control
+// runs a decorative glyph row extracts as), the running publication footer some appendix/front pages
+// fuse onto a chunk, the pipe-delimited running page header, the "Module N:" running header, the
+// front-matter page token, worksheet blank rules, inline list-marker glyphs, and the sub-bullets that
+// extraction reduced to a bare letter. Pure + browser-safe, shared by the result cards, the offline
 // source reader, and the online synthesis path (so the model reads clean text too). Glyph sets are
 // built from \u escapes / code points so this source file stays pure ASCII.
 //
@@ -71,10 +73,77 @@ const VERSION_FOOTER_RE = new RegExp('(?:' + VERSION_FORM + '|' + BARE_REVISED +
 const RUNNING_HEADER_RE =
 	/\s*(?:EFCT PARTICIPANT GUIDE|EMPLOYMENT WORKSHOP)?\s*\|\s*SECTION\s+\d+\s*\|(?:\s*PAGE\b)?(?:\s*\d+)?/g;
 
+// A second running-header form: `tap_va_benefits_guide` prints "Module 6: Course Capstone" on every
+// page, and extraction fuses it into the body at a page break as well as at a chunk start, so this
+// cannot anchor to the opening the way the front-matter rule below does. 136 occurrences.
+//
+// THREE things carry the safety here, each measured over all 1878 chunks:
+//
+// 1. The COLON is mandatory. The corpus has 92 prose references of the form "Module N" with no colon
+//    ("Upon completion of Module 1, you will be able to:", "Lunch occurs after Module 3,"). Relaxing
+//    the colon destroys every one of them.
+// 2. The match is CASE-SENSITIVE. Upper-case "MODULE 1:" is the guide's title page, not its running
+//    header, and it carries a DIFFERENT title ("MODULE 1: Introduction to VA Benefits and Services" -
+//    note the "VA"). Two occurrences; stripping them would delete real title-page content.
+// 3. The titles are sorted LONGEST FIRST. JS alternation is leftmost-alternative-wins, so a title that
+//    is a strict PREFIX of another real title would match first and leave the remainder fused into the
+//    prose after it - which is how an earlier draft of this rule turned "Module 5: Finding a Place to
+//    Live and Community Resources" into a dangling "and Community Resources" across 17 chunks. Sorting
+//    is done here rather than by hand so a title added later cannot reintroduce that.
+//
+// A guide whose title is NOT listed keeps its header visible rather than losing text: the five
+// `tap_va_womens_health` "Module N:" lines use a different title set and are a contents listing, not a
+// running header, so they are deliberately left alone.
+const MODULE_TITLES = [
+	'Introduction to Benefits and Services',
+	'Maintaining Your Health',
+	'Applying for Disability Compensation',
+	'Getting Career Ready',
+	'Finding a Place to Live and Community Resources',
+	'Course Capstone'
+]
+	.slice()
+	.sort((a, b) => b.length - a.length)
+	.join('|');
+const MODULE_HEADER_RE = new RegExp('\\s*Module \\d+:\\s*(?:' + MODULE_TITLES + ')', 'g');
+
+// The front-matter page token the online resource guides print above the title, which extraction fuses
+// onto the body either glued to the title ("page 1Mental Health for Families") or standing alone at the
+// opening ("page 1 Other Than Honorable"). 29 occurrences: 25 open a chunk, and 4 sit mid-text where a
+// page break fused one in, so the glued alternative is deliberately NOT anchored to the string start.
+//
+// Only the PAGE TOKEN is removed. The words after it are not touched: "Resource Guide" is the name of a
+// real document these guides cite constantly in prose ("The VETS Resource Guide (PDF) contains links...",
+// "This Online Resource Guide provides you with the web links..."). It occurs 78 times across 62 chunks,
+// the majority in ordinary sentences, so a rule anchored on the NAME rather than the token would delete
+// them. The lookahead is what keeps the unanchored alternative safe: it requires a capital immediately
+// after the digits with no space, which is an extraction artifact, so a prose "on page 5 of the handbook"
+// or "see page 60 to get started" is never touched.
+const FRONT_MATTER_PAGE_RE = /(?:^|\s)page ?\d+(?=[A-Z])|^\s*page\s+\d+\s+/g;
+
 // Worksheet fill-in-the-blank rules ("My current job is ______") extract as underscore runs that
 // carry no content and read as corruption on a card. Three or more, so an identifier like source_id
 // is left alone.
 const BLANK_RULE_RE = /_{3,}/g;
+
+// Symbol/Wingdings sub-bullets the extractor reduced to a bare letter, which separate list items the
+// same way the glyph markers above do. 158 standalone lowercase "y"/"o" exist in the corpus: 141 are
+// bullets, and 17 are NOT.
+//
+// Three separate classes of single letter have to survive, so the match is narrow on purpose:
+//   - Multiple-choice answer options ("...Facilities d Community Living Centers e All of these") - a
+//     different letter set, excluded by matching only y and o.
+//   - An initial in a name - excluded by matching lower case only.
+//   - LETTER-SPACED text. Three chunks in tap_va_benefits_guide carry the Whole Health diagram labels,
+//     which extraction flattened so that every letter is its own token: "C o m m u n i t y P r e v e n
+//     t i o n". A bare y/o rule fires INSIDE those words and turns "Community" into "C - m m u n i t -".
+//     The neighbour constraint below is what excludes them: a real bullet always sits between
+//     multi-character tokens, a tracked-out letter never does.
+//
+// The cost is 8 bullets the constraint declines to convert (a bullet whose neighbour is itself one
+// character). That direction is the safe one: an unconverted bullet leaves a stray letter exactly as it
+// renders today, whereas a converted letter destroys a word.
+const LETTER_BULLET_RE = /(?:(?<=[^\s]{2}\s)|(?<=^)|(?<=^\s))\b[yo]\b(?=\s+[A-Za-z0-9]{2})/g;
 
 const WHITESPACE_RE = /\s+/g;
 // A separator left stranded at either end (from a leading or trailing marker) is not content.
@@ -82,22 +151,27 @@ const EDGE_SEPARATOR_RE = /^(?:- )+|(?: -)+$/g;
 
 /**
  * Normalizes the residual extraction artifacts in a corpus excerpt for display: strips font-encoding
- * garbage and the fused publication footer, and converts inline list-marker glyphs to " - " separators.
- * See the DISPLAY-ONLY CONTRACT above - this is not the anchor-space normalizer.
+ * garbage, the fused publication footer and the running page headers, and converts inline list markers
+ * to " - " separators. See the DISPLAY-ONLY CONTRACT above - this is not the anchor-space normalizer.
  *
  * Args:
  *     text: The raw corpus chunk text (or a stored excerpt) to clean for display.
  *
  * Returns:
- *     The display-clean text: garbage removed, the footer stripped, marker runs converted to " - ",
- *     whitespace collapsed, and any stranded edge separator trimmed. Clean prose is unchanged.
+ *     The display-clean text, in pipeline order: font-encoding garbage removed, the publication footer
+ *     stripped, the pipe-delimited and "Module N:" running headers stripped, the front-matter page token
+ *     removed, worksheet blank rules removed, marker-glyph runs and bare-letter sub-bullets converted to
+ *     " - ", whitespace collapsed, and any stranded edge separator trimmed. Clean prose is unchanged.
  */
 export function cleanExcerpt(text: string): string {
 	let s = text.replace(GARBAGE_RE, '');
 	s = s.replace(VERSION_FOOTER_RE, ' ');
 	s = s.replace(RUNNING_HEADER_RE, ' ');
+	s = s.replace(MODULE_HEADER_RE, ' ');
+	s = s.replace(FRONT_MATTER_PAGE_RE, ' ');
 	s = s.replace(BLANK_RULE_RE, ' ');
 	s = s.replace(MARKER_RUN_RE, ' - ');
+	s = s.replace(LETTER_BULLET_RE, ' - ');
 	s = s.replace(WHITESPACE_RE, ' ').trim();
 	s = s.replace(EDGE_SEPARATOR_RE, '').trim();
 	return s;

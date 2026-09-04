@@ -90,9 +90,12 @@ export async function synthesize(
 	// glyphs) out of each chunk ONCE, here at the single chunk-entry point, so the model reads the same text
 	// the source cards show AND numeric grounding checks against exactly what the model read.
 	//
-	// Cleaning DOES remove figures - 407 of the 1878 shipped chunks lose at least one numeric token, most
-	// often a publication year carried in the version footer ("2025", in 92 chunks), then page and section
-	// numbers. That is deliberate, and the grounding basis is the CLEANED text on purpose: grounding
+	// Cleaning DOES remove figures - 505 of the 1878 shipped chunks lose at least one numeric token, most
+	// often a publication year carried in the version footer ("2025", in 92 chunks), then the page, section
+	// and module numbers the running headers carry. RE-MEASURE THIS when a cleaning rule is added: the
+	// figure was 407 before the module-header and front-matter-page rules landed, and a stale number here
+	// misrepresents how much the grounding basis gives up. That is deliberate, and the grounding basis is
+	// the CLEANED text on purpose: grounding
 	// against the raw text would let a footer's publication year vouch for a model claim like "rates
 	// increase in 2025", which is exactly the deadline-as-current error rule 7 of the system prompt exists
 	// to prevent.
