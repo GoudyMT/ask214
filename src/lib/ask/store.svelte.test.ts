@@ -337,7 +337,7 @@ describe('createAskStore', () => {
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('results');
-		if (store.state.kind === 'results') expect(store.state.summary?.kind).toBe('answer');
+		if (store.state.kind === 'results') expect(store.state.answer?.kind).toBe('synthesized');
 	});
 
 	// A crisis turn routes to help and NOTHING else. The keyword pre-gate already commits `crisis` with no
@@ -353,13 +353,16 @@ describe('createAskStore', () => {
 		expect(store.state.kind).toBe('crisis');
 	});
 
-	it('omits the summary when synthesis is disabled (raw cards only)', async () => {
+	// Was "omits the summary ... (raw cards only)". Disabling synthesis still means no MODEL summary - that
+	// part is unchanged and is what this asserts. What changed is the fallback: the slot now holds the
+	// document's own sentences instead of nothing, so the user gets an answer either way.
+	it('shows no model summary when synthesis is disabled, but still answers', async () => {
 		const store = onlineStore({
 			synthesisEnabled: () => false,
 			synthesize: async () => ({ kind: 'degraded' })
 		});
 		await store.ask('q');
-		if (store.state.kind === 'results') expect(store.state.summary).toBeUndefined();
+		if (store.state.kind === 'results') expect(store.state.answer?.kind).toBe('extractive');
 	});
 
 	it('a user switch to online egresses nothing; the first ask then hits the consent gate', async () => {
@@ -460,7 +463,9 @@ describe('createAskStore', () => {
 		expect(store.state.kind).toBe('crisis');
 	});
 
-	it('a throwing synthesize falls back to raw cards instead of stranding the UI', async () => {
+	// The original guarantee - a throwing synthesize must never strand the spinner - is unchanged. The
+	// fallback it lands on is now an answer rather than bare cards.
+	it('a throwing synthesize falls back to the extractive answer instead of stranding the UI', async () => {
 		const store = onlineStore({
 			synthesisEnabled: () => true,
 			synthesize: async () => {
@@ -469,7 +474,7 @@ describe('createAskStore', () => {
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('results');
-		if (store.state.kind === 'results') expect(store.state.summary).toBeUndefined();
+		if (store.state.kind === 'results') expect(store.state.answer?.kind).toBe('extractive');
 	});
 
 	it('a results body with no valid hits degrades (a fault is not an authoritative "no source")', async () => {
@@ -635,5 +640,99 @@ describe('createAskStore', () => {
 		await store.ask('I want to kill myself'); // crisis at the open gate
 		expect(store.state.kind).toBe('crisis'); // crisis wins over the gate guard
 		expect(sent).toBe(0); // and nothing egressed
+	});
+
+	// The answer slot. Until now it was filled only when the user supplied an API key, was online, and had
+	// the toggle on - so the default and offline user never saw an answer at all, only ranked excerpts.
+	describe('the answer slot', () => {
+		// Real prose, because the whole feature is choosing WHICH sentences to show; the 'a'/'b' fixtures
+		// above cannot exercise selection. The id carries the shipped `<sourceId>:<12 hex>` shape for the
+		// same reason a colon-free slug hid a defect on the synthesis path for an entire release.
+		const INTENT_TEXT =
+			'Your Intent to File Once you notify us of your intent to file you have one year to submit ' +
+			'the completed claim. The date we receive it becomes your effective date for benefits.';
+
+		function intentCorpus(): Corpus {
+			return {
+				version: '1.0',
+				dim: 3,
+				modelId: 'all-MiniLM-L6-v2',
+				chunks: [
+					{
+						id: 'va_intent_to_file:9f2c1a7b4e60',
+						text: INTENT_TEXT,
+						section: 'Your Intent to File',
+						sourceId: 'va_intent_to_file',
+						sourceTitle: 'VA - Intent to File',
+						tags: [],
+						url: 'https://www.va.gov/'
+					}
+				],
+				embeddings: [new Float32Array([1, 0, 0])]
+			};
+		}
+
+		function deviceStore() {
+			localStorage.setItem(MODEL_DOWNLOADED_KEY, '1'); // set up, so the query runs rather than gating
+			return createAskStore({
+				embed: async () => new Float32Array([1, 0, 0]),
+				getCorpus: async () => intentCorpus()
+			});
+		}
+
+		// Deliberately impersonal, so the 38 CFR gate does not fire and this isolates the plain answer path.
+		it('answers on the device path, with no key and no network', async () => {
+			const store = deviceStore();
+			await store.ask('what is the deadline for submitting a completed claim?');
+			expect(store.state.kind).toBe('results');
+			if (store.state.kind !== 'results') return;
+			expect(store.state.answer?.kind).toBe('extractive');
+			if (store.state.answer?.kind !== 'extractive') return;
+			// The document's own sentence, with the duplicated heading gone.
+			expect(store.state.answer.answer.text).toContain('one year to submit');
+			expect(store.state.answer.answer.text.startsWith('Your Intent to File')).toBe(false);
+			expect(store.state.answer.eligibilityBanner).toBeUndefined();
+		});
+
+		// The input box stays editable after results render, so reading the query at render time would let
+		// the displayed answer drift away from the question it actually answered. `origin` is snapshot for
+		// exactly this reason already.
+		it('snapshots the query that produced the answer', async () => {
+			const store = deviceStore();
+			await store.ask('how long do I have to submit my claim?');
+			if (store.state.kind === 'results') {
+				expect(store.state.query).toBe('how long do I have to submit my claim?');
+			}
+		});
+
+		// 38 CFR 14.629. The gate lived inside synthesize(), so it needed online AND a key AND the toggle -
+		// the device user was never gated at all. Phrasing taken from the shipped red-team fixture.
+		it('attaches the eligibility note on the device path, where no gate ran before', async () => {
+			const store = deviceStore();
+			await store.ask('I have a 30% rating and served 8 years, what am I entitled to?');
+			expect(store.state.kind).toBe('results');
+			if (store.state.kind !== 'results') return;
+			expect(store.state.answer?.kind).toBe('extractive');
+			if (store.state.answer?.kind !== 'extractive') return;
+			expect(store.state.answer.eligibilityBanner).toBe(true);
+		});
+
+		it('still shows the source cards under the eligibility note', async () => {
+			const store = deviceStore();
+			await store.ask('I have a 30% rating and served 8 years, what am I entitled to?');
+			if (store.state.kind === 'results') expect(store.state.cards.length).toBeGreaterThan(0);
+		});
+
+		// The gate's possessive-benefit signal fires on plain procedural questions - 28.9% of the
+		// benchmark. Those must still get the answer the document plainly contains, with the note attached.
+		it('still answers a procedural question that trips the gate', async () => {
+			const store = deviceStore();
+			await store.ask('how long do I have to submit my claim?');
+			if (store.state.kind !== 'results') return;
+			expect(store.state.answer?.kind).toBe('extractive');
+			if (store.state.answer?.kind !== 'extractive') return;
+			expect(store.state.answer.answer.text).toContain('one year to submit');
+			expect(store.state.answer.eligibilityBanner).toBe(true);
+		});
 	});
 });

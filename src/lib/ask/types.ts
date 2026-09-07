@@ -1,7 +1,7 @@
 import type { ResultCard } from '$lib/corpus';
 import type { AskErrorCode } from './errors';
 import type { Rung } from './online/ladder';
-import type { SynthesisView } from './synthesis/synthesis-view';
+import type { AnswerView } from './answer/answer-view';
 
 /** The embedding model C uses for the query. MUST equal the corpus manifest's modelId. */
 export const EMBED_MODEL_ID = 'all-MiniLM-L6-v2';
@@ -24,8 +24,12 @@ export type AskState =
 			// on-device assurance and the always-visible line) derives from THIS, never the live mode - so a
 			// later mode toggle over a displayed answer can never relabel where it actually came from.
 			origin: 'device' | 'online';
+			// The question these cards answered, snapshot for the same reason: the input box stays editable
+			// after results render, so reading it later would drift the answer away from its own question.
+			query: string;
 			cards: ResultCard[];
-			summary?: SynthesisView; // present only on the online+synthesis path
+			// The single answer slot. Absent when nothing qualified, leaving the cards to stand alone.
+			answer?: AnswerView;
 	  }
 	| { kind: 'empty' }
 	| { kind: 'offline' }

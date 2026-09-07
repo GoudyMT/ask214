@@ -20,7 +20,18 @@ export type ExtractiveAnswer = {
  * claim to be the answer, which is why this is a union rather than a pair of optional fields.
  */
 export type AnswerView =
-	| { kind: 'extractive'; answer: ExtractiveAnswer }
+	| {
+			kind: 'extractive';
+			answer: ExtractiveAnswer;
+			/**
+			 * The 38 CFR banner rides ALONGSIDE this answer instead of replacing it. An extractive answer is
+			 * a verbatim quotation from an official document: it contains no reasoning about the user's
+			 * facts, so it cannot make a personalized eligibility claim. Replacing it would have swapped the
+			 * answer for a redirect on 28.9% of the benchmark questions - mostly procedural lookups like
+			 * "how do I get a copy of my DD214" that trip the gate's possessive-benefit signal.
+			 */
+			eligibilityBanner?: true;
+	  }
 	| { kind: 'synthesized'; answer: CitedAnswer }
 	| { kind: 'eligibility' }
 	| { kind: 'notCovered' };
@@ -55,10 +66,11 @@ export function toExtractiveAnswer(card: ResultCard, query: string): ExtractiveA
 /**
  * Decide which single occupant fills the answer slot.
  *
- * The order IS the safety order. An eligibility question never renders a block that reads as an
- * adjudication of the user's own facts, whatever else is available to show - and a question the sources do
- * not cover says so rather than showing the nearest thing. Only below those does an answer appear, the
- * model's when it cleared every gate, otherwise the document's own sentences.
+ * The order IS the safety order, and it turns on WHO WROTE the words. On an eligibility question the
+ * model's prose is suppressed outright - it can reason about the user's facts, which is the thing 38 CFR
+ * 14.629 forbids. The document's own sentences are not suppressed, because a verbatim quotation cannot
+ * adjudicate anything; they carry the banner instead. Below that, a question the sources do not cover says
+ * so rather than showing the nearest thing.
  *
  * @param input The eligibility verdict for this query, the synthesis outcome when there was one, and the
  *   extractive answer when a card produced one.
@@ -70,7 +82,11 @@ export function chooseAnswer(input: {
 	extractive?: ExtractiveAnswer;
 }): AnswerView | undefined {
 	if (input.eligibilityIntent || input.synthesis?.kind === 'eligibility') {
-		return { kind: 'eligibility' };
+		// The model answer is dropped here even when it succeeded; the document's answer survives with the
+		// banner attached. With neither, the banner stands alone.
+		return input.extractive && input.extractive.text !== ''
+			? { kind: 'extractive', answer: input.extractive, eligibilityBanner: true }
+			: { kind: 'eligibility' };
 	}
 	if (input.synthesis?.kind === 'notCovered') return { kind: 'notCovered' };
 	if (input.synthesis?.kind === 'answer') {

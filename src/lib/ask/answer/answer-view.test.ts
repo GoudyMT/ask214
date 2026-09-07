@@ -19,22 +19,43 @@ const synthesized: CitedAnswer = {
 };
 
 describe('chooseAnswer', () => {
-	// The safety order. An eligibility question must never render a block that reads as an adjudication of
-	// the user's own facts, whatever else is available to show (38 CFR 14.629).
-	it('puts eligibility above everything, including a good synthesized answer', () => {
-		expect(
-			chooseAnswer({
-				eligibilityIntent: true,
-				synthesis: { kind: 'answer', answer: synthesized },
-				extractive
-			})
-		).toEqual({ kind: 'eligibility' });
+	// The safety order turns on WHO WROTE the words. Model prose can reason about the user's own facts,
+	// which is what 38 CFR 14.629 forbids, so it is suppressed outright on an eligibility question - even
+	// when synthesis succeeded and cleared every other gate.
+	it('suppresses a successful synthesized answer on an eligibility question', () => {
+		const view = chooseAnswer({
+			eligibilityIntent: true,
+			synthesis: { kind: 'answer', answer: synthesized },
+			extractive
+		});
+		expect(view?.kind).not.toBe('synthesized');
+	});
+
+	// A verbatim quotation from an official document cannot adjudicate anything, so it survives - with the
+	// banner attached rather than in place of it. Replacing it would have swapped the answer for a redirect
+	// on 28.9% of the benchmark questions, most of them procedural lookups.
+	it('keeps the document answer on an eligibility question and attaches the banner', () => {
+		expect(chooseAnswer({ eligibilityIntent: true, extractive })).toEqual({
+			kind: 'extractive',
+			answer: extractive,
+			eligibilityBanner: true
+		});
+	});
+
+	it('shows the banner alone when there is no document answer to carry it', () => {
+		expect(chooseAnswer({ eligibilityIntent: true })).toEqual({ kind: 'eligibility' });
 	});
 
 	it('honours an eligibility verdict reached on the model path too', () => {
 		expect(
 			chooseAnswer({ eligibilityIntent: false, synthesis: { kind: 'eligibility' }, extractive })
-		).toEqual({ kind: 'eligibility' });
+		).toEqual({ kind: 'extractive', answer: extractive, eligibilityBanner: true });
+	});
+
+	// An ordinary question must not pick up the banner.
+	it('attaches no banner when there is no eligibility intent', () => {
+		const view = chooseAnswer({ eligibilityIntent: false, extractive });
+		expect(view).toEqual({ kind: 'extractive', answer: extractive });
 	});
 
 	it('maps notCovered to the boundary state rather than showing an answer anyway', () => {

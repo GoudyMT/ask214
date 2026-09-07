@@ -6,7 +6,7 @@ import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
 import type { ResultCard } from '$lib/corpus';
 import type { Source } from '$lib/ask/sources';
-import type { SynthesisView } from '$lib/ask/synthesis/synthesis-view';
+import type { AnswerView } from '$lib/ask/answer/answer-view';
 
 type ViewProps = {
 	askState: AskState;
@@ -169,7 +169,7 @@ describe('AskView', () => {
 			card({ sourceTitle: 'Similar B' })
 		];
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', cards })
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards })
 		});
 		expect(container.querySelector('.ask-card--lead')?.textContent).toContain('Lead Source');
 		const toggle = container.querySelector('.ask-toggle') as HTMLButtonElement;
@@ -182,7 +182,7 @@ describe('AskView', () => {
 
 	it('results: a single hit shows the lead with no similar toggle', () => {
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', cards: [card()] })
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [card()] })
 		});
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
 		expect(container.querySelector('.ask-toggle')).toBeNull();
@@ -202,7 +202,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent', sourceTitle: 'VA - Intent to File' });
 		const loadSource = vi.fn(async () => heldSource());
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', cards: [lead] }, { loadSource })
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [lead] }, { loadSource })
 		});
 		expect(container.querySelector('.reader__title')).toBeNull(); // reader closed initially
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
@@ -217,7 +217,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent', chunkId: 'h2' });
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'device', cards: [lead] },
+				{ kind: 'results', origin: 'device', query: 'q', cards: [lead] },
 				{ loadSource: async () => heldSource() }
 			)
 		});
@@ -236,7 +236,7 @@ describe('AskView', () => {
 		// A pending load: the reader must still open right away and show loading, not do nothing.
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'device', cards: [lead] },
+				{ kind: 'results', origin: 'device', query: 'q', cards: [lead] },
 				{ loadSource: () => new Promise(() => {}) }
 			)
 		});
@@ -251,7 +251,7 @@ describe('AskView', () => {
 		let resolveLoad!: (s: Source | null) => void;
 		const loadSource = () => new Promise<Source | null>((r) => (resolveLoad = r));
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', cards: [lead] }, { loadSource })
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [lead] }, { loadSource })
 		});
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
 		flushSync();
@@ -277,7 +277,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent' });
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'device', cards: [lead] },
+				{ kind: 'results', origin: 'device', query: 'q', cards: [lead] },
 				{
 					loadSource: async () => {
 						throw new Error('corpus fetch failed');
@@ -351,7 +351,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent' });
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'online', cards: [lead] },
+				{ kind: 'results', origin: 'online', query: 'q', cards: [lead] },
 				{ onlineCapable: true, mode: 'device', loadSource: async () => heldSource() }
 			)
 		});
@@ -370,7 +370,7 @@ describe('AskView', () => {
 		// online wording, when the toggle is later moved to online.
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'device', cards: [card()] },
+				{ kind: 'results', origin: 'device', query: 'q', cards: [card()] },
 				{ onlineCapable: true, mode: 'online' }
 			)
 		});
@@ -420,9 +420,9 @@ describe('AskView', () => {
 		expect(stayed).toBe(1);
 	});
 
-	it('results: renders the AI summary above the cards when present', () => {
-		const summary: SynthesisView = {
-			kind: 'answer',
+	it('results: renders the answer above the cards when present', () => {
+		const answer: AnswerView = {
+			kind: 'synthesized',
 			answer: {
 				text: 'Do X [a].',
 				citations: [{ id: 'a', url: 'https://x.gov', title: 'S' }],
@@ -432,12 +432,32 @@ describe('AskView', () => {
 		};
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'online', cards: [card()], summary },
+				{ kind: 'results', origin: 'online', query: 'q', cards: [card()], answer },
 				{ onlineCapable: true, mode: 'online' }
 			)
 		});
-		expect(container.querySelector('.ask-summary')).not.toBeNull();
+		expect(container.querySelector('.ask-answer')).not.toBeNull();
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull(); // cards still render below
+	});
+
+	// The default and offline user has no key, so the extractive answer is the only one they ever see -
+	// it must render in the same slot, above the same unchanged cards.
+	it('results: renders the extractive answer in the same slot on the device path', () => {
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'You have one year to submit the completed claim.',
+				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://www.va.gov/'
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [card()], answer })
+		});
+		expect(container.querySelector('.ask-answer')).not.toBeNull();
+		expect(container.textContent).toContain('one year to submit');
+		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
 	});
 
 	it('degraded offer_device: the button re-runs the kept query on the device path', () => {

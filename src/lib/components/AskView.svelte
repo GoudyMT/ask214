@@ -5,7 +5,7 @@
 	import SourceReader from './SourceReader.svelte';
 	import QuestionFeed from './QuestionFeed.svelte';
 	import CrisisCard from './CrisisCard.svelte';
-	import AskSummary from './AskSummary.svelte';
+	import AskAnswer from './AskAnswer.svelte';
 
 	let {
 		askState,
@@ -264,8 +264,8 @@
 		</div>
 	{:else if askState.kind === 'results'}
 		{@const cards = askState.cards}
-		{#if askState.summary}
-			<AskSummary view={askState.summary} />
+		{#if askState.answer}
+			<AskAnswer view={askState.answer} />
 		{/if}
 		<p class="ask-count">Top match</p>
 		<AskResultCard
