@@ -223,9 +223,9 @@ describe('cleanExcerpt', () => {
 		);
 	});
 
-	// The same token again, but fused to the trailing "Links" heading of the previous page with no
-	// separator at all - which is exactly why the rule above, needing a space or a line start before
-	// "page", cannot see it. 15 occurrences across 4 guides.
+	// The same token again, but carried on the trailing "Links" heading of the previous page - which is
+	// exactly why the rule above, needing a space or a line start before "page" and a capital straight
+	// after the digit, cannot see it. 17 occurrences across 5 guides, in two spacings.
 	it('strips a page token fused to the trailing Links heading', () => {
 		expect(cleanExcerpt('Linkspage 3VA Disability Compensation Online Resource Guide')).toBe(
 			'VA Disability Compensation Online Resource Guide'
@@ -236,6 +236,23 @@ describe('cleanExcerpt', () => {
 		expect(
 			cleanExcerpt('Retirement Disability Pay (CRDP) Linkspage 4VA Life Insurance Benefits')
 		).toBe('Retirement Disability Pay (CRDP) VA Life Insurance Benefits');
+	});
+
+	// tap_va_home_loan prints the same header spaced out. A corpus-wide scan of the SELECTED answer text
+	// is what surfaced these two; the enumeration that preceded the rule used a fused-only pattern and so
+	// could not see them. Both spacings are the same furniture and both must go.
+	it('strips the spaced form of the same Links page header', () => {
+		expect(cleanExcerpt('Links page 2 VA Home Loan Guaranty Program Online Reference Guide')).toBe(
+			'VA Home Loan Guaranty Program Online Reference Guide'
+		);
+	});
+
+	// The guard that makes the rule safe: 5 chunks use "page N" in ordinary prose ("Review Figure 16 on
+	// page 70 for filing timelines"). None is preceded by "Links", and none is followed by a capital.
+	it('leaves a Links-adjacent page reference in prose alone', () => {
+		expect(
+			cleanExcerpt('Useful Links page 70 for filing timelines and claim effective dates')
+		).toBe('Useful Links page 70 for filing timelines and claim effective dates');
 	});
 
 	// Enumerating the general <word>page <n> shape over all 1878 chunks returned 16 matches: 15 are the

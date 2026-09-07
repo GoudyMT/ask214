@@ -121,12 +121,16 @@ const MODULE_HEADER_RE = new RegExp('\\s*Module \\d+:\\s*(?:' + MODULE_TITLES + 
 // or "see page 60 to get started" is never touched.
 const FRONT_MATTER_PAGE_RE = /(?:^|\s)page ?\d+(?=[A-Z])|^\s*page\s+\d+\s+/g;
 
-// The same token, fused to the trailing "Links" heading of the previous page with no separator at all
-// ("Linkspage 3VA Disability Compensation..."), which is why the rule above - needing a space or a line
-// start before "page" - cannot see it. 15 occurrences across 4 guides. Anchored on the literal "Links"
-// because enumerating the general <word>page <n> shape over the corpus returns 16 matches and one of them
-// is real content: "...the Find VA Locations webpage 2 Select the Find a VA Location tab...".
-const FUSED_LINKS_PAGE_RE = /Links ?page ?\d+(?=[A-Z])/g;
+// The same token, carried on the trailing "Links" heading of the previous page - either fused with no
+// separator ("Linkspage 3VA Disability Compensation...") or spaced out ("Links page 2 VA Home Loan..."),
+// which is why the rule above, needing a space or a line start before "page", cannot see either form.
+// 17 occurrences across 5 guides.
+//
+// Two guards, and both are load-bearing. Anchored on the literal "Links" because enumerating the general
+// <word>page <n> shape over the corpus returns a match that is real content: "...the Find VA Locations
+// webpage 2 Select the Find a VA Location tab...". Followed by (?=[A-Z]) because 5 chunks use "page N" in
+// ordinary prose - "Review Figure 16 on page 70 for filing timelines" - which continues in lower case.
+const FUSED_LINKS_PAGE_RE = /Links\s*page\s*\d+\s*(?=[A-Z])/g;
 
 // Worksheet fill-in-the-blank rules ("My current job is ______") extract as underscore runs that
 // carry no content and read as corruption on a card. Three or more, so an identifier like source_id
