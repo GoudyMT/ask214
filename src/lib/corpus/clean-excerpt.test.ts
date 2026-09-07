@@ -223,6 +223,30 @@ describe('cleanExcerpt', () => {
 		);
 	});
 
+	// The same token again, but fused to the trailing "Links" heading of the previous page with no
+	// separator at all - which is exactly why the rule above, needing a space or a line start before
+	// "page", cannot see it. 15 occurrences across 4 guides.
+	it('strips a page token fused to the trailing Links heading', () => {
+		expect(cleanExcerpt('Linkspage 3VA Disability Compensation Online Resource Guide')).toBe(
+			'VA Disability Compensation Online Resource Guide'
+		);
+	});
+
+	it('strips the Links-fused token mid-text as well as at the start', () => {
+		expect(
+			cleanExcerpt('Retirement Disability Pay (CRDP) Linkspage 4VA Life Insurance Benefits')
+		).toBe('Retirement Disability Pay (CRDP) VA Life Insurance Benefits');
+	});
+
+	// Enumerating the general <word>page <n> shape over all 1878 chunks returned 16 matches: 15 are the
+	// header above, and this one is real content - "webpage" is an English word and "2" is a step number.
+	// The rule is anchored on the literal "Links" for exactly this reason; the general shape destroys it.
+	it('leaves "webpage" followed by a step number alone', () => {
+		const real =
+			'to go directly to the Find VA Locations webpage 2 Select the Find a VA Location tab';
+		expect(cleanExcerpt(real)).toBe(real);
+	});
+
 	// "Resource Guide" is the name of a REAL document, cited 78 times across 62 chunks, mostly in
 	// ordinary sentences. Only the page token is furniture; the name itself must survive.
 	it('leaves a prose reference to the Resource Guide untouched', () => {
