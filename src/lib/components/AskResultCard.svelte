@@ -4,8 +4,18 @@
 	let {
 		card,
 		variant = 'compact',
-		onReadSource
-	}: { card: ResultCard; variant?: 'lead' | 'compact'; onReadSource?: () => void } = $props();
+		onReadSource,
+		showExcerpt = true
+	}: {
+		card: ResultCard;
+		variant?: 'lead' | 'compact';
+		onReadSource?: () => void;
+		// Set false when the answer block above is already showing this chunk's own sentences: repeating
+		// the first 120 words of the same passage underneath is literal duplication. The card yields the
+		// TEXT only - it keeps its badge, its citation, and both actions. Defaults true so every other
+		// call site is unchanged.
+		showExcerpt?: boolean;
+	} = $props();
 
 	// The lead card shows a fuller excerpt; a collapsed "similar" card shows a one-liner. Every cut is
 	// marked - an unmarked cut reads as the document's complete statement.
@@ -47,7 +57,7 @@
 	</div>
 	<!-- A chunk that cleans to nothing (a worksheet page of blank rules) renders no paragraph at all,
 	     rather than an empty node in the accessibility tree. -->
-	{#if excerpt}<p class="ask-card__excerpt">{excerpt}</p>{/if}
+	{#if showExcerpt && excerpt}<p class="ask-card__excerpt">{excerpt}</p>{/if}
 	<div class="ask-card__actions">
 		{#if onReadSource}
 			<button class="ask-card__read" type="button" onclick={onReadSource}>Read more</button>

@@ -440,6 +440,51 @@ describe('AskView', () => {
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull(); // cards still render below
 	});
 
+	// The answer block owns the text at both tiers, so the lead card stops repeating it. The card is not
+	// demoted - it keeps its position, its badge, its citation and both actions.
+	it('results: the lead card yields its excerpt to an extractive answer', () => {
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'You have one year to submit the completed claim.',
+				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://www.va.gov/'
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [card()], answer })
+		});
+		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).toBeNull();
+		expect(container.querySelector('.ask-card__top-match')).not.toBeNull();
+		expect(container.querySelector('.ask-card__link')).not.toBeNull();
+	});
+
+	// A synthesized answer paraphrases, so there is no duplication to remove and the card is untouched.
+	// This is the shipped BYO-key surface, which must not change.
+	it('results: the lead card keeps its excerpt under a synthesized answer', () => {
+		const answer: AnswerView = {
+			kind: 'synthesized',
+			answer: {
+				text: 'Notify VA first, then you have a year.',
+				citations: [],
+				inert: [],
+				disclaimer: 'd'
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'online', query: 'q', cards: [card()], answer })
+		});
+		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
+	});
+
+	it('results: the lead card keeps its excerpt when there is no answer at all', () => {
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [card()] })
+		});
+		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
+	});
+
 	// The default and offline user has no key, so the extractive answer is the only one they ever see -
 	// it must render in the same slot, above the same unchanged cards.
 	it('results: renders the extractive answer in the same slot on the device path', () => {

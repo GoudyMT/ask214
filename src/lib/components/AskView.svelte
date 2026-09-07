@@ -268,9 +268,13 @@
 			<AskAnswer view={askState.answer} />
 		{/if}
 		<p class="ask-count">Top match</p>
+		<!-- The lead card yields its excerpt ONLY to an extractive answer, which is this same chunk's own
+		     sentences - showing both would print the passage twice. A synthesized answer paraphrases, so
+		     there is no duplication and the card is left exactly as it ships. -->
 		<AskResultCard
 			card={cards[0]!}
 			variant="lead"
+			showExcerpt={askState.answer?.kind !== 'extractive'}
 			onReadSource={() => readSource(cards[0]!.sourceId, cards[0]!.chunkId)}
 		/>
 		{#if cards.length > 1}

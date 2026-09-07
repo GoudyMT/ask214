@@ -105,6 +105,32 @@ describe('AskResultCard', () => {
 		expect(container.querySelector('.ask-card__title')?.textContent).toBe('VA - Intent to File');
 	});
 
+	// When the answer block above is already showing this chunk's own sentences, repeating the first 120
+	// words of the same passage underneath is literal duplication - the user reads it twice. The card
+	// yields the TEXT only; it keeps every other job it does.
+	it('yields its excerpt on request, keeping the citation and both actions', () => {
+		const { container } = render(AskResultCard, {
+			props: {
+				card: fullCard(),
+				variant: 'lead',
+				showExcerpt: false,
+				onReadSource: () => {}
+			}
+		});
+		expect(container.querySelector('.ask-card__excerpt')).toBeNull();
+		expect(container.querySelector('.ask-card__top-match')).not.toBeNull();
+		expect(container.querySelector('.ask-card__meta')?.textContent).toContain('p. 12');
+		expect(container.querySelector('.ask-card__title')?.textContent).toBe('VA - Intent to File');
+		expect(container.querySelector('.ask-card__read')).not.toBeNull();
+		expect(container.querySelector('.ask-card__link')).not.toBeNull();
+	});
+
+	// The default has to keep every existing call site rendering exactly as before.
+	it('shows the excerpt by default', () => {
+		const { container } = render(AskResultCard, { props: { card: fullCard() } });
+		expect(container.querySelector('.ask-card__excerpt')).not.toBeNull();
+	});
+
 	it('omits the meta line when there is no section or page', () => {
 		const minimal: ResultCard = {
 			sourceId: 's',
