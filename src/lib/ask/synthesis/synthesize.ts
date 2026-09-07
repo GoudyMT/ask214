@@ -162,12 +162,22 @@ export async function synthesize(
 	// answer about mental-health resources with a crisis card.
 	const citedIds = parseCitedIds(modelText);
 	const retrievedIds = new Set(chunks.map((c) => c.id));
+	// Classified out ahead of ALL THREE gates, on the count of VALID citations rather than of parsed ones.
+	// Ordering this after validateCitations left the crisis reply behind the invalid_citation gate: the
+	// citation pattern accepts digits, so a reply saying "call [988]" - or any markdown link - parses as a
+	// citation, fails validation, and refuses. The user then read benefits content in answer to a self-harm
+	// message. Keying on VALID citations keeps the precision the uncited rule buys, because 29 of the 1878
+	// shipped chunks legitimately mention the crisis line and a genuinely cited answer about mental-health
+	// resources must stay an answer, not become a crisis card.
+	const validCited = citedIds.filter((id) => retrievedIds.has(id));
+	if (validCited.length === 0) {
+		if (mentionsCrisisLine(modelText)) return { kind: 'crisis' };
+		if (mentionsOfficialFallback(modelText)) return { kind: 'notCovered' };
+	}
 	if (!validateCitations(citedIds, retrievedIds).ok) {
 		return { kind: 'refusal', reason: 'invalid_citation' };
 	}
 	if (citedIds.length === 0) {
-		if (mentionsCrisisLine(modelText)) return { kind: 'crisis' };
-		if (mentionsOfficialFallback(modelText)) return { kind: 'notCovered' };
 		// Citing nothing otherwise is exactly the ungrounded output the gates exist to stop.
 		return { kind: 'refusal', reason: 'no_citations' };
 	}

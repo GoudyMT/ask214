@@ -155,9 +155,29 @@ describe('synthesize', () => {
 		expect(result.kind).toBe('crisis');
 	});
 
+	// The classification sits ahead of ALL THREE gates, keyed on VALID citations rather than parsed ones.
+	// The citation pattern accepts digits, so a crisis reply saying "call [988]" - or writing any markdown
+	// link - parses as a citation, fails validation, and used to refuse as invalid_citation. The user then
+	// read benefits content in answer to a self-harm message.
+	it('routes a crisis answer that contains a bracketed token, not just an uncited one', async () => {
+		const impl = stubFetch(
+			'Please reach out right now. Call [988] and press 1, or text 838255 - the Veterans Crisis Line is staffed day and night.'
+		);
+		const result = await synthesize('i cant take this anymore', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('crisis');
+	});
+
+	it('routes a crisis answer that writes a markdown link', async () => {
+		const impl = stubFetch(
+			'You are not alone. Reach the Veterans Crisis Line at [988](tel:988) and press 1, or text 838255.'
+		);
+		const result = await synthesize('there is no point to any of this', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('crisis');
+	});
+
 	// 29 of the 1878 shipped chunks legitimately mention the crisis line, so keying on the number alone
 	// would replace a real answer about mental-health resources with a crisis card. Both signals are
-	// required: the answer must reach for the crisis line AND cite nothing.
+	// required: the answer must reach for the crisis line AND cite nothing VALID.
 	it('does not treat a cited answer that mentions the crisis line as a crisis turn', async () => {
 		const impl = stubFetch(
 			`Support is available and the Veterans Crisis Line can be reached at 988 [${SKILLBRIDGE_ID}].`
