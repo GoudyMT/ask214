@@ -44,6 +44,9 @@ function card(over: Partial<ResultCard> = {}): ResultCard {
 	return {
 		sourceId: 'va_intent_to_file',
 		sourceTitle: 'VA - Intent to File',
+		// Real cards always carry this - toResultCards copies chunk.id, which is required on every chunk.
+		// Omitting it made the "which card did the answer come from" comparison untestable.
+		chunkId: 'va_intent_to_file:0123456789ab',
 		section: 'How to submit',
 		page: 12,
 		excerpt: 'An intent to file lets you notify VA that you plan to file a claim.',
@@ -442,14 +445,15 @@ describe('AskView', () => {
 
 	// The answer block owns the text at both tiers, so the lead card stops repeating it. The card is not
 	// demoted - it keeps its position, its badge, its citation and both actions.
-	it('results: the lead card yields its excerpt to an extractive answer', () => {
+	it('results: the card the answer came from yields its excerpt', () => {
 		const answer: AnswerView = {
 			kind: 'extractive',
 			answer: {
 				text: 'You have one year to submit the completed claim.',
 				passage: 'You have one year to submit the completed claim. It sets your effective date.',
 				sourceTitle: 'VA - Intent to File',
-				url: 'https://www.va.gov/'
+				url: 'https://www.va.gov/',
+				chunkId: 'va_intent_to_file:0123456789ab'
 			}
 		};
 		const { container } = render(AskView, {

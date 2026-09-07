@@ -691,7 +691,6 @@ describe('createAskStore', () => {
 			// The document's own sentence, with the duplicated heading gone.
 			expect(store.state.answer.answer.text).toContain('one year to submit');
 			expect(store.state.answer.answer.text.startsWith('Your Intent to File')).toBe(false);
-			expect(store.state.answer.eligibilityBanner).toBeUndefined();
 		});
 
 		// The input box stays editable after results render, so reading the query at render time would let
@@ -712,9 +711,10 @@ describe('createAskStore', () => {
 			await store.ask('I have a 30% rating and served 8 years, what am I entitled to?');
 			expect(store.state.kind).toBe('results');
 			if (store.state.kind !== 'results') return;
+			// The 38 CFR note is PERMANENT on the extractive block (AskAnswer.svelte), because the gate reads
+			// the question's phrasing and misses cases like "can I use VA health care". What this asserts is
+			// the other half of the gate: the answer still renders rather than being replaced by a redirect.
 			expect(store.state.answer?.kind).toBe('extractive');
-			if (store.state.answer?.kind !== 'extractive') return;
-			expect(store.state.answer.eligibilityBanner).toBe(true);
 		});
 
 		it('still shows the source cards under the eligibility note', async () => {
@@ -732,7 +732,6 @@ describe('createAskStore', () => {
 			expect(store.state.answer?.kind).toBe('extractive');
 			if (store.state.answer?.kind !== 'extractive') return;
 			expect(store.state.answer.answer.text).toContain('one year to submit');
-			expect(store.state.answer.eligibilityBanner).toBe(true);
 		});
 	});
 });

@@ -1,7 +1,13 @@
 import { splitSentences } from '$lib/content-ops/chunk/sentences';
 
-// Measured against this project's own benchmark: a 45-word target puts the answer inside the selected text
-// for 86.7% of the 135 answerable queries, at about a third of the length of the 120-word result card.
+// Measured against this project's own benchmark, END TO END through real retrieval (`pnpm answer-gate`):
+// the answer lands inside the selected text for 28.9% of the 135 answerable queries, against 25.9% for the
+// 120-word result card this replaces, at a median of 52 words and a hard maximum of 67.
+//
+// Read that 28.9% honestly. An earlier version of the gate paired each query to the chunk that CONTAINS
+// its answer and reported 86.7%; that is selection quality given perfect retrieval, not the feature's
+// score, and quoting it here was wrong. The ceiling is what retrieval can reach - the answer is in SOME
+// retrieved card 59.3% of the time - so the remaining gap is a retrieval problem, not a selection one.
 const TARGET_WORDS = 45;
 // A sentence may cross the target up to this multiple. Extraction leaves long lists with no terminator, so
 // they read as one huge sentence; without the ceiling the packer stops on the short lead-in immediately
@@ -36,7 +42,51 @@ function contentTerms(query: string): Set<string> {
 	);
 }
 
-/** Whole sentences from `from`, to the target, allowing one sentence to cross it up to `limit`. */
+/**
+ * Break up a "sentence" that is really a flattened list.
+ *
+ * `cleanExcerpt` turns bullet glyphs into ` - ` separators, and those lists carry no sentence terminator,
+ * so `splitSentences` returns them as one unit - routinely 100+ words, measured up to 226. Truncating such
+ * a unit from its start always keeps the first few bullets and discards the rest, which is exactly where
+ * the answer often is. Subdividing on the separators instead lets the normal run-selection choose WITHIN
+ * the list, so the algorithm handles it rather than a special case.
+ *
+ * Only oversized units are touched; a real sentence containing " - " is left whole.
+ */
+function subdivideLists(sentences: string[], limit: number): string[] {
+	const out: string[] = [];
+	for (const sentence of sentences) {
+		if (wordCount(sentence) <= limit || !sentence.includes(' - ')) {
+			out.push(sentence);
+			continue;
+		}
+		let buffer = '';
+		for (const part of sentence.split(' - ')) {
+			const merged = buffer === '' ? part : `${buffer} - ${part}`;
+			if (buffer !== '' && wordCount(merged) > limit) {
+				out.push(buffer);
+				buffer = part;
+			} else {
+				buffer = merged;
+			}
+		}
+		if (buffer !== '') out.push(buffer);
+	}
+	return out;
+}
+
+/**
+ * Whole sentences from `from`, to the target, allowing one sentence to cross it up to `limit`.
+ *
+ * The first sentence is taken even when it alone busts the limit, because a run has to contain something -
+ * but it is then CUT, with the cut marked. Without that cut this was not a ceiling at all: 13.3% of answers
+ * came out LONGER than the 120-word card this feature replaces, to a measured maximum of 226. A short
+ * answer longer than the thing it replaced has inverted its own premise.
+ *
+ * Cutting mid-sentence is otherwise forbidden here (it measured worse than doing nothing clever), so this
+ * is deliberately the single exception, and `subdivideLists` above keeps it rare - it is reached only for
+ * an oversized run with no separators to break on.
+ */
 function packRun(sentences: string[], from: number, limit: number): string[] {
 	const run: string[] = [];
 	let count = 0;
@@ -44,6 +94,17 @@ function packRun(sentences: string[], from: number, limit: number): string[] {
 		const sentence = sentences[i]!;
 		const n = wordCount(sentence);
 		if (run.length > 0 && count + n > limit) break;
+		if (run.length === 0 && n > limit) {
+			// An unmarked cut reads as the document's complete statement - the same rule the result card
+			// states and enforces with its own ellipsis.
+			return [
+				sentence
+					.split(/\s+/)
+					.slice(0, limit)
+					.join(' ')
+					.replace(/(?: -)+$/, '') + '...'
+			];
+		}
 		run.push(sentence);
 		count += n;
 		if (count >= TARGET_WORDS) break;
@@ -65,9 +126,13 @@ function packRun(sentences: string[], from: number, limit: number): string[] {
  * @returns The selected sentences joined by a space, or '' when the body holds no sentences.
  */
 export function selectAnswer(body: string, query: string): string {
-	const sentences = splitSentences(body)
-		.map(({ start, end }) => body.slice(start, end).trim())
-		.filter((s) => s.length > 0);
+	const ceiling = TARGET_WORDS * CEILING_MULTIPLIER;
+	const sentences = subdivideLists(
+		splitSentences(body)
+			.map(({ start, end }) => body.slice(start, end).trim())
+			.filter((s) => s.length > 0),
+		ceiling
+	);
 	if (sentences.length === 0) return '';
 
 	const terms = contentTerms(query);
@@ -84,5 +149,5 @@ export function selectAnswer(body: string, query: string): string {
 			}
 		}
 	}
-	return packRun(sentences, from, TARGET_WORDS * CEILING_MULTIPLIER).join(' ');
+	return packRun(sentences, from, ceiling).join(' ');
 }

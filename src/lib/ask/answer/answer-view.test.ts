@@ -31,14 +31,15 @@ describe('chooseAnswer', () => {
 		expect(view?.kind).not.toBe('synthesized');
 	});
 
-	// A verbatim quotation from an official document cannot adjudicate anything, so it survives - with the
-	// banner attached rather than in place of it. Replacing it would have swapped the answer for a redirect
-	// on 28.9% of the benchmark questions, most of them procedural lookups.
-	it('keeps the document answer on an eligibility question and attaches the banner', () => {
+	// A verbatim quotation from an official document cannot adjudicate anything, so it SURVIVES an
+	// eligibility question rather than being replaced by a redirect - which would have swapped the answer
+	// away on 28.9% of the benchmark questions, most of them procedural lookups. The 38 CFR note itself is
+	// permanent on the block (AskAnswer.svelte), not flagged on here, because the gate reads the question's
+	// phrasing and misses cases like "can I use VA health care".
+	it('keeps the document answer on an eligibility question', () => {
 		expect(chooseAnswer({ eligibilityIntent: true, extractive })).toEqual({
 			kind: 'extractive',
-			answer: extractive,
-			eligibilityBanner: true
+			answer: extractive
 		});
 	});
 
@@ -49,13 +50,15 @@ describe('chooseAnswer', () => {
 	it('honours an eligibility verdict reached on the model path too', () => {
 		expect(
 			chooseAnswer({ eligibilityIntent: false, synthesis: { kind: 'eligibility' }, extractive })
-		).toEqual({ kind: 'extractive', answer: extractive, eligibilityBanner: true });
+		).toEqual({ kind: 'extractive', answer: extractive });
 	});
 
-	// An ordinary question must not pick up the banner.
-	it('attaches no banner when there is no eligibility intent', () => {
-		const view = chooseAnswer({ eligibilityIntent: false, extractive });
-		expect(view).toEqual({ kind: 'extractive', answer: extractive });
+	// With the note permanent, the gate's only remaining job on this path is suppressing MODEL prose. The
+	// extractive shape must therefore be identical either way - no flag, nothing for a renderer to diverge on.
+	it('produces the same extractive shape whether or not the gate fired', () => {
+		expect(chooseAnswer({ eligibilityIntent: false, extractive })).toEqual(
+			chooseAnswer({ eligibilityIntent: true, extractive })
+		);
 	});
 
 	it('maps notCovered to the boundary state rather than showing an answer anyway', () => {
@@ -143,14 +146,37 @@ describe('toExtractiveAnswer', () => {
 	}
 
 	it('strips the heading echo from both tiers', async () => {
-		const answer = toExtractiveAnswer(await card(), 'how long do I have?');
-		expect(answer.text.startsWith('Once you notify us')).toBe(true);
-		expect(answer.passage.startsWith('Once you notify us')).toBe(true);
+		const answer = toExtractiveAnswer([await card()], 'how long do I have?');
+		expect(answer?.text.startsWith('Once you notify us')).toBe(true);
+		expect(answer?.passage.startsWith('Once you notify us')).toBe(true);
+	});
+
+	it('returns undefined when there are no cards at all', () => {
+		expect(toExtractiveAnswer([], 'anything')).toBeUndefined();
+	});
+
+	// The answer is chosen across the retrieved SET, not from card 1: end to end the answer sits in card 1
+	// only 27.4% of the time but in SOME retrieved card 59.3% of the time.
+	it('takes the answer from a later card when that card covers the question better', async () => {
+		const weak = await card({
+			chunkId: 'other_source:0123456789ab',
+			sourceTitle: 'Unrelated',
+			section: undefined,
+			excerpt: 'Burial allowances are described elsewhere in this guide.',
+			score: 0.8
+		});
+		const strong = await card({ score: 0.75 });
+		const answer = toExtractiveAnswer(
+			[weak, strong],
+			'how long do I have to submit my intent to file?'
+		);
+		expect(answer?.sourceTitle).toBe('VA - Your Intent to File');
+		expect(answer?.chunkId).toBe(strong.chunkId);
 	});
 
 	it('carries the citation through', async () => {
 		const c = await card();
-		expect(toExtractiveAnswer(c, 'how long do I have?')).toMatchObject({
+		expect(toExtractiveAnswer([c], 'how long do I have?')).toMatchObject({
 			sourceTitle: c.sourceTitle,
 			url: c.url,
 			page: 3,
@@ -163,7 +189,7 @@ describe('toExtractiveAnswer', () => {
 		delete bare.page;
 		delete bare.section;
 		delete bare.chunkId;
-		const keys = Object.keys(toExtractiveAnswer(bare, 'anything'));
+		const keys = Object.keys(toExtractiveAnswer([bare], 'anything') ?? {});
 		expect(keys).not.toContain('page');
 		expect(keys).not.toContain('section');
 		expect(keys).not.toContain('chunkId');

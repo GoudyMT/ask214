@@ -267,14 +267,17 @@
 		{#if askState.answer}
 			<AskAnswer view={askState.answer} />
 		{/if}
+		<!-- A card yields its excerpt only to an EXTRACTIVE answer taken from that same card - showing both
+		     would print the same sentences twice. The answer is now chosen across the whole retrieved set,
+		     so the card it came from is not necessarily the lead one. A synthesized answer paraphrases, so
+		     nothing is duplicated and every card is left exactly as it ships. -->
+		{@const quoted =
+			askState.answer?.kind === 'extractive' ? askState.answer.answer.chunkId : undefined}
 		<p class="ask-count">Top match</p>
-		<!-- The lead card yields its excerpt ONLY to an extractive answer, which is this same chunk's own
-		     sentences - showing both would print the passage twice. A synthesized answer paraphrases, so
-		     there is no duplication and the card is left exactly as it ships. -->
 		<AskResultCard
 			card={cards[0]!}
 			variant="lead"
-			showExcerpt={askState.answer?.kind !== 'extractive'}
+			showExcerpt={quoted === undefined || cards[0]!.chunkId !== quoted}
 			onReadSource={() => readSource(cards[0]!.sourceId, cards[0]!.chunkId)}
 		/>
 		{#if cards.length > 1}
@@ -287,6 +290,7 @@
 						<AskResultCard
 							card={c}
 							variant="compact"
+							showExcerpt={quoted === undefined || c.chunkId !== quoted}
 							onReadSource={() => readSource(c.sourceId, c.chunkId)}
 						/>
 					{/each}
