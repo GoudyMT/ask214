@@ -39,11 +39,16 @@ describe('AskAnswer', () => {
 	});
 
 	// Tier 2. Collapsed by default - a short answer that arrives pre-expanded is not a short answer.
+	// Both tiers stay in the DOM for the disclosure contract, so assert VISIBILITY, not textContent.
 	it('extractive: hides the fuller passage until asked, then shows it', async () => {
 		const { container, getByRole } = render(AskAnswer, { props: { view: extractiveView } });
-		expect(container.textContent).not.toContain('becomes your effective date');
+		const short = container.querySelector('#ask-answer-short') as HTMLElement;
+		const passage = container.querySelector('#ask-answer-passage') as HTMLElement;
+		expect(passage.hidden).toBe(true);
+		expect(short.hidden).toBe(false);
 		await getByRole('button', { name: /more detail/i }).click();
-		expect(container.textContent).toContain('becomes your effective date');
+		expect(passage.hidden).toBe(false);
+		expect(short.hidden).toBe(true);
 		expect(container.textContent).toContain('Show less');
 	});
 
@@ -95,21 +100,52 @@ describe('AskAnswer', () => {
 		expect(['pre-line', 'pre-wrap', 'pre']).toContain(getComputedStyle(el).whiteSpace);
 	});
 
-	// The gate fires on a lot of ordinary procedural questions, so the answer has to survive it. The note
-	// qualifies the quotation rather than replacing it.
-	it('extractive: carries the eligibility note above the answer without hiding it', () => {
-		const { container } = render(AskAnswer, {
-			props: { view: { ...extractiveView, eligibilityBanner: true } as AnswerView }
-		});
+	// PERMANENT, not conditional. The eligibility gate reads the QUESTION's phrasing, so it misses the
+	// cases that matter most - "can I use VA health care" renders "You're eligible for VA health care" and
+	// never trips it. A quotation is never a determination, so the line is always true and always shown.
+	it('extractive: always carries the 38 CFR note, on any question', () => {
+		const { container } = render(AskAnswer, { props: { view: extractiveView } });
 		const text = container.textContent ?? '';
 		expect(text).toContain('not a determination of your eligibility');
 		expect(text).toContain('one year to submit the claim'); // the answer is still there
-		expect(container.querySelector('a[href*="accreditation"]')).not.toBeNull();
 	});
 
-	it('extractive: shows no eligibility note on an ordinary question', () => {
+	// VSO claim help is free; the OGC accreditation search also lists attorneys and agents who may charge.
+	it('extractive: routes to the canonical free-help destination', () => {
 		const { container } = render(AskAnswer, { props: { view: extractiveView } });
-		expect(container.textContent).not.toContain('not a determination');
+		const href = container.querySelector('.ask-answer__note a')?.getAttribute('href') ?? '';
+		expect(href).toBe('https://www.va.gov/get-help-from-accredited-representative/');
+	});
+
+	// The label must not assert that this IS the answer: measured end to end it contains the answer 28.9%
+	// of the time.
+	it('extractive: does not claim to be the answer', () => {
+		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+		expect(container.querySelector('.ask-answer__label')?.textContent).toContain(
+			'What the source says'
+		);
+	});
+
+	// A real disclosure, matching every other one in the app: state announced, target owned by id.
+	it('extractive: the expand control is a real disclosure', async () => {
+		const { container, getByRole } = render(AskAnswer, { props: { view: extractiveView } });
+		const button = container.querySelector('.ask-answer__more') as HTMLButtonElement;
+		expect(button.getAttribute('aria-expanded')).toBe('false');
+		expect(button.getAttribute('aria-controls')).toBe('ask-answer-passage');
+		expect(container.querySelector('#ask-answer-passage')).not.toBeNull(); // in the DOM while collapsed
+		await getByRole('button', { name: /more detail/i }).click();
+		expect(
+			(container.querySelector('.ask-answer__more') as HTMLButtonElement).getAttribute(
+				'aria-expanded'
+			)
+		).toBe('true');
+	});
+
+	// 90 corpus chunks carry an unbreakable run over 40 chars; without this one overflows 320px by 382px.
+	it('extractive: long unbreakable tokens wrap instead of widening the block', () => {
+		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+		const el = container.querySelector('.ask-answer__text') as HTMLElement;
+		expect(['anywhere', 'break-word']).toContain(getComputedStyle(el).overflowWrap);
 	});
 
 	it('eligibility: shows the impersonal-info note and the accredited-VSO / va.gov outbound', () => {

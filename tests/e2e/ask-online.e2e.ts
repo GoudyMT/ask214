@@ -152,8 +152,10 @@ test('synthesis enabled with no key falls back to the document answer and still 
 	await expect(askInput(page)).toBeEnabled();
 	await askInput(page).fill('What is SkillBridge?');
 	await searchButton(page).click();
-	await expect(page.getByText(/In short/i)).toBeVisible(); // an answer, not an apology
-	await expect(page.getByText(/train with an employer/i)).toBeVisible();
+	await expect(page.getByText(/What the source says/i)).toBeVisible(); // a real block, not an apology
+	// Both tiers are in the DOM for the disclosure contract, so a bare text locator matches twice; scope to
+	// the visible one. (Hidden nodes leave the accessibility tree, so nothing is announced twice.)
+	await expect(page.locator('#ask-answer-short')).toContainText(/train with an employer/i);
 	await expect(page.locator('.ask-card__title', { hasText: /DoD SkillBridge/i })).toBeVisible(); // the sources still render
 	await expect(page.getByText(/summary unavailable/i)).toHaveCount(0);
 });
@@ -207,12 +209,19 @@ test('the answer block shows a short answer above the cards and expands to the f
 	const answer = page.locator('.ask-answer');
 	await expect(answer).toBeVisible();
 	await expect(answer).toContainText(/commander approval/i);
-	// Collapsed: the tail of the passage is not on screen yet.
-	await expect(page.getByText(/no guarantee of employment/i)).toHaveCount(0);
+	// Both tiers live in the DOM for the disclosure contract, so assert VISIBILITY rather than presence.
+	const passage = page.locator('#ask-answer-passage');
+	await expect(passage).toBeHidden();
+	const more = page.getByRole('button', { name: /more detail/i });
+	await expect(more).toHaveAttribute('aria-expanded', 'false');
 
-	await page.getByRole('button', { name: /more detail/i }).click();
-	await expect(page.getByText(/no guarantee of employment/i)).toBeVisible();
-	await expect(page.getByRole('button', { name: /show less/i })).toBeVisible();
+	await more.click();
+	await expect(passage).toBeVisible();
+	await expect(passage).toContainText(/no guarantee of employment/i);
+	await expect(page.getByRole('button', { name: /show less/i })).toHaveAttribute(
+		'aria-expanded',
+		'true'
+	);
 
 	// The answer sits ABOVE the cards, and the lead card no longer repeats the same sentences underneath.
 	await expect(page.locator('.ask-card--lead')).toBeVisible();

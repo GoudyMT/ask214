@@ -7,39 +7,61 @@
 </script>
 
 {#if view.kind === 'extractive'}
-	<section class="ask-answer" aria-label="Answer">
-		<!-- The 38 CFR note sits ABOVE the quotation, so the boundary is read before the text it qualifies.
-		     The answer itself is the document's own words, which cannot adjudicate the reader's facts - the
-		     note is what says so out loud. -->
-		{#if view.eligibilityBanner}
-			<p class="ask-answer__eligibility">
-				This is general information, not a determination of your eligibility. For your specific
-				situation, contact an
-				<a href="https://www.va.gov/ogc/apps/accreditation/index.asp" rel="external noopener">
-					accredited VSO
-				</a>.
-			</p>
-		{/if}
-		<p class="ask-answer__label">In short</p>
+	<section class="ask-answer" aria-label="What the source says">
+		<!-- Not "In short". Measured end to end, this passage contains the answer to the question asked
+		     28.9% of the time - better than the 25.9% of the card it replaces, and nowhere near enough to
+		     assert it AS the answer. The label says what the block actually is: the document's own words,
+		     chosen for relevance. -->
+		<p class="ask-answer__label">What the source says</p>
 		<!-- The document's own words, interpolated as plain text. No model wrote this, so there is no
 		     fabricated-link risk to defend against here - but a URL or phone number printed in the source
 		     still must not become clickable, which plain interpolation and the app-wide
 		     format-detection:telephone=no meta together guarantee. -->
-		<!-- Expanding SWAPS the short answer for the full passage rather than appending it. The passage
-		     already contains the selected sentences, so appending printed them twice inside one block. -->
-		<p class="ask-answer__text">{expanded ? view.answer.passage : view.answer.text}</p>
+		<!-- A real disclosure, matching the pattern the rest of the app uses (InstallPrompt, CalendarPanel,
+		     TaskCard): both tiers stay in the DOM and are toggled with `hidden`, so the trigger can own them
+		     by id via aria-controls and announce its state. Swapping one paragraph's text instead would
+		     leave the control unannounced and re-read the whole passage into the live region.
+		     The passage already contains the selected sentences, so only one is ever shown. -->
+		<p class="ask-answer__text" id="ask-answer-short" hidden={expanded}>{view.answer.text}</p>
+		<p class="ask-answer__text" id="ask-answer-passage" hidden={!expanded}>
+			{view.answer.passage}
+		</p>
+		<!-- The section heading is the ANTECEDENT of the sentence above it on these VA pages - "If you've
+		     completed 2 or more qualifying periods of active duty" scopes "you may qualify for a maximum of
+		     48 months". stripHeadingEcho removes it from the answer text, and the result card below shows it
+		     only as muted metadata, so without this line the condition is severed from the claim it governs
+		     and the block reads as an unconditional determination. -->
 		<p class="ask-answer__src">
-			From {view.answer.sourceTitle}{view.answer.page !== undefined
-				? ` - p. ${view.answer.page}`
-				: ''}
+			From {view.answer.sourceTitle}{view.answer.section !== undefined
+				? ` - ${view.answer.section}`
+				: ''}{view.answer.page !== undefined ? ` - p. ${view.answer.page}` : ''}
 		</p>
 		<!-- Offered only when there is genuinely more to show; an expand control that reveals the same
 		     sentences again is a dead button. -->
 		{#if view.answer.passage !== view.answer.text}
-			<button class="ask-answer__more" type="button" onclick={() => (expanded = !expanded)}>
+			<button
+				class="ask-answer__more"
+				type="button"
+				aria-expanded={expanded}
+				aria-controls="ask-answer-passage"
+				onclick={() => (expanded = !expanded)}
+			>
 				{expanded ? 'Show less' : 'More detail'}
 			</button>
 		{/if}
+		<!-- PERMANENT, not conditional on the eligibility gate. That gate reads the QUESTION's phrasing, so
+		     it misses "can I use VA health care" - which renders "You're eligible for VA health care" - and
+		     fires on procedural lookups that need no warning. This block is always a quotation from an
+		     official document and therefore never a determination about the reader, so the line is a
+		     standing description rather than a warning, and it cannot under-fire. The destination is the
+		     repo's canonical one (resources.ts): VSO claim help is free, while the OGC accreditation search
+		     also lists attorneys and agents who may charge. -->
+		<p class="ask-answer__note">
+			General information, not a determination of your eligibility.
+			<a href="https://www.va.gov/get-help-from-accredited-representative/" rel="external noopener">
+				Find an accredited VSO
+			</a>
+		</p>
 	</section>
 {:else if view.kind === 'synthesized'}
 	<section class="ask-answer" aria-label="AI-generated summary">
@@ -106,14 +128,19 @@
 		/* The model emits 2-3 short paragraphs separated by blank lines. Without this the whole answer
 		   renders as one run-on block - never seen, because no answer had ever rendered. */
 		white-space: pre-line;
+		/* Printed URLs are real document content and stay in the text, so an unbreakable 100+ char token
+		   must wrap instead of pushing the block wider than the viewport. 90 corpus chunks carry a run over
+		   40 chars with no space or hyphen; without this the longest overflows a 320px screen by 382px.
+		   The same rule and the same reason as the result card's excerpt, which this block replaced. */
+		overflow-wrap: anywhere;
 		margin: 0 0 var(--space-m);
 	}
-	.ask-answer__eligibility {
+	.ask-answer__note {
 		font-size: var(--font-size-s);
 		color: var(--color-fg-muted);
-		border-bottom: 1px solid var(--color-border);
-		margin: 0 0 var(--space-m);
-		padding-bottom: var(--space-s);
+		border-top: 1px solid var(--color-border);
+		margin: var(--space-m) 0 0;
+		padding-top: var(--space-s);
 	}
 	.ask-answer__src {
 		font-size: var(--font-size-s);
