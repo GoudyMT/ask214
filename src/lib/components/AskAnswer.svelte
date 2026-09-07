@@ -25,10 +25,9 @@
 		     fabricated-link risk to defend against here - but a URL or phone number printed in the source
 		     still must not become clickable, which plain interpolation and the app-wide
 		     format-detection:telephone=no meta together guarantee. -->
-		<p class="ask-answer__text">{view.answer.text}</p>
-		{#if expanded}
-			<p class="ask-answer__passage">{view.answer.passage}</p>
-		{/if}
+		<!-- Expanding SWAPS the short answer for the full passage rather than appending it. The passage
+		     already contains the selected sentences, so appending printed them twice inside one block. -->
+		<p class="ask-answer__text">{expanded ? view.answer.passage : view.answer.text}</p>
 		<p class="ask-answer__src">
 			From {view.answer.sourceTitle}{view.answer.page !== undefined
 				? ` - p. ${view.answer.page}`
@@ -115,11 +114,6 @@
 		border-bottom: 1px solid var(--color-border);
 		margin: 0 0 var(--space-m);
 		padding-bottom: var(--space-s);
-	}
-	.ask-answer__passage {
-		white-space: pre-line;
-		margin: 0 0 var(--space-m);
-		color: var(--color-fg-muted);
 	}
 	.ask-answer__src {
 		font-size: var(--font-size-s);
