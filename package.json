@@ -92,7 +92,7 @@
 		"globals": "^17.7.0",
 		"husky": "^9.1.7",
 		"linkedom": "^0.18.13",
-		"lint-staged": "^17.3.0",
+		"lint-staged": "^17.4.1",
 		"pdfjs-dist": "^6.2.108",
 		"playwright": "^1.61.1",
 		"prettier": "^3.9.6",
