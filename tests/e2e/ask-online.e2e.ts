@@ -64,7 +64,7 @@ test('the first online ask is held behind consent; Use online answers it and is 
 	expect(retrieveCalls).toBe(0); // nothing sent before consent
 	// consenting records the choice and answers the held query
 	await page.getByRole('button', { name: /^use online$/i }).click();
-	await expect(page.getByText(/DoD SkillBridge/i)).toBeVisible();
+	await expect(page.locator('.ask-card__title', { hasText: /DoD SkillBridge/i })).toBeVisible();
 	await expect.poll(() => retrieveCalls).toBe(1);
 	// consent is remembered on this device: a second ask egresses directly, no gate
 	await askInput(page).fill('another question');
@@ -122,10 +122,13 @@ test('online: renders cited result cards from the server', async ({ page }) => {
 	await expect(askInput(page)).toBeEnabled();
 	await askInput(page).fill('What is SkillBridge?');
 	await searchButton(page).click();
-	await expect(page.getByText(/DoD SkillBridge/i)).toBeVisible();
+	await expect(page.locator('.ask-card__title', { hasText: /DoD SkillBridge/i })).toBeVisible();
 });
 
-test('synthesis enabled with no key degrades to "summary unavailable" but still shows the sources', async ({
+// Was: 'degrades to "summary unavailable"'. The graceful-degradation guarantee is unchanged - synthesis
+// with no key must not blank the surface - but what it degrades TO is now the document's own sentences
+// instead of an apology, so this asserts the answer rather than the absence of one.
+test('synthesis enabled with no key falls back to the document answer and still shows the sources', async ({
 	page
 }) => {
 	// Turn synthesis on (a non-PII device flag) but store no key: the route reads the key on demand, finds
@@ -149,6 +152,69 @@ test('synthesis enabled with no key degrades to "summary unavailable" but still 
 	await expect(askInput(page)).toBeEnabled();
 	await askInput(page).fill('What is SkillBridge?');
 	await searchButton(page).click();
-	await expect(page.getByText(/summary unavailable/i)).toBeVisible(); // no key -> graceful
-	await expect(page.getByText(/DoD SkillBridge/i)).toBeVisible(); // the sources still render
+	await expect(page.getByText(/In short/i)).toBeVisible(); // an answer, not an apology
+	await expect(page.getByText(/train with an employer/i)).toBeVisible();
+	await expect(page.locator('.ask-card__title', { hasText: /DoD SkillBridge/i })).toBeVisible(); // the sources still render
+	await expect(page.getByText(/summary unavailable/i)).toHaveCount(0);
+});
+
+// Sized against the selector's own budget, not by eye: the short answer targets 45 words and may reach a
+// 1.5x ceiling of ~67, so a passage under that is returned WHOLE and tier 2 has nothing left to reveal.
+// This one runs ~90 words with the query's terms in the first two sentences, so the selected run lands at
+// the top and the tail below stays hidden until the user expands.
+const LONG_HIT = {
+	score: 0.9,
+	chunk: {
+		id: 'skillbridge_overview_long',
+		text:
+			'SkillBridge lets service members train with a civilian employer during their last 180 days of service. ' +
+			'Participation requires unit commander approval before any agreement is signed. ' +
+			'You continue to receive military pay and benefits throughout the program. ' +
+			'The employer provides the training at no cost to the government. ' +
+			'Programs vary widely in length, industry, and location across the country. ' +
+			'Some are remote and some require relocation at your own expense. ' +
+			'Your command may withdraw approval if mission requirements change. ' +
+			'There is no guarantee of employment when the program ends.',
+		sourceId: 'dod_skillbridge',
+		sourceTitle: 'DoD SkillBridge',
+		url: 'https://skillbridge.osd.mil/',
+		tags: []
+	}
+};
+
+// The whole point of the feature: a short answer in the document's own words, one tap from the fuller
+// passage, on a path that needs no API key.
+test('the answer block shows a short answer above the cards and expands to the fuller passage', async ({
+	page
+}) => {
+	await page.addInitScript(() => localStorage.setItem('mtc:ask:online-consented', '1'));
+	await page.route('**/api/retrieve', (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				status: 'results',
+				corpusVersion: CORPUS_VERSION,
+				results: [LONG_HIT]
+			})
+		})
+	);
+	await page.goto('/');
+	await expect(askInput(page)).toBeEnabled();
+	await askInput(page).fill('does SkillBridge require commander approval?');
+	await searchButton(page).click();
+
+	const answer = page.locator('.ask-answer');
+	await expect(answer).toBeVisible();
+	await expect(answer).toContainText(/commander approval/i);
+	// Collapsed: the tail of the passage is not on screen yet.
+	await expect(page.getByText(/no guarantee of employment/i)).toHaveCount(0);
+
+	await page.getByRole('button', { name: /more detail/i }).click();
+	await expect(page.getByText(/no guarantee of employment/i)).toBeVisible();
+	await expect(page.getByRole('button', { name: /show less/i })).toBeVisible();
+
+	// The answer sits ABOVE the cards, and the lead card no longer repeats the same sentences underneath.
+	await expect(page.locator('.ask-card--lead')).toBeVisible();
+	await expect(page.locator('.ask-card--lead .ask-card__excerpt')).toHaveCount(0);
 });
