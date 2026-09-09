@@ -157,4 +157,40 @@ describe('AskResultCard', () => {
 		flushSync();
 		expect(read).toBe(1);
 	});
+
+	// Every TAP guide's `card.url` is the SAME shared library directory page, so "View on the official
+	// site" could only ever drop the reader on a list of 21 documents. These two cases are the citation
+	// actually arriving: the right document, at the page the passage is on.
+	it('links a TAP guide to its own document at the cited page', () => {
+		const { container } = render(AskResultCard, {
+			props: {
+				card: fullCard({
+					sourceId: 'tap_vet_centers',
+					url: 'https://www.tapevents.mil/resources/documents',
+					page: 2
+				})
+			}
+		});
+		const link = container.querySelector('.ask-card__link') as HTMLAnchorElement;
+		expect(link.getAttribute('href')).toBe(
+			'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf#page=2'
+		);
+	});
+
+	it('links a TAP guide to the document itself when the chunk carries no page', () => {
+		// Built explicitly rather than by stripping a key off fullCard(): the absence of `page` is the whole
+		// point of this case, and it should be visible in the fixture.
+		const noPage: ResultCard = {
+			sourceId: 'tap_vet_centers',
+			sourceTitle: 'TAP - Vet Centers',
+			excerpt: 'Vet Centers offer readjustment counseling to combat veterans.',
+			url: 'https://www.tapevents.mil/resources/documents',
+			score: 0.82
+		};
+		const { container } = render(AskResultCard, { props: { card: noPage } });
+		const link = container.querySelector('.ask-card__link') as HTMLAnchorElement;
+		expect(link.getAttribute('href')).toBe(
+			'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf'
+		);
+	});
 });

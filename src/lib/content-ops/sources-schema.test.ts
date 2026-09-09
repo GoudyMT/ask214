@@ -103,6 +103,54 @@ describe('validateSourcesSchema', () => {
 		});
 	});
 
+	// A PDF source's `url` is the TAP library DIRECTORY page - one page shared by all 21 guides - so it
+	// cannot take a reader to the document they picked. `document_url` is the document itself. Requiring it
+	// on every PDF is what stops a citation from dead-ending, which is the defect this field exists to fix.
+	it('flags a PDF source with no document_url (its citation would dead-end on the library page)', () => {
+		const r = validateSourcesSchema([{ ...ok, content_type: 'pdf' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_PDF_NO_DOCUMENT_URL',
+			sourceId: 'va_disability_file',
+			field: 'document_url'
+		});
+	});
+
+	it('accepts a PDF source that carries its document_url', () => {
+		const r = validateSourcesSchema([
+			{
+				...ok,
+				content_type: 'pdf',
+				document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-DC.pdf'
+			}
+		]);
+		expect(r).toEqual({ valid: true, errors: [] });
+	});
+
+	// The value is interpolated straight into an href, so it gets the same https gate as `url` itself.
+	it('flags a non-https document_url', () => {
+		const r = validateSourcesSchema([
+			{ ...ok, content_type: 'pdf', document_url: 'http://www.tapevents.mil/x.pdf' }
+		]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_URL',
+			sourceId: 'va_disability_file',
+			field: 'document_url'
+		});
+	});
+
+	// An HTML source's `url` IS its document. A second document link would leave it ambiguous which one a
+	// citation should open. Mirrors the served rule above: a field that means nothing here is an error, not
+	// something to ignore.
+	it('flags an HTML source carrying a document_url (its url is already the document)', () => {
+		const r = validateSourcesSchema([
+			{ ...ok, content_type: 'html', document_url: 'https://www.va.gov/x.pdf' }
+		]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_HTML_DOCUMENT_URL',
+			sourceId: 'va_disability_file',
+			field: 'document_url'
+		});
+	});
 	it('flags a missing required field', () => {
 		const r = validateSourcesSchema([{ ...ok, origin: undefined }]);
 		expect(r.errors).toContainEqual({

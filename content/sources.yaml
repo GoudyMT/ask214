@@ -394,6 +394,7 @@
   source_updated_date: '2025-12-04'
   title: 'TAP - VA Benefits and Services Participant Guide'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/VA-Benefits-Participant-Guide.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -417,6 +418,7 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - Financial Planning for Transition'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/Financial_Planning_Transition.pdf'
   origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -440,6 +442,7 @@
   source_updated_date: '2026-01-29'
   title: 'TAP - Pre-Separation Brief Resource Guide'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/Pre_Separation_Counseling_Resource_Guide.pdf'
   origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -463,6 +466,7 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - Managing Your Transition'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/Managing_Your_Transition.pdf'
   origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -486,6 +490,7 @@
   source_updated_date: '2026-05-12'
   title: 'TAP - Military Occupational Code (MOC) Crosswalk'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MOC_Crosswalk.pdf'
   origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -509,6 +514,7 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - Managing Your Education'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/Managing_Your_Education.pdf'
   origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -532,6 +538,7 @@
   source_updated_date: '2025-03-24'
   title: 'TAP - DOL Employment Fundamentals of Career Transition (EFCT) Participant Guide'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/DOL-1-Day-EFCT.pdf'
   origin: 'DOL (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -555,6 +562,7 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - DOL Employment Workshop Participant Guide'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/Employment-Track-DOL-Employment-Workshop.pdf'
   origin: 'DOL (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -578,6 +586,7 @@
   source_updated_date: '2025-12-04'
   title: "TAP - VA Women's Health Transition Training Participant Handbook"
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/VA_WHTT_ParticipantHandbook.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -601,6 +610,7 @@
   source_updated_date: '2026-04-15'
   title: 'TAP - Interagency Website Guide (TIWG)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/TAP_Interagency_Website_Guide.pdf'
   origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -624,6 +634,7 @@
   source_updated_date: '2025-12-04'
   title: 'TAP - VA Benefits 101 (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VA101.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -647,6 +658,7 @@
   source_updated_date: '2025-12-04'
   title: 'TAP - VA Disability Compensation (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-DC.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -670,6 +682,7 @@
   source_updated_date: '2025-12-04'
   title: 'TAP - VA Education Benefits (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-EDBEN.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -693,6 +706,7 @@
   source_updated_date: '2025-05-21'
   title: 'TAP - VA Education Benefits for Spouses and Dependent Children (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-EDSDC.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -716,6 +730,7 @@
   source_updated_date: '2025-12-04'
   title: 'TAP - VA Home Loan Guaranty Program (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-HLGP.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -739,6 +754,7 @@
   source_updated_date: '2025-05-21'
   title: 'TAP - VA Life Insurance Benefits (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-LIB.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -762,6 +778,7 @@
   source_updated_date: '2025-03-20'
   title: 'TAP - Mental Health for Families (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-MHF.pdf'
   origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -785,6 +802,7 @@
   source_updated_date: '2025-12-04'
   title: 'TAP - Reserve Component Dual Payments (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-Reserve_Component_Dual.pdf'
   origin: 'DoD (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -808,6 +826,7 @@
   source_updated_date: '2023-01-26'
   title: 'TAP - Vet Centers (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -831,6 +850,7 @@
   source_updated_date: '2025-12-04'
   title: 'TAP - Other Than Honorable Online Reference Guide'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/VA_MLC_OTH_ReferenceGuide.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
@@ -854,6 +874,7 @@
   source_updated_date: '2025-12-29'
   title: 'TAP - VA Benefits for Reserve and National Guard (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
+  document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/VA_MLC_RNG_ResourceGuide.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd

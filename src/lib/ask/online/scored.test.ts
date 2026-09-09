@@ -47,9 +47,25 @@ describe('toRetrievedChunks', () => {
 			{
 				id: 'tap_moc_crosswalk:0fb72e844a79',
 				text: 'Use the MOC crosswalk.',
+				sourceId: 'tap_moc',
 				url: 'https://tapevents.mil/moc',
 				title: 'MOC Crosswalk'
 			}
 		]);
+	});
+
+	// The page is what anchors a citation deep link to the right page of the real document; 87.5% of
+	// shipped chunks carry one, so dropping it here would silently flatten most citations to the document's
+	// first page.
+	it('carries the page through when the hit has one', () => {
+		const chunks = toRetrievedChunks(narrowScored([wireHit({ page: 7 })]));
+		expect(chunks[0]!.page).toBe(7);
+	});
+
+	// Absent, not undefined: an `undefined` key would violate exactOptionalPropertyTypes and read as a
+	// known-missing page rather than a chunk that never had one.
+	it('omits page entirely when the hit has none', () => {
+		const chunks = toRetrievedChunks(narrowScored([wireHit()]));
+		expect(chunks[0]).not.toHaveProperty('page');
 	});
 });

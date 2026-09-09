@@ -35,12 +35,14 @@ export async function realChunks(): Promise<RetrievedChunk[]> {
 		{
 			id: await deriveChunkId('dod_skillbridge', SKILLBRIDGE_TEXT),
 			text: SKILLBRIDGE_TEXT,
+			sourceId: 'dod_skillbridge',
 			url: 'https://skillbridge.osd.mil/',
 			title: 'DoD SkillBridge'
 		},
 		{
 			id: await deriveChunkId('tap_dol_efct', EFCT_TEXT),
 			text: EFCT_TEXT,
+			sourceId: 'tap_dol_efct',
 			url: 'https://www.dol.gov/agencies/vets/programs/tap',
 			title: 'Employment Fundamentals of Career Transition'
 		}

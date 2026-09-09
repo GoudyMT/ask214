@@ -7,6 +7,7 @@ const CHUNKS: RetrievedChunk[] = [
 	{
 		id: 'tap_moc_crosswalk',
 		text: 'SkillBridge lets you train with an employer before separation.',
+		sourceId: 'dod_skillbridge',
 		url: 'https://example.gov/skillbridge',
 		title: 'SkillBridge'
 	}
@@ -45,6 +46,32 @@ const REAL_ID_CHUNKS = await realChunks();
 const SKILLBRIDGE_ID = REAL_ID_CHUNKS[0]!.id;
 
 describe('synthesize', () => {
+	// A TAP guide's chunk url is the shared library DIRECTORY page. A Citation is by contract the one
+	// CLICKABLE thing on this surface (model-written links are forced inert), so it has to resolve to the
+	// guide itself at the cited page - otherwise the only link the reader is allowed to trust drops them on
+	// a list of 21 documents.
+	it('resolves a TAP guide citation to the document itself at the cited page', async () => {
+		const tapChunks: RetrievedChunk[] = [
+			{
+				id: 'tap_vet_centers:0fb72e844a79',
+				text: 'Vet Centers offer readjustment counseling to combat veterans.',
+				sourceId: 'tap_vet_centers',
+				page: 2,
+				url: 'https://www.tapevents.mil/resources/documents',
+				title: 'TAP - Vet Centers'
+			}
+		];
+		const impl = stubFetch(
+			'Vet Centers offer readjustment counseling [tap_vet_centers:0fb72e844a79].'
+		);
+		const result = await synthesize('What is a Vet Center?', tapChunks, deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.citations[0]!.url).toBe(
+				'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf#page=2'
+			);
+		}
+	});
 	it('short-circuits a personalized-eligibility query with no provider call', async () => {
 		const impl = stubFetch('unused');
 		const result = await synthesize('Do I qualify for the housing grant?', CHUNKS, deps(impl));
@@ -60,7 +87,11 @@ describe('synthesize', () => {
 		expect(result.kind).toBe('answer');
 		if (result.kind === 'answer') {
 			expect(result.answer.citations).toEqual([
-				{ id: 'tap_moc_crosswalk', url: 'https://example.gov/skillbridge', title: 'SkillBridge' }
+				{
+					id: 'tap_moc_crosswalk',
+					url: 'https://example.gov/skillbridge',
+					title: 'SkillBridge'
+				}
 			]);
 			expect(result.answer.disclaimer).toBeTruthy();
 		}
@@ -278,6 +309,7 @@ describe('synthesize', () => {
 			{
 				id: 'tap_moc_crosswalk',
 				text: `SkillBridge ${bullet} train with an employer before separation. Version 6.1 Released May 2025`,
+				sourceId: 'dod_skillbridge',
 				url: 'https://example.gov/skillbridge',
 				title: 'SkillBridge'
 			}
@@ -300,6 +332,7 @@ describe('synthesize', () => {
 			{
 				id: 'tap_moc_crosswalk',
 				text: 'SkillBridge lets you train with an employer. Version 6.1 Released May 2025',
+				sourceId: 'dod_skillbridge',
 				url: 'https://example.gov/skillbridge',
 				title: 'SkillBridge'
 			}
@@ -316,6 +349,7 @@ describe('synthesize', () => {
 			{
 				id: 'tap_moc_crosswalk',
 				text: 'The relocation allowance is $3,000 for eligible members. Version 6.1 Released May 2025',
+				sourceId: 'dod_skillbridge',
 				url: 'https://example.gov/skillbridge',
 				title: 'SkillBridge'
 			}

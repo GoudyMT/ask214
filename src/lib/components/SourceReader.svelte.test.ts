@@ -203,4 +203,46 @@ describe('SourceReader', () => {
 		expect(status.textContent).toMatch(/loading the source/i);
 		expect(status.textContent).not.toMatch(/on your device/i);
 	});
+
+	// The reader is the deepest tier: it is ALREADY showing the exact passage. Sending its link out to the
+	// shared TAP library directory page would walk the reader back to a list of 21 documents, so it
+	// resolves the guide and anchors the highlighted passage's own page.
+	it('links a TAP guide to the highlighted passage page in the real document', () => {
+		const { container } = render(SourceReader, {
+			props: {
+				source: source({
+					sourceId: 'tap_vet_centers',
+					url: 'https://www.tapevents.mil/resources/documents',
+					passages: [
+						{ id: 's1', text: 'Vet Centers offer readjustment counseling.', page: 1 },
+						{ id: 's2', text: 'Services are free and confidential.', page: 2 }
+					]
+				}),
+				highlightId: 's2',
+				onClose: () => {}
+			}
+		});
+		flushSync();
+		const link = container.querySelector('.reader__link') as HTMLAnchorElement;
+		expect(link.getAttribute('href')).toBe(
+			'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf#page=2'
+		);
+	});
+
+	it('links a TAP guide to the document itself when no passage is highlighted', () => {
+		const { container } = render(SourceReader, {
+			props: {
+				source: source({
+					sourceId: 'tap_vet_centers',
+					url: 'https://www.tapevents.mil/resources/documents'
+				}),
+				onClose: () => {}
+			}
+		});
+		flushSync();
+		const link = container.querySelector('.reader__link') as HTMLAnchorElement;
+		expect(link.getAttribute('href')).toBe(
+			'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf'
+		);
+	});
 });

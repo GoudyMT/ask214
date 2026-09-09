@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ResultCard } from '$lib/corpus';
+	import { documentUrl } from '$lib/sources/document-url';
 
 	let {
 		card,
@@ -35,6 +36,13 @@
 			.join(' - ')
 	);
 
+	// Where "View on the official site" actually goes. `card.url` is the source's registry url, which for a
+	// TAP guide is the shared library DIRECTORY page - byte-identical across all 21 guides - so using it
+	// directly lands the reader on a list of documents instead of the one they asked about. documentUrl
+	// resolves the guide itself and anchors the cited page; it returns undefined for an html source, whose
+	// own url already IS the document, so that case keeps the url unchanged.
+	const officialUrl = $derived(documentUrl(card.sourceId, card.page) ?? card.url);
+
 	function truncateWords(text: string, maxWords: number): string {
 		const words = text.trim().split(/\s+/);
 		if (words.length <= maxWords) return text.trim();
@@ -62,9 +70,9 @@
 		{#if onReadSource}
 			<button class="ask-card__read" type="button" onclick={onReadSource}>Read more</button>
 		{/if}
-		<!-- card.url is an external public-source citation (https), not internal SvelteKit nav; resolve() does not apply. -->
+		<!-- officialUrl is an external public-source citation (https), not internal SvelteKit nav; resolve() does not apply. -->
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-		<a class="ask-card__link" href={card.url} target="_blank" rel="noopener noreferrer"
+		<a class="ask-card__link" href={officialUrl} target="_blank" rel="noopener noreferrer"
 			>View on the official site</a
 		>
 	</div>

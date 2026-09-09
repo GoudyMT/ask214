@@ -58,6 +58,10 @@ export function toRetrievedChunks(results: RetrievalResult[]): RetrievedChunk[] 
 		id: chunk.id,
 		text: chunk.text,
 		url: chunk.url,
-		title: chunk.sourceTitle
+		title: chunk.sourceTitle,
+		// Carried for the citation deep link, not for the model. Page is spread conditionally so a chunk
+		// without one never gains an `undefined` key (exactOptionalPropertyTypes), matching toResultCards.
+		sourceId: chunk.sourceId,
+		...(chunk.page !== undefined ? { page: chunk.page } : {})
 	}));
 }
