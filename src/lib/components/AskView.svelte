@@ -265,7 +265,7 @@
 	{:else if askState.kind === 'results'}
 		{@const cards = askState.cards}
 		{#if askState.answer}
-			<AskAnswer view={askState.answer} />
+			<AskAnswer view={askState.answer} onOpenSource={readSource} />
 		{/if}
 		<!-- A card yields its excerpt only to an EXTRACTIVE answer taken from that same card - showing both
 		     would print the same sentences twice. The answer is now chosen across the whole retrieved set,

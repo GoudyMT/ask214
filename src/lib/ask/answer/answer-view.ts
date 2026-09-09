@@ -8,6 +8,10 @@ import { selectAnswer } from './select-answer';
 export type ExtractiveAnswer = {
 	text: string;
 	passage: string;
+	// Which source this was taken from. Required, because the answer is chosen across the retrieved set and
+	// is NOT necessarily the lead card - the reader has to be opened on the document the answer actually
+	// quotes, not on whatever happened to rank first.
+	sourceId: string;
 	sourceTitle: string;
 	url: string;
 	chunkId?: string;
@@ -100,6 +104,7 @@ export function toExtractiveAnswer(
 	return {
 		text: selectAnswer(passage, query),
 		passage,
+		sourceId: best.sourceId,
 		sourceTitle: best.sourceTitle,
 		url: best.url,
 		...(best.chunkId !== undefined ? { chunkId: best.chunkId } : {}),

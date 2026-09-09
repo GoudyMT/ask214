@@ -451,6 +451,7 @@ describe('AskView', () => {
 			answer: {
 				text: 'You have one year to submit the completed claim.',
 				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceId: 'va_intent_to_file',
 				sourceTitle: 'VA - Intent to File',
 				url: 'https://www.va.gov/',
 				chunkId: 'va_intent_to_file:0123456789ab'
@@ -497,6 +498,7 @@ describe('AskView', () => {
 			answer: {
 				text: 'You have one year to submit the completed claim.',
 				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceId: 'va_intent_to_file',
 				sourceTitle: 'VA - Intent to File',
 				url: 'https://www.va.gov/'
 			}

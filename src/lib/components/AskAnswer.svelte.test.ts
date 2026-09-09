@@ -24,9 +24,11 @@ const extractiveView: AnswerView = {
 		text: 'Once you notify us of your intent to file you have one year to submit the claim.',
 		passage:
 			'Once you notify us of your intent to file you have one year to submit the claim. The date we receive it becomes your effective date for benefits.',
+		sourceId: 'va_intent_to_file',
 		sourceTitle: 'VA - Intent to File',
 		url: 'https://www.va.gov/',
-		page: 12
+		page: 12,
+		chunkId: 'va_intent_to_file:0123456789ab'
 	}
 };
 
@@ -139,6 +141,31 @@ describe('AskAnswer', () => {
 				'aria-expanded'
 			)
 		).toBe('true');
+	});
+
+	// The third tier. The reader already highlights the cited passage offline; the answer block simply had
+	// no way in, so on ~4 queries in 10 the only reachable source control opened a DIFFERENT document.
+	it('extractive: offers a route into the source it was quoted from', async () => {
+		let opened: [string, string | undefined] | null = null;
+		const { getByRole } = render(AskAnswer, {
+			props: {
+				view: extractiveView,
+				onOpenSource: (sourceId: string, chunkId?: string) => (opened = [sourceId, chunkId])
+			}
+		});
+		await getByRole('button', { name: /read it in the source/i }).click();
+		expect(opened).toEqual(['va_intent_to_file', 'va_intent_to_file:0123456789ab']);
+	});
+
+	it('extractive: offers no source route when the answer carries no chunk id', () => {
+		const noChunk = {
+			kind: 'extractive',
+			answer: { ...extractiveView.answer, chunkId: undefined }
+		} as AnswerView;
+		const { container } = render(AskAnswer, {
+			props: { view: noChunk, onOpenSource: () => {} }
+		});
+		expect(container.textContent).not.toContain('Read it in the source');
 	});
 
 	// 90 corpus chunks carry an unbreakable run over 40 chars; without this one overflows 320px by 382px.

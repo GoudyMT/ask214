@@ -1,6 +1,15 @@
 <script lang="ts">
 	import type { AnswerView } from '$lib/ask/answer/answer-view';
-	let { view }: { view: AnswerView } = $props();
+	let {
+		view,
+		onOpenSource
+	}: {
+		view: AnswerView;
+		// Opens the offline reader on the document this answer was quoted from, highlighting the exact
+		// passage. Without it the answer block was a dead end: the only reachable "read source" control
+		// belonged to the LEAD card, and the answer comes from a different card roughly 4 times in 10.
+		onOpenSource?: (sourceId: string, chunkId?: string) => void;
+	} = $props();
 
 	// Tier 2. Collapsed by default: the point of the short answer is that it is short.
 	let expanded = $state(false);
@@ -38,17 +47,32 @@
 		</p>
 		<!-- Offered only when there is genuinely more to show; an expand control that reveals the same
 		     sentences again is a dead button. -->
-		{#if view.answer.passage !== view.answer.text}
-			<button
-				class="ask-answer__more"
-				type="button"
-				aria-expanded={expanded}
-				aria-controls="ask-answer-passage"
-				onclick={() => (expanded = !expanded)}
-			>
-				{expanded ? 'Show less' : 'More detail'}
-			</button>
-		{/if}
+		<div class="ask-answer__actions">
+			{#if view.answer.passage !== view.answer.text}
+				<button
+					class="ask-answer__more"
+					type="button"
+					aria-expanded={expanded}
+					aria-controls="ask-answer-passage"
+					onclick={() => (expanded = !expanded)}
+				>
+					{expanded ? 'Show less' : 'More detail'}
+				</button>
+			{/if}
+			<!-- The third tier. The reader already renders the whole document offline with the cited passage
+			     highlighted; the answer just never had a way in. It opens on the source the answer was taken
+			     FROM, which is not necessarily the lead card. -->
+			{#if onOpenSource && view.answer.chunkId}
+				{@const answer = view.answer}
+				<button
+					class="ask-answer__more"
+					type="button"
+					onclick={() => onOpenSource(answer.sourceId, answer.chunkId)}
+				>
+					Read it in the source
+				</button>
+			{/if}
+		</div>
 		<!-- PERMANENT, not conditional on the eligibility gate. That gate reads the QUESTION's phrasing, so
 		     it misses "can I use VA health care" - which renders "You're eligible for VA health care" - and
 		     fires on procedural lookups that need no warning. This block is always a quotation from an
@@ -146,6 +170,11 @@
 		font-size: var(--font-size-s);
 		color: var(--color-fg-muted);
 		margin: 0 0 var(--space-s);
+	}
+	.ask-answer__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-m);
 	}
 	.ask-answer__more {
 		background: none;

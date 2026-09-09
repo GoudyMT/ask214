@@ -7,6 +7,7 @@ import { chooseAnswer, toExtractiveAnswer, type ExtractiveAnswer } from './answe
 const extractive: ExtractiveAnswer = {
 	text: 'You have one year to submit the completed claim.',
 	passage: 'You have one year to submit the completed claim. It reserves your effective date.',
+	sourceId: 'va_disability_file',
 	sourceTitle: 'VA - Your Intent to File',
 	url: 'https://www.va.gov/'
 };
@@ -177,6 +178,7 @@ describe('toExtractiveAnswer', () => {
 	it('carries the citation through', async () => {
 		const c = await card();
 		expect(toExtractiveAnswer([c], 'how long do I have?')).toMatchObject({
+			sourceId: c.sourceId,
 			sourceTitle: c.sourceTitle,
 			url: c.url,
 			page: 3,
