@@ -175,6 +175,93 @@ describe('toExtractiveAnswer', () => {
 		expect(answer?.chunkId).toBe(strong.chunkId);
 	});
 
+	// Coverage over the WHOLE chunk rewards a card that mentions the question's words in passing over one
+	// that answers it. Measured on the benchmark this was the dominant card-choice failure: a USERRA card
+	// won a "VET TEC 2.0" query at 0.83 coverage because "vet", "training" and "benefits" all appear in it.
+	// The mention card here genuinely out-scores the answering one under the old rule, so this fails unless
+	// the heading actually carries weight.
+	it('prefers a card whose heading answers the question over one that only mentions its words', async () => {
+		// Both fixtures run past the opening window on purpose. A chunk shorter than that window IS its own
+		// opening, so the heading signal could not discriminate and the test would pass or fail for the
+		// wrong reason. Real chunks are ~190 words.
+		const mentions = await card({
+			chunkId: 'other_source:aaaaaaaaaaaa',
+			sourceTitle: 'Appendix',
+			section: 'Appendix: additional resources',
+			excerpt:
+				'Appendix of additional resources for separating service members. This appendix lists websites, ' +
+				'points of contact and printed material referenced elsewhere in this guide. Entries are grouped ' +
+				'by topic and reviewed each year by the program office. Veterans can use these listings to find ' +
+				'training programs, technology (TEC) offerings and employment links.',
+			score: 0.8
+		});
+		const answers = await card({
+			chunkId: 'other_source:bbbbbbbbbbbb',
+			sourceTitle: 'VET TEC',
+			section: 'What training can I use VET TEC for?',
+			excerpt:
+				'What training can I use VET TEC for? VET TEC covers computer software, media, information ' +
+				'science and data processing programs. Providers must be approved and the program must be ' +
+				'completed within its approved length. A housing allowance may be payable while you are ' +
+				'enrolled full time.',
+			score: 0.75
+		});
+		const answer = toExtractiveAnswer([mentions, answers], 'what training can I use VET TEC for');
+		expect(answer?.sourceTitle).toBe('VET TEC');
+	});
+
+	// A question asking who to call is answered by a phone number, and the chunk holding one is a resource
+	// listing that never repeats the words "call" or "number" - so term coverage sinks exactly the card that
+	// answers. Six of the sixteen diagnosed card-choice failures were this single shape, one of them a
+	// crisis query.
+	it('prefers a card carrying a phone number when the question asks who to call', async () => {
+		// Coverage figures mirror the measured failure: the prose card scored 0.50 on the question's terms
+		// and the listing that actually held the number scored 0.17.
+		const prose = await card({
+			chunkId: 'other_source:cccccccccccc',
+			sourceTitle: 'Applying online',
+			section: 'Applying online',
+			excerpt:
+				'If you apply online, it is recommended you create an account before beginning. This allows ' +
+				'you to save your work and return later. You can also call your school certifying official ' +
+				'about your GI Bill enrollment once classes begin.',
+			score: 0.7
+		});
+		const listing = await card({
+			chunkId: 'other_source:dddddddddddd',
+			sourceTitle: 'Key VA resources',
+			section: 'Key VA resources',
+			excerpt:
+				'VA Home Page. The VA.gov website offers current resources, tools and contact information for ' +
+				'all VA benefits and services. GI Bill hotline: 1-888-442-4551. Education and training ' +
+				'benefits information for service members and veterans.',
+			score: 0.72
+		});
+		const answer = toExtractiveAnswer([prose, listing], 'what number do I call about my GI Bill');
+		expect(answer?.sourceTitle).toBe('Key VA resources');
+	});
+
+	// The boost must not fire on a question that merely CONTAINS one of those words in another sense.
+	// "How long does it take VA to make a decision on my claim" is not a request for a phone number.
+	it('does not prefer a phone-bearing card when the question is not asking who to call', async () => {
+		const answers = await card({
+			chunkId: 'other_source:eeeeeeeeeeee',
+			sourceTitle: 'Decision timelines',
+			section: 'How long does a decision take?',
+			excerpt: 'How long does a decision take? Most disability claims are decided within 100 days.',
+			score: 0.75
+		});
+		const listing = await card({
+			chunkId: 'other_source:ffffffffffff',
+			sourceTitle: 'Key VA resources',
+			section: 'Key VA resources',
+			excerpt: 'VA Home Page. Benefits hotline: 1-800-827-1000. Claim status information.',
+			score: 0.74
+		});
+		const answer = toExtractiveAnswer([answers, listing], 'how long does a decision take');
+		expect(answer?.sourceTitle).toBe('Decision timelines');
+	});
+
 	it('carries the citation through', async () => {
 		const c = await card();
 		expect(toExtractiveAnswer([c], 'how long do I have?')).toMatchObject({

@@ -61,18 +61,49 @@ function coverage(text: string, terms: Set<string>): number {
 	return hit / terms.size;
 }
 
+// How much a match in the heading or the opening line counts on top of a match anywhere in the chunk, and
+// how much a phone number counts when the question asks for one. NOT fitted to the benchmark: both were
+// chosen as "enough to overturn a moderate coverage gap, not enough to overrule a large one" and measured
+// once. Worth +1.5pp end to end, which fixed 5 of the 20 mention-beats-answer failures and introduced 2
+// where the boost overturned a card that was right. A sweep of these values would be fitting to the score
+// they are judged by, so it belongs on the tune split or nowhere.
+const HEAD_WEIGHT = 0.6;
+const CONTACT_WEIGHT = 0.6;
+// How much of the chunk counts as its opening. These sources are FAQ-shaped: the chunk that answers usually
+// restates the question in its first line.
+const OPENING_WORDS = 25;
+
+/** The question is asking how to reach someone, so a passage without a number cannot answer it. */
+const CONTACT_INTENT = /\b(?:call|phone|number|hotline|helpline|contact|reach)\b/;
+/** A US number as these documents write them: 1-800-827-1000, 877-827-3702, 1-877-222-VETS, 1-855-VA-WOMEN. */
+const PHONE = /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b1-\d{3}-[A-Za-z0-9]{2,}-[A-Za-z0-9]+/;
+
+/**
+ * The heading plus the opening line - the part of a chunk that says what it is ABOUT, rather than what it
+ * happens to mention. Coverage over the whole chunk cannot tell those apart, which is what let a card that
+ * merely name-drops the query's words beat the card that answers.
+ */
+function headArea(card: ResultCard): string {
+	const opening = card.excerpt.split(/\s+/).slice(0, OPENING_WORDS).join(' ');
+	return `${card.section ?? ''} ${opening}`;
+}
+
 /**
  * Build the extractive answer from the retrieved set.
  *
- * It reads EVERY retrieved card, not just the first. Measured end to end on the project's benchmark, the
- * answer sits inside card 1 only 27.4% of the time but inside SOME retrieved card 59.3% of the time, so
- * taking card 1 unconditionally discarded most of what retrieval had already found: 31.9% of queries put
- * the right passage in a later card while a wrong answer sat on top of it. Choosing across the set moved
- * the end-to-end score from 24.4% to 31.1%, against 25.9% for the card this replaces.
+ * It reads EVERY retrieved card, not just the first. Retrieval is not the weak link: measured end to end on
+ * the online path, the answer sits in SOME retrieved card 87.4% of the time. Choice is. The rendered answer
+ * carries it 51.1% of the time, and would carry it 77.0% if the right card were always picked - so roughly
+ * 26 points sit inside cards retrieval has already returned.
  *
- * The card is chosen by query-term coverage over its whole text, multiplied by its retrieval score - so
- * retrieval's own evidence still counts rather than being thrown away for a keyword count. Ties and empty
- * queries keep the retrieval order, which is the honest default.
+ * Three signals decide, all multiplied by retrieval's own score so ranking still counts. Term coverage over
+ * the whole chunk is the base. A match in the HEADING or opening line counts extra, because coverage alone
+ * cannot tell a chunk that answers from one that name-drops the question's words - the dominant failure,
+ * where a USERRA card won a "VET TEC" query on incidental mentions. And a chunk carrying a phone number
+ * counts extra when the question asks who to call, because a resource listing never repeats the words
+ * "call" or "number" and so loses exactly the query it answers.
+ *
+ * Ties and empty queries keep the retrieval order, which is the honest default.
  *
  * @param cards The retrieved cards in retrieval order; each excerpt is full cleaned chunk text.
  * @param query The user's question.
@@ -90,10 +121,19 @@ export function toExtractiveAnswer(
 			.filter((w) => w.length > 2 && !STOP_WORDS.has(w))
 	);
 
+	const wantsContact = CONTACT_INTENT.test(normalize(query));
+
 	let best = cards[0]!;
 	let bestScore = -1;
 	for (const card of cards) {
-		const score = coverage(card.excerpt, terms) * card.score;
+		// Three signals, all multiplied by retrieval's own evidence so ranking still counts:
+		//   - what the chunk mentions anywhere (the original signal)
+		//   - what its heading and opening line are ABOUT, which is what separates answering from mentioning
+		//   - whether it carries a number, when a number is what was asked for
+		const contact = wantsContact && PHONE.test(card.excerpt) ? CONTACT_WEIGHT : 0;
+		const score =
+			(coverage(card.excerpt, terms) + HEAD_WEIGHT * coverage(headArea(card), terms) + contact) *
+			card.score;
 		if (score > bestScore) {
 			bestScore = score;
 			best = card;
