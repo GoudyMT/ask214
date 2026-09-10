@@ -28,6 +28,7 @@
 		"embed": "tsx content-ops/build-corpus.mjs",
 		"eval": "tsx content-ops/run-eval.mjs",
 		"answer-gate": "tsx content-ops/answer-gate.mjs",
+		"answer-gate:bge": "tsx content-ops/answer-gate-bge.mjs",
 		"embed:bge": "tsx content-ops/build-corpus-bge.mjs",
 		"eval:bge": "tsx content-ops/eval-corpus-bge.mjs",
 		"refresh": "tsx content-ops/refresh.mjs",
