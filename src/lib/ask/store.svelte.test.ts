@@ -3,6 +3,7 @@ import { createAskStore } from './store.svelte';
 import { AskError, ASK_ERROR } from './errors';
 import type { Corpus, CorpusChunk } from '$lib/corpus';
 import type { RetrieveResult } from './online/outcome';
+import { detectEligibilityIntent } from './synthesis/eligibility-gate';
 
 function chunk(id: string): CorpusChunk {
 	return { id, text: id, sourceId: 's', sourceTitle: 'S', tags: [], url: 'https://example.gov' };
@@ -696,19 +697,28 @@ describe('createAskStore', () => {
 		// The input box stays editable after results render, so reading the query at render time would let
 		// the displayed answer drift away from the question it actually answered. `origin` is snapshot for
 		// exactly this reason already.
+		// Assert the kind BEFORE narrowing on it, the way the sibling above does. Guarding an assertion
+		// behind an unchecked `if` does not let the test pass silently - `expect.requireAssertions` turns
+		// zero assertions into a failure - but it fails with "expected any number of assertion, but got
+		// none", which says nothing about what went wrong. Asserting first fails with the actual state.
 		it('snapshots the query that produced the answer', async () => {
 			const store = deviceStore();
 			await store.ask('how long do I have to submit my claim?');
-			if (store.state.kind === 'results') {
-				expect(store.state.query).toBe('how long do I have to submit my claim?');
-			}
+			expect(store.state.kind).toBe('results');
+			if (store.state.kind !== 'results') return;
+			expect(store.state.query).toBe('how long do I have to submit my claim?');
 		});
 
 		// 38 CFR 14.629. The gate lived inside synthesize(), so it needed online AND a key AND the toggle -
 		// the device user was never gated at all. Phrasing taken from the shipped red-team fixture.
 		it('attaches the eligibility note on the device path, where no gate ran before', async () => {
 			const store = deviceStore();
-			await store.ask('I have a 30% rating and served 8 years, what am I entitled to?');
+			const query = 'I have a 30% rating and served 8 years, what am I entitled to?';
+			// The PREMISE, asserted rather than assumed: this test is about what happens when the gate
+			// fires, so if the gate ever stopped firing on this phrasing it would keep passing while
+			// testing nothing it claims to test.
+			expect(detectEligibilityIntent(query).shortCircuit).toBe(true);
+			await store.ask(query);
 			expect(store.state.kind).toBe('results');
 			if (store.state.kind !== 'results') return;
 			// The 38 CFR note is PERMANENT on the extractive block (AskAnswer.svelte), because the gate reads
@@ -719,15 +729,24 @@ describe('createAskStore', () => {
 
 		it('still shows the source cards under the eligibility note', async () => {
 			const store = deviceStore();
-			await store.ask('I have a 30% rating and served 8 years, what am I entitled to?');
-			if (store.state.kind === 'results') expect(store.state.cards.length).toBeGreaterThan(0);
+			const query = 'I have a 30% rating and served 8 years, what am I entitled to?';
+			expect(detectEligibilityIntent(query).shortCircuit).toBe(true);
+			await store.ask(query);
+			expect(store.state.kind).toBe('results');
+			if (store.state.kind !== 'results') return;
+			expect(store.state.cards.length).toBeGreaterThan(0);
 		});
 
 		// The gate's possessive-benefit signal fires on plain procedural questions - 28.9% of the
 		// benchmark. Those must still get the answer the document plainly contains, with the note attached.
 		it('still answers a procedural question that trips the gate', async () => {
 			const store = deviceStore();
-			await store.ask('how long do I have to submit my claim?');
+			const query = 'how long do I have to submit my claim?';
+			// The premise again: the whole point is that a PROCEDURAL question trips the gate. Without this
+			// the test would survive the gate going quiet on exactly the cases it was written to cover.
+			expect(detectEligibilityIntent(query).shortCircuit).toBe(true);
+			await store.ask(query);
+			expect(store.state.kind).toBe('results');
 			if (store.state.kind !== 'results') return;
 			expect(store.state.answer?.kind).toBe('extractive');
 			if (store.state.answer?.kind !== 'extractive') return;

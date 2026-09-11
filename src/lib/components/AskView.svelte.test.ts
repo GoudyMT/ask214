@@ -41,13 +41,19 @@ function props(state: AskState, over: Partial<ViewProps> = {}): ViewProps {
 	};
 }
 
+// Real chunk ids are UNIQUE - `toResultCards` copies `chunk.id`, which the corpus guarantees distinct.
+// A constant here gave every card in a multi-card test the same id, so `c.chunkId !== quoted` was false
+// for all of them and the "which card did the answer come from" comparison - the exact thing this field
+// was added to enable - could never discriminate. Tests that need to pair an answer to a card read the id
+// off the card rather than hardcoding it.
+let cardSeq = 0;
+
 function card(over: Partial<ResultCard> = {}): ResultCard {
+	cardSeq++;
 	return {
 		sourceId: 'va_intent_to_file',
 		sourceTitle: 'VA - Intent to File',
-		// Real cards always carry this - toResultCards copies chunk.id, which is required on every chunk.
-		// Omitting it made the "which card did the answer come from" comparison untestable.
-		chunkId: 'va_intent_to_file:0123456789ab',
+		chunkId: `va_intent_to_file:${String(cardSeq).padStart(12, '0')}`,
 		section: 'How to submit',
 		page: 12,
 		excerpt: 'An intent to file lets you notify VA that you plan to file a claim.',
@@ -466,6 +472,7 @@ describe('AskView', () => {
 	// The answer block owns the text at both tiers, so the lead card stops repeating it. The card is not
 	// demoted - it keeps its position, its badge, its citation and both actions.
 	it('results: the card the answer came from yields its excerpt', () => {
+		const lead = card();
 		const answer: AnswerView = {
 			kind: 'extractive',
 			answer: {
@@ -474,15 +481,38 @@ describe('AskView', () => {
 				sourceId: 'va_intent_to_file',
 				sourceTitle: 'VA - Intent to File',
 				url: 'https://www.va.gov/',
-				chunkId: 'va_intent_to_file:0123456789ab'
+				chunkId: lead.chunkId
 			}
 		};
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [card()], answer })
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [lead], answer })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).toBeNull();
 		expect(container.querySelector('.ask-card__top-match')).not.toBeNull();
 		expect(container.querySelector('.ask-card__link')).not.toBeNull();
+	});
+
+	// The counterpart, which no test covered: when the answer came from a card OTHER than the lead, the
+	// lead must KEEP its excerpt. With one shared fixture id this could not be expressed at all - and the
+	// branch matters, because the answer is chosen across the retrieved set rather than taken from card 1.
+	it('results: a card the answer did NOT come from keeps its excerpt', () => {
+		const lead = card();
+		const other = card();
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'You have one year to submit the completed claim.',
+				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceId: 'va_intent_to_file',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://www.va.gov/',
+				chunkId: other.chunkId
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [lead, other], answer })
+		});
+		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
 	});
 
 	// A synthesized answer paraphrases, so there is no duplication to remove and the card is untouched.

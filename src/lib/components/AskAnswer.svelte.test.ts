@@ -32,7 +32,33 @@ const extractiveView: AnswerView = {
 	}
 };
 
+// The section line is what the component names as standing between the answer and an unconditional
+// reading: `stripHeadingEcho` strips the heading OUT of the answer text, so if it is not redisplayed the
+// condition governing the claim is simply gone. Every fixture omitted `section`, so deleting that
+// expression from the template left the whole suite green. The heading here is the real shape - a
+// conditional that scopes what follows it - not a tidy label.
+const conditionalSectionView: AnswerView = {
+	kind: 'extractive',
+	answer: {
+		text: 'You may qualify for a maximum of 48 months of benefits.',
+		passage: 'You may qualify for a maximum of 48 months of benefits.',
+		sourceId: 'va_gi_bill',
+		sourceTitle: 'VA - GI Bill',
+		url: 'https://www.va.gov/',
+		section: "If you've completed 2 or more qualifying periods of active duty",
+		page: 7,
+		chunkId: 'va_gi_bill:0123456789ab'
+	}
+};
+
 describe('AskAnswer', () => {
+	it('extractive: redisplays the section, which carries the governing condition', () => {
+		const { container } = render(AskAnswer, { props: { view: conditionalSectionView } });
+		expect(container.querySelector('.ask-answer__src')?.textContent).toContain(
+			"If you've completed 2 or more qualifying periods of active duty"
+		);
+	});
+
 	it('extractive: shows the short answer and names its source', () => {
 		const { container } = render(AskAnswer, { props: { view: extractiveView } });
 		expect(container.textContent).toContain('one year to submit the claim');
