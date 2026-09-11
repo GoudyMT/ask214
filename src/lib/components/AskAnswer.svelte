@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { AnswerView } from '$lib/ask/answer/answer-view';
 	let {
 		view,
@@ -13,6 +14,21 @@
 
 	// Tier 2. Collapsed by default: the point of the short answer is that it is short.
 	let expanded = $state(false);
+	let passageEl = $state<HTMLElement | null>(null);
+
+	// The revealed passage sits BEFORE this control in reading order, because the control lives in the
+	// action row beneath the text. A screen-reader user who presses it and continues forward therefore
+	// reaches the source line and the legal note - never the passage they asked for. Moving focus onto
+	// the passage closes that without reordering the visual layout.
+	//
+	// On OPEN only. Closing leaves focus on the button, which is where the reader already is and where
+	// the next press belongs; yanking it elsewhere on collapse would be the more annoying bug.
+	function toggleExpanded(): void {
+		expanded = !expanded;
+		if (!expanded) return;
+		// After the `hidden` flip has landed - a hidden element cannot take focus.
+		void tick().then(() => passageEl?.focus());
+	}
 </script>
 
 {#if view.kind === 'extractive'}
@@ -34,7 +50,13 @@
 		     leave the control unannounced and re-read the whole passage into the live region.
 		     The passage already contains the selected sentences, so only one is ever shown. -->
 		<p class="ask-answer__text" id="ask-answer-short" hidden={expanded}>{view.answer.text}</p>
-		<p class="ask-answer__text" id="ask-answer-passage" hidden={!expanded}>
+		<p
+			class="ask-answer__text"
+			id="ask-answer-passage"
+			bind:this={passageEl}
+			tabindex="-1"
+			hidden={!expanded}
+		>
 			{view.answer.passage}
 		</p>
 		<!-- The section heading is the ANTECEDENT of the sentence above it on these VA pages - "If you've
@@ -55,8 +77,8 @@
 					class="ask-answer__more"
 					type="button"
 					aria-expanded={expanded}
-					aria-controls="ask-answer-passage"
-					onclick={() => (expanded = !expanded)}
+					aria-controls="ask-answer-short ask-answer-passage"
+					onclick={toggleExpanded}
 				>
 					{expanded ? 'Show less' : 'More detail'}
 				</button>
@@ -75,6 +97,16 @@
 				</button>
 			{/if}
 		</div>
+		<!-- A synthesis was attempted for this question and did not reach the reader. Shown only when that
+		     actually happened, so the default user - who never enabled the summary - sees nothing. It is a
+		     note on the one answer, not a second block competing to BE the answer. -->
+		{#if view.synthesisNote}
+			<p class="ask-answer__note-synthesis">
+				{view.synthesisNote === 'refused'
+					? 'An AI summary was produced but did not pass our accuracy checks, so the document is quoted instead.'
+					: 'An AI summary could not be produced, so the document is quoted instead.'}
+			</p>
+		{/if}
 		<!-- PERMANENT, not conditional on the eligibility gate. That gate reads the QUESTION's phrasing, so
 		     it misses "can I use VA health care" - which renders "You're eligible for VA health care" - and
 		     fires on procedural lookups that need no warning. This block is always a quotation from an
@@ -99,7 +131,10 @@
 		{#if view.answer.citations.length > 0}
 			<ul class="ask-answer__sources">
 				{#each view.answer.citations as c (c.id)}
-					<li><a href={c.url} rel="external noopener">{c.title}</a></li>
+					<li>
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+						<a href={c.url} target="_blank" rel="noopener noreferrer">{c.title}</a>
+					</li>
 				{/each}
 			</ul>
 		{/if}
@@ -143,6 +178,11 @@
 		border-radius: var(--radius-m);
 		padding: var(--space-l);
 		margin-bottom: var(--space-l);
+	}
+	.ask-answer__note-synthesis {
+		font-size: var(--font-size-s);
+		color: var(--color-fg-muted);
+		margin: var(--space-s) 0 0;
 	}
 	.ask-answer__label {
 		font-size: var(--font-size-s);

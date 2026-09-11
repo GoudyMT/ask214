@@ -24,7 +24,22 @@ export type ExtractiveAnswer = {
  * claim to be the answer, which is why this is a union rather than a pair of optional fields.
  */
 export type AnswerView =
-	| { kind: 'extractive'; answer: ExtractiveAnswer }
+	| {
+			kind: 'extractive';
+			answer: ExtractiveAnswer;
+			/**
+			 * Set when this answer is STANDING IN for a synthesis that did not reach the reader: `refused`
+			 * when the model answered and a safety gate rejected it (an ungrounded figure, an invalid
+			 * citation), `unavailable` when none could be produced. Absent when synthesis never ran, which
+			 * is every default user.
+			 *
+			 * The slot still holds exactly one answer - this is a note ON it, not a second block. It exists
+			 * because dropping the old refusal/unavailable states took their disclosure with them, leaving a
+			 * reader who enabled the summary and supplied a key unable to tell "it worked" from "the model
+			 * output was rejected". WHICH gate fired stays a safety-log detail; that one did is the reader's.
+			 */
+			synthesisNote?: 'refused' | 'unavailable';
+	  }
 	| { kind: 'synthesized'; answer: CitedAnswer }
 	| { kind: 'eligibility' }
 	| { kind: 'notCovered' };
@@ -191,7 +206,17 @@ export function chooseAnswer(input: {
 	}
 	// A chunk that selects to nothing renders no block at all, rather than an empty one above the cards.
 	if (input.extractive && input.extractive.text !== '') {
-		return { kind: 'extractive', answer: input.extractive };
+		const note =
+			input.synthesis?.kind === 'refusal'
+				? ('refused' as const)
+				: input.synthesis?.kind === 'unavailable'
+					? ('unavailable' as const)
+					: undefined;
+		return {
+			kind: 'extractive',
+			answer: input.extractive,
+			...(note !== undefined ? { synthesisNote: note } : {})
+		};
 	}
 	return undefined;
 }

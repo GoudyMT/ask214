@@ -79,18 +79,26 @@ describe('chooseAnswer', () => {
 	});
 
 	// This is what the one-slot decision bought: both of these used to render an apology over raw cards.
-	it('falls back to the extractive answer when synthesis refuses', () => {
+	// The fallback itself is unchanged; what is new is that it SAYS SO. A safety gate rejecting the model's
+	// answer is information the reader is entitled to - without it, someone who supplied a key and enabled
+	// the summary cannot tell "it worked" from "the output was rejected". WHICH gate fired stays a
+	// safety-log detail; that one did is not.
+	it('falls back to the extractive answer when synthesis refuses, and says so', () => {
 		expect(
 			chooseAnswer({ eligibilityIntent: false, synthesis: { kind: 'refusal' }, extractive })
-		).toEqual({ kind: 'extractive', answer: extractive });
+		).toEqual({ kind: 'extractive', answer: extractive, synthesisNote: 'refused' });
 	});
 
-	it('falls back to the extractive answer when synthesis is unavailable', () => {
+	// Distinct from a refusal: nothing was produced at all. The deleted AskSummary had separate copy for
+	// these two, and collapsing them would tell the reader something that is not true of their case.
+	it('falls back to the extractive answer when synthesis is unavailable, and says so', () => {
 		expect(
 			chooseAnswer({ eligibilityIntent: false, synthesis: { kind: 'unavailable' }, extractive })
-		).toEqual({ kind: 'extractive', answer: extractive });
+		).toEqual({ kind: 'extractive', answer: extractive, synthesisNote: 'unavailable' });
 	});
 
+	// The exact-match here now also proves the ABSENCE of a note: the default user never ran synthesis, so
+	// telling them one was rejected would be false.
 	it('uses the extractive answer when there is no synthesis at all (the device path)', () => {
 		expect(chooseAnswer({ eligibilityIntent: false, extractive })).toEqual({
 			kind: 'extractive',

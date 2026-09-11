@@ -1,4 +1,5 @@
 import { render } from 'vitest-browser-svelte';
+import { flushSync } from 'svelte';
 import { describe, it, expect } from 'vitest';
 import AskAnswer from './AskAnswer.svelte';
 import type { AnswerView } from '$lib/ask/answer/answer-view';
@@ -52,6 +53,60 @@ const conditionalSectionView: AnswerView = {
 };
 
 describe('AskAnswer', () => {
+	// (a) The revealed passage sits BEFORE its trigger in reading order, so a screen-reader user who
+	// presses "More detail" and continues forward reaches the source line and the note - never the text
+	// they asked for. Moving focus onto the revealed passage is what closes that.
+	it('extractive: expanding moves focus to the revealed passage', async () => {
+		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+		(container.querySelector('.ask-answer__more') as HTMLButtonElement).click();
+		flushSync();
+		await Promise.resolve();
+		const passage = container.querySelector('#ask-answer-passage');
+		expect(passage?.getAttribute('tabindex')).toBe('-1');
+		expect(document.activeElement).toBe(passage);
+	});
+
+	// (b) A synthesis rejected by a SAFETY gate (an ungrounded number, an invalid citation) is replaced by
+	// the extractive answer with no signal at all. A user who enabled the summary and supplied a key
+	// cannot tell "it worked" from "the model output was rejected". The deleted AskSummary disclosed both
+	// cases; the one-slot rewrite dropped the disclosure along with the states.
+	it('extractive: says so when a synthesis was produced and refused', () => {
+		const { container } = render(AskAnswer, {
+			props: { view: { ...extractiveView, synthesisNote: 'refused' } as AnswerView }
+		});
+		expect(container.querySelector('.ask-answer__note-synthesis')?.textContent).toMatch(
+			/accuracy checks/i
+		);
+	});
+
+	it('extractive: says so when a synthesis could not be produced', () => {
+		const { container } = render(AskAnswer, {
+			props: { view: { ...extractiveView, synthesisNote: 'unavailable' } as AnswerView }
+		});
+		expect(container.querySelector('.ask-answer__note-synthesis')?.textContent).toMatch(
+			/could not be produced/i
+		);
+	});
+
+	it('extractive: carries no synthesis note when synthesis never ran', () => {
+		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+		expect(container.querySelector('.ask-answer__note-synthesis')).toBeNull();
+	});
+
+	// (c) These point at the same class of destination as the card's own link - a government PDF up to
+	// 45 MB. The siblings open a new tab; this one replaced the app, discarding the answer and the session
+	// state in an offline-first PWA.
+	it('synthesized: citations open in a new tab, safely', () => {
+		const { container } = render(AskAnswer, { props: { view: synthesizedView } });
+		const links = [...container.querySelectorAll('.ask-answer__sources a')];
+		expect(links.length).toBeGreaterThan(0);
+		for (const a of links) {
+			expect(a.getAttribute('target')).toBe('_blank');
+			expect(a.getAttribute('rel')).toContain('noopener');
+			expect(a.getAttribute('rel')).toContain('noreferrer');
+		}
+	});
+
 	it('extractive: redisplays the section, which carries the governing condition', () => {
 		const { container } = render(AskAnswer, { props: { view: conditionalSectionView } });
 		expect(container.querySelector('.ask-answer__src')?.textContent).toContain(
@@ -159,7 +214,8 @@ describe('AskAnswer', () => {
 		const { container, getByRole } = render(AskAnswer, { props: { view: extractiveView } });
 		const button = container.querySelector('.ask-answer__more') as HTMLButtonElement;
 		expect(button.getAttribute('aria-expanded')).toBe('false');
-		expect(button.getAttribute('aria-controls')).toBe('ask-answer-passage');
+		// Both regions: this one button hides the short answer as well as revealing the passage.
+		expect(button.getAttribute('aria-controls')).toBe('ask-answer-short ask-answer-passage');
 		expect(container.querySelector('#ask-answer-passage')).not.toBeNull(); // in the DOM while collapsed
 		await getByRole('button', { name: /more detail/i }).click();
 		expect(
