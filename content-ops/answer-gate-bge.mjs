@@ -19,8 +19,9 @@ import { decodeCorpus } from '../src/lib/corpus/index.ts';
 import { measureAnswers } from '../src/lib/ask/eval/measure-answer.ts';
 import { runOracle, scanJunk, report } from './answer-gate-core.mjs';
 
-// Config-as-invariant (ADR-025): these MUST match workers/retrieve/src/index.ts, which is what serves
-// production. bge is asymmetric - the QUERY carries the instruction prefix, the indexed passages do not.
+// These MUST match workers/retrieve/src/index.ts, which is what serves production - a gate measuring
+// different constants than the thing it guards measures nothing. bge is asymmetric: the QUERY carries the
+// instruction prefix, the indexed passages do not.
 const MODEL_ID = '@cf/baai/bge-small-en-v1.5';
 const QUERY_PREFIX = 'Represent this sentence for searching relevant passages: ';
 const MIN_SCORE = 0.6;
