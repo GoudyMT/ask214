@@ -1,21 +1,29 @@
 import { splitSentences } from '$lib/content-ops/chunk/sentences';
 
-// Measured END TO END through real retrieval on the DEFAULT online path (`pnpm answer-gate:bge`), over the
-// 135 answerable benchmark queries: the answer lands inside the selected text 51.1% of the time, against
-// 54.1% for the 120-word result card, and 63.7% once the reader taps through to the whole passage. The
-// constants below cap the output at 67 words.
+// Measured END TO END through real retrieval over the 135 answerable benchmark queries, 2026-09-11.
+// Regenerate with `pnpm answer-gate:bge` (online) or `pnpm answer-gate` (device) - these move whenever the
+// corpus, the benchmark or the pipeline does, so treat them as a dated reading, not a constant:
 //
-// Two things this selector is NOT. It is not why the score is 51%: the answer sits in SOME retrieved card
-// 87.4% of the time, and choosing the best of those cards by hand reaches only 77%, so the loss is in card
-// choice and ranking - where four independent methods each moved it by nothing. And the word-picking itself
-// is worth roughly zero: against simply taking the first N words of the same passage at the same budget it
-// measured 0.0pp on device and +1.5pp online. Its real value is that the output ends on a sentence boundary.
+//                          online   device
+//     this selected text    50.4%    42.2%
+//     the 120-word card     51.1%    39.3%
+//     after tapping More    62.2%    50.4%
+//
+// The constants below cap the output at 67 words.
+//
+// Two things this selector is NOT. It is not why the score sits near half: the answer is in SOME retrieved
+// card 85.2% of the time online, and choosing the best of those by hand reaches 74.1%, so the loss is in
+// card choice and ranking - where four independent methods each moved it by nothing. And the word-picking
+// itself is worth roughly zero: against simply taking the first N words of the same passage at the same
+// budget it measured 0.0pp on device and +1.5pp online. Its real value is that the output ends on a
+// sentence boundary.
 //
 // Scoring these runs by embedding cosine to the query, instead of by term overlap, has been measured and is
-// dead: 51.9% against 51.1%, winning 9 queries and losing 8, McNemar p=1.0. Cosine scores TOPICALITY, so a
-// short on-topic stub ("Learn more about how the Rudisill decision affects you") outranks the longer
-// sentence that answers. Term overlap resists that by accident, because an answering sentence carries more
-// of the question's specific nouns than a stub does. Do not re-try it.
+// dead: it won 9 queries and lost 8 for +0.7pp, McNemar p=1.0. (That run predates the benchmark correction
+// that produced the table above; the margin was indistinguishable from a coin flip either way.) Cosine
+// scores TOPICALITY, so a short on-topic stub ("Learn more about how the Rudisill decision affects you")
+// outranks the longer sentence that answers. Term overlap resists that by accident, because an answering
+// sentence carries more of the question's specific nouns than a stub does. Do not re-try it.
 const TARGET_WORDS = 45;
 // A sentence may cross the target up to this multiple. Extraction leaves long lists with no terminator, so
 // they read as one huge sentence; without the ceiling the packer stops on the short lead-in immediately

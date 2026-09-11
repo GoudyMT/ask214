@@ -176,7 +176,7 @@ export function report(input) {
 	// Why not tier 1 against the full card: that surface has no second tier, so a ~56-word extract loses to a
 	// 120-word block on "contains the answer somewhere" almost by construction. Measured: coverage rises
 	// smoothly with length, ~0.2pp per word, with no knee. The bar moved to the two-tier EXPERIENCE once the
-	// feature was ahead on its own terms (63.7% vs 54.1% online); it was deliberately NOT moved while the
+	// feature was ahead on its own terms (62.2% vs 51.1% online); it was deliberately NOT moved while the
 	// feature was behind, which would have been moving the goalposts. Tier 1 alone stays reported above.
 	//
 	// The second bar exists so tier 1 cannot quietly rot while tier 2 carries the gate: it holds length fixed

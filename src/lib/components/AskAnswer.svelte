@@ -17,10 +17,12 @@
 
 {#if view.kind === 'extractive'}
 	<section class="ask-answer" aria-label="What the source says">
-		<!-- Not "In short". Measured end to end, this passage contains the answer to the question asked
-		     28.9% of the time - better than the 25.9% of the card it replaces, and nowhere near enough to
-		     assert it AS the answer. The label says what the block actually is: the document's own words,
-		     chosen for relevance. -->
+		<!-- Not "In short". Measured end to end on a corrected benchmark, this passage contains the answer
+		     to the question asked 50.4% of the time online and 42.2% on device - nowhere near enough to
+		     assert it AS the answer, which is why the label describes the block instead of claiming it.
+		     It says what this actually is: the document's own words, chosen for relevance.
+		     Note it does NOT beat the card it replaces online (51.1%); it does on device (39.3%). What
+		     wins on both paths is the two tiers together, once the reader taps through. -->
 		<p class="ask-answer__label">What the source says</p>
 		<!-- The document's own words, interpolated as plain text. No model wrote this, so there is no
 		     fabricated-link risk to defend against here - but a URL or phone number printed in the source

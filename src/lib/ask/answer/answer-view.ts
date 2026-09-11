@@ -92,9 +92,9 @@ function headArea(card: ResultCard): string {
  * Build the extractive answer from the retrieved set.
  *
  * It reads EVERY retrieved card, not just the first. Retrieval is not the weak link: measured end to end on
- * the online path, the answer sits in SOME retrieved card 87.4% of the time. Choice is. The rendered answer
- * carries it 51.1% of the time, and would carry it 77.0% if the right card were always picked - so roughly
- * 26 points sit inside cards retrieval has already returned.
+ * the online path (2026-09-11, `pnpm answer-gate:bge`), the answer sits in SOME retrieved card 85.2% of the
+ * time. Choice is. The rendered answer carries it 50.4%, and would carry it 74.1% if the right card were
+ * always picked - so roughly 24 points sit inside cards retrieval has already returned.
  *
  * Three signals decide, all multiplied by retrieval's own score so ranking still counts. Term coverage over
  * the whole chunk is the base. A match in the HEADING or opening line counts extra, because coverage alone

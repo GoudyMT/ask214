@@ -156,8 +156,8 @@ describe('toExtractiveAnswer', () => {
 		expect(toExtractiveAnswer([], 'anything')).toBeUndefined();
 	});
 
-	// The answer is chosen across the retrieved SET, not from card 1: end to end the answer sits in card 1
-	// only 27.4% of the time but in SOME retrieved card 59.3% of the time.
+	// The answer is chosen across the retrieved SET, not from card 1: end to end the answer sits in SOME
+	// retrieved card 85.2% of the time online, far more often than in card 1 alone.
 	it('takes the answer from a later card when that card covers the question better', async () => {
 		const weak = await card({
 			chunkId: 'other_source:0123456789ab',
