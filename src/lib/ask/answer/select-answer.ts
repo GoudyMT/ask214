@@ -1,13 +1,21 @@
 import { splitSentences } from '$lib/content-ops/chunk/sentences';
 
-// Measured against this project's own benchmark, END TO END through real retrieval (`pnpm answer-gate`):
-// the answer lands inside the selected text for 28.9% of the 135 answerable queries, against 25.9% for the
-// 120-word result card this replaces, at a median of 52 words and a hard maximum of 67.
+// Measured END TO END through real retrieval on the DEFAULT online path (`pnpm answer-gate:bge`), over the
+// 135 answerable benchmark queries: the answer lands inside the selected text 51.1% of the time, against
+// 54.1% for the 120-word result card, and 63.7% once the reader taps through to the whole passage. The
+// constants below cap the output at 67 words.
 //
-// Read that 28.9% honestly. An earlier version of the gate paired each query to the chunk that CONTAINS
-// its answer and reported 86.7%; that is selection quality given perfect retrieval, not the feature's
-// score, and quoting it here was wrong. The ceiling is what retrieval can reach - the answer is in SOME
-// retrieved card 59.3% of the time - so the remaining gap is a retrieval problem, not a selection one.
+// Two things this selector is NOT. It is not why the score is 51%: the answer sits in SOME retrieved card
+// 87.4% of the time, and choosing the best of those cards by hand reaches only 77%, so the loss is in card
+// choice and ranking - where four independent methods each moved it by nothing. And the word-picking itself
+// is worth roughly zero: against simply taking the first N words of the same passage at the same budget it
+// measured 0.0pp on device and +1.5pp online. Its real value is that the output ends on a sentence boundary.
+//
+// Scoring these runs by embedding cosine to the query, instead of by term overlap, has been measured and is
+// dead: 51.9% against 51.1%, winning 9 queries and losing 8, McNemar p=1.0. Cosine scores TOPICALITY, so a
+// short on-topic stub ("Learn more about how the Rudisill decision affects you") outranks the longer
+// sentence that answers. Term overlap resists that by accident, because an answering sentence carries more
+// of the question's specific nouns than a stub does. Do not re-try it.
 const TARGET_WORDS = 45;
 // A sentence may cross the target up to this multiple. Extraction leaves long lists with no terminator, so
 // they read as one huge sentence; without the ceiling the packer stops on the short lead-in immediately
@@ -53,26 +61,49 @@ function contentTerms(query: string): Set<string> {
  *
  * Only oversized units are touched; a real sentence containing " - " is left whole.
  */
-function subdivideLists(sentences: string[], limit: number): string[] {
-	const out: string[] = [];
+/**
+ * One packable unit: a whole sentence, or one piece of a flattened list that was split for size.
+ *
+ * `continuesList` records that a list separator stood between this piece and the one before it, so a run
+ * spanning both can put it back. Rejoining with a plain space fused two independent bullets into one
+ * continuous statement - a "you may use this for X" item welded to a "you may not use it for Y" item reads
+ * as a sentence the document never wrote.
+ */
+type Unit = { text: string; continuesList: boolean };
+
+function subdivideLists(sentences: string[], limit: number): Unit[] {
+	const out: Unit[] = [];
 	for (const sentence of sentences) {
 		if (wordCount(sentence) <= limit || !sentence.includes(' - ')) {
-			out.push(sentence);
+			out.push({ text: sentence, continuesList: false });
 			continue;
 		}
 		let buffer = '';
+		// The first piece of a split sentence follows whatever preceded the sentence, not a list separator;
+		// every piece after it does.
+		let firstPiece = true;
 		for (const part of sentence.split(' - ')) {
 			const merged = buffer === '' ? part : `${buffer} - ${part}`;
 			if (buffer !== '' && wordCount(merged) > limit) {
-				out.push(buffer);
+				out.push({ text: buffer, continuesList: !firstPiece });
+				firstPiece = false;
 				buffer = part;
 			} else {
 				buffer = merged;
 			}
 		}
-		if (buffer !== '') out.push(buffer);
+		if (buffer !== '') out.push({ text: buffer, continuesList: !firstPiece });
 	}
 	return out;
+}
+
+/** Reassemble a run, restoring the separator between pieces that a list split apart. */
+function joinUnits(units: Unit[]): string {
+	return units.reduce(
+		(acc, unit, i) =>
+			i === 0 ? unit.text : `${acc}${unit.continuesList ? ' - ' : ' '}${unit.text}`,
+		''
+	);
 }
 
 /**
@@ -87,25 +118,29 @@ function subdivideLists(sentences: string[], limit: number): string[] {
  * is deliberately the single exception, and `subdivideLists` above keeps it rare - it is reached only for
  * an oversized run with no separators to break on.
  */
-function packRun(sentences: string[], from: number, limit: number): string[] {
-	const run: string[] = [];
+function packRun(units: Unit[], from: number, limit: number): Unit[] {
+	const run: Unit[] = [];
 	let count = 0;
-	for (let i = from; i < sentences.length; i++) {
-		const sentence = sentences[i]!;
-		const n = wordCount(sentence);
+	for (let i = from; i < units.length; i++) {
+		const unit = units[i]!;
+		const n = wordCount(unit.text);
 		if (run.length > 0 && count + n > limit) break;
 		if (run.length === 0 && n > limit) {
 			// An unmarked cut reads as the document's complete statement - the same rule the result card
 			// states and enforces with its own ellipsis.
 			return [
-				sentence
-					.split(/\s+/)
-					.slice(0, limit)
-					.join(' ')
-					.replace(/(?: -)+$/, '') + '...'
+				{
+					text:
+						unit.text
+							.split(/\s+/)
+							.slice(0, limit)
+							.join(' ')
+							.replace(/(?: -)+$/, '') + '...',
+					continuesList: unit.continuesList
+				}
 			];
 		}
-		run.push(sentence);
+		run.push(unit);
 		count += n;
 		if (count >= TARGET_WORDS) break;
 	}
@@ -127,20 +162,20 @@ function packRun(sentences: string[], from: number, limit: number): string[] {
  */
 export function selectAnswer(body: string, query: string): string {
 	const ceiling = TARGET_WORDS * CEILING_MULTIPLIER;
-	const sentences = subdivideLists(
+	const units = subdivideLists(
 		splitSentences(body)
 			.map(({ start, end }) => body.slice(start, end).trim())
 			.filter((s) => s.length > 0),
 		ceiling
 	);
-	if (sentences.length === 0) return '';
+	if (units.length === 0) return '';
 
 	const terms = contentTerms(query);
 	let from = 0;
 	if (terms.size > 0) {
 		let bestScore = -1;
-		for (let i = 0; i < sentences.length; i++) {
-			const candidate = normalize(packRun(sentences, i, TARGET_WORDS).join(' '));
+		for (let i = 0; i < units.length; i++) {
+			const candidate = normalize(joinUnits(packRun(units, i, TARGET_WORDS)));
 			let score = 0;
 			for (const term of terms) if (candidate.includes(term)) score++;
 			if (score > bestScore) {
@@ -149,5 +184,10 @@ export function selectAnswer(body: string, query: string): string {
 			}
 		}
 	}
-	return packRun(sentences, from, ceiling).join(' ');
+	const text = joinUnits(packRun(units, from, ceiling));
+	// A LEADING cut, marked the way the trailing one already is. Everything before `from` is text the
+	// document has and the reader does not, and in a benefits document that is usually the condition or the
+	// negation governing what follows - so an unmarked start can turn "you are NOT eligible if X" into a
+	// flat statement that X applies to the reader. Attached with no space, matching the trailing form.
+	return from > 0 ? `...${text}` : text;
 }
