@@ -30,4 +30,16 @@ describe('documentUrl', () => {
 	it('returns undefined for an unknown source id', () => {
 		expect(documentUrl('not_a_source')).toBeUndefined();
 	});
+
+	// A bare index reaches Object.prototype, so these returned a stringified function rather than
+	// undefined - and because that is a non-empty string, every caller's `?? card.url` https fallback was
+	// skipped and the value became a citation href. The online path narrows `sourceId` only with
+	// `typeof === 'string'`, and the registry's own id pattern /^[a-z0-9_]+$/ MATCHES both of these.
+	it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf'])(
+		'returns undefined for the inherited Object key %s',
+		(key) => {
+			expect(documentUrl(key)).toBeUndefined();
+			expect(documentUrl(key, 3)).toBeUndefined();
+		}
+	);
 });

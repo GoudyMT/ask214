@@ -138,6 +138,37 @@ describe('validateSourcesSchema', () => {
 		});
 	});
 
+	// https alone is not the boundary. The project ships public US-Government work only, and a document_url
+	// becomes a citation href on a surface whose audience is actively targeted by benefits scams - so a
+	// lookalike that merely puts ".mil" in a LABEL must not pass. The app's other curated outbound set
+	// already enforces a host rule in a test (resources.test.ts ALLOWED_HOSTS); this had scheme only.
+	it.each([
+		'https://tapevents.mil.evil.example/x.pdf',
+		'https://www.tapevents.mil.co/x.pdf',
+		'https://notva.gov.example.com/x.pdf',
+		'https://example.com/x.pdf'
+	])('flags a document_url that is not on a .gov or .mil host: %s', (document_url) => {
+		const r = validateSourcesSchema([
+			{ ...ok, source_id: 'va_disability_file', content_type: 'pdf', document_url }
+		]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_URL',
+			sourceId: 'va_disability_file',
+			field: 'document_url'
+		});
+	});
+
+	it.each([
+		'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf',
+		'https://www.va.gov/files/thing.pdf',
+		'https://skillbridge.osd.mil/x.pdf'
+	])('accepts a document_url on a genuine government host: %s', (document_url) => {
+		const r = validateSourcesSchema([
+			{ ...ok, source_id: 'va_disability_file', content_type: 'pdf', document_url }
+		]);
+		expect(r.errors.filter((e) => e.field === 'document_url')).toEqual([]);
+	});
+
 	// An HTML source's `url` IS its document. A second document link would leave it ambiguous which one a
 	// citation should open. Mirrors the served rule above: a field that means nothing here is an error, not
 	// something to ignore.

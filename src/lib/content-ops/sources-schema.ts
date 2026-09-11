@@ -76,6 +76,25 @@ function isValidIsoDate(s: string): boolean {
 	return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
+/**
+ * Whether a url points at a genuine US-Government host.
+ *
+ * `https://` alone is not the boundary this project actually has: it ships public US-Government work only
+ * (17 USC 105), and these urls become citation hrefs on a surface whose audience is targeted by benefits
+ * scams. A scheme check passes `https://tapevents.mil.evil.example/x.pdf` - the ".mil" is a label, not the
+ * host. Parsing and testing the HOSTNAME is what closes that, and `.gov` / `.mil` are restricted TLDs no
+ * lookalike can register. Mirrors the ALLOWED_HOSTS rule the app's other curated outbound set enforces.
+ */
+function isGovernmentHost(url: string): boolean {
+	let host: string;
+	try {
+		host = new URL(url).hostname.toLowerCase();
+	} catch {
+		return false;
+	}
+	return host === 'gov' || host === 'mil' || host.endsWith('.gov') || host.endsWith('.mil');
+}
+
 export function validateSourcesSchema(entries: unknown[]): ValidationResult {
 	if (!Array.isArray(entries)) return { valid: false, errors: [{ code: 'E_SOURCES_NOT_ARRAY' }] };
 
@@ -102,7 +121,10 @@ export function validateSourcesSchema(entries: unknown[]): ValidationResult {
 				errors.push({ code: 'E_SOURCES_DUP_ID', sourceId: sid, field: 'source_id' });
 			seen.add(sid);
 		}
-		if (typeof e.url === 'string' && !e.url.startsWith('https://'))
+		// Same gate as document_url below, because this is the same class: an outbound url the app turns
+		// into a citation href. All five hosts in the shipped registry are already .gov or .mil, so this
+		// tightens the rule without narrowing what the registry legitimately holds.
+		if (typeof e.url === 'string' && (!e.url.startsWith('https://') || !isGovernmentHost(e.url)))
 			errors.push({ code: 'E_SOURCES_BAD_URL', sourceId: sid, field: 'url' });
 		if (typeof e.legal_tier === 'string' && !TIERS.has(e.legal_tier))
 			errors.push({ code: 'E_SOURCES_BAD_TIER', sourceId: sid, field: 'legal_tier' });
@@ -160,7 +182,7 @@ export function validateSourcesSchema(entries: unknown[]): ValidationResult {
 					sourceId: sid,
 					field: 'document_url'
 				});
-			else if (!e.document_url.startsWith('https://'))
+			else if (!e.document_url.startsWith('https://') || !isGovernmentHost(e.document_url))
 				errors.push({ code: 'E_SOURCES_BAD_URL', sourceId: sid, field: 'document_url' });
 		} else if (e.content_type === 'html' && e.document_url !== undefined) {
 			errors.push({ code: 'E_SOURCES_HTML_DOCUMENT_URL', sourceId: sid, field: 'document_url' });
