@@ -7,6 +7,7 @@ import { ASK_ERROR } from '$lib/ask/errors';
 import type { ResultCard } from '$lib/corpus';
 import type { Source } from '$lib/ask/sources';
 import type { AnswerView } from '$lib/ask/answer/answer-view';
+import { OFFICIAL_FALLBACK } from '$lib/ask/crisis/contacts';
 
 type ViewProps = {
 	askState: AskState;
@@ -163,6 +164,25 @@ describe('AskView', () => {
 				props: props({ kind: 'error', code: ASK_ERROR.EMBED })
 			}).container.textContent?.toLowerCase()
 		).toContain("couldn't run");
+	});
+
+	it('empty: keeps the rephrase hint, hedges coverage, and gives a way out of the app', () => {
+		const { container } = render(AskView, { props: props({ kind: 'empty' }) });
+		const text = container.textContent ?? '';
+		expect(text).toContain('No close match');
+		expect(text).toMatch(/rephras/i);
+		// This state means nothing scored above the cutoff, which is NOT evidence the documents lack the
+		// answer - a differently-worded question often reaches it. So the coverage claim stays hedged, and
+		// the state must never assert what `notCovered` asserts.
+		expect(text).toContain('may not cover it');
+		// The number comes from the one verified copy, never a literal: it had already drifted into four
+		// places once, and a benefits hotline that is wrong in one of them is the worst failure this
+		// audience can be handed.
+		expect(text).toContain(OFFICIAL_FALLBACK.phone);
+		const link = container.querySelector('a[href="https://www.va.gov/"]');
+		expect(link).not.toBeNull();
+		// Reverse-tabnabbing: every outbound link in this app carries it.
+		expect(link?.getAttribute('rel')).toBe('external noopener');
 	});
 
 	it('results: renders the lead card; extra hits collapse behind a "similar sources" toggle', () => {

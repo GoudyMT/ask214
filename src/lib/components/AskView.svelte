@@ -6,6 +6,7 @@
 	import QuestionFeed from './QuestionFeed.svelte';
 	import CrisisCard from './CrisisCard.svelte';
 	import AskAnswer from './AskAnswer.svelte';
+	import { OFFICIAL_FALLBACK } from '$lib/ask/crisis/contacts';
 
 	let {
 		askState,
@@ -300,7 +301,17 @@
 	{:else if askState.kind === 'empty'}
 		<div class="ask-msg">
 			<p class="ask-msg__title">No close match</p>
-			<p class="ask-msg__body">Try rephrasing your question, or ask about something else.</p>
+			<!-- Hedged deliberately. This state fires when nothing scored above the retrieval cutoff, which is
+			     not evidence that the documents lack the answer - the same question worded differently often
+			     reaches it. Stating "not covered" here would assert as fact something the cutoff cannot
+			     establish; that claim belongs to the notCovered state, where a model actually made it. The
+			     way out matters because this is the state the default user reaches, and telling someone to
+			     try again with nowhere else to go is a dead end. -->
+			<p class="ask-msg__body">
+				Try rephrasing your question. If it still isn't here, these documents may not cover it -
+				<a href="https://www.va.gov/" rel="external noopener">search va.gov</a> or call the VA
+				benefits hotline at {OFFICIAL_FALLBACK.phone}.
+			</p>
 		</div>
 	{:else if askState.kind === 'offline'}
 		<div class="ask-msg ask-msg--accent">
