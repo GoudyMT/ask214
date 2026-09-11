@@ -90,11 +90,11 @@ export function scanJunk(corpus) {
  * it replaces, measured over the same queries on the same path. A bar carried in a constant drifts from
  * the thing it is supposed to be comparing against; one measured alongside cannot.
  *
- * @param {{ label: string; metrics: AnswerMetrics; leadCardWords: number; oracle: { hit: number; pairs: number }; dirty: { id: string; label: string; sample: string }[]; corpusSize: number }} input
+ * @param {{ label: string; metrics: AnswerMetrics; leadCardWords: number; floors: { answered: number; expanded: number; inTopK: number; rendered: number }; oracle: { hit: number; pairs: number }; dirty: { id: string; label: string; sample: string }[]; corpusSize: number }} input
  * @returns {string[]} Failure reasons; empty means the gate passed.
  */
 export function report(input) {
-	const { label, metrics: m, leadCardWords, oracle, dirty, corpusSize } = input;
+	const { label, metrics: m, leadCardWords, floors, oracle, dirty, corpusSize } = input;
 	const n = m.n;
 
 	console.log(`\n[2/4] ORACLE (diagnostic): selection given the answer-bearing chunk...`);
@@ -103,10 +103,17 @@ export function report(input) {
 	);
 
 	console.log(`\n[3/4] SHIPPED (${label}): embed -> search -> cards[0] -> the rendered answer...`);
-	console.log(`    the rendered short answer contains it   ${pct(m.answered, n)}   <- THE GATE`);
-	console.log(`    after tapping More detail               ${pct(m.expanded, n)}`);
+	// Labels name what each number is actually WIRED to. They used to read "<- THE GATE" on tier 1 and
+	// "<- the floor it must beat" on the card, and neither was true: tier 1 feeds a direction-only guard,
+	// and the card is compared against the two-tier experience, not against tier 1.
 	console.log(
-		`    the ${leadCardWords}-word lead card contained it     ${pct(m.baseline, n)}   <- the floor it must beat`
+		`    the rendered short answer contains it   ${pct(m.answered, n)}   <- floor + the tier-1 guard`
+	);
+	console.log(
+		`    after tapping More detail               ${pct(m.expanded, n)}   <- THE BAR, against the card below`
+	);
+	console.log(
+		`    the ${leadCardWords}-word lead card contained it     ${pct(m.baseline, n)}   <- what the two-tier answer must beat`
 	);
 	console.log(`    reachable ceiling (in SOME card)        ${pct(m.inTopK, n)}`);
 	console.log(`    right answer buried under a wrong one   ${pct(m.buriedWrong, n)}`);
@@ -145,11 +152,15 @@ export function report(input) {
 	const lengths = [...m.lengths].sort((a, b) => a - b);
 	const at = (/** @type {number} */ f) => lengths[Math.floor(lengths.length * f)] ?? 0;
 	const overCard = lengths.filter((w) => w > leadCardWords).length;
+	// Disclosed because every rate above is over `n` while these length stats are over the answers that
+	// actually RENDERED. A run where most queries produce nothing still posts rates against 135, and
+	// nothing on screen said the two denominators differed.
+	console.log(`    answers rendered: ${lengths.length} of ${n}`);
 	console.log(
 		`    length: median ${at(0.5)}  p90 ${at(0.9)}  max ${lengths[lengths.length - 1] ?? 0}`
 	);
 	console.log(
-		`    longer than the card it replaces: ${overCard} (${pct(overCard, lengths.length)})`
+		`    longer than the card it replaces: ${overCard} (${pct(overCard, lengths.length)} of rendered)`
 	);
 
 	console.log(`\n[4/4] Scanning selected answers over the whole corpus...`);
@@ -193,6 +204,35 @@ export function report(input) {
 			failures.push(
 				`${bar.label} wins only ${bar.d.aOnly} of the ${bar.d.aOnly + bar.d.bOnly} disagreements ` +
 					`(p=${v.p.toFixed(4)}); at n=${n} that is not distinguishable from chance`
+			);
+		}
+	}
+	// ABSOLUTE FLOORS, fail-closed. The paired bars above ask only whether the feature beats the surface it
+	// replaced, and they DISCARD every query the two surfaces agree on - so a regression that hurts both
+	// equally moves no bar at all. Probed with a collapsed run, this gate printed GATE PASSED at 0.7%
+	// answered on the strength of seven discordant queries out of 135.
+	//
+	// The caller supplies them because the two delivery paths score differently - a different model, a
+	// different cutoff - so one set of numbers baked in here would be wrong for whichever path did not
+	// produce it.
+	//
+	// These are REGRESSION floors, not a quality bar. Each is the rate measured on its own path, less
+	// roughly two queries of slack at the benchmark's current size. They are deliberately NOT the spec's
+	// locked 85% / 91%, which this feature does not meet - closing that gap is a product decision, not
+	// something a script gets to quietly redefine. Raise a floor when the feature genuinely improves;
+	// never lower one to make a run pass. Same rule the retrieval eval states: climb the escalation
+	// ladder, never lower the gate.
+	/** @type {{ what: string; value: number; floor: number }[]} */
+	const floorChecks = [
+		{ what: 'the short answer', value: m.answered, floor: floors.answered },
+		{ what: 'the two-tier answer', value: m.expanded, floor: floors.expanded },
+		{ what: 'retrieval reachability', value: m.inTopK, floor: floors.inTopK },
+		{ what: 'answers rendered', value: lengths.length, floor: floors.rendered }
+	];
+	for (const { what, value, floor } of floorChecks) {
+		if (value / n < floor) {
+			failures.push(
+				`${what} is ${pct(value, n)}, below the ${(floor * 100).toFixed(1)}% regression floor`
 			);
 		}
 	}

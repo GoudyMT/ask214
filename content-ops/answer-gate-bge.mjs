@@ -28,6 +28,17 @@ const MIN_SCORE = 0.6;
 const K = 5;
 const LEAD_CARD_WORDS = 120;
 
+// Absolute regression floors for THIS path, applied by report(). Each is the rate measured here through
+// real Workers AI serving on 2026-09-11, less roughly two queries of slack at n=135. They are a
+// regression guard, NOT a quality bar - the spec's locked 85%/91% is not met and closing that gap is a
+// product decision. Raise one when the feature improves; never lower one to make a run pass.
+const FLOORS = {
+	answered: 0.48, // measured 50.4%
+	expanded: 0.6, // measured 62.2%
+	inTopK: 0.83, // measured 85.2%
+	rendered: 0.95 // calibrated against a real run below
+};
+
 const INDEX_DIR = 'content-ops/server-index';
 const DEVICE_CORPUS_JSON = 'static/corpus/corpus-v1.0.1.json';
 const QUERIES_PATH = 'src/lib/ask/eval/queries.json';
@@ -111,6 +122,7 @@ async function main() {
 		label: 'online',
 		metrics,
 		leadCardWords: LEAD_CARD_WORDS,
+		floors: FLOORS,
 		oracle: runOracle(corpus, scoreable),
 		dirty: scanJunk(corpus),
 		corpusSize: corpus.chunks.length

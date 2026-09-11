@@ -10,7 +10,7 @@
 // the oracle, the junk scan and the bar are shared via answer-gate-core.mjs. Nothing about the comparison
 // lives in this file, so the two gates cannot judge the same feature by different rules.
 import { readFileSync } from 'node:fs';
-import { pipeline } from '@huggingface/transformers';
+import { pipeline, env } from '@huggingface/transformers';
 import { decodeCorpus } from '../src/lib/corpus/index.ts';
 import { measureAnswers } from '../src/lib/ask/eval/measure-answer.ts';
 import { runOracle, scanJunk, report } from './answer-gate-core.mjs';
@@ -22,6 +22,23 @@ const MIN_SCORE = 0.4;
 const K = 5;
 // The lead card's word cap (AskResultCard.svelte) - the surface the short answer replaces.
 const LEAD_CARD_WORDS = 120;
+
+// The SAME vendored weights the browser serves, not a hub download. embed-worker.ts pins the shipped path
+// with allowRemoteModels=false against static/models/, and a model-integrity test pins those bytes by
+// SHA-256 - so a gate resolving its own copy from the network measures a model no user runs, and would
+// not notice a swap the integrity test exists to catch. It is also what makes this script's "no network"
+// claim true, and therefore what makes it runnable in CI.
+const LOCAL_MODEL_PATH = 'static/models/';
+
+// Absolute regression floors for THIS path, applied by report(). The on-device path uses a different model
+// and a different cutoff than the online one, so it carries its own numbers. Regression guard, not a
+// quality bar. Raise one when the feature improves; never lower one to make a run pass.
+const FLOORS = {
+	answered: 0.4, // measured 42.2%
+	expanded: 0.48, // measured 50.4%
+	inTopK: 0.71, // measured 73.3%
+	rendered: 0.95 // measured 135 of 135
+};
 
 const CORPUS_JSON = 'static/corpus/corpus-v1.0.1.json';
 const CORPUS_BIN = 'static/corpus/corpus-v1.0.1.embeddings.bin';
@@ -44,6 +61,9 @@ async function main() {
 		`\n[1/4] Corpus ${corpus.chunks.length} chunks; scoreable queries ${scoreable.length}`
 	);
 
+	env.allowLocalModels = true;
+	env.allowRemoteModels = false;
+	env.localModelPath = LOCAL_MODEL_PATH;
 	const extractor = await pipeline('feature-extraction', MODEL_REPO, { dtype: 'q8' });
 	/** @param {string} text */
 	const embed = async (text) => {
@@ -64,6 +84,7 @@ async function main() {
 		label: 'on-device',
 		metrics,
 		leadCardWords: LEAD_CARD_WORDS,
+		floors: FLOORS,
 		oracle: runOracle(corpus, scoreable),
 		dirty: scanJunk(corpus),
 		corpusSize: corpus.chunks.length
