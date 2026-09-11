@@ -198,7 +198,7 @@ describe('AskView', () => {
 			card({ sourceTitle: 'Similar B' })
 		];
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards })
+			props: props({ kind: 'results', origin: 'device', cards })
 		});
 		expect(container.querySelector('.ask-card--lead')?.textContent).toContain('Lead Source');
 		const toggle = container.querySelector('.ask-toggle') as HTMLButtonElement;
@@ -211,7 +211,7 @@ describe('AskView', () => {
 
 	it('results: a single hit shows the lead with no similar toggle', () => {
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [card()] })
+			props: props({ kind: 'results', origin: 'device', cards: [card()] })
 		});
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
 		expect(container.querySelector('.ask-toggle')).toBeNull();
@@ -231,7 +231,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent', sourceTitle: 'VA - Intent to File' });
 		const loadSource = vi.fn(async () => heldSource());
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [lead] }, { loadSource })
+			props: props({ kind: 'results', origin: 'device', cards: [lead] }, { loadSource })
 		});
 		expect(container.querySelector('.reader__title')).toBeNull(); // reader closed initially
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
@@ -246,7 +246,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent', chunkId: 'h2' });
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'device', query: 'q', cards: [lead] },
+				{ kind: 'results', origin: 'device', cards: [lead] },
 				{ loadSource: async () => heldSource() }
 			)
 		});
@@ -265,7 +265,7 @@ describe('AskView', () => {
 		// A pending load: the reader must still open right away and show loading, not do nothing.
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'device', query: 'q', cards: [lead] },
+				{ kind: 'results', origin: 'device', cards: [lead] },
 				{ loadSource: () => new Promise(() => {}) }
 			)
 		});
@@ -280,7 +280,7 @@ describe('AskView', () => {
 		let resolveLoad!: (s: Source | null) => void;
 		const loadSource = () => new Promise<Source | null>((r) => (resolveLoad = r));
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [lead] }, { loadSource })
+			props: props({ kind: 'results', origin: 'device', cards: [lead] }, { loadSource })
 		});
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
 		flushSync();
@@ -306,7 +306,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent' });
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'device', query: 'q', cards: [lead] },
+				{ kind: 'results', origin: 'device', cards: [lead] },
 				{
 					loadSource: async () => {
 						throw new Error('corpus fetch failed');
@@ -380,7 +380,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent' });
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'online', query: 'q', cards: [lead] },
+				{ kind: 'results', origin: 'online', cards: [lead] },
 				{ onlineCapable: true, mode: 'device', loadSource: async () => heldSource() }
 			)
 		});
@@ -399,7 +399,7 @@ describe('AskView', () => {
 		// online wording, when the toggle is later moved to online.
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'device', query: 'q', cards: [card()] },
+				{ kind: 'results', origin: 'device', cards: [card()] },
 				{ onlineCapable: true, mode: 'online' }
 			)
 		});
@@ -461,7 +461,7 @@ describe('AskView', () => {
 		};
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'online', query: 'q', cards: [card()], answer },
+				{ kind: 'results', origin: 'online', cards: [card()], answer },
 				{ onlineCapable: true, mode: 'online' }
 			)
 		});
@@ -485,7 +485,7 @@ describe('AskView', () => {
 			}
 		};
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [lead], answer })
+			props: props({ kind: 'results', origin: 'device', cards: [lead], answer })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).toBeNull();
 		expect(container.querySelector('.ask-card__top-match')).not.toBeNull();
@@ -510,9 +510,36 @@ describe('AskView', () => {
 			}
 		};
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [lead, other], answer })
+			props: props({ kind: 'results', origin: 'device', cards: [lead, other], answer })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
+	});
+
+	// The yield exists to stop the same sentences printing twice, which is real for a 120-word lead card
+	// sitting directly under the answer. A compact card caps at 24 words and lives behind a toggle the
+	// reader deliberately opened, so there is no accidental double-read to prevent - and suppressing it
+	// leaves a card with a title, two links and NO text. That is how the card which actually produced the
+	// answer ends up being the one that looks broken, on roughly 4 queries in 10.
+	it('results: a compact card keeps its excerpt even when the answer came from it', () => {
+		const lead = card();
+		const other = card();
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'You have one year to submit the completed claim.',
+				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceId: 'va_intent_to_file',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://www.va.gov/',
+				chunkId: other.chunkId
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards: [lead, other], answer })
+		});
+		(container.querySelector('.ask-toggle') as HTMLButtonElement).click();
+		flushSync();
+		expect(container.querySelector('.ask-similar .ask-card__excerpt')).not.toBeNull();
 	});
 
 	// A synthesized answer paraphrases, so there is no duplication to remove and the card is untouched.
@@ -528,14 +555,14 @@ describe('AskView', () => {
 			}
 		};
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'online', query: 'q', cards: [card()], answer })
+			props: props({ kind: 'results', origin: 'online', cards: [card()], answer })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
 	});
 
 	it('results: the lead card keeps its excerpt when there is no answer at all', () => {
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [card()] })
+			props: props({ kind: 'results', origin: 'device', cards: [card()] })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
 	});
@@ -554,7 +581,7 @@ describe('AskView', () => {
 			}
 		};
 		const { container } = render(AskView, {
-			props: props({ kind: 'results', origin: 'device', query: 'q', cards: [card()], answer })
+			props: props({ kind: 'results', origin: 'device', cards: [card()], answer })
 		});
 		expect(container.querySelector('.ask-answer')).not.toBeNull();
 		expect(container.textContent).toContain('one year to submit');

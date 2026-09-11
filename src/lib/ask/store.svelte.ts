@@ -102,7 +102,7 @@ export function createAskStore(deps: {
 			const answer = answerFor(query, cards);
 			commitIfCurrent(
 				cards.length > 0
-					? { kind: 'results', origin: 'device', query, cards, ...(answer ? { answer } : {}) }
+					? { kind: 'results', origin: 'device', cards, ...(answer ? { answer } : {}) }
 					: { kind: 'empty' }
 			);
 		} catch (e) {
@@ -204,7 +204,6 @@ export function createAskStore(deps: {
 		commitIfCurrent({
 			kind: 'results',
 			origin: 'online',
-			query,
 			cards,
 			...(answer ? { answer } : {})
 		});

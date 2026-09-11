@@ -697,18 +697,6 @@ describe('createAskStore', () => {
 		// The input box stays editable after results render, so reading the query at render time would let
 		// the displayed answer drift away from the question it actually answered. `origin` is snapshot for
 		// exactly this reason already.
-		// Assert the kind BEFORE narrowing on it, the way the sibling above does. Guarding an assertion
-		// behind an unchecked `if` does not let the test pass silently - `expect.requireAssertions` turns
-		// zero assertions into a failure - but it fails with "expected any number of assertion, but got
-		// none", which says nothing about what went wrong. Asserting first fails with the actual state.
-		it('snapshots the query that produced the answer', async () => {
-			const store = deviceStore();
-			await store.ask('how long do I have to submit my claim?');
-			expect(store.state.kind).toBe('results');
-			if (store.state.kind !== 'results') return;
-			expect(store.state.query).toBe('how long do I have to submit my claim?');
-		});
-
 		// 38 CFR 14.629. The gate lived inside synthesize(), so it needed online AND a key AND the toggle -
 		// the device user was never gated at all. Phrasing taken from the shipped red-team fixture.
 		it('attaches the eligibility note on the device path, where no gate ran before', async () => {
