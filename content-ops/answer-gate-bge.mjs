@@ -31,6 +31,8 @@ const INDEX_DIR = 'content-ops/server-index';
 const DEVICE_CORPUS_JSON = 'static/corpus/corpus-v1.0.1.json';
 const QUERIES_PATH = 'src/lib/ask/eval/queries.json';
 const EMBED_URL = process.env.BGE_EMBED_URL ?? 'http://127.0.0.1:8787';
+const EMBED_ATTEMPTS = 3;
+const EMBED_BACKOFF_MS = 400;
 
 async function main() {
 	console.log('='.repeat(66));
@@ -65,18 +67,34 @@ async function main() {
 	);
 
 	// The caller owns the prefix policy: passages were indexed verbatim, queries carry the prefix.
+	//
+	// Retried because the serving is remote: a single transient 5xx from Workers AI would otherwise abort a
+	// run of 150+ queries and lose the whole measurement. Bounded and re-thrown on exhaustion, so a genuine
+	// outage still fails the gate rather than being papered over.
 	/** @param {string} text */
 	const embed = async (text) => {
-		const res = await fetch(EMBED_URL, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ texts: [QUERY_PREFIX + text] })
-		});
-		if (!res.ok) throw new Error('E_EMBED_HTTP');
-		const data = await res.json();
-		const v = data?.vectors?.[0];
-		if (!Array.isArray(v)) throw new Error('E_EMBED_SHAPE');
-		return Float32Array.from(v);
+		for (let attempt = 1; attempt <= EMBED_ATTEMPTS; attempt++) {
+			try {
+				const res = await fetch(EMBED_URL, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ texts: [QUERY_PREFIX + text] })
+				});
+				if (!res.ok) throw new Error('E_EMBED_HTTP');
+				const data = await res.json();
+				const v = data?.vectors?.[0];
+				if (!Array.isArray(v)) throw new Error('E_EMBED_SHAPE');
+				return Float32Array.from(v);
+			} catch (err) {
+				// Thrown codes stay static and opaque (mtc/no-input-in-error); the detail that makes a failure
+				// diagnosable goes to the console instead, where the rule does not apply.
+				console.error(`    embed attempt ${attempt}/${EMBED_ATTEMPTS} failed:`, err);
+				if (attempt < EMBED_ATTEMPTS) {
+					await new Promise((r) => setTimeout(r, EMBED_BACKOFF_MS * attempt));
+				}
+			}
+		}
+		throw new Error('E_EMBED_EXHAUSTED');
 	};
 
 	const metrics = await measureAnswers({

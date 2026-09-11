@@ -21,6 +21,12 @@ export type AnswerEvalItem = {
 	altAnswers?: { sourceId: string; answerSnippet: string }[];
 };
 
+/**
+ * One paired comparison, counted only where the two surfaces DISAGREE. Queries both get right, or both get
+ * wrong, carry no information about which is better - the disagreements are the whole evidence.
+ */
+export type Discordant = { aOnly: number; bOnly: number };
+
 /** What one run of the shipped answer path produced, counted over the scoreable queries. */
 export type AnswerMetrics = {
 	/** Scoreable queries - the denominator every rate below is reported against. */
@@ -43,10 +49,19 @@ export type AnswerMetrics = {
 	 * deliver.
 	 */
 	bestCardAnswered: number;
-	/** Queries the answer won and the lead card lost. */
-	answerOnly: number;
-	/** Queries the lead card won and the answer lost. */
-	cardOnly: number;
+	/**
+	 * THE BAR: the two-tier experience - what a reader reaches after one tap - against the block it
+	 * replaced. Scoring tier 1 alone against a 120-word card measures LENGTH, not quality: the old surface
+	 * had no second tier, so a short extract loses that comparison almost by construction.
+	 */
+	experienceVsCard: Discordant;
+	/**
+	 * The second bar, so tier 1 cannot rot while tier 2 carries the gate. Length is held fixed at whatever
+	 * the answer rendered, so this tests WHICH words were chosen rather than how many.
+	 */
+	tier1VsHead: Discordant;
+	/** Tier 1 alone against the full card. Reported for continuity; no longer the pass condition. */
+	tier1VsCard: Discordant;
 	/**
 	 * EQUAL BUDGET, same card: the first `wordCount(answer.text)` words of the passage the answer was cut
 	 * from. `answered` beating this is the only clean evidence that CHOOSING the words is worth anything,
@@ -102,6 +117,37 @@ export function mcnemarExactP(b: number, c: number): number {
 	return Math.min(1, 2 * tail);
 }
 
+/** One bar's verdict. `reason` names which condition failed, or null when it passed. */
+export type BarVerdict = { ok: boolean; reason: 'direction' | 'significance' | null; p: number };
+
+/**
+ * Decide one paired comparison.
+ *
+ * Direction is always required: a bar that loses more disagreements than it wins has failed, whatever the
+ * p-value says. Significance is required only of a bar that carries a CLAIM ("this is better"), because a
+ * margin that could be a coin flip is not evidence.
+ *
+ * A regression GUARD asks a different question - "has this rotted?" - and direction alone answers it.
+ * Demanding significance of a guard makes it unfalsifiable when the true effect is small: at the tier-1
+ * comparison's observed 1.5:1 ratio it would need well past 270 benchmark queries and STILL not clear, so it
+ * could only ever fail. A gate that cannot pass is not a gate.
+ *
+ * @param d The discordant pairs; concordant queries carry no information and are not counted.
+ * @param requireSignificance True for a bar asserting an improvement, false for a regression guard.
+ * @param alpha Two-sided level for the significance test.
+ */
+export function evaluateBar(
+	d: Discordant,
+	requireSignificance: boolean,
+	alpha: number
+): BarVerdict {
+	const p = mcnemarExactP(d.aOnly, d.bOnly);
+	// A tie, including no disagreements at all, is not a win.
+	if (d.aOnly <= d.bOnly) return { ok: false, reason: 'direction', p };
+	if (requireSignificance && p >= alpha) return { ok: false, reason: 'significance', p };
+	return { ok: true, reason: null, p };
+}
+
 /**
  * Measure the shipped answer path end to end: embed -> search -> minScore -> cards -> the rendered answer.
  *
@@ -142,8 +188,9 @@ export async function measureAnswers(input: {
 		inTopK: 0,
 		buriedWrong: 0,
 		bestCardAnswered: 0,
-		answerOnly: 0,
-		cardOnly: 0,
+		experienceVsCard: { aOnly: 0, bOnly: 0 },
+		tier1VsHead: { aOnly: 0, bOnly: 0 },
+		tier1VsCard: { aOnly: 0, bOnly: 0 },
 		headSameCard: 0,
 		headLeadCard: 0,
 		lengths: []
@@ -173,19 +220,28 @@ export async function measureAnswers(input: {
 		const head = (text: string) => text.split(/\s+/).slice(0, budget).join(' ');
 		// The passage the answer was cut from, and the lead card's text - both trimmed to the SAME number of
 		// words the answer actually rendered, so length cannot decide the comparison.
-		if (holds(head(answer.passage))) metrics.headSameCard++;
-		if (holds(head(top.excerpt))) metrics.headLeadCard++;
+		const headSame = holds(head(answer.passage));
+		const headLead = holds(head(top.excerpt));
+		if (headSame) metrics.headSameCard++;
+		if (headLead) metrics.headLeadCard++;
 
 		const hit = holds(answer.text);
+		const expandedHit = holds(answer.passage);
 		if (hit) metrics.answered++;
-		if (holds(answer.passage)) metrics.expanded++;
+		if (expandedHit) metrics.expanded++;
 
 		// The card's own display window, not its whole excerpt: the bar has to be what a reader actually saw.
 		const shown = top.excerpt.split(/\s+/).slice(0, leadCardWords).join(' ');
 		const cardHit = holds(shown);
 		if (cardHit) metrics.baseline++;
-		if (hit && !cardHit) metrics.answerOnly++;
-		if (cardHit && !hit) metrics.cardOnly++;
+
+		const pair = (a: boolean, b: boolean, into: Discordant) => {
+			if (a && !b) into.aOnly++;
+			else if (b && !a) into.bOnly++;
+		};
+		pair(expandedHit, cardHit, metrics.experienceVsCard);
+		pair(hit, headLead, metrics.tier1VsHead);
+		pair(hit, cardHit, metrics.tier1VsCard);
 
 		const at = cards.findIndex((c) => holds(c.excerpt));
 		if (at >= 0) metrics.inTopK++;

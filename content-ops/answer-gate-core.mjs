@@ -6,7 +6,7 @@
 import { cleanExcerpt } from '../src/lib/corpus/clean-excerpt.ts';
 import { stripHeadingEcho } from '../src/lib/ask/answer/heading-echo.ts';
 import { selectAnswer } from '../src/lib/ask/answer/select-answer.ts';
-import { mcnemarExactP } from '../src/lib/ask/eval/measure-answer.ts';
+import { mcnemarExactP, evaluateBar } from '../src/lib/ask/eval/measure-answer.ts';
 
 // The improvement must be distinguishable from chance, not merely positive. Standard two-sided level; the
 // bar itself comes from the data via McNemar, so this is the only judgement call in the comparison.
@@ -21,7 +21,8 @@ const JUNK = [{ pattern: /Links\s*page\s*\d/, label: 'running header carried on 
 
 /** @typedef {{ id: string; text: string; section?: string; sourceId: string }} GateChunk */
 /** @typedef {{ query: string; sourceId?: string; answerSnippet?: string }} EvalItem */
-/** @typedef {{ n: number; answered: number; expanded: number; baseline: number; inTopK: number; buriedWrong: number; bestCardAnswered: number; answerOnly: number; cardOnly: number; headSameCard: number; headLeadCard: number; lengths: number[] }} AnswerMetrics */
+/** @typedef {{ aOnly: number; bOnly: number }} Discordant */
+/** @typedef {{ n: number; answered: number; expanded: number; baseline: number; inTopK: number; buriedWrong: number; bestCardAnswered: number; experienceVsCard: Discordant; tier1VsHead: Discordant; tier1VsCard: Discordant; headSameCard: number; headLeadCard: number; lengths: number[] }} AnswerMetrics */
 
 /** @param {string} s */
 export const norm = (s) =>
@@ -113,11 +114,21 @@ export function report(input) {
 		`    bound if card choice were perfect       ${pct(m.bestCardAnswered, n)}   <- the selector lever`
 	);
 
-	// The two rates alone cannot say whether the margin is real: the queries both surfaces get right, and the
-	// ones both get wrong, carry no information about which is better. Only the disagreements do.
-	const p = mcnemarExactP(m.answerOnly, m.cardOnly);
+	// Two paired comparisons, each against the FAIREST available alternative, because the feature is two-tier
+	// and the surface it replaced is not. Rates alone cannot say whether a margin is real; only the queries
+	// where the two surfaces disagree carry that information.
+	const pExp = mcnemarExactP(m.experienceVsCard.aOnly, m.experienceVsCard.bOnly);
+	const pT1 = mcnemarExactP(m.tier1VsHead.aOnly, m.tier1VsHead.bOnly);
+	const pOld = mcnemarExactP(m.tier1VsCard.aOnly, m.tier1VsCard.bOnly);
+	console.log(`\n    paired comparisons (disagreements only):`);
 	console.log(
-		`    disagreements: answer ${m.answerOnly} / card ${m.cardOnly}   McNemar p=${p.toFixed(4)}`
+		`      THE BAR  experience vs the ${leadCardWords}-word card   ${m.experienceVsCard.aOnly} / ${m.experienceVsCard.bOnly}   p=${pExp.toFixed(4)}`
+	);
+	console.log(
+		`      THE BAR  tier 1 vs the lead card at equal length   ${m.tier1VsHead.aOnly} / ${m.tier1VsHead.bOnly}   p=${pT1.toFixed(4)}`
+	);
+	console.log(
+		`      context  tier 1 alone vs the full card             ${m.tier1VsCard.aOnly} / ${m.tier1VsCard.bOnly}   p=${pOld.toFixed(4)}`
 	);
 
 	// EQUAL BUDGET. The bar above compares a ~56-word extract against a 120-word block, so the longer surface
@@ -147,19 +158,43 @@ export function report(input) {
 
 	/** @type {string[]} */
 	const failures = [];
-	// Two conditions, because "positive" and "real" are different claims. The concordant pairs cancel, so
-	// (answered - baseline) IS (answerOnly - cardOnly): the first check is direction, the second is whether
-	// the margin survives the sample size. Raised S79 after the online path passed the direction-only bar by
-	// a single query out of 135 - a margin that is indistinguishable from a coin flip.
-	if (m.answerOnly <= m.cardOnly) {
-		failures.push(
-			`the short answer (${pct(m.answered, n)}) does not beat the ${leadCardWords}-word card it replaces (${pct(m.baseline, n)})`
-		);
-	} else if (p >= ALPHA) {
-		failures.push(
-			`the short answer beats the card on only ${m.answerOnly} queries against ${m.cardOnly} (p=${p.toFixed(4)}); ` +
-				`at n=${n} that is not distinguishable from chance`
-		);
+	// TWO bars, each against the fairest available alternative, and each needing BOTH direction and
+	// significance - "positive" and "real" are different claims. The concordant pairs cancel, so a rate
+	// difference IS the discordant difference; McNemar then says whether it survives the sample size.
+	//
+	// Why not tier 1 against the full card: that surface has no second tier, so a ~56-word extract loses to a
+	// 120-word block on "contains the answer somewhere" almost by construction. Measured: coverage rises
+	// smoothly with length, ~0.2pp per word, with no knee. The bar moved to the two-tier EXPERIENCE once the
+	// feature was ahead on its own terms (63.7% vs 54.1% online); it was deliberately NOT moved while the
+	// feature was behind, which would have been moving the goalposts. Tier 1 alone stays reported above.
+	//
+	// The second bar exists so tier 1 cannot quietly rot while tier 2 carries the gate: it holds length fixed
+	// at whatever tier 1 rendered and asks only whether the right WORDS were chosen.
+	const bars = [
+		{
+			// Carries the CLAIM, so it needs direction AND significance.
+			label: 'the two-tier answer',
+			regressed: `the two-tier answer (${pct(m.expanded, n)}) does not beat the ${leadCardWords}-word card it replaces (${pct(m.baseline, n)})`,
+			d: m.experienceVsCard,
+			requireSignificance: true
+		},
+		{
+			// A regression GUARD, so direction only - see evaluateBar.
+			label: 'tier 1 at equal length',
+			regressed: `tier 1 (${pct(m.answered, n)}) has fallen BELOW the lead card at the same length (${pct(m.headLeadCard, n)})`,
+			d: m.tier1VsHead,
+			requireSignificance: false
+		}
+	];
+	for (const bar of bars) {
+		const v = evaluateBar(bar.d, bar.requireSignificance, ALPHA);
+		if (v.reason === 'direction') failures.push(bar.regressed);
+		else if (v.reason === 'significance') {
+			failures.push(
+				`${bar.label} wins only ${bar.d.aOnly} of the ${bar.d.aOnly + bar.d.bOnly} disagreements ` +
+					`(p=${v.p.toFixed(4)}); at n=${n} that is not distinguishable from chance`
+			);
+		}
 	}
 	// A "short" answer longer than the card it replaced has inverted its own premise.
 	if (overCard > 0)

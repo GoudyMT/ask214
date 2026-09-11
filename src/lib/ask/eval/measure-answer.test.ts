@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Corpus, CorpusChunk } from '$lib/corpus';
-import { measureAnswers, mcnemarExactP, type AnswerEvalItem } from './measure-answer';
+import { measureAnswers, mcnemarExactP, evaluateBar, type AnswerEvalItem } from './measure-answer';
 
 // A 2-dimension corpus so a hit's cosine is controllable exactly: the query is [1, 0], so an embedding of
 // [1, 0] scores 1.0, [0.8, 0.6] scores 0.8, and [0, 1] scores 0. That makes the minScore filter and the
@@ -175,6 +175,45 @@ describe('measureAnswers', () => {
 		expect(m.bestCardAnswered).toBe(0);
 	});
 
+	// THE BAR. The feature is two-tier and the surface it replaced is not, so scoring tier 1 alone against a
+	// 120-word block measures length, not quality. This pair is the experience - what a reader reaches after
+	// one tap - against what it replaced.
+	it('splits the discordant pairs for the experience against the card', async () => {
+		const corpus = corpusOf([[chunk({ id: 'a', text: LONG_BODY }), [1, 0]]]);
+		// The answer sentence sits past the collapsed window but inside the full passage, and a 10-word card
+		// window cannot reach it either: the experience wins, the card does not.
+		const m = await measureAnswers({
+			...base,
+			corpus,
+			leadCardWords: 10,
+			queries: [
+				{ query: 'readjustment counseling combat', sourceId: 'tap_va101', answerSnippet: SNIPPET }
+			]
+		});
+		expect(m.experienceVsCard.aOnly).toBe(1);
+		expect(m.experienceVsCard.bOnly).toBe(0);
+		expect(m.answered).toBe(0); // tier 1 alone missed it - which is exactly why it must not be the bar
+	});
+
+	// The second bar, so tier 1 cannot quietly rot while tier 2 carries the gate. Length is held fixed, so
+	// this tests WHICH words, not how many.
+	it('splits the discordant pairs for tier 1 against a length-matched lead card', async () => {
+		const wrong = chunk({ id: 'wrong', text: 'Parking at the facility is limited to two hours.' });
+		const right = chunk({ id: 'right', text: `${SNIPPET}. Referrals are made as needed.` });
+		const corpus = corpusOf([
+			[wrong, [1, 0]], // rank 0, holds nothing
+			[right, [0.8, 0.6]]
+		]);
+		const m = await measureAnswers({
+			...base,
+			corpus,
+			queries: [{ query: 'bereavement counseling', sourceId: 'tap_va101', answerSnippet: SNIPPET }]
+		});
+		// Choosing the later card wins where truncating the lead card never could.
+		expect(m.tier1VsHead.aOnly).toBe(1);
+		expect(m.tier1VsHead.bOnly).toBe(0);
+	});
+
 	// The two rates alone cannot say whether a margin is real. These are the discordant pairs: the queries
 	// where the two surfaces actually disagree, which is the only place the comparison carries information.
 	it('splits the discordant pairs by which surface won', async () => {
@@ -189,8 +228,8 @@ describe('measureAnswers', () => {
 				{ query: 'bereavement surviving family', sourceId: 'tap_va101', answerSnippet: SNIPPET }
 			]
 		});
-		expect(answerWins.answerOnly).toBe(1);
-		expect(answerWins.cardOnly).toBe(0);
+		expect(answerWins.tier1VsCard.aOnly).toBe(1);
+		expect(answerWins.tier1VsCard.bOnly).toBe(0);
 
 		// Selection lands on the opening run, but the whole body fits inside a 120-word card window.
 		const cardWins = await measureAnswers({
@@ -201,8 +240,8 @@ describe('measureAnswers', () => {
 				{ query: 'readjustment counseling combat', sourceId: 'tap_va101', answerSnippet: SNIPPET }
 			]
 		});
-		expect(cardWins.answerOnly).toBe(0);
-		expect(cardWins.cardOnly).toBe(1);
+		expect(cardWins.tier1VsCard.aOnly).toBe(0);
+		expect(cardWins.tier1VsCard.bOnly).toBe(1);
 	});
 
 	// A question can have more than one right answer, and the corpus genuinely carries several for most of
@@ -251,8 +290,8 @@ describe('measureAnswers', () => {
 			]
 		});
 		expect(m.baseline).toBe(1);
-		expect(m.answerOnly).toBe(0);
-		expect(m.cardOnly).toBe(0);
+		expect(m.tier1VsCard.aOnly).toBe(0);
+		expect(m.tier1VsCard.bOnly).toBe(0);
 	});
 
 	// The coverage bar compares a ~56-word extract against a 120-word block, so the longer surface wins
@@ -330,5 +369,47 @@ describe('mcnemarExactP', () => {
 	// A single disagreement can never be significant: 2 * 0.5^1 = 1.
 	it('never calls one disagreement significant', () => {
 		expect(mcnemarExactP(1, 0)).toBe(1);
+	});
+});
+
+// The gate's verdict is the one thing that must not be wrong, so it is a pure function with its own tests
+// rather than inline logic in a script.
+describe('evaluateBar', () => {
+	const A = 0.05;
+
+	it('passes a bar that wins its disagreements decisively', () => {
+		expect(evaluateBar({ aOnly: 10, bOnly: 0 }, true, A).ok).toBe(true);
+	});
+
+	it('fails a bar whose direction is wrong, significance regardless', () => {
+		const v = evaluateBar({ aOnly: 5, bOnly: 12 }, true, A);
+		expect(v.ok).toBe(false);
+		expect(v.reason).toBe('direction');
+	});
+
+	// A margin that could be a coin flip is not evidence, however positive it looks.
+	it('fails a significance-gated bar that is positive but not distinguishable', () => {
+		const v = evaluateBar({ aOnly: 26, bOnly: 13 }, true, A);
+		expect(v.ok).toBe(false);
+		expect(v.reason).toBe('significance');
+	});
+
+	// THE DIFFERENCE. A regression GUARD asks "has this rotted", not "is this proven better" - so it checks
+	// direction only. Demanding significance of it made it unfalsifiable: at the observed 1.5:1 ratio it
+	// would need well past 270 benchmark queries and still not clear, so it could only ever fail.
+	it('passes a direction-only bar that is positive but not significant', () => {
+		const v = evaluateBar({ aOnly: 27, bOnly: 18 }, false, A);
+		expect(v.ok).toBe(true);
+	});
+
+	it('still fails a direction-only bar that has actually regressed', () => {
+		const v = evaluateBar({ aOnly: 18, bOnly: 27 }, false, A);
+		expect(v.ok).toBe(false);
+		expect(v.reason).toBe('direction');
+	});
+
+	// No disagreements means no evidence either way; a tie is not a win.
+	it('fails a bar with no disagreements at all', () => {
+		expect(evaluateBar({ aOnly: 0, bOnly: 0 }, false, A).ok).toBe(false);
 	});
 });
