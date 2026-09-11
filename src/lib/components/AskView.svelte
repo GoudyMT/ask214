@@ -268,10 +268,14 @@
 		{#if askState.answer}
 			<AskAnswer view={askState.answer} onOpenSource={readSource} />
 		{/if}
-		<!-- A card yields its excerpt only to an EXTRACTIVE answer taken from that same card - showing both
-		     would print the same sentences twice. The answer is now chosen across the whole retrieved set,
-		     so the card it came from is not necessarily the lead one. A synthesized answer paraphrases, so
-		     nothing is duplicated and every card is left exactly as it ships. -->
+		<!-- The LEAD card yields its excerpt to an EXTRACTIVE answer taken from that same card: the two would
+		     otherwise print the same sentences twice, at 120 words directly beneath the answer block.
+		     Scoped to the lead on purpose. A compact card caps at 24 words and sits behind a toggle the
+		     reader chose to open, so there is no accidental double-read to prevent - and hiding its text
+		     leaves a title, two links and nothing else, which is how the card that actually produced the
+		     answer becomes the one that looks broken. The answer is chosen across the whole retrieved set,
+		     so that card is a compact one roughly 4 times in 10.
+		     A synthesized answer paraphrases, so nothing is duplicated and every card ships untouched. -->
 		{@const quoted =
 			askState.answer?.kind === 'extractive' ? askState.answer.answer.chunkId : undefined}
 		<p class="ask-count">Top match</p>
@@ -291,7 +295,6 @@
 						<AskResultCard
 							card={c}
 							variant="compact"
-							showExcerpt={quoted === undefined || c.chunkId !== quoted}
 							onReadSource={() => readSource(c.sourceId, c.chunkId)}
 						/>
 					{/each}
