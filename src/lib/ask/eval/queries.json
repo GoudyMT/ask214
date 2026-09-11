@@ -181,13 +181,7 @@
 	{
 		"query": "what number do I call if I have questions about my GI Bill",
 		"sourceId": "tap_va_education_benefits",
-		"answerSnippet": "GI Bill hotline: 1-888-GIBILL-1 OR 1-888-442-4551",
-		"altAnswers": [
-			{
-				"sourceId": "tap_va_education_spouses",
-				"answerSnippet": "VA benefits hotline: 1-800-827-1000"
-			}
-		]
+		"answerSnippet": "GI Bill hotline: 1-888-GIBILL-1 OR 1-888-442-4551"
 	},
 	{
 		"query": "what education benefits can my kids get if something happens to me in the service",
@@ -240,13 +234,7 @@
 	{
 		"query": "who do I actually call if I have a question about my SGLI or VGLI coverage?",
 		"sourceId": "tap_va_life_insurance",
-		"answerSnippet": "Questions about SGLI, Family SGLI, TSGLI or VGLI: 1-800-419-1473",
-		"altAnswers": [
-			{
-				"sourceId": "va_vgli",
-				"answerSnippet": "you can call the Office of Servicemembers"
-			}
-		]
+		"answerSnippet": "Questions about SGLI, Family SGLI, TSGLI or VGLI: 1-800-419-1473"
 	},
 	{
 		"query": "if I use VR&E first, does that eat into my GI Bill months?",
@@ -321,14 +309,7 @@
 	{
 		"query": "how early should I start TAP before I get out?",
 		"sourceId": "tap_managing_transition",
-		"answerSnippet": "begin TAP 24 months before retirement or 18 months before separation",
-		"altAnswers": [
-			{
-				"sourceId": "tap_pre_separation_brief",
-				"answerSnippet": "Capstone event which occurs no later than 90 days before transition",
-				"marginal": true
-			}
-		]
+		"answerSnippet": "begin TAP 24 months before retirement or 18 months before separation"
 	},
 	{
 		"query": "when do I need to file my disability claim before I separate to use BDD?",
@@ -411,10 +392,6 @@
 		"answerSnippet": "This claim process is called the Benefits Delivery at Discharge (BDD) program",
 		"altAnswers": [
 			{
-				"sourceId": "va_disability_bdd",
-				"answerSnippet": "How do I file a claim for disability compensation before I leave the service"
-			},
-			{
 				"sourceId": "tap_interagency_website_guide",
 				"answerSnippet": "180 to 90 days before leaving the military"
 			},
@@ -491,10 +468,6 @@
 		"altSources": ["va_health_eligibility"],
 		"altAnswers": [
 			{
-				"sourceId": "va_health_eligibility",
-				"answerSnippet": "What if I need help filling out my application"
-			},
-			{
 				"sourceId": "va_health_care_apply",
 				"answerSnippet": "Call our toll-free hotline at 877-222-8387"
 			},
@@ -544,17 +517,7 @@
 	{
 		"query": "my tuition is more than the GI Bill pays, is there anything to cover the gap?",
 		"sourceId": "va_gi_bill_overview",
-		"answerSnippet": "Find out if your school participates in the Yellow Ribbon Program, which can help pay tuition costs that the Post-9/11 GI Bill doesn't cover.",
-		"altAnswers": [
-			{
-				"sourceId": "tap_managing_education",
-				"answerSnippet": "what are my options to make up the difference"
-			},
-			{
-				"sourceId": "tap_managing_education",
-				"answerSnippet": "does the institution participate in the Yellow Ri"
-			}
-		]
+		"answerSnippet": "Find out if your school participates in the Yellow Ribbon Program, which can help pay tuition costs that the Post-9/11 GI Bill doesn't cover."
 	},
 	{
 		"query": "my spouse never served, can they still get education benefits through me?",
@@ -624,13 +587,7 @@
 	{
 		"query": "what documents do I need to convert my SGLI to a commercial policy after I separate?",
 		"sourceId": "tap_va_life_insurance",
-		"answerSnippet": "Service member's Final Leave and Earnings Statement (LES)",
-		"altAnswers": [
-			{
-				"sourceId": "tap_va_life_insurance",
-				"answerSnippet": "CONVERTING SGLI, FSGLI AND VGLI TO COMMERCIAL POLICIES"
-			}
-		]
+		"answerSnippet": "Service member's Final Leave and Earnings Statement (LES)"
 	},
 	{
 		"query": "do I have to close out my TSP when I get out or can I leave the money in?",
@@ -662,14 +619,7 @@
 	{
 		"query": "what's the absolute latest I can start TAP before I get out?",
 		"sourceId": "tap_managing_transition",
-		"answerSnippet": "it is mandatory for all Service members to begin TAP no later than 365 days prior to their separation",
-		"altAnswers": [
-			{
-				"sourceId": "tap_pre_separation_brief",
-				"answerSnippet": "Capstone event which occurs no later than 90 days before transition",
-				"marginal": true
-			}
-		]
+		"answerSnippet": "it is mandatory for all Service members to begin TAP no later than 365 days prior to their separation"
 	},
 	{
 		"query": "does the VA actually reach out to check on me after I separate?",
@@ -702,13 +652,7 @@
 	{
 		"query": "what's the general VA benefits hotline if I don't know who else to call?",
 		"sourceId": "tap_va101",
-		"answerSnippet": "VA benefits hotline: 1-800-827-1000",
-		"altAnswers": [
-			{
-				"sourceId": "va_intent_to_file",
-				"answerSnippet": "MyVA411 main information line"
-			}
-		]
+		"answerSnippet": "VA benefits hotline: 1-800-827-1000"
 	},
 	{
 		"query": "is there a number to call if I end up homeless after I get out?",
@@ -736,14 +680,7 @@
 	{
 		"query": "Where can I find SkillBridge's eligibility requirements and list of industry partners?",
 		"sourceId": "dod_skillbridge",
-		"answerSnippet": "program eligibility requirements, industry partners/employers, commands and installation offices",
-		"altAnswers": [
-			{
-				"sourceId": "tap_va_benefits_guide",
-				"answerSnippet": "DOD SkillBridge Program",
-				"marginal": true
-			}
-		]
+		"answerSnippet": "program eligibility requirements, industry partners/employers, commands and installation offices"
 	},
 	{
 		"query": "Is there an alternative to EFCT for wounded or injured service members?",
@@ -843,14 +780,7 @@
 	{
 		"query": "Do most veterans end up switching to a completely different career field after they get out?",
 		"sourceId": "tap_moc_crosswalk",
-		"answerSnippet": "55% of servicemembers said that they are likely to pursue a different career",
-		"altAnswers": [
-			{
-				"sourceId": "tap_pre_separation_brief",
-				"answerSnippet": "Transitioning from Service is the ultimate career change",
-				"marginal": true
-			}
-		]
+		"answerSnippet": "55% of servicemembers said that they are likely to pursue a different career"
 	},
 	{
 		"query": "How long will I still have TRICARE-type coverage after I separate if I'm not retiring?",
@@ -900,10 +830,6 @@
 			{
 				"sourceId": "va_health_care_apply",
 				"answerSnippet": "Fill out an Application for Health Benefits (VA Form 10-10EZ)"
-			},
-			{
-				"sourceId": "va_health_care_apply",
-				"answerSnippet": "fill out an Application for Health Benefits (VA Form 10-10EZ)"
 			}
 		]
 	},
@@ -944,13 +870,7 @@
 	{
 		"query": "How do I request a transfer of my GI Bill benefits through milConnect?",
 		"sourceId": "tap_va_education_benefits",
-		"answerSnippet": "Request a transfer of benefits through milConnect",
-		"altAnswers": [
-			{
-				"sourceId": "tap_va_benefits_guide",
-				"answerSnippet": "milConnect How to Transfer Benefits"
-			}
-		]
+		"answerSnippet": "Request a transfer of benefits through milConnect"
 	},
 	{
 		"query": "Are there tuition caps for private or foreign schools using my dependent's education benefits?",
@@ -1054,13 +974,7 @@
 	{
 		"query": "Can I request my late spouse's DD214 if I haven't remarried?",
 		"sourceId": "va_dd214",
-		"answerSnippet": "You're the Veteran's surviving spouse and you haven't remarried",
-		"altAnswers": [
-			{
-				"sourceId": "va_dd214",
-				"answerSnippet": "How do I request someone else"
-			}
-		]
+		"answerSnippet": "You're the Veteran's surviving spouse and you haven't remarried"
 	},
 	{
 		"query": "How soon before my separation date can I file a BDD claim?",
@@ -1153,13 +1067,7 @@
 	{
 		"query": "When can my child start using the GI Bill benefits I transferred to them?",
 		"sourceId": "va_gi_bill_transfer",
-		"answerSnippet": "only after you've finished at least 10 years of service",
-		"altAnswers": [
-			{
-				"sourceId": "va_gi_bill_transfer",
-				"answerSnippet": "When can my dependents use the transferred benefits"
-			}
-		]
+		"answerSnippet": "only after you've finished at least 10 years of service"
 	},
 	{
 		"query": "How long should I wait before contacting VA if I haven't heard back on my health care application?",
@@ -1217,13 +1125,7 @@
 	{
 		"query": "Does the automatic online intent to file cover DIC benefit claims?",
 		"sourceId": "va_intent_to_file",
-		"answerSnippet": "doesn't apply to applications for DIC (Dependency and Indemnity Compensation) benefits",
-		"altAnswers": [
-			{
-				"sourceId": "va_intent_to_file",
-				"answerSnippet": "intent to file a claim for VA disability, pension, or DIC benefits"
-			}
-		]
+		"answerSnippet": "doesn't apply to applications for DIC (Dependency and Indemnity Compensation) benefits"
 	},
 	{
 		"query": "How soon after leaving the military do I need to apply for VGLI?",

@@ -15,6 +15,16 @@ export type AnswerEvalItem = {
 	 * than one right answer - a comprehensive guide and a specific page both cover them - and crediting only
 	 * the first-authored snippet scores a correct answer as a miss.
 	 *
+	 * `sourceId` is LOAD-BEARING, not decoration: a snippet counts only against the document it names,
+	 * because the surrounding passage is what makes the words an answer. It was being discarded, and the
+	 * benchmark carries needles that appear in up to ten different sources.
+	 *
+	 * The bar for adding one is that the snippet ALONE answers the question. A heading that restates the
+	 * question, a link label, or a contact line whose number was stripped during extraction all fail it -
+	 * each looks like an answer in context and credits a hit for showing the reader nothing. Widening what
+	 * counts as a right answer inflates every rate in the report at once, so it is the same mistake as
+	 * writing questions backwards from the corpus, wearing different clothes.
+	 *
 	 * Answer-gate only. The retrieval eval keeps its own ground truth and its calibrated floor: widening
 	 * what counts as a hit there would LOWER a gate that was tuned against the narrower definition.
 	 */
@@ -200,12 +210,20 @@ export async function measureAnswers(input: {
 		// Every accepted phrasing of the answer. Applied identically to the answer, the passage, the lead-card
 		// baseline and the reachable set, so no surface is scored by a different rule than the one it is
 		// compared against.
-		const needles = [q.answerSnippet ?? '', ...(q.altAnswers ?? []).map((a) => a.answerSnippet)]
-			.map(normalize)
-			.filter((n) => n !== '');
-		const holds = (text: string) => {
+		// Provenance is part of the claim. An accepted answer is a snippet IN A NAMED DOCUMENT, because the
+		// surrounding passage is what makes the words an answer - the general VA benefits number sitting in a
+		// Reserve dual-pay guide does not answer a GI Bill question. Discarding the sourceId let a needle be
+		// credited against any document that happened to contain the same words; 14 of the benchmark's
+		// accepted answers appear in more than one source, one of them in ten.
+		const accepted = [
+			{ sourceId: q.sourceId ?? '', answerSnippet: q.answerSnippet ?? '' },
+			...(q.altAnswers ?? [])
+		]
+			.map((a) => ({ sourceId: a.sourceId, needle: normalize(a.answerSnippet) }))
+			.filter((a) => a.needle !== '' && a.sourceId !== '');
+		const holds = (text: string, sourceId: string) => {
 			const hay = normalize(text);
-			return needles.some((n) => hay.includes(n));
+			return accepted.some((a) => a.sourceId === sourceId && hay.includes(a.needle));
 		};
 		const vec = await embed(q.query);
 		const cards = toResultCards(filterByMinScore(search(vec, corpus, k), minScore));
@@ -220,19 +238,19 @@ export async function measureAnswers(input: {
 		const head = (text: string) => text.split(/\s+/).slice(0, budget).join(' ');
 		// The passage the answer was cut from, and the lead card's text - both trimmed to the SAME number of
 		// words the answer actually rendered, so length cannot decide the comparison.
-		const headSame = holds(head(answer.passage));
-		const headLead = holds(head(top.excerpt));
+		const headSame = holds(head(answer.passage), answer.sourceId);
+		const headLead = holds(head(top.excerpt), top.sourceId);
 		if (headSame) metrics.headSameCard++;
 		if (headLead) metrics.headLeadCard++;
 
-		const hit = holds(answer.text);
-		const expandedHit = holds(answer.passage);
+		const hit = holds(answer.text, answer.sourceId);
+		const expandedHit = holds(answer.passage, answer.sourceId);
 		if (hit) metrics.answered++;
 		if (expandedHit) metrics.expanded++;
 
 		// The card's own display window, not its whole excerpt: the bar has to be what a reader actually saw.
 		const shown = top.excerpt.split(/\s+/).slice(0, leadCardWords).join(' ');
-		const cardHit = holds(shown);
+		const cardHit = holds(shown, top.sourceId);
 		if (cardHit) metrics.baseline++;
 
 		const pair = (a: boolean, b: boolean, into: Discordant) => {
@@ -243,15 +261,18 @@ export async function measureAnswers(input: {
 		pair(hit, headLead, metrics.tier1VsHead);
 		pair(hit, cardHit, metrics.tier1VsCard);
 
-		const at = cards.findIndex((c) => holds(c.excerpt));
+		const at = cards.findIndex((c) => holds(c.excerpt, c.sourceId));
 		if (at >= 0) metrics.inTopK++;
 		if (at > 0 && !hit) metrics.buriedWrong++;
 
 		// Apply the SAME render the shipped answer uses, to each card that holds the answer. Any one of them
 		// surfacing it means perfect card choice would have answered, so this is the true upper bound.
 		const reachable = cards.some((card) => {
-			if (!holds(card.excerpt)) return false;
-			return holds(selectAnswer(stripHeadingEcho(card.excerpt, card.section), q.query));
+			if (!holds(card.excerpt, card.sourceId)) return false;
+			return holds(
+				selectAnswer(stripHeadingEcho(card.excerpt, card.section), q.query),
+				card.sourceId
+			);
 		});
 		if (reachable) metrics.bestCardAnswered++;
 	}

@@ -268,6 +268,37 @@ describe('measureAnswers', () => {
 		expect(m.answered).toBe(1);
 	});
 
+	// Provenance is part of the claim. The type demands a sourceId on every accepted answer and the metric
+	// was discarding it, so the same sentence found in a DIFFERENT document scored as a hit. Measured on the
+	// real benchmark, 14 of 99 accepted answers appear in more than one source - one of them in ten - and a
+	// general VA hotline number sitting in a Reserve dual-pay guide does not answer a GI Bill question.
+	it('does not credit an accepted answer found in a different source', async () => {
+		const corpus = corpusOf([
+			[
+				chunk({
+					id: 'a',
+					sourceId: 'tap_reserve_dual_pay',
+					text: 'Vet Centers are free and confidential to every combat veteran.'
+				}),
+				[1, 0]
+			]
+		]);
+		const m = await measureAnswers({
+			...base,
+			corpus,
+			queries: [
+				{
+					query: 'vet center cost',
+					sourceId: 'tap_va101',
+					answerSnippet: 'a snippet that appears nowhere in the corpus',
+					altAnswers: [{ sourceId: 'tap_va101', answerSnippet: 'free and confidential' }]
+				}
+			]
+		});
+		expect(m.answered).toBe(0);
+		expect(m.inTopK).toBe(0);
+	});
+
 	// The floor has to be scored by the SAME rule as the thing it is the floor for. Crediting alternates on
 	// one surface but not the other would hand the comparison a result the data does not support.
 	it('applies the accepted answers to the lead-card baseline too', async () => {
