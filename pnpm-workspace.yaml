@@ -28,13 +28,19 @@ overrides:
   nanoid: '>=3.3.17'
   # Force patched js-yaml / adm-zip / sharp across the tree (transitive via @lhci/cli, transformers'
   # onnxruntime-node, and transformers + wrangler>miniflare). Dev/build/test-only - none ship in the
-  # client bundle. GHSA-52cp-r559-cp3m + GHSA-5p4m-2wfm-xmqj (js-yaml quadratic CPU); GHSA-xcpc-8h2w-3j85 (adm-zip 4GB
-  # alloc); GHSA-f88m-g3jw-g9cj (sharp/libvips CVEs). Targeted range pins - only the vulnerable
-  # ranges are bumped, so any patched consumer is left alone. Retire when the parents bundle the
-  # patched versions natively (Dependabot will surface it).
-  'js-yaml@<3.15.1': '3.15.1'
+  # client bundle. GHSA-52cp-r559-cp3m + GHSA-5p4m-2wfm-xmqj + GHSA-2883-xcg3-v3hh (js-yaml quadratic CPU,
+  # then empty merge sources defeating maxTotalMergeKeys); GHSA-xcpc-8h2w-3j85 (adm-zip 4GB alloc);
+  # GHSA-f88m-g3jw-g9cj + GHSA-rgj7-g3m4-5g8c (sharp/libvips CVEs). Targeted range pins - only the
+  # vulnerable ranges are bumped, so any patched consumer is left alone. Retire when the parents bundle
+  # the patched versions natively (Dependabot will surface it).
+  #
+  # Both js-yaml and sharp moved forward one patch when a LATER advisory widened the vulnerable range past
+  # the version the previous pin had landed on. A pin is only ever correct for the advisory it was written
+  # against, so re-read the range - never assume an existing pin still clears a new finding on the same
+  # package.
+  'js-yaml@<3.15.2': '3.15.2'
   'adm-zip@<0.6.0': '0.6.0'
-  'sharp@<0.35.0': '0.35.3'
+  'sharp@<0.35.4': '0.35.4'
   # Force patched brace-expansion (GHSA-mh99-v99m-4gvg + GHSA-rgw5-rvv9-x895, DoS via unbounded expansion -> OOM crash, high;
   # transitive dev/build-only via eslint>minimatch@10 and @lhci/cli>rimraf>glob>minimatch@3, never in
   # the client bundle). Blanket floor, NOT a scoped 5.0.x pin, because pnpm's advisory range (<=5.0.7)
@@ -50,14 +56,20 @@ overrides:
   # ip-address, never in the client bundle). Floor pin - retire when that chain bundles >=10.3.1.
   ip-address: '>=10.3.1'
 
-# Accepted, unfixable, dev/CI-only advisory (never shipped in the client bundle): extract-zip
-# (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6). extract-zip is frozen at
-# 2.0.1 since 2020 with patched version "None" - no version exists to pin. It is a deep transitive of the
-# Lighthouse-CI dev tool (@lhci/cli>lighthouse>puppeteer-core>@puppeteer/browsers); its only job there is
-# unpacking the Chrome archive @puppeteer/browsers downloads from Google over HTTPS - a trusted source,
-# never attacker-controlled input, and never in the client bundle. Scoped to THIS GHSA only: every other
-# high/critical still fails `pnpm audit --audit-level=high`. Retire when the chain drops extract-zip (a
-# @puppeteer/browsers>=3.0.6 bump replaced it with yauzl; Dependabot will surface it) or a patch ships.
+# Accepted, unfixable, dev/CI-only advisories (never shipped in the client bundle): extract-zip
+# (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6; and GHSA-7pqw-9j4j-h8q3,
+# arbitrary file writes through symlink archive entries - the same class, reported separately).
+# extract-zip is frozen at 2.0.1 since 2020. The second advisory names ">=2.0.2" as patched, but no such
+# version is published - the registry's newest is 2.0.1 - so there is still nothing to pin, and the
+# advisory's own patched-version field cannot be taken at face value.
+#
+# It is a deep transitive of the Lighthouse-CI dev tool (@lhci/cli>lighthouse>puppeteer-core>
+# @puppeteer/browsers); its only job there is unpacking the Chrome archive @puppeteer/browsers downloads
+# from Google over HTTPS - a trusted source, never attacker-controlled input, and never in the client
+# bundle. Both entries are scoped to THEIR OWN GHSA: every other high/critical still fails
+# `pnpm audit --audit-level=high`. Retire when the chain drops extract-zip (a @puppeteer/browsers>=3.0.6
+# bump replaced it with yauzl; Dependabot will surface it) or a real patch ships.
 auditConfig:
   ignoreGhsas:
     - GHSA-jmr9-qjv8-65gv
+    - GHSA-7pqw-9j4j-h8q3
