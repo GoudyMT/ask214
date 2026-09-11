@@ -62,6 +62,16 @@ jobs:
       - name: Check sources index (drift gate vs the registry)
         run: pnpm run check:sources-index
 
+      # The answer quality gate, on the on-device path. Self-contained by construction: the committed
+      # corpus, the vendored MiniLM weights, no network and no credentials. Placed with the other
+      # content gates so it fails before the Playwright install rather than after it.
+      #
+      # The ONLINE gate (answer-gate:bge) cannot run here - it needs a live Workers AI binding - so this
+      # covers the shared selector, the shared decision function, and the on-device path's own floors.
+      # Those floors are regression guards: they fail when quality drops, never when it is merely low.
+      - name: Answer quality gate (on-device path)
+        run: pnpm run answer-gate
+
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
