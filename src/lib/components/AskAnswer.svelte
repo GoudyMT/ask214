@@ -97,14 +97,20 @@
 				</button>
 			{/if}
 		</div>
-		<!-- A synthesis was attempted for this question and did not reach the reader. Shown only when that
-		     actually happened, so the default user - who never enabled the summary - sees nothing. It is a
-		     note on the one answer, not a second block competing to BE the answer. -->
+		<!-- A synthesis did not reach the reader. Shown only when synthesis was ENABLED, so the default user
+		     - for whom the toggle is off - sees nothing. It is a note on the one answer, not a second block
+		     competing to BE the answer.
+		     The two cases say different things, and the difference is what makes them honest. `refused`
+		     CAN claim an attempt: a summary was produced and a safety gate rejected it. `unavailable`
+		     CANNOT, because the store reaches it both when the call failed AND when there was no API key to
+		     call with - the route collapses those into one `degraded` result, so a sentence like "could not
+		     be produced" would be plainly false for the reader who simply never supplied a key. It states
+		     the fact it can actually support: that no summary is here. -->
 		{#if view.synthesisNote}
 			<p class="ask-answer__note-synthesis">
 				{view.synthesisNote === 'refused'
 					? 'An AI summary was produced but did not pass our accuracy checks, so the document is quoted instead.'
-					: 'An AI summary could not be produced, so the document is quoted instead.'}
+					: 'No AI summary is shown for this answer.'}
 			</p>
 		{/if}
 		<!-- PERMANENT, not conditional on the eligibility gate. That gate reads the QUESTION's phrasing, so

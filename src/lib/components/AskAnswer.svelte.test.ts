@@ -79,13 +79,17 @@ describe('AskAnswer', () => {
 		);
 	});
 
-	it('extractive: says so when a synthesis could not be produced', () => {
+	// `unavailable` is reached BOTH when the call failed and when the reader never supplied an API key -
+	// the route collapses those into one `degraded` result. So the copy must not claim an attempt: for the
+	// no-key reader, "could not be produced" is simply false, and it renders under every answer they get.
+	it('extractive: on an unavailable synthesis, states only what it can support', () => {
 		const { container } = render(AskAnswer, {
 			props: { view: { ...extractiveView, synthesisNote: 'unavailable' } as AnswerView }
 		});
-		expect(container.querySelector('.ask-answer__note-synthesis')?.textContent).toMatch(
-			/could not be produced/i
-		);
+		const note = container.querySelector('.ask-answer__note-synthesis')?.textContent ?? '';
+		expect(note).toMatch(/no ai summary is shown/i);
+		// It must not assert an attempt, a production, or a failure to produce.
+		expect(note).not.toMatch(/could not|failed|attempted|rejected|error/i);
 	});
 
 	it('extractive: carries no synthesis note when synthesis never ran', () => {

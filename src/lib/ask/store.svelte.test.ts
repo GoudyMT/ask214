@@ -475,7 +475,12 @@ describe('createAskStore', () => {
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('results');
-		if (store.state.kind === 'results') expect(store.state.answer?.kind).toBe('extractive');
+		if (store.state.kind !== 'results') return;
+		expect(store.state.answer?.kind).toBe('extractive');
+		if (store.state.answer?.kind !== 'extractive') return;
+		// A thrown call is NOT "synthesis never ran", and the answer block discloses on that difference.
+		// Swallowing it to `undefined` made a failure indistinguishable from a reader who never enabled it.
+		expect(store.state.answer.synthesisNote).toBe('unavailable');
 	});
 
 	it('a results body with no valid hits degrades (a fault is not an authoritative "no source")', async () => {

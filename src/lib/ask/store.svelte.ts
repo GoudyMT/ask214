@@ -186,8 +186,10 @@ export function createAskStore(deps: {
 			try {
 				summary = toSynthesisView(await deps.synthesize(query, toRetrievedChunks(hits)));
 			} catch {
-				// A throwing synthesize must never strand the spinner; fall back to the raw cards.
-				summary = undefined;
+				// A throwing synthesize must never strand the spinner. It reports `unavailable` rather than
+				// nothing, because `undefined` means "synthesis never ran" - which is what the answer block
+				// discloses on - and a thrown call is not that.
+				summary = { kind: 'unavailable' };
 			}
 		}
 		// A crisis turn routes to help, never to benefits results - the same terminal state the keyword
