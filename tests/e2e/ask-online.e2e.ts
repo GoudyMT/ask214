@@ -176,6 +176,14 @@ const LONG_HIT = {
 			'Programs vary widely in length, industry, and location across the country. ' +
 			'Some are remote and some require relocation at your own expense. ' +
 			'Your command may withdraw approval if mission requirements change. ' +
+			// Filler that pushes the closing sentence past the 120-word tier-1 budget on purpose, so this
+			// test exercises the EXPAND path. Tier 1 renders the lead card's opening up to 120 words, so a
+			// chunk shorter than that is shown whole and offers no expansion at all - which is correct
+			// behaviour, covered by the short-chunk test below.
+			'Applications are submitted through your installation transition office well ahead of the start date. ' +
+			'Each service sets its own additional eligibility rules on top of the department policy. ' +
+			'Approval is never automatic and is evaluated against your unit manning and readiness. ' +
+			'Talk to your career counselor early because the paperwork can take several weeks to clear. ' +
 			'There is no guarantee of employment when the program ends.',
 		sourceId: 'dod_skillbridge',
 		sourceTitle: 'DoD SkillBridge',
@@ -226,4 +234,42 @@ test('the answer block shows a short answer above the cards and expands to the f
 	// The answer sits ABOVE the cards, and the lead card no longer repeats the same sentences underneath.
 	await expect(page.locator('.ask-card--lead')).toBeVisible();
 	await expect(page.locator('.ask-card--lead .ask-card__excerpt')).toHaveCount(0);
+});
+
+// The other half of the disclosure contract, and it covers the MAJORITY case. Tier 1 renders the lead card's
+// opening up to 120 words, so any chunk shorter than that is shown in full and there is nothing left to
+// expand to - measured at 53.3% of the 135 benchmark queries, because the government web pages that supply
+// over half the answers have a 52-word median. Offering a control that reveals the same sentences again is a
+// dead button, so the control must be ABSENT, not present-and-inert.
+test('offers no expansion when the whole passage already fits in the answer', async ({ page }) => {
+	await page.addInitScript(() => localStorage.setItem('mtc:ask:online-consented', '1'));
+	await page.route('**/api/retrieve', (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				status: 'results',
+				corpusVersion: CORPUS_VERSION,
+				results: [
+					{
+						...LONG_HIT,
+						chunk: {
+							...LONG_HIT.chunk,
+							id: 'skillbridge_short',
+							text: 'SkillBridge participation requires unit commander approval before any agreement is signed.'
+						}
+					}
+				]
+			})
+		})
+	);
+	await page.goto('/');
+	await expect(askInput(page)).toBeEnabled();
+	await askInput(page).fill('does SkillBridge require commander approval?');
+	await searchButton(page).click();
+
+	const answer = page.locator('.ask-answer');
+	await expect(answer).toBeVisible();
+	await expect(answer).toContainText(/commander approval/i);
+	await expect(page.getByRole('button', { name: /more detail/i })).toHaveCount(0);
 });
