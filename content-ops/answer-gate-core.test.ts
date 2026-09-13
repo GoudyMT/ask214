@@ -107,11 +107,25 @@ describe('report', () => {
 		);
 	});
 
-	it('fails when the two-tier bar loses its direction', () => {
-		expect(run({ experienceVsCard: { aOnly: 3, bOnly: 9 } }).join(' ')).toMatch(/does not beat/i);
+	// The tier-1 guard is the only paired bar left, and it is direction-only by design: demanding
+	// significance of a regression guard makes it unfalsifiable when the true effect is small, so it could
+	// only ever fail. See evaluateBar.
+	it('fails when tier 1 falls below the lead card at equal length', () => {
+		expect(run({ tier1VsHead: { aOnly: 2, bOnly: 8 } }).join(' ')).toMatch(/fallen BELOW/i);
 	});
 
-	it('fails when the two-tier bar wins but not distinguishably from chance', () => {
-		expect(run({ experienceVsCard: { aOnly: 3, bOnly: 2 } }).join(' ')).toMatch(/chance/i);
+	it('passes the guard on direction alone, without demanding significance', () => {
+		expect(run({ tier1VsHead: { aOnly: 3, bOnly: 2 } })).toEqual([]);
+	});
+
+	// RETIRED 2026-09-13, and pinned so it cannot be reinstated without someone reading why. The bar "the
+	// two-tier answer must beat the 120-word lead card" stopped being a comparison when the answer block was
+	// reverted to render that card's own passage: measured, the two surfaces disagree on 2 of 135 queries.
+	// The reversal was made because the previous surface shipped misleading text on 28 of 135 against the
+	// card's 20, a failure substring containment cannot see - it rose while harm rose with it. Re-adding
+	// this bar would gate the feature on a comparison with itself.
+	it('no longer gates on the two-tier comparison, whichever way it falls', () => {
+		expect(run({ experienceVsCard: { aOnly: 3, bOnly: 9 } })).toEqual([]);
+		expect(run({ experienceVsCard: { aOnly: 0, bOnly: 0 } })).toEqual([]);
 	});
 });

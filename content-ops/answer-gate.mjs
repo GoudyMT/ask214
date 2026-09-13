@@ -33,10 +33,22 @@ const LOCAL_MODEL_PATH = 'static/models/';
 // Absolute regression floors for THIS path, applied by report(). The on-device path uses a different model
 // and a different cutoff than the online one, so it carries its own numbers. Regression guard, not a
 // quality bar. Raise one when the feature improves; never lower one to make a run pass.
+// RE-DERIVED 2026-09-13 against a DELIBERATELY CHANGED surface, not to make a failing run pass. The answer
+// block was reverted to render the lead card's own passage after blind paired judgement measured the
+// previous surface shipping misleading text on 28 of 135 queries against that card's 20 - including a wrong
+// form number, a wrong helpline, and eligibility text stopping at a colon before its qualifying list.
+//
+// Coverage genuinely fell with that decision and these numbers say so honestly: tier 1 42.2% -> 39.3% and
+// the two-tier answer 50.4% -> 40.7%. Recording the lower figures is the point. A floor left at the old
+// value would assert a coverage level this surface never had, and the next person would read the failure as
+// a regression rather than as the trade that was chosen.
+//
+// Each floor is the rate measured on this path less roughly two queries of slack. Raise one when the feature
+// genuinely improves; never lower one to make a run pass.
 const FLOORS = {
-	answered: 0.4, // measured 42.2%
-	expanded: 0.48, // measured 50.4%
-	inTopK: 0.71, // measured 73.3%
+	answered: 0.37, // measured 39.3%, identical to the lead card by construction
+	expanded: 0.38, // measured 40.7%
+	inTopK: 0.71, // measured 73.3%, untouched by this change - retrieval did not move
 	rendered: 0.95 // measured 135 of 135
 };
 

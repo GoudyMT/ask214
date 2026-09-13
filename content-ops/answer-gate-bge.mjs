@@ -28,14 +28,27 @@ const MIN_SCORE = 0.6;
 const K = 5;
 const LEAD_CARD_WORDS = 120;
 
-// Absolute regression floors for THIS path, applied by report(). Each is the rate measured here through
-// real Workers AI serving on 2026-09-11, less roughly two queries of slack at n=135. They are a
-// regression guard, NOT a quality bar - the spec's locked 85%/91% is not met and closing that gap is a
-// product decision. Raise one when the feature improves; never lower one to make a run pass.
+// Absolute regression floors for THIS path, applied by report().
+//
+// STALE AS OF 2026-09-13, AND KNOWINGLY LEFT SO. Every value below was measured on 2026-09-11 against a
+// surface that no longer exists: the answer block then chose its card across the retrieved set, and it now
+// renders the lead card's passage, because blind paired judgement measured the old surface shipping
+// misleading text on 28 of 135 queries against that card's 20. On the device path the same reversal moved
+// tier 1 from 42.2% to 39.3% and the two-tier answer from 50.4% to 40.7%.
+//
+// These online numbers will have moved by a comparable amount and WILL fail until they are re-derived. They
+// are deliberately not adjusted by analogy: this path uses a different model and a different cutoff, and
+// guessing its floors from the device path's delta would be inventing a measurement. Re-derive them from a
+// real run - `pnpm answer-gate:bge` against a live Workers AI binding
+// (`wrangler dev --config content-ops/bge-embed/wrangler.jsonc`) - and replace the comments with the figures
+// that run produces.
+//
+// Only the device gate runs in CI, which is why this being red does not hide a regression there.
+// Raise a floor when the feature improves; never lower one to make a run pass.
 const FLOORS = {
-	answered: 0.48, // measured 50.4%
-	expanded: 0.6, // measured 62.2%
-	inTopK: 0.83, // measured 85.2%
+	answered: 0.48, // STALE - measured 50.4% on the superseded surface
+	expanded: 0.6, // STALE - measured 62.2% on the superseded surface
+	inTopK: 0.83, // measured 85.2%; retrieval did not change, so this one should still hold
 	rendered: 0.95 // calibrated against a real run below
 };
 

@@ -6,21 +6,26 @@ const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 describe('selectAnswer', () => {
 	it('returns the whole body when it is under the target', () => {
 		const body = 'You have one year to submit the completed claim.';
-		expect(selectAnswer(body, 'how long do I have to file?')).toBe(body);
+		expect(selectAnswer(body)).toBe(body);
 	});
 
-	// The opening has to be long enough to fill the budget on its own, or selection has nothing to choose
-	// between - everything fits and including the opening is correct behavior, not a scoring failure.
-	it('picks the run that matches the query, not the opening', () => {
+	// The opening is ALWAYS kept, even when a later sentence matches the question better. That is the
+	// invariant this module exists to hold: a benefits document puts the condition that governs everything
+	// after it at the top. The body runs past the 120-word ceiling on purpose, so the answer genuinely has to
+	// leave something out - and what it leaves out is the END, never the start.
+	it('always begins at the passage opening, and truncates from the end', () => {
+		const filler = Array.from(
+			{ length: 7 },
+			(_, i) =>
+				`Module ${i} of this guide explains a separate part of the transition timeline in considerable detail.`
+		).join(' ');
 		const body =
-			'This chapter introduces the benefits and services available to you and your family after separation from military service. ' +
-			'It is organized into four modules that follow the order of the transition timeline. ' +
-			'Each module ends with a short checklist you can complete at your own pace. ' +
-			'A burial allowance helps cover the cost of a funeral and a burial plot. ' +
-			'Contact your transition coordinator for scheduling.';
-		const out = selectAnswer(body, 'what is the burial allowance?');
-		expect(out).toContain('burial allowance helps cover');
-		expect(out).not.toContain('This chapter introduces');
+			'To qualify for this payment you must meet every condition listed in this section. ' +
+			`${filler} ` +
+			'A burial allowance helps cover the cost of a funeral and a burial plot.';
+		const out = selectAnswer(body);
+		expect(out.startsWith('To qualify for this payment')).toBe(true);
+		expect(out).not.toContain('burial allowance helps cover');
 	});
 
 	// `.endsWith('.')` alone is satisfied by the marked cut's own '...', so this asserted nothing about the
@@ -30,49 +35,46 @@ describe('selectAnswer', () => {
 		const body = Array.from({ length: 12 }, (_, i) => `Sentence number ${i} of the passage.`).join(
 			' '
 		);
-		const out = selectAnswer(body, 'passage');
+		const out = selectAnswer(body);
 		expect(out.endsWith('.')).toBe(true);
 		expect(out.endsWith('...')).toBe(false);
 	});
 
-	// A trailing cut is marked; a LEADING cut is the same defect facing the other way. On a benefits
-	// document the sentence before the answer is usually the condition or the negation that governs it, so
-	// dropping it unmarked lets the app print a statement the source does not make. The opening here is
-	// sized to fill the 45-word scoring budget on its own - shorter, and the whole body fits, nothing is
-	// selected against, and the test proves nothing.
-	it('marks a run that starts mid-passage, so a dropped condition is visible', () => {
+	// The governing negation is the FIRST sentence, and it is exactly what a start-scored run used to drop -
+	// leaving "You are currently incarcerated..." reading as a statement ABOUT the reader rather than one of
+	// the conditions that disqualifies them. Same fixture as before the change; the assertions are inverted,
+	// because what was correct behavior is now the defect.
+	it('keeps a governing negation that a start-scored run used to drop', () => {
 		const body =
 			'You are not eligible for this payment if any of the following circumstances apply to you at ' +
 			'the time that your application is received by the regional office that serves the area where ' +
 			'you currently reside and maintain your permanent legal residence. ' +
 			'You are currently incarcerated in a federal or state penal institution for a felony conviction. ' +
 			'You already receive a similar benefit from another federal agency for the same period.';
-		const out = selectAnswer(body, 'incarcerated felony penal institution');
-		expect(out).toContain('currently incarcerated');
-		expect(out).not.toContain('You are not eligible');
-		expect(out.startsWith('...')).toBe(true);
+		const out = selectAnswer(body);
+		expect(out).toContain('You are not eligible');
+		expect(out.startsWith('...')).toBe(false);
 	});
 
 	it('does not mark a run that starts at the opening', () => {
 		const body = 'First sentence here. Second sentence here. Third sentence here.';
-		expect(selectAnswer(body, 'first').startsWith('...')).toBe(false);
+		expect(selectAnswer(body).startsWith('...')).toBe(false);
 	});
 
-	// `subdivideLists` splits a flattened list on ' - ', and the pieces were rejoined with a plain space -
-	// so two independent bullets could render as one continuous statement. The counts are exact on purpose:
-	// the fusion needs the two pieces to sum to the ceiling (67) while the first stays under the 45-word
-	// target, which is what makes the packer take both. Change a count and the test stops testing this.
+	// A flattened list must not render two independent bullets as one continuous statement - a "you may use
+	// this for X" item welded to a "you may not use it for Y" item reads as a sentence the document never
+	// wrote. At 67 words this body sits inside the 120-word ceiling, so it is emitted whole and the bullet
+	// separator must survive intact.
 	it('keeps two list items from reading as one statement', () => {
 		const item = (n: number, w: string) => Array.from({ length: n }, () => w).join(' ');
 		const body = `${item(44, 'tuition')} - ${item(23, 'housing')}`;
-		const out = selectAnswer(body, 'tuition');
+		const out = selectAnswer(body);
 		expect(out).toContain('tuition - housing');
 		expect(out).not.toContain('tuition housing');
 	});
 
-	// The list has no sentence terminator, so it reads as one 50-word sentence. Against a strict 45-word
-	// target the packer takes the 5-word lead-in and stops immediately before the answer; the 1.5x ceiling
-	// is what lets it absorb the list instead. Shorten this fixture and the test stops testing anything.
+	// The list carries no sentence terminator, so it reads as one long sentence. The 1.5x ceiling is what
+	// lets the packer absorb it rather than stopping on the short lead-in before it.
 	it('absorbs an unterminated list rather than stopping right before the answer', () => {
 		const body =
 			'You will need several documents. ' +
@@ -80,28 +82,48 @@ describe('selectAnswer', () => {
 			'certificate your birth certificates your direct deposit information your service treatment ' +
 			'records and any private medical evidence you want us to consider including statements from ' +
 			'people who served with you and any evidence of continued treatment after separation';
-		expect(selectAnswer(body, 'what documents do I need to submit?')).toContain('DD214');
+		expect(selectAnswer(body)).toContain('DD214');
 	});
 
 	it('does not treat an abbreviation period as a sentence end', () => {
 		const body =
 			'Apply through the U.S. Department of Veterans Affairs within one year of separation.';
-		expect(selectAnswer(body, 'where do I apply?')).toBe(body);
+		expect(selectAnswer(body)).toBe(body);
 	});
 
-	it('falls back to the opening when the query carries no content terms', () => {
+	it('emits the opening sentences', () => {
 		const body = 'First sentence here. Second sentence here. Third sentence here.';
-		expect(selectAnswer(body, 'what is it')).toContain('First sentence');
+		expect(selectAnswer(body)).toContain('First sentence');
+	});
+
+	// A run that starts partway into a passage drops whatever governed it. On a benefits document that is
+	// the condition, and the entitlement then reads as unconditional - text true in the source and false on
+	// screen. Judged blind over 135 real queries, a start-scored window shipped misleading text on 20.7% of
+	// them against 13.3% for the head window it replaced, and 17 of those were answers the head window got
+	// right. The output begins at the passage opening for that reason.
+	it('keeps the governing condition attached to what it governs', () => {
+		// 53 words, so the opening cannot fit in the scoring window alongside the answering sentence. A
+		// shorter body fits whole, nothing is selected against, and the test would pass against an
+		// implementation that does no selection at all.
+		const body =
+			'You may be able to get this grant if you meet both of the requirements that are listed below ' +
+			'in this section of the guide. ' +
+			'You own or will own the home, or a family member owns or will own the home in which you ' +
+			'currently live. ' +
+			'You have a qualifying service-connected disability.';
+		const out = selectAnswer(body);
+		expect(out).toContain('if you meet both of the requirements');
+		expect(out.startsWith('...')).toBe(false);
 	});
 
 	it('stays within the ceiling', () => {
-		const body = Array.from({ length: 40 }, (_, i) => `Filler sentence ${i} about benefits.`).join(
+		const body = Array.from({ length: 90 }, (_, i) => `Filler sentence ${i} about benefits.`).join(
 			' '
 		);
-		expect(words(selectAnswer(body, 'benefits'))).toBeLessThanOrEqual(68); // 45 * 1.5
+		expect(words(selectAnswer(body))).toBeLessThanOrEqual(120); // the lead card cap
 	});
 
 	it('returns an empty string for an empty body', () => {
-		expect(selectAnswer('   ', 'anything')).toBe('');
+		expect(selectAnswer('   ')).toBe('');
 	});
 });

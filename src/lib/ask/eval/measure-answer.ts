@@ -230,7 +230,7 @@ export async function measureAnswers(input: {
 		const top = cards[0];
 		if (top === undefined) continue;
 
-		const answer = toExtractiveAnswer(cards, q.query);
+		const answer = toExtractiveAnswer(cards);
 		if (answer === undefined) continue;
 
 		const budget = wordCount(answer.text);
@@ -269,10 +269,7 @@ export async function measureAnswers(input: {
 		// surfacing it means perfect card choice would have answered, so this is the true upper bound.
 		const reachable = cards.some((card) => {
 			if (!holds(card.excerpt, card.sourceId)) return false;
-			return holds(
-				selectAnswer(stripHeadingEcho(card.excerpt, card.section), q.query),
-				card.sourceId
-			);
+			return holds(selectAnswer(stripHeadingEcho(card.excerpt, card.section)), card.sourceId);
 		});
 		if (reachable) metrics.bestCardAnswered++;
 	}

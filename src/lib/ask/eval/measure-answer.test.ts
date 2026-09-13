@@ -40,9 +40,22 @@ const LONG_BODY =
 	'Referrals to other VA facilities are made when a need falls outside the center scope. ' +
 	'Locations are listed in the directory and many operate outside normal business hours. ' +
 	'Eligibility extends to members who served in any combat theater or area of hostility. ' +
+	// Filler that pushes the snippet past the 120-word tier-1 budget on purpose. Several tests here turn on
+	// the snippet being reachable in the PASSAGE but not in the ANSWER, and a body inside the budget is
+	// returned whole - which would make those tests pass against an implementation that truncates nothing.
+	'Counselors coordinate with community providers when a veteran needs care the center cannot deliver. ' +
+	'Group sessions run on a weekly schedule and are open to family members of enrolled veterans. ' +
+	'Staff can explain how readjustment counseling differs from the care provided at a medical center. ' +
 	'The magic phrase is that bereavement counseling is available to surviving family members.';
 
 const SNIPPET = 'bereavement counseling is available to surviving family members';
+
+// The snippet sits past a 10-word card window but inside the answer's opening run. The answer is emitted
+// from the passage opening, so a fixture hiding the snippet in the tail would test nothing.
+const OPENING_BODY =
+	'Vet Centers serve combat veterans and their families nationwide. ' +
+	`Additionally ${SNIPPET} at no cost. ` +
+	'Staff are frequently veterans themselves and many served in combat theaters.';
 
 const base = {
 	embed,
@@ -95,14 +108,14 @@ describe('measureAnswers', () => {
 	// The baseline IS the bar the gate compares against, so its window has to be the card's real one. Reading
 	// the whole excerpt instead of the first N words would inflate the floor and could fail a real improvement.
 	it('reads the baseline from the lead card first N words only', async () => {
-		const corpus = corpusOf([[chunk({ id: 'a', text: LONG_BODY }), [1, 0]]]);
+		const corpus = corpusOf([[chunk({ id: 'a', text: OPENING_BODY }), [1, 0]]]);
 		const queries: AnswerEvalItem[] = [
 			{ query: 'readjustment counseling combat', sourceId: 'tap_va101', answerSnippet: SNIPPET }
 		];
 		const wide = await measureAnswers({ ...base, corpus, queries, leadCardWords: 120 });
 		const narrow = await measureAnswers({ ...base, corpus, queries, leadCardWords: 10 });
-		expect(wide.baseline).toBe(1); // the whole ~80-word body fits inside 120 words
-		expect(narrow.baseline).toBe(0); // the snippet sits past a 10-word window
+		expect(wide.baseline).toBe(1); // the snippet sits at word 11, well inside a 120-word window
+		expect(narrow.baseline).toBe(0); // and past a 10-word one
 	});
 
 	// The measurement that justified choosing across the retrieved set: the answer exists, retrieval found
@@ -196,20 +209,22 @@ describe('measureAnswers', () => {
 	});
 
 	// The second bar, so tier 1 cannot quietly rot while tier 2 carries the gate. Length is held fixed, so
-	// this tests WHICH words, not how many.
+	// this tests WHICH words, not how many. Since the answer became the lead card's own opening, what still
+	// separates it from a same-length head window of that card is the heading echo: the answer has it
+	// stripped and spends the whole budget on content, while the raw window spends its first words repeating
+	// the section title and reaches less far into the chunk.
 	it('splits the discordant pairs for tier 1 against a length-matched lead card', async () => {
-		const wrong = chunk({ id: 'wrong', text: 'Parking at the facility is limited to two hours.' });
-		const right = chunk({ id: 'right', text: `${SNIPPET}. Referrals are made as needed.` });
-		const corpus = corpusOf([
-			[wrong, [1, 0]], // rank 0, holds nothing
-			[right, [0.8, 0.6]]
-		]);
+		const SECTION = 'What bereavement services does the Vet Center provide to surviving families';
+		const lead = chunk({
+			id: 'lead',
+			section: SECTION,
+			text: `${SECTION} Vet Centers serve combat veterans and their families at no cost to the veteran or to any family member whatsoever. ${SNIPPET}.`
+		});
 		const m = await measureAnswers({
 			...base,
-			corpus,
+			corpus: corpusOf([[lead, [1, 0]]]),
 			queries: [{ query: 'bereavement counseling', sourceId: 'tap_va101', answerSnippet: SNIPPET }]
 		});
-		// Choosing the later card wins where truncating the lead card never could.
 		expect(m.tier1VsHead.aOnly).toBe(1);
 		expect(m.tier1VsHead.bOnly).toBe(0);
 	});
@@ -217,12 +232,10 @@ describe('measureAnswers', () => {
 	// The two rates alone cannot say whether a margin is real. These are the discordant pairs: the queries
 	// where the two surfaces actually disagree, which is the only place the comparison carries information.
 	it('splits the discordant pairs by which surface won', async () => {
-		const corpus = corpusOf([[chunk({ id: 'a', text: LONG_BODY }), [1, 0]]]);
-
-		// The answer finds the tail sentence; a 10-word card window cannot reach it.
+		// The answer reaches the snippet in its opening run; a 10-word card window stops short of it.
 		const answerWins = await measureAnswers({
 			...base,
-			corpus,
+			corpus: corpusOf([[chunk({ id: 'a', text: OPENING_BODY }), [1, 0]]]),
 			leadCardWords: 10,
 			queries: [
 				{ query: 'bereavement surviving family', sourceId: 'tap_va101', answerSnippet: SNIPPET }
@@ -231,10 +244,26 @@ describe('measureAnswers', () => {
 		expect(answerWins.tier1VsCard.aOnly).toBe(1);
 		expect(answerWins.tier1VsCard.bOnly).toBe(0);
 
-		// Selection lands on the opening run, but the whole body fits inside a 120-word card window.
+		// The card wins in exactly one shape now that both surfaces render the lead card's opening: a
+		// sentence boundary stops the answer short of the card's raw word window. Four 25-word sentences
+		// pack to 100; the fifth would bust 120 so the answer stops, while the card's raw 120-word window
+		// reaches into that fifth sentence and picks the snippet up.
+		const sentence = (n: number) =>
+			`Filler ${Array.from({ length: 23 }, () => 'word').join(' ')} ${n}.`;
 		const cardWins = await measureAnswers({
 			...base,
-			corpus,
+			corpus: corpusOf([
+				[
+					chunk({
+						id: 'boundary',
+						text:
+							`${sentence(1)} ${sentence(2)} ${sentence(3)} ${sentence(4)} ` +
+							`Bereavement counseling is available to surviving family members and this clause ` +
+							`deliberately runs on past the budget for several more words here.`
+					}),
+					[1, 0]
+				]
+			]),
 			leadCardWords: 120,
 			queries: [
 				{ query: 'readjustment counseling combat', sourceId: 'tap_va101', answerSnippet: SNIPPET }
@@ -325,11 +354,14 @@ describe('measureAnswers', () => {
 		expect(m.tier1VsCard.bOnly).toBe(0);
 	});
 
-	// The coverage bar compares a ~56-word extract against a 120-word block, so the longer surface wins
-	// almost by construction and the comparison cannot say whether SELECTION works. These two hold length
-	// fixed at whatever the answer actually rendered, leaving only which words were chosen.
+	// headSameCard is now DEGENERATE and is kept only as a printed diagnostic, never as a bar. It compares
+	// the answer against the first wordCount(answer) words of the same passage - and since the answer became
+	// a whole-sentence window over that passage's opening, the two are the same text by construction. It
+	// existed to show that CHOOSING words beat a head window; that mechanism was removed once it measured
+	// 0.0pp on device while causing the severing this module now prevents. The gate's second bar is
+	// tier1VsHead, which pairs against the LEAD card truncated and still discriminates.
 	it('scores a head window of the same length on the chosen card', async () => {
-		const corpus = corpusOf([[chunk({ id: 'a', text: LONG_BODY }), [1, 0]]]);
+		const corpus = corpusOf([[chunk({ id: 'a', text: OPENING_BODY }), [1, 0]]]);
 		const m = await measureAnswers({
 			...base,
 			corpus,
@@ -337,9 +369,8 @@ describe('measureAnswers', () => {
 				{ query: 'bereavement surviving family', sourceId: 'tap_va101', answerSnippet: SNIPPET }
 			]
 		});
-		// Selection reaches the tail sentence; the same number of words taken from the top does not.
 		expect(m.answered).toBe(1);
-		expect(m.headSameCard).toBe(0);
+		expect(m.headSameCard).toBe(1);
 	});
 
 	// The naive alternative to this whole feature: keep the lead card and just truncate it to the same

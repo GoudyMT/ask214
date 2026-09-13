@@ -52,112 +52,36 @@ export type AnswerView =
 export type SlotSynthesis = Exclude<SynthesisView, { kind: 'crisis' }>;
 
 // Words too common to carry query signal - the same small list the selector uses, for the same reason.
-const STOP_WORDS = new Set(
-	(
-		'what how when where why who which the a an of to for and or in on at is are do does i my me ' +
-		'you your can if it that this with be been will would should'
-	).split(' ')
-);
-
-function normalize(text: string): string {
-	return text
-		.toLowerCase()
-		.replace(/[^a-z0-9 ]+/g, ' ')
-		.replace(/\s+/g, ' ')
-		.trim();
-}
-
-/** The share of the query's content terms that appear anywhere in `text`. */
-function coverage(text: string, terms: Set<string>): number {
-	if (terms.size === 0) return 0;
-	const haystack = normalize(text);
-	let hit = 0;
-	for (const term of terms) if (haystack.includes(term)) hit++;
-	return hit / terms.size;
-}
-
-// How much a match in the heading or the opening line counts on top of a match anywhere in the chunk, and
-// how much a phone number counts when the question asks for one. NOT fitted to the benchmark: both were
-// chosen as "enough to overturn a moderate coverage gap, not enough to overrule a large one" and measured
-// once. Worth +1.5pp end to end, which fixed 5 of the 20 mention-beats-answer failures and introduced 2
-// where the boost overturned a card that was right. A sweep of these values would be fitting to the score
-// they are judged by, so it belongs on the tune split or nowhere.
-const HEAD_WEIGHT = 0.6;
-const CONTACT_WEIGHT = 0.6;
-// How much of the chunk counts as its opening. These sources are FAQ-shaped: the chunk that answers usually
-// restates the question in its first line.
-const OPENING_WORDS = 25;
-
-/** The question is asking how to reach someone, so a passage without a number cannot answer it. */
-const CONTACT_INTENT = /\b(?:call|phone|number|hotline|helpline|contact|reach)\b/;
-/** A US number as these documents write them: 1-800-827-1000, 877-827-3702, 1-877-222-VETS, 1-855-VA-WOMEN. */
-const PHONE = /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b1-\d{3}-[A-Za-z0-9]{2,}-[A-Za-z0-9]+/;
-
 /**
- * The heading plus the opening line - the part of a chunk that says what it is ABOUT, rather than what it
- * happens to mention. Coverage over the whole chunk cannot tell those apart, which is what let a card that
- * merely name-drops the query's words beat the card that answers.
- */
-function headArea(card: ResultCard): string {
-	const opening = card.excerpt.split(/\s+/).slice(0, OPENING_WORDS).join(' ');
-	return `${card.section ?? ''} ${opening}`;
-}
-
-/**
- * Build the extractive answer from the retrieved set.
+ * Build the extractive answer from the card retrieval ranked first.
  *
- * It reads EVERY retrieved card, not just the first. Retrieval is not the weak link: measured end to end on
- * the online path (2026-09-11, `pnpm answer-gate:bge`), the answer sits in SOME retrieved card 85.2% of the
- * time. Choice is. The rendered answer carries it 50.4%, and would carry it 74.1% if the right card were
- * always picked - so roughly 24 points sit inside cards retrieval has already returned.
+ * It deliberately does NOT choose across the retrieved set, and that reversal is the whole point. Scoring
+ * every card on term coverage, heading match and contact intent won +8.1pp on substring containment, and it
+ * was the mechanism behind 11 of the 17 queries where this block shipped text a reader would be misled by
+ * on a question the lead card had rendered safely.
  *
- * Three signals decide, all multiplied by retrieval's own score so ranking still counts. Term coverage over
- * the whole chunk is the base. A match in the HEADING or opening line counts extra, because coverage alone
- * cannot tell a chunk that answers from one that name-drops the question's words - the dominant failure,
- * where a USERRA card won a "VET TEC" query on incidental mentions. And a chunk carrying a phone number
- * counts extra when the question asks who to call, because a resource listing never repeats the words
- * "call" or "number" and so loses exactly the query it answers.
+ * Measured by blind paired judgement over all 135 benchmark queries (2026-09-13): the answer block put
+ * misleading text on screen for 28 queries against the lead card's 20. Widening the window to the card's own
+ * length raised how often the block answered - 62 to 66 - and moved harm by nothing, because truncating at
+ * any budget severs something and what separated the two surfaces was WHICH card got truncated.
  *
- * Ties and empty queries keep the retrieval order, which is the honest default.
+ * So the block now renders the lead card's own passage, and its harm equals that card's by construction.
+ * What the block adds over the bare card is the second tier, the route into the source document, and the
+ * standing 38 CFR note - not a different choice of text.
+ *
+ * Do NOT re-introduce cross-card scoring without re-running the harm comparison; substring containment
+ * cannot see this failure, and rose while harm rose with it.
  *
  * @param cards The retrieved cards in retrieval order; each excerpt is full cleaned chunk text.
- * @param query The user's question.
- * @returns Both tiers plus the citation of the card the answer was actually taken from, or undefined when
- *   there are no cards.
+ * @returns Both tiers plus the lead card's citation, or undefined when there are no cards.
  */
-export function toExtractiveAnswer(
-	cards: ResultCard[],
-	query: string
-): ExtractiveAnswer | undefined {
-	if (cards.length === 0) return undefined;
-	const terms = new Set(
-		normalize(query)
-			.split(' ')
-			.filter((w) => w.length > 2 && !STOP_WORDS.has(w))
-	);
-
-	const wantsContact = CONTACT_INTENT.test(normalize(query));
-
-	let best = cards[0]!;
-	let bestScore = -1;
-	for (const card of cards) {
-		// Three signals, all multiplied by retrieval's own evidence so ranking still counts:
-		//   - what the chunk mentions anywhere (the original signal)
-		//   - what its heading and opening line are ABOUT, which is what separates answering from mentioning
-		//   - whether it carries a number, when a number is what was asked for
-		const contact = wantsContact && PHONE.test(card.excerpt) ? CONTACT_WEIGHT : 0;
-		const score =
-			(coverage(card.excerpt, terms) + HEAD_WEIGHT * coverage(headArea(card), terms) + contact) *
-			card.score;
-		if (score > bestScore) {
-			bestScore = score;
-			best = card;
-		}
-	}
+export function toExtractiveAnswer(cards: ResultCard[]): ExtractiveAnswer | undefined {
+	const best = cards[0];
+	if (best === undefined) return undefined;
 
 	const passage = stripHeadingEcho(best.excerpt, best.section);
 	return {
-		text: selectAnswer(passage, query),
+		text: selectAnswer(passage),
 		passage,
 		sourceId: best.sourceId,
 		sourceTitle: best.sourceTitle,

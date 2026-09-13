@@ -1,61 +1,31 @@
 import { splitSentences } from '$lib/content-ops/chunk/sentences';
 
-// Measured END TO END through real retrieval over the 135 answerable benchmark queries, 2026-09-11.
-// Regenerate with `pnpm answer-gate:bge` (online) or `pnpm answer-gate` (device) - these move whenever the
-// corpus, the benchmark or the pipeline does, so treat them as a dated reading, not a constant:
+// The answer surface shown above the result cards. It emits the OPENING sentences of the chosen chunk,
+// whole, up to 120 words.
 //
-//                          online   device
-//     this selected text    50.4%    42.2%
-//     the 120-word card     51.1%    39.3%
-//     after tapping More    62.2%    50.4%
+// What replaced what, and why, measured 2026-09-13 by blind paired judgement over the 135 benchmark
+// queries: this previously emitted a ~52-word run chosen by query-term score. Judged as a reader would,
+// that shipped misleading text on 20.7% of queries against 13.3% for the 120-word lead card it replaced -
+// and 17 of those were answers the card had got right. The cause is structural, not a tuning error: a run
+// starting partway into a passage drops whatever governed it, which on a benefits document is the
+// condition, the deadline or the negation.
 //
-// The constants below cap the output at 67 words.
+// Regenerate the rates with `pnpm answer-gate:bge` (online) or `pnpm answer-gate` (device). They move
+// whenever the corpus, the benchmark or the pipeline does, so treat any number here as a dated reading.
 //
-// Two things this selector is NOT. It is not why the score sits near half: the answer is in SOME retrieved
-// card 85.2% of the time online, and choosing the best of those by hand reaches 74.1%, so the loss is in
-// card choice and ranking - where four independent methods each moved it by nothing. And the word-picking
-// itself is worth roughly zero: against simply taking the first N words of the same passage at the same
-// budget it measured 0.0pp on device and +1.5pp online. Its real value is that the output ends on a
-// sentence boundary.
-//
-// Scoring these runs by embedding cosine to the query, instead of by term overlap, has been measured and is
-// dead: it won 9 queries and lost 8 for +0.7pp, McNemar p=1.0. (That run predates the benchmark correction
-// that produced the table above; the margin was indistinguishable from a coin flip either way.) Cosine
-// scores TOPICALITY, so a short on-topic stub ("Learn more about how the Rudisill decision affects you")
-// outranks the longer sentence that answers. Term overlap resists that by accident, because an answering
-// sentence carries more of the question's specific nouns than a stub does. Do not re-try it.
-const TARGET_WORDS = 45;
-// A sentence may cross the target up to this multiple. Extraction leaves long lists with no terminator, so
-// they read as one huge sentence; without the ceiling the packer stops on the short lead-in immediately
-// before the answer.
-const CEILING_MULTIPLIER = 1.5;
-// Words too common to carry query signal. Deliberately small - enough to stop "what/how/the/my" dominating
-// the score, not a real stoplist.
-const STOP_WORDS = new Set(
-	(
-		'what how when where why who which the a an of to for and or in on at is are do does i my me ' +
-		'you your can if it that this with be been will would should'
-	).split(' ')
-);
-
-function normalize(text: string): string {
-	return text
-		.toLowerCase()
-		.replace(/[^a-z0-9 ]+/g, ' ')
-		.replace(/\s+/g, ' ')
-		.trim();
-}
+// Known and settled, so that none of it is re-litigated: the loss is NOT in this module. The answer is in
+// SOME retrieved card 85.2% of the time online while the rendered answer reaches roughly half that, so the
+// gap lives in card choice and retrieval, where four independent methods each moved it by nothing.
+// 120 words, matching the lead card exactly, because this block now renders that card's own passage. An
+// earlier 80-word target emitted a median of 82 words against the card's 118 and so scored BELOW the surface
+// it is meant to equal - the block was quietly showing less than the card while claiming to be it.
+const TARGET_WORDS = 120;
+// No headroom above the target: the ceiling IS the card's cap. A single sentence longer than that is cut on
+// a word boundary and the cut is marked, which is the one place this module cuts mid-sentence.
+const CEILING_MULTIPLIER = 1;
 
 function wordCount(text: string): number {
 	return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-function contentTerms(query: string): Set<string> {
-	return new Set(
-		normalize(query)
-			.split(' ')
-			.filter((w) => w.length > 2 && !STOP_WORDS.has(w))
-	);
 }
 
 /**
@@ -156,19 +126,28 @@ function packRun(units: Unit[], from: number, limit: number): Unit[] {
 }
 
 /**
- * Choose the sentences of `body` that answer `query` - the short answer shown above the result cards.
+ * Whole sentences from the opening of `body`, up to the ceiling - the answer shown above the result cards.
  *
- * Consecutive sentence runs are scored by how many of the query's content terms they contain; the
- * highest-scoring start wins, earliest on a tie because these documents are written answer-first. Whole
- * sentences only: cutting on a word boundary measured WORSE than doing nothing clever, because it breaks
- * the answer apart. The scoring window packs to the target while the emitted run may reach the ceiling -
- * that asymmetry is what the measurement was taken against.
+ * It begins at the opening rather than at a query-scored run, and that is the whole point. Scoring a start
+ * position measured 0.0pp on device and +1.5pp online against a plain head window of the same length, so it
+ * bought nothing - while costing a great deal. A run beginning partway into a passage silently drops
+ * whatever governed it, and in a benefits document that is the condition, the deadline, or the negation. The
+ * result is text that is true in the source and false on screen, which is the one shape 38 CFR 14.629
+ * forbids: quoting verbatim guarantees fidelity to the source's WORDS, not to its TRUTH CONDITIONS.
+ *
+ * Measured by blind paired judgement over the 135 benchmark queries, 2026-09-13: a start-scored 52-word
+ * window shipped misleading text on 20.7% of them against 13.3% for the 120-word head window it replaced,
+ * and 17 of those were answers the head window had got right. Hence the opening, and hence the 120-word
+ * ceiling that matches the card measured at 13.3%.
+ *
+ * Do NOT re-introduce start scoring in any form. Term overlap is what this replaced; embedding cosine was
+ * measured separately at +0.7pp, 9 queries won and 8 lost, McNemar p=1.0, because cosine scores TOPICALITY
+ * and a short on-topic stub outranks the sentence that answers.
  *
  * @param body The cleaned chunk text, heading echo already stripped.
- * @param query The user's question.
- * @returns The selected sentences joined by a space, or '' when the body holds no sentences.
+ * @returns The opening sentences joined by a space, or '' when the body holds no sentences.
  */
-export function selectAnswer(body: string, query: string): string {
+export function selectAnswer(body: string): string {
 	const ceiling = TARGET_WORDS * CEILING_MULTIPLIER;
 	const units = subdivideLists(
 		splitSentences(body)
@@ -177,25 +156,5 @@ export function selectAnswer(body: string, query: string): string {
 		ceiling
 	);
 	if (units.length === 0) return '';
-
-	const terms = contentTerms(query);
-	let from = 0;
-	if (terms.size > 0) {
-		let bestScore = -1;
-		for (let i = 0; i < units.length; i++) {
-			const candidate = normalize(joinUnits(packRun(units, i, TARGET_WORDS)));
-			let score = 0;
-			for (const term of terms) if (candidate.includes(term)) score++;
-			if (score > bestScore) {
-				bestScore = score;
-				from = i;
-			}
-		}
-	}
-	const text = joinUnits(packRun(units, from, ceiling));
-	// A LEADING cut, marked the way the trailing one already is. Everything before `from` is text the
-	// document has and the reader does not, and in a benefits document that is usually the condition or the
-	// negation governing what follows - so an unmarked start can turn "you are NOT eligible if X" into a
-	// flat statement that X applies to the reader. Attached with no space, matching the trailing form.
-	return from > 0 ? `...${text}` : text;
+	return joinUnits(packRun(units, 0, ceiling));
 }

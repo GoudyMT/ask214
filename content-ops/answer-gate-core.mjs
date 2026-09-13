@@ -60,7 +60,7 @@ export function runOracle(corpus, queries) {
 		);
 		if (!chunk) continue;
 		pairs++;
-		if (norm(selectAnswer(bodyOf(chunk), q.query)).includes(needle)) hit++;
+		if (norm(selectAnswer(bodyOf(chunk))).includes(needle)) hit++;
 	}
 	return { hit, pairs };
 }
@@ -75,7 +75,7 @@ export function runOracle(corpus, queries) {
 export function scanJunk(corpus) {
 	const dirty = [];
 	for (const chunk of corpus.chunks) {
-		const out = selectAnswer(bodyOf(chunk), 'benefits');
+		const out = selectAnswer(bodyOf(chunk));
 		for (const { pattern, label } of JUNK) {
 			if (pattern.test(out)) dirty.push({ id: chunk.id, label, sample: out.slice(0, 90) });
 		}
@@ -103,17 +103,15 @@ export function report(input) {
 	);
 
 	console.log(`\n[3/4] SHIPPED (${label}): embed -> search -> cards[0] -> the rendered answer...`);
-	// Labels name what each number is actually WIRED to. They used to read "<- THE GATE" on tier 1 and
-	// "<- the floor it must beat" on the card, and neither was true: tier 1 feeds a direction-only guard,
-	// and the card is compared against the two-tier experience, not against tier 1.
+	// Labels name what each number is actually WIRED to, and nothing else. A label describing a pass
+	// condition the code does not implement was a finding in its own right once; the only bar left is the
+	// direction-only tier-1 guard, everything else here is a floor or context.
 	console.log(
 		`    the rendered short answer contains it   ${pct(m.answered, n)}   <- floor + the tier-1 guard`
 	);
+	console.log(`    after tapping More detail               ${pct(m.expanded, n)}   <- floor`);
 	console.log(
-		`    after tapping More detail               ${pct(m.expanded, n)}   <- THE BAR, against the card below`
-	);
-	console.log(
-		`    the ${leadCardWords}-word lead card contained it     ${pct(m.baseline, n)}   <- what the two-tier answer must beat`
+		`    the ${leadCardWords}-word lead card contained it     ${pct(m.baseline, n)}   <- the surface tier 1 now renders`
 	);
 	console.log(`    reachable ceiling (in SOME card)        ${pct(m.inTopK, n)}`);
 	console.log(`    right answer buried under a wrong one   ${pct(m.buriedWrong, n)}`);
@@ -129,10 +127,10 @@ export function report(input) {
 	const pOld = mcnemarExactP(m.tier1VsCard.aOnly, m.tier1VsCard.bOnly);
 	console.log(`\n    paired comparisons (disagreements only):`);
 	console.log(
-		`      THE BAR  experience vs the ${leadCardWords}-word card   ${m.experienceVsCard.aOnly} / ${m.experienceVsCard.bOnly}   p=${pExp.toFixed(4)}`
+		`      context  experience vs the ${leadCardWords}-word card   ${m.experienceVsCard.aOnly} / ${m.experienceVsCard.bOnly}   p=${pExp.toFixed(4)}  (bar retired - same surface)`
 	);
 	console.log(
-		`      THE BAR  tier 1 vs the lead card at equal length   ${m.tier1VsHead.aOnly} / ${m.tier1VsHead.bOnly}   p=${pT1.toFixed(4)}`
+		`      THE GUARD  tier 1 vs the lead card at equal length   ${m.tier1VsHead.aOnly} / ${m.tier1VsHead.bOnly}   p=${pT1.toFixed(4)}  (direction only)`
 	);
 	console.log(
 		`      context  tier 1 alone vs the full card             ${m.tier1VsCard.aOnly} / ${m.tier1VsCard.bOnly}   p=${pOld.toFixed(4)}`
@@ -181,14 +179,23 @@ export function report(input) {
 	//
 	// The second bar exists so tier 1 cannot quietly rot while tier 2 carries the gate: it holds length fixed
 	// at whatever tier 1 rendered and asks only whether the right WORDS were chosen.
+	// RETIRED 2026-09-13: the bar "the two-tier answer must beat the 120-word lead card". It is not relaxed,
+	// it is no longer a comparison. The answer block now renders that card's own passage by design, so the two
+	// surfaces agree on 133 of 135 queries and the test compares a thing to itself - measured 2 disagreements,
+	// p=0.5000, which no implementation could ever pass.
+	//
+	// Why the surfaces converged: choosing the answer across the retrieved set won +8.1pp here while shipping
+	// misleading text on 28 of 135 queries against the lead card's 20, judged blind by readers who saw only
+	// what a user sees. 17 of those 28 were questions the card had answered safely. Substring containment
+	// cannot see that failure - it ROSE while harm rose with it - which is the whole reason this bar could not
+	// be the thing that governs the feature.
+	//
+	// The real quality gate is now the blind paired harm comparison, which needs human-judged runs and cannot
+	// live in CI. It is specified in docs/superpowers/specs/2026-09-13-corpus-shape-cycle-design.md section 7.
+	// What remains HERE is regression protection: absolute floors, the junk scan, the length ceiling, and the
+	// direction-only tier-1 guard below, which still discriminates because the answer has its heading echo
+	// stripped while the raw card window spends its first words repeating the section title.
 	const bars = [
-		{
-			// Carries the CLAIM, so it needs direction AND significance.
-			label: 'the two-tier answer',
-			regressed: `the two-tier answer (${pct(m.expanded, n)}) does not beat the ${leadCardWords}-word card it replaces (${pct(m.baseline, n)})`,
-			d: m.experienceVsCard,
-			requireSignificance: true
-		},
 		{
 			// A regression GUARD, so direction only - see evaluateBar.
 			label: 'tier 1 at equal length',

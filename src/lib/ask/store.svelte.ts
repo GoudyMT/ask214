@@ -79,7 +79,7 @@ export function createAskStore(deps: {
 	// closer to a claim about the user's own facts, which is the thing we must never make.
 	function answerFor(query: string, cards: ResultCard[], synthesis?: SlotSynthesis) {
 		// The whole retrieved set, not just the first card - see toExtractiveAnswer for why.
-		const extractive = toExtractiveAnswer(cards, query);
+		const extractive = toExtractiveAnswer(cards);
 		return chooseAnswer({
 			eligibilityIntent: detectEligibilityIntent(query).shortCircuit,
 			...(synthesis ? { synthesis } : {}),
