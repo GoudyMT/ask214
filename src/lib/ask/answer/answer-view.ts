@@ -8,7 +8,8 @@ import { selectAnswer } from './select-answer';
 export type ExtractiveAnswer = {
 	text: string;
 	passage: string;
-	// Which source this was taken from. Required, because the answer is chosen across the retrieved set and
+	// Which source this was taken from. Required because a citation names its own document, and kept explicit
+	// rather than inferred from the lead card so that a later change of which card answers cannot silently
 	// is NOT necessarily the lead card - the reader has to be opened on the document the answer actually
 	// quotes, not on whatever happened to rank first.
 	sourceId: string;
@@ -30,15 +31,21 @@ export type AnswerView =
 			/**
 			 * Set when this answer is STANDING IN for a synthesis that did not reach the reader: `refused`
 			 * when the model answered and a safety gate rejected it (an ungrounded figure, an invalid
-			 * citation), `unavailable` when none could be produced. Absent when synthesis never ran, which
-			 * is every default user.
+			 * citation), `unavailable` when none could be produced, `suppressed` when one was produced and
+			 * we dropped it because the question asks about the reader's own eligibility. Absent when
+			 * synthesis never ran, which is every default user.
+			 *
+			 * The three are kept distinct because they are different statements to a reader who supplied a
+			 * key and got no summary. `refused` claims an accuracy gate fired; `unavailable` claims none
+			 * could be produced; on the eligibility path neither is true, and saying either would be a
+			 * false explanation of a legal decision.
 			 *
 			 * The slot still holds exactly one answer - this is a note ON it, not a second block. It exists
 			 * because dropping the old refusal/unavailable states took their disclosure with them, leaving a
 			 * reader who enabled the summary and supplied a key unable to tell "it worked" from "the model
 			 * output was rejected". WHICH gate fired stays a safety-log detail; that one did is the reader's.
 			 */
-			synthesisNote?: 'refused' | 'unavailable';
+			synthesisNote?: 'refused' | 'unavailable' | 'suppressed';
 	  }
 	| { kind: 'synthesized'; answer: CitedAnswer }
 	| { kind: 'eligibility' }
@@ -105,6 +112,28 @@ export function toExtractiveAnswer(cards: ResultCard[]): ExtractiveAnswer | unde
  *   extractive answer when a card produced one.
  * @returns The slot's occupant, or undefined to leave the result cards standing alone.
  */
+/**
+ * Why no synthesis reached the reader, when they were expecting one.
+ *
+ * A model's own refusal or outage keeps ITS reason even on the eligibility path, because the reason a reader
+ * is owed is the one that actually happened, not the branch it happened on.
+ *
+ * `suppressed` is claimed ONLY for `kind: 'answer'`, which is the only outcome where a summary demonstrably
+ * existed and we dropped it. A model that returned `eligibility` classified the question itself and never
+ * produced prose, so telling the reader one was produced and withheld would be false - the same failure as
+ * the `unavailable` copy that once claimed a summary "could not be produced" for a reader who had simply
+ * never supplied an API key.
+ */
+function synthesisNoteFor(
+	synthesis: SlotSynthesis | undefined,
+	suppressedByGate: boolean
+): 'refused' | 'unavailable' | 'suppressed' | undefined {
+	if (synthesis === undefined) return undefined;
+	if (synthesis.kind === 'refusal') return 'refused';
+	if (synthesis.kind === 'unavailable') return 'unavailable';
+	return suppressedByGate && synthesis.kind === 'answer' ? 'suppressed' : undefined;
+}
+
 export function chooseAnswer(input: {
 	eligibilityIntent: boolean;
 	synthesis?: SlotSynthesis;
@@ -120,8 +149,13 @@ export function chooseAnswer(input: {
 		// health care" and never trips it, since `use` is a deliberately excluded procedural verb. The note
 		// is not a conditional warning; it is a standing description of what the block is, and it is true on
 		// every query. See AskAnswer.svelte.
+		const note = synthesisNoteFor(input.synthesis, true);
 		return input.extractive && input.extractive.text !== ''
-			? { kind: 'extractive', answer: input.extractive }
+			? {
+					kind: 'extractive',
+					answer: input.extractive,
+					...(note !== undefined ? { synthesisNote: note } : {})
+				}
 			: { kind: 'eligibility' };
 	}
 	if (input.synthesis?.kind === 'notCovered') return { kind: 'notCovered' };
@@ -130,12 +164,7 @@ export function chooseAnswer(input: {
 	}
 	// A chunk that selects to nothing renders no block at all, rather than an empty one above the cards.
 	if (input.extractive && input.extractive.text !== '') {
-		const note =
-			input.synthesis?.kind === 'refusal'
-				? ('refused' as const)
-				: input.synthesis?.kind === 'unavailable'
-					? ('unavailable' as const)
-					: undefined;
+		const note = synthesisNoteFor(input.synthesis, false);
 		return {
 			kind: 'extractive',
 			answer: input.extractive,

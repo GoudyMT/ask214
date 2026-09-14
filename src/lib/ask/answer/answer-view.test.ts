@@ -44,8 +44,42 @@ describe('chooseAnswer', () => {
 		});
 	});
 
+	// The reader enabled the summary, supplied a key, and the model answered - and then we dropped it for a
+	// LEGAL reason they cannot see. Saying nothing leaves them unable to tell "it worked" from "it was
+	// withheld", which is the exact disclosure gap synthesisNote exists to close, on the one path where the
+	// reason is 38 CFR rather than a failure. Neither existing note can carry it: `refused` would claim an
+	// accuracy gate fired, which is false here, and `unavailable` would claim none could be produced.
+	it('discloses a synthesis suppressed on an eligibility question', () => {
+		const view = chooseAnswer({
+			eligibilityIntent: true,
+			synthesis: { kind: 'answer', answer: synthesized },
+			extractive
+		});
+		expect(view).toEqual({ kind: 'extractive', answer: extractive, synthesisNote: 'suppressed' });
+	});
+
+	// A refusal or an outage on an eligibility question is still a refusal or an outage - the reason the
+	// reader is owed is the one that actually happened, not the branch it happened on.
+	it('keeps the true reason when synthesis failed on its own before the gate', () => {
+		expect(
+			chooseAnswer({ eligibilityIntent: true, synthesis: { kind: 'refusal' }, extractive })
+		).toEqual({ kind: 'extractive', answer: extractive, synthesisNote: 'refused' });
+	});
+
 	it('shows the banner alone when there is no document answer to carry it', () => {
 		expect(chooseAnswer({ eligibilityIntent: true })).toEqual({ kind: 'eligibility' });
+	});
+
+	// The model classified the question itself, so no prose was ever produced. Claiming one was produced and
+	// withheld would be false - the same shape as the `unavailable` copy that once told a reader with no API
+	// key that a summary "could not be produced".
+	it('does not claim a suppression when the model never produced a summary', () => {
+		const view = chooseAnswer({
+			eligibilityIntent: true,
+			synthesis: { kind: 'eligibility' },
+			extractive
+		});
+		expect(view).toEqual({ kind: 'extractive', answer: extractive });
 	});
 
 	it('honours an eligibility verdict reached on the model path too', () => {

@@ -8,7 +8,7 @@
 		view: AnswerView;
 		// Opens the offline reader on the document this answer was quoted from, highlighting the exact
 		// passage. Without it the answer block was a dead end: the only reachable "read source" control
-		// belonged to the LEAD card, and the answer comes from a different card roughly 4 times in 10.
+		// belonged to the result card, and the answer block had no way into the document it quotes.
 		onOpenSource?: (sourceId: string, chunkId?: string) => void;
 	} = $props();
 
@@ -33,12 +33,14 @@
 
 {#if view.kind === 'extractive'}
 	<section class="ask-answer" aria-label="What the source says">
-		<!-- Not "In short". Measured end to end on a corrected benchmark, this passage contains the answer
-		     to the question asked 50.4% of the time online and 42.2% on device - nowhere near enough to
-		     assert it AS the answer, which is why the label describes the block instead of claiming it.
-		     It says what this actually is: the document's own words, chosen for relevance.
-		     Note it does NOT beat the card it replaces online (51.1%); it does on device (39.3%). What
-		     wins on both paths is the two tiers together, once the reader taps through. -->
+		<!-- Not "In short". This block renders the opening of the lead card's passage, and measured end to
+		     end on the device path it contains the answer to the question asked 39.3% of the time - nowhere
+		     near enough to assert it AS the answer, which is why the label describes the block instead of
+		     claiming it. It says what this actually is: the document's own words.
+		     It neither beats nor loses to the result card below, because it renders that card's own
+		     passage: both sit at 39.3%, and the two-tier experience reaches 40.7% once the reader taps
+		     through. Regenerate with `pnpm answer-gate`; the online path's figures are currently unmeasured
+		     (its gate floors are self-declared stale). -->
 		<p class="ask-answer__label">What the source says</p>
 		<!-- The document's own words, interpolated as plain text. No model wrote this, so there is no
 		     fabricated-link risk to defend against here - but a URL or phone number printed in the source
@@ -85,7 +87,7 @@
 			{/if}
 			<!-- The third tier. The reader already renders the whole document offline with the cited passage
 			     highlighted; the answer just never had a way in. It opens on the source the answer was taken
-			     FROM, which is not necessarily the lead card. -->
+			     FROM. -->
 			{#if onOpenSource && view.answer.chunkId}
 				{@const answer = view.answer}
 				<button
@@ -100,17 +102,22 @@
 		<!-- A synthesis did not reach the reader. Shown only when synthesis was ENABLED, so the default user
 		     - for whom the toggle is off - sees nothing. It is a note on the one answer, not a second block
 		     competing to BE the answer.
-		     The two cases say different things, and the difference is what makes them honest. `refused`
+		     The three cases say different things, and the difference is what makes them honest. `refused`
 		     CAN claim an attempt: a summary was produced and a safety gate rejected it. `unavailable`
 		     CANNOT, because the store reaches it both when the call failed AND when there was no API key to
 		     call with - the route collapses those into one `degraded` result, so a sentence like "could not
 		     be produced" would be plainly false for the reader who simply never supplied a key. It states
-		     the fact it can actually support: that no summary is here. -->
+		     the fact it can actually support: that no summary is here. `suppressed` is the 38 CFR case: a
+		     summary WAS produced and we dropped it because the question asks about the reader's own
+		     eligibility. Neither of the other two can say that without being false about the reason, and a
+		     reader who supplied a key and got no summary is owed the reason that actually applied. -->
 		{#if view.synthesisNote}
 			<p class="ask-answer__note-synthesis">
 				{view.synthesisNote === 'refused'
 					? 'An AI summary was produced but did not pass our accuracy checks, so the document is quoted instead.'
-					: 'No AI summary is shown for this answer.'}
+					: view.synthesisNote === 'suppressed'
+						? 'No AI summary is shown on questions about your own eligibility. The document is quoted instead.'
+						: 'No AI summary is shown for this answer.'}
 			</p>
 		{/if}
 		<!-- PERMANENT, not conditional on the eligibility gate. That gate reads the QUESTION's phrasing, so
