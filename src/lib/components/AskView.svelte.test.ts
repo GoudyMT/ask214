@@ -492,9 +492,10 @@ describe('AskView', () => {
 		expect(container.querySelector('.ask-card__link')).not.toBeNull();
 	});
 
-	// The counterpart, which no test covered: when the answer came from a card OTHER than the lead, the
-	// lead must KEEP its excerpt. With one shared fixture id this could not be expressed at all - and the
-	// branch matters, because the answer is chosen across the retrieved set rather than taken from card 1.
+	// The counterpart: when the answer came from a card OTHER than the lead, the lead must KEEP its excerpt.
+	// The answer is now always taken from the lead card, so this branch is DEFENSIVE rather than routine -
+	// it is what stops a future change to which card answers from silently blanking a compact card, and it
+	// is exactly the defect that shipped once when the yield rule was widened beyond the lead.
 	it('results: a card the answer did NOT come from keeps its excerpt', () => {
 		const lead = card();
 		const other = card();

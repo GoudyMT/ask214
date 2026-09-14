@@ -118,8 +118,10 @@ describe('measureAnswers', () => {
 		expect(narrow.baseline).toBe(0); // and past a 10-word one
 	});
 
-	// The measurement that justified choosing across the retrieved set: the answer exists, retrieval found
-	// it, and a wrong card sat on top of it. A gate that cannot see this cannot show selection is the lever.
+	// buriedWrong: the answer exists, retrieval found it, and a wrong card sat on top of it. This once
+	// justified choosing the answer across the retrieved set; that mechanism was reversed on measured harm,
+	// so the counter is now a DIAGNOSTIC for how much the lead-card rule leaves on the table - 32.6% at
+	// HEAD - rather than an argument for re-introducing the scorer.
 	it('counts a buried answer when the snippet is in a later card and the short answer missed', async () => {
 		const wrong = chunk({ id: 'wrong', text: 'Parking at the facility is limited to two hours.' });
 		const right = chunk({ id: 'right', text: `${SNIPPET}. Referrals are made as needed.` });

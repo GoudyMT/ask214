@@ -273,8 +273,9 @@
 		     Scoped to the lead on purpose. A compact card caps at 24 words and sits behind a toggle the
 		     reader chose to open, so there is no accidental double-read to prevent - and hiding its text
 		     leaves a title, two links and nothing else, which is how the card that actually produced the
-		     answer becomes the one that looks broken. The answer is chosen across the whole retrieved set,
-		     so that card is a compact one roughly 4 times in 10.
+		     answer becomes the one that looks broken. The answer is taken from the LEAD card, so in practice
+		     the card that yields is always that one - but the comparison stays on chunkId rather than on
+		     position, so a later change to which card answers cannot silently blank a compact card.
 		     A synthesized answer paraphrases, so nothing is duplicated and every card ships untouched. -->
 		{@const quoted =
 			askState.answer?.kind === 'extractive' ? askState.answer.answer.chunkId : undefined}

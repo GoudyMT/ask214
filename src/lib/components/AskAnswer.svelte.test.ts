@@ -204,8 +204,8 @@ describe('AskAnswer', () => {
 		expect(href).toBe('https://www.va.gov/get-help-from-accredited-representative/');
 	});
 
-	// The label must not assert that this IS the answer: measured end to end it contains the answer 50.4%
-	// of the time online and 42.2% on device.
+	// The label must not assert that this IS the answer: measured end to end on the device path it contains
+	// the answer 39.3% of the time.
 	it('extractive: does not claim to be the answer', () => {
 		const { container } = render(AskAnswer, { props: { view: extractiveView } });
 		expect(container.querySelector('.ask-answer__label')?.textContent).toContain(

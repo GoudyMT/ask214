@@ -6,6 +6,8 @@
  * sourceId/field travel as DATA. Collects ALL violations (does not stop at the first).
  */
 
+import { isGovernmentHost } from '$lib/sources/government-host';
+
 export type LegalTier = 'confident_pd' | 'verified_gray_zone' | 'excluded';
 export type ContentType = 'html' | 'pdf';
 export type UpdateCadence = 'weekly' | 'monthly';
@@ -74,25 +76,6 @@ function isValidIsoDate(s: string): boolean {
 	const d = Number(parts[2]);
 	const dt = new Date(Date.UTC(y, m - 1, d));
 	return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
-}
-
-/**
- * Whether a url points at a genuine US-Government host.
- *
- * `https://` alone is not the boundary this project actually has: it ships public US-Government work only
- * (17 USC 105), and these urls become citation hrefs on a surface whose audience is targeted by benefits
- * scams. A scheme check passes `https://tapevents.mil.evil.example/x.pdf` - the ".mil" is a label, not the
- * host. Parsing and testing the HOSTNAME is what closes that, and `.gov` / `.mil` are restricted TLDs no
- * lookalike can register. Mirrors the ALLOWED_HOSTS rule the app's other curated outbound set enforces.
- */
-function isGovernmentHost(url: string): boolean {
-	let host: string;
-	try {
-		host = new URL(url).hostname.toLowerCase();
-	} catch {
-		return false;
-	}
-	return host === 'gov' || host === 'mil' || host.endsWith('.gov') || host.endsWith('.mil');
 }
 
 export function validateSourcesSchema(entries: unknown[]): ValidationResult {

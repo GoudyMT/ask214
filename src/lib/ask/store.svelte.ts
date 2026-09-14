@@ -78,7 +78,7 @@ export function createAskStore(deps: {
 	// all. A result card is an excerpt from an official source; a block labelled as THE answer is much
 	// closer to a claim about the user's own facts, which is the thing we must never make.
 	function answerFor(query: string, cards: ResultCard[], synthesis?: SlotSynthesis) {
-		// The whole retrieved set, not just the first card - see toExtractiveAnswer for why.
+		// The lead card only - see toExtractiveAnswer for the measurement that reversed this.
 		const extractive = toExtractiveAnswer(cards);
 		return chooseAnswer({
 			eligibilityIntent: detectEligibilityIntent(query).shortCircuit,
