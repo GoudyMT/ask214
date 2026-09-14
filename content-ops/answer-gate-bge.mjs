@@ -112,8 +112,13 @@ async function main() {
 				return Float32Array.from(v);
 			} catch (err) {
 				// Thrown codes stay static and opaque (mtc/no-input-in-error); the detail that makes a failure
-				// diagnosable goes to the console instead, where the rule does not apply.
-				console.error(`    embed attempt ${attempt}/${EMBED_ATTEMPTS} failed:`, err);
+				// diagnosable goes to the console instead, where that rule does not apply.
+				//
+				// The format string is a LITERAL with the values passed as arguments, rather than a template
+				// literal. A non-literal first argument to a console call is a format string an injected
+				// specifier could forge, which the CI static-analysis gate blocks - and it is the one gate the
+				// pre-commit hook does not run.
+				console.error('    embed attempt %d/%d failed:', attempt, EMBED_ATTEMPTS, err);
 				if (attempt < EMBED_ATTEMPTS) {
 					await new Promise((r) => setTimeout(r, EMBED_BACKOFF_MS * attempt));
 				}
