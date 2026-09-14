@@ -179,12 +179,22 @@
 		height: 1px;
 		background: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
 	}
+	/* The pill must be able to SHRINK and WRAP. Its content is data-driven - "Today - <date>" plus a
+	   days-left count that gains a digit as the separation date moves further out - so a pill that cannot
+	   do either is a pill that overflows the viewport at some string length. Measured with `flex: none` and
+	   `white-space: nowrap` it held a constant width at every viewport (256px here, 297px on the CI
+	   runner's wider font metrics) and pushed past a 320px screen. The exact width where that bites depends
+	   on the font, which is why it read as an intermittent test flake for weeks rather than as the layout
+	   bug it is: a user 100+ days from separation got a horizontally scrolling timeline.
+	   `min-width: 0` is load-bearing - a flex item defaults to `min-width: auto`, which is its content
+	   width, so without it the item refuses to shrink no matter what `flex` says. */
 	.timeline-today__pill {
-		flex: none;
+		flex: 0 1 auto;
+		min-width: 0;
 		font-size: var(--font-size-s);
 		font-weight: 600;
 		color: var(--color-accent);
-		white-space: nowrap;
+		text-align: center;
 		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
 		border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
 		border-radius: 999px;

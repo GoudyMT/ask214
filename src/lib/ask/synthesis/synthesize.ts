@@ -6,6 +6,7 @@ import { mentionsCrisisLine, mentionsOfficialFallback } from '../crisis/contacts
 import { toCitedAnswer, type Citation, type CitedAnswer } from './cited-answer';
 import { assertOnlyKeys } from '../online/payload';
 import { cleanExcerpt } from '$lib/corpus';
+import { documentUrl } from '$lib/sources/document-url';
 import type { FetchLike } from '../online/retrieve-online';
 
 /** A retrieved chunk: the text the model reads plus the fields a rendered citation is built from. */
@@ -14,6 +15,10 @@ export interface RetrievedChunk {
 	text: string;
 	url: string;
 	title: string;
+	// Citation-building only; NEITHER reaches the model. The outbound prompt is an explicit
+	// `{ id, text }` projection, so widening this shape does not widen what egresses to the provider.
+	sourceId: string;
+	page?: number;
 }
 
 export interface SynthesizeDeps {
@@ -162,12 +167,22 @@ export async function synthesize(
 	// answer about mental-health resources with a crisis card.
 	const citedIds = parseCitedIds(modelText);
 	const retrievedIds = new Set(chunks.map((c) => c.id));
+	// Classified out ahead of ALL THREE gates, on the count of VALID citations rather than of parsed ones.
+	// Ordering this after validateCitations left the crisis reply behind the invalid_citation gate: the
+	// citation pattern accepts digits, so a reply saying "call [988]" - or any markdown link - parses as a
+	// citation, fails validation, and refuses. The user then read benefits content in answer to a self-harm
+	// message. Keying on VALID citations keeps the precision the uncited rule buys, because 29 of the 1878
+	// shipped chunks legitimately mention the crisis line and a genuinely cited answer about mental-health
+	// resources must stay an answer, not become a crisis card.
+	const validCited = citedIds.filter((id) => retrievedIds.has(id));
+	if (validCited.length === 0) {
+		if (mentionsCrisisLine(modelText)) return { kind: 'crisis' };
+		if (mentionsOfficialFallback(modelText)) return { kind: 'notCovered' };
+	}
 	if (!validateCitations(citedIds, retrievedIds).ok) {
 		return { kind: 'refusal', reason: 'invalid_citation' };
 	}
 	if (citedIds.length === 0) {
-		if (mentionsCrisisLine(modelText)) return { kind: 'crisis' };
-		if (mentionsOfficialFallback(modelText)) return { kind: 'notCovered' };
 		// Citing nothing otherwise is exactly the ungrounded output the gates exist to stop.
 		return { kind: 'refusal', reason: 'no_citations' };
 	}
@@ -187,6 +202,16 @@ export async function synthesize(
 		return { kind: 'refusal', reason: 'ungrounded_number' };
 	}
 
-	const citations: Citation[] = chunks.map((c) => ({ id: c.id, url: c.url, title: c.title }));
+	// Resolve the citation url HERE rather than widening Citation: a Citation is by contract the only
+	// clickable thing this surface produces (a link the model writes is forced inert), so it must be the
+	// final destination. `c.url` is the source's registry url, which for a TAP guide is the shared library
+	// directory page - the same on all 21 - so a citation built from it would send a reader who trusted the
+	// one trustworthy link to a list of documents. Falls back to c.url for an html source, whose url is
+	// already the document.
+	const citations: Citation[] = chunks.map((c) => ({
+		id: c.id,
+		url: documentUrl(c.sourceId, c.page) ?? c.url,
+		title: c.title
+	}));
 	return { kind: 'answer', answer: toCitedAnswer(modelText, citedIds, citations) };
 }

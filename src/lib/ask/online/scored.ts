@@ -1,5 +1,6 @@
 import type { CorpusChunk, RetrievalResult } from '$lib/corpus';
 import type { RetrievedChunk } from '../synthesis/synthesize';
+import { isGovernmentHost } from '$lib/sources/government-host';
 
 // The server sends the full CorpusChunk, but the body arrived as unknown. Validate only the fields the two
 // consumers actually read (cards + synthesize) and pass optional display fields through when present; a hit
@@ -17,9 +18,12 @@ function narrowOne(entry: unknown): RetrievalResult | null {
 		typeof sourceId !== 'string' ||
 		typeof sourceTitle !== 'string' ||
 		typeof url !== 'string' ||
-		// Mirror the corpus codec's scheme gate: a server-supplied javascript:/data:/http: url must never
-		// become a clickable card or citation href on this scam-targeted surface.
-		!/^https:\/\//i.test(url)
+		// A server-supplied javascript:/data:/http: url must never become a clickable card or citation href
+		// on this scam-targeted surface - and neither must an arbitrary https one. The scheme check alone
+		// let `https://tapevents.mil.evil.example` through, where the ".mil" is a label rather than the
+		// host. Same boundary the sources registry enforces at build time, from the same definition.
+		!/^https:\/\//i.test(url) ||
+		!isGovernmentHost(url)
 	) {
 		return null;
 	}
@@ -58,6 +62,10 @@ export function toRetrievedChunks(results: RetrievalResult[]): RetrievedChunk[] 
 		id: chunk.id,
 		text: chunk.text,
 		url: chunk.url,
-		title: chunk.sourceTitle
+		title: chunk.sourceTitle,
+		// Carried for the citation deep link, not for the model. Page is spread conditionally so a chunk
+		// without one never gains an `undefined` key (exactOptionalPropertyTypes), matching toResultCards.
+		sourceId: chunk.sourceId,
+		...(chunk.page !== undefined ? { page: chunk.page } : {})
 	}));
 }

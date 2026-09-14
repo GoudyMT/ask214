@@ -81,7 +81,18 @@ type Body =
 	| { status: 'high_demand' }
 	| { status: 'error' };
 
-describe('retrieve worker fetch wiring', () => {
+// Every test here re-imports the worker through `loadFetch()`, because `vi.resetModules()` above is what
+// stops the module-scope corpus memo leaking between them. Under the full suite that dynamic import
+// competes with ~198 files transforming in parallel and can be starved well past the 5s default: measured
+// at 5326ms in a full run against 374ms for this file alone, where the tests themselves take 143ms.
+//
+// So this raises the ALLOWANCE for a slow import, not a tolerance for slow code, and it is scoped to the
+// one file that pays that cost. The obvious alternative - hoist the import to the top - is NOT available:
+// a static import evaluates once, and the memo it would carry across tests is exactly what `resetModules`
+// exists to prevent. A retry would be worse still; it would hide a genuine regression in this path.
+const IMPORT_STARVATION_TIMEOUT_MS = 20_000;
+
+describe('retrieve worker fetch wiring', { timeout: IMPORT_STARVATION_TIMEOUT_MS }, () => {
 	it('serves a cited result for a valid query (KV keys, decode, AI extract, search all wired)', async () => {
 		const fetch = await loadFetch();
 		const e = env();

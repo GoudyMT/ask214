@@ -103,6 +103,85 @@ describe('validateSourcesSchema', () => {
 		});
 	});
 
+	// A PDF source's `url` is the TAP library DIRECTORY page - one page shared by all 21 guides - so it
+	// cannot take a reader to the document they picked. `document_url` is the document itself. Requiring it
+	// on every PDF is what stops a citation from dead-ending, which is the defect this field exists to fix.
+	it('flags a PDF source with no document_url (its citation would dead-end on the library page)', () => {
+		const r = validateSourcesSchema([{ ...ok, content_type: 'pdf' }]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_PDF_NO_DOCUMENT_URL',
+			sourceId: 'va_disability_file',
+			field: 'document_url'
+		});
+	});
+
+	it('accepts a PDF source that carries its document_url', () => {
+		const r = validateSourcesSchema([
+			{
+				...ok,
+				content_type: 'pdf',
+				document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-DC.pdf'
+			}
+		]);
+		expect(r).toEqual({ valid: true, errors: [] });
+	});
+
+	// The value is interpolated straight into an href, so it gets the same https gate as `url` itself.
+	it('flags a non-https document_url', () => {
+		const r = validateSourcesSchema([
+			{ ...ok, content_type: 'pdf', document_url: 'http://www.tapevents.mil/x.pdf' }
+		]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_URL',
+			sourceId: 'va_disability_file',
+			field: 'document_url'
+		});
+	});
+
+	// https alone is not the boundary. The project ships public US-Government work only, and a document_url
+	// becomes a citation href on a surface whose audience is actively targeted by benefits scams - so a
+	// lookalike that merely puts ".mil" in a LABEL must not pass. The app's other curated outbound set
+	// already enforces a host rule in a test (resources.test.ts ALLOWED_HOSTS); this had scheme only.
+	it.each([
+		'https://tapevents.mil.evil.example/x.pdf',
+		'https://www.tapevents.mil.co/x.pdf',
+		'https://notva.gov.example.com/x.pdf',
+		'https://example.com/x.pdf'
+	])('flags a document_url that is not on a .gov or .mil host: %s', (document_url) => {
+		const r = validateSourcesSchema([
+			{ ...ok, source_id: 'va_disability_file', content_type: 'pdf', document_url }
+		]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_BAD_URL',
+			sourceId: 'va_disability_file',
+			field: 'document_url'
+		});
+	});
+
+	it.each([
+		'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf',
+		'https://www.va.gov/files/thing.pdf',
+		'https://skillbridge.osd.mil/x.pdf'
+	])('accepts a document_url on a genuine government host: %s', (document_url) => {
+		const r = validateSourcesSchema([
+			{ ...ok, source_id: 'va_disability_file', content_type: 'pdf', document_url }
+		]);
+		expect(r.errors.filter((e) => e.field === 'document_url')).toEqual([]);
+	});
+
+	// An HTML source's `url` IS its document. A second document link would leave it ambiguous which one a
+	// citation should open. Mirrors the served rule above: a field that means nothing here is an error, not
+	// something to ignore.
+	it('flags an HTML source carrying a document_url (its url is already the document)', () => {
+		const r = validateSourcesSchema([
+			{ ...ok, content_type: 'html', document_url: 'https://www.va.gov/x.pdf' }
+		]);
+		expect(r.errors).toContainEqual({
+			code: 'E_SOURCES_HTML_DOCUMENT_URL',
+			sourceId: 'va_disability_file',
+			field: 'document_url'
+		});
+	});
 	it('flags a missing required field', () => {
 		const r = validateSourcesSchema([{ ...ok, origin: undefined }]);
 		expect(r.errors).toContainEqual({

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Source } from '$lib/ask/sources';
+	import { documentUrl } from '$lib/sources/document-url';
 
 	// Opens the modal for any of: a loaded `source`, a `loading` fetch in progress, or an `error`. The
 	// corpus IS the on-device reference library; this shows all the official text held locally for one
@@ -28,6 +29,18 @@
 	let errorEl = $state<HTMLElement>();
 
 	const isOpen = $derived(source !== null || loading || error);
+
+	// Where the link out goes. `source.url` is the source's registry url, which for a TAP guide is the
+	// shared library DIRECTORY page - the same on all 21 guides - so using it would walk the reader from
+	// the exact highlighted passage back to a list of documents. Resolve the guide itself and anchor the
+	// highlighted passage's own page. An html source keeps its url, which already IS the document. The
+	// empty string is unreachable: the link renders only inside `{#if source}`.
+	const officialUrl = $derived(
+		source === null
+			? ''
+			: (documentUrl(source.sourceId, source.passages.find((p) => p.id === highlightId)?.page) ??
+					source.url)
+	);
 
 	// Sync the native dialog's open-state. showModal() (not the `open` attribute) is what gives the
 	// focus-trap + Esc + backdrop the modal lock calls for.
@@ -119,7 +132,7 @@
 		<div class="reader__foot">
 			<!-- external public-source citation (https), not internal SvelteKit nav; resolve() does not apply. -->
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-			<a class="reader__link" href={source.url} target="_blank" rel="noopener noreferrer"
+			<a class="reader__link" href={officialUrl} target="_blank" rel="noopener noreferrer"
 				>View on the official site</a
 			>
 			{#if !online}

@@ -6,7 +6,8 @@ import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
 import type { ResultCard } from '$lib/corpus';
 import type { Source } from '$lib/ask/sources';
-import type { SynthesisView } from '$lib/ask/synthesis/synthesis-view';
+import type { AnswerView } from '$lib/ask/answer/answer-view';
+import { OFFICIAL_FALLBACK } from '$lib/ask/crisis/contacts';
 
 type ViewProps = {
 	askState: AskState;
@@ -40,10 +41,19 @@ function props(state: AskState, over: Partial<ViewProps> = {}): ViewProps {
 	};
 }
 
+// Real chunk ids are UNIQUE - `toResultCards` copies `chunk.id`, which the corpus guarantees distinct.
+// A constant here gave every card in a multi-card test the same id, so `c.chunkId !== quoted` was false
+// for all of them and the "which card did the answer come from" comparison - the exact thing this field
+// was added to enable - could never discriminate. Tests that need to pair an answer to a card read the id
+// off the card rather than hardcoding it.
+let cardSeq = 0;
+
 function card(over: Partial<ResultCard> = {}): ResultCard {
+	cardSeq++;
 	return {
 		sourceId: 'va_intent_to_file',
 		sourceTitle: 'VA - Intent to File',
+		chunkId: `va_intent_to_file:${String(cardSeq).padStart(12, '0')}`,
 		section: 'How to submit',
 		page: 12,
 		excerpt: 'An intent to file lets you notify VA that you plan to file a claim.',
@@ -160,6 +170,25 @@ describe('AskView', () => {
 				props: props({ kind: 'error', code: ASK_ERROR.EMBED })
 			}).container.textContent?.toLowerCase()
 		).toContain("couldn't run");
+	});
+
+	it('empty: keeps the rephrase hint, hedges coverage, and gives a way out of the app', () => {
+		const { container } = render(AskView, { props: props({ kind: 'empty' }) });
+		const text = container.textContent ?? '';
+		expect(text).toContain('No close match');
+		expect(text).toMatch(/rephras/i);
+		// This state means nothing scored above the cutoff, which is NOT evidence the documents lack the
+		// answer - a differently-worded question often reaches it. So the coverage claim stays hedged, and
+		// the state must never assert what `notCovered` asserts.
+		expect(text).toContain('may not cover it');
+		// The number comes from the one verified copy, never a literal: it had already drifted into four
+		// places once, and a benefits hotline that is wrong in one of them is the worst failure this
+		// audience can be handed.
+		expect(text).toContain(OFFICIAL_FALLBACK.phone);
+		const link = container.querySelector('a[href="https://www.va.gov/"]');
+		expect(link).not.toBeNull();
+		// Reverse-tabnabbing: every outbound link in this app carries it.
+		expect(link?.getAttribute('rel')).toBe('external noopener');
 	});
 
 	it('results: renders the lead card; extra hits collapse behind a "similar sources" toggle', () => {
@@ -420,9 +449,9 @@ describe('AskView', () => {
 		expect(stayed).toBe(1);
 	});
 
-	it('results: renders the AI summary above the cards when present', () => {
-		const summary: SynthesisView = {
-			kind: 'answer',
+	it('results: renders the answer above the cards when present', () => {
+		const answer: AnswerView = {
+			kind: 'synthesized',
 			answer: {
 				text: 'Do X [a].',
 				citations: [{ id: 'a', url: 'https://x.gov', title: 'S' }],
@@ -432,12 +461,132 @@ describe('AskView', () => {
 		};
 		const { container } = render(AskView, {
 			props: props(
-				{ kind: 'results', origin: 'online', cards: [card()], summary },
+				{ kind: 'results', origin: 'online', cards: [card()], answer },
 				{ onlineCapable: true, mode: 'online' }
 			)
 		});
-		expect(container.querySelector('.ask-summary')).not.toBeNull();
+		expect(container.querySelector('.ask-answer')).not.toBeNull();
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull(); // cards still render below
+	});
+
+	// The answer block owns the text at both tiers, so the lead card stops repeating it. The card is not
+	// demoted - it keeps its position, its badge, its citation and both actions.
+	it('results: the card the answer came from yields its excerpt', () => {
+		const lead = card();
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'You have one year to submit the completed claim.',
+				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceId: 'va_intent_to_file',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://www.va.gov/',
+				chunkId: lead.chunkId
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards: [lead], answer })
+		});
+		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).toBeNull();
+		expect(container.querySelector('.ask-card__top-match')).not.toBeNull();
+		expect(container.querySelector('.ask-card__link')).not.toBeNull();
+	});
+
+	// The counterpart: when the answer came from a card OTHER than the lead, the lead must KEEP its excerpt.
+	// The answer is now always taken from the lead card, so this branch is DEFENSIVE rather than routine -
+	// it is what stops a future change to which card answers from silently blanking a compact card, and it
+	// is exactly the defect that shipped once when the yield rule was widened beyond the lead.
+	it('results: a card the answer did NOT come from keeps its excerpt', () => {
+		const lead = card();
+		const other = card();
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'You have one year to submit the completed claim.',
+				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceId: 'va_intent_to_file',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://www.va.gov/',
+				chunkId: other.chunkId
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards: [lead, other], answer })
+		});
+		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
+	});
+
+	// The yield exists to stop the same sentences printing twice, which is real for a 120-word lead card
+	// sitting directly under the answer. A compact card caps at 24 words and lives behind a toggle the
+	// reader deliberately opened, so there is no accidental double-read to prevent - and suppressing it
+	// leaves a card with a title, two links and NO text. That is how the card which actually produced the
+	// answer ends up being the one that looks broken, on roughly 4 queries in 10.
+	it('results: a compact card keeps its excerpt even when the answer came from it', () => {
+		const lead = card();
+		const other = card();
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'You have one year to submit the completed claim.',
+				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceId: 'va_intent_to_file',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://www.va.gov/',
+				chunkId: other.chunkId
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards: [lead, other], answer })
+		});
+		(container.querySelector('.ask-toggle') as HTMLButtonElement).click();
+		flushSync();
+		expect(container.querySelector('.ask-similar .ask-card__excerpt')).not.toBeNull();
+	});
+
+	// A synthesized answer paraphrases, so there is no duplication to remove and the card is untouched.
+	// This is the shipped BYO-key surface, which must not change.
+	it('results: the lead card keeps its excerpt under a synthesized answer', () => {
+		const answer: AnswerView = {
+			kind: 'synthesized',
+			answer: {
+				text: 'Notify VA first, then you have a year.',
+				citations: [],
+				inert: [],
+				disclaimer: 'd'
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'online', cards: [card()], answer })
+		});
+		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
+	});
+
+	it('results: the lead card keeps its excerpt when there is no answer at all', () => {
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards: [card()] })
+		});
+		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
+	});
+
+	// The default and offline user has no key, so the extractive answer is the only one they ever see -
+	// it must render in the same slot, above the same unchanged cards.
+	it('results: renders the extractive answer in the same slot on the device path', () => {
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'You have one year to submit the completed claim.',
+				passage: 'You have one year to submit the completed claim. It sets your effective date.',
+				sourceId: 'va_intent_to_file',
+				sourceTitle: 'VA - Intent to File',
+				url: 'https://www.va.gov/'
+			}
+		};
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards: [card()], answer })
+		});
+		expect(container.querySelector('.ask-answer')).not.toBeNull();
+		expect(container.textContent).toContain('one year to submit');
+		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
 	});
 
 	it('degraded offer_device: the button re-runs the kept query on the device path', () => {

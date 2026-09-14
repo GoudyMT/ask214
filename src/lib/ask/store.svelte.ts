@@ -1,6 +1,8 @@
-import { search, toResultCards, type Corpus } from '$lib/corpus';
+import { search, toResultCards, type Corpus, type ResultCard } from '$lib/corpus';
 import { filterByMinScore } from './threshold';
 import { detectCrisisIntent } from './crisis/detect';
+import { detectEligibilityIntent } from './synthesis/eligibility-gate';
+import { chooseAnswer, toExtractiveAnswer, type SlotSynthesis } from './answer/answer-view';
 import { AskError, ASK_ERROR } from './errors';
 import type { AskState } from './types';
 import type { RetrieveResult } from './online/outcome';
@@ -70,6 +72,21 @@ export function createAskStore(deps: {
 	// Which paths have failed this session, so the degradation ladder never re-offers a dead one.
 	const failed = new SvelteSet<'online' | 'device'>();
 
+	// Fill the one answer slot for this turn. The 38 CFR eligibility gate runs HERE rather than inside
+	// synthesize(), because it has to cover every path an answer is rendered on - it previously needed
+	// online AND a user-supplied key AND the toggle, so the default and offline user was never gated at
+	// all. A result card is an excerpt from an official source; a block labelled as THE answer is much
+	// closer to a claim about the user's own facts, which is the thing we must never make.
+	function answerFor(query: string, cards: ResultCard[], synthesis?: SlotSynthesis) {
+		// The lead card only - see toExtractiveAnswer for the measurement that reversed this.
+		const extractive = toExtractiveAnswer(cards);
+		return chooseAnswer({
+			eligibilityIntent: detectEligibilityIntent(query).shortCircuit,
+			...(synthesis ? { synthesis } : {}),
+			...(extractive ? { extractive } : {})
+		});
+	}
+
 	// The embed -> search -> cards path. The loading state is `modelLoading` on the first run (that embed
 	// triggers the one-time ~23MB download) and `embedding` once set up. Shared by ask() (warm) + setUp().
 	async function runQuery(query: string): Promise<void> {
@@ -82,8 +99,11 @@ export function createAskStore(deps: {
 			modelLoaded = true;
 			markModelDownloaded();
 			const cards = toResultCards(filterByMinScore(search(vector, corpus, K), MIN_SCORE));
+			const answer = answerFor(query, cards);
 			commitIfCurrent(
-				cards.length > 0 ? { kind: 'results', origin: 'device', cards } : { kind: 'empty' }
+				cards.length > 0
+					? { kind: 'results', origin: 'device', cards, ...(answer ? { answer } : {}) }
+					: { kind: 'empty' }
 			);
 		} catch (e) {
 			const code = e instanceof AskError ? e.code : ASK_ERROR.EMBED;
@@ -166,8 +186,10 @@ export function createAskStore(deps: {
 			try {
 				summary = toSynthesisView(await deps.synthesize(query, toRetrievedChunks(hits)));
 			} catch {
-				// A throwing synthesize must never strand the spinner; fall back to the raw cards.
-				summary = undefined;
+				// A throwing synthesize must never strand the spinner. It reports `unavailable` rather than
+				// nothing, because `undefined` means "synthesis never ran" - which is what the answer block
+				// discloses on - and a thrown call is not that.
+				summary = { kind: 'unavailable' };
 			}
 		}
 		// A crisis turn routes to help, never to benefits results - the same terminal state the keyword
@@ -178,11 +200,15 @@ export function createAskStore(deps: {
 			commitIfCurrent({ kind: 'crisis' });
 			return;
 		}
-		commitIfCurrent(
-			summary
-				? { kind: 'results', origin: 'online', cards, summary }
-				: { kind: 'results', origin: 'online', cards }
-		);
+		// Past that early return `summary` can no longer be the crisis view, which is what lets it satisfy
+		// SlotSynthesis - the exclusion is enforced by the compiler rather than by this comment.
+		const answer = answerFor(query, cards, summary);
+		commitIfCurrent({
+			kind: 'results',
+			origin: 'online',
+			cards,
+			...(answer ? { answer } : {})
+		});
 	}
 
 	async function ask(query: string): Promise<void> {

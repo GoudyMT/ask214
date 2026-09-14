@@ -117,6 +117,29 @@ async function setEaos(page: Page): Promise<void> {
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 }
 
+// The Today pill is the widest fixed-content element on /timeline, and its width is driven by data rather
+// than by layout: "Today - <date>" plus a days-left count that grows a digit as the separation date moves
+// further out. The suite's shared EAOS is a FIXED date, so the count it produces shrinks by one every day -
+// which made this a flake that appeared and vanished on the calendar and could never be reproduced on
+// demand. This case pins the worst case instead: an EAOS far enough out to force a four-digit count, so the
+// assertion depends on the CSS rather than on what day the suite happens to run.
+test('/timeline - the Today pill does not overflow 320px with a four-digit days-left count', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 320, height: 568 });
+	await page.goto('/wizard');
+	await page.getByLabel(/separation date/i).fill('2030-12-31');
+	await page.getByRole('button', { name: /save and continue/i }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
+	await page.goto('/timeline');
+	await expect(page.getByRole('main')).toBeVisible();
+
+	// Confirm the fixture actually reaches the condition under test - a shorter count would pass here
+	// without exercising anything.
+	await expect(page.locator('.timeline-today__count')).toContainText(/\d{4} days left/);
+	await expectNoHorizontalOverflow(page);
+});
+
 const GATED_ROUTES = ['/timeline', '/settings'];
 for (const route of GATED_ROUTES) {
 	for (const vp of MOBILE) {

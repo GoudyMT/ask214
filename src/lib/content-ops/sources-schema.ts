@@ -6,6 +6,8 @@
  * sourceId/field travel as DATA. Collects ALL violations (does not stop at the first).
  */
 
+import { isGovernmentHost } from '$lib/sources/government-host';
+
 export type LegalTier = 'confident_pd' | 'verified_gray_zone' | 'excluded';
 export type ContentType = 'html' | 'pdf';
 export type UpdateCadence = 'weekly' | 'monthly';
@@ -23,6 +25,7 @@ export type SourceEntry = {
 	terms_notes?: string;
 	redistribution_cleared?: boolean;
 	served?: boolean; // true only for a served (re-hosted) original; PDFs only
+	document_url?: string; // the document ITSELF; required on pdf, forbidden on html (whose url is the document)
 	access: string;
 	reviewed_by?: string;
 	reviewed_date?: string;
@@ -101,7 +104,10 @@ export function validateSourcesSchema(entries: unknown[]): ValidationResult {
 				errors.push({ code: 'E_SOURCES_DUP_ID', sourceId: sid, field: 'source_id' });
 			seen.add(sid);
 		}
-		if (typeof e.url === 'string' && !e.url.startsWith('https://'))
+		// Same gate as document_url below, because this is the same class: an outbound url the app turns
+		// into a citation href. All five hosts in the shipped registry are already .gov or .mil, so this
+		// tightens the rule without narrowing what the registry legitimately holds.
+		if (typeof e.url === 'string' && (!e.url.startsWith('https://') || !isGovernmentHost(e.url)))
 			errors.push({ code: 'E_SOURCES_BAD_URL', sourceId: sid, field: 'url' });
 		if (typeof e.legal_tier === 'string' && !TIERS.has(e.legal_tier))
 			errors.push({ code: 'E_SOURCES_BAD_TIER', sourceId: sid, field: 'legal_tier' });
@@ -145,6 +151,24 @@ export function validateSourcesSchema(entries: unknown[]): ValidationResult {
 					sourceId: sid,
 					field: 'redistribution_cleared'
 				});
+		}
+
+		// The document ITSELF, which `url` is not: every PDF's `url` is the shared TAP library DIRECTORY page,
+		// so a citation built from it could only ever land a reader on a list of 21 documents. Required on
+		// every PDF for that reason - a PDF without one is a dead-end citation, which is the whole defect this
+		// field exists to close. Forbidden on HTML, whose `url` already IS the document; allowing both would
+		// leave it ambiguous which link a citation should open.
+		if (e.content_type === 'pdf') {
+			if (typeof e.document_url !== 'string')
+				errors.push({
+					code: 'E_SOURCES_PDF_NO_DOCUMENT_URL',
+					sourceId: sid,
+					field: 'document_url'
+				});
+			else if (!e.document_url.startsWith('https://') || !isGovernmentHost(e.document_url))
+				errors.push({ code: 'E_SOURCES_BAD_URL', sourceId: sid, field: 'document_url' });
+		} else if (e.content_type === 'html' && e.document_url !== undefined) {
+			errors.push({ code: 'E_SOURCES_HTML_DOCUMENT_URL', sourceId: sid, field: 'document_url' });
 		}
 	}
 

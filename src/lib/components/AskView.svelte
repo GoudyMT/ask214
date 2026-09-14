@@ -5,7 +5,8 @@
 	import SourceReader from './SourceReader.svelte';
 	import QuestionFeed from './QuestionFeed.svelte';
 	import CrisisCard from './CrisisCard.svelte';
-	import AskSummary from './AskSummary.svelte';
+	import AskAnswer from './AskAnswer.svelte';
+	import { OFFICIAL_FALLBACK } from '$lib/ask/crisis/contacts';
 
 	let {
 		askState,
@@ -264,13 +265,25 @@
 		</div>
 	{:else if askState.kind === 'results'}
 		{@const cards = askState.cards}
-		{#if askState.summary}
-			<AskSummary view={askState.summary} />
+		{#if askState.answer}
+			<AskAnswer view={askState.answer} onOpenSource={readSource} />
 		{/if}
+		<!-- The LEAD card yields its excerpt to an EXTRACTIVE answer taken from that same card: the two would
+		     otherwise print the same sentences twice, at 120 words directly beneath the answer block.
+		     Scoped to the lead on purpose. A compact card caps at 24 words and sits behind a toggle the
+		     reader chose to open, so there is no accidental double-read to prevent - and hiding its text
+		     leaves a title, two links and nothing else, which is how the card that actually produced the
+		     answer becomes the one that looks broken. The answer is taken from the LEAD card, so in practice
+		     the card that yields is always that one - but the comparison stays on chunkId rather than on
+		     position, so a later change to which card answers cannot silently blank a compact card.
+		     A synthesized answer paraphrases, so nothing is duplicated and every card ships untouched. -->
+		{@const quoted =
+			askState.answer?.kind === 'extractive' ? askState.answer.answer.chunkId : undefined}
 		<p class="ask-count">Top match</p>
 		<AskResultCard
 			card={cards[0]!}
 			variant="lead"
+			showExcerpt={quoted === undefined || cards[0]!.chunkId !== quoted}
 			onReadSource={() => readSource(cards[0]!.sourceId, cards[0]!.chunkId)}
 		/>
 		{#if cards.length > 1}
@@ -292,7 +305,17 @@
 	{:else if askState.kind === 'empty'}
 		<div class="ask-msg">
 			<p class="ask-msg__title">No close match</p>
-			<p class="ask-msg__body">Try rephrasing your question, or ask about something else.</p>
+			<!-- Hedged deliberately. This state fires when nothing scored above the retrieval cutoff, which is
+			     not evidence that the documents lack the answer - the same question worded differently often
+			     reaches it. Stating "not covered" here would assert as fact something the cutoff cannot
+			     establish; that claim belongs to the notCovered state, where a model actually made it. The
+			     way out matters because this is the state the default user reaches, and telling someone to
+			     try again with nowhere else to go is a dead end. -->
+			<p class="ask-msg__body">
+				Try rephrasing your question. If it still isn't here, these documents may not cover it -
+				<a href="https://www.va.gov/" rel="external noopener">search va.gov</a> or call the VA
+				benefits hotline at {OFFICIAL_FALLBACK.phone}.
+			</p>
 		</div>
 	{:else if askState.kind === 'offline'}
 		<div class="ask-msg ask-msg--accent">
