@@ -30,26 +30,36 @@ const LEAD_CARD_WORDS = 120;
 
 // Absolute regression floors for THIS path, applied by report().
 //
-// STALE AS OF 2026-09-13, AND KNOWINGLY LEFT SO. Every value below was measured on 2026-09-11 against a
-// surface that no longer exists: the answer block then chose its card across the retrieved set, and it now
-// renders the lead card's passage, because blind paired judgement measured the old surface shipping
-// misleading text on 28 of 135 queries against that card's 20. On the device path the same reversal moved
-// tier 1 from 42.2% to 39.3% and the two-tier answer from 50.4% to 40.7%.
+// RE-DERIVED 2026-09-15 from a real run against live Workers AI serving, on the rebuilt 1845-chunk corpus.
+// This replaces values that had been STALE since 2026-09-13: they were measured on 2026-09-11 against a
+// surface that no longer exists, where the answer block chose its card across the retrieved set. That
+// mechanism was removed because blind paired judgement measured it shipping misleading text on 28 of 135
+// queries against the lead card's 20. The floors were deliberately NOT adjusted by analogy from the device
+// path at the time, because this path uses a different model and cutoff; they are now measured directly.
 //
-// These online numbers will have moved by a comparable amount and WILL fail until they are re-derived. They
-// are deliberately not adjusted by analogy: this path uses a different model and a different cutoff, and
-// guessing its floors from the device path's delta would be inventing a measurement. Re-derive them from a
-// real run - `pnpm answer-gate:bge` against a live Workers AI binding
-// (`wrangler dev --config content-ops/bge-embed/wrangler.jsonc`) - and replace the comments with the figures
-// that run produces.
+// Each floor is the measured rate less roughly two queries of slack (1 query = 0.74pp at n=135), the same
+// convention the device gate uses. TWO DIFFERENT REASONS are in play and they are not interchangeable:
 //
-// Only the device gate runs in CI, which is why this being red does not hide a regression there.
+//   answered  50.4% -> 48.1%.  SURFACE change. Tier 1 renders the lead card's passage instead of a
+//     cross-card pick. The device path took the same hit for the same reason. 0.48 was also knife-edge
+//     against 48.1% - 0.1pp, one seventh of a query - which guarantees flake rather than signal.
+//   expanded  62.2% -> 52.6%.  SURFACE change, and the largest single effect of the revert: the expand used
+//     to reveal a DIFFERENT card's passage, so removing the chooser removed most of what tier 2 added.
+//   inTopK    85.2% -> 83.0%.  NOT the surface - this is retrieval reach, which the revert cannot touch. It
+//     is the CORPUS rebuild, and it is a real if small loss on this path: 115 of 135 queries -> 112. Note it
+//     moved the OPPOSITE way on device (73.3% -> 76.3%, +4 queries), and that bge source-level retrieval
+//     PASSES with margin in the same run (held-out srcHitRate 0.868 / srcMRR 0.716 vs a 0.8/0.6 floor), so
+//     ranking quality did not degrade. The old floor also failed by 0.04pp - one twentieth of a query -
+//     which is an artifact of pinning a floor exactly at a measurement, not a regression signal.
+//   rendered  135 of 135 answers rendered; 0.95 already sits below the ceiling, so it is unchanged.
+//
+// Only the device gate runs in CI, so this path's red does not hide a regression there.
 // Raise a floor when the feature improves; never lower one to make a run pass.
 const FLOORS = {
-	answered: 0.48, // STALE - measured 50.4% on the superseded surface
-	expanded: 0.6, // STALE - measured 62.2% on the superseded surface
-	inTopK: 0.83, // measured 85.2%; retrieval did not change, so this one should still hold
-	rendered: 0.95 // calibrated against a real run below
+	answered: 0.46, // measured 48.1% (2026-09-15, real serving, 1845-chunk corpus)
+	expanded: 0.51, // measured 52.6%
+	inTopK: 0.81, // measured 83.0% (112/135)
+	rendered: 0.95 // measured 100% (135/135); left at the prior value
 };
 
 const INDEX_DIR = 'content-ops/server-index';
