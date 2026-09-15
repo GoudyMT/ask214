@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 const CALIBRATED_CHUNK_COUNT = 1991;
 
 const corpusPath = fileURLToPath(
-	new URL('../../../static/corpus/corpus-v1.0.1.json', import.meta.url)
+	new URL('../../../static/corpus/corpus-v1.0.2.json', import.meta.url)
 );
 
 describe('corpus calibration tripwire', () => {

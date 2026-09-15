@@ -30,7 +30,11 @@ const LEAD_CARD_WORDS = 120;
 
 // Absolute regression floors for THIS path, applied by report().
 //
-// RE-DERIVED 2026-09-15 from a real run against live Workers AI serving, on the rebuilt 1845-chunk corpus.
+// RE-MEASURED at 1991 chunks the same day, after the HTML family grew: answered 47.4%, expanded 51.9%,
+// inTopK 85.2% - all clear these floors, so they are left as derived below. inTopK in particular now has
+// real margin again (0.81 floor vs 85.2% measured), which is the growth working.
+//
+// RE-DERIVED 2026-09-15 from a real run against live Workers AI serving, on the then-current 1845-chunk corpus.
 // This replaces values that had been STALE since 2026-09-13: they were measured on 2026-09-11 against a
 // surface that no longer exists, where the answer block chose its card across the retrieved set. That
 // mechanism was removed because blind paired judgement measured it shipping misleading text on 28 of 135
@@ -63,7 +67,7 @@ const FLOORS = {
 };
 
 const INDEX_DIR = 'content-ops/server-index';
-const DEVICE_CORPUS_JSON = 'static/corpus/corpus-v1.0.1.json';
+const DEVICE_CORPUS_JSON = 'static/corpus/corpus-v1.0.2.json';
 const QUERIES_PATH = 'src/lib/ask/eval/queries.json';
 const EMBED_URL = process.env.BGE_EMBED_URL ?? 'http://127.0.0.1:8787';
 const EMBED_ATTEMPTS = 3;

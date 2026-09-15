@@ -52,8 +52,8 @@ const FLOORS = {
 	rendered: 0.95 // measured 135 of 135
 };
 
-const CORPUS_JSON = 'static/corpus/corpus-v1.0.1.json';
-const CORPUS_BIN = 'static/corpus/corpus-v1.0.1.embeddings.bin';
+const CORPUS_JSON = 'static/corpus/corpus-v1.0.2.json';
+const CORPUS_BIN = 'static/corpus/corpus-v1.0.2.embeddings.bin';
 const QUERIES_PATH = 'src/lib/ask/eval/queries.json';
 
 async function main() {
