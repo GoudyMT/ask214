@@ -29,6 +29,15 @@
 			"review": 0
 		},
 		{
+			"sourceId": "mos_tap_overview",
+			"contentHash": "cf3d2500ae1ecfc561c1c69cf86c6d49e37c0bf39fa23c9d4dc9c5c71071fda9",
+			"cleanedHash": "5f5bc9def3f242ce5106c45dff2d08ebfdc91fab87dff567114fe05f203ea875",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
 			"sourceId": "tap_dol_efct",
 			"contentHash": "1a95b1b978d736b19f71df5731dbf4d25ebe4c82b7d9a780639f151f3c5de973",
 			"cleanedHash": "1b97e809901a2ef51abe23016d1f9388e389ac53b7f44a5393c1915f1e29fc96",
@@ -227,9 +236,45 @@
 			"review": 0
 		},
 		{
+			"sourceId": "va_camp_lejeune",
+			"contentHash": "309bace38f7986454eed323d88ec35d8ed87c0c842aff80b6f6fc8b563efdc5d",
+			"cleanedHash": "758af746d7a723daf18cb1d4bf967a81913cacbbe9adad4286c091031228edd6",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_career_counseling",
+			"contentHash": "8088da0ed14017c74a7be86c341a5e08b3c19507ff842bf84dfbf7c7fa566396",
+			"cleanedHash": "5f02d808bef8daabd9c0958fcd26d7d9f3cdcfe716d1f2ccc057554dadba52dd",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_caregiver_pcafc",
+			"contentHash": "b10c84361477bc5a791c1df7b465f3e01d2499b392a143d9e448f7f6106c9d32",
+			"cleanedHash": "f31075d57a54192593c54bd92ba68380f4a9eff8e4ac48ec0631d340c018dcc3",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
 			"sourceId": "va_dd214",
 			"contentHash": "31cc2e73933692a8577d4c88ed552f07a5f039ecbbb150b2e948ccfe5fdc93ac",
 			"cleanedHash": "3899e16b2eb6355581b31d96582bfca647e15558f176c4a9c44d53d0f604b97b",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_dea_chapter35",
+			"contentHash": "cbcf320223fc61b98d0e8e5f3912350e382c7beb5ccf7e2b33d1b48755af00f5",
+			"cleanedHash": "eb528b4ed433038a076b496545cfe513bac9cd36dd0a348ca51bac9948fac3b2",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -266,6 +311,15 @@
 			"sourceId": "va_education_apply",
 			"contentHash": "9e7a7e244d85f23d0d19a1cb1b3f6d4aee56cdcabfc3d66a97cba46ad1a28320",
 			"cleanedHash": "4e8b02d67cd9bd94d1cb2c15736ef9a87a6b810330692e090fa35dfbac413a6d",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_gi_bill_montgomery",
+			"contentHash": "4667c44b0ba7941ccf5e0c58eed3fd50269d94d6bec033554c2261167af709af",
+			"cleanedHash": "4d7cdaee1350c74da4a7cb02c89fea51794e0689dfad9116729d18865d675bd5",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -329,6 +383,24 @@
 			"sourceId": "va_intent_to_file",
 			"contentHash": "d446f2d4c058fe06d5799d2fae4beea8fd1c279e279824c908b6a445789748de",
 			"cleanedHash": "26cc2c4eb439cdc34f1b7e85a142d2fa51333c82fbbceaa7638b550820ec0f38",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_stem_scholarship",
+			"contentHash": "ba8afd22b8b2d9b78dfdfc6ea73f2f9c1f97842295561fc492d3be69d180bf5f",
+			"cleanedHash": "7699939d78024adc6a6a61ab9512e31bd94407f365621e7be39001c1672be598",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_vet_tec_2",
+			"contentHash": "4937b81510ea1c57768c7c8fe359245e64aa0c62cfecfaabd687a0a626b3ea42",
+			"cleanedHash": "f2ecf0e197b7f34d446fbbc328ce3ff418733a67ca1382d8fb2ca1dcb4c074a9",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,

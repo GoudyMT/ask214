@@ -88,6 +88,46 @@ export const SOURCES_INDEX: SourcesIndex = {
 			title: 'TSP - Leaving the Uniformed Services',
 			url: 'https://www.tsp.gov/changes-in-your-career/leaving-uniformed-services/',
 			publisher: 'TSP'
+		},
+		{
+			title: 'VA - VET TEC 2.0 (High-Tech Program)',
+			url: 'https://www.va.gov/education/other-va-education-benefits/vet-tec-2/',
+			publisher: 'VA'
+		},
+		{
+			title: 'VA - Camp Lejeune Water Contamination Health Issues',
+			url: 'https://www.va.gov/disability/eligibility/hazardous-materials-exposure/camp-lejeune-water-contamination/',
+			publisher: 'VA'
+		},
+		{
+			title: 'VA - Edith Nourse Rogers STEM Scholarship',
+			url: 'https://www.va.gov/education/other-va-education-benefits/stem-scholarship/',
+			publisher: 'VA'
+		},
+		{
+			title: 'VA - Program of Comprehensive Assistance for Family Caregivers (PCAFC)',
+			url: 'https://www.va.gov/family-and-caregiver-benefits/health-and-disability/comprehensive-assistance-for-family-caregivers/',
+			publisher: 'VA'
+		},
+		{
+			title: 'VA - Montgomery GI Bill Active Duty (MGIB-AD)',
+			url: 'https://www.va.gov/education/about-gi-bill-benefits/montgomery-active-duty/',
+			publisher: 'VA'
+		},
+		{
+			title: "VA - Survivors' and Dependents' Educational Assistance (DEA, Chapter 35)",
+			url: 'https://www.va.gov/family-and-caregiver-benefits/education-and-careers/dependents-education-assistance/',
+			publisher: 'VA'
+		},
+		{
+			title: 'VA - Personalized Career Planning and Guidance (Chapter 36)',
+			url: 'https://www.va.gov/careers-employment/education-and-career-counseling/',
+			publisher: 'VA'
+		},
+		{
+			title: 'DoD - Transition Assistance Program Overview (Military OneSource)',
+			url: 'https://www.militaryonesource.mil/benefits/transition-assistance-program/',
+			publisher: 'DoD'
 		}
 	],
 	tapLibraryUrl: 'https://www.tapevents.mil/resources/documents',

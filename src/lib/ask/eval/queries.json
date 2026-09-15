@@ -160,7 +160,8 @@
 	{
 		"query": "besides Post-9/11 what other GI Bill programs might I qualify for",
 		"sourceId": "va_gi_bill_overview",
-		"answerSnippet": "find out if you qualify for benefits under the Montgomery GI Bill Active Duty program"
+		"answerSnippet": "find out if you qualify for benefits under the Montgomery GI Bill Active Duty program",
+		"altSources": ["va_gi_bill_montgomery"]
 	},
 	{
 		"query": "do I have enough active duty time to qualify for the Post-9/11 GI Bill",
@@ -187,7 +188,14 @@
 	{
 		"query": "what education benefits can my kids get if something happens to me in the service",
 		"sourceId": "tap_va_education_spouses",
-		"answerSnippet": "Educational Assistance (DEA) Program"
+		"answerSnippet": "Educational Assistance (DEA) Program",
+		"altSources": ["va_dea_chapter35"],
+		"altAnswers": [
+			{
+				"sourceId": "va_dea_chapter35",
+				"answerSnippet": "You may be able to get a monthly payment to help you cover the cost of school"
+			}
+		]
 	},
 	{
 		"query": "can my military training count as college credit",
@@ -304,14 +312,25 @@
 			{
 				"sourceId": "tap_managing_transition",
 				"answerSnippet": "MANDATORY FOR ALL SERVICE MEMBERS"
+			},
+			{
+				"sourceId": "mos_tap_overview",
+				"answerSnippet": "Transition Assistance Program is mandatory for separating service members who have served 180 continuous days or more on active duty"
 			}
 		],
-		"altSources": ["tap_managing_transition"]
+		"altSources": ["tap_managing_transition", "mos_tap_overview"]
 	},
 	{
 		"query": "how early should I start TAP before I get out?",
 		"sourceId": "tap_managing_transition",
-		"answerSnippet": "begin TAP 24 months before retirement or 18 months before separation"
+		"answerSnippet": "begin TAP 24 months before retirement or 18 months before separation",
+		"altSources": ["mos_tap_overview"],
+		"altAnswers": [
+			{
+				"sourceId": "mos_tap_overview",
+				"answerSnippet": "Service members must complete TAP no later than a year before leaving the military"
+			}
+		]
 	},
 	{
 		"query": "when do I need to file my disability claim before I separate to use BDD?",
@@ -498,7 +517,14 @@
 	{
 		"query": "I was stationed at Camp Lejeune in the 80s, does that affect my health care eligibility?",
 		"sourceId": "va_health_eligibility",
-		"answerSnippet": "You served at least 30 days at Camp Lejeune between August 1, 1953, and December 31, 1987."
+		"answerSnippet": "You served at least 30 days at Camp Lejeune between August 1, 1953, and December 31, 1987.",
+		"altSources": ["va_camp_lejeune"],
+		"altAnswers": [
+			{
+				"sourceId": "va_camp_lejeune",
+				"answerSnippet": "If you served at either of these locations between August 1, 1953, and December 31, 1987, you may be eligible for disability and health care benefits"
+			}
+		]
 	},
 	{
 		"query": "I used up my Post-9/11 GI Bill but I'm in a STEM program, is there extra money?",
@@ -508,13 +534,25 @@
 			{
 				"sourceId": "tap_va_benefits_guide",
 				"answerSnippet": "The Edith Nourse Rogers STEM Scholarship program assists students who have started training in highdemand STEM fields"
+			},
+			{
+				"sourceId": "va_stem_scholarship",
+				"answerSnippet": "up to 9 months of added benefits (or $30,000, whichever comes first)"
 			}
-		]
+		],
+		"altSources": ["va_stem_scholarship"]
 	},
 	{
 		"query": "I never used the GI Bill before, can I still qualify for VET TEC?",
 		"sourceId": "va_education_apply",
-		"answerSnippet": "You don't need to have qualified for any VA education benefit in the past to be able to participate in VET TEC 2.0."
+		"answerSnippet": "You don't need to have qualified for any VA education benefit in the past to be able to participate in VET TEC 2.0.",
+		"altSources": ["va_vet_tec_2"],
+		"altAnswers": [
+			{
+				"sourceId": "va_vet_tec_2",
+				"answerSnippet": "need to have qualified for any VA education benefit in the past to be able to participate in VET TEC 2.0"
+			}
+		]
 	},
 	{
 		"query": "my tuition is more than the GI Bill pays, is there anything to cover the gap?",
@@ -621,7 +659,14 @@
 	{
 		"query": "what's the absolute latest I can start TAP before I get out?",
 		"sourceId": "tap_managing_transition",
-		"answerSnippet": "it is mandatory for all Service members to begin TAP no later than 365 days prior to their separation"
+		"answerSnippet": "it is mandatory for all Service members to begin TAP no later than 365 days prior to their separation",
+		"altSources": ["mos_tap_overview"],
+		"altAnswers": [
+			{
+				"sourceId": "mos_tap_overview",
+				"answerSnippet": "Service members must complete TAP no later than a year before leaving the military"
+			}
+		]
 	},
 	{
 		"query": "does the VA actually reach out to check on me after I separate?",
@@ -777,7 +822,7 @@
 		"query": "Is there a VA program that helps family members who take care of a disabled veteran?",
 		"sourceId": "tap_mental_health_families",
 		"answerSnippet": "Program of Comprehensive Assistance for Family Caregivers (PCAFC)",
-		"altSources": ["tap_interagency_website_guide", "tap_va_benefits_guide"]
+		"altSources": ["tap_interagency_website_guide", "tap_va_benefits_guide", "va_caregiver_pcafc"]
 	},
 	{
 		"query": "What's the national helpline number if my spouse needs substance abuse treatment?",
@@ -840,7 +885,13 @@
 		"query": "What does VA Chapter 36 educational and career counseling help with?",
 		"sourceId": "tap_va101",
 		"answerSnippet": "Educational and Career Counseling (VA Chapter 36)",
-		"altSources": ["tap_va_education_benefits"]
+		"altSources": ["tap_va_education_benefits", "va_career_counseling"],
+		"altAnswers": [
+			{
+				"sourceId": "va_career_counseling",
+				"answerSnippet": "offers free educational and career guidance, planning, and resources to Veterans and their dependents"
+			}
+		]
 	},
 	{
 		"query": "What form do I fill out to apply for VA health care in person?",

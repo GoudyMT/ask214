@@ -17,12 +17,23 @@ import { fileURLToPath } from 'node:url';
 // `pnpm eval` PASS certifies 0.4 on this corpus. The auto-calibration selects 0.4 on its own (the TUNE split
 // holds the floor at every cutoff, srcMRR 0.614). Removing the boilerplate held the source-hit floor flat;
 // its value is chunk cleanliness for synthesis + highlighting, not the source-level ranking metric.
-// Re-confirmed 2026-09-15 at 1845 chunks, after the corpus-shape rebuild (graded exercises excluded at the
-// clean stage; the chunker gained a list-marker level below sentences). Procedure followed exactly as this
-// comment prescribes - rebuild, re-run the eval, confirm the margin, THEN bump: held-out srcHitRate 0.868 /
-// srcMRR 0.641 at the shipped 0.40 cutoff, over the enforced 0.83 / 0.6 floor, and the auto-calibration
-// selects 0.40 on its own. The answer gate passed in the same run (tier 1 38.5% over its 37.0% floor).
-const CALIBRATED_CHUNK_COUNT = 1845;
+// Re-confirmed 2026-09-15 at 1991 chunks: eight lookup-shaped gov pages added to close enumerated
+// benchmark gaps (1845 -> 1991). Procedure followed exactly as this comment prescribes - rebuild, re-run
+// the eval, confirm the margin, THEN bump: held-out srcHitRate 0.842 / srcMRR 0.613 at the shipped 0.40
+// cutoff, over the enforced 0.83 / 0.6 floor, and the auto-calibration selects 0.40 on its own. Both answer
+// gates passed in the same run (device tier 1 39.3%, online 47.4%).
+//
+// This growth is also the clearest case yet of the margin-erosion this comment warns about. Measured BEFORE
+// the benchmark's ground truth was updated to credit the new pages, srcMRR read 0.600 against its own 0.6
+// floor - zero margin - and every answer metric looked DOWN. That was an instrument artifact: reachability
+// is scored against the expected source, and the items still named the old ones, so a new page answering
+// correctly counted as a miss by construction. With the ground truth corrected the same corpus reads
+// 0.613, and the reachable ceiling rose 76.3% -> 78.5% on device and 83.0% -> 85.2% online. Do not read a
+// rate move after a corpus change until the benchmark can SEE the change.
+//
+// The prior 1845-chunk reading was 0.868 / 0.641; srcHitRate is genuinely lower here (0.842), which is the
+// dilution cost of 146 more chunks competing for the same top-5.
+const CALIBRATED_CHUNK_COUNT = 1991;
 
 const corpusPath = fileURLToPath(
 	new URL('../../../static/corpus/corpus-v1.0.1.json', import.meta.url)
