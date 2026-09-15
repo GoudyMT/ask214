@@ -11,6 +11,10 @@ function nt(blocks: Block[]): string {
 	return blocks.map((b) => b.text).join(' ');
 }
 
+// U+2022 BULLET, built from its code point so this file stays pure ASCII. Extraction leaves this glyph in
+// the raw text, and a list flattened into a single run of them carries no sentence terminator at all.
+const BULLET = String.fromCharCode(0x2022);
+
 describe('splitIntoSpans', () => {
 	it('packs consecutive same-section blocks up to the token target into one chunk', () => {
 		const blocks: Block[] = [
@@ -104,5 +108,70 @@ describe('splitIntoSpans', () => {
 		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 100 });
 		expect(spans[0]?.page).toBe(4);
 		expect(spans[0]?.section).toBeUndefined();
+	});
+});
+
+describe('splitIntoSpans - paragraph level', () => {
+	// A flattened bullet list with NO sentence terminator anywhere: exactly the shape splitSentences
+	// returns as one indivisible unit, which without a paragraph level can only be cut by a token window
+	// landing mid-item.
+	const LIST_BLOCK = `intro text ${BULLET} alpha beta gamma ${BULLET} delta epsilon zeta ${BULLET} eta theta iota`;
+
+	it('cuts an oversized flattened list at its item markers, not mid-item', () => {
+		const blocks: Block[] = [{ text: LIST_BLOCK, section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 6 });
+
+		expect(spans.every((s) => s.brokeAtTokenLevel === false)).toBe(true);
+		expect(spans.map((s) => s.text)).toEqual([
+			`intro text ${BULLET} alpha beta gamma`,
+			`${BULLET} delta epsilon zeta`,
+			`${BULLET} eta theta iota`
+		]);
+	});
+
+	it('packs list items back up to the target instead of emitting one chunk per bullet', () => {
+		const blocks: Block[] = [{ text: LIST_BLOCK, section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 12 });
+		expect(spans.map((s) => s.text)).toEqual([
+			`intro text ${BULLET} alpha beta gamma ${BULLET} delta epsilon zeta`,
+			`${BULLET} eta theta iota`
+		]);
+	});
+
+	it('keeps a block that fits the target whole even when it holds markers', () => {
+		const blocks: Block[] = [{ text: `${BULLET} one ${BULLET} two`, section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 100 });
+		expect(spans.map((s) => s.text)).toEqual([`${BULLET} one ${BULLET} two`]);
+	});
+
+	it('does not emit an empty leading span when the block opens on a marker', () => {
+		const blocks: Block[] = [
+			{ text: `${BULLET} alpha beta gamma ${BULLET} delta epsilon zeta`, section: 'S' }
+		];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 4 });
+		expect(spans.every((s) => s.text.trim().length > 0)).toBe(true);
+		expect(spans.map((s) => s.text)).toEqual([
+			`${BULLET} alpha beta gamma`,
+			`${BULLET} delta epsilon zeta`
+		]);
+	});
+
+	it('every span is still a verbatim slice at its recorded offsets when a list is split', () => {
+		const blocks: Block[] = [{ text: LIST_BLOCK, section: 'S' }];
+		const text = nt(blocks);
+		const spans = splitIntoSpans(text, blocks, words, { targetTokens: 6 });
+		for (const s of spans) expect(text.slice(s.startOffset, s.endOffset)).toBe(s.text);
+	});
+
+	it('leaves marker-free text to the sentence level (behaviour unchanged)', () => {
+		const blocks: Block[] = [
+			{ text: 'One two three. Four five six. Seven eight nine.', section: 'S' }
+		];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 3 });
+		expect(spans.map((s) => s.text)).toEqual([
+			'One two three.',
+			'Four five six.',
+			'Seven eight nine.'
+		]);
 	});
 });

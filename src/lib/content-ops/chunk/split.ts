@@ -22,6 +22,31 @@ type Unit = {
 
 const DEFAULT_TARGET = 256;
 
+// List-marker glyphs this corpus uses as bullets and separators: bullet, black and white square, diamond,
+// circles, small square, bullet operator, the right guillemet used as a breadcrumb separator, the minus
+// sign (which this corpus uses only as a separator, never as a math minus), and the dingbat
+// negative-circled digits used as ordered-list bullets.
+//
+// They matter here because extraction flattens a bullet list into one run carrying no sentence terminator,
+// so splitSentences returns a whole list as a single unit and the only remaining cut is a token window
+// landing mid-item. A marker is the item boundary that prevents that.
+//
+// clean-excerpt.ts carries the same glyph set for DISPLAY. The two are deliberately kept separate: a
+// readability tweak there must never silently re-cut the corpus, and a boundary change here must go
+// through the retrieval eval. Built from code points so this file stays pure ASCII.
+const MARKER_CODE_POINTS = [
+	0x2022, 0x25a0, 0x25a1, 0x2666, 0x25cb, 0x25aa, 0x25cf, 0x2219, 0x00bb, 0x2212
+];
+const MARKER_RANGE_START = 0x2776;
+const MARKER_RANGE_END = 0x277f;
+const MARKER_RUN_SOURCE =
+	'\\s*[' +
+	MARKER_CODE_POINTS.map((p) => String.fromCharCode(p)).join('') +
+	String.fromCharCode(MARKER_RANGE_START) +
+	'-' +
+	String.fromCharCode(MARKER_RANGE_END) +
+	']+\\s*';
+
 function carry(u: Unit, start: number, end: number, broke: boolean): Unit {
 	const out: Unit = { start, end, brokeAtTokenLevel: broke };
 	if (u.page !== undefined) out.page = u.page;
@@ -42,6 +67,30 @@ function mapBlockOffsets(normalizedText: string, blocks: Block[]): Unit[] {
 		cursor = idx + b.text.length;
 	}
 	return units;
+}
+
+/**
+ * Split `text` into contiguous, tiling spans at list-marker boundaries (offsets into `text`). A boundary
+ * opens at each marker run past the first character, so every span carries its own leading marker and a
+ * marker is never orphaned onto the end of the previous span. Spans tile `[0, len)` so a caller can pack
+ * them without dropping characters; text holding no marker returns as one whole span. Pure, ASCII-only.
+ */
+function splitParagraphs(text: string): Array<{ start: number; end: number }> {
+	const bounds: number[] = [0];
+	const re = new RegExp(MARKER_RUN_SOURCE, 'g');
+	let m: RegExpExecArray | null;
+	while ((m = re.exec(text)) !== null) {
+		if (m.index > 0) bounds.push(m.index);
+	}
+	bounds.push(text.length);
+
+	const spans: Array<{ start: number; end: number }> = [];
+	for (let i = 0; i < bounds.length - 1; i++) {
+		const start = bounds[i] ?? 0;
+		const end = bounds[i + 1] ?? text.length;
+		if (end > start) spans.push({ start, end });
+	}
+	return spans;
 }
 
 // A single sentence over the target: pack its words into <=target windows at word boundaries (last resort).
@@ -79,7 +128,13 @@ function tokenWindows(
 	if (winStart < u.end) out.push(carry(u, winStart, u.end, true));
 }
 
-function explode(nt: string, u: Unit, target: number, countTokens: CountTokens, out: Unit[]): void {
+function explodeSentences(
+	nt: string,
+	u: Unit,
+	target: number,
+	countTokens: CountTokens,
+	out: Unit[]
+): void {
 	if (countTokens(nt.slice(u.start, u.end)) <= target) {
 		out.push(u);
 		return;
@@ -87,15 +142,43 @@ function explode(nt: string, u: Unit, target: number, countTokens: CountTokens, 
 	const sents = splitSentences(nt.slice(u.start, u.end));
 	if (sents.length > 1) {
 		for (const s of sents)
-			explode(nt, carry(u, u.start + s.start, u.start + s.end, false), target, countTokens, out);
+			explodeSentences(
+				nt,
+				carry(u, u.start + s.start, u.start + s.end, false),
+				target,
+				countTokens,
+				out
+			);
 		return;
 	}
 	tokenWindows(nt, u, target, countTokens, out);
 }
 
+function explode(nt: string, u: Unit, target: number, countTokens: CountTokens, out: Unit[]): void {
+	if (countTokens(nt.slice(u.start, u.end)) <= target) {
+		out.push(u);
+		return;
+	}
+	// Paragraphs before sentences: a flattened list has no terminator for splitSentences to find, so
+	// without this level an oversized list reaches tokenWindows and is cut mid-item.
+	const paras = splitParagraphs(nt.slice(u.start, u.end));
+	if (paras.length > 1) {
+		for (const p of paras)
+			explodeSentences(
+				nt,
+				carry(u, u.start + p.start, u.start + p.end, false),
+				target,
+				countTokens,
+				out
+			);
+		return;
+	}
+	explodeSentences(nt, u, target, countTokens, out);
+}
+
 /**
  * Cut a source into ordered, no-overlap `ChunkSpan`s over its `normalizedText`. Packs consecutive same-section
- * units (block -> sentence -> token window) greedily up to `targetTokens`; never merges across a section
+ * units (block -> paragraph -> sentence -> token window) greedily up to `targetTokens`; never merges across a section
  * boundary. A short trailing chunk is left as-is - greedy packing already merges everything that fits, so a
  * tiny tail survives only when folding it would breach the window. Each span's `text` is a verbatim slice
  * `normalizedText[start, end)`. Pure (tokenizer injected). Throws `E_CHUNK_BLOCK_NOT_LOCATED` if a block is
