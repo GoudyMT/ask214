@@ -128,6 +128,52 @@ function tokenWindows(
 	if (winStart < u.end) out.push(carry(u, winStart, u.end, true));
 }
 
+// A unit that RESOLVES the one before it, and a unit that LEAVES ITS CLAUSE OPEN. Either way the pair
+// carries one meaning and a boundary between them changes what the text says.
+//
+// The first form is an answer key: a claim followed by the verdict that corrects it. This corpus
+// deliberately contains claims that are wrong - a guide states them so a reader can judge them - so a
+// chunk holding the claim without its verdict renders a falsehood in the document's own voice.
+//
+// The second is a governing condition severed from its consequence. Measured on a benefits page: one
+// chunk ended "...under the Camp Lejeune Justice Act of 2022, and" while the next opened on the remaining
+// condition followed by "The court must reduce the award", so the answer asserted an unconditional legal
+// consequence whose qualifying clause had been cut away. Text true in the source and false on screen is
+// the one shape 38 CFR 14.629 forbids.
+const RESOLVES_PREVIOUS_RE = /^(?:TRUE|FALSE)\s*:/i;
+const LEAVES_CLAUSE_OPEN_RE = /(?:,\s*(?:and|or)|:)$/i;
+
+/**
+ * Join adjacent units whose boundary would orphan one from the other, so packing cannot place them in
+ * different chunks. Runs after `explode` and before packing, because packing treats a unit as atomic -
+ * making the pair one unit is what guarantees they travel together, rather than asking the packer to
+ * avoid a boundary it may have no room to avoid.
+ *
+ * Only joins within a section, and only forward, so the result still tiles in order.
+ */
+function joinUnresolved(nt: string, units: Unit[]): Unit[] {
+	const out: Unit[] = [];
+	for (const u of units) {
+		const prev = out[out.length - 1];
+		const orphaned =
+			prev !== undefined &&
+			prev.section === u.section &&
+			(RESOLVES_PREVIOUS_RE.test(nt.slice(u.start, u.end).trim()) ||
+				LEAVES_CLAUSE_OPEN_RE.test(nt.slice(prev.start, prev.end).trim()));
+		if (orphaned && prev !== undefined) {
+			out[out.length - 1] = carry(
+				prev,
+				prev.start,
+				u.end,
+				prev.brokeAtTokenLevel || u.brokeAtTokenLevel
+			);
+			continue;
+		}
+		out.push(u);
+	}
+	return out;
+}
+
 function explode(nt: string, u: Unit, target: number, countTokens: CountTokens, out: Unit[]): void {
 	if (countTokens(nt.slice(u.start, u.end)) <= target) {
 		out.push(u);
@@ -173,9 +219,10 @@ export function splitIntoSpans(
 ): ChunkSpan[] {
 	const target = opts?.targetTokens ?? DEFAULT_TARGET;
 
-	const units: Unit[] = [];
+	const exploded: Unit[] = [];
 	for (const block of mapBlockOffsets(normalizedText, blocks))
-		explode(normalizedText, block, target, countTokens, units);
+		explode(normalizedText, block, target, countTokens, exploded);
+	const units = joinUnresolved(normalizedText, exploded);
 
 	// Pack units into chunks, never crossing a section boundary, up to target.
 	const chunks: Unit[] = [];

@@ -25,7 +25,7 @@ const DIFF_SNIPPET_LENGTH = 120;
 export type CleanConfig = Record<string, never>;
 
 export type CleanReport = {
-	dropped: { page?: number; kind: string; preview: string }[];
+	dropped: { page?: number; kind: string; preview: string; chars: number }[];
 	stripped: { page?: number; before: string; after: string }[];
 	review: { page?: number; kind: string; preview: string; confidence: number }[];
 };
@@ -44,9 +44,15 @@ function diffSnippet(text: string): string {
 }
 
 /** Builds a dropped-block report entry; page is only assigned when present, since CleanReport's
- *  optional `page` must be omitted rather than set to a literal undefined. */
+ *  optional `page` must be omitted rather than set to a literal undefined.
+ *
+ *  A drop destroys strictly more than a strip, so it gets at least as much of the reviewer's attention:
+ *  the same head-and-tail snippet a strip gets, plus the block's full length. A head-only preview shows
+ *  the part of a block most likely to look like boilerplate - its title - while hiding whatever follows,
+ *  which is where real content would be. One approval in this corpus cleared a 3,058-character block of
+ *  government guidance on the strength of its first 80 characters. */
 function toDroppedEntry(block: Block, kind: string): DroppedEntry {
-	const entry: DroppedEntry = { kind, preview: block.text.slice(0, PREVIEW_LENGTH) };
+	const entry: DroppedEntry = { kind, preview: diffSnippet(block.text), chars: block.text.length };
 	if (block.page !== undefined) entry.page = block.page;
 	return entry;
 }

@@ -255,14 +255,41 @@ describe('classifyBlock', () => {
 			expect(result.confidence).toBeGreaterThanOrEqual(0.7);
 		});
 
-		it('drops the appendix answer key for that statement bank (tap_dol_employment_workshop block 174, page 184)', () => {
+		it('KEEPS a prose answer key, whose corrections are the only place the guidance exists (tap_dol_employment_workshop block 174, page 184)', () => {
 			const result = classifyBlock({
 				page: 184,
 				text: `SECTION 8: APPENDICES APPENDIX A: RESUME QUIZ Answers to the Resume Quiz on Page 18. 1. The number one rule for writing a good resume is ${LEFT_QUOTE}more is better.${RIGHT_QUOTE} FALSE: An employer reviews a resume, on average, less than 30 seconds, so there is a very short amount of time to catch their attention.`
 			});
-			// Each false statement is corrected in place, but an answer window can open on the statement
-			// and stop before its correction.
-			expect(result.kind).toBe('exercise');
+			// Not a token grid: every item is a full paragraph of Department of Labor guidance, and five of
+			// its corrections exist nowhere else in the corpus - how far back a work history should go, that
+			// a paid resume writer will not save you time, and that age and marital status do not belong on
+			// a resume. Dropping this block removed the document's own correction of the statement bank on
+			// page 18 while leaving the hazard that bank describes unanswered.
+			//
+			// Keeping it is safe only because a chunk boundary cannot separate a statement from its verdict
+			// - see the resolution guard in chunk/split.ts.
+			expect(result.kind).toBe('content');
+		});
+
+		it('keeps a block that merely CITES an appendix whose title contains QUIZ', () => {
+			// A cross-reference names the appendix; it is not the appendix. The corpus already carries this
+			// sentence on the surviving RESUME BASICS page, so a rule matching the title anywhere in a block
+			// would auto-drop a page of real guidance at full confidence, with no review lane to catch it.
+			const result = classifyBlock({
+				page: 17,
+				text: 'RESUME BASICS A targeted resume is written for one specific job posting. Review the statements and decide whether each is true or false. Answers will be discussed in class and are available in Appendix A: Resume Quiz.'
+			});
+			expect(result.kind).toBe('content');
+		});
+
+		it('keeps prose that mentions a module question in a sentence', () => {
+			// The anchor is the column header the guide prints above its question bank, not the two words
+			// wherever they appear. A participant guide discusses its own modules constantly.
+			const result = classifyBlock({
+				page: 160,
+				text: 'Module 6: Course Capstone This module reviews what you learned in Modules 1 through 5. If you have a Module Question that was not answered during the course, write it down and ask your Benefits Advisor before you leave.'
+			});
+			expect(result.kind).toBe('content');
 		});
 
 		// The hard constraint. A rule anchored on the word "Capstone" destroys 18 legitimate chunks,
@@ -296,6 +323,25 @@ describe('classifyBlock', () => {
 				text: `EFCT PARTICIPANT GUIDE | SECTION 7 | PAGE 123 JOB OFFERS Congratulations! You finished the final interview, and they offered you the job. Have you had an opportunity to see a written job offer? Let${APOSTROPHE}s start with what you already know about job offers and salary negotiation. JOB OFFER and SALARY NEGOTIATION QUIZ TRUE FALSE 1. A job offer will always be provided in writing. ACTIVITY 7.2: Job Offer Quiz Consider the 10 questions below. Mark each as True or False. What do you think?`
 			});
 			expect(result.kind).toBe('content');
+		});
+
+		it('drops a page-chrome widget that is the whole block', () => {
+			expect(classifyBlock({ text: 'Was this page helpful?' }).kind).toBe('chrome');
+			expect(classifyBlock({ text: 'Related Articles' }).kind).toBe('chrome');
+			expect(classifyBlock({ text: 'Browse by topic' }).kind).toBe('chrome');
+		});
+
+		it('keeps a short heading or step that merely LOOKS like chrome', () => {
+			// The enumeration that produced the literal list is the reason this rule matches a whole block
+			// exactly rather than by length or by substring: of the 51 shortest chunks in this corpus, most
+			// are real content - VGLI premium rows, application steps, and section headings.
+			expect(classifyBlock({ text: 'Ages 30 to 34' }).kind).toBe('content');
+			expect(classifyBlock({ text: 'Option 1: Apply online' }).kind).toBe('content');
+			expect(classifyBlock({ text: 'Preferred providers' }).kind).toBe('content');
+			expect(
+				classifyBlock({ text: 'Related Articles cover how to transfer benefits to a dependent.' })
+					.kind
+			).toBe('content');
 		});
 
 		it('keeps prose about a real VA quiz a veteran can go and take (tap_va_womens_health, page 71)', () => {

@@ -19,9 +19,9 @@ describe('buildCorpusArtifact', () => {
 	it('produces a manifest + Float32 blob that B.decodeCorpus accepts', () => {
 		const chunks = [chunk('a'), chunk('b')];
 		const vectors = [new Float32Array([3, 4]), new Float32Array([0, 5])]; // dim 2
-		const { manifest, embeddingsBuffer } = buildCorpusArtifact(chunks, vectors, MODEL, '1.0');
+		const { manifest, embeddingsBuffer } = buildCorpusArtifact(chunks, vectors, MODEL, '1.0.2');
 
-		expect(manifest.version).toBe('1.0');
+		expect(manifest.version).toBe('1.0.2');
 		expect(manifest.dim).toBe(2);
 		expect(manifest.modelId).toBe(MODEL);
 		expect(manifest.chunks).toHaveLength(2);

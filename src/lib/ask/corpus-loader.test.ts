@@ -3,7 +3,7 @@ import { createLazyCorpus } from './corpus-loader';
 import type { Corpus } from '$lib/corpus';
 
 function fixtureCorpus(): Corpus {
-	return { version: '1.0', dim: 1, modelId: 'm', chunks: [], embeddings: [] };
+	return { version: '1.0.2', dim: 1, modelId: 'm', chunks: [], embeddings: [] };
 }
 
 describe('createLazyCorpus', () => {
@@ -53,6 +53,6 @@ describe('createLazyCorpus', () => {
 		await expect(get()).rejects.toThrow('transient'); // first call rejects
 		const corpus = await get(); // retry re-invokes load and succeeds
 		expect(load).toHaveBeenCalledTimes(2);
-		expect(corpus.version).toBe('1.0');
+		expect(corpus.version).toBe('1.0.2');
 	});
 });

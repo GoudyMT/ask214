@@ -21,7 +21,7 @@ function renderSource({ sourceId, report }: SourceReview): string {
 			report.dropped
 				.map(
 					(d) =>
-						`<div class="dropped">${d.page !== undefined ? `<span class="pg">page ${d.page}</span> ` : ''}<span class="kind">[${esc(d.kind)}]</span> ${esc(d.preview)}</div>`
+						`<div class="dropped">${d.page !== undefined ? `<span class="pg">page ${d.page}</span> ` : ''}<span class="kind">[${esc(d.kind)}]</span> <span class="counts">${d.chars} chars</span> ${esc(d.preview)}</div>`
 				)
 				.join('')
 		: '';

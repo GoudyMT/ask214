@@ -21,6 +21,7 @@ import { assemblePdfText } from '../src/lib/content-ops/extract/pdf-text.ts';
 import { trigramSimilarity } from '../src/lib/content-ops/extract/similarity.ts';
 import { checkExtractionSanity } from '../src/lib/content-ops/extract/fidelity.ts';
 import { shapeHtmlBlocks } from '../src/lib/content-ops/extract/html-blocks.ts';
+import { webComponentText } from '../src/lib/content-ops/extract/web-component-text.ts';
 import { findOffOriginUrls } from '../src/lib/content-ops/extract/off-origin.ts';
 import { isPathAllowed } from '../src/lib/content-ops/capture/robots.ts';
 import { createRateLimiter } from '../src/lib/content-ops/capture/rate-limit.ts';
@@ -190,9 +191,16 @@ function hasBlockAncestor(el, region) {
 	return false;
 }
 
+/** An element's attributes as a plain name -> value record, the shape the pure text mappers take.
+ *  @param {Element} el */
+function attributeRecord(el) {
+	return Object.fromEntries([...el.attributes].map((a) => [a.name, a.value]));
+}
+
 /** A block's text, depth-first like textContent but prefixing link/button text with a LEADING space so an
  *  inline CTA abutting the prior text does not fuse ("page.Use" -> "page. Use"); leading-only avoids a stray
- *  space before trailing punctuation. normalizeText later collapses the space.
+ *  space before trailing punctuation. normalizeText later collapses the space. An element whose text lives
+ *  only in attributes contributes that rendered text instead of its (empty) subtree.
  *  @param {Node} node */
 function blockText(node) {
 	let out = '';
@@ -202,8 +210,17 @@ function blockText(node) {
 		else if (child.nodeType === 1) {
 			// element: recurse; prefix link-like inline tags with a space so a CTA does not glue onto prior text
 			const el = /** @type {Element} */ (child); // nodeType 1 == element node (has tagName)
+			const tag = el.tagName.toLowerCase();
+			// A content-in-attributes web component has no child text node, so recursing yields '' and the
+			// content vanishes; substitute its rendered text at the element's position instead. Same LEADING
+			// space as an inline CTA, for the same anti-fusion reason.
+			const rendered = webComponentText(tag, attributeRecord(el));
+			if (rendered !== null) {
+				out += ` ${rendered}`;
+				continue;
+			}
 			const inner = blockText(el);
-			out += SPACING_INLINE.has(el.tagName.toLowerCase()) ? ` ${inner}` : inner;
+			out += SPACING_INLINE.has(tag) ? ` ${inner}` : inner;
 		}
 	}
 	return out;

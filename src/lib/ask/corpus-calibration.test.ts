@@ -17,7 +17,10 @@ import { fileURLToPath } from 'node:url';
 // `pnpm eval` PASS certifies 0.4 on this corpus. The auto-calibration selects 0.4 on its own (the TUNE split
 // holds the floor at every cutoff, srcMRR 0.614). Removing the boilerplate held the source-hit floor flat;
 // its value is chunk cleanliness for synthesis + highlighting, not the source-level ranking metric.
-// Re-confirmed 2026-09-15 at 1991 chunks: eight lookup-shaped gov pages added to close enumerated
+// Re-confirmed 2026-09-15 at 1992 chunks, after the post-sweep fix batch (a prose answer key restored, a
+// boundary rule that keeps a claim with the text resolving it, 21 phone numbers recovered from markup
+// attributes, page chrome dropped). Held-out srcHitRate 0.842 / srcMRR 0.609 at the shipped 0.40 cutoff,
+// over the enforced 0.83 / 0.6 floor; both answer gates passed in the same run. Prior: eight gov pages to close enumerated
 // benchmark gaps (1845 -> 1991). Procedure followed exactly as this comment prescribes - rebuild, re-run
 // the eval, confirm the margin, THEN bump: held-out srcHitRate 0.842 / srcMRR 0.613 at the shipped 0.40
 // cutoff, over the enforced 0.83 / 0.6 floor, and the auto-calibration selects 0.40 on its own. Both answer
@@ -33,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 //
 // The prior 1845-chunk reading was 0.868 / 0.641; srcHitRate is genuinely lower here (0.842), which is the
 // dilution cost of 146 more chunks competing for the same top-5.
-const CALIBRATED_CHUNK_COUNT = 1991;
+const CALIBRATED_CHUNK_COUNT = 1992;
 
 const corpusPath = fileURLToPath(
 	new URL('../../../static/corpus/corpus-v1.0.2.json', import.meta.url)

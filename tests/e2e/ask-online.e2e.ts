@@ -8,7 +8,7 @@ test.use({ serviceWorkers: 'block' });
 
 // Must match the shipped corpus manifest version (static/corpus/corpus-v1.0.2.json): the client treats a server
 // answer on a different corpus version as unavailable, so the mock has to echo the exact version.
-const CORPUS_VERSION = '1.0';
+const CORPUS_VERSION = '1.0.2';
 
 const askInput = (page: Page) => page.getByRole('textbox', { name: /ask a question/i });
 const searchButton = (page: Page) => page.getByRole('button', { name: /^search$/i });

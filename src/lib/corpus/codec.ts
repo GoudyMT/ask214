@@ -16,8 +16,17 @@ import { normalize } from './search';
  *   6. per-chunk slice + unit-normalize; a zero embedding throws E_CORPUS_ZERO_VECTOR (bad vector)
  */
 
-/** The corpus generation this client build supports. A different version throws. */
-export const ACCEPTED_CORPUS_VERSION = '1.0';
+/**
+ * The corpus generation this client build supports. A different version throws.
+ *
+ * This tracks the shipped artifact's filename, and both must move when the corpus CONTENT changes. The
+ * filename is what gets a returning device the new bytes, because the corpus is cached cache-first under
+ * a name that survives app deploys. This constant is what lets the ONLINE handshake notice the same
+ * change: a client still holding the previous generation asks the retrieve Worker for results and the
+ * version comparison degrades the answer instead of citing passages the local corpus cannot open. Leaving
+ * it at a stale value makes that guard blind to exactly the case it exists for.
+ */
+export const ACCEPTED_CORPUS_VERSION = '1.0.2';
 
 export function decodeCorpus(
 	manifest: CorpusManifest,

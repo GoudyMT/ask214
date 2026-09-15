@@ -35,6 +35,20 @@ describe('bge server corpus index', () => {
 		expect(bge.chunks.length).toBe(minilm.chunks.length);
 		expect(bge.version).toBe(minilm.version);
 	});
+
+	// Equal LENGTH is not the same chunk set, and the difference is what ships. The two indexes are built
+	// by separate commands - one needs a live inference binding and the other does not - so the server
+	// index can age behind the device one while both remain the same size, and the whole-set check that
+	// would catch it needs that binding and therefore cannot run here. Comparing ids and the content
+	// fingerprint costs nothing, runs in CI, and is the only automatic guard that the two delivery paths
+	// answer from the same words.
+	it('carries the same chunk IDS and content fingerprint, not merely the same count', () => {
+		expect([...bge.chunks.map((c) => c.id)].sort()).toEqual(
+			[...minilm.chunks.map((c) => c.id)].sort()
+		);
+		expect(bge.contentRevision?.contentHash).toBe(minilm.contentRevision?.contentHash);
+		expect(bge.contentRevision?.contentHash).toBeTruthy();
+	});
 });
 
 // Read a top-level `const NAME = ...;` literal straight from a source file, so the assertions below bind

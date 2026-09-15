@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
+// U+2022 BULLET, from its code point so this file stays pure ASCII.
+const LIST_BULLET = String.fromCharCode(0x2022);
 import { stripExercise } from './strip-exercise';
 
 // Non-ASCII rebuilt from char codes so this file stays ASCII-only, per the project's character rule.
@@ -64,5 +67,25 @@ describe('stripExercise', () => {
 
 	it('returns an empty string unchanged', () => {
 		expect(stripExercise('')).toBe('');
+	});
+
+	it('walks back only to the nearest structural boundary, not across a whole list', () => {
+		// The cut starts at the quiz HEADING, which carries no sentence terminator of its own. Walking
+		// back to find it must stop at the previous list item as well as at the previous sentence, or a
+		// checklist sitting between the last full stop and the heading is swallowed with the exercise.
+		const text =
+			'Review the written offer carefully. JOB OFFER CHECKLIST Before you accept confirm each item ' +
+			`${LIST_BULLET} Base salary and pay schedule ` +
+			`${LIST_BULLET} Health dental and vision coverage ` +
+			`${LIST_BULLET} Relocation assistance ` +
+			'JOB OFFER and SALARY NEGOTIATION QUIZ TRUE FALSE 1. A job offer will always be in writing.';
+		const out = stripExercise(text);
+		expect(out).toContain('Base salary and pay schedule');
+		expect(out).toContain('Health dental and vision coverage');
+		expect(out).not.toContain('TRUE FALSE');
+		expect(text).toContain(out);
+		// The run directly adjacent to the heading is still lost - normalisation leaves no separator
+		// between the last list item and the heading, so the damage is bounded rather than eliminated.
+		expect(out).not.toContain('Relocation assistance');
 	});
 });

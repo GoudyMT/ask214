@@ -59,7 +59,7 @@ function reportIsEmpty(report) {
 /** @param {CleanReport['dropped'][number]} d @returns {string} */
 function renderDropped(d) {
 	const page = d.page !== undefined ? `page ${d.page}, ` : '';
-	return `- ${page}[${d.kind}]: "${d.preview}"`;
+	return `- ${page}[${d.kind}] ${d.chars} chars: "${d.preview}"`;
 }
 
 /** @param {CleanReport['stripped'][number]} s @returns {string} */

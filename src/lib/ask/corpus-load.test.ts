@@ -3,7 +3,7 @@ import { loadCorpus } from './corpus-load';
 import { buildCorpusArtifact } from './corpus-artifact';
 import { EMBED_MODEL_ID } from './types';
 import { AskError } from './errors';
-import type { CorpusChunk } from '$lib/corpus';
+import { ACCEPTED_CORPUS_VERSION, type CorpusChunk } from '$lib/corpus';
 
 function chunk(id: string): CorpusChunk {
 	return { id, text: id, sourceId: 's', sourceTitle: 'S', tags: [], url: 'https://example.gov/' };
@@ -23,7 +23,9 @@ describe('loadCorpus', () => {
 			[chunk('a'), chunk('b')],
 			[new Float32Array([1, 0]), new Float32Array([0, 1])],
 			EMBED_MODEL_ID,
-			'1.0'
+			// Derived, not a literal: this fixture only has to decode, so pinning a version here just makes
+			// the test drift the next time a corpus generation ships.
+			ACCEPTED_CORPUS_VERSION
 		);
 		const corpus = await loadCorpus(
 			fakeFetch(JSON.stringify(manifest), embeddingsBuffer) as typeof fetch,

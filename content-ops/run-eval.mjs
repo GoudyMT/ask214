@@ -42,7 +42,12 @@ const HELD_OUT_PCT = 30;
 // is a weaker bar on a corrected one.
 //
 // The two numbers derive differently, and only one moves:
-//   srcHitRate 0.8 -> 0.83. Held-out measures 0.868, leaving ~1.4 queries of slack on a 38-positive split;
+//   NOTE 2026-09-15, after the corpus changed twice more: held-out now measures 0.842 (32 of 38), and the
+//   next step down, 31 of 38, is 0.816 - BELOW this floor. So srcHitRate currently carries ZERO queries of
+//   slack, not the 1.4 the derivation below claimed at the time. The floor is left where it is rather than
+//   re-cut to fit, but a single query moving will fail this gate, and that is the honest state of it.
+//
+//   srcHitRate 0.8 -> 0.83. Held-out measured 0.868 when set, giving ~1.4 queries of slack on a 38-positive split;
 //     tune measures 0.856, leaving ~1. Real margin, so the bar rises to match the corrected reality.
 //   srcMRR stays 0.6. Tune measures 0.618, so any raise leaves under one query of margin - and a floor that
 //     tight makes the auto-calibration fall back to a lower cutoff on noise, which is fragility rather than

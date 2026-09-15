@@ -174,6 +174,37 @@ describe('splitIntoSpans - paragraph level', () => {
 		expect(spans.map((s) => s.text)).toEqual(['X y z.', `A b ${BULLET} c d.`]);
 	});
 
+	it('keeps a statement and the verdict that resolves it in the same chunk', () => {
+		// An answer key states a claim and then corrects it. Split between the two, the claim renders as
+		// the document's own assertion - the corpus carries claims that are wrong by design, so the
+		// correction travelling with them is what makes the block safe to keep at all.
+		const blocks: Block[] = [
+			{
+				text: 'Intro line here. A resume should list every job. FALSE: about ten years is the guideline.',
+				section: 'S'
+			}
+		];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 8 });
+		const withClaim = spans.find((s) => s.text.includes('list every job'));
+		expect(withClaim?.text).toContain('FALSE:');
+	});
+
+	it('does not end a chunk on a dangling connector, orphaning the clause it governs', () => {
+		// Measured on a real benefits page: one chunk ended "...under the Camp Lejeune Justice Act of
+		// 2022, and" and the next opened on the second condition followed by an unconditional
+		// consequence, so the rendered answer asserted the consequence with its governing condition
+		// severed into the previous chunk.
+		const blocks: Block[] = [
+			{
+				text: 'Filler words here. Both of these must be true: a court awards you relief, and you already get benefits. The court must reduce the award.',
+				section: 'S'
+			}
+		];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 12 });
+		expect(spans.some((s) => /,\s*(and|or)$/.test(s.text))).toBe(false);
+		expect(spans.some((s) => s.text.endsWith(':'))).toBe(false);
+	});
+
 	it('leaves marker-free text to the sentence level (behaviour unchanged)', () => {
 		const blocks: Block[] = [
 			{ text: 'One two three. Four five six. Seven eight nine.', section: 'S' }

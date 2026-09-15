@@ -20,7 +20,7 @@ function chunk(over: Partial<CorpusChunk> & { id: string; text: string }): Corpu
 
 function corpusOf(pairs: [CorpusChunk, [number, number]][]): Corpus {
 	return {
-		version: '1.0',
+		version: '1.0.2',
 		dim: 2,
 		modelId: 'test',
 		chunks: pairs.map(([c]) => c),

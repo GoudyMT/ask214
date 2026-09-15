@@ -14,7 +14,7 @@ const CHUNKS_DIR = 'content-ops/chunks';
 const OUT_DIR = 'static/corpus';
 const MODEL_REPO = 'Xenova/all-MiniLM-L6-v2';
 const MODEL_ID = 'all-MiniLM-L6-v2'; // stamped into the manifest; must equal the runtime EMBED_MODEL_ID + decodeCorpus expectedModelId
-const VERSION = '1.0';
+const VERSION = '1.0.2';
 const SIZE_BUDGET_BYTES = 300 * 1024 * 1024; // the on-device total corpus budget
 const PER_FILE_CAP_BYTES = 25 * 1024 * 1024; // Cloudflare Workers Assets per-file asset cap
 
