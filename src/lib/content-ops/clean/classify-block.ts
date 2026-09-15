@@ -1,7 +1,59 @@
 import type { Block } from '$lib/content-ops/extract/pdf-text';
 
-export type BlockKind = 'content' | 'toc' | 'disclaimer' | 'frontmatter';
+export type BlockKind = 'content' | 'toc' | 'disclaimer' | 'frontmatter' | 'exercise' | 'chrome';
+
+// chrome: a navigation or feedback widget the page template prints around its content. It answers nothing
+// and is embedded and retrievable like any other block.
+//
+// Matched as the WHOLE block, trimmed and case-folded, against exact literals - never by length and never
+// as a substring. Enumerating the 51 shortest chunks in this corpus is what forced that: almost all of
+// them are real content, including VGLI premium rows ("Ages 30 to 34"), application steps ("Option 1:
+// Apply online") and ordinary section headings ("Preferred providers"). A length rule would delete every
+// one of them, and a substring rule would condemn any sentence that happens to quote a widget's wording.
+const CHROME_BLOCKS = new Set([
+	'was this page helpful?',
+	'related articles',
+	'related information',
+	'related benefits & services',
+	'browse by topic'
+]);
 export type Classification = { kind: BlockKind; confidence: number };
+
+// exercise: a graded classroom exercise - a multiple-choice question bank, a true/false statement bank,
+// or the answer key to one. This is the only class in this corpus where the app can state something FALSE
+// while quoting the source perfectly, because a distractor is wrong by construction and a true/false
+// statement is a claim the reader is meant to JUDGE, not believe. Chunking makes it worse rather than
+// better: it splits the "decide whether it is true or false" framing off the statements, so the statements
+// render as the document's own plain declarative prose.
+//
+// Anchored on the exercise FORM, never on a topic word - a rule keyed on "Capstone" would destroy 18
+// legitimate chunks including the passage answering what a Capstone is, and detecting a run of lettered
+// options matched 9 blocks of which 4 were worksheet sub-lists ("a. Skills b. Education and Training c.
+// Credentials"), a 44% false-positive rate on real content.
+//
+// A THIRD anchor was removed after it destroyed real content. It matched an appendix whose title contains
+// QUIZ, which is a topic word in a title rather than a form - the exact shape this design rejects. It
+// caught two blocks and neither was a graded exercise: a contents page that merely LISTS such an appendix,
+// and a prose answer key whose corrections were the corpus's only source for how far back a work history
+// should go and that age and marital status do not belong on a resume. The graded material it was meant to
+// reach is caught by the two anchors below on its own form, so removing it lost no coverage. A block that
+// cites an appendix is not that appendix.
+//
+// 1. The column header the VA guide prints above its question bank and above its answer-key grid. The
+//    header is followed immediately by the first column - a module number in the quiz, "Number Answer" in
+//    the key - which is what separates the header from a participant guide discussing its own modules in
+//    ordinary prose.
+const EXERCISE_QUESTION_BANK_RE = /Module Question\s+(?:Module\s+\d|Number\s+Answer)/i;
+// 2. A numbered activity whose title says QUIZ, and which OPENS the block. Position is load-bearing: the
+//    same marker TRAILING a block means the block is real content that merely ends in an exercise, which
+//    strip-exercise.ts cuts instead. Requiring the number keeps ordinary worksheets ("ACTIVITY: Gap
+//    Analysis") out, and requiring QUIZ keeps the other 44 numbered activities out.
+const EXERCISE_ACTIVITY_HEAD_RE = /^\s*ACTIVITY\s+[\d.]+\s*:\s*[^\n]{0,40}QUIZ/i;
+// These are exact document-structure literals rather than a weighted heuristic, so a match is certain
+// rather than probable. Firing at 1 clears the orchestrator's auto-drop cutoff with no borderline lane -
+// there is nothing for a human to adjudicate about a block that titles itself an answer key.
+const EXERCISE_FIRE_SCORE = 1;
+const EXERCISE_SCORE_THRESHOLD = 0.5;
 
 // toc: a contents page reads as a dense run of "Title ... pageNumber" entries. We measure that
 // two ways - the fraction of whitespace-split tokens that are themselves a bare 1-3 digit page
@@ -103,6 +155,13 @@ function scoreDisclaimer(text: string): number {
 	return DISCLAIMER_PHRASE_RE.test(text) ? DISCLAIMER_FIRE_SCORE : 0;
 }
 
+/** Whether the block IS a graded exercise or its answer key, judged by the guide's own structural
+ *  labels rather than by topic - so prose about a real quiz a veteran can go and take is untouched. */
+function scoreExercise(text: string): number {
+	const isExercise = EXERCISE_QUESTION_BANK_RE.test(text) || EXERCISE_ACTIVITY_HEAD_RE.test(text);
+	return isExercise ? EXERCISE_FIRE_SCORE : 0;
+}
+
 /** How strongly the block reads as a cover/version stamp rather than a real paragraph. */
 function scoreFrontMatter(text: string, page: number | undefined): number {
 	if (page === undefined || page > FRONTMATTER_EARLY_PAGE_MAX) return 0;
@@ -133,18 +192,24 @@ function scoreFrontMatter(text: string, page: number | undefined): number {
  */
 export function classifyBlock(block: Block): Classification {
 	const text = block.text;
+	// Whole-block equality, so this is a decision rather than a score: either the block IS the widget or
+	// it is not, and there is nothing partial to weigh against the heuristics below.
+	if (CHROME_BLOCKS.has(text.trim().toLowerCase())) return { kind: 'chrome', confidence: 1 };
+
 	const tocScore = scoreToc(text);
 	const disclaimerScore = scoreDisclaimer(text);
 	const frontMatterScore = scoreFrontMatter(text, block.page);
+	const exerciseScore = scoreExercise(text);
 
 	const tocFires = tocScore >= TOC_SCORE_THRESHOLD;
 	const disclaimerFires = disclaimerScore >= DISCLAIMER_SCORE_THRESHOLD;
 	const frontMatterFires = frontMatterScore >= FRONTMATTER_SCORE_THRESHOLD;
+	const exerciseFires = exerciseScore >= EXERCISE_SCORE_THRESHOLD;
 
-	if (!tocFires && !disclaimerFires && !frontMatterFires) {
+	if (!tocFires && !disclaimerFires && !frontMatterFires && !exerciseFires) {
 		return {
 			kind: 'content',
-			confidence: 1 - Math.max(tocScore, disclaimerScore, frontMatterScore)
+			confidence: 1 - Math.max(tocScore, disclaimerScore, frontMatterScore, exerciseScore)
 		};
 	}
 
@@ -153,8 +218,12 @@ export function classifyBlock(block: Block): Classification {
 	const best = Math.max(
 		tocFires ? tocScore : -1,
 		disclaimerFires ? disclaimerScore : -1,
-		frontMatterFires ? frontMatterScore : -1
+		frontMatterFires ? frontMatterScore : -1,
+		exerciseFires ? exerciseScore : -1
 	);
+	// Exercise is tested first because it is the only kind whose blocks can assert a FALSEHOOD; the
+	// others are merely non-answering. On a tie at the same score, that is the one to act on.
+	if (best === exerciseScore) return { kind: 'exercise', confidence: exerciseScore };
 	if (best === tocScore) return { kind: 'toc', confidence: tocScore };
 	if (best === disclaimerScore) return { kind: 'disclaimer', confidence: disclaimerScore };
 	return { kind: 'frontmatter', confidence: frontMatterScore };

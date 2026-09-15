@@ -16,7 +16,7 @@ const MANIFEST_PATH = join(OUT_DIR, 'corpus-v1.0.bge.json');
 const EMBEDDINGS_PATH = join(OUT_DIR, 'corpus-v1.0.bge.bin');
 // Stamped into the manifest; MUST equal the retrieve Worker's BGE_MODEL_ID + decodeCorpus expectedModelId.
 const MODEL_ID = '@cf/baai/bge-small-en-v1.5';
-const VERSION = '1.0';
+const VERSION = '1.0.2';
 const EXPECTED_DIM = 384; // bge-small-en-v1.5
 const EMBED_URL = process.env.BGE_EMBED_URL ?? 'http://127.0.0.1:8787';
 // Batch size per Workers AI embed call. Kept modest so one request stays well under the serving's batch cap.

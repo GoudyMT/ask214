@@ -11,6 +11,10 @@ function nt(blocks: Block[]): string {
 	return blocks.map((b) => b.text).join(' ');
 }
 
+// U+2022 BULLET, built from its code point so this file stays pure ASCII. Extraction leaves this glyph in
+// the raw text, and a list flattened into a single run of them carries no sentence terminator at all.
+const BULLET = String.fromCharCode(0x2022);
+
 describe('splitIntoSpans', () => {
 	it('packs consecutive same-section blocks up to the token target into one chunk', () => {
 		const blocks: Block[] = [
@@ -104,5 +108,112 @@ describe('splitIntoSpans', () => {
 		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 100 });
 		expect(spans[0]?.page).toBe(4);
 		expect(spans[0]?.section).toBeUndefined();
+	});
+});
+
+describe('splitIntoSpans - paragraph level', () => {
+	// A flattened bullet list with NO sentence terminator anywhere: exactly the shape splitSentences
+	// returns as one indivisible unit, which without a paragraph level can only be cut by a token window
+	// landing mid-item.
+	const LIST_BLOCK = `intro text ${BULLET} alpha beta gamma ${BULLET} delta epsilon zeta ${BULLET} eta theta iota`;
+
+	it('cuts an oversized flattened list at its item markers, not mid-item', () => {
+		const blocks: Block[] = [{ text: LIST_BLOCK, section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 6 });
+
+		expect(spans.every((s) => s.brokeAtTokenLevel === false)).toBe(true);
+		expect(spans.map((s) => s.text)).toEqual([
+			`intro text ${BULLET} alpha beta gamma`,
+			`${BULLET} delta epsilon zeta`,
+			`${BULLET} eta theta iota`
+		]);
+	});
+
+	it('packs list items back up to the target instead of emitting one chunk per bullet', () => {
+		const blocks: Block[] = [{ text: LIST_BLOCK, section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 12 });
+		expect(spans.map((s) => s.text)).toEqual([
+			`intro text ${BULLET} alpha beta gamma ${BULLET} delta epsilon zeta`,
+			`${BULLET} eta theta iota`
+		]);
+	});
+
+	it('keeps a block that fits the target whole even when it holds markers', () => {
+		const blocks: Block[] = [{ text: `${BULLET} one ${BULLET} two`, section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 100 });
+		expect(spans.map((s) => s.text)).toEqual([`${BULLET} one ${BULLET} two`]);
+	});
+
+	it('does not emit an empty leading span when the block opens on a marker', () => {
+		const blocks: Block[] = [
+			{ text: `${BULLET} alpha beta gamma ${BULLET} delta epsilon zeta`, section: 'S' }
+		];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 4 });
+		expect(spans.every((s) => s.text.trim().length > 0)).toBe(true);
+		expect(spans.map((s) => s.text)).toEqual([
+			`${BULLET} alpha beta gamma`,
+			`${BULLET} delta epsilon zeta`
+		]);
+	});
+
+	it('every span is still a verbatim slice at its recorded offsets when a list is split', () => {
+		const blocks: Block[] = [{ text: LIST_BLOCK, section: 'S' }];
+		const text = nt(blocks);
+		const spans = splitIntoSpans(text, blocks, words, { targetTokens: 6 });
+		for (const s of spans) expect(text.slice(s.startOffset, s.endOffset)).toBe(s.text);
+	});
+
+	// The discriminator between "paragraphs before sentences" and "sentences before paragraphs". Both
+	// orders decompose to nested atoms that the greedy packer usually reconstitutes identically, so most
+	// fixtures cannot tell them apart. This one can: the second sentence FITS the target on its own, and
+	// it carries a marker in the middle. Splitting at markers first cuts inside that sentence and welds
+	// the fragment "A b" onto the previous sentence; splitting at sentences first leaves it whole.
+	it('does not cut inside a sentence that already fits, even when it holds a marker', () => {
+		const blocks: Block[] = [{ text: `X y z. A b ${BULLET} c d.`, section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 5 });
+		expect(spans.map((s) => s.text)).toEqual(['X y z.', `A b ${BULLET} c d.`]);
+	});
+
+	it('keeps a statement and the verdict that resolves it in the same chunk', () => {
+		// An answer key states a claim and then corrects it. Split between the two, the claim renders as
+		// the document's own assertion - the corpus carries claims that are wrong by design, so the
+		// correction travelling with them is what makes the block safe to keep at all.
+		const blocks: Block[] = [
+			{
+				text: 'Intro line here. A resume should list every job. FALSE: about ten years is the guideline.',
+				section: 'S'
+			}
+		];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 8 });
+		const withClaim = spans.find((s) => s.text.includes('list every job'));
+		expect(withClaim?.text).toContain('FALSE:');
+	});
+
+	it('does not end a chunk on a dangling connector, orphaning the clause it governs', () => {
+		// Measured on a real benefits page: one chunk ended "...under the Camp Lejeune Justice Act of
+		// 2022, and" and the next opened on the second condition followed by an unconditional
+		// consequence, so the rendered answer asserted the consequence with its governing condition
+		// severed into the previous chunk.
+		const blocks: Block[] = [
+			{
+				text: 'Filler words here. Both of these must be true: a court awards you relief, and you already get benefits. The court must reduce the award.',
+				section: 'S'
+			}
+		];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 12 });
+		expect(spans.some((s) => /,\s*(and|or)$/.test(s.text))).toBe(false);
+		expect(spans.some((s) => s.text.endsWith(':'))).toBe(false);
+	});
+
+	it('leaves marker-free text to the sentence level (behaviour unchanged)', () => {
+		const blocks: Block[] = [
+			{ text: 'One two three. Four five six. Seven eight nine.', section: 'S' }
+		];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 3 });
+		expect(spans.map((s) => s.text)).toEqual([
+			'One two three.',
+			'Four five six.',
+			'Seven eight nine.'
+		]);
 	});
 });

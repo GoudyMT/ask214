@@ -45,15 +45,29 @@ const LOCAL_MODEL_PATH = 'static/models/';
 //
 // Each floor is the rate measured on this path less roughly two queries of slack. Raise one when the feature
 // genuinely improves; never lower one to make a run pass.
+//
+// RE-DERIVED 2026-09-15 against a 1992-chunk corpus, after a fix batch that deliberately changed what the
+// corpus contains: a prose answer key restored (its corrections were the only source in the corpus for how
+// far back a work history should go), a chunk-boundary rule that keeps a claim with the text resolving it,
+// 21 phone numbers recovered from markup attributes, and page-chrome widgets dropped.
+//
+//   inTopK   73.3% -> 77.8%. RAISED 0.71 -> 0.76. The comment here previously read "untouched by this
+//     change - retrieval did not move", which this branch made false: the corpus rebuild is exactly what
+//     moved it, and upward. A floor left at 0.71 would no longer guard anything.
+//   expanded 40.7%. RAISED 0.38 -> 0.39, the convention's two queries of slack.
+//   answered 39.3% -> 37.8%, and the floor is HELD at 0.37 rather than re-derived. The convention would
+//     allow 0.36; taking it would ratchet the bar down every time the substrate moves, which is how a
+//     floor stops meaning anything. 37.8% clears 0.37 by one query, and a floor that is tight against a
+//     deliberate change is the honest state to leave it in - not a reason to move it.
 const FLOORS = {
-	answered: 0.37, // measured 39.3%, identical to the lead card by construction
-	expanded: 0.38, // measured 40.7%
-	inTopK: 0.71, // measured 73.3%, untouched by this change - retrieval did not move
+	answered: 0.37, // measured 37.8%; held, not lowered - see the note below
+	expanded: 0.39, // measured 40.7%, RAISED from 0.38
+	inTopK: 0.76, // measured 77.8%, RAISED from 0.71 - retrieval DID move, upward
 	rendered: 0.95 // measured 135 of 135
 };
 
-const CORPUS_JSON = 'static/corpus/corpus-v1.0.1.json';
-const CORPUS_BIN = 'static/corpus/corpus-v1.0.1.embeddings.bin';
+const CORPUS_JSON = 'static/corpus/corpus-v1.0.2.json';
+const CORPUS_BIN = 'static/corpus/corpus-v1.0.2.embeddings.bin';
 const QUERIES_PATH = 'src/lib/ask/eval/queries.json';
 
 async function main() {

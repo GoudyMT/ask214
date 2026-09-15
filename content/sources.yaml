@@ -349,9 +349,9 @@
   scrape_method: direct_url
   update_check: monthly
   corpus_version_first_included: '1.0'
-  content_hash: 030a3aa47440ba6929fcefc2a4a3b015172524fee21bf6c70c8ee5cf9efd7314
-  captured_path: content-ops/captures/030a3aa47440ba6929fcefc2a4a3b015172524fee21bf6c70c8ee5cf9efd7314.html
-  captured_at: 2026-06-25T22:02:05.188Z
+  content_hash: 6fb8e37a71fe49f1ca7d34afdbaf102a8e5fc89842f903db2a0c68b55e7235de
+  captured_path: content-ops/captures/6fb8e37a71fe49f1ca7d34afdbaf102a8e5fc89842f903db2a0c68b55e7235de.html
+  captured_at: 2026-09-15T21:01:23.301Z
   robots_allowed: true
 
 - source_id: tsp_separation
@@ -892,4 +892,185 @@
   content_hash: 12c4f462f29dab043c9085ccc38a76dfba17d0a78a00aec957386807670a7f62
   captured_path: content-ops/captures/12c4f462f29dab043c9085ccc38a76dfba17d0a78a00aec957386807670a7f62.pdf
   captured_at: 2026-06-25T22:02:05.188Z
+  robots_allowed: true
+
+# v1.1 corpus-shape cycle (S83): eight lookup-shaped gov pages added to close ENUMERATED benchmark gaps,
+# not to grow the corpus generally. Each targets a named query the 1845-chunk corpus could not reach.
+# Every URL was fetched and confirmed to be the current official page before inclusion; two candidates
+# were rejected at that step (the original VET TEC pilot ENDED April 2024 - its live successor VET TEC 2.0
+# is below - and a Fully Developed Claims page that turned out not to state the deadline its query asks for).
+
+- source_id: va_vet_tec_2
+  title: 'VA - VET TEC 2.0 (High-Tech Program)'
+  url: 'https://www.va.gov/education/other-va-education-benefits/vet-tec-2/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-09-15
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA. Supersedes the VET TEC pilot that concluded April 2024 - the pilot page is deliberately NOT ingested.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-09-15
+  source_updated_date: '2026-09-08'
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0.2'
+  content_hash: 4937b81510ea1c57768c7c8fe359245e64aa0c62cfecfaabd687a0a626b3ea42
+  captured_path: content-ops/captures/4937b81510ea1c57768c7c8fe359245e64aa0c62cfecfaabd687a0a626b3ea42.html
+  captured_at: 2026-09-15T20:06:06.770Z
+  robots_allowed: true
+
+- source_id: va_camp_lejeune
+  title: 'VA - Camp Lejeune Water Contamination Health Issues'
+  url: 'https://www.va.gov/disability/eligibility/hazardous-materials-exposure/camp-lejeune-water-contamination/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-09-15
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA. Covers health-care eligibility as well as disability compensation.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-09-15
+  source_updated_date: '2025-07-28'
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0.2'
+  content_hash: 309bace38f7986454eed323d88ec35d8ed87c0c842aff80b6f6fc8b563efdc5d
+  captured_path: content-ops/captures/309bace38f7986454eed323d88ec35d8ed87c0c842aff80b6f6fc8b563efdc5d.html
+  captured_at: 2026-09-15T20:06:06.770Z
+  robots_allowed: true
+
+- source_id: va_stem_scholarship
+  title: 'VA - Edith Nourse Rogers STEM Scholarship'
+  url: 'https://www.va.gov/education/other-va-education-benefits/stem-scholarship/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-09-15
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-09-15
+  source_updated_date: '2025-09-25'
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0.2'
+  content_hash: ba8afd22b8b2d9b78dfdfc6ea73f2f9c1f97842295561fc492d3be69d180bf5f
+  captured_path: content-ops/captures/ba8afd22b8b2d9b78dfdfc6ea73f2f9c1f97842295561fc492d3be69d180bf5f.html
+  captured_at: 2026-09-15T20:06:06.770Z
+  robots_allowed: true
+
+- source_id: va_caregiver_pcafc
+  title: 'VA - Program of Comprehensive Assistance for Family Caregivers (PCAFC)'
+  url: 'https://www.va.gov/family-and-caregiver-benefits/health-and-disability/comprehensive-assistance-for-family-caregivers/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-09-15
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-09-15
+  source_updated_date: '2026-02-11'
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0.2'
+  content_hash: b10c84361477bc5a791c1df7b465f3e01d2499b392a143d9e448f7f6106c9d32
+  captured_path: content-ops/captures/b10c84361477bc5a791c1df7b465f3e01d2499b392a143d9e448f7f6106c9d32.html
+  captured_at: 2026-09-15T20:06:06.770Z
+  robots_allowed: true
+
+- source_id: va_gi_bill_montgomery
+  title: 'VA - Montgomery GI Bill Active Duty (MGIB-AD)'
+  url: 'https://www.va.gov/education/about-gi-bill-benefits/montgomery-active-duty/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-09-15
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-09-15
+  source_updated_date: '2026-07-24'
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0.2'
+  content_hash: 4667c44b0ba7941ccf5e0c58eed3fd50269d94d6bec033554c2261167af709af
+  captured_path: content-ops/captures/4667c44b0ba7941ccf5e0c58eed3fd50269d94d6bec033554c2261167af709af.html
+  captured_at: 2026-09-15T20:06:06.770Z
+  robots_allowed: true
+
+- source_id: va_dea_chapter35
+  title: "VA - Survivors' and Dependents' Educational Assistance (DEA, Chapter 35)"
+  url: 'https://www.va.gov/family-and-caregiver-benefits/education-and-careers/dependents-education-assistance/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-09-15
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-09-15
+  source_updated_date: '2025-12-18'
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0.2'
+  content_hash: cbcf320223fc61b98d0e8e5f3912350e382c7beb5ccf7e2b33d1b48755af00f5
+  captured_path: content-ops/captures/cbcf320223fc61b98d0e8e5f3912350e382c7beb5ccf7e2b33d1b48755af00f5.html
+  captured_at: 2026-09-15T20:06:06.770Z
+  robots_allowed: true
+
+- source_id: va_career_counseling
+  title: 'VA - Personalized Career Planning and Guidance (Chapter 36)'
+  url: 'https://www.va.gov/careers-employment/education-and-career-counseling/'
+  origin: VA
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work, not subject to copyright'
+  terms_reviewed_date: 2026-09-15
+  terms_notes: 'Public va.gov page; no ToS restriction on reading public content; app is unofficial, not endorsed by VA.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-09-15
+  source_updated_date: '2025-07-28'
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0.2'
+  content_hash: 8088da0ed14017c74a7be86c341a5e08b3c19507ff842bf84dfbf7c7fa566396
+  captured_path: content-ops/captures/8088da0ed14017c74a7be86c341a5e08b3c19507ff842bf84dfbf7c7fa566396.html
+  captured_at: 2026-09-15T20:06:06.770Z
+  robots_allowed: true
+
+- source_id: mos_tap_overview
+  title: 'DoD - Transition Assistance Program Overview (Military OneSource)'
+  url: 'https://www.militaryonesource.mil/benefits/transition-assistance-program/'
+  origin: 'DoD (Military OneSource)'
+  copyright_status: us_government_work_public_domain
+  legal_tier: confident_pd
+  content_type: html
+  license_notes: '17 USC 105 - US Government work (DoD). Military OneSource is contractor-operated; content treated as US-Gov work consistent with the dod_skillbridge and mos_separation entries. Carries the DoD DESCRIPTION of the TAP curriculum (what each component covers and when it is taken); the contractor-developed curriculum modules themselves stay excluded per section 8.3.'
+  terms_reviewed_date: 2026-09-15
+  terms_notes: 'Public Military OneSource page. Scope is the program and its components - which parts are mandatory, how the two-day tracks are elected, the timing requirements - and includes a Components of the TAP curriculum section describing what each component covers. That is DoD-authored description of the program, NOT the participant-guide material section 8.3 excludes; the distinction is depth, and this entry sits deeper than dol_tap_overview. App is unofficial, not endorsed by DoD.'
+  access: open
+  reviewed_by: max
+  reviewed_date: 2026-09-15
+  scrape_method: direct_url
+  update_check: monthly
+  corpus_version_first_included: '1.0.2'
+  content_hash: cf3d2500ae1ecfc561c1c69cf86c6d49e37c0bf39fa23c9d4dc9c5c71071fda9
+  captured_path: content-ops/captures/cf3d2500ae1ecfc561c1c69cf86c6d49e37c0bf39fa23c9d4dc9c5c71071fda9.html
+  captured_at: 2026-09-15T20:06:06.770Z
   robots_allowed: true

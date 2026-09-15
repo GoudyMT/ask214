@@ -39,8 +39,8 @@ describe('answer quality gate policy', () => {
 	// tracked, the step would fail in CI for a reason that has nothing to do with answer quality.
 	it('depends only on artifacts committed to the repo', () => {
 		for (const path of [
-			'static/corpus/corpus-v1.0.1.json',
-			'static/corpus/corpus-v1.0.1.embeddings.bin',
+			'static/corpus/corpus-v1.0.2.json',
+			'static/corpus/corpus-v1.0.2.embeddings.bin',
 			'static/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
 			'src/lib/ask/eval/queries.json'
 		]) {

@@ -33,7 +33,28 @@ const MODEL_ID = 'all-MiniLM-L6-v2';
 const K = 5;
 const HELD_OUT_PCT = 30;
 // v1.0 SOURCE-level ranking floor/target. correct-empty is reported but v1.1-gated (charter Measured Result).
-const FLOOR = { srcHitRate: 0.8, srcMRR: 0.6 };
+//
+// RE-DERIVED 2026-09-15, after the benchmark's multi-source under-crediting was corrected: 26 altSources
+// across 11 items, each curated against the candidate document's own passage rather than bulk-added. The
+// correction moved the TUNE split 0.825/0.589 -> 0.856/0.618 and left the HELD-OUT acceptance reading
+// unchanged at 0.868/0.641 - so widening what counts as a hit did NOT make this gate easier on the number
+// it actually gates. It is re-derived anyway, because 0.8 was set against the under-crediting benchmark and
+// is a weaker bar on a corrected one.
+//
+// The two numbers derive differently, and only one moves:
+//   NOTE 2026-09-15, after the corpus changed twice more: held-out now measures 0.842 (32 of 38), and the
+//   next step down, 31 of 38, is 0.816 - BELOW this floor. So srcHitRate currently carries ZERO queries of
+//   slack, not the 1.4 the derivation below claimed at the time. The floor is left where it is rather than
+//   re-cut to fit, but a single query moving will fail this gate, and that is the honest state of it.
+//
+//   srcHitRate 0.8 -> 0.83. Held-out measured 0.868 when set, giving ~1.4 queries of slack on a 38-positive split;
+//     tune measures 0.856, leaving ~1. Real margin, so the bar rises to match the corrected reality.
+//   srcMRR stays 0.6. Tune measures 0.618, so any raise leaves under one query of margin - and a floor that
+//     tight makes the auto-calibration fall back to a lower cutoff on noise, which is fragility rather than
+//     quality. Left where it is, deliberately, not overlooked.
+//
+// Same rule as ever: raise a floor when retrieval genuinely improves; never lower one to make a run pass.
+const FLOOR = { srcHitRate: 0.83, srcMRR: 0.6 };
 const TARGET = { srcHitRate: 0.9, srcMRR: 0.75 };
 // MIN_SCORE candidates (display cutoff): pick the HIGHEST that still holds the held-out floor.
 const MIN_SCORE_CANDIDATES = [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4];
@@ -45,8 +66,8 @@ const SHIPPED_MIN_SCORE = 0.4;
 /** @param {number} minScore */
 const DENSE = (minScore) => ({ alpha: 1, minScore, minBm25: 0 });
 
-const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.1.json', 'utf8'));
-const buf = readFileSync('static/corpus/corpus-v1.0.1.embeddings.bin');
+const manifest = JSON.parse(readFileSync('static/corpus/corpus-v1.0.2.json', 'utf8'));
+const buf = readFileSync('static/corpus/corpus-v1.0.2.embeddings.bin');
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 const corpus = decodeCorpus(manifest, ab, MODEL_ID);
 const queries = JSON.parse(readFileSync('src/lib/ask/eval/queries.json', 'utf8'));

@@ -8,6 +8,9 @@ import { classifyBlock } from './classify-block';
 const EM_DASH = String.fromCharCode(0x2014); // U+2014 em dash, as extracted from the source PDF
 const BULLET = String.fromCharCode(0x25a0); // U+25A0 black square, used as a list bullet in the source PDF
 const ANGLE = String.fromCharCode(0x203a); // U+203A single right angle quote, a sub-entry bullet in the source PDF
+const LEFT_QUOTE = String.fromCharCode(0x201c); // U+201C left double quote, as extracted from the source PDF
+const RIGHT_QUOTE = String.fromCharCode(0x201d); // U+201D right double quote, as extracted from the source PDF
+const APOSTROPHE = String.fromCharCode(0x2019); // U+2019 right single quote, used as an apostrophe in the source PDF
 
 // Reused across two tests: a real content block whose running header got fused onto the front of
 // the block by the extractor (Class 2 territory, stripped later - not this classifier's job).
@@ -208,6 +211,147 @@ describe('classifyBlock', () => {
 			const result = classifyBlock({ page: 4, text: FUSED_HEADER_CONTENT });
 			expect(result.confidence).toBeGreaterThanOrEqual(0);
 			expect(result.confidence).toBeLessThanOrEqual(1);
+		});
+	});
+
+	// A graded classroom exercise is the ONE class in this corpus where the app can state something
+	// FALSE while quoting the source perfectly: a multiple-choice distractor is wrong by construction,
+	// and a true/false statement bank is a list of claims the reader is meant to judge, not believe.
+	// Measured over all 38 cleaned sources: 6 blocks carry an exercise marker that OPENS or titles the
+	// block, across 3 guides. Every fixture below is verbatim from content-ops/cleaned/.
+	describe('exercise', () => {
+		it('drops a multiple-choice quiz block (tap_va_benefits_guide block 152, page 164)', () => {
+			const result = classifyBlock({
+				page: 164,
+				text: `Module 6: Course Capstone Module Question Module 1 1. On which form, referred to as, ${LEFT_QUOTE}your key to most VA benefits and services,${RIGHT_QUOTE} should you confirm correct information before leaving active duty to ensure you have access to your benefits? a. VA Form 10-10164 b. DD214 c. VA Form SGLV-8600 d. NGB Form 22 Module 1 2. According to`
+			});
+			// Three of these four options are wrong by design. Rendered as an answer they read as the
+			// document's own prose, because the word "quiz" appears nowhere in the block.
+			expect(result.kind).toBe('exercise');
+			expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+		});
+
+		it('drops the answer-key table (tap_va_benefits_guide block 204, page 216)', () => {
+			const result = classifyBlock({
+				page: 216,
+				text: 'B-203Version 6 1 September 2025Appendix B: Course Links Course Capstone Answer Key Module Question Number Answer PG Page Module 1 1 b. DD214 Page 12 Module 1 2 d. LES Page 13 Module 2 3 c. A and B Page 46 Module 2 4 d. There is no deadline Page 41 Module 2 5 b. Dial 988, then press 1 Page 57'
+			});
+			// Correct, but it renders as "Module 3 8 b. 180 to 90 days before separation Page 72" - a
+			// grid of loose tokens that answers nothing.
+			expect(result.kind).toBe('exercise');
+			expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+		});
+
+		it('drops a true/false statement bank whose marker OPENS the block (tap_dol_employment_workshop block 8, page 18)', () => {
+			const result = classifyBlock({
+				page: 18,
+				text: `ACTIVITY 2.1: RESUME QUIZ Read each statement and decide whether it is true or false. 1. The number one rule for writing a good resume is ${LEFT_QUOTE}more is better.${RIGHT_QUOTE} 2. Regardless of your age, your resume work history should list all jobs going back to high school. 3. Your targeted resume should not be longer than two pages.`
+			});
+			// The most dangerous block measured. The chunker splits the "decide whether it is true or
+			// false" frame off the statements, so the shipped answer renders 109 words of plain
+			// declarative advice - including telling the reader to put their race, age and marital
+			// status on a resume.
+			expect(result.kind).toBe('exercise');
+			expect(result.confidence).toBeGreaterThanOrEqual(0.7);
+		});
+
+		it('KEEPS a prose answer key, whose corrections are the only place the guidance exists (tap_dol_employment_workshop block 174, page 184)', () => {
+			const result = classifyBlock({
+				page: 184,
+				text: `SECTION 8: APPENDICES APPENDIX A: RESUME QUIZ Answers to the Resume Quiz on Page 18. 1. The number one rule for writing a good resume is ${LEFT_QUOTE}more is better.${RIGHT_QUOTE} FALSE: An employer reviews a resume, on average, less than 30 seconds, so there is a very short amount of time to catch their attention.`
+			});
+			// Not a token grid: every item is a full paragraph of Department of Labor guidance, and five of
+			// its corrections exist nowhere else in the corpus - how far back a work history should go, that
+			// a paid resume writer will not save you time, and that age and marital status do not belong on
+			// a resume. Dropping this block removed the document's own correction of the statement bank on
+			// page 18 while leaving the hazard that bank describes unanswered.
+			//
+			// Keeping it is safe only because a chunk boundary cannot separate a statement from its verdict
+			// - see the resolution guard in chunk/split.ts.
+			expect(result.kind).toBe('content');
+		});
+
+		it('keeps a block that merely CITES an appendix whose title contains QUIZ', () => {
+			// A cross-reference names the appendix; it is not the appendix. The corpus already carries this
+			// sentence on the surviving RESUME BASICS page, so a rule matching the title anywhere in a block
+			// would auto-drop a page of real guidance at full confidence, with no review lane to catch it.
+			const result = classifyBlock({
+				page: 17,
+				text: 'RESUME BASICS A targeted resume is written for one specific job posting. Review the statements and decide whether each is true or false. Answers will be discussed in class and are available in Appendix A: Resume Quiz.'
+			});
+			expect(result.kind).toBe('content');
+		});
+
+		it('keeps prose that mentions a module question in a sentence', () => {
+			// The anchor is the column header the guide prints above its question bank, not the two words
+			// wherever they appear. A participant guide discusses its own modules constantly.
+			const result = classifyBlock({
+				page: 160,
+				text: 'Module 6: Course Capstone This module reviews what you learned in Modules 1 through 5. If you have a Module Question that was not answered during the course, write it down and ask your Benefits Advisor before you leave.'
+			});
+			expect(result.kind).toBe('content');
+		});
+
+		// The hard constraint. A rule anchored on the word "Capstone" destroys 18 legitimate chunks,
+		// including the passage below - which is the corpus's best answer to "what is Capstone and when
+		// does it happen". Every anchor is a quiz FORM, so none of them can reach this text.
+		it('keeps the passage that ANSWERS what a Capstone is (tap_pre_separation_brief, page 19)', () => {
+			const result = classifyBlock({
+				page: 19,
+				text: 'Capstone and Warm Handovers After completing all required components of the ITP, you are required to attend a Capstone event which occurs no later than 90 days before transition or as soon as possible for Reserve Component members and Service members with unanticipated separations. During Capstone, the commander or a designee determines if you are prepared for transition.'
+			});
+			expect(result.kind).toBe('content');
+		});
+
+		it('keeps a worksheet ACTIVITY that is not a quiz (tap_moc_crosswalk, page 20)', () => {
+			// 45 blocks across two guides open with an ACTIVITY header. They are worksheets, and their
+			// "a. b. c." sub-lists are things to look up, not distractors - nothing in them is false.
+			// Only the 2 labelled QUIZ are in scope here.
+			const result = classifyBlock({
+				page: 20,
+				text: `ACTIVITY: Gap Analysis Left Column${EM_DASH}Experience I Have Now 1. Use the list of skills you created and your military and civilian documents for transition to locate the following information: 2. Complete the Left Column${EM_DASH}Experience I Have Now of the blank Gap Analysis located in the Appendix. a. Skills b. Education and Training c. Credentials (license, certification, certificate)`
+			});
+			expect(result.kind).toBe('content');
+		});
+
+		it('keeps a block whose exercise marker TRAILS it, leaving the run to the stripper (tap_dol_efct, page 123)', () => {
+			// This block opens with real guidance on job offers and only turns into a quiz at the end.
+			// Dropping it whole would destroy the guidance, so position is the discriminator: a marker
+			// that opens the block condemns it, a marker that trails it does not.
+			const result = classifyBlock({
+				page: 123,
+				text: `EFCT PARTICIPANT GUIDE | SECTION 7 | PAGE 123 JOB OFFERS Congratulations! You finished the final interview, and they offered you the job. Have you had an opportunity to see a written job offer? Let${APOSTROPHE}s start with what you already know about job offers and salary negotiation. JOB OFFER and SALARY NEGOTIATION QUIZ TRUE FALSE 1. A job offer will always be provided in writing. ACTIVITY 7.2: Job Offer Quiz Consider the 10 questions below. Mark each as True or False. What do you think?`
+			});
+			expect(result.kind).toBe('content');
+		});
+
+		it('drops a page-chrome widget that is the whole block', () => {
+			expect(classifyBlock({ text: 'Was this page helpful?' }).kind).toBe('chrome');
+			expect(classifyBlock({ text: 'Related Articles' }).kind).toBe('chrome');
+			expect(classifyBlock({ text: 'Browse by topic' }).kind).toBe('chrome');
+		});
+
+		it('keeps a short heading or step that merely LOOKS like chrome', () => {
+			// The enumeration that produced the literal list is the reason this rule matches a whole block
+			// exactly rather than by length or by substring: of the 51 shortest chunks in this corpus, most
+			// are real content - VGLI premium rows, application steps, and section headings.
+			expect(classifyBlock({ text: 'Ages 30 to 34' }).kind).toBe('content');
+			expect(classifyBlock({ text: 'Option 1: Apply online' }).kind).toBe('content');
+			expect(classifyBlock({ text: 'Preferred providers' }).kind).toBe('content');
+			expect(
+				classifyBlock({ text: 'Related Articles cover how to transfer benefits to a dependent.' })
+					.kind
+			).toBe('content');
+		});
+
+		it('keeps prose about a real VA quiz a veteran can go and take (tap_va_womens_health, page 71)', () => {
+			// "Quiz" as a plain noun in ordinary content. The Self-Check Quiz is a genuine VA resource,
+			// so a rule keying on the word rather than the form would delete a mental-health referral.
+			const result = classifyBlock({
+				page: 71,
+				text: 'Take a Free Self-Check VA and its partners have developed a quiz to help Veterans learn if stress and depression might be affecting them The Self-Check Quiz is a safe, easy and confidential resource'
+			});
+			expect(result.kind).toBe('content');
 		});
 	});
 });

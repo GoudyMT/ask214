@@ -7,7 +7,7 @@ describe('corpus barrel', () => {
 		expect(typeof corpus.decodeCorpus).toBe('function');
 		expect(typeof corpus.search).toBe('function');
 		expect(typeof corpus.toResultCards).toBe('function');
-		expect(corpus.ACCEPTED_CORPUS_VERSION).toBe('1.0');
+		expect(corpus.ACCEPTED_CORPUS_VERSION).toBe('1.0.2');
 		expect(typeof corpus.CorpusFormatError).toBe('function');
 	});
 });

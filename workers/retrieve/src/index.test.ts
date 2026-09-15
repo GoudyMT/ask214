@@ -20,7 +20,7 @@ const MODEL = '@cf/baai/bge-small-en-v1.5';
 // `[0.6,0.8]`, so a query embedded to the same vector scores ~1.0 (above the 0.6 cutoff).
 function manifest(): unknown {
 	return {
-		version: '1.0',
+		version: '1.0.2',
 		dim: 2,
 		modelId: MODEL,
 		chunks: [

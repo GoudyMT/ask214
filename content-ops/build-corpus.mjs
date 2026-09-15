@@ -14,7 +14,7 @@ const CHUNKS_DIR = 'content-ops/chunks';
 const OUT_DIR = 'static/corpus';
 const MODEL_REPO = 'Xenova/all-MiniLM-L6-v2';
 const MODEL_ID = 'all-MiniLM-L6-v2'; // stamped into the manifest; must equal the runtime EMBED_MODEL_ID + decodeCorpus expectedModelId
-const VERSION = '1.0';
+const VERSION = '1.0.2';
 const SIZE_BUDGET_BYTES = 300 * 1024 * 1024; // the on-device total corpus budget
 const PER_FILE_CAP_BYTES = 25 * 1024 * 1024; // Cloudflare Workers Assets per-file asset cap
 
@@ -39,12 +39,12 @@ for (const c of chunks) {
 
 // Content-revision stamp: a stable content fingerprint over the chunks. Preserve the buildDate when the
 // content is byte-identical to the committed artifact (so re-embedding unchanged content does not churn
-// corpus-v1.0.1.json); stamp today only on a real content change.
+// corpus-v1.0.2.json); stamp today only on a real content change.
 const { contentHash } = computeContentRevision(
 	chunks.map((c) => ({ id: c.id, text: c.text })),
 	''
 );
-const manifestPath = join(OUT_DIR, 'corpus-v1.0.1.json');
+const manifestPath = join(OUT_DIR, 'corpus-v1.0.2.json');
 let buildDate = new Date().toISOString().slice(0, 10);
 if (existsSync(manifestPath)) {
 	const prev = JSON.parse(readFileSync(manifestPath, 'utf8'));
@@ -59,11 +59,11 @@ const { manifest, embeddingsBuffer } = buildCorpusArtifact(
 	contentRevision
 );
 mkdirSync(OUT_DIR, { recursive: true });
-writeFileSync(join(OUT_DIR, 'corpus-v1.0.1.json'), JSON.stringify(manifest));
-writeFileSync(join(OUT_DIR, 'corpus-v1.0.1.embeddings.bin'), Buffer.from(embeddingsBuffer));
+writeFileSync(join(OUT_DIR, 'corpus-v1.0.2.json'), JSON.stringify(manifest));
+writeFileSync(join(OUT_DIR, 'corpus-v1.0.2.embeddings.bin'), Buffer.from(embeddingsBuffer));
 
-const jsonBytes = statSync(join(OUT_DIR, 'corpus-v1.0.1.json')).size;
-const binBytes = statSync(join(OUT_DIR, 'corpus-v1.0.1.embeddings.bin')).size;
+const jsonBytes = statSync(join(OUT_DIR, 'corpus-v1.0.2.json')).size;
+const binBytes = statSync(join(OUT_DIR, 'corpus-v1.0.2.embeddings.bin')).size;
 const total = jsonBytes + binBytes;
 console.log(
 	`[embed] wrote ${chunks.length} chunks, dim ${manifest.dim}; json ${(jsonBytes / 1e6).toFixed(1)}MB + bin ${(binBytes / 1e6).toFixed(1)}MB = ${(total / 1e6).toFixed(1)}MB`
@@ -79,8 +79,8 @@ if (jsonBytes > PER_FILE_CAP_BYTES || binBytes > PER_FILE_CAP_BYTES) {
 // Self-verify: re-read the just-written artifact and decode it with the SAME model id the runtime expects,
 // so a stale or model-mismatched artifact can never sit on disk unnoticed (E_CORPUS_MODEL is the gate the
 // dim check cannot catch - MiniLM and arctic are both 384-dim).
-const checkManifest = JSON.parse(readFileSync(join(OUT_DIR, 'corpus-v1.0.1.json'), 'utf8'));
-const checkBuf = readFileSync(join(OUT_DIR, 'corpus-v1.0.1.embeddings.bin'));
+const checkManifest = JSON.parse(readFileSync(join(OUT_DIR, 'corpus-v1.0.2.json'), 'utf8'));
+const checkBuf = readFileSync(join(OUT_DIR, 'corpus-v1.0.2.embeddings.bin'));
 const checkAb = checkBuf.buffer.slice(
 	checkBuf.byteOffset,
 	checkBuf.byteOffset + checkBuf.byteLength

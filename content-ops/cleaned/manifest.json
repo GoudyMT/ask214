@@ -1,9 +1,9 @@
 {
-	"generatedAt": "2026-07-25",
+	"generatedAt": "2026-09-15",
 	"sources": [
 		{
 			"sourceId": "dod_skillbridge",
-			"contentHash": "d09665505ee6f18e67fdd9a58d5447b9d8e8657a19ee0f644a5ed1b55ac13e41",
+			"contentHash": "6e616b38b59f1f67540526524fd1dc876c526fdbb206249fe5a76b8fa2de41b7",
 			"cleanedHash": "165d9c90e912723a326f3941103e090fc8ba792a84fe6cad069b36f224fcf34d",
 			"decision": "approved",
 			"dropped": 0,
@@ -12,7 +12,7 @@
 		},
 		{
 			"sourceId": "dol_tap_overview",
-			"contentHash": "92a906d36aaaf8e95bf398dcb649b3e165ef777401daa6f1cc1e5a688ef53eb7",
+			"contentHash": "6fb8e37a71fe49f1ca7d34afdbaf102a8e5fc89842f903db2a0c68b55e7235de",
 			"cleanedHash": "a5742e16dd3e95b68d3c995a7961792092be2aba70df3b45f7941131c1a7b94f",
 			"decision": "approved",
 			"dropped": 0,
@@ -21,7 +21,7 @@
 		},
 		{
 			"sourceId": "mos_separation",
-			"contentHash": "9077edd8aa38af84d5e28c21ced2ad9b5098e21e18f3838380bb09e5544f3f7f",
+			"contentHash": "32500b784a03d6c86a361a0984a02d3820501d4f8b15c235dc6097e33e73329e",
 			"cleanedHash": "bc8cc3a3db431911cfb287d88001b5c4166856dcede56b686e74e978068857b0",
 			"decision": "approved",
 			"dropped": 0,
@@ -29,9 +29,18 @@
 			"review": 0
 		},
 		{
+			"sourceId": "mos_tap_overview",
+			"contentHash": "cf3d2500ae1ecfc561c1c69cf86c6d49e37c0bf39fa23c9d4dc9c5c71071fda9",
+			"cleanedHash": "85f3dde36800fc4ea8a571d629b47b4df2d3ace55ce715e0a0d9bab4a01b7924",
+			"decision": "approved",
+			"dropped": 3,
+			"stripped": 0,
+			"review": 0
+		},
+		{
 			"sourceId": "tap_dol_efct",
 			"contentHash": "1a95b1b978d736b19f71df5731dbf4d25ebe4c82b7d9a780639f151f3c5de973",
-			"cleanedHash": "aecd68e2c2943853db7bf4a4bfe1f28fc0be9bc1c2d30c646bc11fb32d822cb9",
+			"cleanedHash": "1b97e809901a2ef51abe23016d1f9388e389ac53b7f44a5393c1915f1e29fc96",
 			"decision": "approved",
 			"dropped": 6,
 			"stripped": 155,
@@ -40,9 +49,9 @@
 		{
 			"sourceId": "tap_dol_employment_workshop",
 			"contentHash": "cdc1a520f7331f2e327851b9fce4ff428ec5286f33ff274296cbbc2dee86bc54",
-			"cleanedHash": "a009f9cc07cd362ddda76d3b84b9b1f1f37699a0212b29306614580f195648b5",
+			"cleanedHash": "23f817308de5933892699a12df43334aa0a2af1be3f4fe2636ba8763d7387575",
 			"decision": "approved",
-			"dropped": 10,
+			"dropped": 11,
 			"stripped": 0,
 			"review": 0
 		},
@@ -139,10 +148,10 @@
 		{
 			"sourceId": "tap_va_benefits_guide",
 			"contentHash": "9c0baacc06cf18482f21bd086bdc3f25a37c5c5dad5ccbe9797ea4e7e9a3a742",
-			"cleanedHash": "4e2039673094cf2747dc2afa420accc6f03ff87a77afac54b983339d01114691",
+			"cleanedHash": "84c927d6ff0bfaef2e46eca91518d01cdcc712f661483066afda3d8ab38ee45f",
 			"decision": "approved",
-			"dropped": 12,
-			"stripped": 199,
+			"dropped": 16,
+			"stripped": 195,
 			"review": 0
 		},
 		{
@@ -227,9 +236,45 @@
 			"review": 0
 		},
 		{
+			"sourceId": "va_camp_lejeune",
+			"contentHash": "309bace38f7986454eed323d88ec35d8ed87c0c842aff80b6f6fc8b563efdc5d",
+			"cleanedHash": "b9dc68259ec070efe35535129407b36175ada0b33f38a23513dc7b24a5f82d78",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_career_counseling",
+			"contentHash": "8088da0ed14017c74a7be86c341a5e08b3c19507ff842bf84dfbf7c7fa566396",
+			"cleanedHash": "5f02d808bef8daabd9c0958fcd26d7d9f3cdcfe716d1f2ccc057554dadba52dd",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_caregiver_pcafc",
+			"contentHash": "b10c84361477bc5a791c1df7b465f3e01d2499b392a143d9e448f7f6106c9d32",
+			"cleanedHash": "67a598ec7efe304b5a7ad585ab630bf82ceabb8bb0e77531444f8470e3e9d2f3",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
 			"sourceId": "va_dd214",
-			"contentHash": "31cc2e73933692a8577d4c88ed552f07a5f039ecbbb150b2e948ccfe5fdc93ac",
-			"cleanedHash": "3899e16b2eb6355581b31d96582bfca647e15558f176c4a9c44d53d0f604b97b",
+			"contentHash": "700edc5e2a9c06674018418c1d60ca6b470daa44b5f4a259d0bbbb589abcec71",
+			"cleanedHash": "1d3c29b47db4484b3368da75c043e60e8e0b705ec75345f1731585c0b549e26d",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_dea_chapter35",
+			"contentHash": "cbcf320223fc61b98d0e8e5f3912350e382c7beb5ccf7e2b33d1b48755af00f5",
+			"cleanedHash": "eb528b4ed433038a076b496545cfe513bac9cd36dd0a348ca51bac9948fac3b2",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -237,8 +282,8 @@
 		},
 		{
 			"sourceId": "va_disability_bdd",
-			"contentHash": "666f5a4cfb68505f2a2c7cb1a343a0ba9f55975a716da1ef7a175633aedbeadf",
-			"cleanedHash": "a6622144f98ecf108050aabce18491ab961b549efb0e420a04c0a0872ec3e58d",
+			"contentHash": "70ca10a7594e84a1d9dfc90b9f8a2abd00e53b2d83a982a0bd69ed2e935777fc",
+			"cleanedHash": "0f1a071b97172e1125fb0f2739fccd6f2687361b51551e5d9b0f44cab7ae9bc4",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -246,7 +291,7 @@
 		},
 		{
 			"sourceId": "va_disability_evidence",
-			"contentHash": "b02e4d832977fb0c3dc755051a0a3be234d950d7016e8c8e08228b5ab67b9a33",
+			"contentHash": "f5bca7e47a5abc9c7ce564db04a058d22af217b2ecbe9a029d7128fbab309d8c",
 			"cleanedHash": "7c20d7ded2daca156c1c72f8cefb503e215996dbb92d7ee5061a103c61956bb1",
 			"decision": "approved",
 			"dropped": 0,
@@ -255,8 +300,8 @@
 		},
 		{
 			"sourceId": "va_disability_file",
-			"contentHash": "1300f964d456255d89f96ecab2b475060ec6f2cbac50a41f8ac72b40d5a6fb76",
-			"cleanedHash": "c250b115304ef5d497734d06a7390c365be79b5eee43872bb23bb6ab9e618de8",
+			"contentHash": "d59ecf10c9517c274396312a7b2bda4d4e8d5330e6ff9c2ffad750a0a5553a94",
+			"cleanedHash": "925456b5dbe1d5703d1604867b9f2062284acda22ac4254ece7dbffbf0423ffd",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -264,8 +309,17 @@
 		},
 		{
 			"sourceId": "va_education_apply",
-			"contentHash": "9e7a7e244d85f23d0d19a1cb1b3f6d4aee56cdcabfc3d66a97cba46ad1a28320",
-			"cleanedHash": "4e8b02d67cd9bd94d1cb2c15736ef9a87a6b810330692e090fa35dfbac413a6d",
+			"contentHash": "54d913c0a2255f2dcee35afd803ffb8030f07e95bc1ee28ec7ea7adc8f6f071b",
+			"cleanedHash": "4cf061234b09170ace53dabf852cb760763b1e10f3f7b0dcc425a4e97b20796b",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_gi_bill_montgomery",
+			"contentHash": "4667c44b0ba7941ccf5e0c58eed3fd50269d94d6bec033554c2261167af709af",
+			"cleanedHash": "4d7cdaee1350c74da4a7cb02c89fea51794e0689dfad9116729d18865d675bd5",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -273,7 +327,7 @@
 		},
 		{
 			"sourceId": "va_gi_bill_overview",
-			"contentHash": "10bab321d99bb1680e2f0bb20b43cb1f6a2af988028c86ce53efa024385359e2",
+			"contentHash": "a350594d85d514cbed0d88243a3ecd05e68418c3fe9987afe26a9b15eb730690",
 			"cleanedHash": "ed98c70e745243ca82acfd76c9f1e6e6041330c5c627bbcf93e81cf4901b8e53",
 			"decision": "approved",
 			"dropped": 0,
@@ -282,7 +336,7 @@
 		},
 		{
 			"sourceId": "va_gi_bill_post911",
-			"contentHash": "32c1b9c8b885185cd8373c36f11bea52f5e0660789a26d72e334499402745813",
+			"contentHash": "92ca4c37477d3045a7f4574e8a538d0ca5522cfd64c6cbf1ca34535b5ee84500",
 			"cleanedHash": "94f0e252b6cc172d58f7ac0735b1dca8d2263384259cda7057fbd773c28b1792",
 			"decision": "approved",
 			"dropped": 0,
@@ -291,8 +345,8 @@
 		},
 		{
 			"sourceId": "va_gi_bill_transfer",
-			"contentHash": "897ebfb216bdc3d4881241085a88a926d9dc630db616b56cda3fbae5e0fd3580",
-			"cleanedHash": "8149b873ac0db07a6c3c84d3fec6dd1662d5faad2a5d4c6fddda1a2185a148c1",
+			"contentHash": "ddb3776210934e7caa7567460c651f0529f7c2f23dc080e9feaf01d1a0da7d55",
+			"cleanedHash": "a96d990d3c1f5a8ba198136e941bb8c7eed67ca7918c88a3af7c373ecdd7c0cc",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -300,7 +354,7 @@
 		},
 		{
 			"sourceId": "va_health_care_apply",
-			"contentHash": "bba5b299990edcaad757e7cb97906c603df5540e95f5db7cea7ae5f6b52646a6",
+			"contentHash": "4748840edabaf7a17338377c340c8f62f4a9b01b5a47a4fe21b17091d1b73868",
 			"cleanedHash": "0dfb4ea7a7a862e8c8df7bef1977f670a75f42c9393d391c00deee46a3e14753",
 			"decision": "approved",
 			"dropped": 0,
@@ -309,8 +363,8 @@
 		},
 		{
 			"sourceId": "va_health_eligibility",
-			"contentHash": "d755b92724f19b6caa10b34b254a554296fbe9fb624d48ddea27607042e01bd3",
-			"cleanedHash": "901885b3545267909dbec96cdab25a772ca292ac9d05334ed72e74df96fc7037",
+			"contentHash": "333d76305150b20244a8a94cb2a02429f1872b8e3871dacd83a9f8b4135b3c70",
+			"cleanedHash": "c968359cea14e79ffc5fada72f6835721a4a826b894f28d9ef831f365b2fb6e7",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -318,7 +372,7 @@
 		},
 		{
 			"sourceId": "va_home_loan_coe",
-			"contentHash": "e1bb7a38dbfed447c57daa11b7263057c242317937e9e5035c98a2165b452fa7",
+			"contentHash": "60dba92e0a837e950ca6b4638975bfb3a51dfef36fe9ca307c3d8152a2de6145",
 			"cleanedHash": "ed424b8136bf880c1ce6ca9de3ac0d14256c014bd8a6c0b0ae8c7c78c2db78c8",
 			"decision": "approved",
 			"dropped": 0,
@@ -327,8 +381,26 @@
 		},
 		{
 			"sourceId": "va_intent_to_file",
-			"contentHash": "d446f2d4c058fe06d5799d2fae4beea8fd1c279e279824c908b6a445789748de",
-			"cleanedHash": "26cc2c4eb439cdc34f1b7e85a142d2fa51333c82fbbceaa7638b550820ec0f38",
+			"contentHash": "36d4dda3fb262d42357b378fb9bd5e02c648957b4dd6671b06ee5caa74f0b551",
+			"cleanedHash": "06304af094317fbdfd722714da35df383460041583c98304a4ee571e2eae98d9",
+			"decision": "approved",
+			"dropped": 2,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_stem_scholarship",
+			"contentHash": "ba8afd22b8b2d9b78dfdfc6ea73f2f9c1f97842295561fc492d3be69d180bf5f",
+			"cleanedHash": "7699939d78024adc6a6a61ab9512e31bd94407f365621e7be39001c1672be598",
+			"decision": "approved",
+			"dropped": 0,
+			"stripped": 0,
+			"review": 0
+		},
+		{
+			"sourceId": "va_vet_tec_2",
+			"contentHash": "4937b81510ea1c57768c7c8fe359245e64aa0c62cfecfaabd687a0a626b3ea42",
+			"cleanedHash": "f2ecf0e197b7f34d446fbbc328ce3ff418733a67ca1382d8fb2ca1dcb4c074a9",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,
@@ -336,8 +408,8 @@
 		},
 		{
 			"sourceId": "va_vgli",
-			"contentHash": "29b4e69e464ee5d0dec2cc89f96d9d52d30ebee7c897ab02785d44eb3a31ea3b",
-			"cleanedHash": "b1f993892b87b5d7da2d357fe0e0e6ce6d839bd1d5978aa982b2854cdc6741b3",
+			"contentHash": "a976245e0c9c0c483bf9ad250e4f0b43bfe91212174f7749c311785a26d97a7d",
+			"cleanedHash": "d83c08bc0f5331f78da0e4c7168e0291768ac19d2271da7bdcf652a3bc2c9fd9",
 			"decision": "approved",
 			"dropped": 0,
 			"stripped": 0,

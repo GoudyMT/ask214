@@ -7,7 +7,7 @@ function chunk(over: Partial<CorpusChunk>): CorpusChunk {
 }
 function corpusOf(chunks: CorpusChunk[]): Corpus {
 	return {
-		version: '1.0',
+		version: '1.0.2',
 		dim: 3,
 		modelId: 'all-MiniLM-L6-v2',
 		chunks,

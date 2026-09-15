@@ -7,7 +7,7 @@ import type { CorpusManifest } from '$lib/corpus/types';
 const BGE_MODEL_ID = '@cf/baai/bge-small-en-v1.5';
 const BGE_MANIFEST = 'content-ops/server-index/corpus-v1.0.bge.json';
 const BGE_EMBEDDINGS = 'content-ops/server-index/corpus-v1.0.bge.bin';
-const MINILM_MANIFEST = 'static/corpus/corpus-v1.0.1.json';
+const MINILM_MANIFEST = 'static/corpus/corpus-v1.0.2.json';
 
 function loadManifest(path: string): CorpusManifest {
 	return JSON.parse(readFileSync(path, 'utf8')) as CorpusManifest;
@@ -34,6 +34,20 @@ describe('bge server corpus index', () => {
 	it('carries the same chunk set + version as the MiniLM index (one build, both indexes)', () => {
 		expect(bge.chunks.length).toBe(minilm.chunks.length);
 		expect(bge.version).toBe(minilm.version);
+	});
+
+	// Equal LENGTH is not the same chunk set, and the difference is what ships. The two indexes are built
+	// by separate commands - one needs a live inference binding and the other does not - so the server
+	// index can age behind the device one while both remain the same size, and the whole-set check that
+	// would catch it needs that binding and therefore cannot run here. Comparing ids and the content
+	// fingerprint costs nothing, runs in CI, and is the only automatic guard that the two delivery paths
+	// answer from the same words.
+	it('carries the same chunk IDS and content fingerprint, not merely the same count', () => {
+		expect([...bge.chunks.map((c) => c.id)].sort()).toEqual(
+			[...minilm.chunks.map((c) => c.id)].sort()
+		);
+		expect(bge.contentRevision?.contentHash).toBe(minilm.contentRevision?.contentHash);
+		expect(bge.contentRevision?.contentHash).toBeTruthy();
 	});
 });
 

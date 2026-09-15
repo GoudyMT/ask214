@@ -5,7 +5,7 @@ const sample = [
 	{
 		sourceId: 'tap_va_womens_health',
 		report: {
-			dropped: [{ page: 2, kind: 'toc', preview: 'ii Table of Contents ...' }],
+			dropped: [{ page: 2, kind: 'toc', preview: 'ii Table of Contents ...', chars: 1840 }],
 			stripped: [
 				{
 					page: 9,

@@ -10,7 +10,7 @@ function chunk(id: string): CorpusChunk {
 }
 function fixtureCorpus(): Corpus {
 	return {
-		version: '1.0',
+		version: '1.0.2',
 		dim: 3,
 		modelId: 'all-MiniLM-L6-v2',
 		chunks: [chunk('a'), chunk('b')],
@@ -660,7 +660,7 @@ describe('createAskStore', () => {
 
 		function intentCorpus(): Corpus {
 			return {
-				version: '1.0',
+				version: '1.0.2',
 				dim: 3,
 				modelId: 'all-MiniLM-L6-v2',
 				chunks: [

@@ -27,8 +27,10 @@ export function classifyAsset(pathname: string): CacheStrategy {
  * "downloaded once, works offline" promise holds). The `-vN` suffix is the ONLY cache-bust seam for the
  * vendored model + wasm, whose URLs are stable and served cache-first forever: when those bytes are
  * re-vendored (e.g. an onnxruntime-web security patch), BUMP this suffix - `shouldKeepCache` then evicts
- * the old cache on activate and the new bytes are re-fetched on next use. (Mirrors the corpus filename
- * bump, which versions the corpus by URL instead.) Also cleared by an explicit wipe.
+ * the old cache on activate and the new bytes are re-fetched on next use. The corpus is versioned the
+ * OPPOSITE way - by URL, renaming the artifact - and that does NOT evict anything: the old URL merely stops
+ * being requested while its entry stays cached at full size. Superseded corpus entries are therefore pruned
+ * one at a time on activate (see `isSupersededCorpusEntry`). Also cleared by an explicit wipe.
  */
 export const ASK_ASSET_CACHE = 'ask-assets-v1';
 
@@ -45,6 +47,40 @@ export const ASK_ASSET_CACHE = 'ask-assets-v1';
  */
 export function shouldKeepCache(key: string, appCacheName: string): boolean {
 	return key === appCacheName || key === ASK_ASSET_CACHE;
+}
+
+/**
+ * Decide whether one cached ENTRY inside ASK_ASSET_CACHE is a corpus artifact this build no longer ships.
+ *
+ * `shouldKeepCache` works at whole-cache granularity and keeps ASK_ASSET_CACHE unconditionally, so nothing
+ * else ever retires anything inside it. That is right for the model + ORT WASM, which are served from stable
+ * URLs and so are overwritten in place, but wrong for the corpus: the corpus is versioned BY URL, so a
+ * content change renames `corpus-vX.*` to `corpus-vY.*` and the cache gains the new ~7MB while keeping the
+ * old pair forever. Left alone, every rebuild adds a dead generation next to the ~45MB model, and a browser
+ * that evicts the whole origin under storage pressure (Safari/iOS) takes the model down with it.
+ *
+ * Two conditions must BOTH hold before an entry is marked, which is what bounds over-eviction:
+ *   - the entry is inside the `/corpus/` namespace (the same namespace `classifyAsset` routes into this
+ *     cache), so a `/models/` or `/wasm/` entry can never match no matter what the asset list contains;
+ *   - this build actually ships a corpus, so an unexpected asset list (corpus served from somewhere other
+ *     than the static directory, or an empty list) prunes nothing instead of wiping the live copy. A stale
+ *     entry costs bytes; a wrongly deleted one costs an offline user their answers.
+ *
+ * Args:
+ *   pathname: the pathname of a cached entry's request URL
+ *   currentAssets: the pathnames this build ships (the service worker's build + files list), which carries
+ *     the current corpus identity - so no corpus filename is hardcoded here and a version bump needs no edit
+ *
+ * Returns:
+ *   true when the entry is a superseded corpus artifact and can be deleted.
+ */
+export function isSupersededCorpusEntry(
+	pathname: string,
+	currentAssets: readonly string[]
+): boolean {
+	if (!pathname.startsWith('/corpus/')) return false;
+	if (!currentAssets.some((asset) => asset.startsWith('/corpus/'))) return false;
+	return !currentAssets.includes(pathname);
 }
 
 /**

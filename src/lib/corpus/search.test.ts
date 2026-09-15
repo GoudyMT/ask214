@@ -39,7 +39,7 @@ function chunk(id: string): CorpusChunk {
 // the normalized query against them. Here we hand-build a tiny normalized corpus.
 const unit = (v: number[]) => normalize(new Float32Array(v));
 const CORPUS: Corpus = {
-	version: '1.0',
+	version: '1.0.2',
 	dim: 2,
 	modelId: 'test',
 	chunks: [chunk('a'), chunk('b'), chunk('c')],
