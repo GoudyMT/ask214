@@ -2,6 +2,7 @@ import type { Block } from '$lib/content-ops/extract/pdf-text';
 import { detectRunningAffix } from './detect-running-affix';
 import { classifyBlock } from './classify-block';
 import { stripFused } from './strip-fused';
+import { stripExercise } from './strip-exercise';
 import { blocksToNormalizedText } from './derive-normalized';
 
 // A non-content classification at or above this confidence auto-drops its whole block; below it,
@@ -101,7 +102,9 @@ export function cleanExtraction(
 			continue;
 		}
 
-		const stripped = stripFused(block.text, affix);
+		// A graded exercise that occupies a whole block was dropped above; this catches the one that only
+		// TRAILS a block of real guidance, which must keep the guidance and lose the exercise.
+		const stripped = stripExercise(stripFused(block.text, affix));
 		if (stripped.length === 0) {
 			report.dropped.push(toDroppedEntry(block, 'empty'));
 			continue;

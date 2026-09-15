@@ -1,7 +1,36 @@
 import type { Block } from '$lib/content-ops/extract/pdf-text';
 
-export type BlockKind = 'content' | 'toc' | 'disclaimer' | 'frontmatter';
+export type BlockKind = 'content' | 'toc' | 'disclaimer' | 'frontmatter' | 'exercise';
 export type Classification = { kind: BlockKind; confidence: number };
+
+// exercise: a graded classroom exercise - a multiple-choice question bank, a true/false statement bank,
+// or the answer key to one. This is the only class in this corpus where the app can state something FALSE
+// while quoting the source perfectly, because a distractor is wrong by construction and a true/false
+// statement is a claim the reader is meant to JUDGE, not believe. Chunking makes it worse rather than
+// better: it splits the "decide whether it is true or false" framing off the statements, so the statements
+// render as the document's own plain declarative prose.
+//
+// Anchored on the exercise FORM, never on a topic word. Measured over all 38 cleaned sources: these three
+// literals match exactly 6 blocks in 3 guides, with no false positive. The alternative - detecting a run of
+// lettered options - matched 9 blocks of which 4 were worksheet sub-lists ("a. Skills b. Education and
+// Training c. Credentials"), a 44% false-positive rate on real content. And a rule keyed on the word
+// "Capstone" would destroy 18 legitimate chunks, including the passage that answers what a Capstone is.
+//
+// 1. The column header the VA guide prints above every question in its quiz AND above its answer-key
+//    table. It appears nowhere else in the corpus.
+const EXERCISE_QUESTION_BANK_RE = /Module Question/i;
+// 2. A numbered activity whose title says QUIZ, and which OPENS the block. Position is load-bearing: the
+//    same marker TRAILING a block means the block is real content that merely ends in an exercise, which
+//    strip-exercise.ts cuts instead. Requiring the number keeps ordinary worksheets ("ACTIVITY: Gap
+//    Analysis") out, and requiring QUIZ keeps the other 44 numbered activities out.
+const EXERCISE_ACTIVITY_HEAD_RE = /^\s*ACTIVITY\s+[\d.]+\s*:\s*[^\n]{0,40}QUIZ/i;
+// 3. An appendix that exists to hold the answers to one of the above.
+const EXERCISE_ANSWER_APPENDIX_RE = /APPENDIX\s+[A-Z]\s*:\s*[^\n]{0,40}QUIZ/i;
+// These are exact document-structure literals rather than a weighted heuristic, so a match is certain
+// rather than probable. Firing at 1 clears the orchestrator's auto-drop cutoff with no borderline lane -
+// there is nothing for a human to adjudicate about a block that titles itself an answer key.
+const EXERCISE_FIRE_SCORE = 1;
+const EXERCISE_SCORE_THRESHOLD = 0.5;
 
 // toc: a contents page reads as a dense run of "Title ... pageNumber" entries. We measure that
 // two ways - the fraction of whitespace-split tokens that are themselves a bare 1-3 digit page
@@ -103,6 +132,16 @@ function scoreDisclaimer(text: string): number {
 	return DISCLAIMER_PHRASE_RE.test(text) ? DISCLAIMER_FIRE_SCORE : 0;
 }
 
+/** Whether the block IS a graded exercise or its answer key, judged by the guide's own structural
+ *  labels rather than by topic - so prose about a real quiz a veteran can go and take is untouched. */
+function scoreExercise(text: string): number {
+	const isExercise =
+		EXERCISE_QUESTION_BANK_RE.test(text) ||
+		EXERCISE_ACTIVITY_HEAD_RE.test(text) ||
+		EXERCISE_ANSWER_APPENDIX_RE.test(text);
+	return isExercise ? EXERCISE_FIRE_SCORE : 0;
+}
+
 /** How strongly the block reads as a cover/version stamp rather than a real paragraph. */
 function scoreFrontMatter(text: string, page: number | undefined): number {
 	if (page === undefined || page > FRONTMATTER_EARLY_PAGE_MAX) return 0;
@@ -136,15 +175,17 @@ export function classifyBlock(block: Block): Classification {
 	const tocScore = scoreToc(text);
 	const disclaimerScore = scoreDisclaimer(text);
 	const frontMatterScore = scoreFrontMatter(text, block.page);
+	const exerciseScore = scoreExercise(text);
 
 	const tocFires = tocScore >= TOC_SCORE_THRESHOLD;
 	const disclaimerFires = disclaimerScore >= DISCLAIMER_SCORE_THRESHOLD;
 	const frontMatterFires = frontMatterScore >= FRONTMATTER_SCORE_THRESHOLD;
+	const exerciseFires = exerciseScore >= EXERCISE_SCORE_THRESHOLD;
 
-	if (!tocFires && !disclaimerFires && !frontMatterFires) {
+	if (!tocFires && !disclaimerFires && !frontMatterFires && !exerciseFires) {
 		return {
 			kind: 'content',
-			confidence: 1 - Math.max(tocScore, disclaimerScore, frontMatterScore)
+			confidence: 1 - Math.max(tocScore, disclaimerScore, frontMatterScore, exerciseScore)
 		};
 	}
 
@@ -153,8 +194,12 @@ export function classifyBlock(block: Block): Classification {
 	const best = Math.max(
 		tocFires ? tocScore : -1,
 		disclaimerFires ? disclaimerScore : -1,
-		frontMatterFires ? frontMatterScore : -1
+		frontMatterFires ? frontMatterScore : -1,
+		exerciseFires ? exerciseScore : -1
 	);
+	// Exercise is tested first because it is the only kind whose blocks can assert a FALSEHOOD; the
+	// others are merely non-answering. On a tie at the same score, that is the one to act on.
+	if (best === exerciseScore) return { kind: 'exercise', confidence: exerciseScore };
 	if (best === tocScore) return { kind: 'toc', confidence: tocScore };
 	if (best === disclaimerScore) return { kind: 'disclaimer', confidence: disclaimerScore };
 	return { kind: 'frontmatter', confidence: frontMatterScore };
