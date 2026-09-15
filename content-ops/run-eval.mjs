@@ -33,7 +33,23 @@ const MODEL_ID = 'all-MiniLM-L6-v2';
 const K = 5;
 const HELD_OUT_PCT = 30;
 // v1.0 SOURCE-level ranking floor/target. correct-empty is reported but v1.1-gated (charter Measured Result).
-const FLOOR = { srcHitRate: 0.8, srcMRR: 0.6 };
+//
+// RE-DERIVED 2026-09-15, after the benchmark's multi-source under-crediting was corrected: 26 altSources
+// across 11 items, each curated against the candidate document's own passage rather than bulk-added. The
+// correction moved the TUNE split 0.825/0.589 -> 0.856/0.618 and left the HELD-OUT acceptance reading
+// unchanged at 0.868/0.641 - so widening what counts as a hit did NOT make this gate easier on the number
+// it actually gates. It is re-derived anyway, because 0.8 was set against the under-crediting benchmark and
+// is a weaker bar on a corrected one.
+//
+// The two numbers derive differently, and only one moves:
+//   srcHitRate 0.8 -> 0.83. Held-out measures 0.868, leaving ~1.4 queries of slack on a 38-positive split;
+//     tune measures 0.856, leaving ~1. Real margin, so the bar rises to match the corrected reality.
+//   srcMRR stays 0.6. Tune measures 0.618, so any raise leaves under one query of margin - and a floor that
+//     tight makes the auto-calibration fall back to a lower cutoff on noise, which is fragility rather than
+//     quality. Left where it is, deliberately, not overlooked.
+//
+// Same rule as ever: raise a floor when retrieval genuinely improves; never lower one to make a run pass.
+const FLOOR = { srcHitRate: 0.83, srcMRR: 0.6 };
 const TARGET = { srcHitRate: 0.9, srcMRR: 0.75 };
 // MIN_SCORE candidates (display cutoff): pick the HIGHEST that still holds the held-out floor.
 const MIN_SCORE_CANDIDATES = [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4];
