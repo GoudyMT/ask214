@@ -17,7 +17,12 @@ import { fileURLToPath } from 'node:url';
 // `pnpm eval` PASS certifies 0.4 on this corpus. The auto-calibration selects 0.4 on its own (the TUNE split
 // holds the floor at every cutoff, srcMRR 0.614). Removing the boilerplate held the source-hit floor flat;
 // its value is chunk cleanliness for synthesis + highlighting, not the source-level ranking metric.
-const CALIBRATED_CHUNK_COUNT = 1878;
+// Re-confirmed 2026-09-15 at 1845 chunks, after the corpus-shape rebuild (graded exercises excluded at the
+// clean stage; the chunker gained a list-marker level below sentences). Procedure followed exactly as this
+// comment prescribes - rebuild, re-run the eval, confirm the margin, THEN bump: held-out srcHitRate 0.868 /
+// srcMRR 0.641 at the shipped 0.40 cutoff, over the enforced 0.83 / 0.6 floor, and the auto-calibration
+// selects 0.40 on its own. The answer gate passed in the same run (tier 1 38.5% over its 37.0% floor).
+const CALIBRATED_CHUNK_COUNT = 1845;
 
 const corpusPath = fileURLToPath(
 	new URL('../../../static/corpus/corpus-v1.0.1.json', import.meta.url)

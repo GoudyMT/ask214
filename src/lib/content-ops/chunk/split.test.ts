@@ -163,6 +163,17 @@ describe('splitIntoSpans - paragraph level', () => {
 		for (const s of spans) expect(text.slice(s.startOffset, s.endOffset)).toBe(s.text);
 	});
 
+	// The discriminator between "paragraphs before sentences" and "sentences before paragraphs". Both
+	// orders decompose to nested atoms that the greedy packer usually reconstitutes identically, so most
+	// fixtures cannot tell them apart. This one can: the second sentence FITS the target on its own, and
+	// it carries a marker in the middle. Splitting at markers first cuts inside that sentence and welds
+	// the fragment "A b" onto the previous sentence; splitting at sentences first leaves it whole.
+	it('does not cut inside a sentence that already fits, even when it holds a marker', () => {
+		const blocks: Block[] = [{ text: `X y z. A b ${BULLET} c d.`, section: 'S' }];
+		const spans = splitIntoSpans(nt(blocks), blocks, words, { targetTokens: 5 });
+		expect(spans.map((s) => s.text)).toEqual(['X y z.', `A b ${BULLET} c d.`]);
+	});
+
 	it('leaves marker-free text to the sentence level (behaviour unchanged)', () => {
 		const blocks: Block[] = [
 			{ text: 'One two three. Four five six. Seven eight nine.', section: 'S' }

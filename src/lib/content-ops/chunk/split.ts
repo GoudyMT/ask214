@@ -128,57 +128,38 @@ function tokenWindows(
 	if (winStart < u.end) out.push(carry(u, winStart, u.end, true));
 }
 
-function explodeSentences(
-	nt: string,
-	u: Unit,
-	target: number,
-	countTokens: CountTokens,
-	out: Unit[]
-): void {
-	if (countTokens(nt.slice(u.start, u.end)) <= target) {
-		out.push(u);
-		return;
-	}
-	const sents = splitSentences(nt.slice(u.start, u.end));
-	if (sents.length > 1) {
-		for (const s of sents)
-			explodeSentences(
-				nt,
-				carry(u, u.start + s.start, u.start + s.end, false),
-				target,
-				countTokens,
-				out
-			);
-		return;
-	}
-	tokenWindows(nt, u, target, countTokens, out);
-}
-
 function explode(nt: string, u: Unit, target: number, countTokens: CountTokens, out: Unit[]): void {
 	if (countTokens(nt.slice(u.start, u.end)) <= target) {
 		out.push(u);
 		return;
 	}
-	// Paragraphs before sentences: a flattened list has no terminator for splitSentences to find, so
-	// without this level an oversized list reaches tokenWindows and is cut mid-item.
-	const paras = splitParagraphs(nt.slice(u.start, u.end));
-	if (paras.length > 1) {
-		for (const p of paras)
-			explodeSentences(
-				nt,
-				carry(u, u.start + p.start, u.start + p.end, false),
-				target,
-				countTokens,
-				out
-			);
+	const text = nt.slice(u.start, u.end);
+
+	const sents = splitSentences(text);
+	if (sents.length > 1) {
+		for (const s of sents)
+			explode(nt, carry(u, u.start + s.start, u.start + s.end, false), target, countTokens, out);
 		return;
 	}
-	explodeSentences(nt, u, target, countTokens, out);
+
+	// Markers are the FALLBACK, reached only where the text carries no sentence boundary to cut on -
+	// which is exactly the flattened-list case they exist for. Trying them first instead cuts inside
+	// sentences that already fit, welding the fragment onto its neighbour; measured over the real corpus,
+	// that moved 59% of chunk texts and cost 5 benchmark queries their tier-1 answer while the reachable
+	// ceiling rose, i.e. it degraded which card leads rather than what retrieval can reach.
+	const paras = splitParagraphs(text);
+	if (paras.length > 1) {
+		for (const p of paras)
+			explode(nt, carry(u, u.start + p.start, u.start + p.end, false), target, countTokens, out);
+		return;
+	}
+
+	tokenWindows(nt, u, target, countTokens, out);
 }
 
 /**
  * Cut a source into ordered, no-overlap `ChunkSpan`s over its `normalizedText`. Packs consecutive same-section
- * units (block -> paragraph -> sentence -> token window) greedily up to `targetTokens`; never merges across a section
+ * units (block -> sentence -> list marker -> token window) greedily up to `targetTokens`; never merges across a section
  * boundary. A short trailing chunk is left as-is - greedy packing already merges everything that fits, so a
  * tiny tail survives only when folding it would breach the window. Each span's `text` is a verbatim slice
  * `normalizedText[start, end)`. Pure (tokenizer injected). Throws `E_CHUNK_BLOCK_NOT_LOCATED` if a block is

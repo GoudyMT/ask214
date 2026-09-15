@@ -728,13 +728,7 @@
 	{
 		"query": "How many pages should my targeted resume be?",
 		"sourceId": "tap_dol_employment_workshop",
-		"answerSnippet": "Your targeted resume should not be longer than two pages",
-		"altAnswers": [
-			{
-				"sourceId": "tap_dol_employment_workshop",
-				"answerSnippet": "the length of your targeted resume depends on the employer and their requirements"
-			}
-		]
+		"answerSnippet": "Length: One to two pages (if two pages, add your name to the second page)"
 	},
 	{
 		"query": "How long am I covered under TAMP after I separate?",

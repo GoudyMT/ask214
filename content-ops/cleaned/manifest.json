@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-07-25",
+	"generatedAt": "2026-09-15",
 	"sources": [
 		{
 			"sourceId": "dod_skillbridge",
@@ -31,7 +31,7 @@
 		{
 			"sourceId": "tap_dol_efct",
 			"contentHash": "1a95b1b978d736b19f71df5731dbf4d25ebe4c82b7d9a780639f151f3c5de973",
-			"cleanedHash": "aecd68e2c2943853db7bf4a4bfe1f28fc0be9bc1c2d30c646bc11fb32d822cb9",
+			"cleanedHash": "1b97e809901a2ef51abe23016d1f9388e389ac53b7f44a5393c1915f1e29fc96",
 			"decision": "approved",
 			"dropped": 6,
 			"stripped": 155,
@@ -40,9 +40,9 @@
 		{
 			"sourceId": "tap_dol_employment_workshop",
 			"contentHash": "cdc1a520f7331f2e327851b9fce4ff428ec5286f33ff274296cbbc2dee86bc54",
-			"cleanedHash": "a009f9cc07cd362ddda76d3b84b9b1f1f37699a0212b29306614580f195648b5",
+			"cleanedHash": "1ebc7d94c23f420d3f4b018e2b42610478fc37f965fafa2c9372345d63653c86",
 			"decision": "approved",
-			"dropped": 10,
+			"dropped": 12,
 			"stripped": 0,
 			"review": 0
 		},
@@ -139,10 +139,10 @@
 		{
 			"sourceId": "tap_va_benefits_guide",
 			"contentHash": "9c0baacc06cf18482f21bd086bdc3f25a37c5c5dad5ccbe9797ea4e7e9a3a742",
-			"cleanedHash": "4e2039673094cf2747dc2afa420accc6f03ff87a77afac54b983339d01114691",
+			"cleanedHash": "84c927d6ff0bfaef2e46eca91518d01cdcc712f661483066afda3d8ab38ee45f",
 			"decision": "approved",
-			"dropped": 12,
-			"stripped": 199,
+			"dropped": 16,
+			"stripped": 195,
 			"review": 0
 		},
 		{
