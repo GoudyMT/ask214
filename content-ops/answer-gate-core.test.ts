@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { report } from './answer-gate-core.mjs';
+import { report, scanJunk } from './answer-gate-core.mjs';
 import type { AnswerMetrics } from '../src/lib/ask/eval/measure-answer';
 
 // `report` is the function that decides ship / no-ship, and it was the only link in the chain with no test.
@@ -127,5 +127,56 @@ describe('report', () => {
 	it('no longer gates on the two-tier comparison, whichever way it falls', () => {
 		expect(run({ experienceVsCard: { aOnly: 3, bOnly: 9 } })).toEqual([]);
 		expect(run({ experienceVsCard: { aOnly: 0, bOnly: 0 } })).toEqual([]);
+	});
+});
+
+// The corpus scan reports zero on the shipped artifact, which is what makes it a ratchet - and also means
+// a broken wiring would look exactly like a healthy run. These drive a violation through the real scan so
+// the gate is known to be capable of failing.
+describe('scanJunk', () => {
+	// The body does not repeat its heading here, so there is no echo to keep: the condition exists only in
+	// `section`, and a reader of the answer alone never sees it. This is the DEA spouse-and-child shape.
+	it('flags an answer whose condition lives only in the section', () => {
+		const dirty = scanJunk({
+			chunks: [
+				{
+					id: 'c1',
+					sourceId: 'va_dea_chapter35',
+					section: "If you're the spouse",
+					text: 'You can get both DEA and VA Dependency and Indemnity Compensation (DIC) payments.'
+				}
+			]
+		});
+		expect(dirty.map((d) => d.label)).toContain('property condition-attached');
+	});
+
+	// The same chunk with the heading echoed into the body passes, because the strip now keeps a governing
+	// heading and the answer carries the condition with it.
+	it('passes once the answer carries the condition', () => {
+		const dirty = scanJunk({
+			chunks: [
+				{
+					id: 'c2',
+					sourceId: 'va_dea_chapter35',
+					section: "If you're the spouse",
+					text: "If you're the spouse You can get both DEA and VA Dependency and Indemnity Compensation (DIC) payments."
+				}
+			]
+		});
+		expect(dirty).toEqual([]);
+	});
+
+	it('passes a determination under an ordinary label heading', () => {
+		const dirty = scanJunk({
+			chunks: [
+				{
+					id: 'c3',
+					sourceId: 'va_health_eligibility',
+					section: 'Eligibility for VA Health Care',
+					text: "Eligibility for VA Health Care You're eligible if you meet the service requirements."
+				}
+			]
+		});
+		expect(dirty).toEqual([]);
 	});
 });

@@ -6,6 +6,7 @@
 import { cleanExcerpt } from '../src/lib/corpus/clean-excerpt.ts';
 import { stripHeadingEcho } from '../src/lib/ask/answer/heading-echo.ts';
 import { selectAnswer } from '../src/lib/ask/answer/select-answer.ts';
+import { violatedProperties } from '../src/lib/content-ops/corpus/answer-properties.ts';
 import { mcnemarExactP, evaluateBar } from '../src/lib/ask/eval/measure-answer.ts';
 
 // The improvement must be distinguishable from chance, not merely positive. Standard two-sided level; the
@@ -67,7 +68,12 @@ export function runOracle(corpus, queries) {
 
 /**
  * Junk carried into a SELECTED answer, over every chunk rather than only the benchmarked ones. The
- * benchmark touches a few hundred chunks; furniture can sit anywhere in 1878.
+ * benchmark touches a few hundred chunks; furniture can sit anywhere in 1992.
+ *
+ * Two kinds of check run here. `JUNK` names specific verified strings, which only protects against sources
+ * already seen. `ANSWER_PROPERTIES` describes the SHAPES that make an answer unsafe to read alone, so a
+ * source nobody has ingested yet is gated by the same rules - that is what stops this list growing by one
+ * entry per new guide.
  *
  * @param {{ chunks: GateChunk[] }} corpus
  * @returns {{ id: string; label: string; sample: string }[]}
@@ -78,6 +84,9 @@ export function scanJunk(corpus) {
 		const out = selectAnswer(bodyOf(chunk));
 		for (const { pattern, label } of JUNK) {
 			if (pattern.test(out)) dirty.push({ id: chunk.id, label, sample: out.slice(0, 90) });
+		}
+		for (const id of violatedProperties(out, chunk)) {
+			dirty.push({ id: chunk.id, label: 'property ' + id, sample: out.slice(0, 90) });
 		}
 	}
 	return dirty;
