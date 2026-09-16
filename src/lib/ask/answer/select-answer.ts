@@ -19,6 +19,19 @@ import { splitSentences } from '$lib/content-ops/chunk/sentences';
 // 120 words, matching the lead card exactly, because this block now renders that card's own passage. An
 // earlier 80-word target emitted a median of 82 words against the card's 118 and so scored BELOW the surface
 // it is meant to equal - the block was quietly showing less than the card while claiming to be it.
+//
+// NARROWING was measured (2026-09-16) and rejected, and not for the reason it was once expected to fail.
+// A 52-word budget, judged blind and paired over all 135 benchmark queries with both arms rendered as the
+// app draws them, moved HARM by nothing: 5 against 4, McNemar p = 1.0. The old argument that a short window
+// severs conditions no longer holds on this corpus. It fails instead because the answer stops being there:
+// tier 1 falls from 37.8% to 28.9%, eight points under the enforced regression floor, and the gate rejects
+// it. Short is not dangerous here, short is empty.
+//
+// So do NOT narrow this to manufacture a second tier. Tier 2 is missing on 57% of queries because the
+// passage is frequently no longer than the answer, not because this number is too large; narrowing buys 45
+// expansions by moving 13 answers out of view, and most of those expansions are the same text one tap
+// further away. The lever for tier 2 is more content BEHIND the answer, which is a chunk-size question.
+// The failure is monotone in this number, so intermediate budgets interpolate rather than surprise.
 const TARGET_WORDS = 120;
 // No headroom above the target: the ceiling IS the card's cap. A single sentence longer than that is cut on
 // a word boundary and the cut is marked, which is the one place this module cuts mid-sentence.
