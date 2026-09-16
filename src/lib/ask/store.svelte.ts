@@ -12,7 +12,15 @@ import type { RetrievedChunk, SynthesisResult } from './synthesis/synthesize';
 import { toSynthesisView, type SynthesisView } from './synthesis/synthesis-view';
 import { SvelteSet } from 'svelte/reactivity';
 
-const K = 5; // result cards per query (3-5)
+// Result cards per query (3-5). Widening k was measured and moved nothing, and a cross-encoder re-ranker
+// over the returned chunks measured -0.7pp against real serving, as did hybrid lexical fusion at every
+// alpha. Retrieval is not where the remaining loss sits: the answer is in SOME returned card far more often
+// than it reaches the reader, so the gap is downstream of this number.
+//
+// Do NOT widen k or add a re-ranker without re-running BOTH the retrieval eval and the blind harm
+// comparison. Substring containment rises on changes that make the rendered answer worse - choosing the
+// answer card across this set once won +8.1pp on containment while causing 11 of 17 harmful regressions.
+const K = 5;
 // Minimum cosine score a hit must clear to surface: weak matches are dropped rather
 // than padded in, which is also what makes `empty` reachable. Calibrated against the eval set - set
 // below the weakest relevant lead so a valid answer is never dropped, and above the off-topic noise
