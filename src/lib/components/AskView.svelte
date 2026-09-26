@@ -135,7 +135,7 @@
 
 {#if showReminder}
 	<div class="ask-reminder">
-		<span>Want to set up Ask and keep planning offline? One-time ~45 MB.</span>
+		<span>Want to set up Ask and keep planning offline? One-time, about 55 MB.</span>
 		<span class="ask-reminder__actions">
 			<button class="ask-reminder__set" type="button" onclick={() => inputEl?.focus()}
 				>Set up</button
@@ -238,8 +238,8 @@
 			<h2 class="ask-setup__title">One-time setup to answer your question</h2>
 			<p class="ask-setup__query">"{askState.pendingQuery}"</p>
 			<p class="ask-setup__body">
-				To answer your question, Ask downloads a one-time search tool (about 45 MB). After that it's
-				instant and works fully offline.
+				To answer your question, Ask downloads a one-time search tool (about 55 MB). Once your
+				browser keeps it, answers are instant and work offline.
 			</p>
 			<div class="ask-setup__actions">
 				<button class="ask-setup__go" type="button" onclick={onSetUp}>Set up &amp; answer</button>
@@ -267,8 +267,8 @@
 		<div class="ask-msg ask-msg--accent">
 			<p class="ask-msg__title"><span class="ask-spinner"></span>Setting up Ask</p>
 			<p class="ask-msg__body">
-				Downloading the search tool (about 45 MB), one time only - then answering your question.
-				Afterwards Ask is instant and works offline.
+				Downloading the search tool (about 55 MB), one time only - then answering your question.
+				Once your browser keeps it, Ask is instant and works offline.
 			</p>
 		</div>
 	{:else if askState.kind === 'embedding'}
@@ -333,7 +333,8 @@
 		<div class="ask-msg ask-msg--accent">
 			<p class="ask-msg__title">You're offline</p>
 			<p class="ask-msg__body">
-				Connect to the internet once to set up Ask (about 45 MB). After that it works fully offline.
+				Connect to the internet once to set up Ask (about 55 MB). Once your browser keeps it, Ask
+				works offline.
 			</p>
 		</div>
 	{:else if askState.kind === 'error'}

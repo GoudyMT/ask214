@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { ASK_ASSET_CACHE, CORPUS_BASE } from './asset-cache';
 import { DEVICE_FILES, deviceFilesKept } from './device-files';
@@ -64,5 +64,17 @@ describe('deviceFilesKept', () => {
 			}
 		} as unknown as CacheStorage;
 		expect(await deviceFilesKept(refusing)).toBe(false);
+	});
+});
+
+// The Ask view states the one-time download's size in four places. The figure is the files an on-device answer
+// downloads, rounded to the nearest 5 MB, so a new model or answer library cannot leave the words behind.
+describe('the download size the Ask view states', () => {
+	it('matches the on-device files, to the nearest 5 MB, everywhere it is stated', () => {
+		const bytes = DEVICE_FILES.reduce((sum, path) => sum + statSync(join(STATIC, path)).size, 0);
+		const view = readFileSync(join(process.cwd(), 'src/lib/components/AskView.svelte'), 'utf8');
+		const stated = [...view.matchAll(/(\d+(?:\.\d+)?)\s?MB/g)].map((match) => Number(match[1]));
+		expect(stated).toHaveLength(4);
+		for (const megabytes of stated) expect(megabytes).toBe(Math.round(bytes / 5e6) * 5);
 	});
 });
