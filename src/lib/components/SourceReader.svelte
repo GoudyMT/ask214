@@ -549,12 +549,17 @@
 	}
 
 	.reader__head {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
+		display: grid;
+		/* Close takes the right column and an empty one as wide balances it, so the title centres on the reader. */
+		grid-template-columns: 28px minmax(0, 1fr) 28px;
+		align-items: start;
 		gap: var(--space-m);
 		padding: var(--space-l) var(--space-l) var(--space-m);
+		text-align: center;
 		border-bottom: 1px solid var(--color-border);
+	}
+	.reader__head > div {
+		grid-column: 2;
 	}
 	.reader__src {
 		margin: 0 0 2px;
@@ -567,7 +572,8 @@
 		line-height: 1.25;
 	}
 	.reader__close {
-		flex-shrink: 0;
+		grid-column: 3;
+		justify-self: end;
 		background: none;
 		border: none;
 		color: var(--color-fg-muted);
@@ -610,6 +616,8 @@
 		font-size: var(--font-size-s);
 	}
 	.reader__switch {
+		display: flex;
+		justify-content: center;
 		padding: var(--space-s) var(--space-l);
 		border-bottom: 1px solid var(--color-border);
 	}
@@ -726,6 +734,8 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: center;
+		text-align: center;
 		gap: var(--space-m);
 		padding: var(--space-m) var(--space-l);
 		font-size: var(--font-size-s);

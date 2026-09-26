@@ -1893,4 +1893,70 @@ describe('SourceReader, a document opened whole', () => {
 			}
 		});
 	});
+
+	// The page and the pager sit on the reader's centerline; the title, the view switch and the row under the
+	// document sit on it too, so the reader reads as one column. Measured on the text: a block box spans its column
+	// whatever the alignment, so only the lines show where the words sit.
+	describe('on one centerline', () => {
+		let size = { width: 0, height: 0 };
+		beforeEach(() => {
+			size = { width: window.innerWidth, height: window.innerHeight };
+		});
+		afterEach(async () => {
+			await page.viewport(size.width, size.height);
+		});
+
+		// The middle of the ink on each line the elements' text occupies, one value per line.
+		function lineCentres(elements: Element[]): number[] {
+			const lines = new Map<number, { left: number; right: number }>();
+			for (const element of elements) {
+				const range = document.createRange();
+				range.selectNodeContents(element);
+				for (const rect of range.getClientRects()) {
+					if (rect.width === 0) continue;
+					const key = Math.round(rect.top);
+					const line = lines.get(key);
+					lines.set(
+						key,
+						line
+							? { left: Math.min(line.left, rect.left), right: Math.max(line.right, rect.right) }
+							: { left: rect.left, right: rect.right }
+					);
+				}
+			}
+			return [...lines.values()].map(({ left, right }) => (left + right) / 2);
+		}
+
+		it.each([
+			['a desktop', 1280, 800],
+			['a phone', 390, 844],
+			['a phone turned sideways', 844, 390]
+		])('centres the title, the switch and the foot on %s', async (_name, width, height) => {
+			await caches.delete(ASK_ASSET_CACHE);
+			await page.viewport(width, height);
+			const { container } = render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: threePages()
+				}
+			});
+			await vi.waitFor(() => expect(container.querySelector('.reader__foot .save')).not.toBeNull());
+			const box = (container.querySelector('dialog.reader') as HTMLElement).getBoundingClientRect();
+			const middle = box.left + box.width / 2;
+			const parts: [string, Element[]][] = [
+				['the title', [container.querySelector('.reader__head > div') as Element]],
+				['the switch', [container.querySelector('.seg') as Element]],
+				['the foot', [...(container.querySelector('.reader__foot') as Element).children]]
+			];
+			for (const [part, elements] of parts) {
+				const centres = lineCentres(elements);
+				expect(centres.length, part).toBeGreaterThan(0);
+				for (const centre of centres)
+					expect(Math.abs(centre - middle), part).toBeLessThanOrEqual(1);
+			}
+		});
+	});
 });
