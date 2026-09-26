@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { DEVICE_FILES } from '../../src/lib/ask/device-files';
 
 // Acceptance: the offline "Ask" must answer with NO network after a one-time warm load - the whole
 // privacy + offline premise (Context 1). Real model, no stub: a stubbed embed would not test
@@ -72,4 +73,54 @@ test('ask answers fully offline after a warm load @slow', async ({
 	// The offline reader opens with no network too (pure client render over the held corpus text).
 	await page.locator('.ask-card--lead .ask-card__read').click();
 	await expect(page.locator('dialog.reader .reader__title')).toBeVisible();
+});
+
+// A first visitor who asks at once taps Set up while the worker is still installing. Everything that download
+// fetches must still be kept, or the "one-time" download happens again and nothing works offline.
+test('a setup tapped before the worker takes charge still keeps every file @slow', async ({
+	page,
+	browserName
+}) => {
+	test.skip(
+		browserName === 'webkit',
+		'Playwright WebKit offline fails a worker-controlled request before the worker can answer it'
+	);
+	test.setTimeout(180_000);
+
+	// Hold back the page's call that registers the worker, so the page is not controlled when Set up is tapped.
+	// Page-side, so the test does not depend on routing the worker's own requests.
+	await page.addInitScript(() => {
+		const container = navigator.serviceWorker;
+		const register = container.register.bind(container);
+		let release: () => void = () => {};
+		const held = new Promise<void>((resolve) => (release = resolve));
+		(window as unknown as { releaseWorker: () => void }).releaseWorker = release;
+		container.register = (...args: Parameters<ServiceWorkerContainer['register']>) =>
+			held.then(() => register(...args));
+	});
+	await page.goto('/');
+	const input = page.getByLabel('Ask a question');
+	await expect(input).toBeEnabled({ timeout: 30_000 });
+	await page.getByRole('button', { name: /^on device$/i }).click();
+	await input.fill('what is SkillBridge and how long does it last?');
+	await page.getByRole('button', { name: 'Search' }).click();
+	await page.getByRole('button', { name: /set up.+answer/i }).click();
+	// The premise: no worker is in charge as the download is asked for.
+	expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
+	await page.evaluate(() => (window as unknown as { releaseWorker: () => void }).releaseWorker());
+	await expect(page.locator('.ask-card--lead')).toBeVisible({ timeout: 150_000 });
+
+	// Exactly the files an on-device answer needs are kept - no fewer, and none this list does not name.
+	await expect
+		.poll(
+			() =>
+				page.evaluate(async () =>
+					(await (await caches.open('ask-assets-v1')).keys())
+						.map((request) => new URL(request.url).pathname)
+						.filter((path) => /^\/(models|wasm|corpus)\//.test(path))
+						.sort()
+				),
+			{ timeout: 30_000 }
+		)
+		.toEqual([...DEVICE_FILES].sort());
 });

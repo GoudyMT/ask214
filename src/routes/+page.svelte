@@ -13,6 +13,7 @@
 	import { ACCEPTED_CORPUS_VERSION } from '$lib/corpus';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
+	import { whenControlled } from '$lib/ask/when-controlled';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
@@ -25,6 +26,15 @@
 		setOnlineConsented,
 		isSynthesisEnabled
 	} from '$lib/ask/online-prefs';
+
+	// How long the first download waits for the service worker on a first visit. Its install downloads ~133 KB,
+	// about 4-5 s on a slow 0.25 Mbps link; past this the download goes ahead and is not kept.
+	const CONTROL_WAIT_MS = 10_000;
+	let control: Promise<boolean> | undefined;
+	// Waits at most once per visit: once a worker is in charge the check is immediate, and a worker that has not
+	// come within the time is not waited for again.
+	const waitForControl = () =>
+		(control ??= whenControlled(CONTROL_WAIT_MS, navigator.serviceWorker));
 
 	const app = getProfileApp();
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a
@@ -43,7 +53,11 @@
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
 	const getCorpus = createLazyCorpus(
-		() => loadCorpus(fetch, CORPUS_BASE),
+		async () => {
+			// The answer library is one of the first downloads too: waiting keeps it on a first visit.
+			await waitForControl();
+			return loadCorpus(fetch, CORPUS_BASE);
+		},
 		(c) => {
 			sources = sourcesFromCorpus(c);
 		}
@@ -80,7 +94,12 @@
 		// on page load (the corpus is likewise lazy, via getCorpus above) - and made again after a failure.
 		const { embed, dispose } = createRecoveringEmbed(() => new EmbedWorker());
 		store = createAskStore({
-			embed,
+			// The embed worker, and the model it downloads, are created only after the wait, so both go through the
+			// service worker and are kept.
+			embed: async (text) => {
+				await waitForControl();
+				return embed(text);
+			},
 			getCorpus,
 			// Route-bound closures keep fetch and the raw BYO key out of the store. A decoded corpus always
 			// carries ACCEPTED_CORPUS_VERSION (the codec rejects any other), so the online handshake uses the
