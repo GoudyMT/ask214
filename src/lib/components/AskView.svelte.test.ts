@@ -390,8 +390,80 @@ describe('AskView', () => {
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
 		await vi.waitFor(() => expect(container.querySelector('.reader__title')).not.toBeNull());
 		const readerText = container.querySelector('dialog.reader')?.textContent ?? '';
-		expect(readerText).toMatch(/official source text/i); // the neutral online reader copy
+		expect(readerText).toMatch(/passage this answer found/i); // the neutral online reader copy
 		expect(readerText).not.toMatch(/no connection needed/i); // never the on-device offline assurance
+	});
+
+	// An online answer carries its passage in the search result, so the reader opens on it at once. The answer
+	// library is several megabytes and exists for answering offline; reading an online answer's source never
+	// fetches it.
+	// Opened from the second card, so the passage shown is found by the card's own id, not by position.
+	it("opens an online answer's source from the answer itself, without the answer library", async () => {
+		const loadSource = vi.fn(async () => heldSource());
+		const lead = card();
+		const other = card({
+			sourceId: 'va_decision_reviews',
+			sourceTitle: 'VA - Decision Reviews',
+			excerpt: 'A supplemental claim adds new and relevant evidence to a decided claim.'
+		});
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'results', origin: 'online', cards: [lead, other] },
+				{ onlineCapable: true, mode: 'online', loadSource }
+			)
+		});
+
+		(container.querySelector('.ask-toggle') as HTMLButtonElement).click();
+		await vi.waitFor(() => expect(container.querySelector('.ask-similar')).not.toBeNull());
+		(container.querySelector('.ask-similar .ask-card__read') as HTMLButtonElement).click();
+		await vi.waitFor(() =>
+			expect(container.querySelector('.reader__passage--cited')?.textContent?.trim()).toBe(
+				other.excerpt
+			)
+		);
+		expect(container.querySelector('.reader__title')?.textContent).toBe('VA - Decision Reviews');
+		expect(loadSource).not.toHaveBeenCalled();
+	});
+
+	// The answer block names its source by id; the card it came from carries the passage.
+	it("opens an online answer's source from the answer block too, without the answer library", async () => {
+		const loadSource = vi.fn(async () => heldSource());
+		const lead = card();
+		const answer: AnswerView = {
+			kind: 'extractive',
+			answer: {
+				text: 'An intent to file lets you notify VA that you plan to file a claim.',
+				passage: lead.excerpt,
+				sourceId: lead.sourceId,
+				sourceTitle: lead.sourceTitle,
+				url: lead.url,
+				chunkId: lead.chunkId
+			}
+		};
+		const { container } = render(AskView, {
+			props: props(
+				{ kind: 'results', origin: 'online', cards: [lead], answer },
+				{ onlineCapable: true, mode: 'online', loadSource }
+			)
+		});
+
+		(container.querySelector('.ask-answer__more') as HTMLButtonElement).click();
+		await vi.waitFor(() =>
+			expect(container.querySelector('.reader__passage--cited')?.textContent?.trim()).toBe(
+				lead.excerpt
+			)
+		);
+		expect(loadSource).not.toHaveBeenCalled();
+	});
+
+	it('still reads an on-device answer from the answer library', async () => {
+		const loadSource = vi.fn(async () => heldSource());
+		const { container } = render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards: [card()] }, { loadSource })
+		});
+
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		await vi.waitFor(() => expect(loadSource).toHaveBeenCalledWith('va_intent_to_file'));
 	});
 
 	it('a device answer keeps the on-device copy even after the mode flips to online', () => {

@@ -25,6 +25,12 @@ describe('CSP egress contract', () => {
 		}
 	});
 
+	it('worker-src is exactly self, so the PDF library runs only its own same-origin worker', () => {
+		// The reader's PDF library loads its worker from the app's own origin. The usual fix when such a worker
+		// fails to start is to allow blob: here, which would let a script start a worker from any bytes it holds.
+		expect(directives?.['worker-src']).toEqual(['self']);
+	});
+
 	it('script-src pins the two hand-added inline script hashes so they cannot be dropped', () => {
 		// The pre-paint theme script and the early install-prompt capture in src/app.html are hand-added,
 		// so hash mode does not auto-pin them; both sha256 hashes must stay or the scripts are CSP-blocked.

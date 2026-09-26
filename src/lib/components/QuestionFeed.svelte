@@ -4,7 +4,8 @@
 
 	let { onPick }: { onPick: (question: string) => void } = $props();
 
-	let maskEl = $state<HTMLDivElement>();
+	// Plain, not state: read once, on mount, when the binding is already set.
+	let maskEl: HTMLDivElement | undefined;
 	// A persistent stop for the auto-scroll (WCAG 2.2.2): hover/focus pause is unavailable to a touch
 	// user, so this always-present control is their pause. Read live in the drift loop below; toggled by
 	// a click (a normal user event, so mutating this $state is safe - unlike a teardown-time flag).

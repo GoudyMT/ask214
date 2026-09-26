@@ -58,8 +58,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
-		why: 'Your VA.gov account is the gateway to claims, health care, and records.',
-		value: 'One secure login for every VA benefit you will use.'
+		why: 'Your VA.gov account is the gateway to claims, health care, and records.'
 	},
 	{
 		id: 'login-gov-account',
@@ -69,8 +68,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
-		why: 'Login.gov is the secure sign-in for VA.gov and other federal services.',
-		value: 'Verified access to your benefits.'
+		why: 'Login.gov is the secure sign-in for VA.gov and other federal services.'
 	},
 	{
 		id: 'update-sgli',
@@ -80,8 +78,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
-		why: 'Coverage amounts and beneficiaries drift out of date.',
-		value: 'Your life insurance matches your family before you transition.'
+		why: 'Coverage amounts and beneficiaries drift out of date.'
 	},
 	{
 		id: 'verify-service-record',
@@ -91,8 +88,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
-		why: 'Record errors are far easier to fix while you are still in.',
-		value: 'An accurate record that flows into your DD-214.'
+		why: 'Record errors are far easier to fix while you are still in.'
 	},
 	{
 		id: 'will-poa',
@@ -102,8 +98,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -730,
 		windowEnd: -90,
 		recommendedOffset: -540,
-		why: 'Legal documents take time and are easy to put off.',
-		value: 'Your affairs are in order for the transition.'
+		why: 'Legal documents take time and are easy to put off.'
 	},
 	{
 		id: 'financial-counselor',
@@ -113,8 +108,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
-		why: 'A transition changes your pay, benefits, and budget.',
-		value: 'A financial plan for civilian life.'
+		why: 'A transition changes your pay, benefits, and budget.'
 	},
 	{
 		id: 'master-resume',
@@ -124,8 +118,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -540,
 		windowEnd: -120,
 		recommendedOffset: -450,
-		why: 'Translating military experience into civilian terms takes several drafts.',
-		value: 'A foundation you tailor for each application.'
+		why: 'Translating military experience into civilian terms takes several drafts.'
 	},
 	{
 		id: 'gi-bill-research',
@@ -135,8 +128,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
-		why: 'Education benefits and school timelines take months to line up.',
-		value: 'A clear education plan before you separate.'
+		why: 'Education benefits and school timelines take months to line up.'
 	},
 	{
 		id: 'document-medical',
@@ -146,8 +138,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -540,
 		windowEnd: -180,
 		recommendedOffset: -450,
-		why: 'Conditions documented now build the record your VA claim relies on.',
-		value: 'A documented health history before separation.'
+		why: 'Conditions documented now build the record your VA claim relies on.'
 	},
 
 	// ---- TAP / counseling (federally anchored) ----
@@ -159,9 +150,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -540,
 		windowEnd: -365,
 		recommendedOffset: -400,
-		why: 'TAP officially starts here, and it is required no later than 365 days out.',
-		value: 'Your transition plan is on record and on time.',
-		sourceRef: 'https://www.dodtap.mil/dodtap/app/transition/pre-separation_counseling'
+		why: 'TAP officially starts here, and it is required no later than 365 days out.'
 	},
 	{
 		id: 'tap-course',
@@ -171,9 +160,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -270,
-		why: 'The DoL Employment Workshop and VA Benefits Briefings I and II are mandatory.',
-		value: 'The core transition knowledge, complete.',
-		sourceRef: 'https://www.dol.gov/agencies/vets/programs/tap'
+		why: 'The DoL Employment Workshop and VA Benefits Briefings I and II are mandatory.'
 	},
 	{
 		id: 'tap-track',
@@ -183,9 +170,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -240,
-		why: 'Each member picks one focused 2-day track for their path.',
-		value: 'Targeted preparation for your chosen direction.',
-		sourceRef: 'https://www.dodtap.mil/'
+		why: 'Each member picks one focused 2-day track for their path.'
 	},
 
 	// ---- Job / benefits prep (mid window) ----
@@ -197,8 +182,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -30,
 		recommendedOffset: -270,
-		why: 'Job searches take months from first application to offer.',
-		value: 'Momentum toward a civilian job by separation.'
+		why: 'Job searches take months from first application to offer.'
 	},
 	{
 		id: 'health-insurance-research',
@@ -208,8 +192,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -90,
 		recommendedOffset: -270,
-		why: 'Coverage can lapse the day you separate if you do not plan.',
-		value: 'A coverage plan with no gap.'
+		why: 'Coverage can lapse the day you separate if you do not plan.'
 	},
 	{
 		id: 'life-insurance-research',
@@ -219,8 +202,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -90,
 		recommendedOffset: -270,
-		why: 'SGLI ends after separation; VGLI and civilian options differ in cost and coverage.',
-		value: 'Right-sized coverage for your family.'
+		why: 'SGLI ends after separation; VGLI and civilian options differ in cost and coverage.'
 	},
 	{
 		id: 'va-career-guidance',
@@ -230,9 +212,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -90,
 		recommendedOffset: -240,
-		why: 'VA offers free career counseling (Chapter 36) to map your path.',
-		value: 'A professional sounding board for your direction.',
-		sourceRef: 'https://www.va.gov/careers-employment/education-and-career-counseling/'
+		why: 'VA offers free career counseling (Chapter 36) to map your path.'
 	},
 	{
 		id: 'jst-order',
@@ -242,9 +222,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: 'Schools and employers use your JST to credit your military training.',
-		value: 'Your training documented for college credit and hiring.',
-		sourceRef: 'https://www.militaryonesource.mil/benefits/joint-services-transcript/'
+		why: 'Schools and employers use your JST to credit your military training.'
 	},
 	{
 		id: 'reserve-affiliation',
@@ -255,7 +233,6 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -90,
 		recommendedOffset: -180,
 		why: 'Affiliating with the reserves takes paperwork and lead time.',
-		value: 'A smooth move into the reserve component.',
 		requires: { intendedPath: ['reserves'] }
 	},
 	{
@@ -267,7 +244,6 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -90,
 		recommendedOffset: -180,
 		why: 'School application and financial-aid deadlines are fixed and early.',
-		value: 'Admission and aid lined up for your start date.',
 		requires: { intendedPath: ['school'] }
 	},
 
@@ -280,9 +256,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: 'The SHA is one exam that serves both your separation and your VA claim - book it early.',
-		value: 'Your separation health on record.',
-		sourceRef: 'https://benefits.va.gov/BENEFITS/separation-health-assessment.asp'
+		why: 'The SHA is one exam that serves both your separation and your VA claim - book it early.'
 	},
 	{
 		id: 'sha-complete',
@@ -292,9 +266,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -150,
 		windowEnd: -90,
 		recommendedOffset: -120,
-		why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
-		value: 'A complete separation exam supporting your claim.',
-		sourceRef: 'https://benefits.va.gov/BENEFITS/separation-health-assessment.asp'
+		why: 'Part A is the self-assessment your VA (BDD) claim is built on.'
 	},
 	{
 		id: 'va-bdd-claim',
@@ -304,9 +276,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -120,
-		why: 'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.',
-		value: 'Your disability claim decided around the time you separate.',
-		sourceRef: 'https://www.va.gov/disability/how-to-file-claim/when-to-file/pre-discharge-claim/'
+		why: 'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.'
 	},
 
 	// ---- Capstone + final-90 ----
@@ -318,9 +288,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -120,
 		windowEnd: -90,
 		recommendedOffset: -90,
-		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
-		value: 'Confirmed transition-ready.',
-		sourceRef: 'https://www.dodtap.mil/dodtap/app/transition/capstone'
+		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.'
 	},
 	{
 		id: 'va-benefits-advisor',
@@ -330,8 +298,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -60,
 		recommendedOffset: -120,
-		why: 'A benefits advisor helps you claim everything you earned.',
-		value: 'Confidence you are not leaving benefits on the table.'
+		why: 'A benefits advisor helps you claim everything you earned.'
 	},
 	{
 		id: 'reference-letters',
@@ -341,8 +308,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -30,
 		recommendedOffset: -120,
-		why: 'Ask while your work is fresh and your leaders are still available.',
-		value: 'Strong references for civilian applications.'
+		why: 'Ask while your work is fresh and your leaders are still available.'
 	},
 	{
 		id: 'financial-docs',
@@ -352,8 +318,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -120,
 		windowEnd: -30,
 		recommendedOffset: -90,
-		why: 'You lose easy access to military pay records after you separate.',
-		value: 'Your pay history preserved for taxes and claims.'
+		why: 'You lose easy access to military pay records after you separate.'
 	},
 	{
 		id: 'hhg-counseling',
@@ -363,8 +328,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -30,
 		recommendedOffset: -120,
-		why: 'Your final move is government-funded but must be scheduled.',
-		value: 'A planned, funded move.'
+		why: 'Your final move is government-funded but must be scheduled.'
 	},
 	{
 		id: 'separation-package',
@@ -374,8 +338,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -120,
 		windowEnd: -60,
 		recommendedOffset: -75,
-		why: 'The Navy needs your package by about 60 days out to process your separation and DD-214.',
-		value: 'Your separation paperwork in on time.'
+		why: 'The Navy needs your package by about 60 days out to process your separation and DD-214.'
 	},
 	{
 		id: 'dd214-review',
@@ -385,8 +348,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -90,
 		windowEnd: -1,
 		recommendedOffset: -30,
-		why: 'Errors on the DD-214 are hard to correct after you separate.',
-		value: 'An accurate DD-214 - your key veteran document.'
+		why: 'Errors on the DD-214 are hard to correct after you separate.'
 	},
 
 	// ---- Near / at separation ----
@@ -398,9 +360,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -60,
 		windowEnd: 30,
 		recommendedOffset: -14,
-		why: 'Make the election before you separate to avoid a coverage gap.',
-		value: 'Continuous health coverage through your transition.',
-		sourceRef: 'https://www.militaryonesource.mil/transition-retirement/separation/'
+		why: 'Make the election before you separate to avoid a coverage gap.'
 	},
 	{
 		id: 'dd214-copies',
@@ -410,8 +370,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -7,
 		windowEnd: 60,
 		recommendedOffset: 0,
-		why: 'You will need DD-214 copies for years of benefits, jobs, and schools.',
-		value: 'Proof of service ready whenever you need it.'
+		why: 'You will need DD-214 copies for years of benefits, jobs, and schools.'
 	},
 
 	// ---- After separation ----
@@ -423,9 +382,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: 0,
 		windowEnd: 90,
 		recommendedOffset: 30,
-		why: 'An unpaid TSP loan becomes a taxable distribution after 90 days.',
-		value: 'Your retirement savings handled without a tax surprise.',
-		sourceRef: 'https://www.tsp.gov/changes-in-your-career/leaving-uniformed-services/'
+		why: 'An unpaid TSP loan becomes a taxable distribution after 90 days.'
 	},
 	{
 		id: 'vgli-convert',
@@ -435,9 +392,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: 0,
 		windowEnd: 240,
 		recommendedOffset: 30,
-		why: 'You can convert with no health questions within 240 days of separation (hard deadline about 485 days).',
-		value: 'Continued life insurance without a medical exam.',
-		sourceRef: 'https://www.va.gov/life-insurance/options-eligibility/vgli/'
+		why: 'You can convert with no health questions within 240 days of separation (hard deadline about 485 days).'
 	},
 	{
 		id: 'final-pay-check',
@@ -447,8 +402,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: 0,
 		windowEnd: 120,
 		recommendedOffset: 30,
-		why: 'Final-pay and leave sell-back errors are common and worth catching.',
-		value: 'You are paid correctly for your service.'
+		why: 'Final-pay and leave sell-back errors are common and worth catching.'
 	},
 	{
 		id: 'va-claim-fallback',
@@ -458,8 +412,6 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: 0,
 		windowEnd: 180,
 		recommendedOffset: 14,
-		why: 'If you missed the BDD window, file now - an Intent-to-File locks your effective date.',
-		value: 'Your claim in the queue with the earliest possible date.',
-		sourceRef: 'https://www.va.gov/disability/how-to-file-claim/when-to-file/'
+		why: 'If you missed the BDD window, file now - an Intent-to-File locks your effective date.'
 	}
 ];

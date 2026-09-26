@@ -14,6 +14,7 @@ import { pipeline, env } from '@huggingface/transformers';
 import { decodeCorpus } from '../src/lib/corpus/index.ts';
 import { measureAnswers } from '../src/lib/ask/eval/measure-answer.ts';
 import { runOracle, scanJunk, report } from './answer-gate-core.mjs';
+import { CORPUS_BASE } from '../src/lib/ask/asset-cache.ts';
 
 // Mirrors of the shipped store's constants (store.svelte.ts). If those change, change these.
 const MODEL_ID = 'all-MiniLM-L6-v2';
@@ -66,8 +67,9 @@ const FLOORS = {
 	rendered: 0.95 // measured 135 of 135
 };
 
-const CORPUS_JSON = 'static/corpus/corpus-v1.0.2.json';
-const CORPUS_BIN = 'static/corpus/corpus-v1.0.2.embeddings.bin';
+// The corpus the app loads: the same base path every page reads.
+const CORPUS_JSON = `static${CORPUS_BASE}.json`;
+const CORPUS_BIN = `static${CORPUS_BASE}.embeddings.bin`;
 const QUERIES_PATH = 'src/lib/ask/eval/queries.json';
 
 async function main() {

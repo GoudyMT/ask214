@@ -23,9 +23,43 @@
 	} from '$lib/ask/online-prefs';
 	import { downloadTextFile } from '$lib/calendar/download';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
+	import { resolve } from '$app/paths';
+	import { documentStates } from '$lib/sources/document-states';
+	import { LOCAL_DOCUMENT_BYTES, LOCAL_DOCUMENTS } from '$lib/sources/local-documents.data';
+	import { heldBytes, listCachedDocuments, stopSaves } from '$lib/sources/document-cache';
 
 	const app = getProfileApp();
 	const install = getInstallApp();
+
+	// The Documents row's summary, read from the asset cache on arrival like the Documents page itself. It
+	// counts from the paths and sizes alone; the titles stay with the Documents page, which shows them.
+	let heldDocuments = $state<string[]>([]);
+	$effect(() => {
+		void listCachedDocuments().then((paths) => (heldDocuments = paths));
+	});
+	const documentCount = Object.keys(LOCAL_DOCUMENTS).length;
+	const states = $derived(documentStates(heldDocuments, LOCAL_DOCUMENTS));
+	const savedDocuments = $derived(
+		Object.entries(states)
+			.filter(([, held]) => held.state === 'saved')
+			.map(([sourceId]) => sourceId)
+	);
+	// The older copies an update left, counted as the Documents page counts them: sized from the device, and
+	// without a size when the device would not give it.
+	let older = $state<{ count: number; bytes: number | null }>({ count: 0, bytes: 0 });
+	$effect(() => {
+		const stale = Object.values(states).flatMap((held) => held.stale);
+		let cancelled = false;
+		void heldBytes(stale).then((bytes) => {
+			if (!cancelled) older = { count: stale.length, bytes };
+		});
+		return () => {
+			cancelled = true;
+		};
+	});
+	const savedMb = $derived(
+		`${(savedDocuments.reduce((total, id) => total + (LOCAL_DOCUMENT_BYTES[id] ?? 0), 0) / 1e6).toFixed(1)} MB`
+	);
 
 	// Online-answers settings: non-PII device prefs + whether a BYO key is stored (presence only).
 	let defaultMode = $state<'device' | 'online'>(getDefaultMode());
@@ -180,6 +214,8 @@
 				clearStorage: () => window.localStorage.clear(),
 				clearCaches: async () => {
 					if (!('caches' in window)) return;
+					// A document save still writing would store its document again after the caches are gone.
+					await stopSaves();
 					const keys = await window.caches.keys();
 					await Promise.all(keys.map((key) => window.caches.delete(key)));
 				},
@@ -269,6 +305,22 @@
 			{/if}
 		</section>
 	{/if}
+	<!-- Documents: public government guides, no personal data, so like Install it sits above the lock gate
+	     and a user with no timeline still reaches them. -->
+	<section class="settings-section" aria-labelledby="documents-heading">
+		<h2 id="documents-heading" class="settings-section__heading">Documents</h2>
+		<div class="documents-summary">
+			<span
+				>{savedDocuments.length} of {documentCount} saved on this device - {savedMb}{older.count > 0
+					? `, plus ${older.count} older ${older.count === 1 ? 'copy' : 'copies'}${older.bytes === null ? '' : ` (${(older.bytes / 1e6).toFixed(1)} MB)`}`
+					: ''}</span
+			>
+			<a class="documents-manage" href={resolve('/documents')}>Manage documents</a>
+		</div>
+		<p class="settings-hint">
+			Read the official guides behind the answers, and choose which stay on this device.
+		</p>
+	</section>
 	{#if app.store?.locked}
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else}
@@ -547,6 +599,26 @@
 		margin: var(--space-s) 0 0;
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+
+	.documents-summary {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-s) var(--space-m);
+	}
+
+	/* The outline button the Documents page uses, on a link because it navigates. */
+	.documents-manage {
+		display: inline-block;
+		padding: 6px var(--space-m);
+		border: 1px solid var(--color-accent);
+		border-radius: var(--radius-s);
+		color: var(--color-accent);
+		font-size: var(--font-size-s);
+		font-weight: 600;
+		text-decoration: none;
 	}
 
 	/* Clock-backward reset control: the deliberate "I fixed my clock" reset the

@@ -18,6 +18,8 @@ export function toResultCards(results: RetrievalResult[]): ResultCard[] {
 		...(chunk.page !== undefined ? { page: chunk.page } : {}),
 		...(chunk.section !== undefined ? { section: chunk.section } : {}),
 		excerpt: cleanExcerpt(chunk.excerpt ?? chunk.text),
+		// The server's copy of a chunk carries no anchor field, but a PDF chunk's anchor is its text.
+		anchor: chunk.anchor?.exact ?? chunk.text,
 		url: chunk.url,
 		score
 	}));

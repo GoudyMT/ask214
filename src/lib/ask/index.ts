@@ -1,7 +1,7 @@
 /** Public surface of the Ask cycle (C). Consumed by the home route's Ask (and the v1.1 server path later). */
 export { createAskStore } from './store.svelte';
-export { createEmbedder } from './embedder';
-export { loadCorpus } from './corpus-load';
+export { createEmbedder, createRecoveringEmbed } from './embedder';
+export { CORPUS_BASE, loadCorpus } from './corpus-load';
 export { ASK_ERROR, AskError, isAskErrorCode } from './errors';
 export { EMBED_MODEL_ID } from './types';
 export type { AskErrorCode } from './errors';

@@ -7,6 +7,7 @@ export const KNOWN_ROUTES = [
 	'/ask',
 	'/resources',
 	'/settings',
+	'/documents',
 	'/about',
 	'/feedback'
 ] as const;
@@ -42,6 +43,7 @@ const ROUTE_LABELS: Record<KnownRoute, string> = {
 	'/ask': 'Ask',
 	'/resources': 'Resources',
 	'/settings': 'Settings',
+	'/documents': 'Documents',
 	'/about': 'About',
 	'/feedback': 'Feedback'
 };

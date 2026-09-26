@@ -6,6 +6,10 @@ describe('sanitizeRoute', () => {
 		expect(sanitizeRoute('/timeline')).toBe('/timeline');
 		expect(sanitizeRoute('/')).toBe('/');
 	});
+	it('accepts the documents page, so feedback sent from it keeps its page', () => {
+		expect(sanitizeRoute('/documents')).toBe('/documents');
+		expect(routeLabel('/documents')).toBe('Documents');
+	});
 	it('strips query and hash before matching', () => {
 		expect(sanitizeRoute('/ask?q=hi')).toBe('/ask');
 		expect(sanitizeRoute('/about#sources')).toBe('/about');

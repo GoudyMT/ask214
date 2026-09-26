@@ -44,4 +44,11 @@ describe('Semgrep SAST workflow policy', () => {
 	it('blocks the build on findings (--error)', () => {
 		expect(scanStep?.run).toContain('--error');
 	});
+
+	// The vendored pdf.js build is a byte copy of the installed package (a gate pins it), so it cannot carry our
+	// annotations; it is the one path left out, and nothing of our own code is.
+	it('leaves out only the vendored pdf.js build', () => {
+		const excluded = [...String(scanStep?.run).matchAll(/--exclude\s+(\S+)/g)].map((m) => m[1]);
+		expect(excluded).toEqual(['static/pdf-worker']);
+	});
 });

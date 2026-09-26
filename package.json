@@ -22,6 +22,9 @@
 		"validate:sources": "tsx content-ops/validate-sources.mjs",
 		"build:sources-index": "tsx content-ops/build-sources-index.mjs",
 		"check:sources-index": "tsx content-ops/check-sources-index.mjs",
+		"check:pdf-worker": "tsx content-ops/check-pdf-worker.mjs",
+		"check:served-history": "node content-ops/check-served-history.mjs",
+		"check:chunks": "tsx content-ops/check-chunk-budget.mjs",
 		"ingest": "tsx content-ops/capture-extract.mjs",
 		"clean": "tsx content-ops/clean-sources.mjs",
 		"chunk": "tsx content-ops/chunk-sources.mjs",
@@ -32,6 +35,11 @@
 		"embed:bge": "tsx content-ops/build-corpus-bge.mjs",
 		"eval:bge": "tsx content-ops/eval-corpus-bge.mjs",
 		"refresh": "tsx content-ops/refresh.mjs",
+		"derive:pdfs": "python content-ops/derive_served_pdfs.py",
+		"serve:pdfs": "tsx content-ops/serve-pdfs.mjs",
+		"verify:pdfs": "tsx content-ops/verify-served-pdfs.mjs",
+		"compare:pdfs": "python content-ops/compare_served_quality.py",
+		"highlight-gate": "tsx content-ops/highlight-gate.mjs",
 		"corpus": "tsx content-ops/corpus.mjs",
 		"backfill:sources": "tsx content-ops/backfill-sources.mjs",
 		"lint": "prettier --check . && eslint .",
@@ -58,12 +66,6 @@
 			"gzip": true
 		},
 		{
-			"name": "SvelteKit chunks",
-			"path": ".svelte-kit/output/client/_app/immutable/chunks/*.js",
-			"limit": "50 KB",
-			"gzip": true
-		},
-		{
 			"name": "Root layout node (loaded on every page)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/0.*.js",
 			"limit": "7 KB",
@@ -72,7 +74,7 @@
 		{
 			"name": "Lazy route nodes (sum; no single page loads all of them)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
-			"limit": "45 KB",
+			"limit": "40700 B",
 			"gzip": true
 		}
 	],
@@ -95,7 +97,6 @@
 		"husky": "^9.1.7",
 		"linkedom": "^0.18.13",
 		"lint-staged": "^17.3.0",
-		"pdfjs-dist": "^6.3.289",
 		"playwright": "^1.61.1",
 		"prettier": "^3.9.6",
 		"prettier-plugin-svelte": "^4.1.1",
@@ -112,6 +113,7 @@
 		"yaml": "^2.9.0"
 	},
 	"dependencies": {
-		"@huggingface/transformers": "^4.2.0"
+		"@huggingface/transformers": "^4.2.0",
+		"pdfjs-dist": "^6.3.289"
 	}
 }

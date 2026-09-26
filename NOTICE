@@ -40,6 +40,13 @@ Bundled / vendored runtime components
    https://github.com/sveltejs/svelte  |  https://github.com/sveltejs/kit
    The application framework; compiled into the shipped client bundle.
 
+5. PDF.js  (pdfjs-dist)
+   Copyright (c) Mozilla Foundation
+   License: Apache License, Version 2.0
+   https://github.com/mozilla/pdf.js
+   The library and its worker in static/pdf-worker/ are redistributed from
+   this project, byte-for-byte; they draw the pages of the served documents.
+
 ================================================================================
 Reference content (the offline corpus)
 ================================================================================
@@ -49,6 +56,11 @@ Government, which are not subject to copyright protection in the United States
 (17 U.S.C. 105). Sources include Transition Assistance Program curriculum
 (tapevents.mil), VA guides (va.gov), and pages from militaryonesource.mil,
 tsp.gov, and dol.gov; every result links to its official source.
+
+The documents in static/docs/ are copies of U.S. Government PDFs from the
+same sources, served so an answer can open the cited page. Each copy keeps its
+text exactly and removes every picture whose own metadata does not state
+Public Domain; the reader links each copy to its official original.
 
 This product is an independent project. It is not affiliated with, endorsed by,
 or sponsored by the U.S. Department of Veterans Affairs, the U.S. Department of

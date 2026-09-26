@@ -18,8 +18,7 @@ function makeItem(title: string): TimelineItem {
 			track: 'transition',
 			windowStart: -120,
 			windowEnd: -60,
-			why: `Why ${title} matters.`,
-			value: 'value'
+			why: `Why ${title} matters.`
 		},
 		targetDate: '2027-01-10',
 		windowStartDate: '2026-12-01',

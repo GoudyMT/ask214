@@ -1,1 +1,3 @@
 * text=auto eol=lf
+# The served documents are byte-checked against their captures; never let text=auto guess a PDF is text.
+*.pdf binary

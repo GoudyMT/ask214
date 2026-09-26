@@ -58,6 +58,9 @@ export type ResultCard = {
 	page?: number;
 	section?: string;
 	excerpt: string; // chunk.excerpt ?? chunk.text (retrieval passes through; the Ask UI truncates for display)
+	// The passage as retrieved, never cleaned and never displayed: what the source reader searches the served
+	// document for. `excerpt` is its cleaned form, which the document does not contain word for word.
+	anchor?: string;
 	url: string;
 	score: number;
 };

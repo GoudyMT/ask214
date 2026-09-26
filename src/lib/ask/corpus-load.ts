@@ -2,6 +2,9 @@ import { decodeCorpus, type Corpus, type CorpusManifest } from '$lib/corpus';
 import { EMBED_MODEL_ID } from './types';
 import { AskError, ASK_ERROR } from './errors';
 
+// Where the corpus artifact is served; kept beside the cache rules so a save can name it without this loader.
+export { CORPUS_BASE } from './asset-cache';
+
 /**
  * Fetch the bundled corpus artifact (`<basePath>.json` + `<basePath>.embeddings.bin`) and decode it
  * into the in-memory `Corpus`. No IndexedDB / CDN in v1.0 - the artifact is a

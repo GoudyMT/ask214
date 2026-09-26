@@ -37,8 +37,13 @@ jobs:
         # Blocking: --error exits non-zero on findings. Two rules are excluded as reviewed, intentional
         # policy: our pnpm minimumReleaseAge is a deliberate 24h floor for manual adds (Dependabot
         # already cools down 7 days), and npm's min-release-age key is inert for a pnpm-only project.
-        # Code is never uploaded; --metrics=off sends no telemetry.
+        # Code is never uploaded; --metrics=off sends no telemetry. One path is left out, reviewed: the
+        # vendored pdf.js build in static/pdf-worker is a byte copy of the installed pdfjs-dist, pinned to
+        # it by `pnpm check:pdf-worker` and covered by `pnpm audit`, so it cannot carry annotations. Its two
+        # detect-non-literal-regexp findings build a pattern from pdf.js's own constants ("filename", "i")
+        # and run it on our own origin's Content-Disposition header - no user input reaches them.
         run: >-
           semgrep scan --config p/default --metrics=off --error
+          --exclude static/pdf-worker
           --exclude-rule package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age
           --exclude-rule package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age

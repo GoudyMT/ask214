@@ -17,7 +17,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      # The whole history: the served-history check walks every commit a pull request carries.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -61,6 +64,16 @@ jobs:
 
       - name: Check sources index (drift gate vs the registry)
         run: pnpm run check:sources-index
+
+      # A pull request publishes every commit it carries, so a served document an earlier commit held is public
+      # even when the head replaced it. Every one must be a file the manifest records.
+      - name: Check served documents across the pull request's commits
+        run: pnpm run check:served-history
+
+      # The library refuses to run against a worker from a different release, so a dependency bump that
+      # skips re-copying the vendored file fails only at runtime, for the reader, with nothing red here.
+      - name: Check vendored pdf worker (drift gate vs the installed package)
+        run: pnpm run check:pdf-worker
 
       # The answer quality gate, on the on-device path. Self-contained by construction: the committed
       # corpus, the vendored MiniLM weights, no network and no credentials. Placed with the other
@@ -108,8 +121,19 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      # Whether each citation opens the right served document at a page it has, and whether the passage and
+      # the quote are found there, measured with the shipped matcher and reader. It reads the corpus from the
+      # build output, so it runs after the build; the documents and the registry it also reads are committed.
+      - name: Highlight gate (citations land on the served pages)
+        run: pnpm run highlight-gate
+
       - name: Bundle size check
         run: pnpm run check:bundle
+
+      # The shared chunks are budgeted by how they load, not as one sum: what a page downloads keeps its
+      # 50 KB limit, and code fetched only on demand (the PDF viewer, when a document is opened) has its own.
+      - name: Chunk budget (page-loaded vs on-demand) and the worker's precache
+        run: pnpm run check:chunks
 
       - name: Lighthouse CI
         run: pnpm exec lhci autorun

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createEmbedder } from './embedder';
+import { createEmbedder, createRecoveringEmbed } from './embedder';
 import { AskError } from './errors';
 import type { EmbedRequest, EmbedResponse } from './types';
 
@@ -111,4 +111,65 @@ describe('createEmbedder', () => {
 		w.onerror?.({} as ErrorEvent); // cold-load crash (no successful embed yet)
 		await expect(embed('boot')).rejects.toBeInstanceOf(AskError);
 	}, 2000);
+});
+
+// A worker whose model or WASM failed to load stays failed - the runtime inside it remembers a failed start -
+// so the only recovery is a fresh worker.
+describe('createRecoveringEmbed', () => {
+	/** Workers made on demand; the first `failing` of them answer every embed with an error. */
+	function workers(failing: number) {
+		const made: { terminated: boolean }[] = [];
+		const make = () => {
+			const index = made.length;
+			const record = { terminated: false };
+			made.push(record);
+			const w = {
+				onmessage: null as ((e: MessageEvent<EmbedResponse>) => void) | null,
+				postMessage(req: EmbedRequest) {
+					queueMicrotask(() => {
+						const res: EmbedResponse =
+							index < failing
+								? { id: req.id, ok: false, code: 'E_ASK_EMBED' }
+								: { id: req.id, ok: true, vector: new Float32Array([1, 0, 0]) };
+						this.onmessage?.({ data: res } as MessageEvent<EmbedResponse>);
+					});
+				},
+				terminate() {
+					record.terminated = true;
+				}
+			};
+			return w as unknown as Worker;
+		};
+		return { make, made };
+	}
+
+	it('starts no worker until the first embed', () => {
+		const { make, made } = workers(0);
+		createRecoveringEmbed(make);
+		expect(made).toHaveLength(0);
+	});
+
+	it('ends a worker whose embed failed, and embeds the next text in a fresh one', async () => {
+		const { make, made } = workers(1);
+		const { embed } = createRecoveringEmbed(make);
+		await expect(embed('first')).rejects.toBeInstanceOf(AskError);
+		await expect(embed('second').then((v) => Array.from(v))).resolves.toEqual([1, 0, 0]);
+		expect(made.map((w) => w.terminated)).toEqual([true, false]);
+	});
+
+	it('keeps a worker that answers', async () => {
+		const { make, made } = workers(0);
+		const { embed } = createRecoveringEmbed(make);
+		await embed('a');
+		await embed('b');
+		expect(made.map((w) => w.terminated)).toEqual([false]);
+	});
+
+	it('ends the worker on dispose', async () => {
+		const { make, made } = workers(0);
+		const { embed, dispose } = createRecoveringEmbed(make);
+		await embed('a');
+		dispose();
+		expect(made.map((w) => w.terminated)).toEqual([true]);
+	});
 });
