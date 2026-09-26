@@ -7,7 +7,19 @@ import { expect, test } from '@playwright/test';
 // out of the fast/default + CI runs (run on demand via `pnpm test:e2e:offline`). Queries are taken from
 // the eval set (src/lib/ask/eval/queries.json) so a result card is guaranteed (recall@5 = 1.0 at q8).
 
-test('ask answers fully offline after a warm load @slow', async ({ page, context }) => {
+test('ask answers fully offline after a warm load @slow', async ({
+	page,
+	context,
+	browserName
+}) => {
+	// Chromium only. Under Playwright's WebKit, `context.setOffline(true)` fails every request from a page the
+	// worker controls before the worker can answer it - a precached /_app/immutable/ file included - so the
+	// offline reload below fails there whatever the app does. Real iOS Safari is covered by the release gate's
+	// device smoke.
+	test.skip(
+		browserName === 'webkit',
+		'Playwright WebKit offline fails a worker-controlled request before the worker can answer it'
+	);
 	test.setTimeout(180_000);
 
 	// First visit installs the service worker. Wait until it CONTROLS this client, then reload once

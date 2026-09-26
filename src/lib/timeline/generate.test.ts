@@ -20,8 +20,7 @@ const universal: TaskDef = {
 	windowStart: -180,
 	windowEnd: -90,
 	recommendedOffset: -120,
-	why: 'w',
-	value: 'v'
+	why: 'w'
 };
 
 const noRecommended: TaskDef = {
@@ -31,8 +30,7 @@ const noRecommended: TaskDef = {
 	track: 'transition',
 	windowStart: -60,
 	windowEnd: -30,
-	why: 'w',
-	value: 'v'
+	why: 'w'
 };
 
 const gatedSchool: TaskDef = {
@@ -43,7 +41,6 @@ const gatedSchool: TaskDef = {
 	windowStart: -365,
 	windowEnd: -180,
 	why: 'w',
-	value: 'v',
 	requires: { intendedPath: ['school'] }
 };
 
@@ -152,8 +149,7 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		windowStart: recommendedOffset,
 		windowEnd: recommendedOffset + 30,
 		recommendedOffset,
-		why: 'w',
-		value: 'v'
+		why: 'w'
 	});
 	const emptyState: TimelineState = { schemaVersion: 1, tasks: {} };
 	const persona: PersonaFilters = {
@@ -287,8 +283,7 @@ describe('generateTimeline SkillBridge shift', () => {
 		windowStart: -120,
 		windowEnd: -90,
 		recommendedOffset: -120,
-		why: 'w',
-		value: 'v'
+		why: 'w'
 	};
 	const transitionTask: TaskDef = { ...militaryTask, id: 't1', track: 'transition' };
 

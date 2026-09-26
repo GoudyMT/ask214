@@ -1,7 +1,14 @@
 /**
- * The single canonical text normalizer. Anchors + chunk ids are computed in NORMALIZED space,
- * and the future highlight viewer MUST apply this same function before searching - so a text-quote anchor
- * resolves deterministically across the extracted-text / PDF.js-text-layer / app-rendered-HTML surfaces.
+ * The single canonical text normalizer. Anchors + chunk ids are computed in NORMALIZED space, so anything
+ * that DERIVES an anchor or an id must apply it.
+ *
+ * SUPERSEDED for the highlight viewer, which this docblock used to require it for: the viewer needs
+ * offsets into the text it was handed, and collapsing whitespace shortens that string, so a normalized
+ * offset points several characters early and drifts further the more whitespace precedes the passage. The
+ * viewer folds the raw text to alphanumerics instead (`$lib/sources/highlight-match`), which subsumes this
+ * function's whitespace collapse, zero-width stripping and de-hyphenation, and covers its ligature
+ * expansion by decomposing each character. Determinism is preserved because BOTH sides go through that
+ * same fold - which is what this contract was really asking for.
  * The job is DETERMINISM (same input -> same output, applied identically on both the stored anchor and
  * the viewer's search target), NOT linguistic perfection - so even heuristic de-hyphenation still resolves
  * consistently. Shared by the pipeline (build) and the future viewer (runtime); pure, no IO, no third-party

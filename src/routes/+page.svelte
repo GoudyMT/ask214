@@ -3,7 +3,13 @@
 	import { resolve } from '$app/paths';
 	import AskView from '$lib/components/AskView.svelte';
 	import EmbedWorker from '$lib/ask/embed-worker?worker';
-	import { createAskStore, createEmbedder, loadCorpus, type AskState } from '$lib/ask';
+	import {
+		CORPUS_BASE,
+		createAskStore,
+		createRecoveringEmbed,
+		loadCorpus,
+		type AskState
+	} from '$lib/ask';
 	import { ACCEPTED_CORPUS_VERSION } from '$lib/corpus';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
@@ -19,8 +25,6 @@
 		setOnlineConsented,
 		isSynthesisEnabled
 	} from '$lib/ask/online-prefs';
-
-	const CORPUS_BASE = '/corpus/corpus-v1.0.2';
 
 	const app = getProfileApp();
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a
@@ -73,14 +77,8 @@
 
 	onMount(() => {
 		// The ~23MB model + its embed worker are created lazily, on the first query that needs them - never
-		// on page load (the corpus is likewise lazy, via getCorpus above).
-		let worker: Worker | undefined;
-		let embedder: ((text: string) => Promise<Float32Array>) | undefined;
-		const embed = (text: string): Promise<Float32Array> => {
-			worker ??= new EmbedWorker();
-			embedder ??= createEmbedder(worker);
-			return embedder(text);
-		};
+		// on page load (the corpus is likewise lazy, via getCorpus above) - and made again after a failure.
+		const { embed, dispose } = createRecoveringEmbed(() => new EmbedWorker());
 		store = createAskStore({
 			embed,
 			getCorpus,
@@ -104,7 +102,7 @@
 		});
 		// The store opens online when capable (the on-ramp default); honor an explicit device choice.
 		if (getDefaultMode() === 'device') store.setMode('device');
-		return () => worker?.terminate();
+		return dispose;
 	});
 </script>
 

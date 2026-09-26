@@ -22,5 +22,11 @@
 /timeline
   Cache-Control: no-store
 
+/docs/*
+  X-Robots-Tag: noindex
+
+/pdf-worker/*
+  Content-Security-Policy: default-src 'none'
+
 /.well-known/security.txt
   Content-Type: text/plain; charset=utf-8

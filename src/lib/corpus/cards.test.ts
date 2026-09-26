@@ -27,9 +27,28 @@ describe('toResultCards', () => {
 			page: 3,
 			section: 'Benefits',
 			excerpt: 'full chunk text',
+			anchor: 'full chunk text',
 			url: 'https://va.gov/x',
 			score: 0.9
 		});
+	});
+
+	// The excerpt is cleaned for display, but the page view searches the document for the passage as it was
+	// extracted: searched with the cleaned text, fewer passages are found (measured over every PDF passage).
+	// This one opens with a running page header, which cleaning drops and the document still carries.
+	it('keeps the passage as retrieved, uncleaned, as the anchor the page view searches for', () => {
+		const raw =
+			'EFCT PARTICIPANT GUIDE | SECTION 1 | PAGE 10 The Transition Assistance Program (TAP) includes multiple steps.';
+		const [card] = toResultCards([result({ text: raw }, 0.9)]);
+		expect(card!.excerpt).not.toBe(raw);
+		expect(card!.anchor).toBe(raw);
+	});
+
+	it('takes the stored anchor when the chunk carries one', () => {
+		const [card] = toResultCards([
+			result({ text: 'the chunk text', anchor: { exact: 'the stored anchor' } }, 0.9)
+		]);
+		expect(card!.anchor).toBe('the stored anchor');
 	});
 
 	it('carries the chunk id so the reader can highlight the cited passage', () => {

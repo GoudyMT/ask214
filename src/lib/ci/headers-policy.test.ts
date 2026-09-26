@@ -47,4 +47,25 @@ describe('_headers policy (P1b)', () => {
 		expect(global?.['Cross-Origin-Opener-Policy']).toBe('same-origin');
 		expect(global?.['Cross-Origin-Resource-Policy']).toBe('same-origin');
 	});
+
+	// A served document is our altered copy - its pictures removed - and a search hit would open it bare, with no
+	// note that it is a copy and no link to the official original. Search engines are asked not to list them.
+	it('asks search engines not to list the served documents', () => {
+		expect(headers.get('/docs/*')?.['X-Robots-Tag']).toBe('noindex');
+	});
+
+	// The PDF library's worker runs the code that parses each document, and a worker takes its policy from its own
+	// response, not from the page: without this it could fetch anywhere. It fetches nothing - the page hands it
+	// the document - so it gets nothing (proven against the built site served with these headers). The library
+	// module in the same folder is imported by the page, which ignores a policy on a module.
+	it("locks the PDF library's worker to no network", () => {
+		expect(headers.get('/pdf-worker/*')?.['Content-Security-Policy']).toBe("default-src 'none'");
+	});
+
+	// Every vendored or served static folder is named in NOTICE, with its license or its public-domain basis.
+	it('NOTICE names the page reader and the served documents', () => {
+		const notice = readFileSync(join(process.cwd(), 'NOTICE'), 'utf8');
+		expect(notice).toContain('static/pdf-worker/');
+		expect(notice).toContain('static/docs/');
+	});
 });

@@ -73,3 +73,38 @@ export function createEmbedder(
 			worker.postMessage(req);
 		});
 }
+
+/**
+ * Create the embed worker on the first embed, and replace it after an embed fails.
+ *
+ * A worker whose model or WASM failed to load stays failed: the runtime inside it remembers a failed start, so
+ * every later embed would fail until the page is left. Ending that worker, and starting a fresh one for the
+ * next embed, lets a retry succeed once the connection is back, and frees whatever half-loaded model it held.
+ *
+ * @param makeWorker Creates the embed worker.
+ * @param wrap Wraps a worker in an embed function; `createEmbedder` by default.
+ * @returns `embed`, and `dispose`, which ends the current worker (the page calls it when it is left).
+ */
+export function createRecoveringEmbed(
+	makeWorker: () => Worker,
+	wrap: (worker: Worker) => (text: string) => Promise<Float32Array> = createEmbedder
+) {
+	let worker: Worker | undefined;
+	let embedder: ((text: string) => Promise<Float32Array>) | undefined;
+	const dispose = () => {
+		worker?.terminate();
+		worker = undefined;
+		embedder = undefined;
+	};
+	const embed = async (text: string): Promise<Float32Array> => {
+		worker ??= makeWorker();
+		embedder ??= wrap(worker);
+		try {
+			return await embedder(text);
+		} catch (error) {
+			dispose();
+			throw error;
+		}
+	};
+	return { embed, dispose };
+}

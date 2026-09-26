@@ -1,0 +1,376 @@
+[
+	{
+		"bytes": 4392513,
+		"captureHash": "1a95b1b978d736b19f71df5731dbf4d25ebe4c82b7d9a780639f151f3c5de973",
+		"darkenedPages": [8, 20, 44, 56, 84, 112, 130, 134, 162],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_dol_efct.4a3fc979.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 164,
+		"sha256": "07dde7c52df5cdb945a23359b133a9967636eab0ca5db93e925e2a6d7f4cffa5",
+		"sourceId": "tap_dol_efct",
+		"textDigest": "8cad5ed6a2d6c3c8cc22452c55b3680b7dce13c2f50e42bb0d335d2d40519136"
+	},
+	{
+		"bytes": 5089466,
+		"captureHash": "cdc1a520f7331f2e327851b9fce4ff428ec5286f33ff274296cbbc2dee86bc54",
+		"darkenedPages": [12, 16, 68, 90, 116, 182, 184, 226],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_dol_employment_workshop.235129b9.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 228,
+		"sha256": "6d8e3912f98679c675ebd36b22e2246197d255d86d4f3fca1bff82654c601ea6",
+		"sourceId": "tap_dol_employment_workshop",
+		"textDigest": "caab115d0d8b3338cdfb5103204c31d3e6d7a435d7c9e01b5e4479fd750c77d9"
+	},
+	{
+		"bytes": 817657,
+		"captureHash": "ac30f8e97336fdbb0a1b4673d79a6a4d28c0140d7315ac1cad093318fdf65b06",
+		"darkenedPages": [73],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_financial_planning.4e69166c.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 78,
+		"sha256": "4440cf095b773e2aec0dc2d1cd83aed1f052e86f78d174ff44310556caa009b9",
+		"sourceId": "tap_financial_planning",
+		"textDigest": "2000718fedd9abef768dd2424373b1ff96e249649d7243d9f07e12f166250712"
+	},
+	{
+		"bytes": 3860690,
+		"captureHash": "452b32242a2e477258b801dd41bd4481e8e9fed6c16ed30b7d8e3546646ae10c",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_interagency_website_guide.82746aec.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 58,
+		"sha256": "0b3c8c60beb2bc01d5b69a68c79ebdc206287c50da10e4e7c331f67ad421adf5",
+		"sourceId": "tap_interagency_website_guide",
+		"textDigest": "e13a3e0f98096ca3292f821416a7c96dc6146a44ccb6d30cdb690696c70d13b9"
+	},
+	{
+		"bytes": 1301677,
+		"captureHash": "c088ac54a71f23eec04c428104a49580781090bba88063a45193240f405ed290",
+		"darkenedPages": [33],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_managing_education.2a977636.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 150,
+		"sha256": "16521b39ea14fef3a8b3882d2fbaba279172abd49af5fe2a50e5c30216e41030",
+		"sourceId": "tap_managing_education",
+		"textDigest": "5fd470e143d0a792f5b0d126222daf86c12176b7bdc66dd96a0d63111fabd159"
+	},
+	{
+		"bytes": 1065832,
+		"captureHash": "581dd6dd275f79d8fbbf1d4c9c2cd15d75a8126b53b3b969721c37e4475e9b15",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_managing_transition.5d481c78.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 27,
+		"sha256": "3a1f58feebc7b620326f95ce24cf95d7a1404f3dd4ec861606d2b9138dbdf401",
+		"sourceId": "tap_managing_transition",
+		"textDigest": "0418fb3c1f0ee6a40ed39b508381359aeb31908a5e5bbaa8b18a9d8bf5c57144"
+	},
+	{
+		"bytes": 148019,
+		"captureHash": "2d4b9d96a1ceba48137857279d4341b60dfa174aebe1b70989799ace02a0338a",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_mental_health_families.ab99f482.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 4,
+		"sha256": "2a90bdc42122d897ca4193c4e00432ccc59c4892571cded256ac3379bae6ff1b",
+		"sourceId": "tap_mental_health_families",
+		"textDigest": "e59b9b4752ecf6193db024678f226121f1b9542f200c8720d559688c3e42761c"
+	},
+	{
+		"bytes": 657015,
+		"captureHash": "03a55a88dd92f3a15afbf8dc62cb118d48476306f95eae07a745c0bffa0051b4",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_moc_crosswalk.e752ac3d.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 57,
+		"sha256": "616e2af3e2c047219dfd6014379a6dc600b06c7f26335e141309c3c2051b5846",
+		"sourceId": "tap_moc_crosswalk",
+		"textDigest": "33a15ec9440eeb2c0b33c34a00daf18b77bd5329dbc12d401dc8f48235da1bdf"
+	},
+	{
+		"bytes": 207525,
+		"captureHash": "7c5827752a10e1f91a9e3223ab214853b7435b89c7ed4161ebbae79ecee32aab",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_other_than_honorable.17c88423.pdf",
+		"keptImages": 1,
+		"keptPerPage": {
+			"1": 1
+		},
+		"pages": 6,
+		"sha256": "da86545dff092ea9a771c6020a33af7813d0acfe1e34e77bdb07b2ddc30fe81b",
+		"sourceId": "tap_other_than_honorable",
+		"textDigest": "37fea4cdfa37ccf8d10ad1e5dea527e5cb6d22ee343766f566e7b33a554f9132"
+	},
+	{
+		"bytes": 605982,
+		"captureHash": "ac120dd1bb3fc8377ad5fa0e9c08944872f75680e319c1f840f70556277ece34",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_pre_separation_brief.00b382d4.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 49,
+		"sha256": "14613c501b3eaa737d0d318bdbde812e71f0046055e39050d56fde703f6f952b",
+		"sourceId": "tap_pre_separation_brief",
+		"textDigest": "3aefe7e25b9f6e1fab00542925db6da129a893eba908ab8d1090a69458e85210"
+	},
+	{
+		"bytes": 375740,
+		"captureHash": "7dede06d7c8f8dfd6a9439364c23959013267a1bad20074252095ec71f407c1f",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_reserve_dual_pay.0b7edd84.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 3,
+		"sha256": "94568feeb7f0882291251e0632cbf50716c1c4ae8e8c56b812ec85bdab4ed688",
+		"sourceId": "tap_reserve_dual_pay",
+		"textDigest": "ce3e4716adfd54919cda496a408616e4827ee6033b7ca51d8c7b13bf9d9b57ee"
+	},
+	{
+		"bytes": 210775,
+		"captureHash": "be4487f5a73ff066f2216a4d682527893cbd8dfc80b1bbb19bf3948ab5442326",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va101.25c0595e.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 4,
+		"sha256": "7fe086584dd5f3a6dbbd1c69b38ab602d1309898db9d4d6bf4ff58780d321b70",
+		"sourceId": "tap_va101",
+		"textDigest": "bc8c01d1748f08a6787cff8dfb446703e4f27e5aaecd49934dbe4dc67781ab32"
+	},
+	{
+		"bytes": 12953102,
+		"captureHash": "9c0baacc06cf18482f21bd086bdc3f25a37c5c5dad5ccbe9797ea4e7e9a3a742",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va_benefits_guide.c66eef63.pdf",
+		"keptImages": 12,
+		"keptPerPage": {
+			"1": 5,
+			"32": 1,
+			"65": 1,
+			"76": 1,
+			"104": 1,
+			"126": 1,
+			"138": 1,
+			"162": 1
+		},
+		"pages": 217,
+		"sha256": "b32ca4a85c88cd3b182529852dd4a674df11ec6a7212feb375341f34e0b491ef",
+		"sourceId": "tap_va_benefits_guide",
+		"textDigest": "40d1bf72bfb61db20d43a6ba9b811a0c60f9e4aab0b888828c7768aa924b1c2f"
+	},
+	{
+		"bytes": 197323,
+		"captureHash": "4bf49a25c3c2cbc79a1c2f3db079c8ffccf1c710db43ae31c05128cc268844c7",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va_disability_comp.691e784c.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 4,
+		"sha256": "1a209201ae11629bdcb647df8a991b0b478a5ce17413c553218655d4495f2e59",
+		"sourceId": "tap_va_disability_comp",
+		"textDigest": "af1e422d0e41526ccbaa1b375cb8c50ef42b52ae60e4cc12bbcd3cc5a6721c9a"
+	},
+	{
+		"bytes": 208032,
+		"captureHash": "df209bc37aa15ab21ef79c8e7b369653d82d0fc22464de5555973e1b4a8cc325",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va_education_benefits.174dfa2d.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 6,
+		"sha256": "6266994005eb1934064c936e23639858a8ab7516f4ea44b53645724f41825bd9",
+		"sourceId": "tap_va_education_benefits",
+		"textDigest": "60b3eaf85b3cfec0152df881ff58b6e4b38bb83d98eb048f4abd396ca968051e"
+	},
+	{
+		"bytes": 160405,
+		"captureHash": "9c7e290f81268649e9411ad68320840bd6ffcaba3065921a24ae8f98ee611fb6",
+		"darkenedPages": [1],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va_education_spouses.d165f7ea.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 3,
+		"sha256": "df56989cc77409f791896b14f00f326cf7f474bccb8218dd164567e8fa97c19a",
+		"sourceId": "tap_va_education_spouses",
+		"textDigest": "bc4294c9030fd1ad0249fd8a00736cab71f61b0d7c57d3090ee272ca49938817"
+	},
+	{
+		"bytes": 164712,
+		"captureHash": "102d6fef9bdb4a7fd2641ecddb0171b79ccf0fe9cf7e25e2497c7ac0ac7337ca",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va_home_loan.bf0bda3f.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 2,
+		"sha256": "401aeb6da4f74b8156fdd3f143bdf25c87f12b85a4500fc90e849591d20196db",
+		"sourceId": "tap_va_home_loan",
+		"textDigest": "6d65256efa0bf6722c83067ac0b39834527586a558a0887e0062846a053a9e44"
+	},
+	{
+		"bytes": 184485,
+		"captureHash": "dbeb7777d2b7d7c26d28f52e380a07c706b779553e92fb5b82cb24a8d50f4eb9",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va_life_insurance.97e2b529.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 4,
+		"sha256": "87ae2ebf28cca12da2b0c3612219316b4a88f153e13e03e6c81a86f4b44531b4",
+		"sourceId": "tap_va_life_insurance",
+		"textDigest": "ea923c044f46f2a6df9fa264b2e83b9b96e1928e8bb446ed5096135cd56aa6b2"
+	},
+	{
+		"bytes": 252180,
+		"captureHash": "12c4f462f29dab043c9085ccc38a76dfba17d0a78a00aec957386807670a7f62",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va_reserve_natl_guard.12eaa577.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 10,
+		"sha256": "0c8f1fb432f4d0326142efccc4b7a9c81ff68d02a5f9e591ab211b58c5e8f45a",
+		"sourceId": "tap_va_reserve_natl_guard",
+		"textDigest": "71a21e0c790b91c5cf7e6d2d18d29f84153e913c6619188cda3d8146b8711621"
+	},
+	{
+		"bytes": 3548223,
+		"captureHash": "d0182e0f1dd0fea6c96fbea92af617fe607380fababbb9e872fa694744cee57a",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_va_womens_health.020563c1.pdf",
+		"keptImages": 8,
+		"keptPerPage": {
+			"1": 4,
+			"13": 1,
+			"80": 1,
+			"104": 1,
+			"112": 1
+		},
+		"pages": 128,
+		"sha256": "56ed477d3190ad3c2181fb5ca5375d3e5dcccf16fc8627119c3d1137718486a3",
+		"sourceId": "tap_va_womens_health",
+		"textDigest": "add40c1d549ff6bd6faee941ae93de95927c5b6e2733ca2cfb4514a9955f10cb"
+	},
+	{
+		"bytes": 103411,
+		"captureHash": "f1fde799f74b911d9d565d5568dd589ca415ccc4d5fa499a2beed8dfdcead9cd",
+		"darkenedPages": [],
+		"derivation": {
+			"jpegQuality": 70,
+			"maxPixels": 1960000
+		},
+		"derivationVersion": "4",
+		"file": "tap_vet_centers.03ae5a04.pdf",
+		"keptImages": 0,
+		"keptPerPage": {},
+		"pages": 2,
+		"sha256": "6b4c546816921b333ff64043f7e7ae11c725be56a683e1234bbbfe33048f187f",
+		"sourceId": "tap_vet_centers",
+		"textDigest": "797abfe39dd427ea8f58f1fd56f46e9e06076cf9d9a929a477535f419967347c"
+	}
+]

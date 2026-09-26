@@ -10,3 +10,6 @@ bun.lockb
 
 # Generated server corpus index (built by `pnpm embed:bge`; minified artifact, not source)
 /content-ops/server-index/
+
+# The crash page ships as a string inside the reader's on-demand budget, so it is kept compact by hand
+/src/error.html

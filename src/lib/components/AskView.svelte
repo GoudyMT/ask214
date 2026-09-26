@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { AskState } from '$lib/ask/types';
-	import type { Source } from '$lib/ask/sources';
+	import { sourceFromCard, type Source } from '$lib/ask/sources';
 	import AskResultCard from './AskResultCard.svelte';
 	import SourceReader from './SourceReader.svelte';
 	import QuestionFeed from './QuestionFeed.svelte';
@@ -90,14 +90,26 @@
 		reminderDismissed = true;
 		if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(REMINDER_DISMISSED_KEY, '1');
 	}
-	// "Read more" -> open the offline reader on the source this card cites. The corpus (which holds the
-	// text) is fetched on demand, so the reader opens in a loading state at once and fills when it resolves
-	// - never a silent dead button. A load failure or a source not held locally shows the error state.
+	// "Read more" -> open the reader on the source this card cites. An online answer carries its passage,
+	// so its reader opens on that passage at once. An on-device answer reads the corpus (which holds the
+	// whole text), fetched on demand, so the reader opens in a loading state at once and fills when it
+	// resolves - never a silent dead button. A load failure or a source not held locally shows the error state.
 	async function readSource(sourceId: string, chunkId?: string) {
 		const req = ++readerReq; // this open's token
 		openHighlightId = chunkId ?? null;
-		openSource = null;
 		readerError = false;
+		// An online answer's passage is in the card it came from, found by the chunk id the answer block, the
+		// lead card and the similar cards all pass: only the cards hold the passage as retrieved.
+		const card =
+			askState.kind === 'results' && askState.origin === 'online'
+				? askState.cards.find((c) => c.chunkId === chunkId)
+				: undefined;
+		if (card) {
+			openSource = sourceFromCard(card);
+			readerLoading = false;
+			return;
+		}
+		openSource = null;
 		readerLoading = true; // synchronous: the reader opens immediately, before the await
 		try {
 			const src = await loadSource(sourceId);

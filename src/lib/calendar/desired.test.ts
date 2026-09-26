@@ -11,8 +11,7 @@ function def(id: string, category: TaskDef['category'], title = id): TaskDef {
 		track: 'transition',
 		windowStart: -30,
 		windowEnd: 0,
-		why: '',
-		value: ''
+		why: ''
 	};
 }
 function item(

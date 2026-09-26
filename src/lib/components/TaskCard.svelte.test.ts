@@ -16,8 +16,7 @@ const DEF: TaskDef = {
 	track: 'transition',
 	windowStart: -540,
 	windowEnd: -365,
-	why: 'Find approved programs that fit your rate.',
-	value: 'A concrete shortlist before the window opens.'
+	why: 'Find approved programs that fit your rate.'
 };
 
 const noop = () => {};

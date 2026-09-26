@@ -46,5 +46,10 @@ export default defineConfig({
 		},
 		{ name: 'webkit', use: { ...devices['Desktop Safari'] } }
 	],
-	testMatch: '**/*.e2e.{ts,js}'
+	testMatch: '**/*.e2e.{ts,js}',
+	// Four at a time on a developer machine. Playwright's default is half the cores, 16 on a 32-core machine,
+	// and under that load WebKit's profile pages outlast their waits: twice through the suite, 16 workers
+	// failed 6 WebKit tests in 6.1 min and 4 workers failed none of 346 in 2.5 min. CI keeps its own default,
+	// 2 on its 4 cores.
+	workers: process.env.CI ? undefined : 4
 });

@@ -52,8 +52,6 @@ export type TaskDef = {
 	windowEnd: number;
 	recommendedOffset?: number; // defaults to windowStart
 	why: string; // why it matters (plain language, 1-2 sentences)
-	value: string; // what the user gets from doing it
-	sourceRef?: string; // citation into the corpus / outbound link (wires up later)
 	requires?: PersonaGate; // absent = universal
 	calendar?: { allDay?: boolean; durationMin?: number }; // consumed by the later Calendar sub-project
 };

@@ -10,7 +10,6 @@ import { nextRung, type Rung } from './online/ladder';
 import { narrowScored, toRetrievedChunks } from './online/scored';
 import type { RetrievedChunk, SynthesisResult } from './synthesis/synthesize';
 import { toSynthesisView, type SynthesisView } from './synthesis/synthesis-view';
-import { SvelteSet } from 'svelte/reactivity';
 
 // Result cards per query (3-5). Widening k was measured and moved nothing, and a cross-encoder re-ranker
 // over the returned chunks measured -0.7pp against real serving, as did hybrid lexical fusion at every
@@ -77,8 +76,11 @@ export function createAskStore(deps: {
 	let askedCount = $state(0);
 	let nudgeDismissed = $state(false);
 	const nudgeAfter = deps.nudgeAfter ?? 2;
-	// Which paths have failed this session, so the degradation ladder never re-offers a dead one.
-	const failed = new SvelteSet<'online' | 'device'>();
+	// Which paths have failed this session, so the degradation ladder never re-offers a dead one. A plain Set:
+	// it is read only inside rungAfter, whose result lands in `state`, and the reactive Set would add about
+	// half a kilobyte to the Ask page for reactivity nothing uses.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- read only imperatively; nothing reactive depends on it
+	const failed = new Set<'online' | 'device'>();
 
 	// Fill the one answer slot for this turn. The 38 CFR eligibility gate runs HERE rather than inside
 	// synthesize(), because it has to cover every path an answer is rendered on - it previously needed
