@@ -23,21 +23,9 @@ test('ask answers fully offline after a warm load @slow', async ({
 	);
 	test.setTimeout(180_000);
 
-	// First visit installs the service worker. Wait until it CONTROLS this client, then reload once
-	// online so the now-controlling SW caches the /ask navigation - the first load happened before the
-	// SW took control, so the page itself was not in the cache yet (navigations are cached network-first).
-	await page.goto('/ask');
-	await page.evaluate(async () => {
-		await navigator.serviceWorker.ready;
-		if (!navigator.serviceWorker.controller) {
-			await new Promise<void>((resolve) =>
-				navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
-					once: true
-				})
-			);
-		}
-	});
-	await page.reload();
+	// A first visit, used as a person would: no waiting for the service worker and no online reload before
+	// going offline. The install keeps the app page, and the setup's downloads wait for the worker.
+	await page.goto('/');
 
 	const input = page.getByLabel('Ask a question');
 	await expect(input).toBeEnabled({ timeout: 30_000 }); // usable at once; the corpus loads lazily on the query
@@ -64,8 +52,8 @@ test('ask answers fully offline after a warm load @slow', async ({
 	// service-worker-cache offline proof, not an incidental cache hit.
 	expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
 
-	// A brand-new query, fully offline: the model re-loads from cache into the worker; embed + search
-	// run locally. The persisted "downloaded" flag means no second consent prompt.
+	// A brand-new query, fully offline: the model re-loads from cache into the worker; embed + search run locally.
+	// The files are in the cache, so there is no second consent prompt.
 	await input.fill('how can I enroll in VA health care?');
 	await page.getByRole('button', { name: 'Search' }).click();
 	await expect(page.locator('.ask-card--lead')).toBeVisible({ timeout: 90_000 });
