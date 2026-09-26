@@ -45,11 +45,12 @@
 	);
 
 	// Ask store wiring: the store is created once the cache has been read (a lookup, no download - see onMount),
-	// so the input, mode toggle, and feed are live at once. The corpus is fetched lazily - only a device query or a "Read more" click needs
-	// it - so the ~3.5MB artifact stays off the initial page load (an eager fetch pins LCP/TTI to its
-	// download). The ~23MB model + its worker are also lazy (created on the first embed, in onMount).
+	// so the input, mode toggle, and feed are live at once. The corpus is fetched lazily - only a device query or
+	// a "Read more" click needs it - so the ~3.5MB artifact stays off the initial page load (an eager fetch pins
+	// LCP/TTI to its download). The ~23MB model + its worker are also lazy (created on the first embed, in onMount).
 	let store = $state<ReturnType<typeof createAskStore> | null>(null);
-	let sources = $state<Map<string, Source>>(new Map());
+	// Read only by loadSource, after the load that fills it - never by the template - so it needs no reactivity.
+	let sources: Map<string, Source> | undefined;
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
@@ -67,7 +68,7 @@
 	// more" (which shows a loading state meanwhile), so the corpus is not fetched until a user reads a source.
 	async function loadSource(sourceId: string): Promise<Source | null> {
 		await getCorpus();
-		return sources.get(sourceId) ?? null;
+		return sources?.get(sourceId) ?? null;
 	}
 
 	const askState: AskState = $derived(store?.state ?? { kind: 'idle' });
