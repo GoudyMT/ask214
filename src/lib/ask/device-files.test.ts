@@ -25,15 +25,14 @@ describe('DEVICE_FILES', () => {
 	});
 });
 
-// A CacheStorage stand-in holding the given paths in the asset cache, or no asset cache at all (null).
+// A CacheStorage stand-in holding the given paths in the asset cache, or no asset cache at all (null). A lookup
+// that does not name the asset cache finds nothing, so a check reading any other cache fails.
 function storageHolding(paths: readonly string[] | null) {
-	const cache = {
-		match: async (request: RequestInfo | URL) =>
-			paths?.includes(String(request)) ? new Response('') : undefined
-	};
 	return {
-		has: async (name: string) => paths !== null && name === ASK_ASSET_CACHE,
-		open: async () => cache
+		match: async (request: RequestInfo | URL, options?: MultiCacheQueryOptions) =>
+			options?.cacheName === ASK_ASSET_CACHE && paths?.includes(String(request))
+				? new Response('')
+				: undefined
 	} as unknown as CacheStorage;
 }
 
@@ -59,7 +58,7 @@ describe('deviceFilesKept', () => {
 
 	it('is false, not an error, when the cache cannot be read', async () => {
 		const refusing = {
-			has: async () => {
+			match: async () => {
 				throw new Error('E_TEST_REFUSED');
 			}
 		} as unknown as CacheStorage;

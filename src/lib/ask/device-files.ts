@@ -29,10 +29,11 @@ export const DEVICE_FILES: readonly string[] = [
  */
 export async function deviceFilesKept(cachesApi: CacheStorage | undefined): Promise<boolean> {
 	try {
-		if (cachesApi === undefined || !(await cachesApi.has(ASK_ASSET_CACHE))) return false;
-		const cache = await cachesApi.open(ASK_ASSET_CACHE);
+		if (cachesApi === undefined) return false;
 		for (const path of DEVICE_FILES) {
-			if ((await cache.match(path, { ignoreVary: true })) === undefined) return false;
+			// cacheName looks in the asset cache alone, and a missing cache reads as missing - never created.
+			const options = { cacheName: ASK_ASSET_CACHE, ignoreVary: true };
+			if ((await cachesApi.match(path, options)) === undefined) return false;
 		}
 		return true;
 	} catch {
