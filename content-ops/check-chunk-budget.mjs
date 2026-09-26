@@ -8,7 +8,11 @@
 // (50 KB = 50,000 bytes) - so the page budget keeps the meaning it had as a size-limit entry.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { precachedPaths, splitChunksByLoading } from '../src/lib/ci/chunk-budget-policy.ts';
+import {
+	precachedPaths,
+	splitChunksByLoading,
+	SHELL_BYTES_ALLOWANCE
+} from '../src/lib/ci/chunk-budget-policy.ts';
 
 const CLIENT = '.svelte-kit/output/client';
 const CHUNK_DIR = `${CLIENT}/_app/immutable/chunks`;
@@ -51,6 +55,7 @@ const STATIC = 'static';
 //     and 130,811 B. `main` precached 39 build files before the source document arrived. The count is
 //     budgeted as well as the bytes: on a first visit the install runs beside the page, and with the larger
 //     precache a tap during it stalled the next page ~500 ms on WebKit (6 of 8 runs; 0 of 45 before).
+//     The shell page kept at install counts as one file, weighed by SHELL_BYTES_ALLOWANCE.
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = { page: 55_800, onDemand: 7_300, precacheFiles: 60, precacheBytes: 133_000 };
@@ -136,13 +141,16 @@ if (!listedAll) {
 	throw new Error('E_PRECACHE_LIST_MISMATCH');
 }
 
-const precacheBytes = total(precached.map((path) => path.slice(1)));
-const filesPass = precached.length <= LIMIT.precacheFiles;
+// The worker also keeps APP_SHELL at install: one more file, weighed by its allowance because it is a served
+// page, not a built file.
+const precacheFiles = precached.length + 1;
+const precacheBytes = total(precached.map((path) => path.slice(1))) + SHELL_BYTES_ALLOWANCE;
+const filesPass = precacheFiles <= LIMIT.precacheFiles;
 const bytesPass = precacheBytes <= LIMIT.precacheBytes;
 if (!filesPass) failed += 1;
 if (!bytesPass) failed += 1;
 console.log(
-	`    ${'files the worker precaches'.padEnd(26)} ${String(precached.length).padStart(8)}     <= ${LIMIT.precacheFiles}      ${filesPass ? 'PASS' : 'FAIL'}`
+	`    ${'files the worker precaches'.padEnd(26)} ${String(precacheFiles).padStart(8)}     <= ${LIMIT.precacheFiles}      ${filesPass ? 'PASS' : 'FAIL'}`
 );
 console.log(
 	`    ${'bytes the worker precaches'.padEnd(26)} ${(precacheBytes / 1000).toFixed(2).padStart(8)} KB  <= ${(LIMIT.precacheBytes / 1000).toFixed(0)} KB  ${bytesPass ? 'PASS' : 'FAIL'}`
