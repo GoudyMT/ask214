@@ -12,7 +12,9 @@ import {
 	libraryToRestore,
 	storeOnFetch,
 	carryOverSavedDocuments,
-	keptOnActivate
+	keptOnActivate,
+	APP_SHELL,
+	offlineResponse
 } from './asset-cache';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
@@ -491,5 +493,48 @@ function vendoredDigest(): string {
 describe('the asset cache name and the vendored bytes it holds', () => {
 	it('names the cache after the model and WASM bytes it keeps', () => {
 		expect(VENDORED_BYTES[ASK_ASSET_CACHE]).toBe(vendoredDigest());
+	});
+});
+
+// A navigation that fails offline gets the page kept for its address, else the page the worker keeps at install,
+// which draws any top-level page. Any other request gets only its own kept answer.
+describe('offlineResponse', () => {
+	function cacheHolding(entries: Record<string, string>) {
+		const match = vi.fn(async (request: RequestInfo | URL) => {
+			const path =
+				request instanceof URL
+					? request.pathname
+					: typeof request === 'string'
+						? request
+						: new URL(request.url).pathname;
+			return path in entries ? new Response(entries[path]) : undefined;
+		});
+		return { match };
+	}
+	// A navigation Request cannot be constructed in script (mode 'navigate' is reserved), so it is described.
+	const navigation = (path: string) =>
+		({ url: `https://ask214.test${path}`, mode: 'navigate' }) as unknown as Request;
+
+	it('serves the page kept for that address first', async () => {
+		const cache = cacheHolding({ '/documents': 'documents page', [APP_SHELL]: 'shell' });
+		const answer = await offlineResponse(cache, navigation('/documents'));
+		expect(await answer?.text()).toBe('documents page');
+	});
+
+	it('serves the page kept at install for an address never kept, ignoring Vary', async () => {
+		const cache = cacheHolding({ [APP_SHELL]: 'shell' });
+		const answer = await offlineResponse(cache, navigation('/about'));
+		expect(await answer?.text()).toBe('shell');
+		expect(cache.match).toHaveBeenLastCalledWith(APP_SHELL, { ignoreVary: true });
+	});
+
+	it('gives a request that is not a navigation only its own kept answer', async () => {
+		const cache = cacheHolding({ [APP_SHELL]: 'shell' });
+		const script = new Request('https://ask214.test/_app/immutable/x.js');
+		expect(await offlineResponse(cache, script)).toBeUndefined();
+	});
+
+	it('returns nothing when neither is kept', async () => {
+		expect(await offlineResponse(cacheHolding({}), navigation('/about'))).toBeUndefined();
 	});
 });

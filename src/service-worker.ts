@@ -13,7 +13,9 @@ import {
 	isApiRequest,
 	keptOnFetch,
 	libraryToRestore,
-	storeOnFetch
+	storeOnFetch,
+	APP_SHELL,
+	offlineResponse
 } from '$lib/ask/asset-cache';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
@@ -28,7 +30,8 @@ sw.addEventListener('install', (event) => {
 	event.waitUntil(
 		(async () => {
 			const cache = await caches.open(CACHE);
-			await cache.addAll(PRECACHE);
+			// The app page too: every offline navigation falls back to it (see offlineResponse).
+			await cache.addAll([...PRECACHE, APP_SHELL]);
 			// Install is when this release's files are known to be reachable - it is downloading them now - while
 			// activation may come later with no connection. So a device holding saved documents gets this
 			// release's PDF library here, and activation tries again for any file this could not store. The
@@ -160,9 +163,9 @@ sw.addEventListener('fetch', (event) => {
 				}
 				return response;
 			} catch {
-				const cached = await cache.match(event.request);
-				if (cached) return cached;
-				return new Response('Offline', { status: 503 });
+				return (
+					(await offlineResponse(cache, event.request)) ?? new Response('Offline', { status: 503 })
+				);
 			}
 		})()
 	);

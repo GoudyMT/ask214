@@ -271,3 +271,34 @@ export function storeOnFetch(
 export function isApiRequest(pathname: string): boolean {
 	return pathname.startsWith('/api/');
 }
+
+/**
+ * The page the service worker keeps at install, in the same cache as the app's code. Every page that shows
+ * personal data renders in the browser (`ssr = false`), so this is the app's frame with nothing of the user's in
+ * it: served for any top-level address, the router draws that page. Each release's install keeps its own copy
+ * while online, so a page still opens offline after an update deletes the previous release's cache - and after a
+ * first visit, whose own page load came before the worker could keep it.
+ */
+export const APP_SHELL = '/';
+
+/**
+ * What the service worker answers from its cache when the network fails.
+ *
+ * A request gets the copy kept for it. A navigation with none - a page never opened while the worker was in
+ * charge, or any page after an update - gets APP_SHELL, which draws it. The shell loads its code by relative
+ * paths, so this holds for top-level addresses only; `src/lib/ci/offline-shell-policy.test.ts` fails if a nested
+ * page route is added.
+ *
+ * @param cache The cache the request would be kept in.
+ * @param request The request that failed on the network.
+ * @returns The kept response, or undefined when there is none.
+ */
+export async function offlineResponse(
+	cache: Pick<Cache, 'match'>,
+	request: Request
+): Promise<Response | undefined> {
+	const kept = await cache.match(request);
+	if (kept !== undefined || request.mode !== 'navigate') return kept;
+	// ignoreVary: install stored the shell under its own request, not under a navigation's headers.
+	return cache.match(APP_SHELL, { ignoreVary: true });
+}
