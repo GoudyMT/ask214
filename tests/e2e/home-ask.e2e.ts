@@ -18,11 +18,24 @@ test('the home page leads with the hero headline and the Ask input', async ({ pa
 test('the model is NOT downloaded on page load (soft opt-in)', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeEnabled();
-	// `mtc:ask:model-downloaded` is the shipped NON-PII device-capability flag (store.svelte.ts): it
-	// records only "was the model fetched on this device" - no query, no profile, nothing personal.
-	// ADR-004's encrypted-IDB rule governs PII, which this is not; reading it asserts the soft opt-in held.
-	const flag = await page.evaluate(() => localStorage.getItem('mtc:ask:model-downloaded'));
-	expect(flag).toBeNull();
+	// The model downloads inside the embed worker, which exists only after the user agrees to set up on-device
+	// answers. No worker on the page means nothing is downloading.
+	expect(page.workers()).toEqual([]);
+});
+
+// A device carrying the old "downloaded" flag but none of the files - a download made before the service worker
+// took charge, or files the browser deleted - must ask before downloading, not fetch the model unasked.
+test('a device without the files asks before downloading, whatever an old flag says', async ({
+	page
+}) => {
+	await page.addInitScript(() => localStorage.setItem('mtc:ask:model-downloaded', '1'));
+	await page.goto('/');
+	const input = page.getByRole('textbox', { name: /ask a question/i });
+	await expect(input).toBeEnabled();
+	await page.getByRole('button', { name: /^on device$/i }).click();
+	await input.fill('How do I apply for SkillBridge?');
+	await page.getByRole('button', { name: /^search$/i }).click();
+	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
 });
 
 test('asking in device mode on a fresh profile replaces the on-ramp with the setup prompt', async ({
@@ -34,7 +47,7 @@ test('asking in device mode on a fresh profile replaces the on-ramp with the set
 	// idle + no profile: the on-ramp is visible
 	await expect(page.getByRole('heading', { name: /make it yours/i })).toBeVisible();
 	// online is the on-ramp default, so switch to device to exercise the soft opt-in: device mode gates the
-	// one-time ~45MB download on the first query. The prompt takes the space; the on-ramp is gone.
+	// one-time download on the first query. The prompt takes the space; the on-ramp is gone.
 	await page.getByRole('button', { name: /^on device$/i }).click();
 	await input.fill('How do I apply for SkillBridge?');
 	await page.getByRole('button', { name: /^search$/i }).click();

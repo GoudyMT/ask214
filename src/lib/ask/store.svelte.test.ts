@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createAskStore } from './store.svelte';
 import { AskError, ASK_ERROR } from './errors';
 import type { Corpus, CorpusChunk } from '$lib/corpus';
@@ -19,11 +19,6 @@ function fixtureCorpus(): Corpus {
 }
 
 describe('createAskStore', () => {
-	// The model-downloaded flag persists across sessions; clear it before each test so every case starts
-	// "not set up" (mirrors the store's localStorage key). Tests needing a set-up device set it explicitly.
-	const MODEL_DOWNLOADED_KEY = 'mtc:ask:model-downloaded';
-	beforeEach(() => localStorage.removeItem(MODEL_DOWNLOADED_KEY));
-
 	it('starts idle', () => {
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
@@ -33,13 +28,16 @@ describe('createAskStore', () => {
 	});
 
 	it('does not load the corpus until a device query runs (lazy)', async () => {
-		localStorage.setItem('mtc:ask:model-downloaded', '1'); // set-up device: the query runs, not needsSetup
 		let corpusLoads = 0;
 		const getCorpus = async () => {
 			corpusLoads++;
 			return fixtureCorpus();
 		};
-		const store = createAskStore({ embed: async () => new Float32Array([1, 0, 0]), getCorpus });
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			getCorpus,
+			deviceKept: true // set-up device: the query runs, not needsSetup
+		});
 		expect(corpusLoads).toBe(0); // construction does not fetch the corpus
 		await store.ask('how do I file a claim');
 		expect(store.state.kind).toBe('results');
@@ -61,7 +59,40 @@ describe('createAskStore', () => {
 		expect(embedCalls).toBe(0); // nothing is downloaded or embedded without consent
 	});
 
-	it('setUp() shows modelLoading, answers the preserved query, and persists the flag', async () => {
+	// Earlier versions remembered a "downloaded" flag, which could claim a model the cache did not hold - and the
+	// next question then downloaded it unasked. The flag is no longer read: only `deviceKept` skips setup.
+	it('does not skip setup for a leftover downloaded flag', async () => {
+		localStorage.setItem('mtc:ask:model-downloaded', '1');
+		try {
+			let embedCalls = 0;
+			const store = createAskStore({
+				embed: async () => {
+					embedCalls++;
+					return new Float32Array([1, 0, 0]);
+				},
+				getCorpus: async () => fixtureCorpus()
+			});
+			await store.ask('how do I file a claim');
+			expect(store.state.kind).toBe('needsSetup');
+			expect(embedCalls).toBe(0);
+		} finally {
+			localStorage.removeItem('mtc:ask:model-downloaded');
+		}
+	});
+
+	// Pins a behaviour the change must keep: the model loaded this session answers the next question at once.
+	it('answers the next question without asking again once set up this session', async () => {
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			getCorpus: async () => fixtureCorpus()
+		});
+		await store.ask('q'); // -> needsSetup
+		await store.setUp();
+		await store.ask('another question');
+		expect(store.state.kind).toBe('results');
+	});
+
+	it('setUp() shows modelLoading, answers the preserved query, and remembers nothing', async () => {
 		let release: (v: Float32Array) => void = () => {};
 		const embed = () => new Promise<Float32Array>((r) => (release = r));
 		const store = createAskStore({ embed, getCorpus: async () => fixtureCorpus() });
@@ -71,7 +102,7 @@ describe('createAskStore', () => {
 		release(new Float32Array([1, 0, 0]));
 		await p;
 		expect(store.state.kind).toBe('results');
-		expect(localStorage.getItem(MODEL_DOWNLOADED_KEY)).toBe('1');
+		expect(localStorage.getItem('mtc:ask:model-downloaded')).toBeNull();
 	});
 
 	it('dismissSetup() returns to idle', async () => {
@@ -85,22 +116,25 @@ describe('createAskStore', () => {
 	});
 
 	it('goes straight to embedding (skips needsSetup) when already set up', async () => {
-		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1'); // set up in a prior session
 		let release: (v: Float32Array) => void = () => {};
 		const embed = () => new Promise<Float32Array>((r) => (release = r));
-		const store = createAskStore({ embed, getCorpus: async () => fixtureCorpus() });
+		const store = createAskStore({
+			embed,
+			getCorpus: async () => fixtureCorpus(),
+			deviceKept: true // set up in a prior session
+		});
 		void store.ask('q'); // sets state synchronously before embed resolves
 		expect(store.state.kind).toBe('embedding'); // no needsSetup, no modelLoading
 		release(new Float32Array([1, 0, 0]));
 	});
 
 	it('surfaces error when an online embed fails (set up)', async () => {
-		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
 		const store = createAskStore({
 			embed: async () => {
 				throw new AskError(ASK_ERROR.EMBED);
 			},
-			getCorpus: async () => fixtureCorpus()
+			getCorpus: async () => fixtureCorpus(),
+			deviceKept: true
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('error');
@@ -142,10 +176,10 @@ describe('createAskStore', () => {
 	it('returns empty when no hit clears the minimum score threshold (set up)', async () => {
 		// Query orthogonal to both fixture chunks -> cosine 0 -> below MIN_SCORE, so the threshold gate
 		// drops them and `empty` is reachable. Set up so ask() takes the embed path.
-		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
 		const store = createAskStore({
 			embed: async () => new Float32Array([0, 0, 1]),
-			getCorpus: async () => fixtureCorpus()
+			getCorpus: async () => fixtureCorpus(),
+			deviceKept: true
 		});
 		await store.ask('q');
 		expect(store.state.kind).toBe('empty');
@@ -154,14 +188,14 @@ describe('createAskStore', () => {
 	it('ignores a new ask() while a query is already in flight (set up)', async () => {
 		// Two overlapping runQuery calls would race on `state` and the later-resolving one would win
 		// regardless of submit order; the in-flight guard drops the second submit so the first owns the result.
-		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
 		let calls = 0;
 		const store = createAskStore({
 			embed: () => {
 				calls++;
 				return new Promise<Float32Array>(() => {}); // stays pending: the query is in flight
 			},
-			getCorpus: async () => fixtureCorpus()
+			getCorpus: async () => fixtureCorpus(),
+			deviceKept: true
 		});
 		void store.ask('first'); // -> embedding, embed #1 in flight
 		expect(store.state.kind).toBe('embedding');
@@ -170,14 +204,14 @@ describe('createAskStore', () => {
 	});
 
 	it('short-circuits a crisis message to the crisis state without ever embedding (set up)', async () => {
-		localStorage.setItem(MODEL_DOWNLOADED_KEY, '1'); // even a set-up device must not search a crisis message
 		let embedCalls = 0;
 		const store = createAskStore({
 			embed: async () => {
 				embedCalls++;
 				return new Float32Array([1, 0, 0]);
 			},
-			getCorpus: async () => fixtureCorpus()
+			getCorpus: async () => fixtureCorpus(),
+			deviceKept: true // even a set-up device must not search a crisis message
 		});
 		await store.ask('I want to kill myself');
 		expect(store.state.kind).toBe('crisis');
@@ -249,10 +283,10 @@ describe('createAskStore', () => {
 	});
 
 	it('a device answer records origin device', async () => {
-		localStorage.setItem('mtc:ask:model-downloaded', '1'); // set-up device: the query runs
 		const store = createAskStore({
 			embed: async () => new Float32Array([1, 0, 0]),
-			getCorpus: async () => fixtureCorpus()
+			getCorpus: async () => fixtureCorpus(),
+			deviceKept: true // set-up device: the query runs
 		});
 		await store.ask('how do I file a claim');
 		expect(store.state.kind).toBe('results');
@@ -449,11 +483,11 @@ describe('createAskStore', () => {
 	});
 
 	it('a crisis submitted during an in-flight device query keeps the crisis state', async () => {
-		localStorage.setItem('mtc:ask:model-downloaded', '1'); // set up -> the device path embeds
 		let release: (v: Float32Array) => void = () => {};
 		const store = createAskStore({
 			embed: () => new Promise<Float32Array>((r) => (release = r)),
-			getCorpus: async () => fixtureCorpus()
+			getCorpus: async () => fixtureCorpus(),
+			deviceKept: true // set up -> the device path embeds
 		});
 		const p = store.ask('benign'); // -> embedding, suspended on embed
 		expect(store.state.kind).toBe('embedding');
@@ -530,8 +564,8 @@ describe('createAskStore', () => {
 	});
 
 	it('a device retrieval failure offers the online path (the ladder device->online direction)', async () => {
-		localStorage.setItem('mtc:ask:model-downloaded', '1'); // set up -> device embeds (not the offline first-run)
 		const store = onlineStore({
+			deviceKept: true, // set up -> device embeds (not the offline first-run)
 			embed: async () => {
 				throw new AskError(ASK_ERROR.EMBED);
 			}
@@ -543,8 +577,8 @@ describe('createAskStore', () => {
 	});
 
 	it('once both online and device have failed, the ladder is terminal (outbound hub)', async () => {
-		localStorage.setItem('mtc:ask:model-downloaded', '1');
 		const store = onlineStore({
+			deviceKept: true,
 			retrieveOnline: async () => ({ status: 'error' }),
 			embed: async () => {
 				throw new AskError(ASK_ERROR.EMBED);
@@ -679,10 +713,10 @@ describe('createAskStore', () => {
 		}
 
 		function deviceStore() {
-			localStorage.setItem(MODEL_DOWNLOADED_KEY, '1'); // set up, so the query runs rather than gating
 			return createAskStore({
 				embed: async () => new Float32Array([1, 0, 0]),
-				getCorpus: async () => intentCorpus()
+				getCorpus: async () => intentCorpus(),
+				deviceKept: true // set up, so the query runs rather than gating
 			});
 		}
 

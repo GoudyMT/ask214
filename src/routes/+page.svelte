@@ -14,6 +14,7 @@
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
 	import { whenControlled } from '$lib/ask/when-controlled';
+	import { deviceFilesKept } from '$lib/ask/device-files';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
@@ -43,8 +44,8 @@
 		app.status === 'ready' && !app.store?.locked && app.store?.persona.completeness === 'none'
 	);
 
-	// Ask store wiring: the store is created immediately (no corpus wait), so the input, mode toggle, and
-	// feed are live at once. The corpus is fetched lazily - only a device query or a "Read more" click needs
+	// Ask store wiring: the store is created once the cache has been read (a lookup, no download - see onMount),
+	// so the input, mode toggle, and feed are live at once. The corpus is fetched lazily - only a device query or a "Read more" click needs
 	// it - so the ~3.5MB artifact stays off the initial page load (an eager fetch pins LCP/TTI to its
 	// download). The ~23MB model + its worker are also lazy (created on the first embed, in onMount).
 	let store = $state<ReturnType<typeof createAskStore> | null>(null);
@@ -93,35 +94,45 @@
 		// The ~23MB model + its embed worker are created lazily, on the first query that needs them - never
 		// on page load (the corpus is likewise lazy, via getCorpus above) - and made again after a failure.
 		const { embed, dispose } = createRecoveringEmbed(() => new EmbedWorker());
-		store = createAskStore({
-			// The embed worker, and the model it downloads, are created only after the wait, so both go through the
-			// service worker and are kept.
-			embed: async (text) => {
-				await waitForControl();
-				return embed(text);
-			},
-			getCorpus,
-			// Route-bound closures keep fetch and the raw BYO key out of the store. A decoded corpus always
-			// carries ACCEPTED_CORPUS_VERSION (the codec rejects any other), so the online handshake uses the
-			// constant, not the loaded object - which lets online mode skip the corpus load entirely.
-			retrieveOnline: (query) =>
-				retrieveOnline(query, { fetch, expectedCorpusVersion: ACCEPTED_CORPUS_VERSION }),
-			synthesize: async (query, chunks) => {
-				try {
-					const apiKey = (await app.byok?.readApiKey()) ?? null;
-					if (apiKey === null) return { kind: 'degraded' }; // no key -> raw cards, no summary
-					return await synthesize(query, chunks, { fetch, apiKey });
-				} catch {
-					return { kind: 'degraded' }; // a locked keystore or read failure degrades gracefully
-				}
-			},
-			onlineConsented: isOnlineConsented,
-			markOnlineConsent: () => setOnlineConsented(true),
-			synthesisEnabled: isSynthesisEnabled
+		let left = false;
+		// Whether this device keeps every on-device file is read from the cache - a lookup, no download - before
+		// the store exists, so the store asks before any download the device does not already hold.
+		void deviceFilesKept(globalThis.caches).then((deviceKept) => {
+			if (left) return;
+			store = createAskStore({
+				// The embed worker, and the model it downloads, are created only after the wait, so both go
+				// through the service worker and are kept.
+				embed: async (text) => {
+					await waitForControl();
+					return embed(text);
+				},
+				getCorpus,
+				deviceKept,
+				// Route-bound closures keep fetch and the raw BYO key out of the store. A decoded corpus always
+				// carries ACCEPTED_CORPUS_VERSION (the codec rejects any other), so the online handshake uses the
+				// constant, not the loaded object - which lets online mode skip the corpus load entirely.
+				retrieveOnline: (query) =>
+					retrieveOnline(query, { fetch, expectedCorpusVersion: ACCEPTED_CORPUS_VERSION }),
+				synthesize: async (query, chunks) => {
+					try {
+						const apiKey = (await app.byok?.readApiKey()) ?? null;
+						if (apiKey === null) return { kind: 'degraded' }; // no key -> raw cards, no summary
+						return await synthesize(query, chunks, { fetch, apiKey });
+					} catch {
+						return { kind: 'degraded' }; // a locked keystore or read failure degrades gracefully
+					}
+				},
+				onlineConsented: isOnlineConsented,
+				markOnlineConsent: () => setOnlineConsented(true),
+				synthesisEnabled: isSynthesisEnabled
+			});
+			// The store opens online when capable (the on-ramp default); honor an explicit device choice.
+			if (getDefaultMode() === 'device') store.setMode('device');
 		});
-		// The store opens online when capable (the on-ramp default); honor an explicit device choice.
-		if (getDefaultMode() === 'device') store.setMode('device');
-		return dispose;
+		return () => {
+			left = true;
+			dispose();
+		};
 	});
 </script>
 
