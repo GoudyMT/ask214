@@ -541,6 +541,26 @@ describe('createAskStore', () => {
 		}
 	});
 
+	// Online is the default mode, so a device that keeps every file and is reopened with no signal asks online
+	// first. It holds the answer itself: it is offered, never told to connect and set up again.
+	it('an online query that fails offline on a device that keeps the files offers the device answer', async () => {
+		const original = navigator.onLine;
+		Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+		try {
+			const store = onlineStore({
+				deviceKept: true,
+				retrieveOnline: async () => {
+					throw new Error('net');
+				}
+			});
+			await store.ask('q');
+			expect(store.state.kind).toBe('degraded');
+			if (store.state.kind === 'degraded') expect(store.state.rung).toBe('offer_device');
+		} finally {
+			Object.defineProperty(navigator, 'onLine', { value: original, configurable: true });
+		}
+	});
+
 	it('toggling online<->device is a pure flip that keeps the feed and never traps the user', () => {
 		const store = onlineStore(); // online-capable; consent state irrelevant (no ask() here)
 		store.setMode('device');

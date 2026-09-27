@@ -139,10 +139,11 @@ export function createAskStore(deps: {
 	}
 
 	// Degrade an online failure onto the ladder, guarding the same supersession + the `failed` mutation.
-	// Offline is a dead end for the ladder (even its outbound hub is unreachable), so surface the offline hint.
+	// Offline is a dead end for the ladder (even its outbound hub is unreachable), so surface the offline hint -
+	// unless this device holds the model, in which case the ladder offers the answer it can give offline.
 	function degradeOnline(query: string): void {
 		if (state.kind !== 'embedding' && state.kind !== 'modelLoading') return;
-		if (!(typeof navigator === 'undefined' || navigator.onLine)) {
+		if (!modelLoaded && !(typeof navigator === 'undefined' || navigator.onLine)) {
 			state = { kind: 'offline' };
 			return;
 		}
