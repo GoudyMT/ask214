@@ -310,6 +310,8 @@ export async function offlineResponse(
 ): Promise<Response | undefined> {
 	const kept = await cache.match(request);
 	if (kept !== undefined || request.mode !== 'navigate') return kept;
+	// Top-level addresses only: from anywhere deeper the shell's relative paths miss, and it opens blank.
+	if (!/^\/[^/]*$/.test(new URL(request.url).pathname)) return undefined;
 	// ignoreVary: install stored the shell under its own request, not under a navigation's headers.
 	return cache.match(APP_SHELL, { ignoreVary: true });
 }

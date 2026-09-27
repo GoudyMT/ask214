@@ -553,4 +553,12 @@ describe('offlineResponse', () => {
 	it('returns nothing when neither is kept', async () => {
 		expect(await offlineResponse(cacheHolding({}), navigation('/about'))).toBeUndefined();
 	});
+
+	// The shell loads its code by relative paths, which resolve only from a top-level address: deeper, it would
+	// open as a blank page, so the plain "Offline" answer is the honest one there.
+	it('does not answer a nested or trailing-slash address with the shell', async () => {
+		const cache = cacheHolding({ [APP_SHELL]: 'shell' });
+		expect(await offlineResponse(cache, navigation('/about/'))).toBeUndefined();
+		expect(await offlineResponse(cache, navigation('/documents/x'))).toBeUndefined();
+	});
 });
