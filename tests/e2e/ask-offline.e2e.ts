@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { DEVICE_FILES } from '../../src/lib/ask/device-files';
 
 // Acceptance: the offline "Ask" must answer with NO network after a one-time warm load - the whole
@@ -63,20 +63,10 @@ test('ask answers fully offline after a warm load @slow', async ({
 	await expect(page.locator('dialog.reader .reader__title')).toBeVisible();
 });
 
-// A first visitor who asks at once taps Set up while the worker is still installing. Everything that download
-// fetches must still be kept, or the "one-time" download happens again and nothing works offline.
-test('a setup tapped before the worker takes charge still keeps every file @slow', async ({
-	page,
-	browserName
-}) => {
-	test.skip(
-		browserName === 'webkit',
-		'Playwright WebKit offline fails a worker-controlled request before the worker can answer it'
-	);
-	test.setTimeout(180_000);
-
-	// Hold back the page's call that registers the worker, so the page is not controlled when Set up is tapped.
-	// Page-side, so the test does not depend on routing the worker's own requests.
+// A first visitor who asks at once taps Set up while the worker is still installing. The page's call that
+// registers the worker is held back, so the page is not controlled when Set up is tapped, until the test lets
+// it go. Page-side, so the test does not depend on routing the worker's own requests.
+async function setUpBeforeControl(page: Page): Promise<void> {
 	await page.addInitScript(() => {
 		const container = navigator.serviceWorker;
 		const register = container.register.bind(container);
@@ -95,7 +85,25 @@ test('a setup tapped before the worker takes charge still keeps every file @slow
 	await page.getByRole('button', { name: /set up.+answer/i }).click();
 	// The premise: no worker is in charge as the download is asked for.
 	expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
-	await page.evaluate(() => (window as unknown as { releaseWorker: () => void }).releaseWorker());
+}
+
+const releaseWorker = (page: Page) =>
+	page.evaluate(() => (window as unknown as { releaseWorker: () => void }).releaseWorker());
+
+// Everything that download fetches must still be kept, or the "one-time" download happens again and nothing works
+// offline.
+test('a setup tapped before the worker takes charge still keeps every file @slow', async ({
+	page,
+	browserName
+}) => {
+	test.skip(
+		browserName === 'webkit',
+		'Playwright WebKit offline fails a worker-controlled request before the worker can answer it'
+	);
+	test.setTimeout(180_000);
+
+	await setUpBeforeControl(page);
+	await releaseWorker(page);
 	await expect(page.locator('.ask-card--lead')).toBeVisible({ timeout: 150_000 });
 
 	// Exactly the files an on-device answer needs are kept - no fewer, and none this list does not name.
@@ -111,4 +119,33 @@ test('a setup tapped before the worker takes charge still keeps every file @slow
 			{ timeout: 30_000 }
 		)
 		.toEqual([...DEVICE_FILES].sort());
+});
+
+// A person who taps Set up and then leaves Home before the worker takes charge has left the setup behind. When the
+// worker does take charge, nothing starts: no embed worker (and so no model) and no answer library.
+test('leaving Home while the setup waits for the worker starts no download', async ({
+	page,
+	context
+}) => {
+	const workers: string[] = [];
+	page.on('worker', (worker) => workers.push(worker.url()));
+	const library: string[] = [];
+	context.on('request', (request) => {
+		const path = new URL(request.url()).pathname;
+		if (path.startsWith('/corpus/')) library.push(path);
+	});
+
+	await setUpBeforeControl(page);
+	await page
+		.getByRole('navigation', { name: 'Primary' })
+		.getByRole('link', { name: 'Resources', exact: true })
+		.click();
+	await expect(page).toHaveURL(/\/resources$/);
+	await releaseWorker(page);
+	await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+	// A download the wait let go would start as the worker takes charge; this gives it time to show.
+	await page.waitForTimeout(2_000);
+
+	expect(workers).toEqual([]);
+	expect(library).toEqual([]);
 });

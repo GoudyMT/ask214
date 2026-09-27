@@ -17,6 +17,8 @@
 	import AskView from '$lib/components/AskView.svelte';
 	import EmbedWorker from '$lib/ask/embed-worker?worker';
 	import {
+		ASK_ERROR,
+		AskError,
 		CORPUS_BASE,
 		createAskStore,
 		createRecoveringEmbed,
@@ -54,6 +56,9 @@
 	let store = $state<ReturnType<typeof createAskStore> | null>(null);
 	// Read only by loadSource, after the load that fills it - never by the template - so it needs no reactivity.
 	let sources: Map<string, Source> | undefined;
+	// Set when the page is left. A download waiting for the service worker checks it when the wait ends, so a setup
+	// left behind starts nothing once the worker takes charge.
+	let left = false;
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
@@ -61,6 +66,7 @@
 		async () => {
 			// The answer library is one of the first downloads too: waiting keeps it on a first visit.
 			await waitForControl();
+			if (left) throw new AskError(ASK_ERROR.CORPUS);
 			return loadCorpus(fetch, CORPUS_BASE);
 		},
 		(c) => {
@@ -98,7 +104,6 @@
 		// The ~23MB model + its embed worker are created lazily, on the first query that needs them - never
 		// on page load (the corpus is likewise lazy, via getCorpus above) - and made again after a failure.
 		const { embed, dispose } = createRecoveringEmbed(() => new EmbedWorker());
-		let left = false;
 		// Whether this device keeps every on-device file is read from the cache - a lookup, no download - before
 		// the store exists, so the store asks before any download the device does not already hold.
 		void deviceFilesKept(globalThis.caches).then((deviceKept) => {
@@ -108,6 +113,7 @@
 				// through the service worker and are kept.
 				embed: async (text) => {
 					await waitForControl();
+					if (left) throw new AskError(ASK_ERROR.EMBED);
 					return embed(text);
 				},
 				getCorpus,
