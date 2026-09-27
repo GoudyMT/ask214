@@ -60,8 +60,9 @@
 	// left behind starts nothing once the worker takes charge.
 	let left = false;
 	// A mode or a feed question picked before the store exists - it waits for the cache read - is held here and
-	// handed to the store when it is made, so an early tap is not lost. The held mode shows on the toggle at once.
-	let earlyMode = $state<'device' | 'online'>();
+	// handed to the store when it is made, so an early tap is not lost. The toggle shows the held mode until then:
+	// the saved default, or the one just picked.
+	let earlyMode = $state(getDefaultMode());
 	let earlyQuery: string | undefined;
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
@@ -140,9 +141,9 @@
 				markOnlineConsent: () => setOnlineConsented(true),
 				synthesisEnabled: isSynthesisEnabled
 			});
-			// The store opens online when capable (the on-ramp default); honor a mode picked while the cache was read,
-			// else an explicit device choice. A feed question picked in that time is asked now.
-			if ((earlyMode ?? getDefaultMode()) === 'device') store.setMode('device');
+			// The store opens online when capable (the on-ramp default); honor the held mode - an explicit device
+			// choice, or one picked while the cache was read. A feed question picked in that time is asked now.
+			if (earlyMode === 'device') store.setMode('device');
 			if (earlyQuery !== undefined) void store.ask(earlyQuery);
 		});
 		return () => {
@@ -168,7 +169,7 @@
 		{ready}
 		{loadSource}
 		onlineCapable={true}
-		mode={store?.mode ?? earlyMode ?? getDefaultMode()}
+		mode={store?.mode ?? earlyMode}
 		showNudge={store?.showNudge ?? false}
 		onAsk={(q) => (store ? void store.ask(q) : (earlyQuery = q))}
 		onSetUp={() => store?.setUp()}
