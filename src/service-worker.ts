@@ -15,7 +15,7 @@ import {
 	libraryToRestore,
 	answerLibraryToRestore,
 	storeOnFetch,
-	APP_SHELL,
+	INSTALL_PAGES,
 	offlineResponse
 } from '$lib/ask/asset-cache';
 
@@ -32,7 +32,7 @@ sw.addEventListener('install', (event) => {
 		(async () => {
 			const cache = await caches.open(CACHE);
 			// The app page too: every offline navigation falls back to it (see offlineResponse).
-			await cache.addAll([...PRECACHE, APP_SHELL]);
+			await cache.addAll([...PRECACHE, ...INSTALL_PAGES]);
 			// Install is when this release's files are known to be reachable - it is downloading them now - while
 			// activation may come later with no connection. So a device holding saved documents gets this
 			// release's PDF library here, and a device that kept the answer library gets this release's; activation

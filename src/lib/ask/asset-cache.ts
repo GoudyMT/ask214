@@ -318,6 +318,12 @@ export function isApiRequest(pathname: string): boolean {
 export const APP_SHELL = '/';
 
 /**
+ * The pages install keeps beside the build files. One list, read by the worker and by the precache budget, so a
+ * page kept at install is always counted.
+ */
+export const INSTALL_PAGES: readonly string[] = [APP_SHELL];
+
+/**
  * What the service worker answers from its cache when the network fails.
  *
  * A request gets the copy kept for it. A navigation with none - a page never opened while the worker was in

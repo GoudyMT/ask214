@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { readdirSync } from 'node:fs';
-import { relative, sep } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // The page the service worker falls back to offline (APP_SHELL in src/lib/ask/asset-cache.ts) loads its code by
@@ -26,4 +26,14 @@ describe('every page route is top-level, so the offline fallback page can draw i
 			expect(segments.length).toBeLessThanOrEqual(1);
 		});
 	}
+});
+
+// The precache budget counts the pages kept at install from INSTALL_PAGES (content-ops/check-chunk-budget.mjs), so
+// the worker must install exactly that list beside the build files - a page added to install alone would go
+// uncounted.
+describe('the worker installs the pages the budget counts', () => {
+	it('installs INSTALL_PAGES with the precache, and nothing else', () => {
+		const worker = readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8');
+		expect(worker).toMatch(/cache\.addAll\(\[\.\.\.PRECACHE, \.\.\.INSTALL_PAGES\]\)/);
+	});
 });

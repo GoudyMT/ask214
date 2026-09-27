@@ -91,7 +91,8 @@ describe('the download size the Ask view states', () => {
 		const view = readFileSync(join(process.cwd(), 'src/lib/components/AskView.svelte'), 'utf8');
 		const stated = [...view.matchAll(/(\d+(?:\.\d+)?)\s?MB/g)].map((match) => Number(match[1]));
 		expect(stated).toHaveLength(4);
-		for (const megabytes of stated) expect(megabytes).toBe(Math.round(bytes / 5e6) * 5);
+		// Rounded up, so the figure can over-state the download but never under-state it.
+		for (const megabytes of stated) expect(megabytes).toBe(Math.ceil(bytes / 5e6) * 5);
 	});
 
 	// "Works offline" holds only once the browser keeps the files - a browser that cannot keep them asks again - so
