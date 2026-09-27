@@ -449,14 +449,22 @@ describe('answerLibraryToRestore (the answer library a device keeps through an u
 	});
 
 	it('returns only what is missing, and nothing when the shipped library is held', () => {
-		expect(answerLibraryToRestore([...OLD, NEW[0] ?? ''], SHIPPED)).toEqual([NEW[1]]);
-		expect(answerLibraryToRestore(NEW, SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([...OLD, NEW[0] ?? '', MODEL], SHIPPED)).toEqual([NEW[1]]);
+		expect(answerLibraryToRestore([...NEW, MODEL], SHIPPED)).toEqual([]);
 	});
 
 	// A device that never kept the library never asked for it, so an update downloads nothing for it.
 	it('returns nothing on a device that held no answer library', () => {
 		expect(answerLibraryToRestore([MODEL], SHIPPED)).toEqual([]);
 		expect(answerLibraryToRestore([], SHIPPED)).toEqual([]);
+	});
+
+	// The worker also keeps the library when a page merely reads it - "Read more" on an online answer, a document's
+	// text. That device never set up on-device answers or saved a document, so it never asked to keep 7.3 MB, and
+	// a release downloads nothing for it. A saved document stores the library with it, so that device gets it back.
+	it('returns nothing when the library was kept only by reading, and the library for a saved document', () => {
+		expect(answerLibraryToRestore(OLD, SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([...OLD, '/docs/tap_va101.0f650528.pdf'], SHIPPED)).toEqual(NEW);
 	});
 });
 

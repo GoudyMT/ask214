@@ -228,8 +228,11 @@ export function libraryToRestore(
  * The library is versioned by URL: a new release ships a new pair and activate prunes the old one. Without this, a
  * device that set up on-device answers (or saved a document) would be asked to set up again although it still
  * holds the model, and could not answer offline until it did. Install runs while online, so the pair is fetched
- * then - only for a device that held a library, and only the files it lacks. A restore that fails at install is
- * not retried at activate, where the prune has already removed the old pair this rule reads.
+ * then - only for a device that held a library AND set up on-device answers (a model file held) or saved a
+ * document, and only the files it lacks. The worker also keeps the library when a page merely reads it ("Read
+ * more", a document's text); that device never asked to keep it, so a release downloads nothing for it. A restore
+ * that fails at install is not retried at activate, where the prune has already removed the old pair this rule
+ * reads.
  *
  * Args:
  *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
@@ -243,6 +246,8 @@ export function answerLibraryToRestore(
 	shipped: readonly string[]
 ): string[] {
 	if (!cachedPaths.some((path) => path.startsWith('/corpus/'))) return [];
+	if (!cachedPaths.some((path) => path.startsWith('/models/') || path.startsWith('/docs/')))
+		return [];
 	return shipped.filter((path) => path.startsWith('/corpus/') && !cachedPaths.includes(path));
 }
 

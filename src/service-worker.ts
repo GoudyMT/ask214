@@ -105,7 +105,8 @@ async function pruneSupersededVersions(cacheNames: string[]): Promise<void> {
  * every saved document would open offline only as its text. `libraryToRestore` returns the shipped library
  * files to fetch, and none on a device that saved no document. Run at install, while the release is being
  * downloaded, and again after activation for anything install could not store. The answer library is restored
- * the same way (`answerLibraryToRestore`), for a device that kept an earlier one.
+ * the same way (`answerLibraryToRestore`), for a device that kept an earlier one because it set up on-device
+ * answers or saved a document.
  *
  * @param cacheNames The cache names already read from caches.keys(), so an install that has never fetched a
  *   lazy asset is skipped rather than being given an empty cache by caches.open().
