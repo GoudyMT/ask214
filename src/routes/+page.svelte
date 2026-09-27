@@ -1,3 +1,16 @@
+<script module lang="ts">
+	import { whenControlled } from '$lib/ask/when-controlled';
+
+	// How long the first download waits for the service worker on a first visit. Its install downloads ~133 KB,
+	// about 4-5 s on a slow 0.25 Mbps link; past this the download goes ahead and is not kept.
+	const CONTROL_WAIT_MS = 10_000;
+	// Module scope, so the wait happens at most once per visit, not once per return to this page: once a worker
+	// is in charge the check is immediate, and a worker that has not come within the time is not waited for again.
+	let control: Promise<boolean> | undefined;
+	const waitForControl = () =>
+		(control ??= whenControlled(CONTROL_WAIT_MS, navigator.serviceWorker));
+</script>
+
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -13,7 +26,6 @@
 	import { ACCEPTED_CORPUS_VERSION } from '$lib/corpus';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
-	import { whenControlled } from '$lib/ask/when-controlled';
 	import { deviceFilesKept } from '$lib/ask/device-files';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
@@ -27,15 +39,6 @@
 		setOnlineConsented,
 		isSynthesisEnabled
 	} from '$lib/ask/online-prefs';
-
-	// How long the first download waits for the service worker on a first visit. Its install downloads ~133 KB,
-	// about 4-5 s on a slow 0.25 Mbps link; past this the download goes ahead and is not kept.
-	const CONTROL_WAIT_MS = 10_000;
-	let control: Promise<boolean> | undefined;
-	// Waits at most once per visit: once a worker is in charge the check is immediate, and a worker that has not
-	// come within the time is not waited for again.
-	const waitForControl = () =>
-		(control ??= whenControlled(CONTROL_WAIT_MS, navigator.serviceWorker));
 
 	const app = getProfileApp();
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a

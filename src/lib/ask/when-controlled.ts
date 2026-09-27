@@ -25,5 +25,15 @@ export function whenControlled(
 			resolve(controlled);
 		}
 		container.addEventListener('controllerchange', onChange);
+		// A worker that has finished activating and still does not control this page never will - it claims pages
+		// only while it activates, and a hard reload bypasses it - so waiting the full time would buy nothing.
+		void container.getRegistration().then(
+			(registration) => {
+				const settled = registration?.active?.state === 'activated';
+				const pending = registration?.installing || registration?.waiting;
+				if (settled && !pending) end(false);
+			},
+			() => {}
+		);
 	});
 }
