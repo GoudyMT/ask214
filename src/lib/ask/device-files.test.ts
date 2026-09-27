@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { ASK_ASSET_CACHE, CORPUS_BASE } from './asset-cache';
@@ -63,6 +63,23 @@ describe('deviceFilesKept', () => {
 			}
 		} as unknown as CacheStorage;
 		expect(await deviceFilesKept(refusing)).toBe(false);
+	});
+
+	// The Ask is created only once this answers, crisis routing and online answers included, so a cache that
+	// never answers must not hold it up: past the limit the answer is "not kept", which asks before downloading.
+	it('is false at the time limit when the cache never answers', async () => {
+		vi.useFakeTimers();
+		try {
+			const silent = { match: () => new Promise(() => {}) } as unknown as CacheStorage;
+			let verdict: boolean | undefined;
+			void deviceFilesKept(silent, 1_000).then((kept) => (verdict = kept));
+			await vi.advanceTimersByTimeAsync(999);
+			expect(verdict).toBeUndefined();
+			await vi.advanceTimersByTimeAsync(1);
+			expect(verdict).toBe(false);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
 

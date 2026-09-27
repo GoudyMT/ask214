@@ -1,5 +1,8 @@
 import { ASK_ASSET_CACHE, CORPUS_BASE } from './asset-cache';
 
+// The lookup takes milliseconds; a browser whose Cache API never answers must not hold the Ask up past this.
+const LOOKUP_LIMIT_MS = 2_000;
+
 /**
  * Every file an on-device answer needs, as the service worker keeps them: the search model, the runtime that runs
  * it, and the answer library. The model and runtime paths are written out rather than read from the vendored
@@ -25,9 +28,21 @@ export const DEVICE_FILES: readonly string[] = [
  * there - and the next question downloaded the model again without asking. The cache is the fact.
  *
  * @param cachesApi The browser's CacheStorage; undefined where it has none.
- * @returns true only when every file is kept; false otherwise, including when the cache cannot be read.
+ * @param timeoutMs How long to wait for the cache before answering "not kept", which asks before downloading.
+ * @returns true only when every file is kept; false otherwise, including when the cache cannot be read in time.
  */
-export async function deviceFilesKept(cachesApi: CacheStorage | undefined): Promise<boolean> {
+export function deviceFilesKept(
+	cachesApi: CacheStorage | undefined,
+	timeoutMs = LOOKUP_LIMIT_MS
+): Promise<boolean> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const limit = new Promise<boolean>((resolve) => {
+		timer = setTimeout(() => resolve(false), timeoutMs);
+	});
+	return Promise.race([allKept(cachesApi), limit]).finally(() => clearTimeout(timer));
+}
+
+async function allKept(cachesApi: CacheStorage | undefined): Promise<boolean> {
 	try {
 		if (cachesApi === undefined) return false;
 		for (const path of DEVICE_FILES) {
