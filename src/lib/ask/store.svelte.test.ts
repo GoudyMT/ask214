@@ -92,6 +92,59 @@ describe('createAskStore', () => {
 		expect(store.state.kind).toBe('results');
 	});
 
+	// A failed embed ends the worker, and the model in its memory with it. On a device that does not keep the files,
+	// the next question asks again rather than downloading the model unasked.
+	it('asks again after a failed embed on a device that does not keep the files', async () => {
+		let calls = 0;
+		const store = createAskStore({
+			embed: async () => {
+				calls++;
+				if (calls === 2) throw new AskError(ASK_ERROR.EMBED);
+				return new Float32Array([1, 0, 0]);
+			},
+			getCorpus: async () => fixtureCorpus()
+		});
+		await store.ask('q'); // -> needsSetup
+		await store.setUp(); // the first embed answers
+		await store.ask('second'); // the second fails
+		await store.ask('third');
+		expect(store.state.kind).toBe('needsSetup');
+		expect(calls).toBe(2);
+	});
+
+	it('stays set up after a failed embed on a device that keeps the files', async () => {
+		let calls = 0;
+		const store = createAskStore({
+			embed: async () => {
+				calls++;
+				if (calls === 1) throw new AskError(ASK_ERROR.EMBED);
+				return new Float32Array([1, 0, 0]);
+			},
+			getCorpus: async () => fixtureCorpus(),
+			deviceKept: true
+		});
+		await store.ask('first'); // fails
+		await store.ask('second');
+		expect(store.state.kind).toBe('results');
+	});
+
+	it('stays set up this session when only the answer library failed to load', async () => {
+		let loads = 0;
+		const store = createAskStore({
+			embed: async () => new Float32Array([1, 0, 0]),
+			getCorpus: async () => {
+				loads++;
+				if (loads === 2) throw new AskError(ASK_ERROR.CORPUS);
+				return fixtureCorpus();
+			}
+		});
+		await store.ask('q'); // -> needsSetup
+		await store.setUp(); // the model loads
+		await store.ask('second'); // the library fails; the model is still in memory
+		await store.ask('third');
+		expect(store.state.kind).toBe('results');
+	});
+
 	it('setUp() shows modelLoading, answers the preserved query, and remembers nothing', async () => {
 		let release: (v: Float32Array) => void = () => {};
 		const embed = () => new Promise<Float32Array>((r) => (release = r));

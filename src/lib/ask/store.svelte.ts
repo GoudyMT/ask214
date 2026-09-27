@@ -105,12 +105,16 @@ export function createAskStore(deps: {
 			);
 		} catch (e) {
 			const code = e instanceof AskError ? e.code : ASK_ERROR.EMBED;
+			const wasLoaded = modelLoaded;
+			// A failed embed ends the worker and the model in its memory, so only files kept on the device still
+			// count as set up: anything else asks again before downloading. A corpus failure leaves the model.
+			if (code !== ASK_ERROR.CORPUS) modelLoaded = deps.deviceKept ?? false;
 			// Superseded mid-embed (a crisis message routed to help, a pending consent gate) - do not clobber.
 			if (state.kind !== 'embedding' && state.kind !== 'modelLoading') return;
 			// Offline only when a first-run (model-not-loaded) embed fails with no network: a warm embed
 			// needs no network, so its failure is a genuine error, not connectivity.
 			const online = typeof navigator === 'undefined' || navigator.onLine;
-			if (!modelLoaded && !online) {
+			if (!wasLoaded && !online) {
 				state = { kind: 'offline' };
 			} else if (onlineCapable) {
 				// A device retrieval failure offers the working online path (or the outbound hub once both
