@@ -93,4 +93,18 @@ describe('the download size the Ask view states', () => {
 		expect(stated).toHaveLength(4);
 		for (const megabytes of stated) expect(megabytes).toBe(Math.round(bytes / 5e6) * 5);
 	});
+
+	// "Works offline" holds only once the browser keeps the files - a browser that cannot keep them asks again - so
+	// wherever the view says it, it says that first. Read across line breaks: the markup wraps the phrase.
+	it('says "works offline" only after "once your browser keeps it"', () => {
+		const view = readFileSync(join(process.cwd(), 'src/lib/components/AskView.svelte'), 'utf8');
+		const claims = [...view.matchAll(/works?\s+offline/g)];
+		expect(claims.length).toBeGreaterThan(0);
+		for (const claim of claims) {
+			const before = view
+				.slice(Math.max(0, (claim.index ?? 0) - 100), claim.index)
+				.replace(/\s+/g, ' ');
+			expect(before, claim[0]).toMatch(/keeps it/i);
+		}
+	});
 });

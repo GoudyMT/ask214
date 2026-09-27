@@ -150,8 +150,8 @@
 {#if showNudge}
 	<div class="ask-reminder">
 		<span
-			>Prefer to keep everything on your device? Set up on-device answers - fully private, works
-			offline.</span
+			>Prefer to keep everything on your device? Set up on-device answers - fully private, and once
+			your browser keeps it, it works offline.</span
 		>
 		<span class="ask-reminder__actions">
 			<button
