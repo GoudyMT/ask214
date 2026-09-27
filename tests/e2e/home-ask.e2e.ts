@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ASK_ASSET_CACHE } from '../../src/lib/ask/asset-cache';
+import { DEVICE_FILES } from '../../src/lib/ask/device-files';
 
 // The Ask is the home page now (ADR-022/024). /ask stays as a permanent redirect so old links land.
 test('/ask redirects to the home page', async ({ page }) => {
@@ -26,8 +28,16 @@ test('the model is NOT downloaded on page load (soft opt-in)', async ({ page }) 
 // A device carrying the old "downloaded" flag but none of the files - a download made before the service worker
 // took charge, or files the browser deleted - must ask before downloading, not fetch the model unasked.
 test('a device without the files asks before downloading, whatever an old flag says', async ({
-	page
+	page,
+	context
 }) => {
+	const workers: string[] = [];
+	page.on('worker', (worker) => workers.push(worker.url()));
+	const downloads: string[] = [];
+	context.on('request', (request) => {
+		const path = new URL(request.url()).pathname;
+		if (/^\/(models|wasm)\//.test(path)) downloads.push(path);
+	});
 	await page.addInitScript(() => localStorage.setItem('mtc:ask:model-downloaded', '1'));
 	await page.goto('/');
 	const input = page.getByRole('textbox', { name: /ask a question/i });
@@ -36,6 +46,35 @@ test('a device without the files asks before downloading, whatever an old flag s
 	await input.fill('How do I apply for SkillBridge?');
 	await page.getByRole('button', { name: /^search$/i }).click();
 	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
+	// Asking is all it did: no embed worker, and nothing of the model or its runtime was fetched.
+	expect(workers).toEqual([]);
+	expect(downloads).toEqual([]);
+});
+
+// The other side: a device that keeps every on-device file is set up already, so asking on the device goes
+// straight to the answer - no setup prompt, and the embed worker starts at once.
+test('a device that keeps every on-device file answers without asking to set up', async ({
+	page
+}) => {
+	const workers: string[] = [];
+	page.on('worker', (worker) => workers.push(worker.url()));
+	await page.goto('/');
+	// Stand-ins at the on-device files' addresses: the page asks only whether each is kept, not what it holds.
+	await page.evaluate(
+		async ({ cacheName, paths }) => {
+			const cache = await caches.open(cacheName);
+			await Promise.all(paths.map((path) => cache.put(path, new Response('kept'))));
+		},
+		{ cacheName: ASK_ASSET_CACHE, paths: [...DEVICE_FILES] }
+	);
+	await page.reload();
+	const input = page.getByRole('textbox', { name: /ask a question/i });
+	await expect(input).toBeEnabled();
+	await page.getByRole('button', { name: /^on device$/i }).click();
+	await input.fill('How do I apply for SkillBridge?');
+	await page.getByRole('button', { name: /^search$/i }).click();
+	await expect.poll(() => workers.length, { timeout: 15_000 }).toBe(1);
+	await expect(page.getByText(/one-time setup to answer your question/i)).toHaveCount(0);
 });
 
 test('asking in device mode on a fresh profile replaces the on-ramp with the setup prompt', async ({

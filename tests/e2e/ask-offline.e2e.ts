@@ -149,3 +149,30 @@ test('leaving Home while the setup waits for the worker starts no download', asy
 	expect(workers).toEqual([]);
 	expect(library).toEqual([]);
 });
+
+// The setup's downloads wait for the worker, so they go through it and are kept: nothing starts while the page is
+// not yet in its charge, and the download goes ahead once it is.
+test('a setup tapped before the worker takes charge starts its download only once it does', async ({
+	page,
+	context
+}) => {
+	const workers: string[] = [];
+	page.on('worker', (worker) => workers.push(worker.url()));
+	const library: string[] = [];
+	context.on('request', (request) => {
+		const path = new URL(request.url()).pathname;
+		if (path.startsWith('/corpus/')) library.push(path);
+	});
+
+	await setUpBeforeControl(page);
+	// Well inside the wait's limit: a download that did not wait would already have started.
+	await page.waitForTimeout(2_000);
+	expect(workers).toEqual([]);
+	expect(library).toEqual([]);
+
+	await releaseWorker(page);
+	await expect.poll(() => workers.length, { timeout: 15_000 }).toBe(1);
+	await expect
+		.poll(() => [...new Set(library)].sort(), { timeout: 15_000 })
+		.toEqual(DEVICE_FILES.filter((path) => path.startsWith('/corpus/')).sort());
+});
