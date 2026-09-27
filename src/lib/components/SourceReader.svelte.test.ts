@@ -1961,11 +1961,11 @@ describe('SourceReader, a document opened whole', () => {
 
 		// Centring the title must not narrow it: a column held empty on each side to balance Close cost a long title
 		// a line on a phone and, at 400% zoom, most of the reading pane.
-		const openDoc = async () => {
+		const openDoc = async (title = DOC.title) => {
 			const view = render(SourceReader, {
 				props: {
 					source: null,
-					doc: DOC,
+					doc: { ...DOC, title },
 					loadSource: async () => null,
 					onClose: () => {},
 					pdfLoader: threePages()
@@ -2020,6 +2020,23 @@ describe('SourceReader, a document opened whole', () => {
 			).getBoundingClientRect();
 			const gap = parseFloat(getComputedStyle(head).columnGap) || 0;
 			expect(Math.abs(title.left - inside(head).left - (22 + gap))).toBeLessThanOrEqual(1);
+		});
+
+		// At 400% zoom a long title wraps beside Close; Close stays at the top right, level with the first line,
+		// rather than sliding down to the middle of the block as the title grows.
+		it('keeps Close level with the first line of a wrapped title at 400% zoom', async () => {
+			await page.viewport(320, 256);
+			const container = await openDoc(
+				'TAP - DOL Employment Fundamentals of Career Transition (EFCT) Participant Guide'
+			);
+			const title = (
+				container.querySelector('.reader__title') as HTMLElement
+			).getBoundingClientRect();
+			const close = (
+				container.querySelector('.reader__close') as HTMLElement
+			).getBoundingClientRect();
+			expect(title.height).toBeGreaterThan(close.height * 2); // the premise: the title wraps
+			expect(Math.abs(close.top - title.top)).toBeLessThanOrEqual(1);
 		});
 
 		// Where a scrollbar takes room (Windows), it would push the pages off the centreline by half its width; the

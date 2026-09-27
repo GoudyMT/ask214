@@ -792,6 +792,10 @@
 			grid-template-areas: '. title close';
 			column-gap: var(--space-s);
 		}
+		/* Top right, level with the first line when the title wraps (at 400% zoom). */
+		.reader__close {
+			align-self: start;
+		}
 		.reader__title {
 			white-space: nowrap;
 			overflow: hidden;
