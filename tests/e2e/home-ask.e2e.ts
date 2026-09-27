@@ -46,19 +46,26 @@ test('a device without the files asks before downloading, whatever an old flag s
 	await input.fill('How do I apply for SkillBridge?');
 	await page.getByRole('button', { name: /^search$/i }).click();
 	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
+	// A download started behind the prompt would wait for the worker, like every download here: let the worker
+	// take charge, then give such a download time to show.
+	await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+	await page.waitForTimeout(2_000);
 	// Asking is all it did: no embed worker, and nothing of the model or its runtime was fetched.
 	expect(workers).toEqual([]);
 	expect(downloads).toEqual([]);
 });
 
 // The other side: a device that keeps every on-device file is set up already, so asking on the device goes
-// straight to the answer - no setup prompt, and the embed worker starts at once.
-test('a device that keeps every on-device file answers without asking to set up', async ({
+// straight to its on-device answer - no setup prompt, and the embed worker starts at once. (The stand-in files
+// cannot answer, so the run itself then fails; what is checked is that it started without asking.)
+test('a device that keeps every on-device file starts its on-device answer without asking to set up', async ({
 	page
 }) => {
 	const workers: string[] = [];
 	page.on('worker', (worker) => workers.push(worker.url()));
 	await page.goto('/');
+	// WebKit ties the cache to a registration, so seed it only once one is in place.
+	await page.evaluate(() => navigator.serviceWorker.ready);
 	// Stand-ins at the on-device files' addresses: the page asks only whether each is kept, not what it holds.
 	await page.evaluate(
 		async ({ cacheName, paths }) => {
@@ -149,8 +156,10 @@ test('a mode picked before the page is ready is kept', async ({ page }) => {
 	await page.goto('/');
 	const search = page.getByRole('button', { name: /^search$/i });
 	const onDevice = page.getByRole('button', { name: /^on device$/i });
-	await expect(search).toBeDisabled(); // the premise: no store yet
-	await onDevice.click();
+	await expect(search).toBeDisabled();
+	expect(await tapBeforeReady(page, [{ selector: '.ask-mode__opt', text: 'On device' }])).toBe(
+		true
+	);
 	await expect(onDevice).toHaveAttribute('aria-pressed', 'true');
 
 	await expect(search).toBeEnabled({ timeout: 10_000 });
@@ -167,12 +176,10 @@ test('a question picked from the feed before the page is ready is asked once it 
 	page
 }) => {
 	await holdCacheReads(page);
-	// The feed drifts sideways unless motion is reduced, and a moving pill cannot be tapped reliably.
-	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await page.goto('/');
 	const search = page.getByRole('button', { name: /^search$/i });
-	await expect(search).toBeDisabled(); // the premise: no store yet
-	await page.locator('.q-feed__pill').first().click();
+	await expect(search).toBeDisabled();
+	expect(await tapBeforeReady(page, [{ selector: '.q-feed__pill' }])).toBe(true);
 
 	await expect(search).toBeEnabled({ timeout: 10_000 });
 	// Online is the default, so the question reaches the consent step for answering online.

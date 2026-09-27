@@ -2019,7 +2019,9 @@ describe('SourceReader, a document opened whole', () => {
 				container.querySelector('.reader__title') as HTMLElement
 			).getBoundingClientRect();
 			const gap = parseFloat(getComputedStyle(head).columnGap) || 0;
-			expect(Math.abs(title.left - inside(head).left - (22 + gap))).toBeLessThanOrEqual(1);
+			const inner = inside(head);
+			expect(Math.abs(title.left - inner.left - (22 + gap))).toBeLessThanOrEqual(1);
+			expect(Math.abs(inner.left + inner.width - title.right - (22 + gap))).toBeLessThanOrEqual(1);
 		});
 
 		// At 400% zoom a long title wraps beside Close; Close stays at the top right, level with the first line,

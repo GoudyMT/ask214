@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ASK_ASSET_CACHE } from '../../src/lib/ask/asset-cache';
 import { DEVICE_FILES } from '../../src/lib/ask/device-files';
 
 // Acceptance: the offline "Ask" must answer with NO network after a one-time warm load - the whole
@@ -171,8 +172,21 @@ test('a setup tapped before the worker takes charge starts its download only onc
 	expect(library).toEqual([]);
 
 	await releaseWorker(page);
-	await expect.poll(() => workers.length, { timeout: 15_000 }).toBe(1);
+	await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+	// Started by the worker taking charge, not by the wait running out 10 s after the tap: well inside that.
+	await expect.poll(() => workers.length, { timeout: 3_000 }).toBe(1);
+	// And through the worker, which keeps it: the answer library lands in the device's cache.
 	await expect
-		.poll(() => [...new Set(library)].sort(), { timeout: 15_000 })
+		.poll(
+			() =>
+				page.evaluate(async (cacheName) => {
+					const kept = await (await caches.open(cacheName)).keys();
+					return kept
+						.map((request) => new URL(request.url).pathname)
+						.filter((path) => path.startsWith('/corpus/'))
+						.sort();
+				}, ASK_ASSET_CACHE),
+			{ timeout: 30_000 }
+		)
 		.toEqual(DEVICE_FILES.filter((path) => path.startsWith('/corpus/')).sort());
 });
