@@ -222,6 +222,31 @@ export function libraryToRestore(
 }
 
 /**
+ * Decide which answer-library files the service worker fetches at install, so a device that kept the library
+ * still answers on the device - offline too - after a release that renames it.
+ *
+ * The library is versioned by URL: a new release ships a new pair and activate prunes the old one. Without this, a
+ * device that set up on-device answers (or saved a document) would be asked to set up again although it still
+ * holds the model, and could not answer offline until it did. Install runs while online, so the pair is fetched
+ * then - only for a device that held a library, and only the files it lacks. A restore that fails at install is
+ * not retried at activate, where the prune has already removed the old pair this rule reads.
+ *
+ * Args:
+ *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
+ *   shipped: the pathnames this build ships, which carries the current library's name
+ *
+ * Returns:
+ *   the shipped answer-library pathnames to fetch and store; empty when none was held or the current one is.
+ */
+export function answerLibraryToRestore(
+	cachedPaths: readonly string[],
+	shipped: readonly string[]
+): string[] {
+	if (!cachedPaths.some((path) => path.startsWith('/corpus/'))) return [];
+	return shipped.filter((path) => path.startsWith('/corpus/') && !cachedPaths.includes(path));
+}
+
+/**
  * Decide whether the service worker keeps a response it passes through to the page.
  *
  * Everything it passes is kept, except a source document: viewing a document keeps nothing, and only the

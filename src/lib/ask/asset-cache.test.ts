@@ -10,6 +10,7 @@ import {
 	isApiRequest,
 	keptOnFetch,
 	libraryToRestore,
+	answerLibraryToRestore,
 	storeOnFetch,
 	carryOverSavedDocuments,
 	keptOnActivate,
@@ -426,6 +427,36 @@ describe('libraryToRestore (the PDF library a saved document needs after an upda
 			'/pdf-worker/6.4.0/pdf.min.mjs',
 			'/pdf-worker/6.4.0/pdf.worker.min.mjs'
 		]);
+	});
+});
+
+// A release that renames the answer library prunes the old pair at activate. A device that kept one - set up for
+// on-device answers, or a document saved - gets the new pair at install, while online, instead of being asked to
+// set up again (the model is still held) and losing offline answers until it does.
+describe('answerLibraryToRestore (the answer library a device keeps through an update)', () => {
+	const SHIPPED = [
+		'/_app/immutable/entry/start.js',
+		'/corpus/corpus-v1.0.3.json',
+		'/corpus/corpus-v1.0.3.embeddings.bin',
+		'/docs/tap_va101.0f650528.pdf'
+	];
+	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const OLD = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
+	const NEW = ['/corpus/corpus-v1.0.3.json', '/corpus/corpus-v1.0.3.embeddings.bin'];
+
+	it('returns the shipped library when an earlier one is held', () => {
+		expect(answerLibraryToRestore([...OLD, MODEL], SHIPPED)).toEqual(NEW);
+	});
+
+	it('returns only what is missing, and nothing when the shipped library is held', () => {
+		expect(answerLibraryToRestore([...OLD, NEW[0] ?? ''], SHIPPED)).toEqual([NEW[1]]);
+		expect(answerLibraryToRestore(NEW, SHIPPED)).toEqual([]);
+	});
+
+	// A device that never kept the library never asked for it, so an update downloads nothing for it.
+	it('returns nothing on a device that held no answer library', () => {
+		expect(answerLibraryToRestore([MODEL], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([], SHIPPED)).toEqual([]);
 	});
 });
 

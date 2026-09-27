@@ -13,6 +13,7 @@ import {
 	isApiRequest,
 	keptOnFetch,
 	libraryToRestore,
+	answerLibraryToRestore,
 	storeOnFetch,
 	APP_SHELL,
 	offlineResponse
@@ -34,9 +35,10 @@ sw.addEventListener('install', (event) => {
 			await cache.addAll([...PRECACHE, APP_SHELL]);
 			// Install is when this release's files are known to be reachable - it is downloading them now - while
 			// activation may come later with no connection. So a device holding saved documents gets this
-			// release's PDF library here, and activation tries again for any file this could not store. The
-			// restore never throws, so it cannot fail the install.
-			await restoreLibraryForSavedDocuments(await caches.keys());
+			// release's PDF library here, and a device that kept the answer library gets this release's; activation
+			// tries again for any PDF-library file this could not store. The restore never throws, so it cannot
+			// fail the install.
+			await restoreKeptLibraries(await caches.keys());
 		})()
 	);
 });
@@ -57,7 +59,7 @@ sw.addEventListener('activate', (event) => {
 			// The fallback for a library install could not store. Started after activation, not awaited inside
 			// it: page requests wait while a worker activates, so a ~1.7 MB download here would stall every page
 			// load after an update.
-			void restoreLibraryForSavedDocuments(keys);
+			void restoreKeptLibraries(keys);
 		})()
 	);
 });
@@ -102,12 +104,13 @@ async function pruneSupersededVersions(cacheNames: string[]): Promise<void> {
  * prune above deletes the old pair, and nothing else would store the new one until a reader opens online, so
  * every saved document would open offline only as its text. `libraryToRestore` returns the shipped library
  * files to fetch, and none on a device that saved no document. Run at install, while the release is being
- * downloaded, and again after activation for anything install could not store.
+ * downloaded, and again after activation for anything install could not store. The answer library is restored
+ * the same way (`answerLibraryToRestore`), for a device that kept an earlier one.
  *
  * @param cacheNames The cache names already read from caches.keys(), so an install that has never fetched a
  *   lazy asset is skipped rather than being given an empty cache by caches.open().
  */
-async function restoreLibraryForSavedDocuments(cacheNames: string[]): Promise<void> {
+async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
 	if (!cacheNames.includes(ASK_ASSET_CACHE)) return;
 	// A restore is opportunistic, like the prune: if a fetch or a cache call rejects - or the browser stops the
 	// worker part-way, which stores nothing partial - the saved documents open as text offline until the next
@@ -119,7 +122,10 @@ async function restoreLibraryForSavedDocuments(cacheNames: string[]): Promise<vo
 			const url = new URL(request.url);
 			if (url.origin === sw.location.origin) cached.push(url.pathname);
 		}
-		for (const path of libraryToRestore(cached, ASSETS)) {
+		for (const path of [
+			...libraryToRestore(cached, ASSETS),
+			...answerLibraryToRestore(cached, ASSETS)
+		]) {
 			const response = await fetch(path);
 			if (response.status === 200) await cache.put(path, response);
 		}
