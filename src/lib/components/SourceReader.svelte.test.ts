@@ -1458,9 +1458,9 @@ describe('SourceReader, a document opened whole', () => {
 		await settle();
 		seg(container, 'Page')?.click();
 		await settle();
-		body.scrollTop = 900;
+		body.scrollTop = 600;
 		await settle();
-		expect(body.scrollTop).toBe(900);
+		expect(body.scrollTop).toBe(600);
 
 		seg(container, 'Text')?.click();
 		await settle();
@@ -1957,6 +1957,79 @@ describe('SourceReader, a document opened whole', () => {
 				for (const centre of centres)
 					expect(Math.abs(centre - middle), part).toBeLessThanOrEqual(1);
 			}
+		});
+
+		// Centring the title must not narrow it: a column held empty on each side to balance Close cost a long title
+		// a line on a phone and, at 400% zoom, most of the reading pane.
+		const openDoc = async () => {
+			const view = render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: threePages()
+				}
+			});
+			await vi.waitFor(() => expect(view.container.querySelector('.reader__title')).not.toBeNull());
+			return view.container;
+		};
+		// The head's content box, less its padding.
+		function inside(head: HTMLElement): { left: number; width: number } {
+			const style = getComputedStyle(head);
+			const box = head.getBoundingClientRect();
+			const left = parseFloat(style.paddingLeft);
+			return {
+				left: box.left + left,
+				width: head.clientWidth - left - parseFloat(style.paddingRight)
+			};
+		}
+
+		// On a tall screen Close sits up on the Source line, so the title has a row of the head's whole width.
+		it.each([
+			['a desktop', 1280, 800],
+			['a phone', 390, 844]
+		])(
+			"gives the title the head's whole width on %s, with Close above it",
+			async (_name, width, height) => {
+				await page.viewport(width, height);
+				const container = await openDoc();
+				const head = container.querySelector('.reader__head') as HTMLElement;
+				const title = (
+					container.querySelector('.reader__title') as HTMLElement
+				).getBoundingClientRect();
+				const close = (
+					container.querySelector('.reader__close') as HTMLElement
+				).getBoundingClientRect();
+				expect(Math.abs(title.width - inside(head).width)).toBeLessThanOrEqual(1);
+				expect(close.bottom).toBeLessThanOrEqual(title.top);
+			}
+		);
+
+		// On a short screen Source is hidden and Close shares the title's line, in a column only as wide as Close
+		// needs; an equal column on the other side keeps the title centred.
+		it.each([
+			['a phone turned sideways', 844, 390],
+			['400% zoom', 320, 256]
+		])('keeps only a 22 px column each side of the title on %s', async (_name, width, height) => {
+			await page.viewport(width, height);
+			const container = await openDoc();
+			const head = container.querySelector('.reader__head') as HTMLElement;
+			const title = (
+				container.querySelector('.reader__title') as HTMLElement
+			).getBoundingClientRect();
+			const gap = parseFloat(getComputedStyle(head).columnGap) || 0;
+			expect(Math.abs(title.left - inside(head).left - (22 + gap))).toBeLessThanOrEqual(1);
+		});
+
+		// Where a scrollbar takes room (Windows), it would push the pages off the centreline by half its width; the
+		// body keeps as much room free on the other edge, so they stay on the title's line. This test browser hides
+		// its scrollbars and will not draw one that takes room, even a styled one, so the offset cannot show here:
+		// the rule is read.
+		it('keeps room for a scrollbar on both edges of the body', async () => {
+			const container = await openDoc();
+			const body = container.querySelector('.reader__body') as HTMLElement;
+			expect(getComputedStyle(body).scrollbarGutter).toBe('stable both-edges');
 		});
 	});
 });
