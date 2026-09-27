@@ -465,6 +465,22 @@ describe('storeOnFetch', () => {
 		expect(waited).toHaveLength(1);
 		await expect(waited[0]).resolves.toBeUndefined();
 	});
+
+	// The app page kept at install must stay the one its own release installed: a visit online during an update
+	// fetches the NEW release's page, and storing it in the old release's cache would serve, offline, a page naming
+	// files that cache does not hold. So a held copy stands; with none held (after an erase), a visit keeps one.
+	it('keeps the app page install stored, and stores one only when none is held', async () => {
+		for (const held of [true, false]) {
+			const put = vi.fn(async () => {});
+			const match = vi.fn(async () => (held ? new Response('install copy') : undefined));
+			const waited: Promise<unknown>[] = [];
+			const event = { waitUntil: (promise: Promise<unknown>) => void waited.push(promise) };
+			const cache = { put, match } as unknown as Cache;
+			storeOnFetch(event, cache, new Request(`https://app.test${APP_SHELL}`), new Response('page'));
+			await waited[0];
+			expect(put, `held: ${held}`).toHaveBeenCalledTimes(held ? 0 : 1);
+		}
+	});
 });
 
 // The model and the ORT WASM are served at fixed URLs and kept in the asset cache for good: a returning device

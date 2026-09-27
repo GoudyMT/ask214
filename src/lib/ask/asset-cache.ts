@@ -245,6 +245,10 @@ export function keptOnFetch(pathname: string): boolean {
  * until it lands rather than stopping an idle worker mid-write; a write that fails - a full disk above all -
  * ends quietly, because the response was already served and the next request fetches and tries again.
  *
+ * APP_SHELL is the exception: a held copy stands. Install stored it from its own release, and a visit during an
+ * update fetches the next release's page, which in this cache would name files the cache does not hold. With none
+ * held - after an erase - the visit keeps one.
+ *
  * @param event The fetch event whose lifetime the write extends.
  * @param cache The cache to write into.
  * @param request The request the copy is stored under.
@@ -256,7 +260,14 @@ export function storeOnFetch(
 	request: Request,
 	response: Response
 ): void {
-	event.waitUntil(cache.put(request, response.clone()).catch(() => {}));
+	const copy = response.clone();
+	const keepHeld = new URL(request.url).pathname === APP_SHELL;
+	event.waitUntil(
+		(async () => {
+			if (keepHeld && (await cache.match(APP_SHELL, { ignoreVary: true })) !== undefined) return;
+			await cache.put(request, copy);
+		})().catch(() => {})
+	);
 }
 
 /**
