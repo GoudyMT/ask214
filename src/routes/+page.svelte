@@ -61,9 +61,9 @@
 	let left = false;
 	// A mode or a feed question picked before the store exists - it waits for the cache read - is held here and
 	// handed to the store when it is made, so an early tap is not lost. The toggle shows the held mode until then:
-	// the saved default, or the one just picked.
+	// the saved default, or the one just picked. A question keeps the mode it was picked in.
 	let earlyMode = $state(getDefaultMode());
-	let earlyQuery: string | undefined;
+	let earlyQuery: { query: string; mode: 'device' | 'online' } | undefined;
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
@@ -142,9 +142,13 @@
 				synthesisEnabled: isSynthesisEnabled
 			});
 			// The store opens online when capable (the on-ramp default); honor the held mode - an explicit device
-			// choice, or one picked while the cache was read. A feed question picked in that time is asked now.
-			if (earlyMode === 'device') store.setMode('device');
-			if (earlyQuery !== undefined) void store.ask(earlyQuery);
+			// choice, or one picked while the cache was read. A feed question picked in that time is asked now, in
+			// the mode showing when it was picked, as it would have been with the store in place; a mode tapped
+			// after it then applies to the next question.
+			const first = earlyQuery?.mode ?? earlyMode;
+			if (first === 'device') store.setMode('device');
+			if (earlyQuery !== undefined) void store.ask(earlyQuery.query);
+			if (earlyMode !== first) store.setMode(earlyMode);
 		});
 		return () => {
 			left = true;
@@ -171,7 +175,7 @@
 		onlineCapable={true}
 		mode={store?.mode ?? earlyMode}
 		showNudge={store?.showNudge ?? false}
-		onAsk={(q) => (store ? void store.ask(q) : (earlyQuery = q))}
+		onAsk={(q) => (store ? void store.ask(q) : (earlyQuery = { query: q, mode: earlyMode }))}
 		onSetUp={() => store?.setUp()}
 		onDismiss={() => store?.dismissSetup()}
 		onSetMode={(m) => (store ? store.setMode(m) : (earlyMode = m))}

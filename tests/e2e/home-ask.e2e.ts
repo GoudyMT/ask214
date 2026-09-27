@@ -181,6 +181,62 @@ test('a question picked from the feed before the page is ready is asked once it 
 	).toBeVisible();
 });
 
+// Taps made in one task while Search is still disabled - no store yet - so each lands before the store exists
+// however slow the machine is. Returns whether that held when the taps were made.
+async function tapBeforeReady(
+	page: Page,
+	targets: { selector: string; text?: string }[]
+): Promise<boolean> {
+	return page.evaluate((all) => {
+		const early = (document.querySelector('button.ask-search') as HTMLButtonElement).disabled;
+		for (const { selector, text } of all) {
+			const target = [...document.querySelectorAll<HTMLElement>(selector)].find(
+				(element) => text === undefined || element.textContent?.trim() === text
+			);
+			if (target === undefined) throw new Error('E_TAP_TARGET_MISSING');
+			target.click();
+		}
+		return early;
+	}, targets);
+}
+
+// A question held before the page is ready runs in the mode showing when it was picked, as it would with the page
+// ready; a mode tapped after it applies to the next question and sends nothing. The saved default here is the
+// device and online answers were agreed to before, so a question run in the later mode would go online at once.
+test('a feed question picked before the page is ready runs in the mode it was picked in', async ({
+	page,
+	context
+}) => {
+	await page.addInitScript(() => {
+		localStorage.setItem('mtc:ask:default-mode', 'device');
+		localStorage.setItem('mtc:ask:online-consented', '1');
+	});
+	const sent: string[] = [];
+	context.on('request', (request) => {
+		const path = new URL(request.url()).pathname;
+		if (path.startsWith('/api/')) sent.push(path);
+	});
+	await holdCacheReads(page);
+	await page.goto('/');
+	const search = page.getByRole('button', { name: /^search$/i });
+	await expect(search).toBeDisabled();
+	const early = await tapBeforeReady(page, [
+		{ selector: '.q-feed__pill' },
+		{ selector: '.ask-mode__opt', text: 'Online' }
+	]);
+	expect(early).toBe(true);
+
+	await expect(search).toBeEnabled({ timeout: 10_000 });
+	// Picked on the device, which keeps nothing: the setup is offered, and nothing went online.
+	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
+	expect(sent).toEqual([]);
+	// The later tap still counts, for the next question.
+	await expect(page.getByRole('button', { name: 'Online', exact: true })).toHaveAttribute(
+		'aria-pressed',
+		'true'
+	);
+});
+
 test('the Ask input is the first focusable control in the page content', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeEnabled();
