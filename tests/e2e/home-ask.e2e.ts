@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 // The Ask is the home page now (ADR-022/024). /ask stays as a permanent redirect so old links land.
 test('/ask redirects to the home page', async ({ page }) => {
@@ -94,6 +94,52 @@ test('the mode toggle flips both ways and the question feed stays put (V2)', asy
 	await expect(online).toHaveAttribute('aria-pressed', 'true');
 	await expect(privacy).toContainText(/only your question is sent/i);
 	await expect(feedPill).toBeVisible();
+});
+
+// The page makes its Ask store only after it has read the cache, which can take up to its time limit. A choice made
+// in that time is held and handed to the store, not lost. The page's cache reads are held here, so the store
+// waits for the limit and every tap below lands before it exists.
+async function holdCacheReads(page: Page): Promise<void> {
+	await page.addInitScript(() => {
+		caches.match = () => new Promise<Response | undefined>(() => {});
+	});
+}
+
+test('a mode picked before the page is ready is kept', async ({ page }) => {
+	await holdCacheReads(page);
+	await page.goto('/');
+	const search = page.getByRole('button', { name: /^search$/i });
+	const onDevice = page.getByRole('button', { name: /^on device$/i });
+	await expect(search).toBeDisabled(); // the premise: no store yet
+	await onDevice.click();
+	await expect(onDevice).toHaveAttribute('aria-pressed', 'true');
+
+	await expect(search).toBeEnabled({ timeout: 10_000 });
+	await expect(onDevice).toHaveAttribute('aria-pressed', 'true');
+	await page
+		.getByRole('textbox', { name: /ask a question/i })
+		.fill('How do I apply for SkillBridge?');
+	await search.click();
+	// Asked on the device, so it offers the setup, not an online answer.
+	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
+});
+
+test('a question picked from the feed before the page is ready is asked once it is', async ({
+	page
+}) => {
+	await holdCacheReads(page);
+	// The feed drifts sideways unless motion is reduced, and a moving pill cannot be tapped reliably.
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	await page.goto('/');
+	const search = page.getByRole('button', { name: /^search$/i });
+	await expect(search).toBeDisabled(); // the premise: no store yet
+	await page.locator('.q-feed__pill').first().click();
+
+	await expect(search).toBeEnabled({ timeout: 10_000 });
+	// Online is the default, so the question reaches the consent step for answering online.
+	await expect(
+		page.getByRole('heading', { name: /send your question to answer online/i })
+	).toBeVisible();
 });
 
 test('the Ask input is the first focusable control in the page content', async ({ page }) => {

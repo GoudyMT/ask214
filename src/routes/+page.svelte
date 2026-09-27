@@ -59,6 +59,10 @@
 	// Set when the page is left. A download waiting for the service worker checks it when the wait ends, so a setup
 	// left behind starts nothing once the worker takes charge.
 	let left = false;
+	// A mode or a feed question picked before the store exists - it waits for the cache read - is held here and
+	// handed to the store when it is made, so an early tap is not lost. The held mode shows on the toggle at once.
+	let earlyMode = $state<'device' | 'online'>();
+	let earlyQuery: string | undefined;
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
@@ -136,8 +140,10 @@
 				markOnlineConsent: () => setOnlineConsented(true),
 				synthesisEnabled: isSynthesisEnabled
 			});
-			// The store opens online when capable (the on-ramp default); honor an explicit device choice.
-			if (getDefaultMode() === 'device') store.setMode('device');
+			// The store opens online when capable (the on-ramp default); honor a mode picked while the cache was read,
+			// else an explicit device choice. A feed question picked in that time is asked now.
+			if ((earlyMode ?? getDefaultMode()) === 'device') store.setMode('device');
+			if (earlyQuery !== undefined) void store.ask(earlyQuery);
 		});
 		return () => {
 			left = true;
@@ -162,12 +168,12 @@
 		{ready}
 		{loadSource}
 		onlineCapable={true}
-		mode={store?.mode ?? getDefaultMode()}
+		mode={store?.mode ?? earlyMode ?? getDefaultMode()}
 		showNudge={store?.showNudge ?? false}
-		onAsk={(q) => store?.ask(q)}
+		onAsk={(q) => (store ? void store.ask(q) : (earlyQuery = q))}
 		onSetUp={() => store?.setUp()}
 		onDismiss={() => store?.dismissSetup()}
-		onSetMode={(m) => store?.setMode(m)}
+		onSetMode={(m) => (store ? store.setMode(m) : (earlyMode = m))}
 		onConsentOnline={() => store?.consentOnline()}
 		onStayDevice={() => store?.stayOnDevice()}
 		onDismissNudge={() => store?.dismissNudge()}
