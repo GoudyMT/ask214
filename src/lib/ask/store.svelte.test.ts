@@ -501,6 +501,13 @@ describe('createAskStore', () => {
 		expect(store.showNudge).toBe(false);
 	});
 
+	it('never shows the private-mode nudge on a device that keeps the files', async () => {
+		const store = onlineStore({ nudgeAfter: 2, deviceKept: true });
+		await store.ask('one');
+		await store.ask('two');
+		expect(store.showNudge).toBe(false);
+	});
+
 	// --- run terminal-write robustness: a stale run must never clobber a superseding state ---
 
 	const oneHit: RetrieveResult = {
