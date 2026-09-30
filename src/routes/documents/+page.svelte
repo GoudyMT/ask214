@@ -4,6 +4,7 @@
 	import SourceReader from '$lib/components/SourceReader.svelte';
 	import { CORPUS_BASE, loadCorpus } from '$lib/ask/corpus-load';
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
+	import { waitForControl } from '$lib/ask/when-controlled';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { documentLibrary } from '$lib/sources/document-library';
 	import {
@@ -132,8 +133,19 @@
 
 	// The reader's text view comes from the corpus, loaded only when a document's text is asked for.
 	let sources = new Map<string, Source>();
+	// Set when the page is left, so a load still waiting for the service worker starts nothing once it takes charge.
+	let left = false;
+	onMount(() => () => {
+		left = true;
+	});
 	const getCorpus = createLazyCorpus(
-		() => loadCorpus(fetch, CORPUS_BASE),
+		async () => {
+			// On a first visit this can be the first download of the answer library: waiting for the service worker
+			// keeps it, so it is not downloaded again.
+			await waitForControl();
+			if (left) throw new Error('E_PAGE_LEFT');
+			return loadCorpus(fetch, CORPUS_BASE);
+		},
 		(corpus) => {
 			sources = sourcesFromCorpus(corpus);
 		}

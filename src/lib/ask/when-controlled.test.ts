@@ -91,3 +91,39 @@ describe('whenControlled', () => {
 		expect(settled).toBe(false);
 	});
 });
+
+describe('waitForControl', () => {
+	// The memo lives at module scope, so each case loads the module afresh and stubs the browser's container.
+	async function loadModule(container: FakeContainer) {
+		vi.resetModules();
+		vi.stubGlobal('navigator', { serviceWorker: asContainer(container) });
+		return import('./when-controlled');
+	}
+
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+	});
+
+	it('hands every caller the one wait, so a visit waits at most once', async () => {
+		const fake = new FakeContainer();
+		const { waitForControl } = await loadModule(fake);
+		const first = waitForControl();
+		expect(waitForControl()).toBe(first);
+		fake.controller = {};
+		expect(waitForControl()).toBe(first);
+	});
+
+	it('gives up on a worker that does not come once the wait time has passed', async () => {
+		vi.useFakeTimers();
+		const { waitForControl, CONTROL_WAIT_MS } = await loadModule(new FakeContainer());
+		let settled: boolean | undefined;
+		void waitForControl().then((controlled) => (settled = controlled));
+		vi.advanceTimersByTime(CONTROL_WAIT_MS - 1);
+		await Promise.resolve();
+		expect(settled).toBeUndefined();
+		vi.advanceTimersByTime(1);
+		await Promise.resolve();
+		expect(settled).toBe(false);
+	});
+});
