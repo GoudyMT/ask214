@@ -16,7 +16,7 @@ The foundation phase establishes the development environment, build pipeline, an
 | End-to-end tests       | Playwright          | 1.59.x     | Cross-browser E2E (Chromium / Firefox / WebKit)          |
 | Linting                | ESLint              | 10.x       | TypeScript + Svelte rules                                |
 | Formatting             | Prettier            | 3.x        | Consistent code style                                    |
-| Pre-commit hooks       | Husky + lint-staged | 9.x / 17.x | Block commits that violate lint, types, or tests         |
+| Pre-commit hooks       | Husky + lint-staged | 9.x / 17.x | Block commits that fail lint, types, tests, or messages  |
 | Node version manager   | fnm                 | 1.39.x     | User-space Node management; auto-switch via `.nvmrc`     |
 | Hosting                | Cloudflare Workers  | n/a        | Static assets + Worker on Cloudflare's edge              |
 | Deploy CLI             | wrangler            | 4.x        | Cloudflare deployment tool, consumed via `wrangler.toml` |
@@ -102,7 +102,7 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Pipeline.** `lint-staged` (lints + formats staged files only) -> `pnpm run check` (TypeScript) -> `pnpm run test:unit` (Vitest). If any step fails, the commit is rejected.
 
-**Commit message check.** A second hook, `commit-msg`, reads the message before the commit is recorded. It rejects any message that is not a single line of the form `type: subject`, so a body, a footer or a trailer stops the commit. It runs on every `git commit` and `git merge`, whether the message comes from `-m`, a file or an editor.
+**Commit message check.** A second hook, `commit-msg`, reads the message before `git commit` or `git merge` records it, once `pnpm install` has set up the hooks. It is an early warning: it stops a message that is not a single line of the form `type: subject`, and it lets through anything git would record correctly. The check that enforces the format runs in CI. It reads every commit a pull request carries as git recorded it, because commits git makes itself, such as a cherry-pick, skip the hook. The squash commit on `main` takes the pull request's title.
 
 **Tradeoffs accepted.** Each commit takes 10-15 seconds while the hook runs. Acceptable for solo development; revisitable as the test suite grows.
 
@@ -167,7 +167,7 @@ Cloudflare Workers (with Static Assets) was chosen for cost (free at expected sc
 - **Test-Driven Development.** Tests written before or alongside implementation. Acceptance criteria live in test files, not in comments.
 - **No commit bypasses.** The pre-commit hook is the safety net. The `--no-verify` flag is reserved for genuine emergencies.
 - **Strict TypeScript.** No `any` without justification. No silent unchecked indexed access.
-- **One-line commit messages.** One line of the form `type: subject`, with nothing after it. The type is one of `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `security` or `perf`. A scope in parentheses is used only when it is needed. The subject is an imperative phrase in lowercase with no period. There is no body and no footer. The `commit-msg` hook checks it.
+- **One-line commit messages.** One line of the form `type: subject`, with nothing after it. The type is one of `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `security` or `perf`. A scope in parentheses is used only when it is needed. The subject is an imperative phrase in lowercase with no period. There is no body and no footer. The `commit-msg` hook warns early, and CI checks every commit a pull request carries.
 - **Public source code with selective documentation.** Code and outward-facing decision documents are tracked publicly. Operational documents (drafts, ADRs in progress, session logs) are kept locally.
 
 ## Further Reading
@@ -188,4 +188,4 @@ Cloudflare Workers (with Static Assets) was chosen for cost (free at expected sc
 - 2026-05-22 (initial draft): Phase 0 foundation decisions captured at Tasks 0.1-0.6.
 - 2026-05-22 (Phase 0 polish): Tasks 0.7-0.10 folded in - CI Pipeline + Dependency Maintenance section, Architecture Decision Records section, Cloudflare Workers + Static Assets update (replaces earlier "Pages" framing per Cloudflare's 2025-2026 platform unification). Stack at a Glance updated; wrangler added as deploy CLI. Knowingly exceeds 1500-word soft cap by ~265 words to capture distinct Phase 0 tooling without compressing previously approved Tasks 0.1-0.6 narratives.
 - 2026-06-13: Corrected the `minimumReleaseAge` description - the guard gates dependency _resolution_ (local installs/updates and Dependabot lockfile regeneration), not frozen-lockfile installs. It had been described here but configured nowhere; now set to 1440 in `pnpm-workspace.yaml`, paired with a seven-day Dependabot `cooldown`.
-- 2026-09-30: Added the `commit-msg` hook to the Husky section and replaced the commit message standard with the one-line `type: subject` rule the hook enforces.
+- 2026-09-30: Added the `commit-msg` hook to the Husky section as an early warning, added a CI check of every commit message a pull request carries, and replaced the commit message standard with the one-line `type: subject` rule they enforce.

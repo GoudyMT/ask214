@@ -70,6 +70,10 @@ jobs:
       - name: Check served documents across the pull request's commits
         run: pnpm run check:served-history
 
+      # Commits git makes itself (cherry-pick, revert, squash) never run the local hook, so read them here.
+      - name: Check every commit message the pull request carries
+        run: pnpm run check:commits
+
       # The library refuses to run against a worker from a different release, so a dependency bump that
       # skips re-copying the vendored file fails only at runtime, for the reader, with nothing red here.
       - name: Check vendored pdf worker (drift gate vs the installed package)
