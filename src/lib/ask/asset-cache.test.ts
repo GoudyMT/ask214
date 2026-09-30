@@ -29,7 +29,7 @@ describe('classifyAsset', () => {
 	it('marks the heavy model, ORT WASM, and the corpus as lazy (kept out of the install precache)', () => {
 		expect(classifyAsset('/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx')).toBe('lazy');
 		expect(classifyAsset('/models/Xenova/all-MiniLM-L6-v2/config.json')).toBe('lazy');
-		expect(classifyAsset('/wasm/ort-wasm-simd-threaded.wasm')).toBe('lazy');
+		expect(classifyAsset('/wasm/ort-wasm-simd-threaded.asyncify.wasm')).toBe('lazy');
 		// The ~3.5MB corpus is lazy too: fetched on demand (a device query or a "Read more" click) and cached
 		// then, so it never crosses the wire on a passive page load (including the SW install).
 		expect(classifyAsset('/corpus/corpus-v1.0.2.json')).toBe('lazy');
@@ -60,7 +60,7 @@ describe('classifyAsset', () => {
 			'/pdf-worker/pdf.worker.min.mjs',
 			'/corpus/corpus-v1.0.2.json',
 			'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 		];
 		expect(assets.filter((path) => classifyAsset(path) === 'precache')).toEqual(['/index.html']);
 	});
@@ -107,7 +107,7 @@ describe('isSupersededVersionedEntry (per-entry pruning inside the lazy asset ca
 		'/corpus/corpus-v1.0.2.json',
 		'/corpus/corpus-v1.0.2.embeddings.bin',
 		'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-		'/wasm/ort-wasm-simd-threaded.wasm'
+		'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 	];
 
 	it('marks a corpus generation that is no longer shipped', () => {
@@ -159,7 +159,7 @@ describe('isSupersededVersionedEntry (per-entry pruning inside the lazy asset ca
 			'/corpus/corpus-v1.0.2.json',
 			'/corpus/corpus-v1.0.2.embeddings.bin',
 			'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 		];
 		expect(cached.filter((path) => isSupersededVersionedEntry(path, SHIPPED))).toEqual([
 			'/corpus/corpus-v1.0.json',
@@ -171,7 +171,7 @@ describe('isSupersededVersionedEntry (per-entry pruning inside the lazy asset ca
 			'/corpus/corpus-v1.0.2.json',
 			'/corpus/corpus-v1.0.2.embeddings.bin',
 			'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 		]);
 	});
 
@@ -231,7 +231,7 @@ describe('isSupersededVersionedEntry - documents and the pdf library', () => {
 			'/docs/tap_vet_centers.2222bbbb.pdf',
 			'/corpus/corpus-v1.0.2.json',
 			'/models/Xenova/all-MiniLM-L6-v2/config.json',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.mjs'
 		];
 		expect(
 			isSupersededVersionedEntry(
@@ -334,7 +334,7 @@ describe('carryOverSavedDocuments (a new asset-cache name keeps what the user sa
 				'/pdf-worker/6.3.289/pdf.min.mjs': 'lib',
 				'/corpus/corpus-v1.0.2.json': 'text',
 				[MODEL]: 'model',
-				'/wasm/ort-wasm-simd-threaded.wasm': 'wasm'
+				'/wasm/ort-wasm-simd-threaded.asyncify.wasm': 'wasm'
 			}
 		});
 		expect(await carryOverSavedDocuments(api)).toEqual(new Set([EARLIER]));
@@ -966,7 +966,7 @@ describe('supersededToPrune (the old answer library stays while its replacement 
 		...NEW,
 		DOCUMENT,
 		'/models/Xenova/all-MiniLM-L6-v2/config.json',
-		'/wasm/ort-wasm-simd-threaded.wasm',
+		'/wasm/ort-wasm-simd-threaded.asyncify.mjs',
 		'/pdf-worker/6.4.0/pdf.min.mjs',
 		'/pdf-worker/6.4.0/pdf.worker.min.mjs'
 	];
@@ -1061,10 +1061,13 @@ describe('storeOnFetch', () => {
 
 // The model and the ORT WASM are served at fixed URLs and kept in the asset cache for good: a returning device
 // never asks for them again, so bytes vendored anew reach it only if the cache's name changes as well. Each
-// name is pinned to the digest of the bytes it holds. Changing those bytes fails here until the cache takes a
-// new name - add a line for the new name, and keep the old one as the record of what that name held.
+// name is pinned to the digest of the vendored folders. Changing bytes a device keeps fails here until the cache
+// takes a new name - add a line for the new name, and keep the old one as the record of what that name held. The
+// digest also moves when a file no device ever requested is removed, which reaches no device: nothing needs
+// fetching again, so that case re-pins the same name to the new digest (the base runtime WASM was removed this
+// way - no glue for it was vendored, so nothing could start it).
 const VENDORED_BYTES: Record<string, string> = {
-	'ask-assets-v1': 'e34ba4ce08d953a419ffe5c595fe4c5b8017300fdd5745ef467a7e1b2f50b708'
+	'ask-assets-v1': '214663e52ef03af7c450efa53b0f4ea32cb2ef61c470cc33ec2e2803ccc4d8d7'
 };
 
 function filesUnder(dir: string): string[] {

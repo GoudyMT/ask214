@@ -114,7 +114,7 @@ const WORKER =
 	'e+`/_app/immutable/assets/0.DjlkDVm5.css`],' +
 	'n=[e+`/.well-known/security.txt`,e+`/corpus/corpus-v1.0.2.json`,e+`/docs/tap_dol_efct.6dbd2705.pdf`,' +
 	'e+`/models/Xenova/all-MiniLM-L6-v2/tokenizer_config.json`,e+`/pdf-worker/6.3.289/pdf.min.mjs`,' +
-	'e+`/robots.txt`,e+`/wasm/ort-wasm-simd-threaded.wasm`],r=`1790302866627`;' +
+	'e+`/robots.txt`,e+`/wasm/ort-wasm-simd-threaded.asyncify.wasm`],r=`1790302866627`;' +
 	'function i(e){return e.startsWith(`/models/`)||e.startsWith(`/wasm/`)}';
 
 describe('precachedPaths', () => {
@@ -129,7 +129,7 @@ describe('precachedPaths', () => {
 			'/models/Xenova/all-MiniLM-L6-v2/tokenizer_config.json',
 			'/pdf-worker/6.3.289/pdf.min.mjs',
 			'/robots.txt',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 		]);
 	});
 
