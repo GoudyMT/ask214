@@ -11,6 +11,24 @@ export default defineConfig({
 	// unable to test the app as it actually ships. The cert is generated on demand and never written
 	// to the repo; a checked-in private key is a liability that protects nothing.
 	plugins: [sveltekit(), basicSsl()],
+	worker: {
+		// The embed worker sets `wasmPaths = '/wasm/'`, so the ONNX runtime loads its WASM from the vendored folder.
+		// The runtime library inside the worker also names its own WASM as a fallback for when `wasmPaths` is unset,
+		// and the bundler writes that ~23 MB file beside the worker's script, where nothing ever requests it. This
+		// drops every WASM the worker bundle writes. The fallback URL left in the worker then points at a file
+		// that does not exist, which is acceptable: it is read only when `wasmPaths` is unset, and a missing
+		// WASM must fail loudly (see embed-worker.ts) rather than load a copy nobody vendored.
+		plugins: () => [
+			{
+				name: 'drop-worker-wasm',
+				generateBundle(_options, bundle) {
+					for (const [name, file] of Object.entries(bundle)) {
+						if (file.type === 'asset' && name.endsWith('.wasm')) delete bundle[name];
+					}
+				}
+			}
+		]
+	},
 	test: {
 		expect: { requireAssertions: true },
 		passWithNoTests: true,

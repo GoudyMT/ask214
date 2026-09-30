@@ -101,6 +101,22 @@ export function unreadWorkerScripts(named: readonly string[], onDisk: readonly s
 }
 
 /**
+ * The WebAssembly files in the build output that are not in the `/wasm/` folder.
+ *
+ * The embed worker sets `wasmPaths = '/wasm/'`, so the runtime loads its WASM from the vendored folder and from
+ * nowhere else. The runtime library inside the worker also names a copy of it as a fallback for when `wasmPaths`
+ * is unset, and the bundler writes that copy - about 23 MB - next to the worker's script, where nothing ever
+ * requests it and every release would ship it. Any WASM outside the vendored folder is that, or a new one nothing
+ * has decided to ship.
+ *
+ * @param files Every file the build wrote, as paths relative to the client output (`wasm/x.wasm`).
+ * @returns The `.wasm` files not under `wasm/`.
+ */
+export function strayWasm(files: readonly string[]): string[] {
+	return files.filter((file) => file.endsWith('.wasm') && !file.startsWith('wasm/'));
+}
+
+/**
  * The page the service worker also keeps at install (APP_SHELL in ../ask/asset-cache): a served page, not a file
  * in the build, so the budget cannot weigh it on disk. This is its allowance in gzip-9 bytes; the offline-pages
  * E2E weighs the real page against it. Measured 1,469 B (that E2E, gzip-9 of the kept body) on 2026-09-26.

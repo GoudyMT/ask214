@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	precachedPaths,
 	splitChunksByLoading,
+	strayWasm,
 	unreadWorkerScripts,
 	type BuildManifest
 } from './chunk-budget-policy';
@@ -102,6 +103,32 @@ describe('unreadWorkerScripts', () => {
 	it('returns a script in a subfolder of the worker folder, which no built code can name', () => {
 		const split = '/_app/immutable/workers/chunks/shared-Z3.js';
 		expect(unreadWorkerScripts([SCRIPT], [SCRIPT, split])).toEqual([split]);
+	});
+});
+
+// The worker loads its WASM from the vendored /wasm/ folder. A copy the bundler writes anywhere else is never
+// requested, and is the largest file in the build.
+describe('strayWasm', () => {
+	it('passes a build whose only WASM is in the vendored folder', () => {
+		expect(
+			strayWasm([
+				'wasm/ort-wasm-simd-threaded.asyncify.mjs',
+				'wasm/ort-wasm-simd-threaded.asyncify.wasm',
+				'_app/immutable/workers/embed-worker-BIZt0I_P.js'
+			])
+		).toEqual([]);
+	});
+
+	it('returns a WASM file the bundler wrote outside the vendored folder', () => {
+		const copy = '_app/immutable/workers/assets/ort-wasm-simd-threaded.asyncify-DMmc6YqF.wasm';
+		expect(strayWasm(['wasm/ort-wasm-simd-threaded.asyncify.wasm', copy])).toEqual([copy]);
+	});
+
+	it('does not take a folder that merely starts with the name for the vendored one', () => {
+		expect(strayWasm(['wasmish/x.wasm', '_app/wasm/x.wasm'])).toEqual([
+			'wasmish/x.wasm',
+			'_app/wasm/x.wasm'
+		]);
 	});
 });
 

@@ -11,6 +11,7 @@ import { gzipSync } from 'node:zlib';
 import {
 	precachedPaths,
 	splitChunksByLoading,
+	strayWasm,
 	unreadWorkerScripts,
 	SHELL_BYTES_ALLOWANCE
 } from '../src/lib/ci/chunk-budget-policy.ts';
@@ -199,6 +200,21 @@ console.log(
 if (unread.length > 0) {
 	for (const script of unread) console.log(`    not named by any built code ${script}`);
 	throw new Error('E_WORKER_SCRIPT_UNREAD');
+}
+
+// Instrument check: the worker loads its WASM from the vendored /wasm/ folder only. A copy written anywhere else
+// is never requested and ships to every visitor's release - the runtime library inside the worker names one as a
+// fallback, and the bundler writes it beside the worker's script.
+const builtFiles = readdirSync(CLIENT, { recursive: true })
+	.map((path) => String(path).replaceAll('\\', '/'))
+	.filter((path) => statSync(`${CLIENT}/${path}`).isFile());
+const stray = strayWasm(builtFiles);
+console.log(
+	`    wasm files outside /wasm/ ${stray.length}: ${stray.length === 0 ? 'NONE' : 'FOUND'}`
+);
+if (stray.length > 0) {
+	for (const file of stray) console.log(`    wasm outside /wasm/ ${file}`);
+	throw new Error('E_STRAY_WASM');
 }
 
 if (failed > 0) {
