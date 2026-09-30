@@ -52,9 +52,10 @@ describe('the worker installs the pages the budget counts', () => {
 // What install and activate do is ordered, and the libraries' safety rests on the order: the prune runs before the
 // worker takes charge, so the download that follows has room; the downloads are not awaited inside activation, which
 // would stall every page load after an update; and no prune follows them, because one there would run with this
-// release's asset list after a newer release may already be installed.
+// release's asset list after a newer release may already be installed. The prune itself deletes on the version rule
+// alone: a condition that holds an old answer library back would fill a nearly full device for good.
 describe('the worker does its install and activate work in order', () => {
-	it('awaits the restore then the script keep at install, and the prune then the claim at activate, starting both retries unawaited and chaining nothing after them', () => {
+	it('awaits the restore then the script keep at install, and the prune then the claim at activate, starting both retries unawaited and chaining nothing after them, and prunes on the version rule alone', () => {
 		const worker = readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8');
 		/** The `sw.addEventListener(name, ...)` call, up to the `});` that closes it at the start of a line. */
 		const handler = (name: string) => {
@@ -62,35 +63,56 @@ describe('the worker does its install and activate work in order', () => {
 			expect(start, name).toBeGreaterThanOrEqual(0);
 			return worker.slice(start, worker.indexOf('\n});', start));
 		};
-		/** Whether each statement appears, in this order, in the source. */
-		const inOrder = (source: string, statements: RegExp[]) => {
+		/** The first statement that does not appear after the one before it, or undefined when all do in order. */
+		const firstOutOfOrder = (source: string, statements: RegExp[]) => {
 			let from = 0;
 			for (const statement of statements) {
 				const at = source.slice(from).search(statement);
-				if (at < 0) return false;
+				if (at < 0) return String(statement);
 				from += at + 1;
 			}
-			return true;
+			return undefined;
 		};
 
 		expect(
-			inOrder(handler('install'), [
+			firstOutOfOrder(handler('install'), [
 				/\n\s*await restoreKeptLibraries\(cacheNames\);/,
 				/\n\s*await keepEmbedWorkerScript\(cacheNames\);/
-			])
-		).toBe(true);
+			]),
+			'install statement missing or out of order'
+		).toBeUndefined();
 
 		const activate = handler('activate');
 		expect(
-			inOrder(activate, [
+			firstOutOfOrder(activate, [
 				/\n\s*await pruneSupersededVersions\(keys\);/,
 				/\n\s*await sw\.clients\.claim\(\);/,
 				/\n\s*void restoreKeptLibraries\(keys\);/,
 				/\n\s*void keepEmbedWorkerScript\(keys\);/
-			])
-		).toBe(true);
-		expect(activate).not.toMatch(/await (restoreKeptLibraries|keepEmbedWorkerScript)/);
-		expect(activate).not.toMatch(/restoreKeptLibraries\(keys\)\s*\./);
-		expect(activate.match(/pruneSupersededVersions\(/g)).toHaveLength(1);
+			]),
+			'activate statement missing or out of order'
+		).toBeUndefined();
+		expect(activate, 'a retry is awaited').not.toMatch(
+			/await (restoreKeptLibraries|keepEmbedWorkerScript)/
+		);
+		expect(activate, 'something is chained after the library retry').not.toMatch(
+			/restoreKeptLibraries\(keys\)\s*\./
+		);
+		expect(activate.match(/pruneSupersededVersions\(/g), 'a second prune at activate').toHaveLength(
+			1
+		);
+
+		// The prune's one delete hangs on the version rule and nothing else, and it reads every same-origin entry, so
+		// no entry is held back by a condition of its own.
+		const start = worker.indexOf('async function pruneSupersededVersions(');
+		expect(start, 'the prune function').toBeGreaterThanOrEqual(0);
+		const prune = worker.slice(start, worker.indexOf('\n}', start));
+		expect(prune.match(/\.delete\(/g), 'the prune deletes in more than one place').toHaveLength(1);
+		expect(prune, 'the prune deletes on something besides the version rule').toMatch(
+			/of held\) \{\s*if \(isSupersededVersionedEntry\(pathname, ASSETS\)\) await cache\.delete\(request\);\s*\}/
+		);
+		expect(prune, 'the prune reads fewer than every same-origin entry').toMatch(
+			/if \(url\.origin === sw\.location\.origin\) held\.push\(\{ request, pathname: url\.pathname \}\);/
+		);
 	});
 });
