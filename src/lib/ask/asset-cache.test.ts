@@ -12,6 +12,8 @@ import {
 	libraryToRestore,
 	answerLibraryToRestore,
 	restoreLibraries,
+	workerScriptsNamed,
+	keepWorkerScripts,
 	supersededToPrune,
 	storeOnFetch,
 	carryOverSavedDocuments,
@@ -680,6 +682,214 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 		const fetchLibrary = fetching(ok);
 		await restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE);
 		expect(fetchLibrary).not.toHaveBeenCalled();
+	});
+});
+
+// The build list the service worker precaches leaves out the embed worker's script, so the only place this release
+// names it is the page code that starts the worker. Install reads the name from there.
+describe('workerScriptsNamed (the worker scripts a built chunk starts)', () => {
+	const NODE = '/_app/immutable/nodes/2.CrZheqGl.js';
+	const SCRIPT = '/_app/immutable/workers/embed-worker-BIZt0I_P.js';
+	// Cut from the built chunk that starts the embed worker.
+	const BUILT =
+		'new Worker(`+new URL(`../workers/embed-worker-BIZt0I_P.js`,import.meta.url).href,{name:e?.name';
+
+	it('resolves the literal against the chunk that holds it, as new URL(literal, import.meta.url) does', () => {
+		expect(workerScriptsNamed(NODE, BUILT)).toEqual([SCRIPT]);
+		// The same text in a chunk one folder deeper resolves to another path: the chunk's own place is the base.
+		expect(workerScriptsNamed('/_app/immutable/nodes/deeper/2.X.js', BUILT)).toEqual([]);
+	});
+
+	it('names no worker for a chunk that names a worker asset, or none at all', () => {
+		expect(
+			workerScriptsNamed(
+				NODE,
+				'new URL(`../workers/assets/ort-wasm-simd-threaded.asyncify-DMmc6YqF.wasm`,import.meta.url)'
+			)
+		).toEqual([]);
+		expect(
+			workerScriptsNamed(NODE, 'new URL(`../workers/assets/helper-A1.js`,import.meta.url)')
+		).toEqual([]);
+		expect(workerScriptsNamed(NODE, 'export const a=1;')).toEqual([]);
+	});
+
+	it('names every worker a chunk starts, each once', () => {
+		const text = `${BUILT};new URL("../workers/other-Q9.js",import.meta.url);new URL('../workers/embed-worker-BIZt0I_P.js',import.meta.url)`;
+		expect(workerScriptsNamed(NODE, text)).toEqual([SCRIPT, '/_app/immutable/workers/other-Q9.js']);
+	});
+
+	it('keeps only paths under the worker folder', () => {
+		expect(
+			workerScriptsNamed(NODE, 'new URL(`../../elsewhere/workers/x-1.js`,import.meta.url)')
+		).toEqual([]);
+	});
+});
+
+describe('keepWorkerScripts (the embed worker script, kept for a device that set up on-device answers)', () => {
+	const ORIGIN = 'https://ask214.com';
+	const DEADLINE = 1_000;
+	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const NODE = '/_app/immutable/nodes/2.CrZheqGl.js';
+	const SCRIPT = '/_app/immutable/workers/embed-worker-BIZt0I_P.js';
+	const OTHER = '/_app/immutable/workers/other-Q9.js';
+	const NAMES_SCRIPT =
+		'new Worker(new URL(`../workers/embed-worker-BIZt0I_P.js`,import.meta.url).href)';
+	const RELEASE = {
+		[NODE]: NAMES_SCRIPT,
+		'/_app/immutable/entry/start.js': 'export{}',
+		'/': '<html>'
+	};
+
+	const pathOf = (request: Request | string) =>
+		new URL(typeof request === 'string' ? request : request.url, ORIGIN).pathname;
+
+	/** The asset cache holding the given paths. */
+	function assetsHolding(paths: string[], origin = ORIGIN) {
+		return {
+			async keys() {
+				return paths.map((path) => new Request(`${origin}${path}`));
+			}
+		} as unknown as Pick<Cache, 'keys'>;
+	}
+
+	/** The release cache holding the given path-to-text entries, which records what is stored into it. */
+	function releaseHolding(entries: Record<string, string>) {
+		const held = new Map(Object.entries(entries));
+		const cache = {
+			async keys() {
+				return [...held.keys()].map((path) => new Request(`${ORIGIN}${path}`));
+			},
+			async match(request: Request | string) {
+				const text = held.get(pathOf(request));
+				return text === undefined ? undefined : new Response(text);
+			},
+			async put(request: Request | string, response: Response) {
+				held.set(pathOf(request), await response.text());
+			}
+		};
+		return {
+			cache: cache as unknown as Pick<Cache, 'keys' | 'match' | 'put'>,
+			stored: () => [...held.keys()].filter((path) => !(path in entries))
+		};
+	}
+
+	const fetching = (answer: (path: string, signal: AbortSignal) => Promise<Response>) =>
+		vi.fn((path: string, init: { signal: AbortSignal }) => answer(path, init.signal));
+	const ok = (path: string) => Promise.resolve(new Response(`bytes of ${path}`));
+
+	it('fetches and stores the script a set-up device lacks', async () => {
+		const release = releaseHolding(RELEASE);
+		const fetchScript = fetching(ok);
+		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, fetchScript, ORIGIN, DEADLINE);
+		expect(fetchScript.mock.calls.map(([path]) => path)).toEqual([SCRIPT]);
+		expect(release.stored()).toEqual([SCRIPT]);
+	});
+
+	it('fetches nothing for a device that did not set up on-device answers', async () => {
+		for (const held of [[], ['/corpus/corpus-v1.0.2.json', '/docs/tap_va101.0f650528.pdf']]) {
+			const release = releaseHolding(RELEASE);
+			const fetchScript = fetching(ok);
+			await keepWorkerScripts(assetsHolding(held), release.cache, fetchScript, ORIGIN, DEADLINE);
+			expect(fetchScript, held.join(' ')).not.toHaveBeenCalled();
+			expect(release.stored()).toEqual([]);
+		}
+	});
+
+	it('reads only this origin: a model held for another origin is not a set-up device', async () => {
+		const fetchScript = fetching(ok);
+		await keepWorkerScripts(
+			assetsHolding([MODEL], 'https://elsewhere.example'),
+			releaseHolding(RELEASE).cache,
+			fetchScript,
+			ORIGIN,
+			DEADLINE
+		);
+		expect(fetchScript).not.toHaveBeenCalled();
+	});
+
+	it('does not fetch a script the release cache already holds', async () => {
+		const release = releaseHolding({ ...RELEASE, [SCRIPT]: 'kept' });
+		const fetchScript = fetching(ok);
+		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, fetchScript, ORIGIN, DEADLINE);
+		expect(fetchScript).not.toHaveBeenCalled();
+	});
+
+	it('stores a response only when its status is 200', async () => {
+		const release = releaseHolding(RELEASE);
+		const fetchScript = fetching(() => Promise.resolve(new Response('missing', { status: 404 })));
+		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, fetchScript, ORIGIN, DEADLINE);
+		expect(fetchScript).toHaveBeenCalledTimes(1);
+		expect(release.stored()).toEqual([]);
+	});
+
+	it('still stores a second script when the first fails, and never throws', async () => {
+		const release = releaseHolding({
+			...RELEASE,
+			'/_app/immutable/nodes/3.Y.js':
+				'new Worker(new URL(`../workers/other-Q9.js`,import.meta.url))'
+		});
+		const fetchScript = fetching((path) =>
+			path === SCRIPT ? Promise.reject(new TypeError('offline')) : ok(path)
+		);
+		await expect(
+			keepWorkerScripts(assetsHolding([MODEL]), release.cache, fetchScript, ORIGIN, DEADLINE)
+		).resolves.toBeUndefined();
+		expect(release.stored()).toEqual([OTHER]);
+	});
+
+	it('never throws when a cache cannot be read', async () => {
+		const unreadable = { keys: () => Promise.reject(new Error('unreadable')) } as unknown as Pick<
+			Cache,
+			'keys'
+		>;
+		const fetchScript = fetching(ok);
+		await expect(
+			keepWorkerScripts(unreadable, releaseHolding(RELEASE).cache, fetchScript, ORIGIN, DEADLINE)
+		).resolves.toBeUndefined();
+		await expect(
+			keepWorkerScripts(
+				assetsHolding([MODEL]),
+				{ ...releaseHolding(RELEASE).cache, keys: () => Promise.reject(new Error('unreadable')) },
+				fetchScript,
+				ORIGIN,
+				DEADLINE
+			)
+		).resolves.toBeUndefined();
+		expect(fetchScript).not.toHaveBeenCalled();
+	});
+
+	it('abandons a stalled download at the deadline', async () => {
+		vi.useFakeTimers();
+		try {
+			const release = releaseHolding(RELEASE);
+			const fetchScript = fetching(
+				(_path, signal) =>
+					new Promise<Response>((_resolve, reject) => {
+						signal.addEventListener('abort', () =>
+							reject(new DOMException('aborted', 'AbortError'))
+						);
+					})
+			);
+			let settled = false;
+			const done = keepWorkerScripts(
+				assetsHolding([MODEL]),
+				release.cache,
+				fetchScript,
+				ORIGIN,
+				DEADLINE
+			).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(settled).toBe(true);
+			await done;
+			expect(release.stored()).toEqual([]);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
 

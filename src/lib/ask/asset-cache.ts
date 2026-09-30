@@ -253,7 +253,7 @@ export function answerLibraryToRestore(
 }
 
 /**
- * How long the install-time restore waits on one library before giving it up.
+ * How long the install-time restore waits on one library - or on the embed worker's script - before giving it up.
  *
  * A bound, so a stalled download cannot hold the install - and with it the update - open. A miss costs nothing
  * lasting: the old library is kept and the restore is tried again after activation. The answer library is about
@@ -309,6 +309,101 @@ export async function restoreLibraries(
 		} finally {
 			clearTimeout(timer);
 		}
+	}
+}
+
+/** Where the built embed worker's script is served from; `workers/assets/` beside it holds files, never a script. */
+const WORKER_SCRIPT_FOLDER = '/_app/immutable/workers/';
+
+/**
+ * The worker scripts a built chunk starts, as absolute pathnames.
+ *
+ * SvelteKit's build list leaves a worker's script out, so the service worker cannot precache it from that list;
+ * the one place this release names it is the page code that starts the worker, as a string literal ending in
+ * `workers/<name>.js` that the page resolves against its own address (`new URL(literal, import.meta.url)`).
+ * This resolves it the same way, against the chunk's pathname. Only a script directly in the worker folder
+ * counts: what sits in `workers/assets/` is a file the worker loads, never a script to keep.
+ *
+ * @param chunkPath The pathname the chunk is served from.
+ * @param text The chunk's text.
+ * @returns The worker script pathnames the chunk names, each once, in the order they appear.
+ */
+export function workerScriptsNamed(chunkPath: string, text: string): string[] {
+	const named: string[] = [];
+	for (const match of text.matchAll(/(["'`])([^"'`\s]*workers\/[^"'`/\s]+\.js)\1/g)) {
+		const path = new URL(match[2] ?? '', `https://chunk.invalid${chunkPath}`).pathname;
+		const inFolder =
+			path.startsWith(WORKER_SCRIPT_FOLDER) &&
+			!path.slice(WORKER_SCRIPT_FOLDER.length).includes('/');
+		if (inFolder && !named.includes(path)) named.push(path);
+	}
+	return named;
+}
+
+/**
+ * Keep the embed worker's script for a device that set up on-device answers, so its first question after an
+ * update still starts the worker offline.
+ *
+ * The page fetches the script only when it first asks a question, and an update deletes the previous release's
+ * cache, so a device that then goes offline has no script for the new release. Install runs while online and has
+ * just stored this release's own page code: the script's name is read from it (`workerScriptsNamed`) and the
+ * script stored beside it, where the fetch handler already looks. It lives as long as the release that names it.
+ * A device with no `/models/` file held never set up, asked for no offline answers, and downloads nothing here.
+ *
+ * Each script is its own try under one deadline, and nothing throws, so it cannot fail the install or hold it open.
+ * Only a 200 response is stored.
+ *
+ * Args:
+ *   assetCache: ASK_ASSET_CACHE, read to see whether the device set up
+ *   releaseCache: this release's own cache, to read its code from and store the script into
+ *   fetchScript: the network fetch, given the path and the signal; injected by tests
+ *   origin: this worker's origin; only entries under it are read
+ *   deadlineMs: how long the downloads may take
+ */
+export async function keepWorkerScripts(
+	assetCache: Pick<Cache, 'keys'>,
+	releaseCache: Pick<Cache, 'keys' | 'match' | 'put'>,
+	fetchScript: (path: string, init: { signal: AbortSignal }) => Promise<Response>,
+	origin: string,
+	deadlineMs: number
+): Promise<void> {
+	let missing: string[];
+	try {
+		const sameOrigin = (requests: readonly Request[]) =>
+			requests.map((request) => new URL(request.url)).filter((url) => url.origin === origin);
+		const setUp = sameOrigin(await assetCache.keys()).some((url) =>
+			url.pathname.startsWith('/models/')
+		);
+		if (!setUp) return;
+		const held = await releaseCache.keys();
+		const heldPaths = sameOrigin(held).map((url) => url.pathname);
+		const named: string[] = [];
+		for (const request of held) {
+			const { origin: requestOrigin, pathname } = new URL(request.url);
+			if (requestOrigin !== origin || !pathname.endsWith('.js')) continue;
+			const text = await (await releaseCache.match(request))?.text();
+			if (text === undefined) continue;
+			for (const script of workerScriptsNamed(pathname, text))
+				if (!named.includes(script)) named.push(script);
+		}
+		missing = named.filter((script) => !heldPaths.includes(script));
+	} catch {
+		return;
+	}
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), deadlineMs);
+	try {
+		for (const path of missing) {
+			try {
+				const response = await fetchScript(path, { signal: controller.signal });
+				if (response.status === 200) await releaseCache.put(path, response);
+			} catch {
+				// This script is given up on - a failed or stalled download, or a full disk. The first question after
+				// an update then fetches it while online, as it did before this kept it.
+			}
+		}
+	} finally {
+		clearTimeout(timer);
 	}
 }
 

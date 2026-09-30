@@ -6,14 +6,15 @@
 //
 // Sizes are measured exactly as size-limit measures them - gzip at level 9, limits in metric kilobytes
 // (50 KB = 50,000 bytes) - so the page budget keeps the meaning it had as a size-limit entry.
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import {
 	precachedPaths,
 	splitChunksByLoading,
+	unreadWorkerScripts,
 	SHELL_BYTES_ALLOWANCE
 } from '../src/lib/ci/chunk-budget-policy.ts';
-import { INSTALL_PAGES } from '../src/lib/ask/asset-cache.ts';
+import { INSTALL_PAGES, workerScriptsNamed } from '../src/lib/ask/asset-cache.ts';
 
 const CLIENT = '.svelte-kit/output/client';
 const CHUNK_DIR = `${CLIENT}/_app/immutable/chunks`;
@@ -170,6 +171,32 @@ console.log(
 console.log(
 	`    ${'bytes the worker precaches'.padEnd(26)} ${(precacheBytes / 1000).toFixed(2).padStart(8)} KB  <= ${(LIMIT.precacheBytes / 1000).toFixed(0)} KB  ${bytesPass ? 'PASS' : 'FAIL'}`
 );
+
+// Instrument check: install keeps the embed worker's script by reading its name from the built code, because the
+// build list the worker precaches leaves worker scripts out. Every script the build wrote must be found that way,
+// or the script silently stops being kept for a device that set up on-device answers.
+const WORKERS = '_app/immutable/workers';
+const scriptsOnDisk = existsSync(`${CLIENT}/${WORKERS}`)
+	? readdirSync(`${CLIENT}/${WORKERS}`)
+			.filter((f) => f.endsWith('.js'))
+			.map((f) => `/${WORKERS}/${f}`)
+			.sort()
+	: [];
+const scriptsNamed = [
+	...new Set(
+		built
+			.filter((file) => file.endsWith('.js'))
+			.flatMap((file) => workerScriptsNamed(`/${file}`, readFileSync(`${CLIENT}/${file}`, 'utf-8')))
+	)
+].sort();
+const unread = unreadWorkerScripts(scriptsNamed, scriptsOnDisk);
+console.log(
+	`    worker scripts on disk ${scriptsOnDisk.length}, named by the built code ${scriptsNamed.length}: ${unread.length === 0 ? 'ALL FOUND' : 'MISSED'}`
+);
+if (unread.length > 0) {
+	for (const script of unread) console.log(`    not named by any built code ${script}`);
+	throw new Error('E_WORKER_SCRIPT_UNREAD');
+}
 
 if (failed > 0) {
 	console.log(

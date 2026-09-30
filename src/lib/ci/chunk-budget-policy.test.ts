@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { precachedPaths, splitChunksByLoading, type BuildManifest } from './chunk-budget-policy';
+import {
+	precachedPaths,
+	splitChunksByLoading,
+	unreadWorkerScripts,
+	type BuildManifest
+} from './chunk-budget-policy';
 
 // The shape of the real Vite manifest SvelteKit writes: the app entry and every route node are marked
 // `isEntry`; a component loaded with import() is `isDynamicEntry`, and so is the library it loads the same way.
@@ -73,6 +78,23 @@ describe('splitChunksByLoading', () => {
 			'nodes/0.js': { file: '_app/immutable/nodes/0.B.js', isEntry: true, imports: ['_missing.js'] }
 		};
 		expect(() => splitChunksByLoading(broken)).toThrow('E_CHUNK_BUDGET_MANIFEST');
+	});
+});
+
+// The worker's script is left out of the build list, so install finds it only by reading its name from the built
+// code. A script the reading misses would silently stop being kept for a set-up device, so the build fails on it.
+describe('unreadWorkerScripts', () => {
+	const SCRIPT = '/_app/immutable/workers/embed-worker-BIZt0I_P.js';
+
+	it('passes when every script in the build is named by the built code', () => {
+		expect(unreadWorkerScripts([SCRIPT], [SCRIPT])).toEqual([]);
+		expect(unreadWorkerScripts([], [])).toEqual([]);
+	});
+
+	it('returns a script in the build that no built code names', () => {
+		expect(unreadWorkerScripts([], [SCRIPT])).toEqual([SCRIPT]);
+		const other = '/_app/immutable/workers/other-Q9.js';
+		expect(unreadWorkerScripts([SCRIPT], [SCRIPT, other])).toEqual([other]);
 	});
 });
 

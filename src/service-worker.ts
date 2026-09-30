@@ -14,6 +14,7 @@ import {
 	keptOnFetch,
 	LIBRARY_RESTORE_DEADLINE_MS,
 	restoreLibraries,
+	keepWorkerScripts,
 	storeOnFetch,
 	INSTALL_PAGES,
 	offlineResponse
@@ -38,7 +39,9 @@ sw.addEventListener('install', (event) => {
 			// release's PDF library here, and a device that kept the answer library gets this release's; activation
 			// tries again for any library file this could not store. The restore never throws and gives each
 			// library a deadline, so it cannot fail the install or hold it open.
-			await restoreKeptLibraries(await caches.keys());
+			const cacheNames = await caches.keys();
+			await restoreKeptLibraries(cacheNames);
+			await keepEmbedWorkerScript(cache, cacheNames);
 		})()
 	);
 });
@@ -137,6 +140,34 @@ async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
 			(path, init) => fetch(path, init),
 			sw.location.origin,
 			ASSETS,
+			LIBRARY_RESTORE_DEADLINE_MS
+		);
+	} catch {
+		// Intentionally ignored - see above.
+	}
+}
+
+/**
+ * Keep the embed worker's script in this release's cache when the device set up on-device answers.
+ *
+ * The build list this worker precaches leaves worker scripts out, and the page fetches the script only when it
+ * first asks a question - after an update deleted the last release's copy, and perhaps with no connection. So
+ * install, while online, stores it from the name this release's own page code carries (`keepWorkerScripts`).
+ * It sits in the release's cache, so it goes with the release that names it and needs no prune.
+ *
+ * @param releaseCache This release's cache, opened by install after the precache stored the page code.
+ * @param cacheNames The cache names already read from caches.keys(), so a device that has never fetched a lazy
+ *   asset is skipped rather than being given an empty cache by caches.open().
+ */
+async function keepEmbedWorkerScript(releaseCache: Cache, cacheNames: string[]): Promise<void> {
+	if (!cacheNames.includes(ASK_ASSET_CACHE)) return;
+	// Opportunistic, like the restore above: a failure leaves the script to be fetched by the first question.
+	try {
+		await keepWorkerScripts(
+			await caches.open(ASK_ASSET_CACHE),
+			releaseCache,
+			(path, init) => fetch(path, init),
+			sw.location.origin,
 			LIBRARY_RESTORE_DEADLINE_MS
 		);
 	} catch {
