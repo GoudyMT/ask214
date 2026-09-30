@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+	kilobytes,
 	precachedPaths,
 	splitChunksByLoading,
 	strayWasm,
@@ -89,7 +90,18 @@ describe('unreadWorkerScripts', () => {
 
 	it('passes when every script in the build is named by the built code', () => {
 		expect(unreadWorkerScripts([SCRIPT], [SCRIPT])).toEqual([]);
-		expect(unreadWorkerScripts([], [])).toEqual([]);
+	});
+
+	// The app always ships the embed worker. A build with no script on disk - the worker renamed, or moved out of the
+	// folder - has nothing to check, and must not read as a pass.
+	it('fails closed when no script is on disk, whatever the built code names', () => {
+		expect(() => unreadWorkerScripts([], [])).toThrow('E_WORKER_SCRIPT_NONE');
+		expect(() => unreadWorkerScripts([SCRIPT], [])).toThrow('E_WORKER_SCRIPT_NONE');
+	});
+
+	// The built code naming nothing leaves every script on disk unkept: the reading is broken, so each is returned.
+	it('returns every script on disk when the built code names none', () => {
+		expect(unreadWorkerScripts([], [SCRIPT])).toEqual([SCRIPT]);
 	});
 
 	it('returns a script in the build that no built code names', () => {
@@ -129,6 +141,22 @@ describe('strayWasm', () => {
 			'wasmish/x.wasm',
 			'_app/wasm/x.wasm'
 		]);
+	});
+});
+
+// A budget line prints the size and its limit the same way, so a size at or under the limit never reads as over it:
+// rounding the limit to whole kilobytes printed "135.11 KB <= 135 KB" for a build that passed.
+describe('kilobytes', () => {
+	it('prints metric kilobytes to two places, the same for a size and for a limit', () => {
+		expect(kilobytes(55_930)).toBe('55.93');
+		expect(kilobytes(56_000)).toBe('56.00');
+		expect(kilobytes(135_200)).toBe('135.20');
+		expect(kilobytes(7_300)).toBe('7.30');
+	});
+
+	it('keeps a limit that is not a whole kilobyte apart from the whole kilobyte below it', () => {
+		expect(kilobytes(135_112)).toBe('135.11');
+		expect(kilobytes(135_000)).not.toBe(kilobytes(135_112));
 	});
 });
 

@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import {
+	kilobytes,
 	precachedPaths,
 	splitChunksByLoading,
 	strayWasm,
@@ -80,9 +81,19 @@ const STATIC = 'static';
 //     the reader's title given its own full-width row - 134,970 B measured with 55 files, after that trim pass.
 //     Raised 135,100 -> 135,200 (owner's call, 2026-09-30): the Documents page's wait, above - 135,112 B measured
 //     with 55 files, after that trim pass.
+//   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
+//     code, which a device downloads the first time it asks a question on-device. The worker script's download
+//     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
+//     (this check's own gzip-9), 123 B of room (owner's call, 2026-09-30).
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
-const LIMIT = { page: 56_000, onDemand: 7_300, precacheFiles: 60, precacheBytes: 135_200 };
+const LIMIT = {
+	page: 56_000,
+	onDemand: 7_300,
+	precacheFiles: 60,
+	precacheBytes: 135_200,
+	workerScripts: 147_200
+};
 
 /**
  * @param {string} file A path as the manifest names it, relative to the client output.
@@ -125,19 +136,26 @@ if (!accounted) {
 	throw new Error('E_CHUNK_BUDGET_UNCLASSIFIED');
 }
 
-const rows = [
-	{ label: 'chunks a page downloads', files: page, limit: LIMIT.page },
-	{ label: 'chunks loaded on demand', files: onDemand, limit: LIMIT.onDemand }
-];
 let failed = 0;
-for (const { label, files, limit } of rows) {
+
+/**
+ * Print one size row against its limit, and count it when it fails. The limit prints with the size's precision.
+ *
+ * @param {string} label
+ * @param {string[]} files Paths relative to the client output.
+ * @param {number} limit Gzipped bytes.
+ */
+function sizeRow(label, files, limit) {
 	const size = total(files);
 	const pass = size <= limit;
 	if (!pass) failed += 1;
 	console.log(
-		`    ${label.padEnd(26)} ${(size / 1000).toFixed(2).padStart(8)} KB  <= ${(limit / 1000).toFixed(0)} KB  ${pass ? 'PASS' : 'FAIL'}  (${files.length} files)`
+		`    ${label.padEnd(26)} ${kilobytes(size).padStart(8)} KB  <= ${kilobytes(limit)} KB  ${pass ? 'PASS' : 'FAIL'}  (${files.length} files)`
 	);
 }
+
+sizeRow('chunks a page downloads', page, LIMIT.page);
+sizeRow('chunks loaded on demand', onDemand, LIMIT.onDemand);
 
 // The precache, read from the built worker's own list and filtered by the worker's own rule.
 const { listed, precached } = precachedPaths(readFileSync(`${CLIENT}/service-worker.js`, 'utf-8'));
@@ -178,7 +196,7 @@ console.log(
 	`    ${'files the worker precaches'.padEnd(26)} ${String(precacheFiles).padStart(8)}     <= ${LIMIT.precacheFiles}      ${filesPass ? 'PASS' : 'FAIL'}`
 );
 console.log(
-	`    ${'bytes the worker precaches'.padEnd(26)} ${(precacheBytes / 1000).toFixed(2).padStart(8)} KB  <= ${(LIMIT.precacheBytes / 1000).toFixed(0)} KB  ${bytesPass ? 'PASS' : 'FAIL'}`
+	`    ${'bytes the worker precaches'.padEnd(26)} ${kilobytes(precacheBytes).padStart(8)} KB  <= ${kilobytes(LIMIT.precacheBytes)} KB  ${bytesPass ? 'PASS' : 'FAIL'}`
 );
 
 // Instrument check: install keeps the embed worker's script by reading its name from the built code, because the
@@ -201,7 +219,17 @@ const scriptsNamed = [
 			.flatMap((file) => workerScriptsNamed(`/${file}`, readFileSync(`${CLIENT}/${file}`, 'utf-8')))
 	)
 ].sort();
-const unread = unreadWorkerScripts(scriptsNamed, scriptsOnDisk);
+// The app always ships the embed worker, so none on disk is a failure, not a pass with nothing to check.
+/** @type {string[]} */
+let unread;
+try {
+	unread = unreadWorkerScripts(scriptsNamed, scriptsOnDisk);
+} catch (error) {
+	console.log(
+		`    worker scripts on disk ${scriptsOnDisk.length}, named by the built code ${scriptsNamed.length}: NONE ON DISK`
+	);
+	throw error;
+}
 console.log(
 	`    worker scripts on disk ${scriptsOnDisk.length}, named by the built code ${scriptsNamed.length}: ${unread.length === 0 ? 'ALL FOUND' : 'MISSED'}`
 );
@@ -209,6 +237,14 @@ if (unread.length > 0) {
 	for (const script of unread) console.log(`    not named by any built code ${script}`);
 	throw new Error('E_WORKER_SCRIPT_UNREAD');
 }
+
+// The worker script is fetched under its own deadline (WORKER_SCRIPT_DEADLINE_MS), which assumes the size
+// measured below; a script that grows past it can miss that deadline on a slow connection.
+sizeRow(
+	'worker scripts',
+	scriptsOnDisk.map((script) => script.slice(1)),
+	LIMIT.workerScripts
+);
 
 // Instrument check: the worker loads its WASM from the vendored /wasm/ folder only. A copy written anywhere else
 // is never requested and ships to every visitor's release - the runtime library inside the worker names one as a

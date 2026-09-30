@@ -94,9 +94,13 @@ export function precachedPaths(workerSource: string): { listed: string[]; precac
  * @param onDisk Every `.js` file the build wrote under the worker folder, subfolders included, as pathnames
  *   served from the site root. A worker's split code is written to a subfolder, and only a script directly in
  *   the folder can be found by name, so one in a subfolder is always returned.
- * @returns Every script on disk that the reading did not find.
+ * @returns Every script on disk that the reading did not find; all of them when the built code names none.
+ * @throws Error `E_WORKER_SCRIPT_NONE` when no script is on disk. The app always ships the embed worker, so an
+ *   empty folder means the worker was renamed or moved out of it, and a check with nothing to check would read
+ *   as a pass while the script stopped being kept.
  */
 export function unreadWorkerScripts(named: readonly string[], onDisk: readonly string[]): string[] {
+	if (onDisk.length === 0) throw new Error('E_WORKER_SCRIPT_NONE');
 	return onDisk.filter((script) => !named.includes(script));
 }
 
@@ -114,6 +118,17 @@ export function unreadWorkerScripts(named: readonly string[], onDisk: readonly s
  */
 export function strayWasm(files: readonly string[]): string[] {
 	return files.filter((file) => file.endsWith('.wasm') && !file.startsWith('wasm/'));
+}
+
+/**
+ * A byte count as metric kilobytes (1 KB = 1,000 B) to two places.
+ *
+ * A budget line prints its size and its limit through this one function, so both carry the same precision: a
+ * limit rounded to whole kilobytes beside a size in hundredths printed a passing "135.11 KB <= 135 KB", and
+ * could misprint a real shortfall by up to 499 B.
+ */
+export function kilobytes(bytes: number): string {
+	return (bytes / 1000).toFixed(2);
 }
 
 /**
