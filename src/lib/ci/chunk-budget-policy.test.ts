@@ -96,6 +96,13 @@ describe('unreadWorkerScripts', () => {
 		const other = '/_app/immutable/workers/other-Q9.js';
 		expect(unreadWorkerScripts([SCRIPT], [SCRIPT, other])).toEqual([other]);
 	});
+
+	// A worker's split code is written below the worker folder. Install would not keep it, and it can never be named
+	// the way a script directly in the folder is, so its presence alone must fail the build.
+	it('returns a script in a subfolder of the worker folder, which no built code can name', () => {
+		const split = '/_app/immutable/workers/chunks/shared-Z3.js';
+		expect(unreadWorkerScripts([SCRIPT], [SCRIPT, split])).toEqual([split]);
+	});
 });
 
 // The head of a real built service worker, cut to a few entries per list: SvelteKit reads a base path from the

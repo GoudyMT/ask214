@@ -91,7 +91,9 @@ export function precachedPaths(workerSource: string): { listed: string[]; precac
  * disk turns that into a failed build.
  *
  * @param named The worker script pathnames the reading found in the built code.
- * @param onDisk The worker script pathnames the build wrote, as pathnames served from the site root.
+ * @param onDisk Every `.js` file the build wrote under the worker folder, subfolders included, as pathnames
+ *   served from the site root. A worker's split code is written to a subfolder, and only a script directly in
+ *   the folder can be found by name, so one in a subfolder is always returned.
  * @returns Every script on disk that the reading did not find.
  */
 export function unreadWorkerScripts(named: readonly string[], onDisk: readonly string[]): string[] {

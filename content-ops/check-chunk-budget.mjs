@@ -174,10 +174,13 @@ console.log(
 
 // Instrument check: install keeps the embed worker's script by reading its name from the built code, because the
 // build list the worker precaches leaves worker scripts out. Every script the build wrote must be found that way,
-// or the script silently stops being kept for a device that set up on-device answers.
+// or the script silently stops being kept for a device that set up on-device answers. Every folder under the
+// worker's is read, not only the top one: a worker's split code is written to a subfolder, and install keeps
+// nothing it does not find by name there.
 const WORKERS = '_app/immutable/workers';
 const scriptsOnDisk = existsSync(`${CLIENT}/${WORKERS}`)
-	? readdirSync(`${CLIENT}/${WORKERS}`)
+	? readdirSync(`${CLIENT}/${WORKERS}`, { recursive: true })
+			.map((f) => String(f).replaceAll('\\', '/'))
 			.filter((f) => f.endsWith('.js'))
 			.map((f) => `/${WORKERS}/${f}`)
 			.sort()

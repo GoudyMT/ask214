@@ -253,13 +253,24 @@ export function answerLibraryToRestore(
 }
 
 /**
- * How long the install-time restore waits on one library - or on the embed worker's script - before giving it up.
+ * How long the install-time restore waits on one library before giving it up.
  *
  * A bound, so a stalled download cannot hold the install - and with it the update - open. A miss costs nothing
  * lasting: the old library is kept and the restore is tried again after activation. The answer library is about
  * 7.3 MB, which takes about a minute at roughly 1 Mbps; this is a bound, not a measured limit.
  */
 export const LIBRARY_RESTORE_DEADLINE_MS = 60_000;
+
+/**
+ * How long keeping the embed worker's script waits on its download before giving it up.
+ *
+ * A bound, so a stalled download cannot hold the install - and with it the update - open. The script is about
+ * 517 KB, or about 147 KB compressed on the wire, which takes about 5 seconds on a slow 0.25 Mbps link; 20 seconds
+ * leaves room beyond that and still ends a stall. It is a bound, not a measured limit. A miss costs the device
+ * its offline answers after an update that changed the script, until the retry after activation or the first
+ * online question stores it.
+ */
+export const WORKER_SCRIPT_DEADLINE_MS = 20_000;
 
 /**
  * Fetch and store the library files this device is owed, each library in its own try and within its own deadline.
@@ -351,7 +362,8 @@ export function workerScriptsNamed(chunkPath: string, text: string): string[] {
  * A device with no `/models/` file held never set up, asked for no offline answers, and downloads nothing here.
  *
  * Each script is its own try under one deadline, and nothing throws, so it cannot fail the install or hold it open.
- * Only a 200 response is stored.
+ * Only a 200 response is stored. A script already held is not fetched again, so the same call after activation
+ * stores what install could not and costs nothing once it is held.
  *
  * Args:
  *   assetCache: ASK_ASSET_CACHE, read to see whether the device set up
@@ -398,8 +410,8 @@ export async function keepWorkerScripts(
 				const response = await fetchScript(path, { signal: controller.signal });
 				if (response.status === 200) await releaseCache.put(path, response);
 			} catch {
-				// This script is given up on - a failed or stalled download, or a full disk. The first question after
-				// an update then fetches it while online, as it did before this kept it.
+				// This script is given up on - a failed or stalled download, or a full disk. It is tried again after
+				// activation, and the first question asked online fetches it if that misses too.
 			}
 		}
 	} finally {

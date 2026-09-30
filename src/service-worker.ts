@@ -13,6 +13,7 @@ import {
 	isApiRequest,
 	keptOnFetch,
 	LIBRARY_RESTORE_DEADLINE_MS,
+	WORKER_SCRIPT_DEADLINE_MS,
 	restoreLibraries,
 	keepWorkerScripts,
 	storeOnFetch,
@@ -41,7 +42,7 @@ sw.addEventListener('install', (event) => {
 			// library a deadline, so it cannot fail the install or hold it open.
 			const cacheNames = await caches.keys();
 			await restoreKeptLibraries(cacheNames);
-			await keepEmbedWorkerScript(cache, cacheNames);
+			await keepEmbedWorkerScript(cacheNames);
 		})()
 	);
 });
@@ -59,12 +60,13 @@ sw.addEventListener('activate', (event) => {
 			}
 			await pruneSupersededVersions(keys);
 			await sw.clients.claim();
-			// The fallback for a library install could not store. Started after activation, not awaited inside
-			// it: page requests wait while a worker activates, so a download of several megabytes here (the PDF
-			// library, the answer library) would stall every page
-			// load after an update. The prune runs again once it has finished, which is when the old answer
-			// library - kept above while its replacement was owed - can go.
+			// The fallback for a library or the embed worker's script that install could not store. Started after
+			// activation, not awaited inside it: page requests wait while a worker activates, so a download of
+			// several megabytes here (the PDF library, the answer library) would stall every page load after an
+			// update. The prune runs again once the libraries are done, which is when the old answer library -
+			// kept above while its replacement was owed - can go.
 			void restoreKeptLibraries(keys).then(() => pruneSupersededVersions(keys));
+			void keepEmbedWorkerScript(keys);
 		})()
 	);
 });
@@ -152,23 +154,25 @@ async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
  *
  * The build list this worker precaches leaves worker scripts out, and the page fetches the script only when it
  * first asks a question - after an update deleted the last release's copy, and perhaps with no connection. So
- * install, while online, stores it from the name this release's own page code carries (`keepWorkerScripts`).
- * It sits in the release's cache, so it goes with the release that names it and needs no prune.
+ * install, while online, stores it from the name this release's own page code carries (`keepWorkerScripts`),
+ * and activation tries again for a script install could not store. It sits in the release's cache, so it goes
+ * with the release that names it and needs no prune.
  *
- * @param releaseCache This release's cache, opened by install after the precache stored the page code.
  * @param cacheNames The cache names already read from caches.keys(), so a device that has never fetched a lazy
  *   asset is skipped rather than being given an empty cache by caches.open().
  */
-async function keepEmbedWorkerScript(releaseCache: Cache, cacheNames: string[]): Promise<void> {
+async function keepEmbedWorkerScript(cacheNames: string[]): Promise<void> {
 	if (!cacheNames.includes(ASK_ASSET_CACHE)) return;
-	// Opportunistic, like the restore above: a failure leaves the script to be fetched by the first question.
+	// Opportunistic, like the restore above: a failure leaves the script to the retry after activation, and then
+	// to the first question asked online - until one of those stores it, the device cannot answer offline after
+	// an update that changed the script.
 	try {
 		await keepWorkerScripts(
 			await caches.open(ASK_ASSET_CACHE),
-			releaseCache,
+			await caches.open(CACHE),
 			(path, init) => fetch(path, init),
 			sw.location.origin,
-			LIBRARY_RESTORE_DEADLINE_MS
+			WORKER_SCRIPT_DEADLINE_MS
 		);
 	} catch {
 		// Intentionally ignored - see above.

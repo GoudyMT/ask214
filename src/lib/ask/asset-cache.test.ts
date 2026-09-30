@@ -891,6 +891,65 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 			vi.useRealTimers();
 		}
 	});
+
+	// Headers arrive at once and the body then stops: the stall a timer cleared when the fetch resolved would miss.
+	it('abandons a download that stalls after its headers arrive, and stores nothing', async () => {
+		vi.useFakeTimers();
+		try {
+			const release = releaseHolding(RELEASE);
+			const fetchScript = fetching((_path, signal) =>
+				Promise.resolve(
+					new Response(
+						new ReadableStream({
+							start(controller) {
+								signal.addEventListener('abort', () =>
+									controller.error(new DOMException('aborted', 'AbortError'))
+								);
+							}
+						}),
+						{ status: 200 }
+					)
+				)
+			);
+			let settled = false;
+			const done = keepWorkerScripts(
+				assetsHolding([MODEL]),
+				release.cache,
+				fetchScript,
+				ORIGIN,
+				DEADLINE
+			).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(fetchScript).toHaveBeenCalledTimes(1);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(settled).toBe(true);
+			await done;
+			expect(release.stored()).toEqual([]);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// Activation calls this again for a script install could not store, so the second call must finish the job and
+	// the third, with the script held, must cost nothing.
+	it('stores on a retry what the first try could not, and fetches nothing once it is held', async () => {
+		const release = releaseHolding(RELEASE);
+		const offline = fetching(() => Promise.reject(new TypeError('offline')));
+		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, offline, ORIGIN, DEADLINE);
+		expect(release.stored()).toEqual([]);
+
+		const online = fetching(ok);
+		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, online, ORIGIN, DEADLINE);
+		expect(release.stored()).toEqual([SCRIPT]);
+
+		const again = fetching(ok);
+		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, again, ORIGIN, DEADLINE);
+		expect(again).not.toHaveBeenCalled();
+	});
 });
 
 // A release that renames the answer library must not delete the old one before the new one is stored: an install
