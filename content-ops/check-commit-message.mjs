@@ -21,7 +21,12 @@ try {
 	process.exit(1);
 }
 
-const violations = findCommitMessageViolations(raw);
+// Git runs the hook with GIT_EDITOR set to ":" when no editor will open (`-m`, `-F`); only then does it keep
+// `#` lines and scissors text in the message. Anything else is read as an editor session, so a hook run by
+// hand or by a tool that sets GIT_EDITOR to an editor is checked as git would clean it.
+const violations = findCommitMessageViolations(raw, {
+	editorOpened: process.env.GIT_EDITOR !== ':'
+});
 if (violations.length > 0) {
 	for (const violation of violations) console.log(`    ${violation}`);
 	console.log(`    One line, nothing else: ${EXAMPLE}`);

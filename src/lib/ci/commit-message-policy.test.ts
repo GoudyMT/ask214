@@ -3,6 +3,21 @@ import { findCommitMessageViolations } from './commit-message-policy';
 
 const SCISSORS = '# ------------------------ >8 ------------------------';
 
+// What git writes into the message file when it opens an editor (here after `git commit -v`).
+const EDITOR_TEMPLATE = [
+	'fix: hold the page still',
+	'',
+	'# Please enter the commit message for your changes.',
+	'#',
+	'# On branch main',
+	SCISSORS,
+	'# Do not modify or remove the line above.',
+	'diff --git a/x b/x',
+	'+Co-Authored-By: someone in the diff, not in the message',
+	'Not a comment line inside the diff',
+	''
+].join('\n');
+
 describe('findCommitMessageViolations', () => {
 	it('accepts a one-line message with a type and a lowercase subject', () => {
 		expect(
@@ -22,21 +37,37 @@ describe('findCommitMessageViolations', () => {
 		}
 	});
 
-	it('accepts a valid line followed by comment lines and a scissors section holding a diff', () => {
-		const raw = [
-			'fix: hold the page still',
-			'',
-			'# Please enter the commit message for your changes.',
-			'#',
-			'# On branch main',
-			SCISSORS,
-			'# Do not modify or remove the line above.',
-			'diff --git a/x b/x',
-			'+Co-Authored-By: someone in the diff, not in the message',
-			'Not a comment line inside the diff',
-			''
-		].join('\n');
-		expect(findCommitMessageViolations(raw)).toEqual([]);
+	it('accepts the editor template: a valid line, comment lines, and a scissors section holding a diff', () => {
+		expect(findCommitMessageViolations(EDITOR_TEMPLATE, { editorOpened: true })).toEqual([]);
+	});
+
+	it('reads the same template as a message with a body when no editor opened', () => {
+		const violations = findCommitMessageViolations(EDITOR_TEMPLATE, { editorOpened: false });
+		expect(violations).toContain('The message must be one line, with no body and no trailer.');
+	});
+
+	it('treats a message as written with no editor when the caller does not say', () => {
+		expect(findCommitMessageViolations(EDITOR_TEMPLATE)).toEqual(
+			findCommitMessageViolations(EDITOR_TEMPLATE, { editorOpened: false })
+		);
+		expect(findCommitMessageViolations(EDITOR_TEMPLATE)).not.toEqual([]);
+		expect(findCommitMessageViolations('fix: x\n\n#42\n', {})).toHaveLength(1);
+	});
+
+	it('rejects a # line as a body when no editor opened', () => {
+		const violations = findCommitMessageViolations('fix: x\n\n#42\n', { editorOpened: false });
+		expect(violations).toEqual(['The message must be one line, with no body and no trailer.']);
+	});
+
+	it('accepts a # line after the message when an editor opened, because git removes it', () => {
+		expect(findCommitMessageViolations('fix: x\n\n#42\n', { editorOpened: true })).toEqual([]);
+	});
+
+	it('rejects text under a scissors line when no editor opened', () => {
+		const violations = findCommitMessageViolations(`fix: x\n${SCISSORS}\nmore text\n`, {
+			editorOpened: false
+		});
+		expect(violations).toEqual(['The message must be one line, with no body and no trailer.']);
 	});
 
 	it('accepts a message with a CRLF line ending and trailing whitespace', () => {
@@ -122,14 +153,26 @@ describe('findCommitMessageViolations', () => {
 		]);
 	});
 
-	it('rejects a message of only comment lines', () => {
-		expect(
-			findCommitMessageViolations('# Please enter the commit message\n#\n# On branch main\n')
-		).toHaveLength(1);
+	it('rejects a message of only comment lines once the editor has them removed', () => {
+		const violations = findCommitMessageViolations(
+			'# Please enter the commit message\n#\n# On branch main\n',
+			{ editorOpened: true }
+		);
+		expect(violations).toEqual(['The message is empty.']);
 	});
 
-	it('rejects a message whose only text is below the scissors line', () => {
-		expect(findCommitMessageViolations(`${SCISSORS}\nfix: add x\n`)).toHaveLength(1);
+	it('rejects a message whose only text is below the scissors line once the editor has it removed', () => {
+		expect(
+			findCommitMessageViolations(`${SCISSORS}\nfix: add x\n`, { editorOpened: true })
+		).toEqual(['The message is empty.']);
+	});
+
+	it('rejects a message of only comment lines as not in the format when no editor opened', () => {
+		const violations = findCommitMessageViolations('# Please enter the commit message\n', {
+			editorOpened: false
+		});
+		expect(violations).toHaveLength(1);
+		expect(violations[0]).toMatch(/type: subject/);
 	});
 
 	it('names each problem once when a line is wrong in two ways', () => {
