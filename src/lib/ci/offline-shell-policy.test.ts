@@ -43,7 +43,8 @@ describe('the worker installs the pages the budget counts', () => {
 	it('installs INSTALL_PAGES with the precache, and nothing else', () => {
 		const worker = readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8');
 		expect(worker).toMatch(/cache\.addAll\(\[\.\.\.PRECACHE, \.\.\.INSTALL_PAGES\]\)/);
-		// The one call that stores anything at install: no second add, even a commented-out one, beside it.
+		// The one precache call at install (the library restore and the worker script store with put): no second
+		// add, even a commented-out one, beside it.
 		expect(worker.match(/\.add(All)?\(/g)).toHaveLength(1);
 	});
 });

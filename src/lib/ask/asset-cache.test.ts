@@ -1064,8 +1064,7 @@ describe('storeOnFetch', () => {
 // name is pinned to the digest of the vendored folders. Changing bytes a device keeps fails here until the cache
 // takes a new name - add a line for the new name, and keep the old one as the record of what that name held. The
 // digest also moves when a file no device ever requested is removed, which reaches no device: nothing needs
-// fetching again, so that case re-pins the same name to the new digest (the base runtime WASM was removed this
-// way - no glue for it was vendored, so nothing could start it).
+// fetching again, so that case re-pins the same name to the new digest.
 const VENDORED_BYTES: Record<string, string> = {
 	'ask-assets-v1': '214663e52ef03af7c450efa53b0f4ea32cb2ef61c470cc33ec2e2803ccc4d8d7'
 };
