@@ -114,6 +114,19 @@ describe('waitForControl', () => {
 		expect(waitForControl()).toBe(first);
 	});
 
+	// A worker that did not come within the time is not waited for again: each later download goes ahead at once.
+	it('hands back the same settled answer after a wait that timed out, not a new wait', async () => {
+		vi.useFakeTimers();
+		const fake = new FakeContainer();
+		const { waitForControl, CONTROL_WAIT_MS } = await loadModule(fake);
+		const first = waitForControl();
+		vi.advanceTimersByTime(CONTROL_WAIT_MS);
+		expect(await first).toBe(false);
+		const listen = vi.spyOn(fake, 'addEventListener');
+		expect(waitForControl()).toBe(first);
+		expect(listen).not.toHaveBeenCalled();
+	});
+
 	it('gives up on a worker that does not come once the wait time has passed', async () => {
 		vi.useFakeTimers();
 		const { waitForControl, CONTROL_WAIT_MS } = await loadModule(new FakeContainer());
