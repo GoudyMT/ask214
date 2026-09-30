@@ -50,6 +50,12 @@ const STATIC = 'static';
 //     when the page is left starts nothing, a mode or feed question tapped before the page is ready is kept,
 //     the cache read is capped at 2 s, and a page no worker will control stops waiting - 41,093 B measured after
 //     a trim pass (-14 B: the held mode starts at the saved default).
+//     Page 55,800 -> 56,000 and route nodes 41,200 -> 41,078 (owner's call, 2026-09-30): the Documents page now
+//     waits for the service worker before it loads the answer library, as the home page does, so the wait -
+//     shared by the two routes - left the home page's route node for their shared chunk (+211 B here, -169 B
+//     there); 122 B moved between the two limits, plus room. Measured after a trim pass (-2 B: the page's left
+//     flag set in its existing cleanup): page 55,926 B, route nodes 41,004 B - each keeps about 75 B of room,
+//     because builds of the same code differ by a few bytes with SvelteKit's per-build global name.
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -72,9 +78,11 @@ const STATIC = 'static';
 //     measured with 55 files, after the trim pass above.
 //     Raised 134,800 -> 135,100 (owner's call, 2026-09-27): the same review fixes as the route-node raise, and
 //     the reader's title given its own full-width row - 134,970 B measured with 55 files, after that trim pass.
+//     Raised 135,100 -> 135,200 (owner's call, 2026-09-30): the Documents page's wait, above - 135,112 B measured
+//     with 55 files, after that trim pass.
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
-const LIMIT = { page: 55_800, onDemand: 7_300, precacheFiles: 60, precacheBytes: 135_100 };
+const LIMIT = { page: 56_000, onDemand: 7_300, precacheFiles: 60, precacheBytes: 135_200 };
 
 /**
  * @param {string} file A path as the manifest names it, relative to the client output.
