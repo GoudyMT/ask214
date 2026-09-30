@@ -41,8 +41,8 @@ export function classifyAsset(pathname: string): CacheStrategy {
  * old one, and the new model bytes are re-fetched on next use. The corpus is versioned the
  * OPPOSITE way - by URL, renaming the artifact - and that does NOT evict anything: the old URL merely stops
  * being requested while its entry stays cached at full size. Superseded corpus entries are therefore pruned
- * one at a time on activate (see `supersededToPrune`) - on a device still owed the new library, only once the
- * new one is stored, after activation's retry. Also cleared by an explicit wipe.
+ * one at a time on activate (see `isSupersededVersionedEntry`), and a device that kept a library is then given
+ * the new one (see `answerLibraryToRestore`). Also cleared by an explicit wipe.
  */
 export const ASK_ASSET_CACHE = 'ask-assets-v1';
 
@@ -226,27 +226,30 @@ export function libraryToRestore(
  * Decide which answer-library files the service worker fetches at install, so a device that kept the library
  * still answers on the device - offline too - after a release that renames it.
  *
- * The library is versioned by URL: a new release ships a new pair and the old one is pruned. Without this, a
- * device that set up on-device answers (or saved a document) would be asked to set up again although it still
- * holds the model, and could not answer offline until it did. Install runs while online, so the pair is fetched
- * then - only for a device that held a library AND set up on-device answers (a model file held) or saved a
- * document, and only the files it lacks. The worker also keeps the library when a page merely reads it ("Read
- * more", a document's text); that device never asked to keep it, so a release downloads nothing for it. A restore
- * that fails at install is tried again after activation, because `supersededToPrune` keeps the old pair - which
- * this rule reads - for as long as the result here is not empty.
+ * The library is versioned by URL: a new release ships a new pair, which an earlier release's pair cannot stand in
+ * for, and activate prunes the earlier one. Without this, a device that set up on-device answers (or saved a
+ * document) would be asked to set up again although it still holds the model, and could not answer offline until
+ * it did. Install runs while online, so the pair is fetched then, and again after activation for any file that
+ * could not be stored.
+ *
+ * The device is owed the pair when it holds a model file or a saved document and lacks a file of the current pair.
+ * Setup always downloads the library, and a document's first save always stores it, so either one means this device
+ * kept a library; no earlier pair needs to be held, which is what lets activate delete it at once. The worker also
+ * keeps the library when a page merely reads it ("Read more", a document's text), but that device never set up or
+ * saved anything, so it never asked to keep several megabytes and a release downloads nothing for it.
  *
  * Args:
  *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
  *   shipped: the pathnames this build ships, which carries the current library's name
  *
  * Returns:
- *   the shipped answer-library pathnames to fetch and store; empty when none was held or the current one is.
+ *   the shipped answer-library pathnames to fetch and store; empty when the device kept no library or holds the
+ *   current one.
  */
 export function answerLibraryToRestore(
 	cachedPaths: readonly string[],
 	shipped: readonly string[]
 ): string[] {
-	if (!cachedPaths.some((path) => path.startsWith('/corpus/'))) return [];
 	if (!cachedPaths.some((path) => path.startsWith('/models/') || path.startsWith('/docs/')))
 		return [];
 	return shipped.filter((path) => path.startsWith('/corpus/') && !cachedPaths.includes(path));
@@ -256,8 +259,9 @@ export function answerLibraryToRestore(
  * How long the install-time restore waits on one library before giving it up.
  *
  * A bound, so a stalled download cannot hold the install - and with it the update - open. A miss costs nothing
- * lasting: the old library is kept and the restore is tried again after activation. The answer library is about
- * 7.3 MB, which takes about a minute at roughly 1 Mbps; this is a bound, not a measured limit.
+ * lasting: the files stored so far stay, and the restore is tried again after activation and at the next install.
+ * The answer library is about 3.7 MB on the wire (its embeddings do not compress; measured from production with
+ * compression on), so 60 seconds holds down to about 0.5 Mbps; this is a bound, not a measured limit.
  */
 export const LIBRARY_RESTORE_DEADLINE_MS = 60_000;
 
@@ -315,15 +319,19 @@ export async function restoreLibraries(
 				if (response.status === 200) await cache.put(path, response);
 			}
 		} catch {
-			// This library is given up on - a failed or stalled download, or a full disk. The other one is still
-			// tried, and this one is tried again after activation because the old library is still held.
+			// This library is given up on - a failed or stalled download, or a full disk - with the files stored so
+			// far kept. The other one is still tried, and this one is tried again after activation, fetching only
+			// the files still missing.
 		} finally {
 			clearTimeout(timer);
 		}
 	}
 }
 
-/** Where the built embed worker's script is served from; `workers/assets/` beside it holds files, never a script. */
+/**
+ * Where the built embed worker's script is served from. `workers/assets/` beside it is where SvelteKit writes a
+ * worker's non-script files.
+ */
 const WORKER_SCRIPT_FOLDER = '/_app/immutable/workers/';
 
 /**
@@ -333,7 +341,8 @@ const WORKER_SCRIPT_FOLDER = '/_app/immutable/workers/';
  * the one place this release names it is the page code that starts the worker, as a string literal ending in
  * `workers/<name>.js` that the page resolves against its own address (`new URL(literal, import.meta.url)`).
  * This resolves it the same way, against the chunk's pathname. Only a script directly in the worker folder
- * counts: what sits in `workers/assets/` is a file the worker loads, never a script to keep.
+ * counts: `workers/assets/` is where SvelteKit writes a worker's non-script files, never a script to keep. The
+ * name is taken only in the characters Vite uses for a worker file, so an encoded separator in it is refused.
  *
  * @param chunkPath The pathname the chunk is served from.
  * @param text The chunk's text.
@@ -341,7 +350,7 @@ const WORKER_SCRIPT_FOLDER = '/_app/immutable/workers/';
  */
 export function workerScriptsNamed(chunkPath: string, text: string): string[] {
 	const named: string[] = [];
-	for (const match of text.matchAll(/(["'`])([^"'`\s]*workers\/[^"'`/\s]+\.js)\1/g)) {
+	for (const match of text.matchAll(/(["'`])([^"'`\s]*workers\/[\w-]+\.js)\1/g)) {
 		const path = new URL(match[2] ?? '', `https://chunk.invalid${chunkPath}`).pathname;
 		const inFolder =
 			path.startsWith(WORKER_SCRIPT_FOLDER) &&
@@ -417,35 +426,6 @@ export async function keepWorkerScripts(
 	} finally {
 		clearTimeout(timer);
 	}
-}
-
-/**
- * The cached entries to delete because this build no longer ships them, which is what `isSupersededVersionedEntry`
- * marks - except the answer library's while a restore of it is still owed.
- *
- * A device that set up on-device answers holds the old library and is owed the new one (`answerLibraryToRestore`).
- * Until the new pair is stored, the old one is the only library that device has: deleting it on an install whose
- * download failed would leave the device with none, and with no held pair to read the restore rule from. So the old
- * pair stays until the new one is held, and goes at the first prune after. The PDF library is not held back: an
- * old one cannot draw a page for the new reader, and the rule that restores the new one reads the saved documents,
- * which no prune removes.
- *
- * Args:
- *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
- *   shipped: the pathnames this build ships
- *
- * Returns:
- *   the held pathnames to delete.
- */
-export function supersededToPrune(
-	cachedPaths: readonly string[],
-	shipped: readonly string[]
-): string[] {
-	const restoreOwed = answerLibraryToRestore(cachedPaths, shipped).length > 0;
-	return cachedPaths.filter(
-		(path) =>
-			isSupersededVersionedEntry(path, shipped) && !(restoreOwed && path.startsWith('/corpus/'))
-	);
 }
 
 /**

@@ -9,7 +9,7 @@ import {
 	ASK_ASSET_CACHE,
 	carryOverSavedDocuments,
 	keptOnActivate,
-	supersededToPrune,
+	isSupersededVersionedEntry,
 	isApiRequest,
 	keptOnFetch,
 	LIBRARY_RESTORE_DEADLINE_MS,
@@ -37,9 +37,9 @@ sw.addEventListener('install', (event) => {
 			await cache.addAll([...PRECACHE, ...INSTALL_PAGES]);
 			// Install is when this release's files are known to be reachable - it is downloading them now - while
 			// activation may come later with no connection. So a device holding saved documents gets this
-			// release's PDF library here, and a device that kept the answer library gets this release's; activation
-			// tries again for any library file this could not store. The restore never throws and gives each
-			// library a deadline, so it cannot fail the install or hold it open.
+			// release's PDF library here, and a device that set up on-device answers or saved a document gets this
+			// release's answer library; activation tries again for any library file this could not store. The
+			// restore never throws and gives each library a deadline, so it cannot fail the install or hold it open.
 			const cacheNames = await caches.keys();
 			await restoreKeptLibraries(cacheNames);
 			await keepEmbedWorkerScript(cacheNames);
@@ -60,12 +60,12 @@ sw.addEventListener('activate', (event) => {
 			}
 			await pruneSupersededVersions(keys);
 			await sw.clients.claim();
-			// The fallback for a library or the embed worker's script that install could not store. Started after
-			// activation, not awaited inside it: page requests wait while a worker activates, so a download of
+			// The fallback for a library file or the embed worker's script that install could not store. Started
+			// after activation, not awaited inside it: page requests wait while a worker activates, so a download of
 			// several megabytes here (the PDF library, the answer library) would stall every page load after an
-			// update. The prune runs again once the libraries are done, which is when the old answer library -
-			// kept above while its replacement was owed - can go.
-			void restoreKeptLibraries(keys).then(() => pruneSupersededVersions(keys));
+			// update. Nothing is pruned after them: the prune above already freed the room they need, and one run
+			// here would use this release's file list after a newer release may have been installed meanwhile.
+			void restoreKeptLibraries(keys);
 			void keepEmbedWorkerScript(keys);
 		})()
 	);
@@ -80,6 +80,9 @@ sw.addEventListener('activate', (event) => {
  * each deploy leaves bytes that nothing will ever request again. `isSupersededVersionedEntry` is given this
  * build's asset list, so the model, the WASM, and everything current never match - and neither does an older
  * copy of a document still shipped, which the user saved and the Documents area reports as updated.
+ *
+ * An earlier answer library goes here with the rest, at once: this release cannot read it, and a device that kept
+ * a library is owed the current one by the restore, which does not need the earlier pair as its signal.
  *
  * @param cacheNames The cache names already read from caches.keys(), so an install that has never fetched a
  *   lazy asset is skipped rather than being given an empty cache by caches.open().
@@ -99,15 +102,8 @@ async function pruneSupersededVersions(cacheNames: string[]): Promise<void> {
 			// origin check keeps the pathname comparison against the asset list meaningful even so.
 			if (url.origin === sw.location.origin) held.push({ request, pathname: url.pathname });
 		}
-		// The old answer library stays while its replacement is owed: see supersededToPrune.
-		const doomed = new Set(
-			supersededToPrune(
-				held.map((entry) => entry.pathname),
-				ASSETS
-			)
-		);
 		for (const { request, pathname } of held) {
-			if (doomed.has(pathname)) await cache.delete(request);
+			if (isSupersededVersionedEntry(pathname, ASSETS)) await cache.delete(request);
 		}
 	} catch {
 		// Intentionally ignored - see above.
@@ -122,10 +118,10 @@ async function pruneSupersededVersions(cacheNames: string[]): Promise<void> {
  * every saved document would open offline only as its text. `libraryToRestore` returns the shipped library
  * files to fetch, and none on a device that saved no document. Run at install, while the release is being
  * downloaded, and again after activation for anything install could not store. The answer library is restored
- * the same way (`answerLibraryToRestore`), for a device that kept an earlier one because it set up on-device
- * answers or saved a document; the prune keeps its old pair until the new one is held, so that second try has
- * something to read. Each library has its own try and its own deadline (`restoreLibraries`), so a stalled
- * download cannot hold the install open and one library failing does not cost the other.
+ * the same way (`answerLibraryToRestore`), for a device that set up on-device answers or saved a document; the
+ * prune has already deleted its earlier pair, so the new one has the room. Each library has its own try and its
+ * own deadline (`restoreLibraries`), so a stalled download cannot hold the install open and one library failing
+ * does not cost the other.
  *
  * @param cacheNames The cache names already read from caches.keys(), so an install that has never fetched a
  *   lazy asset is skipped rather than being given an empty cache by caches.open().
@@ -133,8 +129,9 @@ async function pruneSupersededVersions(cacheNames: string[]): Promise<void> {
 async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
 	if (!cacheNames.includes(ASK_ASSET_CACHE)) return;
 	// A restore is opportunistic, like the prune: if a cache call rejects - or the browser stops the worker
-	// part-way, which stores nothing partial - the saved documents open as text offline until the next save or a
-	// reader opening online stores the library. The fetches are bounded and kept apart by restoreLibraries.
+	// part-way, which can leave a two-file library half stored - the next install or retry fetches only the file
+	// still missing, and until then the saved documents open as text offline and a set-up device cannot answer
+	// offline. The fetches are bounded and kept apart by restoreLibraries.
 	try {
 		const cache = await caches.open(ASK_ASSET_CACHE);
 		await restoreLibraries(

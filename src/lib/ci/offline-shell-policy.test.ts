@@ -48,3 +48,49 @@ describe('the worker installs the pages the budget counts', () => {
 		expect(worker.match(/\.add(All)?\(/g)).toHaveLength(1);
 	});
 });
+
+// What install and activate do is ordered, and the libraries' safety rests on the order: the prune runs before the
+// worker takes charge, so the download that follows has room; the downloads are not awaited inside activation, which
+// would stall every page load after an update; and no prune follows them, because one there would run with this
+// release's asset list after a newer release may already be installed.
+describe('the worker does its install and activate work in order', () => {
+	it('awaits the restore then the script keep at install, and the prune then the claim at activate, starting both retries unawaited and chaining nothing after them', () => {
+		const worker = readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8');
+		/** The `sw.addEventListener(name, ...)` call, up to the `});` that closes it at the start of a line. */
+		const handler = (name: string) => {
+			const start = worker.indexOf(`sw.addEventListener('${name}'`);
+			expect(start, name).toBeGreaterThanOrEqual(0);
+			return worker.slice(start, worker.indexOf('\n});', start));
+		};
+		/** Whether each statement appears, in this order, in the source. */
+		const inOrder = (source: string, statements: RegExp[]) => {
+			let from = 0;
+			for (const statement of statements) {
+				const at = source.slice(from).search(statement);
+				if (at < 0) return false;
+				from += at + 1;
+			}
+			return true;
+		};
+
+		expect(
+			inOrder(handler('install'), [
+				/\n\s*await restoreKeptLibraries\(cacheNames\);/,
+				/\n\s*await keepEmbedWorkerScript\(cacheNames\);/
+			])
+		).toBe(true);
+
+		const activate = handler('activate');
+		expect(
+			inOrder(activate, [
+				/\n\s*await pruneSupersededVersions\(keys\);/,
+				/\n\s*await sw\.clients\.claim\(\);/,
+				/\n\s*void restoreKeptLibraries\(keys\);/,
+				/\n\s*void keepEmbedWorkerScript\(keys\);/
+			])
+		).toBe(true);
+		expect(activate).not.toMatch(/await (restoreKeptLibraries|keepEmbedWorkerScript)/);
+		expect(activate).not.toMatch(/restoreKeptLibraries\(keys\)\s*\./);
+		expect(activate.match(/pruneSupersededVersions\(/g)).toHaveLength(1);
+	});
+});
