@@ -80,3 +80,10 @@ export function precachedPaths(workerSource: string): { listed: string[]; precac
 	];
 	return { listed, precached: listed.filter((path) => classifyAsset(path) === 'precache') };
 }
+
+/**
+ * The page the service worker also keeps at install (APP_SHELL in ../ask/asset-cache): a served page, not a file
+ * in the build, so the budget cannot weigh it on disk. This is its allowance in gzip-9 bytes; the offline-pages
+ * E2E weighs the real page against it. Measured 1,469 B (that E2E, gzip-9 of the kept body) on 2026-09-26.
+ */
+export const SHELL_BYTES_ALLOWANCE = 1_600;

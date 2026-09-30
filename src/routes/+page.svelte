@@ -1,9 +1,24 @@
+<script module lang="ts">
+	import { whenControlled } from '$lib/ask/when-controlled';
+
+	// How long the first download waits for the service worker on a first visit. Its install downloads ~133 KB,
+	// about 4-5 s on a slow 0.25 Mbps link; past this the download goes ahead and is not kept.
+	const CONTROL_WAIT_MS = 10_000;
+	// Module scope, so the wait happens at most once per visit, not once per return to this page: once a worker
+	// is in charge the check is immediate, and a worker that has not come within the time is not waited for again.
+	let control: Promise<boolean> | undefined;
+	const waitForControl = () =>
+		(control ??= whenControlled(CONTROL_WAIT_MS, navigator.serviceWorker));
+</script>
+
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import AskView from '$lib/components/AskView.svelte';
 	import EmbedWorker from '$lib/ask/embed-worker?worker';
 	import {
+		ASK_ERROR,
+		AskError,
 		CORPUS_BASE,
 		createAskStore,
 		createRecoveringEmbed,
@@ -13,6 +28,7 @@
 	import { ACCEPTED_CORPUS_VERSION } from '$lib/corpus';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
+	import { deviceFilesKept } from '$lib/ask/device-files';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
@@ -33,17 +49,31 @@
 		app.status === 'ready' && !app.store?.locked && app.store?.persona.completeness === 'none'
 	);
 
-	// Ask store wiring: the store is created immediately (no corpus wait), so the input, mode toggle, and
-	// feed are live at once. The corpus is fetched lazily - only a device query or a "Read more" click needs
-	// it - so the ~3.5MB artifact stays off the initial page load (an eager fetch pins LCP/TTI to its
-	// download). The ~23MB model + its worker are also lazy (created on the first embed, in onMount).
+	// Ask store wiring: the store is created once the cache has been read (a lookup, no download - see onMount),
+	// so the input, mode toggle, and feed are live at once. The corpus is fetched lazily - only a device query or
+	// a "Read more" click needs it - so the ~3.5MB artifact stays off the initial page load (an eager fetch pins
+	// LCP/TTI to its download). The ~23MB model + its worker are also lazy (created on the first embed, in onMount).
 	let store = $state<ReturnType<typeof createAskStore> | null>(null);
-	let sources = $state<Map<string, Source>>(new Map());
+	// Read only by loadSource, after the load that fills it - never by the template - so it needs no reactivity.
+	let sources: Map<string, Source> | undefined;
+	// Set when the page is left. A download waiting for the service worker checks it when the wait ends, so a setup
+	// left behind starts nothing once the worker takes charge.
+	let left = false;
+	// A mode or a feed question picked before the store exists - it waits for the cache read - is held here and
+	// handed to the store when it is made, so an early tap is not lost. The toggle shows the held mode until then:
+	// the saved default, or the one just picked. A question keeps the mode it was picked in.
+	let earlyMode = $state(getDefaultMode());
+	let earlyQuery: { query: string; mode: 'device' | 'online' } | undefined;
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
 	const getCorpus = createLazyCorpus(
-		() => loadCorpus(fetch, CORPUS_BASE),
+		async () => {
+			// The answer library is one of the first downloads too: waiting keeps it on a first visit.
+			await waitForControl();
+			if (left) throw new AskError(ASK_ERROR.CORPUS);
+			return loadCorpus(fetch, CORPUS_BASE);
+		},
 		(c) => {
 			sources = sourcesFromCorpus(c);
 		}
@@ -52,7 +82,7 @@
 	// more" (which shows a loading state meanwhile), so the corpus is not fetched until a user reads a source.
 	async function loadSource(sourceId: string): Promise<Source | null> {
 		await getCorpus();
-		return sources.get(sourceId) ?? null;
+		return sources?.get(sourceId) ?? null;
 	}
 
 	const askState: AskState = $derived(store?.state ?? { kind: 'idle' });
@@ -79,30 +109,51 @@
 		// The ~23MB model + its embed worker are created lazily, on the first query that needs them - never
 		// on page load (the corpus is likewise lazy, via getCorpus above) - and made again after a failure.
 		const { embed, dispose } = createRecoveringEmbed(() => new EmbedWorker());
-		store = createAskStore({
-			embed,
-			getCorpus,
-			// Route-bound closures keep fetch and the raw BYO key out of the store. A decoded corpus always
-			// carries ACCEPTED_CORPUS_VERSION (the codec rejects any other), so the online handshake uses the
-			// constant, not the loaded object - which lets online mode skip the corpus load entirely.
-			retrieveOnline: (query) =>
-				retrieveOnline(query, { fetch, expectedCorpusVersion: ACCEPTED_CORPUS_VERSION }),
-			synthesize: async (query, chunks) => {
-				try {
-					const apiKey = (await app.byok?.readApiKey()) ?? null;
-					if (apiKey === null) return { kind: 'degraded' }; // no key -> raw cards, no summary
-					return await synthesize(query, chunks, { fetch, apiKey });
-				} catch {
-					return { kind: 'degraded' }; // a locked keystore or read failure degrades gracefully
-				}
-			},
-			onlineConsented: isOnlineConsented,
-			markOnlineConsent: () => setOnlineConsented(true),
-			synthesisEnabled: isSynthesisEnabled
+		// Whether this device keeps every on-device file is read from the cache - a lookup, no download - before
+		// the store exists, so the store asks before any download the device does not already hold.
+		void deviceFilesKept(globalThis.caches).then((deviceKept) => {
+			if (left) return;
+			store = createAskStore({
+				// The embed worker, and the model it downloads, are created only after the wait, so both go
+				// through the service worker and are kept.
+				embed: async (text) => {
+					await waitForControl();
+					if (left) throw new AskError(ASK_ERROR.EMBED);
+					return embed(text);
+				},
+				getCorpus,
+				deviceKept,
+				// Route-bound closures keep fetch and the raw BYO key out of the store. A decoded corpus always
+				// carries ACCEPTED_CORPUS_VERSION (the codec rejects any other), so the online handshake uses the
+				// constant, not the loaded object - which lets online mode skip the corpus load entirely.
+				retrieveOnline: (query) =>
+					retrieveOnline(query, { fetch, expectedCorpusVersion: ACCEPTED_CORPUS_VERSION }),
+				synthesize: async (query, chunks) => {
+					try {
+						const apiKey = (await app.byok?.readApiKey()) ?? null;
+						if (apiKey === null) return { kind: 'degraded' }; // no key -> raw cards, no summary
+						return await synthesize(query, chunks, { fetch, apiKey });
+					} catch {
+						return { kind: 'degraded' }; // a locked keystore or read failure degrades gracefully
+					}
+				},
+				onlineConsented: isOnlineConsented,
+				markOnlineConsent: () => setOnlineConsented(true),
+				synthesisEnabled: isSynthesisEnabled
+			});
+			// The store opens online when capable (the on-ramp default); honor the held mode - an explicit device
+			// choice, or one picked while the cache was read. A feed question picked in that time is asked now, in
+			// the mode showing when it was picked, as it would have been with the store in place; a mode tapped
+			// after it then applies to the next question.
+			const first = earlyQuery?.mode ?? earlyMode;
+			if (first === 'device') store.setMode('device');
+			if (earlyQuery !== undefined) void store.ask(earlyQuery.query);
+			if (earlyMode !== first) store.setMode(earlyMode);
 		});
-		// The store opens online when capable (the on-ramp default); honor an explicit device choice.
-		if (getDefaultMode() === 'device') store.setMode('device');
-		return dispose;
+		return () => {
+			left = true;
+			dispose();
+		};
 	});
 </script>
 
@@ -122,12 +173,12 @@
 		{ready}
 		{loadSource}
 		onlineCapable={true}
-		mode={store?.mode ?? getDefaultMode()}
+		mode={store?.mode ?? earlyMode}
 		showNudge={store?.showNudge ?? false}
-		onAsk={(q) => store?.ask(q)}
+		onAsk={(q) => (store ? void store.ask(q) : (earlyQuery = { query: q, mode: earlyMode }))}
 		onSetUp={() => store?.setUp()}
 		onDismiss={() => store?.dismissSetup()}
-		onSetMode={(m) => store?.setMode(m)}
+		onSetMode={(m) => (store ? store.setMode(m) : (earlyMode = m))}
 		onConsentOnline={() => store?.consentOnline()}
 		onStayDevice={() => store?.stayOnDevice()}
 		onDismissNudge={() => store?.dismissNudge()}

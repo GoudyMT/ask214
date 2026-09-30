@@ -26,21 +26,6 @@ const K = 5;
 // tail so unrelated hits collapse. Recalibrate as the corpus scales.
 const MIN_SCORE = 0.4;
 
-// The ~23MB on-device search model is fetched + cached once, then served from cache forever.
-// We persist one non-PII boolean - "was the model downloaded on this device?" - so the "downloading..."
-// modelLoading message shows on the first-EVER query only, not once per session. This
-// is a device-capability flag, NOT user data (no query, no profile, nothing personal), so plain
-// localStorage is correct here - the encrypted-IDB rule governs PII, which this is not.
-const MODEL_DOWNLOADED_KEY = 'mtc:ask:model-downloaded';
-
-function readModelDownloaded(): boolean {
-	return typeof localStorage !== 'undefined' && localStorage.getItem(MODEL_DOWNLOADED_KEY) === '1';
-}
-
-function markModelDownloaded(): void {
-	if (typeof localStorage !== 'undefined') localStorage.setItem(MODEL_DOWNLOADED_KEY, '1');
-}
-
 /**
  * The Ask view store: holds the `AskState` machine and orchestrates one query. `embed` + `getCorpus` are
  * injected so the device path is unit-testable without a model/worker; `getCorpus` is lazy so the corpus
@@ -54,11 +39,13 @@ function markModelDownloaded(): void {
  *
  * Soft opt-in (device path, unchanged): the ~23MB model is NEVER auto-downloaded. The first query on an
  * un-set-up device goes to `needsSetup` with the query preserved; the download happens only when the user
- * consents via `setUp()`. A set-up device (persisted flag) skips straight to `embedding`.
+ * consents via `setUp()`. A device that keeps every file an on-device answer needs (`deviceKept`, which the page
+ * reads from the cache before creating the store) skips straight to `embedding`; without it the store asks.
  */
 export function createAskStore(deps: {
 	embed: (text: string) => Promise<Float32Array>;
 	getCorpus: () => Promise<Corpus>;
+	deviceKept?: boolean;
 	retrieveOnline?: (query: string) => Promise<RetrieveResult>;
 	synthesize?: (query: string, chunks: RetrievedChunk[]) => Promise<SynthesisResult>;
 	onlineConsented?: () => boolean;
@@ -67,7 +54,9 @@ export function createAskStore(deps: {
 	nudgeAfter?: number;
 }) {
 	let state = $state<AskState>({ kind: 'idle' });
-	let modelLoaded = $state(readModelDownloaded()); // $state so `showNudge` stays reactive to it
+	// Kept on the device when the page opened, or loaded this session. Absent means not kept, so the store asks
+	// before any download - the safe default. $state so `showNudge` stays reactive to it.
+	let modelLoaded = $state(deps.deviceKept ?? false);
 
 	// Online is available only when the route supplied the retrieve closure; that presence (not a global
 	// default) is what keeps the change additive - a device-only construction is identical to before.
@@ -107,7 +96,6 @@ export function createAskStore(deps: {
 			// otherwise pin LCP/TTI to its download time.
 			const [vector, corpus] = await Promise.all([deps.embed(query), deps.getCorpus()]);
 			modelLoaded = true;
-			markModelDownloaded();
 			const cards = toResultCards(filterByMinScore(search(vector, corpus, K), MIN_SCORE));
 			const answer = answerFor(query, cards);
 			commitIfCurrent(
@@ -117,12 +105,16 @@ export function createAskStore(deps: {
 			);
 		} catch (e) {
 			const code = e instanceof AskError ? e.code : ASK_ERROR.EMBED;
+			const wasLoaded = modelLoaded;
+			// A failed embed ends the worker and the model in its memory, so only files kept on the device still
+			// count as set up: anything else asks again before downloading. A corpus failure leaves the model.
+			if (code !== ASK_ERROR.CORPUS) modelLoaded = deps.deviceKept ?? false;
 			// Superseded mid-embed (a crisis message routed to help, a pending consent gate) - do not clobber.
 			if (state.kind !== 'embedding' && state.kind !== 'modelLoading') return;
 			// Offline only when a first-run (model-not-loaded) embed fails with no network: a warm embed
 			// needs no network, so its failure is a genuine error, not connectivity.
 			const online = typeof navigator === 'undefined' || navigator.onLine;
-			if (!modelLoaded && !online) {
+			if (!wasLoaded && !online) {
 				state = { kind: 'offline' };
 			} else if (onlineCapable) {
 				// A device retrieval failure offers the working online path (or the outbound hub once both
@@ -151,10 +143,11 @@ export function createAskStore(deps: {
 	}
 
 	// Degrade an online failure onto the ladder, guarding the same supersession + the `failed` mutation.
-	// Offline is a dead end for the ladder (even its outbound hub is unreachable), so surface the offline hint.
+	// Offline is a dead end for the ladder (even its outbound hub is unreachable), so surface the offline hint -
+	// unless this device holds the model, in which case the ladder offers the answer it can give offline.
 	function degradeOnline(query: string): void {
 		if (state.kind !== 'embedding' && state.kind !== 'modelLoading') return;
-		if (!(typeof navigator === 'undefined' || navigator.onLine)) {
+		if (!modelLoaded && !(typeof navigator === 'undefined' || navigator.onLine)) {
 			state = { kind: 'offline' };
 			return;
 		}

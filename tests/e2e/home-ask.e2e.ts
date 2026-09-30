@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { ASK_ASSET_CACHE } from '../../src/lib/ask/asset-cache';
+import { DEVICE_FILES } from '../../src/lib/ask/device-files';
 
 // The Ask is the home page now (ADR-022/024). /ask stays as a permanent redirect so old links land.
 test('/ask redirects to the home page', async ({ page }) => {
@@ -18,11 +20,68 @@ test('the home page leads with the hero headline and the Ask input', async ({ pa
 test('the model is NOT downloaded on page load (soft opt-in)', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeEnabled();
-	// `mtc:ask:model-downloaded` is the shipped NON-PII device-capability flag (store.svelte.ts): it
-	// records only "was the model fetched on this device" - no query, no profile, nothing personal.
-	// ADR-004's encrypted-IDB rule governs PII, which this is not; reading it asserts the soft opt-in held.
-	const flag = await page.evaluate(() => localStorage.getItem('mtc:ask:model-downloaded'));
-	expect(flag).toBeNull();
+	// The model downloads inside the embed worker, which exists only after the user agrees to set up on-device
+	// answers. No worker on the page means nothing is downloading.
+	expect(page.workers()).toEqual([]);
+});
+
+// A device carrying the old "downloaded" flag but none of the files - a download made before the service worker
+// took charge, or files the browser deleted - must ask before downloading, not fetch the model unasked.
+test('a device without the files asks before downloading, whatever an old flag says', async ({
+	page,
+	context
+}) => {
+	const workers: string[] = [];
+	page.on('worker', (worker) => workers.push(worker.url()));
+	const downloads: string[] = [];
+	context.on('request', (request) => {
+		const path = new URL(request.url()).pathname;
+		if (/^\/(models|wasm)\//.test(path)) downloads.push(path);
+	});
+	await page.addInitScript(() => localStorage.setItem('mtc:ask:model-downloaded', '1'));
+	await page.goto('/');
+	const input = page.getByRole('textbox', { name: /ask a question/i });
+	await expect(input).toBeEnabled();
+	await page.getByRole('button', { name: /^on device$/i }).click();
+	await input.fill('How do I apply for SkillBridge?');
+	await page.getByRole('button', { name: /^search$/i }).click();
+	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
+	// A download started behind the prompt would wait for the worker, like every download here: let the worker
+	// take charge, then give such a download time to show.
+	await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+	await page.waitForTimeout(2_000);
+	// Asking is all it did: no embed worker, and nothing of the model or its runtime was fetched.
+	expect(workers).toEqual([]);
+	expect(downloads).toEqual([]);
+});
+
+// The other side: a device that keeps every on-device file is set up already, so asking on the device goes
+// straight to its on-device answer - no setup prompt, and the embed worker starts at once. (The stand-in files
+// cannot answer, so the run itself then fails; what is checked is that it started without asking.)
+test('a device that keeps every on-device file starts its on-device answer without asking to set up', async ({
+	page
+}) => {
+	const workers: string[] = [];
+	page.on('worker', (worker) => workers.push(worker.url()));
+	await page.goto('/');
+	// WebKit ties the cache to a registration, so seed it only once one is in place.
+	await page.evaluate(() => navigator.serviceWorker.ready);
+	// Stand-ins at the on-device files' addresses: the page asks only whether each is kept, not what it holds.
+	await page.evaluate(
+		async ({ cacheName, paths }) => {
+			const cache = await caches.open(cacheName);
+			await Promise.all(paths.map((path) => cache.put(path, new Response('kept'))));
+		},
+		{ cacheName: ASK_ASSET_CACHE, paths: [...DEVICE_FILES] }
+	);
+	await page.reload();
+	const input = page.getByRole('textbox', { name: /ask a question/i });
+	await expect(input).toBeEnabled();
+	await page.getByRole('button', { name: /^on device$/i }).click();
+	await input.fill('How do I apply for SkillBridge?');
+	await page.getByRole('button', { name: /^search$/i }).click();
+	await expect.poll(() => workers.length, { timeout: 15_000 }).toBe(1);
+	await expect(page.getByText(/one-time setup to answer your question/i)).toHaveCount(0);
 });
 
 test('asking in device mode on a fresh profile replaces the on-ramp with the setup prompt', async ({
@@ -34,7 +93,7 @@ test('asking in device mode on a fresh profile replaces the on-ramp with the set
 	// idle + no profile: the on-ramp is visible
 	await expect(page.getByRole('heading', { name: /make it yours/i })).toBeVisible();
 	// online is the on-ramp default, so switch to device to exercise the soft opt-in: device mode gates the
-	// one-time ~45MB download on the first query. The prompt takes the space; the on-ramp is gone.
+	// one-time download on the first query. The prompt takes the space; the on-ramp is gone.
 	await page.getByRole('button', { name: /^on device$/i }).click();
 	await input.fill('How do I apply for SkillBridge?');
 	await page.getByRole('button', { name: /^search$/i }).click();
@@ -81,6 +140,108 @@ test('the mode toggle flips both ways and the question feed stays put (V2)', asy
 	await expect(online).toHaveAttribute('aria-pressed', 'true');
 	await expect(privacy).toContainText(/only your question is sent/i);
 	await expect(feedPill).toBeVisible();
+});
+
+// The page makes its Ask store only after it has read the cache, which can take up to its time limit. A choice made
+// in that time is held and handed to the store, not lost. The page's cache reads are held here, so the store
+// waits for the limit and every tap below lands before it exists.
+async function holdCacheReads(page: Page): Promise<void> {
+	await page.addInitScript(() => {
+		caches.match = () => new Promise<Response | undefined>(() => {});
+	});
+}
+
+test('a mode picked before the page is ready is kept', async ({ page }) => {
+	await holdCacheReads(page);
+	await page.goto('/');
+	const search = page.getByRole('button', { name: /^search$/i });
+	const onDevice = page.getByRole('button', { name: /^on device$/i });
+	await expect(search).toBeDisabled();
+	expect(await tapBeforeReady(page, [{ selector: '.ask-mode__opt', text: 'On device' }])).toBe(
+		true
+	);
+	await expect(onDevice).toHaveAttribute('aria-pressed', 'true');
+
+	await expect(search).toBeEnabled({ timeout: 10_000 });
+	await expect(onDevice).toHaveAttribute('aria-pressed', 'true');
+	await page
+		.getByRole('textbox', { name: /ask a question/i })
+		.fill('How do I apply for SkillBridge?');
+	await search.click();
+	// Asked on the device, so it offers the setup, not an online answer.
+	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
+});
+
+test('a question picked from the feed before the page is ready is asked once it is', async ({
+	page
+}) => {
+	await holdCacheReads(page);
+	await page.goto('/');
+	const search = page.getByRole('button', { name: /^search$/i });
+	await expect(search).toBeDisabled();
+	expect(await tapBeforeReady(page, [{ selector: '.q-feed__pill' }])).toBe(true);
+
+	await expect(search).toBeEnabled({ timeout: 10_000 });
+	// Online is the default, so the question reaches the consent step for answering online.
+	await expect(
+		page.getByRole('heading', { name: /send your question to answer online/i })
+	).toBeVisible();
+});
+
+// Taps made in one task while Search is still disabled - no store yet - so each lands before the store exists
+// however slow the machine is. Returns whether that held when the taps were made.
+async function tapBeforeReady(
+	page: Page,
+	targets: { selector: string; text?: string }[]
+): Promise<boolean> {
+	return page.evaluate((all) => {
+		const early = (document.querySelector('button.ask-search') as HTMLButtonElement).disabled;
+		for (const { selector, text } of all) {
+			const target = [...document.querySelectorAll<HTMLElement>(selector)].find(
+				(element) => text === undefined || element.textContent?.trim() === text
+			);
+			if (target === undefined) throw new Error('E_TAP_TARGET_MISSING');
+			target.click();
+		}
+		return early;
+	}, targets);
+}
+
+// A question held before the page is ready runs in the mode showing when it was picked, as it would with the page
+// ready; a mode tapped after it applies to the next question and sends nothing. The saved default here is the
+// device and online answers were agreed to before, so a question run in the later mode would go online at once.
+test('a feed question picked before the page is ready runs in the mode it was picked in', async ({
+	page,
+	context
+}) => {
+	await page.addInitScript(() => {
+		localStorage.setItem('mtc:ask:default-mode', 'device');
+		localStorage.setItem('mtc:ask:online-consented', '1');
+	});
+	const sent: string[] = [];
+	context.on('request', (request) => {
+		const path = new URL(request.url()).pathname;
+		if (path.startsWith('/api/')) sent.push(path);
+	});
+	await holdCacheReads(page);
+	await page.goto('/');
+	const search = page.getByRole('button', { name: /^search$/i });
+	await expect(search).toBeDisabled();
+	const early = await tapBeforeReady(page, [
+		{ selector: '.q-feed__pill' },
+		{ selector: '.ask-mode__opt', text: 'Online' }
+	]);
+	expect(early).toBe(true);
+
+	await expect(search).toBeEnabled({ timeout: 10_000 });
+	// Picked on the device, which keeps nothing: the setup is offered, and nothing went online.
+	await expect(page.getByText(/one-time setup to answer your question/i)).toBeVisible();
+	expect(sent).toEqual([]);
+	// The later tap still counts, for the next question.
+	await expect(page.getByRole('button', { name: 'Online', exact: true })).toHaveAttribute(
+		'aria-pressed',
+		'true'
+	);
 });
 
 test('the Ask input is the first focusable control in the page content', async ({ page }) => {

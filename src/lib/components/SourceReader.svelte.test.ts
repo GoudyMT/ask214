@@ -1458,9 +1458,9 @@ describe('SourceReader, a document opened whole', () => {
 		await settle();
 		seg(container, 'Page')?.click();
 		await settle();
-		body.scrollTop = 900;
+		body.scrollTop = 600;
 		await settle();
-		expect(body.scrollTop).toBe(900);
+		expect(body.scrollTop).toBe(600);
 
 		seg(container, 'Text')?.click();
 		await settle();
@@ -1891,6 +1891,164 @@ describe('SourceReader, a document opened whole', () => {
 				letRead();
 				has.mockRestore();
 			}
+		});
+	});
+
+	// The page and the pager sit on the reader's centerline; the title, the view switch and the row under the
+	// document sit on it too, so the reader reads as one column. Measured on the text: a block box spans its column
+	// whatever the alignment, so only the lines show where the words sit.
+	describe('on one centerline', () => {
+		let size = { width: 0, height: 0 };
+		beforeEach(() => {
+			size = { width: window.innerWidth, height: window.innerHeight };
+		});
+		afterEach(async () => {
+			await page.viewport(size.width, size.height);
+		});
+
+		// The middle of the ink on each line the elements' text occupies, one value per line.
+		function lineCentres(elements: Element[]): number[] {
+			const lines = new Map<number, { left: number; right: number }>();
+			for (const element of elements) {
+				const range = document.createRange();
+				range.selectNodeContents(element);
+				for (const rect of range.getClientRects()) {
+					if (rect.width === 0) continue;
+					const key = Math.round(rect.top);
+					const line = lines.get(key);
+					lines.set(
+						key,
+						line
+							? { left: Math.min(line.left, rect.left), right: Math.max(line.right, rect.right) }
+							: { left: rect.left, right: rect.right }
+					);
+				}
+			}
+			return [...lines.values()].map(({ left, right }) => (left + right) / 2);
+		}
+
+		it.each([
+			['a desktop', 1280, 800],
+			['a phone', 390, 844],
+			['a phone turned sideways', 844, 390]
+		])('centres the title, the switch and the foot on %s', async (_name, width, height) => {
+			await caches.delete(ASK_ASSET_CACHE);
+			await page.viewport(width, height);
+			const { container } = render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: threePages()
+				}
+			});
+			await vi.waitFor(() => expect(container.querySelector('.reader__foot .save')).not.toBeNull());
+			const box = (container.querySelector('dialog.reader') as HTMLElement).getBoundingClientRect();
+			const middle = box.left + box.width / 2;
+			const parts: [string, Element[]][] = [
+				['the title', [container.querySelector('.reader__head > div') as Element]],
+				['the switch', [container.querySelector('.seg') as Element]],
+				['the foot', [...(container.querySelector('.reader__foot') as Element).children]]
+			];
+			for (const [part, elements] of parts) {
+				const centres = lineCentres(elements);
+				expect(centres.length, part).toBeGreaterThan(0);
+				for (const centre of centres)
+					expect(Math.abs(centre - middle), part).toBeLessThanOrEqual(1);
+			}
+		});
+
+		// Centring the title must not narrow it: a column held empty on each side to balance Close cost a long title
+		// a line on a phone and, at 400% zoom, most of the reading pane.
+		const openDoc = async (title = DOC.title) => {
+			const view = render(SourceReader, {
+				props: {
+					source: null,
+					doc: { ...DOC, title },
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: threePages()
+				}
+			});
+			await vi.waitFor(() => expect(view.container.querySelector('.reader__title')).not.toBeNull());
+			return view.container;
+		};
+		// The head's content box, less its padding.
+		function inside(head: HTMLElement): { left: number; width: number } {
+			const style = getComputedStyle(head);
+			const box = head.getBoundingClientRect();
+			const left = parseFloat(style.paddingLeft);
+			return {
+				left: box.left + left,
+				width: head.clientWidth - left - parseFloat(style.paddingRight)
+			};
+		}
+
+		// On a tall screen Close sits up on the Source line, so the title has a row of the head's whole width.
+		it.each([
+			['a desktop', 1280, 800],
+			['a phone', 390, 844]
+		])(
+			"gives the title the head's whole width on %s, with Close above it",
+			async (_name, width, height) => {
+				await page.viewport(width, height);
+				const container = await openDoc();
+				const head = container.querySelector('.reader__head') as HTMLElement;
+				const title = (
+					container.querySelector('.reader__title') as HTMLElement
+				).getBoundingClientRect();
+				const close = (
+					container.querySelector('.reader__close') as HTMLElement
+				).getBoundingClientRect();
+				expect(Math.abs(title.width - inside(head).width)).toBeLessThanOrEqual(1);
+				expect(close.bottom).toBeLessThanOrEqual(title.top);
+			}
+		);
+
+		// On a short screen Source is hidden and Close shares the title's line, in a column only as wide as Close
+		// needs; an equal column on the other side keeps the title centred.
+		it.each([
+			['a phone turned sideways', 844, 390],
+			['400% zoom', 320, 256]
+		])('keeps only a 22 px column each side of the title on %s', async (_name, width, height) => {
+			await page.viewport(width, height);
+			const container = await openDoc();
+			const head = container.querySelector('.reader__head') as HTMLElement;
+			const title = (
+				container.querySelector('.reader__title') as HTMLElement
+			).getBoundingClientRect();
+			const gap = parseFloat(getComputedStyle(head).columnGap) || 0;
+			const inner = inside(head);
+			expect(Math.abs(title.left - inner.left - (22 + gap))).toBeLessThanOrEqual(1);
+			expect(Math.abs(inner.left + inner.width - title.right - (22 + gap))).toBeLessThanOrEqual(1);
+		});
+
+		// At 400% zoom a long title wraps beside Close; Close stays at the top right, level with the first line,
+		// rather than sliding down to the middle of the block as the title grows.
+		it('keeps Close level with the first line of a wrapped title at 400% zoom', async () => {
+			await page.viewport(320, 256);
+			const container = await openDoc(
+				'TAP - DOL Employment Fundamentals of Career Transition (EFCT) Participant Guide'
+			);
+			const title = (
+				container.querySelector('.reader__title') as HTMLElement
+			).getBoundingClientRect();
+			const close = (
+				container.querySelector('.reader__close') as HTMLElement
+			).getBoundingClientRect();
+			expect(title.height).toBeGreaterThan(close.height * 2); // the premise: the title wraps
+			expect(Math.abs(close.top - title.top)).toBeLessThanOrEqual(1);
+		});
+
+		// Where a scrollbar takes room (Windows), it would push the pages off the centreline by half its width; the
+		// body keeps as much room free on the other edge, so they stay on the title's line. This test browser hides
+		// its scrollbars and will not draw one that takes room, even a styled one, so the offset cannot show here:
+		// the rule is read.
+		it('keeps room for a scrollbar on both edges of the body', async () => {
+			const container = await openDoc();
+			const body = container.querySelector('.reader__body') as HTMLElement;
+			expect(getComputedStyle(body).scrollbarGutter).toBe('stable both-edges');
 		});
 	});
 });

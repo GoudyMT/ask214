@@ -549,25 +549,38 @@
 	}
 
 	.reader__head {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: var(--space-m);
+		display: grid;
+		/* Close sits on the Source line with an empty column as wide balancing it, so Source centres; the title
+		   takes the whole width below them and centres on the reader. */
+		grid-template-columns: 28px minmax(0, 1fr) 28px;
+		grid-template-areas:
+			'. src close'
+			'title title title';
+		align-items: center;
+		gap: 2px var(--space-m);
 		padding: var(--space-l) var(--space-l) var(--space-m);
+		text-align: center;
 		border-bottom: 1px solid var(--color-border);
 	}
+	/* The wrapper draws no box, so Source and the title each take their own place in the head's grid. */
+	.reader__head > div {
+		display: contents;
+	}
 	.reader__src {
-		margin: 0 0 2px;
+		grid-area: src;
+		margin: 0;
 		font-size: var(--font-size-s);
 		color: var(--color-fg-muted);
 	}
 	.reader__title {
+		grid-area: title;
 		margin: 0;
 		font-size: var(--font-size-l);
 		line-height: 1.25;
 	}
 	.reader__close {
-		flex-shrink: 0;
+		grid-area: close;
+		justify-self: end;
 		background: none;
 		border: none;
 		color: var(--color-fg-muted);
@@ -582,6 +595,9 @@
 		overflow-y: auto;
 		/* A scroll that reaches the end of the document stops there instead of passing to the page. */
 		overscroll-behavior: contain;
+		/* Where scrollbars take room (Windows), a scrollbar's width stays free on both edges, so the pages keep to
+		   the title's line. */
+		scrollbar-gutter: stable both-edges;
 		padding: var(--space-l);
 	}
 	/* Drawn inside each view: on a short screen the body has no room around the views, and it clips. */
@@ -610,6 +626,8 @@
 		font-size: var(--font-size-s);
 	}
 	.reader__switch {
+		display: flex;
+		justify-content: center;
 		padding: var(--space-s) var(--space-l);
 		border-bottom: 1px solid var(--color-border);
 	}
@@ -726,6 +744,8 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: center;
+		text-align: center;
 		gap: var(--space-m);
 		padding: var(--space-m) var(--space-l);
 		font-size: var(--font-size-s);
@@ -765,8 +785,16 @@
 		.reader__src {
 			display: none;
 		}
-		.reader__head > div {
-			min-width: 0;
+		/* With Source hidden, Close shares the title's line; columns only as wide as Close needs leave the title
+		   most of the width. */
+		.reader__head {
+			grid-template-columns: 22px minmax(0, 1fr) 22px;
+			grid-template-areas: '. title close';
+			column-gap: var(--space-s);
+		}
+		/* Top right, level with the first line when the title wraps (at 400% zoom). */
+		.reader__close {
+			align-self: start;
 		}
 		.reader__title {
 			white-space: nowrap;

@@ -222,6 +222,36 @@ export function libraryToRestore(
 }
 
 /**
+ * Decide which answer-library files the service worker fetches at install, so a device that kept the library
+ * still answers on the device - offline too - after a release that renames it.
+ *
+ * The library is versioned by URL: a new release ships a new pair and activate prunes the old one. Without this, a
+ * device that set up on-device answers (or saved a document) would be asked to set up again although it still
+ * holds the model, and could not answer offline until it did. Install runs while online, so the pair is fetched
+ * then - only for a device that held a library AND set up on-device answers (a model file held) or saved a
+ * document, and only the files it lacks. The worker also keeps the library when a page merely reads it ("Read
+ * more", a document's text); that device never asked to keep it, so a release downloads nothing for it. A restore
+ * that fails at install is not retried at activate, where the prune has already removed the old pair this rule
+ * reads.
+ *
+ * Args:
+ *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
+ *   shipped: the pathnames this build ships, which carries the current library's name
+ *
+ * Returns:
+ *   the shipped answer-library pathnames to fetch and store; empty when none was held or the current one is.
+ */
+export function answerLibraryToRestore(
+	cachedPaths: readonly string[],
+	shipped: readonly string[]
+): string[] {
+	if (!cachedPaths.some((path) => path.startsWith('/corpus/'))) return [];
+	if (!cachedPaths.some((path) => path.startsWith('/models/') || path.startsWith('/docs/')))
+		return [];
+	return shipped.filter((path) => path.startsWith('/corpus/') && !cachedPaths.includes(path));
+}
+
+/**
  * Decide whether the service worker keeps a response it passes through to the page.
  *
  * Everything it passes is kept, except a source document: viewing a document keeps nothing, and only the
@@ -245,6 +275,10 @@ export function keptOnFetch(pathname: string): boolean {
  * until it lands rather than stopping an idle worker mid-write; a write that fails - a full disk above all -
  * ends quietly, because the response was already served and the next request fetches and tries again.
  *
+ * APP_SHELL is the exception: a held copy stands. Install stored it from its own release, and a visit during an
+ * update fetches the next release's page, which in this cache would name files the cache does not hold. With none
+ * held - after an erase - the visit keeps one.
+ *
  * @param event The fetch event whose lifetime the write extends.
  * @param cache The cache to write into.
  * @param request The request the copy is stored under.
@@ -256,7 +290,14 @@ export function storeOnFetch(
 	request: Request,
 	response: Response
 ): void {
-	event.waitUntil(cache.put(request, response.clone()).catch(() => {}));
+	const copy = response.clone();
+	const keepHeld = new URL(request.url).pathname === APP_SHELL;
+	event.waitUntil(
+		(async () => {
+			if (keepHeld && (await cache.match(APP_SHELL, { ignoreVary: true })) !== undefined) return;
+			await cache.put(request, copy);
+		})().catch(() => {})
+	);
 }
 
 /**
@@ -270,4 +311,43 @@ export function storeOnFetch(
  */
 export function isApiRequest(pathname: string): boolean {
 	return pathname.startsWith('/api/');
+}
+
+/**
+ * The page the service worker keeps at install, in the same cache as the app's code. Every page that shows
+ * personal data renders in the browser (`ssr = false`), so this is the app's frame with nothing of the user's in
+ * it: served for any top-level address, the router draws that page. Each release's install keeps its own copy
+ * while online, so a page still opens offline after an update deletes the previous release's cache - and after a
+ * first visit, whose own page load came before the worker could keep it.
+ */
+export const APP_SHELL = '/';
+
+/**
+ * The pages install keeps beside the build files. One list, read by the worker and by the precache budget, so a
+ * page kept at install is always counted.
+ */
+export const INSTALL_PAGES: readonly string[] = [APP_SHELL];
+
+/**
+ * What the service worker answers from its cache when the network fails.
+ *
+ * A request gets the copy kept for it. A navigation with none - a page never opened while the worker was in
+ * charge, or any page after an update - gets APP_SHELL, which draws it. The shell loads its code by relative
+ * paths, so this holds for top-level addresses only; `src/lib/ci/offline-shell-policy.test.ts` fails if a nested
+ * page route is added.
+ *
+ * @param cache The cache the request would be kept in.
+ * @param request The request that failed on the network.
+ * @returns The kept response, or undefined when there is none.
+ */
+export async function offlineResponse(
+	cache: Pick<Cache, 'match'>,
+	request: Request
+): Promise<Response | undefined> {
+	const kept = await cache.match(request);
+	if (kept !== undefined || request.mode !== 'navigate') return kept;
+	// Top-level addresses only: from anywhere deeper the shell's relative paths miss, and it opens blank.
+	if (!/^\/[^/]*$/.test(new URL(request.url).pathname)) return undefined;
+	// ignoreVary: install stored the shell under its own request, not under a navigation's headers.
+	return cache.match(APP_SHELL, { ignoreVary: true });
 }

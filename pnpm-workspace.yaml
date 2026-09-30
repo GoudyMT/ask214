@@ -17,12 +17,15 @@ allowBuilds:
 # Force patched ws + undici (deep transitives via wrangler>miniflare; ws also via @vitest/browser).
 # Dev/deploy-only - neither ships in the client bundle. GHSA-96hv-2xvq-fx4p (ws DoS, high);
 # GHSA-vmh5-mc38-953g + GHSA-vxpw-j846-p89q (undici TLS-bypass + WS DoS) + GHSA-4cwx-7wf7-3272 (undici
-# cross-user disclosure + parse-time crash, the >=8.0.0 <8.9.0 range), all high -> undici floor now
-# >=8.9.0. Floor pins - retire when wrangler/miniflare bundle them natively (Dependabot will surface it).
+# cross-user disclosure + parse-time crash, the >=8.0.0 <8.9.0 range), all high -> undici floor then
+# >=8.9.0; GHSA-rfgv-xxqx-mfg5 + GHSA-w293-vg96-wgc3 + GHSA-vp8m-p9jh-q5pm (undici WebSocket-subprotocol DoS,
+# BalancedPool TLS-validation bypass, interceptor cross-origin cache poisoning; up to <8.10.2), all high ->
+# undici floor now >=8.10.2. Floor pins - retire when wrangler/miniflare bundle them natively (Dependabot will
+# surface it).
 overrides:
   tmp: '>=0.2.6'
   ws: '>=8.21.0'
-  undici: '>=8.9.0'
+  undici: '>=8.10.2'
   # Force patched nanoid (GHSA-2v37-7h3g-55p8, custom generators loop forever on size 0, high; transitive
   # dev/build-only via vite>postcss, never in the client bundle). Floor pin.
   nanoid: '>=3.3.17'
@@ -51,7 +54,9 @@ overrides:
   # calls as a function - so a BRACE glob routed through that lhci chain would throw. That path is
   # dev-only AND dormant (lhci's rimraf/glob operate on brace-less temp paths; the build + lighthouse CI
   # gates pass). Retire when @lhci/cli's chain bundles a patched, minimatch@3-compatible brace-expansion.
-  brace-expansion: '>=5.0.9'
+  # Raised to >=5.0.11 for GHSA-6j4f-fj2g-mc7p + GHSA-qhr7-859c-m2p7 (stack exhaustion through uncontrolled
+  # recursion - in parseCommaParts, and on nested brace groups - high; the ranges run to <5.0.10 and <5.0.11).
+  brace-expansion: '>=5.0.11'
   # Force patched ip-address (GHSA-mwp4-54f8-5fhr, SSRF + trust-boundary bypass via leading-zero octets
   # decoded as decimal, high; transitive dev-only via @lhci/cli>lighthouse>puppeteer-core>...>socks>
   # ip-address, never in the client bundle). Floor pin - retire when that chain bundles >=10.3.1.

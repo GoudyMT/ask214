@@ -10,9 +10,12 @@ import {
 	isApiRequest,
 	keptOnFetch,
 	libraryToRestore,
+	answerLibraryToRestore,
 	storeOnFetch,
 	carryOverSavedDocuments,
-	keptOnActivate
+	keptOnActivate,
+	APP_SHELL,
+	offlineResponse
 } from './asset-cache';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
@@ -427,6 +430,44 @@ describe('libraryToRestore (the PDF library a saved document needs after an upda
 	});
 });
 
+// A release that renames the answer library prunes the old pair at activate. A device that kept one - set up for
+// on-device answers, or a document saved - gets the new pair at install, while online, instead of being asked to
+// set up again (the model is still held) and losing offline answers until it does.
+describe('answerLibraryToRestore (the answer library a device keeps through an update)', () => {
+	const SHIPPED = [
+		'/_app/immutable/entry/start.js',
+		'/corpus/corpus-v1.0.3.json',
+		'/corpus/corpus-v1.0.3.embeddings.bin',
+		'/docs/tap_va101.0f650528.pdf'
+	];
+	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const OLD = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
+	const NEW = ['/corpus/corpus-v1.0.3.json', '/corpus/corpus-v1.0.3.embeddings.bin'];
+
+	it('returns the shipped library when an earlier one is held', () => {
+		expect(answerLibraryToRestore([...OLD, MODEL], SHIPPED)).toEqual(NEW);
+	});
+
+	it('returns only what is missing, and nothing when the shipped library is held', () => {
+		expect(answerLibraryToRestore([...OLD, NEW[0] ?? '', MODEL], SHIPPED)).toEqual([NEW[1]]);
+		expect(answerLibraryToRestore([...NEW, MODEL], SHIPPED)).toEqual([]);
+	});
+
+	// A device that never kept the library never asked for it, so an update downloads nothing for it.
+	it('returns nothing on a device that held no answer library', () => {
+		expect(answerLibraryToRestore([MODEL], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([], SHIPPED)).toEqual([]);
+	});
+
+	// The worker also keeps the library when a page merely reads it - "Read more" on an online answer, a document's
+	// text. That device never set up on-device answers or saved a document, so it never asked to keep 7.3 MB, and
+	// a release downloads nothing for it. A saved document stores the library with it, so that device gets it back.
+	it('returns nothing when the library was kept only by reading, and the library for a saved document', () => {
+		expect(answerLibraryToRestore(OLD, SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([...OLD, '/docs/tap_va101.0f650528.pdf'], SHIPPED)).toEqual(NEW);
+	});
+});
+
 // The worker keeps a fetched model, WASM or corpus file as it passes through. The write must outlive the
 // fetch - the browser may stop an idle worker the moment the response is handed over - so it runs under the
 // fetch event's waitUntil; and a write that fails, a full disk above all, must not surface as an unhandled
@@ -463,6 +504,22 @@ describe('storeOnFetch', () => {
 		expect(waited).toHaveLength(1);
 		await expect(waited[0]).resolves.toBeUndefined();
 	});
+
+	// The app page kept at install must stay the one its own release installed: a visit online during an update
+	// fetches the NEW release's page, and storing it in the old release's cache would serve, offline, a page naming
+	// files that cache does not hold. So a held copy stands; with none held (after an erase), a visit keeps one.
+	it('keeps the app page install stored, and stores one only when none is held', async () => {
+		for (const held of [true, false]) {
+			const put = vi.fn(async () => {});
+			const match = vi.fn(async () => (held ? new Response('install copy') : undefined));
+			const waited: Promise<unknown>[] = [];
+			const event = { waitUntil: (promise: Promise<unknown>) => void waited.push(promise) };
+			const cache = { put, match } as unknown as Cache;
+			storeOnFetch(event, cache, new Request(`https://app.test${APP_SHELL}`), new Response('page'));
+			await waited[0];
+			expect(put, `held: ${held}`).toHaveBeenCalledTimes(held ? 0 : 1);
+		}
+	});
 });
 
 // The model and the ORT WASM are served at fixed URLs and kept in the asset cache for good: a returning device
@@ -491,5 +548,56 @@ function vendoredDigest(): string {
 describe('the asset cache name and the vendored bytes it holds', () => {
 	it('names the cache after the model and WASM bytes it keeps', () => {
 		expect(VENDORED_BYTES[ASK_ASSET_CACHE]).toBe(vendoredDigest());
+	});
+});
+
+// A navigation that fails offline gets the page kept for its address, else the page the worker keeps at install,
+// which draws any top-level page. Any other request gets only its own kept answer.
+describe('offlineResponse', () => {
+	function cacheHolding(entries: Record<string, string>) {
+		const match = vi.fn(async (request: RequestInfo | URL) => {
+			const path =
+				request instanceof URL
+					? request.pathname
+					: typeof request === 'string'
+						? request
+						: new URL(request.url).pathname;
+			return path in entries ? new Response(entries[path]) : undefined;
+		});
+		return { match };
+	}
+	// A navigation Request cannot be constructed in script (mode 'navigate' is reserved), so it is described.
+	const navigation = (path: string) =>
+		({ url: `https://ask214.test${path}`, mode: 'navigate' }) as unknown as Request;
+
+	it('serves the page kept for that address first', async () => {
+		const cache = cacheHolding({ '/documents': 'documents page', [APP_SHELL]: 'shell' });
+		const answer = await offlineResponse(cache, navigation('/documents'));
+		expect(await answer?.text()).toBe('documents page');
+	});
+
+	it('serves the page kept at install for an address never kept, ignoring Vary', async () => {
+		const cache = cacheHolding({ [APP_SHELL]: 'shell' });
+		const answer = await offlineResponse(cache, navigation('/about'));
+		expect(await answer?.text()).toBe('shell');
+		expect(cache.match).toHaveBeenLastCalledWith(APP_SHELL, { ignoreVary: true });
+	});
+
+	it('gives a request that is not a navigation only its own kept answer', async () => {
+		const cache = cacheHolding({ [APP_SHELL]: 'shell' });
+		const script = new Request('https://ask214.test/_app/immutable/x.js');
+		expect(await offlineResponse(cache, script)).toBeUndefined();
+	});
+
+	it('returns nothing when neither is kept', async () => {
+		expect(await offlineResponse(cacheHolding({}), navigation('/about'))).toBeUndefined();
+	});
+
+	// The shell loads its code by relative paths, which resolve only from a top-level address: deeper, it would
+	// open as a blank page, so the plain "Offline" answer is the honest one there.
+	it('does not answer a nested or trailing-slash address with the shell', async () => {
+		const cache = cacheHolding({ [APP_SHELL]: 'shell' });
+		expect(await offlineResponse(cache, navigation('/about/'))).toBeUndefined();
+		expect(await offlineResponse(cache, navigation('/documents/x'))).toBeUndefined();
 	});
 });
