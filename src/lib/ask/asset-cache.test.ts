@@ -700,8 +700,9 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 		}
 	});
 
-	// The downloads start only after the activate prune has run, so on a nearly full device the earlier pair - which
-	// the new release cannot read - must already be gone when the new one is written, or it would block it for good.
+	// The retry after activation starts only after the activate prune has run, so on a nearly full device the earlier
+	// pair - which the new release cannot read - must already be gone when the new one is written, or it would block
+	// it for good. (The install-time attempt runs before any prune and can fail for lack of room; this models the retry.)
 	describe('on a device with room for one answer library', () => {
 		const FILE_BYTES = 50;
 		const MODEL_BYTES = 100;
