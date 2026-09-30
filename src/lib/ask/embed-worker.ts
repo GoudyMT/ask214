@@ -13,8 +13,9 @@ env.localModelPath = '/models/'; // -> /models/Xenova/all-MiniLM-L6-v2/
 // The service worker keeps the model in the app's asset cache, which survives updates. The library's own
 // browser cache would hold a second ~23 MB copy, which the worker deletes on every update, so it is off.
 env.useBrowserCache = false;
-// ORT initializes the wasm backend at load; the guard satisfies the conservative Partial type (were it
-// ever absent, the default-CDN wasm fetch is CSP-blocked - fails loud, never a silent leak).
+// ORT initializes the wasm backend at load; the guard satisfies the conservative Partial type. The worker has no
+// CSP header of its own (the page's does not reach it), so nothing here is blocked by policy: no remote fetch is
+// made because wasmPaths is set before any session starts and allowRemoteModels is false.
 const onnxWasm = env.backends.onnx.wasm;
 if (onnxWasm) onnxWasm.wasmPaths = '/wasm/';
 
