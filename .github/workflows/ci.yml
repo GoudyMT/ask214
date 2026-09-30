@@ -71,7 +71,7 @@ jobs:
         run: pnpm run check:served-history
 
       # Commits git makes itself (cherry-pick, revert, squash) never run the local hook, so read them here.
-      - name: Check every commit message the pull request carries
+      - name: Check the commit messages the pull request carries
         run: pnpm run check:commits
 
       # The library refuses to run against a worker from a different release, so a dependency bump that
