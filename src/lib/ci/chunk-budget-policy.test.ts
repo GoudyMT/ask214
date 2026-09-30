@@ -145,7 +145,7 @@ describe('strayWasm', () => {
 });
 
 // A budget line prints the size and its limit the same way, so a size at or under the limit never reads as over it:
-// rounding the limit to whole kilobytes printed "135.11 KB <= 135 KB" for a build that passed.
+// a limit rounded to whole kilobytes would read "135.11 KB <= 135 KB" for a build that passes.
 describe('kilobytes', () => {
 	it('prints metric kilobytes to two places, the same for a size and for a limit', () => {
 		expect(kilobytes(55_930)).toBe('55.93');

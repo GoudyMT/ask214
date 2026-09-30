@@ -124,8 +124,8 @@ export function strayWasm(files: readonly string[]): string[] {
  * A byte count as metric kilobytes (1 KB = 1,000 B) to two places.
  *
  * A budget line prints its size and its limit through this one function, so both carry the same precision: a
- * limit rounded to whole kilobytes beside a size in hundredths printed a passing "135.11 KB <= 135 KB", and
- * could misprint a real shortfall by up to 499 B.
+ * limit rounded to whole kilobytes beside a size in hundredths would show a passing size as over its limit
+ * ("135.11 KB <= 135 KB") and could misstate a real shortfall by up to 499 B.
  */
 export function kilobytes(bytes: number): string {
 	return (bytes / 1000).toFixed(2);
