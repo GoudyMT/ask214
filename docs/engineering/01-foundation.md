@@ -102,6 +102,8 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Pipeline.** `lint-staged` (lints + formats staged files only) -> `pnpm run check` (TypeScript) -> `pnpm run test:unit` (Vitest). If any step fails, the commit is rejected.
 
+**Commit message check.** A second hook, `commit-msg`, reads the message before the commit is recorded. It rejects any message that is not a single line of the form `type: subject`, so a body, a footer or a trailer stops the commit. It runs on every local commit, whether the message comes from `-m`, a file or an editor.
+
 **Tradeoffs accepted.** Each commit takes 10-15 seconds while the hook runs. Acceptable for solo development; revisitable as the test suite grows.
 
 ---
@@ -165,7 +167,7 @@ Cloudflare Workers (with Static Assets) was chosen for cost (free at expected sc
 - **Test-Driven Development.** Tests written before or alongside implementation. Acceptance criteria live in test files, not in comments.
 - **No commit bypasses.** The pre-commit hook is the safety net. The `--no-verify` flag is reserved for genuine emergencies.
 - **Strict TypeScript.** No `any` without justification. No silent unchecked indexed access.
-- **Conventional commit messages.** Type prefix (`feat` / `fix` / `chore` / `refactor` / `test` / `docs` / `security`) + scope + imperative summary.
+- **One-line commit messages.** One line of the form `type: subject`, with nothing after it. The type is one of `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `security` or `perf`. A scope in parentheses is used only when it is needed. The subject is an imperative phrase in lowercase with no period. There is no body and no footer. The `commit-msg` hook checks every message.
 - **Public source code with selective documentation.** Code and outward-facing decision documents are tracked publicly. Operational documents (drafts, ADRs in progress, session logs) are kept locally.
 
 ## Further Reading
@@ -186,3 +188,4 @@ Cloudflare Workers (with Static Assets) was chosen for cost (free at expected sc
 - 2026-05-22 (initial draft): Phase 0 foundation decisions captured at Tasks 0.1-0.6.
 - 2026-05-22 (Phase 0 polish): Tasks 0.7-0.10 folded in - CI Pipeline + Dependency Maintenance section, Architecture Decision Records section, Cloudflare Workers + Static Assets update (replaces earlier "Pages" framing per Cloudflare's 2025-2026 platform unification). Stack at a Glance updated; wrangler added as deploy CLI. Knowingly exceeds 1500-word soft cap by ~265 words to capture distinct Phase 0 tooling without compressing previously approved Tasks 0.1-0.6 narratives.
 - 2026-06-13: Corrected the `minimumReleaseAge` description - the guard gates dependency _resolution_ (local installs/updates and Dependabot lockfile regeneration), not frozen-lockfile installs. It had been described here but configured nowhere; now set to 1440 in `pnpm-workspace.yaml`, paired with a seven-day Dependabot `cooldown`.
+- 2026-09-30: Added the `commit-msg` hook to the Husky section and replaced the commit message standard with the one-line `type: subject` rule the hook enforces.
