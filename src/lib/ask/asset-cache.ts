@@ -194,8 +194,8 @@ export function isSupersededVersionedEntry(
 }
 
 /**
- * Decide which PDF library files the service worker restores on activate, so a saved document still draws
- * its page offline after an update.
+ * Decide which PDF library files the service worker restores at install and again after activation, so a saved
+ * document still draws its page offline after an update.
  *
  * Saving a document stores the library with it, but a pdf.js upgrade moves the library to a new
  * `/pdf-worker/<release>/` folder: activate prunes the old pair, and nothing else would store the new one
@@ -225,14 +225,14 @@ export function libraryToRestore(
  * Decide which answer-library files the service worker fetches at install, so a device that kept the library
  * still answers on the device - offline too - after a release that renames it.
  *
- * The library is versioned by URL: a new release ships a new pair and activate prunes the old one. Without this, a
+ * The library is versioned by URL: a new release ships a new pair and the old one is pruned. Without this, a
  * device that set up on-device answers (or saved a document) would be asked to set up again although it still
  * holds the model, and could not answer offline until it did. Install runs while online, so the pair is fetched
  * then - only for a device that held a library AND set up on-device answers (a model file held) or saved a
  * document, and only the files it lacks. The worker also keeps the library when a page merely reads it ("Read
  * more", a document's text); that device never asked to keep it, so a release downloads nothing for it. A restore
- * that fails at install is not retried at activate, where the prune has already removed the old pair this rule
- * reads.
+ * that fails at install is tried again after activation, because `supersededToPrune` keeps the old pair - which
+ * this rule reads - for as long as the result here is not empty.
  *
  * Args:
  *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
@@ -249,6 +249,95 @@ export function answerLibraryToRestore(
 	if (!cachedPaths.some((path) => path.startsWith('/models/') || path.startsWith('/docs/')))
 		return [];
 	return shipped.filter((path) => path.startsWith('/corpus/') && !cachedPaths.includes(path));
+}
+
+/**
+ * How long the install-time restore waits on one library before giving it up.
+ *
+ * A bound, so a stalled download cannot hold the install - and with it the update - open. A miss costs nothing
+ * lasting: the old library is kept and the restore is tried again after activation. The answer library is about
+ * 7.3 MB, which takes about a minute at roughly 1 Mbps; this is a bound, not a measured limit.
+ */
+export const LIBRARY_RESTORE_DEADLINE_MS = 60_000;
+
+/**
+ * Fetch and store the library files this device is owed, each library in its own try and within its own deadline.
+ *
+ * The PDF library and the answer library are separate tries: one that fails or stalls costs the device only that
+ * library, and the other is still fetched. Each has an AbortController that a timer fires after `deadlineMs`; its
+ * signal goes to every fetch of that library, so a download that stalls - headers or body - is cut off instead of
+ * holding the install. Only a 200 response is stored. Nothing here throws, so it cannot fail the install.
+ *
+ * Args:
+ *   cache: ASK_ASSET_CACHE, to read the held entries from and store into
+ *   fetchLibrary: the network fetch, given the path and the signal; injected by tests
+ *   origin: this worker's origin; only entries under it are read, so the pathnames compared with the shipped list
+ *     are this app's own
+ *   shipped: the pathnames this build ships
+ *   deadlineMs: how long each library may take
+ */
+export async function restoreLibraries(
+	cache: Pick<Cache, 'keys' | 'put'>,
+	fetchLibrary: (path: string, init: { signal: AbortSignal }) => Promise<Response>,
+	origin: string,
+	shipped: readonly string[],
+	deadlineMs: number
+): Promise<void> {
+	let owed: string[][];
+	try {
+		const cachedPaths: string[] = [];
+		for (const request of await cache.keys()) {
+			const url = new URL(request.url);
+			if (url.origin === origin) cachedPaths.push(url.pathname);
+		}
+		owed = [libraryToRestore(cachedPaths, shipped), answerLibraryToRestore(cachedPaths, shipped)];
+	} catch {
+		return;
+	}
+	for (const paths of owed) {
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), deadlineMs);
+		try {
+			for (const path of paths) {
+				const response = await fetchLibrary(path, { signal: controller.signal });
+				if (response.status === 200) await cache.put(path, response);
+			}
+		} catch {
+			// This library is given up on - a failed or stalled download, or a full disk. The other one is still
+			// tried, and this one is tried again after activation because the old library is still held.
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+}
+
+/**
+ * The cached entries to delete because this build no longer ships them, which is what `isSupersededVersionedEntry`
+ * marks - except the answer library's while a restore of it is still owed.
+ *
+ * A device that set up on-device answers holds the old library and is owed the new one (`answerLibraryToRestore`).
+ * Until the new pair is stored, the old one is the only library that device has: deleting it on an install whose
+ * download failed would leave the device with none, and with no held pair to read the restore rule from. So the old
+ * pair stays until the new one is held, and goes at the first prune after. The PDF library is not held back: an
+ * old one cannot draw a page for the new reader, and the rule that restores the new one reads the saved documents,
+ * which no prune removes.
+ *
+ * Args:
+ *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
+ *   shipped: the pathnames this build ships
+ *
+ * Returns:
+ *   the held pathnames to delete.
+ */
+export function supersededToPrune(
+	cachedPaths: readonly string[],
+	shipped: readonly string[]
+): string[] {
+	const restoreOwed = answerLibraryToRestore(cachedPaths, shipped).length > 0;
+	return cachedPaths.filter(
+		(path) =>
+			isSupersededVersionedEntry(path, shipped) && !(restoreOwed && path.startsWith('/corpus/'))
+	);
 }
 
 /**

@@ -11,6 +11,8 @@ import {
 	keptOnFetch,
 	libraryToRestore,
 	answerLibraryToRestore,
+	restoreLibraries,
+	supersededToPrune,
 	storeOnFetch,
 	carryOverSavedDocuments,
 	keptOnActivate,
@@ -465,6 +467,271 @@ describe('answerLibraryToRestore (the answer library a device keeps through an u
 	it('returns nothing when the library was kept only by reading, and the library for a saved document', () => {
 		expect(answerLibraryToRestore(OLD, SHIPPED)).toEqual([]);
 		expect(answerLibraryToRestore([...OLD, '/docs/tap_va101.0f650528.pdf'], SHIPPED)).toEqual(NEW);
+	});
+});
+
+// The restore runs while an update installs, so one stalled download must not hold the update open, and one
+// library failing must not cost the device the other. Time is driven with fake timers: no test waits real seconds.
+describe('restoreLibraries (each library gets one try within its own deadline)', () => {
+	const ORIGIN = 'https://ask214.com';
+	const DEADLINE = 1_000;
+	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const DOCUMENT = '/docs/tap_va101.0f650528.pdf';
+	const OLD_ANSWERS = ['/corpus/corpus-v1.0.1.json', '/corpus/corpus-v1.0.1.embeddings.bin'];
+	const NEW_ANSWERS = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
+	const PDF_LIBRARY = ['/pdf-worker/6.4.0/pdf.min.mjs', '/pdf-worker/6.4.0/pdf.worker.min.mjs'];
+	const SHIPPED = ['/_app/immutable/entry/start.js', ...NEW_ANSWERS, DOCUMENT, ...PDF_LIBRARY];
+	// A saved document and an earlier answer library on a device that set up on-device answers: both libraries are owed.
+	const OWING_BOTH = [MODEL, DOCUMENT, ...OLD_ANSWERS];
+
+	/** A cache holding the given paths, which records what is stored; a write for a path `failPut` names fails. */
+	function heldCache(held: string[], failPut: (path: string) => boolean = () => false) {
+		const stored = new Map<string, string>();
+		const cache = {
+			async keys() {
+				return held.map((path) => new Request(`${ORIGIN}${path}`));
+			},
+			async put(request: string, response: Response) {
+				if (failPut(request)) throw new DOMException('full', 'QuotaExceededError');
+				stored.set(request, await response.text());
+			}
+		};
+		return { cache: cache as unknown as Pick<Cache, 'keys' | 'put'>, stored };
+	}
+
+	/** A fetch that answers each path as `answer` says, and is told the signal it was given, as the real one is. */
+	function fetching(answer: (path: string, signal: AbortSignal) => Promise<Response>) {
+		return vi.fn((path: string, init: { signal: AbortSignal }) => answer(path, init.signal));
+	}
+
+	/** Never settles by itself; rejects when its signal aborts, as a real fetch does. */
+	function stalled(signal: AbortSignal): Promise<Response> {
+		return new Promise<Response>((_resolve, reject) => {
+			signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+		});
+	}
+
+	const ok = (path: string) => Promise.resolve(new Response(`bytes of ${path}`));
+
+	it('abandons a library whose download stalls at the deadline, and still stores the next one', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache(OWING_BOTH);
+			const fetchLibrary = fetching((path, signal) =>
+				path.startsWith('/pdf-worker/') ? stalled(signal) : ok(path)
+			);
+			let settled = false;
+			const done = restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE).then(() => {
+				settled = true;
+			});
+
+			// One tick short of the deadline the PDF library is still being waited on, so the answer library has not started.
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(fetchLibrary.mock.calls.map(([path]) => path)).toEqual([PDF_LIBRARY[0]]);
+			expect(settled).toBe(false);
+
+			await vi.advanceTimersByTimeAsync(1);
+			// Checked before awaiting, so a restore that never gives up fails here instead of hanging the test.
+			expect(settled).toBe(true);
+			await done;
+			expect([...stored.keys()]).toEqual(NEW_ANSWERS);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('gives each library its own full deadline', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache(OWING_BOTH);
+			const fetchLibrary = fetching((_path, signal) => stalled(signal));
+			let settled = false;
+			const done = restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE).then(() => {
+				settled = true;
+			});
+
+			await vi.advanceTimersByTimeAsync(DEADLINE);
+			// The answer library began only when the PDF library was abandoned, and has its whole deadline still.
+			expect(fetchLibrary.mock.calls.map(([path]) => path)).toEqual([
+				PDF_LIBRARY[0],
+				NEW_ANSWERS[0]
+			]);
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(settled).toBe(true);
+			await done;
+			expect(stored.size).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('gives every fetch of a library the same signal, and stops at the first miss in it', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache([MODEL, DOCUMENT]);
+			const fetchLibrary = fetching((path, signal) =>
+				path === PDF_LIBRARY[1] ? stalled(signal) : ok(path)
+			);
+			let settled = false;
+			const done = restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(DEADLINE);
+			expect(settled).toBe(true);
+			await done;
+
+			const signals = fetchLibrary.mock.calls.map(([, init]) => init.signal);
+			expect(signals).toHaveLength(2);
+			expect(signals[0]).toBe(signals[1]);
+			expect(signals[0]?.aborted).toBe(true);
+			expect([...stored.keys()]).toEqual([PDF_LIBRARY[0]]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('leaves no timer running once the libraries are done', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache } = heldCache(OWING_BOTH);
+			await restoreLibraries(cache, fetching(ok), ORIGIN, SHIPPED, DEADLINE);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('stores the answer library when the PDF library fails, and the PDF library when the answer library fails', async () => {
+		const failing = (prefix: string) =>
+			fetching((path) =>
+				path.startsWith(prefix) ? Promise.reject(new TypeError('offline')) : ok(path)
+			);
+
+		const pdfFails = heldCache(OWING_BOTH);
+		await restoreLibraries(pdfFails.cache, failing('/pdf-worker/'), ORIGIN, SHIPPED, DEADLINE);
+		expect([...pdfFails.stored.keys()]).toEqual(NEW_ANSWERS);
+
+		const answersFail = heldCache(OWING_BOTH);
+		await restoreLibraries(answersFail.cache, failing('/corpus/'), ORIGIN, SHIPPED, DEADLINE);
+		expect([...answersFail.stored.keys()]).toEqual(PDF_LIBRARY);
+	});
+
+	it('stores the other library when a cache write fails, and never throws', async () => {
+		const { cache, stored } = heldCache(OWING_BOTH, (path) => path.startsWith('/pdf-worker/'));
+		await expect(
+			restoreLibraries(cache, fetching(ok), ORIGIN, SHIPPED, DEADLINE)
+		).resolves.toBeUndefined();
+		expect([...stored.keys()]).toEqual(NEW_ANSWERS);
+	});
+
+	it('never throws when the cache cannot be read', async () => {
+		const cache = {
+			keys: () => Promise.reject(new Error('unreadable')),
+			put: vi.fn()
+		} as unknown as Pick<Cache, 'keys' | 'put'>;
+		const fetchLibrary = fetching(ok);
+		await expect(
+			restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE)
+		).resolves.toBeUndefined();
+		expect(fetchLibrary).not.toHaveBeenCalled();
+	});
+
+	it('stores a response only when its status is 200', async () => {
+		const { cache, stored } = heldCache(OWING_BOTH);
+		const fetchLibrary = fetching((path) =>
+			Promise.resolve(
+				path === PDF_LIBRARY[0]
+					? new Response('missing', { status: 404 })
+					: path === NEW_ANSWERS[0]
+						? new Response('busy', { status: 503 })
+						: new Response(`bytes of ${path}`)
+			)
+		);
+		await restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE);
+		expect(fetchLibrary).toHaveBeenCalledTimes(4);
+		expect([...stored.keys()]).toEqual([PDF_LIBRARY[1], NEW_ANSWERS[1]]);
+	});
+
+	it('fetches nothing when nothing is owed', async () => {
+		for (const held of [
+			[],
+			[MODEL],
+			[...OLD_ANSWERS],
+			[MODEL, ...NEW_ANSWERS, DOCUMENT, ...PDF_LIBRARY]
+		]) {
+			const { cache, stored } = heldCache(held);
+			const fetchLibrary = fetching(ok);
+			await restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE);
+			expect(fetchLibrary, held.join(' ')).not.toHaveBeenCalled();
+			expect(stored.size).toBe(0);
+		}
+	});
+
+	it('reads only this origin: an entry held for another origin is nothing owed', async () => {
+		const cache = {
+			async keys() {
+				return [new Request(`https://elsewhere.example${DOCUMENT}`)];
+			},
+			put: vi.fn()
+		} as unknown as Pick<Cache, 'keys' | 'put'>;
+		const fetchLibrary = fetching(ok);
+		await restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE);
+		expect(fetchLibrary).not.toHaveBeenCalled();
+	});
+});
+
+// A release that renames the answer library must not delete the old one before the new one is stored: an install
+// that could not fetch it, or an activation with no connection, would leave a set-up device with no library at all.
+describe('supersededToPrune (the old answer library stays while its replacement is owed)', () => {
+	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const WASM = '/wasm/ort-wasm-simd-threaded.asyncify.wasm';
+	const DOCUMENT = '/docs/tap_va101.0f650528.pdf';
+	const OLD = ['/corpus/corpus-v1.0.1.json', '/corpus/corpus-v1.0.1.embeddings.bin'];
+	const NEW = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
+	const OLD_PDF = ['/pdf-worker/6.3.289/pdf.min.mjs', '/pdf-worker/6.3.289/pdf.worker.min.mjs'];
+	const SHIPPED = [
+		'/_app/immutable/entry/start.js',
+		...NEW,
+		DOCUMENT,
+		'/models/Xenova/all-MiniLM-L6-v2/config.json',
+		'/wasm/ort-wasm-simd-threaded.wasm',
+		'/pdf-worker/6.4.0/pdf.min.mjs',
+		'/pdf-worker/6.4.0/pdf.worker.min.mjs'
+	];
+
+	it('keeps the old pair on a set-up device that does not yet hold the new pair', () => {
+		expect(supersededToPrune([MODEL, ...OLD], SHIPPED)).toEqual([]);
+	});
+
+	it('returns the old pair once the new pair is held', () => {
+		expect(supersededToPrune([MODEL, ...OLD, ...NEW], SHIPPED)).toEqual(OLD);
+	});
+
+	it('keeps the old pair while either file of the new pair is still missing', () => {
+		expect(supersededToPrune([MODEL, ...OLD, NEW[0] ?? ''], SHIPPED)).toEqual([]);
+		expect(supersededToPrune([MODEL, ...OLD, NEW[1] ?? ''], SHIPPED)).toEqual([]);
+	});
+
+	it('keeps the old pair on a device that saved a document, until the new pair is held', () => {
+		expect(supersededToPrune([DOCUMENT, ...OLD], SHIPPED)).toEqual([]);
+	});
+
+	it('returns the old pair of a device that only read the library, which is owed no replacement', () => {
+		expect(supersededToPrune([...OLD], SHIPPED)).toEqual(OLD);
+	});
+
+	it('returns a superseded PDF library even while a PDF restore is owed', () => {
+		const cached = [DOCUMENT, ...OLD_PDF, MODEL, ...OLD];
+		// The PDF restore is owed (saved document, current library missing) and so is the answer restore; only the
+		// answer pair is kept, because an old PDF library cannot draw a page for the new reader.
+		expect(supersededToPrune(cached, SHIPPED)).toEqual(OLD_PDF);
+	});
+
+	it('never returns the model or the WASM', () => {
+		const cached = [MODEL, WASM, '/models/e2e-prune-probe.onnx', ...OLD, ...NEW];
+		expect(supersededToPrune(cached, SHIPPED)).toEqual(OLD);
 	});
 });
 
