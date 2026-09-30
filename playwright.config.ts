@@ -18,8 +18,10 @@ export default defineConfig({
 		// and nothing needs to be. Production serves a real one.
 		ignoreHTTPSErrors: true,
 		// Freeze the home feed's auto-scroll (it honours prefers-reduced-motion) so a moving element
-		// cannot flake interactions, and so the reduced-motion path is what CI exercises.
-		reducedMotion: 'reduce'
+		// cannot flake interactions, and so the reduced-motion path is what CI exercises. It lives in
+		// `contextOptions` because Playwright reads browser-context settings from there: a bare
+		// `reducedMotion` key under `use` is not an option and reaches no page.
+		contextOptions: { reducedMotion: 'reduce' }
 		// NOTE: `trace: 'retain-on-failure'` was tried here to capture a DOM snapshot for the CI-only
 		// /timeline overflow, and REVERTED. It destabilised the suite - the browser died mid-run
 		// ("browser.newContext: Target page, context or browser has been closed"), 2 of 148 failing and
