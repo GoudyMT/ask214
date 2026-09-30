@@ -24,8 +24,9 @@ const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
  * Whether `#` lines are text depends on who reads the message. A message already recorded is exactly what
  * git kept, so a `#` line is part of it and counts as a message line. The commit-msg hook instead sees the
  * text before git cleans it, and cannot tell which cleanup git will run; it asks for `stripComments`, which
- * drops every `#` line and everything from the scissors line on, as git's editor cleanup does, so the hook
- * never refuses a message that git would record correctly.
+ * drops every `#` line and everything from the scissors line on, as git's editor cleanup does, so with git's
+ * default comment character the hook does not refuse a message that git would record correctly. (A different
+ * `core.commentChar` makes git keep lines the hook drops, or drop lines it keeps.)
  *
  * @param raw The text of the commit message.
  * @param options `stripComments`: true only for the text of the file the hook reads. Default false, the

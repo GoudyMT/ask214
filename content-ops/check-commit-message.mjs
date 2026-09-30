@@ -3,12 +3,15 @@
 //
 // File mode, run by the commit-msg git hook: `pnpm run check:commit-msg <message file>`. Git passes the path of
 // the file holding the message it is about to record. The hook cannot see which cleanup git will apply, and
-// git may remove `#` lines afterwards, so it drops them as the editor cleanup would and never refuses a message
-// git would record correctly. It is an early warning: commits git makes itself (a cherry-pick, a revert, a
+// git may remove `#` lines afterwards, so it drops them as the editor cleanup would; with git's default comment
+// character it does not refuse a message git would record correctly (another `core.commentChar` can make it
+// disagree with git either way). It is an early warning: commits git makes itself (a cherry-pick, a revert, a
 // squash) never run it, and neither does a checkout where the hooks were not installed.
 //
 // Range mode, run by CI and by hand: `pnpm run check:commits [range]` (default range: origin/main..HEAD). It
-// reads each commit's message as git recorded it and checks it strictly, so it is the check that enforces.
+// reads each commit's message as git recorded it and checks it strictly, so it is the check that enforces. It
+// skips merge commits and Dependabot's commits, and it does not see the commit that lands on main, which is
+// written when the pull request is merged.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { findCommitMessageViolations } from '../src/lib/ci/commit-message-policy.ts';
@@ -54,7 +57,8 @@ function checkFile(file) {
 function checkRange(range) {
 	let commits;
 	try {
-		// A merge commit is one nobody wrote: GitHub makes it to test a pull request, and git words it itself.
+		// Merge commits are left out: GitHub makes one to test a pull request, and git words the ones it makes
+		// itself. That also skips a merge a person makes on a branch, which is rare here since branches squash.
 		commits = gitOutput(['rev-list', '--no-merges', range]).split('\n').filter(Boolean);
 	} catch (error) {
 		console.error(error instanceof Error ? error.message : 'unknown error');

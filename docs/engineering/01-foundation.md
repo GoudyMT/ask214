@@ -102,7 +102,7 @@ The foundation phase establishes the development environment, build pipeline, an
 
 **Pipeline.** `lint-staged` (lints + formats staged files only) -> `pnpm run check` (TypeScript) -> `pnpm run test:unit` (Vitest). If any step fails, the commit is rejected.
 
-**Commit message check.** A second hook, `commit-msg`, reads the message before `git commit` or `git merge` records it, once `pnpm install` has set up the hooks. It is an early warning: it stops a message that is not a single line of the form `type: subject`, and it lets through anything git would record correctly. The check that enforces the format runs in CI. It reads every commit a pull request carries as git recorded it, because commits git makes itself, such as a cherry-pick, skip the hook. The squash commit on `main` takes the pull request's title.
+**Commit message check.** A second hook, `commit-msg`, reads the message before `git commit` or `git merge` records it, once `pnpm install` has set up the hooks. It is an early warning: it stops a message that is not a single line of the form `type: subject`, and, with git's default comment character, it lets through anything git would record correctly. The check that enforces the format runs in CI. It reads the message of each commit a pull request carries, as git recorded it, because commits git makes itself, such as a cherry-pick, skip the hook. It skips merge commits and Dependabot's commits. The commit that lands on `main` is written when the pull request is merged, and these checks do not cover it.
 
 **Tradeoffs accepted.** Each commit takes 10-15 seconds while the hook runs. Acceptable for solo development; revisitable as the test suite grows.
 
@@ -167,7 +167,7 @@ Cloudflare Workers (with Static Assets) was chosen for cost (free at expected sc
 - **Test-Driven Development.** Tests written before or alongside implementation. Acceptance criteria live in test files, not in comments.
 - **No commit bypasses.** The pre-commit hook is the safety net. The `--no-verify` flag is reserved for genuine emergencies.
 - **Strict TypeScript.** No `any` without justification. No silent unchecked indexed access.
-- **One-line commit messages.** One line of the form `type: subject`, with nothing after it. The type is one of `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `security` or `perf`. A scope in parentheses is used only when it is needed. The subject is an imperative phrase in lowercase with no period. There is no body and no footer. The `commit-msg` hook warns early, and CI checks every commit a pull request carries.
+- **One-line commit messages.** One line of the form `type: subject`, with nothing after it. The type is one of `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `security` or `perf`. A scope in parentheses is used only when it is needed. The subject is an imperative phrase in lowercase with no period. There is no body and no footer. The `commit-msg` hook warns early, and CI checks the commits a pull request carries, apart from merge commits and Dependabot's.
 - **Public source code with selective documentation.** Code and outward-facing decision documents are tracked publicly. Operational documents (drafts, ADRs in progress, session logs) are kept locally.
 
 ## Further Reading
