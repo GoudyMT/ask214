@@ -75,6 +75,7 @@
 		window.addEventListener('online', update);
 		window.addEventListener('offline', update);
 		return () => {
+			left = true;
 			window.removeEventListener('online', update);
 			window.removeEventListener('offline', update);
 		};
@@ -135,9 +136,6 @@
 	let sources = new Map<string, Source>();
 	// Set when the page is left, so a load still waiting for the service worker starts nothing once it takes charge.
 	let left = false;
-	onMount(() => () => {
-		left = true;
-	});
 	const getCorpus = createLazyCorpus(
 		async () => {
 			// On a first visit this can be the first download of the answer library: waiting for the service worker
