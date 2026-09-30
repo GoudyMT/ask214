@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm';
 
 export default defineConfig({
 	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
@@ -12,22 +13,10 @@ export default defineConfig({
 	// to the repo; a checked-in private key is a liability that protects nothing.
 	plugins: [sveltekit(), basicSsl()],
 	worker: {
-		// The embed worker sets `wasmPaths = '/wasm/'`, so the ONNX runtime loads its WASM from the vendored folder.
-		// The runtime library inside the worker also names its own WASM as a fallback for when `wasmPaths` is unset,
-		// and the bundler writes that ~23 MB file beside the worker's script, where nothing ever requests it. This
-		// drops every WASM the worker bundle writes. The fallback URL left in the worker then points at a file
-		// that does not exist, which is acceptable: it is read only when `wasmPaths` is unset, and a missing
-		// WASM must fail loudly (see embed-worker.ts) rather than load a copy nobody vendored.
-		plugins: () => [
-			{
-				name: 'drop-worker-wasm',
-				generateBundle(_options, bundle) {
-					for (const [name, file] of Object.entries(bundle)) {
-						if (file.type === 'asset' && name.endsWith('.wasm')) delete bundle[name];
-					}
-				}
-			}
-		]
+		// Drops the ONNX runtime's unused fallback WASM from each worker bundle (~23 MB the embed worker never
+		// loads, because it sets `wasmPaths = '/wasm/'`) and fails the build on any other WASM; the reasoning is
+		// with the plugin.
+		plugins: () => [dropWorkerWasm()]
 	},
 	test: {
 		expect: { requireAssertions: true },
