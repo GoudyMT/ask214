@@ -41,7 +41,8 @@ export function classifyAsset(pathname: string): CacheStrategy {
  * old one, and the new model bytes are re-fetched on next use. The corpus is versioned the
  * OPPOSITE way - by URL, renaming the artifact - and that does NOT evict anything: the old URL merely stops
  * being requested while its entry stays cached at full size. Superseded corpus entries are therefore pruned
- * one at a time on activate (see `isSupersededVersionedEntry`). Also cleared by an explicit wipe.
+ * one at a time on activate (see `supersededToPrune`) - on a device still owed the new library, only once the
+ * new one is stored, after activation's retry. Also cleared by an explicit wipe.
  */
 export const ASK_ASSET_CACHE = 'ask-assets-v1';
 

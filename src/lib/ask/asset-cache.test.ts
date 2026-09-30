@@ -432,7 +432,8 @@ describe('libraryToRestore (the PDF library a saved document needs after an upda
 	});
 });
 
-// A release that renames the answer library prunes the old pair at activate. A device that kept one - set up for
+// A release that renames the answer library prunes the old pair once the new one is held - at activate, or after
+// activation's retry (`supersededToPrune`). A device that kept one - set up for
 // on-device answers, or a document saved - gets the new pair at install, while online, instead of being asked to
 // set up again (the model is still held) and losing offline answers until it does.
 describe('answerLibraryToRestore (the answer library a device keeps through an update)', () => {

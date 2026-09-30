@@ -57,7 +57,8 @@ sw.addEventListener('activate', (event) => {
 			await pruneSupersededVersions(keys);
 			await sw.clients.claim();
 			// The fallback for a library install could not store. Started after activation, not awaited inside
-			// it: page requests wait while a worker activates, so a ~1.7 MB download here would stall every page
+			// it: page requests wait while a worker activates, so a download of several megabytes here (the PDF
+			// library, the answer library) would stall every page
 			// load after an update. The prune runs again once it has finished, which is when the old answer
 			// library - kept above while its replacement was owed - can go.
 			void restoreKeptLibraries(keys).then(() => pruneSupersededVersions(keys));
