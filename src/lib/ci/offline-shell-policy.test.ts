@@ -55,8 +55,18 @@ describe('the worker installs the pages the budget counts', () => {
 // release's asset list after a newer release may already be installed. The prune itself deletes on the version rule
 // alone: a condition that holds an old answer library back would fill a nearly full device for good.
 describe('the worker does its install and activate work in order', () => {
-	const worker = readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8');
-	const assetCache = readFileSync(join(process.cwd(), 'src/lib/ask/asset-cache.ts'), 'utf8');
+	/**
+	 * The source without its comments, so a word in a comment is never read as a call. A `//` right after a colon or
+	 * a quote is part of a string (an address), not a comment.
+	 */
+	const withoutComments = (source: string) =>
+		source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
+	const worker = withoutComments(
+		readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8')
+	);
+	const assetCache = withoutComments(
+		readFileSync(join(process.cwd(), 'src/lib/ask/asset-cache.ts'), 'utf8')
+	);
 
 	/** The `sw.addEventListener(name, ...)` call, up to the `});` that closes it at the start of a line. */
 	const handler = (name: string) => {
@@ -121,10 +131,24 @@ describe('the worker does its install and activate work in order', () => {
 			callsOf('pruneSupersededEntries'),
 			'calls of the shared prune in the worker'
 		).toHaveLength(1);
-		expect(handler('install'), 'the prune runs at install').not.toMatch(/prune/i);
+		expect(handler('install'), 'the prune runs at install').not.toMatch(/prune\w*\(/i);
 		expect(
 			handler('activate').match(/pruneSupersededVersions\(/g),
 			'the prune at activate'
+		).toHaveLength(1);
+		// A prune written out by hand, under any name, still deletes with `.delete(`: the one in the worker is the
+		// sweep of stale app caches at activate, and the one in the asset-cache module is the shared prune's.
+		expect(
+			worker.match(/\.delete\(/g),
+			'a delete in the worker besides the cache sweep'
+		).toHaveLength(1);
+		expect(
+			handler('activate').match(/await caches\.delete\(key\);/g),
+			'the one delete is not the cache sweep at activate'
+		).toHaveLength(1);
+		expect(
+			assetCache.match(/\.delete\(/g),
+			'a delete in asset-cache besides the shared prune'
 		).toHaveLength(1);
 
 		for (const retry of ['restoreKeptLibraries', 'keepEmbedWorkerScript']) {
@@ -138,6 +162,17 @@ describe('the worker does its install and activate work in order', () => {
 				retry
 			).toHaveLength(1);
 		}
+	});
+
+	// The comment stripper decides what the pins above read, so a stripper that ate code would blind them.
+	it('reads the code of the worker and the asset-cache module, comments aside', () => {
+		expect(worker).toMatch(/cache\.addAll\(\[\.\.\.PRECACHE, \.\.\.INSTALL_PAGES\]\)/);
+		expect(worker).toMatch(/new URL\(event\.request\.url\)/);
+		expect(assetCache).toMatch(/export async function pruneSupersededEntries\(/);
+		expect(assetCache).toMatch(/https:\/\/chunk\.invalid/);
+		expect(withoutComments('a(); // b()\n/* c() */ d(); "http://e"')).toBe(
+			'a(); \n d(); "http://e"'
+		);
 	});
 
 	it('chains no prune after a retry: nothing follows the last retry, and no retry has a callback', () => {
