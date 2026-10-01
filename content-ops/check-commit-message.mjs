@@ -6,9 +6,10 @@
 // git may remove `#` lines afterwards, so it drops them as the editor cleanup would; with git's default comment
 // character it does not refuse a message git would record correctly (another `core.commentChar` can make it
 // disagree with git either way). It also cannot tell whether git keeps a `#` line given with a second `-m`, so
-// those are left to the range check. It lets git's own one-line message for a merge in progress through, as the
-// range check skips merges. It is an early warning: commits git makes itself (a cherry-pick, a revert, a
-// squash) never run it, and neither does a checkout where the hooks were not installed.
+// those are left to the range check. While a merge is in progress it lets through a one-line message that starts
+// with `Merge`, as git words its own, because the range check skips merges. It is an early warning: commits git
+// makes itself (a cherry-pick, a revert, a squash) never run it, and neither does a checkout where the hooks
+// were not installed.
 //
 // Range mode, run by CI and by hand: `pnpm run check:commits [range]` (default range: origin/main..HEAD). It
 // reads each commit's message as git recorded it and checks it strictly, so it is the check that enforces. It
