@@ -80,10 +80,18 @@ describe('the worker does its install and activate work in order', () => {
 		expect(start, signature).toBeGreaterThanOrEqual(0);
 		return source.slice(start, source.indexOf('\n}', start));
 	};
-	/** Where `name(` is called in the worker: not where it is defined, and not a longer name ending in it. */
-	const callsOf = (name: string) => [
-		...worker.matchAll(new RegExp(`(?<![\\w.]|function )${name}\\(`, 'g'))
-	];
+	/**
+	 * Where `name(` is called in the worker: not where it is defined, and not a longer name ending in it. Found by
+	 * searching for the text, because a regular expression built from a parameter fails the semgrep gate.
+	 */
+	const callsOf = (name: string) => {
+		const calls: { index: number }[] = [];
+		for (let at = worker.indexOf(`${name}(`); at >= 0; at = worker.indexOf(`${name}(`, at + 1)) {
+			const before = worker.slice(Math.max(0, at - 'function '.length), at);
+			if (!/[\w.]$/.test(before) && !before.endsWith('function ')) calls.push({ index: at });
+		}
+		return calls;
+	};
 	/** The first statement that does not appear after the one before it, or undefined when all do in order. */
 	const firstOutOfOrder = (source: string, statements: RegExp[]) => {
 		let from = 0;
