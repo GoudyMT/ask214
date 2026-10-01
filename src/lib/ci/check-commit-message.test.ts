@@ -167,6 +167,62 @@ describe('check-commit-message, file mode (the hook)', () => {
 	);
 
 	it(
+		'refuses a merge message that carries a trailer or a body, which no check would read afterwards',
+		() => {
+			const { repo, mergeMessage } = mergeInProgress();
+			for (const [name, extra] of [
+				['merge-trailer', TRAILER],
+				['merge-body', 'Some detail about the merge.']
+			] as const) {
+				const result = runScript([messageFile(name, `${mergeMessage}\n${extra}\n`)], { cwd: repo });
+				expect(result.status, name).toBe(1);
+				expect(result.stdout, name).toContain('COMMIT MESSAGE REJECTED');
+				expect(result.stdout, name).toContain('no body and no trailer');
+			}
+		},
+		TIMEOUT
+	);
+
+	it(
+		'passes the message git keeps for a conflicted merge, whose conflict lines are comments',
+		() => {
+			const repo = makeRepo();
+			writeFileSync(join(repo, 'a.txt'), 'one\n');
+			git(repo, 'add', 'a.txt');
+			commit(repo, 'fix: add the file');
+			git(repo, 'switch', '--quiet', '-c', 'side');
+			writeFileSync(join(repo, 'a.txt'), 'side\n');
+			git(repo, 'add', 'a.txt');
+			commit(repo, 'fix: change it on the side');
+			git(repo, 'switch', '--quiet', 'main');
+			writeFileSync(join(repo, 'a.txt'), 'main\n');
+			git(repo, 'add', 'a.txt');
+			commit(repo, 'fix: change it on main');
+			expect(() => git(repo, 'merge', '--quiet', 'side')).toThrow();
+			const mergeMessage = readFileSync(
+				join(repo, git(repo, 'rev-parse', '--git-path', 'MERGE_MSG')),
+				'utf8'
+			);
+			expect(mergeMessage).toContain('# Conflicts:');
+			const result = runScript([messageFile('merge-conflict', mergeMessage)], { cwd: repo });
+			expect(result.status, result.stdout).toBe(0);
+		},
+		TIMEOUT
+	);
+
+	it(
+		'does not take a tag named MERGE_HEAD for a merge in progress',
+		() => {
+			const repo = makeRepo();
+			git(repo, 'tag', 'MERGE_HEAD');
+			const result = runScript([messageFile('merge-tag', "Merge branch 'side'\n")], { cwd: repo });
+			expect(result.status).toBe(1);
+			expect(result.stdout).toContain('COMMIT MESSAGE REJECTED');
+		},
+		TIMEOUT
+	);
+
+	it(
 		'passes a line that ends with extra carriage returns, which git trims in an editor flow',
 		() => {
 			const result = runScript([messageFile('cr', 'fix: x\r\r\n')]);
@@ -447,7 +503,7 @@ describe('check-commit-message, range mode', () => {
 	);
 
 	it(
-		'reads the range that follows a literal -- , as `pnpm run check:commits -- <range>` passes it',
+		'reads the range that follows a literal -- , for a caller that passes one itself',
 		() => {
 			const repo = makeRepo();
 			const base = git(repo, 'rev-parse', 'HEAD');

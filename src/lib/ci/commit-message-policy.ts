@@ -3,6 +3,13 @@ const TYPES = ['feat', 'fix', 'refactor', 'test', 'docs', 'chore', 'security', '
 // One prefix, an optional lowercase scope, a colon, exactly one space, then a character that is not a space.
 const SUBJECT_LINE = new RegExp(`^(?:${TYPES.join('|')})(?:\\([a-z0-9-]+\\))?: \\S`);
 
+/**
+ * The sentence for a first line that is not `type: subject`. It is the only violation of a message that is one
+ * clean line of the wrong form, so a caller can tell that case from a message that also has a body or a control
+ * character.
+ */
+export const FORMAT_VIOLATION = `The line must be "type: subject" or "type(scope): subject", with a type of ${TYPES.join(', ')}.`;
+
 // The line git writes above the diff it appends for `git commit -v`; when git cleans the message up, it and
 // everything after it is not the message.
 const SCISSORS = '# ------------------------ >8 ------------------------';
@@ -82,9 +89,7 @@ export function findCommitMessageViolations(
 		);
 	}
 	if (!SUBJECT_LINE.test(first)) {
-		violations.push(
-			`The line must be "type: subject" or "type(scope): subject", with a type of ${TYPES.join(', ')}.`
-		);
+		violations.push(FORMAT_VIOLATION);
 		return violations;
 	}
 

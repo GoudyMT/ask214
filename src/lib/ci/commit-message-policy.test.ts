@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findCommitMessageViolations } from './commit-message-policy';
+import { FORMAT_VIOLATION, findCommitMessageViolations } from './commit-message-policy';
 
 const SCISSORS = '# ------------------------ >8 ------------------------';
 const CONTROL_SENTENCE =
@@ -213,6 +213,24 @@ describe('findCommitMessageViolations', () => {
 		const violations = findCommitMessageViolations('feature: add x');
 		expect(violations).toHaveLength(1);
 		expect(violations[0]).toMatch(/type: subject/);
+	});
+
+	it('names the form alone for one clean line of the wrong form, and adds to it for anything else', () => {
+		const options = { stripComments: true };
+		expect(findCommitMessageViolations("Merge branch 'side'\n", options)).toEqual([
+			FORMAT_VIOLATION
+		]);
+		expect(
+			findCommitMessageViolations("Merge branch 'side'\n\n# Conflicts:\n#\ta.txt\n", options)
+		).toEqual([FORMAT_VIOLATION]);
+		expect(findCommitMessageViolations("Merge branch 'side'\n\nmore\n", options)).toEqual([
+			'The message must be one line, with no body and no trailer.',
+			FORMAT_VIOLATION
+		]);
+		expect(findCommitMessageViolations("Merge branch\t'side'\n", options)).toEqual([
+			CONTROL_SENTENCE,
+			FORMAT_VIOLATION
+		]);
 	});
 
 	it('rejects an uppercase type', () => {

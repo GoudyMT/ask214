@@ -6,8 +6,8 @@
 // git may remove `#` lines afterwards, so it drops them as the editor cleanup would; with git's default comment
 // character it does not refuse a message git would record correctly (another `core.commentChar` can make it
 // disagree with git either way). It also cannot tell whether git keeps a `#` line given with a second `-m`, so
-// those are left to the range check. It lets the message of a merge in progress through, as the range check
-// skips merges. It is an early warning: commits git makes itself (a cherry-pick, a revert, a
+// those are left to the range check. It lets git's own one-line message for a merge in progress through, as the
+// range check skips merges. It is an early warning: commits git makes itself (a cherry-pick, a revert, a
 // squash) never run it, and neither does a checkout where the hooks were not installed.
 //
 // Range mode, run by CI and by hand: `pnpm run check:commits [range]` (default range: origin/main..HEAD). It
@@ -15,8 +15,11 @@
 // skips merge commits and Dependabot's commits, and it does not see the commit that lands on main, which is
 // written when the pull request is merged.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { findCommitMessageViolations } from '../src/lib/ci/commit-message-policy.ts';
+import { existsSync, readFileSync } from 'node:fs';
+import {
+	FORMAT_VIOLATION,
+	findCommitMessageViolations
+} from '../src/lib/ci/commit-message-policy.ts';
 
 const EXAMPLE = 'git commit -m "fix: hold the page still behind the open reader"';
 const DEFAULT_RANGE = 'origin/main..HEAD';
@@ -33,11 +36,13 @@ function printable(line) {
 	return line.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '?').replaceAll('##[', '# #[');
 }
 
-/** @returns {boolean} True when a merge is in progress in the current repository, whose message git words itself. */
+/** @returns {boolean} True when a merge is in progress in the current repository. */
 function mergeInProgress() {
 	try {
-		execFileSync('git', ['rev-parse', '-q', '--verify', 'MERGE_HEAD'], { stdio: 'ignore' });
-		return true;
+		// The file git itself looks for, not `rev-parse --verify MERGE_HEAD`, which also resolves a tag or a
+		// branch of that name.
+		const path = gitOutput(['rev-parse', '--git-path', 'MERGE_HEAD']).trim();
+		return existsSync(path);
 	} catch {
 		return false;
 	}
@@ -61,8 +66,15 @@ function checkFile(file) {
 	const violations = findCommitMessageViolations(raw, { stripComments: true });
 	// The message git words for a merge it is making (`git merge`, a pull that diverged, a commit that ends a
 	// conflicted merge) is not written by a person, and the range check skips merge commits, so the hook does
-	// not refuse it either.
-	if (violations.length > 0 && raw.startsWith('Merge ') && mergeInProgress()) {
+	// not refuse it either. It passes only when the form is its one fault: one clean line, then at most the
+	// comment lines git adds. A body or a trailer on a merge would be read by no check, so those stay refused,
+	// which includes the log body git adds with `merge.log` or `--log` (off by default).
+	if (
+		violations.length === 1 &&
+		violations[0] === FORMAT_VIOLATION &&
+		raw.startsWith('Merge ') &&
+		mergeInProgress()
+	) {
 		console.log('    merge message written by git');
 		console.log('\nCOMMIT MESSAGE PASSED');
 		return;
@@ -131,7 +143,8 @@ function gitOutput(args) {
 }
 
 if (process.argv[2] === '--range') {
-	// `pnpm run check:commits -- <range>` hands the `--` on as an argument of its own.
+	// A caller may put a `--` before the range, as when the script is run directly; the pnpm this project pins
+	// drops it before the script sees it.
 	const rangeArg = process.argv[3] === '--' ? process.argv[4] : process.argv[3];
 	checkRange(rangeArg ?? DEFAULT_RANGE);
 } else if (process.argv[2] === undefined) {
