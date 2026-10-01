@@ -98,6 +98,61 @@ describe('findCommitMessageViolations', () => {
 		expect(findCommitMessageViolations('fix: add b\r\n')).toEqual([]);
 	});
 
+	it('lets go of any run of trailing spaces, tabs and carriage returns when comments are stripped, as git does', () => {
+		for (const raw of ['fix: x\r\r\n', 'fix: x\r \n', 'fix: x \t\r\r\n', 'fix: x\r\n\r\r\n']) {
+			expect(
+				findCommitMessageViolations(raw, { stripComments: true }),
+				JSON.stringify(raw)
+			).toEqual([]);
+		}
+	});
+
+	it('still refuses a carriage return in the middle of a line when comments are stripped', () => {
+		expect(findCommitMessageViolations('fix: a\rb\r\r\n', { stripComments: true })).toEqual([
+			CONTROL_SENTENCE
+		]);
+		expect(findCommitMessageViolations('fix: a\r\nb\rc', { stripComments: true })).toContain(
+			CONTROL_SENTENCE
+		);
+	});
+
+	it('keeps the strict reading of trailing carriage returns for a recorded message', () => {
+		expect(findCommitMessageViolations('fix: x\r\r\n', { stripComments: false })).toEqual([
+			CONTROL_SENTENCE
+		]);
+		expect(findCommitMessageViolations('fix: x\r \n', { stripComments: false })).toEqual([
+			CONTROL_SENTENCE
+		]);
+	});
+
+	it('rejects characters that break or hide a line without being control characters', () => {
+		// U+2028 and U+2029 end a line for some readers, U+202E reverses text, and U+FEFF is invisible mid-message.
+		for (const code of [0x2028, 0x2029, 0x202e, 0xfeff, 0x200b, 0x2066]) {
+			const raw = `fix: add ${String.fromCharCode(code)}b`;
+			for (const stripComments of [false, true]) {
+				expect(
+					findCommitMessageViolations(raw, { stripComments }),
+					`code ${code} strip ${stripComments}`
+				).toEqual([CONTROL_SENTENCE]);
+			}
+		}
+	});
+
+	it('rejects such a character at the end of the line, where trimming must not hide it', () => {
+		const raw = `fix: add b${String.fromCharCode(0x2028)}`;
+		expect(findCommitMessageViolations(raw)).toEqual([CONTROL_SENTENCE]);
+		expect(findCommitMessageViolations(raw, { stripComments: true })).toEqual([CONTROL_SENTENCE]);
+	});
+
+	it('gives a leading byte-order mark only its own sentence, not the control sentence as well', () => {
+		const bom = String.fromCharCode(0xfeff);
+		expect(findCommitMessageViolations(`${bom}fix: add x`)).toEqual([BOM_SENTENCE]);
+		expect(findCommitMessageViolations(`${bom}fix: add${bom}x`)).toEqual([
+			BOM_SENTENCE,
+			CONTROL_SENTENCE
+		]);
+	});
+
 	it('rejects a tab inside the line', () => {
 		expect(findCommitMessageViolations('fix: add\tb')).toEqual([CONTROL_SENTENCE]);
 	});

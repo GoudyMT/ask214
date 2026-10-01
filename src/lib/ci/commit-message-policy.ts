@@ -9,6 +9,11 @@ const SCISSORS = '# ------------------------ >8 ------------------------';
 
 const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
 
+// Control characters, plus the format characters (bidi overrides, zero-width marks, a byte-order mark inside
+// the text) and the line and paragraph separators (U+2028, U+2029), which show nothing or end a line for some
+// readers while git and a regex `$` do not.
+const HIDDEN_OR_CONTROL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+
 /**
  * Check a commit message against the project's one-line format.
  *
@@ -18,13 +23,15 @@ const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
  *
  * Line breaks are `\n`, or `\r\n`. Any other control character, a tab or a carriage return on its own
  * included, is refused: a lone carriage return ends a line to some readers and not to others, so a second line
- * could hide behind it. A byte-order mark at the start is refused with its own sentence; some shells put one
+ * could hide behind it. So are the invisible and direction-changing format characters and the Unicode line and
+ * paragraph separators, for the same reason. A byte-order mark at the start is refused with its own sentence; some shells put one
  * there when they pipe text, and it would otherwise show up as a message that looks right but is not.
  *
  * Whether `#` lines are text depends on who reads the message. A message already recorded is exactly what
  * git kept, so a `#` line is part of it and counts as a message line. The commit-msg hook instead sees the
  * text before git cleans it, and cannot tell which cleanup git will run; it asks for `stripComments`, which
- * drops every `#` line and everything from the scissors line on, as git's editor cleanup does, so with git's
+ * drops every `#` line and everything from the scissors line on and trims each line's trailing spaces, tabs
+ * and carriage returns, as git's editor cleanup does, so with git's
  * default comment character the hook does not refuse a message that git would record correctly. (A different
  * `core.commentChar` makes git keep lines the hook drops, or drop lines it keeps.)
  *
@@ -42,9 +49,18 @@ export function findCommitMessageViolations(
 	if (hasMark)
 		violations.push('The message starts with a byte-order mark; save it as UTF-8 without one.');
 
+	// Git's editor cleanup trims every trailing space, tab and carriage return from each line, so for the text
+	// the hook reads a run of them is not content; a recorded message is read strictly, one carriage return at
+	// most being half of a CRLF line break.
 	const lines = (hasMark ? raw.slice(1) : raw)
 		.split('\n')
-		.map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+		.map((line) =>
+			options.stripComments === true
+				? line.replace(/[ \t\r]+$/, '')
+				: line.endsWith('\r')
+					? line.slice(0, -1)
+					: line
+		);
 	const cut = lines.findIndex((line) => line.trimEnd() === SCISSORS);
 	const written =
 		options.stripComments === true
@@ -60,7 +76,7 @@ export function findCommitMessageViolations(
 	if (content.length > 1) {
 		violations.push('The message must be one line, with no body and no trailer.');
 	}
-	if (content.some((line) => /\p{Cc}/u.test(line))) {
+	if (content.some((line) => HIDDEN_OR_CONTROL.test(line))) {
 		violations.push(
 			'The message holds a control character, such as a tab or a lone carriage return; use plain text.'
 		);
