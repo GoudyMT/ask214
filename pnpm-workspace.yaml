@@ -61,6 +61,20 @@ overrides:
   # decoded as decimal, high; transitive dev-only via @lhci/cli>lighthouse>puppeteer-core>...>socks>
   # ip-address, never in the client bundle). Floor pin - retire when that chain bundles >=10.3.1.
   ip-address: '>=10.3.1'
+  # Force patched devalue (GHSA-j22f-vq7h-c4qm, `stringify`/`uneval` serialize shared memory; GHSA-mcm9-63f2-9j32,
+  # repeated primitive strings expand quadratically in `uneval`; GHSA-x5rw-q4pp-hg5g, `stringifyAsync` can leave an
+  # unhandled rejection - all high, all up to <=5.9.2). Unlike every pin above, devalue SHIPS: it is SvelteKit's
+  # serializer (via @sveltejs/kit and svelte) in the live worker and the client bundle. Targeted range pin to the
+  # newest 5.9.x, so the patch stays inside the minor SvelteKit was built against and a consumer that already
+  # resolves a patched devalue is left alone. Retire when the lockfile resolves >=5.9.3 without it.
+  'devalue@<5.9.3': '5.9.4'
+  # Force patched basic-ftp (GHSA-c475-qrg2-pj4r, quadratic CPU in the Unix directory-listing parser, high, up to
+  # <=6.2.0; transitive dev-only via @lhci/cli>...>proxy-agent>pac-proxy-agent>get-uri, never in the client
+  # bundle). The patch exists only in 6.x and every get-uri release asks for ^5, so this floor crosses a major,
+  # as the brace-expansion pin does. The accepted cost: get-uri's FTP path may not work with 6.x. That path only
+  # fetches a proxy auto-config file from an ftp: address, which Lighthouse CI never uses; the Lighthouse gate
+  # proves the chain still loads. Retire when get-uri accepts a patched basic-ftp (Dependabot will surface it).
+  basic-ftp: '>=6.2.1'
 
 # Accepted, unfixable, dev/CI-only advisories (never shipped in the client bundle): extract-zip
 # (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6; and GHSA-7pqw-9j4j-h8q3,
