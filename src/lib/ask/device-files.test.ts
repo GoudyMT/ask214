@@ -24,12 +24,14 @@ describe('DEVICE_FILES', () => {
 		for (const path of DEVICE_FILES) expect(existsSync(join(STATIC, path)), path).toBe(true);
 	});
 
-	// The service worker decides a setup is finished from SET_UP_FILES alone, so the page's list must be exactly
-	// those files and the library: the two then agree on which device is set up.
+	// The service worker decides a setup is finished from SET_UP_FILES alone, and the page writes its own list out, so
+	// the page's list must be exactly those files and the library: the two then agree on which device is set up.
 	it('is the files that finish a setup and the answer library, and nothing else', () => {
-		expect([...DEVICE_FILES].sort()).toEqual(
-			[...SET_UP_FILES, `${CORPUS_BASE}.json`, `${CORPUS_BASE}.embeddings.bin`].sort()
-		);
+		expect(DEVICE_FILES).toEqual([
+			...SET_UP_FILES,
+			`${CORPUS_BASE}.json`,
+			`${CORPUS_BASE}.embeddings.bin`
+		]);
 		expect(SET_UP_FILES.filter((path) => path.startsWith('/corpus/'))).toEqual([]);
 		expect(new Set(DEVICE_FILES).size).toBe(DEVICE_FILES.length);
 	});
