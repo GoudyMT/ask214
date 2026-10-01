@@ -1,8 +1,11 @@
 import type { Plugin } from 'vite';
 
 // The file name the bundler gives the ONNX runtime's own WASM: the library's name, an optional variant
-// (`.asyncify`, `.jsep`), a hash, and `.wasm`. Anything else - a different prefix, no hash - is not that file.
-const ORT_WASM_NAME = /^ort-wasm-simd-threaded(?:\.\w+)*-[\w-]{6,}\.wasm$/;
+// (`.asyncify`, `.jsep`), a hash, and `.wasm`. SvelteKit joins a worker asset's hash with `-` and the main build's
+// with `.`, so either is read. The vendored copy's own name (`...threaded.asyncify.wasm`) has a variant where a
+// hash would go, so a variant word is refused as one. Anything else - a different prefix, no hash - is not that file.
+const ORT_WASM_NAME =
+	/^ort-wasm-simd-threaded(?:\.\w+)*[.-](?!(?:asyncify|jsep)\.wasm$)[\w-]{6,}\.wasm$/;
 
 /**
  * Remove the ONNX runtime's fallback WASM from a worker bundle, and fail on any other WASM.
@@ -10,9 +13,10 @@ const ORT_WASM_NAME = /^ort-wasm-simd-threaded(?:\.\w+)*-[\w-]{6,}\.wasm$/;
  * The embed worker sets `wasmPaths = '/wasm/'`, so the ONNX runtime loads its WASM from the vendored folder.
  * The runtime library inside the worker also names its own WASM as a fallback for when `wasmPaths` is unset,
  * and the bundler writes that ~23 MB file beside the worker's script, where nothing ever requests it. That one
- * file is dropped. The fallback URL left in the worker then points at a file that does not exist, which is
- * acceptable: it is read only when `wasmPaths` is unset, and a missing WASM must fail loudly (see
- * embed-worker.ts) rather than load a copy nobody vendored.
+ * file is dropped. The fallback URL left in the worker then points at a file that does not exist. That is
+ * acceptable only because `wasmPaths` is set: were it unset, transformers.js's own default would point the runtime
+ * at a CDN (jsDelivr), and the worker has no CSP header of its own to block the fetch. What keeps the runtime off
+ * both the dropped file and the CDN is the `wasmPaths = '/wasm/'` line in embed-worker.ts.
  *
  * Only that file is dropped. A worker that really bundles its own WASM would otherwise build green and then
  * 404 in production, so any other `.wasm` asset ends the build instead.

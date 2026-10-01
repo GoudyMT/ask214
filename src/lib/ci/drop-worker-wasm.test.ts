@@ -52,6 +52,18 @@ describe('dropOrtWasm', () => {
 		expect(Object.keys(bundle)).toEqual([SCRIPT]);
 	});
 
+	// SvelteKit puts a `-` before the hash of a worker's asset and a `.` before the hash of the main build's; a
+	// change of the worker's separator must not end the build on the very file this plugin exists to drop.
+	it('removes the runtime WASM whether a `-` or a `.` comes before its hash', () => {
+		const bundle = {
+			'assets/ort-wasm-simd-threaded.asyncify.Ab12Cd34.wasm': { type: 'asset' },
+			'assets/ort-wasm-simd-threaded.Ab12Cd34.wasm': { type: 'asset' },
+			[SCRIPT]: { type: 'chunk' }
+		};
+		expect(endedWith(() => dropOrtWasm(bundle, context()))).toBeUndefined();
+		expect(Object.keys(bundle)).toEqual([SCRIPT]);
+	});
+
 	// A worker that really bundles its own WASM would build green and 404 in production if the drop took it too.
 	it('ends the build on any other WASM, with a code that names no file', () => {
 		const bundle = {
@@ -69,6 +81,20 @@ describe('dropOrtWasm', () => {
 			'assets/my-ort-wasm-simd-threaded-Ab12Cd34.wasm',
 			'assets/ort-wasm-simd-threaded-Ab12Cd34.wasm.txt.wasm',
 			'assets/ort-wasm-simd-threaded.wasm'
+		]) {
+			expect(endedWith(() => dropOrtWasm({ [name]: { type: 'asset' } }, context()))).toBe(
+				'E_WORKER_WASM_UNEXPECTED'
+			);
+		}
+	});
+
+	// The vendored copy's own name ends in a variant, not a hash. A variant word beside the separator must not be
+	// read as one, or the file this plugin must refuse would be dropped silently.
+	it('does not take a runtime-named WASM that has no hash', () => {
+		for (const name of [
+			'assets/ort-wasm-simd-threaded.asyncify.wasm',
+			'assets/ort-wasm-simd-threaded.jsep.wasm',
+			'assets/ort-wasm-simd-threaded.Ab1.wasm'
 		]) {
 			expect(endedWith(() => dropOrtWasm({ [name]: { type: 'asset' } }, context()))).toBe(
 				'E_WORKER_WASM_UNEXPECTED'

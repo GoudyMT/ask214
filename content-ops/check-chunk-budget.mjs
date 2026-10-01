@@ -11,6 +11,7 @@ import { gzipSync } from 'node:zlib';
 import {
 	kilobytes,
 	precachedPaths,
+	roomInBytes,
 	splitChunksByLoading,
 	strayWasm,
 	unreadWorkerScripts,
@@ -84,7 +85,9 @@ const STATIC = 'static';
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
-//     (this check's own gzip-9), 123 B of room (owner's call, 2026-09-30).
+//     (this check's own gzip-9), 123 B of room (owner's call, 2026-09-30). A transformers.js, onnxruntime or Vite
+//     update can grow the worker past it; a raise then is expected, on a measured reason and as the owner's call,
+//     as for every limit here. The budget exists to make that growth a decision, not a surprise.
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
@@ -150,7 +153,7 @@ function sizeRow(label, files, limit) {
 	const pass = size <= limit;
 	if (!pass) failed += 1;
 	console.log(
-		`    ${label.padEnd(26)} ${kilobytes(size).padStart(8)} KB  <= ${kilobytes(limit)} KB  ${pass ? 'PASS' : 'FAIL'}  (${files.length} files)`
+		`    ${label.padEnd(26)} ${kilobytes(size).padStart(8)} KB  <= ${kilobytes(limit)} KB  ${pass ? 'PASS' : 'FAIL'}  (${files.length} files, ${roomInBytes(size, limit)})`
 	);
 }
 
@@ -196,7 +199,7 @@ console.log(
 	`    ${'files the worker precaches'.padEnd(26)} ${String(precacheFiles).padStart(8)}     <= ${LIMIT.precacheFiles}      ${filesPass ? 'PASS' : 'FAIL'}`
 );
 console.log(
-	`    ${'bytes the worker precaches'.padEnd(26)} ${kilobytes(precacheBytes).padStart(8)} KB  <= ${kilobytes(LIMIT.precacheBytes)} KB  ${bytesPass ? 'PASS' : 'FAIL'}`
+	`    ${'bytes the worker precaches'.padEnd(26)} ${kilobytes(precacheBytes).padStart(8)} KB  <= ${kilobytes(LIMIT.precacheBytes)} KB  ${bytesPass ? 'PASS' : 'FAIL'}  (${roomInBytes(precacheBytes, LIMIT.precacheBytes)})`
 );
 
 // Instrument check: install keeps the embed worker's script by reading its name from the built code, because the

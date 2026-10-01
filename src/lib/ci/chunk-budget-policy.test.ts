@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	kilobytes,
 	precachedPaths,
+	roomInBytes,
 	splitChunksByLoading,
 	strayWasm,
 	unreadWorkerScripts,
@@ -157,6 +158,28 @@ describe('kilobytes', () => {
 	it('keeps a limit that is not a whole kilobyte apart from the whole kilobyte below it', () => {
 		expect(kilobytes(135_112)).toBe('135.11');
 		expect(kilobytes(135_000)).not.toBe(kilobytes(135_112));
+	});
+});
+
+// Two decimals of a kilobyte hide up to 4 B, so a row's kilobytes alone can read "147.20 KB <= 147.20 KB" for a size
+// that is over. The row states its room or its shortfall in whole bytes beside them.
+describe('roomInBytes', () => {
+	it('states the bytes of room under the limit', () => {
+		expect(roomInBytes(147_126, 147_200)).toBe('74 B to spare');
+	});
+
+	it('states no room, and not an overage, for a size exactly at the limit', () => {
+		expect(roomInBytes(147_200, 147_200)).toBe('0 B to spare');
+	});
+
+	it('states a single byte over, which the kilobytes of that row print as equal', () => {
+		expect(kilobytes(147_201)).toBe(kilobytes(147_200));
+		expect(roomInBytes(147_201, 147_200)).toBe('1 B over');
+	});
+
+	it('states the measured shortfall for a larger overage', () => {
+		expect(roomInBytes(147_203, 147_200)).toBe('3 B over');
+		expect(roomInBytes(150_200, 147_200)).toBe('3,000 B over');
 	});
 });
 
