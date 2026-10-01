@@ -4,8 +4,9 @@ import type { EmbedRequest, EmbedResponse } from './types';
 import { ASK_ERROR } from './errors';
 
 // Self-host both the model and the ORT WASM as same-origin static assets: NO runtime HF-CDN /
-// jsDelivr fetch -> connect-src 'self' holds, the query never leaves the device, and the flow works
-// offline after the (same-origin) first load. Configure env BEFORE pipeline(). Single-threaded SIMD WASM,
+// jsDelivr fetch -> the query never leaves the device, and the flow works offline after the (same-origin) first
+// load. The page's connect-src does not reach this worker, so the settings below are what keep it off a CDN; a
+// test holds them. Configure env BEFORE pipeline(). Single-threaded SIMD WASM,
 // no cross-origin isolation / COEP. Output is mean-pooled + L2-normalized (384-d).
 env.allowLocalModels = true;
 env.allowRemoteModels = false;
