@@ -64,8 +64,9 @@ export const CORPUS_BYTES = 7_347_321;
 /**
  * The files a set-up of on-device answers stores besides the answer library: the search model and the runtime that
  * runs it. A device that holds every one of them has finished setting up (`deviceFinishedSetUp`). The paths are
- * written out rather than read from the vendored manifest, so the page does not carry the manifest's hashes; tests
- * hold them to the manifest and to the files the app ships.
+ * written out rather than read from the vendored manifest, so the service worker does not carry the manifest's
+ * hashes; tests hold them to the manifest and to the files the app ships. The page keeps its own written-out copy
+ * of this list, which a test holds equal to this one plus the answer library.
  */
 export const SET_UP_FILES: readonly string[] = [
 	'/models/Xenova/all-MiniLM-L6-v2/config.json',
