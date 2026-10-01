@@ -161,7 +161,7 @@ describe('kilobytes', () => {
 	});
 });
 
-// Two decimals of a kilobyte hide up to 4 B, so a row's kilobytes alone can read "147.20 KB <= 147.20 KB" for a size
+// Two decimals of a kilobyte hide a few bytes (up to 5 B), so a row's kilobytes alone can read "147.20 KB <= 147.20 KB" for a size
 // that is over. The row states its room or its shortfall in whole bytes beside them.
 describe('roomInBytes', () => {
 	it('states the bytes of room under the limit', () => {

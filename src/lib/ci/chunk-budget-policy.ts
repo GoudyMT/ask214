@@ -134,7 +134,8 @@ export function kilobytes(bytes: number): string {
 /**
  * What a budget row has left, or is short, in whole bytes.
  *
- * Two decimals of a kilobyte hide up to 4 B: a size 1 B over its limit prints as `147.20 KB <= 147.20 KB`. The
+ * Two decimals of a kilobyte hide a few bytes (up to 5 B: 7,305 B prints as 7.30 KB): a size 1 B over its limit
+ * prints as `147.20 KB <= 147.20 KB`. The
  * row states the exact figure beside them, so a shortfall is always shown as measured.
  *
  * @param size The measured bytes.
