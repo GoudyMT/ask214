@@ -9,11 +9,13 @@ import {
 	ASK_ASSET_CACHE,
 	carryOverSavedDocuments,
 	keptOnActivate,
-	isSupersededVersionedEntry,
+	pruneSupersededEntries,
 	isApiRequest,
 	keptOnFetch,
-	libraryToRestore,
-	answerLibraryToRestore,
+	LIBRARY_RESTORE_DEADLINE_MS,
+	WORKER_SCRIPT_DEADLINE_MS,
+	restoreLibraries,
+	keepWorkerScripts,
 	storeOnFetch,
 	INSTALL_PAGES,
 	offlineResponse
@@ -34,11 +36,14 @@ sw.addEventListener('install', (event) => {
 			// The app page too: every offline navigation falls back to it (see offlineResponse).
 			await cache.addAll([...PRECACHE, ...INSTALL_PAGES]);
 			// Install is when this release's files are known to be reachable - it is downloading them now - while
-			// activation may come later with no connection. So a device holding saved documents gets this
-			// release's PDF library here, and a device that kept the answer library gets this release's; activation
-			// tries again for any PDF-library file this could not store. The restore never throws, so it cannot
-			// fail the install.
-			await restoreKeptLibraries(await caches.keys());
+			// activation may come later with no connection. So a device holding a saved document this release still
+			// ships gets this release's PDF library here, and a device that finished setting up on-device answers
+			// (the whole model and runtime held) or holds such a document gets this release's answer library;
+			// activation tries again for any library file this could not store. The restore never throws and gives
+			// each library a deadline, so it cannot fail the install or hold it open.
+			const cacheNames = await caches.keys();
+			await restoreKeptLibraries(cacheNames);
+			await keepEmbedWorkerScript(cacheNames);
 		})()
 	);
 });
@@ -56,10 +61,15 @@ sw.addEventListener('activate', (event) => {
 			}
 			await pruneSupersededVersions(keys);
 			await sw.clients.claim();
-			// The fallback for a library install could not store. Started after activation, not awaited inside
-			// it: page requests wait while a worker activates, so a ~1.7 MB download here would stall every page
-			// load after an update.
+			// The fallback for a library file or the embed worker's script that install could not store. Started
+			// after activation, not awaited inside it: page requests wait while a worker activates, so a download of
+			// several megabytes here (the PDF library, the answer library) would stall every page load after an
+			// update. Nothing is pruned after them: the prune above freed the room the earlier answer library held,
+			// so a retry succeeds only while this worker stays alive, the new pair fits in that room, and activation
+			// came online; and one run here would use this release's file list after a newer release may have been
+			// installed meanwhile.
 			void restoreKeptLibraries(keys);
+			void keepEmbedWorkerScript(keys);
 		})()
 	);
 });
@@ -74,6 +84,10 @@ sw.addEventListener('activate', (event) => {
  * build's asset list, so the model, the WASM, and everything current never match - and neither does an older
  * copy of a document still shipped, which the user saved and the Documents area reports as updated.
  *
+ * An earlier answer library goes here with the rest, at once: this release cannot read it, and a device that kept
+ * a library is owed the current one by the restore, which does not need the earlier pair as its signal. The
+ * work is `pruneSupersededEntries`; this keeps it from failing activation.
+ *
  * @param cacheNames The cache names already read from caches.keys(), so an install that has never fetched a
  *   lazy asset is skipped rather than being given an empty cache by caches.open().
  */
@@ -83,15 +97,7 @@ async function pruneSupersededVersions(cacheNames: string[]): Promise<void> {
 	// until the next activate costs a few megabytes, while letting the error escape waitUntil would fail
 	// activation and strand clients on the previous worker.
 	try {
-		const cache = await caches.open(ASK_ASSET_CACHE);
-		for (const request of await cache.keys()) {
-			const url = new URL(request.url);
-			// Entries here are written by the same-origin fetch handler below, by the page saving a document
-			// (the document and the PDF library) and by the library restore below, all under this origin; the
-			// origin check keeps the pathname comparison against the asset list meaningful even so.
-			if (url.origin !== sw.location.origin) continue;
-			if (isSupersededVersionedEntry(url.pathname, ASSETS)) await cache.delete(request);
-		}
+		await pruneSupersededEntries(await caches.open(ASK_ASSET_CACHE), sw.location.origin, ASSETS);
 	} catch {
 		// Intentionally ignored - see above.
 	}
@@ -103,33 +109,64 @@ async function pruneSupersededVersions(cacheNames: string[]): Promise<void> {
  * Saving a document stores the library with it, but a new library release is served from a new folder: the
  * prune above deletes the old pair, and nothing else would store the new one until a reader opens online, so
  * every saved document would open offline only as its text. `libraryToRestore` returns the shipped library
- * files to fetch, and none on a device that saved no document. Run at install, while the release is being
- * downloaded, and again after activation for anything install could not store. The answer library is restored
- * the same way (`answerLibraryToRestore`), for a device that kept an earlier one because it set up on-device
- * answers or saved a document.
+ * files to fetch, and none on a device that saved no document this release still ships. Run at install, while
+ * the release is being downloaded, and again after activation for anything install could not store. The answer
+ * library is restored the same way (`answerLibraryToRestore`), for a device that finished setting up on-device
+ * answers (the whole model and runtime held, not a setup stopped part-way) or saved such a document. At
+ * install the earlier answer library is still held - only activation prunes - so on a nearly full device that
+ * attempt can fail for lack of room; the retry after activation runs once the prune has freed it. Each library
+ * has its own try and its own deadline (`restoreLibraries`), so a stalled download cannot hold the install open
+ * and one library failing does not cost the other.
  *
  * @param cacheNames The cache names already read from caches.keys(), so an install that has never fetched a
  *   lazy asset is skipped rather than being given an empty cache by caches.open().
  */
 async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
 	if (!cacheNames.includes(ASK_ASSET_CACHE)) return;
-	// A restore is opportunistic, like the prune: if a fetch or a cache call rejects - or the browser stops the
-	// worker part-way, which stores nothing partial - the saved documents open as text offline until the next
-	// save or a reader opening online stores the library.
+	// A restore is opportunistic, like the prune: if a cache call rejects - or the browser stops the worker
+	// part-way, which can leave a two-file library half stored - the next install or retry fetches only the file
+	// still missing, and until then the saved documents open as text offline and a set-up device cannot answer
+	// offline. The fetches are bounded and kept apart by restoreLibraries.
 	try {
 		const cache = await caches.open(ASK_ASSET_CACHE);
-		const cached: string[] = [];
-		for (const request of await cache.keys()) {
-			const url = new URL(request.url);
-			if (url.origin === sw.location.origin) cached.push(url.pathname);
-		}
-		for (const path of [
-			...libraryToRestore(cached, ASSETS),
-			...answerLibraryToRestore(cached, ASSETS)
-		]) {
-			const response = await fetch(path);
-			if (response.status === 200) await cache.put(path, response);
-		}
+		await restoreLibraries(
+			cache,
+			(path, init) => fetch(path, init),
+			sw.location.origin,
+			ASSETS,
+			LIBRARY_RESTORE_DEADLINE_MS
+		);
+	} catch {
+		// Intentionally ignored - see above.
+	}
+}
+
+/**
+ * Keep the embed worker's script in this release's cache when the device finished setting up on-device answers
+ * (the whole model and runtime held; a setup stopped part-way keeps nothing here).
+ *
+ * The build list this worker precaches leaves worker scripts out, and the page fetches the script only when it
+ * first asks a question - after an update deleted the last release's copy, and perhaps with no connection. So
+ * install, while online, stores it from the name this release's own page code carries (`keepWorkerScripts`),
+ * and activation tries again for a script install could not store. It sits in the release's cache, so it goes
+ * with the release that names it and needs no prune.
+ *
+ * @param cacheNames The cache names already read from caches.keys(), so a device that has never fetched a lazy
+ *   asset is skipped rather than being given an empty cache by caches.open().
+ */
+async function keepEmbedWorkerScript(cacheNames: string[]): Promise<void> {
+	if (!cacheNames.includes(ASK_ASSET_CACHE)) return;
+	// Opportunistic, like the restore above: a failure leaves the script to the retry after activation, and then
+	// to the first question asked online - until one of those stores it, the device cannot answer offline after
+	// an update that changed the script.
+	try {
+		await keepWorkerScripts(
+			await caches.open(ASK_ASSET_CACHE),
+			await caches.open(CACHE),
+			(path, init) => fetch(path, init),
+			sw.location.origin,
+			WORKER_SCRIPT_DEADLINE_MS
+		);
 	} catch {
 		// Intentionally ignored - see above.
 	}

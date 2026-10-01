@@ -7,10 +7,15 @@ import {
 	ASK_ASSET_CACHE,
 	shouldKeepCache,
 	isSupersededVersionedEntry,
+	pruneSupersededEntries,
+	SET_UP_FILES,
 	isApiRequest,
 	keptOnFetch,
 	libraryToRestore,
 	answerLibraryToRestore,
+	restoreLibraries,
+	workerScriptsNamed,
+	keepWorkerScripts,
 	storeOnFetch,
 	carryOverSavedDocuments,
 	keptOnActivate,
@@ -25,7 +30,7 @@ describe('classifyAsset', () => {
 	it('marks the heavy model, ORT WASM, and the corpus as lazy (kept out of the install precache)', () => {
 		expect(classifyAsset('/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx')).toBe('lazy');
 		expect(classifyAsset('/models/Xenova/all-MiniLM-L6-v2/config.json')).toBe('lazy');
-		expect(classifyAsset('/wasm/ort-wasm-simd-threaded.wasm')).toBe('lazy');
+		expect(classifyAsset('/wasm/ort-wasm-simd-threaded.asyncify.wasm')).toBe('lazy');
 		// The ~3.5MB corpus is lazy too: fetched on demand (a device query or a "Read more" click) and cached
 		// then, so it never crosses the wire on a passive page load (including the SW install).
 		expect(classifyAsset('/corpus/corpus-v1.0.2.json')).toBe('lazy');
@@ -56,7 +61,7 @@ describe('classifyAsset', () => {
 			'/pdf-worker/pdf.worker.min.mjs',
 			'/corpus/corpus-v1.0.2.json',
 			'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 		];
 		expect(assets.filter((path) => classifyAsset(path) === 'precache')).toEqual(['/index.html']);
 	});
@@ -103,7 +108,7 @@ describe('isSupersededVersionedEntry (per-entry pruning inside the lazy asset ca
 		'/corpus/corpus-v1.0.2.json',
 		'/corpus/corpus-v1.0.2.embeddings.bin',
 		'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-		'/wasm/ort-wasm-simd-threaded.wasm'
+		'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 	];
 
 	it('marks a corpus generation that is no longer shipped', () => {
@@ -155,7 +160,7 @@ describe('isSupersededVersionedEntry (per-entry pruning inside the lazy asset ca
 			'/corpus/corpus-v1.0.2.json',
 			'/corpus/corpus-v1.0.2.embeddings.bin',
 			'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 		];
 		expect(cached.filter((path) => isSupersededVersionedEntry(path, SHIPPED))).toEqual([
 			'/corpus/corpus-v1.0.json',
@@ -167,7 +172,7 @@ describe('isSupersededVersionedEntry (per-entry pruning inside the lazy asset ca
 			'/corpus/corpus-v1.0.2.json',
 			'/corpus/corpus-v1.0.2.embeddings.bin',
 			'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 		]);
 	});
 
@@ -227,7 +232,7 @@ describe('isSupersededVersionedEntry - documents and the pdf library', () => {
 			'/docs/tap_vet_centers.2222bbbb.pdf',
 			'/corpus/corpus-v1.0.2.json',
 			'/models/Xenova/all-MiniLM-L6-v2/config.json',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.mjs'
 		];
 		expect(
 			isSupersededVersionedEntry(
@@ -330,7 +335,7 @@ describe('carryOverSavedDocuments (a new asset-cache name keeps what the user sa
 				'/pdf-worker/6.3.289/pdf.min.mjs': 'lib',
 				'/corpus/corpus-v1.0.2.json': 'text',
 				[MODEL]: 'model',
-				'/wasm/ort-wasm-simd-threaded.wasm': 'wasm'
+				'/wasm/ort-wasm-simd-threaded.asyncify.wasm': 'wasm'
 			}
 		});
 		expect(await carryOverSavedDocuments(api)).toEqual(new Set([EARLIER]));
@@ -415,6 +420,23 @@ describe('libraryToRestore (the PDF library a saved document needs after an upda
 		expect(libraryToRestore([], SHIPPED)).toEqual([]);
 	});
 
+	// A release that stops shipping a document has activation delete the saved copy, so the library it would have
+	// needed is not owed to a device that holds only that copy.
+	it('returns nothing when the only saved document is one this build no longer ships', () => {
+		expect(libraryToRestore(['/docs/tap_retired_guide.1111aaaa.pdf', MODEL], SHIPPED)).toEqual([]);
+	});
+
+	it('counts a saved document whose source ships, even as an older copy, and one beside a retired one', () => {
+		const library = ['/pdf-worker/6.4.0/pdf.min.mjs', '/pdf-worker/6.4.0/pdf.worker.min.mjs'];
+		expect(libraryToRestore(['/docs/tap_vet_centers.0badc0de.pdf'], SHIPPED)).toEqual(library);
+		expect(
+			libraryToRestore(
+				['/docs/tap_retired_guide.1111aaaa.pdf', '/docs/tap_va101.0f650528.pdf'],
+				SHIPPED
+			)
+		).toEqual(library);
+	});
+
 	// The shipped list carries every document, the corpus and the app shell, none of them cached here. Only the
 	// library is restored: a saved document's own update is the user's to take from the Documents area.
 	it('returns only library files, never another shipped file the cache lacks', () => {
@@ -430,9 +452,11 @@ describe('libraryToRestore (the PDF library a saved document needs after an upda
 	});
 });
 
-// A release that renames the answer library prunes the old pair at activate. A device that kept one - set up for
-// on-device answers, or a document saved - gets the new pair at install, while online, instead of being asked to
-// set up again (the model is still held) and losing offline answers until it does.
+// A set-up device always downloaded the answer library, and a document's first save always stores it, so a device
+// that finished setting up - the whole model and runtime held - or one that saved a document means this device kept a
+// library. Such a device gets the current pair at install, while online, instead of being asked to set up again (the
+// model is still held) and losing offline answers until it does. It is owed whether or not an earlier pair is still
+// held: activate prunes the earlier one. A setup abandoned part-way is not a setup: it never asked for the library.
 describe('answerLibraryToRestore (the answer library a device keeps through an update)', () => {
 	const SHIPPED = [
 		'/_app/immutable/entry/start.js',
@@ -440,31 +464,822 @@ describe('answerLibraryToRestore (the answer library a device keeps through an u
 		'/corpus/corpus-v1.0.3.embeddings.bin',
 		'/docs/tap_va101.0f650528.pdf'
 	];
+	const SET_UP = [...SET_UP_FILES];
 	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const WASM = '/wasm/ort-wasm-simd-threaded.asyncify.wasm';
+	const DOCUMENT = '/docs/tap_va101.0f650528.pdf';
+	const RETIRED_DOCUMENT = '/docs/tap_retired_guide.1111aaaa.pdf';
 	const OLD = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
 	const NEW = ['/corpus/corpus-v1.0.3.json', '/corpus/corpus-v1.0.3.embeddings.bin'];
 
 	it('returns the shipped library when an earlier one is held', () => {
-		expect(answerLibraryToRestore([...OLD, MODEL], SHIPPED)).toEqual(NEW);
+		expect(answerLibraryToRestore([...OLD, ...SET_UP], SHIPPED)).toEqual(NEW);
+	});
+
+	it('returns the shipped library to a set-up device that holds no library file at all', () => {
+		expect(answerLibraryToRestore(SET_UP, SHIPPED)).toEqual(NEW);
+	});
+
+	it('returns the shipped library to a device that saved a document and holds no library file', () => {
+		expect(answerLibraryToRestore([DOCUMENT], SHIPPED)).toEqual(NEW);
 	});
 
 	it('returns only what is missing, and nothing when the shipped library is held', () => {
-		expect(answerLibraryToRestore([...OLD, NEW[0] ?? '', MODEL], SHIPPED)).toEqual([NEW[1]]);
-		expect(answerLibraryToRestore([...NEW, MODEL], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([...SET_UP, NEW[0] ?? ''], SHIPPED)).toEqual([NEW[1]]);
+		expect(answerLibraryToRestore([...SET_UP, NEW[1] ?? ''], SHIPPED)).toEqual([NEW[0]]);
+		expect(answerLibraryToRestore([...OLD, NEW[0] ?? '', ...SET_UP], SHIPPED)).toEqual([NEW[1]]);
+		expect(answerLibraryToRestore([...NEW, ...SET_UP], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([...NEW, DOCUMENT], SHIPPED)).toEqual([]);
 	});
 
-	// A device that never kept the library never asked for it, so an update downloads nothing for it.
-	it('returns nothing on a device that held no answer library', () => {
-		expect(answerLibraryToRestore([MODEL], SHIPPED)).toEqual([]);
+	// A device that kept nothing never asked for the library, so an update downloads nothing for it.
+	it('returns nothing on a fresh device, and on one that holds only the runtime', () => {
 		expect(answerLibraryToRestore([], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([WASM], SHIPPED)).toEqual([]);
+	});
+
+	// A setup stopped part-way - the model's small files stored, the 23 MB model not yet - never asked to keep the
+	// library, and on a nearly full device it would be downloaded again with every release, with no earlier pair for
+	// the prune to free.
+	it('returns nothing for a setup abandoned part-way, which has not stored the whole model and runtime', () => {
+		const small = SET_UP.filter((path) => !path.endsWith('.onnx') && !path.startsWith('/wasm/'));
+		expect(small).toHaveLength(3);
+		expect(answerLibraryToRestore(small, SHIPPED)).toEqual([]);
+		expect(
+			answerLibraryToRestore(
+				SET_UP.filter((path) => !path.startsWith('/wasm/')),
+				SHIPPED
+			)
+		).toEqual([]);
+		expect(
+			answerLibraryToRestore(
+				SET_UP.filter((path) => !path.startsWith('/models/')),
+				SHIPPED
+			)
+		).toEqual([]);
+		for (const missing of SET_UP) {
+			const held = SET_UP.filter((path) => path !== missing);
+			expect(answerLibraryToRestore([...OLD, ...held], SHIPPED), missing).toEqual([]);
+		}
+	});
+
+	it('returns nothing for the model file alone, which no longer means a finished setup', () => {
+		expect(answerLibraryToRestore([MODEL], SHIPPED)).toEqual([]);
+	});
+
+	// Activate deletes a saved document whose source a release no longer ships, so it cannot be why a device is owed
+	// a library at install; the one that still ships can.
+	it('does not count a saved document whose source this build no longer ships', () => {
+		expect(answerLibraryToRestore([RETIRED_DOCUMENT], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([RETIRED_DOCUMENT, ...OLD], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([RETIRED_DOCUMENT, DOCUMENT], SHIPPED)).toEqual(NEW);
+		expect(answerLibraryToRestore(['/docs/tap_va101.0badc0de.pdf'], SHIPPED)).toEqual(NEW);
+	});
+
+	it('still counts a saved document when the build ships no documents at all, which prunes none', () => {
+		const noDocuments = SHIPPED.filter((path) => !path.startsWith('/docs/'));
+		expect(answerLibraryToRestore([RETIRED_DOCUMENT], noDocuments)).toEqual(NEW);
 	});
 
 	// The worker also keeps the library when a page merely reads it - "Read more" on an online answer, a document's
 	// text. That device never set up on-device answers or saved a document, so it never asked to keep 7.3 MB, and
-	// a release downloads nothing for it. A saved document stores the library with it, so that device gets it back.
-	it('returns nothing when the library was kept only by reading, and the library for a saved document', () => {
+	// a release downloads nothing for it, whichever release's library it holds.
+	it('returns nothing when the library was kept only by reading', () => {
 		expect(answerLibraryToRestore(OLD, SHIPPED)).toEqual([]);
-		expect(answerLibraryToRestore([...OLD, '/docs/tap_va101.0f650528.pdf'], SHIPPED)).toEqual(NEW);
+		expect(answerLibraryToRestore([NEW[0] ?? ''], SHIPPED)).toEqual([]);
+	});
+
+	it('returns only library files, never another shipped file the device lacks', () => {
+		expect(answerLibraryToRestore(SET_UP, SHIPPED)).toEqual(NEW);
+		expect(answerLibraryToRestore(SET_UP, SHIPPED)).not.toContain(DOCUMENT);
+		expect(answerLibraryToRestore(SET_UP, SHIPPED)).not.toContain('/_app/immutable/entry/start.js');
+	});
+});
+
+// The restore runs while an update installs, so one stalled download must not hold the update open, and one
+// library failing must not cost the device the other. Time is driven with fake timers: no test waits real seconds.
+describe('restoreLibraries (each library gets one try within its own deadline)', () => {
+	const ORIGIN = 'https://ask214.com';
+	const DEADLINE = 1_000;
+	const SET_UP = [...SET_UP_FILES];
+	const DOCUMENT = '/docs/tap_va101.0f650528.pdf';
+	const OLD_ANSWERS = ['/corpus/corpus-v1.0.1.json', '/corpus/corpus-v1.0.1.embeddings.bin'];
+	const NEW_ANSWERS = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
+	const PDF_LIBRARY = ['/pdf-worker/6.4.0/pdf.min.mjs', '/pdf-worker/6.4.0/pdf.worker.min.mjs'];
+	const SHIPPED = ['/_app/immutable/entry/start.js', ...NEW_ANSWERS, DOCUMENT, ...PDF_LIBRARY];
+	// A saved document and an earlier answer library on a device that set up on-device answers: both libraries are owed.
+	const OWING_BOTH = [...SET_UP, DOCUMENT, ...OLD_ANSWERS];
+
+	/** A cache holding the given paths, which records what is stored; a write for a path `failPut` names fails. */
+	function heldCache(held: string[], failPut: (path: string) => boolean = () => false) {
+		const stored = new Map<string, string>();
+		const cache = {
+			async keys() {
+				return held.map((path) => new Request(`${ORIGIN}${path}`));
+			},
+			async put(request: string, response: Response) {
+				if (failPut(request)) throw new DOMException('full', 'QuotaExceededError');
+				stored.set(request, await response.text());
+			}
+		};
+		return { cache: cache as unknown as Pick<Cache, 'keys' | 'put'>, stored };
+	}
+
+	/** A fetch that answers each path as `answer` says, and is told the signal it was given, as the real one is. */
+	function fetching(answer: (path: string, signal: AbortSignal) => Promise<Response>) {
+		return vi.fn((path: string, init: { signal: AbortSignal }) => answer(path, init.signal));
+	}
+
+	/** Never settles by itself; rejects when its signal aborts, as a real fetch does. */
+	function stalled(signal: AbortSignal): Promise<Response> {
+		return new Promise<Response>((_resolve, reject) => {
+			signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+		});
+	}
+
+	const ok = (path: string) => Promise.resolve(new Response(`bytes of ${path}`));
+
+	it('abandons a library whose download stalls at the deadline, and still stores the next one', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache(OWING_BOTH);
+			const fetchLibrary = fetching((path, signal) =>
+				path.startsWith('/pdf-worker/') ? stalled(signal) : ok(path)
+			);
+			let settled = false;
+			const done = restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE).then(() => {
+				settled = true;
+			});
+
+			// One tick short of the deadline the PDF library is still being waited on, so the answer library has not started.
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(fetchLibrary.mock.calls.map(([path]) => path)).toEqual([PDF_LIBRARY[0]]);
+			expect(settled).toBe(false);
+
+			await vi.advanceTimersByTimeAsync(1);
+			// Checked before awaiting, so a restore that never gives up fails here instead of hanging the test.
+			expect(settled).toBe(true);
+			await done;
+			expect([...stored.keys()]).toEqual(NEW_ANSWERS);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('gives each library its own full deadline', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache(OWING_BOTH);
+			const fetchLibrary = fetching((_path, signal) => stalled(signal));
+			let settled = false;
+			const done = restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE).then(() => {
+				settled = true;
+			});
+
+			await vi.advanceTimersByTimeAsync(DEADLINE);
+			// The answer library began only when the PDF library was abandoned, and has its whole deadline still.
+			expect(fetchLibrary.mock.calls.map(([path]) => path)).toEqual([
+				PDF_LIBRARY[0],
+				NEW_ANSWERS[0]
+			]);
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(settled).toBe(true);
+			await done;
+			expect(stored.size).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('gives every fetch of a library the same signal, and stops at the first miss in it', async () => {
+		vi.useFakeTimers();
+		try {
+			// The answer library is held, so only the PDF library is owed and its two fetches are the only ones.
+			const { cache, stored } = heldCache([...SET_UP, DOCUMENT, ...NEW_ANSWERS]);
+			const fetchLibrary = fetching((path, signal) =>
+				path === PDF_LIBRARY[1] ? stalled(signal) : ok(path)
+			);
+			let settled = false;
+			const done = restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(DEADLINE);
+			expect(settled).toBe(true);
+			await done;
+
+			const signals = fetchLibrary.mock.calls.map(([, init]) => init.signal);
+			expect(signals).toHaveLength(2);
+			expect(signals[0]).toBe(signals[1]);
+			expect(signals[0]?.aborted).toBe(true);
+			expect([...stored.keys()]).toEqual([PDF_LIBRARY[0]]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('leaves no timer running once the libraries are done', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache } = heldCache(OWING_BOTH);
+			await restoreLibraries(cache, fetching(ok), ORIGIN, SHIPPED, DEADLINE);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('stores the answer library when the PDF library fails, and the PDF library when the answer library fails', async () => {
+		const failing = (prefix: string) =>
+			fetching((path) =>
+				path.startsWith(prefix) ? Promise.reject(new TypeError('offline')) : ok(path)
+			);
+
+		const pdfFails = heldCache(OWING_BOTH);
+		await restoreLibraries(pdfFails.cache, failing('/pdf-worker/'), ORIGIN, SHIPPED, DEADLINE);
+		expect([...pdfFails.stored.keys()]).toEqual(NEW_ANSWERS);
+
+		const answersFail = heldCache(OWING_BOTH);
+		await restoreLibraries(answersFail.cache, failing('/corpus/'), ORIGIN, SHIPPED, DEADLINE);
+		expect([...answersFail.stored.keys()]).toEqual(PDF_LIBRARY);
+	});
+
+	it('stores the other library when a cache write fails, and never throws', async () => {
+		const { cache, stored } = heldCache(OWING_BOTH, (path) => path.startsWith('/pdf-worker/'));
+		await expect(
+			restoreLibraries(cache, fetching(ok), ORIGIN, SHIPPED, DEADLINE)
+		).resolves.toBeUndefined();
+		expect([...stored.keys()]).toEqual(NEW_ANSWERS);
+	});
+
+	it('never throws when the cache cannot be read', async () => {
+		const cache = {
+			keys: () => Promise.reject(new Error('unreadable')),
+			put: vi.fn()
+		} as unknown as Pick<Cache, 'keys' | 'put'>;
+		const fetchLibrary = fetching(ok);
+		await expect(
+			restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE)
+		).resolves.toBeUndefined();
+		expect(fetchLibrary).not.toHaveBeenCalled();
+	});
+
+	it('stores a response only when its status is 200', async () => {
+		const { cache, stored } = heldCache(OWING_BOTH);
+		const fetchLibrary = fetching((path) =>
+			Promise.resolve(
+				path === PDF_LIBRARY[0]
+					? new Response('missing', { status: 404 })
+					: path === NEW_ANSWERS[0]
+						? new Response('busy', { status: 503 })
+						: new Response(`bytes of ${path}`)
+			)
+		);
+		await restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE);
+		expect(fetchLibrary).toHaveBeenCalledTimes(4);
+		expect([...stored.keys()]).toEqual([PDF_LIBRARY[1], NEW_ANSWERS[1]]);
+	});
+
+	it('fetches nothing when nothing is owed', async () => {
+		for (const held of [
+			// A fresh device, and one that only read the library.
+			[],
+			[...OLD_ANSWERS],
+			[...SET_UP, ...NEW_ANSWERS, DOCUMENT, ...PDF_LIBRARY],
+			// A setup stopped part-way: the small files of the model, not the model or the runtime.
+			SET_UP.slice(0, 3),
+			// A saved document whose source this build no longer ships, which activation deletes.
+			['/docs/tap_retired_guide.1111aaaa.pdf', ...OLD_ANSWERS]
+		]) {
+			const { cache, stored } = heldCache(held);
+			const fetchLibrary = fetching(ok);
+			await restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE);
+			expect(fetchLibrary, held.join(' ')).not.toHaveBeenCalled();
+			expect(stored.size).toBe(0);
+		}
+	});
+
+	it('stores the current answer library for a set-up device that holds none, and for a saving one', async () => {
+		for (const held of [SET_UP, [DOCUMENT, ...PDF_LIBRARY]]) {
+			const { cache, stored } = heldCache(held);
+			await restoreLibraries(cache, fetching(ok), ORIGIN, SHIPPED, DEADLINE);
+			expect([...stored.keys()], held.join(' ')).toEqual(NEW_ANSWERS);
+		}
+	});
+
+	// The retry after activation starts only after the activate prune has run, so on a nearly full device the earlier
+	// pair - which the new release cannot read - must already be gone when the new one is written, or it would block
+	// it for good. (The install-time attempt runs before any prune and can fail for lack of room; this models the retry.)
+	describe('on a device with room for one answer library', () => {
+		const FILE_BYTES = 50;
+		const SET_UP_FILE_BYTES = 20;
+
+		/** A cache with `quota` bytes of room; a write that would pass it fails, as a full device's does. */
+		function cacheWithRoom(quota: number, held: Record<string, number>) {
+			const sizes = new Map(Object.entries(held));
+			const used = () => [...sizes.values()].reduce((sum, size) => sum + size, 0);
+			const cache = {
+				async keys() {
+					return [...sizes.keys()].map((path) => new Request(`${ORIGIN}${path}`));
+				},
+				async put(path: string, response: Response) {
+					const size = (await response.arrayBuffer()).byteLength;
+					if (used() - (sizes.get(path) ?? 0) + size > quota)
+						throw new DOMException('full', 'QuotaExceededError');
+					sizes.set(path, size);
+				},
+				async delete(request: Request) {
+					return sizes.delete(new URL(request.url).pathname);
+				}
+			};
+			return { cache, paths: () => [...sizes.keys()] };
+		}
+
+		/**
+		 * What activate does to the cache before the restore: the worker's own prune, not a copy of it, so a
+		 * condition added to it that holds the earlier pair back fails here.
+		 */
+		async function prune(cache: ReturnType<typeof cacheWithRoom>['cache']) {
+			await pruneSupersededEntries(
+				cache as unknown as Pick<Cache, 'keys' | 'delete'>,
+				ORIGIN,
+				SHIPPED
+			);
+		}
+
+		const bytes = () => Promise.resolve(new Response('x'.repeat(FILE_BYTES)));
+		const held = {
+			...Object.fromEntries(SET_UP.map((path) => [path, SET_UP_FILE_BYTES])),
+			[OLD_ANSWERS[0] ?? '']: FILE_BYTES,
+			[OLD_ANSWERS[1] ?? '']: FILE_BYTES
+		};
+		const QUOTA = SET_UP.length * SET_UP_FILE_BYTES + 2 * FILE_BYTES;
+
+		it('stores the current pair once the prune has freed the earlier one', async () => {
+			const { cache, paths } = cacheWithRoom(QUOTA, held);
+			await prune(cache);
+			await restoreLibraries(
+				cache as unknown as Pick<Cache, 'keys' | 'put'>,
+				fetching(bytes),
+				ORIGIN,
+				SHIPPED,
+				DEADLINE
+			);
+			expect(paths()).toEqual([...SET_UP, ...NEW_ANSWERS]);
+		});
+
+		// The guard against a vacuous pass: with the earlier pair still held the same device cannot take the new one.
+		it('cannot store it while the earlier pair is still held', async () => {
+			const { cache, paths } = cacheWithRoom(QUOTA, held);
+			await restoreLibraries(
+				cache as unknown as Pick<Cache, 'keys' | 'put'>,
+				fetching(bytes),
+				ORIGIN,
+				SHIPPED,
+				DEADLINE
+			);
+			expect(paths()).toEqual([...SET_UP, ...OLD_ANSWERS]);
+		});
+	});
+
+	// Headers arrive at once and the body then stops: the stall a timer cleared when the last fetch resolved would miss.
+	it('abandons an answer library whose body stalls after its headers arrive, and stores nothing', async () => {
+		vi.useFakeTimers();
+		try {
+			// One file of the pair is held, so the stalled one is the last file the library fetches.
+			const { cache, stored } = heldCache([...SET_UP, NEW_ANSWERS[0] ?? '']);
+			const fetchLibrary = fetching((_path, signal) =>
+				Promise.resolve(
+					new Response(
+						new ReadableStream({
+							start(controller) {
+								signal.addEventListener('abort', () =>
+									controller.error(new DOMException('aborted', 'AbortError'))
+								);
+							}
+						}),
+						{ status: 200 }
+					)
+				)
+			);
+			let settled = false;
+			const done = restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(fetchLibrary.mock.calls.map(([path]) => path)).toEqual([NEW_ANSWERS[1]]);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(settled).toBe(true);
+			await done;
+			expect(stored.size).toBe(0);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('reads only this origin: an entry held for another origin is nothing owed', async () => {
+		const cache = {
+			async keys() {
+				return [new Request(`https://elsewhere.example${DOCUMENT}`)];
+			},
+			put: vi.fn()
+		} as unknown as Pick<Cache, 'keys' | 'put'>;
+		const fetchLibrary = fetching(ok);
+		await restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE);
+		expect(fetchLibrary).not.toHaveBeenCalled();
+	});
+});
+
+// The build list the service worker precaches leaves out the embed worker's script, so the only place this release
+// names it is the page code that starts the worker. Install reads the name from there.
+describe('workerScriptsNamed (the worker scripts a built chunk starts)', () => {
+	const NODE = '/_app/immutable/nodes/2.CrZheqGl.js';
+	const SCRIPT = '/_app/immutable/workers/embed-worker-BIZt0I_P.js';
+	// Cut from the built chunk that starts the embed worker.
+	const BUILT =
+		'new Worker(``+new URL(`../workers/embed-worker-BIZt0I_P.js`,import.meta.url).href,{name:e?.name';
+
+	it('resolves the literal against the chunk that holds it, as new URL(literal, import.meta.url) does', () => {
+		expect(workerScriptsNamed(NODE, BUILT)).toEqual([SCRIPT]);
+		// The same text in a chunk one folder deeper resolves to another path: the chunk's own place is the base.
+		expect(workerScriptsNamed('/_app/immutable/nodes/deeper/2.X.js', BUILT)).toEqual([]);
+	});
+
+	it('names no worker for a chunk that names a worker asset, or none at all', () => {
+		expect(
+			workerScriptsNamed(
+				NODE,
+				'new URL(`../workers/assets/ort-wasm-simd-threaded.asyncify-DMmc6YqF.wasm`,import.meta.url)'
+			)
+		).toEqual([]);
+		expect(
+			workerScriptsNamed(NODE, 'new URL(`../workers/assets/helper-A1.js`,import.meta.url)')
+		).toEqual([]);
+		expect(workerScriptsNamed(NODE, 'export const a=1;')).toEqual([]);
+	});
+
+	it('names every worker a chunk starts, each once', () => {
+		const text = `${BUILT};new URL("../workers/other-Q9.js",import.meta.url);new URL('../workers/embed-worker-BIZt0I_P.js',import.meta.url)`;
+		expect(workerScriptsNamed(NODE, text)).toEqual([SCRIPT, '/_app/immutable/workers/other-Q9.js']);
+	});
+
+	it('keeps only paths under the worker folder', () => {
+		expect(
+			workerScriptsNamed(NODE, 'new URL(`../../elsewhere/workers/x-1.js`,import.meta.url)')
+		).toEqual([]);
+	});
+
+	// An encoded separator stays inside one path segment when a URL is resolved, so only the characters Vite uses in a
+	// worker's file name are taken as a script's name.
+	it('refuses a name with an encoded separator or a dot-segment in it', () => {
+		for (const name of ['..%2f..%2fx.js', '%2e%2e%2fx.js', '..%2Fx.js', 'a.b.js', 'x%00.js']) {
+			expect(
+				workerScriptsNamed(NODE, `new URL("../workers/${name}",import.meta.url)`),
+				name
+			).toEqual([]);
+		}
+		expect(workerScriptsNamed(NODE, 'new URL("../workers/a_b-C1.js",import.meta.url)')).toEqual([
+			'/_app/immutable/workers/a_b-C1.js'
+		]);
+	});
+});
+
+describe('keepWorkerScripts (the embed worker script, kept for a device that set up on-device answers)', () => {
+	const ORIGIN = 'https://ask214.com';
+	const DEADLINE = 1_000;
+	const SET_UP = [...SET_UP_FILES];
+	const NODE = '/_app/immutable/nodes/2.CrZheqGl.js';
+	const SCRIPT = '/_app/immutable/workers/embed-worker-BIZt0I_P.js';
+	const OTHER = '/_app/immutable/workers/other-Q9.js';
+	const NAMES_SCRIPT =
+		'new Worker(new URL(`../workers/embed-worker-BIZt0I_P.js`,import.meta.url).href)';
+	const RELEASE = {
+		[NODE]: NAMES_SCRIPT,
+		'/_app/immutable/entry/start.js': 'export{}',
+		'/': '<html>'
+	};
+
+	const pathOf = (request: Request | string) =>
+		new URL(typeof request === 'string' ? request : request.url, ORIGIN).pathname;
+
+	/** The asset cache holding the given paths. */
+	function assetsHolding(paths: string[], origin = ORIGIN) {
+		return {
+			async keys() {
+				return paths.map((path) => new Request(`${origin}${path}`));
+			}
+		} as unknown as Pick<Cache, 'keys'>;
+	}
+
+	/** The release cache holding the given path-to-text entries, which records what is stored into it. */
+	function releaseHolding(entries: Record<string, string>) {
+		const held = new Map(Object.entries(entries));
+		const cache = {
+			async keys() {
+				return [...held.keys()].map((path) => new Request(`${ORIGIN}${path}`));
+			},
+			async match(request: Request | string) {
+				const text = held.get(pathOf(request));
+				return text === undefined ? undefined : new Response(text);
+			},
+			async put(request: Request | string, response: Response) {
+				held.set(pathOf(request), await response.text());
+			}
+		};
+		return {
+			cache: cache as unknown as Pick<Cache, 'keys' | 'match' | 'put'>,
+			stored: () => [...held.keys()].filter((path) => !(path in entries))
+		};
+	}
+
+	const fetching = (answer: (path: string, signal: AbortSignal) => Promise<Response>) =>
+		vi.fn((path: string, init: { signal: AbortSignal }) => answer(path, init.signal));
+	const ok = (path: string) => Promise.resolve(new Response(`bytes of ${path}`));
+
+	it('fetches and stores the script a set-up device lacks', async () => {
+		const release = releaseHolding(RELEASE);
+		const fetchScript = fetching(ok);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, fetchScript, ORIGIN, DEADLINE);
+		expect(fetchScript.mock.calls.map(([path]) => path)).toEqual([SCRIPT]);
+		expect(release.stored()).toEqual([SCRIPT]);
+	});
+
+	// A setup stopped part-way - the model's small files stored, the model or the runtime not yet - has not finished
+	// and asked for no offline answers, so a release keeps no worker script for it.
+	it('fetches nothing for a device that did not finish setting up on-device answers', async () => {
+		const abandoned = [
+			// The model's small files only.
+			SET_UP.slice(0, 3),
+			// The model without the runtime, and the runtime without the model.
+			SET_UP.filter((path) => path.startsWith('/models/')),
+			SET_UP.filter((path) => path.startsWith('/wasm/')),
+			// Everything but one file, whichever it is.
+			...SET_UP.map((missing) => SET_UP.filter((path) => path !== missing))
+		];
+		for (const held of [
+			[],
+			['/corpus/corpus-v1.0.2.json', '/docs/tap_va101.0f650528.pdf'],
+			...abandoned
+		]) {
+			const release = releaseHolding(RELEASE);
+			const fetchScript = fetching(ok);
+			await keepWorkerScripts(assetsHolding(held), release.cache, fetchScript, ORIGIN, DEADLINE);
+			expect(fetchScript, held.join(' ')).not.toHaveBeenCalled();
+			expect(release.stored()).toEqual([]);
+		}
+	});
+
+	it('reads only this origin: a model held for another origin is not a set-up device', async () => {
+		const fetchScript = fetching(ok);
+		await keepWorkerScripts(
+			assetsHolding(SET_UP, 'https://elsewhere.example'),
+			releaseHolding(RELEASE).cache,
+			fetchScript,
+			ORIGIN,
+			DEADLINE
+		);
+		expect(fetchScript).not.toHaveBeenCalled();
+	});
+
+	it('still keeps the script for a device that finished setting up while it held an old answer library', async () => {
+		const release = releaseHolding(RELEASE);
+		const fetchScript = fetching(ok);
+		await keepWorkerScripts(
+			assetsHolding([...SET_UP, '/corpus/corpus-v1.0.1.json']),
+			release.cache,
+			fetchScript,
+			ORIGIN,
+			DEADLINE
+		);
+		expect(release.stored()).toEqual([SCRIPT]);
+	});
+
+	it('does not fetch a script the release cache already holds', async () => {
+		const release = releaseHolding({ ...RELEASE, [SCRIPT]: 'kept' });
+		const fetchScript = fetching(ok);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, fetchScript, ORIGIN, DEADLINE);
+		expect(fetchScript).not.toHaveBeenCalled();
+	});
+
+	it('stores a response only when its status is 200', async () => {
+		const release = releaseHolding(RELEASE);
+		const fetchScript = fetching(() => Promise.resolve(new Response('missing', { status: 404 })));
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, fetchScript, ORIGIN, DEADLINE);
+		expect(fetchScript).toHaveBeenCalledTimes(1);
+		expect(release.stored()).toEqual([]);
+	});
+
+	it('still stores a second script when the first fails, and never throws', async () => {
+		const release = releaseHolding({
+			...RELEASE,
+			'/_app/immutable/nodes/3.Y.js':
+				'new Worker(new URL(`../workers/other-Q9.js`,import.meta.url))'
+		});
+		const fetchScript = fetching((path) =>
+			path === SCRIPT ? Promise.reject(new TypeError('offline')) : ok(path)
+		);
+		await expect(
+			keepWorkerScripts(assetsHolding(SET_UP), release.cache, fetchScript, ORIGIN, DEADLINE)
+		).resolves.toBeUndefined();
+		expect(release.stored()).toEqual([OTHER]);
+	});
+
+	it('never throws when a cache cannot be read', async () => {
+		const unreadable = { keys: () => Promise.reject(new Error('unreadable')) } as unknown as Pick<
+			Cache,
+			'keys'
+		>;
+		const fetchScript = fetching(ok);
+		await expect(
+			keepWorkerScripts(unreadable, releaseHolding(RELEASE).cache, fetchScript, ORIGIN, DEADLINE)
+		).resolves.toBeUndefined();
+		await expect(
+			keepWorkerScripts(
+				assetsHolding(SET_UP),
+				{ ...releaseHolding(RELEASE).cache, keys: () => Promise.reject(new Error('unreadable')) },
+				fetchScript,
+				ORIGIN,
+				DEADLINE
+			)
+		).resolves.toBeUndefined();
+		expect(fetchScript).not.toHaveBeenCalled();
+	});
+
+	it('abandons a stalled download at the deadline', async () => {
+		vi.useFakeTimers();
+		try {
+			const release = releaseHolding(RELEASE);
+			const fetchScript = fetching(
+				(_path, signal) =>
+					new Promise<Response>((_resolve, reject) => {
+						signal.addEventListener('abort', () =>
+							reject(new DOMException('aborted', 'AbortError'))
+						);
+					})
+			);
+			let settled = false;
+			const done = keepWorkerScripts(
+				assetsHolding(SET_UP),
+				release.cache,
+				fetchScript,
+				ORIGIN,
+				DEADLINE
+			).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(settled).toBe(true);
+			await done;
+			expect(release.stored()).toEqual([]);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// Headers arrive at once and the body then stops: the stall a timer cleared when the fetch resolved would miss.
+	it('abandons a download that stalls after its headers arrive, and stores nothing', async () => {
+		vi.useFakeTimers();
+		try {
+			const release = releaseHolding(RELEASE);
+			const fetchScript = fetching((_path, signal) =>
+				Promise.resolve(
+					new Response(
+						new ReadableStream({
+							start(controller) {
+								signal.addEventListener('abort', () =>
+									controller.error(new DOMException('aborted', 'AbortError'))
+								);
+							}
+						}),
+						{ status: 200 }
+					)
+				)
+			);
+			let settled = false;
+			const done = keepWorkerScripts(
+				assetsHolding(SET_UP),
+				release.cache,
+				fetchScript,
+				ORIGIN,
+				DEADLINE
+			).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(DEADLINE - 1);
+			expect(fetchScript).toHaveBeenCalledTimes(1);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(settled).toBe(true);
+			await done;
+			expect(release.stored()).toEqual([]);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// Activation calls this again for a script install could not store, so the second call must finish the job and
+	// the third, with the script held, must cost nothing.
+	it('stores on a retry what the first try could not, and fetches nothing once it is held', async () => {
+		const release = releaseHolding(RELEASE);
+		const offline = fetching(() => Promise.reject(new TypeError('offline')));
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, offline, ORIGIN, DEADLINE);
+		expect(release.stored()).toEqual([]);
+
+		const online = fetching(ok);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, online, ORIGIN, DEADLINE);
+		expect(release.stored()).toEqual([SCRIPT]);
+
+		const again = fetching(ok);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, again, ORIGIN, DEADLINE);
+		expect(again).not.toHaveBeenCalled();
+	});
+});
+
+// Activate deletes what the build no longer ships, the answer library's earlier pairs included: a set-up device is
+// owed the current pair (`answerLibraryToRestore`) whether or not it still holds an earlier one, and an earlier pair
+// is unreadable to this release, so keeping it would only fill the device - more with every release.
+describe('the activate prune (every entry isSupersededVersionedEntry marks, and nothing else)', () => {
+	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const WASM = '/wasm/ort-wasm-simd-threaded.asyncify.wasm';
+	const DOCUMENT = '/docs/tap_va101.0f650528.pdf';
+	const OLDEST = ['/corpus/corpus-v1.0.json', '/corpus/corpus-v1.0.embeddings.bin'];
+	const OLD = ['/corpus/corpus-v1.0.1.json', '/corpus/corpus-v1.0.1.embeddings.bin'];
+	const NEW = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
+	const OLD_PDF = ['/pdf-worker/6.3.289/pdf.min.mjs', '/pdf-worker/6.3.289/pdf.worker.min.mjs'];
+	const SHIPPED = [
+		'/_app/immutable/entry/start.js',
+		...NEW,
+		DOCUMENT,
+		'/models/Xenova/all-MiniLM-L6-v2/config.json',
+		'/wasm/ort-wasm-simd-threaded.asyncify.mjs',
+		'/pdf-worker/6.4.0/pdf.min.mjs',
+		'/pdf-worker/6.4.0/pdf.worker.min.mjs'
+	];
+	const marked = (cached: string[]) =>
+		cached.filter((path) => isSupersededVersionedEntry(path, SHIPPED));
+
+	it('marks an earlier answer library whatever the device holds beside it', () => {
+		expect(marked([MODEL, ...OLD])).toEqual(OLD);
+		expect(marked([DOCUMENT, ...OLD])).toEqual(OLD);
+		expect(marked([...OLD])).toEqual(OLD);
+		expect(marked([MODEL, ...OLD, ...NEW])).toEqual(OLD);
+		expect(marked([MODEL, ...OLD, NEW[0] ?? ''])).toEqual(OLD);
+	});
+
+	it('marks the pairs of every earlier release, so none piles up', () => {
+		expect(marked([MODEL, ...OLDEST, ...OLD, ...NEW])).toEqual([...OLDEST, ...OLD]);
+	});
+
+	it('marks a superseded PDF library too', () => {
+		expect(marked([DOCUMENT, ...OLD_PDF, MODEL, ...OLD])).toEqual([...OLD_PDF, ...OLD]);
+	});
+
+	it('never marks the model or the WASM, or a saved document whose source still ships', () => {
+		const older = '/docs/tap_va101.0badc0de.pdf';
+		expect(marked([MODEL, WASM, '/models/e2e-prune-probe.onnx', older, DOCUMENT, ...OLD])).toEqual(
+			OLD
+		);
+	});
+
+	describe('pruneSupersededEntries (the one prune the worker runs, with the cache and the build list given)', () => {
+		const ORIGIN = 'https://ask214.com';
+
+		/** A cache holding the given URLs, which records what is deleted. */
+		function cacheHolding(urls: string[]) {
+			const deleted: string[] = [];
+			const cache = {
+				async keys() {
+					return urls.map((url) => new Request(url));
+				},
+				async delete(request: Request) {
+					deleted.push(request.url);
+					return true;
+				}
+			};
+			return { cache: cache as unknown as Pick<Cache, 'keys' | 'delete'>, deleted };
+		}
+		const own = (path: string) => `${ORIGIN}${path}`;
+
+		it('deletes exactly the entries the version rule marks, whatever else the device holds', async () => {
+			const held = [MODEL, WASM, DOCUMENT, ...OLDEST, ...OLD, ...NEW, ...OLD_PDF];
+			const { cache, deleted } = cacheHolding(held.map(own));
+			await pruneSupersededEntries(cache, ORIGIN, SHIPPED);
+			expect(deleted).toEqual(marked(held).map(own));
+			expect(deleted).toEqual([...OLDEST, ...OLD, ...OLD_PDF].map(own));
+		});
+
+		it('deletes nothing for an entry held for another origin, even one the build no longer ships', async () => {
+			const { cache, deleted } = cacheHolding([`https://elsewhere.example${OLD[0] ?? ''}`]);
+			await pruneSupersededEntries(cache, ORIGIN, SHIPPED);
+			expect(deleted).toEqual([]);
+		});
 	});
 });
 
@@ -524,10 +1339,12 @@ describe('storeOnFetch', () => {
 
 // The model and the ORT WASM are served at fixed URLs and kept in the asset cache for good: a returning device
 // never asks for them again, so bytes vendored anew reach it only if the cache's name changes as well. Each
-// name is pinned to the digest of the bytes it holds. Changing those bytes fails here until the cache takes a
-// new name - add a line for the new name, and keep the old one as the record of what that name held.
+// name is pinned to the digest of the vendored folders. Changing bytes a device keeps fails here until the cache
+// takes a new name - add a line for the new name, and keep the old one as the record of what that name held. The
+// digest also moves when a file no device ever requested is removed, which reaches no device: nothing needs
+// fetching again, so that case re-pins the same name to the new digest.
 const VENDORED_BYTES: Record<string, string> = {
-	'ask-assets-v1': 'e34ba4ce08d953a419ffe5c595fe4c5b8017300fdd5745ef467a7e1b2f50b708'
+	'ask-assets-v1': '214663e52ef03af7c450efa53b0f4ea32cb2ef61c470cc33ec2e2803ccc4d8d7'
 };
 
 function filesUnder(dir: string): string[] {

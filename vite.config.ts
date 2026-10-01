@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm';
 
 export default defineConfig({
 	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
@@ -11,6 +12,12 @@ export default defineConfig({
 	// unable to test the app as it actually ships. The cert is generated on demand and never written
 	// to the repo; a checked-in private key is a liability that protects nothing.
 	plugins: [sveltekit(), basicSsl()],
+	worker: {
+		// Drops the ONNX runtime's unused fallback WASM from each worker bundle (~23 MB the embed worker never
+		// loads, because it sets `wasmPaths = '/wasm/'`) and fails the build on any other WASM; the reasoning is
+		// with the plugin.
+		plugins: () => [dropWorkerWasm()]
+	},
 	test: {
 		expect: { requireAssertions: true },
 		passWithNoTests: true,

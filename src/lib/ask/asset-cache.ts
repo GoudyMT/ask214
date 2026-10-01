@@ -41,7 +41,9 @@ export function classifyAsset(pathname: string): CacheStrategy {
  * old one, and the new model bytes are re-fetched on next use. The corpus is versioned the
  * OPPOSITE way - by URL, renaming the artifact - and that does NOT evict anything: the old URL merely stops
  * being requested while its entry stays cached at full size. Superseded corpus entries are therefore pruned
- * one at a time on activate (see `isSupersededVersionedEntry`). Also cleared by an explicit wipe.
+ * one at a time on activate (see `isSupersededVersionedEntry`). A device that kept a library is given the new one
+ * at install (see `answerLibraryToRestore`), when the old pair is still held and a full disk can refuse it, and
+ * again after activation, once the prune has freed the room. Also cleared by an explicit wipe.
  */
 export const ASK_ASSET_CACHE = 'ask-assets-v1';
 
@@ -58,6 +60,22 @@ export const CORPUS_BASE = '/corpus/corpus-v1.0.2';
  * while they are missing. A test holds it to the files on disk, so a new corpus fails until it is stated again.
  */
 export const CORPUS_BYTES = 7_347_321;
+
+/**
+ * The files a set-up of on-device answers stores besides the answer library: the search model and the runtime that
+ * runs it. A device that holds every one of them has finished setting up (`deviceFinishedSetUp`). The paths are
+ * written out rather than read from the vendored manifest, so the service worker does not carry the manifest's
+ * hashes; tests hold them to the manifest and to the files the app ships. The page keeps its own written-out copy
+ * of this list, which a test holds equal to this one plus the answer library.
+ */
+export const SET_UP_FILES: readonly string[] = [
+	'/models/Xenova/all-MiniLM-L6-v2/config.json',
+	'/models/Xenova/all-MiniLM-L6-v2/tokenizer_config.json',
+	'/models/Xenova/all-MiniLM-L6-v2/tokenizer.json',
+	'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
+	'/wasm/ort-wasm-simd-threaded.asyncify.mjs',
+	'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
+];
 
 /**
  * On service-worker activate, decide whether to keep a cache. Keep the current app-shell cache and the
@@ -194,30 +212,93 @@ export function isSupersededVersionedEntry(
 }
 
 /**
- * Decide which PDF library files the service worker restores on activate, so a saved document still draws
- * its page offline after an update.
+ * Delete every entry of the asset cache that `isSupersededVersionedEntry` marks - the one prune the service worker
+ * runs on activate, kept here so a test runs the worker's own rule on a full device instead of a copy of it.
+ *
+ * It deletes on the version rule alone. A condition that held an earlier answer library back - until the current
+ * one was stored, say - would keep the old pair on a nearly full device, which is where the new pair then cannot
+ * be stored: the room it needs is the room the old pair holds.
+ *
+ * It does not catch: a cache call that rejects reaches the caller. The worker's wrapper owns that guard, because a
+ * prune is housekeeping and an error escaping activation would strand clients on the previous worker.
+ *
+ * @param cache ASK_ASSET_CACHE, to read the held entries from and delete from.
+ * @param origin This worker's origin; only entries under it are read, so the pathnames compared with the shipped
+ *   list are this app's own.
+ * @param shipped The pathnames this build ships (the service worker's build + files list).
+ */
+export async function pruneSupersededEntries(
+	cache: Pick<Cache, 'keys' | 'delete'>,
+	origin: string,
+	shipped: readonly string[]
+): Promise<void> {
+	const held: { request: Request; pathname: string }[] = [];
+	for (const request of await cache.keys()) {
+		const url = new URL(request.url);
+		// Entries here are written by the same-origin fetch handler, by the page saving a document (the document and
+		// the PDF library) and by the library restore, all under this origin; the origin check keeps the pathname
+		// comparison against the shipped list meaningful even so.
+		if (url.origin === origin) held.push({ request, pathname: url.pathname });
+	}
+	for (const { request, pathname } of held) {
+		if (isSupersededVersionedEntry(pathname, shipped)) await cache.delete(request);
+	}
+}
+
+/**
+ * Whether a device finished setting up on-device answers: it holds every model and runtime file (`SET_UP_FILES`).
+ *
+ * A setup stopped part-way - the model's small files stored, the 23 MB model not yet - holds some of them and has
+ * asked for nothing to be kept, so it is not set up. The answer library is not in the test: it is what a finished
+ * setup is owed, not part of the finishing.
+ *
+ * @param cachedPaths The same-origin pathnames held in ASK_ASSET_CACHE.
+ * @returns true only when every model and runtime file is held.
+ */
+export function deviceFinishedSetUp(cachedPaths: readonly string[]): boolean {
+	return SET_UP_FILES.every((path) => cachedPaths.includes(path));
+}
+
+/**
+ * Whether a device holds a saved document this build still ships. Activation deletes a saved document whose source
+ * the build no longer ships (`isSupersededVersionedEntry`), so one cannot be why the device is owed a library: the
+ * copy is gone by the time the library would be used.
+ */
+function holdsShippedDocument(cachedPaths: readonly string[], shipped: readonly string[]): boolean {
+	return cachedPaths.some(
+		(path) => path.startsWith('/docs/') && !isSupersededVersionedEntry(path, shipped)
+	);
+}
+
+/**
+ * Decide which PDF library files the service worker restores at install and again after activation, so a saved
+ * document still draws its page offline after an update.
  *
  * Saving a document stores the library with it, but a pdf.js upgrade moves the library to a new
  * `/pdf-worker/<release>/` folder: activate prunes the old pair, and nothing else would store the new one
  * until a reader opens online. Until then every saved document opens offline only as text.
  *
  * Only a device that holds a saved document gets the library back - one that saved nothing never asked for it
- * to be kept. Only library files are returned, never another shipped file the cache lacks: every document,
- * the corpus and the app shell are in the shipped list too.
+ * to be kept. A saved document counts only while this build still ships its source: activation deletes one it
+ * does not, so a device holding only that copy would be given a library for nothing. Only library files are
+ * returned, never another shipped file the cache lacks: every document, the corpus and the app shell are in the
+ * shipped list too.
  *
  * Args:
  *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
  *   shipped: the pathnames this build ships (the service worker's build + files list), which carries the
- *     current release's folder - so no release is hardcoded here and a bump needs no edit
+ *     current release's folder and the sources it still ships - so no release is hardcoded here and a bump needs
+ *     no edit
  *
  * Returns:
- *   the shipped library pathnames to fetch and store; empty when nothing is saved or the library is held.
+ *   the shipped library pathnames to fetch and store; empty when no saved document is still shipped or the library
+ *   is held.
  */
 export function libraryToRestore(
 	cachedPaths: readonly string[],
 	shipped: readonly string[]
 ): string[] {
-	if (!cachedPaths.some((path) => path.startsWith('/docs/'))) return [];
+	if (!holdsShippedDocument(cachedPaths, shipped)) return [];
 	return shipped.filter((path) => path.startsWith('/pdf-worker/') && !cachedPaths.includes(path));
 }
 
@@ -225,30 +306,211 @@ export function libraryToRestore(
  * Decide which answer-library files the service worker fetches at install, so a device that kept the library
  * still answers on the device - offline too - after a release that renames it.
  *
- * The library is versioned by URL: a new release ships a new pair and activate prunes the old one. Without this, a
- * device that set up on-device answers (or saved a document) would be asked to set up again although it still
- * holds the model, and could not answer offline until it did. Install runs while online, so the pair is fetched
- * then - only for a device that held a library AND set up on-device answers (a model file held) or saved a
- * document, and only the files it lacks. The worker also keeps the library when a page merely reads it ("Read
- * more", a document's text); that device never asked to keep it, so a release downloads nothing for it. A restore
- * that fails at install is not retried at activate, where the prune has already removed the old pair this rule
- * reads.
+ * The library is versioned by URL: a new release ships a new pair, which an earlier release's pair cannot stand in
+ * for, and activate prunes the earlier one. Without this, a device that set up on-device answers (or saved a
+ * document) would be asked to set up again although it still holds the model, and could not answer offline until
+ * it did. Install runs while online, so the pair is fetched then, and again after activation for any file that
+ * could not be stored.
+ *
+ * The device is owed the pair when it finished setting up (`deviceFinishedSetUp`: the whole model and runtime held)
+ * or holds a saved document this build still ships, and lacks a file of the current pair. Setup always downloads the
+ * library, and a document's first save always stores it, so either one means this device kept a library; no earlier
+ * pair needs to be held, which is what lets activate delete it at once. Two cases are not owed it, because each
+ * would download several megabytes the device never asked to keep: a setup abandoned part-way (the model's small
+ * files stored, the 23 MB model not yet), which on a nearly full device would repeat with every release since there
+ * is no earlier pair for the prune to free; and a saved document whose source this build no longer ships, which
+ * activation deletes. The worker also keeps the library when a page merely reads it ("Read more", a document's
+ * text), but that device never set up or saved anything, so a release downloads nothing for it.
  *
  * Args:
  *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
- *   shipped: the pathnames this build ships, which carries the current library's name
+ *   shipped: the pathnames this build ships, which carries the current library's name and the sources it ships
  *
  * Returns:
- *   the shipped answer-library pathnames to fetch and store; empty when none was held or the current one is.
+ *   the shipped answer-library pathnames to fetch and store; empty when the device kept no library or holds the
+ *   current one.
  */
 export function answerLibraryToRestore(
 	cachedPaths: readonly string[],
 	shipped: readonly string[]
 ): string[] {
-	if (!cachedPaths.some((path) => path.startsWith('/corpus/'))) return [];
-	if (!cachedPaths.some((path) => path.startsWith('/models/') || path.startsWith('/docs/')))
-		return [];
+	if (!deviceFinishedSetUp(cachedPaths) && !holdsShippedDocument(cachedPaths, shipped)) return [];
 	return shipped.filter((path) => path.startsWith('/corpus/') && !cachedPaths.includes(path));
+}
+
+/**
+ * How long the install-time restore waits on one library before giving it up.
+ *
+ * A bound, so a stalled download cannot hold the install - and with it the update - open. A miss is not free: the
+ * files stored so far stay, but until the retry after activation, the next install or an online load stores the
+ * rest, a set-up device cannot answer offline. The answer library is about 3.7 MB on the wire (its embeddings do not compress; measured from production with
+ * compression on), so 60 seconds holds down to about 0.5 Mbps; this is a bound, not a measured limit.
+ */
+export const LIBRARY_RESTORE_DEADLINE_MS = 60_000;
+
+/**
+ * How long keeping the embed worker's script waits on its download before giving it up.
+ *
+ * A bound, so a stalled download cannot hold the install - and with it the update - open. The script is about
+ * 517 KB, or about 147 KB compressed on the wire, which takes about 5 seconds on a slow 0.25 Mbps link; 20 seconds
+ * leaves room beyond that and still ends a stall. It is a bound, not a measured limit. A miss costs the device
+ * its offline answers after an update that changed the script, until the retry after activation or the first
+ * online question stores it.
+ */
+export const WORKER_SCRIPT_DEADLINE_MS = 20_000;
+
+/**
+ * Fetch and store the library files this device is owed, each library in its own try and within its own deadline.
+ *
+ * The PDF library and the answer library are separate tries: one that fails or stalls costs the device only that
+ * library, and the other is still fetched. Each has an AbortController that a timer fires after `deadlineMs`; its
+ * signal goes to every fetch of that library, so a download that stalls - headers or body - is cut off instead of
+ * holding the install. Only a 200 response is stored. Nothing here throws, so it cannot fail the install.
+ *
+ * Args:
+ *   cache: ASK_ASSET_CACHE, to read the held entries from and store into
+ *   fetchLibrary: the network fetch, given the path and the signal; injected by tests
+ *   origin: this worker's origin; only entries under it are read, so the pathnames compared with the shipped list
+ *     are this app's own
+ *   shipped: the pathnames this build ships
+ *   deadlineMs: how long each library may take
+ */
+export async function restoreLibraries(
+	cache: Pick<Cache, 'keys' | 'put'>,
+	fetchLibrary: (path: string, init: { signal: AbortSignal }) => Promise<Response>,
+	origin: string,
+	shipped: readonly string[],
+	deadlineMs: number
+): Promise<void> {
+	let owed: string[][];
+	try {
+		const cachedPaths: string[] = [];
+		for (const request of await cache.keys()) {
+			const url = new URL(request.url);
+			if (url.origin === origin) cachedPaths.push(url.pathname);
+		}
+		owed = [libraryToRestore(cachedPaths, shipped), answerLibraryToRestore(cachedPaths, shipped)];
+	} catch {
+		return;
+	}
+	for (const paths of owed) {
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), deadlineMs);
+		try {
+			for (const path of paths) {
+				const response = await fetchLibrary(path, { signal: controller.signal });
+				if (response.status === 200) await cache.put(path, response);
+			}
+		} catch {
+			// This library is given up on - a failed or stalled download, or a full disk - with the files stored so
+			// far kept. The other one is still tried, and this one is tried again after activation, fetching only
+			// the files still missing.
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+}
+
+/**
+ * Where the built embed worker's script is served from. `workers/assets/` beside it is where SvelteKit writes a
+ * worker's non-script files.
+ */
+const WORKER_SCRIPT_FOLDER = '/_app/immutable/workers/';
+
+/**
+ * The worker scripts a built chunk starts, as absolute pathnames.
+ *
+ * SvelteKit's build list leaves a worker's script out, so the service worker cannot precache it from that list;
+ * the one place this release names it is the page code that starts the worker, as a string literal ending in
+ * `workers/<name>.js` that the page resolves against its own address (`new URL(literal, import.meta.url)`).
+ * This resolves it the same way, against the chunk's pathname. Only a script directly in the worker folder
+ * counts: `workers/assets/` is where SvelteKit writes a worker's non-script files, never a script to keep. The
+ * name is taken only in the characters Vite uses for a worker file, so an encoded separator in it is refused.
+ *
+ * @param chunkPath The pathname the chunk is served from.
+ * @param text The chunk's text.
+ * @returns The worker script pathnames the chunk names, each once, in the order they appear.
+ */
+export function workerScriptsNamed(chunkPath: string, text: string): string[] {
+	const named: string[] = [];
+	for (const match of text.matchAll(/(["'`])([^"'`\s]*workers\/[\w-]+\.js)\1/g)) {
+		const path = new URL(match[2] ?? '', `https://chunk.invalid${chunkPath}`).pathname;
+		const inFolder =
+			path.startsWith(WORKER_SCRIPT_FOLDER) &&
+			!path.slice(WORKER_SCRIPT_FOLDER.length).includes('/');
+		if (inFolder && !named.includes(path)) named.push(path);
+	}
+	return named;
+}
+
+/**
+ * Keep the embed worker's script for a device that set up on-device answers, so its first question after an
+ * update still starts the worker offline.
+ *
+ * The page fetches the script only when it first asks a question, and an update deletes the previous release's
+ * cache, so a device that then goes offline has no script for the new release. Install runs while online and has
+ * just stored this release's own page code: the script's name is read from it (`workerScriptsNamed`) and the
+ * script stored beside it, where the fetch handler already looks. It lives as long as the release that names it.
+ * A device that did not finish setting up (`deviceFinishedSetUp`: the whole model and runtime held) asked for no
+ * offline answers yet - one stopped part-way has stored a few small model files and no more - and downloads nothing
+ * here.
+ *
+ * Each script is its own try under one deadline, and nothing throws, so it cannot fail the install or hold it open.
+ * Only a 200 response is stored. A script already held is not fetched again, so the same call after activation
+ * stores what install could not and costs nothing once it is held.
+ *
+ * Args:
+ *   assetCache: ASK_ASSET_CACHE, read to see whether the device set up
+ *   releaseCache: this release's own cache, to read its code from and store the script into
+ *   fetchScript: the network fetch, given the path and the signal; injected by tests
+ *   origin: this worker's origin; only entries under it are read
+ *   deadlineMs: how long the downloads may take
+ */
+export async function keepWorkerScripts(
+	assetCache: Pick<Cache, 'keys'>,
+	releaseCache: Pick<Cache, 'keys' | 'match' | 'put'>,
+	fetchScript: (path: string, init: { signal: AbortSignal }) => Promise<Response>,
+	origin: string,
+	deadlineMs: number
+): Promise<void> {
+	let missing: string[];
+	try {
+		const sameOrigin = (requests: readonly Request[]) =>
+			requests.map((request) => new URL(request.url)).filter((url) => url.origin === origin);
+		const setUp = deviceFinishedSetUp(
+			sameOrigin(await assetCache.keys()).map((url) => url.pathname)
+		);
+		if (!setUp) return;
+		const held = await releaseCache.keys();
+		const heldPaths = sameOrigin(held).map((url) => url.pathname);
+		const named: string[] = [];
+		for (const request of held) {
+			const { origin: requestOrigin, pathname } = new URL(request.url);
+			if (requestOrigin !== origin || !pathname.endsWith('.js')) continue;
+			const text = await (await releaseCache.match(request))?.text();
+			if (text === undefined) continue;
+			for (const script of workerScriptsNamed(pathname, text))
+				if (!named.includes(script)) named.push(script);
+		}
+		missing = named.filter((script) => !heldPaths.includes(script));
+	} catch {
+		return;
+	}
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), deadlineMs);
+	try {
+		for (const path of missing) {
+			try {
+				const response = await fetchScript(path, { signal: controller.signal });
+				if (response.status === 200) await releaseCache.put(path, response);
+			} catch {
+				// This script is given up on - a failed or stalled download, or a full disk. It is tried again after
+				// activation, and the first question asked online fetches it if that misses too.
+			}
+		}
+	} finally {
+		clearTimeout(timer);
+	}
 }
 
 /**

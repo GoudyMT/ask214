@@ -8,6 +8,11 @@ import { LOCAL_DOCUMENTS } from '$lib/sources/local-documents.data';
 import { LIBRARY_SRC, WORKER_SRC } from '$lib/sources/pdf-library-paths';
 import { SOURCES_INDEX } from '$lib/sources/sources-index.data';
 
+// No worker controls the page in this browser, so the real wait would last its full time. Every case starts with it
+// over at once; the cases about the wait hold it and end it themselves.
+const control = vi.hoisted(() => ({ wait: Promise.resolve(true) }));
+vi.mock('$lib/ask/when-controlled', () => ({ waitForControl: () => control.wait }));
+
 // Integration: the real generated maps flow through the page, and the page reads the real Cache API. The
 // cache is emptied first, so each case starts on a device that has saved nothing.
 const text = (el: Element) => el.textContent?.replace(/\s+/g, ' ').trim() ?? '';
@@ -25,6 +30,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+	control.wait = Promise.resolve(true);
 	await caches.delete(ASK_ASSET_CACHE);
 });
 
@@ -478,6 +484,66 @@ describe('Documents page', () => {
 			expect(text(container)).toContain(`1 of ${SERVED} saved on this device - 0.1 MB`)
 		);
 		expect(download.requests()).toBe(1);
+	});
+
+	// A first visit that starts here: opening a document's text is the first download of the answer library, so it
+	// waits for the service worker, which keeps it. The wait is held here; the library requests are counted and
+	// refused, so no test downloads it.
+	describe('the answer library', () => {
+		function holdWait() {
+			let end = () => {};
+			control.wait = new Promise<boolean>((resolve) => (end = () => resolve(true)));
+			release = end;
+			const realFetch = globalThis.fetch;
+			const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+				if (String(input).startsWith(CORPUS_BASE)) return new Response('', { status: 503 });
+				return realFetch(input, init);
+			});
+			return {
+				end,
+				requests: () =>
+					spy.mock.calls.filter(([input]) => String(input).startsWith(CORPUS_BASE)).length
+			};
+		}
+
+		async function openText(container: Element) {
+			const title = () =>
+				[...container.querySelectorAll('button')].find(
+					(b) => text(b) === 'TAP - Vet Centers (Resource Guide)'
+				);
+			await vi.waitFor(() => expect(title()).toBeDefined());
+			title()?.click();
+			const reader = container.querySelector('dialog.reader') as HTMLDialogElement;
+			await vi.waitFor(() => expect(reader.querySelector('.seg')).not.toBeNull());
+			[...reader.querySelectorAll<HTMLElement>('.seg button')]
+				.find((b) => text(b) === 'Text')
+				?.click();
+			await vi.waitFor(() =>
+				expect(text(reader.querySelector('.seg [aria-pressed="true"]') as Element)).toBe('Text')
+			);
+		}
+
+		it('is not requested while the wait for the service worker lasts, and is once it ends', async () => {
+			const wait = holdWait();
+			const { container } = render(DocumentsPage);
+			await openText(container);
+
+			await new Promise((resolve) => setTimeout(resolve, 300));
+			expect(wait.requests()).toBe(0);
+			wait.end();
+			await vi.waitFor(() => expect(wait.requests()).toBeGreaterThan(0));
+		});
+
+		it('is not requested when the page is left while the wait still lasts', async () => {
+			const wait = holdWait();
+			const { container, unmount } = render(DocumentsPage);
+			await openText(container);
+
+			unmount();
+			wait.end();
+			await new Promise((resolve) => setTimeout(resolve, 300));
+			expect(wait.requests()).toBe(0);
+		});
 	});
 
 	it('points to the web-page sources on About', () => {

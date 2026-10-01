@@ -11,7 +11,9 @@ import { join } from 'node:path';
  * node_modules/.pnpm/onnxruntime-web@<version>/node_modules/onnxruntime-web/dist - located here by scan.
  *
  * ORT loads the `asyncify` variant at runtime (its `.mjs` glue + `.wasm`); a missing asyncify file 404s
- * mid-load (the failure this guard now prevents). The base `.wasm` is also kept. JSPI-capable
+ * mid-load (the failure this guard now prevents). Only that pair is vendored: the embed worker sets
+ * `wasmPaths = '/wasm/'`, which loads the pair, while the base `.wasm` has no glue vendored to start it and is
+ * never requested, so shipping it would only add ~13 MB to every build. JSPI-capable
  * browsers may request the `jspi` variant instead - that is deferred to the cross-browser launch gate.
  */
 const PNPM = 'node_modules/.pnpm';
@@ -33,12 +35,12 @@ describe('vendored ORT runtime matches the installed onnxruntime-web', () => {
 		expect(existsSync(ortDist)).toBe(true);
 	});
 
-	it('vendors the ORT variant the worker actually loads (base + asyncify glue + wasm)', () => {
+	it('vendors exactly the ORT variant the worker loads (the asyncify glue + wasm), and nothing else', () => {
 		expect(existsSync(VENDOR), 'static/wasm/ must exist - vendor the ORT runtime').toBe(true);
-		const files = vendoredOrtFiles();
-		expect(files).toContain('ort-wasm-simd-threaded.wasm');
-		expect(files).toContain('ort-wasm-simd-threaded.asyncify.mjs');
-		expect(files).toContain('ort-wasm-simd-threaded.asyncify.wasm');
+		expect(vendoredOrtFiles().sort()).toEqual([
+			'ort-wasm-simd-threaded.asyncify.mjs',
+			'ort-wasm-simd-threaded.asyncify.wasm'
+		]);
 	});
 
 	it('every vendored ORT file is byte-identical to the installed dist', () => {

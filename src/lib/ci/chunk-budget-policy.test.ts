@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { precachedPaths, splitChunksByLoading, type BuildManifest } from './chunk-budget-policy';
+import {
+	kilobytes,
+	precachedPaths,
+	roomInBytes,
+	splitChunksByLoading,
+	strayWasm,
+	unreadWorkerScripts,
+	type BuildManifest
+} from './chunk-budget-policy';
 
 // The shape of the real Vite manifest SvelteKit writes: the app entry and every route node are marked
 // `isEntry`; a component loaded with import() is `isDynamicEntry`, and so is the library it loads the same way.
@@ -76,6 +84,105 @@ describe('splitChunksByLoading', () => {
 	});
 });
 
+// The worker's script is left out of the build list, so install finds it only by reading its name from the built
+// code. A script the reading misses would silently stop being kept for a set-up device, so the build fails on it.
+describe('unreadWorkerScripts', () => {
+	const SCRIPT = '/_app/immutable/workers/embed-worker-BIZt0I_P.js';
+
+	it('passes when every script in the build is named by the built code', () => {
+		expect(unreadWorkerScripts([SCRIPT], [SCRIPT])).toEqual([]);
+	});
+
+	// The app always ships the embed worker. A build with no script on disk - the worker renamed, or moved out of the
+	// folder - has nothing to check, and must not read as a pass.
+	it('fails closed when no script is on disk, whatever the built code names', () => {
+		expect(() => unreadWorkerScripts([], [])).toThrow('E_WORKER_SCRIPT_NONE');
+		expect(() => unreadWorkerScripts([SCRIPT], [])).toThrow('E_WORKER_SCRIPT_NONE');
+	});
+
+	// The built code naming nothing leaves every script on disk unkept: the reading is broken, so each is returned.
+	it('returns every script on disk when the built code names none', () => {
+		expect(unreadWorkerScripts([], [SCRIPT])).toEqual([SCRIPT]);
+	});
+
+	it('returns a script in the build that no built code names', () => {
+		expect(unreadWorkerScripts([], [SCRIPT])).toEqual([SCRIPT]);
+		const other = '/_app/immutable/workers/other-Q9.js';
+		expect(unreadWorkerScripts([SCRIPT], [SCRIPT, other])).toEqual([other]);
+	});
+
+	// A worker's split code is written below the worker folder. Install would not keep it, and it can never be named
+	// the way a script directly in the folder is, so its presence alone must fail the build.
+	it('returns a script in a subfolder of the worker folder, which no built code can name', () => {
+		const split = '/_app/immutable/workers/chunks/shared-Z3.js';
+		expect(unreadWorkerScripts([SCRIPT], [SCRIPT, split])).toEqual([split]);
+	});
+});
+
+// The worker loads its WASM from the vendored /wasm/ folder. A copy the bundler writes anywhere else is never
+// requested, and is the largest file in the build.
+describe('strayWasm', () => {
+	it('passes a build whose only WASM is in the vendored folder', () => {
+		expect(
+			strayWasm([
+				'wasm/ort-wasm-simd-threaded.asyncify.mjs',
+				'wasm/ort-wasm-simd-threaded.asyncify.wasm',
+				'_app/immutable/workers/embed-worker-BIZt0I_P.js'
+			])
+		).toEqual([]);
+	});
+
+	it('returns a WASM file the bundler wrote outside the vendored folder', () => {
+		const copy = '_app/immutable/workers/assets/ort-wasm-simd-threaded.asyncify-DMmc6YqF.wasm';
+		expect(strayWasm(['wasm/ort-wasm-simd-threaded.asyncify.wasm', copy])).toEqual([copy]);
+	});
+
+	it('does not take a folder that merely starts with the name for the vendored one', () => {
+		expect(strayWasm(['wasmish/x.wasm', '_app/wasm/x.wasm'])).toEqual([
+			'wasmish/x.wasm',
+			'_app/wasm/x.wasm'
+		]);
+	});
+});
+
+// A budget line prints the size and its limit the same way, so a size at or under the limit never reads as over it:
+// a limit rounded to whole kilobytes would read "135.11 KB <= 135 KB" for a build that passes.
+describe('kilobytes', () => {
+	it('prints metric kilobytes to two places, the same for a size and for a limit', () => {
+		expect(kilobytes(55_930)).toBe('55.93');
+		expect(kilobytes(56_000)).toBe('56.00');
+		expect(kilobytes(135_200)).toBe('135.20');
+		expect(kilobytes(7_300)).toBe('7.30');
+	});
+
+	it('keeps a limit that is not a whole kilobyte apart from the whole kilobyte below it', () => {
+		expect(kilobytes(135_112)).toBe('135.11');
+		expect(kilobytes(135_000)).not.toBe(kilobytes(135_112));
+	});
+});
+
+// Two decimals of a kilobyte hide a few bytes (up to 5 B), so a row's kilobytes alone can read "147.20 KB <= 147.20 KB" for a size
+// that is over. The row states its room or its shortfall in whole bytes beside them.
+describe('roomInBytes', () => {
+	it('states the bytes of room under the limit', () => {
+		expect(roomInBytes(147_126, 147_200)).toBe('74 B to spare');
+	});
+
+	it('states no room, and not an overage, for a size exactly at the limit', () => {
+		expect(roomInBytes(147_200, 147_200)).toBe('0 B to spare');
+	});
+
+	it('states a single byte over, which the kilobytes of that row print as equal', () => {
+		expect(kilobytes(147_201)).toBe(kilobytes(147_200));
+		expect(roomInBytes(147_201, 147_200)).toBe('1 B over');
+	});
+
+	it('states the measured shortfall for a larger overage', () => {
+		expect(roomInBytes(147_203, 147_200)).toBe('3 B over');
+		expect(roomInBytes(150_200, 147_200)).toBe('3,000 B over');
+	});
+});
+
 // The head of a real built service worker, cut to a few entries per list: SvelteKit reads a base path from the
 // worker's own location, then writes its `build` list and its `files` list, each entry prefixed with that base.
 // The template strings after them are the worker's own code - the asset rules' prefixes - and name no asset.
@@ -85,7 +192,7 @@ const WORKER =
 	'e+`/_app/immutable/assets/0.DjlkDVm5.css`],' +
 	'n=[e+`/.well-known/security.txt`,e+`/corpus/corpus-v1.0.2.json`,e+`/docs/tap_dol_efct.6dbd2705.pdf`,' +
 	'e+`/models/Xenova/all-MiniLM-L6-v2/tokenizer_config.json`,e+`/pdf-worker/6.3.289/pdf.min.mjs`,' +
-	'e+`/robots.txt`,e+`/wasm/ort-wasm-simd-threaded.wasm`],r=`1790302866627`;' +
+	'e+`/robots.txt`,e+`/wasm/ort-wasm-simd-threaded.asyncify.wasm`],r=`1790302866627`;' +
 	'function i(e){return e.startsWith(`/models/`)||e.startsWith(`/wasm/`)}';
 
 describe('precachedPaths', () => {
@@ -100,7 +207,7 @@ describe('precachedPaths', () => {
 			'/models/Xenova/all-MiniLM-L6-v2/tokenizer_config.json',
 			'/pdf-worker/6.3.289/pdf.min.mjs',
 			'/robots.txt',
-			'/wasm/ort-wasm-simd-threaded.wasm'
+			'/wasm/ort-wasm-simd-threaded.asyncify.wasm'
 		]);
 	});
 

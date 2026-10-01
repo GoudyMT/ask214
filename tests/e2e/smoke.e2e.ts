@@ -24,6 +24,16 @@ test('skip-to-content link is the first focusable element on the page', async ({
 	expect(firstFocusable).toContain('skip');
 });
 
+// The suite's config asks for reduced motion so the home feed holds still under a tap. A misplaced
+// option fails silently (the page simply animates), so read the preference from the page itself.
+test('the test browser asks for reduced motion', async ({ page }) => {
+	await page.goto('/');
+	const reduced = await page.evaluate(
+		() => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+	);
+	expect(reduced).toBe(true);
+});
+
 test('About link navigates to /about', async ({ page }) => {
 	await page.goto('/');
 	await page.getByRole('link', { name: /about/i }).first().click();

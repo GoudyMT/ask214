@@ -6,14 +6,18 @@
 //
 // Sizes are measured exactly as size-limit measures them - gzip at level 9, limits in metric kilobytes
 // (50 KB = 50,000 bytes) - so the page budget keeps the meaning it had as a size-limit entry.
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import {
+	kilobytes,
 	precachedPaths,
+	roomInBytes,
 	splitChunksByLoading,
+	strayWasm,
+	unreadWorkerScripts,
 	SHELL_BYTES_ALLOWANCE
 } from '../src/lib/ci/chunk-budget-policy.ts';
-import { INSTALL_PAGES } from '../src/lib/ask/asset-cache.ts';
+import { INSTALL_PAGES, workerScriptsNamed } from '../src/lib/ask/asset-cache.ts';
 
 const CLIENT = '.svelte-kit/output/client';
 const CHUNK_DIR = `${CLIENT}/_app/immutable/chunks`;
@@ -48,6 +52,12 @@ const STATIC = 'static';
 //     when the page is left starts nothing, a mode or feed question tapped before the page is ready is kept,
 //     the cache read is capped at 2 s, and a page no worker will control stops waiting - 41,093 B measured after
 //     a trim pass (-14 B: the held mode starts at the saved default).
+//     Page 55,800 -> 56,000 and route nodes 41,200 -> 41,078 (owner's call, 2026-09-30): the Documents page now
+//     waits for the service worker before it loads the answer library, as the home page does, so the wait -
+//     shared by the two routes - left the home page's route node for their shared chunk (+211 B here, -169 B
+//     there); 122 B moved between the two limits, plus room. Measured after a trim pass (-2 B: the page's left
+//     flag set in its existing cleanup): page 55,926 B, route nodes 41,004 B - each keeps about 75 B of room,
+//     because builds of the same code differ by a few bytes with SvelteKit's per-build global name.
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -70,9 +80,23 @@ const STATIC = 'static';
 //     measured with 55 files, after the trim pass above.
 //     Raised 134,800 -> 135,100 (owner's call, 2026-09-27): the same review fixes as the route-node raise, and
 //     the reader's title given its own full-width row - 134,970 B measured with 55 files, after that trim pass.
+//     Raised 135,100 -> 135,200 (owner's call, 2026-09-30): the Documents page's wait, above - 135,112 B measured
+//     with 55 files, after that trim pass.
+//   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
+//     code, which a device downloads the first time it asks a question on-device. The worker script's download
+//     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
+//     (this check's own gzip-9), 123 B of room (owner's call, 2026-09-30). A transformers.js, onnxruntime or Vite
+//     update can grow the worker past it; a raise then is expected, on a measured reason and as the owner's call,
+//     as for every limit here. The budget exists to make that growth a decision, not a surprise.
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
-const LIMIT = { page: 55_800, onDemand: 7_300, precacheFiles: 60, precacheBytes: 135_100 };
+const LIMIT = {
+	page: 56_000,
+	onDemand: 7_300,
+	precacheFiles: 60,
+	precacheBytes: 135_200,
+	workerScripts: 147_200
+};
 
 /**
  * @param {string} file A path as the manifest names it, relative to the client output.
@@ -115,19 +139,26 @@ if (!accounted) {
 	throw new Error('E_CHUNK_BUDGET_UNCLASSIFIED');
 }
 
-const rows = [
-	{ label: 'chunks a page downloads', files: page, limit: LIMIT.page },
-	{ label: 'chunks loaded on demand', files: onDemand, limit: LIMIT.onDemand }
-];
 let failed = 0;
-for (const { label, files, limit } of rows) {
+
+/**
+ * Print one size row against its limit, and count it when it fails. The limit prints with the size's precision.
+ *
+ * @param {string} label
+ * @param {string[]} files Paths relative to the client output.
+ * @param {number} limit Gzipped bytes.
+ */
+function sizeRow(label, files, limit) {
 	const size = total(files);
 	const pass = size <= limit;
 	if (!pass) failed += 1;
 	console.log(
-		`    ${label.padEnd(26)} ${(size / 1000).toFixed(2).padStart(8)} KB  <= ${(limit / 1000).toFixed(0)} KB  ${pass ? 'PASS' : 'FAIL'}  (${files.length} files)`
+		`    ${label.padEnd(26)} ${kilobytes(size).padStart(8)} KB  <= ${kilobytes(limit)} KB  ${pass ? 'PASS' : 'FAIL'}  (${files.length} files, ${roomInBytes(size, limit)})`
 	);
 }
+
+sizeRow('chunks a page downloads', page, LIMIT.page);
+sizeRow('chunks loaded on demand', onDemand, LIMIT.onDemand);
 
 // The precache, read from the built worker's own list and filtered by the worker's own rule.
 const { listed, precached } = precachedPaths(readFileSync(`${CLIENT}/service-worker.js`, 'utf-8'));
@@ -168,8 +199,70 @@ console.log(
 	`    ${'files the worker precaches'.padEnd(26)} ${String(precacheFiles).padStart(8)}     <= ${LIMIT.precacheFiles}      ${filesPass ? 'PASS' : 'FAIL'}`
 );
 console.log(
-	`    ${'bytes the worker precaches'.padEnd(26)} ${(precacheBytes / 1000).toFixed(2).padStart(8)} KB  <= ${(LIMIT.precacheBytes / 1000).toFixed(0)} KB  ${bytesPass ? 'PASS' : 'FAIL'}`
+	`    ${'bytes the worker precaches'.padEnd(26)} ${kilobytes(precacheBytes).padStart(8)} KB  <= ${kilobytes(LIMIT.precacheBytes)} KB  ${bytesPass ? 'PASS' : 'FAIL'}  (${roomInBytes(precacheBytes, LIMIT.precacheBytes)})`
 );
+
+// Instrument check: install keeps the embed worker's script by reading its name from the built code, because the
+// build list the worker precaches leaves worker scripts out. Every script the build wrote must be found that way,
+// or the script silently stops being kept for a device that set up on-device answers. Every folder under the
+// worker's is read, not only the top one: a worker's split code is written to a subfolder, and install keeps
+// nothing it does not find by name there.
+const WORKERS = '_app/immutable/workers';
+const scriptsOnDisk = existsSync(`${CLIENT}/${WORKERS}`)
+	? readdirSync(`${CLIENT}/${WORKERS}`, { recursive: true })
+			.map((f) => String(f).replaceAll('\\', '/'))
+			.filter((f) => f.endsWith('.js'))
+			.map((f) => `/${WORKERS}/${f}`)
+			.sort()
+	: [];
+const scriptsNamed = [
+	...new Set(
+		built
+			.filter((file) => file.endsWith('.js'))
+			.flatMap((file) => workerScriptsNamed(`/${file}`, readFileSync(`${CLIENT}/${file}`, 'utf-8')))
+	)
+].sort();
+// The app always ships the embed worker, so none on disk is a failure, not a pass with nothing to check.
+/** @type {string[]} */
+let unread;
+try {
+	unread = unreadWorkerScripts(scriptsNamed, scriptsOnDisk);
+} catch (error) {
+	console.log(
+		`    worker scripts on disk ${scriptsOnDisk.length}, named by the built code ${scriptsNamed.length}: NONE ON DISK`
+	);
+	throw error;
+}
+console.log(
+	`    worker scripts on disk ${scriptsOnDisk.length}, named by the built code ${scriptsNamed.length}: ${unread.length === 0 ? 'ALL FOUND' : 'MISSED'}`
+);
+if (unread.length > 0) {
+	for (const script of unread) console.log(`    not named by any built code ${script}`);
+	throw new Error('E_WORKER_SCRIPT_UNREAD');
+}
+
+// The worker script is fetched under its own deadline (WORKER_SCRIPT_DEADLINE_MS), which assumes the size
+// measured below; a script that grows past it can miss that deadline on a slow connection.
+sizeRow(
+	'worker scripts',
+	scriptsOnDisk.map((script) => script.slice(1)),
+	LIMIT.workerScripts
+);
+
+// Instrument check: the worker loads its WASM from the vendored /wasm/ folder only. A copy written anywhere else
+// is never requested and ships to every visitor's release - the runtime library inside the worker names one as a
+// fallback, and the bundler writes it beside the worker's script.
+const builtFiles = readdirSync(CLIENT, { recursive: true })
+	.map((path) => String(path).replaceAll('\\', '/'))
+	.filter((path) => statSync(`${CLIENT}/${path}`).isFile());
+const stray = strayWasm(builtFiles);
+console.log(
+	`    wasm files outside /wasm/ ${stray.length}: ${stray.length === 0 ? 'NONE' : 'FOUND'}`
+);
+if (stray.length > 0) {
+	for (const file of stray) console.log(`    wasm outside /wasm/ ${file}`);
+	throw new Error('E_STRAY_WASM');
+}
 
 if (failed > 0) {
 	console.log(

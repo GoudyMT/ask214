@@ -25,6 +25,8 @@
 		"check:pdf-worker": "tsx content-ops/check-pdf-worker.mjs",
 		"check:served-history": "node content-ops/check-served-history.mjs",
 		"check:chunks": "tsx content-ops/check-chunk-budget.mjs",
+		"check:commit-msg": "tsx content-ops/check-commit-message.mjs",
+		"check:commits": "tsx content-ops/check-commit-message.mjs --range",
 		"ingest": "tsx content-ops/capture-extract.mjs",
 		"clean": "tsx content-ops/clean-sources.mjs",
 		"chunk": "tsx content-ops/chunk-sources.mjs",
@@ -74,7 +76,7 @@
 		{
 			"name": "Lazy route nodes (sum; no single page loads all of them)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
-			"limit": "41200 B",
+			"limit": "41078 B",
 			"gzip": true
 		}
 	],

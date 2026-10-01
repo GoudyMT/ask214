@@ -60,3 +60,35 @@ describe('embed worker', () => {
 		expect(posted).toHaveLength(2);
 	});
 });
+
+// A worker has no content-security-policy header of its own - the page's does not reach it - so nothing but these two
+// settings keeps the runtime and the model from being fetched from a CDN. A lost line would break nothing visibly:
+// the library's own defaults load from jsDelivr and the Hugging Face hub, and the question would still be answered.
+describe('embed worker environment', () => {
+	const LIBRARY_WASM_PATH = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.0.0/dist/';
+
+	beforeEach(async () => {
+		vi.resetModules();
+		pipeline.mockReset();
+		// The library's defaults at module load: the runtime from a CDN, the model allowed to come from a remote hub.
+		(env.backends as { onnx: { wasm: { wasmPaths?: string } } }).onnx.wasm.wasmPaths =
+			LIBRARY_WASM_PATH;
+		env.allowRemoteModels = true;
+		vi.stubGlobal('self', { postMessage: () => {} });
+		await import('./embed-worker');
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('loads the runtime from the app itself, replacing the library default', () => {
+		const { wasm } = (env.backends as { onnx: { wasm: { wasmPaths?: string } } }).onnx;
+		expect(wasm.wasmPaths).toBe('/wasm/');
+	});
+
+	it('never fetches a model from a remote hub', () => {
+		expect(env.allowRemoteModels).toBe(false);
+		expect(env.localModelPath).toBe('/models/');
+	});
+});

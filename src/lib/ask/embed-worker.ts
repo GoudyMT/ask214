@@ -4,8 +4,9 @@ import type { EmbedRequest, EmbedResponse } from './types';
 import { ASK_ERROR } from './errors';
 
 // Self-host both the model and the ORT WASM as same-origin static assets: NO runtime HF-CDN /
-// jsDelivr fetch -> connect-src 'self' holds, the query never leaves the device, and the flow works
-// offline after the (same-origin) first load. Configure env BEFORE pipeline(). Single-threaded SIMD WASM,
+// jsDelivr fetch -> the query never leaves the device, and the flow works offline after the (same-origin) first
+// load. The page's connect-src does not reach this worker, so the settings below are what keep it off a CDN; a
+// test holds them. Configure env BEFORE pipeline(). Single-threaded SIMD WASM,
 // no cross-origin isolation / COEP. Output is mean-pooled + L2-normalized (384-d).
 env.allowLocalModels = true;
 env.allowRemoteModels = false;
@@ -13,8 +14,9 @@ env.localModelPath = '/models/'; // -> /models/Xenova/all-MiniLM-L6-v2/
 // The service worker keeps the model in the app's asset cache, which survives updates. The library's own
 // browser cache would hold a second ~23 MB copy, which the worker deletes on every update, so it is off.
 env.useBrowserCache = false;
-// ORT initializes the wasm backend at load; the guard satisfies the conservative Partial type (were it
-// ever absent, the default-CDN wasm fetch is CSP-blocked - fails loud, never a silent leak).
+// ORT initializes the wasm backend at load; the guard satisfies the conservative Partial type. The worker has no
+// CSP header of its own (the page's does not reach it), so nothing here is blocked by policy: no remote fetch is
+// made because wasmPaths is set before any session starts and allowRemoteModels is false.
 const onnxWasm = env.backends.onnx.wasm;
 if (onnxWasm) onnxWasm.wasmPaths = '/wasm/';
 

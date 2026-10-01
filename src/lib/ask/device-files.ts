@@ -4,10 +4,17 @@ import { ASK_ASSET_CACHE, CORPUS_BASE } from './asset-cache';
 const LOOKUP_LIMIT_MS = 2_000;
 
 /**
- * Every file an on-device answer needs, as the service worker keeps them: the search model, the runtime that runs
- * it, and the answer library. The model and runtime paths are written out rather than read from the vendored
- * manifest, so the page does not carry the manifest's hashes; tests hold this list to the manifest, to the files
- * the app ships, and - end to end - to exactly what a real setup stores.
+ * Every file an on-device answer needs from the asset cache, as the service worker keeps them: the search model, the
+ * runtime that runs it, and the answer library. The model and runtime paths are written out here rather than
+ * imported from the service worker's list of what a finished setup holds (`SET_UP_FILES`), so the page carries only
+ * the strings and no spread of another module's list; a test holds this list equal to that one plus the library, so
+ * the page and the worker cannot disagree. They are not read from the vendored manifest either, so the page does not
+ * carry the manifest's hashes. Tests hold this list to the manifest, to the files the app ships, and - end to end -
+ * to exactly what a real setup stores.
+ *
+ * The embed worker's own script is needed too, but it is not in this list: the service worker keeps it in the
+ * release's cache (and the browser's HTTP cache usually holds it as well), not in the asset cache this list is
+ * read from.
  */
 export const DEVICE_FILES: readonly string[] = [
 	'/models/Xenova/all-MiniLM-L6-v2/config.json',
