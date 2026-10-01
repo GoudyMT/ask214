@@ -1,25 +1,21 @@
-import { ASK_ASSET_CACHE, CORPUS_BASE } from './asset-cache';
+import { ASK_ASSET_CACHE, CORPUS_BASE, SET_UP_FILES } from './asset-cache';
 
 // The lookup takes milliseconds; a browser whose Cache API never answers must not hold the Ask up past this.
 const LOOKUP_LIMIT_MS = 2_000;
 
 /**
  * Every file an on-device answer needs from the asset cache, as the service worker keeps them: the search model, the
- * runtime that runs it, and the answer library. The model and runtime paths are written out rather than read from the vendored
- * manifest, so the page does not carry the manifest's hashes; tests hold this list to the manifest, to the files
- * the app ships, and - end to end - to exactly what a real setup stores.
+ * runtime that runs it, and the answer library. The model and runtime paths are the service worker's own list of what
+ * a finished setup holds (`SET_UP_FILES`), so the page and the worker cannot disagree about it; they are written out
+ * there rather than read from the vendored manifest, so the page does not carry the manifest's hashes. Tests hold
+ * this list to the manifest, to the files the app ships, and - end to end - to exactly what a real setup stores.
  *
  * The embed worker's own script is needed too, but it is not in this list: the service worker keeps it in the
  * release's cache (and the browser's HTTP cache usually holds it as well), not in the asset cache this list is
  * read from.
  */
 export const DEVICE_FILES: readonly string[] = [
-	'/models/Xenova/all-MiniLM-L6-v2/config.json',
-	'/models/Xenova/all-MiniLM-L6-v2/tokenizer_config.json',
-	'/models/Xenova/all-MiniLM-L6-v2/tokenizer.json',
-	'/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx',
-	'/wasm/ort-wasm-simd-threaded.asyncify.mjs',
-	'/wasm/ort-wasm-simd-threaded.asyncify.wasm',
+	...SET_UP_FILES,
 	`${CORPUS_BASE}.json`,
 	`${CORPUS_BASE}.embeddings.bin`
 ];

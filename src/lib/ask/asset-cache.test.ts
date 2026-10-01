@@ -7,6 +7,8 @@ import {
 	ASK_ASSET_CACHE,
 	shouldKeepCache,
 	isSupersededVersionedEntry,
+	pruneSupersededEntries,
+	SET_UP_FILES,
 	isApiRequest,
 	keptOnFetch,
 	libraryToRestore,
@@ -418,6 +420,23 @@ describe('libraryToRestore (the PDF library a saved document needs after an upda
 		expect(libraryToRestore([], SHIPPED)).toEqual([]);
 	});
 
+	// A release that stops shipping a document has activation delete the saved copy, so the library it would have
+	// needed is not owed to a device that holds only that copy.
+	it('returns nothing when the only saved document is one this build no longer ships', () => {
+		expect(libraryToRestore(['/docs/tap_retired_guide.1111aaaa.pdf', MODEL], SHIPPED)).toEqual([]);
+	});
+
+	it('counts a saved document whose source ships, even as an older copy, and one beside a retired one', () => {
+		const library = ['/pdf-worker/6.4.0/pdf.min.mjs', '/pdf-worker/6.4.0/pdf.worker.min.mjs'];
+		expect(libraryToRestore(['/docs/tap_vet_centers.0badc0de.pdf'], SHIPPED)).toEqual(library);
+		expect(
+			libraryToRestore(
+				['/docs/tap_retired_guide.1111aaaa.pdf', '/docs/tap_va101.0f650528.pdf'],
+				SHIPPED
+			)
+		).toEqual(library);
+	});
+
 	// The shipped list carries every document, the corpus and the app shell, none of them cached here. Only the
 	// library is restored: a saved document's own update is the user's to take from the Documents area.
 	it('returns only library files, never another shipped file the cache lacks', () => {
@@ -433,10 +452,11 @@ describe('libraryToRestore (the PDF library a saved document needs after an upda
 	});
 });
 
-// A set-up device always downloaded the answer library, and a document's first save always stores it, so a model
-// file or a saved document means this device kept a library. Such a device gets the current pair at install, while
-// online, instead of being asked to set up again (the model is still held) and losing offline answers until it does.
-// It is owed whether or not an earlier pair is still held: activate prunes the earlier one.
+// A set-up device always downloaded the answer library, and a document's first save always stores it, so a device
+// that finished setting up - the whole model and runtime held - or one that saved a document means this device kept a
+// library. Such a device gets the current pair at install, while online, instead of being asked to set up again (the
+// model is still held) and losing offline answers until it does. It is owed whether or not an earlier pair is still
+// held: activate prunes the earlier one. A setup abandoned part-way is not a setup: it never asked for the library.
 describe('answerLibraryToRestore (the answer library a device keeps through an update)', () => {
 	const SHIPPED = [
 		'/_app/immutable/entry/start.js',
@@ -444,18 +464,20 @@ describe('answerLibraryToRestore (the answer library a device keeps through an u
 		'/corpus/corpus-v1.0.3.embeddings.bin',
 		'/docs/tap_va101.0f650528.pdf'
 	];
+	const SET_UP = [...SET_UP_FILES];
 	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
 	const WASM = '/wasm/ort-wasm-simd-threaded.asyncify.wasm';
 	const DOCUMENT = '/docs/tap_va101.0f650528.pdf';
+	const RETIRED_DOCUMENT = '/docs/tap_retired_guide.1111aaaa.pdf';
 	const OLD = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
 	const NEW = ['/corpus/corpus-v1.0.3.json', '/corpus/corpus-v1.0.3.embeddings.bin'];
 
 	it('returns the shipped library when an earlier one is held', () => {
-		expect(answerLibraryToRestore([...OLD, MODEL], SHIPPED)).toEqual(NEW);
+		expect(answerLibraryToRestore([...OLD, ...SET_UP], SHIPPED)).toEqual(NEW);
 	});
 
 	it('returns the shipped library to a set-up device that holds no library file at all', () => {
-		expect(answerLibraryToRestore([MODEL, WASM], SHIPPED)).toEqual(NEW);
+		expect(answerLibraryToRestore(SET_UP, SHIPPED)).toEqual(NEW);
 	});
 
 	it('returns the shipped library to a device that saved a document and holds no library file', () => {
@@ -463,10 +485,10 @@ describe('answerLibraryToRestore (the answer library a device keeps through an u
 	});
 
 	it('returns only what is missing, and nothing when the shipped library is held', () => {
-		expect(answerLibraryToRestore([MODEL, NEW[0] ?? ''], SHIPPED)).toEqual([NEW[1]]);
-		expect(answerLibraryToRestore([MODEL, NEW[1] ?? ''], SHIPPED)).toEqual([NEW[0]]);
-		expect(answerLibraryToRestore([...OLD, NEW[0] ?? '', MODEL], SHIPPED)).toEqual([NEW[1]]);
-		expect(answerLibraryToRestore([...NEW, MODEL], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([...SET_UP, NEW[0] ?? ''], SHIPPED)).toEqual([NEW[1]]);
+		expect(answerLibraryToRestore([...SET_UP, NEW[1] ?? ''], SHIPPED)).toEqual([NEW[0]]);
+		expect(answerLibraryToRestore([...OLD, NEW[0] ?? '', ...SET_UP], SHIPPED)).toEqual([NEW[1]]);
+		expect(answerLibraryToRestore([...NEW, ...SET_UP], SHIPPED)).toEqual([]);
 		expect(answerLibraryToRestore([...NEW, DOCUMENT], SHIPPED)).toEqual([]);
 	});
 
@@ -474,6 +496,49 @@ describe('answerLibraryToRestore (the answer library a device keeps through an u
 	it('returns nothing on a fresh device, and on one that holds only the runtime', () => {
 		expect(answerLibraryToRestore([], SHIPPED)).toEqual([]);
 		expect(answerLibraryToRestore([WASM], SHIPPED)).toEqual([]);
+	});
+
+	// A setup stopped part-way - the model's small files stored, the 23 MB model not yet - never asked to keep the
+	// library, and on a nearly full device it would be downloaded again with every release, with no earlier pair for
+	// the prune to free.
+	it('returns nothing for a setup abandoned part-way, which has not stored the whole model and runtime', () => {
+		const small = SET_UP.filter((path) => !path.endsWith('.onnx') && !path.startsWith('/wasm/'));
+		expect(small).toHaveLength(3);
+		expect(answerLibraryToRestore(small, SHIPPED)).toEqual([]);
+		expect(
+			answerLibraryToRestore(
+				SET_UP.filter((path) => !path.startsWith('/wasm/')),
+				SHIPPED
+			)
+		).toEqual([]);
+		expect(
+			answerLibraryToRestore(
+				SET_UP.filter((path) => !path.startsWith('/models/')),
+				SHIPPED
+			)
+		).toEqual([]);
+		for (const missing of SET_UP) {
+			const held = SET_UP.filter((path) => path !== missing);
+			expect(answerLibraryToRestore([...OLD, ...held], SHIPPED), missing).toEqual([]);
+		}
+	});
+
+	it('returns nothing for the model file alone, which no longer means a finished setup', () => {
+		expect(answerLibraryToRestore([MODEL], SHIPPED)).toEqual([]);
+	});
+
+	// Activate deletes a saved document whose source a release no longer ships, so it cannot be why a device is owed
+	// a library at install; the one that still ships can.
+	it('does not count a saved document whose source this build no longer ships', () => {
+		expect(answerLibraryToRestore([RETIRED_DOCUMENT], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([RETIRED_DOCUMENT, ...OLD], SHIPPED)).toEqual([]);
+		expect(answerLibraryToRestore([RETIRED_DOCUMENT, DOCUMENT], SHIPPED)).toEqual(NEW);
+		expect(answerLibraryToRestore(['/docs/tap_va101.0badc0de.pdf'], SHIPPED)).toEqual(NEW);
+	});
+
+	it('still counts a saved document when the build ships no documents at all, which prunes none', () => {
+		const noDocuments = SHIPPED.filter((path) => !path.startsWith('/docs/'));
+		expect(answerLibraryToRestore([RETIRED_DOCUMENT], noDocuments)).toEqual(NEW);
 	});
 
 	// The worker also keeps the library when a page merely reads it - "Read more" on an online answer, a document's
@@ -485,10 +550,9 @@ describe('answerLibraryToRestore (the answer library a device keeps through an u
 	});
 
 	it('returns only library files, never another shipped file the device lacks', () => {
-		expect(answerLibraryToRestore([MODEL], SHIPPED)).not.toContain(DOCUMENT);
-		expect(answerLibraryToRestore([MODEL], SHIPPED)).not.toContain(
-			'/_app/immutable/entry/start.js'
-		);
+		expect(answerLibraryToRestore(SET_UP, SHIPPED)).toEqual(NEW);
+		expect(answerLibraryToRestore(SET_UP, SHIPPED)).not.toContain(DOCUMENT);
+		expect(answerLibraryToRestore(SET_UP, SHIPPED)).not.toContain('/_app/immutable/entry/start.js');
 	});
 });
 
@@ -497,14 +561,14 @@ describe('answerLibraryToRestore (the answer library a device keeps through an u
 describe('restoreLibraries (each library gets one try within its own deadline)', () => {
 	const ORIGIN = 'https://ask214.com';
 	const DEADLINE = 1_000;
-	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const SET_UP = [...SET_UP_FILES];
 	const DOCUMENT = '/docs/tap_va101.0f650528.pdf';
 	const OLD_ANSWERS = ['/corpus/corpus-v1.0.1.json', '/corpus/corpus-v1.0.1.embeddings.bin'];
 	const NEW_ANSWERS = ['/corpus/corpus-v1.0.2.json', '/corpus/corpus-v1.0.2.embeddings.bin'];
 	const PDF_LIBRARY = ['/pdf-worker/6.4.0/pdf.min.mjs', '/pdf-worker/6.4.0/pdf.worker.min.mjs'];
 	const SHIPPED = ['/_app/immutable/entry/start.js', ...NEW_ANSWERS, DOCUMENT, ...PDF_LIBRARY];
 	// A saved document and an earlier answer library on a device that set up on-device answers: both libraries are owed.
-	const OWING_BOTH = [MODEL, DOCUMENT, ...OLD_ANSWERS];
+	const OWING_BOTH = [...SET_UP, DOCUMENT, ...OLD_ANSWERS];
 
 	/** A cache holding the given paths, which records what is stored; a write for a path `failPut` names fails. */
 	function heldCache(held: string[], failPut: (path: string) => boolean = () => false) {
@@ -593,7 +657,7 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 		vi.useFakeTimers();
 		try {
 			// The answer library is held, so only the PDF library is owed and its two fetches are the only ones.
-			const { cache, stored } = heldCache([MODEL, DOCUMENT, ...NEW_ANSWERS]);
+			const { cache, stored } = heldCache([...SET_UP, DOCUMENT, ...NEW_ANSWERS]);
 			const fetchLibrary = fetching((path, signal) =>
 				path === PDF_LIBRARY[1] ? stalled(signal) : ok(path)
 			);
@@ -682,7 +746,11 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 			// A fresh device, and one that only read the library.
 			[],
 			[...OLD_ANSWERS],
-			[MODEL, ...NEW_ANSWERS, DOCUMENT, ...PDF_LIBRARY]
+			[...SET_UP, ...NEW_ANSWERS, DOCUMENT, ...PDF_LIBRARY],
+			// A setup stopped part-way: the small files of the model, not the model or the runtime.
+			SET_UP.slice(0, 3),
+			// A saved document whose source this build no longer ships, which activation deletes.
+			['/docs/tap_retired_guide.1111aaaa.pdf', ...OLD_ANSWERS]
 		]) {
 			const { cache, stored } = heldCache(held);
 			const fetchLibrary = fetching(ok);
@@ -693,7 +761,7 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 	});
 
 	it('stores the current answer library for a set-up device that holds none, and for a saving one', async () => {
-		for (const held of [[MODEL], [DOCUMENT, ...PDF_LIBRARY]]) {
+		for (const held of [SET_UP, [DOCUMENT, ...PDF_LIBRARY]]) {
 			const { cache, stored } = heldCache(held);
 			await restoreLibraries(cache, fetching(ok), ORIGIN, SHIPPED, DEADLINE);
 			expect([...stored.keys()], held.join(' ')).toEqual(NEW_ANSWERS);
@@ -705,7 +773,7 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 	// it for good. (The install-time attempt runs before any prune and can fail for lack of room; this models the retry.)
 	describe('on a device with room for one answer library', () => {
 		const FILE_BYTES = 50;
-		const MODEL_BYTES = 100;
+		const SET_UP_FILE_BYTES = 20;
 
 		/** A cache with `quota` bytes of room; a write that would pass it fails, as a full device's does. */
 		function cacheWithRoom(quota: number, held: Record<string, number>) {
@@ -728,21 +796,25 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 			return { cache, paths: () => [...sizes.keys()] };
 		}
 
-		/** What activate does to the cache before the restore: delete every entry the build no longer ships. */
+		/**
+		 * What activate does to the cache before the restore: the worker's own prune, not a copy of it, so a
+		 * condition added to it that holds the earlier pair back fails here.
+		 */
 		async function prune(cache: ReturnType<typeof cacheWithRoom>['cache']) {
-			for (const request of await cache.keys()) {
-				if (isSupersededVersionedEntry(new URL(request.url).pathname, SHIPPED))
-					await cache.delete(request);
-			}
+			await pruneSupersededEntries(
+				cache as unknown as Pick<Cache, 'keys' | 'delete'>,
+				ORIGIN,
+				SHIPPED
+			);
 		}
 
 		const bytes = () => Promise.resolve(new Response('x'.repeat(FILE_BYTES)));
 		const held = {
-			[MODEL]: MODEL_BYTES,
+			...Object.fromEntries(SET_UP.map((path) => [path, SET_UP_FILE_BYTES])),
 			[OLD_ANSWERS[0] ?? '']: FILE_BYTES,
 			[OLD_ANSWERS[1] ?? '']: FILE_BYTES
 		};
-		const QUOTA = MODEL_BYTES + 2 * FILE_BYTES;
+		const QUOTA = SET_UP.length * SET_UP_FILE_BYTES + 2 * FILE_BYTES;
 
 		it('stores the current pair once the prune has freed the earlier one', async () => {
 			const { cache, paths } = cacheWithRoom(QUOTA, held);
@@ -754,7 +826,7 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 				SHIPPED,
 				DEADLINE
 			);
-			expect(paths()).toEqual([MODEL, ...NEW_ANSWERS]);
+			expect(paths()).toEqual([...SET_UP, ...NEW_ANSWERS]);
 		});
 
 		// The guard against a vacuous pass: with the earlier pair still held the same device cannot take the new one.
@@ -767,7 +839,7 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 				SHIPPED,
 				DEADLINE
 			);
-			expect(paths()).toEqual([MODEL, ...OLD_ANSWERS]);
+			expect(paths()).toEqual([...SET_UP, ...OLD_ANSWERS]);
 		});
 	});
 
@@ -776,7 +848,7 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 		vi.useFakeTimers();
 		try {
 			// One file of the pair is held, so the stalled one is the last file the library fetches.
-			const { cache, stored } = heldCache([MODEL, NEW_ANSWERS[0] ?? '']);
+			const { cache, stored } = heldCache([...SET_UP, NEW_ANSWERS[0] ?? '']);
 			const fetchLibrary = fetching((_path, signal) =>
 				Promise.resolve(
 					new Response(
@@ -878,7 +950,7 @@ describe('workerScriptsNamed (the worker scripts a built chunk starts)', () => {
 describe('keepWorkerScripts (the embed worker script, kept for a device that set up on-device answers)', () => {
 	const ORIGIN = 'https://ask214.com';
 	const DEADLINE = 1_000;
-	const MODEL = '/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx';
+	const SET_UP = [...SET_UP_FILES];
 	const NODE = '/_app/immutable/nodes/2.CrZheqGl.js';
 	const SCRIPT = '/_app/immutable/workers/embed-worker-BIZt0I_P.js';
 	const OTHER = '/_app/immutable/workers/other-Q9.js';
@@ -930,13 +1002,28 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 	it('fetches and stores the script a set-up device lacks', async () => {
 		const release = releaseHolding(RELEASE);
 		const fetchScript = fetching(ok);
-		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, fetchScript, ORIGIN, DEADLINE);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, fetchScript, ORIGIN, DEADLINE);
 		expect(fetchScript.mock.calls.map(([path]) => path)).toEqual([SCRIPT]);
 		expect(release.stored()).toEqual([SCRIPT]);
 	});
 
-	it('fetches nothing for a device that did not set up on-device answers', async () => {
-		for (const held of [[], ['/corpus/corpus-v1.0.2.json', '/docs/tap_va101.0f650528.pdf']]) {
+	// A setup stopped part-way - the model's small files stored, the model or the runtime not yet - has not finished
+	// and asked for no offline answers, so a release keeps no worker script for it.
+	it('fetches nothing for a device that did not finish setting up on-device answers', async () => {
+		const abandoned = [
+			// The model's small files only.
+			SET_UP.slice(0, 3),
+			// The model without the runtime, and the runtime without the model.
+			SET_UP.filter((path) => path.startsWith('/models/')),
+			SET_UP.filter((path) => path.startsWith('/wasm/')),
+			// Everything but one file, whichever it is.
+			...SET_UP.map((missing) => SET_UP.filter((path) => path !== missing))
+		];
+		for (const held of [
+			[],
+			['/corpus/corpus-v1.0.2.json', '/docs/tap_va101.0f650528.pdf'],
+			...abandoned
+		]) {
 			const release = releaseHolding(RELEASE);
 			const fetchScript = fetching(ok);
 			await keepWorkerScripts(assetsHolding(held), release.cache, fetchScript, ORIGIN, DEADLINE);
@@ -948,7 +1035,7 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 	it('reads only this origin: a model held for another origin is not a set-up device', async () => {
 		const fetchScript = fetching(ok);
 		await keepWorkerScripts(
-			assetsHolding([MODEL], 'https://elsewhere.example'),
+			assetsHolding(SET_UP, 'https://elsewhere.example'),
 			releaseHolding(RELEASE).cache,
 			fetchScript,
 			ORIGIN,
@@ -957,17 +1044,30 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 		expect(fetchScript).not.toHaveBeenCalled();
 	});
 
+	it('still keeps the script for a device that finished setting up while it held an old answer library', async () => {
+		const release = releaseHolding(RELEASE);
+		const fetchScript = fetching(ok);
+		await keepWorkerScripts(
+			assetsHolding([...SET_UP, '/corpus/corpus-v1.0.1.json']),
+			release.cache,
+			fetchScript,
+			ORIGIN,
+			DEADLINE
+		);
+		expect(release.stored()).toEqual([SCRIPT]);
+	});
+
 	it('does not fetch a script the release cache already holds', async () => {
 		const release = releaseHolding({ ...RELEASE, [SCRIPT]: 'kept' });
 		const fetchScript = fetching(ok);
-		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, fetchScript, ORIGIN, DEADLINE);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, fetchScript, ORIGIN, DEADLINE);
 		expect(fetchScript).not.toHaveBeenCalled();
 	});
 
 	it('stores a response only when its status is 200', async () => {
 		const release = releaseHolding(RELEASE);
 		const fetchScript = fetching(() => Promise.resolve(new Response('missing', { status: 404 })));
-		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, fetchScript, ORIGIN, DEADLINE);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, fetchScript, ORIGIN, DEADLINE);
 		expect(fetchScript).toHaveBeenCalledTimes(1);
 		expect(release.stored()).toEqual([]);
 	});
@@ -982,7 +1082,7 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 			path === SCRIPT ? Promise.reject(new TypeError('offline')) : ok(path)
 		);
 		await expect(
-			keepWorkerScripts(assetsHolding([MODEL]), release.cache, fetchScript, ORIGIN, DEADLINE)
+			keepWorkerScripts(assetsHolding(SET_UP), release.cache, fetchScript, ORIGIN, DEADLINE)
 		).resolves.toBeUndefined();
 		expect(release.stored()).toEqual([OTHER]);
 	});
@@ -998,7 +1098,7 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 		).resolves.toBeUndefined();
 		await expect(
 			keepWorkerScripts(
-				assetsHolding([MODEL]),
+				assetsHolding(SET_UP),
 				{ ...releaseHolding(RELEASE).cache, keys: () => Promise.reject(new Error('unreadable')) },
 				fetchScript,
 				ORIGIN,
@@ -1022,7 +1122,7 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 			);
 			let settled = false;
 			const done = keepWorkerScripts(
-				assetsHolding([MODEL]),
+				assetsHolding(SET_UP),
 				release.cache,
 				fetchScript,
 				ORIGIN,
@@ -1063,7 +1163,7 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 			);
 			let settled = false;
 			const done = keepWorkerScripts(
-				assetsHolding([MODEL]),
+				assetsHolding(SET_UP),
 				release.cache,
 				fetchScript,
 				ORIGIN,
@@ -1089,15 +1189,15 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 	it('stores on a retry what the first try could not, and fetches nothing once it is held', async () => {
 		const release = releaseHolding(RELEASE);
 		const offline = fetching(() => Promise.reject(new TypeError('offline')));
-		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, offline, ORIGIN, DEADLINE);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, offline, ORIGIN, DEADLINE);
 		expect(release.stored()).toEqual([]);
 
 		const online = fetching(ok);
-		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, online, ORIGIN, DEADLINE);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, online, ORIGIN, DEADLINE);
 		expect(release.stored()).toEqual([SCRIPT]);
 
 		const again = fetching(ok);
-		await keepWorkerScripts(assetsHolding([MODEL]), release.cache, again, ORIGIN, DEADLINE);
+		await keepWorkerScripts(assetsHolding(SET_UP), release.cache, again, ORIGIN, DEADLINE);
 		expect(again).not.toHaveBeenCalled();
 	});
 });
@@ -1146,6 +1246,40 @@ describe('the activate prune (every entry isSupersededVersionedEntry marks, and 
 		expect(marked([MODEL, WASM, '/models/e2e-prune-probe.onnx', older, DOCUMENT, ...OLD])).toEqual(
 			OLD
 		);
+	});
+
+	describe('pruneSupersededEntries (the one prune the worker runs, with the cache and the build list given)', () => {
+		const ORIGIN = 'https://ask214.com';
+
+		/** A cache holding the given URLs, which records what is deleted. */
+		function cacheHolding(urls: string[]) {
+			const deleted: string[] = [];
+			const cache = {
+				async keys() {
+					return urls.map((url) => new Request(url));
+				},
+				async delete(request: Request) {
+					deleted.push(request.url);
+					return true;
+				}
+			};
+			return { cache: cache as unknown as Pick<Cache, 'keys' | 'delete'>, deleted };
+		}
+		const own = (path: string) => `${ORIGIN}${path}`;
+
+		it('deletes exactly the entries the version rule marks, whatever else the device holds', async () => {
+			const held = [MODEL, WASM, DOCUMENT, ...OLDEST, ...OLD, ...NEW, ...OLD_PDF];
+			const { cache, deleted } = cacheHolding(held.map(own));
+			await pruneSupersededEntries(cache, ORIGIN, SHIPPED);
+			expect(deleted).toEqual(marked(held).map(own));
+			expect(deleted).toEqual([...OLDEST, ...OLD, ...OLD_PDF].map(own));
+		});
+
+		it('deletes nothing for an entry held for another origin, even one the build no longer ships', async () => {
+			const { cache, deleted } = cacheHolding([`https://elsewhere.example${OLD[0] ?? ''}`]);
+			await pruneSupersededEntries(cache, ORIGIN, SHIPPED);
+			expect(deleted).toEqual([]);
+		});
 	});
 });
 

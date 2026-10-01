@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { ASK_ASSET_CACHE, CORPUS_BASE } from './asset-cache';
+import { ASK_ASSET_CACHE, CORPUS_BASE, SET_UP_FILES } from './asset-cache';
 import { DEVICE_FILES, deviceFilesKept } from './device-files';
 
 const MODEL_DIR = '/models/Xenova/all-MiniLM-L6-v2/';
@@ -22,6 +22,16 @@ describe('DEVICE_FILES', () => {
 
 	it('names only files the app ships', () => {
 		for (const path of DEVICE_FILES) expect(existsSync(join(STATIC, path)), path).toBe(true);
+	});
+
+	// The service worker decides a setup is finished from SET_UP_FILES alone, so the page's list must be exactly
+	// those files and the library: the two then agree on which device is set up.
+	it('is the files that finish a setup and the answer library, and nothing else', () => {
+		expect([...DEVICE_FILES].sort()).toEqual(
+			[...SET_UP_FILES, `${CORPUS_BASE}.json`, `${CORPUS_BASE}.embeddings.bin`].sort()
+		);
+		expect(SET_UP_FILES.filter((path) => path.startsWith('/corpus/'))).toEqual([]);
+		expect(new Set(DEVICE_FILES).size).toBe(DEVICE_FILES.length);
 	});
 });
 

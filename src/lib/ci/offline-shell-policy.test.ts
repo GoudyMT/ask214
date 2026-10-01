@@ -55,25 +55,37 @@ describe('the worker installs the pages the budget counts', () => {
 // release's asset list after a newer release may already be installed. The prune itself deletes on the version rule
 // alone: a condition that holds an old answer library back would fill a nearly full device for good.
 describe('the worker does its install and activate work in order', () => {
-	it('awaits the restore then the script keep at install, and the prune then the claim at activate, starting both retries unawaited and chaining nothing after them, and prunes on the version rule alone', () => {
-		const worker = readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8');
-		/** The `sw.addEventListener(name, ...)` call, up to the `});` that closes it at the start of a line. */
-		const handler = (name: string) => {
-			const start = worker.indexOf(`sw.addEventListener('${name}'`);
-			expect(start, name).toBeGreaterThanOrEqual(0);
-			return worker.slice(start, worker.indexOf('\n});', start));
-		};
-		/** The first statement that does not appear after the one before it, or undefined when all do in order. */
-		const firstOutOfOrder = (source: string, statements: RegExp[]) => {
-			let from = 0;
-			for (const statement of statements) {
-				const at = source.slice(from).search(statement);
-				if (at < 0) return String(statement);
-				from += at + 1;
-			}
-			return undefined;
-		};
+	const worker = readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8');
+	const assetCache = readFileSync(join(process.cwd(), 'src/lib/ask/asset-cache.ts'), 'utf8');
 
+	/** The `sw.addEventListener(name, ...)` call, up to the `});` that closes it at the start of a line. */
+	const handler = (name: string) => {
+		const start = worker.indexOf(`sw.addEventListener('${name}'`);
+		expect(start, name).toBeGreaterThanOrEqual(0);
+		return worker.slice(start, worker.indexOf('\n});', start));
+	};
+	/** A top-level function's text, up to the `}` that closes it at the start of a line. */
+	const functionIn = (source: string, signature: string) => {
+		const start = source.indexOf(signature);
+		expect(start, signature).toBeGreaterThanOrEqual(0);
+		return source.slice(start, source.indexOf('\n}', start));
+	};
+	/** Where `name(` is called in the worker: not where it is defined, and not a longer name ending in it. */
+	const callsOf = (name: string) => [
+		...worker.matchAll(new RegExp(`(?<![\\w.]|function )${name}\\(`, 'g'))
+	];
+	/** The first statement that does not appear after the one before it, or undefined when all do in order. */
+	const firstOutOfOrder = (source: string, statements: RegExp[]) => {
+		let from = 0;
+		for (const statement of statements) {
+			const at = source.slice(from).search(statement);
+			if (at < 0) return String(statement);
+			from += at + 1;
+		}
+		return undefined;
+	};
+
+	it('awaits the restore then the script keep at install, and the prune then the claim at activate, starting both retries unawaited and chaining nothing after them', () => {
 		expect(
 			firstOutOfOrder(handler('install'), [
 				/\n\s*await restoreKeptLibraries\(cacheNames\);/,
@@ -98,21 +110,81 @@ describe('the worker does its install and activate work in order', () => {
 		expect(activate, 'something is chained after the library retry').not.toMatch(
 			/restoreKeptLibraries\(keys\)\s*\./
 		);
-		expect(activate.match(/pruneSupersededVersions\(/g), 'a second prune at activate').toHaveLength(
-			1
-		);
+	});
 
-		// The prune's one delete hangs on the version rule and nothing else, and it reads every same-origin entry, so
-		// no entry is held back by a condition of its own.
-		const start = worker.indexOf('async function pruneSupersededVersions(');
-		expect(start, 'the prune function').toBeGreaterThanOrEqual(0);
-		const prune = worker.slice(start, worker.indexOf('\n}', start));
+	// Counted over the whole file, not one handler: a second prune or a second restore placed anywhere - a helper
+	// that activate calls, a callback chained to a retry - changes what runs when, and a pin that reads only the
+	// activate handler would not see it.
+	it('calls the prune once, at activate and not at install, and each restore once at install and once, unawaited, after activation', () => {
+		expect(callsOf('pruneSupersededVersions'), 'prune calls in the worker').toHaveLength(1);
+		expect(
+			callsOf('pruneSupersededEntries'),
+			'calls of the shared prune in the worker'
+		).toHaveLength(1);
+		expect(handler('install'), 'the prune runs at install').not.toMatch(/prune/i);
+		expect(
+			handler('activate').match(/pruneSupersededVersions\(/g),
+			'the prune at activate'
+		).toHaveLength(1);
+
+		for (const retry of ['restoreKeptLibraries', 'keepEmbedWorkerScript']) {
+			expect(callsOf(retry), `${retry} calls in the worker`).toHaveLength(2);
+			expect(
+				handler('install').match(new RegExp(`await ${retry}\\(cacheNames\\);`, 'g')),
+				retry
+			).toHaveLength(1);
+			expect(
+				handler('activate').match(new RegExp(`void ${retry}\\(keys\\);`, 'g')),
+				retry
+			).toHaveLength(1);
+		}
+	});
+
+	it('chains no prune after a retry: nothing follows the last retry, and no retry has a callback', () => {
+		const activate = handler('activate');
+		const afterRetries = activate.slice(
+			activate.indexOf('void keepEmbedWorkerScript(keys);') +
+				'void keepEmbedWorkerScript(keys);'.length
+		);
+		expect(afterRetries.replace(/\s|[)}(;]/g, ''), 'something follows the last retry').toBe('');
+
+		const lastRetry = Math.max(...callsOf('restoreKeptLibraries').map((call) => call.index));
+		for (const prune of callsOf('pruneSupersededVersions'))
+			expect(prune.index, 'a prune is called after a retry').toBeLessThan(lastRetry);
+
+		for (const retry of ['restoreKeptLibraries', 'keepEmbedWorkerScript']) {
+			expect(worker, `a callback is chained to ${retry}`).not.toMatch(
+				new RegExp(`${retry}\\([^)]*\\)\\s*\\.(then|catch|finally)\\(`)
+			);
+			expect(functionIn(worker, `async function ${retry}(`), `${retry} runs a prune`).not.toMatch(
+				/pruneSuperseded\w*\(/
+			);
+		}
+	});
+
+	// The wrapper only guards the shared prune, which the full-disk test also runs; the prune's one delete hangs on
+	// the version rule and nothing else, and it reads every same-origin entry, so no entry is held back by a
+	// condition of its own.
+	it('guards the shared prune in the worker, and the shared prune deletes on the version rule alone', () => {
+		const wrapper = functionIn(worker, 'async function pruneSupersededVersions(');
+		expect(wrapper, 'the wrapper skips a device with no asset cache').toMatch(
+			/if \(!cacheNames\.includes\(ASK_ASSET_CACHE\)\) return;/
+		);
+		expect(
+			wrapper,
+			'the wrapper does not guard the prune, or does not call the shared one'
+		).toMatch(
+			/try \{\s*await pruneSupersededEntries\(await caches\.open\(ASK_ASSET_CACHE\), sw\.location\.origin, ASSETS\);\s*\} catch \{/
+		);
+		expect(wrapper.match(/\.delete\(/g), 'the wrapper deletes itself').toBeNull();
+
+		const prune = functionIn(assetCache, 'export async function pruneSupersededEntries(');
 		expect(prune.match(/\.delete\(/g), 'the prune deletes in more than one place').toHaveLength(1);
 		expect(prune, 'the prune deletes on something besides the version rule').toMatch(
-			/of held\) \{\s*if \(isSupersededVersionedEntry\(pathname, ASSETS\)\) await cache\.delete\(request\);\s*\}/
+			/of held\) \{\s*if \(isSupersededVersionedEntry\(pathname, shipped\)\) await cache\.delete\(request\);\s*\}/
 		);
 		expect(prune, 'the prune reads fewer than every same-origin entry').toMatch(
-			/if \(url\.origin === sw\.location\.origin\) held\.push\(\{ request, pathname: url\.pathname \}\);/
+			/if \(url\.origin === origin\) held\.push\(\{ request, pathname: url\.pathname \}\);/
 		);
 	});
 });

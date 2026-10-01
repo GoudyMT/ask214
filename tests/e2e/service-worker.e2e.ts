@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { SET_UP_FILES } from '../../src/lib/ask/asset-cache';
 
 test('service worker registers and activates on home page', async ({ page }) => {
 	await page.goto('/');
@@ -57,21 +58,24 @@ test('activate drops a superseded corpus entry and keeps the heavy model bytes',
 
 	// Mirrors ASK_ASSET_CACHE in src/lib/ask/asset-cache.ts.
 	const ASSET_CACHE = 'ask-assets-v1';
-	// Stand-ins for the multi-megabyte artifacts: a corpus filename no build has ever shipped, so it cannot
-	// be in the asset list - exactly the position a retired generation is in - and a /models/ entry that is
-	// likewise absent from the list, which the prune must still keep because it is outside /corpus/.
+	// Stand-in for the multi-megabyte answer library: a corpus filename no build has ever shipped, so it cannot
+	// be in the asset list - exactly the position a retired generation is in. The device is a set-up one: every
+	// model and runtime file the worker counts as a finished setup, which the prune must keep because they are
+	// outside /corpus/, and a /models/ entry that is likewise absent from the list.
 	const STALE_CORPUS = '/corpus/corpus-v0.0.0-superseded.json';
 	const MODEL_PROBE = '/models/e2e-prune-probe.onnx';
+	const SET_UP = [...SET_UP_FILES];
 
 	await page.goto('/');
 	await page.evaluate(() => navigator.serviceWorker.ready);
 	await page.evaluate(
-		async ({ cacheName, stale, model }) => {
+		async ({ cacheName, stale, model, setUp }) => {
 			const cache = await caches.open(cacheName);
 			await cache.put(stale, new Response('stale corpus'));
 			await cache.put(model, new Response('model bytes'));
+			for (const path of setUp) await cache.put(path, new Response('bytes'));
 		},
-		{ cacheName: ASSET_CACHE, stale: STALE_CORPUS, model: MODEL_PROBE }
+		{ cacheName: ASSET_CACHE, stale: STALE_CORPUS, model: MODEL_PROBE, setUp: SET_UP }
 	);
 
 	// Unregister, then reload for a fresh install + activate over the seeded cache - the position a returning
@@ -107,6 +111,7 @@ test('activate drops a superseded corpus entry and keeps the heavy model bytes',
 	expect(cached).not.toContain(STALE_CORPUS);
 	// Also the guard against a vacuous pass: an emptied cache satisfies the line above but fails this one.
 	expect(cached).toContain(MODEL_PROBE);
+	for (const path of SET_UP) expect(cached, path).toContain(path);
 });
 
 // The embed worker's script is left out of the build list the service worker precaches, and an update deletes the
@@ -124,7 +129,8 @@ test.describe('install keeps the embed worker script for a device that set up on
 
 	// Mirrors ASK_ASSET_CACHE in src/lib/ask/asset-cache.ts.
 	const ASSET_CACHE = 'ask-assets-v1';
-	const MODEL_PROBE = '/models/e2e-worker-probe.onnx';
+	// What a finished setup holds: every model and runtime file. A setup stopped part-way holds only some.
+	const SET_UP = [...SET_UP_FILES];
 	const WORKER_SCRIPT = /^\/_app\/immutable\/workers\/embed-worker-[^/]+\.js$/;
 
 	/** Seed the asset cache as given, replace the worker by unregistering it and reloading, and return what the release caches hold. */
@@ -185,9 +191,16 @@ test.describe('install keeps the embed worker script for a device that set up on
 	test('a set-up device gets the script at install, without the page asking for it', async ({
 		page
 	}) => {
-		const { workerScripts, requested } = await installAgain(page, [MODEL_PROBE]);
+		const { workerScripts, requested } = await installAgain(page, SET_UP);
 		expect(workerScripts).toHaveLength(1);
 		expect(requested.filter((path) => WORKER_SCRIPT.test(path))).toEqual([]);
+	});
+
+	test('a setup stopped part-way gets no worker script', async ({ page }) => {
+		// The model's small files stored, the model and the runtime not yet.
+		const { workerScripts, shell } = await installAgain(page, SET_UP.slice(0, 3));
+		expect(shell).toEqual(['/']);
+		expect(workerScripts).toEqual([]);
 	});
 
 	test('a device that did not set up gets no worker script', async ({ page }) => {
