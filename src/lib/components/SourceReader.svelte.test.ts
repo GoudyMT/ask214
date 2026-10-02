@@ -1044,6 +1044,9 @@ describe('SourceReader with a served document', () => {
 				requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 			);
 		try {
+			// Nothing held, so the Save offers a save and says what a first one also stores: always the same two parts
+			// showing late, waited for below.
+			await caches.delete(ASK_ASSET_CACHE);
 			await page.viewport(390, 844);
 			const { container } = render(SourceReader, {
 				props: {
@@ -1095,6 +1098,15 @@ describe('SourceReader with a served document', () => {
 				expect(inView()).toBe(9);
 				expect(number()?.value).toBe('9');
 			});
+			// The turn builds the foot again inside the body, above the pages, and its Save shows only once it has read
+			// the device: its button and line push the pages down until the reader puts the view back, which it does
+			// before the next frame is drawn. A read in between sees a place no one sees, so the place is read after a
+			// frame drawn with the Save in place.
+			await vi.waitFor(() => {
+				expect(body.querySelector('.reader__foot .save')).not.toBeNull();
+				expect(body.querySelector('.reader__foot .save__line')).not.toBeNull();
+			});
+			await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 			expect(place().n).toBe(before.n);
 			expect(place().at).toBeCloseTo(before.at, 2);
 		} finally {
