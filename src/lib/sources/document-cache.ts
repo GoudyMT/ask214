@@ -4,16 +4,17 @@ import { LIBRARY_SRC, WORKER_SRC } from './pdf-library-paths';
 /**
  * Whether a served document is already held on this device.
  *
- * The reader asks before a document's first download and goes straight to the text when it is offline with
- * nothing saved, so it needs to know before it tries. Only the user's save stores a document, in the asset
- * cache, so that cache is the one place to look.
+ * The reader opens a document at once, but offline with the document not saved it goes straight to the text,
+ * since a load that must fail would only delay it, so it needs to know before it tries. Only the user's save
+ * stores a document, in the asset cache, so that cache is the one place to look.
  *
  * The lookup ignores Vary, so a held copy is found by its path alone, whatever headers the request that
- * stored it carried. A copy that read as absent while it is held would have the reader ask to download a
- * document the user already has.
+ * stored it carried. A copy that read as absent while it is held would send an offline reader to the text of a
+ * document whose pages it has.
  *
  * Every failure answers "not saved" - no Cache API (some private windows), a cache that will not open, a
- * lookup that throws. That is the safe direction: the reader asks rather than promising an offline copy.
+ * lookup that throws. That is the safe direction: offline, the reader shows the text rather than a load that
+ * cannot work.
  *
  * @param path The document's served path, as `localDocumentPath` returns it.
  * @param cachesApi The Cache API; injected by tests, the browser's own by default.

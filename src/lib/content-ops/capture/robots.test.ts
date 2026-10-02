@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { isPathAllowed } from './robots';
 
-const UA = 'MilTransitionCompanion';
+const UA = 'Ask214';
 
 describe('isPathAllowed', () => {
 	test('empty / missing robots.txt allows everything', () => {
@@ -26,10 +26,10 @@ describe('isPathAllowed', () => {
 	});
 
 	test('a spurious substring group (matching only the UA comment) does not hijack our UA', () => {
-		// the full UA carries a "(+contact: ...)" comment; a robots group naming "contact" must NOT capture
+		// the full UA carries a "(+https://...)" comment; a robots group naming "about" must NOT capture
 		// us - matching is on the product token (before "/"), so this falls through to the * group (allow).
-		const fullUA = 'MilTransitionCompanion/1.0 (+contact: pending domain)';
-		const txt = 'User-agent: contact\nDisallow: /\nUser-agent: *\nDisallow:';
+		const fullUA = 'Ask214/1.0 (+https://ask214.com/about)';
+		const txt = 'User-agent: about\nDisallow: /\nUser-agent: *\nDisallow:';
 		expect(isPathAllowed(txt, fullUA, '/anything')).toBe(true);
 	});
 });

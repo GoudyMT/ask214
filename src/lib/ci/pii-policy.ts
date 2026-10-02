@@ -3,9 +3,9 @@
  *
  * Project hard rule: PII never leaves the device. Server-side SvelteKit
  * source (`+server.ts`, `*.server.ts`, `hooks.server.ts`) must never reference a
- * ProfileV1 PII field. v1.0 ships ZERO server files, so this is a forward guard for
- * Phase 3+ backend work - it fails the test suite (pre-commit + CI) the moment a
- * server file names a profile PII field.
+ * ProfileV1 PII field. The one server route today, the feedback endpoint, reads none;
+ * the guard fails the test suite (pre-commit + CI) the moment any server file names a
+ * profile PII field.
  *
  * Implemented as a vitest test rather than a bash CI step:
  * cross-platform, runs in pre-commit AND CI, TDD-native.

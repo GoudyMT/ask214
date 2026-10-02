@@ -1,121 +1,182 @@
-# Backend + Online Synthesis - Engineering Decisions
+# Backend and Online Synthesis: Engineering Decisions
 
 ## Overview
 
-The app answers questions two ways: fully offline on the user's own device, or online through a small server that runs the same search over the same public government documents. This section documents the online path - a stateless, secret-free retrieval service built entirely on a cloud free tier and designed so it can never generate a bill. The service turns a question into a vector, searches a pre-computed index of public documents, and returns the matching passages with their sources. An optional AI-written summary is a later phase, kept on the user's own device and key, so no key or question reaches our servers.
-
-The retrieval service is in active development. The architecture below is locked, and each load-bearing assumption was validated by a pre-build spike before any code depended on it - the model's quality on live serving, the free-tier limits, and the browser reachability of the summarization path.
+Ask answers online through a small search server on Cloudflare that holds no secrets, keeps no logs and is built
+to cost nothing. An optional written summary goes from the user's browser straight to the AI provider, with the
+user's own key. The app's one other server path is the feedback form. Each decision's full reasoning is kept in
+private working notes.
 
 ## Stack at a Glance
 
-| Layer              | Tool                             | Tier | Purpose                                               |
-| ------------------ | -------------------------------- | ---- | ----------------------------------------------------- |
-| Compute            | Cloudflare Workers               | free | Stateless request handler at the edge                 |
-| Server inference   | Workers AI (`bge-small-en-v1.5`) | free | Embed the question into a 384-dimension vector        |
-| Shared counter     | Durable Objects (SQLite-backed)  | free | Global daily-usage circuit-breaker                    |
-| Index storage      | Workers KV                       | free | Hold the ~2.9 MB vector index; read once per instance |
-| Repeat-query cache | Workers Cache API                | n/a  | Skip re-embedding identical questions                 |
-| Vector search      | Hand-rolled cosine top-k (TS)    | n/a  | Rank passages; shared with the offline path           |
-| Burst control      | WAF rate-limiting rule           | free | Per-IP request limit                                  |
-| Edge config        | `wrangler.jsonc`                 | n/a  | Logging off, no secrets, no gateway                   |
+| Layer        | Tool                            | Tier       | Purpose                           |
+| ------------ | ------------------------------- | ---------- | --------------------------------- |
+| Compute      | Cloudflare Workers              | Free       | The search server                 |
+| Embeddings   | Workers AI, `bge-small-en-v1.5` | Free       | Turns a question into 384 numbers |
+| Index        | Workers KV                      | Free       | The server's search index         |
+| Daily budget | Durable Object (SQLite)         | Free       | A shared daily counter            |
+| Burst limit  | Workers rate-limit binding      | Free       | 20 requests a minute per address  |
+| Search       | Cosine top-k in TypeScript      | n/a        | Shared with the device path       |
+| Summary      | Anthropic Messages API          | User's key | Optional, browser-direct          |
+| Feedback     | Resend                          | Free       | Emails a feedback message         |
 
 ## Decisions and Reasoning
 
-### Zero operating cost as an architectural constraint
+### Zero operating cost
 
-**What it is.** The service is designed to run at $0 as usage grows - not merely "cheap."
+**What it is.** The online path is built to cost nothing at any level of use. Every limit it touches stops with
+an error instead of charging: Workers' 100,000 requests a day, Workers AI's 10,000 neurons a day and KV's 1,000
+writes a day. The account is on the free plan with no payment method, so there is nothing to bill.
 
-**Why this project uses it.** The app has no revenue and carries no ads; a bill that scales with users would be an existential risk.
-
-**How it is guaranteed.** Every free limit on the platform (compute requests, database writes, the model's daily budget) stops with an error rather than charging, and the account carries no payment method and is never on a paid plan - so there is structurally nothing to bill.
-
-**Tradeoffs accepted.** Under heavy load or a determined attack, the online path can degrade to "high demand - use offline mode" for the rest of the day. It degrades; it never bills. For a free public service, that is the right trade. -> [ADR-005](../decisions/005-hybrid-retrieval-synthesis.md), [ADR-025](../decisions/025-stateless-backend-security-model.md).
-
----
-
-### Server-side embeddings on the edge
-
-**What it is.** The server converts a question into a 384-number vector using a compact open embedding model run on the provider's edge inference.
-
-**Why this project uses it.** The online path exists for users who cannot or do not want to download the ~50 MB on-device model. Embedding at the edge gives them an instant, zero-download answer with the same search-and-cite behavior.
-
-**Considered alternatives.** A managed vector database - rejected as unnecessary cost and an added data-custody question for a small, static index. A larger embedding model - rejected because a pre-build spike showed the compact model clears our quality floor on real serving.
-
-**Tradeoffs accepted.** Two embedding models now exist (device and server); they must be evaluated and versioned together so both meet the same bar. -> [ADR-025](../decisions/025-stateless-backend-security-model.md).
+**Tradeoffs accepted.** Under heavy use or an attack, online search answers "high demand" until midnight UTC and
+the app offers the on-device path instead. It degrades; it never bills.
 
 ---
 
-### A Durable Object for the usage circuit-breaker (the choice we changed)
+### An isolated search Worker
 
-**What it is.** A single, always-consistent object holds today's running usage total. As usage nears the free ceiling, the service pre-emptively returns "high demand" for everyone until the daily reset - an abrupt cutoff becomes a predictable, graceful degrade.
+**What it is.** `workers/retrieve` is its own Worker, `ask214-retrieve`, and Cloudflare routes
+`ask214.com/api/retrieve` to it. `wrangler.jsonc` turns observability off and holds no secrets; the KV
+namespace id is supplied at deploy and never committed.
 
-**Considered alternatives.** A key-value store (KV) is the obvious first reach, but its free tier allows only ~1,000 writes/day and can read a just-written value back stale - a per-request counter would exhaust that budget and miscount. Durable Objects, historically a paid feature, now offer a free SQLite-backed tier suited exactly to this one-shared-counter job.
+**How a request runs** (`src/lib/ask/online/plan-retrieve.ts`). Cheap checks first: POST only (405 otherwise),
+from `https://ask214.com` only (403), and the question cut to 400 characters. Then the per-address limit,
+then the daily budget, and only then the embedding. Matches scoring below 0.6 are dropped and at most 5 return,
+with the index version. A genuine no-match answers `empty`; any failure answers `error`, without the question.
 
-**Why the change.** The design first noted "KV or a Durable Object." Researching the free-tier limits settled it decisively: the Durable Object is both the correct tool (accurate, shared, instant) and now free, where KV is neither accurate enough nor within budget for a per-request counter.
+**Why this project uses it.** "No secrets, no logs" becomes a property of one small file a reviewer can read in
+full.
 
-**Tradeoffs accepted.** One more moving part than a single KV key - but KV cannot do this job within the free tier, so the "simpler" option was a false economy. -> [ADR-025](../decisions/025-stateless-backend-security-model.md).
-
----
-
-### KV for the index, read once and held in memory
-
-**What it is.** The ~2.9 MB search index (public documents pre-computed into vectors) lives in KV, is read once when a server instance warms up, and is then kept in memory for every later request.
-
-**Considered alternatives.** Bundling the index into the Worker's code risks the free code-size limit.
-
-**Tradeoffs accepted.** The first request to a cold instance pays a one-time read; every warm request is instant. Reads are the cheap, plentiful free operation, so this fits comfortably.
+**Tradeoffs accepted.** It deploys by hand with wrangler, apart from the app's automatic deploy, so a new index
+version needs a manual upload and redeploy; a manual check after every merge asks the live server one question.
 
 ---
 
-### The Workers Cache API for repeated questions
+### Server embeddings
 
-**What it is.** Identical questions reuse a cached vector instead of paying to compute it twice.
+**What it is.** Workers AI runs `bge-small-en-v1.5` on the question with its search instruction prefix (the
+passages were embedded without it). The vector is compared with every passage by cosine similarity, using the
+same search code as the on-device path (`src/lib/corpus/search.ts`).
 
-**Why the Cache API and not KV.** The cache is written on a miss; KV's ~1,000-writes-per-day cap would choke, while the Cache API is free with unlimited writes.
+**Why this project uses it.** People who skip the 55 MB on-device setup still get an answer at once, with the
+same citations.
 
-**Tradeoffs accepted.** The cache is best-effort - an evicted entry simply recomputes. No correctness risk.
+**Considered alternatives.** A managed vector database (a cost, and one more place data could sit). A larger
+model (the small one passes the quality floor on the live service).
 
----
-
-### An isolated, secret-free Worker
-
-**What it is.** The retrieval service is its own single-purpose Worker with logging disabled and no secrets, rather than a route inside the main application.
-
-**Why this project uses it.** "No secrets, no logging, no data retention" becomes a property of one small config file a reviewer can read in full, instead of a promise spread across a larger app with other concerns. The service holds no keys at all - the optional AI-summary feature uses the user's own key, called directly from their browser, so no key ever reaches our servers.
-
-**Tradeoffs accepted.** A second deploy target and a routing rule - worth it for a guarantee you can verify by reading one file. -> [ADR-025](../decisions/025-stateless-backend-security-model.md).
+**Tradeoffs accepted.** Two models, bge on the server and MiniLM on the device, must each pass their own quality
+floor. CI runs the device gate; the server gate needs live Workers AI, so it runs by hand.
 
 ---
 
-### Two independent indexes, one build
+### The index in KV
 
-**What it is.** A single content build emits two search indexes from the same public documents - one for the on-device model, one for the server model - carrying the same version.
+**What it is.** Two KV keys hold the index: the passages with their sources (4.3 MB) and the vectors (3.1 MB).
+Each Worker instance reads them once, checks they were built with the expected model, and keeps the decoded
+index in memory. Concurrent first requests share one read, and a failed read is retried by the next request.
 
-**Why this project uses it.** The offline and online paths must return comparable results and cite the same sources. Building both from one pipeline keeps them honest, and a version handshake lets the client detect and refuse a mismatched server.
+**Considered alternatives.** Bundling the index into the Worker, which risks the code-size limit.
 
-**Tradeoffs accepted.** The build does twice the embedding work and ships a second index; the payoff is that offline and online are the same product, not two that drift apart.
+**Tradeoffs accepted.** The first request to a fresh instance pays the read.
+
+---
+
+### The daily budget
+
+**What it is.** One global, SQLite-backed Durable Object counts each question at an estimated one neuron. Once
+the UTC day's count reaches 65% of the free 10,000, about 6,500 questions, it returns "high demand" to everyone
+until midnight UTC. The per-address limit runs first, so a limited request spends no budget.
+
+**Considered alternatives.** A KV counter: 1,000 writes a day is far too few for a per-request count, and KV can
+read back a stale value. A Durable Object is consistent, and the SQLite kind is on the free plan.
+
+**Tradeoffs accepted.** One more moving part, and the per-question cost is an estimate, so the 35% margin is
+headroom, not a meter. Cloudflare's rate limiter is eventually consistent, so the per-address limit is
+approximate.
+
+---
+
+### One set of passages, two indexes
+
+**What it is.** The corpus build embeds one set of passages twice: with MiniLM for the device (`pnpm embed`)
+and with bge through Workers AI for the server (`pnpm embed:bge`). Both carry version 1.0.2. The app checks the
+version on every online answer and treats a server on another version as unavailable, because a different index
+could cite passages the app cannot show.
+
+**Tradeoffs accepted.** Twice the embedding work, and two artifacts to ship together.
+
+---
+
+### Online Ask in the app
+
+**What it is.** Online is the default mode. Before a device's first online question, the app asks for consent
+once and remembers it. The request body is exactly `{ "query": ... }`, sent without cookies and with a
+15-second timeout. A message that reads as a crisis is never sent: the app shows crisis line help at once. If
+online search fails, the app offers on-device search; if both fail, it points to va.gov.
+
+**Why this project uses it.** Only the question text leaves the device, and only after the user agrees.
+
+**Tradeoffs accepted.** One extra tap before the first online question.
+
+---
+
+### The written summary
+
+**What it is.** Optional. In Settings the user enters their own Anthropic API key, stored encrypted on the
+device. With the summary on, the browser sends the question and the matched passages (id and text only) straight
+to the Messages API (`claude-sonnet-5`, at most 1,024 tokens, a 30-second timeout). An allowlist limits the
+request to five fields, so no user or tracking field can be added. Our servers never see the key, the request or
+the summary.
+
+**Safety layers** (`src/lib/ask/synthesis/`):
+
+- A question about the user's own eligibility never reaches the model. The app answers impersonally and points
+  to an accredited VSO or va.gov (38 CFR 14.629).
+- The system prompt limits the model to the given passages and impersonal answers, forbids advice, and treats
+  the question as data, not instructions.
+- Every citation must name a passage that was sent, and every number must appear in the cited passages;
+  otherwise the summary is refused and the source cards stand alone.
+- A crisis or "not covered" reply is recognised, and the app shows its own wording instead of the model's.
+
+**Tradeoffs accepted.** The user needs a key and pays the provider for their own use. Strict checks sometimes
+refuse a correct summary.
+
+---
+
+### Feedback
+
+**What it is.** `/api/feedback`, in the app's own Worker, validates the message, an optional reply address, the
+page it came from and a spam trap, then emails it to the developer through Resend, with the key held as a
+deployment secret. It is not stored. Each address may send three a minute; if sending fails, the form offers a
+direct email address.
+
+**Tradeoffs accepted.** The message passes through a third-party mail service; the form says it is emailed and
+not stored.
 
 ## How These Pieces Fit Together
 
-A question arriving online is checked cheaply first - from our own site? short enough? budget intact? - before any metered work happens. Only then is it embedded on the edge, searched against the in-memory index, and returned as cited passages or an honest "no official source covers that." A per-IP rate limit blunts bursts; the shared circuit-breaker caps the day; every failure path degrades to the offline experience rather than to a blank screen or a bill. Because the decision rules live in ordinary unit-tested functions and only a thin layer touches the platform, most of the service is testable on a laptop, and the risky parts were de-risked by spikes first.
+A question is checked on the device for consent and crisis, and at the server for origin, rate and budget,
+before any metered work runs. Every failure falls back to the device or to official links, never to a bill. The
+summary runs only between the user's browser and the provider, behind checks that refuse anything the passages
+do not support.
 
 ## Standards Adopted in This Section
 
-- **$0 or it does not ship.** No design may introduce a cost that scales with usage; the no-payment-method account is the hard guarantee.
-- **Empirical build-gates.** Load-bearing platform assumptions (model quality on real serving, free-tier limits, browser reachability) must pass a real spike before code depends on them.
-- **Zero secrets server-side.** The retrieval Worker holds no keys; any provider call uses the user's own key, browser-direct.
-- **Degrade, never bill; degrade, never lie.** Only a genuine empty result shows the "no source" message; every failure degrades to another path.
-- **Pure logic out of the runtime.** Decision rules are unit-tested functions; the platform layer is thin glue.
+- **No cost that scales with use.** The free plan with no payment method is the hard guarantee.
+- **No secrets and no logs on the search server.**
+- **Degrade, never bill; degrade, never mislead.** A fault is never shown as an empty search.
+- **Decision logic in tested functions**, with the platform code kept thin.
 
 ## Further Reading
 
-- Cloudflare Workers: https://developers.cloudflare.com/workers/
-- Workers AI: https://developers.cloudflare.com/workers-ai/
-- Durable Objects: https://developers.cloudflare.com/durable-objects/
-- Workers KV: https://developers.cloudflare.com/kv/
-- Cache API: https://developers.cloudflare.com/workers/runtime-apis/cache/
-- WAF rate limiting: https://developers.cloudflare.com/waf/rate-limiting-rules/
+- Cloudflare Workers limits: https://developers.cloudflare.com/workers/platform/limits/
+- Workers AI pricing: https://developers.cloudflare.com/workers-ai/platform/pricing/
+- Durable Objects pricing: https://developers.cloudflare.com/durable-objects/platform/pricing/
+- Workers KV limits: https://developers.cloudflare.com/kv/platform/limits/
+- Rate limiting binding: https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
+- Anthropic Messages API: https://docs.anthropic.com/en/api/messages
 
 ## Revision Notes
 
-- 2026-07-29 (initial draft): Backend retrieval architecture + the $0 model captured at Phase-2 task-detailing. The usage circuit-breaker was resolved to a SQLite-backed Durable Object over KV after free-tier research. The on-device/server duality and the isolated secret-free Worker are locked; the optional bring-your-own-key summary path is documented when built.
+- 2026-07-29: First draft, the retrieval architecture and the zero-cost model.
+- 2026-10-02: Updated to the live service; the query cache, never built, removed.

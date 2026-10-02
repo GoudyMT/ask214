@@ -43,8 +43,9 @@ const EXTRACTED_DIR = REFRESH_MODE
 	: 'content-ops/extracted'; // per-source extractor output
 const MANUAL_HTML_DIR = 'content-ops/staged/manual-html'; // human-saved page HTML for bot-blocked sources
 
-// Identifying User-Agent for polite scraping; contact URL added once the domain is decided.
-const USER_AGENT = 'MilTransitionCompanion/1.0 (+contact: pending domain)';
+// Identifying User-Agent for polite scraping: robots.txt groups match its product token, and its URL is the
+// About page, which explains the app and lists every source it fetches.
+const USER_AGENT = 'Ask214/1.0 (+https://ask214.com/about)';
 
 // Sources whose host blocks a plain fetch: dol renders under a real headless browser; tsp is Akamai-protected
 // (blocks headless too) -> manual saved-HTML, the last resort (we do not defeat bot-protection).

@@ -41,8 +41,8 @@
 
 	let { children } = $props();
 
-	// Shell content width per route: the whole shell (nav/main/footer) widens together on a wide
-	// route (timeline -> 1024px) via the --shell-width CSS var; other routes keep the 720px column.
+	// Shell content width: one width for every route (shell-width.ts), set on nav, main and footer through
+	// the --shell-width CSS var. The 720px in the styles below is only the fallback for a missing var.
 	const shellWidth = $derived(shellWidthFor(page.route.id));
 
 	// Auto-lock the in-memory profile after 15 minutes of no user input (memory hygiene;
@@ -315,8 +315,7 @@
 	}
 
 	/* Lock #2: right-aligned nav (brand left, nav right) via flex space-between. */
-	/* Lock #1: 720px content container; 1024px wider variant ships when a */
-	/* dashboard/timeline route lands (Phase 2+). */
+	/* Content width from --shell-width, one value for every route; 720px is only the fallback. */
 	nav {
 		display: flex;
 		align-items: center;
@@ -360,7 +359,7 @@
 		color: var(--color-fg);
 	}
 
-	/* Lock #1 + #9: 720px content container; body content inherits the same width. */
+	/* The same --shell-width as the nav and footer; body content inherits the width. */
 	main {
 		max-width: var(--shell-width, 720px);
 		margin: 0 auto;
