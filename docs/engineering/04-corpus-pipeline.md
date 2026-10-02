@@ -140,7 +140,8 @@ changes its bytes.
 **Why Python.** Its PDF libraries replace images in place and Node's do not. The decision stays in TypeScript,
 so the Python step cannot ship anything by itself.
 
-**Tradeoffs accepted.** Some pages lose pictures, and the Python libraries are not pinned in the repository.
+**Tradeoffs accepted.** Some pages lose pictures. The Python step uses two of pypdf's private modules, so its
+libraries are pinned to exact versions in `content-ops/requirements.txt`, and every upgrade needs a re-check.
 
 ## How These Pieces Fit Together
 

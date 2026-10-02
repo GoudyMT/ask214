@@ -1,0 +1,6 @@
+# The served-PDF scripts (derive_served_pdfs.py, compare_served_quality.py), run with Python 3.12.
+# Exact versions: derive_served_pdfs.py imports two of pypdf's private modules, which can change in any
+# release, so an upgrade is re-checked with `pnpm verify:pdfs` before it is pinned here.
+#   python -m pip install -r content-ops/requirements.txt
+pypdf==6.6.0
+Pillow==11.2.1
