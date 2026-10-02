@@ -70,8 +70,9 @@ Defense, or any U.S. Government agency.
 Apache License 2.0
 ================================================================================
 
-The Apache-2.0-licensed components above (Transformers.js and the
-all-MiniLM-L6-v2 model) are distributed under the Apache License, Version 2.0.
+The Apache-2.0-licensed components above (Transformers.js, the
+all-MiniLM-L6-v2 model and PDF.js) are distributed under the Apache License,
+Version 2.0.
 A copy of the license is available at:
 
     http://www.apache.org/licenses/LICENSE-2.0
