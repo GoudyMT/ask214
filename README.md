@@ -57,6 +57,8 @@ Privacy is the architecture, not a setting.
   contact is the AI provider, and only after you turn on the AI summary with your own key.
 - **The search server stores no questions.** It keeps no accounts and no logs of what you ask. To limit
   abuse, it counts requests from each address over one minute.
+- **Feedback is emailed, not stored.** A message from the feedback form, with a reply address if you give
+  one, goes to the developer by email through Resend. It is not stored on our servers.
 - **Boundaries.** Ask 214 does not provide legal, financial, or medical advice, and does not assist with
   VA claims (per 38 CFR 14.629). For anything affecting your benefits, it links you to accredited
   Veteran Service Organizations and official tools.
@@ -92,6 +94,10 @@ The app is written in TypeScript, with Svelte for the interface. The rest:
 - **Python.** `content-ops/derive_served_pdfs.py` makes the served copies of the official PDFs: the text
   stays byte-for-byte identical, and a picture stays only when its own metadata marks it public domain.
   `content-ops/compare_served_quality.py` compares those copies with the originals, picture by picture.
+
+How each part is built, and why, is written up in [`docs/engineering/`](docs/engineering/): the foundation,
+the app shell, online search and the written summary, the corpus pipeline, on-device Ask, the source reader,
+and personal data.
 
 ---
 
