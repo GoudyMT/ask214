@@ -1,3 +1,7 @@
 * text=auto eol=lf
 # The served documents are byte-checked against their captures; never let text=auto guess a PDF is text.
 *.pdf binary
+# Libraries copied in byte-for-byte and served as they are: kept out of GitHub's language statistics so the
+# language bar shows the code written here. The files stay in the repository and in diffs.
+static/pdf-worker/** linguist-vendored
+static/wasm/** linguist-vendored
