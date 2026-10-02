@@ -33,7 +33,7 @@ function parse(robotsTxt: string): Map<string, Rule[]> {
 export function isPathAllowed(robotsTxt: string, userAgent: string, path: string): boolean {
 	const groups = parse(robotsTxt);
 	// Match on the product token (the part before "/"), not the whole UA string - otherwise a robots group
-	// naming any substring of our UA comment (e.g. "contact" / "pending") could hijack the decision and flip
+	// naming any substring of our UA comment (e.g. "https" / "about") could hijack the decision and flip
 	// a Disallow to allow (fail-open). A group matches when our product token starts with its name.
 	const product = (userAgent.toLowerCase().split('/')[0] ?? '').trim();
 	const key = [...groups.keys()].find((k) => k !== '*' && product.startsWith(k)) ?? '*';
