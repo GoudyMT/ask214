@@ -3,8 +3,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { scanForPiiTokens } from './pii-policy';
 
-// Server-side SvelteKit source: anything that can execute on a server. v1.0 ships
-// none of these; the guard protects Phase 3+ backend work (PII stays on device).
+// Server-side SvelteKit source: anything that can execute on a server. The feedback
+// endpoint is the one today; the guard covers it and any added later (PII stays on device).
 const SERVER_FILE_PATTERN =
 	/(\+server\.[jt]s|\+page\.server\.[jt]s|\+layout\.server\.[jt]s|hooks\.server\.[jt]s)$/;
 
