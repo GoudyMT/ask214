@@ -164,7 +164,7 @@ do not support.
 
 - **No cost that scales with use.** The free plan with no payment method is the hard guarantee.
 - **No secrets and no logs on the search server.**
-- **Degrade, never bill; degrade, never mislead.** Only a genuine empty search says no source covers it.
+- **Degrade, never bill; degrade, never mislead.** A fault is never shown as an empty search.
 - **Decision logic in tested functions**, with the platform code kept thin.
 
 ## Further Reading
