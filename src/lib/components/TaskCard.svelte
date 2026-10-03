@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatTimelineDate } from '$lib/timeline/format-date';
+	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
 	import { resourcesForTask, afterLinkForTask } from '$lib/resources';
@@ -130,15 +130,7 @@
 		}
 	});
 
-	const daysLeftLine = $derived(
-		item.daysLeft === undefined
-			? ''
-			: item.daysLeft === 0
-				? 'today'
-				: item.daysLeft === 1
-					? '1 day'
-					: `${item.daysLeft} days`
-	);
+	const daysLeftLine = $derived(item.daysLeft === undefined ? '' : formatDaysLeft(item.daysLeft));
 
 	// After a firm date: what is still possible (late, closed), or what changed at a two-edge task's first edge.
 	const afterNote = $derived(

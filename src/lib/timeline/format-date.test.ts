@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { formatTimelineDate } from './format-date';
+import { formatTimelineDate, formatDaysLeft } from './format-date';
+
+describe('formatDaysLeft', () => {
+	it('says today on the last day, then one day, then a count', () => {
+		expect(formatDaysLeft(0)).toBe('today');
+		expect(formatDaysLeft(1)).toBe('1 day');
+		expect(formatDaysLeft(17)).toBe('17 days');
+	});
+});
 
 // formatTimelineDate turns an engine ISO date (YYYY-MM-DD, UTC-anchored from eaosOffsetDate)
 // into the human "Mon D, YYYY" form the timeline cards + the route subline display

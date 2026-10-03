@@ -88,6 +88,17 @@ describe('NeedsNow', () => {
 		expect(rows[1]?.textContent).toContain('Oct 20, 2026 - 1 day');
 		expect(rows[1]?.textContent).not.toContain('1 days');
 	});
+
+	it('says today, not 0 days, on a last day - the same words as the task card', () => {
+		const groups: NeedsNowGroups = {
+			...empty,
+			closingSoon: [item('bdd', 'File your VA claim through BDD', { daysLeft: 0 })]
+		};
+		const { container } = render(NeedsNow, { props: { groups } });
+		const row = container.querySelector('a.needs-now__row')?.textContent ?? '';
+		expect(row).toContain('Oct 20, 2026 - today');
+		expect(row).not.toContain('0 days');
+	});
 });
 
 // On a phone a long title and the date do not fit side by side, so the date drops under the title instead of

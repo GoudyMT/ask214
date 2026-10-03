@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatTimelineDate } from '$lib/timeline/format-date';
+	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import type { TimelineItem } from '$lib/timeline';
 	import type { NeedsNowGroups } from '$lib/timeline/needs-now';
 
@@ -18,7 +18,7 @@
 
 	function when(item: TimelineItem): string {
 		const f = formatTimelineDate;
-		const days = item.daysLeft === 1 ? '1 day' : `${item.daysLeft} days`;
+		const days = formatDaysLeft(item.daysLeft ?? 0);
 		switch (item.status) {
 			case 'late':
 				return `was due ${f(item.windowEndDate)}`;
