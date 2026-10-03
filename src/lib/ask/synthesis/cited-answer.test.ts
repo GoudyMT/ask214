@@ -15,7 +15,7 @@ describe('toCitedAnswer', () => {
 	});
 
 	// A chunk id ends in 12 hex characters, and the phone pattern below reads a long digit run as a
-	// contact number - 104 of the 1878 shipped ids trip it. Markers are stripped before detection, so the
+	// contact number - 91 of the 1992 shipped ids trip it. Markers are stripped before detection, so the
 	// inert list stays real contact tokens rather than fragments of a hash.
 	it('strips citation markers from the prose and does not read their hex as a phone number', () => {
 		const id = 'dod_skillbridge:71686373cd68';
