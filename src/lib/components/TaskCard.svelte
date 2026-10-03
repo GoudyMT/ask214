@@ -85,7 +85,11 @@
 	const STATUS_LABEL: Record<DisplayStatus, string> = {
 		upcoming: 'Upcoming',
 		'start-now': 'Start now',
-		overdue: 'Overdue',
+		'closing-soon': 'Closing soon',
+		late: 'Late',
+		changed: 'Changed',
+		closed: 'Closed',
+		'still-to-do': 'Still to do',
 		done: 'Done',
 		skipped: 'Skipped',
 		snoozed: 'Snoozed'
@@ -99,20 +103,51 @@
 		finance: 'Finance'
 	};
 
-	// Status-specific date line: upcoming -> when to start (target date);
-	// start-now -> the closing deadline; overdue -> how long past it. Resolved states use the
-	// collapsed treatment instead (this line is only read on open cards).
+	// The date line by status: when a window opens, a soft task's aim, a firm task's last day, when a passed date
+	// was due. Resolved states use the collapsed treatment instead.
+	const firm = $derived(item.def.kind !== 'soft');
 	const dateLine = $derived.by(() => {
-		const end = formatTimelineDate(item.windowEndDate);
+		const f = formatTimelineDate;
 		switch (item.status) {
+			case 'upcoming':
+				return `Opens ${f(item.windowStartDate)}`;
 			case 'start-now':
-				return `Window to ${end}`;
-			case 'overdue':
-				return `since ${end}`;
+				return firm
+					? `Last day ${f(item.windowEndDate)}`
+					: `Aim for ${f(item.aimDate ?? item.windowEndDate)}`;
+			case 'closing-soon':
+				return `Last day ${f(item.windowEndDate)}`;
+			case 'late':
+				return `was due ${f(item.windowEndDate)}`;
+			case 'changed':
+				return `Last day ${f(item.finalEndDate ?? item.windowEndDate)}`;
+			case 'closed':
+				return f(item.finalEndDate ?? item.windowEndDate);
+			case 'still-to-do':
+				return `Aimed for ${f(item.windowEndDate)}`;
 			default:
-				return formatTimelineDate(item.targetDate);
+				return f(item.targetDate);
 		}
 	});
+
+	const daysLeftLine = $derived(
+		item.daysLeft === undefined
+			? ''
+			: item.daysLeft === 0
+				? 'today'
+				: item.daysLeft === 1
+					? '1 day'
+					: `${item.daysLeft} days`
+	);
+
+	// After a firm date: what is still possible (late, closed), or what changed at a two-edge task's first edge.
+	const afterNote = $derived(
+		item.status === 'changed'
+			? { label: 'What changed', text: item.def.changeNote }
+			: item.status === 'late' || item.status === 'closed'
+				? { label: 'What now', text: item.def.afterNote }
+				: undefined
+	);
 </script>
 
 {#snippet noteSection()}
@@ -189,14 +224,20 @@
 		</div>
 	</article>
 {:else}
-	<article class="task-card status-{item.status}">
+	<article class="task-card status-{item.status}" id="task-{item.def.id}">
 		<div class="task-card__body">
 			<h3 class="task-card__title">{item.def.title}</h3>
 			<p class="task-card__why">
 				<span class="task-card__chip category-{item.def.category}"
 					>{CATEGORY_LABEL[item.def.category]}</span
-				>{item.def.why}
+				>{#if firm}<span class="task-card__firm">Firm deadline</span>{/if}{item.def.why}
 			</p>
+			{#if afterNote?.text}
+				<div class="task-card__whatnow">
+					<span class="task-card__whatnow-label">{afterNote.label}</span>
+					{afterNote.text}
+				</div>
+			{/if}
 			<div class="task-card__actions">
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
@@ -263,6 +304,7 @@
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
 			<span class="task-card__date">{dateLine}</span>
+			{#if daysLeftLine}<span class="task-card__days">{daysLeftLine}</span>{/if}
 		</div>
 	</article>
 {/if}
@@ -284,6 +326,8 @@
 		border-radius: var(--radius-m);
 		padding: var(--space-s) var(--space-m);
 		margin-bottom: var(--space-s);
+		/* An anchor target below the sticky header + chip strip, like the phase sections. */
+		scroll-margin-top: 6.5rem;
 	}
 
 	/* Expanded resolved card stacks its header + detail vertically (overrides the open card's
@@ -317,6 +361,32 @@
 		border-radius: var(--radius-s);
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+
+	/* "Firm deadline": danger-outlined, so a closing date is visible long before it nears. */
+	.task-card__firm {
+		display: inline-block;
+		margin-right: var(--space-xs);
+		padding: 1px 6px;
+		border: 1px solid color-mix(in srgb, var(--color-danger) 50%, transparent);
+		border-radius: var(--radius-s);
+		color: var(--color-danger);
+		font-size: var(--font-size-s);
+	}
+
+	.task-card__whatnow {
+		margin-top: var(--space-s);
+		padding: var(--space-s) var(--space-m);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-s);
+		font-size: var(--font-size-s);
+	}
+
+	.task-card__whatnow-label {
+		display: block;
+		margin-bottom: 2px;
+		color: var(--color-fg-muted);
 	}
 
 	/* Action row: accent pills that wrap. Real <button>s for a11y; the pill shape matches the snooze
@@ -533,6 +603,12 @@
 		font-size: var(--font-size-s);
 	}
 
+	.task-card__days {
+		display: block;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
 	/* Expanded resolved header: the disclosure toggle (button reset; full-width tap target). Title
 	   left, status/date/caret right - one large click area to recollapse. */
 	.task-card__header {
@@ -689,7 +765,8 @@
 		background: color-mix(in srgb, var(--color-category-finance) 15%, transparent);
 	}
 
-	/* Status edge + label colors. Open states: upcoming / start-now / overdue. Resolved states:
+	/* Status edge + label colors. Open states: upcoming / start-now / closing-soon / late / changed /
+	   closed / still-to-do. Resolved states:
 	   done / skipped / snoozed - colors MATCH the collapsed line so a status keeps its
 	   color across collapse/expand (skipped stays full-opacity when expanded - you're reviewing it). */
 	.status-upcoming {
@@ -706,11 +783,31 @@
 		color: var(--color-accent);
 	}
 
-	.status-overdue {
+	.status-closing-soon,
+	.status-late,
+	.status-changed {
 		border-left-color: var(--color-danger);
 	}
-	.status-overdue .task-card__status {
+	.status-closing-soon .task-card__status,
+	.status-late .task-card__status,
+	.status-changed .task-card__status,
+	.status-closed .task-card__status {
 		color: var(--color-danger);
+	}
+
+	/* Closed: the date has passed for good - a dashed edge reads "ended", not "act now". */
+	.status-closed {
+		border-left-color: var(--color-danger);
+		border-left-style: dashed;
+	}
+
+	/* Still to do: a soft task past its window - calm, not red; it can still be done. */
+	.status-still-to-do {
+		border-left-color: var(--color-accent-muted);
+		border-left-style: dashed;
+	}
+	.status-still-to-do .task-card__status {
+		color: var(--color-accent-muted);
 	}
 
 	.status-done {

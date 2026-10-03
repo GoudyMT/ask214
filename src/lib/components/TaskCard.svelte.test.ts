@@ -96,30 +96,108 @@ describe('TaskCard (open states)', () => {
 		expect(rel).toContain('noreferrer');
 	});
 
-	it('upcoming: status-color edge class + "Upcoming" label + the target date', () => {
-		const { container } = renderCard(makeItem({ status: 'upcoming', targetDate: '2027-03-16' }));
-		const card = container.querySelector('article');
-		expect(card?.classList.contains('status-upcoming')).toBe(true);
-		expect(container.textContent).toContain('Upcoming'); // text label, never color-only
-		expect(container.textContent).toContain('Mar 16, 2027');
-	});
-
-	it('start-now: edge class + "Start now" + "Window to <end>"', () => {
+	it('upcoming: "Upcoming" + when the window opens', () => {
 		const { container } = renderCard(
-			makeItem({ status: 'start-now', windowEndDate: '2026-10-15' })
+			makeItem({ status: 'upcoming', windowStartDate: '2027-03-16' })
 		);
-		const card = container.querySelector('article');
-		expect(card?.classList.contains('status-start-now')).toBe(true);
-		expect(container.textContent).toContain('Start now');
-		expect(container.textContent).toContain('Window to Oct 15, 2026');
+		expect(container.querySelector('article')?.classList.contains('status-upcoming')).toBe(true);
+		expect(container.textContent).toContain('Upcoming');
+		expect(container.textContent).toContain('Opens Mar 16, 2027');
 	});
 
-	it('overdue: edge class + "Overdue" + "since <end>"', () => {
-		const { container } = renderCard(makeItem({ status: 'overdue', windowEndDate: '2027-01-15' }));
-		const card = container.querySelector('article');
-		expect(card?.classList.contains('status-overdue')).toBe(true);
-		expect(container.textContent).toContain('Overdue');
-		expect(container.textContent).toContain('since Jan 15, 2027');
+	it('start-now, soft: "Start now" + "Aim for <aim date>"', () => {
+		const { container } = renderCard(makeItem({ status: 'start-now', aimDate: '2026-10-15' }));
+		expect(container.textContent).toContain('Start now');
+		expect(container.textContent).toContain('Aim for Oct 15, 2026');
+	});
+
+	it('start-now, firm: "Last day <end>" and a "Firm deadline" tag', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'start-now', windowEndDate: '2026-10-20' })
+		);
+		expect(container.textContent).toContain('Last day Oct 20, 2026');
+		expect(container.querySelector('.task-card__firm')?.textContent).toBe('Firm deadline');
+	});
+
+	it('closing-soon: the last day and the days left', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closing-soon', windowEndDate: '2026-10-20', daysLeft: 17 })
+		);
+		expect(container.querySelector('article')?.classList.contains('status-closing-soon')).toBe(
+			true
+		);
+		expect(container.textContent).toContain('Closing soon');
+		expect(container.textContent).toContain('Last day Oct 20, 2026');
+		expect(container.textContent).toContain('17 days');
+	});
+
+	it('closing-soon: the countdown reads "1 day" the day before and "today" on the last day', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const days = (daysLeft: number) =>
+			renderCard(
+				makeItem({ def, status: 'closing-soon', windowEndDate: '2026-10-20', daysLeft })
+			).container.querySelector('.task-card__days')?.textContent;
+		expect(days(1)).toBe('1 day');
+		expect(days(0)).toBe('today');
+	});
+
+	it('late: "Late", when it was due, and the What now note; Mark done stays', () => {
+		const def = { ...DEF, kind: 'required' as const, afterNote: 'Still required.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'late', windowEndDate: '2026-10-20' })
+		);
+		expect(container.textContent).toContain('Late');
+		expect(container.textContent).toContain('was due Oct 20, 2026');
+		const box = container.querySelector('.task-card__whatnow')?.textContent ?? '';
+		expect(box).toContain('What now');
+		expect(box).toContain('Still required.');
+		expect(buttonByText(container, 'Mark done')).toBeDefined();
+	});
+
+	it('closed: "Closed" + the date + What now', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		expect(container.querySelector('article')?.classList.contains('status-closed')).toBe(true);
+		expect(container.textContent).toContain('Closed');
+		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain('Gone.');
+	});
+
+	it('changed: "Changed", the final last day, and What changed', () => {
+		const def = {
+			...DEF,
+			kind: 'closes' as const,
+			afterNote: 'Gone.',
+			changeNote: 'Now asks health questions.',
+			finalEnd: 485
+		};
+		const { container } = renderCard(
+			makeItem({ def, status: 'changed', windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' })
+		);
+		expect(container.textContent).toContain('Changed');
+		expect(container.textContent).toContain('Last day May 17, 2028');
+		const box = container.querySelector('.task-card__whatnow')?.textContent ?? '';
+		expect(box).toContain('What changed');
+		expect(box).toContain('Now asks health questions.');
+	});
+
+	it('still-to-do: calm "Still to do", "Aimed for <end>", no tag, no What now', () => {
+		const { container } = renderCard(
+			makeItem({ status: 'still-to-do', windowEndDate: '2026-07-22' })
+		);
+		expect(container.querySelector('article')?.classList.contains('status-still-to-do')).toBe(true);
+		expect(container.textContent).toContain('Still to do');
+		expect(container.textContent).toContain('Aimed for Jul 22, 2026');
+		expect(container.querySelector('.task-card__firm')).toBeNull();
+		expect(container.querySelector('.task-card__whatnow')).toBeNull();
+	});
+
+	it('an open card carries an anchor id the summary links to', () => {
+		const { container } = renderCard(makeItem());
+		expect(container.querySelector('article')?.id).toBe('task-skillbridge-hosts');
 	});
 
 	it('color-codes the category chip via a category-<name> class (text label still present)', () => {
