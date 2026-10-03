@@ -1,5 +1,6 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import TaskCard from './TaskCard.svelte';
 import { snoozeUntilIso } from '$lib/timeline/snooze';
@@ -198,6 +199,39 @@ describe('TaskCard (open states)', () => {
 	it('an open card carries an anchor id the summary links to', () => {
 		const { container } = renderCard(makeItem());
 		expect(container.querySelector('article')?.id).toBe('task-skillbridge-hosts');
+	});
+
+	it('What now links to the official page for the task, in a new tab, under an uppercase label', () => {
+		const def = { ...DEF, id: 'va-bdd-claim', kind: 'closes' as const, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		const link = container.querySelector('.task-card__whatnow a');
+		expect(link?.textContent).toContain('Find a VSO on VA.gov');
+		expect(link?.getAttribute('href')).toBe(
+			'https://www.va.gov/get-help-from-accredited-representative/'
+		);
+		expect(link?.getAttribute('target')).toBe('_blank');
+		expect(link?.getAttribute('rel')).toContain('noopener');
+		expect(link?.getAttribute('rel')).toContain('noreferrer');
+		const label = container.querySelector('.task-card__whatnow-label') as HTMLElement;
+		expect(getComputedStyle(label).textTransform).toBe('uppercase');
+	});
+
+	it('a firm card with no curated page shows its note without a link', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain('Gone.');
+		expect(container.querySelector('.task-card__whatnow a')).toBeNull();
+	});
+
+	it('the "Firm deadline" tag keeps to one line', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const { container } = renderCard(makeItem({ def, status: 'start-now' }));
+		const tag = container.querySelector('.task-card__firm') as HTMLElement;
+		expect(getComputedStyle(tag).whiteSpace).toBe('nowrap');
 	});
 
 	it('color-codes the category chip via a category-<name> class (text label still present)', () => {
@@ -442,5 +476,67 @@ describe('TaskCard (notes display)', () => {
 		expect(withNote.container.querySelector('.task-line__note-dot')).not.toBeNull();
 		const without = renderCard(makeItem({ status: 'done' }));
 		expect(without.container.querySelector('.task-line__note-dot')).toBeNull();
+	});
+});
+
+// The card's two columns (text left, status and date right) need room; on a phone the status line moves above the
+// title so the text gets the card's full width. The frame's size is put back after each case.
+describe('TaskCard (layout by width)', () => {
+	let size = { width: 0, height: 0 };
+	beforeEach(() => {
+		size = { width: window.innerWidth, height: window.innerHeight };
+	});
+	afterEach(async () => {
+		await page.viewport(size.width, size.height);
+	});
+
+	const firm = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+	const closing = makeItem({
+		def: firm,
+		status: 'closing-soon',
+		windowEndDate: '2026-10-20',
+		daysLeft: 17
+	});
+	const box = (container: Element, selector: string) =>
+		(container.querySelector(selector) as HTMLElement).getBoundingClientRect();
+
+	it('on a 320 px phone the status line sits above the title', async () => {
+		await page.viewport(320, 800);
+		const { container } = renderCard(closing);
+		expect(box(container, '.task-card__meta').bottom).toBeLessThanOrEqual(
+			box(container, '.task-card__title').top
+		);
+	});
+
+	it('on a wide screen the status line sits beside the title', async () => {
+		await page.viewport(1024, 800);
+		const { container } = renderCard(closing);
+		const meta = box(container, '.task-card__meta');
+		const title = box(container, '.task-card__title');
+		expect(meta.top).toBeLessThan(title.bottom);
+		expect(meta.left).toBeGreaterThanOrEqual(title.right);
+	});
+
+	it('on a 320 px phone a long word stays inside the What now box', async () => {
+		await page.viewport(320, 800);
+		// One unbroken word: a hyphen is a line-break opportunity, so it would not test the overflow.
+		const def = { ...firm, afterNote: 'ContactYourCommandsTransitionAssistanceOfficeToStartNow.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		const note = container.querySelector('.task-card__whatnow') as HTMLElement;
+		expect(note.scrollWidth).toBeLessThanOrEqual(note.clientWidth);
+		// ...and the box itself stays inside the card: a column that sizes to its longest word would widen both.
+		expect(note.getBoundingClientRect().right).toBeLessThanOrEqual(box(container, 'article').right);
+	});
+
+	it('on a 320 px phone a long word in a saved note does not widen the text column past the card', async () => {
+		await page.viewport(320, 800);
+		const note =
+			'https://www.example.gov/a/very/long/address/with/no/spaces/that/a/user/pasted/into/a/note';
+		const { container } = renderCard(makeItem({ def: firm, status: 'start-now', note }));
+		expect(box(container, '.task-card__body').right).toBeLessThanOrEqual(
+			box(container, 'article').right
+		);
 	});
 });
