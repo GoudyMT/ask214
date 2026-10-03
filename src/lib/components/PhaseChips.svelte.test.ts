@@ -16,6 +16,7 @@ function makeItem(title: string): TimelineItem {
 			title,
 			category: 'admin',
 			track: 'transition',
+			kind: 'soft',
 			windowStart: -120,
 			windowEnd: -60,
 			why: `Why ${title} matters.`

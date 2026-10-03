@@ -30,6 +30,14 @@ export type TaskCategory = 'medical' | 'admin' | 'benefits' | 'career' | 'financ
 export type TaskTrack = 'military' | 'transition';
 
 /**
+ * How firm a task's window is. Required on every task, so a new task cannot skip the choice.
+ * - soft: the window is good timing only; doing it later loses nothing but convenience.
+ * - required: a firm date, but the task stays required after it (late, still required).
+ * - closes: after the date the option is gone or works differently.
+ */
+export type TaskKind = 'soft' | 'required' | 'closes';
+
+/**
  * Optional persona gate. No gate = universal (shows for everyone). A gated task shows
  * only when the persona field is SET and its value is in the list (hide-when-unset).
  * Extensible: v2.0 adds branch/component keys.
@@ -50,6 +58,13 @@ export type TaskDef = {
 	track: TaskTrack;
 	windowStart: number; // days vs EAOS; negative = before separation
 	windowEnd: number;
+	kind: TaskKind;
+	/** A second edge, days vs EAOS: the task changes at windowEnd and closes here (VGLI). */
+	finalEnd?: number;
+	/** One factual line shown once a firm date passes: what is still possible and where to go. */
+	afterNote?: string;
+	/** One factual line shown between a two-edge task's edges: what changed at the first. */
+	changeNote?: string;
 	recommendedOffset?: number; // defaults to windowStart
 	why: string; // why it matters (plain language, 1-2 sentences)
 	requires?: PersonaGate; // absent = universal

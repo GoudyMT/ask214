@@ -61,4 +61,35 @@ describe('task-defs seed', () => {
 		expect(offset).toBeGreaterThanOrEqual(bucket.startOffset);
 		expect(offset).toBeLessThan(bucket.endOffset);
 	});
+
+	it('gives every task a kind, and firm tasks a note for after their date', () => {
+		for (const t of TASK_DEFS) {
+			expect(['soft', 'required', 'closes']).toContain(t.kind);
+			if (t.kind === 'soft') {
+				expect(t.afterNote).toBeUndefined();
+				expect(t.finalEnd).toBeUndefined();
+			} else {
+				expect(t.afterNote?.length ?? 0).toBeGreaterThan(0);
+			}
+		}
+	});
+
+	it('gives a two-edge task a later final edge and a note for between the edges', () => {
+		for (const t of TASK_DEFS.filter((d) => d.finalEnd !== undefined)) {
+			expect(t.kind).toBe('closes');
+			expect(t.finalEnd).toBeGreaterThan(t.windowEnd);
+			expect(t.changeNote?.length ?? 0).toBeGreaterThan(0);
+		}
+	});
+
+	// 38 CFR 14.629: the app states public facts and points to official help; it never tells a person what
+	// they qualify for.
+	it('keeps every user-facing line free of personal eligibility claims', () => {
+		const PERSONAL = /\byou (qualify|are eligible|will (get|receive))\b/i;
+		for (const t of TASK_DEFS) {
+			for (const line of [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']) {
+				expect(line).not.toMatch(PERSONAL);
+			}
+		}
+	});
 });

@@ -9,6 +9,7 @@ function def(id: string, category: TaskDef['category'], title = id): TaskDef {
 		title,
 		category,
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -30,
 		windowEnd: 0,
 		why: ''

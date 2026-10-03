@@ -14,6 +14,7 @@ const DEF: TaskDef = {
 	title: 'Research SkillBridge hosts',
 	category: 'career',
 	track: 'transition',
+	kind: 'soft',
 	windowStart: -540,
 	windowEnd: -365,
 	why: 'Find approved programs that fit your rate.'
