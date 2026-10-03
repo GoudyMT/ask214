@@ -1,5 +1,6 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
+import { page } from 'vitest/browser';
 import NeedsNow from './NeedsNow.svelte';
 import type { TimelineItem } from '$lib/timeline';
 import type { NeedsNowGroups } from '$lib/timeline/needs-now';
@@ -86,5 +87,62 @@ describe('NeedsNow', () => {
 		expect(rows[0]?.textContent).toContain('May 17, 2028 - 30 days');
 		expect(rows[1]?.textContent).toContain('Oct 20, 2026 - 1 day');
 		expect(rows[1]?.textContent).not.toContain('1 days');
+	});
+});
+
+// On a phone a long title and the date do not fit side by side, so the date drops under the title instead of
+// squeezing it into a narrow column. Component tests run without app.css, so the cases set the app's spacing
+// tokens and give the panel the page's content width on a 320 px phone (16 px gutters): its rows then get the
+// width they get in the app. The frame's size and the tokens are put back after each case.
+describe('NeedsNow (layout by width)', () => {
+	const SPACING: Record<string, string> = {
+		'--space-xs': '4px',
+		'--space-s': '8px',
+		'--space-m': '16px',
+		'--space-l': '24px'
+	};
+	const PHONE_CONTENT_WIDTH = '288px';
+	let size = { width: 0, height: 0 };
+	beforeEach(() => {
+		size = { width: window.innerWidth, height: window.innerHeight };
+		for (const [name, value] of Object.entries(SPACING)) {
+			document.documentElement.style.setProperty(name, value);
+		}
+	});
+	afterEach(async () => {
+		for (const name of Object.keys(SPACING)) document.documentElement.style.removeProperty(name);
+		await page.viewport(size.width, size.height);
+	});
+
+	const groups: NeedsNowGroups = {
+		...empty,
+		closingSoon: [
+			item(
+				'sha',
+				'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
+				{
+					daysLeft: 17
+				}
+			)
+		]
+	};
+	const box = (container: Element, selector: string) =>
+		(container.querySelector(selector) as HTMLElement).getBoundingClientRect();
+
+	it('on a 320 px phone the date sits under a long title', async () => {
+		await page.viewport(320, 800);
+		const { container } = render(NeedsNow, { props: { groups } });
+		container.style.width = PHONE_CONTENT_WIDTH;
+		expect(box(container, '.needs-now__when').top).toBeGreaterThanOrEqual(
+			box(container, '.needs-now__title').bottom
+		);
+	});
+
+	it('on a wide screen the date sits on the same line as the title', async () => {
+		await page.viewport(1024, 800);
+		const { container } = render(NeedsNow, { props: { groups } });
+		expect(box(container, '.needs-now__when').top).toBeLessThan(
+			box(container, '.needs-now__title').bottom
+		);
 	});
 });

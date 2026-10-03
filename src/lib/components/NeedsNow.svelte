@@ -91,13 +91,16 @@
 		padding: 0;
 		list-style: none;
 	}
-	/* Each row is one link to its card; min-height keeps a 44px touch target. */
+	/* Each row is one link to its card; min-height keeps a 44px touch target. The row wraps, so on a phone the date
+	   drops under a long title instead of squeezing it into a narrow column. */
 	.needs-now__row {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
 		align-items: center;
-		gap: var(--space-s);
+		gap: 0 var(--space-s);
 		min-height: 44px;
+		padding: var(--space-xs) 0;
 		color: var(--color-fg);
 		text-decoration: none;
 		font-size: var(--font-size-s);
@@ -105,6 +108,9 @@
 	}
 	.needs-now__list li:last-child .needs-now__row {
 		border-bottom: none;
+	}
+	.needs-now__title {
+		flex: 1 1 10rem;
 	}
 	.needs-now__row:hover .needs-now__title {
 		text-decoration: underline;
