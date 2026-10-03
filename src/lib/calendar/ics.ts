@@ -1,3 +1,5 @@
+import { addDays } from '../timeline/day-math';
+
 const PRODID = '-//Ask 214//Calendar//EN';
 
 /** Escape an iCalendar TEXT value (RFC 5545 3.3.11): backslash, semicolon, comma, newline. */
@@ -47,9 +49,7 @@ function toDateValue(iso: string): string {
 
 /** The day AFTER an ISO date, as DATE YYYYMMDD (non-inclusive all-day DTEND). */
 function nextDateValue(iso: string): string {
-	const [y, m, d] = iso.split('-').map(Number);
-	const dt = new Date(Date.UTC(y!, m! - 1, d! + 1));
-	return `${dt.getUTCFullYear()}${pad2(dt.getUTCMonth() + 1)}${pad2(dt.getUTCDate())}`;
+	return toDateValue(addDays(iso, 1));
 }
 
 /** An alert `days` before an all-day event, at 09:00: the event starts at local midnight. */
