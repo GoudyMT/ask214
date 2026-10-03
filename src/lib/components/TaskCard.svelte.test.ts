@@ -508,6 +508,17 @@ describe('TaskCard (layout by width)', () => {
 		);
 	});
 
+	it('on a phone a wrapping status line keeps the date and its countdown together', async () => {
+		await page.viewport(320, 800);
+		const { container } = renderCard(closing);
+		(container as HTMLElement).style.width = '288px';
+		const status = box(container, '.task-card__status');
+		const date = box(container, '.task-card__date');
+		// The line wraps (the case under test is reached), and it breaks after the status, never inside the date.
+		expect(date.top).toBeGreaterThan(status.top);
+		expect(box(container, '.task-card__days').top).toBe(date.top);
+	});
+
 	it('on a wide screen the status line sits beside the title', async () => {
 		await page.viewport(1024, 800);
 		const { container } = renderCard(closing);

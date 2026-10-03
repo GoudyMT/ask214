@@ -318,8 +318,11 @@
 		</div>
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
-			<span class="task-card__date">{dateLine}</span>
-			{#if daysLeftLine}<span class="task-card__days">{daysLeftLine}</span>{/if}
+			<span class="task-card__when"
+				><span class="task-card__date">{dateLine}</span>{#if daysLeftLine}<span
+						class="task-card__days">{daysLeftLine}</span
+					>{/if}</span
+			>
 		</div>
 	</article>
 {/if}
@@ -636,6 +639,10 @@
 		font-size: var(--font-size-s);
 	}
 
+	.task-card__when {
+		display: block;
+	}
+
 	.task-card__days {
 		display: block;
 		color: var(--color-fg-muted);
@@ -660,13 +667,23 @@
 		}
 
 		.task-card__meta .task-card__status,
+		.task-card__meta .task-card__when,
 		.task-card__meta .task-card__days {
 			display: inline;
 		}
 
-		.task-card__meta .task-card__date::before,
+		/* The line may break only after the status's dash: the date and its countdown move as one, so no line
+		   starts with "- 17 days". \00a0 is a no-break space. */
+		.task-card__meta .task-card__status::after {
+			content: '\00a0- ';
+		}
+
+		.task-card__meta .task-card__when {
+			white-space: nowrap;
+		}
+
 		.task-card__meta .task-card__days::before {
-			content: ' - ';
+			content: '\00a0-\00a0';
 		}
 	}
 
