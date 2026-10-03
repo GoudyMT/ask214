@@ -609,6 +609,7 @@
 		background: var(--color-bg);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-s);
+		overflow-wrap: anywhere; /* a pasted address wraps instead of spilling past the box */
 	}
 
 	.task-card__note-label {

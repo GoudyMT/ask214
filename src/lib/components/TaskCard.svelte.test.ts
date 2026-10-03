@@ -550,4 +550,13 @@ describe('TaskCard (layout by width)', () => {
 			box(container, 'article').right
 		);
 	});
+
+	it('on a 320 px phone a long word in a saved note wraps inside its box', async () => {
+		await page.viewport(320, 800);
+		const note =
+			'https://www.example.gov/a/very/long/address/with/no/spaces/that/a/user/pasted/into/a/note';
+		const { container } = renderCard(makeItem({ def: firm, status: 'start-now', note }));
+		const shown = container.querySelector('.task-card__note-shown') as HTMLElement;
+		expect(shown.scrollWidth).toBeLessThanOrEqual(shown.clientWidth);
+	});
 });
