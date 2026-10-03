@@ -160,6 +160,8 @@
 		padding-top: var(--space-m);
 		border-top: 1px solid var(--color-border);
 	}
+	/* On a narrow phone the label wraps, each line starting at the left edge, while the summary keeps one
+	   line - so the pair still reads as one row. */
 	.cal-customize__toggle {
 		display: flex;
 		align-items: center;
@@ -171,11 +173,13 @@
 		color: var(--color-fg);
 		font: inherit;
 		font-size: var(--font-size-s);
+		text-align: left;
 		cursor: pointer;
 	}
 	.cal-customize__summary {
 		margin-left: auto;
 		color: var(--color-fg-muted);
+		white-space: nowrap;
 	}
 	/* CSS caret (ASCII source, no glyph): a right-pointing triangle that rotates to point down when
 	   open. No transition - the app's no-motion register. */

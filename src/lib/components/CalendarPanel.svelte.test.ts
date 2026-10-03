@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
@@ -105,5 +106,72 @@ describe('CalendarPanel', () => {
 		(container.querySelector('input[value="medical"]') as HTMLInputElement).click();
 		flushSync();
 		expect(onSetExclusions).toHaveBeenCalledWith({ taskIds: [], categories: ['medical'] });
+	});
+});
+
+// On a narrow phone "Customize what's included" and its summary do not fit on one line. The label wraps with
+// every line starting at the same edge, and the summary keeps one line, so the pair still reads as one row.
+// Component tests run without app.css, so the cases set the app's spacing and type tokens and give the panel
+// the width the Settings page gives it on a 320 px phone (272 px, measured on the build). The frame's size and
+// the tokens are put back after each case.
+describe('CalendarPanel (layout by width)', () => {
+	const TOKENS: Record<string, string> = {
+		'--space-s': '8px',
+		'--space-m': '16px',
+		'--space-l': '24px',
+		'--font-size-s': '14px'
+	};
+	const SETTINGS_PANEL_WIDTH = '272px';
+	let size = { width: 0, height: 0 };
+	beforeEach(() => {
+		size = { width: window.innerWidth, height: window.innerHeight };
+		for (const [name, value] of Object.entries(TOKENS)) {
+			document.documentElement.style.setProperty(name, value);
+		}
+	});
+	afterEach(async () => {
+		for (const name of Object.keys(TOKENS)) document.documentElement.style.removeProperty(name);
+		await page.viewport(size.width, size.height);
+	});
+
+	const props = () => ({
+		items: [item(def('a', 'admin'))],
+		exclusions: { taskIds: [], categories: [] },
+		ready: true,
+		onSetExclusions: vi.fn(),
+		onDownload: vi.fn()
+	});
+	// One rect per line of text the element's content takes.
+	const lines = (el: Element) => {
+		const range = document.createRange();
+		range.selectNodeContents(el);
+		return [...range.getClientRects()].filter((rect) => rect.width > 0);
+	};
+	const label = (root: Element) =>
+		root.querySelectorAll('.cal-customize__toggle > span')[1] as Element;
+	const summary = (root: Element) => root.querySelector('.cal-customize__summary') as Element;
+
+	it('on a 320 px phone the label wraps from one edge and the summary keeps one line', async () => {
+		await page.viewport(320, 800);
+		const { container } = render(CalendarPanel, { props: props() });
+		container.style.width = SETTINGS_PANEL_WIDTH;
+		container.style.fontFamily = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+		container.style.lineHeight = '1.5';
+		const labelLines = lines(label(container));
+		// The case is reached: the row is too narrow for the label on one line.
+		expect(labelLines.length).toBeGreaterThanOrEqual(2);
+		for (const line of labelLines)
+			expect(Math.abs(line.left - (labelLines[0]?.left ?? 0))).toBeLessThan(1);
+		expect(lines(summary(container))).toHaveLength(1);
+	});
+
+	it('on a wide screen the label and the summary share one line', async () => {
+		await page.viewport(1024, 800);
+		const { container } = render(CalendarPanel, { props: props() });
+		const [labelLine] = lines(label(container));
+		const summaryLines = lines(summary(container));
+		expect(lines(label(container))).toHaveLength(1);
+		expect(summaryLines).toHaveLength(1);
+		expect(Math.abs((summaryLines[0]?.top ?? 0) - (labelLine?.top ?? 0))).toBeLessThan(1);
 	});
 });
