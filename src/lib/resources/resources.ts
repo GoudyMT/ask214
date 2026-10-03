@@ -166,6 +166,14 @@ export const RESOURCES: readonly Resource[] = [
 		lastVerified: '2026-08-09'
 	},
 	{
+		id: 'va-life-insurance',
+		title: 'VA Life Insurance',
+		url: 'https://www.va.gov/life-insurance/',
+		description: 'Official VA overview of life insurance options, including VGLI and VALife.',
+		displayCategory: 'finance',
+		lastVerified: '2026-10-03'
+	},
+	{
 		id: 'mos-financial',
 		title: 'Military OneSource: Financial Counseling',
 		url: 'https://www.militaryonesource.mil/benefits/financial-counseling/',
@@ -207,6 +215,24 @@ export const RESOURCES: readonly Resource[] = [
 		description: "The Navy's transition assistance program through Fleet and Family Support.",
 		displayCategory: 'skillbridge-transition',
 		lastVerified: '2026-08-09'
+	},
+	{
+		id: 'mos-final-move',
+		title: 'Military OneSource: Post-Separation Housing',
+		url: 'https://www.militaryonesource.mil/resources/millife-guides/post-separation-housing-options/',
+		description:
+			'Housing after you separate, including your final move at government expense and its time limits.',
+		displayCategory: 'skillbridge-transition',
+		lastVerified: '2026-10-03'
+	},
+	{
+		id: 'navy-reserve',
+		title: 'Navy Reserve: Transitioning from Active Duty',
+		url: 'https://www.navy.com/joining/ways-to-join/reserve/transitioning-to-reserve',
+		description:
+			"The Navy's page on moving from active duty to the Navy Reserve, with recruiter contacts.",
+		displayCategory: 'skillbridge-transition',
+		lastVerified: '2026-10-03'
 	},
 
 	// Mentorship & Networking
@@ -262,6 +288,24 @@ export const RESOURCES: readonly Resource[] = [
 		description: 'VA mental health services and resources.',
 		displayCategory: 'health-wellbeing',
 		lastVerified: '2026-08-09'
+	},
+	{
+		id: 'sha',
+		title: 'Separation Health Assessment',
+		url: 'https://www.health.mil/Military-Health-Topics/Access-Cost-Quality-and-Safety/DES/Separation-Health-Assessment',
+		description:
+			'The Military Health System page on the separation exam: what it covers and when to schedule it.',
+		displayCategory: 'health-wellbeing',
+		lastVerified: '2026-10-03'
+	},
+	{
+		id: 'chcbp',
+		title: 'Continued Health Care Benefit Program (CHCBP)',
+		url: 'https://www.tricare.mil/Plans/SpecialPrograms/CHCBP',
+		description:
+			'Official TRICARE information on CHCBP, temporary health coverage after TRICARE ends.',
+		displayCategory: 'health-wellbeing',
+		lastVerified: '2026-10-03'
 	}
 ];
 
@@ -293,4 +337,32 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'tsp-decision': ['tsp'],
 	'vgli-convert': ['vgli'],
 	'va-claim-fallback': ['va-disability', 'va-accredited-rep']
+};
+
+// The one official page to go to once a firm task's date passes (or changes), shown in its What now box. Keys are
+// the timeline tasks whose kind is 'required' or 'closes'; each names a resource above and the link text to show.
+export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }> = {
+	'preseparation-counseling': {
+		resource: 'navy-transition',
+		label: 'Find Navy transition help (Fleet and Family Support)'
+	},
+	'tap-capstone': {
+		resource: 'navy-transition',
+		label: 'Find Navy transition help (Fleet and Family Support)'
+	},
+	'sha-schedule': { resource: 'sha', label: 'The Separation Health Assessment on health.mil' },
+	'sha-complete': { resource: 'sha', label: 'The Separation Health Assessment on health.mil' },
+	'separation-package': {
+		resource: 'navy-transition',
+		label: 'Find Navy transition help (Fleet and Family Support)'
+	},
+	'va-bdd-claim': { resource: 'va-accredited-rep', label: 'Find a VSO on VA.gov' },
+	'tricare-elect': { resource: 'chcbp', label: 'CHCBP on tricare.mil' },
+	'vgli-convert': { resource: 'va-life-insurance', label: 'VA life insurance options on VA.gov' },
+	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' },
+	'va-claim-fallback': { resource: 'va-accredited-rep', label: 'Find a VSO on VA.gov' },
+	'reserve-affiliation': {
+		resource: 'navy-reserve',
+		label: 'Transition to the Navy Reserve on navy.com'
+	}
 };

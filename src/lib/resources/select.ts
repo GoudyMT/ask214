@@ -1,5 +1,5 @@
 import type { DisplayCategory, Resource } from './types';
-import { RESOURCES, TASK_RESOURCES } from './resources';
+import { RESOURCES, TASK_RESOURCES, TASK_AFTER_LINK } from './resources';
 
 // Human-readable heading for each browse category, shown on the Resources page.
 export const DISPLAY_CATEGORY_LABEL: Record<DisplayCategory, string> = {
@@ -25,6 +25,18 @@ export function resourcesForTask(
 		const r = byId.get(id);
 		return r ? [r] : [];
 	});
+}
+
+// The one official page a firm task's What now box links to, as its link text and url. Undefined for a task with no
+// link (soft tasks) or a link that does not resolve. Map + resources are injectable for testing.
+export function afterLinkForTask(
+	taskId: string,
+	map: Record<string, { resource: string; label: string }> = TASK_AFTER_LINK,
+	resources: readonly Resource[] = RESOURCES
+): { label: string; url: string } | undefined {
+	const link = map[taskId];
+	const resource = link && resources.find((r) => r.id === link.resource);
+	return link && resource ? { label: link.label, url: resource.url } : undefined;
 }
 
 // Page grouping: bucket resources by their browse category, preserving input order within each bucket.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { DisplayCategory } from './types';
-import { RESOURCES, TASK_RESOURCES } from './resources';
+import { RESOURCES, TASK_RESOURCES, TASK_AFTER_LINK } from './resources';
 import { TASK_DEFS } from '$lib/timeline/task-defs';
 
 const DISPLAY_CATEGORIES = new Set<DisplayCategory>([
@@ -75,6 +75,31 @@ describe('task-to-resource mapping integrity', () => {
 	it('no task lists a duplicate resource id', () => {
 		for (const [taskId, resIds] of Object.entries(TASK_RESOURCES)) {
 			expect(new Set(resIds).size, taskId).toBe(resIds.length);
+		}
+	});
+});
+
+describe('what-now links: one official page per firm task', () => {
+	const byId = new Map(RESOURCES.map((r) => [r.id, r]));
+
+	it('links every firm task, and only the firm tasks', () => {
+		const firm = TASK_DEFS.filter((t) => t.kind !== 'soft').map((t) => t.id);
+		expect(Object.keys(TASK_AFTER_LINK).sort()).toEqual([...firm].sort());
+	});
+
+	it('points every link at a curated resource, with link text', () => {
+		for (const [taskId, link] of Object.entries(TASK_AFTER_LINK)) {
+			expect(byId.has(link.resource), `${taskId} -> ${link.resource}`).toBe(true);
+			expect(link.label.trim().length, taskId).toBeGreaterThan(0);
+		}
+	});
+
+	// The claims tasks link to a claims or benefits resource, whose host the 38 CFR test below pins to va.gov or
+	// an accredited VSO.
+	it('sends the VA claim tasks only to a claims or benefits resource', () => {
+		for (const taskId of ['va-bdd-claim', 'va-claim-fallback']) {
+			const category = byId.get(TASK_AFTER_LINK[taskId]?.resource ?? '')?.displayCategory;
+			expect(['claims-vso', 'benefits-va'], taskId).toContain(category);
 		}
 	});
 });
