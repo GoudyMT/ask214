@@ -93,3 +93,36 @@ describe('task-defs seed', () => {
 		}
 	});
 });
+
+// Each firm deadline pinned to the public source it comes from, so a later edit cannot drift from the rule.
+describe('firm deadlines match their official sources', () => {
+	const at = (id: string) => TASK_DEFS.find((t) => t.id === id);
+
+	it.each([
+		// 10 USC 1142 - counseling "shall commence not later than 365 days before"
+		['preseparation-counseling', 'required', -365, undefined],
+		// militaryonesource.mil TAP - the Capstone "no later than 90 days before separation"
+		['tap-capstone', 'required', -90, undefined],
+		// va.gov pre-discharge claim - "between 180 to 90 days before you leave the military"
+		['va-bdd-claim', 'closes', -90, undefined],
+		// tricare.mil CHCBP - "enroll within 60 days of losing your eligibility for TRICARE"
+		['tricare-elect', 'closes', 60, undefined],
+		// va.gov VGLI - 240 days with no health questions; "within 1 year and 120 days"
+		['vgli-convert', 'closes', 240, 485],
+		// militaryonesource.mil - "those separating before retirement have 180 days"
+		['hhg-counseling', 'closes', 180, undefined],
+		// 38 CFR 3.400(b)(2)(i) - a claim "received within 1 year after separation"
+		['va-claim-fallback', 'closes', 365, undefined]
+	] as const)('%s is %s with its last day at %d', (id, kind, windowEnd, finalEnd) => {
+		const t = at(id);
+		expect(t?.kind).toBe(kind);
+		expect(t?.windowEnd).toBe(windowEnd);
+		expect(t?.finalEnd).toBe(finalEnd);
+	});
+
+	it('opens the Capstone at 12 months and Chapter 36 counseling 180 days before separation', () => {
+		expect(at('tap-capstone')?.windowStart).toBe(-365);
+		expect(at('va-career-guidance')?.windowStart).toBe(-180);
+		expect(at('va-career-guidance')?.windowEnd).toBe(365);
+	});
+});

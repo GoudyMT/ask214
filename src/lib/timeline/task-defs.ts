@@ -52,7 +52,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Early prep (no authoritative fixed date; recommended 18-24 months out) ----
 	{
 		id: 'va-gov-account',
-		title: 'Create your VA.gov account',
+		title: 'Sign in to VA.gov and check your profile',
 		category: 'admin',
 		track: 'transition',
 		kind: 'soft',
@@ -63,14 +63,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'login-gov-account',
-		title: 'Create your Login.gov account',
+		title: 'Set up Login.gov or ID.me',
 		category: 'admin',
 		track: 'transition',
 		kind: 'soft',
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
-		why: 'Login.gov is the secure sign-in for VA.gov and other federal services.'
+		why: 'Login.gov or ID.me is the secure sign-in for VA.gov and other federal services.'
 	},
 	{
 		id: 'update-sgli',
@@ -172,7 +172,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -270,
-		why: 'The DoL Employment Workshop and VA Benefits Briefings I and II are mandatory.'
+		why: 'VA Benefits and Services and the DOL Employment Fundamentals of Career Transition course are mandatory.'
 	},
 	{
 		id: 'tap-track',
@@ -218,7 +218,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -90,
 		recommendedOffset: -270,
-		why: 'SGLI ends after separation; VGLI and civilian options differ in cost and coverage.'
+		why: 'SGLI stays free for 120 days after you separate; VGLI and civilian options differ in cost and coverage.'
 	},
 	{
 		id: 'va-career-guidance',
@@ -226,9 +226,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		category: 'career',
 		track: 'transition',
 		kind: 'soft',
-		windowStart: -365,
-		windowEnd: -90,
-		recommendedOffset: -240,
+		windowStart: -180,
+		windowEnd: 365,
+		recommendedOffset: -120,
 		why: 'VA offers free career counseling (Chapter 36) to map your path.'
 	},
 	{
@@ -249,7 +249,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		track: 'transition',
 		kind: 'closes',
 		windowStart: -300,
-		windowEnd: -90,
+		windowEnd: 0,
 		recommendedOffset: -180,
 		why: 'Affiliating with the reserves takes paperwork and lead time.',
 		afterNote:
@@ -315,9 +315,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		category: 'admin',
 		track: 'military',
 		kind: 'required',
-		windowStart: -120,
+		windowStart: -365,
 		windowEnd: -90,
-		recommendedOffset: -90,
+		recommendedOffset: -120,
 		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
 		afterNote: "Still required before you separate. Contact your command's TAP office."
 	},
@@ -356,14 +356,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'hhg-counseling',
-		title: 'Arrange your household-goods (HHG) move counseling',
+		title: 'Arrange your household-goods (HHG) move',
 		category: 'admin',
 		track: 'military',
 		kind: 'closes',
 		windowStart: -180,
-		windowEnd: -30,
+		windowEnd: 180,
 		recommendedOffset: -120,
-		why: 'Your final move is government-funded but must be scheduled.',
+		why: 'Your final move is government-paid for 180 days after you separate.',
 		afterNote:
 			'The government-paid move ends 180 days after separation unless an extension is approved; contact your installation transportation office.'
 	},
@@ -376,7 +376,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -120,
 		windowEnd: -60,
 		recommendedOffset: -75,
-		why: 'The Navy needs your package by about 60 days out to process your separation and DD-214.',
+		why: 'The Navy needs your package 60 days before your PTDY, separation leave or separation, whichever comes first.',
 		afterNote: 'Still required; a late package can delay your orders, DD-214 and final pay.'
 	},
 	{
@@ -394,14 +394,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Near / at separation ----
 	{
 		id: 'tricare-elect',
-		title: 'Elect your health-coverage transition (TRICARE/TAMP or civilian)',
+		title: 'Choose your health coverage for after TRICARE (CHCBP or the Marketplace)',
 		category: 'benefits',
 		track: 'transition',
 		kind: 'closes',
 		windowStart: -60,
-		windowEnd: 30,
+		windowEnd: 60,
 		recommendedOffset: -14,
-		why: 'Make the election before you separate to avoid a coverage gap.',
+		why: 'After TRICARE ends you have 60 days to enroll in CHCBP or use a Marketplace special enrollment period.',
 		afterNote:
 			'The 60-day window for CHCBP and a Marketplace special enrollment has passed; see tricare.mil and healthcare.gov.'
 	},
@@ -427,7 +427,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: 0,
 		windowEnd: 90,
 		recommendedOffset: 30,
-		why: 'An unpaid TSP loan becomes a taxable distribution after 90 days.'
+		why: 'Your TSP and any TSP loan have rules after you separate; tsp.gov explains your options.'
 	},
 	{
 		id: 'vgli-convert',
@@ -463,9 +463,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		track: 'transition',
 		kind: 'closes',
 		windowStart: 0,
-		windowEnd: 180,
+		windowEnd: 365,
 		recommendedOffset: 14,
-		why: 'If you missed the BDD window, file now - an Intent-to-File locks your effective date.',
+		why: 'If you missed the BDD window: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.',
 		afterNote:
 			"VA's effective-date rule changes 1 year after separation; va.gov or an accredited VSO can explain your options."
 	}
