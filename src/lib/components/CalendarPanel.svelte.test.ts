@@ -49,6 +49,8 @@ describe('CalendarPanel', () => {
 		const ics = onDownload.mock.calls[0]?.[0] as string;
 		expect(ics).toContain('SUMMARY:Aim for: a'); // pending admin task included
 		expect(ics).not.toContain('SUMMARY:Aim for: m'); // medical excluded -> no event
+		expect(container.querySelector('.cal-add')?.textContent?.trim()).toBe('Add to my calendar');
+		expect(container.textContent).toContain('On a computer:'); // the test browser is desktop Chromium
 	});
 
 	it('keeps the category toggles collapsed until "Customize" is expanded (inline, matches the snooze date-adjust)', () => {

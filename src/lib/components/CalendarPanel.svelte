@@ -3,6 +3,7 @@
 	import type { TaskCategory } from '$lib/timeline/types';
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs } from '$lib/calendar/build-ics';
+	import { currentDeviceHint } from '$lib/calendar/delivery';
 
 	type Props = {
 		items: TimelineItem[];
@@ -22,6 +23,7 @@
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
+	const hint = currentDeviceHint();
 	// Category toggles live behind an inline expand - the same in-context idiom as the Timeline
 	// snooze date-adjust, so the app keeps one consistent feel for tweaks (modals stay for the
 	// wipe confirm + source reader).
@@ -48,7 +50,7 @@
 
 <section class="cal-section" aria-labelledby="calendar-heading">
 	<h2 id="calendar-heading" class="cal-section__heading">Calendar</h2>
-	<p class="cal-hint">Add your transition deadlines to the calendar you already check.</p>
+	<p class="cal-hint">Your upcoming deadlines, with alerts before each firm one.</p>
 
 	<button
 		class="cal-add"
@@ -56,8 +58,9 @@
 		disabled={building || !ready}
 		onclick={() => void addToCalendar()}
 	>
-		Add to Apple / device calendar
+		Add to my calendar
 	</button>
+	<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
 
 	{#if !ready}
 		<p class="cal-hint cal-hint--unavailable">
@@ -133,6 +136,14 @@
 	.cal-add:disabled {
 		opacity: 0.6;
 		cursor: default;
+	}
+	/* The sentence under the button: what this device does after the tap. */
+	.cal-hint--device {
+		margin: var(--space-s) 0 0;
+	}
+	.cal-hint b {
+		color: var(--color-fg);
+		font-weight: 600;
 	}
 	/* Shown only when the exclusion set is unknown - the export is refused rather than run against
 	   defaults, so the user is told why instead of silently getting everything. */

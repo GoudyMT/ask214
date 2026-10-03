@@ -2,6 +2,7 @@
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs } from '$lib/calendar/build-ics';
+	import { currentDeviceHint } from '$lib/calendar/delivery';
 
 	type Props = {
 		items: TimelineItem[];
@@ -13,6 +14,7 @@
 	let { items, exclusions, onDownload, onDismiss }: Props = $props();
 
 	let building = $state(false);
+	const hint = currentDeviceHint();
 
 	// One tap = the calendar file, no chooser and no second screen. The exclusions the user set in
 	// Settings are honoured here because both surfaces build from the same shared projection.
@@ -29,10 +31,11 @@
 <section class="cal-card" aria-labelledby="cal-card-heading">
 	<div class="cal-card__body">
 		<h2 id="cal-card-heading" class="cal-card__heading">Keep your deadlines in sight</h2>
-		<p class="cal-card__copy">Add your transition deadlines to the calendar you already check.</p>
+		<p class="cal-card__copy">Your upcoming deadlines, with alerts before each firm one.</p>
 		<button class="cal-card__add" type="button" disabled={building} onclick={() => void add()}>
 			Add to my calendar
 		</button>
+		<p class="cal-card__hint"><b>{hint.lead}</b> {hint.text}</p>
 	</div>
 	<button class="cal-card__dismiss" type="button" aria-label="Dismiss" onclick={onDismiss}>
 		<span aria-hidden="true">x</span>
@@ -82,6 +85,15 @@
 	.cal-card__add:disabled {
 		opacity: 0.6;
 		cursor: default;
+	}
+	.cal-card__hint {
+		margin: var(--space-s) 0 0;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+	.cal-card__hint b {
+		color: var(--color-fg);
+		font-weight: 600;
 	}
 	/* Quiet dismiss: present but low-salience, so declining is easy without inviting a mis-tap. */
 	.cal-card__dismiss {

@@ -9,6 +9,7 @@
 	import CalendarCard from '$lib/components/CalendarCard.svelte';
 	import NeedsNow from '$lib/components/NeedsNow.svelte';
 	import { downloadTextFile } from '$lib/calendar/download';
+	import { calendarFileName } from '$lib/calendar/delivery';
 	import { shouldShowCalendarCard } from '$lib/calendar/card-visibility';
 	import { selectNeedsNow } from '$lib/timeline/needs-now';
 
@@ -129,7 +130,7 @@
 				<CalendarCard
 					items={calendarItems}
 					exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-					onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
+					onDownload={(ics) => downloadTextFile(calendarFileName(new Date()), 'text/calendar', ics)}
 					onDismiss={() => void app.calendar?.dismissCard(Date.now())}
 				/>
 			{/if}

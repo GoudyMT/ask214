@@ -47,6 +47,7 @@ describe('CalendarCard', () => {
 		const ics = onDownload.mock.calls[0]?.[0] as string;
 		expect(ics).toContain('SUMMARY:Aim for: a'); // the card honours the same exclusions as the panel
 		expect(ics).not.toContain('SUMMARY:Aim for: m');
+		expect(container.textContent).toContain('On a computer:'); // the test browser is desktop Chromium
 	});
 
 	it('the dismiss control calls onDismiss', () => {
