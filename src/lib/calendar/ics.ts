@@ -52,14 +52,20 @@ function nextDateValue(iso: string): string {
 	return `${dt.getUTCFullYear()}${pad2(dt.getUTCMonth() + 1)}${pad2(dt.getUTCDate())}`;
 }
 
+/** An alert `days` before an all-day event, at 09:00: the event starts at local midnight. */
+function alarmTrigger(days: number): string {
+	return days === 1 ? '-PT15H' : `-P${days - 1}DT15H`;
+}
+
 /**
  * Serialize desired events to a one-way iCalendar file (RFC 5545 core; NO METHOD, so no iTIP
  * ORGANIZER/email is required). All-day VALUE=DATE events (timezone-independent). Each event
  * carries a stable UID so a re-import updates rather than duplicates. CRLF endings, 75-octet
- * folding, TEXT-escaped SUMMARY. `now` is injected for a deterministic DTSTAMP.
+ * folding, TEXT-escaped SUMMARY, and a display VALARM per alarm day. `now` is injected for a
+ * deterministic DTSTAMP.
  */
 export function serializeIcs(
-	events: { title: string; isoDate: string; uid: string }[],
+	events: { title: string; isoDate: string; uid: string; alarmDays?: readonly number[] }[],
 	now: Date
 ): string {
 	const dtstamp = formatDtstamp(now);
@@ -76,9 +82,18 @@ export function serializeIcs(
 			`DTSTAMP:${dtstamp}`,
 			`DTSTART;VALUE=DATE:${toDateValue(ev.isoDate)}`,
 			`DTEND;VALUE=DATE:${nextDateValue(ev.isoDate)}`,
-			foldLine(`SUMMARY:${escapeText(ev.title)}`),
-			'END:VEVENT'
+			foldLine(`SUMMARY:${escapeText(ev.title)}`)
 		);
+		for (const days of ev.alarmDays ?? []) {
+			lines.push(
+				'BEGIN:VALARM',
+				'ACTION:DISPLAY',
+				foldLine(`DESCRIPTION:${escapeText(ev.title)}`),
+				`TRIGGER:${alarmTrigger(days)}`,
+				'END:VALARM'
+			);
+		}
+		lines.push('END:VEVENT');
 	}
 	lines.push('END:VCALENDAR');
 	return lines.join('\r\n') + '\r\n';

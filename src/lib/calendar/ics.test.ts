@@ -41,4 +41,34 @@ describe('serializeIcs', () => {
 		const summaryLine = out.split('\r\n').findIndex((l) => l.startsWith('SUMMARY:'));
 		expect(out.split('\r\n')[summaryLine + 1]?.startsWith(' ')).toBe(true); // continuation is folded
 	});
+
+	it('adds one display alert per alarm day, at 09:00 the given number of days before', () => {
+		const out = serializeIcs(
+			[
+				{
+					title: 'Last day: File, now',
+					isoDate: '2026-10-20',
+					uid: 'u@mtc.local',
+					alarmDays: [30, 7, 1]
+				}
+			],
+			NOW
+		);
+		expect(out.match(/BEGIN:VALARM\r\n/g)?.length).toBe(3);
+		expect(out).toContain('TRIGGER:-P29DT15H\r\n');
+		expect(out).toContain('TRIGGER:-P6DT15H\r\n');
+		expect(out).toContain('TRIGGER:-PT15H\r\n');
+		expect(out).toContain('ACTION:DISPLAY\r\n');
+		expect(out).toContain('DESCRIPTION:Last day: File\\, now\r\n');
+		// Alerts belong to the event: every VALARM closes before the VEVENT does.
+		expect(out.lastIndexOf('END:VALARM')).toBeLessThan(out.indexOf('END:VEVENT'));
+	});
+
+	it('adds no alert when an event has none', () => {
+		const out = serializeIcs(
+			[{ title: 'Opens: X', isoDate: '2026-11-01', uid: 'u@mtc.local', alarmDays: [] }],
+			NOW
+		);
+		expect(out).not.toContain('VALARM');
+	});
 });
