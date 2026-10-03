@@ -206,7 +206,7 @@ describe('synthesize', () => {
 		expect(result.kind).toBe('crisis');
 	});
 
-	// 29 of the 1878 shipped chunks legitimately mention the crisis line, so keying on the number alone
+	// 28 of the 1992 shipped chunks legitimately mention the crisis line, so keying on the number alone
 	// would replace a real answer about mental-health resources with a crisis card. Both signals are
 	// required: the answer must reach for the crisis line AND cite nothing VALID.
 	it('does not treat a cited answer that mentions the crisis line as a crisis turn', async () => {
