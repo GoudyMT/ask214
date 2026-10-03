@@ -1,80 +1,89 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
-// The .ics export is the calendar feature's ENTIRE delivery path, and it had no end-to-end coverage
-// on any engine - only a unit test with a mocked click, which proves the deferred-revoke logic but
-// never that a real file reaches the browser's download system. This drives the real button through
-// the real blob -> anchor -> click -> deferred-revoke handoff and inspects what the OS receives.
-// It matters most on WebKit: the revoke was deferred specifically because WebKit and Firefox drop a
-// file whose blob URL is freed on the click tick, and WebKit had never executed this path.
+// The .ics export is the calendar feature's ENTIRE delivery path. This drives the real button through the real
+// blob -> anchor -> click -> deferred-revoke handoff and inspects what the OS receives. It matters most on WebKit:
+// the revoke was deferred specifically because WebKit and Firefox drop a file whose blob URL is freed on the click
+// tick. Seeded relative to today, because the file never carries an event before today: a fixed separation date
+// would make these assertions expire as the real clock passes them.
+const DAY = 86_400_000;
+const isoFromToday = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
 
-async function seedProfile(page: import('@playwright/test').Page): Promise<void> {
+async function seedProfile(page: Page, separationInDays: number): Promise<void> {
 	await page.goto('/wizard');
-	await page.getByLabel(/separation date/i).fill('2027-04-15');
+	await page.getByLabel(/separation date/i).fill(isoFromToday(separationInDays));
 	await page.getByRole('button', { name: /save and continue/i }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 }
 
-/** Trigger the real export and return the bytes the browser's download system received. */
-async function readIcs(
-	page: import('@playwright/test').Page,
-	addButton: import('@playwright/test').Locator
-): Promise<string> {
+/** Click the add and return the file the browser received, with folded lines joined back. */
+async function readIcs(page: Page, addButton: Locator): Promise<{ name: string; ics: string }> {
 	const downloadPromise = page.waitForEvent('download');
 	await addButton.click();
 	const download = await downloadPromise;
-	return readFileSync(await download.path(), 'utf-8');
+	const ics = readFileSync(await download.path(), 'utf-8').replace(/\r\n /g, '');
+	return { name: download.suggestedFilename(), ics };
 }
 
-test('exports a real .ics the browser actually receives', async ({ page }) => {
-	await seedProfile(page);
+async function openSettingsAdd(page: Page): Promise<Locator> {
 	await page.goto('/settings');
-
-	// The export refuses to run until the exclusion set is loaded (`ready`), so a file can never be
-	// built against an unknown set. Waiting for the enabled button is waiting for that gate to open.
-	const addButton = page.getByRole('button', { name: /add to apple \/ device calendar/i });
+	const addButton = page.getByRole('button', { name: /^add to my calendar$/i });
+	// The export refuses to run until the exclusion set is loaded, so a file can never be built against an
+	// unknown set. Waiting for the enabled button is waiting for that gate to open.
 	await expect(addButton).toBeEnabled();
+	return addButton;
+}
 
-	const downloadPromise = page.waitForEvent('download');
-	await addButton.click();
-	const download = await downloadPromise;
-
-	expect(download.suggestedFilename()).toBe('transition-deadlines.ics');
-
-	const ics = readFileSync(await download.path(), 'utf-8');
-
-	// A real, parseable calendar with at least one deadline. Every pending task projects to one
-	// all-day VEVENT, and a bare separation-date profile still yields the universal tasks - so an
-	// empty or truncated file here is a real delivery failure, not an empty timeline.
+test('exports a dated calendar file with no past events and alerts before firm days', async ({
+	page
+}) => {
+	// 300 days out: preseparation counseling's window and several aim dates have passed (so "no past events" has
+	// something to drop), while the BDD claim's last day is still 210 days ahead.
+	await seedProfile(page, 300);
+	const { name, ics } = await readIcs(page, await openSettingsAdd(page));
+	expect(name).toBe(`ask214-deadlines-${isoFromToday(0)}.ics`);
 	expect(ics.startsWith('BEGIN:VCALENDAR')).toBe(true);
 	expect(ics).toContain('END:VCALENDAR');
-	expect(ics).toContain('BEGIN:VEVENT');
+	expect(ics).toContain('SUMMARY:Last day: File your VA disability claim through BDD');
+	expect(ics).toContain('BEGIN:VALARM');
+	const today = isoFromToday(0).replace(/-/g, '');
+	const starts = [...ics.matchAll(/DTSTART;VALUE=DATE:(\d{8})/g)].map((m) => m[1] ?? '');
+	expect(starts.length).toBeGreaterThan(0);
+	for (const start of starts) expect(start >= today).toBe(true);
 });
 
-// Excluding a category must remove exactly those deadlines from the file the OS receives - the
-// promise that "keep these off my calendar" is honored at the bytes, not just in the UI. Uses the
-// finance category, which the universal task set always contains (the SGLI review is ungated), so
-// the assertion cannot pass vacuously against a category that had no tasks to begin with.
-test('a kept-off category is absent from the exported .ics', async ({ page }) => {
-	await seedProfile(page);
-	await page.goto('/settings');
-
-	const addButton = page.getByRole('button', { name: /add to apple \/ device calendar/i });
-	await expect(addButton).toBeEnabled();
-
-	const baseline = await readIcs(page, addButton);
-	// Non-vacuity guard: the finance task must be PRESENT before we exclude it, or "absent after"
-	// proves nothing.
+// Excluding a category must remove exactly those deadlines from the file the OS receives - the promise that
+// "keep these off my calendar" is honored at the bytes, not just in the UI.
+test('a kept-off category is absent from the exported file', async ({ page }) => {
+	await seedProfile(page, 600);
+	const addButton = await openSettingsAdd(page);
+	// Non-vacuity: the finance task (SGLI, aimed 60 days out with this seed) is there before it is excluded.
+	const baseline = (await readIcs(page, addButton)).ics;
 	expect(baseline).toContain('SGLI coverage and beneficiaries');
 	const baselineCount = (baseline.match(/BEGIN:VEVENT/g) ?? []).length;
-
 	await page.getByRole('button', { name: /customize what's included/i }).click();
 	await page.getByRole('checkbox', { name: /^finance$/i }).check();
-	// The persisted exclusion set is what the export reads; wait for it to register (the summary
-	// flips to "1 kept off") before re-exporting, so this is not a race.
+	// The persisted exclusion set is what the export reads; wait for it to register before re-exporting.
 	await expect(page.getByText('1 kept off')).toBeVisible();
-
-	const filtered = await readIcs(page, addButton);
+	const filtered = (await readIcs(page, addButton)).ics;
 	expect(filtered).not.toContain('SGLI coverage and beneficiaries');
 	expect((filtered.match(/BEGIN:VEVENT/g) ?? []).length).toBeLessThan(baselineCount);
+});
+
+test('the add works offline and no request carries a title or a date', async ({
+	page,
+	context
+}) => {
+	await seedProfile(page, 600);
+	const addButton = await openSettingsAdd(page);
+	const sent: string[] = [];
+	page.on('request', (r) => sent.push(`${r.url()} ${r.postData() ?? ''}`));
+	await context.setOffline(true);
+	const { ics } = await readIcs(page, addButton);
+	await context.setOffline(false);
+	expect(ics).toContain('BEGIN:VEVENT');
+	for (const line of sent) {
+		expect(line).not.toMatch(/SGLI coverage|VA disability claim|BEGIN:VCALENDAR/);
+		expect(line).not.toContain(isoFromToday(600));
+	}
 });
