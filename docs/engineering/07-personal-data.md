@@ -112,16 +112,19 @@ says that nothing was deleted.
 
 ### The timeline and the calendar file
 
-**What it is.** The timeline is computed on the device from the separation date: 38 task definitions with day
+**What it is.** The timeline is computed on the device from the separation date: 35 task definitions with day
 offsets from it, filtered by the profile, since a task shows only when every condition it needs is known to
-apply. Military tasks move earlier by the SkillBridge length. A device clock that jumps back more than a day
-shows a warning rather than quietly reshuffling deadlines. The export is an `.ics` file the user saves: one
-all-day event for each pending task they have not excluded, carrying only a stable ID, the date and the task's
-title, never notes or profile details. The stable ID means a second import updates events instead of
-duplicating them.
+apply. Each task also says how firm its window is: a soft window is good timing only, a required task stays
+required after its date, and some windows close for good. Military tasks move earlier by the SkillBridge length.
+A device clock that jumps back more than a day shows a warning rather than quietly reshuffling deadlines. The
+export is an `.ics` file the user saves, named by the day of the add: an all-day event for each moment still
+ahead (a window opening, a last day, or a soft task's target date), with alerts before each firm date and each
+target date, and never an event before today. Events and alerts carry only a stable ID, the date and the task's
+title with its moment, never notes or profile details. The stable IDs mean a second import updates events
+instead of duplicating them.
 
-**Tradeoffs accepted.** Export is one way, so a change means exporting again. Syncing with Google Calendar is
-designed but not built.
+**Tradeoffs accepted.** Export is one way, so a change means exporting again. Whether a calendar app keeps the
+alerts is that app's choice. Syncing with Google Calendar is designed but not built.
 
 ## How These Pieces Fit Together
 
