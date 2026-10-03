@@ -1,27 +1,33 @@
 import type { TimelineItem } from '../timeline/generate';
-import type { TaskExclusions } from './types';
+import type { TaskExclusions, DesiredEvent } from './types';
 import { computeDesiredEvents } from './desired';
 import { computeIcsUid } from './uid';
 import { serializeIcs } from './ics';
 
 /**
- * Project the generated timeline into the iCalendar text the OS hands to the user's calendar app:
- * the shared desired-set, stamped with each task's stable UID so a re-import updates rather than
- * duplicates. Shared by every surface that offers the add, so they cannot drift apart in what they
- * egress. `now` is injected for a deterministic DTSTAMP.
+ * Project the generated timeline into the iCalendar text the OS hands to the user's calendar app: one event per
+ * moment of the shared desired-set, each with its alerts and a stable calendar ID. Shared by every surface that
+ * offers the add, so they cannot drift apart in what they egress. `now` is injected for a deterministic DTSTAMP.
  */
 export async function buildIcs(
 	items: TimelineItem[],
 	exclusions: TaskExclusions,
 	now: Date
 ): Promise<string> {
-	const desired = computeDesiredEvents(items, exclusions);
+	const desired = computeDesiredEvents(items, exclusions, now.toISOString().slice(0, 10));
 	const events = await Promise.all(
 		desired.map(async (d) => ({
 			title: d.title,
 			isoDate: d.isoDate,
-			uid: await computeIcsUid(d.taskId)
+			alarmDays: d.alarmDays,
+			uid: await computeIcsUid(eventKey(d))
 		}))
 	);
 	return serializeIcs(events, now);
+}
+
+/** "Last day" and "Aim for" keep the task's original calendar ID, so a re-add updates the event a user already
+ *  added; "Opens" and "Changes" are new events with IDs of their own. */
+function eventKey(d: DesiredEvent): string {
+	return d.moment === 'last' || d.moment === 'aim' ? d.taskId : `${d.taskId}:${d.moment}`;
 }

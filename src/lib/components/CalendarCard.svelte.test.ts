@@ -17,13 +17,16 @@ function def(id: string, category: TaskDef['category']): TaskDef {
 		why: ''
 	};
 }
+// Dated ahead of the real clock: the calendar file never carries an event before today.
+const ahead = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
 function item(d: TaskDef): TimelineItem {
 	return {
 		def: d,
-		targetDate: '2026-08-14',
-		windowStartDate: '2026-08-14',
-		windowEndDate: '2026-08-14',
-		status: 'start-now'
+		targetDate: ahead,
+		windowStartDate: ahead,
+		windowEndDate: ahead,
+		status: 'start-now',
+		aimDate: ahead
 	};
 }
 
@@ -42,8 +45,8 @@ describe('CalendarCard', () => {
 		// buildIcs awaits computeIcsUid (crypto.subtle) per event, so poll for the callback.
 		await vi.waitFor(() => expect(onDownload).toHaveBeenCalledOnce());
 		const ics = onDownload.mock.calls[0]?.[0] as string;
-		expect(ics).toContain('SUMMARY:a'); // the card honours the same exclusions as the panel
-		expect(ics).not.toContain('SUMMARY:m');
+		expect(ics).toContain('SUMMARY:Aim for: a'); // the card honours the same exclusions as the panel
+		expect(ics).not.toContain('SUMMARY:Aim for: m');
 	});
 
 	it('the dismiss control calls onDismiss', () => {
