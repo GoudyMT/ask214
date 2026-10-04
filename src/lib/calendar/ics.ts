@@ -1,6 +1,8 @@
 import { addDays } from '../timeline/day-math';
 
 const PRODID = '-//Ask 214//Calendar//EN';
+/** 2000-01-01T00:00:00Z in whole seconds: the event version counts from here. */
+const VERSION_EPOCH_SECONDS = 946_684_800;
 
 /** Escape an iCalendar TEXT value (RFC 5545 3.3.11): backslash, semicolon, comma, newline. */
 function escapeText(s: string): string {
@@ -70,9 +72,10 @@ export function serializeIcs(
 	now: Date
 ): string {
 	const dtstamp = formatDtstamp(now);
-	// The event's version (RFC 5545 3.8.7.4): whole minutes since 1970 at the add, so each later add carries a
-	// higher one and an app that compares versions updates the event instead of keeping the old one.
-	const sequence = Math.floor(now.getTime() / 60_000);
+	// The event's version (RFC 5545 3.8.7.4): whole seconds since 2000 at the add, so each later add carries a
+	// higher one and an app that compares versions updates the event instead of keeping the old one. Counting from
+	// 2000 keeps it inside the format's 32-bit integer until 2068.
+	const sequence = Math.floor(now.getTime() / 1000) - VERSION_EPOCH_SECONDS;
 	const lines: string[] = [
 		'BEGIN:VCALENDAR',
 		'VERSION:2.0',

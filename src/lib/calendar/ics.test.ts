@@ -74,11 +74,15 @@ describe('serializeIcs', () => {
 					/^SEQUENCE:(\d+)\r?$/gm
 				)
 			].map((m) => Number(m[1]));
-		const first = versions(NOW);
+		// A real clock reading, mid-second: a whole number inside RFC 5545's integer range (3.3.8).
+		const now = new Date('2026-10-03T21:05:37.123Z');
+		const first = versions(now);
 		expect(first).toHaveLength(2);
 		expect(first[0]).toBe(first[1]);
-		expect(versions(new Date(NOW.getTime() + 60_000))[0]).toBeGreaterThan(first[0] ?? Infinity);
-		// A device clock set far back still writes a valid, non-negative whole number.
+		expect(first[0]).toBeLessThanOrEqual(2_147_483_647);
+		// An add one second later - a date fixed and added again - carries a higher one.
+		expect(versions(new Date(now.getTime() + 1_000))[0]).toBeGreaterThan(first[0] ?? Infinity);
+		// A device clock set years back (2020) still writes a valid, non-negative whole number.
 		const old = versions(new Date(Date.UTC(2020, 0, 1)));
 		expect(old).toHaveLength(2);
 		expect(old.every((v) => Number.isInteger(v) && v >= 0)).toBe(true);
