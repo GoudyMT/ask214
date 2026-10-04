@@ -6,6 +6,7 @@ import {
 	todayMarkerIndex,
 	type AnchoredTask
 } from './generate';
+import { selectNeedsNow } from './needs-now';
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
@@ -501,17 +502,57 @@ describe('deriveStatus (window kinds)', () => {
 		expect(deriveStatus(vgli, undefined, on('2028-05-18'))).toBe('closed');
 	});
 
-	it('lets a snooze quiet an open firm task, but never hide closing-soon, late or closed', () => {
+	it('lets a snooze quiet an open firm task, but never hide closing-soon, late, changed or closed', () => {
 		const snoozed: TimelineTaskState = { status: 'snoozed', snoozeUntil: '2027-12-31' };
 		expect(deriveStatus(firm('closes'), snoozed, on('2026-08-15'))).toBe('snoozed');
 		expect(deriveStatus(firm('closes'), snoozed, on('2026-10-01'))).toBe('closing-soon');
 		expect(deriveStatus(firm('required'), snoozed, on('2026-10-21'))).toBe('late');
 		expect(deriveStatus(firm('closes'), snoozed, on('2026-10-21'))).toBe('closed');
+		const vgli = firm('closes', { windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' });
+		expect(deriveStatus(vgli, snoozed, on('2027-09-16'))).toBe('changed');
 	});
 
 	it('still quiets a soft task past its window', () => {
 		const snoozed: TimelineTaskState = { status: 'snoozed', snoozeUntil: '2027-12-31' };
 		expect(deriveStatus(firm('soft'), snoozed, on('2026-10-21'))).toBe('snoozed');
+	});
+
+	// Every kind at every boundary of its window (opens Jul 22, last day Oct 20): the day before opening, opening
+	// day, 31 and 30 days before the last day, the last day, and the day after.
+	it.each([
+		['soft', ['upcoming', 'start-now', 'start-now', 'start-now', 'start-now', 'still-to-do']],
+		['required', ['upcoming', 'start-now', 'start-now', 'closing-soon', 'closing-soon', 'late']],
+		['closes', ['upcoming', 'start-now', 'start-now', 'closing-soon', 'closing-soon', 'closed']]
+	] as const)('walks a %s task through every boundary', (kind, expected) => {
+		const days = [
+			'2026-07-21',
+			'2026-07-22',
+			'2026-09-19',
+			'2026-09-20',
+			'2026-10-20',
+			'2026-10-21'
+		];
+		expect(days.map((d) => deriveStatus(firm(kind), undefined, on(d)))).toEqual(expected);
+	});
+
+	it('walks a two-edge task through both edges', () => {
+		const vgli = firm('closes', { windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' });
+		const days = [
+			'2027-08-15',
+			'2027-08-16',
+			'2027-09-15',
+			'2027-09-16',
+			'2028-05-17',
+			'2028-05-18'
+		];
+		expect(days.map((d) => deriveStatus(vgli, undefined, on(d)))).toEqual([
+			'start-now',
+			'closing-soon',
+			'closing-soon',
+			'changed',
+			'changed',
+			'closed'
+		]);
 	});
 });
 
@@ -593,5 +634,49 @@ describe('generateTimeline (deadline fields)', () => {
 		};
 		const [item] = items(shifted, [{ ...vgli, track: 'military' }]);
 		expect(item?.finalEndDate).toBe(eaosOffsetDate(eaos, 485 - 90));
+	});
+
+	it('derives the status and the countdown from the SkillBridge-shifted window', () => {
+		const shifted: PersonaFilters = {
+			...persona,
+			skillbridge: { approved: true, durationDays: 30 }
+		};
+		const military: TaskDef = {
+			...universal,
+			id: 'military',
+			track: 'military',
+			kind: 'closes',
+			windowStart: -180,
+			windowEnd: -60
+		};
+		// Unshifted, the last day is Nov 19 (47 days out); 30 days earlier it is Oct 20.
+		const [item] = items(shifted, [military]);
+		expect(item?.status).toBe('closing-soon');
+		expect(item?.daysLeft).toBe(17);
+	});
+
+	it('counts a two-edge task down to its final edge between the edges, and lists it as closing soon', () => {
+		const separated = '2025-06-25' as EaosString; // the final edge (485 days) falls on Oct 23, 2026
+		const p: PersonaFilters = {
+			completeness: 'eaos-only',
+			eaos: separated,
+			daysUntilSeparation: -465
+		};
+		const list = items(p, [vgli]);
+		expect(list[0]?.status).toBe('changed');
+		expect(list[0]?.daysLeft).toBe(20);
+		expect(selectNeedsNow(list, '2026-10-03').closingSoon.map((i) => i.def.id)).toEqual(['vgli']);
+	});
+
+	it('aims a soft task at a recommended date that falls today', () => {
+		const dueToday: TaskDef = {
+			...universal,
+			id: 'due-today',
+			windowStart: -200,
+			windowEnd: -30,
+			recommendedOffset: -107 // Oct 3, 2026
+		};
+		const [item] = items(persona, [dueToday]);
+		expect(item?.aimDate).toBe('2026-10-03');
 	});
 });

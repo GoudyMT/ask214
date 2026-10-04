@@ -67,10 +67,15 @@ describe('selectNeedsNow', () => {
 		expect(ids(g.justOpened)).toEqual(['o0', 'o13']);
 	});
 
+	// Windows a status-blind rule would list as "just opened": the upcoming one opens next month and the rest opened
+	// two days ago, so only the status keeps them out.
 	it('leaves out upcoming, still-to-do, done, skipped and snoozed tasks', () => {
-		const statuses: DisplayStatus[] = ['upcoming', 'still-to-do', 'done', 'skipped', 'snoozed'];
+		const opened: DisplayStatus[] = ['still-to-do', 'done', 'skipped', 'snoozed'];
 		const g = selectNeedsNow(
-			statuses.map((s) => item(s, s)),
+			[
+				item('upcoming', 'upcoming', { windowStartDate: '2026-11-01' }),
+				...opened.map((s) => item(s, s, { windowStartDate: '2026-10-01' }))
+			],
 			TODAY
 		);
 		expect([...g.late, ...g.closingSoon, ...g.justClosed, ...g.justOpened]).toEqual([]);
