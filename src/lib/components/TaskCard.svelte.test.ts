@@ -167,6 +167,20 @@ describe('TaskCard (open states)', () => {
 		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain('Gone.');
 	});
 
+	// A required task's note says what to do before separation; once separation has passed it no longer applies.
+	it('closed after separation: a required task shows no What now note', () => {
+		const def = {
+			...DEF,
+			kind: 'required' as const,
+			afterNote: 'Still required before you separate.'
+		};
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		expect(container.textContent).toContain('Closed');
+		expect(container.querySelector('.task-card__whatnow')).toBeNull();
+	});
+
 	it('changed: "Changed", the final last day, and What changed', () => {
 		const def = {
 			...DEF,

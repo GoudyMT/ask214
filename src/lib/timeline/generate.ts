@@ -19,6 +19,7 @@ export type AnchoredTask = {
 	windowStartDate: string; // ISO: window opens
 	windowEndDate: string; // ISO: window closes
 	finalEndDate?: string; // ISO: a two-edge task's final close
+	separationDate: string; // ISO: the EAOS itself, never shifted by SkillBridge
 };
 
 /**
@@ -58,7 +59,8 @@ function anchorTask(eaos: EaosString, def: TaskDef, shiftDays: number): Anchored
 		windowEndDate: eaosOffsetDate(eaos, def.windowEnd - shiftDays),
 		...(def.finalEnd !== undefined
 			? { finalEndDate: eaosOffsetDate(eaos, def.finalEnd - shiftDays) }
-			: {})
+			: {}),
+		separationDate: eaosOffsetDate(eaos, 0)
 	};
 }
 
@@ -114,7 +116,10 @@ function statusByDate(a: AnchoredTask, todayIso: string): DisplayStatus {
 			? 'closing-soon'
 			: 'start-now';
 	}
-	if (a.def.kind === 'required') return 'late';
+	// A required task before separation stays late until done; once separation has passed it can no longer be done.
+	if (a.def.kind === 'required') {
+		return todayIso > a.separationDate && a.windowEndDate < a.separationDate ? 'closed' : 'late';
+	}
 	if (a.finalEndDate !== undefined && todayIso <= a.finalEndDate) return 'changed';
 	return 'closed';
 }

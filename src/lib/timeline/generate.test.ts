@@ -106,7 +106,8 @@ describe('deriveStatus (status + snooze-expiry)', () => {
 		effectiveOffset: -120,
 		targetDate: '2027-01-15',
 		windowStartDate: '2027-01-01',
-		windowEndDate: '2027-03-01'
+		windowEndDate: '2027-03-01',
+		separationDate: '2027-05-30'
 	};
 	const inWindow = new Date('2027-02-01T12:00:00Z');
 
@@ -411,7 +412,8 @@ describe('deriveStatus and generateTimeline on the device clock', () => {
 		effectiveOffset: -120,
 		targetDate: '2026-09-01',
 		windowStartDate: '2026-07-22',
-		windowEndDate: '2026-10-20'
+		windowEndDate: '2026-10-20',
+		separationDate: '2027-01-18'
 	};
 
 	it('keeps a window open through the evening of its last day in Los Angeles', () => {
@@ -457,6 +459,7 @@ describe('deriveStatus (window kinds)', () => {
 		targetDate: '2026-09-01',
 		windowStartDate: '2026-07-22',
 		windowEndDate: '2026-10-20',
+		separationDate: '2027-01-18',
 		...extra
 	});
 
@@ -474,6 +477,16 @@ describe('deriveStatus (window kinds)', () => {
 	it('is closed the day after a closing date, and late the day after a required one', () => {
 		expect(deriveStatus(firm('closes'), undefined, on('2026-10-21'))).toBe('closed');
 		expect(deriveStatus(firm('required'), undefined, on('2026-10-21'))).toBe('late');
+	});
+
+	// A required task belongs to the time before separation; once separation has passed, nothing about it can
+	// still be done, so it stops reading as late.
+	it('keeps a required task late through separation day, then closes it', () => {
+		expect(deriveStatus(firm('required'), undefined, on('2027-01-18'))).toBe('late');
+		expect(deriveStatus(firm('required'), undefined, on('2027-01-19'))).toBe('closed');
+		// A task required after separation stays late past its own date.
+		const afterSeparation = firm('required', { windowEndDate: '2027-03-01' });
+		expect(deriveStatus(afterSeparation, undefined, on('2027-03-02'))).toBe('late');
 	});
 
 	it('never shows closing-soon for a soft task, and is still-to-do after its window', () => {
@@ -518,6 +531,25 @@ describe('generateTimeline (deadline fields)', () => {
 		recommendedOffset: 30,
 		finalEnd: 485
 	};
+
+	it('closes a required pre-separation task for a user already separated', () => {
+		const separated = '2026-09-03' as EaosString; // 30 days before Oct 3
+		const required: TaskDef = {
+			...universal,
+			id: 'required',
+			kind: 'required',
+			windowStart: -180,
+			windowEnd: -90,
+			afterNote: 'n'
+		};
+		const persona: PersonaFilters = {
+			completeness: 'eaos-only',
+			eaos: separated,
+			daysUntilSeparation: -30
+		};
+		const [item] = items(persona, [required]);
+		expect(item?.status).toBe('closed');
+	});
 
 	it('anchors a second edge and counts the days left to the next firm edge', () => {
 		const bdd: TaskDef = {

@@ -132,11 +132,12 @@
 
 	const daysLeftLine = $derived(item.daysLeft === undefined ? '' : formatDaysLeft(item.daysLeft));
 
-	// After a firm date: what is still possible (late, closed), or what changed at a two-edge task's first edge.
+	// After a firm date: what is still possible (late, closed), or what changed at a two-edge task's first edge. A
+	// required task closes only after separation, when its note about doing it first no longer applies.
 	const afterNote = $derived(
 		item.status === 'changed'
 			? { label: 'What changed', text: item.def.changeNote }
-			: item.status === 'late' || item.status === 'closed'
+			: item.status === 'late' || (item.status === 'closed' && item.def.kind === 'closes')
 				? { label: 'What now', text: item.def.afterNote }
 				: undefined
 	);
