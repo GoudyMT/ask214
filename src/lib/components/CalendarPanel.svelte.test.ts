@@ -90,6 +90,55 @@ describe('CalendarPanel', () => {
 		expect(onDownload).not.toHaveBeenCalled();
 	});
 
+	// While the settings are unknown the panel says only that; "Nothing ahead" would be a second, unproven reason.
+	it('does not also say nothing is ahead while the settings are unknown', () => {
+		const passed: TimelineItem = {
+			...item(def('p', 'admin')),
+			windowEndDate: '2020-01-01',
+			aimDate: '2020-01-01',
+			status: 'still-to-do'
+		};
+		const { container } = render(CalendarPanel, {
+			props: {
+				items: [passed],
+				exclusions: { taskIds: [], categories: [] },
+				ready: false,
+				onSetExclusions: vi.fn(),
+				onDownload: vi.fn()
+			}
+		});
+		expect(container.textContent).toContain('could not be loaded');
+		expect(container.textContent).not.toContain('Nothing ahead');
+	});
+
+	// Today is the date on the device clock: on a US evening the UTC date is already tomorrow, and a task aimed for
+	// today must still keep the add on.
+	it('keeps the add on for a task aimed at today, on a US evening', () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		try {
+			vi.setSystemTime(new Date('2026-10-04T01:00:00Z'));
+			expect(new Date().getDate()).toBe(3); // the test browser's zone took effect: 18:00 on Oct 3
+			const today: TimelineItem = {
+				...item(def('t', 'admin')),
+				windowEndDate: '2026-10-03',
+				aimDate: '2026-10-03'
+			};
+			const { container } = render(CalendarPanel, {
+				props: {
+					items: [today],
+					exclusions: { taskIds: [], categories: [] },
+					ready: true,
+					onSetExclusions: vi.fn(),
+					onDownload: vi.fn()
+				}
+			});
+			expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(false);
+			expect(container.textContent).not.toContain('Nothing ahead');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	// The file never carries an event before today, so with nothing ahead (or everything kept off) there is nothing
 	// to add: the button stays off and says why, instead of handing over an empty file.
 	it('with nothing ahead to add, keeps the button off and says so', () => {
