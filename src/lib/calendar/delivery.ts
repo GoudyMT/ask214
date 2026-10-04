@@ -4,7 +4,11 @@
  * sentence; nothing is stored or sent.
  */
 import { localTodayIso } from '../timeline/day-math';
-import { isInstalled } from '../install/install-state';
+// The same two signals as isInstalled in install-state.ts. Importing that module here would split it out of the
+// layout into a chunk of its own, which every page then downloads (measured: +221 B of page chunks).
+const isInstalled = () =>
+	window.matchMedia('(display-mode: standalone)').matches ||
+	(navigator as Navigator & { standalone?: boolean }).standalone === true;
 
 /** Dated by the local day of the add, so a second add on a later day never meets "file already exists". */
 export function calendarFileName(now: Date): string {
