@@ -15,14 +15,14 @@ async function seedProfile(page: import('@playwright/test').Page): Promise<void>
 test('erase removes the profile and lands on a clean first run', async ({ page }) => {
 	await seedProfile(page);
 	await page.goto('/settings');
-	await expect(page.getByText('2027-04-15')).toBeVisible();
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
 
 	await page.getByRole('button', { name: /erase all data on this device/i }).click();
 	await page.getByRole('button', { name: /^erase everything$/i }).click();
 
 	// The erase ends in window.location.reload(); wait for that to settle before navigating, or the
 	// next goto aborts it. The separation date being gone is what proves the wipe reached disk.
-	await expect(page.getByText('2027-04-15')).toBeHidden({ timeout: 15_000 });
+	await expect(page.getByText('Apr 15, 2027')).toBeHidden({ timeout: 15_000 });
 	await expect(page.getByRole('button', { name: /^unlock$/i })).toBeHidden();
 
 	// A fresh keystore means first-run: the Home setup CTA is offered again.
@@ -33,7 +33,7 @@ test('erase removes the profile and lands on a clean first run', async ({ page }
 test('a failed erase says so, and the data survives', async ({ page }) => {
 	await seedProfile(page);
 	await page.goto('/settings');
-	await expect(page.getByText('2027-04-15')).toBeVisible();
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
 
 	// Force a REAL failure rather than a mocked one: the store wipe runs under the `mtc-keystore`
 	// lock held exclusively, so holding that lock makes the production path time out exactly as a
@@ -71,5 +71,5 @@ test('a failed erase says so, and the data survives', async ({ page }) => {
 	// The claim the message makes must be true: the wipe is one transaction, so a failure leaves
 	// every record intact. Unlock re-reads it from disk.
 	await page.getByRole('button', { name: /^unlock$/i }).click();
-	await expect(page.getByText('2027-04-15')).toBeVisible({ timeout: 15_000 });
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible({ timeout: 15_000 });
 });

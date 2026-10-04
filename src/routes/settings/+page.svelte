@@ -1,12 +1,12 @@
 <script lang="ts">
-	import EaosInput from '$lib/components/EaosInput.svelte';
+	import SettingsDateRow from '$lib/components/SettingsDateRow.svelte';
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import { eraseEverything } from '$lib/profile/erase';
-	import { OccConflictError } from '$lib/profile/store.svelte';
+	import { OccConflictError, type ProfilePatch } from '$lib/profile/store.svelte';
 	import {
 		validateEaosAtInput,
 		encodeEaos,
@@ -80,10 +80,6 @@
 	// timeline-dependent sections (separation date, calendar) hide until there is a timeline to manage.
 	const hasTimeline = $derived((app.store?.persona.completeness ?? 'none') !== 'none');
 
-	let editing = $state(false);
-	let draft = $state('');
-	let error = $state<string | null>(null);
-	let saving = $state(false);
 	let unlocking = $state(false);
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
@@ -104,6 +100,95 @@
 		return p && p.completeness !== 'none' ? p.eaos : null;
 	});
 
+	const LEAVING_HINT =
+		'Tasks you must finish at your command move earlier to fit before you leave.';
+	const PAYGRADE_NOTE =
+		'Navy SkillBridge can start up to 180 days before separation for E5 and below, 120 days for E6 to E9 and officers O4 and below, and 90 days for O5 and above (NAVADMIN 064/23).';
+	const ORDER_NOTE = 'SkillBridge comes before terminal leave (NAVADMIN 064/23).';
+	const AFTER_SEPARATION = 'This date needs to be before your separation date.';
+	const OCC_MESSAGE =
+		'This was changed in another tab. We reloaded it - please review and save again.';
+	// The leaving rows are not the separation date, so an empty or unreadable entry asks for "a valid date".
+	const LEAVING_ERROR_COPY: Record<EaosCause, string> = {
+		...ERROR_COPY,
+		format: 'Please enter a valid date.'
+	};
+
+	const leaving = $derived.by(() => {
+		const p = app.store?.persona;
+		return p && p.completeness !== 'none' ? p.leaving : undefined;
+	});
+	// Each row shows its stored date, in use or not (the Timeline line says when one is not used).
+	const skillbridgeValue = $derived(
+		leaving?.skillbridgeStart ?? leaving?.notUsed?.skillbridgeStart ?? null
+	);
+	const terminalLeaveValue = $derived(
+		leaving?.terminalLeaveStart ?? leaving?.notUsed?.terminalLeaveStart ?? null
+	);
+	const outOfOrder = $derived(
+		!!leaving?.skillbridgeStart &&
+			!!leaving.terminalLeaveStart &&
+			leaving.skillbridgeStart > leaving.terminalLeaveStart
+	);
+
+	/** A typed date as bytes, or the message to show; the input range is the separation date's own. */
+	function readDate(draft: string, copy: Record<EaosCause, string>): Uint8Array | string {
+		try {
+			return encodeEaos(validateEaosAtInput(draft));
+		} catch (err) {
+			if (err instanceof EaosFormatError) return copy[err.cause];
+			throw err;
+		}
+	}
+
+	async function savePatch(patch: ProfilePatch, bytes?: Uint8Array): Promise<string | null> {
+		const store = app.store;
+		if (!store) return null;
+		try {
+			await store.save(patch);
+			return null;
+		} catch (err) {
+			if (err instanceof OccConflictError) {
+				// refresh, not load: the user asked to save, not to unlock, so if the write lost its race to a
+				// relock this must not re-open the store.
+				await store.refresh();
+				return OCC_MESSAGE;
+			}
+			throw err;
+		} finally {
+			bytes?.fill(0); // the store keeps its own copy; this one held the typed date
+		}
+	}
+
+	async function saveEaos(draft: string): Promise<string | null> {
+		const bytes = readDate(draft, ERROR_COPY);
+		return typeof bytes === 'string' ? bytes : savePatch({ eaos: bytes }, bytes);
+	}
+
+	async function saveLeaving(
+		field: 'skillbridgeStart' | 'terminalLeaveStart',
+		draft: string
+	): Promise<string | null> {
+		const bytes = readDate(draft, LEAVING_ERROR_COPY);
+		if (typeof bytes === 'string') return bytes;
+		if (currentEaos && draft >= currentEaos) {
+			bytes.fill(0);
+			return AFTER_SEPARATION;
+		}
+		const patch: ProfilePatch =
+			field === 'skillbridgeStart' ? { skillbridgeStart: bytes } : { terminalLeaveStart: bytes };
+		return savePatch(patch, bytes);
+	}
+
+	function removeLeaving(field: 'skillbridgeStart' | 'terminalLeaveStart'): Promise<string | null> {
+		// An absent key is "not set": the store drops it and zeroizes the record it replaces.
+		return savePatch(
+			field === 'skillbridgeStart'
+				? { skillbridgeStart: undefined }
+				: { terminalLeaveStart: undefined }
+		);
+	}
+
 	// Until the timeline-state store provisions, fall back to empty state so the calendar panel
 	// still lists date-derived pending tasks; stored done/skip/snooze layer in once it loads.
 	const EMPTY_STATE: TimelineState = { schemaVersion: 1, tasks: {} };
@@ -118,57 +203,6 @@
 			(p) => p.items
 		);
 	});
-
-	function startEdit(): void {
-		draft = currentEaos ?? '';
-		error = null;
-		editing = true;
-	}
-
-	function cancel(): void {
-		editing = false;
-		error = null;
-	}
-
-	function onInput(next: string): void {
-		draft = next;
-		error = null;
-	}
-
-	async function save(e: SubmitEvent): Promise<void> {
-		e.preventDefault();
-		const store = app.store;
-		if (!store) return;
-
-		let bytes: Uint8Array;
-		try {
-			bytes = encodeEaos(validateEaosAtInput(draft));
-		} catch (err) {
-			if (err instanceof EaosFormatError) {
-				error = ERROR_COPY[err.cause];
-				return;
-			}
-			throw err;
-		}
-
-		saving = true;
-		try {
-			await store.save({ eaos: bytes });
-			editing = false;
-		} catch (err) {
-			if (err instanceof OccConflictError) {
-				// Re-read authoritative state; stay in edit mode so the message + input stay visible
-				// (OCC: reload, don't clobber). refresh, not load: the user asked to SAVE, not to
-				// unlock, so if the write lost its race to a relock this must not re-open the store.
-				await store.refresh();
-				error = 'This was changed in another tab. We reloaded it - please review and save again.';
-				return;
-			}
-			throw err;
-		} finally {
-			saving = false;
-		}
-	}
 
 	function lock(): void {
 		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
@@ -329,36 +363,31 @@
 			<section class="settings-section" aria-labelledby="timeline-heading">
 				<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
 
-				<div class="settings-disclosure">
-					<button
-						class="settings-disclosure__toggle"
-						type="button"
-						aria-expanded={editing}
-						aria-controls="eaos-edit"
-						onclick={() => (editing ? cancel() : startEdit())}
-					>
-						<span class="settings-chevron" class:settings-chevron--open={editing} aria-hidden="true"
-						></span>
-						<span>Separation date (EAOS)</span>
-						<span class="settings-disclosure__summary">{currentEaos ?? 'Not set'}</span>
-					</button>
-					{#if editing}
-						<form id="eaos-edit" class="settings-edit" onsubmit={(e) => void save(e)}>
-							<EaosInput
-								value={draft}
-								{error}
-								onchange={onInput}
-								label="Separation date (EAOS)"
-								hint="Your End of Active Obligated Service - the date your current obligation ends."
-								hideLabel
-							/>
-							<div class="settings-edit__actions">
-								<button class="settings-save" type="submit" disabled={saving}>Save</button>
-								<button class="settings-cancel" type="button" onclick={cancel}>Cancel</button>
-							</div>
-						</form>
-					{/if}
-				</div>
+				<SettingsDateRow
+					id="eaos"
+					label="Separation date (EAOS)"
+					value={currentEaos}
+					hint="Your End of Active Obligated Service - the date your current obligation ends."
+					onSave={saveEaos}
+				/>
+				<SettingsDateRow
+					id="skillbridge-start"
+					label="SkillBridge start"
+					value={skillbridgeValue}
+					hint={PAYGRADE_NOTE}
+					onSave={(d) => saveLeaving('skillbridgeStart', d)}
+					onRemove={() => removeLeaving('skillbridgeStart')}
+				/>
+				<SettingsDateRow
+					id="terminal-leave-start"
+					label="Terminal leave start"
+					value={terminalLeaveValue}
+					hint=""
+					onSave={(d) => saveLeaving('terminalLeaveStart', d)}
+					onRemove={() => removeLeaving('terminalLeaveStart')}
+				/>
+				<p class="settings-hint">{LEAVING_HINT}</p>
+				{#if outOfOrder}<p class="settings-hint">{ORDER_NOTE}</p>{/if}
 
 				{#if app.store?.clockBackward}
 					<div class="clock-notice">
@@ -501,83 +530,6 @@
 
 	.settings-row__value {
 		color: var(--color-fg);
-	}
-
-	/* Separation-date disclosure: the same caret-expand idiom as the Calendar "Customize" panel, so both
-	   in-place edits read as siblings. (End-state: a shared Disclosure component; today they mirror by hand.) */
-	.settings-disclosure__toggle {
-		display: flex;
-		align-items: center;
-		gap: var(--space-s);
-		width: 100%;
-		padding: 0;
-		background: none;
-		border: none;
-		color: var(--color-fg);
-		font: inherit;
-		font-size: var(--font-size-s);
-		cursor: pointer;
-		text-align: left;
-	}
-	.settings-disclosure__summary {
-		margin-left: auto;
-		color: var(--color-fg-muted);
-	}
-	.settings-chevron {
-		width: 0;
-		height: 0;
-		border-left: 5px solid currentColor;
-		border-top: 4px solid transparent;
-		border-bottom: 4px solid transparent;
-		flex: none;
-	}
-	.settings-chevron--open {
-		transform: rotate(90deg);
-	}
-
-	.settings-edit {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-m);
-		margin-top: var(--space-m);
-	}
-
-	.settings-edit__actions {
-		display: flex;
-		align-items: center;
-		gap: var(--space-m);
-	}
-
-	/* Primary CTA: filled accent + bg-colored text. */
-	.settings-save {
-		padding: var(--space-s) var(--space-l);
-		background: var(--color-accent);
-		color: var(--color-bg);
-		border: none;
-		border-radius: var(--radius-m);
-		font: inherit;
-		font-weight: 600;
-		cursor: pointer;
-	}
-
-	.settings-save:hover {
-		background: var(--color-accent-muted);
-	}
-
-	.settings-save:disabled {
-		opacity: 0.6;
-		cursor: default;
-	}
-
-	/* Quiet CTA: muted text, underline. */
-	.settings-cancel {
-		padding: var(--space-s);
-		background: none;
-		border: none;
-		color: var(--color-fg-muted);
-		font: inherit;
-		text-decoration: underline;
-		cursor: pointer;
 	}
 
 	/* Secondary/protective CTA: border + fg text, not destructive. */

@@ -21,11 +21,11 @@ test('a saved EAOS propagates across tabs: IDB load + live broadcast update', as
 	// Tab B: open Settings; it loads the stored EAOS from IndexedDB (cross-tab read).
 	const tabB = await context.newPage();
 	await tabB.goto('/settings');
-	await expect(tabB.getByText('2027-04-15')).toBeVisible();
+	await expect(tabB.getByText('Apr 15, 2027')).toBeVisible();
 
 	// Tab A: change the EAOS in Settings and save (fires the 'profile-updated' broadcast).
 	await tabA.goto('/settings');
-	await expect(tabA.getByText('2027-04-15')).toBeVisible(); // store loaded -> the date shows as the disclosure summary
+	await expect(tabA.getByText('Apr 15, 2027')).toBeVisible(); // store loaded -> the date shows as the disclosure summary
 	await tabA.getByRole('button', { name: /separation date/i }).click();
 	await tabA.getByLabel(/separation date/i).fill('2028-08-20');
 	// Scope to the timeline section: Settings now also carries the BYO-key "Save" (Online answers).
@@ -35,6 +35,6 @@ test('a saved EAOS propagates across tabs: IDB load + live broadcast update', as
 		.click();
 
 	// Tab B (no manual reload): broadcast -> store.load() -> persona -> the value re-renders.
-	await expect(tabB.getByText('2028-08-20')).toBeVisible();
-	await expect(tabB.getByText('2027-04-15')).toBeHidden();
+	await expect(tabB.getByText('Aug 20, 2028')).toBeVisible();
+	await expect(tabB.getByText('Apr 15, 2027')).toBeHidden();
 });
