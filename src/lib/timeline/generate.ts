@@ -254,8 +254,7 @@ export function generateTimeline(
 		.map((a) => {
 			const stored = state.tasks[a.def.id];
 			const status = deriveStatus(a, stored, today);
-			// snoozeUntil rides the view only while the item is actively snoozed; gating on the
-			// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.
+			// The countdown runs to the next firm edge: the last day while closing soon, the final edge between two.
 			const nextEdge =
 				status === 'closing-soon'
 					? a.windowEndDate
@@ -273,6 +272,8 @@ export function generateTimeline(
 				...(a.def.kind === 'soft'
 					? { aimDate: a.targetDate >= todayIso ? a.targetDate : a.windowEndDate }
 					: {}),
+				// snoozeUntil rides the view only while the item is actively snoozed; gating on the
+				// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.
 				...(status === 'snoozed' && stored?.snoozeUntil !== undefined
 					? { snoozeUntil: stored.snoozeUntil }
 					: {}),

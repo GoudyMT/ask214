@@ -61,9 +61,10 @@ const STATIC = 'static';
 //     Page 56,000 -> 58,100 and route nodes 41,078 -> 42,350 (owner's call, 2026-10-03): deadline reminders -
 //     the calendar file's event per moment with its alerts and the sentence under the button (+1,441 B, a page
 //     chunk), the task card's new states and the "Needs you now" summary (+1,215 B, the timeline's route node),
-//     and the What now links (+667 B, the resources chunk). Measured after a trim pass (-56 B route nodes, -41 B
-//     precache: the snooze date and the calendar end date reuse the shared whole-day math; loading the calendar
-//     builder only on the tap measured worse on three budgets, because every install precaches it anyway):
+//     and the What now links (+667 B, the resources chunk). Measured after a trim pass (-16 B page, -40 B route
+//     nodes, -41 B precache: the snooze date and the calendar end date reuse the shared whole-day math; loading
+//     the calendar builder only on the tap measured worse on three budgets, because every install precaches it
+//     anyway):
 //     page 58,018 B, route nodes 42,259 B - each keeps about 85 B of room.
 //     Page 58,100 -> 58,230 and route nodes 42,350 -> 42,500 (owner's call, 2026-10-03): the pre-merge review's
 //     fixes - today read from the device clock, the corrected task copy, a required task closing after
