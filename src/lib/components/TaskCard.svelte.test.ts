@@ -618,6 +618,28 @@ describe('TaskCard (layout by width)', () => {
 		expect(box(container, '.task-card__days').top).toBe(date.top);
 	});
 
+	it('on a phone a moved date wraps before its reason and stays inside the card', async () => {
+		await page.viewport(320, 800);
+		const { container } = renderCard(
+			makeItem({
+				def: firm,
+				status: 'closing-soon',
+				windowEndDate: '2026-10-31',
+				daysLeft: 27,
+				fit: { reason: 'skillbridge', date: '2026-10-31' }
+			})
+		);
+		(container as HTMLElement).style.width = '288px';
+		const reason = box(container, '.task-card__reason-words');
+		// The line wraps (the case under test is reached), the reason starting a line of its own...
+		expect(reason.top).toBeGreaterThan(box(container, '.task-card__status').top);
+		// ...with its countdown beside it, and nothing passes the card's edge.
+		expect(box(container, '.task-card__days').top).toBe(reason.top);
+		expect(box(container, '.task-card__when').right).toBeLessThanOrEqual(
+			box(container, 'article').right
+		);
+	});
+
 	it('on a wide screen the status line sits beside the title', async () => {
 		await page.viewport(1024, 800);
 		const { container } = renderCard(closing);

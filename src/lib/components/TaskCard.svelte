@@ -109,8 +109,8 @@
 
 	// The reason Fit moved a date, said on that date only.
 	const REASON: Record<FitReason, string> = {
-		skillbridge: ', before SkillBridge',
-		'terminal-leave': ', before terminal leave'
+		skillbridge: 'before SkillBridge',
+		'terminal-leave': 'before terminal leave'
 	};
 	const AFTER_YOU_LEAVE_NOTE =
 		'This opens after you leave your command. Ask your command how to fit it in.';
@@ -118,14 +118,16 @@
 	// The date line by status: when a window opens, a soft task's aim, a firm task's last day, when a passed date
 	// was due. Resolved states use the collapsed treatment instead.
 	const firm = $derived(item.def.kind !== 'soft');
-	const dateLine = $derived.by(() => {
+	const dateLine = $derived.by((): { text: string; reason?: string } => {
 		const f = formatTimelineDate;
-		const at = (label: string, iso: string) =>
-			`${label} ${f(iso)}${item.fit && iso === item.fit.date ? REASON[item.fit.reason] : ''}`;
+		const at = (label: string, iso: string) => ({
+			text: `${label} ${f(iso)}`,
+			...(item.fit && iso === item.fit.date ? { reason: REASON[item.fit.reason] } : {})
+		});
 		switch (item.status) {
 			case 'upcoming':
 			case 'after-you-leave':
-				return `Opens ${f(item.windowStartDate)}`;
+				return { text: `Opens ${f(item.windowStartDate)}` };
 			case 'start-now':
 				return firm
 					? at('Last day', item.windowEndDate)
@@ -135,13 +137,13 @@
 			case 'late':
 				return at('was due', item.windowEndDate);
 			case 'changed':
-				return `Last day ${f(item.finalEndDate ?? item.windowEndDate)}`;
+				return { text: `Last day ${f(item.finalEndDate ?? item.windowEndDate)}` };
 			case 'closed':
-				return f(item.finalEndDate ?? item.windowEndDate);
+				return { text: f(item.finalEndDate ?? item.windowEndDate) };
 			case 'still-to-do':
 				return at('Aimed for', item.windowEndDate);
 			default:
-				return f(item.targetDate);
+				return { text: f(item.targetDate) };
 		}
 	});
 
@@ -342,9 +344,11 @@
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
 			<span class="task-card__when"
-				><span class="task-card__date">{dateLine}</span>{#if daysLeftLine}<span
-						class="task-card__days">{daysLeftLine}</span
-					>{/if}</span
+				><span class="task-card__date"
+					>{dateLine.text}{#if dateLine.reason}<span class="task-card__reason"
+							>, <span class="task-card__reason-words">{dateLine.reason}</span></span
+						>{/if}</span
+				>{#if daysLeftLine}<span class="task-card__days">{daysLeftLine}</span>{/if}</span
 			>
 		</div>
 	</article>
@@ -708,6 +712,16 @@
 		.task-card__meta .task-card__days::before {
 			content: '\00a0-\00a0';
 		}
+
+		/* A moved date's reason may start the next line, kept whole and joined to its countdown: the one break
+		   the date line allows is the space after the date's comma. */
+		.task-card__meta .task-card__reason {
+			white-space: normal;
+		}
+	}
+
+	.task-card__reason-words {
+		white-space: nowrap;
 	}
 
 	/* Expanded resolved header: the disclosure toggle (button reset; full-width tap target). Title
