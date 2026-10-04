@@ -120,8 +120,9 @@ A device clock that jumps back more than a day shows a warning rather than quiet
 export is an `.ics` file the user saves, named by the day of the add: an all-day event for each moment still
 ahead (a window opening, a last day, or a soft task's target date), with alerts before each firm date and each
 target date, and never an event before today. Events and alerts carry only a stable ID, the date and the task's
-title with its moment, never notes or profile details. The stable IDs mean a second import updates events
-instead of duplicating them.
+title with its moment, never notes or profile details. The stable IDs and a rising version number let a calendar
+app that honors them update events instead of duplicating them; after a date change, the app asks the user to
+remove the old events first, since not every calendar does.
 
 **Tradeoffs accepted.** Export is one way, so a change means exporting again. Whether a calendar app keeps the
 alerts is that app's choice. Syncing with Google Calendar is designed but not built.
