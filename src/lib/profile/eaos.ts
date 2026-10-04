@@ -6,7 +6,7 @@
  * - parseEaosAtRead: LENIENT (load path; no range check; only calendar validity)
  *
  * Errors are PII-free: cause enum, never includes input string.
- * Date math is UTC-anchored to eliminate timezone off-by-one.
+ * Dates are calendar days on the UTC day grid; "today" is the date on the device clock.
  */
 
 export type EaosString = string & { readonly __brand: 'EaosString' };
@@ -122,7 +122,7 @@ export function daysUntilSeparation(eaos: EaosString, now = new Date()): number 
  * The Timeline Engine anchors every task to the separation date: a task's target
  * date is EAOS shifted by its day offset (negative = before separation). Both ends
  * are UTC-anchored (EAOS via Date.UTC, output via toISOString) so neither timezone
- * nor time-of-day can shift the result by a day (same as daysUntilSeparation).
+ * nor time-of-day can shift the result by a day.
  *
  * Returns a plain ISO date string, not a branded EaosString - the projection is a
  * derived target date, not a user-entered/validated EAOS.

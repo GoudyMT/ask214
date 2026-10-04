@@ -115,13 +115,14 @@ says that nothing was deleted.
 **What it is.** The timeline is computed on the device from the separation date: 35 task definitions with day
 offsets from it, filtered by the profile, since a task shows only when every condition it needs is known to
 apply. Each task also says how firm its window is: a soft window is good timing only, a required task stays
-required after its date, and some windows close for good, and others change how they work. Military tasks move earlier by the SkillBridge length.
+required until separation, and some windows close for good, and others change how they work. Military tasks
+move earlier by the SkillBridge length.
 A device clock that jumps back more than a day shows a warning rather than quietly reshuffling deadlines. The
 export is an `.ics` file the user saves, named by the day of the add: an all-day event for each moment still
 ahead (a window opening, a last day, or a soft task's target date), with alerts before each firm date and each
 target date, and never an event before today. Events and alerts carry only a stable ID, the date and the task's
 title with its moment, never notes or profile details. The stable IDs and a rising version number let a calendar
-app that honors them update events instead of duplicating them; after a date change, the app asks the user to
+app that honors them update events instead of duplicating them; after a date change, Settings asks the user to
 remove the old events first, since not every calendar does.
 
 **Tradeoffs accepted.** Export is one way, so a change means exporting again. Whether a calendar app keeps the

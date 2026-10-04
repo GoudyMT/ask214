@@ -26,7 +26,7 @@ describe('buildIcs', () => {
 		};
 		// A UID line is 78 octets, so it always folds: join the folds before reading.
 		const ics = (await buildIcs([bdd], { taskIds: [], categories: [] }, NOW)).replace(/\r\n /g, '');
-		// A re-add then updates the event a user already has instead of duplicating it.
+		// An app that matches events by ID can then update the one a user already has instead of duplicating it.
 		expect(ics).toContain(`UID:${await computeIcsUid('bdd')}\r\n`);
 		expect(ics).toContain(`UID:${await computeIcsUid('bdd:opens')}\r\n`);
 	});
