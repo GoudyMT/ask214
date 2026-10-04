@@ -17,7 +17,7 @@
  * is trivial (single-row stores, no indexes/queries) so a library adds no value.
  */
 export const DB_NAME = 'mtc';
-export const DB_VERSION = 4; // 3 -> 4: adds the byok store (the upgrade loop creates missing stores; prior data survives)
+export const DB_VERSION = 5; // 4 -> 5: no new store; retires a tab on an older bundle (onversionchange -> 'stale'), whose profile decode drops the leaving dates and would save the profile without them
 export const STORES = [
 	'profile',
 	'profile-hwm',
