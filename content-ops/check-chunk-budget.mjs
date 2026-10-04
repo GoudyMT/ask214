@@ -101,6 +101,9 @@ const STATIC = 'static';
 //     with 55 files, after that trim pass.
 //     Raised 139,060 -> 139,350 (owner's call, 2026-10-03): the review's fixes, above - 139,264 B measured with
 //     55 files, after that trim pass.
+//     Raised 139,350 -> 139,440 (owner's call, 2026-10-03): each calendar event's rising version and the Settings
+//     line about removing old events after a date change - 139,348 B measured with 55 files, after a trim pass
+//     (-41 B: the version as plain minutes since 1970, and the line sharing the device sentence's spacing rule).
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -113,7 +116,7 @@ const LIMIT = {
 	page: 58_230,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 139_350,
+	precacheBytes: 139_440,
 	workerScripts: 147_200
 };
 
