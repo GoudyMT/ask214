@@ -13,6 +13,7 @@
 	import { shouldShowCalendarCard } from '$lib/calendar/card-visibility';
 	import { selectNeedsNow } from '$lib/timeline/needs-now';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
+	import LeavingLine from '$lib/components/LeavingLine.svelte';
 
 	const app = getProfileApp();
 
@@ -27,6 +28,11 @@
 	const eaos = $derived.by(() => {
 		const p = app.store?.persona;
 		return p && p.completeness !== 'none' ? p.eaos : null;
+	});
+
+	const leaving = $derived.by(() => {
+		const p = app.store?.persona;
+		return p && p.completeness !== 'none' ? p.leaving : undefined;
 	});
 
 	// The generated timeline projection (pure): re-derives when the persona or the stored
@@ -134,6 +140,7 @@
 		<p class="timeline-subline">
 			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 		</p>
+		<LeavingLine {leaving} />
 		{#if view}
 			{#if needsNow}<NeedsNow groups={needsNow} />{/if}
 			{#if showCalendarCard}
@@ -156,7 +163,7 @@
 	}
 
 	.timeline-subline {
-		margin: 0 0 var(--space-l);
+		margin: 0 0 var(--space-xs);
 		color: var(--color-fg-muted);
 	}
 </style>
