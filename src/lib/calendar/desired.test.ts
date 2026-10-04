@@ -86,6 +86,16 @@ describe('computeDesiredEvents', () => {
 		]);
 	});
 
+	// "Opens" tells the user a window is coming; on opening day the window is already open.
+	it('gives no "Opens" event on opening day itself', () => {
+		const opensToday = item(def('o', 'closes'), {
+			windowStartDate: TODAY,
+			windowEndDate: '2027-02-01',
+			status: 'start-now'
+		});
+		expect(computeDesiredEvents([opensToday], NONE, TODAY).map((e) => e.moment)).toEqual(['last']);
+	});
+
 	it('keeps an event dated today, with no alert left to fire', () => {
 		const lastToday = item(def('t', 'closes'), {
 			windowStartDate: '2026-01-01',

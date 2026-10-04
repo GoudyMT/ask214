@@ -16,8 +16,9 @@ const PREFIX: Record<EventMoment, string> = {
 /**
  * Project the timeline into the shared desired-event set: for each pending, non-excluded task, one event per
  * moment that is today or later. A soft task gets one "Aim for" event (its snooze date while snoozed); a firm
- * task gets "Opens" and "Last day" (a two-edge task also "Changes"), and a snooze never moves those. Alerts are
- * kept only while still ahead, so an import never fires a stale one. Pure + deterministic; `todayIso` injected.
+ * task gets "Opens" while its window is still ahead and "Last day" (a two-edge task also "Changes"), and a
+ * snooze never moves those. Alerts are kept only while still ahead, so an import never fires a stale one. Pure +
+ * deterministic; `todayIso` injected.
  * The SAME set feeds the .ics file and, later, the Google provider, so both egress exactly what is previewed.
  */
 export function computeDesiredEvents(
@@ -48,7 +49,7 @@ export function computeDesiredEvents(
 			if (aim !== undefined) add(it, 'aim', aim, SOFT_ALARM_DAYS);
 			continue;
 		}
-		add(it, 'opens', it.windowStartDate, []);
+		if (it.windowStartDate > todayIso) add(it, 'opens', it.windowStartDate, []);
 		if (it.finalEndDate !== undefined) {
 			add(it, 'changes', it.windowEndDate, FIRM_ALARM_DAYS);
 			add(it, 'last', it.finalEndDate, FIRM_ALARM_DAYS);
