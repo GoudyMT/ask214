@@ -65,6 +65,13 @@ const STATIC = 'static';
 //     precache: the snooze date and the calendar end date reuse the shared whole-day math; loading the calendar
 //     builder only on the tap measured worse on three budgets, because every install precaches it anyway):
 //     page 58,018 B, route nodes 42,259 B - each keeps about 85 B of room.
+//     Page 58,100 -> 58,230 and route nodes 42,350 -> 42,500 (owner's call, 2026-10-03): the pre-merge review's
+//     fixes - today read from the device clock, the corrected task copy, a required task closing after
+//     separation and the installed iPhone sentence (+160 B, a page chunk), the add offered only when the file
+//     would hold an event (+79 B, the Settings and timeline route nodes), and the task card's Snooze rule, link
+//     line, focus target and spaced tags. Measured after a trim pass (-221 B page: the installed check read
+//     inline, so install-state is not split into a chunk of its own; reusing the iPhone sentence's text measured
+//     6 B worse and was dropped): page 58,143 B, route nodes 42,410 B - each keeps about 90 B of room.
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -91,6 +98,8 @@ const STATIC = 'static';
 //     with 55 files, after that trim pass.
 //     Raised 135,200 -> 139,060 (owner's call, 2026-10-03): the deadline reminders, above - 138,974 B measured
 //     with 55 files, after that trim pass.
+//     Raised 139,060 -> 139,350 (owner's call, 2026-10-03): the review's fixes, above - 139,264 B measured with
+//     55 files, after that trim pass.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -100,10 +109,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 58_100,
+	page: 58_230,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 139_060,
+	precacheBytes: 139_350,
 	workerScripts: 147_200
 };
 
