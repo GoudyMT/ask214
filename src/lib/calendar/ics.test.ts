@@ -78,8 +78,10 @@ describe('serializeIcs', () => {
 		expect(first).toHaveLength(2);
 		expect(first[0]).toBe(first[1]);
 		expect(versions(new Date(NOW.getTime() + 60_000))[0]).toBeGreaterThan(first[0] ?? Infinity);
-		// A device clock set far back still writes a valid, non-negative number.
-		expect(versions(new Date(Date.UTC(2020, 0, 1)))).toEqual([0, 0]);
+		// A device clock set far back still writes a valid, non-negative whole number.
+		const old = versions(new Date(Date.UTC(2020, 0, 1)));
+		expect(old).toHaveLength(2);
+		expect(old.every((v) => Number.isInteger(v) && v >= 0)).toBe(true);
 	});
 
 	it('adds no alert when an event has none', () => {

@@ -52,16 +52,6 @@ function nextDateValue(iso: string): string {
 	return toDateValue(addDays(iso, 1));
 }
 
-/**
- * The event's version (RFC 5545 3.8.7.4): whole minutes from a fixed point to the add, so each later add carries a
- * higher one and an app that compares versions updates the event instead of keeping the old one. Nothing is
- * stored; a device clock set before the fixed point writes 0.
- */
-const SEQUENCE_EPOCH_MS = Date.UTC(2026, 0, 1);
-function sequenceAt(now: Date): number {
-	return Math.max(0, Math.floor((now.getTime() - SEQUENCE_EPOCH_MS) / 60_000));
-}
-
 /** An alert `days` before an all-day event, at 09:00: the event starts at local midnight. */
 function alarmTrigger(days: number): string {
 	return days === 1 ? '-PT15H' : `-P${days - 1}DT15H`;
@@ -80,7 +70,9 @@ export function serializeIcs(
 	now: Date
 ): string {
 	const dtstamp = formatDtstamp(now);
-	const sequence = sequenceAt(now);
+	// The event's version (RFC 5545 3.8.7.4): whole minutes since 1970 at the add, so each later add carries a
+	// higher one and an app that compares versions updates the event instead of keeping the old one.
+	const sequence = Math.floor(now.getTime() / 60_000);
 	const lines: string[] = [
 		'BEGIN:VCALENDAR',
 		'VERSION:2.0',
