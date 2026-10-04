@@ -73,8 +73,8 @@ const STATIC = 'static';
 //     line, focus target and spaced tags. Measured after a trim pass (-221 B page: the installed check read
 //     inline, so install-state is not split into a chunk of its own; reusing the iPhone sentence's text measured
 //     6 B worse and was dropped): page 58,143 B, route nodes 42,410 B - each keeps about 90 B of room.
-//     Measured after the re-review's fixes, with no raise: page 58,218 B (12 B of room), route nodes
-//     42,490 B (10 B).
+//     Measured after the re-review's fixes, with no raise: page 58,220 B (10 B of room), route nodes
+//     42,491 B (9 B).
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -106,7 +106,7 @@ const STATIC = 'static';
 //     Raised 139,350 -> 139,440 (owner's call, 2026-10-03): each calendar event's rising version and the Settings
 //     line about removing old events after a date change - 139,348 B measured with 55 files, after a trim pass
 //     (-41 B: the version as plain minutes since 1970, and the line sharing the device sentence's spacing rule).
-//     Measured after the re-review's fixes, with no raise: 139,420 B (20 B of room); the version now counts whole
+//     Measured after the re-review's fixes, with no raise: 139,432 B (8 B of room); the version now counts whole
 //     seconds since 2000, so two adds a second apart differ.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download

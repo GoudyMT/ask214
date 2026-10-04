@@ -14,6 +14,8 @@ const isoFromToday = (days: number) => {
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+const EVERY_CATEGORY = [/^medical$/i, /^admin$/i, /^benefits$/i, /^career$/i, /^finance$/i];
+
 async function seedProfile(page: Page, separationInDays: number): Promise<void> {
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill(isoFromToday(separationInDays));
@@ -96,16 +98,23 @@ test('the timeline offers the add only while the file would hold an event', asyn
 	await expect(add).toBeVisible();
 	await openSettingsAdd(page);
 	await page.getByRole('button', { name: /customize what's included/i }).click();
-	// One at a time, each saved before the next: the panel builds a toggle from the last saved set, so taps
-	// quicker than the save can overwrite each other.
-	const categories = [/^medical$/i, /^admin$/i, /^benefits$/i, /^career$/i, /^finance$/i];
-	for (const [index, name] of categories.entries()) {
-		await page.getByRole('checkbox', { name }).check();
-		await expect(page.getByText(`${index + 1} kept off`)).toBeVisible();
-	}
+	for (const name of EVERY_CATEGORY) await page.getByRole('checkbox', { name }).check();
+	await expect(page.getByText('5 kept off')).toBeVisible();
 	await page.getByRole('link', { name: 'Timeline' }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 	await expect(add).toHaveCount(0);
+});
+
+// Toggles tapped faster than each save lands all stick - each one is applied to the set as saved - and the
+// record holds them after a reload, not only the boxes on screen.
+test('quick taps on the category toggles all stick', async ({ page }) => {
+	await seedProfile(page, 300);
+	await openSettingsAdd(page);
+	await page.getByRole('button', { name: /customize what's included/i }).click();
+	for (const name of EVERY_CATEGORY) await page.getByRole('checkbox', { name }).check();
+	await expect(page.getByText('5 kept off')).toBeVisible();
+	await page.reload();
+	await expect(page.getByText('5 kept off')).toBeVisible();
 });
 
 test('the add works offline', async ({ page, context }) => {

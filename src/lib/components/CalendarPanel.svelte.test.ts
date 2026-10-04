@@ -5,6 +5,7 @@ import { page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
+import type { TaskExclusions } from '$lib/calendar/types';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 function def(id: string, category: TaskDef['category']): TaskDef {
@@ -204,7 +205,42 @@ describe('CalendarPanel', () => {
 		flushSync();
 		(container.querySelector('input[value="medical"]') as HTMLInputElement).click();
 		flushSync();
-		expect(onSetExclusions).toHaveBeenCalledWith({ taskIds: [], categories: ['medical'] });
+		// The panel sends an update for the set as saved; applied to it, medical is added.
+		expect(onSetExclusions).toHaveBeenCalledOnce();
+		const update = onSetExclusions.mock.calls[0]?.[0] as (
+			current: TaskExclusions
+		) => TaskExclusions;
+		expect(update({ taskIds: [], categories: [] })).toEqual({
+			taskIds: [],
+			categories: ['medical']
+		});
+	});
+
+	// The saved set reaches the panel only after the save lands, so two quick taps happen against the same, older
+	// set. Each toggle must apply to the set as saved, in order (as the store does), or the second tap writes a
+	// set without the first and that category goes back into the calendar file.
+	it('keeps both of two quick toggles made before the first save lands', () => {
+		let saved: TaskExclusions = { taskIds: [], categories: [] };
+		const onSetExclusions = (
+			next: TaskExclusions | ((current: TaskExclusions) => TaskExclusions)
+		) => {
+			saved = typeof next === 'function' ? next(saved) : next;
+		};
+		const { container } = render(CalendarPanel, {
+			props: {
+				items: [item(def('a', 'admin'))],
+				exclusions: { taskIds: [], categories: [] }, // the save has not landed yet
+				ready: true,
+				onSetExclusions,
+				onDownload: vi.fn()
+			}
+		});
+		(container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
+		flushSync();
+		(container.querySelector('input[value="medical"]') as HTMLInputElement).click();
+		(container.querySelector('input[value="admin"]') as HTMLInputElement).click();
+		flushSync();
+		expect(saved.categories).toEqual(['medical', 'admin']);
 	});
 
 	// 38 CFR 14.629: the panel's own words make no personal claim, with something to add, with nothing ahead, or

@@ -17,7 +17,8 @@
 		 * deliberately kept off their calendar.
 		 */
 		ready: boolean;
-		onSetExclusions: (next: TaskExclusions) => void;
+		/** Receives an update to apply to the set as saved, not a whole new set. */
+		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => void;
 		/** Injected so the serialized .ics is testable and the actual download stays the caller's concern. */
 		onDownload: (ics: string) => void;
 	};
@@ -37,11 +38,13 @@
 		computeDesiredEvents(items, exclusions, localTodayIso(new Date())).length > 0
 	);
 
+	// Applied to the set as saved, not to `exclusions`: that prop changes only once a save lands, so quick taps
+	// would each start from the same older set and overwrite one another.
 	function toggleCategory(cat: TaskCategory, on: boolean): void {
-		const categories = on
-			? [...exclusions.categories, cat]
-			: exclusions.categories.filter((c) => c !== cat);
-		onSetExclusions({ taskIds: exclusions.taskIds, categories });
+		onSetExclusions((current) => {
+			const categories = current.categories.filter((c) => c !== cat);
+			return { taskIds: current.taskIds, categories: on ? [...categories, cat] : categories };
+		});
 	}
 
 	async function addToCalendar(): Promise<void> {
