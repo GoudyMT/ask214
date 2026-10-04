@@ -15,6 +15,7 @@ function makeItem(title: string, status: DisplayStatus = 'upcoming'): TimelineIt
 			title,
 			category: 'admin',
 			track: 'transition',
+			kind: 'soft',
 			windowStart: -120,
 			windowEnd: -60,
 			why: `Why ${title} matters.`
@@ -37,7 +38,7 @@ const VIEW: TimelineView = {
 		},
 		{
 			bucket: { id: 'phase-final-90', label: 'Final 90 days', startOffset: -90, endOffset: 0 },
-			items: [makeItem('File VA intent-to-file', 'overdue'), makeItem('DD-214 review')],
+			items: [makeItem('File VA intent-to-file', 'late'), makeItem('DD-214 review')],
 			count: 2,
 			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 2 },
 			collapsible: false
@@ -121,7 +122,7 @@ describe('TimelineList phase progress counts', () => {
 			phases: [
 				{
 					bucket: { id: 'phase-y', label: '12-6 months out', startOffset: -360, endOffset: -180 },
-					items: [makeItem('A', 'overdue'), makeItem('B', 'snoozed'), makeItem('C', 'done')],
+					items: [makeItem('A', 'late'), makeItem('B', 'snoozed'), makeItem('C', 'done')],
 					count: 3,
 					counts: { done: 1, skipped: 0, snoozed: 1, toDo: 1 },
 					collapsible: false
@@ -202,7 +203,7 @@ describe('TimelineList section auto-collapse', () => {
 				{
 					bucket: { id: 'phase-x', label: '18-12 months out', startOffset: -540, endOffset: -360 },
 					items: [
-						makeItem('Request medical records', 'overdue'),
+						makeItem('Request medical records', 'late'),
 						makeItem('Separation physical', 'skipped')
 					],
 					count: 2,

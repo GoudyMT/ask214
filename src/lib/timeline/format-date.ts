@@ -12,3 +12,8 @@ export function formatTimelineDate(iso: string): string {
 	const [year, month, day] = iso.split('-');
 	return `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}`;
 }
+
+/** Days left to a firm date, in the words the task card and the summary both use. */
+export function formatDaysLeft(days: number): string {
+	return days === 0 ? 'today' : days === 1 ? '1 day' : `${days} days`;
+}

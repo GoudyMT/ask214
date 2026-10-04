@@ -1,4 +1,8 @@
+import { addDays } from '../timeline/day-math';
+
 const PRODID = '-//Ask 214//Calendar//EN';
+/** 2000-01-01T00:00:00Z in whole seconds: the event version counts from here. */
+const VERSION_EPOCH_SECONDS = 946_684_800;
 
 /** Escape an iCalendar TEXT value (RFC 5545 3.3.11): backslash, semicolon, comma, newline. */
 function escapeText(s: string): string {
@@ -47,22 +51,31 @@ function toDateValue(iso: string): string {
 
 /** The day AFTER an ISO date, as DATE YYYYMMDD (non-inclusive all-day DTEND). */
 function nextDateValue(iso: string): string {
-	const [y, m, d] = iso.split('-').map(Number);
-	const dt = new Date(Date.UTC(y!, m! - 1, d! + 1));
-	return `${dt.getUTCFullYear()}${pad2(dt.getUTCMonth() + 1)}${pad2(dt.getUTCDate())}`;
+	return toDateValue(addDays(iso, 1));
+}
+
+/** An alert `days` before an all-day event, at 09:00: the event starts at local midnight. */
+function alarmTrigger(days: number): string {
+	return days === 1 ? '-PT15H' : `-P${days - 1}DT15H`;
 }
 
 /**
  * Serialize desired events to a one-way iCalendar file (RFC 5545 core; NO METHOD, so no iTIP
  * ORGANIZER/email is required). All-day VALUE=DATE events (timezone-independent). Each event
- * carries a stable UID so a re-import updates rather than duplicates. CRLF endings, 75-octet
- * folding, TEXT-escaped SUMMARY. `now` is injected for a deterministic DTSTAMP.
+ * carries a stable UID and a rising SEQUENCE, so an app that honors them updates on a re-import
+ * rather than duplicating. CRLF endings, 75-octet
+ * folding, TEXT-escaped SUMMARY, and a display VALARM per alarm day. `now` is injected for a
+ * deterministic DTSTAMP.
  */
 export function serializeIcs(
-	events: { title: string; isoDate: string; uid: string }[],
+	events: { title: string; isoDate: string; uid: string; alarmDays?: readonly number[] }[],
 	now: Date
 ): string {
 	const dtstamp = formatDtstamp(now);
+	// The event's version (RFC 5545 3.8.7.4): whole seconds since 2000 at the add, so each later add carries a
+	// higher one and an app that compares versions updates the event instead of keeping the old one. Counting from
+	// 2000 keeps it inside the format's 32-bit integer until 2068.
+	const sequence = Math.floor(now.getTime() / 1000) - VERSION_EPOCH_SECONDS;
 	const lines: string[] = [
 		'BEGIN:VCALENDAR',
 		'VERSION:2.0',
@@ -74,11 +87,21 @@ export function serializeIcs(
 			'BEGIN:VEVENT',
 			foldLine(`UID:${ev.uid}`),
 			`DTSTAMP:${dtstamp}`,
+			`SEQUENCE:${sequence}`,
 			`DTSTART;VALUE=DATE:${toDateValue(ev.isoDate)}`,
 			`DTEND;VALUE=DATE:${nextDateValue(ev.isoDate)}`,
-			foldLine(`SUMMARY:${escapeText(ev.title)}`),
-			'END:VEVENT'
+			foldLine(`SUMMARY:${escapeText(ev.title)}`)
 		);
+		for (const days of ev.alarmDays ?? []) {
+			lines.push(
+				'BEGIN:VALARM',
+				'ACTION:DISPLAY',
+				foldLine(`DESCRIPTION:${escapeText(ev.title)}`),
+				`TRIGGER:${alarmTrigger(days)}`,
+				'END:VALARM'
+			);
+		}
+		lines.push('END:VEVENT');
 	}
 	lines.push('END:VCALENDAR');
 	return lines.join('\r\n') + '\r\n';

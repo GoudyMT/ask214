@@ -4,6 +4,11 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm';
 
+// The app reads today from the device clock, so both test projects run in one fixed zone: every machine and CI
+// read the same day, and a zone behind UTC makes a slip back to the UTC date fail here too. A fixed TZ also lets
+// a test that stubs another zone get this one back (Node on Windows ignores a deleted TZ).
+const TEST_TIME_ZONE = 'America/Los_Angeles';
+
 export default defineConfig({
 	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
 	// sends `upgrade-insecure-requests` and browsers that honour it rewrite every asset URL to https.
@@ -28,7 +33,7 @@ export default defineConfig({
 					name: 'client',
 					browser: {
 						enabled: true,
-						provider: playwright(),
+						provider: playwright({ contextOptions: { timezoneId: TEST_TIME_ZONE } }),
 						instances: [{ browser: 'chromium', headless: true }],
 						// Pin the browser-mode server to IPv4 loopback + a FIXED port outside the Windows
 						// Hyper-V/WinNAT reserved ranges. The default lands on a reserved high port (63315, inside the
@@ -47,6 +52,7 @@ export default defineConfig({
 				test: {
 					name: 'server',
 					environment: 'node',
+					env: { TZ: TEST_TIME_ZONE },
 					include: [
 						'src/**/*.{test,spec}.{js,ts}',
 						'eslint-plugins/**/*.{test,spec}.{js,ts}',

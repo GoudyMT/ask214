@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Resource } from './types';
-import { resourcesForTask, groupByDisplayCategory } from './select';
+import { resourcesForTask, groupByDisplayCategory, afterLinkForTask } from './select';
 
 function res(id: string, displayCategory: Resource['displayCategory']): Resource {
 	return {
@@ -28,6 +28,31 @@ describe('resourcesForTask', () => {
 	it('drops mapped ids that do not resolve to a resource', () => {
 		const map = { t2: ['a', 'missing', 'c'] };
 		expect(resourcesForTask('t2', map, R).map((r) => r.id)).toEqual(['a', 'c']);
+	});
+});
+
+describe('afterLinkForTask', () => {
+	const R = [res('a', 'claims-vso')];
+
+	it('returns the link text and the resource url for a linked task', () => {
+		const map = { t1: { resource: 'a', label: 'Find a VSO' } };
+		expect(afterLinkForTask('t1', map, R)).toEqual({
+			label: 'Find a VSO',
+			url: 'https://example.gov/a'
+		});
+	});
+
+	it('returns undefined for a task with no link, or a link that does not resolve', () => {
+		expect(afterLinkForTask('t2', { t1: { resource: 'a', label: 'x' } }, R)).toBeUndefined();
+		expect(afterLinkForTask('t1', { t1: { resource: 'missing', label: 'x' } }, R)).toBeUndefined();
+	});
+
+	it('reads the curated map by default', () => {
+		expect(afterLinkForTask('va-bdd-claim')).toEqual({
+			label: 'Find a VSO on VA.gov',
+			url: 'https://www.va.gov/get-help-from-accredited-representative/'
+		});
+		expect(afterLinkForTask('will-poa')).toBeUndefined();
 	});
 });
 

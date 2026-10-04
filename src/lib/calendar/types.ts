@@ -20,9 +20,14 @@ export type CalendarSyncState = {
 	card?: CardDismissal;
 };
 
-/** One all-day event in the shared desired-set (feeds both the .ics file and, later, Google). */
+/** Which moment of a task an event marks; it also keys the event's stable calendar ID. */
+export type EventMoment = 'opens' | 'changes' | 'last' | 'aim';
+
+/** One all-day event in the shared desired-set (feeds the .ics file and, later, Google). */
 export type DesiredEvent = {
 	taskId: string;
-	title: string;
-	isoDate: string; // YYYY-MM-DD
+	moment: EventMoment;
+	title: string; // the task title behind its moment prefix
+	isoDate: string; // YYYY-MM-DD, never before today
+	alarmDays: number[]; // alerts this many days before the event, only those still ahead
 };

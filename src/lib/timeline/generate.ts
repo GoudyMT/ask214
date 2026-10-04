@@ -8,6 +8,7 @@
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import { PHASE_BUCKETS } from './task-defs';
+import { daysBetween, localTodayIso } from './day-math';
 import type { TaskDef, TimelineTaskState, TimelineState, PhaseBucket } from './types';
 
 /** A task definition projected onto absolute UTC calendar dates off the user's EAOS. */
@@ -17,6 +18,8 @@ export type AnchoredTask = {
 	targetDate: string; // ISO YYYY-MM-DD: when to act (recommendedOffset, else windowStart)
 	windowStartDate: string; // ISO: window opens
 	windowEndDate: string; // ISO: window closes
+	finalEndDate?: string; // ISO: a two-edge task's final close
+	separationDate: string; // ISO: the EAOS itself, never shifted by SkillBridge
 };
 
 /**
@@ -53,7 +56,11 @@ function anchorTask(eaos: EaosString, def: TaskDef, shiftDays: number): Anchored
 		effectiveOffset,
 		targetDate: eaosOffsetDate(eaos, effectiveOffset),
 		windowStartDate: eaosOffsetDate(eaos, def.windowStart - shiftDays),
-		windowEndDate: eaosOffsetDate(eaos, def.windowEnd - shiftDays)
+		windowEndDate: eaosOffsetDate(eaos, def.windowEnd - shiftDays),
+		...(def.finalEnd !== undefined
+			? { finalEndDate: eaosOffsetDate(eaos, def.finalEnd - shiftDays) }
+			: {}),
+		separationDate: eaosOffsetDate(eaos, 0)
 	};
 }
 
@@ -77,35 +84,65 @@ export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): Ancho
 }
 
 /** Display status for a task card: paired with a text label in the view (never color-only). */
-export type DisplayStatus = 'upcoming' | 'start-now' | 'overdue' | 'done' | 'skipped' | 'snoozed';
+export type DisplayStatus =
+	| 'upcoming'
+	| 'start-now'
+	| 'closing-soon'
+	| 'late'
+	| 'changed'
+	| 'closed'
+	| 'still-to-do'
+	| 'done'
+	| 'skipped'
+	| 'snoozed';
+
+/** A firm last day this close or closer reads "closing soon": the same distance as the first calendar alert. */
+export const CLOSING_SOON_DAYS = 30;
+
+/** States a snooze may never hide: a snooze quiets a task, it must not make anyone miss a deadline. */
+export const FIRM_WARNINGS: ReadonlySet<DisplayStatus> = new Set([
+	'closing-soon',
+	'late',
+	'changed',
+	'closed'
+]);
+
+/** The date-derived status, by the task's kind; stored done / skipped / snoozed are applied by the caller. */
+function statusByDate(a: AnchoredTask, todayIso: string): DisplayStatus {
+	if (todayIso < a.windowStartDate) return 'upcoming';
+	if (a.def.kind === 'soft') return todayIso > a.windowEndDate ? 'still-to-do' : 'start-now';
+	if (todayIso <= a.windowEndDate) {
+		return daysBetween(todayIso, a.windowEndDate) <= CLOSING_SOON_DAYS
+			? 'closing-soon'
+			: 'start-now';
+	}
+	// A required task before separation stays late until done; once separation has passed it can no longer be done.
+	if (a.def.kind === 'required') {
+		return todayIso > a.separationDate && a.windowEndDate < a.separationDate ? 'closed' : 'late';
+	}
+	if (a.finalEndDate !== undefined && todayIso <= a.finalEndDate) return 'changed';
+	return 'closed';
+}
 
 /**
- * Derive a task's display status. Stored terminal/deferred state wins: 'done' and
- * 'skipped' override the date; 'snoozed' holds only while snoozeUntil is still in the future
- * and otherwise auto-reopens. With no overriding stored state the status is
- * date-derived against the anchored window: before it opens = upcoming, inside = start-now,
- * past = overdue. Both ends are UTC ISO dates so time-of-day cannot shift the result.
+ * Derive a task's display status. Stored 'done' and 'skipped' win; a snooze still in the future quiets the task
+ * unless the date says closing soon, late, changed or closed. Otherwise the status comes from the anchored window
+ * and the task's kind. Today is the date on the device clock, so a window stays open through its last local day.
  */
 export function deriveStatus(
 	anchored: AnchoredTask,
 	stored: TimelineTaskState | undefined,
 	today: Date
 ): DisplayStatus {
-	const todayIso = today.toISOString().slice(0, 10);
-
+	const todayIso = localTodayIso(today);
 	if (stored?.status === 'done') return 'done';
 	if (stored?.status === 'skipped') return 'skipped';
-	if (
+	const byDate = statusByDate(anchored, todayIso);
+	const snoozed =
 		stored?.status === 'snoozed' &&
 		stored.snoozeUntil !== undefined &&
-		stored.snoozeUntil > todayIso
-	) {
-		return 'snoozed';
-	}
-
-	if (todayIso < anchored.windowStartDate) return 'upcoming';
-	if (todayIso > anchored.windowEndDate) return 'overdue';
-	return 'start-now';
+		stored.snoozeUntil > todayIso;
+	return snoozed && !FIRM_WARNINGS.has(byDate) ? 'snoozed' : byDate;
 }
 
 /** One generated, anchored, status-stamped task as rendered in the view. */
@@ -115,6 +152,9 @@ export type TimelineItem = {
 	windowStartDate: string;
 	windowEndDate: string;
 	status: DisplayStatus;
+	finalEndDate?: string;
+	daysLeft?: number; // days to the next firm edge while it counts down
+	aimDate?: string; // soft tasks: the recommended date, or the window end once that passed
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
 	note?: string; // the user's saved note for this task, if any (shown on any status)
 };
@@ -124,7 +164,7 @@ export type PhaseCounts = {
 	done: number;
 	skipped: number;
 	snoozed: number;
-	toDo: number; // active: upcoming + start-now + overdue
+	toDo: number; // active: every status but done / skipped / snoozed
 };
 
 /** A non-empty phase bucket with its (sorted) items, a chip-strip count, a progress tally, and
@@ -175,7 +215,7 @@ function tallyCounts(items: TimelineItem[]): PhaseCounts {
 				counts.snoozed++;
 				break;
 			default:
-				counts.toDo++; // upcoming / start-now / overdue
+				counts.toDo++; // every active status
 		}
 	}
 	return counts;
@@ -208,19 +248,32 @@ export function generateTimeline(
 	today: Date
 ): TimelineView {
 	const anchored = filterAndAnchor(persona, defs);
+	const todayIso = localTodayIso(today);
 
 	const sorted = anchored
 		.map((a) => {
 			const stored = state.tasks[a.def.id];
 			const status = deriveStatus(a, stored, today);
-			// snoozeUntil rides the view only while the item is actively snoozed; gating on the
-			// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.
+			// The countdown runs to the next firm edge: the last day while closing soon, the final edge between two.
+			const nextEdge =
+				status === 'closing-soon'
+					? a.windowEndDate
+					: status === 'changed'
+						? a.finalEndDate
+						: undefined;
 			const item: TimelineItem = {
 				def: a.def,
 				targetDate: a.targetDate,
 				windowStartDate: a.windowStartDate,
 				windowEndDate: a.windowEndDate,
 				status,
+				...(a.finalEndDate !== undefined ? { finalEndDate: a.finalEndDate } : {}),
+				...(nextEdge !== undefined ? { daysLeft: daysBetween(todayIso, nextEdge) } : {}),
+				...(a.def.kind === 'soft'
+					? { aimDate: a.targetDate >= todayIso ? a.targetDate : a.windowEndDate }
+					: {}),
+				// snoozeUntil rides the view only while the item is actively snoozed; gating on the
+				// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.
 				...(status === 'snoozed' && stored?.snoozeUntil !== undefined
 					? { snoozeUntil: stored.snoozeUntil }
 					: {}),
@@ -249,7 +302,7 @@ export function generateTimeline(
 	if (persona.completeness !== 'none') {
 		const daysToSep = daysUntilSeparation(persona.eaos, today);
 		view.todayMarkerIndex = todayMarkerIndex(phases, -daysToSep);
-		view.todayDate = today.toISOString().slice(0, 10);
+		view.todayDate = localTodayIso(today);
 		view.daysToSeparation = daysToSep;
 	}
 	return view;

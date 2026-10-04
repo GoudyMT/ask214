@@ -231,9 +231,17 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 			return api.load();
 		},
 
-		/** Replace the exclusion set (preserves the card dismissal state). */
-		setExclusions(exclusions: TaskExclusions): Promise<void> {
-			return persist((base) => ({ ...base, exclusions }));
+		/**
+		 * Replace the exclusion set, or update it from the set as saved (preserves the card dismissal state). An
+		 * update runs inside the write lock, so quick toggles each build on the one before.
+		 */
+		setExclusions(
+			next: TaskExclusions | ((current: TaskExclusions) => TaskExclusions)
+		): Promise<void> {
+			return persist((base) => ({
+				...base,
+				exclusions: typeof next === 'function' ? next(base.exclusions) : next
+			}));
 		},
 
 		/** Record a card dismissal at `now`, incrementing the count (preserves exclusions). */

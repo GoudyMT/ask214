@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
 	filterAndAnchor,
 	deriveStatus,
@@ -6,6 +6,7 @@ import {
 	todayMarkerIndex,
 	type AnchoredTask
 } from './generate';
+import { selectNeedsNow } from './needs-now';
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
@@ -17,6 +18,7 @@ const universal: TaskDef = {
 	title: 'Universal task',
 	category: 'admin',
 	track: 'transition',
+	kind: 'soft',
 	windowStart: -180,
 	windowEnd: -90,
 	recommendedOffset: -120,
@@ -28,6 +30,7 @@ const noRecommended: TaskDef = {
 	title: 'No recommended offset',
 	category: 'admin',
 	track: 'transition',
+	kind: 'soft',
 	windowStart: -60,
 	windowEnd: -30,
 	why: 'w'
@@ -38,6 +41,7 @@ const gatedSchool: TaskDef = {
 	title: 'School-only task',
 	category: 'career',
 	track: 'transition',
+	kind: 'soft',
 	windowStart: -365,
 	windowEnd: -180,
 	why: 'w',
@@ -103,7 +107,8 @@ describe('deriveStatus (status + snooze-expiry)', () => {
 		effectiveOffset: -120,
 		targetDate: '2027-01-15',
 		windowStartDate: '2027-01-01',
-		windowEndDate: '2027-03-01'
+		windowEndDate: '2027-03-01',
+		separationDate: '2027-05-30'
 	};
 	const inWindow = new Date('2027-02-01T12:00:00Z');
 
@@ -115,8 +120,8 @@ describe('deriveStatus (status + snooze-expiry)', () => {
 		expect(deriveStatus(anchored, undefined, inWindow)).toBe('start-now');
 	});
 
-	it('derives "overdue" after the window closes', () => {
-		expect(deriveStatus(anchored, undefined, new Date('2027-04-01T12:00:00Z'))).toBe('overdue');
+	it('derives "still-to-do" after a soft window ends', () => {
+		expect(deriveStatus(anchored, undefined, new Date('2027-04-01T12:00:00Z'))).toBe('still-to-do');
 	});
 
 	it('lets stored "done" win regardless of the date', () => {
@@ -146,6 +151,7 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		title: id,
 		category: 'admin',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: recommendedOffset,
 		windowEnd: recommendedOffset + 30,
 		recommendedOffset,
@@ -231,7 +237,7 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		const phase = generateTimeline(persona, defs, state, today).phases[0];
 		expect(phase?.collapsible).toBe(false);
 		expect(phase?.counts?.done).toBe(1);
-		expect(phase?.counts?.toDo).toBe(1); // a2 derives active (overdue) -> still "to do"
+		expect(phase?.counts?.toDo).toBe(1); // a2 derives active (still to do) -> still "to do"
 	});
 
 	it('keeps a phase non-collapsible when a task is snoozed (paused, not resolved)', () => {
@@ -280,6 +286,7 @@ describe('generateTimeline SkillBridge shift', () => {
 		title: 'Military task',
 		category: 'admin',
 		track: 'military',
+		kind: 'soft',
 		windowStart: -120,
 		windowEnd: -90,
 		recommendedOffset: -120,
@@ -342,7 +349,7 @@ describe('generateTimeline Today marker', () => {
 			{ ...universal, id: 'early', recommendedOffset: -400, windowStart: -420, windowEnd: -380 },
 			{ ...universal, id: 'late', recommendedOffset: -100, windowStart: -120, windowEnd: -80 }
 		];
-		const today = new Date('2026-06-19'); // ~300 days before EAOS 2027-04-15
+		const today = new Date('2026-06-19T12:00:00Z'); // ~300 days before EAOS 2027-04-15
 		const view = generateTimeline(eaosOnly, defs, { schemaVersion: 1, tasks: {} }, today);
 		expect(view.phases.map((p) => p.bucket.id)).toEqual(['18-12mo', '6-3mo']);
 		expect(view.todayMarkerIndex).toBe(1); // marker before the 6-3mo phase (today is in the gap)
@@ -353,7 +360,7 @@ describe('generateTimeline Today marker', () => {
 			{ completeness: 'none' } as PersonaFilters,
 			[universal],
 			{ schemaVersion: 1, tasks: {} },
-			new Date('2026-06-19')
+			new Date('2026-06-19T12:00:00Z')
 		);
 		expect(view.todayMarkerIndex).toBeUndefined();
 	});
@@ -363,7 +370,7 @@ describe('generateTimeline Today marker', () => {
 			eaosOnly,
 			[universal],
 			{ schemaVersion: 1, tasks: {} },
-			new Date('2026-06-19')
+			new Date('2026-06-19T12:00:00Z')
 		);
 		expect(view.todayDate).toBe('2026-06-19');
 	});
@@ -373,13 +380,13 @@ describe('generateTimeline Today marker', () => {
 			{ completeness: 'none' } as PersonaFilters,
 			[universal],
 			{ schemaVersion: 1, tasks: {} },
-			new Date('2026-06-19')
+			new Date('2026-06-19T12:00:00Z')
 		);
 		expect(view.todayDate).toBeUndefined();
 	});
 
 	it('exposes daysToSeparation (whole days from today to EAOS)', () => {
-		const today = new Date('2026-06-19');
+		const today = new Date('2026-06-19T12:00:00Z');
 		const view = generateTimeline(eaosOnly, [universal], { schemaVersion: 1, tasks: {} }, today);
 		expect(view.daysToSeparation).toBe(daysUntilSeparation(EAOS, today));
 	});
@@ -389,8 +396,310 @@ describe('generateTimeline Today marker', () => {
 			{ completeness: 'none' } as PersonaFilters,
 			[universal],
 			{ schemaVersion: 1, tasks: {} },
-			new Date('2026-06-19')
+			new Date('2026-06-19T12:00:00Z')
 		);
 		expect(view.daysToSeparation).toBeUndefined();
+	});
+});
+
+// Today is the date on the user's clock. On the evening of a last day in Los Angeles the UTC date is already the
+// day after, and on the next morning in Tokyo the UTC date is still the last day.
+describe('deriveStatus and generateTimeline on the device clock', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+	const bddWindow: AnchoredTask = {
+		def: { ...universal, kind: 'closes' },
+		effectiveOffset: -120,
+		targetDate: '2026-09-01',
+		windowStartDate: '2026-07-22',
+		windowEndDate: '2026-10-20',
+		separationDate: '2027-01-18'
+	};
+
+	it('keeps a window open through the evening of its last day in Los Angeles', () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2026-10-21T03:00:00Z');
+		expect(evening.getHours()).toBe(20); // the zone took effect
+		expect(deriveStatus(bddWindow, undefined, evening)).toBe('closing-soon');
+	});
+
+	it('closes a window on the morning after its last day in Tokyo', () => {
+		vi.stubEnv('TZ', 'Asia/Tokyo');
+		const morning = new Date('2026-10-20T23:30:00Z');
+		expect(morning.getHours()).toBe(8); // the zone took effect
+		expect(deriveStatus(bddWindow, undefined, morning)).toBe('closed');
+	});
+
+	it('builds the view for the local date, so the last day counts as today', () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2026-10-21T03:00:00Z'); // 20:00 on Oct 20
+		const eaos = '2027-01-18' as EaosString; // a -90 window ends Oct 20, 2026
+		const bdd: TaskDef = {
+			...universal,
+			id: 'bdd',
+			kind: 'closes',
+			windowStart: -180,
+			windowEnd: -90
+		};
+		const persona: PersonaFilters = { completeness: 'eaos-only', eaos, daysUntilSeparation: 90 };
+		const view = generateTimeline(persona, [bdd], { schemaVersion: 1, tasks: {} }, evening);
+		const [item] = view.phases.flatMap((p) => p.items);
+		expect(view.todayDate).toBe('2026-10-20');
+		expect(item?.status).toBe('closing-soon');
+		expect(item?.daysLeft).toBe(0);
+		expect(view.daysToSeparation).toBe(90);
+	});
+});
+
+describe('deriveStatus (window kinds)', () => {
+	const on = (iso: string) => new Date(`${iso}T12:00:00Z`);
+	const firm = (kind: TaskDef['kind'], extra: Partial<AnchoredTask> = {}): AnchoredTask => ({
+		def: { ...universal, kind },
+		effectiveOffset: -120,
+		targetDate: '2026-09-01',
+		windowStartDate: '2026-07-22',
+		windowEndDate: '2026-10-20',
+		separationDate: '2027-01-18',
+		...extra
+	});
+
+	it('is upcoming the day before the window opens and open on opening day', () => {
+		expect(deriveStatus(firm('closes'), undefined, on('2026-07-21'))).toBe('upcoming');
+		expect(deriveStatus(firm('closes'), undefined, on('2026-07-22'))).toBe('start-now');
+	});
+
+	it('turns closing-soon 30 days before a firm last day, through the last day', () => {
+		expect(deriveStatus(firm('closes'), undefined, on('2026-09-19'))).toBe('start-now');
+		expect(deriveStatus(firm('closes'), undefined, on('2026-09-20'))).toBe('closing-soon');
+		expect(deriveStatus(firm('required'), undefined, on('2026-10-20'))).toBe('closing-soon');
+	});
+
+	it('is closed the day after a closing date, and late the day after a required one', () => {
+		expect(deriveStatus(firm('closes'), undefined, on('2026-10-21'))).toBe('closed');
+		expect(deriveStatus(firm('required'), undefined, on('2026-10-21'))).toBe('late');
+	});
+
+	// A required task belongs to the time before separation; once separation has passed, nothing about it can
+	// still be done, so it stops reading as late.
+	it('keeps a required task late through separation day, then closes it', () => {
+		expect(deriveStatus(firm('required'), undefined, on('2027-01-18'))).toBe('late');
+		expect(deriveStatus(firm('required'), undefined, on('2027-01-19'))).toBe('closed');
+		// A task required after separation stays late past its own date.
+		const afterSeparation = firm('required', { windowEndDate: '2027-03-01' });
+		expect(deriveStatus(afterSeparation, undefined, on('2027-03-02'))).toBe('late');
+	});
+
+	it('never shows closing-soon for a soft task, and is still-to-do after its window', () => {
+		expect(deriveStatus(firm('soft'), undefined, on('2026-10-19'))).toBe('start-now');
+		expect(deriveStatus(firm('soft'), undefined, on('2026-10-21'))).toBe('still-to-do');
+	});
+
+	it('is changed between two edges and closed after the final one', () => {
+		const vgli = firm('closes', { windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' });
+		expect(deriveStatus(vgli, undefined, on('2027-09-16'))).toBe('changed');
+		expect(deriveStatus(vgli, undefined, on('2028-05-17'))).toBe('changed');
+		expect(deriveStatus(vgli, undefined, on('2028-05-18'))).toBe('closed');
+	});
+
+	it('lets a snooze quiet an open firm task, but never hide closing-soon, late, changed or closed', () => {
+		const snoozed: TimelineTaskState = { status: 'snoozed', snoozeUntil: '2027-12-31' };
+		expect(deriveStatus(firm('closes'), snoozed, on('2026-08-15'))).toBe('snoozed');
+		expect(deriveStatus(firm('closes'), snoozed, on('2026-10-01'))).toBe('closing-soon');
+		expect(deriveStatus(firm('required'), snoozed, on('2026-10-21'))).toBe('late');
+		expect(deriveStatus(firm('closes'), snoozed, on('2026-10-21'))).toBe('closed');
+		const vgli = firm('closes', { windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' });
+		expect(deriveStatus(vgli, snoozed, on('2027-09-16'))).toBe('changed');
+	});
+
+	it('still quiets a soft task past its window', () => {
+		const snoozed: TimelineTaskState = { status: 'snoozed', snoozeUntil: '2027-12-31' };
+		expect(deriveStatus(firm('soft'), snoozed, on('2026-10-21'))).toBe('snoozed');
+	});
+
+	// Every kind at every boundary of its window (opens Jul 22, last day Oct 20): the day before opening, opening
+	// day, 31 and 30 days before the last day, the last day, and the day after.
+	it.each([
+		['soft', ['upcoming', 'start-now', 'start-now', 'start-now', 'start-now', 'still-to-do']],
+		['required', ['upcoming', 'start-now', 'start-now', 'closing-soon', 'closing-soon', 'late']],
+		['closes', ['upcoming', 'start-now', 'start-now', 'closing-soon', 'closing-soon', 'closed']]
+	] as const)('walks a %s task through every boundary', (kind, expected) => {
+		const days = [
+			'2026-07-21',
+			'2026-07-22',
+			'2026-09-19',
+			'2026-09-20',
+			'2026-10-20',
+			'2026-10-21'
+		];
+		expect(days.map((d) => deriveStatus(firm(kind), undefined, on(d)))).toEqual(expected);
+	});
+
+	it('walks a two-edge task through both edges', () => {
+		const vgli = firm('closes', { windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' });
+		const days = [
+			'2027-08-15',
+			'2027-08-16',
+			'2027-09-15',
+			'2027-09-16',
+			'2028-05-17',
+			'2028-05-18'
+		];
+		expect(days.map((d) => deriveStatus(vgli, undefined, on(d)))).toEqual([
+			'start-now',
+			'closing-soon',
+			'closing-soon',
+			'changed',
+			'changed',
+			'closed'
+		]);
+	});
+});
+
+describe('generateTimeline (deadline fields)', () => {
+	const today = new Date('2026-10-03T12:00:00Z');
+	const eaos = '2027-01-18' as EaosString;
+	const persona: PersonaFilters = { completeness: 'eaos-only', eaos, daysUntilSeparation: 107 };
+	const state: TimelineState = { schemaVersion: 1, tasks: {} };
+	const items = (p: PersonaFilters, defs: TaskDef[]) =>
+		generateTimeline(p, defs, state, today).phases.flatMap((ph) => ph.items);
+	const vgli: TaskDef = {
+		...universal,
+		id: 'vgli',
+		kind: 'closes',
+		windowStart: 0,
+		windowEnd: 240,
+		recommendedOffset: 30,
+		finalEnd: 485
+	};
+
+	it('closes a required pre-separation task for a user already separated', () => {
+		const separated = '2026-09-03' as EaosString; // 30 days before Oct 3
+		const required: TaskDef = {
+			...universal,
+			id: 'required',
+			kind: 'required',
+			windowStart: -180,
+			windowEnd: -90,
+			afterNote: 'n'
+		};
+		const persona: PersonaFilters = {
+			completeness: 'eaos-only',
+			eaos: separated,
+			daysUntilSeparation: -30
+		};
+		const [item] = items(persona, [required]);
+		expect(item?.status).toBe('closed');
+	});
+
+	// SkillBridge moves a military task earlier, not the separation itself: a required task stays late until the
+	// real separation date has passed.
+	it('keeps a SkillBridge-shifted required task late until the real separation', () => {
+		const shifted: PersonaFilters = {
+			completeness: 'eaos-only',
+			eaos: '2026-11-02' as EaosString,
+			daysUntilSeparation: 30,
+			skillbridge: { approved: true, durationDays: 90 }
+		};
+		const required: TaskDef = {
+			...universal,
+			id: 'required',
+			track: 'military',
+			kind: 'required',
+			windowStart: -180,
+			windowEnd: -90,
+			afterNote: 'n'
+		};
+		const [item] = items(shifted, [required]);
+		expect(item?.windowEndDate).toBe('2026-05-06'); // 180 days before separation: long past on Oct 3
+		expect(item?.status).toBe('late');
+	});
+
+	it('anchors a second edge and counts the days left to the next firm edge', () => {
+		const bdd: TaskDef = {
+			...universal,
+			id: 'bdd',
+			kind: 'closes',
+			windowStart: -180,
+			windowEnd: -90
+		};
+		const [first, second] = items(persona, [bdd, vgli]);
+		expect(first?.status).toBe('closing-soon');
+		expect(first?.daysLeft).toBe(17); // Oct 3 -> Oct 20
+		expect(second?.finalEndDate).toBe(eaosOffsetDate(eaos, 485));
+		expect(second?.daysLeft).toBeUndefined(); // upcoming: no countdown
+	});
+
+	it('aims a soft task at its recommended date, then at its window end once that has passed', () => {
+		const ahead: TaskDef = {
+			...universal,
+			id: 'ahead',
+			windowStart: -200,
+			windowEnd: -30,
+			recommendedOffset: -60
+		};
+		const passed: TaskDef = {
+			...universal,
+			id: 'passed',
+			windowStart: -730,
+			windowEnd: -90,
+			recommendedOffset: -540
+		};
+		const byId = new Map(items(persona, [ahead, passed]).map((i) => [i.def.id, i]));
+		expect(byId.get('ahead')?.aimDate).toBe(eaosOffsetDate(eaos, -60));
+		expect(byId.get('passed')?.aimDate).toBe(eaosOffsetDate(eaos, -90));
+	});
+
+	it('moves the second edge with the SkillBridge shift, like the window', () => {
+		const shifted: PersonaFilters = {
+			...persona,
+			skillbridge: { approved: true, durationDays: 90 }
+		};
+		const [item] = items(shifted, [{ ...vgli, track: 'military' }]);
+		expect(item?.finalEndDate).toBe(eaosOffsetDate(eaos, 485 - 90));
+	});
+
+	it('derives the status and the countdown from the SkillBridge-shifted window', () => {
+		const shifted: PersonaFilters = {
+			...persona,
+			skillbridge: { approved: true, durationDays: 30 }
+		};
+		const military: TaskDef = {
+			...universal,
+			id: 'military',
+			track: 'military',
+			kind: 'closes',
+			windowStart: -180,
+			windowEnd: -60
+		};
+		// Unshifted, the last day is Nov 19 (47 days out); 30 days earlier it is Oct 20.
+		const [item] = items(shifted, [military]);
+		expect(item?.status).toBe('closing-soon');
+		expect(item?.daysLeft).toBe(17);
+	});
+
+	it('counts a two-edge task down to its final edge between the edges, and lists it as closing soon', () => {
+		const separated = '2025-06-25' as EaosString; // the final edge (485 days) falls on Oct 23, 2026
+		const p: PersonaFilters = {
+			completeness: 'eaos-only',
+			eaos: separated,
+			daysUntilSeparation: -465
+		};
+		const list = items(p, [vgli]);
+		expect(list[0]?.status).toBe('changed');
+		expect(list[0]?.daysLeft).toBe(20);
+		expect(selectNeedsNow(list, '2026-10-03').closingSoon.map((i) => i.def.id)).toEqual(['vgli']);
+	});
+
+	it('aims a soft task at a recommended date that falls today', () => {
+		const dueToday: TaskDef = {
+			...universal,
+			id: 'due-today',
+			windowStart: -200,
+			windowEnd: -30,
+			recommendedOffset: -107 // Oct 3, 2026
+		};
+		const [item] = items(persona, [dueToday]);
+		expect(item?.aimDate).toBe('2026-10-03');
 	});
 });

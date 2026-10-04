@@ -41,7 +41,7 @@ test('About link navigates to /about', async ({ page }) => {
 	await expect(page.locator('h1')).toContainText(/about/i);
 });
 
-// Lock #4: header is `position: sticky` (pure CSS, no JS). Tested via computed style
+// The header is `position: sticky` (pure CSS, no JS). Tested via computed style
 // rather than scroll behavior to avoid flaky scroll-position dependencies in headless mode.
 test('header has sticky positioning', async ({ page }) => {
 	await page.goto('/');

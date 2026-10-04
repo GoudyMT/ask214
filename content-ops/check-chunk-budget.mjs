@@ -58,6 +58,23 @@ const STATIC = 'static';
 //     there); 122 B moved between the two limits, plus room. Measured after a trim pass (-2 B: the page's left
 //     flag set in its existing cleanup): page 55,926 B, route nodes 41,004 B - each keeps about 75 B of room,
 //     because builds of the same code differ by a few bytes with SvelteKit's per-build global name.
+//     Page 56,000 -> 58,100 and route nodes 41,078 -> 42,350 (owner's call, 2026-10-03): deadline reminders -
+//     the calendar file's event per moment with its alerts and the sentence under the button (+1,441 B, a page
+//     chunk), the task card's new states and the "Needs you now" summary (+1,215 B, the timeline's route node),
+//     and the What now links (+667 B, the resources chunk). Measured after a trim pass (-16 B page, -40 B route
+//     nodes, -41 B precache: the snooze date and the calendar end date reuse the shared whole-day math; loading
+//     the calendar builder only on the tap measured worse on three budgets, because every install precaches it
+//     anyway):
+//     page 58,018 B, route nodes 42,259 B - each keeps about 85 B of room.
+//     Page 58,100 -> 58,230 and route nodes 42,350 -> 42,500 (owner's call, 2026-10-03): the pre-merge review's
+//     fixes - today read from the device clock, the corrected task copy, a required task closing after
+//     separation and the installed iPhone sentence (+160 B, a page chunk), the add offered only when the file
+//     would hold an event (+79 B, the Settings and timeline route nodes), and the task card's Snooze rule, link
+//     line, focus target and spaced tags. Measured after a trim pass (-221 B page: the installed check read
+//     inline, so install-state is not split into a chunk of its own; reusing the iPhone sentence's text measured
+//     6 B worse and was dropped): page 58,143 B, route nodes 42,410 B - each keeps about 90 B of room.
+//     Measured after the re-review's fixes, with no raise: page 58,220 B (10 B of room), route nodes
+//     42,491 B (9 B).
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -82,6 +99,15 @@ const STATIC = 'static';
 //     the reader's title given its own full-width row - 134,970 B measured with 55 files, after that trim pass.
 //     Raised 135,100 -> 135,200 (owner's call, 2026-09-30): the Documents page's wait, above - 135,112 B measured
 //     with 55 files, after that trim pass.
+//     Raised 135,200 -> 139,060 (owner's call, 2026-10-03): the deadline reminders, above - 138,974 B measured
+//     with 55 files, after that trim pass.
+//     Raised 139,060 -> 139,350 (owner's call, 2026-10-03): the review's fixes, above - 139,264 B measured with
+//     55 files, after that trim pass.
+//     Raised 139,350 -> 139,440 (owner's call, 2026-10-03): each calendar event's rising version and the Settings
+//     line about removing old events after a date change - 139,348 B measured with 55 files, after a trim pass
+//     (-41 B: the version as plain minutes since 1970, and the line sharing the device sentence's spacing rule).
+//     Measured after the re-review's fixes, with no raise: 139,432 B (8 B of room); the version now counts whole
+//     seconds since 2000, so two adds a second apart differ.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -91,10 +117,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 56_000,
+	page: 58_230,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 135_200,
+	precacheBytes: 139_440,
 	workerScripts: 147_200
 };
 

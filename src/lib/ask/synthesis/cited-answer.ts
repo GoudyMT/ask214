@@ -65,7 +65,7 @@ export function toCitedAnswer(
 		.map((c) => ({ id: c.id, url: c.url, title: c.title }));
 	// The citation MARKER is machine syntax, not prose. Rendered verbatim it put 12 characters of hash in
 	// front of the reader ("...last 180 days of service [dod_skillbridge:71686373cd68]."), and its hex run
-	// tripped the anti-phishing phone pattern below on 104 of the 1878 shipped ids. Attribution is carried
+	// tripped the anti-phishing phone pattern below on 91 of the 1992 shipped ids. Attribution is carried
 	// by `citations`, which is the verified list the UI links. Stripping here uses the same transform the
 	// grounding gate does, so the checked text and the read text are the same string.
 	// The prompt tells the model to END with the disclaimer, and this function attaches it unconditionally

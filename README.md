@@ -37,7 +37,7 @@ the transition it is designed to help with.
 - **Works offline.** After your first visit the app opens without a connection, and it keeps working
   after an update.
 - **Timeline.** A persona-aware, separation-date-anchored checklist of transition tasks. Mark done,
-  skip, snooze, or add private notes; export any task to your calendar as an `.ics` file.
+  skip, snooze, or add private notes; add your upcoming deadlines to your calendar as an `.ics` file.
 - **Resources.** A curated hub of official outbound links (VA, DoD, DOL, TSP, SkillBridge). We link to
   the real government tools with context; we never recreate or replace them.
 - **Reference library.** TAP curriculum, VA guides, and agency pages, all public U.S. Government work.

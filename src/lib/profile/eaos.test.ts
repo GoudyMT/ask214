@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
 	parseEaosCalendar,
 	EaosFormatError,
@@ -123,6 +123,27 @@ describe('validateEaosAtInput', () => {
 		const today = new Date('2026-05-26T12:00:00Z');
 		expect(() => validateEaosAtInput('2041-05-26', today)).not.toThrow();
 	});
+
+	it('measures the range from the local date on a US evening', () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2026-05-27T03:00:00Z');
+		expect(evening.getDate()).toBe(26); // the zone took effect: 20:00 on May 26
+		expect(() => validateEaosAtInput('2021-05-26', evening)).not.toThrow();
+	});
+
+	// On a US New Year's Eve the UTC month and year are already the next ones: the range still starts 5 years
+	// before the local date.
+	it("measures the range from the local year and month on a US New Year's Eve", () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2027-01-01T03:00:00Z');
+		expect(evening.getDate()).toBe(31); // the zone took effect: 19:00 on Dec 31
+		expect(() => validateEaosAtInput('2021-12-31', evening)).not.toThrow();
+		expect(() => validateEaosAtInput('2021-12-30', evening)).toThrow(EaosFormatError);
+	});
+});
+
+afterEach(() => {
+	vi.unstubAllEnvs();
 });
 
 describe('parseEaosAtRead', () => {
@@ -161,13 +182,22 @@ describe('daysUntilSeparation', () => {
 		expect(daysUntilSeparation(eaos, today)).toBe(0);
 	});
 
-	it('is timezone-stable: two instants on the same UTC date return the same value', () => {
+	it('is stable through a local day: two instants on the same local date return the same value', () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
 		const eaos = '2027-01-01' as EaosString;
-		// 03:00 UTC and 23:00 UTC are the same UTC calendar date (2026-05-26);
-		// UTC anchoring means time-of-day must not shift the day count.
-		const early = new Date('2026-05-26T03:00:00Z');
-		const late = new Date('2026-05-26T23:00:00Z');
+		// 00:30 and 23:30 on May 26 in Los Angeles; the later one is already May 27 in UTC.
+		const early = new Date('2026-05-26T07:30:00Z');
+		const late = new Date('2026-05-27T06:30:00Z');
+		expect([early.getDate(), late.getDate()]).toEqual([26, 26]); // the zone took effect
 		expect(daysUntilSeparation(eaos, early)).toBe(daysUntilSeparation(eaos, late));
+		expect(daysUntilSeparation(eaos, late)).toBe(220);
+	});
+
+	it("counts from the local year and month on a US New Year's Eve", () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2027-01-01T03:00:00Z');
+		expect(evening.getDate()).toBe(31); // the zone took effect: 19:00 on Dec 31
+		expect(daysUntilSeparation('2027-01-01' as EaosString, evening)).toBe(1);
 	});
 
 	it('handles leap-day arithmetic correctly', () => {

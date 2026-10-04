@@ -95,12 +95,11 @@ export async function synthesize(
 	// glyphs) out of each chunk ONCE, here at the single chunk-entry point, so the model reads the same text
 	// the source cards show AND numeric grounding checks against exactly what the model read.
 	//
-	// Cleaning DOES remove figures - 505 of the 1878 shipped chunks lose at least one numeric token, most
-	// often a publication year carried in the version footer ("2025", in 92 chunks), then the page, section
-	// and module numbers the running headers carry. RE-MEASURE THIS when a cleaning rule is added: the
-	// figure was 407 before the module-header and front-matter-page rules landed, and a stale number here
-	// misrepresents how much the grounding basis gives up. That is deliberate, and the grounding basis is
-	// the CLEANED text on purpose: grounding
+	// Cleaning DOES remove figures - 494 of the 1992 shipped chunks lose at least one numeric token, most
+	// often a publication year carried in the version footer ("2025", in 87 chunks), then the page, section
+	// and module numbers the running headers carry. RE-MEASURE THIS when a cleaning rule or the corpus
+	// changes: a stale number here misrepresents how much the grounding basis gives up. That is deliberate,
+	// and the grounding basis is the CLEANED text on purpose: grounding
 	// against the raw text would let a footer's publication year vouch for a model claim like "rates
 	// increase in 2025", which is exactly the deadline-as-current error rule 7 of the system prompt exists
 	// to prevent.
@@ -162,7 +161,7 @@ export async function synthesize(
 	// them, because prose that would need an exemption is not rendered at all.
 	// BOTH authorized shapes cite nothing - the prompt tells the model to give no benefits information on a
 	// crisis turn, and there is nothing to cite when the sources do not cover the question. Requiring the
-	// answer to be UNCITED is what keeps the classification precise: 29 of the 1878 shipped chunks
+	// answer to be UNCITED is what keeps the classification precise: 28 of the 1992 shipped chunks
 	// legitimately mention the crisis line, so keying on the number alone would replace a real, useful
 	// answer about mental-health resources with a crisis card.
 	const citedIds = parseCitedIds(modelText);
@@ -171,7 +170,7 @@ export async function synthesize(
 	// Ordering this after validateCitations left the crisis reply behind the invalid_citation gate: the
 	// citation pattern accepts digits, so a reply saying "call [988]" - or any markdown link - parses as a
 	// citation, fails validation, and refuses. The user then read benefits content in answer to a self-harm
-	// message. Keying on VALID citations keeps the precision the uncited rule buys, because 29 of the 1878
+	// message. Keying on VALID citations keeps the precision the uncited rule buys, because 28 of the 1992
 	// shipped chunks legitimately mention the crisis line and a genuinely cited answer about mental-health
 	// resources must stay an answer, not become a crisis card.
 	const validCited = citedIds.filter((id) => retrievedIds.has(id));

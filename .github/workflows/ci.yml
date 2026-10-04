@@ -104,7 +104,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Unit tests
-        run: pnpm run test:unit -- --run
+        run: pnpm run test:unit --run
 
       - name: E2E tests (excludes @slow - the heavy offline-model run; see pnpm test:e2e:offline)
         run: pnpm exec playwright test --grep-invert @slow

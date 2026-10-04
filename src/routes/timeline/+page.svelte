@@ -7,8 +7,12 @@
 	import { generateTimeline, TASK_DEFS, type TimelineState, type TaskStatus } from '$lib/timeline';
 	import { formatTimelineDate } from '$lib/timeline/format-date';
 	import CalendarCard from '$lib/components/CalendarCard.svelte';
+	import NeedsNow from '$lib/components/NeedsNow.svelte';
 	import { downloadTextFile } from '$lib/calendar/download';
+	import { calendarFileName } from '$lib/calendar/delivery';
 	import { shouldShowCalendarCard } from '$lib/calendar/card-visibility';
+	import { selectNeedsNow } from '$lib/timeline/needs-now';
+	import { computeDesiredEvents } from '$lib/calendar/desired';
 
 	const app = getProfileApp();
 
@@ -37,15 +41,25 @@
 	// The flat pending-task list the calendar card projects to events (same shared projection the
 	// Settings panel uses, so both surfaces egress identically).
 	const calendarItems = $derived(view ? view.phases.flatMap((p) => p.items) : []);
+	const needsNow = $derived(view?.todayDate ? selectNeedsNow(calendarItems, view.todayDate) : null);
 
 	// The card is the discoverable entry point for the calendar add. It respects the dismissal
-	// cooldown + cap, and stays hidden when there is nothing to add.
+	// cooldown + cap, and stays hidden when there is nothing to add: no event today or later once the
+	// exclusions apply.
 	//
 	// Fail closed on `ready`: until the store loads, both the dismissal state and the exclusion set
 	// are UNKNOWN, not empty. Rendering then would nag a user who already answered AND offer a
 	// one-tap export built from an exclusion set we cannot vouch for.
+	const hasEventsToAdd = $derived(
+		view?.todayDate !== undefined &&
+			computeDesiredEvents(
+				calendarItems,
+				app.calendar?.exclusions ?? { taskIds: [], categories: [] },
+				view.todayDate
+			).length > 0
+	);
 	const showCalendarCard = $derived(
-		calendarItems.length > 0 &&
+		hasEventsToAdd &&
 			(app.calendar?.ready ?? false) &&
 			shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
 	);
@@ -121,11 +135,12 @@
 			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 		</p>
 		{#if view}
+			{#if needsNow}<NeedsNow groups={needsNow} />{/if}
 			{#if showCalendarCard}
 				<CalendarCard
 					items={calendarItems}
 					exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-					onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
+					onDownload={(ics) => downloadTextFile(calendarFileName(new Date()), 'text/calendar', ics)}
 					onDismiss={() => void app.calendar?.dismissCard(Date.now())}
 				/>
 			{/if}

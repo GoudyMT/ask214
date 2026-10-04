@@ -293,7 +293,7 @@
 </AppGate>
 
 <style>
-	/* Lock #4: sticky header (pure CSS, no JS). Background + z-index prevent */
+	/* Sticky header (pure CSS, no JS). Background + z-index prevent */
 	/* underlying content from showing through on scroll. */
 	header {
 		position: sticky;
@@ -314,7 +314,7 @@
 		}
 	}
 
-	/* Lock #2: right-aligned nav (brand left, nav right) via flex space-between. */
+	/* Right-aligned nav (brand left, nav right) via flex space-between. */
 	/* Content width from --shell-width, one value for every route; 720px is only the fallback. */
 	nav {
 		display: flex;
@@ -324,7 +324,7 @@
 		margin: 0 auto;
 	}
 
-	/* Lock #7: inline horizontal nav (brand + Timeline/Resources/Settings; Settings appears only once a
+	/* Inline horizontal nav (brand + Timeline/Resources/Settings; Settings appears only once a
 	   separation date is set; About lives in the footer). Migrate to a bottom-tab-bar when the nav grows
 	   to 4+ items (e.g. a future Tools section). */
 	nav ul {
@@ -352,7 +352,7 @@
 		border-bottom-color: var(--color-accent);
 	}
 
-	/* Lock #3: text wordmark, font-weight 600 (no logo until trademark clears). */
+	/* Text wordmark, font-weight 600 (no logo until trademark clears). */
 	.brand {
 		font-weight: 600;
 		text-decoration: none;
@@ -367,8 +367,8 @@
 		min-height: calc(100vh - 160px);
 	}
 
-	/* Lock #5: 2-line footer content (attribution disclaimer + About/Source links). */
-	/* Lock #6: 14px footer text via --font-size-s (already shipped via app.css). */
+	/* Two-line footer content (attribution disclaimer + About/Source links). */
+	/* 14px footer text via --font-size-s (set in app.css). */
 	footer {
 		max-width: var(--shell-width, 720px);
 		margin: 0 auto;

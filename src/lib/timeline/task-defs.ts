@@ -52,9 +52,10 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Early prep (no authoritative fixed date; recommended 18-24 months out) ----
 	{
 		id: 'va-gov-account',
-		title: 'Create your VA.gov account',
+		title: 'Sign in to VA.gov and check your profile',
 		category: 'admin',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
@@ -62,19 +63,21 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'login-gov-account',
-		title: 'Create your Login.gov account',
+		title: 'Set up Login.gov or ID.me',
 		category: 'admin',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
-		why: 'Login.gov is the secure sign-in for VA.gov and other federal services.'
+		why: 'Login.gov or ID.me is the secure sign-in for VA.gov and other federal services.'
 	},
 	{
 		id: 'update-sgli',
 		title: 'Review your SGLI coverage and beneficiaries',
 		category: 'finance',
 		track: 'military',
+		kind: 'soft',
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
@@ -85,6 +88,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Verify your service record is accurate (awards, training)',
 		category: 'admin',
 		track: 'military',
+		kind: 'soft',
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
@@ -95,6 +99,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Create a will and power of attorney',
 		category: 'admin',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -730,
 		windowEnd: -90,
 		recommendedOffset: -540,
@@ -105,6 +110,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Meet a personal financial counselor',
 		category: 'finance',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
@@ -115,6 +121,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Create a master resume',
 		category: 'career',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -540,
 		windowEnd: -120,
 		recommendedOffset: -450,
@@ -125,6 +132,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Research your GI Bill and education options',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -730,
 		windowEnd: -180,
 		recommendedOffset: -540,
@@ -135,6 +143,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Start documenting any medical conditions',
 		category: 'medical',
 		track: 'military',
+		kind: 'soft',
 		windowStart: -540,
 		windowEnd: -180,
 		recommendedOffset: -450,
@@ -147,26 +156,30 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Complete Initial and Pre-separation Counseling',
 		category: 'admin',
 		track: 'military',
+		kind: 'required',
 		windowStart: -540,
 		windowEnd: -365,
 		recommendedOffset: -400,
-		why: 'TAP officially starts here, and it is required no later than 365 days out.'
+		why: 'TAP officially starts here, and it is required no later than 365 days out.',
+		afterNote: "Still required. Contact your command's Transition Assistance office to start now."
 	},
 	{
 		id: 'tap-course',
 		title: 'Attend your required TAP curriculum',
 		category: 'admin',
 		track: 'military',
+		kind: 'soft',
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -270,
-		why: 'The DoL Employment Workshop and VA Benefits Briefings I and II are mandatory.'
+		why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
 	},
 	{
 		id: 'tap-track',
 		title: 'Attend a TAP 2-day track (Employment / Education / Vocational / Entrepreneurship)',
 		category: 'admin',
 		track: 'military',
+		kind: 'soft',
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -240,
@@ -179,6 +192,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Begin and refine your job search',
 		category: 'career',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -365,
 		windowEnd: -30,
 		recommendedOffset: -270,
@@ -189,6 +203,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Research your health-coverage options (TRICARE/TAMP, civilian)',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -365,
 		windowEnd: -90,
 		recommendedOffset: -270,
@@ -199,19 +214,21 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Research life-insurance options for you and your family',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -365,
 		windowEnd: -90,
 		recommendedOffset: -270,
-		why: 'SGLI ends after separation; VGLI and civilian options differ in cost and coverage.'
+		why: 'SGLI stays free for 120 days after you separate; VGLI and civilian options differ in cost and coverage.'
 	},
 	{
 		id: 'va-career-guidance',
 		title: 'Apply for VA personalized career planning and guidance',
 		category: 'career',
 		track: 'transition',
-		windowStart: -365,
-		windowEnd: -90,
-		recommendedOffset: -240,
+		kind: 'soft',
+		windowStart: -180,
+		windowEnd: 365,
+		recommendedOffset: -120,
 		why: 'VA offers free career counseling (Chapter 36) to map your path.'
 	},
 	{
@@ -219,6 +236,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Order your Joint Services Transcript (JST)',
 		category: 'career',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
@@ -229,10 +247,11 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Start reserve affiliation',
 		category: 'career',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -300,
-		windowEnd: -90,
+		windowEnd: 0,
 		recommendedOffset: -180,
-		why: 'Affiliating with the reserves takes paperwork and lead time.',
+		why: 'Affiliating with the reserves takes paperwork and lead time. TAMP coverage through the Selected Reserve requires joining the day after you separate.',
 		requires: { intendedPath: ['reserves'] }
 	},
 	{
@@ -240,6 +259,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Apply to schools and submit the FAFSA',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -270,
 		windowEnd: -90,
 		recommendedOffset: -180,
@@ -253,30 +273,37 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Schedule your Separation Health Assessment (SHA)',
 		category: 'medical',
 		track: 'military',
+		kind: 'required',
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: 'The SHA is one exam that serves both your separation and your VA claim - book it early.'
+		why: 'The SHA is one exam that serves both your separation and your VA claim - book it early.',
+		afterNote: "Still required before you separate. Contact your command's medical department."
 	},
 	{
 		id: 'sha-complete',
 		title: 'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
 		category: 'medical',
 		track: 'military',
+		kind: 'required',
 		windowStart: -150,
 		windowEnd: -90,
 		recommendedOffset: -120,
-		why: 'Part A is the self-assessment your VA (BDD) claim is built on.'
+		why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
+		afterNote: "Still required before you separate. Contact your command's medical department."
 	},
 	{
 		id: 'va-bdd-claim',
 		title: 'File your VA disability claim through BDD (Benefits Delivery at Discharge)',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'closes',
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -120,
-		why: 'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.'
+		why: 'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.',
+		afterNote:
+			'BDD is no longer available. A VA claim can still be filed the standard way, and an accredited VSO helps for free.'
 	},
 
 	// ---- Capstone + final-90 ----
@@ -285,16 +312,19 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Complete your TAP Capstone',
 		category: 'admin',
 		track: 'military',
-		windowStart: -120,
+		kind: 'required',
+		windowStart: -365,
 		windowEnd: -90,
-		recommendedOffset: -90,
-		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.'
+		recommendedOffset: -120,
+		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
+		afterNote: "Still required before you separate. Contact your command's TAP office."
 	},
 	{
 		id: 'va-benefits-advisor',
 		title: 'Meet one-on-one with a VA benefits advisor',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -180,
 		windowEnd: -60,
 		recommendedOffset: -120,
@@ -305,6 +335,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Gather reference and recommendation letters',
 		category: 'career',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -180,
 		windowEnd: -30,
 		recommendedOffset: -120,
@@ -315,6 +346,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Save your LES history, myPay access, and SGLI election',
 		category: 'finance',
 		track: 'military',
+		kind: 'soft',
 		windowStart: -120,
 		windowEnd: -30,
 		recommendedOffset: -90,
@@ -322,29 +354,35 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'hhg-counseling',
-		title: 'Arrange your household-goods (HHG) move counseling',
+		title: 'Arrange your household-goods (HHG) move',
 		category: 'admin',
 		track: 'military',
+		kind: 'closes',
 		windowStart: -180,
-		windowEnd: -30,
+		windowEnd: 180,
 		recommendedOffset: -120,
-		why: 'Your final move is government-funded but must be scheduled.'
+		why: 'The government-paid final move generally runs 180 days after you separate; confirm with your transportation office.',
+		afterNote:
+			'The government-paid move ends 180 days after separation unless an extension is approved; contact your installation transportation office.'
 	},
 	{
 		id: 'separation-package',
 		title: 'Submit your Navy separation package (1306, eval, award, statement of service)',
 		category: 'admin',
 		track: 'military',
+		kind: 'required',
 		windowStart: -120,
 		windowEnd: -60,
 		recommendedOffset: -75,
-		why: 'The Navy needs your package by about 60 days out to process your separation and DD-214.'
+		why: 'The Navy needs your package 60 days before your PTDY, separation leave or separation, whichever comes first.',
+		afterNote: 'Still required; a late package can delay your orders, DD-214 and final pay.'
 	},
 	{
 		id: 'dd214-review',
 		title: 'Review your DD-2648 and DD-214 for accuracy',
 		category: 'admin',
 		track: 'military',
+		kind: 'soft',
 		windowStart: -90,
 		windowEnd: -1,
 		recommendedOffset: -30,
@@ -354,19 +392,23 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Near / at separation ----
 	{
 		id: 'tricare-elect',
-		title: 'Elect your health-coverage transition (TRICARE/TAMP or civilian)',
+		title: 'Choose your health coverage for after TRICARE (CHCBP or the Marketplace)',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'closes',
 		windowStart: -60,
-		windowEnd: 30,
+		windowEnd: 60,
 		recommendedOffset: -14,
-		why: 'Make the election before you separate to avoid a coverage gap.'
+		why: 'A Marketplace special enrollment period runs from 60 days before to 60 days after TRICARE (or TAMP) ends, and CHCBP enrollment within 60 days after; tricare.mil and healthcare.gov say who qualifies.',
+		afterNote:
+			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.'
 	},
 	{
 		id: 'dd214-copies',
 		title: 'Make several certified copies of your DD-214 (member-4)',
 		category: 'admin',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: -7,
 		windowEnd: 60,
 		recommendedOffset: 0,
@@ -379,26 +421,35 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Decide on your TSP and pay off any TSP loan',
 		category: 'finance',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: 0,
 		windowEnd: 90,
 		recommendedOffset: 30,
-		why: 'An unpaid TSP loan becomes a taxable distribution after 90 days.'
+		why: 'Your TSP and any TSP loan have rules after you separate; tsp.gov explains your options.'
 	},
 	{
 		id: 'vgli-convert',
 		title: 'Convert your SGLI to VGLI',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'closes',
 		windowStart: 0,
 		windowEnd: 240,
+		// 1 year and 120 days, counted as 365 + 120: one day early at most across a leap day, never late.
+		finalEnd: 485,
 		recommendedOffset: 30,
-		why: 'You can convert with no health questions within 240 days of separation (hard deadline about 485 days).'
+		why: 'You can convert with no health questions within 240 days of separation (hard deadline about 485 days).',
+		changeNote:
+			'After 240 days, VGLI asks health questions. It closes 1 year and 120 days after you leave.',
+		afterNote:
+			'The standard VGLI deadline (1 year and 120 days) has passed; see va.gov for life insurance options.'
 	},
 	{
 		id: 'final-pay-check',
 		title: 'Verify your final pay and terminal-leave settlement',
 		category: 'finance',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: 0,
 		windowEnd: 120,
 		recommendedOffset: 30,
@@ -409,9 +460,10 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'File your VA disability claim (if you did not file through BDD)',
 		category: 'benefits',
 		track: 'transition',
+		kind: 'soft',
 		windowStart: 0,
-		windowEnd: 180,
+		windowEnd: 365,
 		recommendedOffset: 14,
-		why: 'If you missed the BDD window, file now - an Intent-to-File locks your effective date.'
+		why: 'If you missed the BDD window: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.'
 	}
 ];

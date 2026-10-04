@@ -22,6 +22,7 @@
 		setSynthesisEnabled
 	} from '$lib/ask/online-prefs';
 	import { downloadTextFile } from '$lib/calendar/download';
+	import { calendarFileName } from '$lib/calendar/delivery';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
 	import { resolve } from '$app/paths';
 	import { documentStates } from '$lib/sources/document-states';
@@ -404,7 +405,7 @@
 				ready={app.calendar?.ready ?? false}
 				onSetExclusions={(next) =>
 					void app.calendar?.setExclusions(next).catch(() => app.calendar?.refresh())}
-				onDownload={(ics) => downloadTextFile('transition-deadlines.ics', 'text/calendar', ics)}
+				onDownload={(ics) => downloadTextFile(calendarFileName(new Date()), 'text/calendar', ics)}
 			/>
 		{/if}
 

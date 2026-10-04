@@ -1,9 +1,11 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import TaskCard from './TaskCard.svelte';
 import { snoozeUntilIso } from '$lib/timeline/snooze';
 import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
+import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 // TaskCard renders one generated TimelineItem as an open status card: status-color left
 // edge + text status label (never color-only) + a status-specific date line + category chip +
@@ -14,6 +16,7 @@ const DEF: TaskDef = {
 	title: 'Research SkillBridge hosts',
 	category: 'career',
 	track: 'transition',
+	kind: 'soft',
 	windowStart: -540,
 	windowEnd: -365,
 	why: 'Find approved programs that fit your rate.'
@@ -95,30 +98,169 @@ describe('TaskCard (open states)', () => {
 		expect(rel).toContain('noreferrer');
 	});
 
-	it('upcoming: status-color edge class + "Upcoming" label + the target date', () => {
-		const { container } = renderCard(makeItem({ status: 'upcoming', targetDate: '2027-03-16' }));
-		const card = container.querySelector('article');
-		expect(card?.classList.contains('status-upcoming')).toBe(true);
-		expect(container.textContent).toContain('Upcoming'); // text label, never color-only
-		expect(container.textContent).toContain('Mar 16, 2027');
-	});
-
-	it('start-now: edge class + "Start now" + "Window to <end>"', () => {
+	it('upcoming: "Upcoming" + when the window opens', () => {
 		const { container } = renderCard(
-			makeItem({ status: 'start-now', windowEndDate: '2026-10-15' })
+			makeItem({ status: 'upcoming', windowStartDate: '2027-03-16' })
 		);
-		const card = container.querySelector('article');
-		expect(card?.classList.contains('status-start-now')).toBe(true);
-		expect(container.textContent).toContain('Start now');
-		expect(container.textContent).toContain('Window to Oct 15, 2026');
+		expect(container.querySelector('article')?.classList.contains('status-upcoming')).toBe(true);
+		expect(container.textContent).toContain('Upcoming');
+		expect(container.textContent).toContain('Opens Mar 16, 2027');
 	});
 
-	it('overdue: edge class + "Overdue" + "since <end>"', () => {
-		const { container } = renderCard(makeItem({ status: 'overdue', windowEndDate: '2027-01-15' }));
-		const card = container.querySelector('article');
-		expect(card?.classList.contains('status-overdue')).toBe(true);
-		expect(container.textContent).toContain('Overdue');
-		expect(container.textContent).toContain('since Jan 15, 2027');
+	it('start-now, soft: "Start now" + "Aim for <aim date>"', () => {
+		const { container } = renderCard(makeItem({ status: 'start-now', aimDate: '2026-10-15' }));
+		expect(container.textContent).toContain('Start now');
+		expect(container.textContent).toContain('Aim for Oct 15, 2026');
+	});
+
+	it('start-now, firm: "Last day <end>" and a "Firm deadline" tag', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'start-now', windowEndDate: '2026-10-20' })
+		);
+		expect(container.textContent).toContain('Last day Oct 20, 2026');
+		expect(container.querySelector('.task-card__firm')?.textContent).toBe('Firm deadline');
+	});
+
+	it('closing-soon: the last day and the days left', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closing-soon', windowEndDate: '2026-10-20', daysLeft: 17 })
+		);
+		expect(container.querySelector('article')?.classList.contains('status-closing-soon')).toBe(
+			true
+		);
+		expect(container.textContent).toContain('Closing soon');
+		expect(container.textContent).toContain('Last day Oct 20, 2026');
+		expect(container.textContent).toContain('17 days');
+	});
+
+	it('closing-soon: the countdown reads "1 day" the day before and "today" on the last day', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const days = (daysLeft: number) =>
+			renderCard(
+				makeItem({ def, status: 'closing-soon', windowEndDate: '2026-10-20', daysLeft })
+			).container.querySelector('.task-card__days')?.textContent;
+		expect(days(1)).toBe('1 day');
+		expect(days(0)).toBe('today');
+	});
+
+	it('late: "Late", when it was due, and the What now note; Mark done stays', () => {
+		const def = { ...DEF, kind: 'required' as const, afterNote: 'Still required.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'late', windowEndDate: '2026-10-20' })
+		);
+		expect(container.textContent).toContain('Late');
+		expect(container.textContent).toContain('was due Oct 20, 2026');
+		const box = container.querySelector('.task-card__whatnow')?.textContent ?? '';
+		expect(box).toContain('What now');
+		expect(box).toContain('Still required.');
+		expect(buttonByText(container, 'Mark done')).toBeDefined();
+	});
+
+	it('closed: "Closed" + the date + What now', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		expect(container.querySelector('article')?.classList.contains('status-closed')).toBe(true);
+		expect(container.textContent).toContain('Closed');
+		expect(container.querySelector('.task-card__date')?.textContent).toBe('Oct 20, 2026');
+		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain('Gone.');
+	});
+
+	it('closed two-edge task: the date is its final day', () => {
+		const def = { ...DEF, kind: 'closes' as const, finalEnd: 485, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({
+				def,
+				status: 'closed',
+				windowEndDate: '2027-09-15',
+				finalEndDate: '2028-05-17'
+			})
+		);
+		expect(container.querySelector('.task-card__date')?.textContent).toBe('May 17, 2028');
+	});
+
+	// A required task's note says what to do before separation; once separation has passed it no longer applies.
+	it('closed after separation: a required task shows no What now note', () => {
+		const def = {
+			...DEF,
+			kind: 'required' as const,
+			afterNote: 'Still required before you separate.'
+		};
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		expect(container.textContent).toContain('Closed');
+		expect(container.querySelector('.task-card__whatnow')).toBeNull();
+	});
+
+	it('changed: "Changed", the final last day, and What changed', () => {
+		const def = {
+			...DEF,
+			kind: 'closes' as const,
+			afterNote: 'Gone.',
+			changeNote: 'Now asks health questions.',
+			finalEnd: 485
+		};
+		const { container } = renderCard(
+			makeItem({ def, status: 'changed', windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' })
+		);
+		expect(container.textContent).toContain('Changed');
+		expect(container.textContent).toContain('Last day May 17, 2028');
+		const box = container.querySelector('.task-card__whatnow')?.textContent ?? '';
+		expect(box).toContain('What changed');
+		expect(box).toContain('Now asks health questions.');
+	});
+
+	it('still-to-do: calm "Still to do", "Aimed for <end>", no tag, no What now', () => {
+		const { container } = renderCard(
+			makeItem({ status: 'still-to-do', windowEndDate: '2026-07-22' })
+		);
+		expect(container.querySelector('article')?.classList.contains('status-still-to-do')).toBe(true);
+		expect(container.textContent).toContain('Still to do');
+		expect(container.textContent).toContain('Aimed for Jul 22, 2026');
+		expect(container.querySelector('.task-card__firm')).toBeNull();
+		expect(container.querySelector('.task-card__whatnow')).toBeNull();
+	});
+
+	it('an open card carries an anchor id the summary links to', () => {
+		const { container } = renderCard(makeItem());
+		expect(container.querySelector('article')?.id).toBe('task-skillbridge-hosts');
+	});
+
+	it('What now links to the official page for the task, in a new tab, under an uppercase label', () => {
+		const def = { ...DEF, id: 'va-bdd-claim', kind: 'closes' as const, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		const link = container.querySelector('.task-card__whatnow a');
+		expect(link?.textContent).toContain('Find a VSO on VA.gov');
+		expect(link?.getAttribute('href')).toBe(
+			'https://www.va.gov/get-help-from-accredited-representative/'
+		);
+		expect(link?.getAttribute('target')).toBe('_blank');
+		expect(link?.getAttribute('rel')).toContain('noopener');
+		expect(link?.getAttribute('rel')).toContain('noreferrer');
+		const label = container.querySelector('.task-card__whatnow-label') as HTMLElement;
+		expect(getComputedStyle(label).textTransform).toBe('uppercase');
+	});
+
+	it('a firm card with no curated page shows its note without a link', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain('Gone.');
+		expect(container.querySelector('.task-card__whatnow a')).toBeNull();
+	});
+
+	it('the "Firm deadline" tag keeps to one line', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const { container } = renderCard(makeItem({ def, status: 'start-now' }));
+		const tag = container.querySelector('.task-card__firm') as HTMLElement;
+		expect(getComputedStyle(tag).whiteSpace).toBe('nowrap');
 	});
 
 	it('color-codes the category chip via a category-<name> class (text label still present)', () => {
@@ -152,6 +294,76 @@ describe('TaskCard (open states)', () => {
 		const { container } = renderCard(makeItem(), { onSetStatus });
 		buttonByText(container, 'Skip')?.click();
 		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', 'skipped');
+	});
+
+	// A snooze can never hide a firm warning, so the card does not offer one there: the tap would change nothing.
+	it('offers Snooze only where a snooze can quiet the card', () => {
+		const firmDef = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		for (const status of ['closing-soon', 'late', 'changed', 'closed'] as const) {
+			const card = renderCard(
+				makeItem({ def: firmDef, status, windowEndDate: '2026-10-20', daysLeft: 5 })
+			).container;
+			expect(buttonByText(card, 'Snooze'), status).toBeUndefined();
+			expect(buttonByText(card, 'Mark done'), status).toBeDefined();
+		}
+		for (const status of ['upcoming', 'start-now', 'still-to-do'] as const) {
+			expect(
+				buttonByText(renderCard(makeItem({ status })).container, 'Snooze'),
+				status
+			).toBeDefined();
+		}
+	});
+
+	// The day can turn (or a date change land from another tab) while the picker is open; when the card turns firm
+	// the picker closes with its button, so no preset is left that would change nothing.
+	it('closes an open Snooze picker when the card turns firm', () => {
+		const firmDef = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const props = $state<{
+			item: TimelineItem;
+			onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
+			onSetSnooze: (taskId: string, untilIso: string) => void;
+		}>({
+			item: makeItem({ def: firmDef, status: 'start-now' }),
+			onSetStatus: noop,
+			onSetSnooze: noop
+		});
+		const { container } = render(TaskCard, { props });
+		buttonByText(container, 'Snooze')?.click();
+		flushSync();
+		expect(buttonByText(container, '1 week')).toBeDefined();
+		props.item = makeItem({
+			def: firmDef,
+			status: 'closing-soon',
+			windowEndDate: '2026-10-20',
+			daysLeft: 5
+		});
+		flushSync();
+		expect(buttonByText(container, 'Snooze')).toBeUndefined();
+		expect(buttonByText(container, '1 week')).toBeUndefined();
+	});
+
+	// 38 CFR 14.629: the words the card adds around a task - status, dates, tags, What now and What changed - make
+	// no personal claim in any state (the task data itself is checked in task-defs.test.ts).
+	it('adds no personal eligibility claim in any state', () => {
+		const firm = { ...DEF, id: 'va-bdd-claim', kind: 'closes' as const, afterNote: 'n' };
+		const twoEdge = { ...firm, finalEnd: 485, changeNote: 'c' };
+		const states: Partial<TimelineItem>[] = [
+			{ status: 'upcoming' },
+			{ status: 'start-now', aimDate: '2026-10-15' },
+			{ status: 'still-to-do' },
+			{ def: firm, status: 'start-now' },
+			{ def: firm, status: 'closing-soon', daysLeft: 5 },
+			{ def: { ...firm, kind: 'required' }, status: 'late' },
+			{ def: twoEdge, status: 'changed', finalEndDate: '2027-05-17', daysLeft: 20 },
+			{ def: firm, status: 'closed' },
+			{ status: 'done' },
+			{ status: 'skipped' },
+			{ status: 'snoozed', snoozeUntil: '2026-11-01' }
+		];
+		for (const state of states) {
+			const text = textOf(renderCard(makeItem(state)).container);
+			expect(makesPersonalClaim(text), text).toBe(false);
+		}
 	});
 
 	it('Snooze opens a picker with presets and a pick-a-date option', () => {
@@ -363,5 +575,125 @@ describe('TaskCard (notes display)', () => {
 		expect(withNote.container.querySelector('.task-line__note-dot')).not.toBeNull();
 		const without = renderCard(makeItem({ status: 'done' }));
 		expect(without.container.querySelector('.task-line__note-dot')).toBeNull();
+	});
+});
+
+// The card's two columns (text left, status and date right) need room; on a phone the status line moves above the
+// title so the text gets the card's full width. The frame's size is put back after each case.
+describe('TaskCard (layout by width)', () => {
+	let size = { width: 0, height: 0 };
+	beforeEach(() => {
+		size = { width: window.innerWidth, height: window.innerHeight };
+	});
+	afterEach(async () => {
+		await page.viewport(size.width, size.height);
+	});
+
+	const firm = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+	const closing = makeItem({
+		def: firm,
+		status: 'closing-soon',
+		windowEndDate: '2026-10-20',
+		daysLeft: 17
+	});
+	const box = (container: Element, selector: string) =>
+		(container.querySelector(selector) as HTMLElement).getBoundingClientRect();
+
+	it('on a 320 px phone the status line sits above the title', async () => {
+		await page.viewport(320, 800);
+		const { container } = renderCard(closing);
+		expect(box(container, '.task-card__meta').bottom).toBeLessThanOrEqual(
+			box(container, '.task-card__title').top
+		);
+	});
+
+	it('on a phone a wrapping status line keeps the date and its countdown together', async () => {
+		await page.viewport(320, 800);
+		const { container } = renderCard(closing);
+		(container as HTMLElement).style.width = '288px';
+		const status = box(container, '.task-card__status');
+		const date = box(container, '.task-card__date');
+		// The line wraps (the case under test is reached), and it breaks after the status, never inside the date.
+		expect(date.top).toBeGreaterThan(status.top);
+		expect(box(container, '.task-card__days').top).toBe(date.top);
+	});
+
+	it('on a wide screen the status line sits beside the title', async () => {
+		await page.viewport(1024, 800);
+		const { container } = renderCard(closing);
+		const meta = box(container, '.task-card__meta');
+		const title = box(container, '.task-card__title');
+		expect(meta.top).toBeLessThan(title.bottom);
+		expect(meta.left).toBeGreaterThanOrEqual(title.right);
+	});
+
+	it('on a 320 px phone a long word stays inside the What now box', async () => {
+		await page.viewport(320, 800);
+		// One unbroken word: a hyphen is a line-break opportunity, so it would not test the overflow.
+		const def = { ...firm, afterNote: 'ContactYourCommandsTransitionAssistanceOfficeToStartNow.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		const note = container.querySelector('.task-card__whatnow') as HTMLElement;
+		expect(note.scrollWidth).toBeLessThanOrEqual(note.clientWidth);
+		// ...and the box itself stays inside the card: a column that sizes to its longest word would widen both.
+		expect(note.getBoundingClientRect().right).toBeLessThanOrEqual(box(container, 'article').right);
+	});
+
+	it('on a 320 px phone a long word in a saved note does not widen the text column past the card', async () => {
+		await page.viewport(320, 800);
+		const note =
+			'https://www.example.gov/a/very/long/address/with/no/spaces/that/a/user/pasted/into/a/note';
+		const { container } = renderCard(makeItem({ def: firm, status: 'start-now', note }));
+		expect(box(container, '.task-card__body').right).toBeLessThanOrEqual(
+			box(container, 'article').right
+		);
+	});
+
+	it('on a 320 px phone a long word in a saved note wraps inside its box', async () => {
+		await page.viewport(320, 800);
+		const note =
+			'https://www.example.gov/a/very/long/address/with/no/spaces/that/a/user/pasted/into/a/note';
+		const { container } = renderCard(makeItem({ def: firm, status: 'start-now', note }));
+		const shown = container.querySelector('.task-card__note-shown') as HTMLElement;
+		expect(shown.scrollWidth).toBeLessThanOrEqual(shown.clientWidth);
+	});
+});
+
+// What a keyboard or screen-reader user meets: the link's place, the jump's landing, and words kept apart.
+describe('TaskCard (for keyboard and screen reader)', () => {
+	it('puts the What now link on its own line, under the note', () => {
+		const def = { ...DEF, id: 'tricare-elect', kind: 'closes' as const, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		const box = container.querySelector('.task-card__whatnow') as HTMLElement;
+		const link = box.querySelector('a') as HTMLElement;
+		const note = [...box.childNodes].find((n) => n.textContent?.includes('Gone.')) as Node;
+		const range = document.createRange();
+		range.selectNodeContents(note);
+		expect(link.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+			range.getBoundingClientRect().bottom - 1
+		);
+	});
+
+	it('takes focus when the timeline jumps to it', () => {
+		const card = renderCard(makeItem({ status: 'start-now' })).container.querySelector(
+			'article'
+		) as HTMLElement;
+		card.focus();
+		expect(document.activeElement).toBe(card);
+	});
+
+	it('separates the tags from the text with spaces, so they are not read as one word', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const open = renderCard(makeItem({ def, status: 'start-now' })).container;
+		expect(open.querySelector('.task-card__why')?.textContent).toMatch(
+			/^Career Firm deadline Find approved/
+		);
+		const resolved = renderCard(makeItem({ status: 'done' })).container;
+		(resolved.querySelector('button.task-line') as HTMLButtonElement).click();
+		flushSync();
+		expect(resolved.querySelector('.task-card__why')?.textContent).toMatch(/^Career Find approved/);
 	});
 });

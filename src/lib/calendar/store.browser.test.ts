@@ -3,6 +3,7 @@ import { createCalendarSyncStore, CalendarRelockedError } from './store.svelte';
 import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
+import type { TaskExclusions } from './types';
 
 // Real Chromium (SubtleCrypto + IndexedDB + navigator.locks). The calendar-sync
 // store mirrors the timeline-state store's load/save/OCC/relock/wipe spine over the
@@ -163,6 +164,26 @@ describe('calendar-sync store', () => {
 		await b.load();
 		expect(b.card).toEqual({ dismissedAt: 1_000, dismissCount: 1 }); // survived setExclusions
 		expect(b.exclusions).toEqual({ taskIds: [], categories: ['medical'] });
+		await deleteTestDb(db);
+	});
+
+	// A category toggle is applied to the saved set inside the write lock, like the card: two quick toggles fired
+	// before the first lands both survive, instead of the second replacing the set with one that predates it.
+	it('applies quick exclusion updates in order to the saved set', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		const add = (category: 'medical' | 'admin') => (current: TaskExclusions) => ({
+			taskIds: current.taskIds,
+			categories: [...current.categories, category]
+		});
+		await Promise.allSettled([a.setExclusions(add('medical')), a.setExclusions(add('admin'))]);
+
+		const b = createCalendarSyncStore(db);
+		await b.load();
+		expect(b.exclusions).toEqual({ taskIds: [], categories: ['medical', 'admin'] });
 		await deleteTestDb(db);
 	});
 });

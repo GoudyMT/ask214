@@ -22,6 +22,10 @@ const SERVED = Object.keys(LOCAL_DOCUMENTS).length;
 // What a save stores with its first document - the PDF library and the answer library. A test that saves holds
 // them first, so its saves download only the document; the library steps have their own tests.
 const LIBRARIES = [LIBRARY_SRC, WORKER_SRC, `${CORPUS_BASE}.json`, `${CORPUS_BASE}.embeddings.bin`];
+// A case that saves a real file from the test server waits this long for it to land, not waitFor's default 1 s:
+// on a busy machine the server can take longer (a 0.2 MB save measured 1.5 s on a 1 Mbps link). It stays well
+// inside the 15 s a browser test gets, so a save that never lands still fails on its assertion.
+const REAL_DOWNLOAD = { timeout: 10_000 };
 
 // The reader loads its page view, pager and Save lazily. Loaded once here, each test renders against loaded
 // modules, as the app does after a first open; a cold load under a busy full run can outlast a wait below.
@@ -103,8 +107,9 @@ describe('Documents page', () => {
 
 		await vi.waitFor(() => expect(act('Save')).toBeDefined());
 		act('Save')?.click();
-		await vi.waitFor(() =>
-			expect(text(container)).toContain(`1 of ${SERVED} saved on this device - 0.1 MB`)
+		await vi.waitFor(
+			() => expect(text(container)).toContain(`1 of ${SERVED} saved on this device - 0.1 MB`),
+			REAL_DOWNLOAD
 		);
 		const held = await (
 			await caches.open(ASK_ASSET_CACHE)
@@ -246,8 +251,9 @@ describe('Documents page', () => {
 		const dialog = container.querySelector('dialog[open]') as HTMLDialogElement;
 		button(dialog, 'Save 1 document')?.click();
 
-		await vi.waitFor(() =>
-			expect(text(container)).toContain(`${SERVED} of ${SERVED} saved on this device`)
+		await vi.waitFor(
+			() => expect(text(container)).toContain(`${SERVED} of ${SERVED} saved on this device`),
+			REAL_DOWNLOAD
 		);
 	});
 
@@ -415,7 +421,7 @@ describe('Documents page', () => {
 		await vi.waitFor(() => {
 			expect(text(container)).toContain(`${SERVED - 1} of ${SERVED} saved on this device`);
 			expect(text(container)).not.toContain('Saving ');
-		});
+		}, REAL_DOWNLOAD);
 		expect(download.requests()).toBe(1);
 		download.open();
 		await vi.waitFor(() =>

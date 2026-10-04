@@ -3,6 +3,9 @@
 	import type { TaskCategory } from '$lib/timeline/types';
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs } from '$lib/calendar/build-ics';
+	import { computeDesiredEvents } from '$lib/calendar/desired';
+	import { currentDeviceHint } from '$lib/calendar/delivery';
+	import { localTodayIso } from '$lib/timeline/day-math';
 
 	type Props = {
 		items: TimelineItem[];
@@ -14,7 +17,8 @@
 		 * deliberately kept off their calendar.
 		 */
 		ready: boolean;
-		onSetExclusions: (next: TaskExclusions) => void;
+		/** Receives an update to apply to the set as saved, not a whole new set. */
+		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => void;
 		/** Injected so the serialized .ics is testable and the actual download stays the caller's concern. */
 		onDownload: (ics: string) => void;
 	};
@@ -22,18 +26,25 @@
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
+	const hint = currentDeviceHint();
 	// Category toggles live behind an inline expand - the same in-context idiom as the Timeline
 	// snooze date-adjust, so the app keeps one consistent feel for tweaks (modals stay for the
 	// wipe confirm + source reader).
 	let expanded = $state(false);
 
 	const hiddenCount = $derived(exclusions.categories.length);
+	// The file carries only what is today or later, so with nothing ahead there is nothing to hand over.
+	const hasEvents = $derived(
+		computeDesiredEvents(items, exclusions, localTodayIso(new Date())).length > 0
+	);
 
+	// Applied to the set as saved, not to `exclusions`: that prop changes only once a save lands, so quick taps
+	// would each start from the same older set and overwrite one another.
 	function toggleCategory(cat: TaskCategory, on: boolean): void {
-		const categories = on
-			? [...exclusions.categories, cat]
-			: exclusions.categories.filter((c) => c !== cat);
-		onSetExclusions({ taskIds: exclusions.taskIds, categories });
+		onSetExclusions((current) => {
+			const categories = current.categories.filter((c) => c !== cat);
+			return { taskIds: current.taskIds, categories: on ? [...categories, cat] : categories };
+		});
 	}
 
 	async function addToCalendar(): Promise<void> {
@@ -48,16 +59,25 @@
 
 <section class="cal-section" aria-labelledby="calendar-heading">
 	<h2 id="calendar-heading" class="cal-section__heading">Calendar</h2>
-	<p class="cal-hint">Add your transition deadlines to the calendar you already check.</p>
+	<p class="cal-hint">Your upcoming deadlines, with alerts before each firm one.</p>
 
 	<button
 		class="cal-add"
 		type="button"
-		disabled={building || !ready}
+		disabled={building || !ready || !hasEvents}
 		onclick={() => void addToCalendar()}
 	>
-		Add to Apple / device calendar
+		Add to my calendar
 	</button>
+	{#if ready && !hasEvents}
+		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
+	{:else}
+		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
+		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. -->
+		<p class="cal-hint cal-hint--device">
+			Changed a date? Remove the events you added before, then add again.
+		</p>
+	{/if}
 
 	{#if !ready}
 		<p class="cal-hint cal-hint--unavailable">
@@ -134,6 +154,14 @@
 		opacity: 0.6;
 		cursor: default;
 	}
+	/* The sentence under the button: what this device does after the tap. */
+	.cal-hint--device {
+		margin: var(--space-s) 0 0;
+	}
+	.cal-hint b {
+		color: var(--color-fg);
+		font-weight: 600;
+	}
 	/* Shown only when the exclusion set is unknown - the export is refused rather than run against
 	   defaults, so the user is told why instead of silently getting everything. */
 	.cal-hint--unavailable {
@@ -149,6 +177,8 @@
 		padding-top: var(--space-m);
 		border-top: 1px solid var(--color-border);
 	}
+	/* On a narrow phone the label wraps, each line starting at the left edge, while the summary keeps one
+	   line - so the pair still reads as one row. */
 	.cal-customize__toggle {
 		display: flex;
 		align-items: center;
@@ -160,11 +190,13 @@
 		color: var(--color-fg);
 		font: inherit;
 		font-size: var(--font-size-s);
+		text-align: left;
 		cursor: pointer;
 	}
 	.cal-customize__summary {
 		margin-left: auto;
 		color: var(--color-fg-muted);
+		white-space: nowrap;
 	}
 	/* CSS caret (ASCII source, no glyph): a right-pointing triangle that rotates to point down when
 	   open. No transition - the app's no-motion register. */

@@ -6,7 +6,7 @@
  * generation helpers (filterAndAnchor / deriveStatus /
  * AnchoredTask) are intentionally NOT re-exported - the public surface is generateTimeline.
  */
-export { generateTimeline } from './generate';
+export { generateTimeline, CLOSING_SOON_DAYS } from './generate';
 export type { TimelineView, TimelinePhase, TimelineItem, DisplayStatus } from './generate';
 
 export { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
