@@ -592,6 +592,29 @@ describe('generateTimeline (deadline fields)', () => {
 		expect(item?.status).toBe('closed');
 	});
 
+	// SkillBridge moves a military task earlier, not the separation itself: a required task stays late until the
+	// real separation date has passed.
+	it('keeps a SkillBridge-shifted required task late until the real separation', () => {
+		const shifted: PersonaFilters = {
+			completeness: 'eaos-only',
+			eaos: '2026-11-02' as EaosString,
+			daysUntilSeparation: 30,
+			skillbridge: { approved: true, durationDays: 90 }
+		};
+		const required: TaskDef = {
+			...universal,
+			id: 'required',
+			track: 'military',
+			kind: 'required',
+			windowStart: -180,
+			windowEnd: -90,
+			afterNote: 'n'
+		};
+		const [item] = items(shifted, [required]);
+		expect(item?.windowEndDate).toBe('2026-05-06'); // 180 days before separation: long past on Oct 3
+		expect(item?.status).toBe('late');
+	});
+
 	it('anchors a second edge and counts the days left to the next firm edge', () => {
 		const bdd: TaskDef = {
 			...universal,
