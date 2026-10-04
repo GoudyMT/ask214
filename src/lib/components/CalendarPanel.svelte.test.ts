@@ -109,6 +109,40 @@ describe('CalendarPanel', () => {
 	});
 });
 
+// The sentence under the button is chosen from this device's user agent; the test browser is desktop Chromium, so
+// a phone and an iPad are stood in for by the two values the choice reads.
+describe('CalendarPanel (the sentence for this device)', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+	const ANDROID =
+		'Mozilla/5.0 (Linux; Android 16; SM-S941U) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36';
+	const MAC =
+		'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.5 Safari/605.1.15';
+	const panelProps = () => ({
+		items: [item(def('a', 'admin'))],
+		exclusions: { taskIds: [], categories: [] },
+		ready: true,
+		onSetExclusions: vi.fn(),
+		onDownload: vi.fn()
+	});
+
+	it('tells an Android phone what happens after the tap', () => {
+		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(ANDROID);
+		const { container } = render(CalendarPanel, { props: panelProps() });
+		expect(container.querySelector('.cal-hint--device')?.textContent).toContain('On this phone:');
+	});
+
+	it('reads an iPad, which asks for desktop pages, from its touch points', () => {
+		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(MAC);
+		vi.spyOn(Navigator.prototype, 'maxTouchPoints', 'get').mockReturnValue(5);
+		const { container } = render(CalendarPanel, { props: panelProps() });
+		expect(container.querySelector('.cal-hint--device')?.textContent).toContain(
+			'On iPhone or iPad'
+		);
+	});
+});
+
 // On a narrow phone "Customize what's included" and its summary do not fit on one line. The label wraps with
 // every line starting at the same edge, and the summary keeps one line, so the pair still reads as one row.
 // Component tests run without app.css, so the cases set the app's spacing and type tokens and give the panel

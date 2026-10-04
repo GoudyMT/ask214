@@ -99,6 +99,47 @@ describe('NeedsNow', () => {
 		expect(row).toContain('Oct 20, 2026 - today');
 		expect(row).not.toContain('0 days');
 	});
+
+	it('says a two-edge task closed on its final day', () => {
+		const groups: NeedsNowGroups = {
+			...empty,
+			justClosed: [
+				item('vgli', 'Convert your SGLI to VGLI', {
+					status: 'closed',
+					windowEndDate: '2027-09-15',
+					finalEndDate: '2028-05-17'
+				})
+			]
+		};
+		const { container } = render(NeedsNow, { props: { groups } });
+		expect(container.querySelector('a.needs-now__row')?.textContent).toContain(
+			'closed May 17, 2028'
+		);
+	});
+
+	it('orders the groups by urgency, counts every task, and marks only the time-bound dates', () => {
+		const groups: NeedsNowGroups = {
+			late: [item('cap', 'Complete your TAP Capstone', { status: 'late' })],
+			closingSoon: [
+				item('bdd', 'File your VA claim through BDD', { daysLeft: 17 }),
+				item('sha', 'Complete your SHA', { daysLeft: 17 })
+			],
+			justClosed: [item('tri', 'Choose your health coverage', { status: 'closed' })],
+			justOpened: [item('pkg', 'Submit your separation package', { status: 'start-now' })]
+		};
+		const { container } = render(NeedsNow, { props: { groups } });
+		expect([...container.querySelectorAll('h3')].map((h) => h.textContent)).toEqual([
+			'Late',
+			'Closing soon',
+			'Just closed',
+			'Just opened'
+		]);
+		expect(container.querySelector('.needs-now__count')?.textContent).toBe('5');
+		const hot = [...container.querySelectorAll('.needs-now__when')].map((el) =>
+			el.classList.contains('needs-now__when--hot')
+		);
+		expect(hot).toEqual([true, true, true, true, false]);
+	});
 });
 
 // On a phone a long title and the date do not fit side by side, so the date drops under the title instead of

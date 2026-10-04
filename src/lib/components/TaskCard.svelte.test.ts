@@ -164,7 +164,21 @@ describe('TaskCard (open states)', () => {
 		);
 		expect(container.querySelector('article')?.classList.contains('status-closed')).toBe(true);
 		expect(container.textContent).toContain('Closed');
+		expect(container.querySelector('.task-card__date')?.textContent).toBe('Oct 20, 2026');
 		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain('Gone.');
+	});
+
+	it('closed two-edge task: the date is its final day', () => {
+		const def = { ...DEF, kind: 'closes' as const, finalEnd: 485, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({
+				def,
+				status: 'closed',
+				windowEndDate: '2027-09-15',
+				finalEndDate: '2028-05-17'
+			})
+		);
+		expect(container.querySelector('.task-card__date')?.textContent).toBe('May 17, 2028');
 	});
 
 	// A required task's note says what to do before separation; once separation has passed it no longer applies.
