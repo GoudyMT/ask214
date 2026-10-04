@@ -172,7 +172,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -270,
-		why: 'VA Benefits and Services and the DOL Employment Fundamentals of Career Transition course are mandatory.'
+		why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
 	},
 	{
 		id: 'tap-track',
@@ -361,7 +361,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: 180,
 		recommendedOffset: -120,
-		why: 'Your final move is government-paid for 180 days after you separate.',
+		why: 'The government-paid final move generally runs 180 days after you separate; confirm with your transportation office.',
 		afterNote:
 			'The government-paid move ends 180 days after separation unless an extension is approved; contact your installation transportation office.'
 	},
@@ -399,9 +399,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -60,
 		windowEnd: 60,
 		recommendedOffset: -14,
-		why: 'After TRICARE ends you have 60 days to enroll in CHCBP or use a Marketplace special enrollment period.',
+		why: 'CHCBP enrollment and a Marketplace special enrollment period each run 60 days from the end of TRICARE (or TAMP); tricare.mil and healthcare.gov say who qualifies.',
 		afterNote:
-			'The 60-day window for CHCBP and a Marketplace special enrollment has passed; see tricare.mil and healthcare.gov.'
+			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.'
 	},
 	{
 		id: 'dd214-copies',
@@ -441,7 +441,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		why: 'You can convert with no health questions within 240 days of separation (hard deadline about 485 days).',
 		changeNote:
 			'After 240 days, VGLI asks health questions. It closes 1 year and 120 days after you leave.',
-		afterNote: 'VGLI is no longer available; see va.gov for other life insurance information.'
+		afterNote:
+			'The standard VGLI deadline (1 year and 120 days) has passed; see va.gov for life insurance options.'
 	},
 	{
 		id: 'final-pay-check',

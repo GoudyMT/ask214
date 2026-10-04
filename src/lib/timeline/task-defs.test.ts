@@ -124,6 +124,25 @@ describe('firm deadlines match their official sources', () => {
 		expect(t?.finalEnd).toBe(finalEnd);
 	});
 
+	// Copy that has to carry the condition its source carries, so a later edit cannot drop it.
+	it('keeps the conditions the sources state in the coverage, move, VGLI and TAP lines', () => {
+		// tricare.mil: TAMP gives 180 more days of coverage, and the CHCBP window runs from the end of TAMP.
+		expect(at('tricare-elect')?.why).toContain('TAMP');
+		expect(at('tricare-elect')?.afterNote).toContain('TAMP');
+		// militaryonesource.mil: "Final move entitlements vary ... confirm with your installation's Transportation Office".
+		expect(at('hhg-counseling')?.why).toContain('confirm with your transportation office');
+		// va.gov SGLI: a member totally disabled at separation keeps free SGLI longer, then VGLI is offered.
+		expect(at('vgli-convert')?.afterNote).toContain('standard VGLI deadline');
+		// militaryonesource.mil TAP: three mandatory courses.
+		for (const course of [
+			'Transition Day',
+			'VA Benefits and Services',
+			'Employment Fundamentals of Career Transition'
+		]) {
+			expect(at('tap-course')?.why).toContain(course);
+		}
+	});
+
 	it('opens the Capstone at 12 months and Chapter 36 counseling 180 days before separation', () => {
 		expect(at('tap-capstone')?.windowStart).toBe(-365);
 		expect(at('va-career-guidance')?.windowStart).toBe(-180);
