@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import type { ComponentProps } from 'svelte';
 import SettingsDateRow from './SettingsDateRow.svelte';
@@ -83,5 +83,55 @@ describe('SettingsDateRow', () => {
 	it('says nothing about what the user qualifies for', async () => {
 		const { container } = row({ value: '2026-11-01', onRemove: vi.fn(async () => null) });
 		for (const line of textOf(container).split('\n')) expect(makesPersonalClaim(line)).toBe(false);
+	});
+});
+
+// Component tests run without app.css, so the cases set the tokens the row uses and give it the width it gets in
+// the Settings section on a 320 px phone (measured on the build: a 272 px section less its padding and border).
+// The tokens and the frame's size are put back after each case.
+describe('SettingsDateRow (layout by width)', () => {
+	const TOKENS: Record<string, string> = {
+		'--space-xs': '4px',
+		'--space-s': '8px',
+		'--space-m': '16px',
+		'--space-l': '24px',
+		'--font-size-s': '14px'
+	};
+	const PHONE_ROW_WIDTH = '222px';
+	let size = { width: 0, height: 0 };
+	beforeEach(() => {
+		size = { width: window.innerWidth, height: window.innerHeight };
+		for (const [name, value] of Object.entries(TOKENS)) {
+			document.documentElement.style.setProperty(name, value);
+		}
+	});
+	afterEach(async () => {
+		for (const name of Object.keys(TOKENS)) document.documentElement.style.removeProperty(name);
+		await page.viewport(size.width, size.height);
+	});
+
+	it('on a 320 px phone the date reads on one line beside a label that wraps', async () => {
+		await page.viewport(320, 800);
+		const { container } = row({ id: 'eaos', label: 'Separation date (EAOS)', value: '2027-04-30' });
+		container.style.width = PHONE_ROW_WIDTH;
+		const summary = container.querySelector('.settings-disclosure__summary') as HTMLElement;
+		const lines = document.createRange();
+		lines.selectNodeContents(summary);
+		expect(summary.textContent).toBe('Apr 30, 2027');
+		expect(lines.getClientRects()).toHaveLength(1);
+	});
+
+	it('on a 320 px phone an open row keeps every button inside it, each row a 44 px target', async () => {
+		await page.viewport(320, 800);
+		const { container } = row({ value: '2026-11-01', onRemove: vi.fn(async () => null) });
+		container.style.width = PHONE_ROW_WIDTH;
+		const toggle = container.querySelector('.settings-disclosure__toggle') as HTMLElement;
+		toggle.click();
+		await expect.element(page.getByRole('button', { name: /^remove$/i })).toBeVisible();
+		const frame = container.getBoundingClientRect();
+		for (const button of container.querySelectorAll('.settings-edit__actions button')) {
+			expect(button.getBoundingClientRect().right).toBeLessThanOrEqual(frame.right);
+		}
+		expect(toggle.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
 	});
 });

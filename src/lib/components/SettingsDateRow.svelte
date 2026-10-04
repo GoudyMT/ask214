@@ -112,11 +112,13 @@
 <style>
 	/* Settings date disclosure: the same caret-expand idiom as the Calendar "Customize" panel, so both
 	   in-place edits read as siblings. (End-state: a shared Disclosure component; today they mirror by hand.) */
+	/* min-height: the 44px touch target, which also keeps the stacked rows apart. */
 	.settings-disclosure__toggle {
 		display: flex;
 		align-items: center;
 		gap: var(--space-s);
 		width: 100%;
+		min-height: 44px;
 		padding: 0;
 		background: none;
 		border: none;
@@ -126,9 +128,11 @@
 		cursor: pointer;
 		text-align: left;
 	}
+	/* A date reads as one piece: the label wraps before the date does. */
 	.settings-disclosure__summary {
 		margin-left: auto;
 		color: var(--color-fg-muted);
+		white-space: nowrap;
 	}
 	.settings-chevron {
 		width: 0;
@@ -149,8 +153,10 @@
 		margin-top: var(--space-m);
 	}
 
+	/* flex-wrap: on a phone a button that will not fit drops to the next line instead of past the card. */
 	.settings-edit__actions {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--space-m);
 	}
