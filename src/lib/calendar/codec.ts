@@ -1,6 +1,25 @@
-import type { CalendarSyncState } from './types';
+import type { CalendarSyncState, HandedOverEvent, EventMoment } from './types';
 
 const SCHEMA_VERSION = 1;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const MOMENTS: ReadonlySet<EventMoment> = new Set(['opens', 'changes', 'last', 'aim', 'leave']);
+
+/** A stored list the app wrote itself, checked anyway: a bad shape must read as "no record yet", never throw later. */
+function isHandedOverList(v: unknown): v is HandedOverEvent[] {
+	return (
+		Array.isArray(v) &&
+		v.every(
+			(e: unknown) =>
+				typeof e === 'object' &&
+				e !== null &&
+				typeof (e as HandedOverEvent).taskId === 'string' &&
+				MOMENTS.has((e as HandedOverEvent).moment) &&
+				typeof (e as HandedOverEvent).title === 'string' &&
+				ISO_DATE.test(String((e as HandedOverEvent).isoDate)) &&
+				ISO_DATE.test(String((e as HandedOverEvent).addedOn))
+		)
+	);
+}
 
 export class CalendarSchemaError extends Error {
 	constructor() {
@@ -27,5 +46,11 @@ export function decodeCalendarSyncState(bytes: Uint8Array): CalendarSyncState {
 	) {
 		throw new CalendarSchemaError();
 	}
-	return parsed as CalendarSyncState;
+	const state = parsed as CalendarSyncState & { lastAdd?: unknown };
+	if (state.lastAdd !== undefined && !isHandedOverList(state.lastAdd)) {
+		const rest = { ...state };
+		delete rest.lastAdd;
+		return rest;
+	}
+	return state as CalendarSyncState;
 }

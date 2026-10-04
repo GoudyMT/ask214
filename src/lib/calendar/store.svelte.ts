@@ -1,6 +1,7 @@
-import type { CalendarSyncState, TaskExclusions } from './types';
+import type { CalendarSyncState, DesiredEvent, HandedOverEvent, TaskExclusions } from './types';
 import type { CardDismissal } from './card-visibility';
 import { encodeCalendarSyncState, decodeCalendarSyncState } from './codec';
+import { mergeHandedOver, acknowledge } from './handed-over';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
@@ -27,6 +28,10 @@ import { withStores, reqToPromise } from '../db/schema';
  * stays encrypted. Reuses withWriteLocks (profile-write exclusive) - safe
  * full-serialization for a single-user app; HWM domain-separation is via the
  * sidecar name ('calendar-sync-hwm').
+ *
+ * `lastAdd` lives only in this encrypted body, never the signed HWM; like every decrypted field here it is dropped
+ * on relock, not zeroized - plain JS strings cannot be zeroized, so dropping the reference is the bar the platform
+ * allows.
  */
 
 /** A write was attempted against unloaded/relocked state, where the current record is UNKNOWN. */
@@ -179,6 +184,11 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 			return _state?.card ?? {};
 		},
 
+		/** Every event handed over and not yet acknowledged; undefined before load, when relocked, or never added. */
+		get lastAdd(): HandedOverEvent[] | undefined {
+			return _state?.lastAdd;
+		},
+
 		/**
 		 * Re-read from disk. A relock landing WHILE this runs wins: repopulating decrypted state into
 		 * a tab that has since locked silently undoes the lock, and the idle timer does not fire twice.
@@ -242,6 +252,19 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 				...base,
 				exclusions: typeof next === 'function' ? next(base.exclusions) : next
 			}));
+		},
+
+		/** Record the events just handed over (merged - see mergeHandedOver). Refused while relocked. */
+		recordAdd(events: DesiredEvent[], addedOn: string, todayIso: string): Promise<void> {
+			return persist((base) => ({
+				...base,
+				lastAdd: mergeHandedOver(base.lastAdd, events, addedOn, todayIso)
+			}));
+		},
+
+		/** The user deleted these from their calendar: forget them. */
+		acknowledgeStale(listed: HandedOverEvent[]): Promise<void> {
+			return persist((base) => ({ ...base, lastAdd: acknowledge(base.lastAdd ?? [], listed) }));
 		},
 
 		/** Record a card dismissal at `now`, incrementing the count (preserves exclusions). */

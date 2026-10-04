@@ -3,7 +3,8 @@ import { createCalendarSyncStore, CalendarRelockedError } from './store.svelte';
 import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
-import type { TaskExclusions } from './types';
+import { withStores, reqToPromise } from '../db/schema';
+import type { DesiredEvent, TaskExclusions } from './types';
 
 // Real Chromium (SubtleCrypto + IndexedDB + navigator.locks). The calendar-sync
 // store mirrors the timeline-state store's load/save/OCC/relock/wipe spine over the
@@ -185,5 +186,86 @@ describe('calendar-sync store', () => {
 		await b.load();
 		expect(b.exclusions).toEqual({ taskIds: [], categories: ['medical', 'admin'] });
 		await deleteTestDb(db);
+	});
+
+	describe('the handed-over record', () => {
+		const e: DesiredEvent = {
+			taskId: 'a',
+			moment: 'last',
+			title: 'Last day: a',
+			isoDate: '2099-01-01',
+			alarmDays: []
+		};
+		const heldA = {
+			taskId: 'a',
+			moment: 'last',
+			title: 'Last day: a',
+			isoDate: '2099-01-01',
+			addedOn: '2026-10-04'
+		};
+
+		it('recordAdd merges the events handed over; acknowledgeStale removes the listed ones', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await store.recordAdd([e], '2026-10-04', '2026-10-04');
+			expect(store.lastAdd).toEqual([heldA]);
+
+			const again = createCalendarSyncStore(db);
+			await again.load();
+			expect(again.lastAdd).toEqual([heldA]); // persisted, not only in memory
+
+			await store.acknowledgeStale(store.lastAdd ?? []);
+			expect(store.lastAdd).toEqual([]);
+			await deleteTestDb(db);
+		});
+
+		it('a relocked store refuses recordAdd and keeps its record on disk', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await store.recordAdd([e], '2026-10-04', '2026-10-04');
+			store.relockSync('hygiene');
+			await expect(store.recordAdd([], '2026-10-04', '2026-10-04')).rejects.toThrow(
+				CalendarRelockedError
+			);
+			await store.load();
+			expect(store.lastAdd).toHaveLength(1);
+			await deleteTestDb(db);
+		});
+
+		it('Erase all data takes the record with it', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await store.recordAdd([e], '2026-10-04', '2026-10-04');
+			await store.wipe();
+			await store.load();
+			expect(store.lastAdd).toBeUndefined();
+			await deleteTestDb(db);
+		});
+
+		it('keeps the record out of the signed HWM, which holds counters only', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await store.recordAdd([e], '2026-10-04', '2026-10-04');
+			const hwm = await withStores(db, 'calendar-sync-hwm', 'readonly', (tx) =>
+				reqToPromise<{ payload: Record<string, unknown> } | undefined>(
+					tx.objectStore('calendar-sync-hwm').get(0)
+				)
+			);
+			expect(Object.keys(hwm?.payload ?? {}).sort()).toEqual([
+				'epoch',
+				'generation',
+				'keystoreGeneration',
+				'ts'
+			]);
+			await deleteTestDb(db);
+		});
 	});
 });
