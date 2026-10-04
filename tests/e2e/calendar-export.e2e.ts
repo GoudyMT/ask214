@@ -75,6 +75,19 @@ test('a kept-off category is absent from the exported file', async ({ page }) =>
 	expect((filtered.match(/BEGIN:VEVENT/g) ?? []).length).toBeLessThan(baselineCount);
 });
 
+// 600 days after separation every window has closed (VGLI's last edge is 485 days after), so nothing is ahead:
+// Settings says so instead of building an empty file, and the timeline does not offer the add at all.
+test('a profile with nothing ahead is not offered the add', async ({ page }) => {
+	await seedProfile(page, -600);
+	await page.goto('/settings');
+	// The sentence shows only once the calendar store has loaded, so this wait is not a race.
+	await expect(page.getByText('Nothing ahead to add right now.')).toBeVisible();
+	await expect(page.getByRole('button', { name: /^add to my calendar$/i })).toBeDisabled();
+	await page.getByRole('link', { name: 'Timeline' }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
+	await expect(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveCount(0);
+});
+
 test('the add works offline', async ({ page, context }) => {
 	await seedProfile(page, 600);
 	const addButton = await openSettingsAdd(page);

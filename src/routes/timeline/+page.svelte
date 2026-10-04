@@ -12,6 +12,7 @@
 	import { calendarFileName } from '$lib/calendar/delivery';
 	import { shouldShowCalendarCard } from '$lib/calendar/card-visibility';
 	import { selectNeedsNow } from '$lib/timeline/needs-now';
+	import { computeDesiredEvents } from '$lib/calendar/desired';
 
 	const app = getProfileApp();
 
@@ -43,13 +44,22 @@
 	const needsNow = $derived(view?.todayDate ? selectNeedsNow(calendarItems, view.todayDate) : null);
 
 	// The card is the discoverable entry point for the calendar add. It respects the dismissal
-	// cooldown + cap, and stays hidden when there is nothing to add.
+	// cooldown + cap, and stays hidden when there is nothing to add: no event today or later once the
+	// exclusions apply.
 	//
 	// Fail closed on `ready`: until the store loads, both the dismissal state and the exclusion set
 	// are UNKNOWN, not empty. Rendering then would nag a user who already answered AND offer a
 	// one-tap export built from an exclusion set we cannot vouch for.
+	const hasEventsToAdd = $derived(
+		view?.todayDate !== undefined &&
+			computeDesiredEvents(
+				calendarItems,
+				app.calendar?.exclusions ?? { taskIds: [], categories: [] },
+				view.todayDate
+			).length > 0
+	);
 	const showCalendarCard = $derived(
-		calendarItems.length > 0 &&
+		hasEventsToAdd &&
 			(app.calendar?.ready ?? false) &&
 			shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
 	);

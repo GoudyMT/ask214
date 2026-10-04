@@ -90,6 +90,31 @@ describe('CalendarPanel', () => {
 		expect(onDownload).not.toHaveBeenCalled();
 	});
 
+	// The file never carries an event before today, so with nothing ahead (or everything kept off) there is nothing
+	// to add: the button stays off and says why, instead of handing over an empty file.
+	it('with nothing ahead to add, keeps the button off and says so', () => {
+		const passed: TimelineItem = {
+			...item(def('p', 'admin')),
+			windowEndDate: '2020-01-01',
+			aimDate: '2020-01-01',
+			status: 'still-to-do'
+		};
+		const panel = (items: TimelineItem[], categories: TaskDef['category'][]) =>
+			render(CalendarPanel, {
+				props: {
+					items,
+					exclusions: { taskIds: [], categories },
+					ready: true,
+					onSetExclusions: vi.fn(),
+					onDownload: vi.fn()
+				}
+			}).container;
+		for (const container of [panel([passed], []), panel([item(def('a', 'admin'))], ['admin'])]) {
+			expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(true);
+			expect(container.textContent).toContain('Nothing ahead to add right now.');
+		}
+	});
+
 	it('toggling a category once expanded calls onSetExclusions with the updated set', () => {
 		const onSetExclusions = vi.fn();
 		const { container } = render(CalendarPanel, {

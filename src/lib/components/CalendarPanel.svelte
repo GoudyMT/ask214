@@ -3,7 +3,9 @@
 	import type { TaskCategory } from '$lib/timeline/types';
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs } from '$lib/calendar/build-ics';
+	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { currentDeviceHint } from '$lib/calendar/delivery';
+	import { localTodayIso } from '$lib/timeline/day-math';
 
 	type Props = {
 		items: TimelineItem[];
@@ -30,6 +32,10 @@
 	let expanded = $state(false);
 
 	const hiddenCount = $derived(exclusions.categories.length);
+	// The file carries only what is today or later, so with nothing ahead there is nothing to hand over.
+	const hasEvents = $derived(
+		computeDesiredEvents(items, exclusions, localTodayIso(new Date())).length > 0
+	);
 
 	function toggleCategory(cat: TaskCategory, on: boolean): void {
 		const categories = on
@@ -55,12 +61,16 @@
 	<button
 		class="cal-add"
 		type="button"
-		disabled={building || !ready}
+		disabled={building || !ready || !hasEvents}
 		onclick={() => void addToCalendar()}
 	>
 		Add to my calendar
 	</button>
-	<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
+	{#if ready && !hasEvents}
+		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
+	{:else}
+		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
+	{/if}
 
 	{#if !ready}
 		<p class="cal-hint cal-hint--unavailable">
