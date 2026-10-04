@@ -30,6 +30,64 @@ describe('buildIcs', () => {
 		expect(ics).toContain(`UID:${await computeIcsUid('bdd')}\r\n`);
 		expect(ics).toContain(`UID:${await computeIcsUid('bdd:opens')}\r\n`);
 	});
+
+	it('keeps the per-task calendar ID on a soft task\'s "Aim for" event', async () => {
+		const soft: TimelineItem = {
+			def: {
+				id: 's',
+				title: 'S',
+				category: 'admin',
+				track: 'transition',
+				kind: 'soft',
+				windowStart: -180,
+				windowEnd: -90,
+				why: ''
+			},
+			targetDate: '2026-11-01',
+			windowStartDate: '2026-11-01',
+			windowEndDate: '2027-02-01',
+			status: 'upcoming',
+			aimDate: '2026-11-01'
+		};
+		const ics = (await buildIcs([soft], { taskIds: [], categories: [] }, NOW)).replace(
+			/\r\n /g,
+			''
+		);
+		expect(ics).toContain(`UID:${await computeIcsUid('s')}\r\n`);
+		expect(ics).not.toContain(`UID:${await computeIcsUid('s:aim')}\r\n`);
+	});
+
+	it('gives each moment of a two-edge task its own calendar ID', async () => {
+		const vgli: TimelineItem = {
+			def: {
+				id: 'v',
+				title: 'V',
+				category: 'benefits',
+				track: 'transition',
+				kind: 'closes',
+				windowStart: 0,
+				windowEnd: 240,
+				finalEnd: 485,
+				why: '',
+				afterNote: 'n',
+				changeNote: 'c'
+			},
+			targetDate: '2026-11-01',
+			windowStartDate: '2026-11-01',
+			windowEndDate: '2027-07-01',
+			finalEndDate: '2028-03-01',
+			status: 'upcoming'
+		};
+		const ics = (await buildIcs([vgli], { taskIds: [], categories: [] }, NOW)).replace(
+			/\r\n /g,
+			''
+		);
+		const uids = ics.split('\r\n').filter((line) => line.startsWith('UID:'));
+		expect(uids).toHaveLength(3);
+		expect(new Set(uids).size).toBe(3);
+		expect(uids).toContain(`UID:${await computeIcsUid('v')}`);
+		expect(uids).toContain(`UID:${await computeIcsUid('v:changes')}`);
+	});
 });
 
 // The file's today is the date on the user's clock: on a New York evening the UTC date is already tomorrow, and on

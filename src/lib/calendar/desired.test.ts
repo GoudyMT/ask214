@@ -78,12 +78,27 @@ describe('computeDesiredEvents', () => {
 			finalEndDate: '2028-05-17'
 		});
 		expect(
-			computeDesiredEvents([vgli], NONE, TODAY).map((e) => [e.moment, e.title, e.isoDate])
+			computeDesiredEvents([vgli], NONE, TODAY).map((e) => [
+				e.moment,
+				e.title,
+				e.isoDate,
+				e.alarmDays
+			])
 		).toEqual([
-			['opens', 'Opens: v', '2026-11-01'],
-			['changes', 'Changes: v', '2027-09-15'],
-			['last', 'Last day: v', '2028-05-17']
+			['opens', 'Opens: v', '2026-11-01', []],
+			['changes', 'Changes: v', '2027-09-15', [30, 7, 1]],
+			['last', 'Last day: v', '2028-05-17', [30, 7, 1]]
 		]);
+	});
+
+	// An alert lands at 09:00 on its day; on the day itself that may already be past, so only later days count.
+	it('drops an alert that would land today', () => {
+		const inAWeek = item(def('w', 'closes'), {
+			windowStartDate: '2026-01-01',
+			windowEndDate: '2026-10-10',
+			status: 'closing-soon'
+		});
+		expect(computeDesiredEvents([inAWeek], NONE, TODAY)[0]?.alarmDays).toEqual([1]);
 	});
 
 	// "Opens" tells the user a window is coming; on opening day the window is already open.
