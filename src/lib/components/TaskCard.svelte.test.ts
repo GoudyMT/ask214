@@ -606,3 +606,41 @@ describe('TaskCard (layout by width)', () => {
 		expect(shown.scrollWidth).toBeLessThanOrEqual(shown.clientWidth);
 	});
 });
+
+// What a keyboard or screen-reader user meets: the link's place, the jump's landing, and words kept apart.
+describe('TaskCard (for keyboard and screen reader)', () => {
+	it('puts the What now link on its own line, under the note', () => {
+		const def = { ...DEF, id: 'tricare-elect', kind: 'closes' as const, afterNote: 'Gone.' };
+		const { container } = renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
+		);
+		const box = container.querySelector('.task-card__whatnow') as HTMLElement;
+		const link = box.querySelector('a') as HTMLElement;
+		const note = [...box.childNodes].find((n) => n.textContent?.includes('Gone.')) as Node;
+		const range = document.createRange();
+		range.selectNodeContents(note);
+		expect(link.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+			range.getBoundingClientRect().bottom - 1
+		);
+	});
+
+	it('takes focus when the timeline jumps to it', () => {
+		const card = renderCard(makeItem({ status: 'start-now' })).container.querySelector(
+			'article'
+		) as HTMLElement;
+		card.focus();
+		expect(document.activeElement).toBe(card);
+	});
+
+	it('separates the tags from the text with spaces, so they are not read as one word', () => {
+		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const open = renderCard(makeItem({ def, status: 'start-now' })).container;
+		expect(open.querySelector('.task-card__why')?.textContent).toMatch(
+			/^Career Firm deadline Find approved/
+		);
+		const resolved = renderCard(makeItem({ status: 'done' })).container;
+		(resolved.querySelector('button.task-line') as HTMLButtonElement).click();
+		flushSync();
+		expect(resolved.querySelector('.task-card__why')?.textContent).toMatch(/^Career Find approved/);
+	});
+});

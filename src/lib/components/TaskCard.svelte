@@ -209,7 +209,8 @@
 			<p class="task-card__why">
 				<span class="task-card__chip category-{item.def.category}"
 					>{CATEGORY_LABEL[item.def.category]}</span
-				>{item.def.why}
+				>
+				{item.def.why}
 			</p>
 			<!-- Decision B: a single unified Restore clears the stored status (un-mark / un-snooze). -->
 			<div class="task-card__actions">
@@ -220,19 +221,23 @@
 		</div>
 	</article>
 {:else}
-	<article class="task-card status-{item.status}" id="task-{item.def.id}">
+	<!-- tabindex -1: the "Needs you now" rows jump here, and the card must be able to take that focus. -->
+	<article class="task-card status-{item.status}" id="task-{item.def.id}" tabindex="-1">
 		<div class="task-card__body">
 			<h3 class="task-card__title">{item.def.title}</h3>
 			<p class="task-card__why">
 				<span class="task-card__chip category-{item.def.category}"
 					>{CATEGORY_LABEL[item.def.category]}</span
-				>{#if firm}<span class="task-card__firm">Firm deadline</span>{/if}{item.def.why}
+				>
+				{#if firm}<span class="task-card__firm">Firm deadline</span>{/if}
+				{item.def.why}
 			</p>
 			{#if afterNote?.text}
 				<div class="task-card__whatnow">
 					<span class="task-card__whatnow-label">{afterNote.label}</span>
 					{afterNote.text}
 					{#if afterLink}
+						<br />
 						<a
 							class="task-card__whatnow-link"
 							href={afterLink.url}
@@ -368,9 +373,9 @@
 		font-size: var(--font-size-s);
 	}
 
+	/* The space after each tag in the markup is the gap between them, so a screen reader reads them apart. */
 	.task-card__chip {
 		display: inline-block;
-		margin-right: var(--space-xs);
 		padding: 1px 6px;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-s);
@@ -381,7 +386,6 @@
 	/* "Firm deadline": danger-outlined, so a closing date is visible long before it nears. */
 	.task-card__firm {
 		display: inline-block;
-		margin-right: var(--space-xs);
 		padding: 1px 6px;
 		border: 1px solid color-mix(in srgb, var(--color-danger) 50%, transparent);
 		border-radius: var(--radius-s);
