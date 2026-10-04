@@ -191,15 +191,55 @@ describe('CalendarPanel (the sentence for this device)', () => {
 		);
 	});
 
+	const IPHONE =
+		'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 Version/18.5 Mobile/15E148 Safari/604.1';
+	const hintOf = (container: Element) =>
+		container.querySelector('.cal-hint--device')?.textContent ?? '';
+
 	it('never sends the installed iPhone app to Safari', () => {
-		const IPHONE =
-			'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 Version/18.5 Mobile/15E148 Safari/604.1';
 		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(IPHONE);
-		vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
-		const { container } = render(CalendarPanel, { props: panelProps() });
-		const hint = container.querySelector('.cal-hint--device')?.textContent ?? '';
+		// An installed app answers yes to this one query and no to every other, so a check that asked the wrong
+		// question would not pass.
+		vi.spyOn(window, 'matchMedia').mockImplementation(
+			(query) => ({ matches: query === '(display-mode: standalone)' }) as MediaQueryList
+		);
+		const hint = hintOf(render(CalendarPanel, { props: panelProps() }).container);
 		expect(hint).toContain('Open it from Downloads');
 		expect(hint).not.toContain('Safari');
+	});
+
+	// The app installed from iPhone Safari does not report the display mode; it sets navigator.standalone instead.
+	it('reads the installed iPhone app from navigator.standalone too', () => {
+		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(IPHONE);
+		Object.defineProperty(navigator, 'standalone', { value: true, configurable: true });
+		try {
+			const hint = hintOf(render(CalendarPanel, { props: panelProps() }).container);
+			expect(hint).toContain('Open it from Downloads');
+			expect(hint).not.toContain('Safari');
+		} finally {
+			delete (navigator as Navigator & { standalone?: boolean }).standalone;
+		}
+	});
+
+	// Chrome, Firefox and Edge on iPhone keep their own data, apart from Safari's, so they are not sent there
+	// either. Safari in a browser tab still is: its data is the app's there.
+	it('never sends another iPhone browser to Safari', () => {
+		const OTHER_BROWSERS = [
+			'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.7390.41 Mobile/15E148 Safari/604.1',
+			'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/143.0 Mobile/15E148 Safari/605.1.15',
+			'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) EdgiOS/141.0.3537.71 Version/18.0 Mobile/15E148 Safari/604.1'
+		];
+		for (const userAgent of OTHER_BROWSERS) {
+			vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(userAgent);
+			const hint = hintOf(render(CalendarPanel, { props: panelProps() }).container);
+			expect(hint, userAgent).toContain('Open it from Downloads');
+			expect(hint, userAgent).not.toContain('Safari');
+			vi.restoreAllMocks();
+		}
+		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(IPHONE);
+		expect(hintOf(render(CalendarPanel, { props: panelProps() }).container)).toContain(
+			'use Safari'
+		);
 	});
 });
 

@@ -9,6 +9,9 @@ import { localTodayIso } from '../timeline/day-math';
 const isInstalled = () =>
 	window.matchMedia('(display-mode: standalone)').matches ||
 	(navigator as Navigator & { standalone?: boolean }).standalone === true;
+// Chrome, Firefox and Edge on iPhone name themselves in the user agent. Firefox on iPad and Brave send Safari's own,
+// so they cannot be told apart and read the Safari sentence.
+const OTHER_IOS_BROWSER = /CriOS|FxiOS|EdgiOS/;
 
 /** Dated by the local day of the add, so a second add on a later day never meets "file already exists". */
 export function calendarFileName(now: Date): string {
@@ -43,18 +46,26 @@ export const DEVICE_HINT: Record<DeviceKind, { lead: string; text: string }> = {
 };
 
 /**
- * The installed iPhone app keeps its data apart from Safari, so it is never told to go there; it gets the steps
- * after the download only. Not yet checked on a real iPhone.
+ * The installed iPhone app, and Chrome, Firefox or Edge on iPhone, keep their data apart from Safari's, so they are
+ * never told to go there; they get the steps after the download only. Not yet checked on a real iPhone, and WebKit
+ * bug reports (236943, 275288) say an installed app's downloads can fail.
  */
 export const IOS_APP_HINT = {
 	lead: 'On iPhone or iPad:',
 	text: 'it saves a calendar file. Open it from Downloads, then tap Add All.'
 };
 
-export function deviceHint(kind: DeviceKind, installed: boolean): { lead: string; text: string } {
-	return kind === 'ios' && installed ? IOS_APP_HINT : DEVICE_HINT[kind];
+export function deviceHint(
+	kind: DeviceKind,
+	apartFromSafari: boolean
+): { lead: string; text: string } {
+	return kind === 'ios' && apartFromSafari ? IOS_APP_HINT : DEVICE_HINT[kind];
 }
 
 export function currentDeviceHint(): { lead: string; text: string } {
-	return deviceHint(deviceKind(navigator.userAgent, navigator.maxTouchPoints), isInstalled());
+	const userAgent = navigator.userAgent;
+	return deviceHint(
+		deviceKind(userAgent, navigator.maxTouchPoints),
+		isInstalled() || OTHER_IOS_BROWSER.test(userAgent)
+	);
 }
