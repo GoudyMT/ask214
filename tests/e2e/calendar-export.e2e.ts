@@ -88,6 +88,26 @@ test('a profile with nothing ahead is not offered the add', async ({ page }) => 
 	await expect(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveCount(0);
 });
 
+// The timeline offers the add while the file would hold an event, and stops once every category is kept off,
+// which empties the file just as a passed date does.
+test('the timeline offers the add only while the file would hold an event', async ({ page }) => {
+	await seedProfile(page, 300);
+	const add = page.getByRole('button', { name: /^add to my calendar$/i });
+	await expect(add).toBeVisible();
+	await openSettingsAdd(page);
+	await page.getByRole('button', { name: /customize what's included/i }).click();
+	// One at a time, each saved before the next: the panel builds a toggle from the last saved set, so taps
+	// quicker than the save can overwrite each other.
+	const categories = [/^medical$/i, /^admin$/i, /^benefits$/i, /^career$/i, /^finance$/i];
+	for (const [index, name] of categories.entries()) {
+		await page.getByRole('checkbox', { name }).check();
+		await expect(page.getByText(`${index + 1} kept off`)).toBeVisible();
+	}
+	await page.getByRole('link', { name: 'Timeline' }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
+	await expect(add).toHaveCount(0);
+});
+
 test('the add works offline', async ({ page, context }) => {
 	await seedProfile(page, 600);
 	const addButton = await openSettingsAdd(page);

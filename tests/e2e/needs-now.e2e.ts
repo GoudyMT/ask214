@@ -22,7 +22,13 @@ test('"Needs you now" lists a closing BDD window and jumps to its card', async (
 	const row = panel.getByRole('link', { name: /File your VA disability claim through BDD/ });
 	await expect(row).toContainText('10 days');
 	await row.click();
-	await expect(page.locator('#task-va-bdd-claim')).toBeInViewport();
+	const card = page.locator('#task-va-bdd-claim');
+	await expect(card).toBeInViewport();
+	// Focus lands on the card, so a keyboard or screen-reader user continues from there - and again on a second
+	// tap of the same row, which the page handles itself rather than the browser.
+	await expect(card).toBeFocused();
+	await row.click();
+	await expect(card).toBeFocused();
 	// A soft task past its window is calm, not red: nothing on the page reads "Overdue" any more.
 	await expect(page.getByText('Overdue', { exact: true })).toHaveCount(0);
 });
