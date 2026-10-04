@@ -252,4 +252,17 @@ describe('timeline-state store', () => {
 		expect(b.state.tasks).toEqual({});
 		await deleteTestDb(db);
 	});
+
+	it('is ready only while its record is loaded', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const store = createTimelineStateStore(db);
+		expect(store.ready).toBe(false);
+		await store.load();
+		expect(store.ready).toBe(true);
+		store.relockSync('user');
+		expect(store.ready).toBe(false);
+		await deleteTestDb(db);
+	});
 });

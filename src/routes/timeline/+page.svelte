@@ -8,8 +8,7 @@
 	import { formatTimelineDate } from '$lib/timeline/format-date';
 	import CalendarCard from '$lib/components/CalendarCard.svelte';
 	import NeedsNow from '$lib/components/NeedsNow.svelte';
-	import { downloadTextFile } from '$lib/calendar/download';
-	import { calendarFileName } from '$lib/calendar/delivery';
+	import { handOver } from '$lib/calendar/hand-over';
 	import { shouldShowCalendarCard } from '$lib/calendar/card-visibility';
 	import { selectNeedsNow } from '$lib/timeline/needs-now';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
@@ -21,7 +20,8 @@
 
 	// Until the timeline-state store provisions (async, after the profile store), fall back to
 	// empty state so the timeline still renders with date-derived statuses; stored done/skip/
-	// snooze (set via the status actions) layer in once the store loads.
+	// snooze (set via the status actions) layer in once the store loads. The calendar add waits for
+	// the real state instead (the card below gates on `ready`).
 	const EMPTY_STATE: TimelineState = { schemaVersion: 1, tasks: {} };
 
 	// Stored EAOS (string form) via the derived persona, or null when unset - mirrors Settings.
@@ -67,6 +67,7 @@
 	const showCalendarCard = $derived(
 		hasEventsToAdd &&
 			(app.calendar?.ready ?? false) &&
+			(app.timeline?.ready ?? false) &&
 			shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
 	);
 
@@ -147,7 +148,7 @@
 				<CalendarCard
 					items={calendarItems}
 					exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-					onDownload={(ics) => downloadTextFile(calendarFileName(new Date()), 'text/calendar', ics)}
+					onAdd={(file) => void handOver(file, app.calendar, new Date())}
 					onDismiss={() => void app.calendar?.dismissCard(Date.now())}
 				/>
 			{/if}

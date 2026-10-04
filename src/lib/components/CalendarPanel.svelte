@@ -2,7 +2,7 @@
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskCategory } from '$lib/timeline/types';
 	import type { TaskExclusions } from '$lib/calendar/types';
-	import { buildIcs } from '$lib/calendar/build-ics';
+	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { currentDeviceHint } from '$lib/calendar/delivery';
 	import { localTodayIso } from '$lib/timeline/day-math';
@@ -17,12 +17,12 @@
 		 * deliberately kept off their calendar.
 		 */
 		ready: boolean;
-		/** Receives an update to apply to the set as saved, not a whole new set. */
-		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => void;
-		/** Injected so the serialized .ics is testable and the actual download stays the caller's concern. */
-		onDownload: (ics: string) => void;
+		/** Receives an update to apply to the set as saved, not a whole new set; rejects when the save fails. */
+		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => Promise<void>;
+		/** Injected so the built file is testable and the actual hand-over stays the caller's concern. */
+		onAdd: (file: CalendarFile) => void;
 	};
-	let { items, exclusions, ready, onSetExclusions, onDownload }: Props = $props();
+	let { items, exclusions, ready, onSetExclusions, onAdd }: Props = $props();
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
@@ -38,19 +38,32 @@
 		computeDesiredEvents(items, exclusions, localTodayIso(new Date())).length > 0
 	);
 
+	let toggleError = $state<string | null>(null);
+
 	// Applied to the set as saved, not to `exclusions`: that prop changes only once a save lands, so quick taps
-	// would each start from the same older set and overwrite one another.
-	function toggleCategory(cat: TaskCategory, on: boolean): void {
-		onSetExclusions((current) => {
-			const categories = current.categories.filter((c) => c !== cat);
-			return { taskIds: current.taskIds, categories: on ? [...categories, cat] : categories };
-		});
+	// would each start from the same older set and overwrite one another. A failed write puts the box back and
+	// says so: the prop never changed, so the box would otherwise show a choice that was not saved.
+	async function toggleCategory(
+		cat: TaskCategory,
+		on: boolean,
+		box: HTMLInputElement
+	): Promise<void> {
+		toggleError = null;
+		try {
+			await onSetExclusions((current) => {
+				const categories = current.categories.filter((c) => c !== cat);
+				return { taskIds: current.taskIds, categories: on ? [...categories, cat] : categories };
+			});
+		} catch {
+			box.checked = !on;
+			toggleError = 'Could not update right now - please try again.';
+		}
 	}
 
 	async function addToCalendar(): Promise<void> {
 		building = true;
 		try {
-			onDownload(await buildIcs(items, exclusions, new Date()));
+			onAdd(await buildIcs(items, exclusions, new Date()));
 		} finally {
 			building = false;
 		}
@@ -111,12 +124,13 @@
 							type="checkbox"
 							value={cat}
 							checked={exclusions.categories.includes(cat)}
-							onchange={(e) => toggleCategory(cat, e.currentTarget.checked)}
+							onchange={(e) => void toggleCategory(cat, e.currentTarget.checked, e.currentTarget)}
 						/>
 						<span>{cat}</span>
 					</label>
 				{/each}
 			</fieldset>
+			{#if toggleError}<p class="cal-hint" role="alert">{toggleError}</p>{/if}
 		{/if}
 	</div>
 </section>

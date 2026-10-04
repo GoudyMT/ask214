@@ -195,6 +195,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return _state ?? EMPTY_STATE;
 		},
 
+		/** Whether the record is loaded. FALSE before the first load and after a relock: the stored statuses are
+		 *  then UNKNOWN, and an add built from the empty defaults would put done tasks back in the calendar. */
+		get ready(): boolean {
+			return _state !== null;
+		},
+
 		/**
 		 * Re-read from disk. A relock landing WHILE this runs wins: repopulating decrypted state into
 		 * a tab that has since locked silently undoes the lock, and the idle timer does not fire twice.

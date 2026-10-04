@@ -6,6 +6,7 @@ import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
 import type { TaskExclusions } from '$lib/calendar/types';
+import type { CalendarFile } from '$lib/calendar/build-ics';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 function def(id: string, category: TaskDef['category']): TaskDef {
@@ -35,7 +36,7 @@ function item(d: TaskDef): TimelineItem {
 
 describe('CalendarPanel', () => {
 	it('downloads an .ics of the pending, non-excluded items when "Add to calendar" is clicked', async () => {
-		const onDownload = vi.fn();
+		const onAdd = vi.fn();
 		const items = [item(def('a', 'admin')), item(def('m', 'medical'))];
 		const { container } = render(CalendarPanel, {
 			props: {
@@ -43,13 +44,13 @@ describe('CalendarPanel', () => {
 				exclusions: { taskIds: [], categories: ['medical'] },
 				ready: true,
 				onSetExclusions: vi.fn(),
-				onDownload
+				onAdd
 			}
 		});
 		(container.querySelector('.cal-add') as HTMLButtonElement).click();
 		// addToCalendar awaits computeIcsUid (crypto.subtle) per event, so poll for the callback.
-		await vi.waitFor(() => expect(onDownload).toHaveBeenCalledOnce());
-		const ics = onDownload.mock.calls[0]?.[0] as string;
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
+		const ics = (onAdd.mock.calls[0]?.[0] as CalendarFile | undefined)?.ics;
 		expect(ics).toContain('SUMMARY:Aim for: a'); // pending admin task included
 		expect(ics).not.toContain('SUMMARY:Aim for: m'); // medical excluded -> no event
 		expect(container.querySelector('.cal-add')?.textContent?.trim()).toBe('Add to my calendar');
@@ -63,7 +64,7 @@ describe('CalendarPanel', () => {
 				exclusions: { taskIds: [], categories: [] },
 				ready: true,
 				onSetExclusions: vi.fn(),
-				onDownload: vi.fn()
+				onAdd: vi.fn()
 			}
 		});
 		expect(container.querySelector('input[value="medical"]')).toBeNull(); // collapsed by default
@@ -73,14 +74,14 @@ describe('CalendarPanel', () => {
 	});
 
 	it('fails closed when the store is not ready: no export against an unknown exclusion set', () => {
-		const onDownload = vi.fn();
+		const onAdd = vi.fn();
 		const { container } = render(CalendarPanel, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the empty DEFAULT, not a real record
 				ready: false,
 				onSetExclusions: vi.fn(),
-				onDownload
+				onAdd
 			}
 		});
 		// An unknown exclusion set must never be treated as "the user excluded nothing".
@@ -89,7 +90,7 @@ describe('CalendarPanel', () => {
 			true
 		);
 		expect(container.textContent).toContain('could not be loaded');
-		expect(onDownload).not.toHaveBeenCalled();
+		expect(onAdd).not.toHaveBeenCalled();
 	});
 
 	// While the settings are unknown the panel says only that; "Nothing ahead" would be a second, unproven reason.
@@ -106,7 +107,7 @@ describe('CalendarPanel', () => {
 				exclusions: { taskIds: [], categories: [] },
 				ready: false,
 				onSetExclusions: vi.fn(),
-				onDownload: vi.fn()
+				onAdd: vi.fn()
 			}
 		});
 		expect(container.textContent).toContain('could not be loaded');
@@ -131,7 +132,7 @@ describe('CalendarPanel', () => {
 					exclusions: { taskIds: [], categories: [] },
 					ready: true,
 					onSetExclusions: vi.fn(),
-					onDownload: vi.fn()
+					onAdd: vi.fn()
 				}
 			});
 			expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(false);
@@ -157,7 +158,7 @@ describe('CalendarPanel', () => {
 					exclusions: { taskIds: [], categories },
 					ready: true,
 					onSetExclusions: vi.fn(),
-					onDownload: vi.fn()
+					onAdd: vi.fn()
 				}
 			}).container;
 		for (const container of [panel([passed], []), panel([item(def('a', 'admin'))], ['admin'])]) {
@@ -177,7 +178,7 @@ describe('CalendarPanel', () => {
 					exclusions: { taskIds: [], categories: [] },
 					ready: true,
 					onSetExclusions: vi.fn(),
-					onDownload: vi.fn()
+					onAdd: vi.fn()
 				}
 			}).container;
 		expect(panel([item(def('a', 'admin'))]).textContent).toContain(LINE);
@@ -198,7 +199,7 @@ describe('CalendarPanel', () => {
 				exclusions: { taskIds: [], categories: [] },
 				ready: true,
 				onSetExclusions,
-				onDownload: vi.fn()
+				onAdd: vi.fn()
 			}
 		});
 		(container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
@@ -221,7 +222,7 @@ describe('CalendarPanel', () => {
 	// set without the first and that category goes back into the calendar file.
 	it('keeps both of two quick toggles made before the first save lands', () => {
 		let saved: TaskExclusions = { taskIds: [], categories: [] };
-		const onSetExclusions = (
+		const onSetExclusions = async (
 			next: TaskExclusions | ((current: TaskExclusions) => TaskExclusions)
 		) => {
 			saved = typeof next === 'function' ? next(saved) : next;
@@ -232,7 +233,7 @@ describe('CalendarPanel', () => {
 				exclusions: { taskIds: [], categories: [] }, // the save has not landed yet
 				ready: true,
 				onSetExclusions,
-				onDownload: vi.fn()
+				onAdd: vi.fn()
 			}
 		});
 		(container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
@@ -241,6 +242,25 @@ describe('CalendarPanel', () => {
 		(container.querySelector('input[value="admin"]') as HTMLInputElement).click();
 		flushSync();
 		expect(saved.categories).toEqual(['medical', 'admin']);
+	});
+
+	it('puts a category toggle back, and says so, when the save fails', async () => {
+		render(CalendarPanel, {
+			props: {
+				items: [],
+				exclusions: { taskIds: [], categories: [] },
+				ready: true,
+				onSetExclusions: () => Promise.reject(new Error('E_OCC_CONFLICT')),
+				onAdd: () => {}
+			}
+		});
+		await page.getByRole('button', { name: /customize what's included/i }).click();
+		const box = page.getByRole('checkbox', { name: 'medical' });
+		await box.click();
+		await expect.element(box).not.toBeChecked();
+		await expect
+			.element(page.getByText('Could not update right now - please try again.'))
+			.toBeVisible();
 	});
 
 	// 38 CFR 14.629: the panel's own words make no personal claim, with something to add, with nothing ahead, or
@@ -264,7 +284,7 @@ describe('CalendarPanel', () => {
 					exclusions: { taskIds: [], categories: [] },
 					ready,
 					onSetExclusions: vi.fn(),
-					onDownload: vi.fn()
+					onAdd: vi.fn()
 				}
 			});
 			(container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
@@ -290,7 +310,7 @@ describe('CalendarPanel (the sentence for this device)', () => {
 		exclusions: { taskIds: [], categories: [] },
 		ready: true,
 		onSetExclusions: vi.fn(),
-		onDownload: vi.fn()
+		onAdd: vi.fn()
 	});
 
 	it('tells an Android phone what happens after the tap', () => {
@@ -390,7 +410,7 @@ describe('CalendarPanel (layout by width)', () => {
 		exclusions: { taskIds: [], categories: [] },
 		ready: true,
 		onSetExclusions: vi.fn(),
-		onDownload: vi.fn()
+		onAdd: vi.fn()
 	});
 	// One rect per line of text the element's content takes.
 	const lines = (el: Element) => {

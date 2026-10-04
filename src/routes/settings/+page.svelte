@@ -21,8 +21,7 @@
 		isSynthesisEnabled,
 		setSynthesisEnabled
 	} from '$lib/ask/online-prefs';
-	import { downloadTextFile } from '$lib/calendar/download';
-	import { calendarFileName } from '$lib/calendar/delivery';
+	import { handOver } from '$lib/calendar/hand-over';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
 	import { resolve } from '$app/paths';
 	import { documentStates } from '$lib/sources/document-states';
@@ -190,7 +189,8 @@
 	}
 
 	// Until the timeline-state store provisions, fall back to empty state so the calendar panel
-	// still lists date-derived pending tasks; stored done/skip/snooze layer in once it loads.
+	// still lists date-derived pending tasks; stored done/skip/snooze layer in once it loads. The add
+	// itself waits for the real state (the panel's `ready` includes the timeline store's).
 	const EMPTY_STATE: TimelineState = { schemaVersion: 1, tasks: {} };
 
 	// The flat pending-task list the calendar panel projects to events - the timeline route's
@@ -431,10 +431,15 @@
 			<CalendarPanel
 				items={calendarItems}
 				exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-				ready={app.calendar?.ready ?? false}
+				ready={(app.calendar?.ready ?? false) && (app.timeline?.ready ?? false)}
 				onSetExclusions={(next) =>
-					void app.calendar?.setExclusions(next).catch(() => app.calendar?.refresh())}
-				onDownload={(ics) => downloadTextFile(calendarFileName(new Date()), 'text/calendar', ics)}
+					app.calendar
+						? app.calendar.setExclusions(next).catch(async (err) => {
+								await app.calendar?.refresh();
+								throw err;
+							})
+						: Promise.resolve()}
+				onAdd={(file) => void handOver(file, app.calendar, new Date())}
 			/>
 		{/if}
 
