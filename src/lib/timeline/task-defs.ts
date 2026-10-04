@@ -399,7 +399,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -60,
 		windowEnd: 60,
 		recommendedOffset: -14,
-		why: 'CHCBP enrollment and a Marketplace special enrollment period each run 60 days from the end of TRICARE (or TAMP); tricare.mil and healthcare.gov say who qualifies.',
+		why: 'A Marketplace special enrollment period runs from 60 days before to 60 days after TRICARE (or TAMP) ends, and CHCBP enrollment within 60 days after; tricare.mil and healthcare.gov say who qualifies.',
 		afterNote:
 			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.'
 	},

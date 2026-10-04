@@ -136,11 +136,14 @@ describe('firm deadlines match their official sources', () => {
 		// tricare.mil: TAMP gives 180 more days of coverage, and the CHCBP window runs from the end of TAMP.
 		expect(at('tricare-elect')?.why).toContain('TAMP');
 		expect(at('tricare-elect')?.afterNote).toContain('TAMP');
+		// healthcare.gov: a Marketplace period opens for coverage a person "expects to lose ... in the next 60 days".
+		expect(at('tricare-elect')?.why).toContain('60 days before');
 		// militaryonesource.mil: "Final move entitlements vary ... confirm with your installation's Transportation Office".
 		expect(at('hhg-counseling')?.why).toContain('confirm with your transportation office');
 		// va.gov SGLI: a member totally disabled at separation keeps free SGLI longer, then VGLI is offered.
 		expect(at('vgli-convert')?.afterNote).toContain('standard VGLI deadline');
-		// militaryonesource.mil TAP: three mandatory courses.
+		// TAP's three mandatory courses: Transition Day (militaryonesource.mil), VA Benefits and Services (va.gov, "part
+		// of the required TAP Curriculum") and DOL's one-day course (dol.gov, "their DOL one-day EFCT requirement").
 		for (const course of [
 			'Transition Day',
 			'VA Benefits and Services',
