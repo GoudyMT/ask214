@@ -141,6 +141,17 @@ describe('CalendarPanel (the sentence for this device)', () => {
 			'On iPhone or iPad'
 		);
 	});
+
+	it('never sends the installed iPhone app to Safari', () => {
+		const IPHONE =
+			'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 Version/18.5 Mobile/15E148 Safari/604.1';
+		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(IPHONE);
+		vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
+		const { container } = render(CalendarPanel, { props: panelProps() });
+		const hint = container.querySelector('.cal-hint--device')?.textContent ?? '';
+		expect(hint).toContain('Open it from Downloads');
+		expect(hint).not.toContain('Safari');
+	});
 });
 
 // On a narrow phone "Customize what's included" and its summary do not fit on one line. The label wraps with

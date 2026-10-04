@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { calendarFileName, deviceKind, DEVICE_HINT } from './delivery';
+import { calendarFileName, deviceKind, deviceHint, DEVICE_HINT, IOS_APP_HINT } from './delivery';
 
 describe('calendarFileName', () => {
 	afterEach(() => {
@@ -57,5 +57,20 @@ describe('deviceKind', () => {
 
 	it('has one sentence per device', () => {
 		expect(Object.keys(DEVICE_HINT).sort()).toEqual(['android', 'computer', 'ios']);
+	});
+});
+
+// The installed iPhone app keeps its data apart from Safari, so it must never be told to go to Safari.
+describe('deviceHint', () => {
+	it('sends an iPhone browser to Safari, and the installed iPhone app only to its downloads', () => {
+		expect(deviceHint('ios', false)).toEqual(DEVICE_HINT.ios);
+		expect(deviceHint('ios', true)).toEqual(IOS_APP_HINT);
+		expect(`${IOS_APP_HINT.lead} ${IOS_APP_HINT.text}`).not.toContain('Safari');
+		expect(IOS_APP_HINT.text).toContain('Open it from Downloads');
+	});
+
+	it('keeps the same sentence for an installed app on Android or a computer', () => {
+		expect(deviceHint('android', true)).toEqual(DEVICE_HINT.android);
+		expect(deviceHint('computer', true)).toEqual(DEVICE_HINT.computer);
 	});
 });

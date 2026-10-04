@@ -1,8 +1,10 @@
 /**
  * How the calendar file reaches the user: its name, and the one sentence under the button that says what this
- * device does next. The device is read from the user agent only to pick that sentence; nothing is stored or sent.
+ * device does next. The device is read from the user agent, and whether the app is installed, only to pick that
+ * sentence; nothing is stored or sent.
  */
 import { localTodayIso } from '../timeline/day-math';
+import { isInstalled } from '../install/install-state';
 
 /** Dated by the local day of the add, so a second add on a later day never meets "file already exists". */
 export function calendarFileName(now: Date): string {
@@ -25,7 +27,7 @@ export const DEVICE_HINT: Record<DeviceKind, { lead: string; text: string }> = {
 		lead: 'On this phone:',
 		text: 'it saves a calendar file, then asks which app to open it with. Pick your calendar, then tap Add all.'
 	},
-	// Not yet checked on a real iPhone: installed home-screen apps are reported to refuse this download.
+	// Not yet checked on a real iPhone.
 	ios: {
 		lead: 'On iPhone or iPad, use Safari:',
 		text: 'it saves a calendar file. Open it from Downloads, then tap Add All.'
@@ -36,6 +38,19 @@ export const DEVICE_HINT: Record<DeviceKind, { lead: string; text: string }> = {
 	}
 };
 
+/**
+ * The installed iPhone app keeps its data apart from Safari, so it is never told to go there; it gets the steps
+ * after the download only. Not yet checked on a real iPhone.
+ */
+export const IOS_APP_HINT = {
+	lead: 'On iPhone or iPad:',
+	text: 'it saves a calendar file. Open it from Downloads, then tap Add All.'
+};
+
+export function deviceHint(kind: DeviceKind, installed: boolean): { lead: string; text: string } {
+	return kind === 'ios' && installed ? IOS_APP_HINT : DEVICE_HINT[kind];
+}
+
 export function currentDeviceHint(): { lead: string; text: string } {
-	return DEVICE_HINT[deviceKind(navigator.userAgent, navigator.maxTouchPoints)];
+	return deviceHint(deviceKind(navigator.userAgent, navigator.maxTouchPoints), isInstalled());
 }

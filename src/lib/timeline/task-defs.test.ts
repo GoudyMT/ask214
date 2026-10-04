@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
 import { RESOURCES, TASK_AFTER_LINK } from '$lib/resources/resources';
-import { DEVICE_HINT } from '$lib/calendar/delivery';
+import { DEVICE_HINT, IOS_APP_HINT } from '$lib/calendar/delivery';
 
 // Well-formedness guards for the seed: these pass for ANY valid seed, so editing the
 // task CONTENT (titles, windows, why/value, gates) keeps them green as long as the
@@ -94,7 +94,7 @@ describe('task-defs seed', () => {
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
 			...RESOURCES.flatMap((r) => [r.title, r.description]),
-			...Object.values(DEVICE_HINT).map((hint) => `${hint.lead} ${hint.text}`)
+			...[...Object.values(DEVICE_HINT), IOS_APP_HINT].map((hint) => `${hint.lead} ${hint.text}`)
 		];
 		expect(lines.length).toBeGreaterThan(200);
 		for (const line of lines) expect(line).not.toMatch(PERSONAL);
