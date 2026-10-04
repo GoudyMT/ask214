@@ -1,11 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { calendarFileName, deviceKind, DEVICE_HINT } from './delivery';
 
 describe('calendarFileName', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
 	it('names the file by the day of the add, so a later add never meets "file already exists"', () => {
-		expect(calendarFileName(new Date('2026-10-03T08:00:00Z'))).toBe(
+		expect(calendarFileName(new Date('2026-10-03T12:00:00Z'))).toBe(
 			'ask214-deadlines-2026-10-03.ics'
 		);
+	});
+
+	it('dates the file by the local day on a US evening', () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2026-10-04T01:00:00Z');
+		expect(evening.getHours()).toBe(18); // the zone took effect: 18:00 on Oct 3
+		expect(calendarFileName(evening)).toBe('ask214-deadlines-2026-10-03.ics');
 	});
 });
 

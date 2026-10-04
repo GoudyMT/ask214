@@ -2,10 +2,11 @@
  * How the calendar file reaches the user: its name, and the one sentence under the button that says what this
  * device does next. The device is read from the user agent only to pick that sentence; nothing is stored or sent.
  */
+import { localTodayIso } from '../timeline/day-math';
 
-/** Dated by the day of the add, so a second add on a later day never meets "file already exists". */
+/** Dated by the local day of the add, so a second add on a later day never meets "file already exists". */
 export function calendarFileName(now: Date): string {
-	return `ask214-deadlines-${now.toISOString().slice(0, 10)}.ics`;
+	return `ask214-deadlines-${localTodayIso(now)}.ics`;
 }
 
 export type DeviceKind = 'android' | 'ios' | 'computer';

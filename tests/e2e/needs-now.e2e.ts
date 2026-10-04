@@ -3,8 +3,13 @@ import { expect, test } from '@playwright/test';
 // 100 days out (task-defs.ts as of this PR): the BDD claim, the TAP Capstone and both separation-exam tasks have
 // their last day 90 days before separation - ten days away, so closing soon - and preseparation counseling (due
 // 365 days before) is late.
-const DAY = 86_400_000;
-const isoFromToday = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
+// The app's today is the date on the device clock, so the seed counts local calendar days too.
+const isoFromToday = (days: number) => {
+	const d = new Date();
+	d.setDate(d.getDate() + days);
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 test('"Needs you now" lists a closing BDD window and jumps to its card', async ({ page }) => {
 	await page.goto('/wizard');

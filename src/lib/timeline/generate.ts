@@ -8,7 +8,7 @@
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import { PHASE_BUCKETS } from './task-defs';
-import { daysBetween } from './day-math';
+import { daysBetween, localTodayIso } from './day-math';
 import type { TaskDef, TimelineTaskState, TimelineState, PhaseBucket } from './types';
 
 /** A task definition projected onto absolute UTC calendar dates off the user's EAOS. */
@@ -122,14 +122,14 @@ function statusByDate(a: AnchoredTask, todayIso: string): DisplayStatus {
 /**
  * Derive a task's display status. Stored 'done' and 'skipped' win; a snooze still in the future quiets the task
  * unless the date says closing soon, late, changed or closed. Otherwise the status comes from the anchored window
- * and the task's kind. Both ends are UTC ISO dates so time-of-day cannot shift the result.
+ * and the task's kind. Today is the date on the device clock, so a window stays open through its last local day.
  */
 export function deriveStatus(
 	anchored: AnchoredTask,
 	stored: TimelineTaskState | undefined,
 	today: Date
 ): DisplayStatus {
-	const todayIso = today.toISOString().slice(0, 10);
+	const todayIso = localTodayIso(today);
 	if (stored?.status === 'done') return 'done';
 	if (stored?.status === 'skipped') return 'skipped';
 	const byDate = statusByDate(anchored, todayIso);
@@ -243,7 +243,7 @@ export function generateTimeline(
 	today: Date
 ): TimelineView {
 	const anchored = filterAndAnchor(persona, defs);
-	const todayIso = today.toISOString().slice(0, 10);
+	const todayIso = localTodayIso(today);
 
 	const sorted = anchored
 		.map((a) => {
@@ -296,7 +296,7 @@ export function generateTimeline(
 	if (persona.completeness !== 'none') {
 		const daysToSep = daysUntilSeparation(persona.eaos, today);
 		view.todayMarkerIndex = todayMarkerIndex(phases, -daysToSep);
-		view.todayDate = today.toISOString().slice(0, 10);
+		view.todayDate = localTodayIso(today);
 		view.daysToSeparation = daysToSep;
 	}
 	return view;

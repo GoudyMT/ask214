@@ -3,6 +3,7 @@ import type { TaskExclusions, DesiredEvent } from './types';
 import { computeDesiredEvents } from './desired';
 import { computeIcsUid } from './uid';
 import { serializeIcs } from './ics';
+import { localTodayIso } from '../timeline/day-math';
 
 /**
  * Project the generated timeline into the iCalendar text the OS hands to the user's calendar app: one event per
@@ -14,7 +15,7 @@ export async function buildIcs(
 	exclusions: TaskExclusions,
 	now: Date
 ): Promise<string> {
-	const desired = computeDesiredEvents(items, exclusions, now.toISOString().slice(0, 10));
+	const desired = computeDesiredEvents(items, exclusions, localTodayIso(now));
 	const events = await Promise.all(
 		desired.map(async (d) => ({
 			title: d.title,

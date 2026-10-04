@@ -1,9 +1,9 @@
-import { addDays } from './day-math';
+import { addDays, localTodayIso } from './day-math';
 
 /**
- * Snooze presets + date math. snoozeUntilIso projects "today + N days" to a
- * UTC-anchored ISO date (YYYY-MM-DD) through the shared whole-day math, so the snooze-until
- * date never shifts by the runtime timezone. Presets are day-based ("1 month" = 30d, "3 months"
+ * Snooze presets + date math. snoozeUntilIso projects "today + N days" from the date on the
+ * device clock through the shared whole-day math, so a snooze set on a US evening counts from
+ * that evening's date, not the UTC one. Presets are day-based ("1 month" = 30d, "3 months"
  * = 90d) - deterministic and matching the engine's day-offset model; the snoozed card shows the
  * exact resulting date, so the approximation is never hidden from the user.
  */
@@ -17,5 +17,5 @@ export const SNOOZE_PRESETS: readonly SnoozePreset[] = [
 ];
 
 export function snoozeUntilIso(today: Date, days: number): string {
-	return addDays(today.toISOString().slice(0, 10), days);
+	return addDays(localTodayIso(today), days);
 }

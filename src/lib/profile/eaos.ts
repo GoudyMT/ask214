@@ -58,15 +58,16 @@ const FUTURE_YEARS = 15;
 /**
  * Strict input-path validator: calendar-valid AND within [today - 5y, today + 15y].
  *
- * "today" is read via UTC getters so the comparison is anchored to the same UTC
- * calendar as the Date.UTC-built input value - no timezone off-by-one.
+ * "today" is the date on the device clock (local getters), placed on the same UTC day grid
+ * as the Date.UTC-built input value, so both sides are calendar days and the time of day
+ * cannot move the range.
  */
 export function validateEaosAtInput(s: string, today = new Date()): EaosString {
 	const { y, m, d } = parseEaosCalendar(s);
 	const inputUTC = Date.UTC(y, m - 1, d);
-	const ty = today.getUTCFullYear();
-	const tm = today.getUTCMonth();
-	const td = today.getUTCDate();
+	const ty = today.getFullYear();
+	const tm = today.getMonth();
+	const td = today.getDate();
 	const minUTC = Date.UTC(ty - PAST_YEARS, tm, td);
 	const maxUTC = Date.UTC(ty + FUTURE_YEARS, tm, td);
 	if (inputUTC < minUTC || inputUTC > maxUTC) {
@@ -104,14 +105,14 @@ export function decodeEaos(bytes: Uint8Array): string {
 const MS_PER_DAY = 86_400_000;
 
 /**
- * Whole-day count from "today" to the EAOS. Both ends are UTC-anchored (the EAOS
- * via Date.UTC, "today" via UTC getters) so neither timezone nor time-of-day can
- * shift the result. Positive = future, negative = past, 0 = today.
+ * Whole-day count from "today" to the EAOS. "today" is the date on the device clock (local
+ * getters), and both dates sit on the UTC day grid (Date.UTC), so the count changes only when
+ * the user's own date does. Positive = future, negative = past, 0 = today.
  */
 export function daysUntilSeparation(eaos: EaosString, now = new Date()): number {
 	const { y, m, d } = parseEaosCalendar(eaos);
 	const eaosUTC = Date.UTC(y, m - 1, d);
-	const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+	const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
 	return Math.round((eaosUTC - todayUTC) / MS_PER_DAY);
 }
 

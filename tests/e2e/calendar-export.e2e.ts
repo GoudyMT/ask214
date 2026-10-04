@@ -5,9 +5,14 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // blob -> anchor -> click -> deferred-revoke handoff and inspects what the OS receives. It matters most on WebKit:
 // the revoke was deferred specifically because WebKit and Firefox drop a file whose blob URL is freed on the click
 // tick. Seeded relative to today, because the file never carries an event before today: a fixed separation date
-// would make these assertions expire as the real clock passes them.
-const DAY = 86_400_000;
-const isoFromToday = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
+// would make these assertions expire as the real clock passes them. The app's today is the date on the device
+// clock, so the seed counts local calendar days too.
+const isoFromToday = (days: number) => {
+	const d = new Date();
+	d.setDate(d.getDate() + days);
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 async function seedProfile(page: Page, separationInDays: number): Promise<void> {
 	await page.goto('/wizard');

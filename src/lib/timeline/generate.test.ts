@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
 	filterAndAnchor,
 	deriveStatus,
@@ -347,7 +347,7 @@ describe('generateTimeline Today marker', () => {
 			{ ...universal, id: 'early', recommendedOffset: -400, windowStart: -420, windowEnd: -380 },
 			{ ...universal, id: 'late', recommendedOffset: -100, windowStart: -120, windowEnd: -80 }
 		];
-		const today = new Date('2026-06-19'); // ~300 days before EAOS 2027-04-15
+		const today = new Date('2026-06-19T12:00:00Z'); // ~300 days before EAOS 2027-04-15
 		const view = generateTimeline(eaosOnly, defs, { schemaVersion: 1, tasks: {} }, today);
 		expect(view.phases.map((p) => p.bucket.id)).toEqual(['18-12mo', '6-3mo']);
 		expect(view.todayMarkerIndex).toBe(1); // marker before the 6-3mo phase (today is in the gap)
@@ -358,7 +358,7 @@ describe('generateTimeline Today marker', () => {
 			{ completeness: 'none' } as PersonaFilters,
 			[universal],
 			{ schemaVersion: 1, tasks: {} },
-			new Date('2026-06-19')
+			new Date('2026-06-19T12:00:00Z')
 		);
 		expect(view.todayMarkerIndex).toBeUndefined();
 	});
@@ -368,7 +368,7 @@ describe('generateTimeline Today marker', () => {
 			eaosOnly,
 			[universal],
 			{ schemaVersion: 1, tasks: {} },
-			new Date('2026-06-19')
+			new Date('2026-06-19T12:00:00Z')
 		);
 		expect(view.todayDate).toBe('2026-06-19');
 	});
@@ -378,13 +378,13 @@ describe('generateTimeline Today marker', () => {
 			{ completeness: 'none' } as PersonaFilters,
 			[universal],
 			{ schemaVersion: 1, tasks: {} },
-			new Date('2026-06-19')
+			new Date('2026-06-19T12:00:00Z')
 		);
 		expect(view.todayDate).toBeUndefined();
 	});
 
 	it('exposes daysToSeparation (whole days from today to EAOS)', () => {
-		const today = new Date('2026-06-19');
+		const today = new Date('2026-06-19T12:00:00Z');
 		const view = generateTimeline(eaosOnly, [universal], { schemaVersion: 1, tasks: {} }, today);
 		expect(view.daysToSeparation).toBe(daysUntilSeparation(EAOS, today));
 	});
@@ -394,9 +394,58 @@ describe('generateTimeline Today marker', () => {
 			{ completeness: 'none' } as PersonaFilters,
 			[universal],
 			{ schemaVersion: 1, tasks: {} },
-			new Date('2026-06-19')
+			new Date('2026-06-19T12:00:00Z')
 		);
 		expect(view.daysToSeparation).toBeUndefined();
+	});
+});
+
+// Today is the date on the user's clock. On the evening of a last day in Los Angeles the UTC date is already the
+// day after, and on the next morning in Tokyo the UTC date is still the last day.
+describe('deriveStatus and generateTimeline on the device clock', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+	const bddWindow: AnchoredTask = {
+		def: { ...universal, kind: 'closes' },
+		effectiveOffset: -120,
+		targetDate: '2026-09-01',
+		windowStartDate: '2026-07-22',
+		windowEndDate: '2026-10-20'
+	};
+
+	it('keeps a window open through the evening of its last day in Los Angeles', () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2026-10-21T03:00:00Z');
+		expect(evening.getHours()).toBe(20); // the zone took effect
+		expect(deriveStatus(bddWindow, undefined, evening)).toBe('closing-soon');
+	});
+
+	it('closes a window on the morning after its last day in Tokyo', () => {
+		vi.stubEnv('TZ', 'Asia/Tokyo');
+		const morning = new Date('2026-10-20T23:30:00Z');
+		expect(morning.getHours()).toBe(8); // the zone took effect
+		expect(deriveStatus(bddWindow, undefined, morning)).toBe('closed');
+	});
+
+	it('builds the view for the local date, so the last day counts as today', () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2026-10-21T03:00:00Z'); // 20:00 on Oct 20
+		const eaos = '2027-01-18' as EaosString; // a -90 window ends Oct 20, 2026
+		const bdd: TaskDef = {
+			...universal,
+			id: 'bdd',
+			kind: 'closes',
+			windowStart: -180,
+			windowEnd: -90
+		};
+		const persona: PersonaFilters = { completeness: 'eaos-only', eaos, daysUntilSeparation: 90 };
+		const view = generateTimeline(persona, [bdd], { schemaVersion: 1, tasks: {} }, evening);
+		const [item] = view.phases.flatMap((p) => p.items);
+		expect(view.todayDate).toBe('2026-10-20');
+		expect(item?.status).toBe('closing-soon');
+		expect(item?.daysLeft).toBe(0);
+		expect(view.daysToSeparation).toBe(90);
 	});
 });
 
