@@ -26,6 +26,8 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\.intendedPath\b/,
 	/\.geographicDestination\b/,
 	/\.specialSituations\b/,
+	/\.skillbridgeStart\b/,
+	/\.terminalLeaveStart\b/,
 	/\b_profileBytes\b/,
 	/\binstallUuid\b/
 ];

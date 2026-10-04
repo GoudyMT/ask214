@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { encodeProfile, decodeProfile, ProfileSchemaError, type ProfileV1 } from './codec';
+import { zeroizeRecord } from './lifecycle';
 
 const baseProfile: ProfileV1 = {
 	schemaVersion: 1,
@@ -99,5 +100,44 @@ describe('encodeProfile / decodeProfile', () => {
 		const dec = decodeProfile(encodeProfile(baseProfile));
 		expect(dec.skillbridgeApproved).toBeUndefined();
 		expect(dec.skillbridgeDurationDays).toBeUndefined();
+	});
+});
+
+describe('the leaving dates', () => {
+	const enc = (s: string) => new TextEncoder().encode(s);
+	const base = (): ProfileV1 => ({
+		schemaVersion: 1,
+		generation: 1,
+		lastSeenAt: 0,
+		setupIntent: 'completed',
+		setupIntentChangedAt: 0,
+		eaos: enc('2027-04-30')
+	});
+
+	it('round-trips both dates as bytes', () => {
+		const p = {
+			...base(),
+			skillbridgeStart: enc('2026-11-01'),
+			terminalLeaveStart: enc('2027-04-01')
+		};
+		const dec = decodeProfile(encodeProfile(p));
+		expect(new TextDecoder().decode(dec.skillbridgeStart)).toBe('2026-11-01');
+		expect(new TextDecoder().decode(dec.terminalLeaveStart)).toBe('2027-04-01');
+	});
+
+	it('omits a date that is not set, so clearing one drops its key', () => {
+		const p = { ...base(), skillbridgeStart: undefined };
+		const wire = JSON.parse(new TextDecoder().decode(encodeProfile(p))) as Record<string, unknown>;
+		expect('skillbridgeStart' in wire).toBe(false);
+		expect('skillbridgeStart' in decodeProfile(encodeProfile(p))).toBe(false);
+	});
+
+	it('the new dates are zeroized with the rest of the record on relock', () => {
+		const sb = enc('2026-11-01');
+		const tl = enc('2027-04-01');
+		const p: ProfileV1 = { ...base(), eaos: null, skillbridgeStart: sb, terminalLeaveStart: tl };
+		zeroizeRecord(p as unknown as Record<string, unknown>);
+		expect(sb.every((b) => b === 0)).toBe(true);
+		expect(tl.every((b) => b === 0)).toBe(true);
 	});
 });
