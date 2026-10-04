@@ -9,7 +9,7 @@ import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile
 import type { PersonaFilters, LeavingDates } from '../profile/persona';
 import { PHASE_BUCKETS } from './task-defs';
 import { addDays, daysBetween, localTodayIso } from './day-math';
-import type { TaskDef, TimelineTaskState, TimelineState, PhaseBucket } from './types';
+import type { TaskDef, TaskKind, TimelineTaskState, TimelineState, PhaseBucket } from './types';
 
 /** Why Fit pulled a window's last day in: the date the task must be finished before. */
 export type FitReason = 'skillbridge' | 'terminal-leave';
@@ -140,6 +140,14 @@ export const FIRM_WARNINGS: ReadonlySet<DisplayStatus> = new Set([
 	'closed'
 ]);
 
+/**
+ * Whether a status is a firm warning for this task: one a snooze cannot hide, and the card offers no Snooze for.
+ * "After you leave" warns only on a firm task; a soft window is good timing only, so it stays calm and snoozable.
+ */
+export function isFirmWarning(status: DisplayStatus, kind: TaskKind): boolean {
+	return FIRM_WARNINGS.has(status) || (status === 'after-you-leave' && kind !== 'soft');
+}
+
 /** The date-derived status, by the task's kind; stored done / skipped / snoozed are applied by the caller. */
 function statusByDate(a: AnchoredTask, todayIso: string): DisplayStatus {
 	if (a.fit?.cannotFit && todayIso <= a.separationDate) return 'after-you-leave';
@@ -179,7 +187,7 @@ export function deriveStatus(
 		stored?.status === 'snoozed' &&
 		stored.snoozeUntil !== undefined &&
 		stored.snoozeUntil > todayIso;
-	return snoozed && !FIRM_WARNINGS.has(byDate) ? 'snoozed' : byDate;
+	return snoozed && !isFirmWarning(byDate, anchored.def.kind) ? 'snoozed' : byDate;
 }
 
 /** One generated, anchored, status-stamped task as rendered in the view. */

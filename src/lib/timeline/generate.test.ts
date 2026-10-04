@@ -703,3 +703,44 @@ describe('generateTimeline (deadline fields)', () => {
 		expect(item?.aimDate).toBe('2026-10-03');
 	});
 });
+
+describe('After you leave', () => {
+	const SEP = '2027-04-30' as EaosString;
+	const at = (today: Date, leaving: object, state: TimelineState['tasks'] = {}) =>
+		generateTimeline(
+			{ completeness: 'eaos-only', eaos: SEP, daysUntilSeparation: 208, leaving: leaving as never },
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: state },
+			today
+		)
+			.phases.flatMap((p) => p.items)
+			.reduce<Record<string, string>>((m, i) => ({ ...m, [i.def.id]: i.status }), {});
+	const OCT_4 = new Date(2026, 9, 4, 12);
+
+	it('a snooze quiets a soft task that cannot fit', () => {
+		const s = at(
+			OCT_4,
+			{ skillbridgeStart: '2026-11-01' },
+			{ 'dd214-review': { status: 'snoozed', snoozeUntil: '2026-11-20' } }
+		);
+		expect(s['dd214-review']).toBe('snoozed');
+	});
+
+	it('a snooze never hides a firm task that cannot fit', () => {
+		const s = at(
+			OCT_4,
+			{ terminalLeaveStart: '2026-11-15' },
+			{ 'sha-complete': { status: 'snoozed', snoozeUntil: '2026-11-20' } }
+		);
+		expect(s['sha-complete']).toBe('after-you-leave');
+	});
+
+	it('ends at separation: the next day the official window decides', () => {
+		const s = at(new Date(2027, 4, 2, 12), {
+			skillbridgeStart: '2026-11-01',
+			terminalLeaveStart: '2026-11-15'
+		});
+		expect(s['sha-complete']).toBe('closed'); // required, official last day Jan 30, separation passed
+		expect(s['dd214-review']).toBe('still-to-do'); // soft, official window ended Apr 29
+	});
+});

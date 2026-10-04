@@ -26,7 +26,13 @@ function item(id: string, title: string, extra: Partial<TimelineItem> = {}): Tim
 		...extra
 	};
 }
-const empty: NeedsNowGroups = { late: [], closingSoon: [], justClosed: [], justOpened: [] };
+const empty: NeedsNowGroups = {
+	late: [],
+	closingSoon: [],
+	justClosed: [],
+	justOpened: [],
+	afterYouLeave: []
+};
 
 describe('NeedsNow', () => {
 	it('renders nothing when no task needs attention', () => {
@@ -145,7 +151,8 @@ describe('NeedsNow', () => {
 				item('sha', 'Complete your SHA', { daysLeft: 17 })
 			],
 			justClosed: [item('tri', 'Choose your health coverage', { status: 'closed' })],
-			justOpened: [item('pkg', 'Submit your separation package', { status: 'start-now' })]
+			justOpened: [item('pkg', 'Submit your separation package', { status: 'start-now' })],
+			afterYouLeave: []
 		};
 		const { container } = render(NeedsNow, { props: { groups } });
 		expect([...container.querySelectorAll('h3')].map((h) => h.textContent)).toEqual([
@@ -182,7 +189,8 @@ describe('NeedsNow', () => {
 			justOpened: [
 				item('pkg', 'Submit your separation package', { status: 'start-now' }),
 				{ ...soft, def: { ...soft.def, kind: 'soft' } }
-			]
+			],
+			afterYouLeave: []
 		};
 		const text = textOf(render(NeedsNow, { props: { groups } }).container);
 		expect(text).toContain('aim for Oct 17, 2026');
