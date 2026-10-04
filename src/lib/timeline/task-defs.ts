@@ -247,13 +247,11 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Start reserve affiliation',
 		category: 'career',
 		track: 'transition',
-		kind: 'closes',
+		kind: 'soft',
 		windowStart: -300,
 		windowEnd: 0,
 		recommendedOffset: -180,
-		why: 'Affiliating with the reserves takes paperwork and lead time.',
-		afterNote:
-			'You can still affiliate after you separate. A Navy Reserve recruiter can explain what changes with the timing.',
+		why: 'Affiliating with the reserves takes paperwork and lead time. TAMP coverage through the Selected Reserve requires joining the day after you separate.',
 		requires: { intendedPath: ['reserves'] }
 	},
 	{
@@ -461,12 +459,10 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'File your VA disability claim (if you did not file through BDD)',
 		category: 'benefits',
 		track: 'transition',
-		kind: 'closes',
+		kind: 'soft',
 		windowStart: 0,
 		windowEnd: 365,
 		recommendedOffset: 14,
-		why: 'If you missed the BDD window: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.',
-		afterNote:
-			"VA's effective-date rule changes 1 year after separation; va.gov or an accredited VSO can explain your options."
+		why: 'If you missed the BDD window: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.'
 	}
 ];

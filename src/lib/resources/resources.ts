@@ -359,10 +359,5 @@ export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }
 	'va-bdd-claim': { resource: 'va-accredited-rep', label: 'Find a VSO on VA.gov' },
 	'tricare-elect': { resource: 'chcbp', label: 'CHCBP on tricare.mil' },
 	'vgli-convert': { resource: 'va-life-insurance', label: 'VA life insurance options on VA.gov' },
-	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' },
-	'va-claim-fallback': { resource: 'va-accredited-rep', label: 'Find a VSO on VA.gov' },
-	'reserve-affiliation': {
-		resource: 'navy-reserve',
-		label: 'Transition to the Navy Reserve on navy.com'
-	}
+	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' }
 };

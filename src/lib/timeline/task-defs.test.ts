@@ -111,8 +111,12 @@ describe('firm deadlines match their official sources', () => {
 		['vgli-convert', 'closes', 240, 485],
 		// militaryonesource.mil - "those separating before retirement have 180 days"
 		['hhg-counseling', 'closes', 180, undefined],
-		// 38 CFR 3.400(b)(2)(i) - a claim "received within 1 year after separation"
-		['va-claim-fallback', 'closes', 365, undefined]
+		// 38 CFR 3.400(b)(2)(i) - a claim "received within 1 year after separation" keeps the earliest effective
+		// date. It is an effective-date rule, not a filing deadline, so the task is soft: no last day, never closed.
+		['va-claim-fallback', 'soft', 365, undefined],
+		// tricare.mil TAMP - a Selected Reservist "the day immediately following release"; affiliating later is still
+		// possible, so the task is soft with its aim at separation.
+		['reserve-affiliation', 'soft', 0, undefined]
 	] as const)('%s is %s with its last day at %d', (id, kind, windowEnd, finalEnd) => {
 		const t = at(id);
 		expect(t?.kind).toBe(kind);

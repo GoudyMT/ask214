@@ -94,10 +94,10 @@ describe('what-now links: one official page per firm task', () => {
 		}
 	});
 
-	// The claims tasks link to a claims or benefits resource, whose host the 38 CFR test below pins to va.gov or
+	// The claims task links to a claims or benefits resource, whose host the 38 CFR test below pins to va.gov or
 	// an accredited VSO.
-	it('sends the VA claim tasks only to a claims or benefits resource', () => {
-		for (const taskId of ['va-bdd-claim', 'va-claim-fallback']) {
+	it('sends the VA claim task only to a claims or benefits resource', () => {
+		for (const taskId of ['va-bdd-claim']) {
 			const category = byId.get(TASK_AFTER_LINK[taskId]?.resource ?? '')?.displayCategory;
 			expect(['claims-vso', 'benefits-va'], taskId).toContain(category);
 		}
