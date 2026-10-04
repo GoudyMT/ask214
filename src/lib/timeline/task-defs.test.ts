@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
 import { RESOURCES, TASK_AFTER_LINK } from '$lib/resources/resources';
 import { DEVICE_HINT, IOS_APP_HINT } from '$lib/calendar/delivery';
+import { makesPersonalClaim } from './personal-claim';
 
 // Well-formedness guards for the seed: these pass for ANY valid seed, so editing the
 // task CONTENT (titles, windows, why/value, gates) keeps them green as long as the
@@ -84,12 +85,32 @@ describe('task-defs seed', () => {
 		}
 	});
 
-	// 38 CFR 14.629: the app states public facts and points to official help; it never tells a person what
-	// they qualify for, are entitled to, or have left to act. Every line shown about a task is covered: its own
-	// text, its What now link, the curated resources and the sentence under the calendar button.
+	// The guard itself: every form of a personal claim it must catch, planted, and a public fact it must not.
+	it('catches every planted form of a personal claim', () => {
+		const planted = [
+			'You get a government-paid final move for 180 days.',
+			'You have 1 year to file.',
+			'You still have 180 days for this.',
+			'You are qualified for CHCBP.',
+			'Coverage is guaranteed for 180 days.',
+			`You${String.fromCharCode(0x2019)}re eligible for VGLI.`,
+			"You'll get TAMP coverage.",
+			'You may qualify for a special enrollment period.',
+			'You might be eligible for TAMP.',
+			'You could be entitled to a move.',
+			'You will be eligible after you separate.',
+			'You have up to 90 days.',
+			'You have 6 months left.',
+			'You have until your separation date.',
+			'You receive 180 days of coverage.'
+		];
+		for (const line of planted) expect(makesPersonalClaim(line), line).toBe(true);
+		expect(makesPersonalClaim('tricare.mil and healthcare.gov say who qualifies.')).toBe(false);
+	});
+
+	// 38 CFR 14.629 over the task data: its own text, its What now link, the curated resources and the sentences
+	// under the calendar button. The words the components add around them are checked in each component's tests.
 	it('keeps every public line about a task free of personal eligibility claims', () => {
-		const PERSONAL =
-			/\byou(?:'re| are)? (?:qualify|eligible|entitled)\b|\byou will (?:get|receive)\b|\byou have \d+ days\b|\byou can get\b/i;
 		const lines = [
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
@@ -97,7 +118,7 @@ describe('task-defs seed', () => {
 			...[...Object.values(DEVICE_HINT), IOS_APP_HINT].map((hint) => `${hint.lead} ${hint.text}`)
 		];
 		expect(lines.length).toBeGreaterThan(200);
-		for (const line of lines) expect(line).not.toMatch(PERSONAL);
+		for (const line of lines) expect(makesPersonalClaim(line), line).toBe(false);
 	});
 });
 

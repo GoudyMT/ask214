@@ -5,6 +5,7 @@ import { flushSync } from 'svelte';
 import TaskCard from './TaskCard.svelte';
 import { snoozeUntilIso } from '$lib/timeline/snooze';
 import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
+import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 // TaskCard renders one generated TimelineItem as an open status card: status-color left
 // edge + text status label (never color-only) + a status-specific date line + category chip +
@@ -339,6 +340,30 @@ describe('TaskCard (open states)', () => {
 		flushSync();
 		expect(buttonByText(container, 'Snooze')).toBeUndefined();
 		expect(buttonByText(container, '1 week')).toBeUndefined();
+	});
+
+	// 38 CFR 14.629: the words the card adds around a task - status, dates, tags, What now and What changed - make
+	// no personal claim in any state (the task data itself is checked in task-defs.test.ts).
+	it('adds no personal eligibility claim in any state', () => {
+		const firm = { ...DEF, id: 'va-bdd-claim', kind: 'closes' as const, afterNote: 'n' };
+		const twoEdge = { ...firm, finalEnd: 485, changeNote: 'c' };
+		const states: Partial<TimelineItem>[] = [
+			{ status: 'upcoming' },
+			{ status: 'start-now', aimDate: '2026-10-15' },
+			{ status: 'still-to-do' },
+			{ def: firm, status: 'start-now' },
+			{ def: firm, status: 'closing-soon', daysLeft: 5 },
+			{ def: { ...firm, kind: 'required' }, status: 'late' },
+			{ def: twoEdge, status: 'changed', finalEndDate: '2027-05-17', daysLeft: 20 },
+			{ def: firm, status: 'closed' },
+			{ status: 'done' },
+			{ status: 'skipped' },
+			{ status: 'snoozed', snoozeUntil: '2026-11-01' }
+		];
+		for (const state of states) {
+			const text = textOf(renderCard(makeItem(state)).container);
+			expect(makesPersonalClaim(text), text).toBe(false);
+		}
 	});
 
 	it('Snooze opens a picker with presets and a pick-a-date option', () => {

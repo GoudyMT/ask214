@@ -4,6 +4,7 @@ import { page } from 'vitest/browser';
 import NeedsNow from './NeedsNow.svelte';
 import type { TimelineItem } from '$lib/timeline';
 import type { NeedsNowGroups } from '$lib/timeline/needs-now';
+import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 function item(id: string, title: string, extra: Partial<TimelineItem> = {}): TimelineItem {
 	return {
@@ -158,6 +159,34 @@ describe('NeedsNow', () => {
 			el.classList.contains('needs-now__when--hot')
 		);
 		expect(hot).toEqual([true, true, true, true, false]);
+	});
+
+	// 38 CFR 14.629: the words the panel adds around each task - group names and the date lines - make no
+	// personal claim in any group (the task titles are checked with the task data in task-defs.test.ts).
+	it('adds no personal eligibility claim to any row', () => {
+		const soft = item('claim', 'File your VA disability claim', {
+			status: 'start-now',
+			aimDate: '2026-10-17'
+		});
+		const groups: NeedsNowGroups = {
+			late: [item('cap', 'Complete your TAP Capstone', { status: 'late' })],
+			closingSoon: [
+				item('bdd', 'File your VA claim through BDD', { daysLeft: 17 }),
+				item('vgli', 'Convert your SGLI to VGLI', {
+					status: 'changed',
+					finalEndDate: '2028-05-17',
+					daysLeft: 0
+				})
+			],
+			justClosed: [item('tri', 'Choose your health coverage', { status: 'closed' })],
+			justOpened: [
+				item('pkg', 'Submit your separation package', { status: 'start-now' }),
+				{ ...soft, def: { ...soft.def, kind: 'soft' } }
+			]
+		};
+		const text = textOf(render(NeedsNow, { props: { groups } }).container);
+		expect(text).toContain('aim for Oct 17, 2026');
+		expect(makesPersonalClaim(text), text).toBe(false);
 	});
 });
 

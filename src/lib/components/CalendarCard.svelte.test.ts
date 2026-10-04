@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import CalendarCard from './CalendarCard.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
+import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 function def(id: string, category: TaskDef['category']): TaskDef {
 	return {
@@ -63,5 +64,21 @@ describe('CalendarCard', () => {
 		(container.querySelector('.cal-card__dismiss') as HTMLButtonElement).click();
 		flushSync();
 		expect(onDismiss).toHaveBeenCalledOnce();
+	});
+
+	// 38 CFR 14.629: the card's own words make no personal claim (the sentences per device are checked with the
+	// task data in task-defs.test.ts).
+	it('adds no personal eligibility claim', () => {
+		const { container } = render(CalendarCard, {
+			props: {
+				items: [item(def('a', 'admin'))],
+				exclusions: { taskIds: [], categories: [] },
+				onDownload: vi.fn(),
+				onDismiss: vi.fn()
+			}
+		});
+		const text = textOf(container);
+		expect(text).toContain('Add to my calendar');
+		expect(makesPersonalClaim(text), text).toBe(false);
 	});
 });

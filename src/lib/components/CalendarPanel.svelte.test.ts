@@ -5,6 +5,7 @@ import { page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
+import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 function def(id: string, category: TaskDef['category']): TaskDef {
 	return {
@@ -204,6 +205,37 @@ describe('CalendarPanel', () => {
 		(container.querySelector('input[value="medical"]') as HTMLInputElement).click();
 		flushSync();
 		expect(onSetExclusions).toHaveBeenCalledWith({ taskIds: [], categories: ['medical'] });
+	});
+
+	// 38 CFR 14.629: the panel's own words make no personal claim, with something to add, with nothing ahead, or
+	// while its settings are unknown (the sentences per device are checked with the task data in task-defs.test.ts).
+	it('adds no personal eligibility claim in any state', () => {
+		const passed: TimelineItem = {
+			...item(def('p', 'admin')),
+			windowEndDate: '2020-01-01',
+			aimDate: '2020-01-01',
+			status: 'still-to-do'
+		};
+		const states: { items: TimelineItem[]; ready: boolean }[] = [
+			{ items: [item(def('a', 'admin'))], ready: true },
+			{ items: [passed], ready: true },
+			{ items: [item(def('a', 'admin'))], ready: false }
+		];
+		for (const { items, ready } of states) {
+			const { container } = render(CalendarPanel, {
+				props: {
+					items,
+					exclusions: { taskIds: [], categories: [] },
+					ready,
+					onSetExclusions: vi.fn(),
+					onDownload: vi.fn()
+				}
+			});
+			(container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
+			flushSync();
+			const text = textOf(container);
+			expect(makesPersonalClaim(text), text).toBe(false);
+		}
 	});
 });
 
