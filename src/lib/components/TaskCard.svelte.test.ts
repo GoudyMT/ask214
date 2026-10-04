@@ -313,6 +313,34 @@ describe('TaskCard (open states)', () => {
 		}
 	});
 
+	// The day can turn (or a date change land from another tab) while the picker is open; when the card turns firm
+	// the picker closes with its button, so no preset is left that would change nothing.
+	it('closes an open Snooze picker when the card turns firm', () => {
+		const firmDef = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		const props = $state<{
+			item: TimelineItem;
+			onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
+			onSetSnooze: (taskId: string, untilIso: string) => void;
+		}>({
+			item: makeItem({ def: firmDef, status: 'start-now' }),
+			onSetStatus: noop,
+			onSetSnooze: noop
+		});
+		const { container } = render(TaskCard, { props });
+		buttonByText(container, 'Snooze')?.click();
+		flushSync();
+		expect(buttonByText(container, '1 week')).toBeDefined();
+		props.item = makeItem({
+			def: firmDef,
+			status: 'closing-soon',
+			windowEndDate: '2026-10-20',
+			daysLeft: 5
+		});
+		flushSync();
+		expect(buttonByText(container, 'Snooze')).toBeUndefined();
+		expect(buttonByText(container, '1 week')).toBeUndefined();
+	});
+
 	it('Snooze opens a picker with presets and a pick-a-date option', () => {
 		const { container } = renderCard(makeItem());
 		buttonByText(container, 'Snooze')?.click();
