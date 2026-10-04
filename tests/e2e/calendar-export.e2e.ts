@@ -75,20 +75,47 @@ test('a kept-off category is absent from the exported file', async ({ page }) =>
 	expect((filtered.match(/BEGIN:VEVENT/g) ?? []).length).toBeLessThan(baselineCount);
 });
 
-test('the add works offline and no request carries a title or a date', async ({
-	page,
-	context
-}) => {
+test('the add works offline', async ({ page, context }) => {
 	await seedProfile(page, 600);
 	const addButton = await openSettingsAdd(page);
-	const sent: string[] = [];
-	page.on('request', (r) => sent.push(`${r.url()} ${r.postData() ?? ''}`));
 	await context.setOffline(true);
 	const { ics } = await readIcs(page, addButton);
 	await context.setOffline(false);
 	expect(ics).toContain('BEGIN:VEVENT');
-	for (const line of sent) {
-		expect(line).not.toMatch(/SGLI coverage|VA disability claim|BEGIN:VCALENDAR/);
-		expect(line).not.toContain(isoFromToday(600));
+});
+
+/** A request as text a reader would search: the URL and the body, percent- and form-decoded. */
+function decodeRequest(text: string): string {
+	try {
+		return decodeURIComponent(text.replace(/\+/g, ' '));
+	} catch {
+		return text; // a stray % that is not an escape: search the raw text instead
+	}
+}
+
+// Privacy at the wire: the file is built on the device, so no request may carry anything in it. The listener is on
+// the browser context, so it also sees service-worker and popup requests, and it is proven live on the page load.
+// Every title and every date in the downloaded file, in both date forms, is looked for in each request after the tap.
+test('no request carries a title or a date from the file', async ({ page, context }) => {
+	await seedProfile(page, 600);
+	const sent: string[] = [];
+	context.on('request', (r) => {
+		sent.push(decodeRequest(`${r.url()} ${r.postDataBuffer()?.toString('utf8') ?? ''}`));
+	});
+	const addButton = await openSettingsAdd(page);
+	expect(sent.some((request) => request.includes('/settings'))).toBe(true);
+	const fromTap = sent.length;
+	const { ics } = await readIcs(page, addButton);
+	await page.waitForLoadState('networkidle');
+	const titles = [...ics.matchAll(/^SUMMARY:([^\r\n]*)/gm)].map((m) =>
+		(m[1] ?? '').replace(/\\n/gi, '\n').replace(/\\([,;\\])/g, '$1')
+	);
+	const days = [...ics.matchAll(/^DTSTART;VALUE=DATE:(\d{8})/gm)].map((m) => m[1] ?? '');
+	const dates = days.flatMap((d) => [d, `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}`]);
+	expect(titles.length).toBeGreaterThan(0);
+	expect(dates.length).toBeGreaterThan(0);
+	for (const request of sent.slice(fromTap)) {
+		for (const title of titles) expect(request).not.toContain(title);
+		for (const date of dates) expect(request).not.toContain(date);
 	}
 });
