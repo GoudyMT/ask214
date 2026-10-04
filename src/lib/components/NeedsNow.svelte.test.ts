@@ -57,6 +57,25 @@ describe('NeedsNow', () => {
 		expect(rows[1]?.textContent).toContain('open to Nov 19, 2026');
 	});
 
+	// A soft window has no closing date to give, so its row names the date the card aims for: the VA claim's row
+	// must never read like a deadline VA does not set.
+	it('gives a soft task the date it aims for, never the end of its window', () => {
+		const claim = item('claim', 'File your VA disability claim (if you did not file through BDD)', {
+			status: 'start-now',
+			windowEndDate: '2027-10-03',
+			aimDate: '2026-10-17'
+		});
+		const groups: NeedsNowGroups = {
+			...empty,
+			justOpened: [{ ...claim, def: { ...claim.def, kind: 'soft' } }]
+		};
+		const { container } = render(NeedsNow, { props: { groups } });
+		const row = container.querySelector('a.needs-now__row')?.textContent ?? '';
+		expect(row).toContain('aim for Oct 17, 2026');
+		expect(row).not.toContain('open to');
+		expect(row).not.toContain('2027');
+	});
+
 	it('says when a late task was due and when a closed one closed', () => {
 		const groups: NeedsNowGroups = {
 			...empty,

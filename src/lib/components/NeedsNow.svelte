@@ -29,7 +29,10 @@
 			case 'closed':
 				return `closed ${f(item.finalEndDate ?? item.windowEndDate)}`;
 			default:
-				return `open to ${f(item.windowEndDate)}`;
+				// A soft window has no closing date to give: name the date the card aims for.
+				return item.def.kind === 'soft'
+					? `aim for ${f(item.aimDate ?? item.windowEndDate)}`
+					: `open to ${f(item.windowEndDate)}`;
 		}
 	}
 </script>
