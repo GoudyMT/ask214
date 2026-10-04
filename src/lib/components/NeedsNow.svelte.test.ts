@@ -190,11 +190,32 @@ describe('NeedsNow', () => {
 				item('pkg', 'Submit your separation package', { status: 'start-now' }),
 				{ ...soft, def: { ...soft.def, kind: 'soft' } }
 			],
-			afterYouLeave: []
+			afterYouLeave: [item('sha', 'Complete your SHA', { status: 'after-you-leave' })]
 		};
 		const text = textOf(render(NeedsNow, { props: { groups } }).container);
 		expect(text).toContain('aim for Oct 17, 2026');
+		expect(text).toContain('ask your command');
 		expect(makesPersonalClaim(text), text).toBe(false);
+	});
+
+	it('draws After you leave after Closing soon and before Just closed, its rows not in the hot colour', async () => {
+		const { container } = render(NeedsNow, {
+			props: {
+				groups: {
+					...empty,
+					closingSoon: [item('cs', 'Closing task', { daysLeft: 5 })],
+					afterYouLeave: [item('sha', 'Complete your SHA', { status: 'after-you-leave' })],
+					justClosed: [item('jc', 'Closed task', { status: 'closed' })]
+				}
+			}
+		});
+		const headings = [...container.querySelectorAll('.needs-now__group')].map((h) => h.textContent);
+		expect(headings).toEqual(['Closing soon', 'After you leave', 'Just closed']);
+		await expect.element(page.getByText('ask your command')).toBeVisible();
+		const ask = [...container.querySelectorAll('.needs-now__when')].find(
+			(el) => el.textContent === 'ask your command'
+		);
+		expect(ask?.classList.contains('needs-now__when--hot')).toBe(false);
 	});
 });
 

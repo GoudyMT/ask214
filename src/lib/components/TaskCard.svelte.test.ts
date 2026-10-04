@@ -697,3 +697,65 @@ describe('TaskCard (for keyboard and screen reader)', () => {
 		expect(resolved.querySelector('.task-card__why')?.textContent).toMatch(/^Career Find approved/);
 	});
 });
+
+describe('leaving your command', () => {
+	const firmDef: TaskDef = { ...DEF, id: 'sha', kind: 'required' };
+
+	it('names the reason on a date Fit moved', async () => {
+		renderCard(
+			makeItem({
+				def: firmDef,
+				status: 'closing-soon',
+				windowEndDate: '2026-10-31',
+				daysLeft: 27,
+				fit: { reason: 'skillbridge', date: '2026-10-31' }
+			})
+		);
+		await expect.element(page.getByText('Last day Oct 31, 2026, before SkillBridge')).toBeVisible();
+	});
+
+	it('names no reason on a date Fit left alone', async () => {
+		renderCard(
+			makeItem({
+				status: 'start-now',
+				aimDate: '2026-09-02',
+				windowEndDate: '2026-10-31',
+				fit: { reason: 'skillbridge', date: '2026-10-31' }
+			})
+		);
+		await expect.element(page.getByText('Aim for Sep 2, 2026')).toBeVisible();
+		expect(page.getByText(/before SkillBridge/).query()).toBeNull();
+	});
+
+	it('a firm task that cannot fit warns: the opening, the What now box, no Snooze', async () => {
+		const { container } = renderCard(
+			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })
+		);
+		await expect.element(page.getByText('After you leave', { exact: true })).toBeVisible();
+		await expect.element(page.getByText('Opens Dec 1, 2026')).toBeVisible();
+		await expect
+			.element(
+				page.getByText(
+					/This opens after you leave your command\. Ask your command how to fit it in\./
+				)
+			)
+			.toBeVisible();
+		expect(page.getByRole('button', { name: /^snooze$/i }).query()).toBeNull();
+		expect(container.querySelector('article')?.classList.contains('task-card--calm')).toBe(false);
+	});
+
+	it('a soft task that cannot fit stays calm and keeps Snooze', async () => {
+		const { container } = renderCard(
+			makeItem({ status: 'after-you-leave', windowStartDate: '2027-01-30' })
+		);
+		await expect.element(page.getByRole('button', { name: /^snooze$/i })).toBeVisible();
+		expect(container.querySelector('article')?.classList.contains('task-card--calm')).toBe(true);
+	});
+
+	it('says nothing about what the user qualifies for', () => {
+		const { container } = renderCard(
+			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })
+		);
+		for (const line of textOf(container).split('\n')) expect(makesPersonalClaim(line)).toBe(false);
+	});
+});
