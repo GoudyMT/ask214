@@ -18,6 +18,8 @@ export type CalendarSyncState = {
 	exclusions: TaskExclusions;
 	/** Timeline card dismissal bookkeeping; absent until the user first dismisses the card. */
 	card?: CardDismissal;
+	/** Every event handed over and not yet acknowledged; absent until the first add after this field existed. */
+	lastAdd?: HandedOverEvent[];
 };
 
 /** Which moment of a task an event marks; it also keys the event's stable calendar ID. */
@@ -30,4 +32,16 @@ export type DesiredEvent = {
 	title: string; // the task title behind its moment prefix
 	isoDate: string; // YYYY-MM-DD, never before today
 	alarmDays: number[]; // alerts this many days before the event, only those still ahead
+};
+
+/**
+ * One event the app handed to the user's calendar app. Kept until the user says they deleted it or its date
+ * passes, because the app cannot see the calendar: "handed over", never "imported".
+ */
+export type HandedOverEvent = {
+	taskId: string;
+	moment: EventMoment;
+	title: string;
+	isoDate: string;
+	addedOn: string; // the local day of the add
 };
