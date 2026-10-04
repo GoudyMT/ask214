@@ -17,7 +17,7 @@ const universal: TaskDef = {
 	id: 'u1',
 	title: 'Universal task',
 	category: 'admin',
-	track: 'transition',
+	finishBefore: 'separation',
 	kind: 'soft',
 	windowStart: -180,
 	windowEnd: -90,
@@ -29,7 +29,7 @@ const noRecommended: TaskDef = {
 	id: 'n1',
 	title: 'No recommended offset',
 	category: 'admin',
-	track: 'transition',
+	finishBefore: 'separation',
 	kind: 'soft',
 	windowStart: -60,
 	windowEnd: -30,
@@ -40,7 +40,7 @@ const gatedSchool: TaskDef = {
 	id: 'g1',
 	title: 'School-only task',
 	category: 'career',
-	track: 'transition',
+	finishBefore: 'separation',
 	kind: 'soft',
 	windowStart: -365,
 	windowEnd: -180,
@@ -150,7 +150,7 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		id,
 		title: id,
 		category: 'admin',
-		track: 'transition',
+		finishBefore: 'separation',
 		kind: 'soft',
 		windowStart: recommendedOffset,
 		windowEnd: recommendedOffset + 30,
@@ -285,14 +285,14 @@ describe('generateTimeline SkillBridge shift', () => {
 		id: 'm1',
 		title: 'Military task',
 		category: 'admin',
-		track: 'military',
+		finishBefore: 'leaving',
 		kind: 'soft',
 		windowStart: -120,
 		windowEnd: -90,
 		recommendedOffset: -120,
 		why: 'w'
 	};
-	const transitionTask: TaskDef = { ...militaryTask, id: 't1', track: 'transition' };
+	const transitionTask: TaskDef = { ...militaryTask, id: 't1', finishBefore: 'separation' };
 
 	const firstItem = (p: PersonaFilters, defs: TaskDef[]) =>
 		generateTimeline(p, defs, emptyState, today).phases.flatMap((ph) => ph.items)[0];
@@ -604,7 +604,7 @@ describe('generateTimeline (deadline fields)', () => {
 		const required: TaskDef = {
 			...universal,
 			id: 'required',
-			track: 'military',
+			finishBefore: 'leaving',
 			kind: 'required',
 			windowStart: -180,
 			windowEnd: -90,
@@ -655,7 +655,7 @@ describe('generateTimeline (deadline fields)', () => {
 			...persona,
 			skillbridge: { approved: true, durationDays: 90 }
 		};
-		const [item] = items(shifted, [{ ...vgli, track: 'military' }]);
+		const [item] = items(shifted, [{ ...vgli, finishBefore: 'leaving' }]);
 		expect(item?.finalEndDate).toBe(eaosOffsetDate(eaos, 485 - 90));
 	});
 
@@ -667,7 +667,7 @@ describe('generateTimeline (deadline fields)', () => {
 		const military: TaskDef = {
 			...universal,
 			id: 'military',
-			track: 'military',
+			finishBefore: 'leaving',
 			kind: 'closes',
 			windowStart: -180,
 			windowEnd: -60

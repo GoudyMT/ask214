@@ -11,7 +11,7 @@ function def(id: string, kind: TaskDef['kind'], extra: Partial<TaskDef> = {}): T
 		id,
 		title: id,
 		category: 'admin',
-		track: 'transition',
+		finishBefore: 'separation',
 		kind,
 		windowStart: -180,
 		windowEnd: -90,

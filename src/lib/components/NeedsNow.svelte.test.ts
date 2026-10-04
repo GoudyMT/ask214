@@ -12,7 +12,7 @@ function item(id: string, title: string, extra: Partial<TimelineItem> = {}): Tim
 			id,
 			title,
 			category: 'benefits',
-			track: 'transition',
+			finishBefore: 'separation',
 			kind: 'closes',
 			windowStart: -180,
 			windowEnd: -90,

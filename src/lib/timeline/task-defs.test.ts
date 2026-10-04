@@ -180,3 +180,42 @@ describe('firm deadlines match their official sources', () => {
 		expect(at('va-career-guidance')?.windowEnd).toBe(365);
 	});
 });
+
+describe('what each task must finish before', () => {
+	const by = (value: string) =>
+		TASK_DEFS.filter((t) => t.finishBefore === value)
+			.map((t) => t.id)
+			.sort();
+
+	it('TAP and the command-side tasks finish before leaving the command', () => {
+		expect(by('leaving')).toEqual(
+			[
+				'dd214-review',
+				'document-medical',
+				'preseparation-counseling',
+				'reference-letters',
+				'separation-package',
+				'tap-capstone',
+				'tap-course',
+				'tap-track',
+				'verify-service-record'
+			].sort()
+		);
+	});
+
+	it('the separation health assessment finishes before terminal leave only', () => {
+		expect(by('terminal-leave')).toEqual(['sha-complete', 'sha-schedule']);
+	});
+
+	it('every other task, the track fixes included, counts from separation alone', () => {
+		const rest = by('separation');
+		for (const id of ['update-sgli', 'financial-docs', 'hhg-counseling'])
+			expect(rest).toContain(id);
+		expect(rest.length + by('leaving').length + by('terminal-leave').length).toBe(TASK_DEFS.length);
+	});
+
+	it('only a separation-counted task may have a second edge', () => {
+		for (const t of TASK_DEFS)
+			if (t.finalEnd !== undefined) expect(t.finishBefore).toBe('separation');
+	});
+});

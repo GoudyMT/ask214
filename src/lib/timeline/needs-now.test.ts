@@ -10,7 +10,7 @@ function item(id: string, status: DisplayStatus, extra: Partial<TimelineItem> = 
 			id,
 			title: id,
 			category: 'admin',
-			track: 'transition',
+			finishBefore: 'separation',
 			kind: 'closes',
 			windowStart: -180,
 			windowEnd: -90,

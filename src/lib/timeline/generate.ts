@@ -78,7 +78,7 @@ export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): Ancho
 		.filter((def) => includeTask(persona, def))
 		.map((def) => {
 			const shiftDays =
-				def.track === 'military' && skillbridge?.approved ? skillbridge.durationDays : 0;
+				def.finishBefore !== 'separation' && skillbridge?.approved ? skillbridge.durationDays : 0;
 			return anchorTask(eaos, def, shiftDays);
 		});
 }

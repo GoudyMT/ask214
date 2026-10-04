@@ -15,7 +15,7 @@ const DEF: TaskDef = {
 	id: 'skillbridge-hosts',
 	title: 'Research SkillBridge hosts',
 	category: 'career',
-	track: 'transition',
+	finishBefore: 'separation',
 	kind: 'soft',
 	windowStart: -540,
 	windowEnd: -365,
