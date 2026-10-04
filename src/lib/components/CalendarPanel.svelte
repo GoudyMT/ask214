@@ -70,6 +70,10 @@
 		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
 	{:else}
 		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
+		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. -->
+		<p class="cal-hint cal-hint--device">
+			Changed a date? Remove the events you added before, then add again.
+		</p>
 	{/if}
 
 	{#if !ready}

@@ -115,6 +115,30 @@ describe('CalendarPanel', () => {
 		}
 	});
 
+	// Not every calendar app updates an event on a re-add, so after a date change the old events are the user's to
+	// remove. Said wherever there is something to add, and only there.
+	it('tells the user to remove old events after a date change, when there is something to add', () => {
+		const LINE = 'Changed a date? Remove the events you added before, then add again.';
+		const panel = (items: TimelineItem[]) =>
+			render(CalendarPanel, {
+				props: {
+					items,
+					exclusions: { taskIds: [], categories: [] },
+					ready: true,
+					onSetExclusions: vi.fn(),
+					onDownload: vi.fn()
+				}
+			}).container;
+		expect(panel([item(def('a', 'admin'))]).textContent).toContain(LINE);
+		const passed: TimelineItem = {
+			...item(def('p', 'admin')),
+			windowEndDate: '2020-01-01',
+			aimDate: '2020-01-01',
+			status: 'still-to-do'
+		};
+		expect(panel([passed]).textContent).not.toContain(LINE);
+	});
+
 	it('toggling a category once expanded calls onSetExclusions with the updated set', () => {
 		const onSetExclusions = vi.fn();
 		const { container } = render(CalendarPanel, {
