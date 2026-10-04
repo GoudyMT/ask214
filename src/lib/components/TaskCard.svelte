@@ -3,6 +3,7 @@
 	import { SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
 	import { resourcesForTask, afterLinkForTask } from '$lib/resources';
+	import { FIRM_WARNINGS } from '$lib/timeline/generate';
 
 	let {
 		item,
@@ -249,7 +250,10 @@
 			<div class="task-card__actions">
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
-				<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
+				<!-- A snooze never hides a firm warning, so it is not offered where it would change nothing. -->
+				{#if !FIRM_WARNINGS.has(item.status)}
+					<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
+				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
 			{#if snoozeOpen}

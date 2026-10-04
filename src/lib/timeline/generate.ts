@@ -100,7 +100,7 @@ export type DisplayStatus =
 export const CLOSING_SOON_DAYS = 30;
 
 /** States a snooze may never hide: a snooze quiets a task, it must not make anyone miss a deadline. */
-const FIRM_WARNINGS: ReadonlySet<DisplayStatus> = new Set([
+export const FIRM_WARNINGS: ReadonlySet<DisplayStatus> = new Set([
 	'closing-soon',
 	'late',
 	'changed',

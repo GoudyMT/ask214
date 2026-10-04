@@ -295,6 +295,24 @@ describe('TaskCard (open states)', () => {
 		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', 'skipped');
 	});
 
+	// A snooze can never hide a firm warning, so the card does not offer one there: the tap would change nothing.
+	it('offers Snooze only where a snooze can quiet the card', () => {
+		const firmDef = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
+		for (const status of ['closing-soon', 'late', 'changed', 'closed'] as const) {
+			const card = renderCard(
+				makeItem({ def: firmDef, status, windowEndDate: '2026-10-20', daysLeft: 5 })
+			).container;
+			expect(buttonByText(card, 'Snooze'), status).toBeUndefined();
+			expect(buttonByText(card, 'Mark done'), status).toBeDefined();
+		}
+		for (const status of ['upcoming', 'start-now', 'still-to-do'] as const) {
+			expect(
+				buttonByText(renderCard(makeItem({ status })).container, 'Snooze'),
+				status
+			).toBeDefined();
+		}
+	});
+
 	it('Snooze opens a picker with presets and a pick-a-date option', () => {
 		const { container } = renderCard(makeItem());
 		buttonByText(container, 'Snooze')?.click();
