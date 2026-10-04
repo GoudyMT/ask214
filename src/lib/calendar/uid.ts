@@ -1,7 +1,8 @@
 /**
- * Stable, opaque per-task iCalendar UID: a deterministic SHA-256 over the taskId, hex-encoded,
- * suffixed with a FIXED namespace. Stable per task so a re-import UPDATES rather than duplicates
- * (well-behaved calendar apps dedup by UID). The namespace MUST NEVER change (changing it changes
+ * Stable, opaque iCalendar UID: a deterministic SHA-256 over a key - the task id, or the task id and a
+ * moment - hex-encoded, suffixed with a FIXED namespace. Stable per key so a re-import can update
+ * rather than duplicate, in an app that matches events by UID and their rising SEQUENCE (not every app
+ * does: some keep the old event). The namespace MUST NEVER change (changing it changes
  * every UID -> duplicate events on the next import); it is an RFC-5545 uniqueness qualifier, not a
  * resolvable domain. (Google two-way events use a separate calendar-scoped ref, not this UID.)
  */

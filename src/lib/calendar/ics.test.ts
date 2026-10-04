@@ -64,6 +64,24 @@ describe('serializeIcs', () => {
 		expect(out.lastIndexOf('END:VALARM')).toBeLessThan(out.indexOf('END:VEVENT'));
 	});
 
+	// A re-add after a date change moves events the user already has, and an app that compares versions keeps the
+	// higher one: every add carries a version that rises with time, with nothing stored anywhere.
+	it('gives every event a version number that rises with each later add', () => {
+		const event = { title: 'Last day: X', isoDate: '2026-10-20', uid: 'u@mtc.local' };
+		const versions = (now: Date) =>
+			[
+				...serializeIcs([event, { ...event, uid: 'v@mtc.local' }], now).matchAll(
+					/^SEQUENCE:(\d+)\r?$/gm
+				)
+			].map((m) => Number(m[1]));
+		const first = versions(NOW);
+		expect(first).toHaveLength(2);
+		expect(first[0]).toBe(first[1]);
+		expect(versions(new Date(NOW.getTime() + 60_000))[0]).toBeGreaterThan(first[0] ?? Infinity);
+		// A device clock set far back still writes a valid, non-negative number.
+		expect(versions(new Date(Date.UTC(2020, 0, 1)))).toEqual([0, 0]);
+	});
+
 	it('adds no alert when an event has none', () => {
 		const out = serializeIcs(
 			[{ title: 'Opens: X', isoDate: '2026-11-01', uid: 'u@mtc.local', alarmDays: [] }],
