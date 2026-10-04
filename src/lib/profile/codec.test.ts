@@ -85,21 +85,22 @@ describe('encodeProfile / decodeProfile', () => {
 		expect(dec.rate?.length).toBe(100_000);
 	});
 
-	it('roundtrips the SkillBridge flat numeric fields', () => {
-		const withSkillBridge: ProfileV1 = {
-			...baseProfile,
-			skillbridgeApproved: 1,
-			skillbridgeDurationDays: 180
-		};
-		const dec = decodeProfile(encodeProfile(withSkillBridge));
-		expect(dec.skillbridgeApproved).toBe(1);
-		expect(dec.skillbridgeDurationDays).toBe(180);
-	});
-
-	it('omits the SkillBridge fields when unset (forward-compat with older blobs)', () => {
-		const dec = decodeProfile(encodeProfile(baseProfile));
-		expect(dec.skillbridgeApproved).toBeUndefined();
-		expect(dec.skillbridgeDurationDays).toBeUndefined();
+	it('a legacy record holding the old SkillBridge fields decodes, with both keys dropped', () => {
+		const legacy = new TextEncoder().encode(
+			JSON.stringify({
+				schemaVersion: 1,
+				generation: 1,
+				lastSeenAt: 0,
+				setupIntent: 'completed',
+				setupIntentChangedAt: 0,
+				eaos: null,
+				skillbridgeApproved: 1,
+				skillbridgeDurationDays: 180
+			})
+		);
+		const dec = decodeProfile(legacy) as unknown as Record<string, unknown>;
+		expect('skillbridgeApproved' in dec).toBe(false);
+		expect('skillbridgeDurationDays' in dec).toBe(false);
 	});
 });
 

@@ -6,20 +6,25 @@
  */
 
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
-import type { PersonaFilters } from '../profile/persona';
+import type { PersonaFilters, LeavingDates } from '../profile/persona';
 import { PHASE_BUCKETS } from './task-defs';
-import { daysBetween, localTodayIso } from './day-math';
+import { addDays, daysBetween, localTodayIso } from './day-math';
 import type { TaskDef, TimelineTaskState, TimelineState, PhaseBucket } from './types';
 
-/** A task definition projected onto absolute UTC calendar dates off the user's EAOS. */
+/** Why Fit pulled a window's last day in: the date the task must be finished before. */
+export type FitReason = 'skillbridge' | 'terminal-leave';
+
+/** A task definition projected onto absolute calendar dates off the user's EAOS. */
 export type AnchoredTask = {
 	def: TaskDef;
-	effectiveOffset: number; // shifted sort/group key: (recommendedOffset ?? windowStart) - SkillBridge shift
-	targetDate: string; // ISO YYYY-MM-DD: when to act (recommendedOffset, else windowStart)
-	windowStartDate: string; // ISO: window opens
-	windowEndDate: string; // ISO: window closes
+	sortOffset: number; // days from separation to the target date: the sort and phase key
+	targetDate: string; // ISO: when to act - the recommended date, held inside a shortened window
+	windowStartDate: string; // ISO: window opens (never moved)
+	windowEndDate: string; // ISO: window closes - the leaving day when Fit pulled it in
 	finalEndDate?: string; // ISO: a two-edge task's final close
-	separationDate: string; // ISO: the EAOS itself, never shifted by SkillBridge
+	separationDate: string; // ISO: the EAOS itself
+	/** Present when Fit shortened the window: why, whether it still fits, and the official last day. */
+	fit?: { reason: FitReason; cannotFit: boolean; officialEndDate: string };
 };
 
 /**
@@ -43,44 +48,71 @@ function includeTask(persona: PersonaFilters, def: TaskDef): boolean {
 	return true;
 }
 
+/** The first day away a task must be finished before, and why; undefined when no entered date applies. */
+function anchorFor(
+	def: TaskDef,
+	leaving: LeavingDates | undefined
+): { date: string; reason: FitReason } | undefined {
+	if (!leaving || def.finishBefore === 'separation') return undefined;
+	const tl = leaving.terminalLeaveStart;
+	if (def.finishBefore === 'terminal-leave') {
+		return tl ? { date: tl, reason: 'terminal-leave' } : undefined;
+	}
+	const sb = leaving.skillbridgeStart;
+	if (sb && (!tl || sb <= tl)) return { date: sb, reason: 'skillbridge' };
+	return tl ? { date: tl, reason: 'terminal-leave' } : undefined;
+}
+
 /**
- * Anchor + SkillBridge shift: project a def's day offsets to absolute UTC dates off the EAOS,
- * shifted earlier by `shiftDays` (the SkillBridge duration for military-track tasks; 0
- * otherwise). The shift is uniform across the target + both window edges, so the whole task
- * moves left as a unit.
+ * Anchor + Fit: project a def's day offsets to calendar dates off the EAOS. When the task must be finished before
+ * a date the user leaves the command on, its last day becomes the earlier of the official last day and the day
+ * before that date; its opening never moves, so every date still comes from the task's source. A window whose
+ * opening falls after that last day cannot fit.
  */
-function anchorTask(eaos: EaosString, def: TaskDef, shiftDays: number): AnchoredTask {
-	const effectiveOffset = (def.recommendedOffset ?? def.windowStart) - shiftDays;
+function anchorTask(
+	eaos: EaosString,
+	def: TaskDef,
+	leaving: LeavingDates | undefined
+): AnchoredTask {
+	const separationDate = eaosOffsetDate(eaos, 0);
+	const windowStartDate = eaosOffsetDate(eaos, def.windowStart);
+	const officialEndDate = eaosOffsetDate(eaos, def.windowEnd);
+	const anchor = anchorFor(def, leaving);
+	const lastDay = anchor ? addDays(anchor.date, -1) : undefined;
+	const fitted = anchor !== undefined && lastDay !== undefined && lastDay < officialEndDate;
+	const windowEndDate = fitted && lastDay !== undefined ? lastDay : officialEndDate;
+	const recommended = eaosOffsetDate(eaos, def.recommendedOffset ?? def.windowStart);
+	const targetDate = recommended > windowEndDate ? windowEndDate : recommended;
 	return {
 		def,
-		effectiveOffset,
-		targetDate: eaosOffsetDate(eaos, effectiveOffset),
-		windowStartDate: eaosOffsetDate(eaos, def.windowStart - shiftDays),
-		windowEndDate: eaosOffsetDate(eaos, def.windowEnd - shiftDays),
-		...(def.finalEnd !== undefined
-			? { finalEndDate: eaosOffsetDate(eaos, def.finalEnd - shiftDays) }
-			: {}),
-		separationDate: eaosOffsetDate(eaos, 0)
+		sortOffset: daysBetween(separationDate, targetDate),
+		targetDate,
+		windowStartDate,
+		windowEndDate,
+		...(def.finalEnd !== undefined ? { finalEndDate: eaosOffsetDate(eaos, def.finalEnd) } : {}),
+		separationDate,
+		...(fitted && anchor
+			? {
+					fit: {
+						reason: anchor.reason,
+						cannotFit: windowStartDate > windowEndDate,
+						officialEndDate
+					}
+				}
+			: {})
 	};
 }
 
 /**
- * Filter the task set by the persona gate, then anchor each surviving task to the
- * user's EAOS, left-shifting military-track tasks by the approved SkillBridge
- * duration. A 'none' persona has no EAOS to anchor against -> empty list (the route
- * renders the setup CTA upstream). Pure + deterministic.
+ * Filter the task set by the persona gate, then anchor each surviving task to the user's EAOS, fitting the tasks
+ * that must be finished before a leaving date. A 'none' persona has no EAOS to anchor against -> empty list (the
+ * route renders the setup CTA upstream). Pure + deterministic.
  */
 export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): AnchoredTask[] {
 	if (persona.completeness === 'none') return [];
-	const eaos = persona.eaos;
-	const skillbridge = persona.skillbridge;
 	return defs
 		.filter((def) => includeTask(persona, def))
-		.map((def) => {
-			const shiftDays =
-				def.finishBefore !== 'separation' && skillbridge?.approved ? skillbridge.durationDays : 0;
-			return anchorTask(eaos, def, shiftDays);
-		});
+		.map((def) => anchorTask(persona.eaos, def, persona.leaving));
 }
 
 /** Display status for a task card: paired with a text label in the view (never color-only). */
@@ -94,7 +126,8 @@ export type DisplayStatus =
 	| 'still-to-do'
 	| 'done'
 	| 'skipped'
-	| 'snoozed';
+	| 'snoozed'
+	| 'after-you-leave';
 
 /** A firm last day this close or closer reads "closing soon": the same distance as the first calendar alert. */
 export const CLOSING_SOON_DAYS = 30;
@@ -109,6 +142,10 @@ export const FIRM_WARNINGS: ReadonlySet<DisplayStatus> = new Set([
 
 /** The date-derived status, by the task's kind; stored done / skipped / snoozed are applied by the caller. */
 function statusByDate(a: AnchoredTask, todayIso: string): DisplayStatus {
+	if (a.fit?.cannotFit && todayIso <= a.separationDate) return 'after-you-leave';
+	if (a.fit?.cannotFit) {
+		return statusByDate({ ...a, windowEndDate: a.fit.officialEndDate, fit: undefined }, todayIso);
+	}
 	if (todayIso < a.windowStartDate) return 'upcoming';
 	if (a.def.kind === 'soft') return todayIso > a.windowEndDate ? 'still-to-do' : 'start-now';
 	if (todayIso <= a.windowEndDate) {
@@ -157,6 +194,8 @@ export type TimelineItem = {
 	aimDate?: string; // soft tasks: the recommended date, or the window end once that passed
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
 	note?: string; // the user's saved note for this task, if any (shown on any status)
+	/** Present when Fit pulled the last day in: why, and the date it moved to (the card names the reason there). */
+	fit?: { reason: FitReason; date: string };
 };
 
 /** Per-phase progress tally derived from item display status (drives the header count + collapse). */
@@ -277,9 +316,12 @@ export function generateTimeline(
 				...(status === 'snoozed' && stored?.snoozeUntil !== undefined
 					? { snoozeUntil: stored.snoozeUntil }
 					: {}),
-				...(stored?.notes !== undefined ? { note: stored.notes } : {})
+				...(stored?.notes !== undefined ? { note: stored.notes } : {}),
+				...(a.fit && !a.fit.cannotFit
+					? { fit: { reason: a.fit.reason, date: a.windowEndDate } }
+					: {})
 			};
-			return { item, offset: a.effectiveOffset };
+			return { item, offset: a.sortOffset };
 		})
 		.sort((x, y) => x.offset - y.offset);
 

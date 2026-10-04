@@ -95,7 +95,8 @@
 		'still-to-do': 'Still to do',
 		done: 'Done',
 		skipped: 'Skipped',
-		snoozed: 'Snoozed'
+		snoozed: 'Snoozed',
+		'after-you-leave': 'After you leave'
 	};
 
 	const CATEGORY_LABEL: Record<TaskCategory, string> = {

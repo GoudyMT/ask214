@@ -49,8 +49,6 @@ type WireProfile = {
 	intendedPath?: string;
 	geographicDestination?: string;
 	specialSituations?: string[];
-	skillbridgeApproved?: number;
-	skillbridgeDurationDays?: number;
 	skillbridgeStart?: string;
 	terminalLeaveStart?: string;
 };
@@ -76,10 +74,6 @@ export function encodeProfile(p: ProfileV1): Uint8Array {
 		}),
 		...(p.specialSituations && {
 			specialSituations: p.specialSituations.map(b64encode)
-		}),
-		...(p.skillbridgeApproved !== undefined && { skillbridgeApproved: p.skillbridgeApproved }),
-		...(p.skillbridgeDurationDays !== undefined && {
-			skillbridgeDurationDays: p.skillbridgeDurationDays
 		}),
 		...(p.skillbridgeStart && { skillbridgeStart: b64encode(p.skillbridgeStart) }),
 		...(p.terminalLeaveStart && { terminalLeaveStart: b64encode(p.terminalLeaveStart) })
@@ -118,12 +112,6 @@ export function decodeProfile(bytes: Uint8Array): ProfileV1 {
 		}),
 		...(wire.specialSituations && {
 			specialSituations: wire.specialSituations.map(b64decode)
-		}),
-		...(wire.skillbridgeApproved !== undefined && {
-			skillbridgeApproved: wire.skillbridgeApproved
-		}),
-		...(wire.skillbridgeDurationDays !== undefined && {
-			skillbridgeDurationDays: wire.skillbridgeDurationDays
 		}),
 		...(wire.skillbridgeStart && { skillbridgeStart: b64decode(wire.skillbridgeStart) }),
 		...(wire.terminalLeaveStart && { terminalLeaveStart: b64decode(wire.terminalLeaveStart) })
