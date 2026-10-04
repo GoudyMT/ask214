@@ -21,7 +21,7 @@ export type CalendarSyncState = {
 };
 
 /** Which moment of a task an event marks; it also keys the event's stable calendar ID. */
-export type EventMoment = 'opens' | 'changes' | 'last' | 'aim';
+export type EventMoment = 'opens' | 'changes' | 'last' | 'aim' | 'leave';
 
 /** One all-day event in the shared desired-set (feeds the .ics file and, later, Google). */
 export type DesiredEvent = {

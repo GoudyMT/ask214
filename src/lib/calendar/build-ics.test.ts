@@ -1,7 +1,9 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { buildIcs } from './build-ics';
 import { computeIcsUid } from './uid';
-import type { TimelineItem } from '../timeline/generate';
+import { generateTimeline, type TimelineItem } from '../timeline/generate';
+import { TASK_DEFS } from '../timeline/task-defs';
+import type { EaosString } from '../profile/eaos';
 
 const NOW = new Date('2026-10-03T12:00:00Z');
 
@@ -141,5 +143,83 @@ describe('buildIcs on the device clock', () => {
 		);
 		expect(ics).not.toContain('DTSTART;VALUE=DATE:20261003');
 		expect(ics).toContain('DTSTART;VALUE=DATE:20261004');
+	});
+
+	it('a "Before you leave" event keeps the task\'s own calendar ID', async () => {
+		const it0: TimelineItem = {
+			def: {
+				id: 'sha-complete',
+				title: 'Complete your SHA',
+				category: 'medical',
+				finishBefore: 'terminal-leave',
+				kind: 'required',
+				windowStart: -150,
+				windowEnd: -90,
+				why: ''
+			},
+			targetDate: '2026-11-14',
+			windowStartDate: '2026-12-01',
+			windowEndDate: '2026-11-14',
+			status: 'after-you-leave'
+		};
+		const ics = await buildIcs([it0], { taskIds: [], categories: [] }, new Date(2026, 9, 4, 12));
+		const unfolded = ics.replace(/\r\n /g, '');
+		expect(unfolded).toContain(`UID:${await computeIcsUid('sha-complete')}`);
+		expect(unfolded).toContain('SUMMARY:Before you leave: Complete your SHA');
+	});
+
+	it('the leaving dates change only event dates, alerts and the Before-you-leave prefix - nothing is added', async () => {
+		const now = new Date(2026, 9, 4, 12);
+		const fileFor = async (leaving?: object) => {
+			const persona = {
+				completeness: 'eaos-only' as const,
+				eaos: '2027-04-30' as EaosString,
+				daysUntilSeparation: 208,
+				...(leaving ? { leaving: leaving as never } : {})
+			};
+			const items = generateTimeline(
+				persona,
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				now
+			).phases.flatMap((p) => p.items);
+			return (await buildIcs(items, { taskIds: [], categories: [] }, now)).replace(/\r\n /g, '');
+		};
+		const withDates = await fileFor({
+			skillbridgeStart: '2026-11-01',
+			terminalLeaveStart: '2027-04-01'
+		});
+		const allowed = new Set([
+			'BEGIN',
+			'END',
+			'UID',
+			'DTSTAMP',
+			'SEQUENCE',
+			'DTSTART',
+			'DTEND',
+			'SUMMARY',
+			'ACTION',
+			'DESCRIPTION',
+			'TRIGGER',
+			'VERSION',
+			'PRODID',
+			'CALSCALE'
+		]);
+		for (const line of withDates.split('\r\n').filter(Boolean)) {
+			expect(allowed.has(line.split(/[;:]/)[0] ?? '')).toBe(true);
+		}
+		expect(withDates).not.toMatch(/SkillBridge|terminal leave/i);
+		// SUMMARY text is escaped in the file (a comma is written "\,"); undo that to compare with the task titles.
+		const titles = (ics: string) =>
+			[...ics.matchAll(/SUMMARY:(.*)/g)].map((m) =>
+				(m[1] ?? '').replace(/\\([,;\\])/g, '$1').replace(/^Before you leave: /, '')
+			);
+		const without = await fileFor();
+		// Every title in the dated file is a task title the undated file could also carry; no new kind of text.
+		const known = new Set(TASK_DEFS.map((t) => t.title));
+		for (const t of titles(withDates)) {
+			expect(known.has(t.replace(/^(Opens|Changes|Last day|Aim for): /, '')), t).toBe(true);
+		}
+		expect(titles(without).length).toBeGreaterThan(0);
 	});
 });
