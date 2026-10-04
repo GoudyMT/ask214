@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { DisplayCategory } from './types';
 import { RESOURCES, TASK_RESOURCES, TASK_AFTER_LINK } from './resources';
 import { TASK_DEFS } from '$lib/timeline/task-defs';
+import { isGovernmentHost } from '$lib/sources/government-host';
 
 const DISPLAY_CATEGORIES = new Set<DisplayCategory>([
 	'benefits-va',
@@ -85,6 +86,14 @@ describe('what-now links: one official page per firm task', () => {
 	it('links every firm task, and only the firm tasks', () => {
 		const firm = TASK_DEFS.filter((t) => t.kind !== 'soft').map((t) => t.id);
 		expect(Object.keys(TASK_AFTER_LINK).sort()).toEqual([...firm].sort());
+	});
+
+	// "The one official page": every What now link goes to a .gov or .mil host, the rule the source registry uses.
+	it('sends every link to an official .gov or .mil page', () => {
+		for (const [taskId, link] of Object.entries(TASK_AFTER_LINK)) {
+			const url = byId.get(link.resource)?.url ?? '';
+			expect(isGovernmentHost(url), `${taskId} -> ${url}`).toBe(true);
+		}
 	});
 
 	it('points every link at a curated resource, with link text', () => {

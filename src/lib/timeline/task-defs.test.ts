@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
+import { RESOURCES, TASK_AFTER_LINK } from '$lib/resources/resources';
+import { DEVICE_HINT } from '$lib/calendar/delivery';
 
 // Well-formedness guards for the seed: these pass for ANY valid seed, so editing the
 // task CONTENT (titles, windows, why/value, gates) keeps them green as long as the
@@ -83,14 +85,19 @@ describe('task-defs seed', () => {
 	});
 
 	// 38 CFR 14.629: the app states public facts and points to official help; it never tells a person what
-	// they qualify for.
-	it('keeps every user-facing line free of personal eligibility claims', () => {
-		const PERSONAL = /\byou (qualify|are eligible|will (get|receive))\b/i;
-		for (const t of TASK_DEFS) {
-			for (const line of [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']) {
-				expect(line).not.toMatch(PERSONAL);
-			}
-		}
+	// they qualify for, are entitled to, or have left to act. Every line shown about a task is covered: its own
+	// text, its What now link, the curated resources and the sentence under the calendar button.
+	it('keeps every public line about a task free of personal eligibility claims', () => {
+		const PERSONAL =
+			/\byou(?:'re| are)? (?:qualify|eligible|entitled)\b|\byou will (?:get|receive)\b|\byou have \d+ days\b|\byou can get\b/i;
+		const lines = [
+			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
+			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
+			...RESOURCES.flatMap((r) => [r.title, r.description]),
+			...Object.values(DEVICE_HINT).map((hint) => `${hint.lead} ${hint.text}`)
+		];
+		expect(lines.length).toBeGreaterThan(200);
+		for (const line of lines) expect(line).not.toMatch(PERSONAL);
 	});
 });
 
