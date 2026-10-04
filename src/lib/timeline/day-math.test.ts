@@ -41,4 +41,23 @@ describe('localTodayIso', () => {
 		expect(morning.getHours()).toBe(8); // the zone took effect
 		expect(localTodayIso(morning)).toBe('2026-10-04');
 	});
+
+	// On a US New Year's Eve the UTC month and year are already the next ones, not only the UTC day.
+	it("is the local year and month on a US New Year's Eve, not the UTC ones", () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2027-01-01T03:00:00Z');
+		expect(evening.getHours()).toBe(19); // the zone took effect
+		expect(localTodayIso(evening)).toBe('2026-12-31');
+	});
+
+	// Every machine and CI read the same day: the test projects run in one zone behind UTC (vite.config.ts), and a
+	// zone a test stubs is put back afterwards rather than left for the tests after it.
+	it('runs in the pinned zone, and gets it back after a stubbed one', () => {
+		const instant = new Date('2027-01-01T03:00:00Z');
+		expect(instant.getDate()).toBe(31); // Los Angeles: 19:00 on Dec 31
+		vi.stubEnv('TZ', 'Asia/Tokyo');
+		expect(instant.getDate()).toBe(1); // Tokyo: 12:00 on Jan 1
+		vi.unstubAllEnvs();
+		expect(instant.getDate()).toBe(31);
+	});
 });

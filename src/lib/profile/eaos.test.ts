@@ -130,6 +130,16 @@ describe('validateEaosAtInput', () => {
 		expect(evening.getDate()).toBe(26); // the zone took effect: 20:00 on May 26
 		expect(() => validateEaosAtInput('2021-05-26', evening)).not.toThrow();
 	});
+
+	// On a US New Year's Eve the UTC month and year are already the next ones: the range still starts 5 years
+	// before the local date.
+	it("measures the range from the local year and month on a US New Year's Eve", () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2027-01-01T03:00:00Z');
+		expect(evening.getDate()).toBe(31); // the zone took effect: 19:00 on Dec 31
+		expect(() => validateEaosAtInput('2021-12-31', evening)).not.toThrow();
+		expect(() => validateEaosAtInput('2021-12-30', evening)).toThrow(EaosFormatError);
+	});
 });
 
 afterEach(() => {
@@ -181,6 +191,13 @@ describe('daysUntilSeparation', () => {
 		expect([early.getDate(), late.getDate()]).toEqual([26, 26]); // the zone took effect
 		expect(daysUntilSeparation(eaos, early)).toBe(daysUntilSeparation(eaos, late));
 		expect(daysUntilSeparation(eaos, late)).toBe(220);
+	});
+
+	it("counts from the local year and month on a US New Year's Eve", () => {
+		vi.stubEnv('TZ', 'America/Los_Angeles');
+		const evening = new Date('2027-01-01T03:00:00Z');
+		expect(evening.getDate()).toBe(31); // the zone took effect: 19:00 on Dec 31
+		expect(daysUntilSeparation('2027-01-01' as EaosString, evening)).toBe(1);
 	});
 
 	it('handles leap-day arithmetic correctly', () => {
