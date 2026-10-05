@@ -366,6 +366,38 @@ describe('Fit: the leaving dates pull in a last day, never an opening', () => {
 		// Oct 31 is 181 days out: the 12-6 months phase ([-365, -180)); without SkillBridge it sits in 6-3 months.
 		expect(capstonePhase?.bucket.id).toBe('12-6mo');
 	});
+
+	it('the separation package counts its whole window from the day you leave', () => {
+		const pkg = item(leaving({ skillbridgeStart: '2026-11-01' }), 'separation-package');
+		expect(pkg.windowStartDate).toBe('2026-02-04'); // 270 days before Nov 1
+		expect(pkg.targetDate).toBe('2026-06-04'); // 150 days before
+		expect(pkg.windowEndDate).toBe('2026-07-04'); // 120 days before
+		expect(pkg.fit).toBeUndefined(); // moved whole, never shortened
+		expect(pkg.status).toBe('late');
+	});
+
+	it('the separation package counts from SkillBridge when terminal leave follows it', () => {
+		const pkg = item(
+			leaving({ skillbridgeStart: '2026-11-01', terminalLeaveStart: '2027-03-01' }),
+			'separation-package'
+		);
+		expect(pkg.windowEndDate).toBe('2026-07-04');
+	});
+
+	it('the separation package counts from terminal leave when it is the only date', () => {
+		const pkg = item(leaving({ terminalLeaveStart: '2027-03-01' }), 'separation-package');
+		expect(pkg.windowStartDate).toBe('2026-06-04');
+		expect(pkg.windowEndDate).toBe('2026-11-01');
+		expect(pkg.status).toBe('closing-soon'); // 28 days left
+	});
+
+	it('with no leaving date the separation package closes 120 days before separation', () => {
+		const pkg = item(leaving({}), 'separation-package');
+		expect(pkg.windowStartDate).toBe('2026-08-03');
+		expect(pkg.targetDate).toBe('2026-12-01');
+		expect(pkg.windowEndDate).toBe('2026-12-31');
+		expect(pkg.status).toBe('start-now');
+	});
 });
 
 describe('todayMarkerIndex (Today divider placement)', () => {

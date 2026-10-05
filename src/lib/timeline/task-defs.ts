@@ -368,11 +368,12 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		title: 'Submit your Navy separation package (1306, eval, award, statement of service)',
 		category: 'admin',
 		finishBefore: 'leaving',
+		countsFrom: 'leaving',
 		kind: 'required',
-		windowStart: -120,
-		windowEnd: -60,
-		recommendedOffset: -75,
-		why: 'The Navy needs your package 60 days before your PTDY, separation leave or separation, whichever comes first.',
+		windowStart: -270,
+		windowEnd: -120,
+		recommendedOffset: -150,
+		why: 'Your admin office must send it to the Navy at least 120 days before you leave: SkillBridge, terminal leave or separation, whichever comes first.',
 		afterNote: 'Still required; a late package can delay your orders, DD-214 and final pay.'
 	},
 	{

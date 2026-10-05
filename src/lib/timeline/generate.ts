@@ -19,7 +19,7 @@ export type AnchoredTask = {
 	def: TaskDef;
 	sortOffset: number; // days from separation to the target date: the sort and phase key
 	targetDate: string; // ISO: when to act - the recommended date, held inside a shortened window
-	windowStartDate: string; // ISO: window opens (never moved)
+	windowStartDate: string; // ISO: window opens (never moved by Fit)
 	windowEndDate: string; // ISO: window closes - the leaving day when Fit pulled it in
 	finalEndDate?: string; // ISO: a two-edge task's final close
 	separationDate: string; // ISO: the EAOS itself
@@ -67,7 +67,8 @@ function anchorFor(
  * Anchor + Fit: project a def's day offsets to calendar dates off the EAOS. When the task must be finished before
  * a date the user leaves the command on, its last day becomes the earlier of the official last day and the day
  * before that date; its opening never moves, so every date still comes from the task's source. A window whose
- * opening falls after that last day cannot fit.
+ * opening falls after that last day cannot fit. A task whose rule counts from the leaving day moves its whole
+ * window instead.
  */
 function anchorTask(
 	eaos: EaosString,
@@ -78,6 +79,18 @@ function anchorTask(
 	const windowStartDate = eaosOffsetDate(eaos, def.windowStart);
 	const officialEndDate = eaosOffsetDate(eaos, def.windowEnd);
 	const anchor = anchorFor(def, leaving);
+	// A rule set as "N days before you leave" moves its whole window with the leaving day; it is never fitted.
+	if (def.countsFrom === 'leaving' && anchor) {
+		const targetDate = addDays(anchor.date, def.recommendedOffset ?? def.windowStart);
+		return {
+			def,
+			sortOffset: daysBetween(separationDate, targetDate),
+			targetDate,
+			windowStartDate: addDays(anchor.date, def.windowStart),
+			windowEndDate: addDays(anchor.date, def.windowEnd),
+			separationDate
+		};
+	}
 	const lastDay = anchor ? addDays(anchor.date, -1) : undefined;
 	const fitted = lastDay !== undefined && lastDay < officialEndDate;
 	const windowEndDate = fitted ? lastDay : officialEndDate;

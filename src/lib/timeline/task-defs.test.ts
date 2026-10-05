@@ -219,4 +219,10 @@ describe('what each task must finish before', () => {
 		for (const t of TASK_DEFS)
 			if (t.finalEnd !== undefined) expect(t.finishBefore).toBe('separation');
 	});
+
+	it('only the separation package counts its window from the leaving day, and it finishes before leaving', () => {
+		const counted = TASK_DEFS.filter((t) => t.countsFrom === 'leaving');
+		expect(counted.map((t) => t.id)).toEqual(['separation-package']);
+		for (const t of counted) expect(t.finishBefore).toBe('leaving');
+	});
 });
