@@ -75,6 +75,14 @@ const STATIC = 'static';
 //     6 B worse and was dropped): page 58,143 B, route nodes 42,410 B - each keeps about 90 B of room.
 //     Measured after the re-review's fixes, with no raise: page 58,220 B (10 B of room), route nodes
 //     42,491 B (9 B).
+//     Page 58,230 -> 59,230 and route nodes 42,500 -> 44,590 (owner's call, 2026-10-05): the leaving dates -
+//     the two Settings date rows, the Timeline line and the task card's "After you leave" state (the Settings
+//     and timeline route nodes), Fit and the separation package counted from the leaving day (a page chunk), the
+//     handed-over calendar record and the list of events to delete (the Settings route node), and the error
+//     catcher installed at start-up. Measured after two trim passes (-5 B page: two checks Fit's last day
+//     already decides; -14 B page, -30 B precache: a task's window computed once; moving two element references
+//     out of reactive state measured worse, and grouping the new CSS saved nothing): page 59,142 B, route nodes
+//     44,511 B - each keeps about 80 B of room.
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -108,6 +116,8 @@ const STATIC = 'static';
 //     (-41 B: the version as plain minutes since 1970, and the line sharing the device sentence's spacing rule).
 //     Measured after the re-review's fixes, with no raise: 139,432 B (8 B of room); the version now counts whole
 //     seconds since 2000, so two adds a second apart differ.
+//     Raised 139,440 -> 143,150 (owner's call, 2026-10-05): the leaving dates, above - 143,084 B measured with
+//     56 files, after those trim passes.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -117,10 +127,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 58_230,
+	page: 59_230,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 139_440,
+	precacheBytes: 143_150,
 	workerScripts: 147_200
 };
 
