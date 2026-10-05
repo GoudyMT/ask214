@@ -64,10 +64,14 @@
 		margin: var(--space-xs) 0;
 		padding-left: var(--space-l);
 	}
+	/* A date reads as one piece: when it does not fit after its title, the whole date takes the next line. */
 	.stale__date {
 		color: var(--color-fg-muted);
+		white-space: nowrap;
 	}
+	/* min-height: the 44px touch target the Settings rows use. */
 	.stale__ack {
+		min-height: 44px;
 		background: none;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-s);
