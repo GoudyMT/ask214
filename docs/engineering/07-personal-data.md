@@ -25,12 +25,11 @@ request. Each decision's full reasoning is kept in private working notes.
 ### What is stored, and where
 
 **What it is.** The profile holds the separation date (EAOS) and, optionally, rate, rank, years of service,
-anticipated disability rating, family status, intended path, destination, special situations and SkillBridge
-dates. Beside it are the timeline's task statuses, snooze dates and notes, the calendar choices, and the
-optional API key. Each lives as ciphertext in its own single-row IndexedDB store; three more stores hold signed
-rollback marks and one holds the keys, eight in all, through the raw IndexedDB API with no wrapper library.
-Pages that show personal data render only in the browser, and a CI test fails if any server file names a
-profile field.
+anticipated disability rating, family status, intended path, destination, special situations, and SkillBridge
+and terminal leave start dates. Beside it are the timeline's task statuses, snooze dates and notes, the
+calendar choices, and the optional API key. Each lives as ciphertext in its own single-row IndexedDB store;
+three more stores hold signed rollback marks and one holds the keys, eight in all. Pages that show personal
+data render only in the browser, and a CI test fails if any server file names a profile field.
 
 **Why this project uses it.** With no server copy, there is nothing to breach, sell or hand over.
 
@@ -42,14 +41,14 @@ profile field.
 
 **What it is.** Every record passes through one function, `encryptRecord` (`src/lib/crypto/record-crypto.ts`):
 AES-GCM with a 256-bit key, a fresh random 12-byte IV for each write and a 128-bit tag. The additional
-authenticated data binds the ciphertext to its store, its record, its write generation, its schema version and
-the key record, so a record moved to another slot, replayed from an older write or paired with another key
-record fails to decrypt. A project lint rule forbids writing to an encrypted store anywhere else.
+authenticated data binds the ciphertext to its store, record, write generation, schema version and key record,
+so a record moved to another slot, replayed from an older write or paired with another key record fails to
+decrypt. A project lint rule forbids writing to an encrypted store anywhere else.
 
-**Keys.** On first run the browser generates an AES-GCM 256 key and an HMAC-SHA-256 key, both non-extractable,
-and stores them with the signed key record in one transaction. IndexedDB holds them as `CryptoKey` objects that
-no script can export. Signed high-water marks beside the profile, timeline and calendar records refuse an older
-copy, and errors carry opaque codes, never decrypted text.
+**Keys.** On first run the browser generates an AES-GCM 256 key and an HMAC-SHA-256 key as non-extractable
+`CryptoKey` objects, which no script can export, and stores them with the signed key record in one
+transaction. Signed high-water marks beside the profile, timeline and calendar records refuse an older copy, and
+errors carry opaque codes, never decrypted text.
 
 **What it does not protect.** There is no passphrase yet, so the key sits on the same device as the data.
 Non-extractable keys and authenticated encryption stop the key being exported and the records being altered or
@@ -80,31 +79,31 @@ erase takes the key lock alone. After a write, a tab posts a bare event over Bro
 read again from IndexedDB, and a lock in one tab locks the others. A tab still on an older version steps aside
 when a newer tab upgrades the database, and asks the user to reload.
 
-**Tradeoffs accepted.** The channel is not authenticated, but its events carry no data, so a forged one, which
-needs code already running on the site, can at most cause an extra read or a lock. A browser without
-BroadcastChannel simply does not update other tabs live.
+**Tradeoffs accepted.** The channel is not authenticated, but its events carry no data, so a forged one (which
+needs code already on the site) can at most cause an extra read or a lock. Without BroadcastChannel, other tabs
+do not update live.
 
 ---
 
 ### Keeping the data
 
 **What it is.** Losing the database loses the key with it, so the app asks the browser for persistent storage
-(`navigator.storage.persist()`) at load and again when the app is installed, and the home page suggests
-installing it. In Safari, being installed exempts a site from clearing after seven days without a visit, and
-granted persistence exempts it from clearing under storage pressure.
+(`navigator.storage.persist()`) at load and again on install, and the home page suggests installing it. In
+Safari, being installed exempts a site from clearing after seven days without a visit, and granted persistence
+exempts it from clearing under storage pressure.
 
 **Tradeoffs accepted.** Persistence is the browser's decision, an uninstalled Safari tab can still be cleared
-after seven days, and how these exemptions behave has not been tested on a real iPhone.
+after seven days, and these exemptions are untested on a real iPhone.
 
 ---
 
 ### Erase
 
-**What it is.** Erase, in Settings after a confirmation, runs in one safe order: the decrypted data is cleared
-from memory first; then all eight stores are cleared in one transaction while erase holds the key lock alone,
-so no save in progress can write a row back; then local storage and every cache, saved documents included;
-then a reload into a fresh first run. It refuses to start unless it can clear every store, and if it stops, it
-says that nothing was deleted.
+**What it is.** Erase, in Settings after a confirmation, runs in one safe order: decrypted data leaves memory
+first; then all eight stores are cleared in one transaction while erase holds the key lock alone, so no save in
+progress can write a row back; then local storage and every cache, saved documents included; then a reload into
+a fresh first run. It refuses to start unless it can clear every store, and if it stops, it says nothing was
+deleted.
 
 **Tradeoffs accepted.** Erase removes the saved documents too, so they download again on the next save.
 
@@ -112,29 +111,30 @@ says that nothing was deleted.
 
 ### The timeline and the calendar file
 
-**What it is.** The timeline is computed on the device from the separation date: 35 task definitions with day
-offsets from it, filtered by the profile, since a task shows only when every condition it needs is known to
-apply. Each task also says how firm its window is: a soft window is good timing only, a required task stays
-required until separation, and some windows close for good, and others change how they work. Military tasks
-move earlier by the SkillBridge length.
-A device clock that jumps back more than a day shows a warning rather than quietly reshuffling deadlines. The
-export is an `.ics` file the user saves, named by the day of the add: an all-day event for each moment still
-ahead (a window opening, a last day, or a soft task's target date), with alerts before each firm date and each
-target date, and never an event before today. Events and alerts carry only a stable ID, the date and the task's
-title with its moment, never notes or profile details. The stable IDs and a rising version number let a calendar
-app that honors them update events instead of duplicating them; after a date change, Settings asks the user to
-remove the old events first, since not every calendar does.
+**What it is.** The timeline is computed on the device: 35 task definitions with day offsets from the
+separation date, each shown only when the profile is known to meet its conditions. Each window has a firmness:
+soft (good timing only), required until separation, closing for good, or changing how it works. Each task also
+names what it must finish before: separation, terminal leave, or leaving the command (SkillBridge or terminal
+leave, whichever starts first). Once that date is entered, the last day moves to the day before it if earlier,
+while the opening stays, so every date keeps its source; only the separation package counts its whole window
+from the leaving day. A device clock that jumps back over a day shows a warning rather than quietly reshuffling
+deadlines. The export is an `.ics` file the user saves, named by the day of the add: an all-day event for each
+moment still ahead (a window opening, a last day, or a soft task's target date), with alerts before each firm
+date and target date, never an event before today. Events and alerts carry only a stable ID, the date and the
+task's title with its moment, never notes or profile details, though the dates can reveal the separation and
+leaving days. Stable IDs and a rising version number let an app that honors them update events rather than
+duplicate them. Not every app does, so the calendar record keeps each event handed over (task, moment,
+title, date and day of the add), and after a change Settings lists the ones to delete until the user marks
+them deleted.
 
-**Tradeoffs accepted.** Export is one way, so a change means exporting again. Whether a calendar app keeps the
-alerts is that app's choice. Syncing with Google Calendar is designed but not built.
+**Tradeoffs accepted.** Export is one way, so a change means exporting again. Each calendar app decides whether
+to keep the alerts. Google Calendar sync is designed but not built.
 
 ## How These Pieces Fit Together
 
-Every personal record goes through one encryption function into IndexedDB, bound to its place and its write so
-it cannot be swapped or replayed. Locks order the writes across tabs, the idle lock clears what is in memory,
-persistence keeps the database from being evicted, and erase removes all of it in an order that cannot leave a
-row behind. Nothing in it leaves except a calendar file the user saves and the API key, which goes only to its
-own provider.
+Every personal record goes through one encryption function into IndexedDB, bound to its place and write. Locks
+order writes across tabs, the idle lock clears memory, persistence resists eviction, and erase leaves no row
+behind. Only a calendar file the user saves and the API key, sent to its own provider, ever leave.
 
 ## Standards Adopted in This Section
 
@@ -156,3 +156,4 @@ own provider.
 ## Revision Notes
 
 - 2026-10-02: First draft.
+- 2026-10-05: The leaving dates and the record of handed-over calendar events.
