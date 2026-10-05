@@ -55,6 +55,9 @@ export const IOS_APP_HINT = {
 	text: 'it saves a calendar file. Open it from Downloads, then tap Add All.'
 };
 
+/** Under every add button: the file stays in the downloads after the calendar takes it, outside Erase all data. */
+export const DELETE_FILE_HINT = "Once it's added, you can delete the downloaded file.";
+
 export function deviceHint(
 	kind: DeviceKind,
 	apartFromSafari: boolean

@@ -82,4 +82,20 @@ describe('CalendarCard', () => {
 		expect(text).toContain('Add to my calendar');
 		expect(makesPersonalClaim(text), text).toBe(false);
 	});
+
+	// The file stays in the downloads after the calendar takes it, outside Erase all data, so the card says it can go:
+	// a line of its own, after the steps for this device.
+	it('says the downloaded file can be deleted once it is added', () => {
+		const { container } = render(CalendarCard, {
+			props: {
+				items: [item(def('a', 'admin'))],
+				exclusions: { taskIds: [], categories: [] },
+				onAdd: vi.fn(),
+				onDismiss: vi.fn()
+			}
+		});
+		const hints = [...container.querySelectorAll('.cal-card__hint')].map((p) => p.textContent);
+		expect(hints).toHaveLength(2);
+		expect(hints[1]).toBe("Once it's added, you can delete the downloaded file.");
+	});
 });

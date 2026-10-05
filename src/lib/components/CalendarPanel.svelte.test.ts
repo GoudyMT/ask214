@@ -191,6 +191,33 @@ describe('CalendarPanel', () => {
 		expect(panel([passed]).textContent).not.toContain(LINE);
 	});
 
+	// The downloaded file outlives Erase all data, so wherever there is a file to add, the panel says it can go once
+	// it is in the calendar: a line of its own, right after the steps for this device.
+	it('says the downloaded file can be deleted once added, when there is something to add', () => {
+		const LINE = "Once it's added, you can delete the downloaded file.";
+		const panel = (items: TimelineItem[]) =>
+			render(CalendarPanel, {
+				props: {
+					items,
+					exclusions: { taskIds: [], categories: [] },
+					ready: true,
+					onSetExclusions: vi.fn(),
+					onAdd: vi.fn()
+				}
+			}).container;
+		const lines = [...panel([item(def('a', 'admin'))]).querySelectorAll('.cal-hint--device')].map(
+			(p) => p.textContent?.trim()
+		);
+		expect(lines[1]).toBe(LINE);
+		const passed: TimelineItem = {
+			...item(def('p', 'admin')),
+			windowEndDate: '2020-01-01',
+			aimDate: '2020-01-01',
+			status: 'still-to-do'
+		};
+		expect(panel([passed]).textContent).not.toContain(LINE);
+	});
+
 	it('toggling a category once expanded calls onSetExclusions with the updated set', () => {
 		const onSetExclusions = vi.fn();
 		const { container } = render(CalendarPanel, {

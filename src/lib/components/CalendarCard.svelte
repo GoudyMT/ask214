@@ -2,7 +2,7 @@
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
-	import { currentDeviceHint } from '$lib/calendar/delivery';
+	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
 
 	type Props = {
 		items: TimelineItem[];
@@ -36,6 +36,7 @@
 			Add to my calendar
 		</button>
 		<p class="cal-card__hint"><b>{hint.lead}</b> {hint.text}</p>
+		<p class="cal-card__hint">{DELETE_FILE_HINT}</p>
 	</div>
 	<button class="cal-card__dismiss" type="button" aria-label="Dismiss" onclick={onDismiss}>
 		<span aria-hidden="true">x</span>

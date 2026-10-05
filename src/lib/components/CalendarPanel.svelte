@@ -4,7 +4,7 @@
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
-	import { currentDeviceHint } from '$lib/calendar/delivery';
+	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
 	import { localTodayIso } from '$lib/timeline/day-math';
 
 	type Props = {
@@ -86,6 +86,7 @@
 		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
 	{:else}
 		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
+		<p class="cal-hint cal-hint--device">{DELETE_FILE_HINT}</p>
 		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. -->
 		<p class="cal-hint cal-hint--device">
 			Changed a date? Remove the events you added before, then add again.
