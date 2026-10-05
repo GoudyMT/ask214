@@ -22,6 +22,9 @@
 		setSynthesisEnabled
 	} from '$lib/ask/online-prefs';
 	import { handOver } from '$lib/calendar/hand-over';
+	import { staleEvents } from '$lib/calendar/handed-over';
+	import { computeDesiredEvents } from '$lib/calendar/desired';
+	import { localTodayIso } from '$lib/timeline/day-math';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
 	import { resolve } from '$app/paths';
 	import { documentStates } from '$lib/sources/document-states';
@@ -201,6 +204,17 @@
 		const state = app.timeline?.state ?? EMPTY_STATE;
 		return generateTimeline(persona, [...TASK_DEFS], state, new Date()).phases.flatMap(
 			(p) => p.items
+		);
+	});
+
+	// The events handed to the calendar that the file would no longer carry as they are.
+	const stale = $derived.by(() => {
+		const today = localTodayIso(new Date());
+		const exclusions = app.calendar?.exclusions ?? { taskIds: [], categories: [] };
+		return staleEvents(
+			app.calendar?.lastAdd,
+			computeDesiredEvents(calendarItems, exclusions, today),
+			today
 		);
 	});
 
@@ -440,6 +454,15 @@
 							})
 						: Promise.resolve()}
 				onAdd={(file) => void handOver(file, app.calendar, new Date())}
+				{stale}
+				hasRecord={app.calendar?.lastAdd !== undefined}
+				onAcknowledge={() =>
+					app.calendar
+						? app.calendar.acknowledgeStale(stale).catch(async (err) => {
+								await app.calendar?.refresh();
+								throw err;
+							})
+						: Promise.resolve()}
 			/>
 		{/if}
 

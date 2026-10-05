@@ -5,7 +5,7 @@ import { page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
-import type { TaskExclusions } from '$lib/calendar/types';
+import type { HandedOverEvent, TaskExclusions } from '$lib/calendar/types';
 import type { CalendarFile } from '$lib/calendar/build-ics';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
@@ -33,6 +33,12 @@ function item(d: TaskDef): TimelineItem {
 		aimDate: ahead
 	};
 }
+// No add recorded yet: the panel as it was before the record existed.
+const NO_RECORD: {
+	stale: HandedOverEvent[];
+	hasRecord: boolean;
+	onAcknowledge: () => Promise<void>;
+} = { stale: [], hasRecord: false, onAcknowledge: async () => {} };
 
 describe('CalendarPanel', () => {
 	it('downloads an .ics of the pending, non-excluded items when "Add to calendar" is clicked', async () => {
@@ -43,6 +49,7 @@ describe('CalendarPanel', () => {
 				items,
 				exclusions: { taskIds: [], categories: ['medical'] },
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions: vi.fn(),
 				onAdd
 			}
@@ -63,6 +70,7 @@ describe('CalendarPanel', () => {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions: vi.fn(),
 				onAdd: vi.fn()
 			}
@@ -80,6 +88,7 @@ describe('CalendarPanel', () => {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the empty DEFAULT, not a real record
 				ready: false,
+				...NO_RECORD,
 				onSetExclusions: vi.fn(),
 				onAdd
 			}
@@ -106,6 +115,7 @@ describe('CalendarPanel', () => {
 				items: [passed],
 				exclusions: { taskIds: [], categories: [] },
 				ready: false,
+				...NO_RECORD,
 				onSetExclusions: vi.fn(),
 				onAdd: vi.fn()
 			}
@@ -131,6 +141,7 @@ describe('CalendarPanel', () => {
 					items: [today],
 					exclusions: { taskIds: [], categories: [] },
 					ready: true,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
 					onAdd: vi.fn()
 				}
@@ -157,6 +168,7 @@ describe('CalendarPanel', () => {
 					items,
 					exclusions: { taskIds: [], categories },
 					ready: true,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
 					onAdd: vi.fn()
 				}
@@ -177,6 +189,7 @@ describe('CalendarPanel', () => {
 					items,
 					exclusions: { taskIds: [], categories: [] },
 					ready: true,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
 					onAdd: vi.fn()
 				}
@@ -201,6 +214,7 @@ describe('CalendarPanel', () => {
 					items,
 					exclusions: { taskIds: [], categories: [] },
 					ready: true,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
 					onAdd: vi.fn()
 				}
@@ -225,6 +239,7 @@ describe('CalendarPanel', () => {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions,
 				onAdd: vi.fn()
 			}
@@ -259,6 +274,7 @@ describe('CalendarPanel', () => {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the save has not landed yet
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions,
 				onAdd: vi.fn()
 			}
@@ -277,6 +293,7 @@ describe('CalendarPanel', () => {
 				items: [],
 				exclusions: { taskIds: [], categories: [] },
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions: () => Promise.reject(new Error('E_OCC_CONFLICT')),
 				onAdd: () => {}
 			}
@@ -288,6 +305,62 @@ describe('CalendarPanel', () => {
 		await expect
 			.element(page.getByText('Could not update right now - please try again.'))
 			.toBeVisible();
+	});
+
+	const HELD: HandedOverEvent = {
+		taskId: 'tap-capstone',
+		moment: 'last',
+		title: 'Last day: Complete your TAP Capstone',
+		isoDate: '2027-01-30',
+		addedOn: '2026-10-03'
+	};
+	const withRecord = (
+		ready: boolean,
+		stale: HandedOverEvent[],
+		onAcknowledge = NO_RECORD.onAcknowledge
+	) =>
+		render(CalendarPanel, {
+			props: {
+				items: [item(def('a', 'admin'))],
+				exclusions: { taskIds: [], categories: [] },
+				ready,
+				stale,
+				hasRecord: true,
+				onAcknowledge,
+				onSetExclusions: vi.fn(),
+				onAdd: vi.fn()
+			}
+		}).container;
+
+	it('lists the events to delete above the Add button, once its settings are loaded', () => {
+		const container = withRecord(true, [HELD]);
+		const head = [...container.querySelectorAll('p')].find(
+			(p) => p.textContent === 'Your calendar is out of date'
+		);
+		const add = container.querySelector('.cal-add');
+		expect(head).toBeDefined();
+		expect(add).not.toBeNull();
+		if (!head || !add) return;
+		expect(head.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
+
+	// Until both stores load, the list would be built from a stand-in empty task state and could name an event
+	// that is not out of date.
+	it('shows no list while its settings are not loaded', () => {
+		expect(withRecord(false, [HELD]).textContent).not.toContain('Your calendar is out of date');
+	});
+
+	it('once an add is recorded, the list replaces the general line', () => {
+		expect(withRecord(true, []).textContent).not.toContain(
+			'Changed a date? Remove the events you added before, then add again.'
+		);
+	});
+
+	it("passes I've deleted these to its handler", async () => {
+		const onAcknowledge = vi.fn(async () => {});
+		withRecord(true, [HELD], onAcknowledge);
+		await page.getByRole('button', { name: "I've deleted these" }).click();
+		expect(onAcknowledge).toHaveBeenCalledOnce();
 	});
 
 	// 38 CFR 14.629: the panel's own words make no personal claim, with something to add, with nothing ahead, or
@@ -310,6 +383,7 @@ describe('CalendarPanel', () => {
 					items,
 					exclusions: { taskIds: [], categories: [] },
 					ready,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
 					onAdd: vi.fn()
 				}
@@ -336,6 +410,7 @@ describe('CalendarPanel (the sentence for this device)', () => {
 		items: [item(def('a', 'admin'))],
 		exclusions: { taskIds: [], categories: [] },
 		ready: true,
+		...NO_RECORD,
 		onSetExclusions: vi.fn(),
 		onAdd: vi.fn()
 	});
@@ -436,6 +511,7 @@ describe('CalendarPanel (layout by width)', () => {
 		items: [item(def('a', 'admin'))],
 		exclusions: { taskIds: [], categories: [] },
 		ready: true,
+		...NO_RECORD,
 		onSetExclusions: vi.fn(),
 		onAdd: vi.fn()
 	});

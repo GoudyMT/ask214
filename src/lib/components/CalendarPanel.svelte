@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskCategory } from '$lib/timeline/types';
-	import type { TaskExclusions } from '$lib/calendar/types';
+	import type { HandedOverEvent, TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
+	import StaleEvents from './StaleEvents.svelte';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
 	import { localTodayIso } from '$lib/timeline/day-math';
@@ -21,8 +22,15 @@
 		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => Promise<void>;
 		/** Injected so the built file is testable and the actual hand-over stays the caller's concern. */
 		onAdd: (file: CalendarFile) => void;
+		/** The events handed to the calendar that the file no longer carries as they are: the user's to delete. */
+		stale: HandedOverEvent[];
+		/** Whether any add has been recorded; until one is, the general line stands in for the list. */
+		hasRecord: boolean;
+		/** Forgets the listed events; rejects when the save fails. */
+		onAcknowledge: () => Promise<void>;
 	};
-	let { items, exclusions, ready, onSetExclusions, onAdd }: Props = $props();
+	let { items, exclusions, ready, onSetExclusions, onAdd, stale, hasRecord, onAcknowledge }: Props =
+		$props();
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
@@ -74,6 +82,12 @@
 	<h2 id="calendar-heading" class="cal-section__heading">Calendar</h2>
 	<p class="cal-hint">Your upcoming deadlines, with alerts before each firm one.</p>
 
+	<!-- Only once both stores have loaded: before that the list is built from a stand-in empty task state and
+	     could name an event that is not out of date. -->
+	{#if ready}
+		<StaleEvents events={stale} {onAcknowledge} />
+	{/if}
+
 	<button
 		class="cal-add"
 		type="button"
@@ -87,10 +101,13 @@
 	{:else}
 		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
 		<p class="cal-hint cal-hint--device">{DELETE_FILE_HINT}</p>
-		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. -->
-		<p class="cal-hint cal-hint--device">
-			Changed a date? Remove the events you added before, then add again.
-		</p>
+		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. Once an
+		     add is recorded, the list above names them instead. -->
+		{#if !hasRecord}
+			<p class="cal-hint cal-hint--device">
+				Changed a date? Remove the events you added before, then add again.
+			</p>
+		{/if}
 	{/if}
 
 	{#if !ready}
