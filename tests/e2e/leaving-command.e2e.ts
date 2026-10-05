@@ -126,6 +126,39 @@ test('a SkillBridge date pulls TAP in and reaches the calendar file, with nothin
 	}
 });
 
+// Removing a date leaves the old events in the user's calendar, which the app cannot see: Settings lists each one by
+// its title and old date until the user says they deleted them. The record is saved, so the list survives a fresh
+// load, and so does its clearing.
+test('after a date is removed, Settings lists the events to delete until you say you did', async ({
+	page
+}) => {
+	const shownDate = (days: number) => {
+		const d = new Date();
+		d.setDate(d.getDate() + days);
+		return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+	};
+	await seedProfile(page, SEP_IN);
+	await enterSkillBridge(page, isoFromToday(SB_IN));
+	await expect(page.getByLabel('SkillBridge start')).toBeHidden(); // the row closes once the date is saved
+	await readIcs(page, await openSettingsAdd(page));
+
+	await page.getByRole('button', { name: /skillbridge start/i }).click();
+	await page.getByRole('button', { name: /^remove$/i }).click();
+	const outOfDate = page.getByText('Your calendar is out of date');
+	await expect(outOfDate).toBeVisible();
+	await expect(
+		page.getByRole('listitem').filter({ hasText: 'Last day: Complete your TAP Capstone' })
+	).toContainText(shownDate(SB_IN - 1));
+
+	await openSettingsAdd(page); // a fresh load
+	await expect(outOfDate).toBeVisible();
+
+	await page.getByRole('button', { name: "I've deleted these" }).click();
+	await expect(outOfDate).toBeHidden();
+	await openSettingsAdd(page);
+	await expect(outOfDate).toBeHidden();
+});
+
 // Both refusals keep the date out of the profile: the Timeline still invites the dates instead of naming one.
 test('a date outside the input range or on separation is refused, and nothing is saved', async ({
 	page
