@@ -79,8 +79,8 @@ function anchorTask(
 	const officialEndDate = eaosOffsetDate(eaos, def.windowEnd);
 	const anchor = anchorFor(def, leaving);
 	const lastDay = anchor ? addDays(anchor.date, -1) : undefined;
-	const fitted = anchor !== undefined && lastDay !== undefined && lastDay < officialEndDate;
-	const windowEndDate = fitted && lastDay !== undefined ? lastDay : officialEndDate;
+	const fitted = lastDay !== undefined && lastDay < officialEndDate;
+	const windowEndDate = fitted ? lastDay : officialEndDate;
 	const recommended = eaosOffsetDate(eaos, def.recommendedOffset ?? def.windowStart);
 	const targetDate = recommended > windowEndDate ? windowEndDate : recommended;
 	return {
