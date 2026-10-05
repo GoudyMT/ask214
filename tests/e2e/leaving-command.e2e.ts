@@ -142,3 +142,21 @@ test('a date outside the input range or on separation is refused, and nothing is
 	await page.goto('/timeline');
 	await expect(page.getByText('Doing SkillBridge or taking terminal leave?')).toBeVisible();
 });
+
+// Printing is blocked on every page, so a page added later that shows a date is covered without opting in: the
+// Timeline (dates on it) and Home (none) both print only the notice.
+test('printing any page shows only the notice', async ({ page }) => {
+	await seedProfile(page, SEP_IN);
+	await page.emulateMedia({ media: 'print' });
+	for (const path of ['/timeline', '/']) {
+		await page.goto(path);
+		const printed = await page.evaluate(() => ({
+			children: document.body.children.length,
+			hidden: [...document.body.children].every((el) => getComputedStyle(el).display === 'none'),
+			notice: getComputedStyle(document.body, '::before').content
+		}));
+		expect(printed.children).toBeGreaterThan(0);
+		expect(printed.hidden).toBe(true);
+		expect(printed.notice).toBe('"Printing is disabled to protect your data."');
+	}
+});
