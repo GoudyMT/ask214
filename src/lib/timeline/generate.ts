@@ -75,26 +75,18 @@ function anchorTask(
 	def: TaskDef,
 	leaving: LeavingDates | undefined
 ): AnchoredTask {
-	const separationDate = eaosOffsetDate(eaos, 0);
-	const windowStartDate = eaosOffsetDate(eaos, def.windowStart);
-	const officialEndDate = eaosOffsetDate(eaos, def.windowEnd);
 	const anchor = anchorFor(def, leaving);
-	// A rule set as "N days before you leave" moves its whole window with the leaving day; it is never fitted.
-	if (def.countsFrom === 'leaving' && anchor) {
-		const targetDate = addDays(anchor.date, def.recommendedOffset ?? def.windowStart);
-		return {
-			def,
-			sortOffset: daysBetween(separationDate, targetDate),
-			targetDate,
-			windowStartDate: addDays(anchor.date, def.windowStart),
-			windowEndDate: addDays(anchor.date, def.windowEnd),
-			separationDate
-		};
-	}
+	// A rule set as "N days before you leave" moves its whole window with the leaving day, so its last day is
+	// already before that day and Fit leaves it alone.
+	const from = def.countsFrom === 'leaving' ? anchor?.date : undefined;
+	const at = (days: number) => (from ? addDays(from, days) : eaosOffsetDate(eaos, days));
+	const separationDate = eaosOffsetDate(eaos, 0);
+	const windowStartDate = at(def.windowStart);
+	const officialEndDate = at(def.windowEnd);
 	const lastDay = anchor ? addDays(anchor.date, -1) : undefined;
 	const fitted = lastDay !== undefined && lastDay < officialEndDate;
 	const windowEndDate = fitted ? lastDay : officialEndDate;
-	const recommended = eaosOffsetDate(eaos, def.recommendedOffset ?? def.windowStart);
+	const recommended = at(def.recommendedOffset ?? def.windowStart);
 	const targetDate = recommended > windowEndDate ? windowEndDate : recommended;
 	return {
 		def,
