@@ -29,6 +29,7 @@ export type ErrorCode =
 	| 'E_INIT_FAILED'
 	| 'E_CLOCK_BACKWARD'
 	| 'E_TIMEOUT'
+	| 'E_INTERNAL'
 	| 'E_TEST'; // dev/test only; stripped in prod build via type-check
 
 export type SafeLogEntry = {
