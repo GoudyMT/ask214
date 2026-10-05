@@ -382,10 +382,11 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		category: 'admin',
 		finishBefore: 'leaving',
 		kind: 'soft',
+		countsFrom: 'leaving',
 		windowStart: -90,
-		windowEnd: -1,
+		windowEnd: -15,
 		recommendedOffset: -30,
-		why: 'Errors on the DD-214 are hard to correct after you separate.'
+		why: 'If it is not final 14 days before you leave, the Navy can finalize it without your signature.'
 	},
 
 	// ---- Near / at separation ----

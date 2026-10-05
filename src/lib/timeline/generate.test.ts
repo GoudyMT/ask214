@@ -398,6 +398,28 @@ describe('Fit: the leaving dates pull in a last day, never an opening', () => {
 		expect(pkg.windowEndDate).toBe('2026-12-31');
 		expect(pkg.status).toBe('start-now');
 	});
+
+	it('the DD-214 review counts from the day you leave and ends 15 days before it', () => {
+		const review = item(leaving({ skillbridgeStart: '2026-11-01' }), 'dd214-review');
+		expect(review.windowStartDate).toBe('2026-08-03'); // 90 days before Nov 1
+		expect(review.targetDate).toBe('2026-10-02'); // 30 days before
+		expect(review.windowEndDate).toBe('2026-10-17'); // 15 days before: the day before the 14-day mark
+		expect(review.fit).toBeUndefined();
+		expect(review.status).toBe('start-now'); // it fits before SkillBridge
+	});
+
+	it('the DD-214 review counts from terminal leave when it is the only date', () => {
+		const review = item(leaving({ terminalLeaveStart: '2027-03-01' }), 'dd214-review');
+		expect(review.windowStartDate).toBe('2026-12-01');
+		expect(review.windowEndDate).toBe('2027-02-14');
+	});
+
+	it('with no leaving date the DD-214 review ends 15 days before separation', () => {
+		const review = item(leaving({}), 'dd214-review');
+		expect(review.windowStartDate).toBe('2027-01-30');
+		expect(review.targetDate).toBe('2027-03-31');
+		expect(review.windowEndDate).toBe('2027-04-15');
+	});
 });
 
 describe('todayMarkerIndex (Today divider placement)', () => {
@@ -753,9 +775,9 @@ describe('After you leave', () => {
 		const s = at(
 			OCT_4,
 			{ skillbridgeStart: '2026-11-01' },
-			{ 'dd214-review': { status: 'snoozed', snoozeUntil: '2026-11-20' } }
+			{ 'reference-letters': { status: 'snoozed', snoozeUntil: '2026-11-20' } }
 		);
-		expect(s['dd214-review']).toBe('snoozed');
+		expect(s['reference-letters']).toBe('snoozed');
 	});
 
 	it('a snooze never hides a firm task that cannot fit', () => {
@@ -773,6 +795,6 @@ describe('After you leave', () => {
 			terminalLeaveStart: '2026-11-15'
 		});
 		expect(s['sha-complete']).toBe('closed'); // required, official last day Jan 30, separation passed
-		expect(s['dd214-review']).toBe('still-to-do'); // soft, official window ended Apr 29
+		expect(s['reference-letters']).toBe('still-to-do'); // soft, official window ended Mar 31
 	});
 });

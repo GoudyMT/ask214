@@ -116,8 +116,8 @@ separation date, each shown only when the profile is known to meet its condition
 soft (good timing only), required until separation, closing for good, or changing how it works. Each task also
 names what it must finish before: separation, terminal leave, or leaving the command (SkillBridge or terminal
 leave, whichever starts first). Once that date is entered, the last day moves to the day before it if earlier,
-while the opening stays, so every date keeps its source; only the separation package counts its whole window
-from the leaving day. A device clock that jumps back over a day shows a warning rather than quietly reshuffling
+while the opening stays, so every date keeps its source; the separation package and DD-214 review count their
+whole window from it. A device clock that jumps back over a day shows a warning rather than quietly reshuffling
 deadlines. The export is an `.ics` file the user saves, named by the day of the add: an all-day event for each
 moment still ahead (a window opening, a last day, or a soft task's target date), with alerts before each firm
 date and target date, never an event before today. Events and alerts carry only a stable ID, the date and the
