@@ -147,6 +147,11 @@ const STATIC = 'static';
 //     generation, lock and failure kept true to what it read (the Timeline and Settings) - 144,376 B measured with
 //     56 files, after a trim pass (one subscription for any signal instead of four named ones, -23 B precache and
 //     -18 B root layout, kept).
+//     CI drift (owner's call, 2026-10-06): the build stamps itself with the time, that chunk's hashed name changes on
+//     every build, and every chunk importing it by name changes size with it - CI measured the same code 17 B apart on
+//     precache (139,419 / 139,436 / 139,443 B against 139,440) and 8 B apart on route nodes. Each limit keeps about 40
+//     B of room above that: page 59,300 -> 59,320, route nodes 45,000 -> 45,040, precache 144,460 -> 144,480. A build
+//     stamped with its commit would make these exact per commit (hardening box).
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -156,10 +161,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 59_300,
+	page: 59_320,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 144_460,
+	precacheBytes: 144_480,
 	workerScripts: 147_200
 };
 
