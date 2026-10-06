@@ -481,28 +481,48 @@
 			onClearKey={() => void app.byok?.clearApiKey().then(() => (hasKey = false))}
 		/>
 
-		<dialog
-			bind:this={wipeDialog}
-			class="wipe-dialog"
-			aria-labelledby="wipe-dialog-heading"
-			aria-describedby="wipe-dialog-body"
-		>
-			<h2 id="wipe-dialog-heading" class="wipe-dialog__heading">Erase all data on this device?</h2>
-			<p id="wipe-dialog-body" class="wipe-dialog__body">
-				This permanently erases everything stored on this device - your separation date and any
-				profile details. It can't be undone.
-			</p>
-			<div class="wipe-dialog__actions">
-				<button class="wipe-dialog__cancel" type="button" onclick={() => wipeDialog?.close()}>
-					Cancel
-				</button>
-				<button class="wipe-dialog__erase" type="button" onclick={() => void confirmErase()}>
-					Erase everything
-				</button>
-			</div>
-		</dialog>
+		{@render eraseDialog()}
 	{/if}
+{:else if app.status === 'damaged'}
+	<!-- The saved data failed its own checks at start-up, so no reload can read it: only the way back is offered - the
+	     same erase, from the same dialog. -->
+	{#if eraseError}
+		<p class="erase-error" role="alert">{eraseError}</p>
+	{/if}
+	<section class="settings-section" aria-labelledby="privacy-heading">
+		<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
+		<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
+			Erase all data on this device
+		</button>
+		<p class="settings-hint">
+			Erasing removes everything saved on this device, so the app can start again.
+		</p>
+	</section>
+	{@render eraseDialog()}
 {/if}
+
+{#snippet eraseDialog()}
+	<dialog
+		bind:this={wipeDialog}
+		class="wipe-dialog"
+		aria-labelledby="wipe-dialog-heading"
+		aria-describedby="wipe-dialog-body"
+	>
+		<h2 id="wipe-dialog-heading" class="wipe-dialog__heading">Erase all data on this device?</h2>
+		<p id="wipe-dialog-body" class="wipe-dialog__body">
+			This permanently erases everything stored on this device - your separation date and any
+			profile details. It can't be undone.
+		</p>
+		<div class="wipe-dialog__actions">
+			<button class="wipe-dialog__cancel" type="button" onclick={() => wipeDialog?.close()}>
+				Cancel
+			</button>
+			<button class="wipe-dialog__erase" type="button" onclick={() => void confirmErase()}>
+				Erase everything
+			</button>
+		</div>
+	</dialog>
+{/snippet}
 
 <style>
 	h1 {

@@ -5,7 +5,8 @@ import type { TimelineStateStore } from '../timeline';
 import type { CalendarSyncStore } from '../calendar/store.svelte';
 import type { ByokStore } from '../ask/byok/store';
 
-export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale' | 'error';
+// `damaged`: the saved data failed its own checks at start-up, so only the erase is offered (see `isDamagedRecord`).
+export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale' | 'error' | 'damaged';
 
 /**
  * The status a failed start-up leaves. Only a start-up still loading takes the failure: a takeover set while it ran

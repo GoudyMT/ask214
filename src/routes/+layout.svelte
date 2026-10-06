@@ -81,7 +81,8 @@
 	// data (its persona reads 'none' only because the plaintext is sealed), so it still shows.
 	// Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable, so
 	// even a fresh no-timeline user has something to set there (the timeline sections hide inside Settings).
-	const showSettings = $derived(app.status === 'ready');
+	// And when the saved data is damaged, where its erase is the only way back.
+	const showSettings = $derived(app.status === 'ready' || app.status === 'damaged');
 
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
@@ -116,9 +117,12 @@
 					app.status = 'unsupported';
 					return;
 				}
+				// The saved data failed its own checks: no reload can read it, so the erase is the way back. It needs only
+				// the open database - it clears every store by registry name.
 				if (result.status === 'damaged') {
 					safeLog({ code: 'E_INIT_FAILED' });
-					app.status = afterStartupFailure(app.status, 'error');
+					app.wipeAll = () => wipeAllStores(result.db);
+					app.status = afterStartupFailure(app.status, 'damaged');
 					return;
 				}
 				app.store = result.store;
@@ -278,8 +282,8 @@
 
 	{#if app.status === 'ready' && app.store?.clockBackward}
 		<ClockBackwardBanner onfix={() => void goto(resolve('/settings'))} />
-	{:else if app.status === 'error'}
-		<InitErrorBanner />
+	{:else if app.status === 'error' || app.status === 'damaged'}
+		<InitErrorBanner damaged={app.status === 'damaged'} />
 	{/if}
 
 	<main id="main-content" style:--shell-width={shellWidth}>

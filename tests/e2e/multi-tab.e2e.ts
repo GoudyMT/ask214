@@ -59,6 +59,8 @@ test('an app older than its database says so and offers a reload, and Ask still 
 	).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
 	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeEnabled();
+	// The data may be fine - a newer release wrote it - so no erase is offered: no Settings link anywhere.
+	await expect(page.getByRole('link', { name: 'Settings' })).toHaveCount(0);
 });
 
 test('a saved EAOS propagates across tabs: IDB load + live broadcast update', async ({
