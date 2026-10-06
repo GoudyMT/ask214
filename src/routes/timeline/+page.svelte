@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
 	import TimelineList from '$lib/components/TimelineList.svelte';
@@ -18,10 +19,9 @@
 
 	let unlocking = $state(false);
 
-	// Until the timeline-state store provisions (async, after the profile store), fall back to
-	// empty state so the timeline still renders with date-derived statuses; stored done/skip/
-	// snooze (set via the status actions) layer in once the store loads. The calendar add waits for
-	// the real state instead (the card below gates on `ready`).
+	// Until the timeline-state store loads (async, after the profile store), the view is built from an empty state. The
+	// list and the calendar card render only once the store is `ready`, so nothing shows a task as not started that the
+	// user marked done; a failed load shows a note instead (below).
 	const EMPTY_STATE: TimelineState = { schemaVersion: 1, tasks: {} };
 
 	// Stored EAOS (string form) via the derived persona, or null when unset - mirrors Settings.
@@ -80,10 +80,8 @@
 			// The secondary stores relock alongside the profile on idle/pagehide but are not part of
 			// the profile's load. Without this they stay unloaded behind an unlocked UI and their empty
 			// defaults read as real state. allSettled: a secondary failure must not block the unlock.
-			// The calendar then fails closed on `ready`; the TIMELINE DOES NOT - it has no ready gate,
-			// so a failed load here renders an empty timeline as though nothing were done. The store
-			// refuses the write, so nothing is destroyed, but the user is shown a blank slate with no
-			// explanation. Surfacing that is deferred to the v1.1 init-error work.
+			// Both then fail closed on `ready`, and a timeline load that fails says so in place of the list
+			// (the store's `failed`).
 			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
 		} finally {
 			unlocking = false;
@@ -142,7 +140,21 @@
 			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 		</p>
 		<LeavingLine {leaving} />
-		{#if view}
+		<!-- The list waits for the saved progress: drawn without it, every task shows as not started. A load that failed
+		     says so in its place, where a list would read as lost progress and its buttons would do nothing. -->
+		{#if view && app.timeline?.failed}
+			<div class="timeline-note">
+				<p class="timeline-note__msg" role="alert">
+					Your saved progress couldn't be loaded, so your tasks aren't shown. Reload to try again.
+					If it keeps happening, you can erase all data in <a href={resolve('/settings')}
+						>Settings</a
+					> and start again.
+				</p>
+				<button class="timeline-note__reload" type="button" onclick={() => location.reload()}
+					>Reload</button
+				>
+			</div>
+		{:else if view && app.timeline?.ready}
 			{#if needsNow}<NeedsNow groups={needsNow} />{/if}
 			{#if showCalendarCard}
 				<CalendarCard
@@ -166,5 +178,35 @@
 	.timeline-subline {
 		margin: 0 0 var(--space-xs);
 		color: var(--color-fg-muted);
+	}
+
+	/* The start-up banner's look (InitErrorBanner), inside the page: surface, a 3 px danger edge. */
+	.timeline-note {
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-left: 3px solid var(--color-danger);
+		border-radius: var(--radius-m);
+		padding: var(--space-s) var(--space-m);
+	}
+
+	.timeline-note__msg {
+		margin: 0;
+	}
+
+	.timeline-note__msg a {
+		color: var(--color-accent);
+	}
+
+	/* The banner's Reload: a 44 px target with the text-link look. */
+	.timeline-note__reload {
+		min-height: 44px;
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 </style>
