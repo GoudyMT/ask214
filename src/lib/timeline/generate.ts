@@ -20,7 +20,7 @@ export type AnchoredTask = {
 	sortOffset: number; // days from separation to the target date: the sort and phase key
 	targetDate: string; // ISO: when to act - the recommended date, held inside a shortened window
 	windowStartDate: string; // ISO: window opens (never moved by Fit)
-	windowEndDate: string; // ISO: window closes - the leaving day when Fit pulled it in
+	windowEndDate: string; // ISO: window closes - the day before the leaving day when Fit pulled it in
 	finalEndDate?: string; // ISO: a two-edge task's final close
 	separationDate: string; // ISO: the EAOS itself
 	/** Present when Fit shortened the window: why, whether it still fits, and the official last day. */

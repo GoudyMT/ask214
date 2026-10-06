@@ -59,9 +59,10 @@ export type TaskDef = {
 	category: TaskCategory;
 	finishBefore: FinishBefore;
 	/** The window's offsets count from the day the user leaves the command, when a leaving date is entered - for a
-	 *  rule set as "N days before you leave" (the separation package), not "finish before you leave". */
+	 *  rule set as "N days before you leave" (the separation package, the DD-214 review), not "finish before you
+	 *  leave". */
 	countsFrom?: 'leaving';
-	windowStart: number; // days vs EAOS; negative = before separation
+	windowStart: number; // days vs EAOS, or vs the leaving day for countsFrom; negative = before it
 	windowEnd: number;
 	kind: TaskKind;
 	/** A second edge, days vs EAOS: the task changes at windowEnd and closes here (VGLI). */

@@ -5,14 +5,14 @@ import { computeIcsUid } from './uid';
 import { serializeIcs } from './ics';
 import { localTodayIso } from '../timeline/day-math';
 
+/** The calendar file and the events it holds, so the add can record exactly what it handed over. */
+export type CalendarFile = { ics: string; events: DesiredEvent[] };
+
 /**
  * Project the generated timeline into the iCalendar text the OS hands to the user's calendar app: one event per
  * moment of the shared desired-set, each with its alerts and a stable calendar ID. Shared by every surface that
  * offers the add, so they cannot drift apart in what they egress. `now` is injected for a deterministic DTSTAMP.
  */
-/** The calendar file and the events it holds, so the add can record exactly what it handed over. */
-export type CalendarFile = { ics: string; events: DesiredEvent[] };
-
 export async function buildIcs(
 	items: TimelineItem[],
 	exclusions: TaskExclusions,

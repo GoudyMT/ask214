@@ -17,6 +17,8 @@
  * is trivial (single-row stores, no indexes/queries) so a library adds no value.
  */
 export const DB_NAME = 'mtc';
+// Fix forward only: never roll the deployed app back past a version that raised this. An older bundle cannot open the
+// newer database, so it stays on its loading screen.
 export const DB_VERSION = 5; // 4 -> 5: no new store; retires a tab on an older bundle (onversionchange -> 'stale'), whose profile decode drops the leaving dates and would save the profile without them
 export const STORES = [
 	'profile',

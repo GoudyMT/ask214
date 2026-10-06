@@ -3,7 +3,7 @@ import type { TaskDef, PhaseBucket } from './types';
 /**
  * Phase buckets for the timeline view: the 24-month runway, furthest-out first.
  * A task is grouped into the bucket whose [startOffset, endOffset) contains its
- * recommendedOffset; empty buckets are dropped at render (generation).
+ * target date's offset (the fitted one when Fit moved it); empty buckets are dropped at render (generation).
  *
  * Offsets are days relative to EAOS (negative = before separation). The 'after' bucket
  * runs out to +730d to hold late post-separation deadlines (e.g. VGLI conversion).

@@ -2,10 +2,6 @@ import type { ProfileV1 } from './types';
 import { parseEaosAtRead, daysUntilSeparation, decodeEaos, type EaosString } from './eaos';
 
 /**
- * Persona is a discriminated union on `completeness`; consumers MUST narrow before
- * reading optional fields (TS-strict enforces it). Pure + deterministic given `today`.
- */
-/**
  * The dates a sailor leaves the command before separation (ISO). A stored date on or after separation is not used
  * - no one leaves the command after they separate - and is reported under `notUsed` so the Timeline can say so.
  */
@@ -15,6 +11,10 @@ export type LeavingDates = {
 	notUsed?: { skillbridgeStart?: EaosString; terminalLeaveStart?: EaosString };
 };
 
+/**
+ * Persona is a discriminated union on `completeness`; consumers MUST narrow before
+ * reading optional fields (TS-strict enforces it). Pure + deterministic given `today`.
+ */
 export type PersonaFilters =
 	| { completeness: 'none' }
 	| {

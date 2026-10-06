@@ -50,7 +50,10 @@ function project(view: TimelineView) {
 	};
 }
 
-describe('the no-dates view is v1.2.0 exactly', () => {
+// The frozen view is v1.2.0's except for the two tasks whose rule now counts from the leaving day, which falls on
+// separation when no date is entered: the separation package (last day 120 days before, not 60) and the DD-214 review
+// (15 days before, not 1).
+describe("the no-dates view is v1.2.0's, but for the two tasks counted from the leaving day", () => {
 	it('matches the frozen view for three separation dates', async () => {
 		const views = [
 			persona('2027-04-30', 208),
