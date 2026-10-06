@@ -313,8 +313,8 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
-	// A load that starts from nothing has not failed yet: the Timeline waits for it instead of repeating the last failure.
-	it('clears a past failure when a load starts from nothing', async () => {
+	// The user's Unlock is a new attempt: the Timeline waits for it instead of repeating the last failure.
+	it('clears a past failure when the user unlocks', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);
 		const a = createTimelineStateStore(db);
@@ -333,10 +333,33 @@ describe('timeline-state store', () => {
 			tx.objectStore('timeline-state').put(body);
 		});
 
+		b.relockSync('user');
 		const retry = b.load();
 		expect(b.failed).toBe(false);
 		await retry;
 		expect(b.ready).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	// An automatic re-read (a page coming back, a peer's change) keeps the failure while it runs: the note stays mounted
+	// and is not announced again on every return.
+	it('keeps a failure through an automatic re-read', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('dd214-review', 'done');
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').delete(0);
+		});
+		const b = createTimelineStateStore(db);
+		await expect(b.load()).rejects.toThrow('E_TIMELINE_BODY_MISSING');
+
+		b.relockSync('hygiene');
+		const reread = b.refresh();
+		expect(b.failed).toBe(true);
+		await expect(reread).rejects.toThrow('E_TIMELINE_BODY_MISSING');
+		expect(b.failed).toBe(true);
 		await deleteTestDb(db);
 	});
 

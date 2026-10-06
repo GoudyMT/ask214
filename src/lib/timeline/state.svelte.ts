@@ -227,9 +227,10 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
-			// A load that starts from nothing has not failed yet: the Timeline waits for it instead of repeating the last
-			// failure (announced as an alert) while it runs.
-			if (_state === null) _failed = false;
+			// The user's Unlock is a new attempt: the Timeline waits for it instead of repeating the last failure (an alert)
+			// while it runs. An automatic re-read keeps the failure, so a note that stays true is not announced again on
+			// every return to the page.
+			if (lockState === 'locked') _failed = false;
 			try {
 				await withWriteLocks(
 					async () => {
