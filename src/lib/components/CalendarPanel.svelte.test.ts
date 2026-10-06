@@ -370,6 +370,13 @@ describe('CalendarPanel', () => {
 		expect(withRecord(false, [HELD]).textContent).not.toContain('Your calendar is out of date');
 	});
 
+	// Nothing is listed while the settings load, so the general line stands, even when the list would name events.
+	it('keeps the general line while its settings are not loaded', () => {
+		expect(withRecord(false, [HELD]).textContent).toContain(
+			'Changed a date? Remove the events you added before, then add again.'
+		);
+	});
+
 	// Nothing listed - no add recorded yet, or every listed event acknowledged - leaves the general line, which also
 	// says to add again; while the list names events, it replaces the line.
 	it('shows the general line whenever nothing is listed, and the list in its place', () => {

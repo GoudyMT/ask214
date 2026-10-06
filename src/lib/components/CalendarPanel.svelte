@@ -111,9 +111,10 @@
 		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
 		<p class="cal-hint cal-hint--device">{DELETE_FILE_HINT}</p>
 		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. While the
-		     list above names events it says this instead; with nothing listed (no add recorded yet, or every listed
-		     event deleted) the line stands, and it also says to add again. -->
-		{#if stale.length === 0}
+		     list above names events it says this instead; with nothing listed (no add recorded yet, every listed
+		     event deleted, or the settings still loading, when the list is not shown) the line stands, and it also
+		     says to add again. -->
+		{#if !ready || stale.length === 0}
 			<p class="cal-hint cal-hint--device">
 				Changed a date? Remove the events you added before, then add again.
 			</p>

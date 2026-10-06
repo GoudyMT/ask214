@@ -69,5 +69,8 @@ describe('Settings, the calendar add', () => {
 			.element(page.getByRole('button', { name: /^add to my calendar$/i }))
 			.toBeDisabled();
 		expect(container.textContent).not.toContain('Your calendar is out of date');
+		expect(container.textContent).toContain(
+			'Changed a date? Remove the events you added before, then add again.'
+		);
 	});
 });
