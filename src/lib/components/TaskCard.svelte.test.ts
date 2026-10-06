@@ -749,6 +749,47 @@ describe('leaving your command', () => {
 		expect(page.getByText(/before SkillBridge/).query()).toBeNull();
 	});
 
+	// Every dated status names the reason when its date is the one Fit moved.
+	const FIT: NonNullable<TimelineItem['fit']> = { reason: 'skillbridge', date: '2026-10-31' };
+	const REASON_CASES: [string, Partial<TimelineItem>, string][] = [
+		[
+			'a firm last day',
+			{ def: firmDef, status: 'start-now' },
+			'Last day Oct 31, 2026, before SkillBridge'
+		],
+		[
+			'an aim date',
+			{ status: 'start-now', aimDate: '2026-10-31' },
+			'Aim for Oct 31, 2026, before SkillBridge'
+		],
+		[
+			'a date that was due',
+			{ def: firmDef, status: 'late' },
+			'was due Oct 31, 2026, before SkillBridge'
+		],
+		[
+			'an aim that has passed',
+			{ status: 'still-to-do' },
+			'Aimed for Oct 31, 2026, before SkillBridge'
+		],
+		[
+			'a last day before terminal leave',
+			{
+				def: firmDef,
+				status: 'closing-soon',
+				daysLeft: 27,
+				fit: { reason: 'terminal-leave', date: '2026-10-31' }
+			},
+			'Last day Oct 31, 2026, before terminal leave'
+		]
+	];
+	for (const [name, over, text] of REASON_CASES) {
+		it(`names the reason on ${name}`, async () => {
+			renderCard(makeItem({ windowEndDate: '2026-10-31', fit: FIT, ...over }));
+			await expect.element(page.getByText(text)).toBeVisible();
+		});
+	}
+
 	it('a firm task that cannot fit warns: the opening, the What now box, no Snooze', async () => {
 		const { container } = renderCard(
 			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })

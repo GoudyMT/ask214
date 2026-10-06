@@ -56,6 +56,56 @@ describe('SettingsDateRow', () => {
 			.toBeVisible();
 	});
 
+	it('takes a new date after a refused save', async () => {
+		const onSave = vi
+			.fn<(draft: string) => Promise<string | null>>()
+			.mockResolvedValueOnce('This date needs to be before your separation date.')
+			.mockResolvedValueOnce(null);
+		row({ onSave });
+		await page.getByRole('button', { name: /skillbridge start/i }).click();
+		await page.getByLabelText('SkillBridge start').fill('2027-06-01');
+		await page.getByRole('button', { name: /^save$/i }).click();
+		await expect
+			.element(page.getByText('This date needs to be before your separation date.'))
+			.toBeVisible();
+		await page.getByLabelText('SkillBridge start').fill('2026-11-01');
+		const save = page.getByRole('button', { name: /^save$/i });
+		await expect.element(save).toBeEnabled();
+		await save.click();
+		expect(onSave).toHaveBeenCalledTimes(2);
+		expect(onSave).toHaveBeenLastCalledWith('2026-11-01');
+	});
+
+	it('opens on the stored date and saves it as it stands', async () => {
+		const onSave = vi.fn(async () => null);
+		row({ value: '2026-11-01', onSave });
+		await page.getByRole('button', { name: /skillbridge start/i }).click();
+		await expect.element(page.getByLabelText('SkillBridge start')).toHaveValue('2026-11-01');
+		await page.getByRole('button', { name: /^save$/i }).click();
+		expect(onSave).toHaveBeenCalledWith('2026-11-01');
+	});
+
+	it('closes on a second tap of the row', async () => {
+		const { container } = row();
+		const toggle = page.getByRole('button', { name: /skillbridge start/i });
+		await toggle.click();
+		await toggle.click();
+		await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
+		expect(container.querySelector('form')).toBeNull();
+	});
+
+	// The second press is a DOM click: a locator waits for an enabled button, so it would time out, not count.
+	it('saves once while a save is still running', async () => {
+		const onSave = vi.fn(() => new Promise<string | null>(() => {}));
+		const { container } = row({ onSave });
+		await page.getByRole('button', { name: /skillbridge start/i }).click();
+		await page.getByLabelText('SkillBridge start').fill('2026-11-01');
+		await page.getByRole('button', { name: /^save$/i }).click();
+		await expect.element(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
+		(container.querySelector('.settings-save') as HTMLButtonElement).click();
+		expect(onSave).toHaveBeenCalledOnce();
+	});
+
 	it('offers Remove only on a removable row with a date', async () => {
 		const onRemove = vi.fn(async () => null);
 		row({ value: '2026-11-01', onRemove });

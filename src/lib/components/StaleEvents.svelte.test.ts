@@ -55,6 +55,19 @@ describe('StaleEvents', () => {
 		await expect.element(page.getByText('Last day: Complete your TAP Capstone')).toBeVisible();
 	});
 
+	it('takes the failure line away when the user tries again', async () => {
+		const onAcknowledge = vi
+			.fn<() => Promise<void>>()
+			.mockRejectedValueOnce(new Error('E_TEST_SAVE'))
+			.mockImplementationOnce(() => new Promise<void>(() => {}));
+		render(StaleEvents, { props: { events: E, onAcknowledge } });
+		const ack = page.getByRole('button', { name: "I've deleted these" });
+		await ack.click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await ack.click();
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+	});
+
 	it('draws nothing with nothing to list', () => {
 		const { container } = render(StaleEvents, {
 			props: { events: [], onAcknowledge: vi.fn(async () => {}) }

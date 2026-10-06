@@ -307,6 +307,28 @@ describe('CalendarPanel', () => {
 			.toBeVisible();
 	});
 
+	it('takes the failure line away once a later toggle saves', async () => {
+		const onSetExclusions = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('E_OCC_CONFLICT'))
+			.mockResolvedValueOnce(undefined);
+		render(CalendarPanel, {
+			props: {
+				items: [],
+				exclusions: { taskIds: [], categories: [] },
+				ready: true,
+				...NO_RECORD,
+				onSetExclusions,
+				onAdd: () => {}
+			}
+		});
+		await page.getByRole('button', { name: /customize what's included/i }).click();
+		await page.getByRole('checkbox', { name: 'medical' }).click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await page.getByRole('checkbox', { name: 'admin' }).click();
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+	});
+
 	const HELD: HandedOverEvent = {
 		taskId: 'tap-capstone',
 		moment: 'last',
