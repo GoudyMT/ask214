@@ -68,7 +68,7 @@ through one sink that refuses error objects and keeps 64 entries in memory only;
 error.
 
 **Tradeoffs accepted.** Without a passphrase, Unlock is one tap: the lock clears the screen, it is not access
-control. Timeline and calendar notes are not overwritten in memory the way the profile is.
+control. Timeline notes and the calendar record are not overwritten in memory like the profile.
 
 ---
 
