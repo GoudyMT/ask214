@@ -176,4 +176,25 @@ describe('StaleEvents (layout by width)', () => {
 		const button = container.querySelector('.stale__ack') as HTMLElement;
 		expect(button.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
 	});
+
+	// The heading looks as the box's bold first line did. The app's global h3 rule (a larger size and line height) is
+	// put on the page here, as app.css does, and the box must set it back to its own text.
+	it('draws the heading at the size and line height of the lead, in bold', () => {
+		const globalRule = document.createElement('style');
+		globalRule.textContent = 'h3 { font-size: 22px; line-height: 1.4; }';
+		document.head.append(globalRule);
+		try {
+			const { container } = render(StaleEvents, {
+				props: { events: E, onAcknowledge: vi.fn(async () => {}) }
+			});
+			container.style.lineHeight = '1.5';
+			const head = getComputedStyle(container.querySelector('.stale__head') as Element);
+			const lead = getComputedStyle(container.querySelector('.stale__lead') as Element);
+			expect([head.fontSize, head.lineHeight]).toEqual([lead.fontSize, lead.lineHeight]);
+			expect(head.fontSize).toBe('14px');
+			expect(head.fontWeight).toBe('700');
+		} finally {
+			globalRule.remove();
+		}
+	});
 });

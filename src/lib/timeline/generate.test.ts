@@ -836,4 +836,50 @@ describe('After you leave', () => {
 		expect(at(new Date(2027, 3, 30, 12), leave)['sha-complete']).toBe('after-you-leave');
 		expect(at(new Date(2027, 4, 1, 12), leave)['sha-complete']).toBe('closed');
 	});
+
+	// The date and the status change on the same local midnight: the last minute of separation day keeps the pulled-in
+	// day, the first minute of the next day shows the official one.
+	it('shows the official last day from the first minute after separation day', () => {
+		const sha = (today: Date) =>
+			generateTimeline(
+				{
+					completeness: 'eaos-only',
+					eaos: SEP,
+					daysUntilSeparation: 208,
+					leaving: { terminalLeaveStart: '2026-11-15' } as never
+				},
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				today
+			)
+				.phases.flatMap((p) => p.items)
+				.find((i) => i.def.id === 'sha-complete');
+		const lastMinute = sha(new Date(2027, 3, 30, 23, 59));
+		expect([lastMinute?.status, lastMinute?.windowEndDate]).toEqual([
+			'after-you-leave',
+			'2026-11-14'
+		]);
+		const firstMinute = sha(new Date(2027, 4, 1, 0, 0));
+		expect([firstMinute?.status, firstMinute?.windowEndDate]).toEqual(['closed', '2027-01-30']);
+	});
+
+	// Only a task that could not fit is judged by its official window after separation; one that fit keeps its
+	// pulled-in last day and the reason for it.
+	it('after separation a task that fit keeps its pulled-in last day', () => {
+		const capstone = generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: SEP,
+				daysUntilSeparation: 208,
+				leaving: { skillbridgeStart: '2026-11-01' } as never
+			},
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: {} },
+			new Date(2027, 4, 2, 12)
+		)
+			.phases.flatMap((p) => p.items)
+			.find((i) => i.def.id === 'tap-capstone');
+		expect(capstone?.windowEndDate).toBe('2026-10-31');
+		expect(capstone?.fit).toEqual({ reason: 'skillbridge', date: '2026-10-31' });
+	});
 });

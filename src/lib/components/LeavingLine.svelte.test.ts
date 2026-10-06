@@ -42,11 +42,24 @@ describe('LeavingLine', () => {
 		await expect.element(page.getByText(/Your SkillBridge date \(May 2, 2027\)/)).toBeVisible();
 	});
 
-	it('carries no query and says nothing personal', () => {
-		const { container } = show({ skillbridgeStart: '2026-11-01' });
-		for (const a of container.querySelectorAll('a'))
-			expect(a.getAttribute('href')).not.toContain('?');
-		for (const line of textOf(container).split('\n')) expect(makesPersonalClaim(line)).toBe(false);
+	it('names terminal leave when it is the only date', async () => {
+		show({ terminalLeaveStart: '2027-03-04' });
+		await expect.element(page.getByText(/Terminal leave from Mar 4, 2027\./)).toBeVisible();
+		expect(page.getByText(/Doing SkillBridge or taking terminal leave\?/).query()).toBeNull();
+	});
+
+	it('carries no query and says nothing personal, in every state', () => {
+		for (const leaving of [
+			undefined,
+			{ skillbridgeStart: '2026-11-01', terminalLeaveStart: '2027-03-04' },
+			{ notUsed: { terminalLeaveStart: '2027-05-04' } }
+		]) {
+			const { container } = show(leaving);
+			for (const a of container.querySelectorAll('a'))
+				expect(a.getAttribute('href')).not.toContain('?');
+			for (const line of textOf(container).split('\n'))
+				expect(makesPersonalClaim(line), line).toBe(false);
+		}
 	});
 });
 
