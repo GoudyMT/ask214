@@ -5,7 +5,7 @@ import type { TimelineStateStore } from '../timeline';
 import type { CalendarSyncStore } from '../calendar/store.svelte';
 import type { ByokStore } from '../ask/byok/store';
 
-export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale';
+export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale' | 'error';
 
 /**
  * Reactive app-wide container for the profile subsystem. Set ONCE in +layout (synchronously

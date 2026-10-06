@@ -41,6 +41,23 @@ describe('AppGate', () => {
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
 	});
 
+	// A failed start-up leaves the shell up: Ask, About and Documents need no saved data, and the layout shows a
+	// banner above them.
+	it('renders children (the app shell) when start-up failed', () => {
+		const app: ProfileApp = {
+			status: 'error',
+			store: null,
+			timeline: null,
+			calendar: null,
+			byok: null,
+			cause: null,
+			wipeAll: null,
+			relockAll: null
+		};
+		const { container } = render(AppGate, { props: { app, children: childSnippet } });
+		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
+	});
+
 	it('renders children when status is ready', () => {
 		const app: ProfileApp = {
 			status: 'ready',

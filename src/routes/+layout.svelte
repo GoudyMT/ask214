@@ -6,6 +6,7 @@
 	import { page } from '$app/state';
 	import AppGate from '$lib/components/AppGate.svelte';
 	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
+	import InitErrorBanner from '$lib/components/InitErrorBanner.svelte';
 	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
 	import {
 		initProfileApp,
@@ -180,10 +181,11 @@
 					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
 			})
 			.catch(() => {
-				// Hard init failure past the capability gate (e.g. a tampered keystore failing
-				// load()). Opaque log only (no PII). The app shell stays usable; a dedicated
-				// init-error / recovery surface is deferred to v1.1 (see Settings "Wipe" L5).
+				// Hard init failure past the capability gate: an app older than its database (a newer release raised
+				// the version), or a damaged key record failing load(). Opaque log only (no PII). The shell stays usable
+				// - Ask, About and Documents need no saved data - and a banner says so, with Reload.
 				safeLog({ code: 'E_INIT_FAILED' });
+				if (!destroyed) app.status = 'error';
 			});
 
 		return () => {
@@ -271,6 +273,8 @@
 
 	{#if app.status === 'ready' && app.store?.clockBackward}
 		<ClockBackwardBanner onfix={() => void goto(resolve('/settings'))} />
+	{:else if app.status === 'error'}
+		<InitErrorBanner />
 	{/if}
 
 	<main id="main-content" style:--shell-width={shellWidth}>
