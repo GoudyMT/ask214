@@ -7,7 +7,7 @@
 	import AppGate from '$lib/components/AppGate.svelte';
 	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
 	import InitErrorBanner from '$lib/components/InitErrorBanner.svelte';
-	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
+	import { afterStartupFailure, setProfileApp, type ProfileApp } from '$lib/profile/context';
 	import {
 		initProfileApp,
 		provisionStore,
@@ -185,7 +185,7 @@
 				// the version), or a damaged key record failing load(). Opaque log only (no PII). The shell stays usable
 				// - Ask, About and Documents need no saved data - and a banner says so, with Reload.
 				safeLog({ code: 'E_INIT_FAILED' });
-				if (!destroyed) app.status = 'error';
+				if (!destroyed) app.status = afterStartupFailure(app.status, 'error');
 			});
 
 		return () => {

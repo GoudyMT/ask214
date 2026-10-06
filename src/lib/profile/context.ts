@@ -8,6 +8,14 @@ import type { ByokStore } from '../ask/byok/store';
 export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale' | 'error';
 
 /**
+ * The status a failed start-up leaves. Only a start-up still loading takes the failure: a takeover set while it ran
+ * (another tab upgraded the database and closed this connection, so the next read threw) already names the cause.
+ */
+export function afterStartupFailure(current: AppStatus, next: AppStatus): AppStatus {
+	return current === 'loading' ? next : current;
+}
+
+/**
  * Reactive app-wide container for the profile subsystem. Set ONCE in +layout (synchronously
  * at component init, since setContext must run during init), then populated by the async
  * app-init. Components read it via getProfileApp() and react to status/store changes.
