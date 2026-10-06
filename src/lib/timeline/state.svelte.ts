@@ -88,7 +88,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	let relockEpoch = 0;
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
 	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
-	let lockState: LockState = 'unlocked';
+	// Reactive: the Timeline offers Unlock while this stays `locked` after the profile has opened.
+	let lockState = $state<LockState>('unlocked');
 
 	function relockNow(reason: RelockReason): void {
 		_state = null;
@@ -210,6 +211,15 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		},
 
 		/**
+		 * Whether the user's lock holds: only a load the user asks for opens it, and page hygiene on top of it does not
+		 * move it. The profile can open while this stays locked (a page hidden while Unlock read the timeline), and then
+		 * only Unlock reads it again - an automatic re-read refuses a locked store.
+		 */
+		get locked(): boolean {
+			return lockState === 'locked';
+		},
+
+		/**
 		 * Re-read from disk. A relock landing WHILE this runs wins: repopulating decrypted state into
 		 * a tab that has since locked silently undoes the lock, and the idle timer does not fire twice.
 		 * Same residency guard persist() carries.
@@ -217,6 +227,9 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
+			// A load that starts from nothing has not failed yet: the Timeline waits for it instead of repeating the last
+			// failure (announced as an alert) while it runs.
+			if (_state === null) _failed = false;
 			try {
 				await withWriteLocks(
 					async () => {

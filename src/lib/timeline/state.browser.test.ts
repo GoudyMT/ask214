@@ -296,6 +296,50 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	// Locked is the user's lock, which only a load the user asks for opens: page hygiene on top of it does not move it, so
+	// a page that sees it can offer Unlock.
+	it('is locked from a lock until a load opens it', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createTimelineStateStore(db);
+		await store.load();
+		expect(store.locked).toBe(false);
+		store.relockSync('user');
+		expect(store.locked).toBe(true);
+		store.relockSync('hygiene');
+		expect(store.locked).toBe(true);
+		await store.load();
+		expect(store.locked).toBe(false);
+		await deleteTestDb(db);
+	});
+
+	// A load that starts from nothing has not failed yet: the Timeline waits for it instead of repeating the last failure.
+	it('clears a past failure when a load starts from nothing', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('dd214-review', 'done');
+		const body = await withStores(db, 'timeline-state', 'readonly', (tx) =>
+			reqToPromise(tx.objectStore('timeline-state').get(0))
+		);
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').delete(0);
+		});
+		const b = createTimelineStateStore(db);
+		await expect(b.load()).rejects.toThrow('E_TIMELINE_BODY_MISSING');
+		expect(b.failed).toBe(true);
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').put(body);
+		});
+
+		const retry = b.load();
+		expect(b.failed).toBe(false);
+		await retry;
+		expect(b.ready).toBe(true);
+		await deleteTestDb(db);
+	});
+
 	// A re-read that fails after a peer saved keeps the store's old generation with its old statuses, so a write from it
 	// is refused rather than laid over the peer's save.
 	it('refuses a write after a failed re-read, so a newer save survives', async () => {

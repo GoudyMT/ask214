@@ -16,6 +16,7 @@ const { isoFromToday, current } = vi.hoisted(() => ({
 		timeline: null as null | {
 			ready: boolean;
 			failed: boolean;
+			locked?: boolean;
 			state: { schemaVersion: 1; tasks: Record<string, never> };
 		}
 	}
@@ -63,6 +64,22 @@ describe('Timeline, its saved progress', () => {
 		const { container } = render(TimelinePage);
 		await expect.element(page.getByRole('alert')).toHaveTextContent(NOTE);
 		expect(container.querySelector('.timeline-list')).toBeNull();
+	});
+
+	// The profile opened but the timeline stayed locked (a tab hidden while Unlock read it): Unlock again, not a blank page.
+	it('offers Unlock while the timeline stays locked', async () => {
+		current.timeline = { ready: false, failed: false, locked: true, state: EMPTY };
+		const { container } = render(TimelinePage);
+		await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
+		expect(container.querySelector('.timeline-list')).toBeNull();
+	});
+
+	// A locked timeline whose load failed says so: Unlock would only fail again.
+	it('says the load failed, not Unlock, when the locked timeline could not be read', async () => {
+		current.timeline = { ready: false, failed: true, locked: true, state: EMPTY };
+		render(TimelinePage);
+		await expect.element(page.getByRole('alert')).toHaveTextContent(NOTE);
+		expect(page.getByRole('button', { name: 'Unlock' }).elements()).toHaveLength(0);
 	});
 
 	// On a normal start the list waits for the progress instead of flashing every task as not started.

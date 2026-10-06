@@ -131,7 +131,9 @@
 <h1>Timeline</h1>
 
 {#if app.status === 'ready'}
-	{#if app.store?.locked}
+	<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
+	     Unless its load failed: then the note below says so, since Unlock would only fail again. -->
+	{#if app.store?.locked || (app.timeline?.locked && !app.timeline.failed)}
 		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
 	{:else if app.store?.persona.completeness === 'none'}
 		<SetupCTA />
