@@ -7,7 +7,9 @@ import { KeystoreHmacMismatchError } from './store.svelte';
  * same bytes and fails the same way, so this is the one start-up failure offered an erase. Anything else - an app older
  * than its database, a blocked open, a lock timeout, a storage error, any other throw - can pass, so its data is never
  * offered for erase. Bootstrap writes the key record and the high-water mark in one transaction, so a mark missing
- * beside a key record, or a body missing once the mark says one was saved, is damage too.
+ * beside a key record, or a body missing once the mark says one was saved, is damage too. This holds only while every
+ * change to how saved data is checked raises DB_VERSION (schema.ts): an older app must stop at the version, never
+ * here, where it would read a newer release's data as damaged.
  */
 export function isDamagedRecord(e: unknown): boolean {
 	return (

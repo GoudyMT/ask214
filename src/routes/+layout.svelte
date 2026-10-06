@@ -77,9 +77,6 @@
 	});
 	setInstallApp(install);
 
-	// Settings acts only on stored data (the date, calendar, lock, erase). Hide the tab on a fresh
-	// no-date profile so it appears only once there is something to configure; a locked profile has
-	// data (its persona reads 'none' only because the plaintext is sealed), so it still shows.
 	// Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable, so
 	// even a fresh no-timeline user has something to set there (the timeline sections hide inside Settings).
 	// And when the saved data is damaged, where its erase is the only way back.
@@ -222,8 +219,9 @@
 			})
 			.catch(() => {
 				// Hard init failure past the capability gate: an app older than its database (a newer release raised
-				// the version), or a damaged key record failing load(). Opaque log only (no PII). The shell stays usable
-				// - Ask, About and Documents need no saved data - and a banner says so, with Reload.
+				// the version), an open another tab blocks, a storage error - damaged saved data resolves as `damaged`
+				// above instead. Opaque log only (no PII). The shell stays usable - Ask, About and Documents need no saved
+				// data - and a banner says so, with Reload.
 				safeLog({ code: 'E_INIT_FAILED' });
 				if (!destroyed) app.status = afterStartupFailure(app.status, 'error');
 			});

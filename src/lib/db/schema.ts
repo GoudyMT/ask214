@@ -19,6 +19,9 @@
 export const DB_NAME = 'mtc';
 // Fix forward only: never roll the deployed app back past a version that raised this. An older bundle cannot open the
 // newer database: a v1.2.0 bundle stays on its loading screen; later ones show the start-up banner with Reload.
+// Raise it too whenever a change alters how saved data is checked (the key record's HMAC input, the AAD, a sidecar's
+// signed bytes, a record's format): an older app then stops at the version, with Reload, instead of reading the
+// newer data as damaged and offering to erase it.
 export const DB_VERSION = 5; // 4 -> 5: no new store; retires a tab on an older bundle (onversionchange -> 'stale'), whose profile decode drops the leaving dates and would save the profile without them
 export const STORES = [
 	'profile',

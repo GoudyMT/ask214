@@ -39,7 +39,7 @@ export type ProfileApp = {
 	/**
 	 * Relock every provisioned store. Use this for ANY "lock" or "erase" - never relock stores
 	 * one by one at a call site: a per-site list drifts, and decrypted PII is left behind silently.
-	 * Null until app-init resolves.
+	 * Null until app-init resolves ready, and under `damaged`, where nothing was decrypted.
 	 */
 	relockAll: (() => void) | null;
 };
