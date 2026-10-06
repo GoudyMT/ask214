@@ -23,7 +23,7 @@ describe('handOver', () => {
 		expect(recordAdd).toHaveBeenCalledWith(FILE.events, '2026-10-04', '2026-10-04');
 	});
 
-	it('keeps the old record when the write fails - listing too much is the safe side', async () => {
+	it('does not throw when the record fails: the file still reached the user', async () => {
 		const download = vi.fn();
 		const recordAdd = vi.fn(async () => Promise.reject(new Error('E_CALENDAR_RELOCKED')));
 		await expect(handOver(FILE, { recordAdd }, NOW, download)).resolves.toBeUndefined();
