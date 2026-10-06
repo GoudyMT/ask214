@@ -4,6 +4,8 @@
 
 	let { events, onAcknowledge }: { events: HandedOverEvent[]; onAcknowledge: () => Promise<void> } =
 		$props();
+	// Ids for the heading and the lead, so the button's description can point at them; unique per instance.
+	const uid = $props.id();
 
 	// The earliest add these came from: the day the user last trusted their calendar to be current.
 	const since = $derived(events.map((e) => e.addedOn).sort()[0]);
@@ -28,15 +30,18 @@
 
 {#if events.length > 0}
 	<div class="stale">
-		<p class="stale__head">Your calendar is out of date</p>
-		<p class="stale__lead">{lead}</p>
+		<h3 id="{uid}-head" class="stale__head">Your calendar is out of date</h3>
+		<p id="{uid}-lead" class="stale__lead">{lead}</p>
 		<ul class="stale__list">
 			{#each events as e (`${e.taskId}|${e.moment}|${e.isoDate}|${e.title}`)}
 				<li>{e.title} <span class="stale__date">{formatTimelineDate(e.isoDate)}</span></li>
 			{/each}
 		</ul>
-		<button class="stale__ack" type="button" onclick={() => void acknowledge()}
-			>I've deleted these</button
+		<button
+			class="stale__ack"
+			type="button"
+			aria-describedby="{uid}-head {uid}-lead"
+			onclick={() => void acknowledge()}>I've deleted these</button
 		>
 		{#if failed}<p class="stale__error" role="alert">
 				Could not update right now - please try again.
@@ -53,8 +58,12 @@
 		margin-bottom: var(--space-m);
 		font-size: var(--font-size-s);
 	}
+	/* A heading for screen readers that looks as the box's bold first line did: the global h3 size, line height and
+	   margins are set back to the box's own. */
 	.stale__head {
 		margin: 0 0 var(--space-xs);
+		font-size: inherit;
+		line-height: inherit;
 		font-weight: 700;
 	}
 	.stale__lead {

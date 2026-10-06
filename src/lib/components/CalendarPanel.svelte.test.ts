@@ -354,8 +354,8 @@ describe('CalendarPanel', () => {
 
 	it('lists the events to delete above the Add button, once its settings are loaded', () => {
 		const container = withRecord(true, [HELD]);
-		const head = [...container.querySelectorAll('p')].find(
-			(p) => p.textContent === 'Your calendar is out of date'
+		const head = [...container.querySelectorAll('h3')].find(
+			(h) => h.textContent === 'Your calendar is out of date'
 		);
 		const add = container.querySelector('.cal-add');
 		expect(head).toBeDefined();
@@ -376,6 +376,29 @@ describe('CalendarPanel', () => {
 		const LINE = 'Changed a date? Remove the events you added before, then add again.';
 		expect(withRecord(true, []).textContent).toContain(LINE);
 		expect(withRecord(true, [HELD]).textContent).not.toContain(LINE);
+	});
+
+	// The list unmounts with focus on its button; focus goes to the next step the list names, adding again.
+	it("moves focus to the add button once I've deleted these saves", async () => {
+		withRecord(
+			true,
+			[HELD],
+			vi.fn(async () => {})
+		);
+		await page.getByRole('button', { name: "I've deleted these" }).click();
+		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
+	});
+
+	it("keeps focus on I've deleted these when the save fails", async () => {
+		withRecord(
+			true,
+			[HELD],
+			vi.fn(async () => Promise.reject(new Error('E_TEST_SAVE')))
+		);
+		const ack = page.getByRole('button', { name: "I've deleted these" });
+		await ack.click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await expect.element(ack).toHaveFocus();
 	});
 
 	it("passes I've deleted these to its handler", async () => {

@@ -38,6 +38,19 @@ describe('StaleEvents', () => {
 		await expect.element(page.getByText('Jan 30, 2027')).toBeVisible();
 	});
 
+	// A screen reader moving by heading finds the box, and the button names what it confirms.
+	it('heads the box, and describes its button by the heading and the lead', async () => {
+		render(StaleEvents, { props: { events: E, onAcknowledge: vi.fn(async () => {}) } });
+		await expect
+			.element(page.getByRole('heading', { level: 3, name: 'Your calendar is out of date' }))
+			.toBeVisible();
+		await expect
+			.element(page.getByRole('button', { name: "I've deleted these" }))
+			.toHaveAccessibleDescription(
+				/^Your calendar is out of date Since you added it on Oct 3, these changed\./
+			);
+	});
+
 	it("clears through I've deleted these", async () => {
 		const onAcknowledge = vi.fn(async () => {});
 		render(StaleEvents, { props: { events: E, onAcknowledge } });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskCategory } from '$lib/timeline/types';
 	import type { HandedOverEvent, TaskExclusions } from '$lib/calendar/types';
@@ -65,6 +66,16 @@
 		}
 	}
 
+	let addEl = $state<HTMLButtonElement | null>(null);
+
+	// "I've deleted these" takes the list away with focus on its button, so focus moves to Add, the next step the list
+	// names. A failed save rejects before this, so focus stays and the list says why.
+	async function acknowledge(): Promise<void> {
+		await onAcknowledge();
+		await tick();
+		addEl?.focus();
+	}
+
 	async function addToCalendar(): Promise<void> {
 		building = true;
 		try {
@@ -82,10 +93,11 @@
 	<!-- Only once both stores have loaded: before that the list is built from a stand-in empty task state and
 	     could name an event that is not out of date. -->
 	{#if ready}
-		<StaleEvents events={stale} {onAcknowledge} />
+		<StaleEvents events={stale} onAcknowledge={acknowledge} />
 	{/if}
 
 	<button
+		bind:this={addEl}
 		class="cal-add"
 		type="button"
 		disabled={building || !ready || !hasEvents}
