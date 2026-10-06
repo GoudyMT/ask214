@@ -34,10 +34,10 @@ export const DEVICE_HINT: Record<DeviceKind, { lead: string; text: string }> = {
 		lead: 'On this phone:',
 		text: 'it saves a calendar file, then asks which app to open it with. Pick your calendar, then tap Add all.'
 	},
-	// Checked on a real iPhone in Safari (2026-10-06): the file added well.
+	// Checked on a real iPhone (2026-10-06): Safari opens the file straight in Calendar, which offers Add All.
 	ios: {
 		lead: 'On iPhone or iPad, use Safari:',
-		text: 'it saves a calendar file. Open it from Downloads, then tap Add All.'
+		text: 'it opens the events in your calendar. Tap Add All.'
 	},
 	computer: {
 		lead: 'On a computer:',
