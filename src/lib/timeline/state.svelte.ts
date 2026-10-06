@@ -227,8 +227,11 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 						if (!ks) throw new KeystoreNotInitializedError();
 						const keystore = ks;
 						const gen = await readCurrentGeneration(keystore);
-						_generation = gen;
+						// The generation moves only with the statuses it belongs to: a read that fails after a peer's save
+						// would otherwise pair the newer generation with the older statuses, and a write from them would
+						// pass the conflict check and lay them over the peer's save.
 						if (gen === 0) {
+							_generation = gen;
 							if (relockEpoch === relockAtStart) {
 								_state = { schemaVersion: 1, tasks: {} };
 								lockState = 'unlocked';
@@ -240,6 +243,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 						const decoded = decodeTimelineState(
 							await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
 						);
+						_generation = gen;
 						if (relockEpoch === relockAtStart) {
 							_state = decoded;
 							lockState = 'unlocked';

@@ -57,6 +57,14 @@ describe('Timeline, its saved progress', () => {
 		expect(container.querySelector('.timeline-list')).toBeNull();
 	});
 
+	// A re-read that fails after a good one leaves statuses that may be out of date: the note, not the list.
+	it('says so in place of the list when a re-read fails after a good load', async () => {
+		current.timeline = { ready: true, failed: true, state: EMPTY };
+		const { container } = render(TimelinePage);
+		await expect.element(page.getByRole('alert')).toHaveTextContent(NOTE);
+		expect(container.querySelector('.timeline-list')).toBeNull();
+	});
+
 	// On a normal start the list waits for the progress instead of flashing every task as not started.
 	it('shows neither while the progress loads', async () => {
 		current.timeline = null;

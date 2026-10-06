@@ -295,4 +295,34 @@ describe('timeline-state store', () => {
 		expect(b.state.tasks['dd214-review']?.status).toBe('done');
 		await deleteTestDb(db);
 	});
+
+	// A re-read that fails after a peer saved keeps the store's old generation with its old statuses, so a write from it
+	// is refused rather than laid over the peer's save.
+	it('refuses a write after a failed re-read, so a newer save survives', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('t1', 'done');
+		const peer = createTimelineStateStore(db);
+		await peer.load();
+		await peer.setStatus('t2', 'done');
+
+		const body = await withStores(db, 'timeline-state', 'readonly', (tx) =>
+			reqToPromise(tx.objectStore('timeline-state').get(0))
+		);
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').delete(0);
+		});
+		await expect(a.load()).rejects.toThrow('E_TIMELINE_BODY_MISSING');
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').put(body);
+		});
+
+		await expect(a.setStatus('t3', 'done')).rejects.toThrow(OccConflictError);
+		const fresh = createTimelineStateStore(db);
+		await fresh.load();
+		expect(fresh.state.tasks['t2']?.status).toBe('done');
+		await deleteTestDb(db);
+	});
 });

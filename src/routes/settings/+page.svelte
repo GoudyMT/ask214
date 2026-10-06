@@ -445,7 +445,9 @@
 			<CalendarPanel
 				items={calendarItems}
 				exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-				ready={(app.calendar?.ready ?? false) && (app.timeline?.ready ?? false)}
+				ready={(app.calendar?.ready ?? false) &&
+					(app.timeline?.ready ?? false) &&
+					!(app.timeline?.failed ?? false)}
 				onSetExclusions={(next) =>
 					app.calendar
 						? app.calendar.setExclusions(next).catch(async (err) => {
