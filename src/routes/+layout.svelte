@@ -26,7 +26,7 @@
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
 	import { wipeAllStores } from '$lib/db/wipe';
-	import { stillDamaged } from '$lib/profile/damaged';
+	import { NoLongerDamagedError, stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { requestPersistentStorage } from '$lib/storage/persistence';
@@ -131,7 +131,7 @@
 						});
 						if (!damaged) {
 							location.reload();
-							throw new Error('E_NO_LONGER_DAMAGED');
+							throw new NoLongerDamagedError();
 						}
 						await wipeAllStores(result.db);
 					};

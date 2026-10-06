@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { NoLongerDamagedError } from '$lib/profile/damaged';
 
 // The erase refuses here, as one that cannot reach every store does: a real erase ends in a page reload, which this
 // page test cannot survive. The end-to-end test erases for real.
@@ -57,6 +58,24 @@ describe('Settings, when the saved data cannot be read', () => {
 		expect(page.getByRole('heading', { level: 2 }).elements()).toHaveLength(1);
 		const text = textOf(container);
 		expect(makesPersonalClaim(text), text).toBe(false);
+	});
+
+	// Data that reads again since start-up is not erased: the page reloads onto it, and nothing failed, so nothing says so.
+	it('shows no erase failure when the data reads again and the page reloads onto it', async () => {
+		wipeAll.mockImplementationOnce(async () => {
+			throw new NoLongerDamagedError();
+		});
+		try {
+			render(SettingsPage);
+			await page.getByRole('button', { name: 'Erase all data on this device' }).click();
+			await page.getByRole('button', { name: 'Erase everything' }).click();
+			await vi.waitFor(() => expect(wipeAll).toHaveBeenCalled());
+			// Past the erase's own catch, so an alert it drew would be on the page.
+			await new Promise((r) => setTimeout(r, 50));
+			expect(page.getByRole('alert').elements()).toHaveLength(0);
+		} finally {
+			wipeAll.mockClear();
+		}
 	});
 
 	it('erases through the same dialog, and says so when the erase refuses', async () => {

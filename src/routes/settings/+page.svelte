@@ -6,6 +6,7 @@
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import { eraseEverything } from '$lib/profile/erase';
+	import { NoLongerDamagedError } from '$lib/profile/damaged';
 	import { OccConflictError, type ProfilePatch } from '$lib/profile/store.svelte';
 	import {
 		LEAVING_HINT,
@@ -271,7 +272,9 @@
 				// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
 				reload: () => window.location.reload()
 			});
-		} catch {
+		} catch (e) {
+			// Damaged data that reads again is not erased: the page is already reloading onto it, and nothing failed.
+			if (e instanceof NoLongerDamagedError) return;
 			// The erase refuses before touching disk unless it can clear every store, and the store
 			// wipe is one transaction - so if we are here, nothing was destroyed. Saying so matters
 			// more than usual: the user asked for their data to be gone and would otherwise walk away
