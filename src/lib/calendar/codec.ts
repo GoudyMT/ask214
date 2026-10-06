@@ -13,11 +13,14 @@ const MOMENT_KEYS: Record<EventMoment, true> = {
 const MOMENTS: ReadonlySet<string> = new Set(Object.keys(MOMENT_KEYS));
 
 /**
- * A day as the app writes it, YYYY-MM-DD: only a string a UTC round trip gives back unchanged. A date that is not a
- * string, carries extra text or names no day (the parser rolls 2026-02-30 over to March 2) fails.
+ * A day as the app writes it, YYYY-MM-DD: only a string a UTC round trip gives back unchanged. The string check
+ * comes first, because turning an object into text can throw. A date with extra text, or one that names no day
+ * (2026-02-30: some engines roll it over to March 2, others give no date at all), fails. UTC on both sides, so the
+ * device's time zone cannot move the day.
  */
 function isDay(v: unknown): boolean {
-	const t = new Date(`${String(v)}T00:00:00Z`);
+	if (typeof v !== 'string') return false;
+	const t = new Date(`${v}T00:00:00Z`);
 	return !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === v;
 }
 

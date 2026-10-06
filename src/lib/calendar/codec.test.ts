@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { encodeCalendarSyncState, decodeCalendarSyncState, CalendarSchemaError } from './codec';
 import type { CalendarSyncState } from './types';
 
@@ -77,6 +77,9 @@ describe('calendar-sync codec', () => {
 	};
 	const untrusted: [string, unknown[]][] = [
 		['a date held in an array', [{ ...good, isoDate: ['2026-12-01'] }]],
+		// JSON can give an object its own toString; turning that object into text throws.
+		['a date held in an object', [{ ...good, isoDate: { toString: 0 } }]],
+		['an add day held in an object', [{ ...good, addedOn: { toString: 0 } }]],
 		['a day the month does not have', [{ ...good, isoDate: '2026-02-30' }]],
 		['a month that does not exist', [{ ...good, addedOn: '2026-13-01' }]],
 		['text after the date', [{ ...good, isoDate: '2026-12-01x' }]],
@@ -91,6 +94,24 @@ describe('calendar-sync codec', () => {
 			expect(decodeCalendarSyncState(bytes).lastAdd).toBeUndefined();
 		});
 	}
+
+	describe('in a time zone east of UTC', () => {
+		afterEach(() => {
+			vi.unstubAllEnvs();
+		});
+
+		// Local midnight in Tokyo is still the day before in UTC, so a check that read the date as local time would
+		// turn every day the app wrote into the one before it and drop the whole record.
+		it('keeps a well-formed lastAdd', () => {
+			vi.stubEnv('TZ', 'Asia/Tokyo');
+			expect(new Date('2026-10-03T23:30:00Z').getHours()).toBe(8); // the zone took effect
+			const lastAdd = [good];
+			const bytes = new TextEncoder().encode(
+				JSON.stringify({ schemaVersion: 1, exclusions: { taskIds: [], categories: [] }, lastAdd })
+			);
+			expect(decodeCalendarSyncState(bytes).lastAdd).toEqual(lastAdd);
+		});
+	});
 
 	it('keeps a well-formed lastAdd', () => {
 		const lastAdd = [

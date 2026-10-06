@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { formatTimelineDate } from '$lib/timeline/format-date';
 	import type { HandedOverEvent } from '$lib/calendar/types';
+	import { handedOverKey } from '$lib/calendar/handed-over';
 
 	let { events, onAcknowledge }: { events: HandedOverEvent[]; onAcknowledge: () => Promise<void> } =
 		$props();
@@ -33,7 +34,8 @@
 		<h3 id="{uid}-head" class="stale__head">Your calendar is out of date</h3>
 		<p id="{uid}-lead" class="stale__lead">{lead}</p>
 		<ul class="stale__list">
-			{#each events as e (`${e.taskId}|${e.moment}|${e.isoDate}|${e.title}`)}
+			<!-- Keyed by the identity the codec holds unique, so a stored list can never repeat a key here. -->
+			{#each events as e (handedOverKey(e))}
 				<li>{e.title} <span class="stale__date">{formatTimelineDate(e.isoDate)}</span></li>
 			{/each}
 		</ul>
