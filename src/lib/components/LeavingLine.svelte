@@ -13,21 +13,25 @@
 				? { what: 'SkillBridge', iso: leaving.notUsed.skillbridgeStart }
 				: null
 	);
-	const inUse = $derived(
-		[
-			leaving?.skillbridgeStart ? `SkillBridge from ${f(leaving.skillbridgeStart)}.` : null,
-			leaving?.terminalLeaveStart ? `Terminal leave from ${f(leaving.terminalLeaveStart)}.` : null
-		].filter((s): s is string => s !== null)
-	);
+	const inUse = $derived(!!(leaving?.skillbridgeStart || leaving?.terminalLeaveStart));
+	// Held here so the sentence stays on one source line: a line break inside it would reach the page's text.
+	const NOT_USED = "is after your separation date, so it isn't used.";
 </script>
 
-<!-- The link is a fixed path: no query and no stored flag, so nothing about the dates reaches a URL. -->
+<!-- The link is a fixed path: no query and no stored flag, so nothing about the dates reaches a URL. Each date sits in
+     a span of its own, so a date that does not fit takes the next line whole. -->
 <p class="leaving-line">
 	{#if notUsed}
-		Your {notUsed.what} date ({f(notUsed.iso)}) is after your separation date, so it isn't used.
+		Your {notUsed.what} date (<span class="leaving-line__date">{f(notUsed.iso)}</span>) {NOT_USED}
 		<a href={resolve('/settings')}>Change</a>
-	{:else if inUse.length > 0}
-		{inUse.join(' ')} <a href={resolve('/settings')}>Change</a>
+	{:else if inUse}
+		{#if leaving?.skillbridgeStart}SkillBridge from <span class="leaving-line__date"
+				>{f(leaving.skillbridgeStart)}</span
+			>.{/if}
+		{#if leaving?.terminalLeaveStart}Terminal leave from <span class="leaving-line__date"
+				>{f(leaving.terminalLeaveStart)}</span
+			>.{/if}
+		<a href={resolve('/settings')}>Change</a>
 	{:else}
 		Doing SkillBridge or taking terminal leave? <a href={resolve('/settings')}
 			>Add your dates in Settings</a
@@ -43,5 +47,9 @@
 	}
 	.leaving-line a {
 		color: var(--color-accent);
+	}
+	/* A date reads as one piece: when it does not fit after the words before it, the whole date takes the next line. */
+	.leaving-line__date {
+		white-space: nowrap;
 	}
 </style>
