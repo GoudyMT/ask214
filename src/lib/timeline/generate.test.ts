@@ -806,6 +806,31 @@ describe('After you leave', () => {
 		expect(s['reference-letters']).toBe('still-to-do'); // soft, official window ended Mar 31
 	});
 
+	// Once separation has passed, a task that could not fit is judged by its official window, so it shows that window's
+	// last day, not the pulled-in day before its own opening.
+	it('after separation shows a task that could not fit by its official last day', () => {
+		const on = (today: Date) => {
+			const items = generateTimeline(
+				{
+					completeness: 'eaos-only',
+					eaos: SEP,
+					daysUntilSeparation: 208,
+					leaving: { skillbridgeStart: '2026-11-01', terminalLeaveStart: '2026-11-15' } as never
+				},
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				today
+			).phases.flatMap((p) => p.items);
+			return (id: string) => items.find((i) => i.def.id === id);
+		};
+		const after = on(new Date(2027, 4, 2, 12));
+		expect(after('reference-letters')?.windowEndDate).toBe('2027-03-31');
+		expect(after('reference-letters')?.aimDate).toBe('2027-03-31');
+		expect(after('sha-complete')?.windowEndDate).toBe('2027-01-30');
+		// On separation day it is still "after you leave", and keeps the day it was pulled in to.
+		expect(on(new Date(2027, 3, 30, 12))('sha-complete')?.windowEndDate).toBe('2026-11-14');
+	});
+
 	it('holds through separation day and hands over the day after', () => {
 		const leave = { terminalLeaveStart: '2026-11-15' };
 		expect(at(new Date(2027, 3, 30, 12), leave)['sha-complete']).toBe('after-you-leave');

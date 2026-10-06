@@ -306,10 +306,14 @@ export function generateTimeline(
 		.map((a) => {
 			const stored = state.tasks[a.def.id];
 			const status = deriveStatus(a, stored, today);
+			// Once separation has passed, a task that could not fit is judged by its official window, so it shows that
+			// window's last day rather than the pulled-in day before its own opening.
+			const windowEndDate =
+				a.fit?.cannotFit && todayIso > a.separationDate ? a.fit.officialEndDate : a.windowEndDate;
 			// The countdown runs to the next firm edge: the last day while closing soon, the final edge between two.
 			const nextEdge =
 				status === 'closing-soon'
-					? a.windowEndDate
+					? windowEndDate
 					: status === 'changed'
 						? a.finalEndDate
 						: undefined;
@@ -317,12 +321,12 @@ export function generateTimeline(
 				def: a.def,
 				targetDate: a.targetDate,
 				windowStartDate: a.windowStartDate,
-				windowEndDate: a.windowEndDate,
+				windowEndDate,
 				status,
 				...(a.finalEndDate !== undefined ? { finalEndDate: a.finalEndDate } : {}),
 				...(nextEdge !== undefined ? { daysLeft: daysBetween(todayIso, nextEdge) } : {}),
 				...(a.def.kind === 'soft'
-					? { aimDate: a.targetDate >= todayIso ? a.targetDate : a.windowEndDate }
+					? { aimDate: a.targetDate >= todayIso ? a.targetDate : windowEndDate }
 					: {}),
 				// snoozeUntil rides the view only while the item is actively snoozed; gating on the
 				// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.
