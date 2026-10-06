@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isDamagedRecord } from './damaged';
+import { isDamagedRecord, stillDamaged } from './damaged';
+import { LockAcquisitionTimeout } from '../db/locks';
 import { AesGcmAuthError } from '../crypto/aes-gcm';
 import { SidecarTamperError } from './sidecars';
 import {
@@ -33,5 +34,29 @@ describe('isDamagedRecord', () => {
 		['nothing', undefined]
 	])('is not damage for %s', (_, e) => {
 		expect(isDamagedRecord(e)).toBe(false);
+	});
+});
+
+// Checked again just before an erase: another tab may have erased and set up new data since this one failed.
+describe('stillDamaged', () => {
+	it('is damage when the check fails the same way', async () => {
+		expect(
+			await stillDamaged(async () => {
+				throw new KeystoreHmacMismatchError();
+			})
+		).toBe(true);
+	});
+
+	it('is not damage when the data now reads', async () => {
+		expect(await stillDamaged(async () => {})).toBe(false);
+	});
+
+	// Nothing is erased on a guess: a check that cannot run says nothing about the bytes.
+	it('is not damage when the check fails for another reason', async () => {
+		expect(
+			await stillDamaged(async () => {
+				throw new LockAcquisitionTimeout();
+			})
+		).toBe(false);
 	});
 });

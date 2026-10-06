@@ -26,6 +26,7 @@
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
 	import { wipeAllStores } from '$lib/db/wipe';
+	import { stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { requestPersistentStorage } from '$lib/storage/persistence';
@@ -118,10 +119,31 @@
 					return;
 				}
 				// The saved data failed its own checks: no reload can read it, so the erase is the way back. It needs only
-				// the open database - it clears every store by registry name.
+				// the open database - it clears every store by registry name. Another tab may erase this data and start
+				// again meanwhile, so any signal from another tab reloads this one, and the erase checks the data once
+				// more first: data that now reads is never wiped - the page reloads onto it, and the throw stops the
+				// erase before it clears anything else.
 				if (result.status === 'damaged') {
 					safeLog({ code: 'E_INIT_FAILED' });
-					app.wipeAll = () => wipeAllStores(result.db);
+					const reread = (): void => location.reload();
+					teardownRuntime = subscribeBus(bus, {
+						relocked: reread,
+						'profile-updated': reread,
+						'timeline-updated': reread,
+						'calendar-updated': reread
+					});
+					app.wipeAll = async () => {
+						const check = createProfileStore(result.db);
+						const damaged = await stillDamaged(async () => {
+							await check.load();
+							check.relockSync('user');
+						});
+						if (!damaged) {
+							location.reload();
+							throw new Error('E_NO_LONGER_DAMAGED');
+						}
+						await wipeAllStores(result.db);
+					};
 					app.status = afterStartupFailure(app.status, 'damaged');
 					return;
 				}

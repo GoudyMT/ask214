@@ -18,3 +18,18 @@ export function isDamagedRecord(e: unknown): boolean {
 			(e.message === 'E_HWM_MISSING' || e.message === 'E_PROFILE_BODY_MISSING'))
 	);
 }
+
+/**
+ * Whether the data is still damaged, checked again just before an erase: another tab may have erased it and started
+ * again since this one failed, and that tab's new data must never be wiped. A check that fails for any other reason
+ * says nothing about the bytes, so it is not damage either - nothing is erased on a guess. `check` reads the saved data
+ * the way start-up does and drops what it read.
+ */
+export async function stillDamaged(check: () => Promise<unknown>): Promise<boolean> {
+	try {
+		await check();
+		return false;
+	} catch (e) {
+		return isDamagedRecord(e);
+	}
+}
