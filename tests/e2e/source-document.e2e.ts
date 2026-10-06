@@ -232,6 +232,8 @@ test('Settings and the Documents page count an older copy an update left, and it
 	page
 }) => {
 	await page.goto('/settings');
+	// WebKit ties the cache to a registration, so seed it only once one is in place.
+	await page.evaluate(() => navigator.serviceWorker.ready);
 	await page.evaluate(async (cacheName) => {
 		const cache = await caches.open(cacheName);
 		await cache.put('/docs/tap_vet_centers.0badc0de.pdf', new Response(new Uint8Array(250_000)));
