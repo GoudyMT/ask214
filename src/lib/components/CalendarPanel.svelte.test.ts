@@ -396,6 +396,25 @@ describe('CalendarPanel', () => {
 		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
 	});
 
+	// With nothing ahead to add, Add is off and cannot take focus, so the Calendar heading takes it. The rerender is the
+	// page's own update: the saved record no longer holds the events, so the list goes.
+	it('moves focus to the Calendar heading when the list clears with nothing to add', async () => {
+		const props = {
+			items: [],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: async () => {
+				await screen.rerender({ ...props, stale: [] });
+			}
+		};
+		const screen = render(CalendarPanel, { props });
+		await page.getByRole('button', { name: "I've deleted these" }).click();
+		await expect.element(page.getByRole('heading', { level: 2, name: 'Calendar' })).toHaveFocus();
+	});
+
 	it("keeps focus on I've deleted these when the save fails", async () => {
 		withRecord(
 			true,

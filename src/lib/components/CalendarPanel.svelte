@@ -67,13 +67,15 @@
 	}
 
 	let addEl = $state<HTMLButtonElement | null>(null);
+	let headingEl = $state<HTMLHeadingElement | null>(null);
 
 	// "I've deleted these" takes the list away with focus on its button, so focus moves to Add, the next step the list
-	// names. A failed save rejects before this, so focus stays and the list says why.
+	// names - or, with nothing ahead to add, to the Calendar heading, since a disabled button cannot take focus. A
+	// failed save rejects before this, so focus stays and the list says why.
 	async function acknowledge(): Promise<void> {
 		await onAcknowledge();
 		await tick();
-		addEl?.focus();
+		(addEl && !addEl.disabled ? addEl : headingEl)?.focus();
 	}
 
 	async function addToCalendar(): Promise<void> {
@@ -87,7 +89,10 @@
 </script>
 
 <section class="cal-section" aria-labelledby="calendar-heading">
-	<h2 id="calendar-heading" class="cal-section__heading">Calendar</h2>
+	<!-- tabindex -1: a target for the focus move above, never a stop on the Tab order. -->
+	<h2 bind:this={headingEl} id="calendar-heading" class="cal-section__heading" tabindex="-1">
+		Calendar
+	</h2>
 	<p class="cal-hint">Your upcoming deadlines, with alerts before each firm one.</p>
 
 	<!-- Only once both stores have loaded: before that the list is built from a stand-in empty task state and

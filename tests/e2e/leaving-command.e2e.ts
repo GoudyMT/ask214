@@ -207,8 +207,14 @@ test('after a date is removed, Settings lists the events to delete until you say
 	await openSettingsAdd(page); // a fresh load
 	await expect(outOfDate).toBeVisible();
 
-	await page.getByRole('button', { name: "I've deleted these" }).click();
+	// By keyboard, as a screen-reader user would: the list goes with focus on its button, and focus moves to Add with a
+	// visible ring.
+	await page.getByRole('button', { name: "I've deleted these" }).focus();
+	await page.keyboard.press('Enter');
 	await expect(outOfDate).toBeHidden();
+	const add = page.getByRole('button', { name: /^add to my calendar$/i });
+	await expect(add).toBeFocused();
+	expect(await add.evaluate((el) => el.matches(':focus-visible'))).toBe(true);
 	await openSettingsAdd(page);
 	await expect(outOfDate).toBeHidden();
 });
