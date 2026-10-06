@@ -8,6 +8,12 @@
 	import { eraseEverything } from '$lib/profile/erase';
 	import { OccConflictError, type ProfilePatch } from '$lib/profile/store.svelte';
 	import {
+		LEAVING_HINT,
+		PAYGRADE_NOTE,
+		ORDER_NOTE,
+		AFTER_SEPARATION
+	} from '$lib/profile/leaving-copy';
+	import {
 		validateEaosAtInput,
 		encodeEaos,
 		EaosFormatError,
@@ -102,12 +108,6 @@
 		return p && p.completeness !== 'none' ? p.eaos : null;
 	});
 
-	const LEAVING_HINT =
-		'Tasks you must finish at your command move earlier to fit before you leave.';
-	const PAYGRADE_NOTE =
-		'Navy SkillBridge can start up to 180 days before separation for E5 and below, 120 days for E6 to E9 and officers O4 and below, and 90 days for O5 and above (NAVADMIN 064/23).';
-	const ORDER_NOTE = 'SkillBridge comes before terminal leave (NAVADMIN 064/23).';
-	const AFTER_SEPARATION = 'This date needs to be before your separation date.';
 	const OCC_MESSAGE =
 		'This was changed in another tab. We reloaded it - please review and save again.';
 	// The leaving rows are not the separation date, so an empty or unreadable entry asks for "a valid date".

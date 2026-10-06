@@ -2,6 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
 import { RESOURCES, TASK_AFTER_LINK } from '$lib/resources/resources';
 import { DELETE_FILE_HINT, DEVICE_HINT, IOS_APP_HINT } from '$lib/calendar/delivery';
+import {
+	LEAVING_HINT,
+	PAYGRADE_NOTE,
+	ORDER_NOTE,
+	AFTER_SEPARATION
+} from '$lib/profile/leaving-copy';
 import { makesPersonalClaim } from './personal-claim';
 
 // Well-formedness guards for the seed: these pass for ANY valid seed, so editing the
@@ -108,15 +114,20 @@ describe('task-defs seed', () => {
 		expect(makesPersonalClaim('tricare.mil and healthcare.gov say who qualifies.')).toBe(false);
 	});
 
-	// 38 CFR 14.629 over the task data: its own text, its What now link, the curated resources and the sentences
-	// under the calendar button. The words the components add around them are checked in each component's tests.
+	// 38 CFR 14.629 over the task data: its own text, its What now link, the curated resources, the sentences under
+	// the calendar button and the Settings lines beside the leaving dates. The words the components add around them
+	// are checked in each component's tests.
 	it('keeps every public line about a task free of personal eligibility claims', () => {
 		const lines = [
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
 			...RESOURCES.flatMap((r) => [r.title, r.description]),
 			...[...Object.values(DEVICE_HINT), IOS_APP_HINT].map((hint) => `${hint.lead} ${hint.text}`),
-			DELETE_FILE_HINT
+			DELETE_FILE_HINT,
+			LEAVING_HINT,
+			PAYGRADE_NOTE,
+			ORDER_NOTE,
+			AFTER_SEPARATION
 		];
 		expect(lines.length).toBeGreaterThan(200);
 		for (const line of lines) expect(makesPersonalClaim(line), line).toBe(false);
