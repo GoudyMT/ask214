@@ -26,7 +26,7 @@ describe('isDamagedRecord', () => {
 	it.each([
 		['an app older than its database', new DOMException('version', 'VersionError')],
 		['a closed connection', new DOMException('closed', 'InvalidStateError')],
-		['a lock timeout', new Error('E_TIMEOUT')],
+		['a lock timeout', new LockAcquisitionTimeout()],
 		['a write race', new OccConflictError()],
 		['a missing key record', new KeystoreNotInitializedError()],
 		['a type error', new TypeError('x')],

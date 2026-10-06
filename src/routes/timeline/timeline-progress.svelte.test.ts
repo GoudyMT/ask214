@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
+import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 // Days from the real clock: the page builds the timeline from today.
 const { isoFromToday, current } = vi.hoisted(() => ({
@@ -56,6 +57,8 @@ describe('Timeline, its saved progress', () => {
 			.element(page.getByRole('alert').getByRole('link', { name: 'Settings' }))
 			.toHaveAttribute('href', '/settings');
 		expect(container.querySelector('.timeline-list')).toBeNull();
+		const text = textOf(container);
+		expect(makesPersonalClaim(text), text).toBe(false);
 	});
 
 	// A re-read that fails after a good one leaves statuses that may be out of date: the note, not the list.

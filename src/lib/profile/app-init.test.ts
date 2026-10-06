@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { initProfileApp, provisionStore, createRelockEcho, relockAll } from './app-init';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import { KeystoreHmacMismatchError } from './store.svelte';
+import { LockAcquisitionTimeout } from '../db/locks';
 import type { BusSignal, ProfileBus } from '../broadcast/bus';
 
 const fakeDb = {} as IDBDatabase;
@@ -149,7 +150,7 @@ describe('initProfileApp', () => {
 	});
 
 	it('rejects a load that fails for any other reason', async () => {
-		const store = { load: vi.fn().mockRejectedValue(new Error('E_TIMEOUT')) };
+		const store = { load: vi.fn().mockRejectedValue(new LockAcquisitionTimeout()) };
 		await expect(
 			initProfileApp({
 				checkSupport: async () => ({ ok: true }),
@@ -159,7 +160,7 @@ describe('initProfileApp', () => {
 				}),
 				createStore: () => store
 			})
-		).rejects.toThrow('E_TIMEOUT');
+		).rejects.toThrow(LockAcquisitionTimeout);
 	});
 
 	it('first run: bootstraps, creates the store, loads, returns ready', async () => {

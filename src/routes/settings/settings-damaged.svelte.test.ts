@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
+import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 // The erase refuses here, as one that cannot reach every store does: a real erase ends in a page reload, which this
 // page test cannot survive. The end-to-end test erases for real.
@@ -38,7 +39,7 @@ vi.mock('$lib/install/context', () => ({
 
 describe('Settings, when the saved data cannot be read', () => {
 	it('offers only the erase, with what it does', async () => {
-		render(SettingsPage);
+		const { container } = render(SettingsPage);
 		await expect
 			.element(page.getByRole('heading', { level: 2, name: 'Privacy and security' }))
 			.toBeVisible();
@@ -54,6 +55,8 @@ describe('Settings, when the saved data cannot be read', () => {
 			.toBeVisible();
 		expect(page.getByRole('button', { name: /^lock$/i }).elements()).toHaveLength(0);
 		expect(page.getByRole('heading', { level: 2 }).elements()).toHaveLength(1);
+		const text = textOf(container);
+		expect(makesPersonalClaim(text), text).toBe(false);
 	});
 
 	it('erases through the same dialog, and says so when the erase refuses', async () => {

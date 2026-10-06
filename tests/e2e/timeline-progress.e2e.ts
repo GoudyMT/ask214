@@ -43,4 +43,26 @@ test('a timeline whose saved progress cannot be read says so instead of showing 
 	await expect(page.getByRole('button', { name: 'Mark done' })).toHaveCount(0);
 	// The profile itself reads fine, so the Timeline still shows its separation date.
 	await expect(page.getByText(/Anchored to Apr 15, 2027/)).toBeVisible();
+
+	// Once the record reads again (here: the bad one removed, so nothing saved yet), Reload brings the list back.
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve, reject) => {
+				const req = indexedDB.open('mtc');
+				req.onerror = () => reject(new Error('E_TEST_OPEN'));
+				req.onsuccess = () => {
+					const db = req.result;
+					const tx = db.transaction('timeline-state-hwm', 'readwrite');
+					tx.objectStore('timeline-state-hwm').delete(0);
+					tx.oncomplete = () => {
+						db.close();
+						resolve();
+					};
+					tx.onerror = () => reject(new Error('E_TEST_WRITE'));
+				};
+			})
+	);
+	await page.getByRole('button', { name: 'Reload' }).click();
+	await expect(page.getByRole('button', { name: 'Mark done' }).first()).toBeAttached();
+	await expect(page.getByRole('alert')).toHaveCount(0);
 });
