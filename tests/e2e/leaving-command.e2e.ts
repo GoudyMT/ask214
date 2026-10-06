@@ -57,6 +57,17 @@ async function enterSkillBridge(page: Page, iso: string): Promise<void> {
 		.click();
 }
 
+/** The same for the terminal leave row. */
+async function enterTerminalLeave(page: Page, iso: string): Promise<void> {
+	await page.goto('/settings');
+	await page.getByRole('button', { name: /terminal leave start/i }).click();
+	await page.getByLabel('Terminal leave start').fill(iso);
+	await page
+		.getByLabel('Transition timeline')
+		.getByRole('button', { name: /^save$/i })
+		.click();
+}
+
 /** The lines of the one event whose title is exactly `title`; fails unless exactly one event has it. */
 function eventTitled(ics: string, title: string): string[] {
 	const events = ics
@@ -123,6 +134,49 @@ test('a SkillBridge date pulls TAP in and reaches the calendar file, with nothin
 			expect(request).not.toContain(date);
 		}
 		expect(request).not.toContain('Before you leave');
+	}
+});
+
+// Terminal leave is entered like SkillBridge and leaves the device the same way: never. Settings says when SkillBridge
+// falls after it, and a start already past is kept. No request may carry a typed date or the day before it.
+test('a terminal leave date, the order note and a past date, with nothing sent anywhere', async ({
+	page,
+	context
+}) => {
+	const TL_IN = 60;
+	const shownDate = (days: number) => {
+		const d = new Date();
+		d.setDate(d.getDate() + days);
+		return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+	};
+	await seedProfile(page, SEP_IN);
+	const sent: string[] = [];
+	context.on('request', (r) => {
+		sent.push(decodeRequest(`${r.url()} ${r.postDataBuffer()?.toString('utf8') ?? ''}`));
+	});
+
+	await enterTerminalLeave(page, isoFromToday(TL_IN));
+	expect(sent.some((request) => request.includes('/settings'))).toBe(true);
+	await expect(page.getByLabel('Terminal leave start')).toBeHidden(); // the row closes once the date is saved
+	await page.goto('/timeline');
+	await expect(page.getByText(`Terminal leave from ${shownDate(TL_IN)}.`)).toBeVisible();
+
+	await enterSkillBridge(page, isoFromToday(TL_IN + 10));
+	await expect(page.getByLabel('SkillBridge start')).toBeHidden();
+	await expect(
+		page.getByText('SkillBridge comes before terminal leave (NAVADMIN 064/23).')
+	).toBeVisible();
+
+	await enterTerminalLeave(page, isoFromToday(-10));
+	await expect(page.getByLabel('Terminal leave start')).toBeHidden();
+	await page.goto('/timeline');
+	await expect(page.getByText(`Terminal leave from ${shownDate(-10)}.`)).toBeVisible();
+
+	for (const request of sent) {
+		for (const days of [TL_IN, TL_IN - 1, TL_IN + 10, TL_IN + 9, -10, -11]) {
+			expect(request).not.toContain(isoFromToday(days));
+			expect(request).not.toContain(compact(isoFromToday(days)));
+		}
 	}
 });
 
