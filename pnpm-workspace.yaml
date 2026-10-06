@@ -34,7 +34,8 @@ overrides:
   # client bundle. GHSA-52cp-r559-cp3m + GHSA-5p4m-2wfm-xmqj + GHSA-2883-xcg3-v3hh (js-yaml quadratic CPU,
   # then empty merge sources defeating maxTotalMergeKeys); GHSA-xcpc-8h2w-3j85 + GHSA-7q85-xj36-vmfc (adm-zip
   # 4GB alloc, then allocation sized by the declared uncompressed size);
-  # GHSA-f88m-g3jw-g9cj + GHSA-rgj7-g3m4-5g8c (sharp/libvips CVEs). Targeted range pins - only the
+  # GHSA-f88m-g3jw-g9cj + GHSA-rgj7-g3m4-5g8c (sharp/libvips CVEs), then GHSA-wq5f-xc86-pv6w (sharp's librsvg,
+  # CVE-2026-96889, up to <0.35.5). Targeted range pins - only the
   # vulnerable ranges are bumped, so any patched consumer is left alone. Retire when the parents bundle
   # the patched versions natively (Dependabot will surface it).
   #
@@ -44,7 +45,7 @@ overrides:
   # package.
   'js-yaml@<3.15.2': '3.15.2'
   'adm-zip@<0.6.1': '0.6.1'
-  'sharp@<0.35.4': '0.35.4'
+  'sharp@<0.35.5': '0.35.5'
   # Force patched brace-expansion (GHSA-mh99-v99m-4gvg + GHSA-rgw5-rvv9-x895, DoS via unbounded expansion -> OOM crash, high;
   # transitive dev/build-only via eslint>minimatch@10 and @lhci/cli>rimraf>glob>minimatch@3, never in
   # the client bundle). Blanket floor, NOT a scoped 5.0.x pin, because pnpm's advisory range (<=5.0.7)
