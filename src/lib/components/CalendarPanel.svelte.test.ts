@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
@@ -413,6 +413,39 @@ describe('CalendarPanel', () => {
 		const screen = render(CalendarPanel, { props });
 		await page.getByRole('button', { name: "I've deleted these" }).click();
 		await expect.element(page.getByRole('heading', { level: 2, name: 'Calendar' })).toHaveFocus();
+	});
+
+	// By keyboard the heading shows the app's focus ring - a 2 px solid outline with a 2 px gap, as on every button
+	// and link - not the browser's own.
+	it('rings the Calendar heading the way the app rings a button, when focus arrives by keyboard', async () => {
+		const props = {
+			items: [],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: async () => {
+				await screen.rerender({ ...props, stale: [] });
+			}
+		};
+		const screen = render(CalendarPanel, { props });
+		// Component tests run without app.css; the ring's colour token is set here as the app defines it, and removed.
+		document.documentElement.style.setProperty('--color-accent', '#1a66c2');
+		try {
+			(screen.container.querySelector('.stale__ack') as HTMLButtonElement).focus();
+			await userEvent.keyboard('{Enter}');
+			const heading = page.getByRole('heading', { level: 2, name: 'Calendar' });
+			await expect.element(heading).toHaveFocus();
+			const ring = getComputedStyle(heading.element());
+			expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual([
+				'solid',
+				'2px',
+				'2px'
+			]);
+		} finally {
+			document.documentElement.style.removeProperty('--color-accent');
+		}
 	});
 
 	it("keeps focus on I've deleted these when the save fails", async () => {

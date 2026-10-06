@@ -180,6 +180,11 @@
 	.cal-section__heading {
 		margin: 0 0 var(--space-m);
 	}
+	/* The heading takes focus when the list clears with nothing to add: the app's ring (app.css), as on a button. */
+	.cal-section__heading:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
 	.cal-hint {
 		margin: 0 0 var(--space-m);
 		color: var(--color-fg-muted);
