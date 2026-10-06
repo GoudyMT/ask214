@@ -3,7 +3,7 @@
 	import { SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
 	import { resourcesForTask, afterLinkForTask } from '$lib/resources';
-	import { FIRM_WARNINGS } from '$lib/timeline/generate';
+	import { isFirmWarning, type FitReason } from '$lib/timeline/generate';
 
 	let {
 		item,
@@ -95,7 +95,8 @@
 		'still-to-do': 'Still to do',
 		done: 'Done',
 		skipped: 'Skipped',
-		snoozed: 'Snoozed'
+		snoozed: 'Snoozed',
+		'after-you-leave': 'After you leave'
 	};
 
 	const CATEGORY_LABEL: Record<TaskCategory, string> = {
@@ -106,30 +107,43 @@
 		finance: 'Finance'
 	};
 
+	// The reason Fit moved a date, said on that date only.
+	const REASON: Record<FitReason, string> = {
+		skillbridge: 'before SkillBridge',
+		'terminal-leave': 'before terminal leave'
+	};
+	const AFTER_YOU_LEAVE_NOTE =
+		'This opens after you leave your command. Ask your command how to fit it in.';
+
 	// The date line by status: when a window opens, a soft task's aim, a firm task's last day, when a passed date
 	// was due. Resolved states use the collapsed treatment instead.
 	const firm = $derived(item.def.kind !== 'soft');
-	const dateLine = $derived.by(() => {
+	const dateLine = $derived.by((): { text: string; reason?: string } => {
 		const f = formatTimelineDate;
+		const at = (label: string, iso: string) => ({
+			text: `${label} ${f(iso)}`,
+			...(item.fit && iso === item.fit.date ? { reason: REASON[item.fit.reason] } : {})
+		});
 		switch (item.status) {
 			case 'upcoming':
-				return `Opens ${f(item.windowStartDate)}`;
+			case 'after-you-leave':
+				return { text: `Opens ${f(item.windowStartDate)}` };
 			case 'start-now':
 				return firm
-					? `Last day ${f(item.windowEndDate)}`
-					: `Aim for ${f(item.aimDate ?? item.windowEndDate)}`;
+					? at('Last day', item.windowEndDate)
+					: at('Aim for', item.aimDate ?? item.windowEndDate);
 			case 'closing-soon':
-				return `Last day ${f(item.windowEndDate)}`;
+				return at('Last day', item.windowEndDate);
 			case 'late':
-				return `was due ${f(item.windowEndDate)}`;
+				return at('was due', item.windowEndDate);
 			case 'changed':
-				return `Last day ${f(item.finalEndDate ?? item.windowEndDate)}`;
+				return { text: `Last day ${f(item.finalEndDate ?? item.windowEndDate)}` };
 			case 'closed':
-				return f(item.finalEndDate ?? item.windowEndDate);
+				return { text: f(item.finalEndDate ?? item.windowEndDate) };
 			case 'still-to-do':
-				return `Aimed for ${f(item.windowEndDate)}`;
+				return at('Aimed for', item.windowEndDate);
 			default:
-				return f(item.targetDate);
+				return { text: f(item.targetDate) };
 		}
 	});
 
@@ -138,11 +152,13 @@
 	// After a firm date: what is still possible (late, closed), or what changed at a two-edge task's first edge. A
 	// required task closes only after separation, when its note about doing it first no longer applies.
 	const afterNote = $derived(
-		item.status === 'changed'
-			? { label: 'What changed', text: item.def.changeNote }
-			: item.status === 'late' || (item.status === 'closed' && item.def.kind === 'closes')
-				? { label: 'What now', text: item.def.afterNote }
-				: undefined
+		item.status === 'after-you-leave'
+			? { label: 'What now', text: AFTER_YOU_LEAVE_NOTE }
+			: item.status === 'changed'
+				? { label: 'What changed', text: item.def.changeNote }
+				: item.status === 'late' || (item.status === 'closed' && item.def.kind === 'closes')
+					? { label: 'What now', text: item.def.afterNote }
+					: undefined
 	);
 	// The one official page to go to from that box (curated per firm task).
 	const afterLink = $derived(afterNote ? afterLinkForTask(item.def.id) : undefined);
@@ -224,7 +240,12 @@
 	</article>
 {:else}
 	<!-- tabindex -1: the "Needs you now" rows jump here, and the card must be able to take that focus. -->
-	<article class="task-card status-{item.status}" id="task-{item.def.id}" tabindex="-1">
+	<article
+		class="task-card status-{item.status}"
+		class:task-card--calm={item.status === 'after-you-leave' && !firm}
+		id="task-{item.def.id}"
+		tabindex="-1"
+	>
 		<div class="task-card__body">
 			<h3 class="task-card__title">{item.def.title}</h3>
 			<p class="task-card__why">
@@ -258,7 +279,7 @@
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
 				<!-- A snooze never hides a firm warning, so it is not offered where it would change nothing. -->
-				{#if !FIRM_WARNINGS.has(item.status)}
+				{#if !isFirmWarning(item.status, item.def.kind)}
 					<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
@@ -323,9 +344,11 @@
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
 			<span class="task-card__when"
-				><span class="task-card__date">{dateLine}</span>{#if daysLeftLine}<span
-						class="task-card__days">{daysLeftLine}</span
-					>{/if}</span
+				><span class="task-card__date"
+					>{dateLine.text}{#if dateLine.reason}<span class="task-card__reason"
+							>, <span class="task-card__reason-words">{dateLine.reason}</span></span
+						>{/if}</span
+				>{#if daysLeftLine}<span class="task-card__days">{daysLeftLine}</span>{/if}</span
 			>
 		</div>
 	</article>
@@ -689,6 +712,16 @@
 		.task-card__meta .task-card__days::before {
 			content: '\00a0-\00a0';
 		}
+
+		/* A moved date's reason may start the next line, kept whole and joined to its countdown: the one break
+		   the date line allows is the space after the date's comma. */
+		.task-card__meta .task-card__reason {
+			white-space: normal;
+		}
+	}
+
+	.task-card__reason-words {
+		white-space: nowrap;
 	}
 
 	/* Expanded resolved header: the disclosure toggle (button reset; full-width tap target). Title
@@ -889,6 +922,23 @@
 		border-left-style: dashed;
 	}
 	.status-still-to-do .task-card__status {
+		color: var(--color-accent-muted);
+	}
+
+	/* After you leave: a firm task that opens after the user leaves the command - dotted, "needs a word with your
+	   command", not "closed". A soft one takes the calm Still-to-do look: good timing only. */
+	.status-after-you-leave {
+		border-left-color: var(--color-danger);
+		border-left-style: dotted;
+	}
+	.status-after-you-leave .task-card__status {
+		color: var(--color-danger);
+	}
+	.task-card--calm.status-after-you-leave {
+		border-left-color: var(--color-accent-muted);
+		border-left-style: dashed;
+	}
+	.task-card--calm.status-after-you-leave .task-card__status {
 		color: var(--color-accent-muted);
 	}
 

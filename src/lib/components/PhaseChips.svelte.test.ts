@@ -15,7 +15,7 @@ function makeItem(title: string): TimelineItem {
 			id: title.toLowerCase().replace(/[^a-z]+/g, '-'),
 			title,
 			category: 'admin',
-			track: 'transition',
+			finishBefore: 'separation',
 			kind: 'soft',
 			windowStart: -120,
 			windowEnd: -60,

@@ -75,6 +75,26 @@ const STATIC = 'static';
 //     6 B worse and was dropped): page 58,143 B, route nodes 42,410 B - each keeps about 90 B of room.
 //     Measured after the re-review's fixes, with no raise: page 58,220 B (10 B of room), route nodes
 //     42,491 B (9 B).
+//     Page 58,230 -> 59,230 and route nodes 42,500 -> 44,590 (owner's call, 2026-10-05): the leaving dates -
+//     the two Settings date rows, the Timeline line and the task card's "After you leave" state (the Settings
+//     and timeline route nodes), Fit and the separation package counted from the leaving day (a page chunk), the
+//     handed-over calendar record and the list of events to delete (the Settings route node), and the error
+//     catcher installed at start-up. Measured after two trim passes (-5 B page: two checks Fit's last day
+//     already decides; -14 B page, -30 B precache: a task's window computed once; moving two element references
+//     out of reactive state measured worse, and grouping the new CSS saved nothing): page 59,142 B, route nodes
+//     44,511 B - each keeps about 80 B of room.
+//     Measured after the Pre-PR review's fixes, with no raise: page 59,178 B (52 B of room), route nodes 44,562 B
+//     (28 B).
+//     Route nodes 44,590 -> 44,680 (owner's call, 2026-10-05; the limit lives in package.json's size-limit): the
+//     re-review's fixes - focus to the Calendar heading when the list clears with nothing to add, with the app's
+//     ring (Settings node, +56 B) - 44,600 B measured, after a trim pass (finding the heading by its id, -8 B, inside
+//     the noise; not kept).
+//     Page 59,230 -> 59,300 and route nodes 44,680 -> 45,000 (owner's call, 2026-10-06): the delta review's way
+//     back from saved data that fails its checks (the erase offered in Settings: the Settings route node) and the
+//     Timeline's note when its saved progress fails to load (the timeline route node) - page 59,233 B, route nodes
+//     44,917 B measured, after a trim pass (the two damaged-record codes compared inline, kept: -13 B precache,
+//     -12 B root layout; the two link colours app.css already sets, -17 B precache but +5 B route nodes and +6 B
+//     page, not kept).
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -108,6 +128,32 @@ const STATIC = 'static';
 //     (-41 B: the version as plain minutes since 1970, and the line sharing the device sentence's spacing rule).
 //     Measured after the re-review's fixes, with no raise: 139,432 B (8 B of room); the version now counts whole
 //     seconds since 2000, so two adds a second apart differ.
+//     Raised 139,440 -> 143,150 (owner's call, 2026-10-05): the leaving dates, above - 143,084 B measured with
+//     56 files, after those trim passes.
+//     Raised 143,150 -> 143,340 (owner's call, 2026-10-05): the Pre-PR review's fixes to the leaving dates - the
+//     calendar record read strictly, the out-of-date list's heading and focus, and each date in the Timeline's
+//     leaving line kept whole - 143,253 B measured with 56 files, after a trim pass (fixed ids for the list's
+//     heading measured +187 B, as the bundler re-split two routes; one loop for the leaving line +30 B; neither
+//     kept).
+//     Raised 143,340 -> 143,580 (owner's call, 2026-10-05): the re-review's fixes - a start-up error banner with
+//     Reload in the root layout (+194 B) and the Calendar heading's focus (+56 B) - 143,497 B measured with 56 files,
+//     after a trim pass (one banner component shared with the clock warning, -8 B here but +41 B in the root layout;
+//     the heading found by its id, -7 B; both together -23 B; none kept).
+//     Raised 143,580 -> 144,300 (owner's call, 2026-10-06): the delta review's fixes - the start-up's damaged-data
+//     path in the root layout (+288 B), the erase in Settings and the Timeline's note (above) - 144,220 B measured
+//     with 56 files, after that trim pass.
+//     Raised 144,300 -> 144,460 (owner's call, 2026-10-06): the Task 22 review's fixes - a damaged tab that reloads
+//     when another tab changes the data and checks again before erasing (root layout), and the timeline store's
+//     generation, lock and failure kept true to what it read (the Timeline and Settings) - 144,376 B measured with
+//     56 files, after a trim pass (one subscription for any signal instead of four named ones, -23 B precache and
+//     -18 B root layout, kept).
+//     CI drift (owner's call, 2026-10-06): the build stamps itself with the time, that chunk's hashed name changes on
+//     every build, and every chunk importing it by name changes size with it - CI measured the same code 17 B apart on
+//     precache (139,419 / 139,436 / 139,443 B against 139,440) and 8 B apart on route nodes. Each limit keeps about 40
+//     B of room above that: page 59,300 -> 59,320, route nodes 45,000 -> 45,040, precache 144,460 -> 144,480. A build
+//     stamped with its commit would make these exact per commit (hardening box).
+//     Root layout 7,000 -> 7,040 B (owner's call, 2026-10-06; the limit lives in package.json's size-limit): the same drift
+//     (main's CI measured it 6.15 and 6.16 kB on the same code) - 6,992 B measured, 48 B of room.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -117,10 +163,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 58_230,
+	page: 59_320,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 139_440,
+	precacheBytes: 144_480,
 	workerScripts: 147_200
 };
 

@@ -43,7 +43,9 @@
 	<label class="eaos-field__label" class:eaos-field__label--hidden={hideLabel} for={id}
 		>{label}</label
 	>
-	<p class="eaos-field__hint" id={hintId}>{hint}</p>
+	{#if hint}
+		<p class="eaos-field__hint" id={hintId}>{hint}</p>
+	{/if}
 	<input
 		bind:this={inputEl}
 		{id}
@@ -51,7 +53,8 @@
 		class:eaos-field__input--error={error}
 		type="date"
 		{value}
-		aria-describedby={error ? `${hintId} ${errorId}` : hintId}
+		aria-describedby={[hint ? hintId : '', error ? errorId : ''].filter(Boolean).join(' ') ||
+			undefined}
 		aria-invalid={error ? 'true' : undefined}
 		oninput={(e) => onchange(e.currentTarget.value)}
 	/>

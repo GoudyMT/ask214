@@ -15,7 +15,7 @@ const DEF: TaskDef = {
 	id: 'skillbridge-hosts',
 	title: 'Research SkillBridge hosts',
 	category: 'career',
-	track: 'transition',
+	finishBefore: 'separation',
 	kind: 'soft',
 	windowStart: -540,
 	windowEnd: -365,
@@ -618,6 +618,28 @@ describe('TaskCard (layout by width)', () => {
 		expect(box(container, '.task-card__days').top).toBe(date.top);
 	});
 
+	it('on a phone a moved date wraps before its reason and stays inside the card', async () => {
+		await page.viewport(320, 800);
+		const { container } = renderCard(
+			makeItem({
+				def: firm,
+				status: 'closing-soon',
+				windowEndDate: '2026-10-31',
+				daysLeft: 27,
+				fit: { reason: 'skillbridge', date: '2026-10-31' }
+			})
+		);
+		(container as HTMLElement).style.width = '288px';
+		const reason = box(container, '.task-card__reason-words');
+		// The line wraps (the case under test is reached), the reason starting a line of its own...
+		expect(reason.top).toBeGreaterThan(box(container, '.task-card__status').top);
+		// ...with its countdown beside it, and nothing passes the card's edge.
+		expect(box(container, '.task-card__days').top).toBe(reason.top);
+		expect(box(container, '.task-card__when').right).toBeLessThanOrEqual(
+			box(container, 'article').right
+		);
+	});
+
 	it('on a wide screen the status line sits beside the title', async () => {
 		await page.viewport(1024, 800);
 		const { container } = renderCard(closing);
@@ -695,5 +717,108 @@ describe('TaskCard (for keyboard and screen reader)', () => {
 		(resolved.querySelector('button.task-line') as HTMLButtonElement).click();
 		flushSync();
 		expect(resolved.querySelector('.task-card__why')?.textContent).toMatch(/^Career Find approved/);
+	});
+});
+
+describe('leaving your command', () => {
+	const firmDef: TaskDef = { ...DEF, id: 'sha', kind: 'required' };
+
+	it('names the reason on a date Fit moved', async () => {
+		renderCard(
+			makeItem({
+				def: firmDef,
+				status: 'closing-soon',
+				windowEndDate: '2026-10-31',
+				daysLeft: 27,
+				fit: { reason: 'skillbridge', date: '2026-10-31' }
+			})
+		);
+		await expect.element(page.getByText('Last day Oct 31, 2026, before SkillBridge')).toBeVisible();
+	});
+
+	it('names no reason on a date Fit left alone', async () => {
+		renderCard(
+			makeItem({
+				status: 'start-now',
+				aimDate: '2026-09-02',
+				windowEndDate: '2026-10-31',
+				fit: { reason: 'skillbridge', date: '2026-10-31' }
+			})
+		);
+		await expect.element(page.getByText('Aim for Sep 2, 2026')).toBeVisible();
+		expect(page.getByText(/before SkillBridge/).query()).toBeNull();
+	});
+
+	// Every dated status names the reason when its date is the one Fit moved.
+	const FIT: NonNullable<TimelineItem['fit']> = { reason: 'skillbridge', date: '2026-10-31' };
+	const REASON_CASES: [string, Partial<TimelineItem>, string][] = [
+		[
+			'a firm last day',
+			{ def: firmDef, status: 'start-now' },
+			'Last day Oct 31, 2026, before SkillBridge'
+		],
+		[
+			'an aim date',
+			{ status: 'start-now', aimDate: '2026-10-31' },
+			'Aim for Oct 31, 2026, before SkillBridge'
+		],
+		[
+			'a date that was due',
+			{ def: firmDef, status: 'late' },
+			'was due Oct 31, 2026, before SkillBridge'
+		],
+		[
+			'an aim that has passed',
+			{ status: 'still-to-do' },
+			'Aimed for Oct 31, 2026, before SkillBridge'
+		],
+		[
+			'a last day before terminal leave',
+			{
+				def: firmDef,
+				status: 'closing-soon',
+				daysLeft: 27,
+				fit: { reason: 'terminal-leave', date: '2026-10-31' }
+			},
+			'Last day Oct 31, 2026, before terminal leave'
+		]
+	];
+	for (const [name, over, text] of REASON_CASES) {
+		it(`names the reason on ${name}`, async () => {
+			renderCard(makeItem({ windowEndDate: '2026-10-31', fit: FIT, ...over }));
+			await expect.element(page.getByText(text)).toBeVisible();
+		});
+	}
+
+	it('a firm task that cannot fit warns: the opening, the What now box, no Snooze', async () => {
+		const { container } = renderCard(
+			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })
+		);
+		await expect.element(page.getByText('After you leave', { exact: true })).toBeVisible();
+		await expect.element(page.getByText('Opens Dec 1, 2026')).toBeVisible();
+		await expect
+			.element(
+				page.getByText(
+					/This opens after you leave your command\. Ask your command how to fit it in\./
+				)
+			)
+			.toBeVisible();
+		expect(page.getByRole('button', { name: /^snooze$/i }).query()).toBeNull();
+		expect(container.querySelector('article')?.classList.contains('task-card--calm')).toBe(false);
+	});
+
+	it('a soft task that cannot fit stays calm and keeps Snooze', async () => {
+		const { container } = renderCard(
+			makeItem({ status: 'after-you-leave', windowStartDate: '2027-01-30' })
+		);
+		await expect.element(page.getByRole('button', { name: /^snooze$/i })).toBeVisible();
+		expect(container.querySelector('article')?.classList.contains('task-card--calm')).toBe(true);
+	});
+
+	it('says nothing about what the user qualifies for', () => {
+		const { container } = renderCard(
+			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })
+		);
+		for (const line of textOf(container).split('\n')) expect(makesPersonalClaim(line)).toBe(false);
 	});
 });

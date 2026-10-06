@@ -1,17 +1,17 @@
 <script lang="ts">
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskExclusions } from '$lib/calendar/types';
-	import { buildIcs } from '$lib/calendar/build-ics';
-	import { currentDeviceHint } from '$lib/calendar/delivery';
+	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
+	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
 
 	type Props = {
 		items: TimelineItem[];
 		exclusions: TaskExclusions;
-		/** Injected so the serialized .ics is testable and the download stays the caller's concern. */
-		onDownload: (ics: string) => void;
+		/** Injected so the built file is testable and the hand-over stays the caller's concern. */
+		onAdd: (file: CalendarFile) => void;
 		onDismiss: () => void;
 	};
-	let { items, exclusions, onDownload, onDismiss }: Props = $props();
+	let { items, exclusions, onAdd, onDismiss }: Props = $props();
 
 	let building = $state(false);
 	const hint = currentDeviceHint();
@@ -21,7 +21,7 @@
 	async function add(): Promise<void> {
 		building = true;
 		try {
-			onDownload(await buildIcs(items, exclusions, new Date()));
+			onAdd(await buildIcs(items, exclusions, new Date()));
 		} finally {
 			building = false;
 		}
@@ -36,6 +36,7 @@
 			Add to my calendar
 		</button>
 		<p class="cal-card__hint"><b>{hint.lead}</b> {hint.text}</p>
+		<p class="cal-card__hint">{DELETE_FILE_HINT}</p>
 	</div>
 	<button class="cal-card__dismiss" type="button" aria-label="Dismiss" onclick={onDismiss}>
 		<span aria-hidden="true">x</span>

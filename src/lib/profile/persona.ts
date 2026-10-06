@@ -2,23 +2,26 @@ import type { ProfileV1 } from './types';
 import { parseEaosAtRead, daysUntilSeparation, decodeEaos, type EaosString } from './eaos';
 
 /**
+ * The dates a sailor leaves the command before separation (ISO). A stored date on or after separation is not used
+ * - no one leaves the command after they separate - and is reported under `notUsed` so the Timeline can say so.
+ */
+export type LeavingDates = {
+	skillbridgeStart?: EaosString;
+	terminalLeaveStart?: EaosString;
+	notUsed?: { skillbridgeStart?: EaosString; terminalLeaveStart?: EaosString };
+};
+
+/**
  * Persona is a discriminated union on `completeness`; consumers MUST narrow before
  * reading optional fields (TS-strict enforces it). Pure + deterministic given `today`.
  */
-/**
- * SkillBridge approval. Surfaced on the persona only when the profile has the
- * approval flag set AND a positive duration; generation left-shifts military-track tasks
- * by `durationDays` so their deadlines precede leaving for the civilian employer.
- */
-export type SkillBridge = { approved: boolean; durationDays: number };
-
 export type PersonaFilters =
 	| { completeness: 'none' }
 	| {
 			completeness: 'eaos-only';
 			eaos: EaosString;
 			daysUntilSeparation: number;
-			skillbridge?: SkillBridge;
+			leaving?: LeavingDates;
 	  }
 	| {
 			completeness: 'partial';
@@ -26,7 +29,7 @@ export type PersonaFilters =
 			daysUntilSeparation: number;
 			rate?: string;
 			rank?: string;
-			skillbridge?: SkillBridge;
+			leaving?: LeavingDates;
 	  }
 	| {
 			completeness: 'complete';
@@ -36,7 +39,7 @@ export type PersonaFilters =
 			rank: string;
 			familyStatus: string;
 			intendedPath: string;
-			skillbridge?: SkillBridge;
+			leaving?: LeavingDates;
 	  };
 
 function decode(u8?: Uint8Array | null): string | undefined {
@@ -54,14 +57,21 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 	}
 	const dus = daysUntilSeparation(eaos, today);
 
-	// SkillBridge surfaces only when explicitly approved with a positive duration; an
-	// unset/zero flag or missing duration means no shift.
-	const skillbridge: SkillBridge | undefined =
-		profile.skillbridgeApproved === 1 &&
-		typeof profile.skillbridgeDurationDays === 'number' &&
-		profile.skillbridgeDurationDays > 0
-			? { approved: true, durationDays: profile.skillbridgeDurationDays }
-			: undefined;
+	// Each date on its own: a damaged one reads as not set and never touches the EAOS or the completeness.
+	const leaving: LeavingDates = {};
+	for (const field of ['skillbridgeStart', 'terminalLeaveStart'] as const) {
+		const bytes = profile[field];
+		if (!bytes) continue;
+		let iso: EaosString;
+		try {
+			iso = parseEaosAtRead(decodeEaos(bytes));
+		} catch {
+			continue;
+		}
+		if (iso < eaos) leaving[field] = iso;
+		else leaving.notUsed = { ...leaving.notUsed, [field]: iso };
+	}
+	const hasLeaving = Object.keys(leaving).length > 0;
 
 	const rate = decode(profile.rate);
 	const rank = decode(profile.rank);
@@ -77,7 +87,7 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 			rank,
 			familyStatus,
 			intendedPath,
-			...(skillbridge && { skillbridge })
+			...(hasLeaving && { leaving })
 		};
 	}
 	if (rate || rank || familyStatus || intendedPath) {
@@ -87,13 +97,13 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 			daysUntilSeparation: dus,
 			rate,
 			rank,
-			...(skillbridge && { skillbridge })
+			...(hasLeaving && { leaving })
 		};
 	}
 	return {
 		completeness: 'eaos-only',
 		eaos,
 		daysUntilSeparation: dus,
-		...(skillbridge && { skillbridge })
+		...(hasLeaving && { leaving })
 	};
 }

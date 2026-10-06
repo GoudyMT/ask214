@@ -6,7 +6,8 @@
 	import { page } from '$app/state';
 	import AppGate from '$lib/components/AppGate.svelte';
 	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
-	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
+	import InitErrorBanner from '$lib/components/InitErrorBanner.svelte';
+	import { afterStartupFailure, setProfileApp, type ProfileApp } from '$lib/profile/context';
 	import {
 		initProfileApp,
 		provisionStore,
@@ -17,7 +18,7 @@
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
-	import { createTimelineStateStore } from '$lib/timeline';
+	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline';
 	import { createCalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus } from '$lib/broadcast/bus';
@@ -25,6 +26,7 @@
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
 	import { wipeAllStores } from '$lib/db/wipe';
+	import { stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { requestPersistentStorage } from '$lib/storage/persistence';
@@ -51,7 +53,7 @@
 
 	// App-wide profile container, set synchronously (setContext must run during component
 	// init). Populated by the client-only app-init in onMount below. The shell renders for
-	// every status except `unsupported`; store-dependent UI reads `app.store` once ready.
+	// every status except the two takeovers, `unsupported` and `stale`; store-dependent UI reads `app.store` once ready.
 	const app = $state<ProfileApp>({
 		status: 'loading',
 		store: null,
@@ -75,12 +77,10 @@
 	});
 	setInstallApp(install);
 
-	// Settings acts only on stored data (the date, calendar, lock, erase). Hide the tab on a fresh
-	// no-date profile so it appears only once there is something to configure; a locked profile has
-	// data (its persona reads 'none' only because the plaintext is sealed), so it still shows.
 	// Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable, so
 	// even a fresh no-timeline user has something to set there (the timeline sections hide inside Settings).
-	const showSettings = $derived(app.status === 'ready');
+	// And when the saved data is damaged, where its erase is the only way back.
+	const showSettings = $derived(app.status === 'ready' || app.status === 'damaged');
 
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
@@ -113,6 +113,30 @@
 				if (result.status === 'unsupported') {
 					app.cause = result.cause;
 					app.status = 'unsupported';
+					return;
+				}
+				// The saved data failed its own checks: no reload can read it, so the erase is the way back. It needs only
+				// the open database - it clears every store by registry name. Another tab may erase this data and start
+				// again meanwhile, so any signal from another tab reloads this one, and the erase checks the data once
+				// more first: data that now reads is never wiped - the page reloads onto it, and the throw stops the
+				// erase before it clears anything else.
+				if (result.status === 'damaged') {
+					safeLog({ code: 'E_INIT_FAILED' });
+					teardownRuntime = bus.subscribe(() => location.reload());
+					app.wipeAll = async () => {
+						const check = createProfileStore(result.db);
+						const damaged = await stillDamaged(async () => {
+							await check.load();
+							check.relockSync('user');
+						});
+						if (!damaged) {
+							location.reload();
+							// E_NO_LONGER_DAMAGED: Settings reads it as "nothing failed" (a fixed code, so its page needs no import).
+							throw new Error('E_NO_LONGER_DAMAGED');
+						}
+						await wipeAllStores(result.db);
+					};
+					app.status = afterStartupFailure(app.status, 'damaged');
 					return;
 				}
 				app.store = result.store;
@@ -155,16 +179,25 @@
 				// Timeline-state store rides on the same db + bus; it joins the relock set the moment
 				// it exists, before its first read decrypts anything. A timeline init failure
 				// degrades to profile-only (never blocks the wiring above).
+				let timelineStore: TimelineStateStore | null = null;
 				void provisionStore(
 					result.db,
 					(db) => createTimelineStateStore(db, { onBroadcast: (e) => echo.publish(e) }),
-					(timeline) => relockables.push(timeline)
+					(timeline) => {
+						relockables.push(timeline);
+						timelineStore = timeline;
+					}
 				)
 					.then((timeline) => {
 						if (destroyed) return;
 						app.timeline = timeline;
 					})
-					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
+					.catch(() => {
+						safeLog({ code: 'E_INIT_FAILED' });
+						// Handed over all the same: the store says its load failed, so the Timeline shows a note
+						// instead of every task as not started.
+						if (!destroyed) app.timeline = timelineStore;
+					});
 
 				// Calendar-sync store rides on the same db + bus and joins the relock set the same
 				// way; an init failure degrades to calendar-off, never blocking the wiring above.
@@ -180,10 +213,12 @@
 					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
 			})
 			.catch(() => {
-				// Hard init failure past the capability gate (e.g. a tampered keystore failing
-				// load()). Opaque log only (no PII). The app shell stays usable; a dedicated
-				// init-error / recovery surface is deferred to v1.1 (see Settings "Wipe" L5).
+				// Hard init failure past the capability gate: an app older than its database (a newer release raised
+				// the version), an open another tab blocks, a storage error - damaged saved data resolves as `damaged`
+				// above instead. Opaque log only (no PII). The shell stays usable - Ask, About and Documents need no saved
+				// data - and a banner says so, with Reload.
 				safeLog({ code: 'E_INIT_FAILED' });
+				if (!destroyed) app.status = afterStartupFailure(app.status, 'error');
 			});
 
 		return () => {
@@ -271,6 +306,8 @@
 
 	{#if app.status === 'ready' && app.store?.clockBackward}
 		<ClockBackwardBanner onfix={() => void goto(resolve('/settings'))} />
+	{:else if app.status === 'error' || app.status === 'damaged'}
+		<InitErrorBanner damaged={app.status === 'damaged'} />
 	{/if}
 
 	<main id="main-content" style:--shell-width={shellWidth}>

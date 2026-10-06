@@ -1,7 +1,9 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { buildIcs } from './build-ics';
 import { computeIcsUid } from './uid';
-import type { TimelineItem } from '../timeline/generate';
+import { generateTimeline, type TimelineItem } from '../timeline/generate';
+import { TASK_DEFS } from '../timeline/task-defs';
+import type { EaosString } from '../profile/eaos';
 
 const NOW = new Date('2026-10-03T12:00:00Z');
 
@@ -12,7 +14,7 @@ describe('buildIcs', () => {
 				id: 'bdd',
 				title: 'BDD',
 				category: 'benefits',
-				track: 'transition',
+				finishBefore: 'separation',
 				kind: 'closes',
 				windowStart: -180,
 				windowEnd: -90,
@@ -25,7 +27,10 @@ describe('buildIcs', () => {
 			status: 'upcoming'
 		};
 		// A UID line is 78 octets, so it always folds: join the folds before reading.
-		const ics = (await buildIcs([bdd], { taskIds: [], categories: [] }, NOW)).replace(/\r\n /g, '');
+		const ics = (await buildIcs([bdd], { taskIds: [], categories: [] }, NOW)).ics.replace(
+			/\r\n /g,
+			''
+		);
 		// An app that matches events by ID can then update the one a user already has instead of duplicating it.
 		expect(ics).toContain(`UID:${await computeIcsUid('bdd')}\r\n`);
 		expect(ics).toContain(`UID:${await computeIcsUid('bdd:opens')}\r\n`);
@@ -37,7 +42,7 @@ describe('buildIcs', () => {
 				id: 's',
 				title: 'S',
 				category: 'admin',
-				track: 'transition',
+				finishBefore: 'separation',
 				kind: 'soft',
 				windowStart: -180,
 				windowEnd: -90,
@@ -49,7 +54,7 @@ describe('buildIcs', () => {
 			status: 'upcoming',
 			aimDate: '2026-11-01'
 		};
-		const ics = (await buildIcs([soft], { taskIds: [], categories: [] }, NOW)).replace(
+		const ics = (await buildIcs([soft], { taskIds: [], categories: [] }, NOW)).ics.replace(
 			/\r\n /g,
 			''
 		);
@@ -63,7 +68,7 @@ describe('buildIcs', () => {
 				id: 'v',
 				title: 'V',
 				category: 'benefits',
-				track: 'transition',
+				finishBefore: 'separation',
 				kind: 'closes',
 				windowStart: 0,
 				windowEnd: 240,
@@ -78,7 +83,7 @@ describe('buildIcs', () => {
 			finalEndDate: '2028-03-01',
 			status: 'upcoming'
 		};
-		const ics = (await buildIcs([vgli], { taskIds: [], categories: [] }, NOW)).replace(
+		const ics = (await buildIcs([vgli], { taskIds: [], categories: [] }, NOW)).ics.replace(
 			/\r\n /g,
 			''
 		);
@@ -101,7 +106,7 @@ describe('buildIcs on the device clock', () => {
 			id,
 			title: id,
 			category: 'benefits',
-			track: 'transition',
+			finishBefore: 'separation',
 			kind: 'closes',
 			windowStart: -180,
 			windowEnd: -90,
@@ -121,7 +126,7 @@ describe('buildIcs on the device clock', () => {
 		const evening = new Date('2026-10-04T01:00:00Z');
 		expect(evening.getHours()).toBe(21); // the zone took effect: 21:00 on Oct 3
 		const ics = unfold(
-			await buildIcs([firm('today', '2026-10-03'), firm('soon', '2026-10-05')], none, evening)
+			(await buildIcs([firm('today', '2026-10-03'), firm('soon', '2026-10-05')], none, evening)).ics
 		);
 		expect(ics).toContain(
 			'DTSTART;VALUE=DATE:20261003\r\nDTEND;VALUE=DATE:20261004\r\nSUMMARY:Last day: today'
@@ -134,12 +139,125 @@ describe('buildIcs on the device clock', () => {
 		vi.stubEnv('TZ', 'Asia/Tokyo');
 		const morning = new Date('2026-10-03T23:30:00Z');
 		expect(morning.getHours()).toBe(8); // the zone took effect: 08:30 on Oct 4
-		const ics = await buildIcs(
+		const { ics } = await buildIcs(
 			[firm('yesterday', '2026-10-03'), firm('today', '2026-10-04')],
 			none,
 			morning
 		);
 		expect(ics).not.toContain('DTSTART;VALUE=DATE:20261003');
 		expect(ics).toContain('DTSTART;VALUE=DATE:20261004');
+	});
+
+	it('a "Before you leave" event keeps the task\'s own calendar ID', async () => {
+		const it0: TimelineItem = {
+			def: {
+				id: 'sha-complete',
+				title: 'Complete your SHA',
+				category: 'medical',
+				finishBefore: 'terminal-leave',
+				kind: 'required',
+				windowStart: -150,
+				windowEnd: -90,
+				why: ''
+			},
+			targetDate: '2026-11-14',
+			windowStartDate: '2026-12-01',
+			windowEndDate: '2026-11-14',
+			status: 'after-you-leave'
+		};
+		const { ics } = await buildIcs(
+			[it0],
+			{ taskIds: [], categories: [] },
+			new Date(2026, 9, 4, 12)
+		);
+		const unfolded = ics.replace(/\r\n /g, '');
+		expect(unfolded).toContain(`UID:${await computeIcsUid('sha-complete')}`);
+		expect(unfolded).toContain('SUMMARY:Before you leave: Complete your SHA');
+	});
+
+	it('the leaving dates change only event dates, alerts and the Before-you-leave prefix - nothing is added', async () => {
+		const now = new Date(2026, 9, 4, 12);
+		const fileFor = async (leaving?: object) => {
+			const persona = {
+				completeness: 'eaos-only' as const,
+				eaos: '2027-04-30' as EaosString,
+				daysUntilSeparation: 208,
+				...(leaving ? { leaving: leaving as never } : {})
+			};
+			const items = generateTimeline(
+				persona,
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				now
+			).phases.flatMap((p) => p.items);
+			return (await buildIcs(items, { taskIds: [], categories: [] }, now)).ics.replace(
+				/\r\n /g,
+				''
+			);
+		};
+		const withDates = await fileFor({
+			skillbridgeStart: '2026-11-01',
+			terminalLeaveStart: '2027-04-01'
+		});
+		const allowed = new Set([
+			'BEGIN',
+			'END',
+			'UID',
+			'DTSTAMP',
+			'SEQUENCE',
+			'DTSTART',
+			'DTEND',
+			'SUMMARY',
+			'ACTION',
+			'DESCRIPTION',
+			'TRIGGER',
+			'VERSION',
+			'PRODID',
+			'CALSCALE'
+		]);
+		for (const line of withDates.split('\r\n').filter(Boolean)) {
+			expect(allowed.has(line.split(/[;:]/)[0] ?? '')).toBe(true);
+		}
+		expect(withDates).not.toMatch(/SkillBridge|terminal leave/i);
+		// SUMMARY text is escaped in the file (a comma is written "\,"); undo that to compare with the task titles.
+		const titles = (ics: string) =>
+			[...ics.matchAll(/SUMMARY:(.*)/g)].map((m) =>
+				(m[1] ?? '').replace(/\\([,;\\])/g, '$1').replace(/^Before you leave: /, '')
+			);
+		const without = await fileFor();
+		// Every title in the dated file is a task title the undated file could also carry; no new kind of text.
+		const known = new Set(TASK_DEFS.map((t) => t.title));
+		for (const t of titles(withDates)) {
+			expect(known.has(t.replace(/^(Opens|Changes|Last day|Aim for): /, '')), t).toBe(true);
+		}
+		expect(titles(without).length).toBeGreaterThan(0);
+	});
+
+	it('returns the events it wrote with the text', async () => {
+		const file = await buildIcs(
+			[
+				{
+					def: {
+						id: 'a',
+						title: 'A',
+						category: 'admin',
+						finishBefore: 'separation',
+						kind: 'soft',
+						windowStart: -180,
+						windowEnd: -90,
+						why: ''
+					},
+					targetDate: '2099-01-01',
+					windowStartDate: '2098-12-01',
+					windowEndDate: '2099-02-01',
+					status: 'upcoming',
+					aimDate: '2099-01-01'
+				}
+			],
+			{ taskIds: [], categories: [] },
+			new Date(2026, 9, 4, 12)
+		);
+		expect(file.events.map((e) => e.title)).toEqual(['Aim for: A']);
+		expect(file.ics).toContain('SUMMARY:Aim for: A');
 	});
 });

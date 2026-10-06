@@ -5,11 +5,12 @@
 
 	let { groups }: { groups: NeedsNowGroups } = $props();
 
-	// The four groups in urgency order; an empty group is not drawn, and with all four empty the panel hides.
+	// The groups in urgency order; an empty group is not drawn, and with every group empty the panel hides.
 	const sections = $derived(
 		[
 			{ label: 'Late', items: groups.late },
 			{ label: 'Closing soon', items: groups.closingSoon },
+			{ label: 'After you leave', items: groups.afterYouLeave },
 			{ label: 'Just closed', items: groups.justClosed },
 			{ label: 'Just opened', items: groups.justOpened }
 		].filter((s) => s.items.length > 0)
@@ -28,6 +29,8 @@
 				return `${f(item.finalEndDate ?? item.windowEndDate)} - ${days}`;
 			case 'closed':
 				return `closed ${f(item.finalEndDate ?? item.windowEndDate)}`;
+			case 'after-you-leave':
+				return 'ask your command';
 			default:
 				// A soft window has no closing date to give: name the date the card aims for.
 				return item.def.kind === 'soft'
@@ -49,8 +52,10 @@
 					<li>
 						<a class="needs-now__row" href="#task-{item.def.id}">
 							<span class="needs-now__title">{item.def.title}</span>
-							<span class="needs-now__when" class:needs-now__when--hot={item.status !== 'start-now'}
-								>{when(item)}</span
+							<span
+								class="needs-now__when"
+								class:needs-now__when--hot={item.status !== 'start-now' &&
+									item.status !== 'after-you-leave'}>{when(item)}</span
 							>
 						</a>
 					</li>

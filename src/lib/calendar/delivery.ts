@@ -34,10 +34,11 @@ export const DEVICE_HINT: Record<DeviceKind, { lead: string; text: string }> = {
 		lead: 'On this phone:',
 		text: 'it saves a calendar file, then asks which app to open it with. Pick your calendar, then tap Add all.'
 	},
-	// Not yet checked on a real iPhone.
+	// Checked on a real iPhone (2026-10-06): Safari opens the file straight in Calendar, which offers Add All; a copy
+	// also stays in Files > Downloads, so the delete-the-file line below holds.
 	ios: {
 		lead: 'On iPhone or iPad, use Safari:',
-		text: 'it saves a calendar file. Open it from Downloads, then tap Add All.'
+		text: 'it opens the events in your calendar. Tap Add All.'
 	},
 	computer: {
 		lead: 'On a computer:',
@@ -54,6 +55,9 @@ export const IOS_APP_HINT = {
 	lead: 'On iPhone or iPad:',
 	text: 'it saves a calendar file. Open it from Downloads, then tap Add All.'
 };
+
+/** Under every add button: the file stays in the downloads after the calendar takes it, outside Erase all data. */
+export const DELETE_FILE_HINT = "Once it's added, you can delete the downloaded file.";
 
 export function deviceHint(
 	kind: DeviceKind,

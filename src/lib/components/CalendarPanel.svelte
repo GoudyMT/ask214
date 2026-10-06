@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskCategory } from '$lib/timeline/types';
-	import type { TaskExclusions } from '$lib/calendar/types';
-	import { buildIcs } from '$lib/calendar/build-ics';
+	import type { HandedOverEvent, TaskExclusions } from '$lib/calendar/types';
+	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
+	import StaleEvents from './StaleEvents.svelte';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
-	import { currentDeviceHint } from '$lib/calendar/delivery';
+	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
 	import { localTodayIso } from '$lib/timeline/day-math';
 
 	type Props = {
@@ -17,12 +19,16 @@
 		 * deliberately kept off their calendar.
 		 */
 		ready: boolean;
-		/** Receives an update to apply to the set as saved, not a whole new set. */
-		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => void;
-		/** Injected so the serialized .ics is testable and the actual download stays the caller's concern. */
-		onDownload: (ics: string) => void;
+		/** Receives an update to apply to the set as saved, not a whole new set; rejects when the save fails. */
+		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => Promise<void>;
+		/** Injected so the built file is testable and the actual hand-over stays the caller's concern. */
+		onAdd: (file: CalendarFile) => void;
+		/** The events handed to the calendar that the file no longer carries as they are: the user's to delete. */
+		stale: HandedOverEvent[];
+		/** Forgets the listed events; rejects when the save fails. */
+		onAcknowledge: () => Promise<void>;
 	};
-	let { items, exclusions, ready, onSetExclusions, onDownload }: Props = $props();
+	let { items, exclusions, ready, onSetExclusions, onAdd, stale, onAcknowledge }: Props = $props();
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
@@ -38,19 +44,46 @@
 		computeDesiredEvents(items, exclusions, localTodayIso(new Date())).length > 0
 	);
 
+	let toggleError = $state<string | null>(null);
+
 	// Applied to the set as saved, not to `exclusions`: that prop changes only once a save lands, so quick taps
-	// would each start from the same older set and overwrite one another.
-	function toggleCategory(cat: TaskCategory, on: boolean): void {
-		onSetExclusions((current) => {
-			const categories = current.categories.filter((c) => c !== cat);
-			return { taskIds: current.taskIds, categories: on ? [...categories, cat] : categories };
-		});
+	// would each start from the same older set and overwrite one another. A failed write puts the box back and
+	// says so: the prop never changed, so the box would otherwise show a choice that was not saved.
+	async function toggleCategory(
+		cat: TaskCategory,
+		on: boolean,
+		box: HTMLInputElement
+	): Promise<void> {
+		toggleError = null;
+		try {
+			await onSetExclusions((current) => {
+				const categories = current.categories.filter((c) => c !== cat);
+				return { taskIds: current.taskIds, categories: on ? [...categories, cat] : categories };
+			});
+		} catch {
+			box.checked = !on;
+			toggleError = 'Could not update right now - please try again.';
+		}
+	}
+
+	let addEl = $state<HTMLButtonElement | null>(null);
+	let headingEl = $state<HTMLHeadingElement | null>(null);
+
+	// "I've deleted these" takes the list away with focus on its button, so focus moves to Add, the next step the list
+	// names - or, with nothing ahead to add, to the Calendar heading, since a disabled button cannot take focus. Only
+	// when focus fell with the list, and without scrolling: a user who moved on while the save ran stays where they are.
+	// A failed save rejects before this, so focus stays and the list says why.
+	async function acknowledge(): Promise<void> {
+		await onAcknowledge();
+		await tick();
+		if (document.activeElement === document.body)
+			(addEl && !addEl.disabled ? addEl : headingEl)?.focus({ preventScroll: true });
 	}
 
 	async function addToCalendar(): Promise<void> {
 		building = true;
 		try {
-			onDownload(await buildIcs(items, exclusions, new Date()));
+			onAdd(await buildIcs(items, exclusions, new Date()));
 		} finally {
 			building = false;
 		}
@@ -58,10 +91,20 @@
 </script>
 
 <section class="cal-section" aria-labelledby="calendar-heading">
-	<h2 id="calendar-heading" class="cal-section__heading">Calendar</h2>
+	<!-- tabindex -1: a target for the focus move above, never a stop on the Tab order. -->
+	<h2 bind:this={headingEl} id="calendar-heading" class="cal-section__heading" tabindex="-1">
+		Calendar
+	</h2>
 	<p class="cal-hint">Your upcoming deadlines, with alerts before each firm one.</p>
 
+	<!-- Only once both stores have loaded: before that the list is built from a stand-in empty task state and
+	     could name an event that is not out of date. -->
+	{#if ready}
+		<StaleEvents events={stale} onAcknowledge={acknowledge} />
+	{/if}
+
 	<button
+		bind:this={addEl}
 		class="cal-add"
 		type="button"
 		disabled={building || !ready || !hasEvents}
@@ -73,10 +116,16 @@
 		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
 	{:else}
 		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
-		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. -->
-		<p class="cal-hint cal-hint--device">
-			Changed a date? Remove the events you added before, then add again.
-		</p>
+		<p class="cal-hint cal-hint--device">{DELETE_FILE_HINT}</p>
+		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. While the
+		     list above names events it says this instead; with nothing listed (no add recorded yet, every listed
+		     event deleted, or the settings still loading, when the list is not shown) the line stands, and it also
+		     says to add again. -->
+		{#if !ready || stale.length === 0}
+			<p class="cal-hint cal-hint--device">
+				Changed a date? Remove the events you added before, then add again.
+			</p>
+		{/if}
 	{/if}
 
 	{#if !ready}
@@ -111,12 +160,13 @@
 							type="checkbox"
 							value={cat}
 							checked={exclusions.categories.includes(cat)}
-							onchange={(e) => toggleCategory(cat, e.currentTarget.checked)}
+							onchange={(e) => void toggleCategory(cat, e.currentTarget.checked, e.currentTarget)}
 						/>
 						<span>{cat}</span>
 					</label>
 				{/each}
 			</fieldset>
+			{#if toggleError}<p class="cal-hint" role="alert">{toggleError}</p>{/if}
 		{/if}
 	</div>
 </section>
@@ -131,6 +181,11 @@
 	}
 	.cal-section__heading {
 		margin: 0 0 var(--space-m);
+	}
+	/* The heading takes focus when the list clears with nothing to add: the app's ring (app.css), as on a button. */
+	.cal-section__heading:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 	.cal-hint {
 		margin: 0 0 var(--space-m);

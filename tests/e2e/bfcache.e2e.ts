@@ -24,20 +24,20 @@ test('page-lifecycle: pagehide relocks the profile, persisted pageshow restores 
 
 	// Settings shows the decrypted value (store loaded, unlocked).
 	await page.goto('/settings');
-	await expect(page.getByText('2027-04-15')).toBeVisible();
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
 
 	// pagehide (page backgrounded / entering BFCache) -> relockSync: PII zeroized, store locked.
 	await page.evaluate(() =>
 		window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
 	);
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeVisible();
-	await expect(page.getByText('2027-04-15')).toBeHidden();
+	await expect(page.getByText('Apr 15, 2027')).toBeHidden();
 
 	// Persisted pageshow (BFCache restore) -> store.load() re-decrypts from IDB; the value returns.
 	await page.evaluate(() =>
 		window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
 	);
-	await expect(page.getByText('2027-04-15')).toBeVisible();
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeHidden();
 });
 
@@ -51,14 +51,14 @@ test('page-lifecycle: freeze relocks the profile, resume restores it', async ({ 
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 
 	await page.goto('/settings');
-	await expect(page.getByText('2027-04-15')).toBeVisible();
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
 
 	await page.evaluate(() => document.dispatchEvent(new Event('freeze')));
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeVisible();
-	await expect(page.getByText('2027-04-15')).toBeHidden();
+	await expect(page.getByText('Apr 15, 2027')).toBeHidden();
 
 	await page.evaluate(() => document.dispatchEvent(new Event('resume')));
-	await expect(page.getByText('2027-04-15')).toBeVisible();
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeHidden();
 });
 
@@ -74,20 +74,20 @@ test('page-lifecycle: hiding the page relocks the profile, showing it restores',
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 
 	await page.goto('/settings');
-	await expect(page.getByText('2027-04-15')).toBeVisible();
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
 
 	await page.evaluate(() => {
 		Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
 		document.dispatchEvent(new Event('visibilitychange'));
 	});
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeVisible();
-	await expect(page.getByText('2027-04-15')).toBeHidden();
+	await expect(page.getByText('Apr 15, 2027')).toBeHidden();
 
 	await page.evaluate(() => {
 		Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
 		document.dispatchEvent(new Event('visibilitychange'));
 	});
-	await expect(page.getByText('2027-04-15')).toBeVisible();
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeHidden();
 });
 
@@ -111,5 +111,5 @@ test('page-lifecycle: an explicit Lock survives a background and restore', async
 
 	// Still locked. The restore may undo the app's own hygiene, never the user's decision.
 	await expect(page.getByRole('heading', { name: /your data is locked/i })).toBeVisible();
-	await expect(page.getByText('2027-04-15')).toBeHidden();
+	await expect(page.getByText('Apr 15, 2027')).toBeHidden();
 });

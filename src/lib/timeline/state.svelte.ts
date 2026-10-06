@@ -81,11 +81,15 @@ export type TimelineStoreOptions = { onBroadcast?: (e: TimelineBroadcastEvent) =
 
 export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOptions = {}) {
 	let _state = $state<TimelineState | null>(null);
+	// Whether the last load failed: not loaded can mean not read YET, which the Timeline waits out, or could not be read,
+	// which it says.
+	let _failed = $state(false);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
 	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
-	let lockState: LockState = 'unlocked';
+	// Reactive: the Timeline offers Unlock while this stays `locked` after the profile has opened.
+	let lockState = $state<LockState>('unlocked');
 
 	function relockNow(reason: RelockReason): void {
 		_state = null;
@@ -195,6 +199,26 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return _state ?? EMPTY_STATE;
 		},
 
+		/** Whether the record is loaded. FALSE before the first load and after a relock: the stored statuses are
+		 *  then UNKNOWN, and an add built from the empty defaults would put done tasks back in the calendar. */
+		get ready(): boolean {
+			return _state !== null;
+		},
+
+		/** Whether the last load failed, so the stored statuses could not be read; a load that succeeds clears it. */
+		get failed(): boolean {
+			return _failed;
+		},
+
+		/**
+		 * Whether the user's lock holds: only a load the user asks for opens it, and page hygiene on top of it does not
+		 * move it. The profile can open while this stays locked (a page hidden while Unlock read the timeline), and then
+		 * only Unlock reads it again - an automatic re-read refuses a locked store.
+		 */
+		get locked(): boolean {
+			return lockState === 'locked';
+		},
+
 		/**
 		 * Re-read from disk. A relock landing WHILE this runs wins: repopulating decrypted state into
 		 * a tab that has since locked silently undoes the lock, and the idle timer does not fire twice.
@@ -203,34 +227,48 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
-			await withWriteLocks(
-				async () => {
-					ks = await readVerifiedKeystore();
-					return ks.keystoreGeneration;
-				},
-				async () => {
-					if (!ks) throw new KeystoreNotInitializedError();
-					const keystore = ks;
-					const gen = await readCurrentGeneration(keystore);
-					_generation = gen;
-					if (gen === 0) {
+			// The user's Unlock is a new attempt: the Timeline waits for it instead of repeating the last failure (an alert)
+			// while it runs. An automatic re-read keeps the failure, so a note that stays true is not announced again on
+			// every return to the page.
+			if (lockState === 'locked') _failed = false;
+			try {
+				await withWriteLocks(
+					async () => {
+						ks = await readVerifiedKeystore();
+						return ks.keystoreGeneration;
+					},
+					async () => {
+						if (!ks) throw new KeystoreNotInitializedError();
+						const keystore = ks;
+						const gen = await readCurrentGeneration(keystore);
+						// The generation moves only with the statuses it belongs to: a read that fails after a peer's save
+						// would otherwise pair the newer generation with the older statuses, and a write from them would
+						// pass the conflict check and lay them over the peer's save.
+						if (gen === 0) {
+							_generation = gen;
+							if (relockEpoch === relockAtStart) {
+								_state = { schemaVersion: 1, tasks: {} };
+								lockState = 'unlocked';
+							}
+							return;
+						}
+						const row = await getRow<StateRow>(db, 'timeline-state');
+						if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
+						const decoded = decodeTimelineState(
+							await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
+						);
+						_generation = gen;
 						if (relockEpoch === relockAtStart) {
-							_state = { schemaVersion: 1, tasks: {} };
+							_state = decoded;
 							lockState = 'unlocked';
 						}
-						return;
 					}
-					const row = await getRow<StateRow>(db, 'timeline-state');
-					if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
-					const decoded = decodeTimelineState(
-						await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
-					);
-					if (relockEpoch === relockAtStart) {
-						_state = decoded;
-						lockState = 'unlocked';
-					}
-				}
-			);
+				);
+			} catch (e) {
+				_failed = true;
+				throw e;
+			}
+			_failed = false;
 		},
 
 		/**

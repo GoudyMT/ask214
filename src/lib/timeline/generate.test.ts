@@ -7,6 +7,7 @@ import {
 	type AnchoredTask
 } from './generate';
 import { selectNeedsNow } from './needs-now';
+import { TASK_DEFS } from './task-defs';
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
@@ -17,7 +18,7 @@ const universal: TaskDef = {
 	id: 'u1',
 	title: 'Universal task',
 	category: 'admin',
-	track: 'transition',
+	finishBefore: 'separation',
 	kind: 'soft',
 	windowStart: -180,
 	windowEnd: -90,
@@ -29,7 +30,7 @@ const noRecommended: TaskDef = {
 	id: 'n1',
 	title: 'No recommended offset',
 	category: 'admin',
-	track: 'transition',
+	finishBefore: 'separation',
 	kind: 'soft',
 	windowStart: -60,
 	windowEnd: -30,
@@ -40,7 +41,7 @@ const gatedSchool: TaskDef = {
 	id: 'g1',
 	title: 'School-only task',
 	category: 'career',
-	track: 'transition',
+	finishBefore: 'separation',
 	kind: 'soft',
 	windowStart: -365,
 	windowEnd: -180,
@@ -104,7 +105,7 @@ describe('filterAndAnchor (gate + anchor)', () => {
 describe('deriveStatus (status + snooze-expiry)', () => {
 	const anchored: AnchoredTask = {
 		def: universal,
-		effectiveOffset: -120,
+		sortOffset: -120,
 		targetDate: '2027-01-15',
 		windowStartDate: '2027-01-01',
 		windowEndDate: '2027-03-01',
@@ -150,7 +151,7 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		id,
 		title: id,
 		category: 'admin',
-		track: 'transition',
+		finishBefore: 'separation',
 		kind: 'soft',
 		windowStart: recommendedOffset,
 		windowEnd: recommendedOffset + 30,
@@ -267,53 +268,165 @@ describe('generateTimeline (sort + group + assemble)', () => {
 	});
 });
 
-describe('generateTimeline SkillBridge shift', () => {
-	const emptyState: TimelineState = { schemaVersion: 1, tasks: {} };
-	const today = new Date('2026-06-04T12:00:00Z');
-	const noSkillBridge: PersonaFilters = {
+describe('Fit: the leaving dates pull in a last day, never an opening', () => {
+	const SEP = '2027-04-30' as EaosString;
+	const TODAY = new Date(2026, 9, 4, 12); // Oct 4, 2026, local
+	const leaving = (l: {
+		skillbridgeStart?: string;
+		terminalLeaveStart?: string;
+	}): PersonaFilters => ({
 		completeness: 'eaos-only',
-		eaos: EAOS,
-		daysUntilSeparation: 100
+		eaos: SEP,
+		daysUntilSeparation: 208,
+		leaving: l as never
+	});
+	const item = (p: PersonaFilters, id: string) => {
+		const view = generateTimeline(p, [...TASK_DEFS], { schemaVersion: 1, tasks: {} }, TODAY);
+		const found = view.phases.flatMap((ph) => ph.items).find((i) => i.def.id === id);
+		if (!found) throw new Error('E_TEST_TASK_MISSING');
+		return found;
 	};
-	const skillBridge90: PersonaFilters = {
-		completeness: 'eaos-only',
-		eaos: EAOS,
-		daysUntilSeparation: 100,
-		skillbridge: { approved: true, durationDays: 90 }
-	};
-	const militaryTask: TaskDef = {
-		id: 'm1',
-		title: 'Military task',
-		category: 'admin',
-		track: 'military',
-		kind: 'soft',
-		windowStart: -120,
-		windowEnd: -90,
-		recommendedOffset: -120,
-		why: 'w'
-	};
-	const transitionTask: TaskDef = { ...militaryTask, id: 't1', track: 'transition' };
 
-	const firstItem = (p: PersonaFilters, defs: TaskDef[]) =>
-		generateTimeline(p, defs, emptyState, today).phases.flatMap((ph) => ph.items)[0];
-
-	it('left-shifts a military-track task by the SkillBridge duration', () => {
-		expect(firstItem(noSkillBridge, [militaryTask])?.targetDate).toBe(eaosOffsetDate(EAOS, -120));
-		expect(firstItem(skillBridge90, [militaryTask])?.targetDate).toBe(eaosOffsetDate(EAOS, -210));
+	it('a leaving task ends the day before SkillBridge starts', () => {
+		const capstone = item(leaving({ skillbridgeStart: '2026-11-01' }), 'tap-capstone');
+		expect(capstone.windowStartDate).toBe('2026-04-30'); // the opening never moves
+		expect(capstone.windowEndDate).toBe('2026-10-31');
+		expect(capstone.status).toBe('closing-soon');
+		expect(capstone.daysLeft).toBe(27); // the countdown runs to the pulled-in last day: Oct 4 -> Oct 31
+		expect(capstone.fit).toEqual({ reason: 'skillbridge', date: '2026-10-31' });
 	});
 
-	it('does not shift a transition-track task', () => {
-		expect(firstItem(skillBridge90, [transitionTask])?.targetDate).toBe(eaosOffsetDate(EAOS, -120));
+	it('a required task past its pulled-in last day stays late until the real separation', () => {
+		const capstone = item(leaving({ skillbridgeStart: '2026-09-01' }), 'tap-capstone');
+		expect(capstone.windowEndDate).toBe('2026-08-31');
+		expect(capstone.status).toBe('late');
 	});
 
-	it('does not shift when SkillBridge is not approved (baseline)', () => {
-		expect(firstItem(noSkillBridge, [militaryTask])?.targetDate).toBe(eaosOffsetDate(EAOS, -120));
+	it('a window already ending before the leaving day is untouched', () => {
+		const presep = item(leaving({ skillbridgeStart: '2026-11-01' }), 'preseparation-counseling');
+		expect(presep.windowEndDate).toBe('2026-04-30');
+		expect(presep.fit).toBeUndefined();
 	});
 
-	it('shifts the window dates uniformly with the target date', () => {
-		const item = firstItem(skillBridge90, [militaryTask]);
-		expect(item?.windowStartDate).toBe(eaosOffsetDate(EAOS, -210));
-		expect(item?.windowEndDate).toBe(eaosOffsetDate(EAOS, -180));
+	it('a terminal-leave task ignores SkillBridge and fits before terminal leave', () => {
+		expect(item(leaving({ skillbridgeStart: '2026-11-01' }), 'sha-complete').windowEndDate).toBe(
+			'2027-01-30'
+		);
+		const sha = item(leaving({ terminalLeaveStart: '2026-11-15' }), 'sha-complete');
+		expect(sha.status).toBe('after-you-leave'); // opens Dec 1, after the Nov 14 last day
+		expect(sha.windowStartDate).toBe('2026-12-01');
+		expect(sha.windowEndDate).toBe('2026-11-14');
+	});
+
+	it('the earlier date anchors a leaving task, and names the reason', () => {
+		const both = item(
+			leaving({ skillbridgeStart: '2027-04-05', terminalLeaveStart: '2027-04-01' }),
+			'tap-capstone'
+		);
+		expect(both.windowEndDate).toBe('2027-01-30'); // official end is already earlier
+		const early = item(
+			leaving({ skillbridgeStart: '2027-01-20', terminalLeaveStart: '2027-01-10' }),
+			'tap-capstone'
+		);
+		expect(early.windowEndDate).toBe('2027-01-09');
+		expect(early.fit?.reason).toBe('terminal-leave');
+		// The reason names the last day, not the target, which stays at its own earlier date (Dec 31).
+		expect(early.fit).toEqual({ reason: 'terminal-leave', date: '2027-01-09' });
+	});
+
+	it('a leaving date the day after the official last day moves nothing', () => {
+		const capstone = item(leaving({ skillbridgeStart: '2027-01-31' }), 'tap-capstone');
+		expect(capstone.windowEndDate).toBe('2027-01-30');
+		expect(capstone.fit).toBeUndefined();
+	});
+
+	it('a task opening on the first day away cannot fit; one day earlier it can', () => {
+		const letters = item(leaving({ skillbridgeStart: '2026-11-01' }), 'reference-letters');
+		expect(letters.status).toBe('after-you-leave');
+		expect(letters.fit).toBeUndefined(); // no reason on a date: the card shows the opening instead
+		const oneDay = item(leaving({ skillbridgeStart: '2026-11-02' }), 'reference-letters');
+		expect(oneDay.windowStartDate).toBe('2026-11-01');
+		expect(oneDay.windowEndDate).toBe('2026-11-01');
+		expect(oneDay.status).toBe('upcoming');
+	});
+
+	it('a soft aim date is held inside the shortened window', () => {
+		const track = item(leaving({ skillbridgeStart: '2026-11-01' }), 'tap-track');
+		expect(track.aimDate).toBe('2026-10-31');
+	});
+
+	it('a separation task never moves', () => {
+		const bdd = item(leaving({ skillbridgeStart: '2026-11-01' }), 'va-bdd-claim');
+		expect(bdd.windowEndDate).toBe('2027-01-30');
+		expect(bdd.fit).toBeUndefined();
+	});
+
+	it('a pulled-in task sorts by its fitted date', () => {
+		const view = generateTimeline(
+			leaving({ skillbridgeStart: '2026-11-01' }),
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: {} },
+			TODAY
+		);
+		const capstonePhase = view.phases.find((ph) =>
+			ph.items.some((i) => i.def.id === 'tap-capstone')
+		);
+		// Oct 31 is 181 days out: the 12-6 months phase ([-365, -180)); without SkillBridge it sits in 6-3 months.
+		expect(capstonePhase?.bucket.id).toBe('12-6mo');
+	});
+
+	it('the separation package counts its whole window from the day you leave', () => {
+		const pkg = item(leaving({ skillbridgeStart: '2026-11-01' }), 'separation-package');
+		expect(pkg.windowStartDate).toBe('2026-02-04'); // 270 days before Nov 1
+		expect(pkg.targetDate).toBe('2026-06-04'); // 150 days before
+		expect(pkg.windowEndDate).toBe('2026-07-04'); // 120 days before
+		expect(pkg.fit).toBeUndefined(); // moved whole, never shortened
+		expect(pkg.status).toBe('late');
+	});
+
+	it('the separation package counts from SkillBridge when terminal leave follows it', () => {
+		const pkg = item(
+			leaving({ skillbridgeStart: '2026-11-01', terminalLeaveStart: '2027-03-01' }),
+			'separation-package'
+		);
+		expect(pkg.windowEndDate).toBe('2026-07-04');
+	});
+
+	it('the separation package counts from terminal leave when it is the only date', () => {
+		const pkg = item(leaving({ terminalLeaveStart: '2027-03-01' }), 'separation-package');
+		expect(pkg.windowStartDate).toBe('2026-06-04');
+		expect(pkg.windowEndDate).toBe('2026-11-01');
+		expect(pkg.status).toBe('closing-soon'); // 28 days left
+	});
+
+	it('with no leaving date the separation package closes 120 days before separation', () => {
+		const pkg = item(leaving({}), 'separation-package');
+		expect(pkg.windowStartDate).toBe('2026-08-03');
+		expect(pkg.targetDate).toBe('2026-12-01');
+		expect(pkg.windowEndDate).toBe('2026-12-31');
+		expect(pkg.status).toBe('start-now');
+	});
+
+	it('the DD-214 review counts from the day you leave and ends 15 days before it', () => {
+		const review = item(leaving({ skillbridgeStart: '2026-11-01' }), 'dd214-review');
+		expect(review.windowStartDate).toBe('2026-08-03'); // 90 days before Nov 1
+		expect(review.targetDate).toBe('2026-10-02'); // 30 days before
+		expect(review.windowEndDate).toBe('2026-10-17'); // 15 days before: the day before the 14-day mark
+		expect(review.fit).toBeUndefined();
+		expect(review.status).toBe('start-now'); // it fits before SkillBridge
+	});
+
+	it('the DD-214 review counts from terminal leave when it is the only date', () => {
+		const review = item(leaving({ terminalLeaveStart: '2027-03-01' }), 'dd214-review');
+		expect(review.windowStartDate).toBe('2026-12-01');
+		expect(review.windowEndDate).toBe('2027-02-14');
+	});
+
+	it('with no leaving date the DD-214 review ends 15 days before separation', () => {
+		const review = item(leaving({}), 'dd214-review');
+		expect(review.windowStartDate).toBe('2027-01-30');
+		expect(review.targetDate).toBe('2027-03-31');
+		expect(review.windowEndDate).toBe('2027-04-15');
 	});
 });
 
@@ -410,7 +523,7 @@ describe('deriveStatus and generateTimeline on the device clock', () => {
 	});
 	const bddWindow: AnchoredTask = {
 		def: { ...universal, kind: 'closes' },
-		effectiveOffset: -120,
+		sortOffset: -120,
 		targetDate: '2026-09-01',
 		windowStartDate: '2026-07-22',
 		windowEndDate: '2026-10-20',
@@ -456,7 +569,7 @@ describe('deriveStatus (window kinds)', () => {
 	const on = (iso: string) => new Date(`${iso}T12:00:00Z`);
 	const firm = (kind: TaskDef['kind'], extra: Partial<AnchoredTask> = {}): AnchoredTask => ({
 		def: { ...universal, kind },
-		effectiveOffset: -120,
+		sortOffset: -120,
 		targetDate: '2026-09-01',
 		windowStartDate: '2026-07-22',
 		windowEndDate: '2026-10-20',
@@ -592,29 +705,6 @@ describe('generateTimeline (deadline fields)', () => {
 		expect(item?.status).toBe('closed');
 	});
 
-	// SkillBridge moves a military task earlier, not the separation itself: a required task stays late until the
-	// real separation date has passed.
-	it('keeps a SkillBridge-shifted required task late until the real separation', () => {
-		const shifted: PersonaFilters = {
-			completeness: 'eaos-only',
-			eaos: '2026-11-02' as EaosString,
-			daysUntilSeparation: 30,
-			skillbridge: { approved: true, durationDays: 90 }
-		};
-		const required: TaskDef = {
-			...universal,
-			id: 'required',
-			track: 'military',
-			kind: 'required',
-			windowStart: -180,
-			windowEnd: -90,
-			afterNote: 'n'
-		};
-		const [item] = items(shifted, [required]);
-		expect(item?.windowEndDate).toBe('2026-05-06'); // 180 days before separation: long past on Oct 3
-		expect(item?.status).toBe('late');
-	});
-
 	it('anchors a second edge and counts the days left to the next firm edge', () => {
 		const bdd: TaskDef = {
 			...universal,
@@ -650,34 +740,6 @@ describe('generateTimeline (deadline fields)', () => {
 		expect(byId.get('passed')?.aimDate).toBe(eaosOffsetDate(eaos, -90));
 	});
 
-	it('moves the second edge with the SkillBridge shift, like the window', () => {
-		const shifted: PersonaFilters = {
-			...persona,
-			skillbridge: { approved: true, durationDays: 90 }
-		};
-		const [item] = items(shifted, [{ ...vgli, track: 'military' }]);
-		expect(item?.finalEndDate).toBe(eaosOffsetDate(eaos, 485 - 90));
-	});
-
-	it('derives the status and the countdown from the SkillBridge-shifted window', () => {
-		const shifted: PersonaFilters = {
-			...persona,
-			skillbridge: { approved: true, durationDays: 30 }
-		};
-		const military: TaskDef = {
-			...universal,
-			id: 'military',
-			track: 'military',
-			kind: 'closes',
-			windowStart: -180,
-			windowEnd: -60
-		};
-		// Unshifted, the last day is Nov 19 (47 days out); 30 days earlier it is Oct 20.
-		const [item] = items(shifted, [military]);
-		expect(item?.status).toBe('closing-soon');
-		expect(item?.daysLeft).toBe(17);
-	});
-
 	it('counts a two-edge task down to its final edge between the edges, and lists it as closing soon', () => {
 		const separated = '2025-06-25' as EaosString; // the final edge (485 days) falls on Oct 23, 2026
 		const p: PersonaFilters = {
@@ -701,5 +763,123 @@ describe('generateTimeline (deadline fields)', () => {
 		};
 		const [item] = items(persona, [dueToday]);
 		expect(item?.aimDate).toBe('2026-10-03');
+	});
+});
+
+describe('After you leave', () => {
+	const SEP = '2027-04-30' as EaosString;
+	const at = (today: Date, leaving: object, state: TimelineState['tasks'] = {}) =>
+		generateTimeline(
+			{ completeness: 'eaos-only', eaos: SEP, daysUntilSeparation: 208, leaving: leaving as never },
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: state },
+			today
+		)
+			.phases.flatMap((p) => p.items)
+			.reduce<Record<string, string>>((m, i) => ({ ...m, [i.def.id]: i.status }), {});
+	const OCT_4 = new Date(2026, 9, 4, 12);
+
+	it('a snooze quiets a soft task that cannot fit', () => {
+		const s = at(
+			OCT_4,
+			{ skillbridgeStart: '2026-11-01' },
+			{ 'reference-letters': { status: 'snoozed', snoozeUntil: '2026-11-20' } }
+		);
+		expect(s['reference-letters']).toBe('snoozed');
+	});
+
+	it('a snooze never hides a firm task that cannot fit', () => {
+		const s = at(
+			OCT_4,
+			{ terminalLeaveStart: '2026-11-15' },
+			{ 'sha-complete': { status: 'snoozed', snoozeUntil: '2026-11-20' } }
+		);
+		expect(s['sha-complete']).toBe('after-you-leave');
+	});
+
+	it('ends at separation: the next day the official window decides', () => {
+		const s = at(new Date(2027, 4, 2, 12), {
+			skillbridgeStart: '2026-11-01',
+			terminalLeaveStart: '2026-11-15'
+		});
+		expect(s['sha-complete']).toBe('closed'); // required, official last day Jan 30, separation passed
+		expect(s['reference-letters']).toBe('still-to-do'); // soft, official window ended Mar 31
+	});
+
+	// Once separation has passed, a task that could not fit is judged by its official window, so it shows that window's
+	// last day, not the pulled-in day before its own opening.
+	it('after separation shows a task that could not fit by its official last day', () => {
+		const on = (today: Date) => {
+			const items = generateTimeline(
+				{
+					completeness: 'eaos-only',
+					eaos: SEP,
+					daysUntilSeparation: 208,
+					leaving: { skillbridgeStart: '2026-11-01', terminalLeaveStart: '2026-11-15' } as never
+				},
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				today
+			).phases.flatMap((p) => p.items);
+			return (id: string) => items.find((i) => i.def.id === id);
+		};
+		const after = on(new Date(2027, 4, 2, 12));
+		expect(after('reference-letters')?.windowEndDate).toBe('2027-03-31');
+		expect(after('reference-letters')?.aimDate).toBe('2027-03-31');
+		expect(after('sha-complete')?.windowEndDate).toBe('2027-01-30');
+		// On separation day it is still "after you leave", and keeps the day it was pulled in to.
+		expect(on(new Date(2027, 3, 30, 12))('sha-complete')?.windowEndDate).toBe('2026-11-14');
+	});
+
+	it('holds through separation day and hands over the day after', () => {
+		const leave = { terminalLeaveStart: '2026-11-15' };
+		expect(at(new Date(2027, 3, 30, 12), leave)['sha-complete']).toBe('after-you-leave');
+		expect(at(new Date(2027, 4, 1, 12), leave)['sha-complete']).toBe('closed');
+	});
+
+	// The date and the status change on the same local midnight: the last minute of separation day keeps the pulled-in
+	// day, the first minute of the next day shows the official one.
+	it('shows the official last day from the first minute after separation day', () => {
+		const sha = (today: Date) =>
+			generateTimeline(
+				{
+					completeness: 'eaos-only',
+					eaos: SEP,
+					daysUntilSeparation: 208,
+					leaving: { terminalLeaveStart: '2026-11-15' } as never
+				},
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				today
+			)
+				.phases.flatMap((p) => p.items)
+				.find((i) => i.def.id === 'sha-complete');
+		const lastMinute = sha(new Date(2027, 3, 30, 23, 59));
+		expect([lastMinute?.status, lastMinute?.windowEndDate]).toEqual([
+			'after-you-leave',
+			'2026-11-14'
+		]);
+		const firstMinute = sha(new Date(2027, 4, 1, 0, 0));
+		expect([firstMinute?.status, firstMinute?.windowEndDate]).toEqual(['closed', '2027-01-30']);
+	});
+
+	// Only a task that could not fit is judged by its official window after separation; one that fit keeps its
+	// pulled-in last day and the reason for it.
+	it('after separation a task that fit keeps its pulled-in last day', () => {
+		const capstone = generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: SEP,
+				daysUntilSeparation: 208,
+				leaving: { skillbridgeStart: '2026-11-01' } as never
+			},
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: {} },
+			new Date(2027, 4, 2, 12)
+		)
+			.phases.flatMap((p) => p.items)
+			.find((i) => i.def.id === 'tap-capstone');
+		expect(capstone?.windowEndDate).toBe('2026-10-31');
+		expect(capstone?.fit).toEqual({ reason: 'skillbridge', date: '2026-10-31' });
 	});
 });

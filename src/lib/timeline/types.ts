@@ -23,11 +23,13 @@ export type TimelineState = {
 export type TaskCategory = 'medical' | 'admin' | 'benefits' | 'career' | 'finance';
 
 /**
- * Which side of separation a task lives on. 'military' tasks must finish before the
- * member leaves for SkillBridge, so generation shifts them earlier by the approved
- * SkillBridge duration; 'transition' tasks anchor to the real EAOS.
+ * What a task must be finished before, from its source. 'separation': counted from separation alone - the two
+ * leaving dates never move it. 'leaving': before the last day at the command, the day before the earlier of the
+ * SkillBridge start and the terminal leave start (TAP must be complete before SkillBridge). 'terminal-leave':
+ * before terminal leave only, so it may be done during SkillBridge (the separation health assessment). Required on
+ * every task, so a new task cannot skip the choice.
  */
-export type TaskTrack = 'military' | 'transition';
+export type FinishBefore = 'separation' | 'leaving' | 'terminal-leave';
 
 /**
  * How firm a task's window is. Required on every task, so a new task cannot skip the choice.
@@ -55,8 +57,12 @@ export type TaskDef = {
 	id: string; // stable slug; timeline-state + future peer-stories key off this
 	title: string;
 	category: TaskCategory;
-	track: TaskTrack;
-	windowStart: number; // days vs EAOS; negative = before separation
+	finishBefore: FinishBefore;
+	/** The window's offsets count from the day the user leaves the command, when a leaving date is entered - for a
+	 *  rule set as "N days before you leave" (the separation package, the DD-214 review), not "finish before you
+	 *  leave". */
+	countsFrom?: 'leaving';
+	windowStart: number; // days vs EAOS, or vs the leaving day for countsFrom; negative = before it
 	windowEnd: number;
 	kind: TaskKind;
 	/** A second edge, days vs EAOS: the task changes at windowEnd and closes here (VGLI). */

@@ -11,7 +11,7 @@ function def(id: string, kind: TaskDef['kind'], extra: Partial<TaskDef> = {}): T
 		id,
 		title: id,
 		category: 'admin',
-		track: 'transition',
+		finishBefore: 'separation',
 		kind,
 		windowStart: -180,
 		windowEnd: -90,
@@ -158,5 +158,36 @@ describe('computeDesiredEvents', () => {
 			TODAY
 		);
 		expect(out).toEqual([]);
+	});
+});
+
+describe('a task that cannot fit before leaving the command', () => {
+	const cannotFit = (kind: TaskDef['kind'], lastDay: string) =>
+		item(def('s', kind), {
+			status: 'after-you-leave',
+			windowStartDate: '2026-12-01',
+			windowEndDate: lastDay
+		});
+
+	it('gets one "Before you leave" event on the last day there, with the firm alerts', () => {
+		expect(computeDesiredEvents([cannotFit('required', '2026-11-14')], NONE, TODAY)).toEqual([
+			{
+				taskId: 's',
+				moment: 'leave',
+				title: 'Before you leave: s',
+				isoDate: '2026-11-14',
+				alarmDays: [30, 7, 1]
+			}
+		]);
+	});
+
+	it('a soft one gets the 7-day alert', () => {
+		expect(
+			computeDesiredEvents([cannotFit('soft', '2026-11-14')], NONE, TODAY)[0]?.alarmDays
+		).toEqual([7]);
+	});
+
+	it('gets no event once that day has passed', () => {
+		expect(computeDesiredEvents([cannotFit('required', '2026-09-30')], NONE, TODAY)).toEqual([]);
 	});
 });

@@ -152,3 +152,14 @@ h3 {
 
 /* Low-bandwidth visual defaults are in effect (system fonts, solid background, no decorative images, no animations) via design tokens. */
 /* The data-bandwidth-mode selector pattern + localStorage toggle did NOT ship in Phase 1; when a future component needs heavy/light variants, revisit the original selector design. */
+
+/* Printing is blocked on every page: a printed or PDF-saved page carries the user's dates to the print spooler or a
+   synced folder. !important is needed to beat the inline display on SvelteKit's wrapper element. */
+@media print {
+	body > * {
+		display: none !important;
+	}
+	body::before {
+		content: 'Printing is disabled to protect your data.';
+	}
+}

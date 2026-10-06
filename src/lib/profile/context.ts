@@ -5,7 +5,16 @@ import type { TimelineStateStore } from '../timeline';
 import type { CalendarSyncStore } from '../calendar/store.svelte';
 import type { ByokStore } from '../ask/byok/store';
 
-export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale';
+// `damaged`: the saved data failed its own checks at start-up, so only the erase is offered (see `isDamagedRecord`).
+export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale' | 'error' | 'damaged';
+
+/**
+ * The status a failed start-up leaves. Only a start-up still loading takes the failure: a takeover set while it ran
+ * (another tab upgraded the database and closed this connection, so the next read threw) already names the cause.
+ */
+export function afterStartupFailure(current: AppStatus, next: AppStatus): AppStatus {
+	return current === 'loading' ? next : current;
+}
 
 /**
  * Reactive app-wide container for the profile subsystem. Set ONCE in +layout (synchronously
@@ -30,7 +39,8 @@ export type ProfileApp = {
 	/**
 	 * Relock every provisioned store. Use this for ANY "lock" or "erase" - never relock stores
 	 * one by one at a call site: a per-site list drifts, and decrypted PII is left behind silently.
-	 * Null until app-init resolves.
+	 * Null until app-init resolves ready, and under `damaged`, where nothing stays decrypted (the erase's check relocks
+	 * its own store).
 	 */
 	relockAll: (() => void) | null;
 };

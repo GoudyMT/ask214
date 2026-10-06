@@ -62,25 +62,51 @@ describe('derivePersona', () => {
 		expect(r.completeness).toBe('complete');
 	});
 
-	it('surfaces SkillBridge when approved with a positive duration', () => {
-		const r = derivePersona(withEaos({ skillbridgeApproved: 1, skillbridgeDurationDays: 180 }));
-		expect(r.completeness).not.toBe('none');
-		if (r.completeness !== 'none') {
-			expect(r.skillbridge).toEqual({ approved: true, durationDays: 180 });
-		}
-	});
+	describe('the leaving dates', () => {
+		const enc = (s: string) => new TextEncoder().encode(s);
 
-	it('omits SkillBridge when the approval flag is not set', () => {
-		const r = derivePersona(withEaos({ skillbridgeApproved: 0, skillbridgeDurationDays: 180 }));
-		if (r.completeness !== 'none') {
-			expect(r.skillbridge).toBeUndefined();
-		}
-	});
+		it('carries each date in use', () => {
+			const r = derivePersona(
+				withEaos({ skillbridgeStart: enc('2026-11-01'), terminalLeaveStart: enc('2027-04-01') })
+			);
+			expect(r.completeness).toBe('eaos-only');
+			if (r.completeness === 'none') return;
+			expect(r.leaving).toEqual({
+				skillbridgeStart: '2026-11-01',
+				terminalLeaveStart: '2027-04-01'
+			});
+		});
 
-	it('omits SkillBridge when approved but the duration is missing', () => {
-		const r = derivePersona(withEaos({ skillbridgeApproved: 1 }));
-		if (r.completeness !== 'none') {
-			expect(r.skillbridge).toBeUndefined();
-		}
+		it('carries no leaving field when neither date is set', () => {
+			const r = derivePersona(withEaos());
+			if (r.completeness === 'none') throw new Error('expected a persona');
+			expect('leaving' in r).toBe(false);
+		});
+
+		it('does not use a date on or after separation, and says which', () => {
+			const r = derivePersona(
+				withEaos({ skillbridgeStart: enc('2027-04-15'), terminalLeaveStart: enc('2027-05-01') })
+			);
+			if (r.completeness === 'none') throw new Error('expected a persona');
+			expect(r.leaving).toEqual({
+				notUsed: { skillbridgeStart: '2027-04-15', terminalLeaveStart: '2027-05-01' }
+			});
+		});
+
+		it.each([
+			['a calendar-invalid date', enc('2026-13-40')],
+			['bytes that are not text', new Uint8Array([0xff, 0xfe])]
+		])(
+			'reads %s as not set, leaving the separation date and completeness alone',
+			(_name, bytes) => {
+				const r = derivePersona(
+					withEaos({ skillbridgeStart: bytes, terminalLeaveStart: enc('2027-04-01') })
+				);
+				expect(r.completeness).toBe('eaos-only');
+				if (r.completeness === 'none') return;
+				expect(r.eaos).toBe('2027-04-15');
+				expect(r.leaving).toEqual({ terminalLeaveStart: '2027-04-01' });
+			}
+		);
 	});
 });

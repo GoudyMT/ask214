@@ -58,6 +58,12 @@ describe('deviceKind', () => {
 	it('has one sentence per device', () => {
 		expect(Object.keys(DEVICE_HINT).sort()).toEqual(['android', 'computer', 'ios']);
 	});
+
+	// Checked on a real iPhone: Safari opens the file straight in Calendar, which offers Add All, so the user has no
+	// file to open first (a copy still stays in Downloads).
+	it('tells iPhone Safari what it really does with the file', () => {
+		expect(DEVICE_HINT.ios.text).toBe('it opens the events in your calendar. Tap Add All.');
+	});
 });
 
 // The installed iPhone app keeps its data apart from Safari, so it must never be told to go to Safari.

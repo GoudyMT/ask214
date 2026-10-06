@@ -21,7 +21,7 @@ export type {
 export type {
 	TaskDef,
 	TaskCategory,
-	TaskTrack,
+	FinishBefore,
 	PersonaGate,
 	PhaseBucket,
 	TaskStatus,

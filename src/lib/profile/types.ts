@@ -22,6 +22,6 @@ export type ProfileV1 = {
 	intendedPath?: Uint8Array;
 	geographicDestination?: Uint8Array;
 	specialSituations?: Uint8Array[];
-	skillbridgeApproved?: number; // 0/1 SkillBridge-approval flag; flat numeric, not nested, per the zeroizeField field constraint
-	skillbridgeDurationDays?: number; // SkillBridge length in days; only meaningful when approved
+	skillbridgeStart?: Uint8Array; // ISO date bytes (like eaos), so zeroizeField reaches it on relock
+	terminalLeaveStart?: Uint8Array; // ISO date bytes
 };

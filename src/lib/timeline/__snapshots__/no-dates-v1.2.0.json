@@ -1,0 +1,1076 @@
+[
+	{
+		"total": 33,
+		"todayMarkerIndex": 1,
+		"daysToSeparation": 208,
+		"phases": [
+			{
+				"bucket": "18-12mo",
+				"counts": {
+					"done": 1,
+					"skipped": 0,
+					"snoozed": 1,
+					"toDo": 8
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "va-gov-account",
+						"kind": "soft",
+						"status": "done",
+						"targetDate": "2025-11-06",
+						"windowStartDate": "2025-04-30",
+						"windowEndDate": "2026-11-01",
+						"aimDate": "2026-11-01"
+					},
+					{
+						"id": "login-gov-account",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2025-11-06",
+						"windowStartDate": "2025-04-30",
+						"windowEndDate": "2026-11-01",
+						"aimDate": "2026-11-01"
+					},
+					{
+						"id": "update-sgli",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2025-11-06",
+						"windowStartDate": "2025-04-30",
+						"windowEndDate": "2026-11-01",
+						"aimDate": "2026-11-01"
+					},
+					{
+						"id": "verify-service-record",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2025-11-06",
+						"windowStartDate": "2025-04-30",
+						"windowEndDate": "2026-11-01",
+						"aimDate": "2026-11-01"
+					},
+					{
+						"id": "will-poa",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2025-11-06",
+						"windowStartDate": "2025-04-30",
+						"windowEndDate": "2027-01-30",
+						"aimDate": "2027-01-30"
+					},
+					{
+						"id": "financial-counselor",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2025-11-06",
+						"windowStartDate": "2025-04-30",
+						"windowEndDate": "2026-11-01",
+						"aimDate": "2026-11-01"
+					},
+					{
+						"id": "gi-bill-research",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2025-11-06",
+						"windowStartDate": "2025-04-30",
+						"windowEndDate": "2026-11-01",
+						"aimDate": "2026-11-01"
+					},
+					{
+						"id": "master-resume",
+						"kind": "soft",
+						"status": "snoozed",
+						"targetDate": "2026-02-04",
+						"windowStartDate": "2025-11-06",
+						"windowEndDate": "2026-12-31",
+						"aimDate": "2026-12-31",
+						"snoozeUntil": "2026-11-15"
+					},
+					{
+						"id": "document-medical",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-02-04",
+						"windowStartDate": "2025-11-06",
+						"windowEndDate": "2026-11-01",
+						"aimDate": "2026-11-01"
+					},
+					{
+						"id": "preseparation-counseling",
+						"kind": "required",
+						"status": "late",
+						"targetDate": "2026-03-26",
+						"windowStartDate": "2025-11-06",
+						"windowEndDate": "2026-04-30"
+					}
+				]
+			},
+			{
+				"bucket": "12-6mo",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 5
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "tap-course",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-03",
+						"windowStartDate": "2026-04-30",
+						"windowEndDate": "2026-12-31",
+						"aimDate": "2026-12-31"
+					},
+					{
+						"id": "job-search",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-03",
+						"windowStartDate": "2026-04-30",
+						"windowEndDate": "2027-03-31",
+						"aimDate": "2027-03-31"
+					},
+					{
+						"id": "health-insurance-research",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-03",
+						"windowStartDate": "2026-04-30",
+						"windowEndDate": "2027-01-30",
+						"aimDate": "2027-01-30"
+					},
+					{
+						"id": "life-insurance-research",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-03",
+						"windowStartDate": "2026-04-30",
+						"windowEndDate": "2027-01-30",
+						"aimDate": "2027-01-30"
+					},
+					{
+						"id": "tap-track",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-09-02",
+						"windowStartDate": "2026-04-30",
+						"windowEndDate": "2026-12-31",
+						"aimDate": "2026-12-31"
+					}
+				]
+			},
+			{
+				"bucket": "6-3mo",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 10
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "jst-order",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2026-12-01",
+						"windowStartDate": "2026-11-01",
+						"windowEndDate": "2027-01-30",
+						"aimDate": "2026-12-01"
+					},
+					{
+						"id": "sha-schedule",
+						"kind": "required",
+						"status": "upcoming",
+						"targetDate": "2026-12-01",
+						"windowStartDate": "2026-11-01",
+						"windowEndDate": "2027-01-30"
+					},
+					{
+						"id": "separation-package",
+						"kind": "required",
+						"status": "start-now",
+						"targetDate": "2026-12-01",
+						"windowStartDate": "2026-08-03",
+						"windowEndDate": "2026-12-31"
+					},
+					{
+						"id": "va-career-guidance",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2026-12-31",
+						"windowStartDate": "2026-11-01",
+						"windowEndDate": "2028-04-29",
+						"aimDate": "2026-12-31"
+					},
+					{
+						"id": "sha-complete",
+						"kind": "required",
+						"status": "upcoming",
+						"targetDate": "2026-12-31",
+						"windowStartDate": "2026-12-01",
+						"windowEndDate": "2027-01-30"
+					},
+					{
+						"id": "va-bdd-claim",
+						"kind": "closes",
+						"status": "upcoming",
+						"targetDate": "2026-12-31",
+						"windowStartDate": "2026-11-01",
+						"windowEndDate": "2027-01-30"
+					},
+					{
+						"id": "tap-capstone",
+						"kind": "required",
+						"status": "start-now",
+						"targetDate": "2026-12-31",
+						"windowStartDate": "2026-04-30",
+						"windowEndDate": "2027-01-30",
+						"note": "n"
+					},
+					{
+						"id": "va-benefits-advisor",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2026-12-31",
+						"windowStartDate": "2026-11-01",
+						"windowEndDate": "2027-03-01",
+						"aimDate": "2026-12-31"
+					},
+					{
+						"id": "reference-letters",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2026-12-31",
+						"windowStartDate": "2026-11-01",
+						"windowEndDate": "2027-03-31",
+						"aimDate": "2026-12-31"
+					},
+					{
+						"id": "hhg-counseling",
+						"kind": "closes",
+						"status": "upcoming",
+						"targetDate": "2026-12-31",
+						"windowStartDate": "2026-11-01",
+						"windowEndDate": "2027-10-27"
+					}
+				]
+			},
+			{
+				"bucket": "final90",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 3
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "financial-docs",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2027-01-30",
+						"windowStartDate": "2026-12-31",
+						"windowEndDate": "2027-03-31",
+						"aimDate": "2027-01-30"
+					},
+					{
+						"id": "dd214-review",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2027-03-31",
+						"windowStartDate": "2027-01-30",
+						"windowEndDate": "2027-04-15",
+						"aimDate": "2027-03-31"
+					},
+					{
+						"id": "tricare-elect",
+						"kind": "closes",
+						"status": "upcoming",
+						"targetDate": "2027-04-16",
+						"windowStartDate": "2027-03-01",
+						"windowEndDate": "2027-06-29"
+					}
+				]
+			},
+			{
+				"bucket": "after",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 5
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "dd214-copies",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2027-04-30",
+						"windowStartDate": "2027-04-23",
+						"windowEndDate": "2027-06-29",
+						"aimDate": "2027-04-30"
+					},
+					{
+						"id": "va-claim-fallback",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2027-05-14",
+						"windowStartDate": "2027-04-30",
+						"windowEndDate": "2028-04-29",
+						"aimDate": "2027-05-14"
+					},
+					{
+						"id": "tsp-decision",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2027-05-30",
+						"windowStartDate": "2027-04-30",
+						"windowEndDate": "2027-07-29",
+						"aimDate": "2027-05-30"
+					},
+					{
+						"id": "vgli-convert",
+						"kind": "closes",
+						"status": "upcoming",
+						"targetDate": "2027-05-30",
+						"windowStartDate": "2027-04-30",
+						"windowEndDate": "2027-12-26",
+						"finalEndDate": "2028-08-27"
+					},
+					{
+						"id": "final-pay-check",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2027-05-30",
+						"windowStartDate": "2027-04-30",
+						"windowEndDate": "2027-08-28",
+						"aimDate": "2027-05-30"
+					}
+				]
+			}
+		]
+	},
+	{
+		"total": 33,
+		"todayMarkerIndex": 3,
+		"daysToSeparation": 72,
+		"phases": [
+			{
+				"bucket": "18-12mo",
+				"counts": {
+					"done": 1,
+					"skipped": 0,
+					"snoozed": 1,
+					"toDo": 8
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "va-gov-account",
+						"kind": "soft",
+						"status": "done",
+						"targetDate": "2025-06-23",
+						"windowStartDate": "2024-12-15",
+						"windowEndDate": "2026-06-18",
+						"aimDate": "2026-06-18"
+					},
+					{
+						"id": "login-gov-account",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-06-23",
+						"windowStartDate": "2024-12-15",
+						"windowEndDate": "2026-06-18",
+						"aimDate": "2026-06-18"
+					},
+					{
+						"id": "update-sgli",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-06-23",
+						"windowStartDate": "2024-12-15",
+						"windowEndDate": "2026-06-18",
+						"aimDate": "2026-06-18"
+					},
+					{
+						"id": "verify-service-record",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-06-23",
+						"windowStartDate": "2024-12-15",
+						"windowEndDate": "2026-06-18",
+						"aimDate": "2026-06-18"
+					},
+					{
+						"id": "will-poa",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-06-23",
+						"windowStartDate": "2024-12-15",
+						"windowEndDate": "2026-09-16",
+						"aimDate": "2026-09-16"
+					},
+					{
+						"id": "financial-counselor",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-06-23",
+						"windowStartDate": "2024-12-15",
+						"windowEndDate": "2026-06-18",
+						"aimDate": "2026-06-18"
+					},
+					{
+						"id": "gi-bill-research",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-06-23",
+						"windowStartDate": "2024-12-15",
+						"windowEndDate": "2026-06-18",
+						"aimDate": "2026-06-18"
+					},
+					{
+						"id": "master-resume",
+						"kind": "soft",
+						"status": "snoozed",
+						"targetDate": "2025-09-21",
+						"windowStartDate": "2025-06-23",
+						"windowEndDate": "2026-08-17",
+						"aimDate": "2026-08-17",
+						"snoozeUntil": "2026-11-15"
+					},
+					{
+						"id": "document-medical",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-09-21",
+						"windowStartDate": "2025-06-23",
+						"windowEndDate": "2026-06-18",
+						"aimDate": "2026-06-18"
+					},
+					{
+						"id": "preseparation-counseling",
+						"kind": "required",
+						"status": "late",
+						"targetDate": "2025-11-10",
+						"windowStartDate": "2025-06-23",
+						"windowEndDate": "2025-12-15"
+					}
+				]
+			},
+			{
+				"bucket": "12-6mo",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 5
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "tap-course",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-03-20",
+						"windowStartDate": "2025-12-15",
+						"windowEndDate": "2026-08-17",
+						"aimDate": "2026-08-17"
+					},
+					{
+						"id": "job-search",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-03-20",
+						"windowStartDate": "2025-12-15",
+						"windowEndDate": "2026-11-15",
+						"aimDate": "2026-11-15"
+					},
+					{
+						"id": "health-insurance-research",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-03-20",
+						"windowStartDate": "2025-12-15",
+						"windowEndDate": "2026-09-16",
+						"aimDate": "2026-09-16"
+					},
+					{
+						"id": "life-insurance-research",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-03-20",
+						"windowStartDate": "2025-12-15",
+						"windowEndDate": "2026-09-16",
+						"aimDate": "2026-09-16"
+					},
+					{
+						"id": "tap-track",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-04-19",
+						"windowStartDate": "2025-12-15",
+						"windowEndDate": "2026-08-17",
+						"aimDate": "2026-08-17"
+					}
+				]
+			},
+			{
+				"bucket": "6-3mo",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 10
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "jst-order",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-07-18",
+						"windowStartDate": "2026-06-18",
+						"windowEndDate": "2026-09-16",
+						"aimDate": "2026-09-16"
+					},
+					{
+						"id": "sha-schedule",
+						"kind": "required",
+						"status": "late",
+						"targetDate": "2026-07-18",
+						"windowStartDate": "2026-06-18",
+						"windowEndDate": "2026-09-16"
+					},
+					{
+						"id": "separation-package",
+						"kind": "required",
+						"status": "late",
+						"targetDate": "2026-07-18",
+						"windowStartDate": "2026-03-20",
+						"windowEndDate": "2026-08-17"
+					},
+					{
+						"id": "va-career-guidance",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-17",
+						"windowStartDate": "2026-06-18",
+						"windowEndDate": "2027-12-15",
+						"aimDate": "2027-12-15"
+					},
+					{
+						"id": "sha-complete",
+						"kind": "required",
+						"status": "late",
+						"targetDate": "2026-08-17",
+						"windowStartDate": "2026-07-18",
+						"windowEndDate": "2026-09-16"
+					},
+					{
+						"id": "va-bdd-claim",
+						"kind": "closes",
+						"status": "closed",
+						"targetDate": "2026-08-17",
+						"windowStartDate": "2026-06-18",
+						"windowEndDate": "2026-09-16"
+					},
+					{
+						"id": "tap-capstone",
+						"kind": "required",
+						"status": "late",
+						"targetDate": "2026-08-17",
+						"windowStartDate": "2025-12-15",
+						"windowEndDate": "2026-09-16",
+						"note": "n"
+					},
+					{
+						"id": "va-benefits-advisor",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-17",
+						"windowStartDate": "2026-06-18",
+						"windowEndDate": "2026-10-16",
+						"aimDate": "2026-10-16"
+					},
+					{
+						"id": "reference-letters",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-17",
+						"windowStartDate": "2026-06-18",
+						"windowEndDate": "2026-11-15",
+						"aimDate": "2026-11-15"
+					},
+					{
+						"id": "hhg-counseling",
+						"kind": "closes",
+						"status": "start-now",
+						"targetDate": "2026-08-17",
+						"windowStartDate": "2026-06-18",
+						"windowEndDate": "2027-06-13"
+					}
+				]
+			},
+			{
+				"bucket": "final90",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 3
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "financial-docs",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-09-16",
+						"windowStartDate": "2026-08-17",
+						"windowEndDate": "2026-11-15",
+						"aimDate": "2026-11-15"
+					},
+					{
+						"id": "dd214-review",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-11-15",
+						"windowStartDate": "2026-09-16",
+						"windowEndDate": "2026-11-30",
+						"aimDate": "2026-11-15"
+					},
+					{
+						"id": "tricare-elect",
+						"kind": "closes",
+						"status": "upcoming",
+						"targetDate": "2026-12-01",
+						"windowStartDate": "2026-10-16",
+						"windowEndDate": "2027-02-13"
+					}
+				]
+			},
+			{
+				"bucket": "after",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 5
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "dd214-copies",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2026-12-15",
+						"windowStartDate": "2026-12-08",
+						"windowEndDate": "2027-02-13",
+						"aimDate": "2026-12-15"
+					},
+					{
+						"id": "va-claim-fallback",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2026-12-29",
+						"windowStartDate": "2026-12-15",
+						"windowEndDate": "2027-12-15",
+						"aimDate": "2026-12-29"
+					},
+					{
+						"id": "tsp-decision",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2027-01-14",
+						"windowStartDate": "2026-12-15",
+						"windowEndDate": "2027-03-15",
+						"aimDate": "2027-01-14"
+					},
+					{
+						"id": "vgli-convert",
+						"kind": "closes",
+						"status": "upcoming",
+						"targetDate": "2027-01-14",
+						"windowStartDate": "2026-12-15",
+						"windowEndDate": "2027-08-12",
+						"finalEndDate": "2028-04-13"
+					},
+					{
+						"id": "final-pay-check",
+						"kind": "soft",
+						"status": "upcoming",
+						"targetDate": "2027-01-14",
+						"windowStartDate": "2026-12-15",
+						"windowEndDate": "2027-04-14",
+						"aimDate": "2027-01-14"
+					}
+				]
+			}
+		]
+	},
+	{
+		"total": 33,
+		"todayMarkerIndex": 4,
+		"daysToSeparation": -64,
+		"phases": [
+			{
+				"bucket": "18-12mo",
+				"counts": {
+					"done": 1,
+					"skipped": 0,
+					"snoozed": 1,
+					"toDo": 8
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "va-gov-account",
+						"kind": "soft",
+						"status": "done",
+						"targetDate": "2025-02-07",
+						"windowStartDate": "2024-08-01",
+						"windowEndDate": "2026-02-02",
+						"aimDate": "2026-02-02"
+					},
+					{
+						"id": "login-gov-account",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-02-07",
+						"windowStartDate": "2024-08-01",
+						"windowEndDate": "2026-02-02",
+						"aimDate": "2026-02-02"
+					},
+					{
+						"id": "update-sgli",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-02-07",
+						"windowStartDate": "2024-08-01",
+						"windowEndDate": "2026-02-02",
+						"aimDate": "2026-02-02"
+					},
+					{
+						"id": "verify-service-record",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-02-07",
+						"windowStartDate": "2024-08-01",
+						"windowEndDate": "2026-02-02",
+						"aimDate": "2026-02-02"
+					},
+					{
+						"id": "will-poa",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-02-07",
+						"windowStartDate": "2024-08-01",
+						"windowEndDate": "2026-05-03",
+						"aimDate": "2026-05-03"
+					},
+					{
+						"id": "financial-counselor",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-02-07",
+						"windowStartDate": "2024-08-01",
+						"windowEndDate": "2026-02-02",
+						"aimDate": "2026-02-02"
+					},
+					{
+						"id": "gi-bill-research",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-02-07",
+						"windowStartDate": "2024-08-01",
+						"windowEndDate": "2026-02-02",
+						"aimDate": "2026-02-02"
+					},
+					{
+						"id": "master-resume",
+						"kind": "soft",
+						"status": "snoozed",
+						"targetDate": "2025-05-08",
+						"windowStartDate": "2025-02-07",
+						"windowEndDate": "2026-04-03",
+						"aimDate": "2026-04-03",
+						"snoozeUntil": "2026-11-15"
+					},
+					{
+						"id": "document-medical",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-05-08",
+						"windowStartDate": "2025-02-07",
+						"windowEndDate": "2026-02-02",
+						"aimDate": "2026-02-02"
+					},
+					{
+						"id": "preseparation-counseling",
+						"kind": "required",
+						"status": "closed",
+						"targetDate": "2025-06-27",
+						"windowStartDate": "2025-02-07",
+						"windowEndDate": "2025-08-01"
+					}
+				]
+			},
+			{
+				"bucket": "12-6mo",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 5
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "tap-course",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-11-04",
+						"windowStartDate": "2025-08-01",
+						"windowEndDate": "2026-04-03",
+						"aimDate": "2026-04-03"
+					},
+					{
+						"id": "job-search",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-11-04",
+						"windowStartDate": "2025-08-01",
+						"windowEndDate": "2026-07-02",
+						"aimDate": "2026-07-02"
+					},
+					{
+						"id": "health-insurance-research",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-11-04",
+						"windowStartDate": "2025-08-01",
+						"windowEndDate": "2026-05-03",
+						"aimDate": "2026-05-03"
+					},
+					{
+						"id": "life-insurance-research",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-11-04",
+						"windowStartDate": "2025-08-01",
+						"windowEndDate": "2026-05-03",
+						"aimDate": "2026-05-03"
+					},
+					{
+						"id": "tap-track",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2025-12-04",
+						"windowStartDate": "2025-08-01",
+						"windowEndDate": "2026-04-03",
+						"aimDate": "2026-04-03"
+					}
+				]
+			},
+			{
+				"bucket": "6-3mo",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 10
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "jst-order",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-03-04",
+						"windowStartDate": "2026-02-02",
+						"windowEndDate": "2026-05-03",
+						"aimDate": "2026-05-03"
+					},
+					{
+						"id": "sha-schedule",
+						"kind": "required",
+						"status": "closed",
+						"targetDate": "2026-03-04",
+						"windowStartDate": "2026-02-02",
+						"windowEndDate": "2026-05-03"
+					},
+					{
+						"id": "separation-package",
+						"kind": "required",
+						"status": "closed",
+						"targetDate": "2026-03-04",
+						"windowStartDate": "2025-11-04",
+						"windowEndDate": "2026-04-03"
+					},
+					{
+						"id": "va-career-guidance",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-04-03",
+						"windowStartDate": "2026-02-02",
+						"windowEndDate": "2027-08-01",
+						"aimDate": "2027-08-01"
+					},
+					{
+						"id": "sha-complete",
+						"kind": "required",
+						"status": "closed",
+						"targetDate": "2026-04-03",
+						"windowStartDate": "2026-03-04",
+						"windowEndDate": "2026-05-03"
+					},
+					{
+						"id": "va-bdd-claim",
+						"kind": "closes",
+						"status": "closed",
+						"targetDate": "2026-04-03",
+						"windowStartDate": "2026-02-02",
+						"windowEndDate": "2026-05-03"
+					},
+					{
+						"id": "tap-capstone",
+						"kind": "required",
+						"status": "closed",
+						"targetDate": "2026-04-03",
+						"windowStartDate": "2025-08-01",
+						"windowEndDate": "2026-05-03",
+						"note": "n"
+					},
+					{
+						"id": "va-benefits-advisor",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-04-03",
+						"windowStartDate": "2026-02-02",
+						"windowEndDate": "2026-06-02",
+						"aimDate": "2026-06-02"
+					},
+					{
+						"id": "reference-letters",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-04-03",
+						"windowStartDate": "2026-02-02",
+						"windowEndDate": "2026-07-02",
+						"aimDate": "2026-07-02"
+					},
+					{
+						"id": "hhg-counseling",
+						"kind": "closes",
+						"status": "start-now",
+						"targetDate": "2026-04-03",
+						"windowStartDate": "2026-02-02",
+						"windowEndDate": "2027-01-28"
+					}
+				]
+			},
+			{
+				"bucket": "final90",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 3
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "financial-docs",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-05-03",
+						"windowStartDate": "2026-04-03",
+						"windowEndDate": "2026-07-02",
+						"aimDate": "2026-07-02"
+					},
+					{
+						"id": "dd214-review",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-07-02",
+						"windowStartDate": "2026-05-03",
+						"windowEndDate": "2026-07-17",
+						"aimDate": "2026-07-17"
+					},
+					{
+						"id": "tricare-elect",
+						"kind": "closes",
+						"status": "closed",
+						"targetDate": "2026-07-18",
+						"windowStartDate": "2026-06-02",
+						"windowEndDate": "2026-09-30"
+					}
+				]
+			},
+			{
+				"bucket": "after",
+				"counts": {
+					"done": 0,
+					"skipped": 0,
+					"snoozed": 0,
+					"toDo": 5
+				},
+				"collapsible": false,
+				"items": [
+					{
+						"id": "dd214-copies",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-08-01",
+						"windowStartDate": "2026-07-25",
+						"windowEndDate": "2026-09-30",
+						"aimDate": "2026-09-30"
+					},
+					{
+						"id": "va-claim-fallback",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-15",
+						"windowStartDate": "2026-08-01",
+						"windowEndDate": "2027-08-01",
+						"aimDate": "2027-08-01"
+					},
+					{
+						"id": "tsp-decision",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-31",
+						"windowStartDate": "2026-08-01",
+						"windowEndDate": "2026-10-30",
+						"aimDate": "2026-10-30"
+					},
+					{
+						"id": "vgli-convert",
+						"kind": "closes",
+						"status": "start-now",
+						"targetDate": "2026-08-31",
+						"windowStartDate": "2026-08-01",
+						"windowEndDate": "2027-03-29",
+						"finalEndDate": "2027-11-29"
+					},
+					{
+						"id": "final-pay-check",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-08-31",
+						"windowStartDate": "2026-08-01",
+						"windowEndDate": "2026-11-29",
+						"aimDate": "2026-11-29"
+					}
+				]
+			}
+		]
+	}
+]

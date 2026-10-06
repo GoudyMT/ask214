@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
 import { RESOURCES, TASK_AFTER_LINK } from '$lib/resources/resources';
-import { DEVICE_HINT, IOS_APP_HINT } from '$lib/calendar/delivery';
+import { DELETE_FILE_HINT, DEVICE_HINT, IOS_APP_HINT } from '$lib/calendar/delivery';
+import {
+	LEAVING_HINT,
+	PAYGRADE_NOTE,
+	ORDER_NOTE,
+	AFTER_SEPARATION
+} from '$lib/profile/leaving-copy';
 import { makesPersonalClaim } from './personal-claim';
 
 // Well-formedness guards for the seed: these pass for ANY valid seed, so editing the
@@ -108,14 +114,20 @@ describe('task-defs seed', () => {
 		expect(makesPersonalClaim('tricare.mil and healthcare.gov say who qualifies.')).toBe(false);
 	});
 
-	// 38 CFR 14.629 over the task data: its own text, its What now link, the curated resources and the sentences
-	// under the calendar button. The words the components add around them are checked in each component's tests.
+	// 38 CFR 14.629 over the task data: its own text, its What now link, the curated resources, the sentences under
+	// the calendar button and the Settings lines beside the leaving dates. The words the components add around them
+	// are checked in each component's tests.
 	it('keeps every public line about a task free of personal eligibility claims', () => {
 		const lines = [
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
 			...RESOURCES.flatMap((r) => [r.title, r.description]),
-			...[...Object.values(DEVICE_HINT), IOS_APP_HINT].map((hint) => `${hint.lead} ${hint.text}`)
+			...[...Object.values(DEVICE_HINT), IOS_APP_HINT].map((hint) => `${hint.lead} ${hint.text}`),
+			DELETE_FILE_HINT,
+			LEAVING_HINT,
+			PAYGRADE_NOTE,
+			ORDER_NOTE,
+			AFTER_SEPARATION
 		];
 		expect(lines.length).toBeGreaterThan(200);
 		for (const line of lines) expect(makesPersonalClaim(line), line).toBe(false);
@@ -174,9 +186,88 @@ describe('firm deadlines match their official sources', () => {
 		}
 	});
 
+	// MILPERSMAN 1900-015 CH-93: the complete separation package "no less than 120 days from commencement of PTDY or
+	// separation leave" (2.b(3)) sets its last day; complete packages 5 to 9 months before separation (2.a) set its
+	// opening and aim, counted here from the leaving day like the last day. A DD 214 not final 14 days before
+	// departure on PTDY or separation leave is finalized without the member's signature (2.a), so its last day is the
+	// day before that mark. The leaving day includes a SkillBridge start: its participants are on permissive TDY
+	// orders (NAVADMIN 160/22 5.e), read here as that departure, and SkillBridge comes first.
+	it("counts the separation package and the DD-214 review from the leaving day, with CH-93's last days", () => {
+		expect(at('separation-package')).toMatchObject({
+			countsFrom: 'leaving',
+			windowStart: -270,
+			recommendedOffset: -150,
+			windowEnd: -120
+		});
+		expect(at('dd214-review')).toMatchObject({ countsFrom: 'leaving', windowEnd: -15 });
+	});
+
+	// skillbridge.mil notice, June 3, 2026: members "in the last 180 days of their service who request SkillBridge
+	// participation within the DIB will be approved", an exception to the Service rank limits the note lists.
+	it('names the defense industry exception beside the paygrade limits', () => {
+		expect(PAYGRADE_NOTE).toContain(
+			'Defense industry (DIB) programs can start up to 180 days out at any rank (Department of War notice, June 2026).'
+		);
+	});
+
 	it('opens the Capstone at 12 months and Chapter 36 counseling 180 days before separation', () => {
 		expect(at('tap-capstone')?.windowStart).toBe(-365);
 		expect(at('va-career-guidance')?.windowStart).toBe(-180);
 		expect(at('va-career-guidance')?.windowEnd).toBe(365);
+	});
+});
+
+describe('what each task must finish before', () => {
+	const by = (value: string) =>
+		TASK_DEFS.filter((t) => t.finishBefore === value)
+			.map((t) => t.id)
+			.sort();
+
+	it('TAP and the command-side tasks finish before leaving the command', () => {
+		expect(by('leaving')).toEqual(
+			[
+				'dd214-review',
+				'document-medical',
+				'preseparation-counseling',
+				'reference-letters',
+				'separation-package',
+				'tap-capstone',
+				'tap-course',
+				'tap-track',
+				'verify-service-record'
+			].sort()
+		);
+	});
+
+	it('the separation health assessment finishes before terminal leave only', () => {
+		expect(by('terminal-leave')).toEqual(['sha-complete', 'sha-schedule']);
+	});
+
+	it('every other task, the track fixes included, counts from separation alone', () => {
+		const rest = by('separation');
+		for (const id of ['update-sgli', 'financial-docs', 'hhg-counseling'])
+			expect(rest).toContain(id);
+		expect(rest.length + by('leaving').length + by('terminal-leave').length).toBe(TASK_DEFS.length);
+	});
+
+	it('only a separation-counted task may have a second edge', () => {
+		for (const t of TASK_DEFS)
+			if (t.finalEnd !== undefined) expect(t.finishBefore).toBe('separation');
+	});
+
+	it('only the separation package and the DD-214 review count from the leaving day, and both finish before it', () => {
+		const counted = TASK_DEFS.filter((t) => t.countsFrom === 'leaving');
+		expect(counted.map((t) => t.id).sort()).toEqual(['dd214-review', 'separation-package']);
+		for (const t of counted) expect(t.finishBefore).toBe('leaving');
+	});
+
+	// A task finished before the user leaves the command, or counted from that day, is over before separation: no one
+	// leaves the command after they separate.
+	it('every task finished before leaving, or counted from it, ends before separation', () => {
+		const leavingTasks = TASK_DEFS.filter(
+			(t) => t.finishBefore !== 'separation' || t.countsFrom === 'leaving'
+		);
+		expect(leavingTasks.length).toBeGreaterThan(0);
+		for (const t of leavingTasks) expect(t.windowEnd, t.id).toBeLessThan(0);
 	});
 });

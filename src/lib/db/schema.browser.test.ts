@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { openMtcDb, withStores, reqToPromise, STORES, DB_VERSION } from './schema';
 import { openTestDb, deleteTestDb } from './_test-helpers';
 
@@ -44,7 +44,7 @@ function openV2Db(name: string): Promise<IDBDatabase> {
 	});
 }
 
-describe('openMtcDb schema (v4)', () => {
+describe('openMtcDb schema (v5)', () => {
 	it('opens at the current DB_VERSION with exactly the registered stores', async () => {
 		const db = await freshDb();
 		expect(db.version).toBe(DB_VERSION);
@@ -165,6 +165,24 @@ describe('openMtcDb schema (v4)', () => {
 			'timeline-state',
 			'timeline-state-hwm'
 		]);
+	});
+
+	it('version 5 retires a tab still holding version 4 (it would save the profile without the leaving dates)', async () => {
+		const name = `mtc-v5-${crypto.randomUUID()}`;
+		const old = await openAtVersion(name, 4);
+		const retired = vi.fn();
+		old.onversionchange = () => {
+			retired();
+			old.close();
+		};
+		const db = await openMtcDb(name);
+		expect(retired).toHaveBeenCalledOnce();
+		expect(db.version).toBe(5);
+		db.close();
+		await new Promise((r) => {
+			const del = indexedDB.deleteDatabase(name);
+			del.onsuccess = del.onerror = () => r(undefined);
+		});
 	});
 });
 

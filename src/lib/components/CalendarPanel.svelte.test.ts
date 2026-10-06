@@ -1,11 +1,12 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
-import type { TaskExclusions } from '$lib/calendar/types';
+import type { HandedOverEvent, TaskExclusions } from '$lib/calendar/types';
+import type { CalendarFile } from '$lib/calendar/build-ics';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 function def(id: string, category: TaskDef['category']): TaskDef {
@@ -13,7 +14,7 @@ function def(id: string, category: TaskDef['category']): TaskDef {
 		id,
 		title: id,
 		category,
-		track: 'transition',
+		finishBefore: 'separation',
 		kind: 'soft',
 		windowStart: -30,
 		windowEnd: 0,
@@ -32,24 +33,30 @@ function item(d: TaskDef): TimelineItem {
 		aimDate: ahead
 	};
 }
+// No add recorded yet: the panel as it was before the record existed.
+const NO_RECORD: {
+	stale: HandedOverEvent[];
+	onAcknowledge: () => Promise<void>;
+} = { stale: [], onAcknowledge: async () => {} };
 
 describe('CalendarPanel', () => {
 	it('downloads an .ics of the pending, non-excluded items when "Add to calendar" is clicked', async () => {
-		const onDownload = vi.fn();
+		const onAdd = vi.fn();
 		const items = [item(def('a', 'admin')), item(def('m', 'medical'))];
 		const { container } = render(CalendarPanel, {
 			props: {
 				items,
 				exclusions: { taskIds: [], categories: ['medical'] },
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions: vi.fn(),
-				onDownload
+				onAdd
 			}
 		});
 		(container.querySelector('.cal-add') as HTMLButtonElement).click();
 		// addToCalendar awaits computeIcsUid (crypto.subtle) per event, so poll for the callback.
-		await vi.waitFor(() => expect(onDownload).toHaveBeenCalledOnce());
-		const ics = onDownload.mock.calls[0]?.[0] as string;
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
+		const ics = (onAdd.mock.calls[0]?.[0] as CalendarFile | undefined)?.ics;
 		expect(ics).toContain('SUMMARY:Aim for: a'); // pending admin task included
 		expect(ics).not.toContain('SUMMARY:Aim for: m'); // medical excluded -> no event
 		expect(container.querySelector('.cal-add')?.textContent?.trim()).toBe('Add to my calendar');
@@ -62,8 +69,9 @@ describe('CalendarPanel', () => {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions: vi.fn(),
-				onDownload: vi.fn()
+				onAdd: vi.fn()
 			}
 		});
 		expect(container.querySelector('input[value="medical"]')).toBeNull(); // collapsed by default
@@ -73,14 +81,15 @@ describe('CalendarPanel', () => {
 	});
 
 	it('fails closed when the store is not ready: no export against an unknown exclusion set', () => {
-		const onDownload = vi.fn();
+		const onAdd = vi.fn();
 		const { container } = render(CalendarPanel, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the empty DEFAULT, not a real record
 				ready: false,
+				...NO_RECORD,
 				onSetExclusions: vi.fn(),
-				onDownload
+				onAdd
 			}
 		});
 		// An unknown exclusion set must never be treated as "the user excluded nothing".
@@ -89,7 +98,7 @@ describe('CalendarPanel', () => {
 			true
 		);
 		expect(container.textContent).toContain('could not be loaded');
-		expect(onDownload).not.toHaveBeenCalled();
+		expect(onAdd).not.toHaveBeenCalled();
 	});
 
 	// While the settings are unknown the panel says only that; "Nothing ahead" would be a second, unproven reason.
@@ -105,8 +114,9 @@ describe('CalendarPanel', () => {
 				items: [passed],
 				exclusions: { taskIds: [], categories: [] },
 				ready: false,
+				...NO_RECORD,
 				onSetExclusions: vi.fn(),
-				onDownload: vi.fn()
+				onAdd: vi.fn()
 			}
 		});
 		expect(container.textContent).toContain('could not be loaded');
@@ -130,8 +140,9 @@ describe('CalendarPanel', () => {
 					items: [today],
 					exclusions: { taskIds: [], categories: [] },
 					ready: true,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
-					onDownload: vi.fn()
+					onAdd: vi.fn()
 				}
 			});
 			expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(false);
@@ -156,8 +167,9 @@ describe('CalendarPanel', () => {
 					items,
 					exclusions: { taskIds: [], categories },
 					ready: true,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
-					onDownload: vi.fn()
+					onAdd: vi.fn()
 				}
 			}).container;
 		for (const container of [panel([passed], []), panel([item(def('a', 'admin'))], ['admin'])]) {
@@ -176,11 +188,40 @@ describe('CalendarPanel', () => {
 					items,
 					exclusions: { taskIds: [], categories: [] },
 					ready: true,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
-					onDownload: vi.fn()
+					onAdd: vi.fn()
 				}
 			}).container;
 		expect(panel([item(def('a', 'admin'))]).textContent).toContain(LINE);
+		const passed: TimelineItem = {
+			...item(def('p', 'admin')),
+			windowEndDate: '2020-01-01',
+			aimDate: '2020-01-01',
+			status: 'still-to-do'
+		};
+		expect(panel([passed]).textContent).not.toContain(LINE);
+	});
+
+	// The downloaded file outlives Erase all data, so wherever there is a file to add, the panel says it can go once
+	// it is in the calendar: a line of its own, right after the steps for this device.
+	it('says the downloaded file can be deleted once added, when there is something to add', () => {
+		const LINE = "Once it's added, you can delete the downloaded file.";
+		const panel = (items: TimelineItem[]) =>
+			render(CalendarPanel, {
+				props: {
+					items,
+					exclusions: { taskIds: [], categories: [] },
+					ready: true,
+					...NO_RECORD,
+					onSetExclusions: vi.fn(),
+					onAdd: vi.fn()
+				}
+			}).container;
+		const lines = [...panel([item(def('a', 'admin'))]).querySelectorAll('.cal-hint--device')].map(
+			(p) => p.textContent?.trim()
+		);
+		expect(lines[1]).toBe(LINE);
 		const passed: TimelineItem = {
 			...item(def('p', 'admin')),
 			windowEndDate: '2020-01-01',
@@ -197,8 +238,9 @@ describe('CalendarPanel', () => {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions,
-				onDownload: vi.fn()
+				onAdd: vi.fn()
 			}
 		});
 		(container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
@@ -221,7 +263,7 @@ describe('CalendarPanel', () => {
 	// set without the first and that category goes back into the calendar file.
 	it('keeps both of two quick toggles made before the first save lands', () => {
 		let saved: TaskExclusions = { taskIds: [], categories: [] };
-		const onSetExclusions = (
+		const onSetExclusions = async (
 			next: TaskExclusions | ((current: TaskExclusions) => TaskExclusions)
 		) => {
 			saved = typeof next === 'function' ? next(saved) : next;
@@ -231,8 +273,9 @@ describe('CalendarPanel', () => {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the save has not landed yet
 				ready: true,
+				...NO_RECORD,
 				onSetExclusions,
-				onDownload: vi.fn()
+				onAdd: vi.fn()
 			}
 		});
 		(container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
@@ -241,6 +284,272 @@ describe('CalendarPanel', () => {
 		(container.querySelector('input[value="admin"]') as HTMLInputElement).click();
 		flushSync();
 		expect(saved.categories).toEqual(['medical', 'admin']);
+	});
+
+	it('puts a category toggle back, and says so, when the save fails', async () => {
+		render(CalendarPanel, {
+			props: {
+				items: [],
+				exclusions: { taskIds: [], categories: [] },
+				ready: true,
+				...NO_RECORD,
+				onSetExclusions: () => Promise.reject(new Error('E_OCC_CONFLICT')),
+				onAdd: () => {}
+			}
+		});
+		await page.getByRole('button', { name: /customize what's included/i }).click();
+		const box = page.getByRole('checkbox', { name: 'medical' });
+		await box.click();
+		await expect.element(box).not.toBeChecked();
+		await expect
+			.element(page.getByText('Could not update right now - please try again.'))
+			.toBeVisible();
+	});
+
+	it('takes the failure line away once a later toggle saves', async () => {
+		const onSetExclusions = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('E_OCC_CONFLICT'))
+			.mockResolvedValueOnce(undefined);
+		render(CalendarPanel, {
+			props: {
+				items: [],
+				exclusions: { taskIds: [], categories: [] },
+				ready: true,
+				...NO_RECORD,
+				onSetExclusions,
+				onAdd: () => {}
+			}
+		});
+		await page.getByRole('button', { name: /customize what's included/i }).click();
+		await page.getByRole('checkbox', { name: 'medical' }).click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await page.getByRole('checkbox', { name: 'admin' }).click();
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+	});
+
+	const HELD: HandedOverEvent = {
+		taskId: 'tap-capstone',
+		moment: 'last',
+		title: 'Last day: Complete your TAP Capstone',
+		isoDate: '2027-01-30',
+		addedOn: '2026-10-03'
+	};
+	const withRecord = (
+		ready: boolean,
+		stale: HandedOverEvent[],
+		onAcknowledge = NO_RECORD.onAcknowledge
+	) =>
+		render(CalendarPanel, {
+			props: {
+				items: [item(def('a', 'admin'))],
+				exclusions: { taskIds: [], categories: [] },
+				ready,
+				stale,
+				onAcknowledge,
+				onSetExclusions: vi.fn(),
+				onAdd: vi.fn()
+			}
+		}).container;
+
+	it('lists the events to delete above the Add button, once its settings are loaded', () => {
+		const container = withRecord(true, [HELD]);
+		const head = [...container.querySelectorAll('h3')].find(
+			(h) => h.textContent === 'Your calendar is out of date'
+		);
+		const add = container.querySelector('.cal-add');
+		expect(head).toBeDefined();
+		expect(add).not.toBeNull();
+		if (!head || !add) return;
+		expect(head.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
+
+	// Until both stores load, the list would be built from a stand-in empty task state and could name an event
+	// that is not out of date.
+	it('shows no list while its settings are not loaded', () => {
+		expect(withRecord(false, [HELD]).textContent).not.toContain('Your calendar is out of date');
+	});
+
+	// Nothing is listed while the settings load, so the general line stands, even when the list would name events.
+	it('keeps the general line while its settings are not loaded', () => {
+		expect(withRecord(false, [HELD]).textContent).toContain(
+			'Changed a date? Remove the events you added before, then add again.'
+		);
+	});
+
+	// Nothing listed - no add recorded yet, or every listed event acknowledged - leaves the general line, which also
+	// says to add again; while the list names events, it replaces the line.
+	it('shows the general line whenever nothing is listed, and the list in its place', () => {
+		const LINE = 'Changed a date? Remove the events you added before, then add again.';
+		expect(withRecord(true, []).textContent).toContain(LINE);
+		expect(withRecord(true, [HELD]).textContent).not.toContain(LINE);
+	});
+
+	// The list unmounts with focus on its button; focus goes to the next step the list names, adding again. The rerender
+	// is the page's own update: the saved record no longer holds the events, so the list goes.
+	it("moves focus to the add button once I've deleted these saves", async () => {
+		const props = {
+			items: [item(def('a', 'admin'))],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: async () => {
+				await screen.rerender({ ...props, stale: [] });
+			}
+		};
+		const screen = render(CalendarPanel, { props });
+		await page.getByRole('button', { name: "I've deleted these" }).click();
+		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
+	});
+
+	// A user who moved on while the save ran stays where they are: focus moves only when it fell with the list.
+	it('leaves focus where the user moved it while the save ran', async () => {
+		let finish = (): Promise<void> => Promise.resolve();
+		const props = {
+			items: [item(def('a', 'admin'))],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: () =>
+				new Promise<void>((resolve) => {
+					finish = async () => {
+						await screen.rerender({ ...props, stale: [] });
+						resolve();
+					};
+				})
+		};
+		const screen = render(CalendarPanel, { props });
+		await page.getByRole('button', { name: "I've deleted these" }).click();
+		const toggle = page
+			.getByRole('button', { name: /customize what's included/i })
+			.element() as HTMLElement;
+		toggle.focus();
+		await finish();
+		// Past the panel's own tick and focus step, so a move it made would have landed.
+		await new Promise((r) => setTimeout(r, 50));
+		expect(document.activeElement).toBe(toggle);
+	});
+
+	// The move does not scroll: the reader may have scrolled on while the save ran.
+	it('moves focus to the add button without scrolling the page', async () => {
+		let finish = (): Promise<void> => Promise.resolve();
+		const props = {
+			items: [item(def('a', 'admin'))],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: () =>
+				new Promise<void>((resolve) => {
+					finish = async () => {
+						await screen.rerender({ ...props, stale: [] });
+						resolve();
+					};
+				})
+		};
+		const screen = render(CalendarPanel, { props });
+		// The panel sits below a tall block and the reader scrolls back to the top, so the panel is out of view and the
+		// list going away below it shifts nothing on screen; only a focus move that scrolls would change the position.
+		const spacer = document.createElement('div');
+		spacer.style.height = '5000px';
+		document.body.prepend(spacer);
+		try {
+			await page.getByRole('button', { name: "I've deleted these" }).click();
+			window.scrollTo(0, 0);
+			await finish();
+			await expect
+				.element(page.getByRole('button', { name: /^add to my calendar$/i }))
+				.toHaveFocus();
+			expect(window.scrollY).toBe(0);
+		} finally {
+			spacer.remove();
+			window.scrollTo(0, 0);
+		}
+	});
+
+	// With nothing ahead to add, Add is off and cannot take focus, so the Calendar heading takes it. The rerender is the
+	// page's own update: the saved record no longer holds the events, so the list goes.
+	it('moves focus to the Calendar heading when the list clears with nothing to add', async () => {
+		const props = {
+			items: [],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: async () => {
+				await screen.rerender({ ...props, stale: [] });
+			}
+		};
+		const screen = render(CalendarPanel, { props });
+		// The ring's colour token is set as the app defines it, so a ring drawn here would be a solid outline.
+		document.documentElement.style.setProperty('--color-accent', '#1a66c2');
+		try {
+			await page.getByRole('button', { name: "I've deleted these" }).click();
+			const heading = page.getByRole('heading', { level: 2, name: 'Calendar' });
+			await expect.element(heading).toHaveFocus();
+			// Focus that follows a click shows no ring: the rule is :focus-visible, which a pointer does not raise.
+			expect(getComputedStyle(heading.element()).outlineStyle).not.toBe('solid');
+		} finally {
+			document.documentElement.style.removeProperty('--color-accent');
+		}
+	});
+
+	// By keyboard the heading shows the app's focus ring - a 2 px solid outline with a 2 px gap, as on every button
+	// and link - not the browser's own.
+	it('rings the Calendar heading the way the app rings a button, when focus arrives by keyboard', async () => {
+		const props = {
+			items: [],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: async () => {
+				await screen.rerender({ ...props, stale: [] });
+			}
+		};
+		const screen = render(CalendarPanel, { props });
+		// Component tests run without app.css; the ring's colour token is set here as the app defines it, and removed.
+		document.documentElement.style.setProperty('--color-accent', '#1a66c2');
+		try {
+			(screen.container.querySelector('.stale__ack') as HTMLButtonElement).focus();
+			await userEvent.keyboard('{Enter}');
+			const heading = page.getByRole('heading', { level: 2, name: 'Calendar' });
+			await expect.element(heading).toHaveFocus();
+			const ring = getComputedStyle(heading.element());
+			expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual([
+				'solid',
+				'2px',
+				'2px'
+			]);
+		} finally {
+			document.documentElement.style.removeProperty('--color-accent');
+		}
+	});
+
+	it("keeps focus on I've deleted these when the save fails", async () => {
+		withRecord(
+			true,
+			[HELD],
+			vi.fn(async () => Promise.reject(new Error('E_TEST_SAVE')))
+		);
+		const ack = page.getByRole('button', { name: "I've deleted these" });
+		await ack.click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await expect.element(ack).toHaveFocus();
+	});
+
+	it("passes I've deleted these to its handler", async () => {
+		const onAcknowledge = vi.fn(async () => {});
+		withRecord(true, [HELD], onAcknowledge);
+		await page.getByRole('button', { name: "I've deleted these" }).click();
+		expect(onAcknowledge).toHaveBeenCalledOnce();
 	});
 
 	// 38 CFR 14.629: the panel's own words make no personal claim, with something to add, with nothing ahead, or
@@ -263,8 +572,9 @@ describe('CalendarPanel', () => {
 					items,
 					exclusions: { taskIds: [], categories: [] },
 					ready,
+					...NO_RECORD,
 					onSetExclusions: vi.fn(),
-					onDownload: vi.fn()
+					onAdd: vi.fn()
 				}
 			});
 			(container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
@@ -289,8 +599,9 @@ describe('CalendarPanel (the sentence for this device)', () => {
 		items: [item(def('a', 'admin'))],
 		exclusions: { taskIds: [], categories: [] },
 		ready: true,
+		...NO_RECORD,
 		onSetExclusions: vi.fn(),
-		onDownload: vi.fn()
+		onAdd: vi.fn()
 	});
 
 	it('tells an Android phone what happens after the tap', () => {
@@ -389,8 +700,9 @@ describe('CalendarPanel (layout by width)', () => {
 		items: [item(def('a', 'admin'))],
 		exclusions: { taskIds: [], categories: [] },
 		ready: true,
+		...NO_RECORD,
 		onSetExclusions: vi.fn(),
-		onDownload: vi.fn()
+		onAdd: vi.fn()
 	});
 	// One rect per line of text the element's content takes.
 	const lines = (el: Element) => {

@@ -10,7 +10,7 @@ function item(id: string, status: DisplayStatus, extra: Partial<TimelineItem> = 
 			id,
 			title: id,
 			category: 'admin',
-			track: 'transition',
+			finishBefore: 'separation',
 			kind: 'closes',
 			windowStart: -180,
 			windowEnd: -90,
@@ -78,6 +78,29 @@ describe('selectNeedsNow', () => {
 			],
 			TODAY
 		);
+		expect([...g.late, ...g.closingSoon, ...g.justClosed, ...g.justOpened]).toEqual([]);
+	});
+
+	it('lists a firm task that cannot fit under After you leave, and never a soft one', () => {
+		const g = selectNeedsNow(
+			[
+				item('firm', 'after-you-leave'),
+				item('soft', 'after-you-leave', {
+					def: {
+						id: 'soft',
+						title: 'soft',
+						category: 'admin',
+						finishBefore: 'leaving',
+						kind: 'soft',
+						windowStart: -90,
+						windowEnd: -1,
+						why: ''
+					}
+				})
+			],
+			TODAY
+		);
+		expect(ids(g.afterYouLeave)).toEqual(['firm']);
 		expect([...g.late, ...g.closingSoon, ...g.justClosed, ...g.justOpened]).toEqual([]);
 	});
 });
