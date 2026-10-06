@@ -70,7 +70,7 @@
 		{
 			"name": "Root layout node (loaded on every page)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/0.*.js",
-			"limit": "7 KB",
+			"limit": "7040 B",
 			"gzip": true
 		},
 		{

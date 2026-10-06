@@ -152,6 +152,8 @@ const STATIC = 'static';
 //     precache (139,419 / 139,436 / 139,443 B against 139,440) and 8 B apart on route nodes. Each limit keeps about 40
 //     B of room above that: page 59,300 -> 59,320, route nodes 45,000 -> 45,040, precache 144,460 -> 144,480. A build
 //     stamped with its commit would make these exact per commit (hardening box).
+//     Root layout 7,000 -> 7,040 B (owner's call, 2026-10-06; the limit lives in package.json's size-limit): the same drift
+//     (main's CI measured it 6.15 and 6.16 kB on the same code) - 6,992 B measured, 48 B of room.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
