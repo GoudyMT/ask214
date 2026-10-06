@@ -1,7 +1,12 @@
 import type { DesiredEvent, HandedOverEvent } from './types';
 
 /** One identity for "the same event": its task, moment, date and title. */
-function key(e: { taskId: string; moment: string; isoDate: string; title: string }): string {
+export function handedOverKey(e: {
+	taskId: string;
+	moment: string;
+	isoDate: string;
+	title: string;
+}): string {
 	return `${e.taskId}|${e.moment}|${e.isoDate}|${e.title}`;
 }
 
@@ -16,9 +21,9 @@ export function mergeHandedOver(
 	todayIso: string
 ): HandedOverEvent[] {
 	const kept = (record ?? []).filter((e) => e.isoDate >= todayIso);
-	const seen = new Set(kept.map(key));
+	const seen = new Set(kept.map(handedOverKey));
 	const added = events
-		.filter((e) => !seen.has(key(e)))
+		.filter((e) => !seen.has(handedOverKey(e)))
 		.map((e) => ({
 			taskId: e.taskId,
 			moment: e.moment,
@@ -39,8 +44,8 @@ export function staleEvents(
 	todayIso: string
 ): HandedOverEvent[] {
 	if (!record) return [];
-	const current = new Set(desired.map(key));
-	return record.filter((e) => e.isoDate > todayIso && !current.has(key(e)));
+	const current = new Set(desired.map(handedOverKey));
+	return record.filter((e) => e.isoDate > todayIso && !current.has(handedOverKey(e)));
 }
 
 /** The record without the entries the user said they deleted. */
@@ -48,6 +53,6 @@ export function acknowledge(
 	record: HandedOverEvent[],
 	listed: HandedOverEvent[]
 ): HandedOverEvent[] {
-	const gone = new Set(listed.map(key));
-	return record.filter((e) => !gone.has(key(e)));
+	const gone = new Set(listed.map(handedOverKey));
+	return record.filter((e) => !gone.has(handedOverKey(e)));
 }

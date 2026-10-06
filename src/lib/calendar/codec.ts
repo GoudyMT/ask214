@@ -1,8 +1,25 @@
 import type { CalendarSyncState, HandedOverEvent, EventMoment } from './types';
+import { handedOverKey } from './handed-over';
 
 const SCHEMA_VERSION = 1;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const MOMENTS: ReadonlySet<EventMoment> = new Set(['opens', 'changes', 'last', 'aim', 'leave']);
+// A record over every moment, so a new moment fails the type-check until it is accepted here too.
+const MOMENT_KEYS: Record<EventMoment, true> = {
+	opens: true,
+	changes: true,
+	last: true,
+	aim: true,
+	leave: true
+};
+const MOMENTS: ReadonlySet<string> = new Set(Object.keys(MOMENT_KEYS));
+
+/**
+ * A day as the app writes it, YYYY-MM-DD: only a string a UTC round trip gives back unchanged. A date that is not a
+ * string, carries extra text or names no day (the parser rolls 2026-02-30 over to March 2) fails.
+ */
+function isDay(v: unknown): boolean {
+	const t = new Date(`${String(v)}T00:00:00Z`);
+	return !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === v;
+}
 
 /** A stored list the app wrote itself, checked anyway: a bad shape must read as "no record yet", never throw later. */
 function isHandedOverList(v: unknown): v is HandedOverEvent[] {
@@ -15,9 +32,11 @@ function isHandedOverList(v: unknown): v is HandedOverEvent[] {
 				typeof (e as HandedOverEvent).taskId === 'string' &&
 				MOMENTS.has((e as HandedOverEvent).moment) &&
 				typeof (e as HandedOverEvent).title === 'string' &&
-				ISO_DATE.test(String((e as HandedOverEvent).isoDate)) &&
-				ISO_DATE.test(String((e as HandedOverEvent).addedOn))
-		)
+				isDay((e as HandedOverEvent).isoDate) &&
+				isDay((e as HandedOverEvent).addedOn)
+		) &&
+		// The list keys its rows by this identity, so a repeated event would break the page.
+		new Set(v.map((e: HandedOverEvent) => handedOverKey(e))).size === v.length
 	);
 }
 

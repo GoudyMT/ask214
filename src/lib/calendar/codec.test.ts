@@ -66,6 +66,32 @@ describe('calendar-sync codec', () => {
 		}
 	});
 
+	// Only a tampered store holds these, but each must read as "no record yet", never a throw: a repeated entry would
+	// break the list's keyed rows, and a date that names no day would be shown as some other day.
+	const good = {
+		taskId: 'a',
+		moment: 'last',
+		title: 't',
+		isoDate: '2026-12-01',
+		addedOn: '2026-10-04'
+	};
+	const untrusted: [string, unknown[]][] = [
+		['a date held in an array', [{ ...good, isoDate: ['2026-12-01'] }]],
+		['a day the month does not have', [{ ...good, isoDate: '2026-02-30' }]],
+		['a month that does not exist', [{ ...good, addedOn: '2026-13-01' }]],
+		['text after the date', [{ ...good, isoDate: '2026-12-01x' }]],
+		['the same event twice', [good, { ...good, addedOn: '2026-10-05' }]]
+	];
+	for (const [name, lastAdd] of untrusted) {
+		it(`drops a lastAdd with ${name}`, () => {
+			const bytes = new TextEncoder().encode(
+				JSON.stringify({ schemaVersion: 1, exclusions: { taskIds: [], categories: [] }, lastAdd })
+			);
+			expect(() => decodeCalendarSyncState(bytes)).not.toThrow();
+			expect(decodeCalendarSyncState(bytes).lastAdd).toBeUndefined();
+		});
+	}
+
 	it('keeps a well-formed lastAdd', () => {
 		const lastAdd = [
 			{
