@@ -330,12 +330,20 @@ describe('Fit: the leaving dates pull in a last day, never an opening', () => {
 		);
 		expect(early.windowEndDate).toBe('2027-01-09');
 		expect(early.fit?.reason).toBe('terminal-leave');
+		// The reason names the last day, not the target, which stays at its own earlier date (Dec 31).
+		expect(early.fit).toEqual({ reason: 'terminal-leave', date: '2027-01-09' });
+	});
+
+	it('a leaving date the day after the official last day moves nothing', () => {
+		const capstone = item(leaving({ skillbridgeStart: '2027-01-31' }), 'tap-capstone');
+		expect(capstone.windowEndDate).toBe('2027-01-30');
+		expect(capstone.fit).toBeUndefined();
 	});
 
 	it('a task opening on the first day away cannot fit; one day earlier it can', () => {
-		expect(item(leaving({ skillbridgeStart: '2026-11-01' }), 'reference-letters').status).toBe(
-			'after-you-leave'
-		);
+		const letters = item(leaving({ skillbridgeStart: '2026-11-01' }), 'reference-letters');
+		expect(letters.status).toBe('after-you-leave');
+		expect(letters.fit).toBeUndefined(); // no reason on a date: the card shows the opening instead
 		const oneDay = item(leaving({ skillbridgeStart: '2026-11-02' }), 'reference-letters');
 		expect(oneDay.windowStartDate).toBe('2026-11-01');
 		expect(oneDay.windowEndDate).toBe('2026-11-01');
@@ -796,5 +804,11 @@ describe('After you leave', () => {
 		});
 		expect(s['sha-complete']).toBe('closed'); // required, official last day Jan 30, separation passed
 		expect(s['reference-letters']).toBe('still-to-do'); // soft, official window ended Mar 31
+	});
+
+	it('holds through separation day and hands over the day after', () => {
+		const leave = { terminalLeaveStart: '2026-11-15' };
+		expect(at(new Date(2027, 3, 30, 12), leave)['sha-complete']).toBe('after-you-leave');
+		expect(at(new Date(2027, 4, 1, 12), leave)['sha-complete']).toBe('closed');
 	});
 });

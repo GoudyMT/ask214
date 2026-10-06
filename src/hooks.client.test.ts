@@ -1,7 +1,24 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { HandleClientError } from '@sveltejs/kit';
-import { handleError } from './hooks.client';
+import { handleError, init } from './hooks.client';
 import { getDiagnosticsForTest } from '$lib/log/safelog';
+
+// The start-up hook installs the catcher on the window. This project runs in Node, so the window is a real event
+// target standing in for it; the catcher's own behaviour in a browser is tested beside it in src/lib/log.
+describe('init', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('installs the error catcher before the app starts', async () => {
+		const target = new EventTarget();
+		vi.stubGlobal('window', target);
+		await init();
+		const ev = new Event('error', { cancelable: true });
+		target.dispatchEvent(ev);
+		expect(ev.defaultPrevented).toBe(true);
+	});
+});
 
 type Input = Parameters<HandleClientError>[0];
 const event = {} as Input['event'];

@@ -175,6 +175,20 @@ describe('firm deadlines match their official sources', () => {
 		}
 	});
 
+	// MILPERSMAN 1900-015 CH-93: the complete separation package "no less than 120 days from commencement of PTDY or
+	// separation leave" (2.b(3)), complete packages 5 to 9 months out (2.a); a DD 214 not final 14 days before
+	// departure on PTDY or separation leave is finalized without the member's signature (2.a), so its last day is the
+	// day before that mark.
+	it('counts the separation package and the DD-214 review from the leaving day, as CH-93 does', () => {
+		expect(at('separation-package')).toMatchObject({
+			countsFrom: 'leaving',
+			windowStart: -270,
+			recommendedOffset: -150,
+			windowEnd: -120
+		});
+		expect(at('dd214-review')).toMatchObject({ countsFrom: 'leaving', windowEnd: -15 });
+	});
+
 	it('opens the Capstone at 12 months and Chapter 36 counseling 180 days before separation', () => {
 		expect(at('tap-capstone')?.windowStart).toBe(-365);
 		expect(at('va-career-guidance')?.windowStart).toBe(-180);
@@ -224,5 +238,15 @@ describe('what each task must finish before', () => {
 		const counted = TASK_DEFS.filter((t) => t.countsFrom === 'leaving');
 		expect(counted.map((t) => t.id).sort()).toEqual(['dd214-review', 'separation-package']);
 		for (const t of counted) expect(t.finishBefore).toBe('leaving');
+	});
+
+	// A task finished before the user leaves the command, or counted from that day, is over before separation: no one
+	// leaves the command after they separate.
+	it('every task finished before leaving, or counted from it, ends before separation', () => {
+		const leavingTasks = TASK_DEFS.filter(
+			(t) => t.finishBefore !== 'separation' || t.countsFrom === 'leaving'
+		);
+		expect(leavingTasks.length).toBeGreaterThan(0);
+		for (const t of leavingTasks) expect(t.windowEnd, t.id).toBeLessThan(0);
 	});
 });

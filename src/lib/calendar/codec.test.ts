@@ -81,4 +81,18 @@ describe('calendar-sync codec', () => {
 		);
 		expect(decodeCalendarSyncState(bytes).lastAdd).toEqual(lastAdd);
 	});
+
+	it('keeps an entry for every moment an event can mark', () => {
+		const lastAdd = (['opens', 'changes', 'last', 'aim', 'leave'] as const).map((moment) => ({
+			taskId: 'a',
+			moment,
+			title: `${moment}: a`,
+			isoDate: '2026-12-01',
+			addedOn: '2026-10-04'
+		}));
+		const bytes = new TextEncoder().encode(
+			JSON.stringify({ schemaVersion: 1, exclusions: { taskIds: [], categories: [] }, lastAdd })
+		);
+		expect(decodeCalendarSyncState(bytes).lastAdd).toEqual(lastAdd);
+	});
 });

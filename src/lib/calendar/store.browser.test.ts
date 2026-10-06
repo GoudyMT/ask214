@@ -4,7 +4,7 @@ import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { withStores, reqToPromise } from '../db/schema';
-import type { DesiredEvent, TaskExclusions } from './types';
+import type { DesiredEvent, HandedOverEvent, TaskExclusions } from './types';
 
 // Real Chromium (SubtleCrypto + IndexedDB + navigator.locks). The calendar-sync
 // store mirrors the timeline-state store's load/save/OCC/relock/wipe spine over the
@@ -196,7 +196,7 @@ describe('calendar-sync store', () => {
 			isoDate: '2099-01-01',
 			alarmDays: []
 		};
-		const heldA = {
+		const heldA: HandedOverEvent = {
 			taskId: 'a',
 			moment: 'last',
 			title: 'Last day: a',
@@ -218,6 +218,40 @@ describe('calendar-sync store', () => {
 
 			await store.acknowledgeStale(store.lastAdd ?? []);
 			expect(store.lastAdd).toEqual([]);
+			await deleteTestDb(db);
+		});
+
+		it('acknowledging some events keeps the others, in memory and on disk', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			const b: DesiredEvent = { ...e, taskId: 'b', title: 'Last day: b' };
+			const heldB = { ...heldA, taskId: 'b', title: 'Last day: b' };
+			await store.recordAdd([e, b], '2026-10-04', '2026-10-04');
+			await store.acknowledgeStale([heldA]);
+			expect(store.lastAdd).toEqual([heldB]);
+
+			const again = createCalendarSyncStore(db);
+			await again.load();
+			expect(again.lastAdd).toEqual([heldB]);
+			await deleteTestDb(db);
+		});
+
+		// Some calendar apps keep the old date on a re-add, so a second add keeps the first add's version too.
+		it('a second add keeps the version an earlier add handed over, also after a reload', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await store.recordAdd([e], '2026-10-04', '2026-10-04');
+			await store.recordAdd([{ ...e, isoDate: '2099-02-01' }], '2026-10-05', '2026-10-05');
+			const both = [heldA, { ...heldA, isoDate: '2099-02-01', addedOn: '2026-10-05' }];
+			expect(store.lastAdd).toEqual(both);
+
+			const again = createCalendarSyncStore(db);
+			await again.load();
+			expect(again.lastAdd).toEqual(both);
 			await deleteTestDb(db);
 		});
 
