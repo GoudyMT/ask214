@@ -58,8 +58,10 @@
 		color: var(--color-fg);
 	}
 
+	/* min-height: the 44px touch target the list's and Settings' buttons use; the text-link look stays. */
 	.init-banner__reload {
 		flex: none;
+		min-height: 44px;
 		padding: 0;
 		background: none;
 		border: none;

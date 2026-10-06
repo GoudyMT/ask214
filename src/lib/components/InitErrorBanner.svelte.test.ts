@@ -17,6 +17,12 @@ describe('InitErrorBanner', () => {
 		expect(onReload).toHaveBeenCalledOnce();
 	});
 
+	it('makes Reload a 44 px target', () => {
+		const { container } = render(InitErrorBanner, { props: { onReload: vi.fn() } });
+		const reload = container.querySelector('.init-banner__reload') as HTMLElement;
+		expect(reload.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+	});
+
 	it('says nothing personal', () => {
 		const { container } = render(InitErrorBanner, { props: { onReload: vi.fn() } });
 		const text = textOf(container);
