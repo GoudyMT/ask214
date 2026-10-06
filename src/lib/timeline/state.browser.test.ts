@@ -3,6 +3,7 @@ import { createTimelineStateStore, TimelineRelockedError } from './state.svelte'
 import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
+import { withStores, reqToPromise } from '../db/schema';
 
 // Real Chromium (SubtleCrypto + IndexedDB + navigator.locks). The timeline-state
 // store mirrors the profile store's load/save/OCC/relock/wipe spine but uses the
@@ -263,6 +264,35 @@ describe('timeline-state store', () => {
 		expect(store.ready).toBe(true);
 		store.relockSync('user');
 		expect(store.ready).toBe(false);
+		await deleteTestDb(db);
+	});
+
+	// A failed load says so, so the Timeline can show a note instead of every task as not started; a load that succeeds
+	// clears it.
+	it('says its load failed, until a load succeeds', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('dd214-review', 'done');
+		const body = await withStores(db, 'timeline-state', 'readonly', (tx) =>
+			reqToPromise(tx.objectStore('timeline-state').get(0))
+		);
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').delete(0);
+		});
+
+		const b = createTimelineStateStore(db);
+		expect(b.failed).toBe(false);
+		await expect(b.load()).rejects.toThrow('E_TIMELINE_BODY_MISSING');
+		expect(b.failed).toBe(true);
+
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').put(body);
+		});
+		await b.load();
+		expect(b.failed).toBe(false);
+		expect(b.state.tasks['dd214-review']?.status).toBe('done');
 		await deleteTestDb(db);
 	});
 });

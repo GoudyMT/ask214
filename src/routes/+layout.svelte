@@ -18,7 +18,7 @@
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
-	import { createTimelineStateStore } from '$lib/timeline';
+	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline';
 	import { createCalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus } from '$lib/broadcast/bus';
@@ -165,16 +165,25 @@
 				// Timeline-state store rides on the same db + bus; it joins the relock set the moment
 				// it exists, before its first read decrypts anything. A timeline init failure
 				// degrades to profile-only (never blocks the wiring above).
+				let timelineStore: TimelineStateStore | null = null;
 				void provisionStore(
 					result.db,
 					(db) => createTimelineStateStore(db, { onBroadcast: (e) => echo.publish(e) }),
-					(timeline) => relockables.push(timeline)
+					(timeline) => {
+						relockables.push(timeline);
+						timelineStore = timeline;
+					}
 				)
 					.then((timeline) => {
 						if (destroyed) return;
 						app.timeline = timeline;
 					})
-					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
+					.catch(() => {
+						safeLog({ code: 'E_INIT_FAILED' });
+						// Handed over all the same: the store says its load failed, so the Timeline shows a note
+						// instead of every task as not started.
+						if (!destroyed) app.timeline = timelineStore;
+					});
 
 				// Calendar-sync store rides on the same db + bus and joins the relock set the same
 				// way; an init failure degrades to calendar-off, never blocking the wiring above.

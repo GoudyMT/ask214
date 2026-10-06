@@ -81,6 +81,9 @@ export type TimelineStoreOptions = { onBroadcast?: (e: TimelineBroadcastEvent) =
 
 export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOptions = {}) {
 	let _state = $state<TimelineState | null>(null);
+	// Whether the last load failed: not loaded can mean not read YET, which the Timeline waits out, or could not be read,
+	// which it says.
+	let _failed = $state(false);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
@@ -201,6 +204,11 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return _state !== null;
 		},
 
+		/** Whether the last load failed, so the stored statuses could not be read; a load that succeeds clears it. */
+		get failed(): boolean {
+			return _failed;
+		},
+
 		/**
 		 * Re-read from disk. A relock landing WHILE this runs wins: repopulating decrypted state into
 		 * a tab that has since locked silently undoes the lock, and the idle timer does not fire twice.
@@ -209,34 +217,40 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
-			await withWriteLocks(
-				async () => {
-					ks = await readVerifiedKeystore();
-					return ks.keystoreGeneration;
-				},
-				async () => {
-					if (!ks) throw new KeystoreNotInitializedError();
-					const keystore = ks;
-					const gen = await readCurrentGeneration(keystore);
-					_generation = gen;
-					if (gen === 0) {
+			try {
+				await withWriteLocks(
+					async () => {
+						ks = await readVerifiedKeystore();
+						return ks.keystoreGeneration;
+					},
+					async () => {
+						if (!ks) throw new KeystoreNotInitializedError();
+						const keystore = ks;
+						const gen = await readCurrentGeneration(keystore);
+						_generation = gen;
+						if (gen === 0) {
+							if (relockEpoch === relockAtStart) {
+								_state = { schemaVersion: 1, tasks: {} };
+								lockState = 'unlocked';
+							}
+							return;
+						}
+						const row = await getRow<StateRow>(db, 'timeline-state');
+						if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
+						const decoded = decodeTimelineState(
+							await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
+						);
 						if (relockEpoch === relockAtStart) {
-							_state = { schemaVersion: 1, tasks: {} };
+							_state = decoded;
 							lockState = 'unlocked';
 						}
-						return;
 					}
-					const row = await getRow<StateRow>(db, 'timeline-state');
-					if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
-					const decoded = decodeTimelineState(
-						await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
-					);
-					if (relockEpoch === relockAtStart) {
-						_state = decoded;
-						lockState = 'unlocked';
-					}
-				}
-			);
+				);
+			} catch (e) {
+				_failed = true;
+				throw e;
+			}
+			_failed = false;
 		},
 
 		/**
