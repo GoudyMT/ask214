@@ -29,7 +29,7 @@ export type ErrorCode =
 	| 'E_CLOCK_BACKWARD'
 	| 'E_TIMEOUT'
 	| 'E_INTERNAL'
-	| 'E_TEST'; // dev/test only; stripped in prod build via type-check
+	| 'E_TEST'; // tests only: no app code logs it, and nothing enforces that
 
 export type SafeLogEntry = {
 	code: ErrorCode;

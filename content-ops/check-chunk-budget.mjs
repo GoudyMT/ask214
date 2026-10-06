@@ -85,7 +85,7 @@ const STATIC = 'static';
 //     44,511 B - each keeps about 80 B of room.
 //     Measured after the Pre-PR review's fixes, with no raise: page 59,178 B (52 B of room), route nodes 44,562 B
 //     (28 B).
-//     Route nodes 44,590 -> 44,680 (owner's call, 2026-10-06; the limit lives in package.json's size-limit): the
+//     Route nodes 44,590 -> 44,680 (owner's call, 2026-10-05; the limit lives in package.json's size-limit): the
 //     re-review's fixes - focus to the Calendar heading when the list clears with nothing to add, with the app's
 //     ring (Settings node, +56 B) - 44,600 B measured, after a trim pass (finding the heading by its id, -8 B, inside
 //     the noise; not kept).
@@ -129,7 +129,7 @@ const STATIC = 'static';
 //     leaving line kept whole - 143,253 B measured with 56 files, after a trim pass (fixed ids for the list's
 //     heading measured +187 B, as the bundler re-split two routes; one loop for the leaving line +30 B; neither
 //     kept).
-//     Raised 143,340 -> 143,580 (owner's call, 2026-10-06): the re-review's fixes - a start-up error banner with
+//     Raised 143,340 -> 143,580 (owner's call, 2026-10-05): the re-review's fixes - a start-up error banner with
 //     Reload in the root layout (+194 B) and the Calendar heading's focus (+56 B) - 143,497 B measured with 56 files,
 //     after a trim pass (one banner component shared with the clock warning, -8 B here but +41 B in the root layout;
 //     the heading found by its id, -7 B; both together -23 B; none kept).

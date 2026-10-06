@@ -207,7 +207,7 @@ test('after a date is removed, Settings lists the events to delete until you say
 	await openSettingsAdd(page); // a fresh load
 	await expect(outOfDate).toBeVisible();
 
-	// By keyboard, as a screen-reader user would: the list goes with focus on its button, and focus moves to Add with a
+	// By keyboard, as a sighted keyboard user would: the list goes with focus on its button, and focus moves to Add with a
 	// visible ring.
 	await page.getByRole('button', { name: "I've deleted these" }).focus();
 	await page.keyboard.press('Enter');
