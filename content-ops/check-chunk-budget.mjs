@@ -83,6 +83,8 @@ const STATIC = 'static';
 //     already decides; -14 B page, -30 B precache: a task's window computed once; moving two element references
 //     out of reactive state measured worse, and grouping the new CSS saved nothing): page 59,142 B, route nodes
 //     44,511 B - each keeps about 80 B of room.
+//     Measured after the Pre-PR review's fixes, with no raise: page 59,178 B (52 B of room), route nodes 44,562 B
+//     (28 B).
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -118,6 +120,11 @@ const STATIC = 'static';
 //     seconds since 2000, so two adds a second apart differ.
 //     Raised 139,440 -> 143,150 (owner's call, 2026-10-05): the leaving dates, above - 143,084 B measured with
 //     56 files, after those trim passes.
+//     Raised 143,150 -> 143,340 (owner's call, 2026-10-05): the Pre-PR review's fixes to the leaving dates - the
+//     calendar record read strictly, the out-of-date list's heading and focus, and each date in the Timeline's
+//     leaving line kept whole - 143,253 B measured with 56 files, after a trim pass (fixed ids for the list's
+//     heading measured +187 B, as the bundler re-split two routes; one loop for the leaving line +30 B; neither
+//     kept).
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -130,7 +137,7 @@ const LIMIT = {
 	page: 59_230,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 143_150,
+	precacheBytes: 143_340,
 	workerScripts: 147_200
 };
 
