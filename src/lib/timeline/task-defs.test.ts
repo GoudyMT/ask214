@@ -187,10 +187,12 @@ describe('firm deadlines match their official sources', () => {
 	});
 
 	// MILPERSMAN 1900-015 CH-93: the complete separation package "no less than 120 days from commencement of PTDY or
-	// separation leave" (2.b(3)), complete packages 5 to 9 months out (2.a); a DD 214 not final 14 days before
+	// separation leave" (2.b(3)) sets its last day; complete packages 5 to 9 months before separation (2.a) set its
+	// opening and aim, counted here from the leaving day like the last day. A DD 214 not final 14 days before
 	// departure on PTDY or separation leave is finalized without the member's signature (2.a), so its last day is the
-	// day before that mark.
-	it('counts the separation package and the DD-214 review from the leaving day, as CH-93 does', () => {
+	// day before that mark. The leaving day includes a SkillBridge start: its participants are on permissive TDY
+	// orders (NAVADMIN 160/22 5.e), read here as that departure, and SkillBridge comes first.
+	it("counts the separation package and the DD-214 review from the leaving day, with CH-93's last days", () => {
 		expect(at('separation-package')).toMatchObject({
 			countsFrom: 'leaving',
 			windowStart: -270,

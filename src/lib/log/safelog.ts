@@ -7,8 +7,7 @@
  * diagnostic output goes through this sink - a raw console could leak decrypted PII.
  *
  * Ring buffer is in-memory only (never persisted; no PII storage); sized 64
- * entries. No public accessor in production - getDiagnosticsForTest is gated
- * by a build-time flag.
+ * entries. Only tests read it, through getDiagnosticsForTest below.
  */
 export type ErrorCode =
 	| 'E_EAOS_FORMAT'
@@ -50,9 +49,8 @@ export function safeLog(entry: { code: ErrorCode; fields?: SafeLogEntry['fields'
 }
 
 /**
- * TEST-ONLY accessor. Production builds remove this via type-check + ESLint
- * (consumer-side: importing this in non-test code is banned via
- * no-restricted-imports). Do NOT expose a public diagnostics API.
+ * TEST-ONLY accessor. No app code imports it, so the bundler leaves it out of the build; no lint rule stops an
+ * import yet, so keep it that way by review. Do NOT expose a public diagnostics API.
  */
 export function getDiagnosticsForTest(): SafeLogEntry[] {
 	return buffer;

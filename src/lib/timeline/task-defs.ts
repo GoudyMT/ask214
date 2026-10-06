@@ -39,7 +39,8 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
  * v1.0 SEED task definitions (US Navy AD Enlisted ETS), research-reconciled against
  * current DoD/VA/DoL/Navy sources (2024-2026). Timing is anchored to the EAOS; when the profile holds a
  * SkillBridge or terminal leave start, a task's last day comes in to fit before the date it must finish before
- * (`finishBefore`), and its opening never moves.
+ * (`finishBefore`), and its opening never moves - except a task whose rule counts from the leaving day
+ * (`countsFrom`), which moves its whole window.
  *
  * Tasks with no authoritative fixed date use a wide early window (best-practice prep). `requires` gates a task on
  * a persona field (hidden until set + matched).
