@@ -6,7 +6,6 @@
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import { eraseEverything } from '$lib/profile/erase';
-	import { NoLongerDamagedError } from '$lib/profile/damaged';
 	import { OccConflictError, type ProfilePatch } from '$lib/profile/store.svelte';
 	import {
 		LEAVING_HINT,
@@ -273,8 +272,10 @@
 				reload: () => window.location.reload()
 			});
 		} catch (e) {
-			// Damaged data that reads again is not erased: the page is already reloading onto it, and nothing failed.
-			if (e instanceof NoLongerDamagedError) return;
+			// Damaged data that reads again is not erased: the page is already reloading onto it, and nothing failed. The
+			// layout throws this fixed code; importing a class from its module here would split that module out of the
+			// layout into a chunk every page downloads (measured: +219 B of page chunks).
+			if (e instanceof Error && e.message === 'E_NO_LONGER_DAMAGED') return;
 			// The erase refuses before touching disk unless it can clear every store, and the store
 			// wipe is one transaction - so if we are here, nothing was destroyed. Saying so matters
 			// more than usual: the user asked for their data to be gone and would otherwise walk away

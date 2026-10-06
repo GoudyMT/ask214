@@ -26,7 +26,7 @@
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
 	import { wipeAllStores } from '$lib/db/wipe';
-	import { NoLongerDamagedError, stillDamaged } from '$lib/profile/damaged';
+	import { stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { requestPersistentStorage } from '$lib/storage/persistence';
@@ -131,7 +131,8 @@
 						});
 						if (!damaged) {
 							location.reload();
-							throw new NoLongerDamagedError();
+							// E_NO_LONGER_DAMAGED: Settings reads it as "nothing failed" (a fixed code, so its page needs no import).
+							throw new Error('E_NO_LONGER_DAMAGED');
 						}
 						await wipeAllStores(result.db);
 					};

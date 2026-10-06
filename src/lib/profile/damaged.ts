@@ -21,14 +21,6 @@ export function isDamagedRecord(e: unknown): boolean {
 	);
 }
 
-/** Thrown by a damaged tab's erase when the data reads again: the page is already reloading onto it, nothing failed. */
-export class NoLongerDamagedError extends Error {
-	constructor() {
-		super('E_NO_LONGER_DAMAGED');
-		this.name = 'NoLongerDamagedError';
-	}
-}
-
 /**
  * Whether the data is still damaged, checked again just before an erase: another tab may have erased it and started
  * again since this one failed, and that tab's new data must never be wiped. A check that fails for any other reason
