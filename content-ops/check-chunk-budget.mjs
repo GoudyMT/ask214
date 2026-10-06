@@ -89,6 +89,12 @@ const STATIC = 'static';
 //     re-review's fixes - focus to the Calendar heading when the list clears with nothing to add, with the app's
 //     ring (Settings node, +56 B) - 44,600 B measured, after a trim pass (finding the heading by its id, -8 B, inside
 //     the noise; not kept).
+//     Page 59,230 -> 59,300 and route nodes 44,680 -> 45,000 (owner's call, 2026-10-06): the delta review's way
+//     back from saved data that fails its checks (the erase offered in Settings: the Settings route node) and the
+//     Timeline's note when its saved progress fails to load (the timeline route node) - page 59,233 B, route nodes
+//     44,917 B measured, after a trim pass (the two damaged-record codes compared inline, kept: -13 B precache,
+//     -12 B root layout; the two link colours app.css already sets, -17 B precache but +5 B route nodes and +6 B
+//     page, not kept).
 //   onDemand 7,000. Measured 5.16 KB: the reader's page view, and nothing else of weight. The PDF library
 //     is NOT here - it is vendored into its own lazy folder and loaded by URL, so the bundler never emits it.
 //     Kept tight on purpose: an on-demand chunk is still a build file, and the service worker precaches
@@ -133,6 +139,9 @@ const STATIC = 'static';
 //     Reload in the root layout (+194 B) and the Calendar heading's focus (+56 B) - 143,497 B measured with 56 files,
 //     after a trim pass (one banner component shared with the clock warning, -8 B here but +41 B in the root layout;
 //     the heading found by its id, -7 B; both together -23 B; none kept).
+//     Raised 143,580 -> 144,300 (owner's call, 2026-10-06): the delta review's fixes - the start-up's damaged-data
+//     path in the root layout (+288 B), the erase in Settings and the Timeline's note (above) - 144,220 B measured
+//     with 56 files, after that trim pass.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -142,10 +151,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 59_230,
+	page: 59_300,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 143_580,
+	precacheBytes: 144_300,
 	workerScripts: 147_200
 };
 
