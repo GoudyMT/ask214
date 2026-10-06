@@ -200,6 +200,14 @@ describe('firm deadlines match their official sources', () => {
 		expect(at('dd214-review')).toMatchObject({ countsFrom: 'leaving', windowEnd: -15 });
 	});
 
+	// skillbridge.mil notice, June 3, 2026: members "in the last 180 days of their service who request SkillBridge
+	// participation within the DIB will be approved", an exception to the Service rank limits the note lists.
+	it('names the defense industry exception beside the paygrade limits', () => {
+		expect(PAYGRADE_NOTE).toContain(
+			'Defense industry (DIB) programs can start up to 180 days out at any rank (Department of War notice, June 2026).'
+		);
+	});
+
 	it('opens the Capstone at 12 months and Chapter 36 counseling 180 days before separation', () => {
 		expect(at('tap-capstone')?.windowStart).toBe(-365);
 		expect(at('va-career-guidance')?.windowStart).toBe(-180);
