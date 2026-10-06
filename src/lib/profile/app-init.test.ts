@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { initProfileApp, provisionStore, createRelockEcho, relockAll } from './app-init';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
+import { KeystoreHmacMismatchError } from './store.svelte';
 import type { BusSignal, ProfileBus } from '../broadcast/bus';
 
 const fakeDb = {} as IDBDatabase;
@@ -130,6 +131,35 @@ describe('initProfileApp', () => {
 		expect(result).toEqual({ status: 'unsupported', cause: 'indexed-db' });
 		// fail-closed: nothing past the gate runs
 		expect(openDb).not.toHaveBeenCalled();
+	});
+
+	// Damaged saved data is named, with the open database, so the app can offer to erase it; a reload would fail the same
+	// way. Any other load failure still rejects, so data that may be fine is never offered for erase.
+	it('names a load that fails on damaged saved data, and hands back the open database', async () => {
+		const store = { load: vi.fn().mockRejectedValue(new KeystoreHmacMismatchError()) };
+		const result = await initProfileApp({
+			checkSupport: async () => ({ ok: true }),
+			openDb: async () => fakeDb,
+			bootstrap: vi.fn(async () => {
+				throw new KeystoreAlreadyExistsError();
+			}),
+			createStore: () => store
+		});
+		expect(result).toEqual({ status: 'damaged', db: fakeDb });
+	});
+
+	it('rejects a load that fails for any other reason', async () => {
+		const store = { load: vi.fn().mockRejectedValue(new Error('E_TIMEOUT')) };
+		await expect(
+			initProfileApp({
+				checkSupport: async () => ({ ok: true }),
+				openDb: async () => fakeDb,
+				bootstrap: vi.fn(async () => {
+					throw new KeystoreAlreadyExistsError();
+				}),
+				createStore: () => store
+			})
+		).rejects.toThrow('E_TIMEOUT');
 	});
 
 	it('first run: bootstraps, creates the store, loads, returns ready', async () => {

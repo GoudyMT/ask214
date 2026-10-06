@@ -116,6 +116,11 @@
 					app.status = 'unsupported';
 					return;
 				}
+				if (result.status === 'damaged') {
+					safeLog({ code: 'E_INIT_FAILED' });
+					app.status = afterStartupFailure(app.status, 'error');
+					return;
+				}
 				app.store = result.store;
 				// Registry-driven, so the erase covers stores that never provisioned - they are the ones
 				// whose orphaned rows would otherwise block their own recovery.

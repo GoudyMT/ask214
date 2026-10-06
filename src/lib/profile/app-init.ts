@@ -1,4 +1,5 @@
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
+import { isDamagedRecord } from './damaged';
 import type { CapabilityResult, CapabilityCause } from '../crypto/capability';
 import type { ProfileBus, BusSignal } from '../broadcast/bus';
 import type { IdleTimer, IdleTimerOptions } from './idle-timer';
@@ -27,7 +28,8 @@ export type AppInitDeps<S extends LoadableStore> = {
 
 export type AppInitResult<S extends LoadableStore> =
 	| { status: 'unsupported'; cause: CapabilityCause }
-	| { status: 'ready'; store: S; db: IDBDatabase };
+	| { status: 'ready'; store: S; db: IDBDatabase }
+	| { status: 'damaged'; db: IDBDatabase };
 
 export async function initProfileApp<S extends LoadableStore>(
 	deps: AppInitDeps<S>
@@ -46,7 +48,14 @@ export async function initProfileApp<S extends LoadableStore>(
 	}
 
 	const store = deps.createStore(db);
-	await store.load();
+	// Damaged saved data is named, with the open database, so the app can offer to erase it; every other failure
+	// rejects as before.
+	try {
+		await store.load();
+	} catch (e) {
+		if (isDamagedRecord(e)) return { status: 'damaged', db };
+		throw e;
+	}
 	return { status: 'ready', store, db };
 }
 
