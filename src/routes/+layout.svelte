@@ -122,13 +122,7 @@
 				// erase before it clears anything else.
 				if (result.status === 'damaged') {
 					safeLog({ code: 'E_INIT_FAILED' });
-					const reread = (): void => location.reload();
-					teardownRuntime = subscribeBus(bus, {
-						relocked: reread,
-						'profile-updated': reread,
-						'timeline-updated': reread,
-						'calendar-updated': reread
-					});
+					teardownRuntime = bus.subscribe(() => location.reload());
 					app.wipeAll = async () => {
 						const check = createProfileStore(result.db);
 						const damaged = await stillDamaged(async () => {
