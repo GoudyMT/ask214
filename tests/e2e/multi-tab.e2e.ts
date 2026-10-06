@@ -12,10 +12,26 @@ import { expect, test } from '@playwright/test';
 test('an app older than its database says so and offers a reload, and Ask still works', async ({
 	page
 }) => {
+	// Records whether the banner was ever added to the page, so one that only flashed while a healthy start loaded counts.
+	await page.addInitScript(() => {
+		new MutationObserver((records) => {
+			for (const r of records)
+				for (const n of r.addedNodes)
+					if (
+						n instanceof Element &&
+						(n.matches('.init-banner') || n.querySelector('.init-banner'))
+					)
+						(window as unknown as { bannerSeen: boolean }).bannerSeen = true;
+		}).observe(document, { childList: true, subtree: true });
+	});
 	await page.goto('/');
 	// The set-up link shows only once the app is ready, so its database is open at the app's own version by now; Ask
 	// alone enables before that, and a raise that lands first is simply upgraded past.
 	await expect(page.getByRole('link', { name: /set up your timeline/i })).toBeVisible();
+	// A healthy start never showed the banner.
+	expect(
+		await page.evaluate(() => (window as unknown as { bannerSeen?: boolean }).bannerSeen ?? false)
+	).toBe(false);
 	// Raise the database one version, as a newer release would; the app's own connection steps aside for it.
 	await page.evaluate(
 		() =>

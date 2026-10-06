@@ -411,8 +411,17 @@ describe('CalendarPanel', () => {
 			}
 		};
 		const screen = render(CalendarPanel, { props });
-		await page.getByRole('button', { name: "I've deleted these" }).click();
-		await expect.element(page.getByRole('heading', { level: 2, name: 'Calendar' })).toHaveFocus();
+		// The ring's colour token is set as the app defines it, so a ring drawn here would be a solid outline.
+		document.documentElement.style.setProperty('--color-accent', '#1a66c2');
+		try {
+			await page.getByRole('button', { name: "I've deleted these" }).click();
+			const heading = page.getByRole('heading', { level: 2, name: 'Calendar' });
+			await expect.element(heading).toHaveFocus();
+			// Focus that follows a click shows no ring: the rule is :focus-visible, which a pointer does not raise.
+			expect(getComputedStyle(heading.element()).outlineStyle).not.toBe('solid');
+		} finally {
+			document.documentElement.style.removeProperty('--color-accent');
+		}
 	});
 
 	// By keyboard the heading shows the app's focus ring - a 2 px solid outline with a 2 px gap, as on every button
