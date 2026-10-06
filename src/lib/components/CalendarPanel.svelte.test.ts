@@ -385,15 +385,91 @@ describe('CalendarPanel', () => {
 		expect(withRecord(true, [HELD]).textContent).not.toContain(LINE);
 	});
 
-	// The list unmounts with focus on its button; focus goes to the next step the list names, adding again.
+	// The list unmounts with focus on its button; focus goes to the next step the list names, adding again. The rerender
+	// is the page's own update: the saved record no longer holds the events, so the list goes.
 	it("moves focus to the add button once I've deleted these saves", async () => {
-		withRecord(
-			true,
-			[HELD],
-			vi.fn(async () => {})
-		);
+		const props = {
+			items: [item(def('a', 'admin'))],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: async () => {
+				await screen.rerender({ ...props, stale: [] });
+			}
+		};
+		const screen = render(CalendarPanel, { props });
 		await page.getByRole('button', { name: "I've deleted these" }).click();
 		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
+	});
+
+	// A user who moved on while the save ran stays where they are: focus moves only when it fell with the list.
+	it('leaves focus where the user moved it while the save ran', async () => {
+		let finish = (): Promise<void> => Promise.resolve();
+		const props = {
+			items: [item(def('a', 'admin'))],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: () =>
+				new Promise<void>((resolve) => {
+					finish = async () => {
+						await screen.rerender({ ...props, stale: [] });
+						resolve();
+					};
+				})
+		};
+		const screen = render(CalendarPanel, { props });
+		await page.getByRole('button', { name: "I've deleted these" }).click();
+		const toggle = page
+			.getByRole('button', { name: /customize what's included/i })
+			.element() as HTMLElement;
+		toggle.focus();
+		await finish();
+		// Past the panel's own tick and focus step, so a move it made would have landed.
+		await new Promise((r) => setTimeout(r, 50));
+		expect(document.activeElement).toBe(toggle);
+	});
+
+	// The move does not scroll: the reader may have scrolled on while the save ran.
+	it('moves focus to the add button without scrolling the page', async () => {
+		let finish = (): Promise<void> => Promise.resolve();
+		const props = {
+			items: [item(def('a', 'admin'))],
+			exclusions: { taskIds: [], categories: [] },
+			ready: true,
+			stale: [HELD],
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn(),
+			onAcknowledge: () =>
+				new Promise<void>((resolve) => {
+					finish = async () => {
+						await screen.rerender({ ...props, stale: [] });
+						resolve();
+					};
+				})
+		};
+		const screen = render(CalendarPanel, { props });
+		// The panel sits below a tall block and the reader scrolls back to the top, so the panel is out of view and the
+		// list going away below it shifts nothing on screen; only a focus move that scrolls would change the position.
+		const spacer = document.createElement('div');
+		spacer.style.height = '5000px';
+		document.body.prepend(spacer);
+		try {
+			await page.getByRole('button', { name: "I've deleted these" }).click();
+			window.scrollTo(0, 0);
+			await finish();
+			await expect
+				.element(page.getByRole('button', { name: /^add to my calendar$/i }))
+				.toHaveFocus();
+			expect(window.scrollY).toBe(0);
+		} finally {
+			spacer.remove();
+			window.scrollTo(0, 0);
+		}
 	});
 
 	// With nothing ahead to add, Add is off and cannot take focus, so the Calendar heading takes it. The rerender is the

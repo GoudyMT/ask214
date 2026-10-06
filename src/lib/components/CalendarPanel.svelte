@@ -70,12 +70,14 @@
 	let headingEl = $state<HTMLHeadingElement | null>(null);
 
 	// "I've deleted these" takes the list away with focus on its button, so focus moves to Add, the next step the list
-	// names - or, with nothing ahead to add, to the Calendar heading, since a disabled button cannot take focus. A
-	// failed save rejects before this, so focus stays and the list says why.
+	// names - or, with nothing ahead to add, to the Calendar heading, since a disabled button cannot take focus. Only
+	// when focus fell with the list, and without scrolling: a user who moved on while the save ran stays where they are.
+	// A failed save rejects before this, so focus stays and the list says why.
 	async function acknowledge(): Promise<void> {
 		await onAcknowledge();
 		await tick();
-		(addEl && !addEl.disabled ? addEl : headingEl)?.focus();
+		if (document.activeElement === document.body)
+			(addEl && !addEl.disabled ? addEl : headingEl)?.focus({ preventScroll: true });
 	}
 
 	async function addToCalendar(): Promise<void> {
