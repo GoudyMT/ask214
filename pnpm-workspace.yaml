@@ -75,6 +75,16 @@ overrides:
   # fetches a proxy auto-config file from an ftp: address, which Lighthouse CI never uses; the Lighthouse gate
   # proves the chain still loads. Retire when get-uri accepts a patched basic-ftp (Dependabot will surface it).
   basic-ftp: '>=6.2.1'
+  # Force patched proxy-addr (GHSA-jqcg-44mw-7w3h, IP spoofing through an IPv4-mapped IPv6 trust subnet, critical)
+  # and compression (GHSA-vc2v-76pw-4v95, memory-leak DoS on a premature response close, high); both transitive
+  # dev-only via @lhci/cli (proxy-addr through express), never in the client bundle. Targeted range pins: each
+  # patch sits inside the minor its parent asks for. Retire when @lhci/cli resolves them natively.
+  'proxy-addr@<2.0.8': '2.0.8'
+  'compression@<1.8.2': '1.8.2'
+  # Force patched source-map-js (GHSA-68fv-2mgg-jv7q, event-loop DoS through indexed source-map section offsets,
+  # high; transitive build-only via vite>postcss, never in the client bundle). Targeted range pin, inside the
+  # ^1.2.1 postcss asks for. Retire when the lockfile resolves >=1.2.2 without it.
+  'source-map-js@<1.2.2': '1.2.2'
 
 # Accepted, unfixable, dev/CI-only advisories (never shipped in the client bundle): extract-zip
 # (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6; and GHSA-7pqw-9j4j-h8q3,
