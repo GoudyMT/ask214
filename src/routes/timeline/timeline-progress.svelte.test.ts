@@ -12,8 +12,10 @@ const { isoFromToday, current } = vi.hoisted(() => ({
 		const pad = (n: number) => String(n).padStart(2, '0');
 		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 	},
-	// The timeline store as the layout hands it over: null until its first load settles.
+	// The timeline store as the layout hands it over: null until its first load settles. `firstRun` is a profile with
+	// nothing saved yet.
 	current: {
+		firstRun: false,
 		timeline: null as null | {
 			ready: boolean;
 			failed: boolean;
@@ -30,7 +32,9 @@ vi.mock('$lib/profile/context', () => ({
 		store: {
 			locked: false,
 			clockBackward: false,
-			persona: { completeness: 'eaos-only', eaos: isoFromToday(200), daysUntilSeparation: 200 }
+			persona: current.firstRun
+				? { completeness: 'none' }
+				: { completeness: 'eaos-only', eaos: isoFromToday(200), daysUntilSeparation: 200 }
 		},
 		timeline: current.timeline,
 		calendar: null,
@@ -75,6 +79,19 @@ describe('Timeline, its saved progress', () => {
 		const { container } = render(TimelinePage);
 		await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
 		expect(container.querySelector('.timeline-list')).toBeNull();
+	});
+
+	// With nothing saved there is nothing to unlock: a first-run tab locked by idle or another tab still offers setup.
+	it('offers setup, not Unlock, when nothing is saved yet', async () => {
+		current.firstRun = true;
+		current.timeline = { ready: false, failed: false, locked: true, state: EMPTY };
+		try {
+			render(TimelinePage);
+			await expect.element(page.getByRole('link', { name: 'Get started' })).toBeVisible();
+			expect(page.getByRole('button', { name: 'Unlock' }).elements()).toHaveLength(0);
+		} finally {
+			current.firstRun = false;
+		}
 	});
 
 	// A locked timeline whose load failed says so: Unlock would only fail again.
