@@ -108,7 +108,7 @@ test('damaged saved data points to the erase in Settings, and erasing starts the
 });
 
 // Two tabs on the same damaged data. An erase in one starts it again, so the other must not keep offering an erase
-// that would wipe what the first then sets up: a save in either tab reloads the other.
+// that would wipe what the first then sets up: a save in the first tab reloads the damaged one.
 test('a tab on damaged data reloads when another tab saves new data', async ({ context }) => {
 	const first = await context.newPage();
 	await seedProfile(first);

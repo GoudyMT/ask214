@@ -34,7 +34,8 @@ export const DEVICE_HINT: Record<DeviceKind, { lead: string; text: string }> = {
 		lead: 'On this phone:',
 		text: 'it saves a calendar file, then asks which app to open it with. Pick your calendar, then tap Add all.'
 	},
-	// Checked on a real iPhone (2026-10-06): Safari opens the file straight in Calendar, which offers Add All.
+	// Checked on a real iPhone (2026-10-06): Safari opens the file straight in Calendar, which offers Add All; a copy
+	// also stays in Files > Downloads, so the delete-the-file line below holds.
 	ios: {
 		lead: 'On iPhone or iPad, use Safari:',
 		text: 'it opens the events in your calendar. Tap Add All.'
