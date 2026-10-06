@@ -24,13 +24,10 @@
 		onAdd: (file: CalendarFile) => void;
 		/** The events handed to the calendar that the file no longer carries as they are: the user's to delete. */
 		stale: HandedOverEvent[];
-		/** Whether any add has been recorded; until one is, the general line stands in for the list. */
-		hasRecord: boolean;
 		/** Forgets the listed events; rejects when the save fails. */
 		onAcknowledge: () => Promise<void>;
 	};
-	let { items, exclusions, ready, onSetExclusions, onAdd, stale, hasRecord, onAcknowledge }: Props =
-		$props();
+	let { items, exclusions, ready, onSetExclusions, onAdd, stale, onAcknowledge }: Props = $props();
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
@@ -101,9 +98,10 @@
 	{:else}
 		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
 		<p class="cal-hint cal-hint--device">{DELETE_FILE_HINT}</p>
-		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. Once an
-		     add is recorded, the list above names them instead. -->
-		{#if !hasRecord}
+		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. While the
+		     list above names events it says this instead; with nothing listed (no add recorded yet, or every listed
+		     event deleted) the line stands, and it also says to add again. -->
+		{#if stale.length === 0}
 			<p class="cal-hint cal-hint--device">
 				Changed a date? Remove the events you added before, then add again.
 			</p>

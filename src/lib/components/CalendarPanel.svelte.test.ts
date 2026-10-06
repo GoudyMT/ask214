@@ -36,9 +36,8 @@ function item(d: TaskDef): TimelineItem {
 // No add recorded yet: the panel as it was before the record existed.
 const NO_RECORD: {
 	stale: HandedOverEvent[];
-	hasRecord: boolean;
 	onAcknowledge: () => Promise<void>;
-} = { stale: [], hasRecord: false, onAcknowledge: async () => {} };
+} = { stale: [], onAcknowledge: async () => {} };
 
 describe('CalendarPanel', () => {
 	it('downloads an .ics of the pending, non-excluded items when "Add to calendar" is clicked', async () => {
@@ -347,7 +346,6 @@ describe('CalendarPanel', () => {
 				exclusions: { taskIds: [], categories: [] },
 				ready,
 				stale,
-				hasRecord: true,
 				onAcknowledge,
 				onSetExclusions: vi.fn(),
 				onAdd: vi.fn()
@@ -372,10 +370,12 @@ describe('CalendarPanel', () => {
 		expect(withRecord(false, [HELD]).textContent).not.toContain('Your calendar is out of date');
 	});
 
-	it('once an add is recorded, the list replaces the general line', () => {
-		expect(withRecord(true, []).textContent).not.toContain(
-			'Changed a date? Remove the events you added before, then add again.'
-		);
+	// Nothing listed - no add recorded yet, or every listed event acknowledged - leaves the general line, which also
+	// says to add again; while the list names events, it replaces the line.
+	it('shows the general line whenever nothing is listed, and the list in its place', () => {
+		const LINE = 'Changed a date? Remove the events you added before, then add again.';
+		expect(withRecord(true, []).textContent).toContain(LINE);
+		expect(withRecord(true, [HELD]).textContent).not.toContain(LINE);
 	});
 
 	it("passes I've deleted these to its handler", async () => {

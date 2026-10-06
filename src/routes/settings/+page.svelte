@@ -455,7 +455,6 @@
 						: Promise.resolve()}
 				onAdd={(file) => void handOver(file, app.calendar, new Date())}
 				{stale}
-				hasRecord={app.calendar?.lastAdd !== undefined}
 				onAcknowledge={() =>
 					app.calendar
 						? app.calendar.acknowledgeStale(stale).catch(async (err) => {
