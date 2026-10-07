@@ -91,3 +91,40 @@ export function scanForPiiTokens(
 	}
 	return violations;
 }
+
+/**
+ * Modules that hold or derive personal data. Code that can send a request off the device must not import them, so a
+ * value cannot reach it under a new name - the case the field patterns cannot see. Matched on `$lib/...` and relative
+ * specifiers only, so a platform module such as `node:crypto` is not caught.
+ */
+export const FORBIDDEN_IMPORT_PATTERN =
+	/(?:^\$lib\/|^\.\.?\/(?:.*\/)?)(?:profile|keystore|crypto|db|timeline|calendar)(?:\/|$)/;
+
+const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"]([^'"]+)['"]/g;
+
+/**
+ * Scan provided file contents for imports of the personal-data modules.
+ *
+ * Args:
+ *   files: array of { path, content } to scan.
+ *
+ * Returns:
+ *   one PiiViolation per forbidden import, with the specifier as its token; empty array when clean.
+ */
+export function scanForPiiImports(
+	files: ReadonlyArray<{ path: string; content: string }>
+): PiiViolation[] {
+	const violations: PiiViolation[] = [];
+	for (const file of files) {
+		const lines = file.content.split('\n');
+		for (let i = 0; i < lines.length; i++) {
+			for (const match of (lines[i] ?? '').matchAll(IMPORT_SPECIFIER)) {
+				const specifier = match[1] ?? '';
+				if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
+					violations.push({ path: file.path, token: specifier, line: i + 1 });
+				}
+			}
+		}
+	}
+	return violations;
+}

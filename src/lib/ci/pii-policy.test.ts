@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { FORBIDDEN_PII_PATTERNS, PII_FIELD_NAMES, scanForPiiTokens } from './pii-policy';
+import {
+	FORBIDDEN_PII_PATTERNS,
+	PII_FIELD_NAMES,
+	scanForPiiImports,
+	scanForPiiTokens
+} from './pii-policy';
 
 // Server-side SvelteKit source: anything that can execute on a server. The feedback
 // endpoint is the one today; the guard covers it and any added later (PII stays on device).
@@ -164,5 +169,54 @@ describe('pii-policy: a profile field read without a dot', () => {
 		expect(scan('// never present a figure, rate, or deadline as current')).toEqual([]);
 		expect(scan('const { rateLimit } = cfg;')).toEqual([]);
 		expect(scan('// the rank of each result')).toEqual([]);
+	});
+});
+
+describe('pii-policy: off-device code must not import the personal-data modules', () => {
+	const scan = (content: string) =>
+		scanForPiiImports([{ path: 'src/lib/ask/online/x.ts', content }]);
+
+	it.each([
+		'$lib/profile/store.svelte',
+		'../../profile/codec',
+		'$lib/keystore/record',
+		'$lib/timeline/state.svelte',
+		'$lib/calendar/store.svelte',
+		'$lib/db/schema',
+		'$lib/crypto/aes-gcm',
+		'../../../src/lib/profile/types'
+	])('flags an import of %s', (specifier) => {
+		const violations = scan(`import { a } from '${specifier}';`);
+		expect(violations).toHaveLength(1);
+		expect(violations[0]?.token).toBe(specifier);
+	});
+
+	it('flags a dynamic import, a side-effect import and an import split over several lines', () => {
+		expect(scan(`const m = await import('$lib/profile/store.svelte');`)).toHaveLength(1);
+		expect(scan(`import '$lib/keystore/record';`)).toHaveLength(1);
+		expect(
+			scan(['import {', '\ta,', '\tb', "} from '$lib/profile/codec';"].join('\n'))
+		).toHaveLength(1);
+	});
+
+	it('leaves public modules and platform modules alone', () => {
+		expect(scan(`import type { CorpusChunk } from '$lib/corpus';`)).toEqual([]);
+		expect(scan(`import { isGovernmentHost } from '$lib/sources/government-host';`)).toEqual([]);
+		expect(scan(`import { webcrypto } from 'node:crypto';`)).toEqual([]);
+		expect(scan(`import { createHash } from 'crypto';`)).toEqual([]);
+	});
+
+	it('the real off-device source imports none of them', () => {
+		// The Ask store and the home route are left out on purpose: the home route reads the profile context to know
+		// first-run status. Both keep the field-name scan above.
+		const units = [
+			...findServerFiles(join(process.cwd(), 'src')),
+			...[...ONLINE_PATH_DIRS, ...FEEDBACK_PATH_DIRS].flatMap((dir) =>
+				findSourceFiles(join(process.cwd(), dir))
+			),
+			...FEEDBACK_PATH_FILES.map((file) => join(process.cwd(), file))
+		];
+		const files = units.map((path) => ({ path, content: readFileSync(path, 'utf8') }));
+		expect(scanForPiiImports(files)).toEqual([]);
 	});
 });
