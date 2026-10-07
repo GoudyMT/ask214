@@ -11,6 +11,10 @@ import mtc from './eslint-plugins/mtc/index.js';
 
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
+const STORAGE_MESSAGE =
+	'Personal data persists only in the encrypted IndexedDB stores. A device setting with nothing personal belongs in an exempt file, or in a disable with its reason.';
+const SAFELOG_MESSAGE = 'getDiagnosticsForTest is for tests only; app code logs through safeLog.';
+
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
 	// Vendored, committed assets (self-hosted model + ORT wasm glue + corpus) are not source - do not
@@ -41,9 +45,76 @@ export default defineConfig(
 		// (src/lib/log/safelog.ts): a raw console.* could leak decrypted PII (e.g. console.error(err)
 		// where err wraps profile data), so console is banned in runtime source. Build-time CLI
 		// scripts (content-ops) and tests keep console.
-		files: ['src/**/*.{ts,svelte}'],
-		ignores: ['src/**/*.test.ts', 'src/**/*.browser.test.ts', 'src/**/*.svelte.test.ts'],
-		rules: { 'no-console': 'error' }
+		files: ['src/**/*.{ts,js,svelte}'],
+		ignores: [
+			'src/**/*.test.ts',
+			'src/**/*.test.js',
+			'src/**/*.browser.test.ts',
+			'src/**/*.svelte.test.ts'
+		],
+		rules: {
+			'no-console': 'error',
+			// The diagnostics buffer's accessor is for tests; app code reading the live buffer would build the public
+			// diagnostics API the sink exists to avoid.
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{
+							group: ['**/log/safelog', '**/log/safelog.*', './safelog', './safelog.*'],
+							importNames: ['getDiagnosticsForTest'],
+							message: SAFELOG_MESSAGE
+						}
+					]
+				}
+			],
+			// The import rule does not see import(), so app code imports the sink statically or not at all.
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector: 'ImportExpression[source.value=/safelog(\\.[jt]s)?$/]',
+					message: SAFELOG_MESSAGE
+				},
+				{
+					selector:
+						"ImportExpression[source.type='TemplateLiteral'] TemplateElement[value.raw=/safelog(\\.[jt]s)?$/]",
+					message: SAFELOG_MESSAGE
+				}
+			]
+		}
+	},
+	{
+		// Personal data persists only through the encrypted IndexedDB stores, so web storage and cookies are banned in
+		// app source. The files below hold device settings with nothing personal (theme, the install nudge, online
+		// preferences, the feedback page's return route); three other lines carry their own disable with the reason.
+		files: ['src/**/*.{ts,js,svelte}'],
+		ignores: [
+			'src/**/*.test.ts',
+			'src/**/*.test.js',
+			'src/**/*.browser.test.ts',
+			'src/**/*.svelte.test.ts',
+			'src/lib/theme/theme.ts',
+			'src/lib/install/dismissed.ts',
+			'src/lib/ask/online-prefs.ts',
+			'src/lib/feedback/context.ts'
+		],
+		rules: {
+			'no-restricted-globals': [
+				'error',
+				{ name: 'localStorage', message: STORAGE_MESSAGE },
+				{ name: 'sessionStorage', message: STORAGE_MESSAGE },
+				{ name: 'cookieStore', message: STORAGE_MESSAGE }
+			],
+			// By property name alone, whatever the object: a rule keyed to `window` misses a Window passed in as a
+			// parameter, an alias, `frames` or `window.document`.
+			'no-restricted-properties': [
+				'error',
+				{ property: 'localStorage', message: STORAGE_MESSAGE },
+				{ property: 'sessionStorage', message: STORAGE_MESSAGE },
+				{ property: 'cookie', message: STORAGE_MESSAGE },
+				{ property: 'cookieStore', message: STORAGE_MESSAGE }
+			]
+		}
 	},
 	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],

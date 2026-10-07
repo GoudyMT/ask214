@@ -69,6 +69,11 @@ describe('EaosInput', () => {
 		expect(input?.getAttribute('aria-invalid')).not.toBe('true');
 	});
 
+	it('asks the browser not to keep the typed date in its autofill history', () => {
+		const { container } = render(EaosInput, { props: baseProps });
+		expect(container.querySelector('input')?.getAttribute('autocomplete')).toBe('off');
+	});
+
 	it('registers its input so a relock scrub clears the typed value (DOM hygiene)', async () => {
 		const { container } = render(EaosInput, { props: { ...baseProps, value: '2027-04-15' } });
 		const input = container.querySelector('input');

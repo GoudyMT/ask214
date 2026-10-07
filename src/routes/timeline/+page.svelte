@@ -128,50 +128,54 @@
 	<title>Timeline</title>
 </svelte:head>
 
-<h1>Timeline</h1>
+<!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
+     separation date. -->
+<div translate="no">
+	<h1>Timeline</h1>
 
-{#if app.status === 'ready'}
-	<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
+	{#if app.status === 'ready'}
+		<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
 	     Unless its load failed: then the note below says so, since Unlock would only fail again. And only with something
 	     saved: a first run has nothing to unlock, so it keeps the setup. -->
-	{#if app.store?.locked || (app.timeline?.locked && !app.timeline.failed && app.store?.persona.completeness !== 'none')}
-		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
-	{:else if app.store?.persona.completeness === 'none'}
-		<SetupCTA />
-	{:else if eaos}
-		<p class="timeline-subline">
-			Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
-		</p>
-		<LeavingLine {leaving} />
-		<!-- The list waits for the saved progress: drawn without it, every task shows as not started. A load that failed
+		{#if app.store?.locked || (app.timeline?.locked && !app.timeline.failed && app.store?.persona.completeness !== 'none')}
+			<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
+		{:else if app.store?.persona.completeness === 'none'}
+			<SetupCTA />
+		{:else if eaos}
+			<p class="timeline-subline">
+				Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
+			</p>
+			<LeavingLine {leaving} />
+			<!-- The list waits for the saved progress: drawn without it, every task shows as not started. A load that failed
 		     says so in its place, where a list would read as lost progress and its buttons would do nothing. -->
-		{#if view && app.timeline?.failed}
-			<div class="timeline-note">
-				<p class="timeline-note__msg" role="alert">
-					Your saved progress couldn't be loaded, so your tasks aren't shown. Reload to try again.
-					If it keeps happening, you can erase all data in <a href={resolve('/settings')}
-						>Settings</a
-					> and start again.
-				</p>
-				<button class="timeline-note__reload" type="button" onclick={() => location.reload()}
-					>Reload</button
-				>
-			</div>
-		{:else if view && app.timeline?.ready}
-			{#if needsNow}<NeedsNow groups={needsNow} />{/if}
-			{#if showCalendarCard}
-				<CalendarCard
-					items={calendarItems}
-					exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-					onAdd={(file) => void handOver(file, app.calendar, new Date())}
-					onDismiss={() => void app.calendar?.dismissCard(Date.now())}
-				/>
+			{#if view && app.timeline?.failed}
+				<div class="timeline-note">
+					<p class="timeline-note__msg" role="alert">
+						Your saved progress couldn't be loaded, so your tasks aren't shown. Reload to try again.
+						If it keeps happening, you can erase all data in <a href={resolve('/settings')}
+							>Settings</a
+						> and start again.
+					</p>
+					<button class="timeline-note__reload" type="button" onclick={() => location.reload()}
+						>Reload</button
+					>
+				</div>
+			{:else if view && app.timeline?.ready}
+				{#if needsNow}<NeedsNow groups={needsNow} />{/if}
+				{#if showCalendarCard}
+					<CalendarCard
+						items={calendarItems}
+						exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
+						onAdd={(file) => void handOver(file, app.calendar, new Date())}
+						onDismiss={() => void app.calendar?.dismissCard(Date.now())}
+					/>
+				{/if}
+				<PhaseChips {view} />
+				<TimelineList {view} onSetStatus={setStatus} onSetSnooze={setSnooze} onSetNote={setNote} />
 			{/if}
-			<PhaseChips {view} />
-			<TimelineList {view} onSetStatus={setStatus} onSetSnooze={setSnooze} onSetNote={setNote} />
 		{/if}
 	{/if}
-{/if}
+</div>
 
 <style>
 	h1 {

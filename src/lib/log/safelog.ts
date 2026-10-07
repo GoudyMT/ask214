@@ -49,8 +49,8 @@ export function safeLog(entry: { code: ErrorCode; fields?: SafeLogEntry['fields'
 }
 
 /**
- * TEST-ONLY accessor. No app code imports it, so the bundler leaves it out of the build; no lint rule stops an
- * import yet, so keep it that way by review. Do NOT expose a public diagnostics API.
+ * TEST-ONLY accessor. A lint rule stops app code importing it, so the bundler leaves it out of the build. Do NOT
+ * expose a public diagnostics API.
  */
 export function getDiagnosticsForTest(): SafeLogEntry[] {
 	return buffer;

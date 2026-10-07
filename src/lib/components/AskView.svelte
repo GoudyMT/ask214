@@ -59,6 +59,7 @@
 	// nudge" - no query, no profile). Plain sessionStorage is fine here (the encrypted-IDB rule governs PII, not this).
 	const REMINDER_DISMISSED_KEY = 'mtc:ask:reminder-dismissed';
 	let reminderDismissed = $state(
+		// eslint-disable-next-line no-restricted-globals -- a "reminder hidden" flag for this tab, nothing personal
 		typeof sessionStorage !== 'undefined' && sessionStorage.getItem(REMINDER_DISMISSED_KEY) === '1'
 	);
 	const showReminder = $derived(askState.kind === 'idle' && setupDismissed && !reminderDismissed);
@@ -88,6 +89,7 @@
 	}
 	function dismissReminder() {
 		reminderDismissed = true;
+		// eslint-disable-next-line no-restricted-globals -- a "reminder hidden" flag for this tab, nothing personal
 		if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(REMINDER_DISMISSED_KEY, '1');
 	}
 	// "Read more" -> open the reader on the source this card cites. An online answer carries its passage,
@@ -236,7 +238,8 @@
 	{:else if askState.kind === 'needsSetup'}
 		<div class="ask-setup">
 			<h2 class="ask-setup__title">One-time setup to answer your question</h2>
-			<p class="ask-setup__query">"{askState.pendingQuery}"</p>
+			<!-- The question has not been sent anywhere yet, so a page translation must not carry it off. -->
+			<p class="ask-setup__query" translate="no">"{askState.pendingQuery}"</p>
 			<p class="ask-setup__body">
 				To answer your question, Ask downloads a one-time search tool (about 55 MB). Once your
 				browser keeps it, answers are instant and work offline.
@@ -251,7 +254,7 @@
 		<div class="ask-msg ask-msg--accent">
 			<h2 class="ask-msg__title">Send your question to answer online?</h2>
 			{#if pending}
-				<p class="ask-setup__query">"{pending}"</p>
+				<p class="ask-setup__query" translate="no">"{pending}"</p>
 			{/if}
 			<p class="ask-msg__body">
 				To answer online, Ask sends your question text to our search server to find official

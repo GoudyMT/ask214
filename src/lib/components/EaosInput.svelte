@@ -52,6 +52,7 @@
 		class="eaos-field__input"
 		class:eaos-field__input--error={error}
 		type="date"
+		autocomplete="off"
 		{value}
 		aria-describedby={[hint ? hintId : '', error ? errorId : ''].filter(Boolean).join(' ') ||
 			undefined}

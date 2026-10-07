@@ -260,6 +260,7 @@
 				wipeAll: app.wipeAll,
 				// Defensive: the app stores no PII outside IndexedDB, but the erase clears localStorage +
 				// Cache Storage for completeness.
+				// eslint-disable-next-line no-restricted-properties -- the erase also clears the device settings
 				clearStorage: () => window.localStorage.clear(),
 				clearCaches: async () => {
 					if (!('caches' in window)) return;
@@ -305,230 +306,235 @@
 	<title>Settings</title>
 </svelte:head>
 
-<h1>Settings</h1>
+<!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
+     separation date. -->
+<div translate="no">
+	<h1>Settings</h1>
 
-{#if app.status === 'ready'}
-	<!-- Outside the locked/unlocked split on purpose: the erase zeroizes memory before it touches
+	{#if app.status === 'ready'}
+		<!-- Outside the locked/unlocked split on purpose: the erase zeroizes memory before it touches
 	     disk, so by the time it can fail the store is already relocked and this whole page has
 	     swapped to the locked panel. Rendered in the section that raised it, this message would be
 	     unmounted before the user ever saw it. -->
-	{#if eraseError}
-		<p class="erase-error" role="alert">{eraseError}</p>
-	{/if}
-	<!-- Above the lock gate on purpose: the theme is a non-PII device preference, so an idle-locked
+		{#if eraseError}
+			<p class="erase-error" role="alert">{eraseError}</p>
+		{/if}
+		<!-- Above the lock gate on purpose: the theme is a non-PII device preference, so an idle-locked
 	     user can still switch light/dark without unlocking. -->
-	<section class="settings-section" aria-labelledby="appearance-heading">
-		<h2 id="appearance-heading" class="settings-section__heading">Appearance</h2>
-		<div class="settings-row appearance-row">
-			<div class="settings-row__field">
-				<span class="settings-row__label">Theme</span>
-				<span class="settings-row__value">Light, dark, or match your device.</span>
+		<section class="settings-section" aria-labelledby="appearance-heading">
+			<h2 id="appearance-heading" class="settings-section__heading">Appearance</h2>
+			<div class="settings-row appearance-row">
+				<div class="settings-row__field">
+					<span class="settings-row__label">Theme</span>
+					<span class="settings-row__value">Light, dark, or match your device.</span>
+				</div>
+				<ThemeControl />
 			</div>
-			<ThemeControl />
-		</div>
-	</section>
-	<!-- Install control: non-PII + device-level, so it sits above the lock gate like Appearance.
+		</section>
+		<!-- Install control: non-PII + device-level, so it sits above the lock gate like Appearance.
 	     Permanent (no dismiss) - a user who dismissed the Home nudge can still install from here. -->
-	{#if install.installed}
-		<section class="settings-section" aria-labelledby="install-heading">
-			<h2 id="install-heading" class="settings-section__heading">Install</h2>
-			{#if install.persisted}
+		{#if install.installed}
+			<section class="settings-section" aria-labelledby="install-heading">
+				<h2 id="install-heading" class="settings-section__heading">Install</h2>
+				{#if install.persisted}
+					<p class="settings-hint">
+						Ask 214 is installed, and its data is set to stay on this device.
+					</p>
+				{:else}
+					<p class="settings-hint">Ask 214 is installed on this device.</p>
+				{/if}
+			</section>
+		{:else}
+			<section class="settings-section" aria-labelledby="install-heading">
+				<h2 id="install-heading" class="settings-section__heading">Install Ask 214</h2>
 				<p class="settings-hint">
-					Ask 214 is installed, and its data is set to stay on this device.
+					Install it so it opens like an app and is less likely to have its data cleared.
 				</p>
-			{:else}
-				<p class="settings-hint">Ask 214 is installed on this device.</p>
-			{/if}
-		</section>
-	{:else}
-		<section class="settings-section" aria-labelledby="install-heading">
-			<h2 id="install-heading" class="settings-section__heading">Install Ask 214</h2>
-			<p class="settings-hint">
-				Install it so it opens like an app and is less likely to have its data cleared.
-			</p>
-			{#if install.canPrompt || install.ios}
-				<InstallPrompt
-					canPrompt={install.canPrompt}
-					onInstall={() => void install.promptInstall()}
-				/>
-			{:else}
-				<p class="settings-hint">
-					If your browser supports it, open its menu and choose Install or Add to Home Screen.
-				</p>
-			{/if}
-		</section>
-	{/if}
-	<!-- Documents: public government guides, no personal data, so like Install it sits above the lock gate
-	     and a user with no timeline still reaches them. -->
-	<section class="settings-section" aria-labelledby="documents-heading">
-		<h2 id="documents-heading" class="settings-section__heading">Documents</h2>
-		<div class="documents-summary">
-			<span
-				>{savedDocuments.length} of {documentCount} saved on this device - {savedMb}{older.count > 0
-					? `, plus ${older.count} older ${older.count === 1 ? 'copy' : 'copies'}${older.bytes === null ? '' : ` (${(older.bytes / 1e6).toFixed(1)} MB)`}`
-					: ''}</span
-			>
-			<a class="documents-manage" href={resolve('/documents')}>Manage documents</a>
-		</div>
-		<p class="settings-hint">
-			Read the official guides behind the answers, and choose which stay on this device.
-		</p>
-	</section>
-	{#if app.store?.locked}
-		<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
-	{:else}
-		{#if hasTimeline}
-			<section class="settings-section" aria-labelledby="timeline-heading">
-				<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
-
-				<SettingsDateRow
-					id="eaos"
-					label="Separation date (EAOS)"
-					value={currentEaos}
-					hint="Your End of Active Obligated Service - the date your current obligation ends."
-					onSave={saveEaos}
-				/>
-				<SettingsDateRow
-					id="skillbridge-start"
-					label="SkillBridge start"
-					value={skillbridgeValue}
-					hint={PAYGRADE_NOTE}
-					onSave={(d) => saveLeaving('skillbridgeStart', d)}
-					onRemove={() => removeLeaving('skillbridgeStart')}
-				/>
-				<SettingsDateRow
-					id="terminal-leave-start"
-					label="Terminal leave start"
-					value={terminalLeaveValue}
-					hint=""
-					onSave={(d) => saveLeaving('terminalLeaveStart', d)}
-					onRemove={() => removeLeaving('terminalLeaveStart')}
-				/>
-				<p class="settings-hint">{LEAVING_HINT}</p>
-				{#if outOfOrder}<p class="settings-hint">{ORDER_NOTE}</p>{/if}
-
-				{#if app.store?.clockBackward}
-					<div class="clock-notice">
-						<p id="clock-notice-msg" class="clock-notice__msg">
-							Your device clock appears to have moved backward - your timeline dates may be off.
-						</p>
-						<button
-							bind:this={clockFixEl}
-							class="clock-notice__fix"
-							type="button"
-							aria-describedby="clock-notice-msg"
-							onclick={() => void clearClock()}
-						>
-							I fixed my clock
-						</button>
-						{#if clockError}
-							<p class="clock-notice__error" role="alert">{clockError}</p>
-						{/if}
-					</div>
+				{#if install.canPrompt || install.ios}
+					<InstallPrompt
+						canPrompt={install.canPrompt}
+						onInstall={() => void install.promptInstall()}
+					/>
+				{:else}
+					<p class="settings-hint">
+						If your browser supports it, open its menu and choose Install or Add to Home Screen.
+					</p>
 				{/if}
 			</section>
 		{/if}
+		<!-- Documents: public government guides, no personal data, so like Install it sits above the lock gate
+	     and a user with no timeline still reaches them. -->
+		<section class="settings-section" aria-labelledby="documents-heading">
+			<h2 id="documents-heading" class="settings-section__heading">Documents</h2>
+			<div class="documents-summary">
+				<span
+					>{savedDocuments.length} of {documentCount} saved on this device - {savedMb}{older.count >
+					0
+						? `, plus ${older.count} older ${older.count === 1 ? 'copy' : 'copies'}${older.bytes === null ? '' : ` (${(older.bytes / 1e6).toFixed(1)} MB)`}`
+						: ''}</span
+				>
+				<a class="documents-manage" href={resolve('/documents')}>Manage documents</a>
+			</div>
+			<p class="settings-hint">
+				Read the official guides behind the answers, and choose which stay on this device.
+			</p>
+		</section>
+		{#if app.store?.locked}
+			<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
+		{:else}
+			{#if hasTimeline}
+				<section class="settings-section" aria-labelledby="timeline-heading">
+					<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
 
-		{#if hasTimeline}
-			<section class="settings-section" aria-labelledby="privacy-heading">
-				<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-				<button class="settings-lock" type="button" onclick={lock}>Lock</button>
-				<p class="settings-hint">
-					Clears your profile from this screen. Use Unlock to view it again.
-				</p>
+					<SettingsDateRow
+						id="eaos"
+						label="Separation date (EAOS)"
+						value={currentEaos}
+						hint="Your End of Active Obligated Service - the date your current obligation ends."
+						onSave={saveEaos}
+					/>
+					<SettingsDateRow
+						id="skillbridge-start"
+						label="SkillBridge start"
+						value={skillbridgeValue}
+						hint={PAYGRADE_NOTE}
+						onSave={(d) => saveLeaving('skillbridgeStart', d)}
+						onRemove={() => removeLeaving('skillbridgeStart')}
+					/>
+					<SettingsDateRow
+						id="terminal-leave-start"
+						label="Terminal leave start"
+						value={terminalLeaveValue}
+						hint=""
+						onSave={(d) => saveLeaving('terminalLeaveStart', d)}
+						onRemove={() => removeLeaving('terminalLeaveStart')}
+					/>
+					<p class="settings-hint">{LEAVING_HINT}</p>
+					{#if outOfOrder}<p class="settings-hint">{ORDER_NOTE}</p>{/if}
 
-				<div class="danger-zone">
-					<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
-						Erase all data on this device
-					</button>
-				</div>
-			</section>
-		{/if}
+					{#if app.store?.clockBackward}
+						<div class="clock-notice">
+							<p id="clock-notice-msg" class="clock-notice__msg">
+								Your device clock appears to have moved backward - your timeline dates may be off.
+							</p>
+							<button
+								bind:this={clockFixEl}
+								class="clock-notice__fix"
+								type="button"
+								aria-describedby="clock-notice-msg"
+								onclick={() => void clearClock()}
+							>
+								I fixed my clock
+							</button>
+							{#if clockError}
+								<p class="clock-notice__error" role="alert">{clockError}</p>
+							{/if}
+						</div>
+					{/if}
+				</section>
+			{/if}
 
-		{#if hasTimeline}
-			<CalendarPanel
-				items={calendarItems}
-				exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-				ready={(app.calendar?.ready ?? false) &&
-					(app.timeline?.ready ?? false) &&
-					!(app.timeline?.failed ?? false)}
-				onSetExclusions={(next) =>
-					app.calendar
-						? app.calendar.setExclusions(next).catch(async (err) => {
-								await app.calendar?.refresh();
-								throw err;
-							})
-						: Promise.resolve()}
-				onAdd={(file) => void handOver(file, app.calendar, new Date())}
-				{stale}
-				onAcknowledge={() =>
-					app.calendar
-						? app.calendar.acknowledgeStale(stale).catch(async (err) => {
-								await app.calendar?.refresh();
-								throw err;
-							})
-						: Promise.resolve()}
+			{#if hasTimeline}
+				<section class="settings-section" aria-labelledby="privacy-heading">
+					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
+					<button class="settings-lock" type="button" onclick={lock}>Lock</button>
+					<p class="settings-hint">
+						Clears your profile from this screen. Use Unlock to view it again.
+					</p>
+
+					<div class="danger-zone">
+						<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
+							Erase all data on this device
+						</button>
+					</div>
+				</section>
+			{/if}
+
+			{#if hasTimeline}
+				<CalendarPanel
+					items={calendarItems}
+					exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
+					ready={(app.calendar?.ready ?? false) &&
+						(app.timeline?.ready ?? false) &&
+						!(app.timeline?.failed ?? false)}
+					onSetExclusions={(next) =>
+						app.calendar
+							? app.calendar.setExclusions(next).catch(async (err) => {
+									await app.calendar?.refresh();
+									throw err;
+								})
+							: Promise.resolve()}
+					onAdd={(file) => void handOver(file, app.calendar, new Date())}
+					{stale}
+					onAcknowledge={() =>
+						app.calendar
+							? app.calendar.acknowledgeStale(stale).catch(async (err) => {
+									await app.calendar?.refresh();
+									throw err;
+								})
+							: Promise.resolve()}
+				/>
+			{/if}
+
+			<OnlineAnswersPanel
+				{defaultMode}
+				{synthesisEnabled}
+				{hasKey}
+				onSetDefaultMode={(m) => {
+					defaultMode = m;
+					setDefaultMode(m);
+				}}
+				onToggleSynthesis={(on) => {
+					synthesisEnabled = on;
+					setSynthesisEnabled(on);
+				}}
+				onSaveKey={(k) => void app.byok?.saveApiKey(k).then(() => (hasKey = true))}
+				onClearKey={() => void app.byok?.clearApiKey().then(() => (hasKey = false))}
 			/>
+
+			{@render eraseDialog()}
 		{/if}
-
-		<OnlineAnswersPanel
-			{defaultMode}
-			{synthesisEnabled}
-			{hasKey}
-			onSetDefaultMode={(m) => {
-				defaultMode = m;
-				setDefaultMode(m);
-			}}
-			onToggleSynthesis={(on) => {
-				synthesisEnabled = on;
-				setSynthesisEnabled(on);
-			}}
-			onSaveKey={(k) => void app.byok?.saveApiKey(k).then(() => (hasKey = true))}
-			onClearKey={() => void app.byok?.clearApiKey().then(() => (hasKey = false))}
-		/>
-
+	{:else if app.status === 'damaged'}
+		<!-- The saved data failed its own checks at start-up, so no reload can read it: only the way back is offered - the
+	     same erase, from the same dialog. -->
+		{#if eraseError}
+			<p class="erase-error" role="alert">{eraseError}</p>
+		{/if}
+		<section class="settings-section" aria-labelledby="privacy-heading">
+			<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
+			<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
+				Erase all data on this device
+			</button>
+			<p class="settings-hint">
+				Erasing removes everything saved on this device, so the app can start again.
+			</p>
+		</section>
 		{@render eraseDialog()}
 	{/if}
-{:else if app.status === 'damaged'}
-	<!-- The saved data failed its own checks at start-up, so no reload can read it: only the way back is offered - the
-	     same erase, from the same dialog. -->
-	{#if eraseError}
-		<p class="erase-error" role="alert">{eraseError}</p>
-	{/if}
-	<section class="settings-section" aria-labelledby="privacy-heading">
-		<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-		<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
-			Erase all data on this device
-		</button>
-		<p class="settings-hint">
-			Erasing removes everything saved on this device, so the app can start again.
-		</p>
-	</section>
-	{@render eraseDialog()}
-{/if}
 
-{#snippet eraseDialog()}
-	<dialog
-		bind:this={wipeDialog}
-		class="wipe-dialog"
-		aria-labelledby="wipe-dialog-heading"
-		aria-describedby="wipe-dialog-body"
-	>
-		<h2 id="wipe-dialog-heading" class="wipe-dialog__heading">Erase all data on this device?</h2>
-		<p id="wipe-dialog-body" class="wipe-dialog__body">
-			This permanently erases everything stored on this device - your separation date and any
-			profile details. It can't be undone.
-		</p>
-		<div class="wipe-dialog__actions">
-			<button class="wipe-dialog__cancel" type="button" onclick={() => wipeDialog?.close()}>
-				Cancel
-			</button>
-			<button class="wipe-dialog__erase" type="button" onclick={() => void confirmErase()}>
-				Erase everything
-			</button>
-		</div>
-	</dialog>
-{/snippet}
+	{#snippet eraseDialog()}
+		<dialog
+			bind:this={wipeDialog}
+			class="wipe-dialog"
+			aria-labelledby="wipe-dialog-heading"
+			aria-describedby="wipe-dialog-body"
+		>
+			<h2 id="wipe-dialog-heading" class="wipe-dialog__heading">Erase all data on this device?</h2>
+			<p id="wipe-dialog-body" class="wipe-dialog__body">
+				This permanently erases everything stored on this device - your separation date and any
+				profile details. It can't be undone.
+			</p>
+			<div class="wipe-dialog__actions">
+				<button class="wipe-dialog__cancel" type="button" onclick={() => wipeDialog?.close()}>
+					Cancel
+				</button>
+				<button class="wipe-dialog__erase" type="button" onclick={() => void confirmErase()}>
+					Erase everything
+				</button>
+			</div>
+		</dialog>
+	{/snippet}
+</div>
 
 <style>
 	h1 {

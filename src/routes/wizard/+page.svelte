@@ -81,7 +81,7 @@
 	<title>Set up your profile</title>
 </svelte:head>
 
-<section class="wizard" aria-labelledby="wizard-heading">
+<section class="wizard" aria-labelledby="wizard-heading" translate="no">
 	<h1 id="wizard-heading">Set up your profile</h1>
 	<p class="wizard__lead">
 		Add your separation date and we'll build a transition timeline around it. Everything stays

@@ -404,6 +404,26 @@ describe('TaskCard (open states)', () => {
 		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', '2026-08-01');
 	});
 
+	it('asks the browser not to keep a typed snooze date in its autofill history', () => {
+		const { container } = renderCard(makeItem());
+		buttonByText(container, 'Snooze')?.click();
+		flushSync();
+		buttonByText(container, 'Customize')?.click();
+		flushSync();
+		const input = container.querySelector('input[type="date"]');
+		if (!input) throw new Error('no date input rendered');
+		expect(input.getAttribute('autocomplete')).toBe('off');
+	});
+
+	it('keeps a typed note away from cloud spellcheck', () => {
+		const { container } = renderCard(makeItem());
+		buttonByText(container, 'Add note')?.click();
+		flushSync();
+		const textarea = container.querySelector('textarea');
+		if (!textarea) throw new Error('no note textarea rendered');
+		expect(textarea.getAttribute('spellcheck')).toBe('false');
+	});
+
 	it('Add note reveals a textarea; Save calls onSetNote with the text', () => {
 		const onSetNote = vi.fn();
 		const { container } = renderCard(makeItem(), { onSetNote });
