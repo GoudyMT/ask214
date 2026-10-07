@@ -45,8 +45,13 @@ export default defineConfig(
 		// (src/lib/log/safelog.ts): a raw console.* could leak decrypted PII (e.g. console.error(err)
 		// where err wraps profile data), so console is banned in runtime source. Build-time CLI
 		// scripts (content-ops) and tests keep console.
-		files: ['src/**/*.{ts,svelte}'],
-		ignores: ['src/**/*.test.ts', 'src/**/*.browser.test.ts', 'src/**/*.svelte.test.ts'],
+		files: ['src/**/*.{ts,js,svelte}'],
+		ignores: [
+			'src/**/*.test.ts',
+			'src/**/*.test.js',
+			'src/**/*.browser.test.ts',
+			'src/**/*.svelte.test.ts'
+		],
 		rules: {
 			'no-console': 'error',
 			// The diagnostics buffer's accessor is for tests; app code reading the live buffer would build the public
@@ -69,6 +74,11 @@ export default defineConfig(
 				{
 					selector: 'ImportExpression[source.value=/safelog(\\.[jt]s)?$/]',
 					message: SAFELOG_MESSAGE
+				},
+				{
+					selector:
+						"ImportExpression[source.type='TemplateLiteral'] TemplateElement[value.raw=/safelog(\\.[jt]s)?$/]",
+					message: SAFELOG_MESSAGE
 				}
 			]
 		}
@@ -77,9 +87,10 @@ export default defineConfig(
 		// Personal data persists only through the encrypted IndexedDB stores, so web storage and cookies are banned in
 		// app source. The files below hold device settings with nothing personal (theme, the install nudge, online
 		// preferences, the feedback page's return route); three other lines carry their own disable with the reason.
-		files: ['src/**/*.{ts,svelte}'],
+		files: ['src/**/*.{ts,js,svelte}'],
 		ignores: [
 			'src/**/*.test.ts',
+			'src/**/*.test.js',
 			'src/**/*.browser.test.ts',
 			'src/**/*.svelte.test.ts',
 			'src/lib/theme/theme.ts',
