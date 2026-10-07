@@ -59,6 +59,7 @@
 	// nudge" - no query, no profile). Plain sessionStorage is fine here (the encrypted-IDB rule governs PII, not this).
 	const REMINDER_DISMISSED_KEY = 'mtc:ask:reminder-dismissed';
 	let reminderDismissed = $state(
+		// eslint-disable-next-line no-restricted-globals -- a "reminder hidden" flag for this tab, nothing personal
 		typeof sessionStorage !== 'undefined' && sessionStorage.getItem(REMINDER_DISMISSED_KEY) === '1'
 	);
 	const showReminder = $derived(askState.kind === 'idle' && setupDismissed && !reminderDismissed);
@@ -88,6 +89,7 @@
 	}
 	function dismissReminder() {
 		reminderDismissed = true;
+		// eslint-disable-next-line no-restricted-globals -- a "reminder hidden" flag for this tab, nothing personal
 		if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(REMINDER_DISMISSED_KEY, '1');
 	}
 	// "Read more" -> open the reader on the source this card cites. An online answer carries its passage,

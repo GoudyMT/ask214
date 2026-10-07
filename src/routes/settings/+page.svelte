@@ -260,6 +260,7 @@
 				wipeAll: app.wipeAll,
 				// Defensive: the app stores no PII outside IndexedDB, but the erase clears localStorage +
 				// Cache Storage for completeness.
+				// eslint-disable-next-line no-restricted-properties -- the erase also clears the device settings
 				clearStorage: () => window.localStorage.clear(),
 				clearCaches: async () => {
 					if (!('caches' in window)) return;

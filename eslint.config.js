@@ -11,6 +11,9 @@ import mtc from './eslint-plugins/mtc/index.js';
 
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
+const STORAGE_MESSAGE =
+	'Personal data persists only in the encrypted IndexedDB stores. A device setting with nothing personal belongs in an exempt file, or in a disable with its reason.';
+
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
 	// Vendored, committed assets (self-hosted model + ORT wasm glue + corpus) are not source - do not
@@ -44,6 +47,38 @@ export default defineConfig(
 		files: ['src/**/*.{ts,svelte}'],
 		ignores: ['src/**/*.test.ts', 'src/**/*.browser.test.ts', 'src/**/*.svelte.test.ts'],
 		rules: { 'no-console': 'error' }
+	},
+	{
+		// Personal data persists only through the encrypted IndexedDB stores, so web storage and cookies are banned in
+		// app source. The files below hold device settings with nothing personal (theme, the install nudge, online
+		// preferences, the feedback page's return route); three other lines carry their own disable with the reason.
+		files: ['src/**/*.{ts,svelte}'],
+		ignores: [
+			'src/**/*.test.ts',
+			'src/**/*.browser.test.ts',
+			'src/**/*.svelte.test.ts',
+			'src/lib/theme/theme.ts',
+			'src/lib/install/dismissed.ts',
+			'src/lib/ask/online-prefs.ts',
+			'src/lib/feedback/context.ts'
+		],
+		rules: {
+			'no-restricted-globals': [
+				'error',
+				{ name: 'localStorage', message: STORAGE_MESSAGE },
+				{ name: 'sessionStorage', message: STORAGE_MESSAGE }
+			],
+			'no-restricted-properties': [
+				'error',
+				{ object: 'window', property: 'localStorage', message: STORAGE_MESSAGE },
+				{ object: 'window', property: 'sessionStorage', message: STORAGE_MESSAGE },
+				{ object: 'globalThis', property: 'localStorage', message: STORAGE_MESSAGE },
+				{ object: 'globalThis', property: 'sessionStorage', message: STORAGE_MESSAGE },
+				{ object: 'self', property: 'localStorage', message: STORAGE_MESSAGE },
+				{ object: 'self', property: 'sessionStorage', message: STORAGE_MESSAGE },
+				{ object: 'document', property: 'cookie', message: STORAGE_MESSAGE }
+			]
+		}
 	},
 	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
