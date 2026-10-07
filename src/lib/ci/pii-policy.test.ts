@@ -1,17 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
 import {
+	BYO_KEY_PATTERNS,
 	FORBIDDEN_PII_PATTERNS,
 	PII_FIELD_NAMES,
 	scanForPiiImports,
 	scanForPiiTokens
 } from './pii-policy';
 
-// Server-side SvelteKit source: anything that can execute on a server. The feedback
-// endpoint is the one today; the guard covers it and any added later (PII stays on device).
-const SERVER_FILE_PATTERN =
-	/(\+server\.[jt]s|\+page\.server\.[jt]s|\+layout\.server\.[jt]s|hooks\.server\.[jt]s)$/;
+// Server-side SvelteKit source: anything that can execute on a server - a route's server file, hooks, any
+// `*.server` module and everything under src/lib/server. The feedback endpoint is the one today; the guard covers it
+// and any added later (PII stays on device).
+const SERVER_FILE_PATTERN = /(?:\+server|\.server)\.[jt]s$/;
+const SERVER_FOLDER_PATTERN = /[\\/]src[\\/]lib[\\/]server[\\/]/;
+
+/** Whether a file in a scanned folder is source the guard reads: every kind, tests and type declarations aside. */
+function isScannedSource(name: string): boolean {
+	return (
+		/\.(?:ts|js|svelte)$/.test(name) && !/\.test\.[jt]s$/.test(name) && !name.endsWith('.d.ts')
+	);
+}
+
+/** Whether a source file runs on the server. */
+function isServerSource(path: string): boolean {
+	return (
+		SERVER_FILE_PATTERN.test(path) ||
+		(SERVER_FOLDER_PATTERN.test(`/${path}`) && isScannedSource(basename(path)))
+	);
+}
 
 /** Recursively collect server-side source files under a directory. */
 function findServerFiles(dir: string): string[] {
@@ -20,12 +38,48 @@ function findServerFiles(dir: string): string[] {
 		const full = join(dir, entry.name);
 		if (entry.isDirectory()) {
 			out.push(...findServerFiles(full));
-		} else if (SERVER_FILE_PATTERN.test(entry.name)) {
+		} else if (isServerSource(full)) {
 			out.push(full);
 		}
 	}
 	return out;
 }
+
+describe('pii-policy: what the guard reads', () => {
+	it('counts every server-only file: *.server modules and src/lib/server', () => {
+		expect(isServerSource(join('src', 'routes', 'api', 'feedback', '+server.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'lib', 'resend.server.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'lib', 'server', 'mailer.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'lib', 'server', 'mailer.test.ts'))).toBe(false);
+		expect(isServerSource(join('src', 'lib', 'ask', 'store.svelte.ts'))).toBe(false);
+	});
+
+	it('skips build output: dot folders and node_modules', () => {
+		const root = mkdtempSync(join(tmpdir(), 'pii-scope-'));
+		try {
+			for (const rel of [
+				'unit.ts',
+				join('.wrangler', 'bundle.js'),
+				join('node_modules', 'dep.js')
+			]) {
+				mkdirSync(dirname(join(root, rel)), { recursive: true });
+				writeFileSync(join(root, rel), '');
+			}
+			expect(findSourceFiles(root).map((p) => basename(p))).toEqual(['unit.ts']);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('reads every source kind in a scanned folder, not only .ts', () => {
+		expect(isScannedSource('Panel.svelte')).toBe(true);
+		expect(isScannedSource('helper.js')).toBe(true);
+		expect(isScannedSource('unit.ts')).toBe(true);
+		expect(isScannedSource('unit.test.ts')).toBe(false);
+		expect(isScannedSource('Panel.svelte.test.ts')).toBe(false);
+		expect(isScannedSource('types.d.ts')).toBe(false);
+	});
+});
 
 describe('pii-policy: server source must not reference ProfileV1 PII fields', () => {
 	it('flags a planted PII token in a server file', () => {
@@ -82,18 +136,16 @@ const FEEDBACK_PATH_FILES = [
 	'src/routes/feedback/+page.ts'
 ];
 
-/** Recursively collect non-test, non-generated .ts source files under a directory. */
+/** Recursively collect the non-test, non-generated source files under a directory, skipping build output (dot
+ *  folders such as the Worker's .wrangler, and node_modules). */
 function findSourceFiles(dir: string): string[] {
 	const out: string[] = [];
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const full = join(dir, entry.name);
 		if (entry.isDirectory()) {
+			if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
 			out.push(...findSourceFiles(full));
-		} else if (
-			entry.name.endsWith('.ts') &&
-			!entry.name.endsWith('.test.ts') &&
-			!entry.name.endsWith('.d.ts')
-		) {
+		} else if (isScannedSource(entry.name)) {
 			out.push(full);
 		}
 	}
@@ -206,17 +258,56 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		expect(scan(`import { createHash } from 'crypto';`)).toEqual([]);
 	});
 
+	it('the ban covers the Ask store and leaves out only the home route', () => {
+		const scanned = collectImportBanFiles();
+		expect(scanned.some((p) => p.endsWith(join('ask', 'store.svelte.ts')))).toBe(true);
+		expect(scanned.some((p) => p.endsWith(join('routes', '+page.svelte')))).toBe(false);
+	});
+
 	it('the real off-device source imports none of them', () => {
-		// The Ask store and the home route are left out on purpose: the home route reads the profile context to know
-		// first-run status. Both keep the field-name scan above.
+		const files = collectImportBanFiles().map((path) => ({
+			path,
+			content: readFileSync(path, 'utf8')
+		}));
+		expect(scanForPiiImports(files)).toEqual([]);
+	});
+});
+
+/**
+ * The import ban's scope: every off-device unit and the Ask store. Only the home route is left out, because it reads
+ * the profile context to know first-run status; it keeps the field-name scan.
+ */
+function collectImportBanFiles(): string[] {
+	return [
+		...findServerFiles(join(process.cwd(), 'src')),
+		...[...ONLINE_PATH_DIRS, ...FEEDBACK_PATH_DIRS].flatMap((dir) =>
+			findSourceFiles(join(process.cwd(), dir))
+		),
+		...['src/lib/ask/store.svelte.ts', ...FEEDBACK_PATH_FILES].map((file) =>
+			join(process.cwd(), file)
+		)
+	];
+}
+
+describe('pii-policy: the BYO API key never reaches our own endpoints', () => {
+	it('flags the key named in an online unit', () => {
+		const violations = scanForPiiTokens(
+			[{ path: 'src/lib/ask/online/x.ts', content: "headers: { 'x-api-key': deps.apiKey }" }],
+			BYO_KEY_PATTERNS
+		);
+		expect(violations).not.toEqual([]);
+	});
+
+	it('the real retrieve, Worker, feedback and server source names no key', () => {
+		// Synthesis is left out on purpose: it sends the key browser-direct to Anthropic, its only destination.
 		const units = [
 			...findServerFiles(join(process.cwd(), 'src')),
-			...[...ONLINE_PATH_DIRS, ...FEEDBACK_PATH_DIRS].flatMap((dir) =>
+			...['src/lib/ask/online', 'workers/retrieve', ...FEEDBACK_PATH_DIRS].flatMap((dir) =>
 				findSourceFiles(join(process.cwd(), dir))
 			),
 			...FEEDBACK_PATH_FILES.map((file) => join(process.cwd(), file))
 		];
 		const files = units.map((path) => ({ path, content: readFileSync(path, 'utf8') }));
-		expect(scanForPiiImports(files)).toEqual([]);
+		expect(scanForPiiTokens(files, BYO_KEY_PATTERNS)).toEqual([]);
 	});
 });

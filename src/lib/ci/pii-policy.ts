@@ -56,6 +56,12 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/^\s*(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\s*(?=[,:=]|$)/
 ];
 
+/**
+ * The user's own Anthropic key: it goes browser-direct to Anthropic and nowhere else, so it is never named in code
+ * that calls our own servers (the retrieve path, the Worker, feedback, server files).
+ */
+export const BYO_KEY_PATTERNS: readonly RegExp[] = [/\b(?:apiKey|readApiKey)\b/, /x-api-key/i];
+
 export interface PiiViolation {
 	path: string;
 	token: string;
@@ -70,19 +76,21 @@ export interface PiiViolation {
  *
  * Args:
  *   files: array of { path, content } to scan.
+ *   patterns: the tokens to look for; the profile fields and the install identifier unless given.
  *
  * Returns:
  *   one PiiViolation per (file, line, matching pattern); empty array when clean.
  */
 export function scanForPiiTokens(
-	files: ReadonlyArray<{ path: string; content: string }>
+	files: ReadonlyArray<{ path: string; content: string }>,
+	patterns: readonly RegExp[] = FORBIDDEN_PII_PATTERNS
 ): PiiViolation[] {
 	const violations: PiiViolation[] = [];
 	for (const file of files) {
 		const lines = file.content.split('\n');
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i] ?? '';
-			for (const pattern of FORBIDDEN_PII_PATTERNS) {
+			for (const pattern of patterns) {
 				if (pattern.test(line)) {
 					violations.push({ path: file.path, token: pattern.source, line: i + 1 });
 				}
