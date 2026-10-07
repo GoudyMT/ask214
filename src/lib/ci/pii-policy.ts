@@ -12,6 +12,24 @@
  */
 
 /**
+ * The ProfileV1 personal-data field names, the one list a new field is added to. A test checks that the dot patterns
+ * and the three field-form patterns below each cover every name.
+ */
+export const PII_FIELD_NAMES: readonly string[] = [
+	'eaos',
+	'rate',
+	'rank',
+	'yearsOfService',
+	'anticipatedDisabilityRating',
+	'familyStatus',
+	'intendedPath',
+	'geographicDestination',
+	'specialSituations',
+	'skillbridgeStart',
+	'terminalLeaveStart'
+];
+
+/**
  * ProfileV1 PII field accessors (src/lib/profile/types.ts), the keystore per-install identifier
  * (src/lib/keystore/record.ts - a device-tracking value that must never egress), plus the historical raw
  * decrypted-bytes marker. Word-boundary anchored so `.rate` does not match `.rateLimit`.
@@ -29,7 +47,13 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\.skillbridgeStart\b/,
 	/\.terminalLeaveStart\b/,
 	/\b_profileBytes\b/,
-	/\binstallUuid\b/
+	/\binstallUuid\b/,
+	// The same fields read without a dot, which the patterns above cannot see: by bracket (`profile['eaos']`), as a key
+	// inside braces on one line (`const { eaos } = profile`), or as a key alone at the start of a line (a destructure
+	// split over several lines). Prose is left alone: "a figure, rate, or deadline" has no braces and no leading key.
+	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)['"`]\s*\]/,
+	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\b[^}]*\}/,
+	/^\s*(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\s*(?=[,:=]|$)/
 ];
 
 export interface PiiViolation {

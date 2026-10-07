@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { scanForPiiTokens } from './pii-policy';
+import { FORBIDDEN_PII_PATTERNS, PII_FIELD_NAMES, scanForPiiTokens } from './pii-policy';
 
 // Server-side SvelteKit source: anything that can execute on a server. The feedback
 // endpoint is the one today; the guard covers it and any added later (PII stays on device).
@@ -117,5 +117,36 @@ describe('pii-policy: the online egress path must not name PII or the install id
 			content: readFileSync(path, 'utf8')
 		}));
 		expect(scanForPiiTokens(files)).toEqual([]);
+	});
+});
+
+describe('pii-policy: a profile field read without a dot', () => {
+	const scan = (content: string) =>
+		scanForPiiTokens([{ path: 'src/routes/x/+server.ts', content }]);
+
+	it.each(PII_FIELD_NAMES)('flags %s read by bracket', (field) => {
+		expect(scan(`const v = profile['${field}'];`)).not.toEqual([]);
+		expect(scan(`const v = profile[\`${field}\`];`)).not.toEqual([]);
+	});
+
+	it.each(PII_FIELD_NAMES)('flags %s destructured on one line', (field) => {
+		expect(scan(`const { a, ${field} } = profile;`)).not.toEqual([]);
+	});
+
+	it.each(PII_FIELD_NAMES)('flags %s destructured over several lines', (field) => {
+		expect(scan(['const {', '\ta,', `\t${field}`, '} = profile;'].join('\n'))).not.toEqual([]);
+	});
+
+	it('every dot pattern names a field in PII_FIELD_NAMES, and every field has one', () => {
+		const dotted = FORBIDDEN_PII_PATTERNS.map((p) => /^\\\.(\w+)\\b$/.exec(p.source)?.[1]).filter(
+			(name): name is string => name !== undefined
+		);
+		expect([...dotted].sort()).toEqual([...PII_FIELD_NAMES].sort());
+	});
+
+	it('leaves prose that lists a field name, and longer names, alone', () => {
+		expect(scan('// never present a figure, rate, or deadline as current')).toEqual([]);
+		expect(scan('const { rateLimit } = cfg;')).toEqual([]);
+		expect(scan('// the rank of each result')).toEqual([]);
 	});
 });
