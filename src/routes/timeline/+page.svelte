@@ -14,6 +14,10 @@
 	import { selectNeedsNow } from '$lib/timeline/needs-now';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import LeavingLine from '$lib/components/LeavingLine.svelte';
+	import SkillBridgeQuestion from '$lib/components/SkillBridgeQuestion.svelte';
+	import { readablePlan, type PlanAnswer } from '$lib/timeline/skillbridge-plan';
+	import { savePlanAnswer } from '$lib/timeline/skillbridge-save';
+	import { localTodayIso } from '$lib/timeline/day-math';
 
 	const app = getProfileApp();
 
@@ -70,6 +74,20 @@
 			(app.timeline?.ready ?? false) &&
 			shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
 	);
+
+	const plan = $derived(readablePlan(app.timeline, eaos, localTodayIso(new Date())));
+	// Set at the tap, before the save lands: the card stays on the page so its frame can hold the answer's line until
+	// the next visit.
+	let planHeld = $state(false);
+
+	// The SkillBridge answer -> the encrypted timeline store, through the shared save (it re-reads the store on a
+	// failure); a rejection reaches the card, which says the save failed.
+	async function answerPlan(answer: PlanAnswer): Promise<void> {
+		const timeline = app.timeline;
+		if (!timeline || !eaos) throw new Error('E_NO_TIMELINE');
+		planHeld = true;
+		await savePlanAnswer(timeline, answer, eaos, localTodayIso(new Date()));
+	}
 
 	async function unlock(): Promise<void> {
 		const store = app.store;
@@ -162,6 +180,13 @@
 				</div>
 			{:else if view && app.timeline?.ready}
 				{#if needsNow}<NeedsNow groups={needsNow} />{/if}
+				{#if plan && (plan.card || planHeld)}
+					<SkillBridgeQuestion
+						wording={plan.card ?? 'again'}
+						notSureReturns={plan.notSureReturns}
+						onAnswer={answerPlan}
+					/>
+				{/if}
 				{#if showCalendarCard}
 					<CalendarCard
 						items={calendarItems}
