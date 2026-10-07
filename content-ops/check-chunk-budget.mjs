@@ -142,7 +142,7 @@ const STATIC = 'static';
 //     Raised 143,580 -> 144,300 (owner's call, 2026-10-06): the delta review's fixes - the start-up's damaged-data
 //     path in the root layout (+288 B), the erase in Settings and the Timeline's note (above) - 144,220 B measured
 //     with 56 files, after that trim pass.
-//     Raised 144,300 -> 144,460 (owner's call, 2026-10-06): the Task 22 review's fixes - a damaged tab that reloads
+//     Raised 144,300 -> 144,460 (owner's call, 2026-10-06): the next review's fixes - a damaged tab that reloads
 //     when another tab changes the data and checks again before erasing (root layout), and the timeline store's
 //     generation, lock and failure kept true to what it read (the Timeline and Settings) - 144,376 B measured with
 //     56 files, after a trim pass (one subscription for any signal instead of four named ones, -23 B precache and
@@ -154,6 +154,10 @@ const STATIC = 'static';
 //     stamped with its commit would make these exact per commit (hardening box).
 //     Root layout 7,000 -> 7,040 B (owner's call, 2026-10-06; the limit lives in package.json's size-limit): the same drift
 //     (main's CI measured it 6.15 and 6.16 kB on the same code) - 6,992 B measured, 48 B of room.
+//     Page 59,320 -> 59,380 and root layout 7,040 -> 7,060 B (owner's call, 2026-10-07): Svelte 5.57's runtime grew
+//     the page chunks 193 B and the root layout 34 B, measured on that update's own build. After a trim pass
+//     (Svelte's version disclosure turned off: -137 B page, -277 B precache, -100 B route nodes, -6 B root layout),
+//     three builds measured page 59,341-59,343 B and root layout 7,011-7,017 B - each keeps about 40 B of room.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -163,7 +167,7 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 59_320,
+	page: 59_380,
 	onDemand: 7_300,
 	precacheFiles: 60,
 	precacheBytes: 144_480,
