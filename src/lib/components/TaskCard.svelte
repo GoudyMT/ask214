@@ -170,6 +170,7 @@
 			<textarea
 				class="task-card__note-input"
 				bind:value={noteValue}
+				spellcheck="false"
 				aria-label="Note"
 				placeholder="Add a note..."></textarea>
 			<div class="task-card__note-actions">

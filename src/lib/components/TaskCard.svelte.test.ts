@@ -415,6 +415,15 @@ describe('TaskCard (open states)', () => {
 		expect(input.getAttribute('autocomplete')).toBe('off');
 	});
 
+	it('keeps a typed note away from cloud spellcheck', () => {
+		const { container } = renderCard(makeItem());
+		buttonByText(container, 'Add note')?.click();
+		flushSync();
+		const textarea = container.querySelector('textarea');
+		if (!textarea) throw new Error('no note textarea rendered');
+		expect(textarea.getAttribute('spellcheck')).toBe('false');
+	});
+
 	it('Add note reveals a textarea; Save calls onSetNote with the text', () => {
 		const onSetNote = vi.fn();
 		const { container } = renderCard(makeItem(), { onSetNote });
