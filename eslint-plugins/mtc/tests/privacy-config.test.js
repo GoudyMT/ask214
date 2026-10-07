@@ -1,5 +1,5 @@
 import { ESLint } from 'eslint';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
 // The privacy rules are core ESLint rules scoped by file in eslint.config.js, so the risk is the scoping, not the
 // rule logic. Each case lints planted code under a real path with the project's own config.
@@ -13,6 +13,14 @@ async function ruleIds(code, filePath) {
 	expect(messages.filter((message) => message.fatal)).toEqual([]);
 	return messages.map((message) => message.ruleId);
 }
+
+// ESLint's first lint in a process loads the config, the plugins and the parsers, and the first .svelte lint also
+// builds the TypeScript project the Svelte parser checks against: seconds each, and more on a busy machine. Paying
+// that once here leaves each case's time limit for its own lint, which takes milliseconds.
+beforeAll(async () => {
+	await ruleIds('export {};', 'src/lib/planted/warm.ts');
+	await ruleIds('<p>warm</p>\n', 'src/lib/components/EaosInput.svelte');
+}, 60_000);
 
 describe('personal data stays out of web storage and cookies', () => {
 	it.each([
@@ -43,14 +51,12 @@ describe('personal data stays out of web storage and cookies', () => {
 		).toContain('no-restricted-globals');
 	});
 
-	// Linting the first .svelte file builds the TypeScript project the Svelte parser checks against: several seconds
-	// on a slower machine, past the default 5 s, so this case gets more time. Its assertion is unchanged.
 	it('flags storage in a Svelte template', async () => {
 		const code = '<button onclick={() => localStorage.setItem("k", "v")}>Remember</button>\n';
 		expect(await ruleIds(code, 'src/lib/components/EaosInput.svelte')).toContain(
 			'no-restricted-globals'
 		);
-	}, 20_000);
+	});
 
 	it.each([
 		'src/lib/theme/theme.ts',
