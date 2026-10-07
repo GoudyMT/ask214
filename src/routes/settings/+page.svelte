@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SettingsDateRow from '$lib/components/SettingsDateRow.svelte';
+	import SkillBridgePlanRow from '$lib/components/SkillBridgePlanRow.svelte';
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
@@ -31,6 +32,8 @@
 	import { staleEvents } from '$lib/calendar/handed-over';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { localTodayIso } from '$lib/timeline/day-math';
+	import { readablePlan, type PlanAnswer } from '$lib/timeline/skillbridge-plan';
+	import { savePlanAnswer } from '$lib/timeline/skillbridge-save';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
 	import { resolve } from '$app/paths';
 	import { documentStates } from '$lib/sources/document-states';
@@ -132,6 +135,22 @@
 			!!leaving.terminalLeaveStart &&
 			leaving.skillbridgeStart > leaving.terminalLeaveStart
 	);
+
+	// The answer lives in the timeline store, which can still be loading, locked or failed while the profile is open:
+	// the row shows a value and offers Save only once that store is readable.
+	const plan = $derived(readablePlan(app.timeline, currentEaos, localTodayIso(new Date())));
+
+	async function savePlan(answer: PlanAnswer): Promise<string | null> {
+		const timeline = app.timeline;
+		if (!timeline || !currentEaos) throw new Error('E_NO_TIMELINE');
+		try {
+			await savePlanAnswer(timeline, answer, currentEaos, localTodayIso(new Date()));
+			return null;
+		} catch (err) {
+			if (err instanceof OccConflictError) return OCC_MESSAGE;
+			throw err;
+		}
+	}
 
 	/** A typed date as bytes, or the message to show; the input range is the separation date's own. */
 	function readDate(draft: string, copy: Record<EaosCause, string>): Uint8Array | string {
@@ -393,6 +412,7 @@
 						hint="Your End of Active Obligated Service - the date your current obligation ends."
 						onSave={saveEaos}
 					/>
+					<SkillBridgePlanRow {plan} onSave={savePlan} />
 					<SettingsDateRow
 						id="skillbridge-start"
 						label="SkillBridge start"
