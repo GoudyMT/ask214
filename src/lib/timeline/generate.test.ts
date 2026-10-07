@@ -923,6 +923,46 @@ describe('the SkillBridge steps follow the saved answer', () => {
 		}
 	});
 
+	// Every profile level that carries a separation date reads the same saved answer: a fuller profile must neither
+	// show the steps with no answer nor lose them after a Yes.
+	const SEPARATION = '2028-06-30' as EaosString;
+	const PERSONAS: Record<string, PersonaFilters> = {
+		'eaos-only': { completeness: 'eaos-only', eaos: SEPARATION, daysUntilSeparation: 632 },
+		partial: { completeness: 'partial', eaos: SEPARATION, daysUntilSeparation: 632, rate: 'IT' },
+		complete: { ...completeSchool, eaos: SEPARATION, daysUntilSeparation: 632 }
+	};
+	const idsFor = (persona: PersonaFilters, tasks: TimelineState['tasks']) =>
+		generateTimeline(persona, [...TASK_DEFS], { schemaVersion: 1, tasks }, TODAY_EARLY)
+			.phases.flatMap((p) => p.items)
+			.map((i) => i.def.id);
+
+	it('hides both steps for every profile level with no answer, after No and after an early Not sure', () => {
+		for (const [level, persona] of Object.entries(PERSONAS)) {
+			for (const answer of [
+				undefined,
+				{ status: 'skipped' as const },
+				{ status: 'snoozed' as const, snoozeUntil: '2027-04-01' }
+			]) {
+				const shown = idsFor(persona, answer ? { [SKILLBRIDGE_PLAN_KEY]: answer } : {});
+				expect(shown.length, level).toBeGreaterThan(0);
+				for (const id of STEPS) {
+					expect(shown, `${level} ${JSON.stringify(answer)}`).not.toContain(id);
+				}
+			}
+		}
+	});
+
+	it('shows both steps for every profile level after Yes and after a Not sure from the second ask', () => {
+		for (const [level, persona] of Object.entries(PERSONAS)) {
+			for (const answer of [{ status: 'done' as const }, { status: 'snoozed' as const }]) {
+				const shown = idsFor(persona, { [SKILLBRIDGE_PLAN_KEY]: answer });
+				for (const id of STEPS) {
+					expect(shown, `${level} ${JSON.stringify(answer)}`).toContain(id);
+				}
+			}
+		}
+	});
+
 	it('a SkillBridge date alone adds no step', () => {
 		const shown = ids({}, { skillbridgeStart: '2028-01-03' });
 		for (const id of STEPS) expect(shown).not.toContain(id);
