@@ -302,7 +302,12 @@
 					</div>
 					{#if showDateInput}
 						<div class="task-card__date-row">
-							<input type="date" bind:value={dateValue} aria-label="Snooze until date" />
+							<input
+								type="date"
+								autocomplete="off"
+								bind:value={dateValue}
+								aria-label="Snooze until date"
+							/>
 							<button
 								type="button"
 								class="task-card__snooze-go"
