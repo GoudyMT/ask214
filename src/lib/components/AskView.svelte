@@ -238,7 +238,8 @@
 	{:else if askState.kind === 'needsSetup'}
 		<div class="ask-setup">
 			<h2 class="ask-setup__title">One-time setup to answer your question</h2>
-			<p class="ask-setup__query">"{askState.pendingQuery}"</p>
+			<!-- The question has not been sent anywhere yet, so a page translation must not carry it off. -->
+			<p class="ask-setup__query" translate="no">"{askState.pendingQuery}"</p>
 			<p class="ask-setup__body">
 				To answer your question, Ask downloads a one-time search tool (about 55 MB). Once your
 				browser keeps it, answers are instant and work offline.
@@ -253,7 +254,7 @@
 		<div class="ask-msg ask-msg--accent">
 			<h2 class="ask-msg__title">Send your question to answer online?</h2>
 			{#if pending}
-				<p class="ask-setup__query">"{pending}"</p>
+				<p class="ask-setup__query" translate="no">"{pending}"</p>
 			{/if}
 			<p class="ask-msg__body">
 				To answer online, Ask sends your question text to our search server to find official

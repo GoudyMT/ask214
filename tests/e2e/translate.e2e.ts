@@ -26,3 +26,24 @@ for (const path of PUBLIC) {
 		await expect(page.locator('[translate="no"]')).toHaveCount(0);
 	});
 }
+
+// The Ask view repeats a typed question back while it waits for the user's choice. The question has not been sent
+// anywhere yet, so a page translation must not carry it off either: first at the online consent question, then at the
+// on-device setup offer that "Stay on device" leads to.
+test('a question held for a choice stays out of page translation', async ({ page }) => {
+	await page.goto('/');
+	const input = page.getByRole('textbox', { name: /ask a question/i });
+	await expect(input).toBeEnabled();
+	await input.fill('What is SkillBridge?');
+	await page.getByRole('button', { name: /^search$/i }).click();
+	await expect(
+		page.getByRole('heading', { name: /send your question to answer online/i })
+	).toBeVisible();
+	const atConsent = page.getByText('"What is SkillBridge?"');
+	await expect(atConsent.locator('xpath=ancestor-or-self::*[@translate="no"]')).toHaveCount(1);
+
+	await page.getByRole('button', { name: /^stay on device$/i }).click();
+	await expect(page.getByRole('heading', { name: /one-time setup/i })).toBeVisible();
+	const atSetup = page.getByText('"What is SkillBridge?"');
+	await expect(atSetup.locator('xpath=ancestor-or-self::*[@translate="no"]')).toHaveCount(1);
+});
