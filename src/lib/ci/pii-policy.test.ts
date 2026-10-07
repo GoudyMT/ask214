@@ -270,6 +270,21 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		).toHaveLength(1);
 	});
 
+	it('does not let a quoted word ending in "from" hide the next import', () => {
+		expect(
+			scan(["const label = 'Imported from';", "import { a } from '$lib/profile/x';"].join('\n'))
+		).toHaveLength(1);
+		expect(
+			scan(
+				["// Resend's 'from' address is verified", "import { a } from '$lib/profile/x';"].join('\n')
+			)
+		).toHaveLength(1);
+	});
+
+	it('leaves a route named in prose alone', () => {
+		expect(scan("// the user came from '/timeline'")).toEqual([]);
+	});
+
 	it('leaves public modules and platform modules alone', () => {
 		expect(scan(`import type { CorpusChunk } from '$lib/corpus';`)).toEqual([]);
 		expect(scan(`import { isGovernmentHost } from '$lib/sources/government-host';`)).toEqual([]);

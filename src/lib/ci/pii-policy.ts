@@ -106,15 +106,18 @@ export function scanForPiiTokens(
 /**
  * Modules that hold or derive personal data. Code that can send a request off the device must not import them. This
  * stops a direct import only: a module the code imports can still pass a value along, which the online request test
- * (tests/e2e/egress-canary.e2e.ts) checks instead. Matched on `$lib/...`, relative and root-absolute specifiers, with
- * the banned folder anywhere in the path, so a platform module such as `node:crypto` is not caught.
+ * (tests/e2e/egress-canary.e2e.ts) checks instead. Matched on `$lib/...`, relative and `/src/...` specifiers, with the
+ * banned folder anywhere in the path, so a platform module such as `node:crypto` or a route such as `/timeline` is
+ * not caught.
  */
 export const FORBIDDEN_IMPORT_PATTERN =
-	/(?:^\$lib\/|^\.\.?\/|^\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar)(?:\/|$)/;
+	/(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar)(?:\/|$)/;
 
 // Any quote, including a template literal, and any whitespace - line breaks too - between `import(` or `from` and the
-// specifier, so the scan runs over the whole file rather than one line at a time.
-const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"`])([^'"`]+)\1/g;
+// specifier, so the scan runs over the whole file rather than one line at a time. The specifier itself stops at a
+// line break: a quoted word ending in "from" in a string or comment would otherwise run on to the next quote and
+// swallow a real import.
+const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"`])([^'"`\r\n]+)\1/g;
 
 /**
  * Scan provided file contents for imports of the personal-data modules.
