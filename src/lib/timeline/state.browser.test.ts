@@ -25,6 +25,21 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	it('keeps a status-only snooze across store instances', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setSnooze('skillbridge-plan', '2027-04-01');
+		await a.setStatus('skillbridge-plan', 'snoozed');
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks['skillbridge-plan']).toEqual({ status: 'snoozed' });
+		await deleteTestDb(db);
+	});
+
 	it('persists a note (encrypted at rest)', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);

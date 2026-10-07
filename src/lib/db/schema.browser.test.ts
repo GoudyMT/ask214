@@ -44,7 +44,7 @@ function openV2Db(name: string): Promise<IDBDatabase> {
 	});
 }
 
-describe('openMtcDb schema (v5)', () => {
+describe('openMtcDb schema (v6)', () => {
 	it('opens at the current DB_VERSION with exactly the registered stores', async () => {
 		const db = await freshDb();
 		expect(db.version).toBe(DB_VERSION);
@@ -177,7 +177,25 @@ describe('openMtcDb schema (v5)', () => {
 		};
 		const db = await openMtcDb(name);
 		expect(retired).toHaveBeenCalledOnce();
-		expect(db.version).toBe(5);
+		expect(db.version).toBe(DB_VERSION);
+		db.close();
+		await new Promise((r) => {
+			const del = indexedDB.deleteDatabase(name);
+			del.onsuccess = del.onerror = () => r(undefined);
+		});
+	});
+
+	it('version 6 retires a tab still holding version 5 (its out-of-date calendar list would mark the SkillBridge steps)', async () => {
+		const name = `mtc-v6-${crypto.randomUUID()}`;
+		const old = await openAtVersion(name, 5);
+		const retired = vi.fn();
+		old.onversionchange = () => {
+			retired();
+			old.close();
+		};
+		const db = await openMtcDb(name);
+		expect(retired).toHaveBeenCalledOnce();
+		expect(db.version).toBe(6);
 		db.close();
 		await new Promise((r) => {
 			const del = indexedDB.deleteDatabase(name);
