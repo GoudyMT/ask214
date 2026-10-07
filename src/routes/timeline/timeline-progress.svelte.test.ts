@@ -266,6 +266,10 @@ describe('Timeline, the SkillBridge question', () => {
 		render(TimelinePage);
 		await page.getByRole('button', { name: 'Not sure' }).click();
 		await expect.element(page.getByRole('status')).toBeVisible();
+		// From the second ask a Not sure shows the steps, so it says what a Yes says.
+		await expect
+			.element(page.getByRole('status'))
+			.toHaveTextContent('SkillBridge steps added to your timeline.');
 		expect(setStatus).toHaveBeenCalledExactlyOnceWith('skillbridge-plan', 'snoozed');
 		expect(setSnooze).not.toHaveBeenCalled();
 	});
@@ -299,5 +303,17 @@ describe('Timeline, the SkillBridge question', () => {
 		expect(setStatus).toHaveBeenCalledOnce();
 		expect(refresh).toHaveBeenCalledOnce();
 		await expect.element(page.getByRole('button', { name: 'Yes' })).toBeEnabled();
+	});
+
+	it('lets the question go when the re-read after a failed save shows another tab answered it', async () => {
+		const { store, refresh } = liveStore('fails');
+		refresh.mockImplementation(async () => {
+			store.state = { schemaVersion: 1, tasks: { 'skillbridge-plan': { status: 'skipped' } } };
+		});
+		current.timeline = store;
+		const { container } = render(TimelinePage);
+		await page.getByRole('button', { name: 'Yes' }).click();
+		await expect.poll(() => refresh.mock.calls.length).toBe(1);
+		await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
 	});
 });

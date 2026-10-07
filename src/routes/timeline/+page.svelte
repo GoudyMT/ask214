@@ -86,7 +86,13 @@
 		const timeline = app.timeline;
 		if (!timeline || !eaos) throw new Error('E_NO_TIMELINE');
 		planHeld = true;
-		await savePlanAnswer(timeline, answer, eaos, localTodayIso(new Date()));
+		try {
+			await savePlanAnswer(timeline, answer, eaos, localTodayIso(new Date()));
+		} catch (err) {
+			// The re-read may show the question answered in another tab; then the card goes, as after an answer here.
+			planHeld = false;
+			throw err;
+		}
 	}
 
 	async function unlock(): Promise<void> {
