@@ -43,12 +43,14 @@ describe('personal data stays out of web storage and cookies', () => {
 		).toContain('no-restricted-globals');
 	});
 
+	// Linting the first .svelte file builds the TypeScript project the Svelte parser checks against: several seconds
+	// on a slower machine, past the default 5 s, so this case gets more time. Its assertion is unchanged.
 	it('flags storage in a Svelte template', async () => {
 		const code = '<button onclick={() => localStorage.setItem("k", "v")}>Remember</button>\n';
 		expect(await ruleIds(code, 'src/lib/components/EaosInput.svelte')).toContain(
 			'no-restricted-globals'
 		);
-	});
+	}, 20_000);
 
 	it.each([
 		'src/lib/theme/theme.ts',
