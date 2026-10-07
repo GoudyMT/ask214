@@ -1,19 +1,20 @@
 /**
  * PII-policy guard.
  *
- * Project hard rule: PII never leaves the device. Server-side SvelteKit
- * source (`+server.ts`, `*.server.ts`, `hooks.server.ts`) must never reference a
- * ProfileV1 PII field. The one server route today, the feedback endpoint, reads none;
- * the guard fails the test suite (pre-commit + CI) the moment any server file names a
- * profile PII field.
+ * Project hard rule: PII never leaves the device. Code that can send data off the device - server source, the online
+ * Ask path, the Worker, the feedback path, and the Ask store and home route that build the online requests - must never
+ * name a ProfileV1 PII field or the install identifier, and (the home route aside) must not import the modules that
+ * hold personal data; code that calls our own servers must not name the user's own API key. The guard fails the test
+ * suite (pre-commit + CI) the moment one does. It reads names and imports, not values: the online request test
+ * (tests/e2e/egress-canary.e2e.ts) checks what actually leaves.
  *
  * Implemented as a vitest test rather than a bash CI step:
  * cross-platform, runs in pre-commit AND CI, TDD-native.
  */
 
 /**
- * The ProfileV1 personal-data field names, the one list a new field is added to. A test checks that the dot patterns
- * and the three field-form patterns below each cover every name.
+ * The ProfileV1 personal-data field names. Each name is also spelled out in the patterns below (literal regexes, so
+ * the static scan in CI accepts them); a test fails when a pattern and this list drift apart.
  */
 export const PII_FIELD_NAMES: readonly string[] = [
 	'eaos',
@@ -50,10 +51,12 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\binstallUuid\b/,
 	// The same fields read without a dot, which the patterns above cannot see: by bracket (`profile['eaos']`), as a key
 	// inside braces on one line (`const { eaos } = profile`), or as a key alone at the start of a line (a destructure
-	// split over several lines). Prose is left alone: "a figure, rate, or deadline" has no braces and no leading key.
+	// split over several lines). The last form leaves out "rate" and "rank": they are ordinary words, and a wrapped line
+	// of prose can start with one. A name scan cannot see a value under a new name at all; the online request test
+	// (tests/e2e/egress-canary.e2e.ts) checks the values that leave the device.
 	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)['"`]\s*\]/,
 	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\b[^}]*\}/,
-	/^\s*(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\s*(?=[,:=]|$)/
+	/^\s*(?:eaos|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\s*(?=[,:=]|$)/
 ];
 
 /**
@@ -101,14 +104,17 @@ export function scanForPiiTokens(
 }
 
 /**
- * Modules that hold or derive personal data. Code that can send a request off the device must not import them, so a
- * value cannot reach it under a new name - the case the field patterns cannot see. Matched on `$lib/...` and relative
- * specifiers only, so a platform module such as `node:crypto` is not caught.
+ * Modules that hold or derive personal data. Code that can send a request off the device must not import them. This
+ * stops a direct import only: a module the code imports can still pass a value along, which the online request test
+ * (tests/e2e/egress-canary.e2e.ts) checks instead. Matched on `$lib/...`, relative and root-absolute specifiers, with
+ * the banned folder anywhere in the path, so a platform module such as `node:crypto` is not caught.
  */
 export const FORBIDDEN_IMPORT_PATTERN =
-	/(?:^\$lib\/|^\.\.?\/(?:.*\/)?)(?:profile|keystore|crypto|db|timeline|calendar)(?:\/|$)/;
+	/(?:^\$lib\/|^\.\.?\/|^\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar)(?:\/|$)/;
 
-const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"]([^'"]+)['"]/g;
+// Any quote, including a template literal, and any whitespace - line breaks too - between `import(` or `from` and the
+// specifier, so the scan runs over the whole file rather than one line at a time.
+const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"`])([^'"`]+)\1/g;
 
 /**
  * Scan provided file contents for imports of the personal-data modules.
@@ -124,13 +130,11 @@ export function scanForPiiImports(
 ): PiiViolation[] {
 	const violations: PiiViolation[] = [];
 	for (const file of files) {
-		const lines = file.content.split('\n');
-		for (let i = 0; i < lines.length; i++) {
-			for (const match of (lines[i] ?? '').matchAll(IMPORT_SPECIFIER)) {
-				const specifier = match[1] ?? '';
-				if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
-					violations.push({ path: file.path, token: specifier, line: i + 1 });
-				}
+		for (const match of file.content.matchAll(IMPORT_SPECIFIER)) {
+			const specifier = match[2] ?? '';
+			if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
+				const line = file.content.slice(0, match.index).split('\n').length;
+				violations.push({ path: file.path, token: specifier, line });
 			}
 		}
 	}

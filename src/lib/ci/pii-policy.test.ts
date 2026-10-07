@@ -206,9 +206,16 @@ describe('pii-policy: a profile field read without a dot', () => {
 		expect(scan(`const { a, ${field} } = profile;`)).not.toEqual([]);
 	});
 
-	it.each(PII_FIELD_NAMES)('flags %s destructured over several lines', (field) => {
-		expect(scan(['const {', '\ta,', `\t${field}`, '} = profile;'].join('\n'))).not.toEqual([]);
-	});
+	// "rate" and "rank" are ordinary words, and a wrapped line of prose can start with one, so the multi-line form leaves
+	// them to the online request test (tests/e2e/egress-canary.e2e.ts), which checks the values that leave the device.
+	const ORDINARY_WORDS = ['rate', 'rank'];
+
+	it.each(PII_FIELD_NAMES.filter((field) => !ORDINARY_WORDS.includes(field)))(
+		'flags %s destructured over several lines',
+		(field) => {
+			expect(scan(['const {', '\ta,', `\t${field}`, '} = profile;'].join('\n'))).not.toEqual([]);
+		}
+	);
 
 	it('every dot pattern names a field in PII_FIELD_NAMES, and every field has one', () => {
 		const dotted = FORBIDDEN_PII_PATTERNS.map((p) => /^\\\.(\w+)\\b$/.exec(p.source)?.[1]).filter(
@@ -221,6 +228,9 @@ describe('pii-policy: a profile field read without a dot', () => {
 		expect(scan('// never present a figure, rate, or deadline as current')).toEqual([]);
 		expect(scan('const { rateLimit } = cfg;')).toEqual([]);
 		expect(scan('// the rank of each result')).toEqual([]);
+		expect(
+			scan(['const p = `never present a figure,', 'rate, or deadline as current`;'].join('\n'))
+		).toEqual([]);
 	});
 });
 
@@ -248,6 +258,15 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		expect(scan(`import '$lib/keystore/record';`)).toHaveLength(1);
 		expect(
 			scan(['import {', '\ta,', '\tb', "} from '$lib/profile/codec';"].join('\n'))
+		).toHaveLength(1);
+	});
+
+	it('flags the other ways to spell the same import', () => {
+		expect(scan('const m = await import(`$lib/profile/store.svelte`);')).toHaveLength(1);
+		expect(scan("import { a } from '$lib/ask/../profile/persona';")).toHaveLength(1);
+		expect(scan("import { a } from '/src/lib/profile/persona';")).toHaveLength(1);
+		expect(
+			scan(['const m = await import(', "\t'$lib/profile/store.svelte'", ');'].join('\n'))
 		).toHaveLength(1);
 	});
 
