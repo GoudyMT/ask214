@@ -142,7 +142,7 @@ const STATIC = 'static';
 //     Raised 143,580 -> 144,300 (owner's call, 2026-10-06): the delta review's fixes - the start-up's damaged-data
 //     path in the root layout (+288 B), the erase in Settings and the Timeline's note (above) - 144,220 B measured
 //     with 56 files, after that trim pass.
-//     Raised 144,300 -> 144,460 (owner's call, 2026-10-06): the Task 22 review's fixes - a damaged tab that reloads
+//     Raised 144,300 -> 144,460 (owner's call, 2026-10-06): the next review's fixes - a damaged tab that reloads
 //     when another tab changes the data and checks again before erasing (root layout), and the timeline store's
 //     generation, lock and failure kept true to what it read (the Timeline and Settings) - 144,376 B measured with
 //     56 files, after a trim pass (one subscription for any signal instead of four named ones, -23 B precache and
