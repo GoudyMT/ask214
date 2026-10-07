@@ -56,11 +56,19 @@ export default defineConfig(
 				{
 					patterns: [
 						{
-							group: ['**/log/safelog', './safelog'],
+							group: ['**/log/safelog', '**/log/safelog.*', './safelog', './safelog.*'],
 							importNames: ['getDiagnosticsForTest'],
 							message: SAFELOG_MESSAGE
 						}
 					]
+				}
+			],
+			// The import rule does not see import(), so app code imports the sink statically or not at all.
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector: 'ImportExpression[source.value=/safelog(\\.[jt]s)?$/]',
+					message: SAFELOG_MESSAGE
 				}
 			]
 		}
@@ -83,17 +91,17 @@ export default defineConfig(
 			'no-restricted-globals': [
 				'error',
 				{ name: 'localStorage', message: STORAGE_MESSAGE },
-				{ name: 'sessionStorage', message: STORAGE_MESSAGE }
+				{ name: 'sessionStorage', message: STORAGE_MESSAGE },
+				{ name: 'cookieStore', message: STORAGE_MESSAGE }
 			],
+			// By property name alone, whatever the object: a rule keyed to `window` misses a Window passed in as a
+			// parameter, an alias, `frames` or `window.document`.
 			'no-restricted-properties': [
 				'error',
-				{ object: 'window', property: 'localStorage', message: STORAGE_MESSAGE },
-				{ object: 'window', property: 'sessionStorage', message: STORAGE_MESSAGE },
-				{ object: 'globalThis', property: 'localStorage', message: STORAGE_MESSAGE },
-				{ object: 'globalThis', property: 'sessionStorage', message: STORAGE_MESSAGE },
-				{ object: 'self', property: 'localStorage', message: STORAGE_MESSAGE },
-				{ object: 'self', property: 'sessionStorage', message: STORAGE_MESSAGE },
-				{ object: 'document', property: 'cookie', message: STORAGE_MESSAGE }
+				{ property: 'localStorage', message: STORAGE_MESSAGE },
+				{ property: 'sessionStorage', message: STORAGE_MESSAGE },
+				{ property: 'cookie', message: STORAGE_MESSAGE },
+				{ property: 'cookieStore', message: STORAGE_MESSAGE }
 			]
 		}
 	},
