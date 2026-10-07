@@ -4,6 +4,7 @@ import { page } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import TaskCard from './TaskCard.svelte';
 import { snoozeUntilIso } from '$lib/timeline/snooze';
+import { TASK_DEFS } from '$lib/timeline';
 import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
@@ -840,5 +841,59 @@ describe('leaving your command', () => {
 			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })
 		);
 		for (const line of textOf(container).split('\n')) expect(makesPersonalClaim(line)).toBe(false);
+	});
+});
+
+describe("the line above a SkillBridge step's links", () => {
+	const request = TASK_DEFS.find((t) => t.id === 'skillbridge-request');
+
+	it('shows the command-instructions line first in the open list, outside the links', async () => {
+		if (!request) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = render(TaskCard, {
+			props: { item: makeItem({ def: request }), onSetStatus: noop, onSetSnooze: noop }
+		});
+		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		const note = container.querySelector('.task-card__related-note');
+		expect(note?.textContent).toBe(
+			"Also follow your command's SkillBridge instructions: they set what your request package needs."
+		);
+		expect(note?.nextElementSibling?.tagName).toBe('UL');
+		expect(container.querySelectorAll('.task-card__related-list li')).toHaveLength(2);
+		const text = textOf(container);
+		expect(makesPersonalClaim(text), text).toBe(false);
+	});
+
+	it('shows no line for a task without one', async () => {
+		const { container } = render(TaskCard, {
+			props: { item: makeItem(), onSetStatus: noop, onSetSnooze: noop }
+		});
+		const toggle = page.getByRole('button', { name: /^Related resources/ });
+		if (toggle.elements().length) await toggle.click();
+		expect(container.querySelector('.task-card__related-note')).toBeNull();
+	});
+
+	it('shows no line above the open links of a task that has links but no line', async () => {
+		const { container } = render(TaskCard, {
+			props: {
+				item: makeItem({ def: { ...DEF, id: 'job-search' } }),
+				onSetStatus: noop,
+				onSetSnooze: noop
+			}
+		});
+		await page.getByRole('button', { name: /^Related resources \(\d+\)/ }).click();
+		expect(container.querySelectorAll('.task-card__related-list li').length).toBeGreaterThan(0);
+		expect(container.querySelector('.task-card__related-note')).toBeNull();
+	});
+
+	it('shows the line only while the links are open', async () => {
+		if (!request) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = render(TaskCard, {
+			props: { item: makeItem({ def: request }), onSetStatus: noop, onSetSnooze: noop }
+		});
+		expect(container.querySelector('.task-card__related-note')).toBeNull();
+		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		expect(container.querySelector('.task-card__related-note')).not.toBeNull();
+		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		expect(container.querySelector('.task-card__related-note')).toBeNull();
 	});
 });
