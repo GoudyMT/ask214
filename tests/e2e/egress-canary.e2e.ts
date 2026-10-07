@@ -1,9 +1,12 @@
 import { expect, test, type Request } from '@playwright/test';
 
-// Every request the app sends off the device, checked for the user's own data. The guard in src/lib/ci/pii-policy.ts
-// reads names and imports; this reads the values, so a date or a note reaching a request under any name - derived,
-// renamed, serialized whole - fails here. The service worker is blocked so page.route sees every request on both
-// engines (a registered worker handles WebKit's fetches before the mock applies).
+// Every request the page sends during this flow - to our own server, to Anthropic, for any file - checked for the
+// user's own data. The guard in src/lib/ci/pii-policy.ts reads names and imports; this reads values: the separation and
+// SkillBridge dates in each form the app shows (ISO, compact, "Mon D, YYYY"), the day count it shows ("208 days"), a
+// task note, and the user's own API key, which may go to Anthropic and nowhere else. URLs and bodies are also read
+// decoded, so an encoded value is still found, and the headers include cookies. A value changed some other way (a sum,
+// a hash) is outside what a string check can see. The service worker is blocked so every request comes from the page
+// itself (a registered worker handles WebKit's fetches before a mock applies).
 test.use({ serviceWorkers: 'block' });
 
 // Must match the shipped corpus manifest version: the client treats an answer on another version as unavailable.
@@ -35,24 +38,29 @@ function dateForms(iso: string): string[] {
 	return [iso, iso.replace(/-/g, ''), `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}`];
 }
 
-const SEPARATION = isoFromToday(208);
+/** A URL or form body read as the server would read it; unchanged when it is not validly encoded. */
+function decoded(text: string): string {
+	try {
+		return decodeURIComponent(text.replace(/\+/g, ' '));
+	} catch {
+		return text;
+	}
+}
+
+const DAYS_TO_SEPARATION = 208;
+const SEPARATION = isoFromToday(DAYS_TO_SEPARATION);
 const SKILLBRIDGE = isoFromToday(28);
 const NOTE = 'Canary note that must stay on this device';
 const QUESTION = 'What is SkillBridge?';
 // A made-up key in Anthropic's format; the request carrying it is answered by the mock below and never leaves.
 const TEST_KEY = 'sk-ant-test-canary-0000';
+const ANTHROPIC = 'https://api.anthropic.com/';
 
 test('no personal value reaches an online request', async ({ page, browserName }) => {
-	const sent: { url: string; body: string; headers: string }[] = [];
-	const record = (request: Request) =>
-		sent.push({
-			url: request.url(),
-			body: request.postData() ?? '',
-			headers: JSON.stringify(request.headers())
-		});
-	await page.route('**/api/retrieve', async (route) => {
-		record(route.request());
-		await route.fulfill({
+	const requests: Request[] = [];
+	page.on('request', (request) => requests.push(request));
+	await page.route('**/api/retrieve', (route) =>
+		route.fulfill({
 			status: 200,
 			contentType: 'application/json',
 			body: JSON.stringify({
@@ -60,16 +68,12 @@ test('no personal value reaches an online request', async ({ page, browserName }
 				corpusVersion: CORPUS_VERSION,
 				results: [RESULT_HIT]
 			})
-		});
-	});
-	await page.route('https://api.anthropic.com/**', async (route) => {
-		record(route.request());
-		await route.fulfill({ status: 500, body: '' });
-	});
-	await page.route('**/api/feedback', async (route) => {
-		record(route.request());
-		await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
-	});
+		})
+	);
+	await page.route(`${ANTHROPIC}**`, (route) => route.fulfill({ status: 500, body: '' }));
+	await page.route('**/api/feedback', (route) =>
+		route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+	);
 
 	// The user's own data: a separation date, a SkillBridge start and a task note.
 	await page.goto('/wizard');
@@ -113,30 +117,53 @@ test('no personal value reaches an online request', async ({ page, browserName }
 	await page.getByRole('button', { name: /^use online$/i }).click();
 	await expect(page.locator('.ask-card__title', { hasText: /DoD SkillBridge/i })).toBeVisible();
 	// WebKit's test browser makes no summary request: the app's key read returns nothing there although the stored key
-	// row is present. Until that is explained, Chromium carries the summary request's check; both engines carry the
-	// question's and the feedback's.
+	// row is present. Until that is explained, Chromium carries the summary request's checks; both engines carry the
+	// rest.
 	if (browserName === 'chromium') {
-		await expect
-			.poll(() => sent.some((r) => r.url.startsWith('https://api.anthropic.com/')))
-			.toBe(true);
+		await expect.poll(() => requests.some((r) => r.url().startsWith(ANTHROPIC))).toBe(true);
 	}
 	await page.goto('/feedback');
 	await page.getByLabel('Your message').fill('the timeline page looked off');
 	await page.getByRole('button', { name: 'Send feedback' }).click();
 	await expect(page.getByText(/your feedback was sent/i)).toBeVisible();
 
+	const sent = await Promise.all(
+		requests.map(async (request) => ({
+			url: request.url(),
+			body: request.postData() ?? '',
+			headers: JSON.stringify(await request.allHeaders())
+		}))
+	);
 	const retrieve = sent.filter((r) => r.url.includes('/api/retrieve'));
 	expect(retrieve).toHaveLength(1);
 	expect(JSON.parse(retrieve[0]?.body ?? '')).toEqual({ query: QUESTION });
 	expect(sent.some((r) => r.url.includes('/api/feedback'))).toBe(true);
 
-	const personal = [...dateForms(SEPARATION), ...dateForms(SKILLBRIDGE), NOTE];
+	const personal = [
+		...dateForms(SEPARATION),
+		...dateForms(SKILLBRIDGE),
+		`${DAYS_TO_SEPARATION} days`,
+		NOTE
+	];
 	for (const request of sent) {
+		const text = [
+			request.url,
+			decoded(request.url),
+			request.body,
+			decoded(request.body),
+			request.headers
+		].join('\n');
 		for (const value of personal) {
-			expect(
-				`${request.url}\n${request.body}\n${request.headers}`,
-				`${value} in ${request.url}`
-			).not.toContain(value);
+			expect(text, `${value} in ${request.url}`).not.toContain(value);
 		}
+		if (!request.url.startsWith(ANTHROPIC)) {
+			expect(text, `the API key in ${request.url}`).not.toContain(TEST_KEY);
+		}
+	}
+	// The control for the key check: on Chromium the key does travel, to Anthropic only, and the check can see it.
+	if (browserName === 'chromium') {
+		expect(sent.some((r) => r.url.startsWith(ANTHROPIC) && r.headers.includes(TEST_KEY))).toBe(
+			true
+		);
 	}
 });
