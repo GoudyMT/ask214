@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
-import { RESOURCES, TASK_AFTER_LINK } from '$lib/resources/resources';
+import { RESOURCES, TASK_AFTER_LINK, TASK_LINK_NOTE } from '$lib/resources/resources';
+import * as SKILLBRIDGE_COPY from './skillbridge-copy';
 import { DELETE_FILE_HINT, DEVICE_HINT, IOS_APP_HINT } from '$lib/calendar/delivery';
 import {
 	LEAVING_HINT,
@@ -118,6 +119,12 @@ describe('task-defs seed', () => {
 	// the calendar button and the Settings lines beside the leaving dates. The words the components add around them
 	// are checked in each component's tests.
 	it('keeps every public line about a task free of personal eligibility claims', () => {
+		// Every export of the SkillBridge copy module, so a line added there later is checked too; dated lines with a
+		// sample day.
+		const skillbridgeLines = Object.values(SKILLBRIDGE_COPY).flatMap((v): string[] =>
+			typeof v === 'string' ? [v] : typeof v === 'function' ? [v('2027-04-01')] : Object.values(v)
+		);
+		expect(skillbridgeLines.length).toBeGreaterThanOrEqual(17);
 		const lines = [
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
@@ -127,7 +134,9 @@ describe('task-defs seed', () => {
 			LEAVING_HINT,
 			PAYGRADE_NOTE,
 			ORDER_NOTE,
-			AFTER_SEPARATION
+			AFTER_SEPARATION,
+			...skillbridgeLines,
+			...Object.values(TASK_LINK_NOTE)
 		];
 		expect(lines.length).toBeGreaterThan(200);
 		for (const line of lines) expect(makesPersonalClaim(line), line).toBe(false);
@@ -210,6 +219,54 @@ describe('firm deadlines match their official sources', () => {
 		);
 	});
 
+	// Navy practice: the search for a program starts about 14 months out (426 days); the request opens at the 364-day
+	// mark, the day after NAVADMIN 160/22 8.a's "up to 365 days before", where the portal opens; both aim at their
+	// opening. The request window runs to 201 days out: the longest program, 180 days (NAVADMIN 064/23 tier one), plus
+	// "at least 3 weeks prior to start date" (MyNavyHR's SkillBridge timeline).
+	it('times the SkillBridge steps from their sources', () => {
+		expect(at('skillbridge-find')).toMatchObject({
+			kind: 'soft',
+			windowStart: -426,
+			recommendedOffset: -426,
+			windowEnd: -365
+		});
+		expect(at('skillbridge-request')).toMatchObject({
+			kind: 'soft',
+			windowStart: -364,
+			recommendedOffset: -364,
+			windowEnd: -201
+		});
+		expect(at('skillbridge-request')?.why).toContain('at least 3 weeks before your start');
+		expect(at('skillbridge-find')?.why).toContain('DoD approval covers your program dates');
+	});
+
+	// The locked wording of both steps, in full, so a later edit to any part of it fails here.
+	it('words the SkillBridge steps exactly as approved', () => {
+		expect(at('skillbridge-find')).toMatchObject({
+			title: 'Find a SkillBridge program and get an acceptance letter',
+			why: 'Start about 14 months out: pick a reputable program whose DoD approval covers your program dates, and get its acceptance letter.'
+		});
+		expect(at('skillbridge-request')).toMatchObject({
+			title: "Submit your SkillBridge request (MyNavy Education and your command's package)",
+			why: "It opens a year before separation; submit as soon as it opens, at least 3 weeks before your start. Print the request's pages for the package your command asks for; your CO has the final say."
+		});
+	});
+
+	it('files both SkillBridge steps under career, to finish before leaving the command', () => {
+		for (const id of ['skillbridge-find', 'skillbridge-request']) {
+			expect(at(id), id).toMatchObject({ category: 'career', finishBefore: 'leaving' });
+		}
+	});
+
+	it('words the dated SkillBridge lines with the day shown the way the timeline shows it', () => {
+		expect(SKILLBRIDGE_COPY.askAgainLine('2027-04-01')).toBe(
+			"We'll ask again on Apr 1, 2027. You can change this in Settings."
+		);
+		expect(SKILLBRIDGE_COPY.rowHintEarly('2027-04-01')).toBe(
+			"Yes adds SkillBridge's steps to your timeline. Not sure asks again on Apr 1, 2027."
+		);
+	});
+
 	it('opens the Capstone at 12 months and Chapter 36 counseling 180 days before separation', () => {
 		expect(at('tap-capstone')?.windowStart).toBe(-365);
 		expect(at('va-career-guidance')?.windowStart).toBe(-180);
@@ -231,6 +288,8 @@ describe('what each task must finish before', () => {
 				'preseparation-counseling',
 				'reference-letters',
 				'separation-package',
+				'skillbridge-find',
+				'skillbridge-request',
 				'tap-capstone',
 				'tap-course',
 				'tap-track',

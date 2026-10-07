@@ -9,6 +9,7 @@ import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile
 import type { PersonaFilters, LeavingDates } from '../profile/persona';
 import { PHASE_BUCKETS } from './task-defs';
 import { addDays, daysBetween, localTodayIso } from './day-math';
+import { readPlan, SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import type { TaskDef, TaskKind, TimelineTaskState, TimelineState, PhaseBucket } from './types';
 
 /** Why Fit pulled a window's last day in: the date the task must be finished before. */
@@ -299,8 +300,16 @@ export function generateTimeline(
 	state: TimelineState,
 	today: Date
 ): TimelineView {
-	const anchored = filterAndAnchor(persona, defs);
 	const todayIso = localTodayIso(today);
+	// The SkillBridge steps show only for a saved answer that shows them, read from this call's own state, so no caller
+	// can leave the gate out.
+	const stepsShow =
+		persona.completeness !== 'none' &&
+		readPlan(state.tasks[SKILLBRIDGE_PLAN_KEY], persona.eaos, todayIso).stepsShow;
+	const anchored = filterAndAnchor(
+		persona,
+		stepsShow ? defs : defs.filter((d) => !d.skillbridgeStep)
+	);
 
 	const sorted = anchored
 		.map((a) => {

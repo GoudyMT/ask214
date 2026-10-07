@@ -193,6 +193,23 @@ export const RESOURCES: readonly Resource[] = [
 		lastVerified: '2026-08-10'
 	},
 	{
+		id: 'mynavy-education',
+		title: 'MyNavy Education',
+		url: 'https://myeducation.netc.navy.mil',
+		description: 'The Navy portal where you submit your SkillBridge request (CAC login).',
+		displayCategory: 'skillbridge-transition',
+		lastVerified: '2026-10-07'
+	},
+	{
+		id: 'navy-skillbridge',
+		title: 'Navy SkillBridge (MyNavyHR)',
+		url: 'https://www.mynavyhr.navy.mil/Career-Management/Transition/SkillBridge/',
+		description:
+			"The Navy's SkillBridge page: the timeline, the paygrade limits and the program office's contact.",
+		displayCategory: 'skillbridge-transition',
+		lastVerified: '2026-10-07'
+	},
+	{
 		id: 'dodtap',
 		title: 'DoD Transition Assistance Program (TAP)',
 		url: 'https://www.dodtap.mil',
@@ -322,6 +339,8 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'preseparation-counseling': ['dodtap', 'navy-transition'],
 	'tap-course': ['dodtap', 'dol-vets'],
 	'tap-track': ['dodtap'],
+	'skillbridge-find': ['skillbridge'],
+	'skillbridge-request': ['mynavy-education', 'navy-skillbridge'],
 	'job-search': ['usajobs', 'hiring-our-heroes', 'hire-heroes'],
 	'health-insurance-research': ['military-onesource'],
 	'life-insurance-research': ['vgli', 'mos-financial'],
@@ -360,4 +379,12 @@ export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }
 	'tricare-elect': { resource: 'chcbp', label: 'CHCBP on tricare.mil' },
 	'vgli-convert': { resource: 'va-life-insurance', label: 'VA life insurance options on VA.gov' },
 	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' }
+};
+
+// One line shown above a task card's links, where a source says to read something those links cannot hold.
+export const COMMAND_INSTRUCTIONS =
+	"Also follow your command's SkillBridge instructions: they set what your request package needs.";
+export const TASK_LINK_NOTE: Record<string, string> = {
+	'skillbridge-find': COMMAND_INSTRUCTIONS,
+	'skillbridge-request': COMMAND_INSTRUCTIONS
 };

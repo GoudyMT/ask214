@@ -185,6 +185,32 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		why: 'Each member picks one focused 2-day track for their path.'
 	},
 
+	// ---- SkillBridge: shown only when the user's answer to the SkillBridge question shows them ----
+	{
+		id: 'skillbridge-find',
+		title: 'Find a SkillBridge program and get an acceptance letter',
+		category: 'career',
+		finishBefore: 'leaving',
+		skillbridgeStep: true,
+		kind: 'soft',
+		windowStart: -426,
+		windowEnd: -365,
+		recommendedOffset: -426,
+		why: 'Start about 14 months out: pick a reputable program whose DoD approval covers your program dates, and get its acceptance letter.'
+	},
+	{
+		id: 'skillbridge-request',
+		title: "Submit your SkillBridge request (MyNavy Education and your command's package)",
+		category: 'career',
+		finishBefore: 'leaving',
+		skillbridgeStep: true,
+		kind: 'soft',
+		windowStart: -364,
+		windowEnd: -201,
+		recommendedOffset: -364,
+		why: "It opens a year before separation; submit as soon as it opens, at least 3 weeks before your start. Print the request's pages for the package your command asks for; your CO has the final say."
+	},
+
 	// ---- Job / benefits prep (mid window) ----
 	{
 		id: 'job-search',

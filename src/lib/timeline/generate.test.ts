@@ -8,6 +8,7 @@ import {
 } from './generate';
 import { selectNeedsNow } from './needs-now';
 import { TASK_DEFS } from './task-defs';
+import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
@@ -881,5 +882,90 @@ describe('After you leave', () => {
 			.find((i) => i.def.id === 'tap-capstone');
 		expect(capstone?.windowEndDate).toBe('2026-10-31');
 		expect(capstone?.fit).toEqual({ reason: 'skillbridge', date: '2026-10-31' });
+	});
+});
+
+describe('the SkillBridge steps follow the saved answer', () => {
+	const STEPS = ['skillbridge-find', 'skillbridge-request'];
+	const TODAY_EARLY = new Date(2026, 9, 7, 12); // before the second ask of Jun 30, 2028 (Apr 1, 2027)
+	const view = (tasks: TimelineState['tasks'], leaving?: object, sep = '2028-06-30') =>
+		generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: sep as EaosString,
+				daysUntilSeparation: 0,
+				...(leaving ? { leaving: leaving as never } : {})
+			},
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks },
+			TODAY_EARLY
+		);
+	const ids = (tasks: TimelineState['tasks'], leaving?: object) =>
+		view(tasks, leaving)
+			.phases.flatMap((p) => p.items)
+			.map((i) => i.def.id);
+
+	it('hides both steps with no answer, after No and after an early Not sure', () => {
+		for (const answer of [
+			undefined,
+			{ status: 'skipped' as const },
+			{ status: 'snoozed' as const, snoozeUntil: '2027-04-01' }
+		]) {
+			const shown = ids(answer ? { [SKILLBRIDGE_PLAN_KEY]: answer } : {});
+			for (const id of STEPS) expect(shown, JSON.stringify(answer)).not.toContain(id);
+		}
+	});
+
+	it('shows both steps after Yes and after a Not sure from the second ask', () => {
+		for (const answer of [{ status: 'done' as const }, { status: 'snoozed' as const }]) {
+			const shown = ids({ [SKILLBRIDGE_PLAN_KEY]: answer });
+			for (const id of STEPS) expect(shown, JSON.stringify(answer)).toContain(id);
+		}
+	});
+
+	it('a SkillBridge date alone adds no step', () => {
+		const shown = ids({}, { skillbridgeStart: '2028-01-03' });
+		for (const id of STEPS) expect(shown).not.toContain(id);
+	});
+
+	it('a person with no profile gets an empty view even with a saved Yes', () => {
+		const v = generateTimeline(
+			{ completeness: 'none' },
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: { [SKILLBRIDGE_PLAN_KEY]: { status: 'done' } } },
+			TODAY_EARLY
+		);
+		expect(v.phases).toEqual([]);
+		expect(v.total).toBe(0);
+	});
+
+	it('counts only the tasks it shows', () => {
+		const v = view({});
+		expect(v.total).toBe(v.phases.reduce((n, p) => n + p.items.length, 0));
+	});
+
+	it('marks both steps, and only them; no task uses the answer key', () => {
+		expect(
+			TASK_DEFS.filter((t) => t.skillbridgeStep)
+				.map((t) => t.id)
+				.sort()
+		).toEqual(STEPS);
+		expect(TASK_DEFS.map((t) => t.id)).not.toContain(SKILLBRIDGE_PLAN_KEY);
+	});
+
+	// A real start is at most 180 days out, later than both windows' ends, so it never moves them; this start is set
+	// earlier on purpose to prove the steps fit before leaving like every 'leaving' task.
+	it('fits the request before an early SkillBridge start and leaves the search window alone', () => {
+		const items = view(
+			{ [SKILLBRIDGE_PLAN_KEY]: { status: 'done' } },
+			{ skillbridgeStart: '2027-09-01' }
+		).phases.flatMap((p) => p.items);
+		const find = items.find((i) => i.def.id === 'skillbridge-find');
+		const request = items.find((i) => i.def.id === 'skillbridge-request');
+		expect(find?.windowStartDate).toBe('2027-05-01');
+		expect(find?.windowEndDate).toBe('2027-07-01');
+		expect(request?.windowStartDate).toBe('2027-07-02');
+		expect(request?.windowEndDate).toBe('2027-08-31');
+		expect(request?.fit).toEqual({ reason: 'skillbridge', date: '2027-08-31' });
 	});
 });
