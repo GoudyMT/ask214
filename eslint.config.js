@@ -13,6 +13,7 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
 const STORAGE_MESSAGE =
 	'Personal data persists only in the encrypted IndexedDB stores. A device setting with nothing personal belongs in an exempt file, or in a disable with its reason.';
+const SAFELOG_MESSAGE = 'getDiagnosticsForTest is for tests only; app code logs through safeLog.';
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
@@ -46,7 +47,23 @@ export default defineConfig(
 		// scripts (content-ops) and tests keep console.
 		files: ['src/**/*.{ts,svelte}'],
 		ignores: ['src/**/*.test.ts', 'src/**/*.browser.test.ts', 'src/**/*.svelte.test.ts'],
-		rules: { 'no-console': 'error' }
+		rules: {
+			'no-console': 'error',
+			// The diagnostics buffer's accessor is for tests; app code reading the live buffer would build the public
+			// diagnostics API the sink exists to avoid.
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{
+							group: ['**/log/safelog', './safelog'],
+							importNames: ['getDiagnosticsForTest'],
+							message: SAFELOG_MESSAGE
+						}
+					]
+				}
+			]
+		}
 	},
 	{
 		// Personal data persists only through the encrypted IndexedDB stores, so web storage and cookies are banned in

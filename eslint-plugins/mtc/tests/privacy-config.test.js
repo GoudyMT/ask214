@@ -39,3 +39,29 @@ describe('personal data stays out of web storage and cookies', () => {
 		).not.toContain('no-restricted-globals');
 	});
 });
+
+describe('the safelog test accessor stays out of app code', () => {
+	it.each([
+		"import { getDiagnosticsForTest } from '$lib/log/safelog';",
+		"import { getDiagnosticsForTest } from '../log/safelog';",
+		"import { safeLog, getDiagnosticsForTest } from '../../lib/log/safelog';",
+		"import { getDiagnosticsForTest } from './safelog';"
+	])('flags %s in app source', async (code) => {
+		expect(await ruleIds(code, 'src/lib/log/planted.ts')).toContain('no-restricted-imports');
+	});
+
+	it('allows the sink itself', async () => {
+		expect(
+			await ruleIds("import { safeLog } from '$lib/log/safelog';", 'src/lib/log/planted.ts')
+		).not.toContain('no-restricted-imports');
+	});
+
+	it('allows tests to read the buffer', async () => {
+		expect(
+			await ruleIds(
+				"import { getDiagnosticsForTest } from '$lib/log/safelog';",
+				'src/lib/log/planted.test.ts'
+			)
+		).not.toContain('no-restricted-imports');
+	});
+});
