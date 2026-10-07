@@ -69,6 +69,13 @@ const ONLINE_PATH_DIRS = ['src/lib/ask/online', 'src/lib/ask/synthesis', 'worker
 // named there would ride into an off-device request just like one in the units above. They are single files,
 // not directory trees, so the guard names them explicitly.
 const ONLINE_PATH_FILES = ['src/lib/ask/store.svelte.ts', 'src/routes/+page.svelte'];
+// The feedback form sends its message to the server's feedback endpoint, so it is an off-device path too.
+const FEEDBACK_PATH_DIRS = ['src/lib/feedback'];
+const FEEDBACK_PATH_FILES = [
+	'src/lib/components/FeedbackForm.svelte',
+	'src/routes/feedback/+page.svelte',
+	'src/routes/feedback/+page.ts'
+];
 
 /** Recursively collect non-test, non-generated .ts source files under a directory. */
 function findSourceFiles(dir: string): string[] {
@@ -91,8 +98,10 @@ function findSourceFiles(dir: string): string[] {
 /** Every path in the online-egress guard's scope: the directory trees plus the explicitly-named files. */
 function collectOnlinePathFiles(): string[] {
 	return [
-		...ONLINE_PATH_DIRS.flatMap((dir) => findSourceFiles(join(process.cwd(), dir))),
-		...ONLINE_PATH_FILES.map((file) => join(process.cwd(), file))
+		...[...ONLINE_PATH_DIRS, ...FEEDBACK_PATH_DIRS].flatMap((dir) =>
+			findSourceFiles(join(process.cwd(), dir))
+		),
+		...[...ONLINE_PATH_FILES, ...FEEDBACK_PATH_FILES].map((file) => join(process.cwd(), file))
 	];
 }
 
@@ -109,6 +118,13 @@ describe('pii-policy: the online egress path must not name PII or the install id
 		const scanned = collectOnlinePathFiles();
 		expect(scanned.some((p) => p.endsWith(join('ask', 'store.svelte.ts')))).toBe(true);
 		expect(scanned.some((p) => p.endsWith(join('routes', '+page.svelte')))).toBe(true);
+	});
+
+	it('the guard covers the feedback form, its route and its library', () => {
+		const scanned = collectOnlinePathFiles();
+		expect(scanned.some((p) => p.endsWith(join('components', 'FeedbackForm.svelte')))).toBe(true);
+		expect(scanned.some((p) => p.endsWith(join('routes', 'feedback', '+page.svelte')))).toBe(true);
+		expect(scanned.some((p) => p.endsWith(join('lib', 'feedback', 'compose.ts')))).toBe(true);
 	});
 
 	it('the real online-path source contains no PII tokens', () => {
