@@ -4,9 +4,10 @@
  * Project hard rule: PII never leaves the device. Code that can send data off the device - server source, the online
  * Ask path, the Worker, the feedback path, and the Ask store and home route that build the online requests - must never
  * name a ProfileV1 PII field or the install identifier, and (the home route aside) must not import the modules that
- * hold personal data; code that calls our own servers must not name the user's own API key. The guard fails the test
- * suite (pre-commit + CI) the moment one does. It reads names and imports, not values: the online request test
- * (tests/e2e/egress-canary.e2e.ts) checks what actually leaves.
+ * hold personal data. The retrieve path, the Worker, feedback and server files must not name the user's own API key;
+ * the home route does, because it hands the key to the Anthropic call. The guard fails the test suite (pre-commit +
+ * CI) the moment one breaks a rule. It reads names and imports, not values: the online request test
+ * (tests/e2e/egress-canary.e2e.ts) checks what actually leaves, the key included.
  *
  * Implemented as a vitest test rather than a bash CI step:
  * cross-platform, runs in pre-commit AND CI, TDD-native.
@@ -53,7 +54,8 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	// inside braces on one line (`const { eaos } = profile`), or as a key alone at the start of a line (a destructure
 	// split over several lines). The last form leaves out "rate" and "rank": they are ordinary words, and a wrapped line
 	// of prose can start with one. A name scan cannot see a value under a new name at all; the online request test
-	// (tests/e2e/egress-canary.e2e.ts) checks the values that leave the device.
+	// (tests/e2e/egress-canary.e2e.ts) checks the values that leave the device - but no screen sets rate or rank yet, so
+	// it covers them only once one does and the test seeds them.
 	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)['"`]\s*\]/,
 	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\b[^}]*\}/,
 	/^\s*(?:eaos|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\s*(?=[,:=]|$)/
@@ -117,7 +119,8 @@ export const FORBIDDEN_IMPORT_PATTERN =
 // specifier, so the scan runs over the whole file rather than one line at a time. The specifier itself stops at a
 // line break: a quoted word ending in "from" in a string or comment would otherwise run on to the next quote and
 // swallow a real import.
-const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"`])([^'"`\r\n]+)\1/g;
+const IMPORT_SPECIFIER =
+	/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\.meta\.glob(?:Eager)?\s*\(\s*\[?\s*|\bimport\s+)(['"`])([^'"`\r\n]+)\1/g;
 
 /**
  * Scan provided file contents for imports of the personal-data modules.

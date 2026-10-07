@@ -19,7 +19,9 @@ const SERVER_FOLDER_PATTERN = /[\\/]src[\\/]lib[\\/]server[\\/]/;
 /** Whether a file in a scanned folder is source the guard reads: every kind, tests and type declarations aside. */
 function isScannedSource(name: string): boolean {
 	return (
-		/\.(?:ts|js|svelte)$/.test(name) && !/\.test\.[jt]s$/.test(name) && !name.endsWith('.d.ts')
+		/\.(?:[cm]?[jt]s|svelte)$/.test(name) &&
+		!/\.test\.[cm]?[jt]s$/.test(name) &&
+		!/\.d\.[cm]?ts$/.test(name)
 	);
 }
 
@@ -75,6 +77,11 @@ describe('pii-policy: what the guard reads', () => {
 		expect(isScannedSource('Panel.svelte')).toBe(true);
 		expect(isScannedSource('helper.js')).toBe(true);
 		expect(isScannedSource('unit.ts')).toBe(true);
+		for (const name of ['worker.mjs', 'build.cjs', 'unit.mts', 'unit.cts']) {
+			expect(isScannedSource(name), name).toBe(true);
+		}
+		expect(isScannedSource('unit.test.mjs')).toBe(false);
+		expect(isScannedSource('types.d.mts')).toBe(false);
 		expect(isScannedSource('unit.test.ts')).toBe(false);
 		expect(isScannedSource('Panel.svelte.test.ts')).toBe(false);
 		expect(isScannedSource('types.d.ts')).toBe(false);
@@ -207,7 +214,8 @@ describe('pii-policy: a profile field read without a dot', () => {
 	});
 
 	// "rate" and "rank" are ordinary words, and a wrapped line of prose can start with one, so the multi-line form leaves
-	// them to the online request test (tests/e2e/egress-canary.e2e.ts), which checks the values that leave the device.
+	// them to the online request test (tests/e2e/egress-canary.e2e.ts), which checks the values that leave the device -
+	// once a screen sets them and that test seeds them; none does yet.
 	const ORDINARY_WORDS = ['rate', 'rank'];
 
 	it.each(PII_FIELD_NAMES.filter((field) => !ORDINARY_WORDS.includes(field)))(
@@ -281,6 +289,13 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		).toHaveLength(1);
 	});
 
+	it('flags a Vite glob import of a banned folder', () => {
+		expect(
+			scan("const m = import.meta.glob('/src/lib/profile/*.ts', { eager: true });")
+		).toHaveLength(1);
+		expect(scan("const m = import.meta.glob(['../../profile/*.ts']);")).toHaveLength(1);
+	});
+
 	it('leaves a route named in prose alone', () => {
 		expect(scan("// the user came from '/timeline'")).toEqual([]);
 	});
@@ -330,6 +345,16 @@ describe('pii-policy: the BYO API key never reaches our own endpoints', () => {
 			BYO_KEY_PATTERNS
 		);
 		expect(violations).not.toEqual([]);
+	});
+
+	it.each([
+		['const k = await byok.readApiKey();', 'the key read'],
+		["request.headers.set('X-API-Key', k);", 'the key header'],
+		["const apiKey = '';", 'the key variable']
+	])('flags %s on its own (%s)', (content) => {
+		expect(
+			scanForPiiTokens([{ path: 'src/lib/ask/online/x.ts', content }], BYO_KEY_PATTERNS)
+		).toHaveLength(1);
 	});
 
 	it('the real retrieve, Worker, feedback and server source names no key', () => {
