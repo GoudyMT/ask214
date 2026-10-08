@@ -2,8 +2,10 @@ import { formatTimelineDate } from './format-date';
 import type { PlanAnswer } from './skillbridge-plan';
 
 /**
- * Every line the SkillBridge question and its Settings row show. They live here, not in the components, so the test
- * that holds every public line to 38 CFR 14.629 reads them all: none may say what the user qualifies for.
+ * The SkillBridge lines the question and its Settings row show. They live here, not in the components, so the test
+ * that holds every public line to 38 CFR 14.629 reads them all: none may say what the user qualifies for. The app's
+ * shared wording (the failed-save line, "opens in a new tab", Save, Cancel, Dismiss) stays in the components, as in
+ * every other component that uses it.
  */
 export const QUESTION_FIRST = {
 	heading: 'Planning to do SkillBridge?',
