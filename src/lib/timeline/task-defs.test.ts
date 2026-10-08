@@ -109,10 +109,35 @@ describe('task-defs seed', () => {
 			'You have up to 90 days.',
 			'You have 6 months left.',
 			'You have until your separation date.',
-			'You receive 180 days of coverage.'
+			'You receive 180 days of coverage.',
+			'You are approved for SkillBridge.',
+			`You${String.fromCharCode(0x2019)}re approved.`,
+			"You're approved for the program.",
+			'You will be approved if you submit early.',
+			"You'll be approved for this.",
+			'Your request will be approved.',
+			'Your command will approve it.',
+			'Your command will approve your request.',
+			'The Navy will approve your request.'
 		];
 		for (const line of planted) expect(makesPersonalClaim(line), line).toBe(true);
 		expect(makesPersonalClaim('tricare.mil and healthcare.gov say who qualifies.')).toBe(false);
+	});
+
+	// Neutral facts about who decides, and the SkillBridge lines themselves, state no approval for the reader.
+	it('lets neutral approval facts through', () => {
+		const neutral = [
+			"Print the request's pages for the package your command asks for; your command approver decides.",
+			'Submit your SkillBridge request',
+			'COs have final approval authority.',
+			'COs and OICs approve SkillBridge requests.',
+			'DoD approval covers your program dates.',
+			"A request needs your command approver's signature before it goes up.",
+			'Members who request SkillBridge within the DIB will be approved, per the DoD notice.',
+			'Your command approver decides whether a request is approved.',
+			'Ask your command whether your request is approved.'
+		];
+		for (const line of neutral) expect(makesPersonalClaim(line), line).toBe(false);
 	});
 
 	// 38 CFR 14.629 over the task data: its own text, its What now link, the curated resources, the sentences under

@@ -6,12 +6,21 @@
 const PERSONAL =
 	/\byou(?:'re| are| may| might| could| will| would)?(?: be)? (?:qualif\w*|eligible|entitled)\b|\byou(?:'ll| will| can)? (?:get|receive)\b|\byou (?:still )?have (?:until\b|(?:up to )?(?:\d+|a|an|one|two|three|six|twelve) (?:more )?(?:day|week|month|year)s?\b)|\bguarantee/i;
 
+/**
+ * An approval claim is an eligibility claim too: a line that says the reader is or will be approved, or that their
+ * request or command will approve it, decides a case only the approving command can decide. Who approves, as a plain
+ * fact, does not match.
+ */
+const APPROVAL =
+	/\byou(?:'re| are| will be|'ll be) approved\b|\byour (?:request|command|package|application|co)(?: \w+){0,2} will (?:be )?approv\w*|\bwill approve your\b/i;
+
 /** A curly apostrophe reads the same as a straight one, so it is folded before matching. */
 const RIGHT_SINGLE_QUOTE = String.fromCharCode(0x2019);
 
-/** Whether a line tells a person what they personally qualify for, will get, or have left. */
+/** Whether a line tells a person what they personally qualify for, will get, have left, or will be approved for. */
 export function makesPersonalClaim(line: string): boolean {
-	return PERSONAL.test(line.replaceAll(RIGHT_SINGLE_QUOTE, "'"));
+	const folded = line.replaceAll(RIGHT_SINGLE_QUOTE, "'");
+	return PERSONAL.test(folded) || APPROVAL.test(folded);
 }
 
 /**
