@@ -114,6 +114,8 @@ describe('the SkillBridge answer', () => {
 			{ status: 'skipped', snoozeUntil: AGAIN },
 			{ status: 'snoozed', snoozeUntil: '2026-13-40' },
 			{ status: 'snoozed', snoozeUntil: '2027-02-30' },
+			{ status: 'snoozed', snoozeUntil: '2027-4-1' },
+			{ status: 'snoozed', snoozeUntil: '2027-04-01T00:00:00Z' },
 			{ status: 'snoozed', snoozeUntil: 20270401 },
 			{ snoozeUntil: AGAIN },
 			{ notes: 'x' },

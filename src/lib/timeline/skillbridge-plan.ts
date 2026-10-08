@@ -32,9 +32,9 @@ export type PlanRead = {
 /** A write through the timeline store: `status` -> setStatus, `snoozeUntil` -> setSnooze. */
 export type PlanWrite = { status: 'done' | 'skipped' | 'snoozed' } | { snoozeUntil: string };
 
-/** A calendar day that survives a UTC round trip unchanged (2026-02-30 does not). */
+/** A calendar day that survives a UTC round trip unchanged: only YYYY-MM-DD comes back equal, and 2026-02-30 does not. */
 function isDay(v: unknown): v is string {
-	if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+	if (typeof v !== 'string') return false;
 	const t = new Date(`${v}T00:00:00Z`);
 	return !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === v;
 }
