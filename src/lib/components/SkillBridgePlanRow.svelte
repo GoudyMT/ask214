@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import type { PlanAnswer, PlanRead } from '$lib/timeline/skillbridge-plan';
 	import {
 		ANSWER_LABEL,
@@ -27,6 +27,23 @@
 	let error = $state<string | null>(null);
 	let busy = $state(false);
 	let toggleEl = $state<HTMLButtonElement | null>(null);
+	let unavailableEl = $state<HTMLElement | null>(null);
+	// The form shows only while the answer can be read, so the row never stays open on a disabled toggle.
+	const open = $derived(editing && plan !== null);
+
+	// When the answer turns unreadable the row closes for good: the form's controls are gone and the toggle is disabled,
+	// so neither can hold focus, and coming back must not reopen a stale choice. A row that was never open leaves focus
+	// alone. A disabled button cannot take focus, so the unavailable line is the target.
+	$effect(() => {
+		if (plan !== null) return;
+		const wasOpen = untrack(() => editing);
+		editing = false;
+		error = null;
+		if (!wasOpen) return;
+		const active = document.activeElement;
+		if (active === null || active === document.body || active === toggleEl) unavailableEl?.focus();
+	});
+
 	// A saved Not sure says what it does itself; any other saved answer is described by what a choice made today would do.
 	const hint = $derived.by(() => {
 		if (plan?.answer === 'not-sure') {
@@ -74,20 +91,21 @@
 		bind:this={toggleEl}
 		class="settings-disclosure__toggle"
 		type="button"
-		aria-expanded={editing}
+		aria-expanded={open}
 		aria-controls="skillbridge-plan-edit"
 		disabled={plan === null}
 		onclick={toggle}
 	>
-		<span class="settings-chevron" class:settings-chevron--open={editing} aria-hidden="true"></span>
+		<span class="settings-chevron" class:settings-chevron--open={open} aria-hidden="true"></span>
 		<span>{ROW_LABEL}</span>
 		<span class="settings-disclosure__summary"
 			>{plan ? ROW_SUMMARY[plan.answer] : ROW_UNAVAILABLE_SUMMARY}</span
 		>
 	</button>
 	{#if plan === null}
-		<p class="sb-row__hint">{ROW_UNAVAILABLE}</p>
-	{:else if editing}
+		<!-- tabindex -1: a target for the focus move above, never a stop on the Tab order. -->
+		<p bind:this={unavailableEl} class="sb-row__hint" tabindex="-1">{ROW_UNAVAILABLE}</p>
+	{:else if open}
 		<form
 			id="skillbridge-plan-edit"
 			class="settings-edit"

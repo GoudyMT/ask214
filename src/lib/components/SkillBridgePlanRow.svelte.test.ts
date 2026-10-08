@@ -167,6 +167,42 @@ describe('SkillBridgePlanRow', () => {
 		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
 	});
 
+	// The store can turn unreadable mid-save (a refresh after a failed write); the row must not stay half open.
+	it('closes when the answer becomes unreadable, moves focus to the unavailable line, and stays closed when it returns', async () => {
+		const onSave = vi.fn(() => Promise.resolve('Something to review.'));
+		const props = { plan: plan(), onSave };
+		const { rerender, container } = render(SkillBridgePlanRow, { props });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.element(page.getByRole('alert')).toHaveTextContent('Something to review.');
+
+		await rerender({ ...props, plan: null });
+		await expect.element(toggle()).toBeDisabled();
+		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
+		expect(container.querySelector('form')).toBeNull();
+		const line = page.getByText(/could not be loaded/).element();
+		expect(line.getAttribute('tabindex')).toBe('-1');
+		expect(document.activeElement).toBe(line);
+
+		await rerender({ ...props, plan: plan() });
+		await expect.element(toggle()).toBeEnabled();
+		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
+		expect(container.querySelector('form')).toBeNull();
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+
+		// Opened again, the form starts from the saved answer, not the stale pick.
+		await toggle().click();
+		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeChecked();
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+	});
+
+	it('does not take focus for the unavailable line when it was never open', async () => {
+		render(SkillBridgePlanRow, { props: { plan: null, onSave: vi.fn() } });
+		await expect.element(page.getByText(/could not be loaded/)).toBeVisible();
+		expect(document.activeElement).toBe(document.body);
+	});
+
 	it('offers no unavailable line while the answer can be read', async () => {
 		render(SkillBridgePlanRow, { props: { plan: plan(), onSave: vi.fn() } });
 		await expect.element(toggle()).toBeEnabled();
