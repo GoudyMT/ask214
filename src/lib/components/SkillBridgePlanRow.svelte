@@ -29,8 +29,6 @@
 	let toggleEl = $state<HTMLButtonElement | null>(null);
 	let unavailableEl = $state<HTMLElement | null>(null);
 	let saveEl = $state<HTMLButtonElement | null>(null);
-	// The form shows only while the answer can be read, so the row never stays open on a disabled toggle.
-	const open = $derived(editing && plan !== null);
 
 	// When the answer turns unreadable the row closes for good: the form's controls are gone and the toggle is disabled,
 	// so neither can hold focus, and coming back must not reopen a stale choice. A row that was never open leaves focus
@@ -39,7 +37,6 @@
 		if (plan !== null) return;
 		const wasOpen = untrack(() => editing);
 		editing = false;
-		error = null;
 		if (!wasOpen) return;
 		const active = document.activeElement;
 		if (active === null || active === document.body || active === toggleEl) unavailableEl?.focus();
@@ -103,12 +100,12 @@
 		bind:this={toggleEl}
 		class="settings-disclosure__toggle"
 		type="button"
-		aria-expanded={open}
+		aria-expanded={editing}
 		aria-controls="skillbridge-plan-edit"
 		disabled={plan === null}
 		onclick={toggle}
 	>
-		<span class="settings-chevron" class:settings-chevron--open={open} aria-hidden="true"></span>
+		<span class="settings-chevron" class:settings-chevron--open={editing} aria-hidden="true"></span>
 		<span>{ROW_LABEL}</span>
 		<span class="settings-disclosure__summary"
 			>{plan ? ROW_SUMMARY[plan.answer] : ROW_UNAVAILABLE_SUMMARY}</span
@@ -117,7 +114,7 @@
 	{#if plan === null}
 		<!-- tabindex -1: a target for the focus move above, never a stop on the Tab order. -->
 		<p bind:this={unavailableEl} class="sb-row__hint" tabindex="-1">{ROW_UNAVAILABLE}</p>
-	{:else if open}
+	{:else if editing}
 		<form
 			id="skillbridge-plan-edit"
 			class="settings-edit"
