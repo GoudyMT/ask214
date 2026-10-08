@@ -11,8 +11,8 @@ import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm';
 const TEST_TIME_ZONE = 'America/Los_Angeles';
 
 // The release the footer names; each release's pull request bumps package.json. The first plugin below writes it into
-// the root layout as plain text before Svelte compiles, so the page carries static markup: a `define` constant was
-// set by Svelte at runtime, 21 B more on every page.
+// the root layout as plain text before Svelte compiles, so the page carries static markup: Svelte sets a `define`
+// constant at runtime, 21 B more on every page. The `define` stays for any other code that reads the version.
 const { version } = JSON.parse(
 	readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
 ) as {
@@ -20,6 +20,7 @@ const { version } = JSON.parse(
 };
 
 export default defineConfig({
+	define: { __APP_VERSION__: JSON.stringify(version) },
 	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
 	// sends `upgrade-insecure-requests` and browsers that honour it rewrite every asset URL to https.
 	// Over plain HTTP that yields a page with no stylesheet at all - which is not a product bug (in
