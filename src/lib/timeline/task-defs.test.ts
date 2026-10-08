@@ -130,7 +130,14 @@ describe('task-defs seed', () => {
 			'You may be approved.',
 			'Your OIC will approve it.',
 			'Your CO will approve it.',
-			'Your SkillBridge request will likely be approved.'
+			'Your SkillBridge request will likely be approved.',
+			'You might be approved.',
+			'You could be approved.',
+			'Your request should be approved.',
+			'Your command would approve it.',
+			'You are now approved.',
+			"You'll get approved.",
+			'Your package will get approved.'
 		];
 		for (const line of planted) expect(makesPersonalClaim(line), line).toBe(true);
 		expect(makesPersonalClaim('tricare.mil and healthcare.gov say who qualifies.')).toBe(false);
@@ -147,7 +154,11 @@ describe('task-defs seed', () => {
 			"A request needs your command approver's signature before it goes up.",
 			'Members who request SkillBridge within the DIB will be approved, per the DoD notice.',
 			'Your command approver decides whether a request is approved.',
-			'Ask your command whether your request is approved.'
+			'Ask your command whether your request is approved.',
+			"You'll find approved programs on skillbridge.mil.",
+			'You will see approved providers in the portal.',
+			'You may find approved programs near your base.',
+			'Your command would need approved program dates.'
 		];
 		for (const line of neutral) expect(makesPersonalClaim(line), line).toBe(false);
 	});

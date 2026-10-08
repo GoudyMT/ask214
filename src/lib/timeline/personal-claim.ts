@@ -12,7 +12,7 @@ const PERSONAL =
  * fact, does not match.
  */
 const APPROVAL =
-	/\byou(?:'re|'ve been|'d|'ll| are| were| have been| will| would| may| might| could| should)(?: \w+)?(?: be)? approved\b|\byour (?:\w+ )?(?:request|command|package|application|co|oic)(?: \w+){0,2} (?:will|would|should)(?: \w+)?(?: be)? approv\w*|\bwill approve your\b/i;
+	/\byou(?:'re|'ve been|'d|'ll| are| were| have been| will| would| may| might| could| should)(?: (?:\w+ly|now|already|also))?(?: be| get)? approved\b|\byour (?:\w+ )?(?:request|command|package|application|co|oic)(?: \w+){0,2} (?:will|would|should)(?: (?:\w+ly|now|already|also))?(?: be| get)? approv\w*|\bwill approve your\b/i;
 
 /** A curly apostrophe reads the same as a straight one, so it is folded before matching. */
 const RIGHT_SINGLE_QUOTE = String.fromCharCode(0x2019);
