@@ -178,6 +178,12 @@ const STATIC = 'static';
 //     shorthand (-3 B CSS), no null check on the focused element (-9 B), no error reset on close (-3 B) and a shorter
 //     close effect (-4 B) kept; the effect reading the open state directly (+36 B), a flat hint (+6 B) and plain element
 //     refs (+8 B) not kept.
+//     Route nodes 46,825 -> 46,855 and precache 148,370 -> 148,395 (owner's call, 2026-10-08): the second review's
+//     fixes - the Settings row leaving focus where the person moved it after a save that works and saving nothing when
+//     the answer is already saved and in effect (+24 B), the Timeline card's close holding for the visit (+6-9 B) -
+//     builds measured 46,799-46,814 B route nodes and 148,331-148,352 B precache, about 40 B of room each at the
+//     higher. Trim pass, each built twice: the row's in-effect test rewritten (+1 B), one shared refocus helper (+8 B),
+//     the close flag folded into the hold (0 B) and the card's condition reordered (+1-2 B), none kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -190,7 +196,7 @@ const LIMIT = {
 	page: 60_930,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 148_370,
+	precacheBytes: 148_395,
 	workerScripts: 147_200
 };
 
