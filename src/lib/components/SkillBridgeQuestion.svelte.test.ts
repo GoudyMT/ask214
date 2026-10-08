@@ -77,25 +77,26 @@ function expectFitsStatusLine(section: Element | null): void {
 	expect(Math.abs(frame.getBoundingClientRect().height - expected)).toBeLessThanOrEqual(1);
 }
 
-// Each case: the tapped label, the answer, the day the save resolves to, and the line that follows.
+// Each case: the tapped label, the day the save resolves to, the answer, and the line that follows. The label and the
+// day come first because the test titles print the first two.
 const ANSWERED_CASES = [
 	[
 		'Yes',
-		'yes',
 		null,
+		'yes',
 		'SkillBridge steps added to your timeline. You can change this in Settings.'
 	],
-	['No', 'no', null, 'Got it. You can change this in Settings.'],
+	['No', null, 'no', 'Got it. You can change this in Settings.'],
 	[
 		'Not sure',
-		'not-sure',
 		'2027-04-01',
+		'not-sure',
 		"We'll ask again on Apr 1, 2027. You can change this in Settings."
 	],
 	[
 		'Not sure',
-		'not-sure',
 		null,
+		'not-sure',
 		'SkillBridge steps added to your timeline. You can change this in Settings.'
 	]
 ] as const;
@@ -139,7 +140,7 @@ describe('SkillBridgeQuestion', () => {
 
 	it.each(ANSWERED_CASES)(
 		'after %s (save resolves to %s) fits the frame to its message, focuses one line and offers only Dismiss',
-		async (label, answer, returns, line) => {
+		async (label, returns, answer, line) => {
 			const { container, onAnswer } = card({ onAnswer: vi.fn(() => Promise.resolve(returns)) });
 			const section = container.querySelector('section');
 			const before = section?.getBoundingClientRect().height ?? 0;
@@ -161,7 +162,7 @@ describe('SkillBridgeQuestion', () => {
 	// The card is as wide as the page's content on a 320 px phone (16 px gutters), where the longest line wraps.
 	it.each(ANSWERED_CASES)(
 		'after %s (save resolves to %s) the message stops before the close button and the button stays inside the frame',
-		async (label, _answer, returns, line) => {
+		async (label, returns, _answer, line) => {
 			await page.viewport(320, 800);
 			const { container } = card({ onAnswer: vi.fn(() => Promise.resolve(returns)) });
 			container.style.width = '288px';
