@@ -5,7 +5,7 @@
 // through a shell-script shim (pnpm's, or node_modules/.bin/vitest) runs inside one more sh. Stopping the command
 // itself (vitest, cmd.exe or pnpm's node) reads as a failure, as it should. Stopping that extra sh from outside
 // (taskkill /F) reads as exit 0 to the hook, which carries on to the commit, each time it was measured. That is how
-// a commit landed on 2026-10-08 with its unit run cut short. Started by node, the run has no extra sh, and stopping
+// a commit landed on 2026-10-07 with its unit run cut short. Started by node, the run has no extra sh, and stopping
 // any process in it fails the hook (measured), so the hook line must stay a bare `node` command.
 //
 // Not closed: husky starts the hook script's own sh the same way, so stopping it (with /T that stops this run too)
