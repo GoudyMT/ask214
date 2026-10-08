@@ -139,7 +139,7 @@ describe('Timeline, the SkillBridge question', () => {
 		current.timeline = { ready: true, failed: false, state: EMPTY };
 		const { container } = render(TimelinePage);
 		await expect
-			.element(page.getByRole('heading', { name: 'Still thinking about SkillBridge?' }))
+			.element(page.getByRole('heading', { name: 'Planning to do SkillBridge?' }))
 			.toBeVisible();
 		const card = container.querySelector('.sb-card');
 		const list = container.querySelector('.timeline-list');

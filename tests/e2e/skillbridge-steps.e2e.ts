@@ -20,12 +20,10 @@ const REQUEST = "Submit your SkillBridge request (MyNavy Education and your comm
 
 test('Yes shows both steps and keeps them after a reload', async ({ page }) => {
 	await seedProfile(page, 208);
-	await expect(
-		page.getByRole('heading', { name: 'Still thinking about SkillBridge?' })
-	).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Planning to do SkillBridge?' })).toBeVisible();
 	await expect(page.getByText(FIND)).toHaveCount(0);
 	await page
-		.getByRole('group', { name: 'Still thinking about SkillBridge?' })
+		.getByRole('group', { name: 'Planning to do SkillBridge?' })
 		.getByRole('button', { name: 'Yes', exact: true })
 		.click();
 	await expect(page.getByRole('status')).toHaveText(

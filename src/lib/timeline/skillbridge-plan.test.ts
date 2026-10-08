@@ -35,9 +35,16 @@ describe('the SkillBridge answer', () => {
 		});
 	});
 
-	it('asks in the second wording from the second ask on, and a Not sure then shows the steps', () => {
-		expect(read(undefined, AGAIN)).toMatchObject({ card: 'again', notSureReturns: null });
-		expect(read(undefined, '2028-06-08')).toMatchObject({ card: 'again' });
+	it('asks a first-time visitor in the first wording at any date it may still ask', () => {
+		expect(read(undefined, AGAIN)).toMatchObject({ card: 'first', notSureReturns: null });
+		expect(read(undefined, '2028-06-08')).toMatchObject({ card: 'first' });
+	});
+
+	it('asks in the second wording only after an early Not sure has come back', () => {
+		const early: TimelineTaskState = { status: 'snoozed', snoozeUntil: AGAIN };
+		expect(read(early, AGAIN)).toMatchObject({ answer: 'not-sure', card: 'again' });
+		expect(read(early, '2028-06-08')).toMatchObject({ answer: 'not-sure', card: 'again' });
+		expect(read(early, LAST)).toMatchObject({ answer: 'not-sure', card: null });
 	});
 
 	it('stops asking from 21 days before separation', () => {

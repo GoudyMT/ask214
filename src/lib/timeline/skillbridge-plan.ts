@@ -73,9 +73,11 @@ export function readPlan(
 	const again = addDays(separation, -ASK_AGAIN_DAYS);
 	const canAsk = todayIso < addDays(separation, -LAST_ASK_DAYS);
 	const notSureReturns = todayIso < again ? again : null;
-	const asking = (answer: PlanRead['answer']): PlanRead => ({
+	// The second wording ("Still thinking...") only follows a real first ask, so no answer reads the first wording
+	// however late the visit.
+	const asking = (answer: PlanRead['answer'], card: 'first' | 'again'): PlanRead => ({
 		answer,
-		card: canAsk ? (todayIso < again ? 'first' : 'again') : null,
+		card: canAsk ? card : null,
 		stepsShow: false,
 		notSureReturns,
 		returnsOn: null
@@ -100,10 +102,10 @@ export function readPlan(
 					returnsOn: back
 				};
 			}
-			return { ...asking('not-sure'), card: canAsk ? 'again' : null };
+			return asking('not-sure', 'again');
 		}
 		default:
-			return asking('none');
+			return asking('none', 'first');
 	}
 }
 
