@@ -34,12 +34,10 @@
 	// so neither can hold focus, and coming back must not reopen a stale choice. A row that was never open leaves focus
 	// alone. A disabled button cannot take focus, so the unavailable line is the target.
 	$effect(() => {
-		if (plan !== null) return;
-		const wasOpen = untrack(() => editing);
+		if (plan !== null || !untrack(() => editing)) return;
 		editing = false;
-		if (!wasOpen) return;
 		const active = document.activeElement;
-		if (active === null || active === document.body || active === toggleEl) unavailableEl?.focus();
+		if (active === document.body || active === toggleEl) unavailableEl?.focus();
 	});
 
 	// A saved Not sure says what it does itself; any other saved answer is described by what a choice made today would do.
@@ -54,7 +52,6 @@
 	// Closing unmounts the focused control; focus goes back to the row, so a keyboard user is not dropped.
 	async function close(): Promise<void> {
 		editing = false;
-		error = null;
 		await tick();
 		toggleEl?.focus();
 	}
@@ -72,26 +69,19 @@
 	async function save(): Promise<void> {
 		if (choice === null) return;
 		busy = true;
-		let failed = false;
+		let message: string | null;
 		try {
-			const message = await onSave(choice);
-			if (message === null) await close();
-			else {
-				error = message;
-				failed = true;
-			}
+			message = await onSave(choice);
 		} catch {
-			error = FAILED;
-			failed = true;
-		} finally {
-			busy = false;
+			message = FAILED;
 		}
-		if (!failed) return;
+		busy = false;
+		if (message === null) return close();
+		error = message;
 		// Save was disabled while the save ran, which dropped focus to the page; put it back so the person can try
 		// again, unless they have already moved on.
 		await tick();
-		const active = document.activeElement;
-		if (active === null || active === document.body) saveEl?.focus();
+		if (document.activeElement === document.body) saveEl?.focus();
 	}
 </script>
 
@@ -288,8 +278,7 @@
 	   is marked by a heavier border in the system highlight colour. */
 	@media (forced-colors: active) {
 		.sb-row__choice:has(input:checked) {
-			border-width: 3px;
-			border-color: Highlight;
+			border: 3px solid Highlight;
 		}
 	}
 	.sb-row__choice:has(input:focus-visible) {
