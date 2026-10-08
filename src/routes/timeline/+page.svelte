@@ -80,6 +80,11 @@
 	// Set at the tap, before the save lands: the store's answer ends the question, but the card stays on the page to show
 	// what happened, until the person closes it or leaves.
 	let planHeld = $state(false);
+	// With no readable answer (locked, loading, failed) the card is gone and remounts fresh; a hold left over would ask
+	// again, and a second tap would overwrite the saved answer.
+	$effect.pre(() => {
+		if (!plan) planHeld = false;
+	});
 
 	// The SkillBridge answer -> the encrypted timeline store, through the shared save (it re-reads the store on a
 	// failure); a rejection reaches the card, which says the save failed. Resolves to the save's return day for the card's line.

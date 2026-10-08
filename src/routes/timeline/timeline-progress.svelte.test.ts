@@ -267,6 +267,35 @@ describe('Timeline, the SkillBridge question', () => {
 		expect(document.activeElement).toBe(first);
 	});
 
+	// A relock (tab or app switch, screen lock, idle lock) takes the store away and a restore brings it back with the
+	// answer on disk: the card must not come back to ask again, where a second tap would overwrite the saved answer.
+	it.each([
+		['Yes', 200, 'Yes'],
+		['an early Not sure', 600, 'Not sure']
+	])(
+		'does not ask again after %s once the store relocks and comes back',
+		async (_label, daysOut, tap) => {
+			current.daysOut = daysOut;
+			try {
+				const { store } = liveStore('lands');
+				current.timeline = store;
+				const { container } = render(TimelinePage);
+				await page.getByRole('button', { name: tap, exact: true }).click();
+				await expect.element(page.getByRole('status')).toBeVisible();
+
+				store.ready = false;
+				await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
+				store.ready = true;
+				await expect
+					.element(page.getByRole('button', { name: 'Mark done' }).first())
+					.toBeInTheDocument();
+				expect(container.querySelector('.sb-card')).toBeNull();
+			} finally {
+				current.daysOut = 200;
+			}
+		}
+	);
+
 	it('saves No as skipped', async () => {
 		const { store, setStatus } = liveStore('lands');
 		current.timeline = store;
