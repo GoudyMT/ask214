@@ -121,6 +121,15 @@ check, `svelte-check`, the type checks of the content scripts and of the search 
 component tests. Any failure stops the commit. It takes about a minute on the development machine, most of it
 the type check.
 
+**The unit and component tests** run through `content-ops/hook-unit-tests.mjs`, started by `node` itself rather
+than through pnpm, and are stopped with everything they started if they are still running after five minutes.
+On Git for Windows, a command run through a shell-script launcher (pnpm's, or vitest's own) runs inside one more
+shell. Stopping the command fails the commit, as it should, but stopping that shell from outside reads as a
+success, and the hook carries on to the commit. Started by `node`, the test run has no such shell. One case
+stays open: stopping the hook's own shell can still let the commit land, and stopping the shell behind one of
+the pnpm steps skips that step the same way. To stop a hung hook, stop the `git commit` process tree or the
+`hook-unit-tests.mjs` node process, never a shell in the chain.
+
 **The commit-msg hook** rejects a message that is not one line of the form `type: subject`. CI checks the same
 rule on every commit a pull request carries, because commits Git makes itself skip the hook.
 

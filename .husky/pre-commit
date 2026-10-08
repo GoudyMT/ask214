@@ -3,4 +3,5 @@ pnpm run validate:sources
 pnpm run check
 pnpm run check:content-ops
 pnpm run check:worker
-pnpm run test:unit --run
+# Started by node itself, never through pnpm: content-ops/hook-unit-tests.mjs says why.
+node content-ops/hook-unit-tests.mjs
