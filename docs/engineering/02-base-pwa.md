@@ -40,7 +40,9 @@ meets WCAG AA contrast (4.5:1, and 3:1 for interface edges) in both themes.
 ### Layout and accessibility
 
 **What it is.** One layout wraps every page: a sticky header with the wordmark and navigation, a `main` region,
-and a footer with the not-affiliated statement and links to About, Source and Feedback. A "Skip to content" link
+and a footer with the not-affiliated statement, links to About, Source and Feedback, and the release version. The
+version comes from `package.json`, which each release's pull request bumps; a small Vite plugin writes it into the
+layout as plain text before Svelte compiles, and it links to that release's notes. A "Skip to content" link
 comes first in keyboard order. The landmarks are plain `header`, labelled `nav`, `main` and `footer` elements,
 which carry their roles natively.
 
