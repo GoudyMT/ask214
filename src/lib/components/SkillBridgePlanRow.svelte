@@ -50,11 +50,12 @@
 		return plan?.notSureReturns ? rowHintEarly(plan.notSureReturns) : ROW_HINT_LATE;
 	});
 
-	// Closing unmounts the focused control; focus goes back to the row, so a keyboard user is not dropped.
+	// Closing unmounts the focused control; focus goes back to the row, so a keyboard user is not dropped - unless they
+	// have already moved on to another control.
 	async function close(): Promise<void> {
 		editing = false;
 		await tick();
-		toggleEl?.focus();
+		if (document.activeElement === document.body) toggleEl?.focus();
 	}
 
 	function toggle(): void {

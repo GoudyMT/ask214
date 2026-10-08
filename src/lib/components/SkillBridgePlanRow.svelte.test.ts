@@ -276,6 +276,27 @@ describe('SkillBridgePlanRow', () => {
 		}
 	});
 
+	it('leaves focus on another control when a save works after the person moved on', async () => {
+		const other = document.createElement('input');
+		other.setAttribute('aria-label', 'other');
+		document.body.appendChild(other);
+		try {
+			let finish: (message: string | null) => void = () => undefined;
+			const onSave = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
+			render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+			await toggle().click();
+			await page.getByRole('radio', { name: 'Yes' }).click();
+			await page.getByRole('button', { name: 'Save' }).click();
+			other.focus();
+			finish(null);
+			await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(document.activeElement).toBe(other);
+		} finally {
+			other.remove();
+		}
+	});
+
 	it('does not take focus for the unavailable line when it was never open', async () => {
 		render(SkillBridgePlanRow, { props: { plan: null, onSave: vi.fn() } });
 		await expect.element(page.getByText(/could not be loaded/)).toBeVisible();
