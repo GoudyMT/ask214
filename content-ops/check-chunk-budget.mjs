@@ -168,6 +168,16 @@ const STATIC = 'static';
 //     pattern the round trip already enforces dropped (-25 B page, -10 B route nodes, -33 B precache, kept); the
 //     Settings row's copied disclosure rules shared (-61 B precache only), the calendar codec's day check reused
 //     (+321 B page) and the row summary built from the answer labels (-4 B) not kept.
+//     Page 60,895 -> 60,930, route nodes 46,640 -> 46,825 (package.json's size-limit) and precache 148,110 -> 148,370
+//     (owner's call, 2026-10-08): the review fixes to the SkillBridge question - the Settings row closing and keeping
+//     focus when its answer cannot be read, its hint following the saved answer, its chosen pill in forced colors; the
+//     Timeline card keeping its answer through a relock, wording its line from the save, moving focus only when focus
+//     fell to the page, its close button named apart - two builds measured 60,884-60,887 / 46,772-46,785 /
+//     148,306-148,327 B, about 40 B of room each at the higher. Trim pass on the row, each measured on a full build:
+//     two guards no test could observe (-16 B), the save without its failed flag (-2 B), one forced-colors border
+//     shorthand (-3 B CSS), no null check on the focused element (-9 B), no error reset on close (-3 B) and a shorter
+//     close effect (-4 B) kept; the effect reading the open state directly (+36 B), a flat hint (+6 B) and plain element
+//     refs (+8 B) not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -177,10 +187,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 60_895,
+	page: 60_930,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 148_110,
+	precacheBytes: 148_370,
 	workerScripts: 147_200
 };
 
