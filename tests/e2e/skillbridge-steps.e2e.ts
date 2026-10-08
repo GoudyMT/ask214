@@ -127,6 +127,14 @@ test('closing the answered message removes the card and moves focus to Add to my
 });
 
 // The app header is sticky; focus() scrolls a target only to the viewport's edge, which is under that header.
+// WebKit applies that scroll a moment after the focus itself, so each check waits for the position to settle;
+// without the card's scroll margin it settles at the top edge, under the header, and the check still fails.
+const belowHeader = (page: Page, selector: string) =>
+	page.evaluate((sel) => {
+		const top = document.querySelector(sel)?.getBoundingClientRect().top ?? NaN;
+		return top - (document.querySelector('header')?.getBoundingClientRect().bottom ?? NaN);
+	}, selector);
+
 for (const how of ['Enter', 'tap'] as const) {
 	test(`the status line clears the sticky header after ${how} on an answer with the card's top scrolled away`, async ({
 		page
@@ -156,11 +164,7 @@ for (const how of ['Enter', 'tap'] as const) {
 		}
 		const line = page.locator('.sb-card').getByRole('status');
 		await expect(line).toBeFocused();
-		const after = await page.evaluate(() => ({
-			lineTop: document.querySelector('.sb-card__done')?.getBoundingClientRect().top ?? NaN,
-			headerBottom: document.querySelector('header')?.getBoundingClientRect().bottom ?? NaN
-		}));
-		expect(after.lineTop).toBeGreaterThanOrEqual(after.headerBottom);
+		await expect.poll(() => belowHeader(page, '.sb-card__done')).toBeGreaterThanOrEqual(0);
 	});
 }
 
@@ -178,11 +182,7 @@ test('the close x clears the sticky header when Tab reaches it from the status l
 	await page.keyboard.press('Tab');
 	const close = page.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true });
 	await expect(close).toBeFocused();
-	const rects = await page.evaluate(() => ({
-		closeTop: document.querySelector('.sb-card__close')?.getBoundingClientRect().top ?? NaN,
-		headerBottom: document.querySelector('header')?.getBoundingClientRect().bottom ?? NaN
-	}));
-	expect(rects.closeTop).toBeGreaterThanOrEqual(rects.headerBottom);
+	await expect.poll(() => belowHeader(page, '.sb-card__close')).toBeGreaterThanOrEqual(0);
 });
 
 // Closing the card moves the calendar card up under the same spot, and moves focus to its Add button: a second tap or
