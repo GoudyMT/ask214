@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
@@ -9,7 +10,15 @@ import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm';
 // a test that stubs another zone get this one back (Node on Windows ignores a deleted TZ).
 const TEST_TIME_ZONE = 'America/Los_Angeles';
 
+// The release the footer names, built into the page as a constant: each release's pull request bumps package.json.
+const { version } = JSON.parse(
+	readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
+) as {
+	version: string;
+};
+
 export default defineConfig({
+	define: { __APP_VERSION__: JSON.stringify(version) },
 	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
 	// sends `upgrade-insecure-requests` and browsers that honour it rewrite every asset URL to https.
 	// Over plain HTTP that yields a page with no stylesheet at all - which is not a product bug (in

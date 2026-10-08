@@ -325,6 +325,10 @@
 			<a href="https://github.com/GoudyMT/ask214" rel="external">Source</a>
 			&middot;
 			<a href={resolve('/feedback')} onclick={() => stashRoute(page.url.pathname)}>Feedback</a>
+			&middot;
+			<a href="https://github.com/GoudyMT/ask214/releases/tag/v{__APP_VERSION__}" rel="external"
+				>v{__APP_VERSION__}</a
+			>
 		</p>
 	</footer>
 </AppGate>
