@@ -161,6 +161,24 @@ describe('Timeline, the SkillBridge question', () => {
 		).toBeTruthy();
 	});
 
+	it('asks with the second wording once an early Not sure has come due', async () => {
+		current.timeline = {
+			ready: true,
+			failed: false,
+			state: {
+				schemaVersion: 1,
+				tasks: { 'skillbridge-plan': { status: 'snoozed', snoozeUntil: isoFromToday(-1) } }
+			}
+		};
+		render(TimelinePage);
+		await expect
+			.element(page.getByRole('heading', { name: 'Still thinking about SkillBridge?' }))
+			.toBeVisible();
+		expect(
+			page.getByRole('heading', { name: 'Planning to do SkillBridge?' }).elements()
+		).toHaveLength(0);
+	});
+
 	it('does not ask once answered', async () => {
 		current.timeline = {
 			ready: true,
@@ -390,6 +408,10 @@ describe('Timeline, the SkillBridge question', () => {
 		expect(setStatus).toHaveBeenCalledOnce();
 		expect(refresh).toHaveBeenCalledOnce();
 		await expect.element(page.getByRole('button', { name: 'Yes' })).toBeEnabled();
+		// The question stays, so the person is put back on the button they tapped, not sent on to the first task.
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(page.getByRole('button', { name: 'Yes' }).element());
 	});
 
 	it('lets the question go when the re-read after a failed save shows another tab answered it', async () => {

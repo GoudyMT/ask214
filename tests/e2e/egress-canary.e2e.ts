@@ -106,6 +106,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 	// The SkillBridge answer: a Not sure here (past the second ask) shows the steps and saves a status-only snooze.
 	await page.locator('.sb-card').getByRole('button', { name: 'Not sure', exact: true }).click();
 	await expect(page.getByText(FIND_TITLE)).toBeVisible();
+	await expect(page.getByText(REQUEST_TITLE)).toBeVisible();
 
 	// The written summary on, with a key, so the request to Anthropic is made too.
 	await page.goto('/settings');
