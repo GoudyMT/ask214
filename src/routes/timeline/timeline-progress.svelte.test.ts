@@ -314,7 +314,13 @@ describe('Timeline, the SkillBridge question', () => {
 			await new Promise((resolve) => setTimeout(resolve, 0));
 			expect(container.querySelectorAll('.sb-card')).toHaveLength(1);
 
-			await page.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true }).click();
+			// The close button's scroll margin puts it where, without app.css, the chip strip overhangs it, so a pointer
+			// click would land on a chip; the click is sent to the button itself.
+			(
+				page
+					.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true })
+					.element() as HTMLElement
+			).click();
 			await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
 		} finally {
 			vi.useRealTimers();

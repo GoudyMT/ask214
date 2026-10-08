@@ -152,6 +152,11 @@
 		color: var(--color-danger);
 		font-size: var(--font-size-s);
 	}
+	/* Where focus lands, clear of the sticky header: focus() alone scrolls a target only to the viewport's edge. */
+	.sb-card__done,
+	.sb-card__close {
+		scroll-margin-top: 6.5rem;
+	}
 	/* Room for the 44px close button, so the message never runs under the x. */
 	.sb-card__done {
 		margin: 0;

@@ -125,3 +125,41 @@ test('closing the answered message removes the card and moves focus to Add to my
 	await expect(page.locator('.sb-card')).toHaveCount(0);
 	await expect(page.locator('.cal-card__add')).toBeFocused();
 });
+
+// The app header is sticky; focus() scrolls a target only to the viewport's edge, which is under that header.
+for (const how of ['Enter', 'tap'] as const) {
+	test(`the status line clears the sticky header after ${how} on an answer with the card's top scrolled away`, async ({
+		page
+	}) => {
+		await page.setViewportSize({ width: 320, height: 640 });
+		await seedProfile(page, 208);
+		const yes = page.locator('.sb-card').getByRole('button', { name: 'Yes', exact: true });
+		await expect(yes).toBeVisible();
+		await page.evaluate(() => {
+			const card = document.querySelector('.sb-card');
+			if (card) window.scrollBy(0, card.getBoundingClientRect().top + 60);
+		});
+		// The set-up only means something while the pills are still in view below the header.
+		const before = await page.evaluate(() => ({
+			cardTop: document.querySelector('.sb-card')?.getBoundingClientRect().top ?? NaN,
+			yesTop:
+				document.querySelector('.sb-card__answers button')?.getBoundingClientRect().top ?? NaN,
+			headerBottom: document.querySelector('header')?.getBoundingClientRect().bottom ?? NaN
+		}));
+		expect(Math.abs(before.cardTop + 60)).toBeLessThanOrEqual(2);
+		expect(before.yesTop).toBeGreaterThanOrEqual(before.headerBottom);
+		if (how === 'Enter') {
+			await yes.focus();
+			await page.keyboard.press('Enter');
+		} else {
+			await yes.click();
+		}
+		const line = page.locator('.sb-card').getByRole('status');
+		await expect(line).toBeFocused();
+		const after = await page.evaluate(() => ({
+			lineTop: document.querySelector('.sb-card__done')?.getBoundingClientRect().top ?? NaN,
+			headerBottom: document.querySelector('header')?.getBoundingClientRect().bottom ?? NaN
+		}));
+		expect(after.lineTop).toBeGreaterThanOrEqual(after.headerBottom);
+	});
+}
