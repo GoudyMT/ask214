@@ -70,6 +70,11 @@
 
 	async function save(): Promise<void> {
 		if (choice === null) return;
+		// The saved answer, still in effect: a new write would only move a waiting Not sure's day or hide the steps a late
+		// one shows.
+		if (choice === plan?.answer && (choice !== 'not-sure' || plan.returnsOn || plan.stepsShow)) {
+			return close();
+		}
 		busy = true;
 		let message: string | null;
 		try {

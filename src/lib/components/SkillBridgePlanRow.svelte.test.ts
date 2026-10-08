@@ -63,6 +63,59 @@ describe('SkillBridgePlanRow', () => {
 		expect(document.activeElement).toBe(toggle().element());
 	});
 
+	// Saving the answer that is already saved and still in effect changes nothing the person can see, but a write would
+	// move a waiting Not sure's day, or hide the steps a late Not sure shows; so it closes without writing.
+	it.each([
+		[
+			'an early Not sure that still waits',
+			plan({ answer: 'not-sure', returnsOn: '2027-02-01', notSureReturns: '2027-04-01' }),
+			'Not sure'
+		],
+		[
+			'a late Not sure that shows the steps',
+			plan({ answer: 'not-sure', stepsShow: true, notSureReturns: '2027-04-01' }),
+			'Not sure'
+		],
+		['a Yes', plan({ answer: 'yes', stepsShow: true }), 'Yes'],
+		['a No', plan({ answer: 'no' }), 'No']
+	] as const)('closes without writing when %s is saved again', async (_label, saved, answer) => {
+		const onSave = vi.fn(() => Promise.resolve(null));
+		render(SkillBridgePlanRow, { props: { plan: saved, onSave } });
+		await toggle().click();
+		await expect.element(page.getByRole('radio', { name: answer, exact: true })).toBeChecked();
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
+		expect(onSave).not.toHaveBeenCalled();
+		await expect.poll(() => document.activeElement).toBe(toggle().element());
+	});
+
+	it('writes a saved Not sure that has come back, since it is no longer in effect', async () => {
+		const onSave = vi.fn(() => Promise.resolve(null));
+		render(SkillBridgePlanRow, { props: { plan: plan({ answer: 'not-sure' }), onSave } });
+		await toggle().click();
+		await expect.element(page.getByRole('radio', { name: 'Not sure' })).toBeChecked();
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
+		expect(onSave).toHaveBeenCalledOnce();
+		expect(onSave).toHaveBeenCalledWith('not-sure');
+	});
+
+	it('still saves an answer that differs from the saved one', async () => {
+		const onSave = vi.fn(() => Promise.resolve(null));
+		render(SkillBridgePlanRow, {
+			props: {
+				plan: plan({ answer: 'not-sure', returnsOn: '2027-02-01', notSureReturns: '2027-04-01' }),
+				onSave
+			}
+		});
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
+		expect(onSave).toHaveBeenCalledOnce();
+		expect(onSave).toHaveBeenCalledWith('yes');
+	});
+
 	it('shows the late hint once a Not sure shows the steps', async () => {
 		render(SkillBridgePlanRow, {
 			props: { plan: plan({ notSureReturns: null }), onSave: vi.fn() }
