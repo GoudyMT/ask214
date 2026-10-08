@@ -58,6 +58,18 @@ test('the footer shows the version from package.json, linked to its release note
 	await expect(link).toHaveAttribute('rel', 'external');
 });
 
+// At the narrowest phone width the app supports, the footer's links, the version included, stay on one line.
+test('the footer links stay on one line at 320 px', async ({ page }) => {
+	await page.setViewportSize({ width: 320, height: 640 });
+	await page.goto('/');
+	const links = page.getByRole('contentinfo').getByRole('link');
+	await expect(links).toHaveCount(4);
+	const tops = await links.evaluateAll((els) =>
+		els.map((el) => Math.round(el.getBoundingClientRect().top))
+	);
+	expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(2);
+});
+
 // The header is `position: sticky` (pure CSS, no JS). Tested via computed style
 // rather than scroll behavior to avoid flaky scroll-position dependencies in headless mode.
 test('header has sticky positioning', async ({ page }) => {
