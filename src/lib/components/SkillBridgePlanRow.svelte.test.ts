@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { cdp, page, userEvent } from 'vitest/browser';
 import SkillBridgePlanRow from './SkillBridgePlanRow.svelte';
 import type { PlanRead } from '$lib/timeline/skillbridge-plan';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
@@ -331,6 +331,39 @@ describe('SkillBridgePlanRow (the choices as pills)', () => {
 		await page.getByRole('radio', { name: 'Yes' }).click();
 		expect(getComputedStyle(pills(container)[0]!.label).backgroundColor).toBe(marked.background);
 		expect(getComputedStyle(pills(container)[1]!.label).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+	});
+
+	// Forced colors replace every colour the chosen pill is marked with, so the mark there is a heavier border; the
+	// normal look keeps the 1 px border.
+	it('marks the chosen pill by a heavier border in forced colors only', async () => {
+		const { container } = render(SkillBridgePlanRow, {
+			props: { plan: plan({ answer: 'not-sure' }), onSave: vi.fn() }
+		});
+		await toggle().click();
+		const widths = () =>
+			pills(container).map((p) => ({
+				value: p.input.value,
+				width: getComputedStyle(p.label).borderTopWidth
+			}));
+		expect(widths().map((w) => w.width)).toEqual(['1px', '1px', '1px']);
+		const session = cdp();
+		await session.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'forced-colors', value: 'active' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			expect(widths()).toEqual([
+				{ value: 'yes', width: '1px' },
+				{ value: 'not-sure', width: '3px' },
+				{ value: 'no', width: '1px' }
+			]);
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+		}
+		await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(false);
+		expect(widths().map((w) => w.width)).toEqual(['1px', '1px', '1px']);
 	});
 
 	it('gives every pill a 44 px target that its radio covers', async () => {

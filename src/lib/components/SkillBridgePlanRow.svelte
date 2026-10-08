@@ -287,6 +287,14 @@
 		background: color-mix(in srgb, var(--color-accent) 15%, transparent);
 		color: var(--color-fg);
 	}
+	/* Forced colors replace the fill and the colours that mark the chosen pill, and the radio is invisible, so the pill
+	   is marked by a heavier border in the system highlight colour. */
+	@media (forced-colors: active) {
+		.sb-row__choice:has(input:checked) {
+			border-width: 3px;
+			border-color: Highlight;
+		}
+	}
 	.sb-row__choice:has(input:focus-visible) {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
