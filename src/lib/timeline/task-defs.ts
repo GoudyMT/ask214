@@ -208,7 +208,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -364,
 		windowEnd: -201,
 		recommendedOffset: -364,
-		why: "It opens a year before separation; submit as soon as it opens, at least 3 weeks before your start. Print the request's pages for the package your command asks for; your CO has the final say."
+		why: "It opens a year before separation; submit as soon as it opens, at least 3 weeks before your start. Print the request's pages for the package your command asks for; your command approver decides."
 	},
 
 	// ---- Job / benefits prep (mid window) ----
