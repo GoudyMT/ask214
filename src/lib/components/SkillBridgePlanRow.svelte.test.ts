@@ -137,6 +137,29 @@ describe('SkillBridgePlanRow', () => {
 			.toHaveTextContent('Could not update right now - please try again.');
 	});
 
+	// Save is disabled while the save runs, which drops focus to the page; after a failure it goes back to Save so a
+	// keyboard user can try again.
+	it('puts focus back on Save after a save that fails or returns a message', async () => {
+		const onSave = vi
+			.fn<() => Promise<string | null>>()
+			.mockResolvedValueOnce('Something to review.')
+			.mockRejectedValueOnce(new Error('E_TEST'));
+		render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		const save = page.getByRole('button', { name: 'Save' });
+		await userEvent.keyboard('{Tab}');
+		expect(document.activeElement).toBe(save.element());
+		await userEvent.keyboard('{Enter}');
+		await expect.element(page.getByRole('alert')).toHaveTextContent('Something to review.');
+		await expect.poll(() => document.activeElement).toBe(save.element());
+		await userEvent.keyboard('{Enter}');
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent('Could not update right now - please try again.');
+		await expect.poll(() => document.activeElement).toBe(save.element());
+	});
+
 	it('Cancel saves nothing', async () => {
 		const onSave = vi.fn();
 		render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });

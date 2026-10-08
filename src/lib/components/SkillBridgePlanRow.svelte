@@ -28,6 +28,7 @@
 	let busy = $state(false);
 	let toggleEl = $state<HTMLButtonElement | null>(null);
 	let unavailableEl = $state<HTMLElement | null>(null);
+	let saveEl = $state<HTMLButtonElement | null>(null);
 	// The form shows only while the answer can be read, so the row never stays open on a disabled toggle.
 	const open = $derived(editing && plan !== null);
 
@@ -74,15 +75,26 @@
 	async function save(): Promise<void> {
 		if (choice === null) return;
 		busy = true;
+		let failed = false;
 		try {
 			const message = await onSave(choice);
 			if (message === null) await close();
-			else error = message;
+			else {
+				error = message;
+				failed = true;
+			}
 		} catch {
 			error = FAILED;
+			failed = true;
 		} finally {
 			busy = false;
 		}
+		if (!failed) return;
+		// Save was disabled while the save ran, which dropped focus to the page; put it back so the person can try
+		// again, unless they have already moved on.
+		await tick();
+		const active = document.activeElement;
+		if (active === null || active === document.body) saveEl?.focus();
 	}
 </script>
 
@@ -135,7 +147,12 @@
 			<p class="sb-row__hint">{hint}</p>
 			{#if error}<p class="sb-row__error" role="alert">{error}</p>{/if}
 			<div class="settings-edit__actions">
-				<button class="settings-save" type="submit" disabled={busy || choice === null}>Save</button>
+				<button
+					bind:this={saveEl}
+					class="settings-save"
+					type="submit"
+					disabled={busy || choice === null}>Save</button
+				>
 				<button class="settings-cancel" type="button" onclick={() => void close()}>Cancel</button>
 			</div>
 		</form>
