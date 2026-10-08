@@ -80,6 +80,8 @@
 	// Set at the tap, before the save lands: the store's answer ends the question, but the card stays on the page to show
 	// what happened, until the person closes it or leaves.
 	let planHeld = $state(false);
+	// A close holds for the rest of the visit, even if the question comes due again while the message is open.
+	let planClosed = $state(false);
 	// With no readable answer (locked, loading, failed) the card is gone and remounts fresh; a hold left over would ask
 	// again, and a second tap would overwrite the saved answer.
 	$effect.pre(() => {
@@ -116,7 +118,7 @@
 	}
 
 	async function closePlan(): Promise<void> {
-		planHeld = false;
+		planClosed = true;
 		await focusAfterCard();
 	}
 
@@ -211,7 +213,7 @@
 				</div>
 			{:else if view && app.timeline?.ready}
 				{#if needsNow}<NeedsNow groups={needsNow} />{/if}
-				{#if plan && (plan.card || planHeld)}
+				{#if plan && !planClosed && (plan.card || planHeld)}
 					<SkillBridgeQuestion
 						wording={plan.card ?? 'again'}
 						onAnswer={answerPlan}

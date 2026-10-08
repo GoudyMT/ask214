@@ -271,6 +271,39 @@ describe('Timeline, the SkillBridge question', () => {
 		expect(document.activeElement).toBe(first);
 	});
 
+	// The page left open past midnight into the second-ask day: the saved Not sure now asks again, but the message the
+	// person is reading has to go when they close it, not be replaced by the same card.
+	it('removes the answered card on Dismiss even when the question has come due again', async () => {
+		current.daysOut = 457;
+		vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+		try {
+			const noon = new Date();
+			noon.setHours(12, 0, 0, 0);
+			vi.setSystemTime(noon);
+			const { store } = liveStore('lands');
+			current.timeline = store;
+			const { container } = render(TimelinePage);
+			await page.getByRole('button', { name: 'Not sure' }).click();
+			await expect
+				.element(page.getByRole('status'))
+				.toHaveTextContent(`We'll ask again on ${formatTimelineDate(isoFromToday(1))}.`);
+
+			const past = new Date(noon);
+			past.setDate(past.getDate() + 1);
+			past.setHours(0, 5, 0, 0);
+			vi.setSystemTime(past);
+			store.state = { schemaVersion: 1, tasks: { ...store.state.tasks } };
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(container.querySelectorAll('.sb-card')).toHaveLength(1);
+
+			await page.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true }).click();
+			await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
+		} finally {
+			vi.useRealTimers();
+			current.daysOut = 200;
+		}
+	});
+
 	// A relock (tab or app switch, screen lock, idle lock) takes the store away and a restore brings it back with the
 	// answer on disk: the card must not come back to ask again, where a second tap would overwrite the saved answer.
 	it.each([
