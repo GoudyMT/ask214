@@ -55,6 +55,10 @@ const SEPARATION = isoFromToday(DAYS_TO_SEPARATION);
 const SKILLBRIDGE = isoFromToday(28);
 const NOTE = 'Canary note that must stay on this device';
 const QUESTION = 'What is SkillBridge?';
+// The titles of the two steps a Yes (or a late Not sure) adds to the timeline, as the task list shows them.
+const FIND_TITLE = 'Find a SkillBridge program and get an acceptance letter';
+const REQUEST_TITLE =
+	"Submit your SkillBridge request (MyNavy Education and your command's package)";
 // A made-up key in Anthropic's format; the request carrying it is answered by the mock below and never leaves.
 const TEST_KEY = 'sk-ant-test-canary-0000';
 const ANTHROPIC = 'https://api.anthropic.com/';
@@ -101,9 +105,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 	await expect(page.getByText(NOTE)).toBeVisible();
 	// The SkillBridge answer: a Not sure here (past the second ask) shows the steps and saves a status-only snooze.
 	await page.locator('.sb-card').getByRole('button', { name: 'Not sure', exact: true }).click();
-	await expect(
-		page.getByText('Find a SkillBridge program and get an acceptance letter')
-	).toBeVisible();
+	await expect(page.getByText(FIND_TITLE)).toBeVisible();
 
 	// The written summary on, with a key, so the request to Anthropic is made too.
 	await page.goto('/settings');
@@ -152,9 +154,17 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		...dateForms(SKILLBRIDGE),
 		`${DAYS_TO_SEPARATION} days`,
 		NOTE,
+		// This Not sure is late, so the app stores no return day; the day stays forbidden so a regression that did store
+		// one (and then sent it) is caught here.
 		...dateForms(isoFromToday(DAYS_TO_SEPARATION - ASK_AGAIN_DAYS)),
+		// The saved answer's key and value, and the two steps it adds to the timeline: which steps a person's timeline
+		// holds reveals the answer, so neither their ids nor their titles may travel.
 		'skillbridge-plan',
-		'not-sure'
+		'not-sure',
+		'skillbridge-find',
+		'skillbridge-request',
+		FIND_TITLE,
+		REQUEST_TITLE
 	];
 	for (const request of sent) {
 		const text = [
@@ -210,7 +220,12 @@ test('an early Not sure keeps its stored return date on this device', async ({
 	await page.getByRole('button', { name: /save and continue/i }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 	await page.locator('.sb-card').getByRole('button', { name: 'Not sure', exact: true }).click();
-	await expect(page.getByRole('status')).toHaveText(/^We'll ask again on .+\./);
+	// The exact line, with the day built from the test's own copy of the ask-again offset: if the app's offset changes,
+	// the screen no longer names this day and the test fails, so the copy cannot drift unnoticed.
+	const returns = dateForms(isoFromToday(EARLY_DAYS_TO_SEPARATION - ASK_AGAIN_DAYS))[2];
+	await expect(page.getByRole('status')).toHaveText(
+		`We'll ask again on ${returns}. You can change this in Settings.`
+	);
 
 	// The same online paths as the flow above: a written summary with a key, an online question, a feedback message.
 	await page.goto('/settings');
