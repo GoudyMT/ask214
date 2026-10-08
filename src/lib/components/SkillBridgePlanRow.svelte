@@ -31,8 +31,9 @@
 	let saveEl = $state<HTMLButtonElement | null>(null);
 
 	// When the answer turns unreadable the row closes for good: the form's controls are gone and the toggle is disabled,
-	// so neither can hold focus, and coming back must not reopen a stale choice. A row that was never open leaves focus
-	// alone. A disabled button cannot take focus, so the unavailable line is the target.
+	// and coming back must not reopen a stale choice. A row that was never open leaves focus alone. Focus moves to the
+	// unavailable line (a disabled button cannot take it) when it fell to the page or was left on the now-disabled
+	// toggle, which an engine may keep there; it is never taken from anywhere else.
 	$effect(() => {
 		if (plan !== null || !untrack(() => editing)) return;
 		editing = false;

@@ -234,6 +234,48 @@ describe('SkillBridgePlanRow', () => {
 		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
 	});
 
+	// Focus is moved only when it fell to the page: a person who has gone on to another control keeps it.
+	it('leaves focus on another control when the answer becomes unreadable', async () => {
+		const other = document.createElement('input');
+		other.setAttribute('aria-label', 'other');
+		document.body.appendChild(other);
+		try {
+			const props = { plan: plan(), onSave: vi.fn() };
+			const { rerender } = render(SkillBridgePlanRow, { props });
+			await toggle().click();
+			await page.getByRole('radio', { name: 'Yes' }).click();
+			other.focus();
+			await rerender({ ...props, plan: null });
+			await expect.element(toggle()).toBeDisabled();
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(document.activeElement).toBe(other);
+		} finally {
+			other.remove();
+		}
+	});
+
+	it('leaves focus on another control when a save fails after the person moved on', async () => {
+		const other = document.createElement('input');
+		other.setAttribute('aria-label', 'other');
+		document.body.appendChild(other);
+		try {
+			let fail: (reason: Error) => void = () => undefined;
+			const onSave = vi.fn(() => new Promise<string | null>((_, reject) => (fail = reject)));
+			render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+			await toggle().click();
+			await page.getByRole('radio', { name: 'Yes' }).click();
+			await page.getByRole('button', { name: 'Save' }).click();
+			other.focus();
+			fail(new Error('E_TEST'));
+			await expect.element(page.getByRole('alert')).toHaveTextContent('Could not update right now');
+			await expect.element(page.getByRole('button', { name: 'Save' })).toBeEnabled();
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(document.activeElement).toBe(other);
+		} finally {
+			other.remove();
+		}
+	});
+
 	it('does not take focus for the unavailable line when it was never open', async () => {
 		render(SkillBridgePlanRow, { props: { plan: null, onSave: vi.fn() } });
 		await expect.element(page.getByText(/could not be loaded/)).toBeVisible();
