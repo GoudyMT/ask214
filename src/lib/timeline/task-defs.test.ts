@@ -137,7 +137,15 @@ describe('task-defs seed', () => {
 			'Your command would approve it.',
 			'You are now approved.',
 			"You'll get approved.",
-			'Your package will get approved.'
+			'Your package will get approved.',
+			'You are already approved.',
+			'You are also approved.',
+			'Your request would already be approved.',
+			'Your request will also be approved.',
+			'Your request will now be approved.',
+			'You would get approved.',
+			'Your application will be approved.',
+			'Your request for SkillBridge will be approved.'
 		];
 		for (const line of planted) expect(makesPersonalClaim(line), line).toBe(true);
 		expect(makesPersonalClaim('tricare.mil and healthcare.gov say who qualifies.')).toBe(false);
