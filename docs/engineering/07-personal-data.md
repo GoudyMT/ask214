@@ -26,10 +26,11 @@ request. Each decision's full reasoning is kept in private working notes.
 
 **What it is.** The profile holds the separation date (EAOS) and, optionally, rate, rank, years of service,
 anticipated disability rating, family status, intended path, destination, special situations, and SkillBridge
-and terminal leave start dates. Beside it are the timeline's task statuses, snooze dates and notes, the
-calendar choices, and the optional API key. Each lives as ciphertext in its own single-row IndexedDB store;
-three more stores hold signed rollback marks and one holds the keys, eight in all. Pages that show personal
-data render only in the browser, and a CI test fails if any server file names a profile field.
+and terminal leave start dates. Beside it are the timeline's task statuses, snooze dates and notes, among them
+the answer to the SkillBridge question, the calendar choices, and the optional API key. Each lives as
+ciphertext in its own single-row IndexedDB store; three more stores hold signed rollback marks and one holds the
+keys, eight in all. Pages that show personal data render only in the browser, and a CI test fails if any server
+file names a profile field.
 
 **Why this project uses it.** With no server copy, there is nothing to breach, sell or hand over.
 
@@ -111,8 +112,10 @@ deleted.
 
 ### The timeline and the calendar file
 
-**What it is.** The timeline is computed on the device: 35 task definitions with day offsets from the
-separation date, each shown only when the profile is known to meet its conditions. Each window has a firmness:
+**What it is.** The timeline is computed on the device: 37 task definitions with day offsets from the
+separation date, each shown only when the profile is known to meet its conditions. Two of them, finding a
+SkillBridge program and submitting the request, show only after the sailor answers Yes to the Timeline's
+SkillBridge question, or Not sure when it asks a second time. Each window has a firmness:
 soft (good timing only), required until separation, closing for good, or changing how it works. Each task also
 names what it must finish before: separation, terminal leave, or leaving the command (SkillBridge or terminal
 leave, whichever starts first). Once that date is entered, the last day moves to the day before it if earlier,
@@ -122,10 +125,10 @@ deadlines. The export is an `.ics` file the user saves, named by the day of the 
 moment still ahead (a window opening, a last day, or a soft task's target date), with alerts before each firm
 date and target date, never an event before today. Events and alerts carry only a stable ID, the date and the
 task's title with its moment, never notes or profile details, though the dates can reveal the separation and
-leaving days. Stable IDs and a rising version number let an app that honors them update events rather than
-duplicate them. Not every app does, so the calendar record keeps each event handed over (task, moment,
-title, date and day of the add), and after a change Settings lists the ones to delete until the user marks
-them deleted.
+leaving days, and the two SkillBridge steps reveal that the sailor plans SkillBridge. Stable IDs and a rising
+version number let an app that honors them update events rather than duplicate them. Not every app does, so the
+calendar record keeps each event handed over (task, moment, title, date and day of the add), and after a change
+Settings lists the ones to delete until the user marks them deleted.
 
 **Tradeoffs accepted.** Export is one way, so a change means exporting again. Each calendar app decides whether
 to keep the alerts. Google Calendar sync is designed but not built.
