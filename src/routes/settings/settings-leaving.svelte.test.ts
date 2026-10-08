@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
+import { formatTimelineDate } from '$lib/timeline/format-date';
 import {
 	AFTER_SEPARATION,
 	AFTER_SKILLBRIDGE,
@@ -178,7 +179,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 		// The note renders with the rows, so once a row shows its date the note's absence is settled.
 		await expect
 			.element(timelineSection().getByRole('button', { name: 'Terminal leave start' }))
-			.toHaveTextContent(/2026|2027/);
+			.toHaveTextContent(formatTimelineDate(isoFromToday(STORED + 1)));
 		expect(page.getByText(ORDER_NOTE).query()).toBeNull();
 	});
 });
