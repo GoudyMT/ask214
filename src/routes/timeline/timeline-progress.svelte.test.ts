@@ -375,6 +375,28 @@ describe('Timeline, the SkillBridge question', () => {
 		await expect.poll(() => document.activeElement).toBe(first);
 	});
 
+	it('leaves focus on a task control the person moved to during the save when the re-read removes the card', async () => {
+		const { store, setStatus, refresh } = liveStore('fails');
+		let fail: (e: Error) => void = () => {};
+		setStatus.mockImplementation(() => new Promise<void>((_, reject) => (fail = reject)));
+		refresh.mockImplementation(async () => {
+			store.state = { schemaVersion: 1, tasks: { 'skillbridge-plan': { status: 'skipped' } } };
+		});
+		current.timeline = store;
+		const { container } = render(TimelinePage);
+		await page.getByRole('button', { name: 'Yes' }).click();
+		const control = page
+			.getByRole('button', { name: 'Mark done' })
+			.first()
+			.element() as HTMLElement;
+		control.focus();
+		expect(document.activeElement).toBe(control);
+		fail(new Error('E_TEST'));
+		await expect.poll(() => refresh.mock.calls.length).toBe(1);
+		await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
+		expect(document.activeElement).toBe(control);
+	});
+
 	it('moves focus to the page heading when the re-read after a failed save leaves the progress failed', async () => {
 		const { store, refresh } = liveStore('fails');
 		refresh.mockImplementation(async () => {

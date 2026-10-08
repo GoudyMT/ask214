@@ -50,14 +50,15 @@
 						? askAgainLine(returns)
 						: ANSWERED.yes;
 			await tick();
-			lineEl?.focus();
+			// Only when focus has fallen to the page: a person who moved on during a slow save keeps their place.
+			if (document.activeElement === document.body) lineEl?.focus();
 		} catch {
 			tapped = null;
 			error = FAILED;
 			busy = false;
-			// The button was disabled during the save, which dropped focus to the page.
+			// The button was disabled during the save, which dropped focus to the page; same rule as above.
 			await tick();
-			button.focus();
+			if (document.activeElement === document.body) button.focus();
 		}
 	}
 </script>

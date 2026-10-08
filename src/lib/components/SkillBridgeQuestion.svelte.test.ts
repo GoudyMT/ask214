@@ -226,6 +226,39 @@ describe('SkillBridgeQuestion', () => {
 		expect(document.activeElement).toBe(tapped.element());
 	});
 
+	// A person who moved on to another control during a slow save keeps their place: focus is put back, or sent to the
+	// status line, only when it has fallen to the page.
+	describe('when focus has moved to another control during the save', () => {
+		let outside: HTMLInputElement;
+		beforeEach(() => {
+			outside = document.createElement('input');
+			outside.setAttribute('aria-label', 'outside note');
+			document.body.append(outside);
+		});
+		afterEach(() => outside.remove());
+
+		it.each(['Yes', 'Not sure'])('leaves focus there after a failed save of %s', async (label) => {
+			let fail: (e: Error) => void = () => {};
+			card({ onAnswer: vi.fn(() => new Promise<string | null>((_, reject) => (fail = reject))) });
+			await page.getByRole('button', { name: label, exact: true }).click();
+			outside.focus();
+			fail(new Error('E_TEST'));
+			await expect.element(page.getByRole('alert')).toBeVisible();
+			await expect.element(page.getByRole('button', { name: label, exact: true })).toBeEnabled();
+			expect(document.activeElement).toBe(outside);
+		});
+
+		it('leaves focus there after a save that worked, and still shows the status line', async () => {
+			let finish: (day: string | null) => void = () => {};
+			card({ onAnswer: vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve))) });
+			await page.getByRole('button', { name: 'Yes', exact: true }).click();
+			outside.focus();
+			finish(null);
+			await expect.element(page.getByRole('status')).toBeVisible();
+			expect(document.activeElement).toBe(outside);
+		});
+	});
+
 	it('names the card, and opens the link in a new tab and says so', async () => {
 		const { container } = card();
 		await expect

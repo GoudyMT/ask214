@@ -107,6 +107,8 @@
 	// collapsed, so its tasks are not on the page: its toggle comes next, and the heading when there is no list at all.
 	async function focusAfterCard(): Promise<void> {
 		await tick();
+		// Focus that is already somewhere on the page stays: the person moved on while the card was still up.
+		if (document.activeElement !== document.body) return;
 		for (const selector of ['.cal-card__add', '[id^="task-"]', '.timeline-list__toggle', 'h1']) {
 			const next = document.querySelector<HTMLElement>(selector);
 			if (next) return next.focus();
