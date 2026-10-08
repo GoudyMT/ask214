@@ -96,6 +96,11 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		.getByRole('button', { name: /^save$/i })
 		.click();
 	await expect(page.getByText(NOTE)).toBeVisible();
+	// The SkillBridge answer: a Not sure here (past the second ask) shows the steps and saves a status-only snooze.
+	await page.locator('.sb-card').getByRole('button', { name: 'Not sure', exact: true }).click();
+	await expect(
+		page.getByText('Find a SkillBridge program and get an acceptance letter')
+	).toBeVisible();
 
 	// The written summary on, with a key, so the request to Anthropic is made too.
 	await page.goto('/settings');
@@ -143,7 +148,10 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		...dateForms(SEPARATION),
 		...dateForms(SKILLBRIDGE),
 		`${DAYS_TO_SEPARATION} days`,
-		NOTE
+		NOTE,
+		...dateForms(isoFromToday(DAYS_TO_SEPARATION - 456)),
+		'skillbridge-plan',
+		'not-sure'
 	];
 	for (const request of sent) {
 		const text = [
