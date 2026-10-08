@@ -2,7 +2,7 @@
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
-	import { resourcesForTask, afterLinkForTask } from '$lib/resources';
+	import { resourcesForTask, afterLinkForTask, linkNoteForTask } from '$lib/resources';
 	import { isFirmWarning, type FitReason } from '$lib/timeline/generate';
 
 	let {
@@ -83,6 +83,7 @@
 
 	// Contextual outbound resources: the links curated for this specific task, collapsed by default.
 	const related = $derived(resourcesForTask(item.def.id));
+	const linkNote = $derived(linkNoteForTask(item.def.id));
 	let relatedOpen = $state(false);
 
 	const STATUS_LABEL: Record<DisplayStatus, string> = {
@@ -332,6 +333,7 @@
 						<span class="caret" class:caret--right={!relatedOpen} aria-hidden="true"></span>
 					</button>
 					{#if relatedOpen}
+						{#if linkNote}<p class="task-card__related-note">{linkNote}</p>{/if}
 						<ul class="task-card__related-list">
 							{#each related as r (r.id)}
 								<li>
@@ -991,6 +993,13 @@
 
 	.task-card__related-toggle:hover {
 		text-decoration: underline;
+	}
+
+	/* A line the links cannot hold, read before them. */
+	.task-card__related-note {
+		margin: var(--space-xs) 0 0;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
 	}
 
 	.task-card__related-list {

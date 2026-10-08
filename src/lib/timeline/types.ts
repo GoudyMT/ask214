@@ -58,6 +58,8 @@ export type TaskDef = {
 	title: string;
 	category: TaskCategory;
 	finishBefore: FinishBefore;
+	/** Shown only when the user's SkillBridge answer shows the steps (src/lib/timeline/skillbridge-plan.ts). */
+	skillbridgeStep?: true;
 	/** The window's offsets count from the day the user leaves the command, when a leaving date is entered - for a
 	 *  rule set as "N days before you leave" (the separation package, the DD-214 review), not "finish before you
 	 *  leave". */

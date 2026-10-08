@@ -161,6 +161,35 @@ const STATIC = 'static';
 //     Page 59,380 -> 59,400 (owner's call, 2026-10-07): the date inputs ask the browser not to keep a typed date in its
 //     autofill history (+14 B, the separation and leaving date input's page chunk) - 59,354 B measured, about 46 B of
 //     room. No second trim pass: the same day's search of the page chunks found nothing above noise.
+//     Page 59,400 -> 60,895, route nodes 45,040 -> 46,640 (package.json's size-limit) and precache 144,480 -> 148,110
+//     (owner's call, 2026-10-07): the SkillBridge question - its Timeline card and Settings row with their styles, the
+//     answer helper and its save, the two steps, and the command-instructions line beside the SkillBridge links -
+//     60,853 / 46,596 / 148,067 B measured, about 40 B of room each. Trim pass, each measured on a full build: a date
+//     pattern the round trip already enforces dropped (-25 B page, -10 B route nodes, -33 B precache, kept); the
+//     Settings row's copied disclosure rules shared (-61 B precache only), the calendar codec's day check reused
+//     (+321 B page) and the row summary built from the answer labels (-4 B) not kept.
+//     Page 60,895 -> 60,930, route nodes 46,640 -> 46,825 (package.json's size-limit) and precache 148,110 -> 148,370
+//     (owner's call, 2026-10-08): the review fixes to the SkillBridge question - the Settings row closing and keeping
+//     focus when its answer cannot be read, its hint following the saved answer, its chosen pill in forced colors; the
+//     Timeline card keeping its answer through a relock, wording its line from the save, moving focus only when focus
+//     fell to the page, its close button named apart - two builds measured 60,884-60,887 / 46,772-46,785 /
+//     148,306-148,327 B, about 40 B of room each at the higher. Trim pass on the row, each measured on a full build:
+//     two guards no test could observe (-16 B), the save without its failed flag (-2 B), one forced-colors border
+//     shorthand (-3 B CSS), no null check on the focused element (-9 B), no error reset on close (-3 B) and a shorter
+//     close effect (-4 B) kept; the effect reading the open state directly (+36 B), a flat hint (+6 B) and plain element
+//     refs (+8 B) not kept.
+//     Route nodes 46,825 -> 46,855 and precache 148,370 -> 148,395 (owner's call, 2026-10-08): the second review's
+//     fixes - the Settings row leaving focus where the person moved it after a save that works and saving nothing when
+//     the answer is already saved and in effect (+24 B), the Timeline card's close holding for the visit (+6-9 B) -
+//     builds measured 46,799-46,814 B route nodes and 148,331-148,352 B precache, about 40 B of room each at the
+//     higher. Trim pass, each built twice: the row's in-effect test rewritten (+1 B), one shared refocus helper (+8 B),
+//     the close flag folded into the hold (0 B) and the card's condition reordered (+1-2 B), none kept.
+//     Route nodes 46,855 -> 46,880 and precache 148,395 -> 148,425 (owner's call, 2026-10-08): the pre-push op-test's
+//     fixes - the answered card's scroll margin and the half-second guard on the calendar card after the close - six
+//     builds measured 46,825-46,840 B route nodes and 148,360-148,385 B precache, 40 B of room above the highest.
+//     Trim pass, each built twice: the close flag folded into a timestamp, the guard inlined (-5 B, inside the noise),
+//     a stored end time, the margin inside the existing rules, those two together, and a monotonic clock (+10 B), none
+//     kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -170,10 +199,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 59_400,
+	page: 60_930,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 144_480,
+	precacheBytes: 148_425,
 	workerScripts: 147_200
 };
 

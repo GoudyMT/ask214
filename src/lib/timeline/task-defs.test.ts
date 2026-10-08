@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
-import { RESOURCES, TASK_AFTER_LINK } from '$lib/resources/resources';
+import { RESOURCES, TASK_AFTER_LINK, TASK_LINK_NOTE } from '$lib/resources/resources';
+import * as SKILLBRIDGE_COPY from './skillbridge-copy';
 import { DELETE_FILE_HINT, DEVICE_HINT, IOS_APP_HINT } from '$lib/calendar/delivery';
 import {
 	LEAVING_HINT,
@@ -108,16 +109,92 @@ describe('task-defs seed', () => {
 			'You have up to 90 days.',
 			'You have 6 months left.',
 			'You have until your separation date.',
-			'You receive 180 days of coverage.'
+			'You receive 180 days of coverage.',
+			'You are approved for SkillBridge.',
+			`You${String.fromCharCode(0x2019)}re approved.`,
+			"You're approved for the program.",
+			'You will be approved if you submit early.',
+			"You'll be approved for this.",
+			'Your request will be approved.',
+			'Your command will approve it.',
+			'Your command will approve your request.',
+			'The Navy will approve your request.',
+			'Your SkillBridge request will be approved.',
+			"You've been approved.",
+			'You have been approved.',
+			'You were approved for it.',
+			'You should be approved.',
+			"You'd be approved.",
+			'You would be approved.',
+			'You will likely be approved.',
+			'You may be approved.',
+			'Your OIC will approve it.',
+			'Your CO will approve it.',
+			'Your SkillBridge request will likely be approved.',
+			'You might be approved.',
+			'You could be approved.',
+			'Your request should be approved.',
+			'Your command would approve it.',
+			'You are now approved.',
+			"You'll get approved.",
+			'Your package will get approved.',
+			'You are already approved.',
+			'You are also approved.',
+			'Your request would already be approved.',
+			'Your request will also be approved.',
+			'Your request will now be approved.',
+			'You would get approved.',
+			'Your application will be approved.',
+			'Your request for SkillBridge will be approved.',
+			'Your request is approved.',
+			'Your SkillBridge request has been approved.',
+			'Your request was approved.',
+			'Your request may be approved.',
+			'Your request might be approved.',
+			'Your request could be approved.',
+			'Your request can be approved.',
+			'You can be approved for SkillBridge.',
+			'Ask your command who will approve your request.'
 		];
 		for (const line of planted) expect(makesPersonalClaim(line), line).toBe(true);
 		expect(makesPersonalClaim('tricare.mil and healthcare.gov say who qualifies.')).toBe(false);
+	});
+
+	// Neutral facts about who decides, and the SkillBridge lines themselves, state no approval for the reader.
+	it('lets neutral approval facts through', () => {
+		const neutral = [
+			"Print the request's pages for the package your command asks for; your command approver decides.",
+			'Submit your SkillBridge request',
+			'COs have final approval authority.',
+			'COs and OICs approve SkillBridge requests.',
+			'DoD approval covers your program dates.',
+			"A request needs your command approver's signature before it goes up.",
+			'Members who request SkillBridge within the DIB will be approved, per the DoD notice.',
+			'Your command approver decides whether a request is approved.',
+			'Ask your command whether your request is approved.',
+			'Ask your command if your request is approved.',
+			'Once your request is approved, tell your provider.',
+			'Tell your provider when your request is approved.',
+			'Wait until your request is approved.',
+			'Find out who will approve your request.',
+			"You'll find approved programs on skillbridge.mil.",
+			'You will see approved providers in the portal.',
+			'You may find approved programs near your base.',
+			'Your command would need approved program dates.'
+		];
+		for (const line of neutral) expect(makesPersonalClaim(line), line).toBe(false);
 	});
 
 	// 38 CFR 14.629 over the task data: its own text, its What now link, the curated resources, the sentences under
 	// the calendar button and the Settings lines beside the leaving dates. The words the components add around them
 	// are checked in each component's tests.
 	it('keeps every public line about a task free of personal eligibility claims', () => {
+		// Every export of the SkillBridge copy module, so a line added there later is checked too; dated lines with a
+		// sample day.
+		const skillbridgeLines = Object.values(SKILLBRIDGE_COPY).flatMap((v): string[] =>
+			typeof v === 'string' ? [v] : typeof v === 'function' ? [v('2027-04-01')] : Object.values(v)
+		);
+		expect(skillbridgeLines.length).toBeGreaterThanOrEqual(17);
 		const lines = [
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
@@ -127,7 +204,9 @@ describe('task-defs seed', () => {
 			LEAVING_HINT,
 			PAYGRADE_NOTE,
 			ORDER_NOTE,
-			AFTER_SEPARATION
+			AFTER_SEPARATION,
+			...skillbridgeLines,
+			...Object.values(TASK_LINK_NOTE)
 		];
 		expect(lines.length).toBeGreaterThan(200);
 		for (const line of lines) expect(makesPersonalClaim(line), line).toBe(false);
@@ -210,6 +289,55 @@ describe('firm deadlines match their official sources', () => {
 		);
 	});
 
+	// Two of these numbers come from a sailor's experience, not a written rule: the search for a program starts about
+	// 14 months out (426 days), and the request opens at the 364-day mark, where the portal opens; both aim at their
+	// opening. The written sources fix the rest: NAVADMIN 160/22 8.a's "up to 365 days before" bounds the opening, and
+	// the request window runs to 201 days out: the longest program, 180 days (NAVADMIN 064/23 tier one), plus "at
+	// least 3 weeks prior to start date" (MyNavyHR's SkillBridge timeline).
+	it('times the SkillBridge steps from their sources', () => {
+		expect(at('skillbridge-find')).toMatchObject({
+			kind: 'soft',
+			windowStart: -426,
+			recommendedOffset: -426,
+			windowEnd: -365
+		});
+		expect(at('skillbridge-request')).toMatchObject({
+			kind: 'soft',
+			windowStart: -364,
+			recommendedOffset: -364,
+			windowEnd: -201
+		});
+		expect(at('skillbridge-request')?.why).toContain('at least 3 weeks before your start');
+		expect(at('skillbridge-find')?.why).toContain('DoD approval covers your program dates');
+	});
+
+	// The locked wording of both steps, in full, so a later edit to any part of it fails here.
+	it('words the SkillBridge steps exactly as approved', () => {
+		expect(at('skillbridge-find')).toMatchObject({
+			title: 'Find a SkillBridge program and get an acceptance letter',
+			why: 'Start about 14 months out: pick a reputable program whose DoD approval covers your program dates, and get its acceptance letter.'
+		});
+		expect(at('skillbridge-request')).toMatchObject({
+			title: "Submit your SkillBridge request (MyNavy Education and your command's package)",
+			why: "It opens a year before separation; submit as soon as it opens, at least 3 weeks before your start. Print the request's pages for the package your command asks for; your command approver decides."
+		});
+	});
+
+	it('files both SkillBridge steps under career, to finish before leaving the command', () => {
+		for (const id of ['skillbridge-find', 'skillbridge-request']) {
+			expect(at(id), id).toMatchObject({ category: 'career', finishBefore: 'leaving' });
+		}
+	});
+
+	it('words the dated SkillBridge lines with the day shown the way the timeline shows it', () => {
+		expect(SKILLBRIDGE_COPY.askAgainLine('2027-04-01')).toBe(
+			"We'll ask again on Apr 1, 2027. You can change this in Settings."
+		);
+		expect(SKILLBRIDGE_COPY.rowHintEarly('2027-04-01')).toBe(
+			"Yes adds SkillBridge's steps to your timeline. Not sure asks again on Apr 1, 2027."
+		);
+	});
+
 	it('opens the Capstone at 12 months and Chapter 36 counseling 180 days before separation', () => {
 		expect(at('tap-capstone')?.windowStart).toBe(-365);
 		expect(at('va-career-guidance')?.windowStart).toBe(-180);
@@ -231,6 +359,8 @@ describe('what each task must finish before', () => {
 				'preseparation-counseling',
 				'reference-letters',
 				'separation-package',
+				'skillbridge-find',
+				'skillbridge-request',
 				'tap-capstone',
 				'tap-course',
 				'tap-track',

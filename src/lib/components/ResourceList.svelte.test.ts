@@ -1,7 +1,8 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import ResourceList from './ResourceList.svelte';
-import type { Resource } from '$lib/resources';
+import { RESOURCES, type Resource } from '$lib/resources';
+import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 const FIXTURE: Resource[] = [
 	{
@@ -62,5 +63,52 @@ describe('ResourceList', () => {
 	it('renders resource descriptions', () => {
 		const { container } = render(ResourceList, { props: { resources: FIXTURE } });
 		expect(container.textContent ?? '').toContain('Federal jobs.');
+	});
+
+	describe('command instructions line', () => {
+		const LINE =
+			"Also follow your command's SkillBridge instructions: they set what your request package needs.";
+
+		function groupOf(container: Element, heading: string): Element {
+			const h2 = [...container.querySelectorAll('h2')].find(
+				(h) => h.textContent?.trim() === heading
+			);
+			const section = h2?.closest('section');
+			if (!section) throw new Error('E_NO_GROUP');
+			return section;
+		}
+
+		it('sits under the SkillBridge & Transition heading and before its links', () => {
+			const { container } = render(ResourceList, { props: { resources: RESOURCES } });
+			const section = groupOf(container, 'SkillBridge & Transition');
+			const notes = [...section.querySelectorAll('p')].filter(
+				(p) => p.textContent?.trim() === LINE
+			);
+			expect(notes).toHaveLength(1);
+			const note = notes[0] as HTMLElement;
+			const h2 = section.querySelector('h2') as HTMLElement;
+			const list = section.querySelector('ul') as HTMLElement;
+			expect(h2.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+			expect(note.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+			expect(list.contains(note)).toBe(false);
+		});
+
+		it('appears in no other group', () => {
+			const { container } = render(ResourceList, { props: { resources: RESOURCES } });
+			const sections = [...container.querySelectorAll('section')];
+			const others = sections.filter(
+				(s) => s.querySelector('h2')?.textContent?.trim() !== 'SkillBridge & Transition'
+			);
+			expect(others.length).toBeGreaterThan(0);
+			for (const s of others) expect(s.textContent ?? '').not.toContain(LINE);
+			expect(sections.filter((s) => (s.textContent ?? '').includes(LINE))).toHaveLength(1);
+		});
+
+		it('makes no personal claim anywhere in the group', () => {
+			const { container } = render(ResourceList, { props: { resources: RESOURCES } });
+			const section = groupOf(container, 'SkillBridge & Transition');
+			expect(textOf(section)).toContain(LINE);
+			expect(makesPersonalClaim(textOf(section))).toBe(false);
+		});
 	});
 });

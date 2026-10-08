@@ -4,6 +4,7 @@ import { computeIcsUid } from './uid';
 import { generateTimeline, type TimelineItem } from '../timeline/generate';
 import { TASK_DEFS } from '../timeline/task-defs';
 import type { EaosString } from '../profile/eaos';
+import type { TimelineState } from '../timeline/types';
 
 const NOW = new Date('2026-10-03T12:00:00Z');
 
@@ -92,6 +93,31 @@ describe('buildIcs', () => {
 		expect(new Set(uids).size).toBe(3);
 		expect(uids).toContain(`UID:${await computeIcsUid('v')}`);
 		expect(uids).toContain(`UID:${await computeIcsUid('v:changes')}`);
+	});
+
+	it('after a SkillBridge Yes, the file gains the two steps and no other new title', async () => {
+		const now = new Date(2026, 9, 7, 12);
+		const fileFor = async (tasks: TimelineState['tasks']) => {
+			const items = generateTimeline(
+				{ completeness: 'eaos-only', eaos: '2028-06-30' as EaosString, daysUntilSeparation: 632 },
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks },
+				now
+			).phases.flatMap((p) => p.items);
+			return (await buildIcs(items, { taskIds: [], categories: [] }, now)).ics.replace(
+				/\r\n /g,
+				''
+			);
+		};
+		const titles = (ics: string) =>
+			new Set([...ics.matchAll(/SUMMARY:(.*)/g)].map((m) => m[1] ?? ''));
+		const without = titles(await fileFor({}));
+		const withYes = titles(await fileFor({ 'skillbridge-plan': { status: 'done' } }));
+		expect([...withYes].filter((t) => !without.has(t)).sort()).toEqual([
+			'Aim for: Find a SkillBridge program and get an acceptance letter',
+			"Aim for: Submit your SkillBridge request (MyNavy Education and your command's package)"
+		]);
+		for (const t of without) expect(withYes.has(t), t).toBe(true);
 	});
 });
 

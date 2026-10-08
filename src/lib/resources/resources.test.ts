@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { DisplayCategory } from './types';
-import { RESOURCES, TASK_RESOURCES, TASK_AFTER_LINK } from './resources';
+import { RESOURCES, TASK_RESOURCES, TASK_AFTER_LINK, TASK_LINK_NOTE } from './resources';
+import { linkNoteForTask, resourcesForTask } from './select';
+import * as INDEX from './index';
 import { TASK_DEFS } from '$lib/timeline/task-defs';
 import { isGovernmentHost } from '$lib/sources/government-host';
 
@@ -110,6 +112,62 @@ describe('what-now links: one official page per firm task', () => {
 			const category = byId.get(TASK_AFTER_LINK[taskId]?.resource ?? '')?.displayCategory;
 			expect(['claims-vso', 'benefits-va'], taskId).toContain(category);
 		}
+	});
+});
+
+describe("the line shown above a task card's links", () => {
+	it('is set for the two SkillBridge steps only', () => {
+		expect(Object.keys(TASK_LINK_NOTE).sort()).toEqual(['skillbridge-find', 'skillbridge-request']);
+		const taskIds = new Set(TASK_DEFS.map((t) => t.id));
+		for (const id of Object.keys(TASK_LINK_NOTE)) expect(taskIds.has(id), id).toBe(true);
+	});
+
+	it('is read by task id, and absent for any other task', () => {
+		expect(linkNoteForTask('skillbridge-request')).toBe(
+			"Also follow your command's SkillBridge instructions: they set what your request package needs."
+		);
+		expect(linkNoteForTask('skillbridge-find')).toBe(linkNoteForTask('skillbridge-request'));
+		expect(linkNoteForTask('tap-course')).toBeUndefined();
+	});
+
+	it('is also reachable from the resources entry point, with the line it holds', () => {
+		expect(INDEX.linkNoteForTask).toBe(linkNoteForTask);
+		expect(INDEX.TASK_LINK_NOTE).toBe(TASK_LINK_NOTE);
+		expect(INDEX.COMMAND_INSTRUCTIONS).toBe(linkNoteForTask('skillbridge-request'));
+	});
+});
+
+describe('the SkillBridge steps link to the pages that carry them out', () => {
+	it('lists the DoD page for the search and the Navy request pages for the request', () => {
+		expect(resourcesForTask('skillbridge-find').map((r) => r.id)).toEqual(['skillbridge']);
+		expect(resourcesForTask('skillbridge-request').map((r) => r.id)).toEqual([
+			'mynavy-education',
+			'navy-skillbridge'
+		]);
+	});
+
+	it('points the two new links at their official Navy pages, checked on one day', () => {
+		const byId = new Map(RESOURCES.map((r) => [r.id, r]));
+		expect(byId.get('mynavy-education')).toMatchObject({
+			url: 'https://myeducation.netc.navy.mil',
+			displayCategory: 'skillbridge-transition',
+			lastVerified: '2026-10-07'
+		});
+		expect(byId.get('navy-skillbridge')).toMatchObject({
+			url: 'https://www.mynavyhr.navy.mil/Career-Management/Transition/SkillBridge/',
+			displayCategory: 'skillbridge-transition',
+			lastVerified: '2026-10-07'
+		});
+		for (const id of ['mynavy-education', 'navy-skillbridge']) {
+			expect(isGovernmentHost(byId.get(id)?.url ?? ''), id).toBe(true);
+		}
+	});
+
+	// The portal takes a CAC or a DoD ID login, so the line names both.
+	it('says the MyNavy Education portal takes a CAC or DoD ID login', () => {
+		expect(RESOURCES.find((r) => r.id === 'mynavy-education')?.description).toBe(
+			'The Navy portal where you submit your SkillBridge request (CAC or DoD ID login).'
+		);
 	});
 });
 

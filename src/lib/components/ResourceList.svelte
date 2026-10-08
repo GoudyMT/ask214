@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { groupByDisplayCategory, DISPLAY_CATEGORY_LABEL, type Resource } from '$lib/resources';
+	import {
+		groupByDisplayCategory,
+		DISPLAY_CATEGORY_LABEL,
+		COMMAND_INSTRUCTIONS,
+		type Resource
+	} from '$lib/resources';
 
 	let { resources }: { resources: readonly Resource[] } = $props();
 
@@ -17,6 +22,9 @@
 					Ask 214 doesn't help with VA claims - these are official, VA-accredited channels for
 					filing. Accredited VSO help on your claim is always free.
 				</p>
+			{/if}
+			{#if category === 'skillbridge-transition'}
+				<p class="resource-note">{COMMAND_INSTRUCTIONS}</p>
 			{/if}
 			<ul class="resource-rows">
 				{#each items as r (r.id)}
@@ -61,6 +69,13 @@
 		margin: 0 0 var(--space-s);
 		font-size: var(--font-size-s);
 		color: var(--color-fg);
+	}
+
+	/* The command's own instructions decide the SkillBridge request; the links below cannot. */
+	.resource-note {
+		margin: 0 0 var(--space-s);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
 	}
 
 	.resource-rows {

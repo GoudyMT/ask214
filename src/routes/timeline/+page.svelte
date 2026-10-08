@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
@@ -14,6 +15,10 @@
 	import { selectNeedsNow } from '$lib/timeline/needs-now';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import LeavingLine from '$lib/components/LeavingLine.svelte';
+	import SkillBridgeQuestion from '$lib/components/SkillBridgeQuestion.svelte';
+	import { readablePlan, type PlanAnswer } from '$lib/timeline/skillbridge-plan';
+	import { savePlanAnswer } from '$lib/timeline/skillbridge-save';
+	import { localTodayIso } from '$lib/timeline/day-math';
 
 	const app = getProfileApp();
 
@@ -70,6 +75,60 @@
 			(app.timeline?.ready ?? false) &&
 			shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
 	);
+
+	const plan = $derived(readablePlan(app.timeline, eaos, localTodayIso(new Date())));
+	// Set at the tap, before the save lands: the store's answer ends the question, but the card stays on the page to show
+	// what happened, until the person closes it or leaves.
+	let planHeld = $state(false);
+	// A close holds for the rest of the visit, even if the question comes due again while the message is open.
+	let planClosed = $state(false);
+	// With no readable answer (locked, loading, failed) the card is gone and remounts fresh; a hold left over would ask
+	// again, and a second tap would overwrite the saved answer.
+	$effect.pre(() => {
+		if (!plan) planHeld = false;
+	});
+
+	// The SkillBridge answer -> the encrypted timeline store, through the shared save (it re-reads the store on a
+	// failure); a rejection reaches the card, which says the save failed. Resolves to the save's return day for the card's line.
+	async function answerPlan(answer: PlanAnswer): Promise<string | null> {
+		const timeline = app.timeline;
+		if (!timeline || !eaos) throw new Error('E_NO_TIMELINE');
+		planHeld = true;
+		try {
+			return await savePlanAnswer(timeline, answer, eaos, localTodayIso(new Date()));
+		} catch (err) {
+			// The re-read may show the question answered in another tab; then the card goes, as after an answer here.
+			planHeld = false;
+			if (!plan?.card) await focusAfterCard();
+			throw err;
+		}
+	}
+
+	// A card that held focus is gone (closed, or removed by a re-read); focus goes to the next thing the person would
+	// act on, so a keyboard or screen-reader user is not dropped back at the top of the page. A fully resolved phase is
+	// collapsed, so its tasks are not on the page: its toggle comes next, and the heading when there is no list at all.
+	async function focusAfterCard(): Promise<void> {
+		await tick();
+		// Focus that is already somewhere on the page stays: the person moved on while the card was still up.
+		if (document.activeElement !== document.body) return;
+		for (const selector of ['.cal-card__add', '[id^="task-"]', '.timeline-list__toggle', 'h1']) {
+			const next = document.querySelector<HTMLElement>(selector);
+			if (next) return next.focus();
+		}
+	}
+
+	// The close moves the calendar card up under the spot of the close button and focus onto its Add button, so a second
+	// tap or key on the button (a double click, a held Enter) would dismiss or download. These handlers wait out a
+	// double-click's time; a tap after reading still works.
+	const CLOSE_GUARD_MS = 500;
+	let closedAt = 0;
+	const justClosed = () => Date.now() - closedAt < CLOSE_GUARD_MS;
+
+	async function closePlan(): Promise<void> {
+		closedAt = Date.now();
+		planClosed = true;
+		await focusAfterCard();
+	}
 
 	async function unlock(): Promise<void> {
 		const store = app.store;
@@ -131,7 +190,7 @@
 <!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
      separation date. -->
 <div translate="no">
-	<h1>Timeline</h1>
+	<h1 tabindex="-1">Timeline</h1>
 
 	{#if app.status === 'ready'}
 		<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
@@ -162,12 +221,23 @@
 				</div>
 			{:else if view && app.timeline?.ready}
 				{#if needsNow}<NeedsNow groups={needsNow} />{/if}
+				{#if plan && !planClosed && (plan.card || planHeld)}
+					<SkillBridgeQuestion
+						wording={plan.card ?? 'again'}
+						onAnswer={answerPlan}
+						onClose={() => void closePlan()}
+					/>
+				{/if}
 				{#if showCalendarCard}
 					<CalendarCard
 						items={calendarItems}
 						exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-						onAdd={(file) => void handOver(file, app.calendar, new Date())}
-						onDismiss={() => void app.calendar?.dismissCard(Date.now())}
+						onAdd={(file) => {
+							if (!justClosed()) void handOver(file, app.calendar, new Date());
+						}}
+						onDismiss={() => {
+							if (!justClosed()) void app.calendar?.dismissCard(Date.now());
+						}}
 					/>
 				{/if}
 				<PhaseChips {view} />
