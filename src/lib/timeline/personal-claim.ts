@@ -8,10 +8,14 @@ const PERSONAL =
 
 /**
  * An approval claim is an eligibility claim too: a line that says the reader is or will be approved, or that their
- * request or command will approve it, decides a case only the approving command can decide. A line that only names who
- * approves ("Find out who will approve your request.") or asks the reader to find out whether, if, once, when or until
- * their request is approved does not match. A line that names who approves and then says that person will approve the
- * request ("Ask your command who will approve your request.") still does, as a claim about this request.
+ * request or command will approve it, decides a case only the approving command can decide. The match is by form, so
+ * it fails closed on some plain facts; a flagged fact is reworded, never let through. It flags "you" with are, were,
+ * have been, will, would, can, may, might, could or should (or their short forms), then an optional adverb and an
+ * optional "be" or "get" before "approved" ("You will likely be approved."); "your" with a request, command, package,
+ * application, CO or OIC, then within two words is, was, has been, will, would, should, may, might, could or can and
+ * an approv- word, plain facts included ("Your command may approve or deny the request."), unless "your" follows
+ * whether, if, once, when or until ("Ask your command whether your request is approved." passes); and "will approve
+ * your", unless it follows "who" ("Find out who will approve your request." passes).
  */
 const APPROVAL =
 	/\byou(?:'re|'ve been|'d|'ll| are| were| have been| will| would| can| may| might| could| should)(?: (?:\w+ly|now|already|also))?(?: be| get)? approved\b|(?<!\b(?:whether|if|once|when|until) )\byour (?:\w+ )?(?:request|command|package|application|co|oic)(?: \w+){0,2} (?:is|was|has been|will|would|should|may|might|could|can)(?: (?:\w+ly|now|already|also))?(?: be| get)? approv\w*|(?<!\bwho )\bwill approve your\b/i;
