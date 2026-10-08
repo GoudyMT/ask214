@@ -163,7 +163,7 @@ describe('the SkillBridge steps link to the pages that carry them out', () => {
 		}
 	});
 
-	// The portal guide and NETC: the portal takes a CAC or a DoD ID login, so the line names both.
+	// The portal takes a CAC or a DoD ID login, so the line names both.
 	it('says the MyNavy Education portal takes a CAC or DoD ID login', () => {
 		expect(RESOURCES.find((r) => r.id === 'mynavy-education')?.description).toBe(
 			'The Navy portal where you submit your SkillBridge request (CAC or DoD ID login).'

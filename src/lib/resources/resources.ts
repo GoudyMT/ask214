@@ -381,8 +381,8 @@ export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }
 	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' }
 };
 
-// One line shown above a task card's links: each command sets what its SkillBridge request package needs, and the
-// links cannot hold that.
+// One line shown above a task card's links: in a sailor's experience each command sets what its SkillBridge request
+// package needs, and the links cannot hold that.
 export const COMMAND_INSTRUCTIONS =
 	"Also follow your command's SkillBridge instructions: they set what your request package needs.";
 export const TASK_LINK_NOTE: Record<string, string> = {
