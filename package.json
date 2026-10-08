@@ -70,13 +70,13 @@
 		{
 			"name": "Root layout node (loaded on every page)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/0.*.js",
-			"limit": "7060 B",
+			"limit": "7080 B",
 			"gzip": true
 		},
 		{
 			"name": "Lazy route nodes (sum; no single page loads all of them)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
-			"limit": "46880 B",
+			"limit": "46930 B",
 			"gzip": true
 		}
 	],

@@ -190,6 +190,12 @@ const STATIC = 'static';
 //     Trim pass, each built twice: the close flag folded into a timestamp, the guard inlined (-5 B, inside the noise),
 //     a stored end time, the margin inside the existing rules, those two together, and a monotonic clock (+10 B), none
 //     kept.
+//     Route nodes 46,880 -> 46,930, precache 148,425 -> 148,505 and the root layout 7,060 -> 7,080 B (owner's call,
+//     2026-10-08): Settings refusing leaving dates out of order (about +55 B route nodes) and the release version in
+//     every page's footer (+28 B root layout) - three builds measured 46,880-46,890 B route nodes, 7,038-7,041 B root
+//     layout and 148,448-148,464 B precache, about 40 B of room above the highest. Trim pass: the version written into
+//     the page as text before compiling instead of a runtime constant (-22 B, kept); the version as a literal
+//     expression (0 B) and the two refusals merged into one block (+6 B), not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -202,7 +208,7 @@ const LIMIT = {
 	page: 60_930,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 148_425,
+	precacheBytes: 148_505,
 	workerScripts: 147_200
 };
 
