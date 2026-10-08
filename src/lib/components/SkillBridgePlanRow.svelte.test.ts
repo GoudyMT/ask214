@@ -104,6 +104,20 @@ describe('SkillBridgePlanRow', () => {
 			.toBeVisible();
 	});
 
+	it('describes what a choice made today would do for a saved Not sure that has come back', async () => {
+		render(SkillBridgePlanRow, {
+			props: { plan: plan({ answer: 'not-sure', notSureReturns: '2027-04-01' }), onSave: vi.fn() }
+		});
+		await toggle().click();
+		await expect
+			.element(
+				page.getByText(
+					"Yes adds SkillBridge's steps to your timeline. Not sure asks again on Apr 1, 2027."
+				)
+			)
+			.toBeVisible();
+	});
+
 	it('describes what a choice made today would do after any other saved answer', async () => {
 		render(SkillBridgePlanRow, {
 			props: { plan: plan({ answer: 'yes', stepsShow: true }), onSave: vi.fn() }
