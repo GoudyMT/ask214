@@ -184,6 +184,12 @@ const STATIC = 'static';
 //     builds measured 46,799-46,814 B route nodes and 148,331-148,352 B precache, about 40 B of room each at the
 //     higher. Trim pass, each built twice: the row's in-effect test rewritten (+1 B), one shared refocus helper (+8 B),
 //     the close flag folded into the hold (0 B) and the card's condition reordered (+1-2 B), none kept.
+//     Route nodes 46,855 -> 46,880 and precache 148,395 -> 148,425 (owner's call, 2026-10-08): the pre-push op-test's
+//     fixes - the answered card's scroll margin and the half-second guard on the calendar card after the close - six
+//     builds measured 46,825-46,840 B route nodes and 148,360-148,385 B precache, 40 B of room above the highest.
+//     Trim pass, each built twice: the close flag folded into a timestamp, the guard inlined (-5 B, inside the noise),
+//     a stored end time, the margin inside the existing rules, those two together, and a monotonic clock (+10 B), none
+//     kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -196,7 +202,7 @@ const LIMIT = {
 	page: 60_930,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 148_395,
+	precacheBytes: 148_425,
 	workerScripts: 147_200
 };
 
