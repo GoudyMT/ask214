@@ -161,6 +161,13 @@ const STATIC = 'static';
 //     Page 59,380 -> 59,400 (owner's call, 2026-10-07): the date inputs ask the browser not to keep a typed date in its
 //     autofill history (+14 B, the separation and leaving date input's page chunk) - 59,354 B measured, about 46 B of
 //     room. No second trim pass: the same day's search of the page chunks found nothing above noise.
+//     Page 59,400 -> 60,895, route nodes 45,040 -> 46,640 (package.json's size-limit) and precache 144,480 -> 148,110
+//     (owner's call, 2026-10-07): the SkillBridge question - its Timeline card and Settings row with their styles, the
+//     answer helper and its save, the two steps, and the command-instructions line beside the SkillBridge links -
+//     60,853 / 46,596 / 148,067 B measured, about 40 B of room each. Trim pass, each measured on a full build: a date
+//     pattern the round trip already enforces dropped (-25 B page, -10 B route nodes, -33 B precache, kept); the
+//     Settings row's copied disclosure rules shared (-61 B precache only), the calendar codec's day check reused
+//     (+321 B page) and the row summary built from the answer labels (-4 B) not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -170,10 +177,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 59_400,
+	page: 60_895,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 144_480,
+	precacheBytes: 148_110,
 	workerScripts: 147_200
 };
 
