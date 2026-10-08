@@ -8,11 +8,13 @@ const PERSONAL =
 
 /**
  * An approval claim is an eligibility claim too: a line that says the reader is or will be approved, or that their
- * request or command will approve it, decides a case only the approving command can decide. Who approves, as a plain
- * fact, does not match.
+ * request or command will approve it, decides a case only the approving command can decide. A line that only names who
+ * approves ("Find out who will approve your request.") or asks the reader to find out whether, if, once, when or until
+ * their request is approved does not match. A line that names who approves and then says that person will approve the
+ * request ("Ask your command who will approve your request.") still does, as a claim about this request.
  */
 const APPROVAL =
-	/\byou(?:'re|'ve been|'d|'ll| are| were| have been| will| would| may| might| could| should)(?: (?:\w+ly|now|already|also))?(?: be| get)? approved\b|\byour (?:\w+ )?(?:request|command|package|application|co|oic)(?: \w+){0,2} (?:will|would|should)(?: (?:\w+ly|now|already|also))?(?: be| get)? approv\w*|\bwill approve your\b/i;
+	/\byou(?:'re|'ve been|'d|'ll| are| were| have been| will| would| can| may| might| could| should)(?: (?:\w+ly|now|already|also))?(?: be| get)? approved\b|(?<!\b(?:whether|if|once|when|until) )\byour (?:\w+ )?(?:request|command|package|application|co|oic)(?: \w+){0,2} (?:is|was|has been|will|would|should|may|might|could|can)(?: (?:\w+ly|now|already|also))?(?: be| get)? approv\w*|(?<!\bwho )\bwill approve your\b/i;
 
 /** A curly apostrophe reads the same as a straight one, so it is folded before matching. */
 const RIGHT_SINGLE_QUOTE = String.fromCharCode(0x2019);
