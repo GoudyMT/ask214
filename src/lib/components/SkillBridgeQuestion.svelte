@@ -9,6 +9,7 @@
 		SETTINGS_HINT,
 		ABOUT_LINK,
 		ANSWERED,
+		CLOSE_LABEL,
 		askAgainLine
 	} from '$lib/timeline/skillbridge-copy';
 
@@ -64,7 +65,7 @@
 <section class="sb-card" aria-labelledby={answered ? undefined : 'sb-card-heading'}>
 	{#if answered}
 		<p bind:this={lineEl} class="sb-card__done" role="status" tabindex="-1">{answered}</p>
-		<button class="sb-card__close" type="button" aria-label="Dismiss" onclick={onClose}>
+		<button class="sb-card__close" type="button" aria-label={CLOSE_LABEL} onclick={onClose}>
 			<span aria-hidden="true">x</span>
 		</button>
 	{:else}

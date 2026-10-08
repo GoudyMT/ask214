@@ -119,8 +119,9 @@ test('closing the answered message removes the card and moves focus to Add to my
 	expect(fit?.inlineMinHeight).toBe('');
 	// The focus check only means something while the calendar card, and so its Add button, is on the page.
 	await expect(page.locator('.cal-card')).toBeVisible();
-	// The calendar card has a button named Dismiss too, so this one is scoped to the SkillBridge card.
-	await card.getByRole('button', { name: 'Dismiss' }).click();
+	const close = page.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true });
+	await expect(close).toHaveCount(1);
+	await close.click();
 	await expect(page.locator('.sb-card')).toHaveCount(0);
 	await expect(page.locator('.cal-card__add')).toBeFocused();
 });

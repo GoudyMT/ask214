@@ -4,8 +4,9 @@ import type { PlanAnswer } from './skillbridge-plan';
 /**
  * The SkillBridge lines the question and its Settings row show. They live here, not in the components, so the test
  * that holds every public line to 38 CFR 14.629 reads them all: none may say what the user qualifies for. The app's
- * shared wording (the failed-save line, "opens in a new tab", Save, Cancel, Dismiss) stays in the components, as in
- * every other component that uses it.
+ * shared wording (the failed-save line, "opens in a new tab", Save, Cancel) stays in the components, as in every other
+ * component that uses it. The close button's name is here, not shared: the Timeline's calendar card has a "Dismiss" of
+ * its own, and two buttons with one name on a page cannot be told apart by a screen reader.
  */
 export const QUESTION_FIRST = {
 	heading: 'Planning to do SkillBridge?',
@@ -26,6 +27,7 @@ export const ANSWERED = {
 	yes: 'SkillBridge steps added to your timeline. You can change this in Settings.',
 	no: 'Got it. You can change this in Settings.'
 };
+export const CLOSE_LABEL = 'Dismiss SkillBridge message';
 export function askAgainLine(day: string): string {
 	return `We'll ask again on ${formatTimelineDate(day)}. You can change this in Settings.`;
 }

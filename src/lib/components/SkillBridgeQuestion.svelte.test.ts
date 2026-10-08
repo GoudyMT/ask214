@@ -6,6 +6,8 @@ import { RESOURCES } from '$lib/resources';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 const SKILLBRIDGE = RESOURCES.find((r) => r.id === 'skillbridge');
+// The Timeline's calendar card has a button named Dismiss too, so this one carries the full name.
+const CLOSE = { name: 'Dismiss SkillBridge message', exact: true } as const;
 
 function card(
 	props: Partial<{
@@ -147,7 +149,8 @@ describe('SkillBridgeQuestion', () => {
 			await expect.element(status).toHaveTextContent(line);
 			expect(document.activeElement).toBe(status.element());
 			expect(container.querySelectorAll('button')).toHaveLength(1);
-			expect(page.getByRole('button', { name: 'Dismiss' }).elements()).toHaveLength(1);
+			expect(page.getByRole('button', CLOSE).elements()).toHaveLength(1);
+			expect(page.getByRole('button', { name: 'Dismiss', exact: true }).elements()).toHaveLength(0);
 			expect(section?.getBoundingClientRect().height ?? before).toBeLessThan(before - 20);
 			expect(section?.style.minHeight).toBe('');
 			expectFitsStatusLine(section);
@@ -165,7 +168,7 @@ describe('SkillBridgeQuestion', () => {
 			await page.getByRole('button', { name: label, exact: true }).click();
 			const status = page.getByRole('status');
 			await expect.element(status).toHaveTextContent(line);
-			const box = page.getByRole('button', { name: 'Dismiss' }).element().getBoundingClientRect();
+			const box = page.getByRole('button', CLOSE).element().getBoundingClientRect();
 			const frame = (container.querySelector('section') as HTMLElement).getBoundingClientRect();
 			const range = document.createRange();
 			range.selectNodeContents(status.element());
@@ -181,14 +184,14 @@ describe('SkillBridgeQuestion', () => {
 		await expect
 			.element(page.getByRole('heading', { name: 'Planning to do SkillBridge?' }))
 			.toBeVisible();
-		expect(page.getByRole('button', { name: 'Dismiss' }).elements()).toHaveLength(0);
+		expect(page.getByRole('button', CLOSE).elements()).toHaveLength(0);
 		expect(container.querySelectorAll('button')).toHaveLength(3);
 	});
 
 	it('offers a 44 px close button at the top right after an answer, and calls onClose once when tapped', async () => {
 		const { container, onClose } = card();
 		await page.getByRole('button', { name: 'No', exact: true }).click();
-		const close = page.getByRole('button', { name: 'Dismiss' });
+		const close = page.getByRole('button', CLOSE);
 		await expect.element(close).toBeVisible();
 		const button = close.element() as HTMLButtonElement;
 		expect(button.type).toBe('button');

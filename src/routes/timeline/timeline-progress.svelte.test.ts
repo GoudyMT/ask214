@@ -264,7 +264,7 @@ describe('Timeline, the SkillBridge question', () => {
 		await expect.element(page.getByRole('status')).toBeVisible();
 		expect(container.querySelectorAll('.sb-card')).toHaveLength(1);
 
-		await page.getByRole('button', { name: 'Dismiss' }).click();
+		await page.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true }).click();
 		await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
 		const first = document.querySelector<HTMLElement>('[id^="task-"]');
 		expect(first).not.toBeNull();
@@ -401,7 +401,11 @@ describe('Timeline, the SkillBridge question', () => {
 
 		// Without app.css the card has no padding, so its 44 px close button overhangs the chips below it and a pointer
 		// click would land on a chip; the click is sent to the button itself.
-		(page.getByRole('button', { name: 'Dismiss' }).element() as HTMLElement).click();
+		(
+			page
+				.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true })
+				.element() as HTMLElement
+		).click();
 		await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
 		const toggle = container.querySelector('.timeline-list__toggle');
 		expect(toggle).not.toBeNull();
