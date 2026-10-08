@@ -135,7 +135,7 @@
 	const outOfOrder = $derived(
 		!!leaving?.skillbridgeStart &&
 			!!leaving.terminalLeaveStart &&
-			leaving.skillbridgeStart > leaving.terminalLeaveStart
+			leaving.skillbridgeStart >= leaving.terminalLeaveStart
 	);
 
 	// The answer lives in the timeline store, which can still be loading, locked or failed while the profile is open:

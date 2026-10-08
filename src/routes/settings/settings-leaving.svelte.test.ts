@@ -140,13 +140,30 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 		expect(store.save).toHaveBeenCalledTimes(1);
 	});
 
-	// A pair saved out of order before the refusal existed keeps its note, so the person can fix it.
-	it('still notes a stored pair that is out of order', async () => {
+	// A pair stored before the refusal existed, or brought into use when the separation date moved, keeps a note
+	// whenever the refusal would turn it away, so the person can fix it.
+	it.each([
+		['out of order', -11],
+		['on one day', 0]
+	])('still notes a stored pair %s', async (_, offset) => {
 		withLeaving({
 			skillbridgeStart: isoFromToday(STORED),
-			terminalLeaveStart: isoFromToday(STORED - 11)
+			terminalLeaveStart: isoFromToday(STORED + offset)
 		});
 		render(SettingsPage);
 		await expect.element(page.getByText(ORDER_NOTE)).toBeVisible();
+	});
+
+	it('shows no note for a stored pair in order', async () => {
+		withLeaving({
+			skillbridgeStart: isoFromToday(STORED),
+			terminalLeaveStart: isoFromToday(STORED + 1)
+		});
+		render(SettingsPage);
+		// The note renders with the rows, so once a row shows its date the note's absence is settled.
+		await expect
+			.element(timelineSection().getByRole('button', { name: 'Terminal leave start' }))
+			.toHaveTextContent(/2026|2027/);
+		expect(page.getByText(ORDER_NOTE).query()).toBeNull();
 	});
 });
