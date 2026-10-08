@@ -162,6 +162,13 @@ describe('the SkillBridge steps link to the pages that carry them out', () => {
 			expect(isGovernmentHost(byId.get(id)?.url ?? ''), id).toBe(true);
 		}
 	});
+
+	// The portal guide and NETC: the portal takes a CAC or a DoD ID login, so the line names both.
+	it('says the MyNavy Education portal takes a CAC or DoD ID login', () => {
+		expect(RESOURCES.find((r) => r.id === 'mynavy-education')?.description).toBe(
+			'The Navy portal where you submit your SkillBridge request (CAC or DoD ID login).'
+		);
+	});
 });
 
 describe('38 CFR 14.629 boundary: claims and benefits links stay official or accredited', () => {

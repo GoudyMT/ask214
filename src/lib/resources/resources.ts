@@ -196,7 +196,7 @@ export const RESOURCES: readonly Resource[] = [
 		id: 'mynavy-education',
 		title: 'MyNavy Education',
 		url: 'https://myeducation.netc.navy.mil',
-		description: 'The Navy portal where you submit your SkillBridge request (CAC login).',
+		description: 'The Navy portal where you submit your SkillBridge request (CAC or DoD ID login).',
 		displayCategory: 'skillbridge-transition',
 		lastVerified: '2026-10-07'
 	},
