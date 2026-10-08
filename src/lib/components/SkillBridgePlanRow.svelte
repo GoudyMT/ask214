@@ -27,7 +27,14 @@
 	let error = $state<string | null>(null);
 	let busy = $state(false);
 	let toggleEl = $state<HTMLButtonElement | null>(null);
-	const hint = $derived(plan?.notSureReturns ? rowHintEarly(plan.notSureReturns) : ROW_HINT_LATE);
+	// A saved Not sure says what it does itself; any other saved answer is described by what a choice made today would do.
+	const hint = $derived.by(() => {
+		if (plan?.answer === 'not-sure') {
+			if (plan.returnsOn) return rowHintEarly(plan.returnsOn);
+			if (plan.stepsShow) return ROW_HINT_LATE;
+		}
+		return plan?.notSureReturns ? rowHintEarly(plan.notSureReturns) : ROW_HINT_LATE;
+	});
 
 	// Closing unmounts the focused control; focus goes back to the row, so a keyboard user is not dropped.
 	async function close(): Promise<void> {

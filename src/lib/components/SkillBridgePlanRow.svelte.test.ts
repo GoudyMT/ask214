@@ -73,6 +73,51 @@ describe('SkillBridgePlanRow', () => {
 			.toBeVisible();
 	});
 
+	// The hint describes the saved answer when it has something to say, else what a choice made today would do.
+	it('names the saved return date while an early Not sure still waits', async () => {
+		render(SkillBridgePlanRow, {
+			props: {
+				plan: plan({ answer: 'not-sure', returnsOn: '2027-02-01', notSureReturns: '2027-04-01' }),
+				onSave: vi.fn()
+			}
+		});
+		await toggle().click();
+		await expect
+			.element(
+				page.getByText(
+					"Yes adds SkillBridge's steps to your timeline. Not sure asks again on Feb 1, 2027."
+				)
+			)
+			.toBeVisible();
+	});
+
+	it('reads the late hint for a saved Not sure that shows the steps, whatever a new Not sure would do', async () => {
+		render(SkillBridgePlanRow, {
+			props: {
+				plan: plan({ answer: 'not-sure', stepsShow: true, notSureReturns: '2027-04-01' }),
+				onSave: vi.fn()
+			}
+		});
+		await toggle().click();
+		await expect
+			.element(page.getByText("Yes or Not sure adds SkillBridge's steps to your timeline."))
+			.toBeVisible();
+	});
+
+	it('describes what a choice made today would do after any other saved answer', async () => {
+		render(SkillBridgePlanRow, {
+			props: { plan: plan({ answer: 'yes', stepsShow: true }), onSave: vi.fn() }
+		});
+		await toggle().click();
+		await expect
+			.element(
+				page.getByText(
+					"Yes adds SkillBridge's steps to your timeline. Not sure asks again on Apr 1, 2027."
+				)
+			)
+			.toBeVisible();
+	});
+
 	it('keeps a returned message and says a failed save', async () => {
 		const onSave = vi
 			.fn<() => Promise<string | null>>()
