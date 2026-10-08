@@ -163,3 +163,82 @@ for (const how of ['Enter', 'tap'] as const) {
 		expect(after.lineTop).toBeGreaterThanOrEqual(after.headerBottom);
 	});
 }
+
+// Closing the card moves the calendar card up under the same spot, and moves focus to its Add button: a second tap or
+// key on the x lands on the calendar card instead.
+const CLOSE_NAME = 'Dismiss SkillBridge message';
+
+async function answerYesAndFindClose(page: Page) {
+	await seedProfile(page, 300);
+	await page.locator('.sb-card').getByRole('button', { name: 'Yes', exact: true }).click();
+	const close = page.getByRole('button', { name: CLOSE_NAME, exact: true });
+	await expect(close).toBeVisible();
+	// The absence checks after the close pass on an empty page, so the calendar card must be there to be acted on.
+	await expect(page.locator('.cal-card')).toBeVisible();
+	return close;
+}
+
+test('a second tap on the closed card x does not dismiss the calendar card', async ({ page }) => {
+	const close = await answerYesAndFindClose(page);
+	const box = await close.boundingBox();
+	expect(box).not.toBeNull();
+	const x = (box?.x ?? 0) + (box?.width ?? 0) / 2;
+	const y = (box?.y ?? 0) + (box?.height ?? 0) / 2;
+	await page.mouse.click(x, y);
+	await page.waitForTimeout(200);
+	await page.mouse.click(x, y);
+	await expect(page.locator('.sb-card')).toHaveCount(0);
+	// A dismissal takes the card off the page at once; the reload then shows whether one was saved.
+	await page.waitForTimeout(300);
+	await expect(page.locator('.cal-card')).toHaveCount(1);
+	await page.reload();
+	await expect(page.locator('[id^="task-"]').first()).toBeVisible();
+	await expect(page.locator('.cal-card')).toHaveCount(1);
+});
+
+test('a deliberate tap on the calendar card x after the close still dismisses it', async ({
+	page
+}) => {
+	const close = await answerYesAndFindClose(page);
+	await close.click();
+	await expect(page.locator('.sb-card')).toHaveCount(0);
+	await page.waitForTimeout(600);
+	await page.locator('.cal-card').getByRole('button', { name: 'Dismiss', exact: true }).click();
+	await expect(page.locator('.cal-card')).toHaveCount(0);
+	await page.reload();
+	await expect(page.locator('[id^="task-"]').first()).toBeVisible();
+	await expect(page.locator('.cal-card')).toHaveCount(0);
+});
+
+for (const key of ['Enter', 'Space'] as const) {
+	test(`${key} twice on the closed card x does not download the calendar file`, async ({
+		page
+	}) => {
+		const files: string[] = [];
+		page.on('download', (d) => files.push(d.suggestedFilename()));
+		const close = await answerYesAndFindClose(page);
+		await close.focus();
+		await page.keyboard.press(key);
+		await page.keyboard.press(key);
+		await expect(page.locator('.sb-card')).toHaveCount(0);
+		// A download that never starts cannot be waited for, so the wait is a fixed pause past the close.
+		await page.waitForTimeout(400);
+		expect(files).toEqual([]);
+		await expect(page.locator('.cal-card')).toHaveCount(1);
+	});
+}
+
+test('Enter on Add to my calendar after the close does download the file', async ({ page }) => {
+	const close = await answerYesAndFindClose(page);
+	await close.focus();
+	await page.keyboard.press('Enter');
+	await expect(page.locator('.sb-card')).toHaveCount(0);
+	await expect(page.locator('.cal-card__add')).toBeFocused();
+	await page.waitForTimeout(600);
+	// Read through the download object only: nothing is saved to disk.
+	const [download] = await Promise.all([
+		page.waitForEvent('download'),
+		page.keyboard.press('Enter')
+	]);
+	expect(download.suggestedFilename()).toMatch(/^ask214-deadlines-.+\.ics$/);
+});

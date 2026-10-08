@@ -7,7 +7,8 @@ import { formatTimelineDate } from '$lib/timeline/format-date';
 import { TASK_DEFS } from '$lib/timeline';
 
 // Days from the real clock: the page builds the timeline from today.
-const { isoFromToday, current } = vi.hoisted(() => ({
+const { isoFromToday, current, handOver } = vi.hoisted(() => ({
+	handOver: vi.fn(async () => {}),
 	isoFromToday: (days: number) => {
 		const d = new Date();
 		d.setDate(d.getDate() + days);
@@ -20,6 +21,13 @@ const { isoFromToday, current } = vi.hoisted(() => ({
 		firstRun: false,
 		// Days from today to the separation date.
 		daysOut: 200,
+		// The calendar store as far as the page and its card read it; null leaves the card off the page.
+		calendar: null as null | {
+			ready: boolean;
+			exclusions: { taskIds: string[]; categories: string[] };
+			card: Record<string, never>;
+			dismissCard: (now: number) => Promise<void>;
+		},
 		timeline: null as null | {
 			ready: boolean;
 			failed: boolean;
@@ -51,7 +59,7 @@ vi.mock('$lib/profile/context', () => ({
 					}
 		},
 		timeline: current.timeline,
-		calendar: null,
+		calendar: current.calendar,
 		byok: null,
 		cause: null,
 		wipeAll: null,
@@ -59,6 +67,9 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
+
+// The page's own hand-over of the calendar file would start a real download.
+vi.mock('$lib/calendar/hand-over', () => ({ handOver }));
 
 const NOTE =
 	"Your saved progress couldn't be loaded, so your tasks aren't shown. Reload to try again. If it keeps happening, you can erase all data in Settings and start again.";
@@ -493,5 +504,75 @@ describe('Timeline, the SkillBridge question', () => {
 		const toggle = container.querySelector('.timeline-list__toggle');
 		expect(toggle).not.toBeNull();
 		await expect.poll(() => document.activeElement).toBe(toggle);
+	});
+
+	// Closing the answered card moves the calendar card up under the spot the close button was in, so a second tap or key
+	// right after the close lands on the calendar card.
+	describe('Timeline, the calendar card just after the SkillBridge card closes', () => {
+		const CLOSE_GUARD_WAIT_MS = 600;
+		const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+		async function closeAnsweredCard() {
+			const dismissCard = vi.fn(async () => {});
+			current.calendar = {
+				ready: true,
+				exclusions: { taskIds: [], categories: [] },
+				card: {},
+				dismissCard
+			};
+			current.timeline = liveStore('lands').store;
+			handOver.mockClear();
+			const { container } = render(TimelinePage);
+			await page.getByRole('button', { name: 'Yes' }).click();
+			await expect.element(page.getByRole('status')).toBeVisible();
+			// A click sent to the element itself: without app.css the cards overlap, so a pointer click could land elsewhere.
+			(
+				page
+					.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true })
+					.element() as HTMLElement
+			).click();
+			await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
+			return { dismissCard, container };
+		}
+
+		const calendarButton = (name: string) =>
+			page.getByRole('button', { name, exact: true }).element() as HTMLElement;
+
+		it('ignores the calendar card Dismiss in the moments after the close', async () => {
+			try {
+				const { dismissCard, container } = await closeAnsweredCard();
+				expect(container.querySelector('.cal-card')).not.toBeNull();
+				calendarButton('Dismiss').click();
+				await pause(100);
+				expect(dismissCard).not.toHaveBeenCalled();
+			} finally {
+				current.calendar = null;
+			}
+		});
+
+		it('ignores the calendar card Add in the moments after the close', async () => {
+			try {
+				await closeAnsweredCard();
+				calendarButton('Add to my calendar').click();
+				// The file is built before it is handed over, so a hand-over that is not coming needs a pause to show.
+				await pause(200);
+				expect(handOver).not.toHaveBeenCalled();
+			} finally {
+				current.calendar = null;
+			}
+		});
+
+		it('acts on a deliberate Dismiss or Add after the guard time', async () => {
+			try {
+				const { dismissCard } = await closeAnsweredCard();
+				await pause(CLOSE_GUARD_WAIT_MS);
+				calendarButton('Dismiss').click();
+				await expect.poll(() => dismissCard.mock.calls.length).toBe(1);
+				calendarButton('Add to my calendar').click();
+				await expect.poll(() => handOver.mock.calls.length).toBe(1);
+			} finally {
+				current.calendar = null;
+			}
+		});
 	});
 });

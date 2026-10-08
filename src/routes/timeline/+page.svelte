@@ -117,7 +117,15 @@
 		}
 	}
 
+	// The close moves the calendar card up under the spot of the close button and focus onto its Add button, so a second
+	// tap or key on the button (a double click, a held Enter) would dismiss or download. These handlers wait out a
+	// double-click's time; a tap after reading still works.
+	const CLOSE_GUARD_MS = 500;
+	let closedAt = 0;
+	const justClosed = () => Date.now() - closedAt < CLOSE_GUARD_MS;
+
 	async function closePlan(): Promise<void> {
+		closedAt = Date.now();
 		planClosed = true;
 		await focusAfterCard();
 	}
@@ -224,8 +232,12 @@
 					<CalendarCard
 						items={calendarItems}
 						exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-						onAdd={(file) => void handOver(file, app.calendar, new Date())}
-						onDismiss={() => void app.calendar?.dismissCard(Date.now())}
+						onAdd={(file) => {
+							if (!justClosed()) void handOver(file, app.calendar, new Date());
+						}}
+						onDismiss={() => {
+							if (!justClosed()) void app.calendar?.dismissCard(Date.now());
+						}}
 					/>
 				{/if}
 				<PhaseChips {view} />
