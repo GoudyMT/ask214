@@ -49,6 +49,8 @@ test('an early Not sure hides the card and the steps, and says when it asks agai
 		/^We'll ask again on .+\. You can change this in Settings\.$/
 	);
 	await page.reload();
+	// The absence checks below pass on an empty page, so they wait for the loaded task list first.
+	await expect(page.locator('[id^="task-"]').first()).toBeVisible();
 	await expect(page.getByRole('heading', { name: /SkillBridge\?$/ })).toHaveCount(0);
 	await expect(page.getByText(FIND)).toHaveCount(0);
 });
@@ -66,6 +68,8 @@ test('No in Settings removes the steps', async ({ page }) => {
 		.click();
 	await expect(page.getByRole('button', { name: /Planning SkillBridge/ })).toHaveText(/No$/);
 	await page.goto('/timeline');
+	// The absence check below passes on an empty page, so it waits for the loaded task list first.
+	await expect(page.locator('[id^="task-"]').first()).toBeVisible();
 	await expect(page.getByText(FIND)).toHaveCount(0);
 });
 
@@ -96,6 +100,25 @@ test('closing the answered message removes the card and moves focus to Add to my
 	await expect(card.getByRole('status')).toHaveText(
 		'SkillBridge steps added to your timeline. You can change this in Settings.'
 	);
+	// The frame fits its message: the card is the status line plus its own padding and border, with no fixed minimum.
+	const fit = await page.evaluate(() => {
+		const frame = document.querySelector<HTMLElement>('.sb-card');
+		const line = frame?.querySelector<HTMLElement>('[role="status"]');
+		if (!frame || !line) return null;
+		const style = getComputedStyle(frame);
+		const extra = ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce(
+			(sum, key) => sum + parseFloat(style[key as 'paddingTop']),
+			0
+		);
+		return {
+			frame: frame.getBoundingClientRect().height,
+			expected: line.getBoundingClientRect().height + extra,
+			inlineMinHeight: frame.style.minHeight
+		};
+	});
+	expect(fit).not.toBeNull();
+	expect(Math.abs((fit?.frame ?? 0) - (fit?.expected ?? 0))).toBeLessThanOrEqual(1);
+	expect(fit?.inlineMinHeight).toBe('');
 	// The focus check only means something while the calendar card, and so its Add button, is on the page.
 	await expect(page.locator('.cal-card')).toBeVisible();
 	// The calendar card has a button named Dismiss too, so this one is scoped to the SkillBridge card.

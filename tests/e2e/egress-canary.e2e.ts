@@ -3,7 +3,8 @@ import { expect, test, type Request } from '@playwright/test';
 // Every request the page sends during this flow - to our own server, to Anthropic, for any file - checked for the
 // user's own data. The guard in src/lib/ci/pii-policy.ts reads names and imports; this reads values: the separation and
 // SkillBridge dates in each form the app shows (ISO, compact, "Mon D, YYYY"), the day count it shows ("208 days"), a
-// task note, and the user's own API key, which may go to Anthropic and nowhere else. URLs and bodies are also read
+// task note, the SkillBridge answer (its stored key, its value and the day a Not sure brings the question back), and
+// the user's own API key, which may go to Anthropic and nowhere else. URLs and bodies are also read
 // decoded, so an encoded value is still found, and the headers include cookies. A value changed some other way (a sum,
 // a hash) is outside what a string check can see. The service worker is blocked so every request comes from the page
 // itself (a registered worker handles WebKit's fetches before a mock applies).
@@ -47,6 +48,8 @@ function decoded(text: string): string {
 	}
 }
 
+// The SkillBridge question asks again this many days before separation (about 15 months); an early Not sure stores that day.
+const ASK_AGAIN_DAYS = 456;
 const DAYS_TO_SEPARATION = 208;
 const SEPARATION = isoFromToday(DAYS_TO_SEPARATION);
 const SKILLBRIDGE = isoFromToday(28);
@@ -149,7 +152,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		...dateForms(SKILLBRIDGE),
 		`${DAYS_TO_SEPARATION} days`,
 		NOTE,
-		...dateForms(isoFromToday(DAYS_TO_SEPARATION - 456)),
+		...dateForms(isoFromToday(DAYS_TO_SEPARATION - ASK_AGAIN_DAYS)),
 		'skillbridge-plan',
 		'not-sure'
 	];
@@ -173,5 +176,94 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		expect(sent.some((r) => r.url.startsWith(ANTHROPIC) && r.headers.includes(TEST_KEY))).toBe(
 			true
 		);
+	}
+});
+
+// Far enough out that a Not sure is early: the app stores the day the question comes back, a date the first flow never
+// stores.
+const EARLY_DAYS_TO_SEPARATION = ASK_AGAIN_DAYS + 176;
+
+test('an early Not sure keeps its stored return date on this device', async ({
+	page,
+	browserName
+}) => {
+	const requests: Request[] = [];
+	page.on('request', (request) => requests.push(request));
+	await page.route('**/api/retrieve', (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				status: 'results',
+				corpusVersion: CORPUS_VERSION,
+				results: [RESULT_HIT]
+			})
+		})
+	);
+	await page.route(`${ANTHROPIC}**`, (route) => route.fulfill({ status: 500, body: '' }));
+	await page.route('**/api/feedback', (route) =>
+		route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+	);
+
+	await page.goto('/wizard');
+	await page.getByLabel(/separation date/i).fill(isoFromToday(EARLY_DAYS_TO_SEPARATION));
+	await page.getByRole('button', { name: /save and continue/i }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
+	await page.locator('.sb-card').getByRole('button', { name: 'Not sure', exact: true }).click();
+	await expect(page.getByRole('status')).toHaveText(/^We'll ask again on .+\./);
+
+	// The same online paths as the flow above: a written summary with a key, an online question, a feedback message.
+	await page.goto('/settings');
+	await page.getByLabel(/add an ai-written summary/i).check();
+	await page.getByLabel('Your Anthropic API key').fill(TEST_KEY);
+	await page
+		.locator('.online-key')
+		.getByRole('button', { name: /^save$/i })
+		.click();
+	await expect(page.getByLabel('Your Anthropic API key')).toHaveAttribute(
+		'placeholder',
+		'A key is stored'
+	);
+	await page.goto('/');
+	await page.getByRole('textbox', { name: /ask a question/i }).fill(QUESTION);
+	await page.getByRole('button', { name: /^search$/i }).click();
+	await page.getByRole('button', { name: /^use online$/i }).click();
+	await expect(page.locator('.ask-card__title', { hasText: /DoD SkillBridge/i })).toBeVisible();
+	if (browserName === 'chromium') {
+		await expect.poll(() => requests.some((r) => r.url().startsWith(ANTHROPIC))).toBe(true);
+	}
+	await page.goto('/feedback');
+	await page.getByLabel('Your message').fill('the timeline page looked off');
+	await page.getByRole('button', { name: 'Send feedback' }).click();
+	await expect(page.getByText(/your feedback was sent/i)).toBeVisible();
+
+	const sent = await Promise.all(
+		requests.map(async (request) => ({
+			url: request.url(),
+			body: request.postData() ?? '',
+			headers: JSON.stringify(await request.allHeaders())
+		}))
+	);
+	expect(sent.some((r) => r.url.includes('/api/retrieve'))).toBe(true);
+	expect(sent.some((r) => r.url.includes('/api/feedback'))).toBe(true);
+
+	const personal = [
+		...dateForms(isoFromToday(EARLY_DAYS_TO_SEPARATION)),
+		...dateForms(isoFromToday(EARLY_DAYS_TO_SEPARATION - ASK_AGAIN_DAYS)),
+		`${EARLY_DAYS_TO_SEPARATION} days`,
+		'skillbridge-plan',
+		'not-sure'
+	];
+	for (const request of sent) {
+		const text = [
+			request.url,
+			decoded(request.url),
+			request.body,
+			decoded(request.body),
+			request.headers
+		].join('\n');
+		for (const value of personal) {
+			expect(text, `${value} in ${request.url}`).not.toContain(value);
+		}
 	}
 });
