@@ -120,7 +120,9 @@ describe('the SkillBridge answer', () => {
 			{ snoozeUntil: AGAIN },
 			{ notes: 'x' },
 			{ status: 'bogus' },
-			{}
+			{},
+			null,
+			'yes'
 		] as unknown as TimelineTaskState[];
 		for (const s of odd) {
 			expect(read(s, '2027-03-31'), JSON.stringify(s)).toMatchObject({

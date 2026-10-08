@@ -916,6 +916,13 @@ describe('the SkillBridge steps follow the saved answer', () => {
 		}
 	});
 
+	it('still builds a view, without the steps, when the saved answer is null', () => {
+		const damaged = { [SKILLBRIDGE_PLAN_KEY]: null } as unknown as TimelineState['tasks'];
+		const shown = ids(damaged);
+		expect(shown.length).toBeGreaterThan(0);
+		for (const id of STEPS) expect(shown).not.toContain(id);
+	});
+
 	it('shows both steps after Yes and after a Not sure from the second ask', () => {
 		for (const answer of [{ status: 'done' as const }, { status: 'snoozed' as const }]) {
 			const shown = ids({ [SKILLBRIDGE_PLAN_KEY]: answer });

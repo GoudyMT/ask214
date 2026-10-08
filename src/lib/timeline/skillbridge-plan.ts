@@ -46,8 +46,10 @@ type Saved =
 	| { kind: 'early'; until: string }
 	| { kind: 'late' };
 
-function recognise(s: TimelineTaskState | undefined): Saved {
-	if (s === undefined) return { kind: 'none' };
+// The stored value comes from disk, so it can be anything: null or a non-object reads as no answer.
+function recognise(raw: unknown): Saved {
+	if (typeof raw !== 'object' || raw === null) return { kind: 'none' };
+	const s = raw as TimelineTaskState;
 	const keys = Object.entries(s)
 		.filter(([, v]) => v !== undefined)
 		.map(([k]) => k)
