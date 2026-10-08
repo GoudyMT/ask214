@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { formatTimelineDate } from '$lib/timeline/format-date';
 
 // Days from the real clock: the page builds the timeline from today.
 const { isoFromToday, current } = vi.hoisted(() => ({
@@ -299,7 +300,12 @@ describe('Timeline, the SkillBridge question', () => {
 				.element(page.getByRole('heading', { name: 'Planning to do SkillBridge?' }))
 				.toBeVisible();
 			await page.getByRole('button', { name: 'Not sure' }).click();
-			await expect.element(page.getByRole('status')).toHaveTextContent("We'll ask again on");
+			// The line names the day the store was given, not one worked out again on screen.
+			await expect
+				.element(page.getByRole('status'))
+				.toHaveTextContent(
+					`We'll ask again on ${formatTimelineDate(isoFromToday(144))}. You can change this in Settings.`
+				);
 			expect(setSnooze).toHaveBeenCalledExactlyOnceWith('skillbridge-plan', isoFromToday(144));
 			expect(setStatus).not.toHaveBeenCalled();
 		} finally {

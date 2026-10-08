@@ -82,13 +82,13 @@
 	let planHeld = $state(false);
 
 	// The SkillBridge answer -> the encrypted timeline store, through the shared save (it re-reads the store on a
-	// failure); a rejection reaches the card, which says the save failed.
-	async function answerPlan(answer: PlanAnswer): Promise<void> {
+	// failure); a rejection reaches the card, which says the save failed. Resolves to the save's return day for the card's line.
+	async function answerPlan(answer: PlanAnswer): Promise<string | null> {
 		const timeline = app.timeline;
 		if (!timeline || !eaos) throw new Error('E_NO_TIMELINE');
 		planHeld = true;
 		try {
-			await savePlanAnswer(timeline, answer, eaos, localTodayIso(new Date()));
+			return await savePlanAnswer(timeline, answer, eaos, localTodayIso(new Date()));
 		} catch (err) {
 			// The re-read may show the question answered in another tab; then the card goes, as after an answer here.
 			planHeld = false;
@@ -201,7 +201,6 @@
 				{#if plan && (plan.card || planHeld)}
 					<SkillBridgeQuestion
 						wording={plan.card ?? 'again'}
-						notSureReturns={plan.notSureReturns}
 						onAnswer={answerPlan}
 						onClose={() => void closePlan()}
 					/>

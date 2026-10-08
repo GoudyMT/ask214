@@ -10,15 +10,14 @@ const SKILLBRIDGE = RESOURCES.find((r) => r.id === 'skillbridge');
 function card(
 	props: Partial<{
 		wording: 'first' | 'again';
-		notSureReturns: string | null;
-		onAnswer: (a: string) => Promise<void>;
+		onAnswer: (a: string) => Promise<string | null>;
 		onClose: () => void;
 	}> = {}
 ) {
-	const onAnswer = props.onAnswer ?? vi.fn(() => Promise.resolve());
+	const onAnswer = props.onAnswer ?? vi.fn(() => Promise.resolve(null));
 	const onClose = props.onClose ?? vi.fn();
 	const r = render(SkillBridgeQuestion, {
-		props: { wording: 'first', notSureReturns: '2027-04-01', ...props, onAnswer, onClose }
+		props: { wording: 'first', ...props, onAnswer, onClose }
 	});
 	return { ...r, onAnswer, onClose };
 }
@@ -76,14 +75,15 @@ function expectFitsStatusLine(section: Element | null): void {
 	expect(Math.abs(frame.getBoundingClientRect().height - expected)).toBeLessThanOrEqual(1);
 }
 
+// Each case: the tapped label, the answer, the day the save resolves to, and the line that follows.
 const ANSWERED_CASES = [
 	[
 		'Yes',
 		'yes',
-		'2027-04-01',
+		null,
 		'SkillBridge steps added to your timeline. You can change this in Settings.'
 	],
-	['No', 'no', '2027-04-01', 'Got it. You can change this in Settings.'],
+	['No', 'no', null, 'Got it. You can change this in Settings.'],
 	[
 		'Not sure',
 		'not-sure',
@@ -125,7 +125,7 @@ describe('SkillBridgeQuestion', () => {
 	});
 
 	it('asks in the second wording', async () => {
-		const { container } = card({ wording: 'again', notSureReturns: null });
+		const { container } = card({ wording: 'again' });
 		await expect
 			.element(page.getByRole('heading', { name: 'Still thinking about SkillBridge?' }))
 			.toBeVisible();
@@ -136,9 +136,9 @@ describe('SkillBridgeQuestion', () => {
 	});
 
 	it.each(ANSWERED_CASES)(
-		'after %s (returns %s) fits the frame to its message, focuses one line and offers only Dismiss',
+		'after %s (save resolves to %s) fits the frame to its message, focuses one line and offers only Dismiss',
 		async (label, answer, returns, line) => {
-			const { container, onAnswer } = card({ notSureReturns: returns });
+			const { container, onAnswer } = card({ onAnswer: vi.fn(() => Promise.resolve(returns)) });
 			const section = container.querySelector('section');
 			const before = section?.getBoundingClientRect().height ?? 0;
 			await page.getByRole('button', { name: label, exact: true }).click();
@@ -157,10 +157,10 @@ describe('SkillBridgeQuestion', () => {
 
 	// The card is as wide as the page's content on a 320 px phone (16 px gutters), where the longest line wraps.
 	it.each(ANSWERED_CASES)(
-		'after %s (returns %s) the message stops before the close button and the button stays inside the frame',
+		'after %s (save resolves to %s) the message stops before the close button and the button stays inside the frame',
 		async (label, _answer, returns, line) => {
 			await page.viewport(320, 800);
-			const { container } = card({ notSureReturns: returns });
+			const { container } = card({ onAnswer: vi.fn(() => Promise.resolve(returns)) });
 			container.style.width = '288px';
 			await page.getByRole('button', { name: label, exact: true }).click();
 			const status = page.getByRole('status');
@@ -224,11 +224,13 @@ describe('SkillBridgeQuestion', () => {
 
 	it('blocks a second tap while saving, frees the answers after a failed save, and clears the error on a retry', async () => {
 		let failFirst: (e: Error) => void = () => {};
-		let finishSecond: () => void = () => {};
+		let finishSecond: (day: string | null) => void = () => {};
 		const onAnswer = vi
-			.fn<(a: string) => Promise<void>>()
-			.mockImplementationOnce(() => new Promise<void>((_, reject) => (failFirst = reject)))
-			.mockImplementationOnce(() => new Promise<void>((resolve) => (finishSecond = resolve)));
+			.fn<(a: string) => Promise<string | null>>()
+			.mockImplementationOnce(() => new Promise<string | null>((_, reject) => (failFirst = reject)))
+			.mockImplementationOnce(
+				() => new Promise<string | null>((resolve) => (finishSecond = resolve))
+			);
 		const { container } = card({ onAnswer });
 		const yes = page.getByRole('button', { name: 'Yes', exact: true });
 		const disabledStates = () =>
@@ -243,7 +245,7 @@ describe('SkillBridgeQuestion', () => {
 		await yes.click();
 		expect(page.getByRole('alert').elements()).toHaveLength(0);
 		expect(disabledStates()).toEqual([true, true, true]);
-		finishSecond();
+		finishSecond(null);
 		await expect.element(page.getByRole('status')).toBeVisible();
 		expect(container.querySelector('section')?.hasAttribute('aria-labelledby')).toBe(false);
 	});
@@ -262,13 +264,13 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 	const onClose = () => {};
 
 	function pending() {
-		let settle: { resolve: () => void; reject: (e: Error) => void } = {
+		let settle: { resolve: (day: string | null) => void; reject: (e: Error) => void } = {
 			resolve: () => {},
 			reject: () => {}
 		};
-		const onAnswer = vi.fn<(answer: string) => Promise<void>>(
+		const onAnswer = vi.fn<(answer: string) => Promise<string | null>>(
 			() =>
-				new Promise<void>((resolve, reject) => {
+				new Promise<string | null>((resolve, reject) => {
 					settle = { resolve, reject };
 				})
 		);
@@ -280,7 +282,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 	it('keeps the tapped question until the status line replaces it, then fits the frame to the line', async () => {
 		await page.viewport(320, 800);
 		const { onAnswer, settle } = pending();
-		const props = { wording: 'first' as const, notSureReturns: '2027-04-01', onAnswer, onClose };
+		const props = { wording: 'first' as const, onAnswer, onClose };
 		const { container, rerender } = render(SkillBridgeQuestion, { props });
 		const section = container.querySelector('section');
 		const before = section?.getBoundingClientRect().height ?? 0;
@@ -293,7 +295,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 		await expect.element(page.getByText(/^SkillBridge is the DoD program/)).toBeVisible();
 		expect(page.getByText(/works best from about 14 months/).elements()).toHaveLength(0);
 
-		settle().resolve();
+		settle().resolve(null);
 		await expect.element(page.getByRole('status')).toBeVisible();
 		const after = section?.getBoundingClientRect().height ?? 0;
 		expect(after).toBeLessThan(before - 20);
@@ -305,7 +307,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 		await page.viewport(700, 800);
 		const { onAnswer, settle } = pending();
 		const { container } = render(SkillBridgeQuestion, {
-			props: { wording: 'first', notSureReturns: '2027-04-01', onAnswer, onClose }
+			props: { wording: 'first', onAnswer, onClose }
 		});
 		const section = container.querySelector('section');
 		const before = section?.getBoundingClientRect().height ?? 0;
@@ -314,7 +316,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 		const midSave = section?.getBoundingClientRect().height ?? 0;
 		expect(midSave).toBeGreaterThan(before + 10);
 
-		settle().resolve();
+		settle().resolve(null);
 		await expect.element(page.getByRole('status')).toBeVisible();
 		const after = section?.getBoundingClientRect().height ?? 0;
 		expect(after).toBeLessThan(midSave - 20);
@@ -326,7 +328,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 		await page.viewport(320, 800);
 		const { onAnswer, settle } = pending();
 		const { container } = render(SkillBridgeQuestion, {
-			props: { wording: 'first', notSureReturns: '2027-04-01', onAnswer, onClose }
+			props: { wording: 'first', onAnswer, onClose }
 		});
 		const section = container.querySelector('section');
 		const yes = page.getByRole('button', { name: 'Yes', exact: true });
@@ -340,7 +342,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 		expect(page.getByRole('alert').elements()).toHaveLength(0);
 		expect(withAlert).toBeGreaterThan(midSave + 5);
 
-		settle().resolve();
+		settle().resolve(null);
 		await expect.element(page.getByRole('status')).toBeVisible();
 		const after = section?.getBoundingClientRect().height ?? 0;
 		expect(after).toBeLessThan(midSave - 20);
@@ -348,26 +350,36 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 		expectFitsStatusLine(section);
 	});
 
-	it('words the status line from the props at the tap, not from the props at the end of the save', async () => {
+	// The save names the day it wrote; the card words its line from that, not from anything it read before the tap.
+	it('words a Not sure line from the day the save resolves to, whatever the wording rerendered to meanwhile', async () => {
 		const { onAnswer, settle } = pending();
-		const props = {
-			wording: 'first' as const,
-			notSureReturns: '2027-04-01' as string | null,
-			onAnswer,
-			onClose
-		};
+		const props = { wording: 'first' as const, onAnswer, onClose };
 		const { rerender } = render(SkillBridgeQuestion, { props });
 		await page.getByRole('button', { name: 'Not sure', exact: true }).click();
-		await rerender({ ...props, notSureReturns: null });
-		settle().resolve();
+		await rerender({ ...props, wording: 'again' });
+		settle().resolve('2027-04-01');
 		await expect
 			.element(page.getByRole('status'))
 			.toHaveTextContent("We'll ask again on Apr 1, 2027. You can change this in Settings.");
 	});
 
+	it('words a Not sure line as the steps line when the save resolves to no day', async () => {
+		const { onAnswer, settle } = pending();
+		const props = { wording: 'first' as const, onAnswer, onClose };
+		const { rerender } = render(SkillBridgeQuestion, { props });
+		await page.getByRole('button', { name: 'Not sure', exact: true }).click();
+		await rerender({ ...props, wording: 'again' });
+		settle().resolve(null);
+		await expect
+			.element(page.getByRole('status'))
+			.toHaveTextContent(
+				'SkillBridge steps added to your timeline. You can change this in Settings.'
+			);
+	});
+
 	it('shows the current question again when the save fails', async () => {
 		const { onAnswer, settle } = pending();
-		const props = { wording: 'first' as const, notSureReturns: '2027-04-01', onAnswer, onClose };
+		const props = { wording: 'first' as const, onAnswer, onClose };
 		const { rerender } = render(SkillBridgeQuestion, { props });
 		await page.getByRole('button', { name: 'Yes', exact: true }).click();
 		await rerender({ ...props, wording: 'again' });

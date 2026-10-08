@@ -28,27 +28,27 @@ function fakeStore(fail?: Error) {
 }
 
 describe('savePlanAnswer', () => {
-	it('writes Yes as done', async () => {
+	it('writes Yes as done and resolves to no return day', async () => {
 		const { store, calls } = fakeStore();
-		await savePlanAnswer(store, 'yes', SEP, BEFORE);
+		await expect(savePlanAnswer(store, 'yes', SEP, BEFORE)).resolves.toBeNull();
 		expect(calls).toEqual([['setStatus', SKILLBRIDGE_PLAN_KEY, 'done']]);
 	});
 
-	it('writes No as skipped', async () => {
+	it('writes No as skipped and resolves to no return day', async () => {
 		const { store, calls } = fakeStore();
-		await savePlanAnswer(store, 'no', SEP, BEFORE);
+		await expect(savePlanAnswer(store, 'no', SEP, BEFORE)).resolves.toBeNull();
 		expect(calls).toEqual([['setStatus', SKILLBRIDGE_PLAN_KEY, 'skipped']]);
 	});
 
-	it('writes a Not sure before the second ask as a snooze to the second ask, and nothing else', async () => {
+	it('writes a Not sure before the second ask as a snooze to the second ask, and resolves to that day', async () => {
 		const { store, calls } = fakeStore();
-		await savePlanAnswer(store, 'not-sure', SEP, BEFORE);
+		await expect(savePlanAnswer(store, 'not-sure', SEP, BEFORE)).resolves.toBe(AGAIN);
 		expect(calls).toEqual([['setSnooze', SKILLBRIDGE_PLAN_KEY, AGAIN]]);
 	});
 
-	it('writes a Not sure from the second ask on as a bare snoozed status', async () => {
+	it('writes a Not sure from the second ask on as a bare snoozed status and resolves to no return day', async () => {
 		const { store, calls } = fakeStore();
-		await savePlanAnswer(store, 'not-sure', SEP, AGAIN);
+		await expect(savePlanAnswer(store, 'not-sure', SEP, AGAIN)).resolves.toBeNull();
 		expect(calls).toEqual([['setStatus', SKILLBRIDGE_PLAN_KEY, 'snoozed']]);
 	});
 

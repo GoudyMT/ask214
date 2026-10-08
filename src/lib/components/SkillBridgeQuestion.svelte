@@ -14,14 +14,12 @@
 
 	type Props = {
 		wording: 'first' | 'again';
-		/** The day a Not sure brings the card back, or null when a Not sure now shows the steps. */
-		notSureReturns: string | null;
-		/** Saves the answer; rejects when the save fails. */
-		onAnswer: (answer: PlanAnswer) => Promise<void>;
+		/** Saves the answer; resolves to the day a Not sure brings the card back (null when none) and rejects on failure. */
+		onAnswer: (answer: PlanAnswer) => Promise<string | null>;
 		/** Called when the person closes the answered message; the page removes the card. */
 		onClose: () => void;
 	};
-	let { wording, notSureReturns, onAnswer, onClose }: Props = $props();
+	let { wording, onAnswer, onClose }: Props = $props();
 
 	const FAILED = 'Could not update right now - please try again.';
 	const ANSWERS: readonly PlanAnswer[] = ['yes', 'not-sure', 'no'];
@@ -38,19 +36,18 @@
 	let lineEl = $state<HTMLElement | null>(null);
 
 	async function answer(choice: PlanAnswer): Promise<void> {
-		// Worked out before the save, while the props still describe the question that was answered.
-		const line =
-			choice === 'no'
-				? ANSWERED.no
-				: choice === 'not-sure' && notSureReturns
-					? askAgainLine(notSureReturns)
-					: ANSWERED.yes;
 		tapped = words;
 		busy = true;
 		error = null;
 		try {
-			await onAnswer(choice);
-			answered = line;
+			// The line follows the write that was made, so it cannot disagree with what is saved.
+			const returns = await onAnswer(choice);
+			answered =
+				choice === 'no'
+					? ANSWERED.no
+					: choice === 'not-sure' && returns
+						? askAgainLine(returns)
+						: ANSWERED.yes;
 			await tick();
 			lineEl?.focus();
 		} catch {
