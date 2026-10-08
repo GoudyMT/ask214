@@ -357,6 +357,12 @@ describe('SkillBridgePlanRow (the choices as pills)', () => {
 				{ value: 'not-sure', width: '3px' },
 				{ value: 'no', width: '1px' }
 			]);
+			// The system highlight colour is the other half of the mark: it must differ from the plain pills' border.
+			const [yes, notSure, no] = pills(container).map(
+				(p) => getComputedStyle(p.label).borderTopColor
+			);
+			expect(notSure).not.toBe(yes);
+			expect(notSure).not.toBe(no);
 		} finally {
 			await session.send('Emulation.setEmulatedMedia', {
 				features: [{ name: 'forced-colors', value: 'none' }]
