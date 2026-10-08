@@ -164,6 +164,27 @@ for (const how of ['Enter', 'tap'] as const) {
 	});
 }
 
+test('the close x clears the sticky header when Tab reaches it from the status line with the card scrolled away', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 320, height: 640 });
+	await seedProfile(page, 208);
+	await page.locator('.sb-card').getByRole('button', { name: 'Yes', exact: true }).click();
+	await expect(page.locator('.sb-card').getByRole('status')).toBeFocused();
+	await page.evaluate(() => {
+		const card = document.querySelector('.sb-card');
+		if (card) window.scrollBy(0, card.getBoundingClientRect().top + 30);
+	});
+	await page.keyboard.press('Tab');
+	const close = page.getByRole('button', { name: 'Dismiss SkillBridge message', exact: true });
+	await expect(close).toBeFocused();
+	const rects = await page.evaluate(() => ({
+		closeTop: document.querySelector('.sb-card__close')?.getBoundingClientRect().top ?? NaN,
+		headerBottom: document.querySelector('header')?.getBoundingClientRect().bottom ?? NaN
+	}));
+	expect(rects.closeTop).toBeGreaterThanOrEqual(rects.headerBottom);
+});
+
 // Closing the card moves the calendar card up under the same spot, and moves focus to its Add button: a second tap or
 // key on the x lands on the calendar card instead.
 const CLOSE_NAME = 'Dismiss SkillBridge message';
