@@ -2,7 +2,12 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
-import { AFTER_SKILLBRIDGE, BEFORE_TERMINAL_LEAVE, ORDER_NOTE } from '$lib/profile/leaving-copy';
+import {
+	AFTER_SEPARATION,
+	AFTER_SKILLBRIDGE,
+	BEFORE_TERMINAL_LEAVE,
+	ORDER_NOTE
+} from '$lib/profile/leaving-copy';
 
 // Days from the real clock: the page reads each typed date against the separation date and the other leaving date.
 const { isoFromToday, store } = vi.hoisted(() => ({
@@ -85,7 +90,7 @@ async function enter(
 }
 
 describe('Settings, the SkillBridge and terminal leave dates in order', () => {
-	// The reported case: a SkillBridge start of Oct 19 saved, then a terminal leave start of Oct 8 typed.
+	// A terminal leave start typed 11 days before a saved SkillBridge start (Oct 8 against Oct 19), or on its day.
 	it.each([
 		['before', -11],
 		['on', 0]
@@ -114,6 +119,16 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 			expect(store.save).not.toHaveBeenCalled();
 		}
 	);
+
+	// A date that breaks both rules gets the separation line: no leaving date can be on or after separation at all.
+	it('refuses a SkillBridge start on separation day and after terminal leave with the separation line', async () => {
+		withLeaving({ terminalLeaveStart: isoFromToday(STORED) });
+		render(SettingsPage);
+		await enter('SkillBridge start', isoFromToday(SEPARATION));
+		await expect.element(page.getByText(AFTER_SEPARATION)).toBeVisible();
+		expect(page.getByText(BEFORE_TERMINAL_LEAVE).query()).toBeNull();
+		expect(store.save).not.toHaveBeenCalled();
+	});
 
 	it('saves a SkillBridge start the day before terminal leave, and a terminal leave start the day after SkillBridge', async () => {
 		withLeaving({
