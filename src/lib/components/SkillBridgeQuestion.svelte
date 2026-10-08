@@ -35,7 +35,7 @@
 	let answered = $state<string | null>(null);
 	let lineEl = $state<HTMLElement | null>(null);
 
-	async function answer(choice: PlanAnswer): Promise<void> {
+	async function answer(choice: PlanAnswer, button: HTMLButtonElement): Promise<void> {
 		tapped = words;
 		busy = true;
 		error = null;
@@ -53,8 +53,10 @@
 		} catch {
 			tapped = null;
 			error = FAILED;
-		} finally {
 			busy = false;
+			// The button was disabled during the save, which dropped focus to the page.
+			await tick();
+			button.focus();
 		}
 	}
 </script>
@@ -70,7 +72,7 @@
 		<p class="sb-card__copy">{shown.line}</p>
 		<div class="sb-card__answers" role="group" aria-labelledby="sb-card-heading">
 			{#each ANSWERS as choice (choice)}
-				<button type="button" disabled={busy} onclick={() => void answer(choice)}
+				<button type="button" disabled={busy} onclick={(e) => void answer(choice, e.currentTarget)}
 					>{ANSWER_LABEL[choice]}</button
 				>
 			{/each}

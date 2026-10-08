@@ -212,6 +212,16 @@ describe('SkillBridgeQuestion', () => {
 		expect(page.getByRole('button', { name: 'Yes', exact: true }).elements()).toHaveLength(1);
 	});
 
+	// The tapped button is disabled during the save, which drops focus to the body; the person must land back on it.
+	it.each(['Yes', 'Not sure', 'No'])('puts focus back on %s after a failed save', async (label) => {
+		card({ onAnswer: vi.fn(() => Promise.reject(new Error('E_TEST'))) });
+		const tapped = page.getByRole('button', { name: label, exact: true });
+		await tapped.click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await expect.element(tapped).toBeEnabled();
+		expect(document.activeElement).toBe(tapped.element());
+	});
+
 	it('names the card, and opens the link in a new tab and says so', async () => {
 		const { container } = card();
 		await expect

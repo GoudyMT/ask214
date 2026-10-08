@@ -97,19 +97,25 @@
 		} catch (err) {
 			// The re-read may show the question answered in another tab; then the card goes, as after an answer here.
 			planHeld = false;
+			if (!plan?.card) await focusAfterCard();
 			throw err;
 		}
 	}
 
-	// Closing the answered message removes the card, which held focus; focus goes to the next thing the person
-	// would act on, so a keyboard or screen-reader user is not dropped back at the top of the page.
+	// A card that held focus is gone (closed, or removed by a re-read); focus goes to the next thing the person would
+	// act on, so a keyboard or screen-reader user is not dropped back at the top of the page. A fully resolved phase is
+	// collapsed, so its tasks are not on the page: its toggle comes next, and the heading when there is no list at all.
+	async function focusAfterCard(): Promise<void> {
+		await tick();
+		for (const selector of ['.cal-card__add', '[id^="task-"]', '.timeline-list__toggle', 'h1']) {
+			const next = document.querySelector<HTMLElement>(selector);
+			if (next) return next.focus();
+		}
+	}
+
 	async function closePlan(): Promise<void> {
 		planHeld = false;
-		await tick();
-		const next =
-			document.querySelector<HTMLElement>('.cal-card__add') ??
-			document.querySelector<HTMLElement>('[id^="task-"]');
-		next?.focus();
+		await focusAfterCard();
 	}
 
 	async function unlock(): Promise<void> {
@@ -172,7 +178,7 @@
 <!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
      separation date. -->
 <div translate="no">
-	<h1>Timeline</h1>
+	<h1 tabindex="-1">Timeline</h1>
 
 	{#if app.status === 'ready'}
 		<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.

@@ -4,6 +4,7 @@ import { page } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 import { formatTimelineDate } from '$lib/timeline/format-date';
+import { TASK_DEFS } from '$lib/timeline';
 
 // Days from the real clock: the page builds the timeline from today.
 const { isoFromToday, current } = vi.hoisted(() => ({
@@ -211,23 +212,26 @@ describe('Timeline, the SkillBridge question', () => {
 	});
 
 	// A store whose state changes when a write lands, as the real one does.
-	function liveStore(save: 'lands' | 'fails') {
+	function liveStore(
+		save: 'lands' | 'fails',
+		saved: NonNullable<typeof current.timeline>['state']['tasks'] = {}
+	) {
 		const setStatus = vi.fn(async (taskId: string, status: 'done' | 'skipped' | 'snoozed') => {
 			if (save === 'fails') throw new Error('E_TEST');
-			store.state = { schemaVersion: 1, tasks: { [taskId]: { status } } };
+			store.state = { schemaVersion: 1, tasks: { ...store.state.tasks, [taskId]: { status } } };
 		});
 		const setSnooze = vi.fn(async (taskId: string, untilIso: string) => {
 			if (save === 'fails') throw new Error('E_TEST');
 			store.state = {
 				schemaVersion: 1,
-				tasks: { [taskId]: { status: 'snoozed', snoozeUntil: untilIso } }
+				tasks: { ...store.state.tasks, [taskId]: { status: 'snoozed', snoozeUntil: untilIso } }
 			};
 		});
 		const refresh = vi.fn(async () => {});
 		const store = $state({
 			ready: true,
 			failed: false,
-			state: { schemaVersion: 1 as const, tasks: {} } as NonNullable<
+			state: { schemaVersion: 1 as const, tasks: saved } as NonNullable<
 				typeof current.timeline
 			>['state'],
 			setStatus,
@@ -365,5 +369,42 @@ describe('Timeline, the SkillBridge question', () => {
 		await page.getByRole('button', { name: 'Yes' }).click();
 		await expect.poll(() => refresh.mock.calls.length).toBe(1);
 		await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
+		// The tapped button went with the card, so focus goes to the next thing to act on, not the page body.
+		const first = document.querySelector<HTMLElement>('[id^="task-"]');
+		expect(first).not.toBeNull();
+		await expect.poll(() => document.activeElement).toBe(first);
+	});
+
+	it('moves focus to the page heading when the re-read after a failed save leaves the progress failed', async () => {
+		const { store, refresh } = liveStore('fails');
+		refresh.mockImplementation(async () => {
+			store.failed = true;
+		});
+		current.timeline = store;
+		const { container } = render(TimelinePage);
+		await page.getByRole('button', { name: 'Yes' }).click();
+		await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await expect.poll(() => document.activeElement).toBe(document.querySelector('h1'));
+	});
+
+	// A fully resolved phase is collapsed, so with every task resolved no task card is on the page to take focus.
+	it('moves focus to the first phase toggle after Dismiss when no task card or calendar card is on the page', async () => {
+		const done = Object.fromEntries(TASK_DEFS.map((d) => [d.id, { status: 'done' as const }]));
+		const { store } = liveStore('lands', done);
+		current.timeline = store;
+		const { container } = render(TimelinePage);
+		await page.getByRole('button', { name: 'No', exact: true }).click();
+		await expect.element(page.getByRole('status')).toBeVisible();
+		expect(container.querySelector('[id^="task-"]')).toBeNull();
+		expect(container.querySelector('.cal-card')).toBeNull();
+
+		// Without app.css the card has no padding, so its 44 px close button overhangs the chips below it and a pointer
+		// click would land on a chip; the click is sent to the button itself.
+		(page.getByRole('button', { name: 'Dismiss' }).element() as HTMLElement).click();
+		await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
+		const toggle = container.querySelector('.timeline-list__toggle');
+		expect(toggle).not.toBeNull();
+		await expect.poll(() => document.activeElement).toBe(toggle);
 	});
 });
