@@ -219,10 +219,11 @@ describe('firm deadlines match their official sources', () => {
 		);
 	});
 
-	// Navy practice: the search for a program starts about 14 months out (426 days); the request opens at the 364-day
-	// mark, the day after NAVADMIN 160/22 8.a's "up to 365 days before", where the portal opens; both aim at their
-	// opening. The request window runs to 201 days out: the longest program, 180 days (NAVADMIN 064/23 tier one), plus
-	// "at least 3 weeks prior to start date" (MyNavyHR's SkillBridge timeline).
+	// Two of these numbers come from a sailor's experience, not a written rule: the search for a program starts about
+	// 14 months out (426 days), and the request opens at the 364-day mark, where the portal opens; both aim at their
+	// opening. The written sources fix the rest: NAVADMIN 160/22 8.a's "up to 365 days before" bounds the opening, and
+	// the request window runs to 201 days out: the longest program, 180 days (NAVADMIN 064/23 tier one), plus "at
+	// least 3 weeks prior to start date" (MyNavyHR's SkillBridge timeline).
 	it('times the SkillBridge steps from their sources', () => {
 		expect(at('skillbridge-find')).toMatchObject({
 			kind: 'soft',
