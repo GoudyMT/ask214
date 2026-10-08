@@ -1,7 +1,7 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
-	// The release version from package.json, built in by `define` in vite.config.ts.
+	// The release version from package.json; vite.config.ts writes it into the root layout as text before compiling.
 	const __APP_VERSION__: string;
 	namespace App {
 		interface Platform {

@@ -10,7 +10,9 @@ import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm';
 // a test that stubs another zone get this one back (Node on Windows ignores a deleted TZ).
 const TEST_TIME_ZONE = 'America/Los_Angeles';
 
-// The release the footer names, built into the page as a constant: each release's pull request bumps package.json.
+// The release the footer names; each release's pull request bumps package.json. The first plugin below writes it into
+// the root layout as plain text before Svelte compiles, so the page carries static markup: a `define` constant was
+// set by Svelte at runtime, 21 B more on every page.
 const { version } = JSON.parse(
 	readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
 ) as {
@@ -18,14 +20,24 @@ const { version } = JSON.parse(
 };
 
 export default defineConfig({
-	define: { __APP_VERSION__: JSON.stringify(version) },
 	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
 	// sends `upgrade-insecure-requests` and browsers that honour it rewrite every asset URL to https.
 	// Over plain HTTP that yields a page with no stylesheet at all - which is not a product bug (in
 	// production the directive is a no-op, the origin is already HTTPS) but does make the E2E suite
 	// unable to test the app as it actually ships. The cert is generated on demand and never written
 	// to the repo; a checked-in private key is a liability that protects nothing.
-	plugins: [sveltekit(), basicSsl()],
+	plugins: [
+		{
+			name: 'app-version',
+			enforce: 'pre',
+			transform: (code, id) =>
+				id.endsWith('/src/routes/+layout.svelte')
+					? code.replaceAll('{__APP_VERSION__}', version)
+					: null
+		},
+		sveltekit(),
+		basicSsl()
+	],
 	worker: {
 		// Drops the ONNX runtime's unused fallback WASM from each worker bundle (~23 MB the embed worker never
 		// loads, because it sets `wasmPaths = '/wasm/'`) and fails the build on any other WASM; the reasoning is
