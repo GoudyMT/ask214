@@ -251,6 +251,21 @@ describe('Timeline, the SkillBridge question', () => {
 		expect(container.querySelectorAll('.sb-card')).toHaveLength(1);
 	});
 
+	it('keeps the answered card until Dismiss, then removes it and moves focus to the first task', async () => {
+		const { store } = liveStore('lands');
+		current.timeline = store;
+		const { container } = render(TimelinePage);
+		await page.getByRole('button', { name: 'Yes' }).click();
+		await expect.element(page.getByRole('status')).toBeVisible();
+		expect(container.querySelectorAll('.sb-card')).toHaveLength(1);
+
+		await page.getByRole('button', { name: 'Dismiss' }).click();
+		await expect.poll(() => container.querySelector('.sb-card')).toBeNull();
+		const first = document.querySelector<HTMLElement>('[id^="task-"]');
+		expect(first).not.toBeNull();
+		expect(document.activeElement).toBe(first);
+	});
+
 	it('saves No as skipped', async () => {
 		const { store, setStatus } = liveStore('lands');
 		current.timeline = store;

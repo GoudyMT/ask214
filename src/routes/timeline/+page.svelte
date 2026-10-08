@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
@@ -76,8 +77,8 @@
 	);
 
 	const plan = $derived(readablePlan(app.timeline, eaos, localTodayIso(new Date())));
-	// Set at the tap, before the save lands: the card stays on the page so its frame can hold the answer's line until
-	// the next visit.
+	// Set at the tap, before the save lands: the store's answer ends the question, but the card stays on the page to show
+	// what happened, until the person closes it or leaves.
 	let planHeld = $state(false);
 
 	// The SkillBridge answer -> the encrypted timeline store, through the shared save (it re-reads the store on a
@@ -93,6 +94,17 @@
 			planHeld = false;
 			throw err;
 		}
+	}
+
+	// Closing the answered message removes the card, which held focus; focus goes to the next thing the person
+	// would act on, so a keyboard or screen-reader user is not dropped back at the top of the page.
+	async function closePlan(): Promise<void> {
+		planHeld = false;
+		await tick();
+		const next =
+			document.querySelector<HTMLElement>('.cal-card__add') ??
+			document.querySelector<HTMLElement>('[id^="task-"]');
+		next?.focus();
 	}
 
 	async function unlock(): Promise<void> {
@@ -191,6 +203,7 @@
 						wording={plan.card ?? 'again'}
 						notSureReturns={plan.notSureReturns}
 						onAnswer={answerPlan}
+						onClose={() => void closePlan()}
 					/>
 				{/if}
 				{#if showCalendarCard}

@@ -18,8 +18,10 @@
 		notSureReturns: string | null;
 		/** Saves the answer; rejects when the save fails. */
 		onAnswer: (answer: PlanAnswer) => Promise<void>;
+		/** Called when the person closes the answered message; the page removes the card. */
+		onClose: () => void;
 	};
-	let { wording, notSureReturns, onAnswer }: Props = $props();
+	let { wording, notSureReturns, onAnswer, onClose }: Props = $props();
 
 	const FAILED = 'Could not update right now - please try again.';
 	const ANSWERS: readonly PlanAnswer[] = ['yes', 'not-sure', 'no'];
@@ -33,8 +35,6 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let answered = $state<string | null>(null);
-	let heldHeight = $state<number | null>(null);
-	let cardEl = $state<HTMLElement | null>(null);
 	let lineEl = $state<HTMLElement | null>(null);
 
 	async function answer(choice: PlanAnswer): Promise<void> {
@@ -50,9 +50,6 @@
 		error = null;
 		try {
 			await onAnswer(choice);
-			// The frame keeps the height it has when the line replaces the question, so the card below does not move
-			// under the finger that just tapped. Measured here, not at the tap: a retry's tap still showed the error.
-			heldHeight = cardEl?.offsetHeight ?? null;
 			answered = line;
 			await tick();
 			lineEl?.focus();
@@ -65,14 +62,12 @@
 	}
 </script>
 
-<section
-	bind:this={cardEl}
-	class="sb-card"
-	aria-labelledby={answered ? undefined : 'sb-card-heading'}
-	style:min-height={heldHeight ? `${heldHeight}px` : undefined}
->
+<section class="sb-card" aria-labelledby={answered ? undefined : 'sb-card-heading'}>
 	{#if answered}
 		<p bind:this={lineEl} class="sb-card__done" role="status" tabindex="-1">{answered}</p>
+		<button class="sb-card__close" type="button" aria-label="Dismiss" onclick={onClose}>
+			<span aria-hidden="true">x</span>
+		</button>
 	{:else}
 		<h2 id="sb-card-heading" class="sb-card__heading">{shown.heading}</h2>
 		<p class="sb-card__copy">{shown.line}</p>
@@ -97,9 +92,9 @@
 <style>
 	/* The calendar card's offer look: an accent edge, not a warning. Static, per the brand register. */
 	.sb-card {
+		position: relative;
 		display: flex;
 		flex-direction: column;
-		justify-content: center;
 		margin-bottom: var(--space-l);
 		padding: var(--space-m);
 		background: var(--color-surface);
@@ -156,8 +151,28 @@
 		color: var(--color-danger);
 		font-size: var(--font-size-s);
 	}
+	/* Room for the 44px close button, so the message never runs under the x. */
 	.sb-card__done {
 		margin: 0;
+		padding-right: calc(44px - var(--space-m));
+	}
+	/* The calendar card's quiet x, with a 44px tap area at the frame's top right. */
+	.sb-card__close {
+		position: absolute;
+		top: 0;
+		right: 0;
+		min-width: 44px;
+		min-height: 44px;
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-fg-muted);
+		font: inherit;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.sb-card__close:hover {
+		color: var(--color-fg);
 	}
 	.visually-hidden {
 		position: absolute;
