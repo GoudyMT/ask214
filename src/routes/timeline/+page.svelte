@@ -44,7 +44,8 @@
 	});
 
 	// The generated timeline projection (pure): re-derives when the persona or the stored
-	// per-task state changes. TASK_DEFS is readonly; generateTimeline takes a mutable array.
+	// per-task state changes, and when the day turns at local midnight. TASK_DEFS is readonly;
+	// generateTimeline takes a mutable array.
 	const view = $derived.by(() => {
 		const persona = app.store?.persona;
 		if (!persona || persona.completeness === 'none') return null;

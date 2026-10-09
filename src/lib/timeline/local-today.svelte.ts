@@ -1,4 +1,3 @@
-/* eslint-disable svelte/prefer-svelte-reactivity -- every Date here is read once and never changed; the reactivity comes from the subscription, which re-reads the clock */
 import { createSubscriber } from 'svelte/reactivity';
 
 /**
@@ -6,6 +5,7 @@ import { createSubscriber } from 'svelte/reactivity';
  * by adding 24 hours, so the day the clocks change is 23 or 25 hours long.
  */
 export function msToNextLocalMidnight(now: Date): number {
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- read once for its time; nothing reactive depends on it
 	return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
 }
 
@@ -23,10 +23,14 @@ export class LocalToday {
 	#subscribe = createSubscriber((update) => {
 		let timer: ReturnType<typeof setTimeout>;
 		const arm = (): void => {
-			timer = setTimeout(() => {
-				update();
-				arm();
-			}, msToNextLocalMidnight(new Date()));
+			timer = setTimeout(
+				() => {
+					update();
+					arm();
+				},
+				// eslint-disable-next-line svelte/prefer-svelte-reactivity -- read once for its time; nothing reactive depends on it
+				msToNextLocalMidnight(new Date())
+			);
 		};
 		arm();
 		return () => clearTimeout(timer);
@@ -35,6 +39,7 @@ export class LocalToday {
 	/** The clock at the moment of the read. */
 	get now(): Date {
 		this.#subscribe();
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a fresh value per read; the subscription is what makes it reactive
 		return new Date();
 	}
 }

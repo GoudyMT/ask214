@@ -6,6 +6,8 @@ import SettingsPage from './+page.svelte';
 import type { CalendarFile } from '$lib/calendar/build-ics';
 import { TASK_DEFS } from '$lib/timeline';
 import { addDays, localTodayIso } from '$lib/timeline/day-math';
+import { ASK_AGAIN_DAYS } from '$lib/timeline/skillbridge-plan';
+import { ROW_HINT_LATE, rowHintEarly } from '$lib/timeline/skillbridge-copy';
 
 const { current, handOver } = vi.hoisted(() => ({
 	handOver: vi.fn<(file: CalendarFile) => Promise<void>>(async () => {}),
@@ -85,5 +87,26 @@ describe('Settings, a page left open past midnight', () => {
 			isoDate: windowEnd
 		});
 		expect(file.ics).toContain(`SUMMARY:Aim for: ${SOFT.title}`);
+	});
+
+	// With no answer saved, the open Planning SkillBridge row says on which day a Not sure brings the question back,
+	// until that day itself arrives. With separation set so that day is tomorrow, the line changes when the day turns.
+	it('changes the line under the open SkillBridge row on the day a Not sure would come back', async () => {
+		vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+		const start = new Date();
+		start.setHours(23, 59, 60 - SECONDS_BEFORE_MIDNIGHT, 0);
+		vi.setSystemTime(start);
+		const today = localTodayIso(new Date());
+		current.eaos = addDays(today, ASK_AGAIN_DAYS + 1);
+
+		const { container } = await render(SettingsPage);
+		(page.getByRole('button', { name: /^planning skillbridge/i }).element() as HTMLElement).click();
+		await tick();
+		const hint = () => container.querySelector('.sb-row__hint')?.textContent;
+		expect(hint()).toBe(rowHintEarly(addDays(today, 1)));
+
+		vi.advanceTimersByTime(SECONDS_BEFORE_MIDNIGHT * 1000);
+		await tick();
+		expect(hint()).toBe(ROW_HINT_LATE);
 	});
 });

@@ -7,6 +7,7 @@ import type { CalendarFile } from '$lib/calendar/build-ics';
 import { TASK_DEFS } from '$lib/timeline';
 import { addDays, localTodayIso } from '$lib/timeline/day-math';
 import { formatTimelineDate } from '$lib/timeline/format-date';
+import { LAST_ASK_DAYS } from '$lib/timeline/skillbridge-plan';
 
 const { current, handOver } = vi.hoisted(() => ({
 	handOver: vi.fn<(file: CalendarFile) => Promise<void>>(async () => {}),
@@ -101,5 +102,17 @@ describe('Timeline, a page left open past midnight', () => {
 			isoDate: windowEnd
 		});
 		expect(file.ics).toContain(`SUMMARY:Aim for: ${SOFT.title}`);
+	});
+
+	// The question stops being asked from three weeks before separation. With separation a day past that line, the
+	// question is up on the old day and gone on the new one.
+	it('takes the SkillBridge question away on the day it stops being asked', async () => {
+		const { today } = startBeforeMidnight();
+		current.eaos = addDays(today, LAST_ASK_DAYS + 1);
+		const { container } = await render(TimelinePage);
+		expect(container.querySelectorAll('.sb-card')).toHaveLength(1);
+
+		await passMidnight();
+		expect(container.querySelectorAll('.sb-card')).toHaveLength(0);
 	});
 });
