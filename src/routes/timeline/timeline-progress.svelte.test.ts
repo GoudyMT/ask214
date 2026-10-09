@@ -278,7 +278,7 @@ describe('Timeline, the SkillBridge question', () => {
 		// The store now holds the answer, which hides the question; the card stays to say what happened.
 		await expect
 			.element(page.getByRole('status'))
-			.toHaveTextContent('SkillBridge steps added to your timeline.');
+			.toMatchTextContent('SkillBridge steps added to your timeline.');
 		expect(setStatus).toHaveBeenCalledExactlyOnceWith('skillbridge-plan', 'done');
 		expect(setSnooze).not.toHaveBeenCalled();
 		expect(refresh).not.toHaveBeenCalled();
@@ -315,7 +315,7 @@ describe('Timeline, the SkillBridge question', () => {
 			await page.getByRole('button', { name: 'Not sure' }).click();
 			await expect
 				.element(page.getByRole('status'))
-				.toHaveTextContent(`We'll ask again on ${formatTimelineDate(isoFromToday(1))}.`);
+				.toMatchTextContent(`We'll ask again on ${formatTimelineDate(isoFromToday(1))}.`);
 
 			const past = new Date(noon);
 			past.setDate(past.getDate() + 1);
@@ -373,7 +373,7 @@ describe('Timeline, the SkillBridge question', () => {
 		current.timeline = store;
 		await render(TimelinePage);
 		await page.getByRole('button', { name: 'No', exact: true }).click();
-		await expect.element(page.getByRole('status')).toHaveTextContent('Got it.');
+		await expect.element(page.getByRole('status')).toMatchTextContent('Got it.');
 		expect(setStatus).toHaveBeenCalledExactlyOnceWith('skillbridge-plan', 'skipped');
 	});
 
@@ -386,7 +386,7 @@ describe('Timeline, the SkillBridge question', () => {
 		// From the second ask a Not sure shows the steps, so it says what a Yes says.
 		await expect
 			.element(page.getByRole('status'))
-			.toHaveTextContent('SkillBridge steps added to your timeline.');
+			.toMatchTextContent('SkillBridge steps added to your timeline.');
 		expect(setStatus).toHaveBeenCalledExactlyOnceWith('skillbridge-plan', 'snoozed');
 		expect(setSnooze).not.toHaveBeenCalled();
 	});

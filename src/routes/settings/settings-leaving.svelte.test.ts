@@ -179,7 +179,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 		// The note renders with the rows, so once a row shows its date the note's absence is settled.
 		await expect
 			.element(timelineSection().getByRole('button', { name: 'Terminal leave start' }))
-			.toHaveTextContent(formatTimelineDate(isoFromToday(STORED + 1)));
+			.toMatchTextContent(formatTimelineDate(isoFromToday(STORED + 1)));
 		expect(page.getByText(ORDER_NOTE).query()).toBeNull();
 	});
 });

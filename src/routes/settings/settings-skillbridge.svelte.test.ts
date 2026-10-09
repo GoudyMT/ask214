@@ -119,20 +119,20 @@ describe('Settings, the Planning SkillBridge row', () => {
 	it('reads Not answered and is enabled when the timeline has read', async () => {
 		await render(SettingsPage);
 		await expect.element(toggle()).toBeEnabled();
-		await expect.element(toggle()).toHaveTextContent('Not answered');
+		await expect.element(toggle()).toMatchTextContent('Not answered');
 	});
 
 	it('reads Unavailable and is disabled when the timeline failed to read', async () => {
 		timeline.failed = true;
 		await render(SettingsPage);
 		await expect.element(toggle()).toBeDisabled();
-		await expect.element(toggle()).toHaveTextContent('Unavailable');
+		await expect.element(toggle()).toMatchTextContent('Unavailable');
 	});
 
 	it('reads Unavailable and is disabled when the timeline is locked', async () => {
 		timeline.locked = true;
 		await render(SettingsPage);
 		await expect.element(toggle()).toBeDisabled();
-		await expect.element(toggle()).toHaveTextContent('Unavailable');
+		await expect.element(toggle()).toMatchTextContent('Unavailable');
 	});
 });

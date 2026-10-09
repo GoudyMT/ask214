@@ -21,7 +21,7 @@ describe('SkillBridgePlanRow', () => {
 		const { container } = await render(SkillBridgePlanRow, {
 			props: { plan: null, onSave: vi.fn() }
 		});
-		await expect.element(toggle()).toHaveTextContent(/Unavailable/);
+		await expect.element(toggle()).toMatchTextContent(/Unavailable/);
 		await expect.element(toggle()).toBeDisabled();
 		await expect
 			.element(
@@ -199,7 +199,7 @@ describe('SkillBridgePlanRow', () => {
 		await expect.element(page.getByRole('radio', { name: 'No', exact: true })).toBeChecked();
 		await page.getByRole('radio', { name: 'Not sure' }).click();
 		await page.getByRole('button', { name: 'Save' }).click();
-		await expect.element(page.getByRole('alert')).toHaveTextContent(/changed in another tab/);
+		await expect.element(page.getByRole('alert')).toMatchTextContent(/changed in another tab/);
 		await page.getByRole('button', { name: 'Save' }).click();
 		await expect
 			.element(page.getByRole('alert'))
@@ -322,7 +322,9 @@ describe('SkillBridgePlanRow', () => {
 			await page.getByRole('button', { name: 'Save' }).click();
 			other.focus();
 			fail(new Error('E_TEST'));
-			await expect.element(page.getByRole('alert')).toHaveTextContent('Could not update right now');
+			await expect
+				.element(page.getByRole('alert'))
+				.toMatchTextContent('Could not update right now');
 			await expect.element(page.getByRole('button', { name: 'Save' })).toBeEnabled();
 			await new Promise((resolve) => setTimeout(resolve, 0));
 			expect(document.activeElement).toBe(other);
