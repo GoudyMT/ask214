@@ -24,15 +24,15 @@ const base: Props = {
 };
 
 describe('OnlineAnswersPanel', () => {
-	it('states plainly that the key is encrypted on-device and sent only to Anthropic, never to us', () => {
-		const { container } = render(OnlineAnswersPanel, { props: { ...base } });
+	it('states plainly that the key is encrypted on-device and sent only to Anthropic, never to us', async () => {
+		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
 		expect(container.textContent?.replace(/\s+/g, ' ')).toContain(
 			'sent only to Anthropic - never to us'
 		);
 	});
 
-	it('the "how is my key protected" disclosure names the concrete, provable guarantees', () => {
-		const { container } = render(OnlineAnswersPanel, { props: { ...base } });
+	it('the "how is my key protected" disclosure names the concrete, provable guarantees', async () => {
+		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
 		const details = container.querySelector('.online-key__protect');
 		expect(details).not.toBeNull();
 		const text = details?.textContent?.replace(/\s+/g, ' ') ?? '';
@@ -41,16 +41,16 @@ describe('OnlineAnswersPanel', () => {
 		expect(text).toContain("can't see, store, or use it"); // never reaches our servers
 	});
 
-	it('the key input is masked (type=password)', () => {
-		const { container } = render(OnlineAnswersPanel, { props: { ...base } });
+	it('the key input is masked (type=password)', async () => {
+		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
 		expect((container.querySelector('.online-key__input') as HTMLInputElement).type).toBe(
 			'password'
 		);
 	});
 
-	it('saving a typed key calls onSaveKey with it', () => {
+	it('saving a typed key calls onSaveKey with it', async () => {
 		let saved: string | null = null;
-		const { container } = render(OnlineAnswersPanel, {
+		const { container } = await render(OnlineAnswersPanel, {
 			props: { ...base, onSaveKey: (k) => (saved = k) }
 		});
 		const input = container.querySelector('.online-key__input') as HTMLInputElement;
@@ -62,13 +62,13 @@ describe('OnlineAnswersPanel', () => {
 		expect(saved).toBe('sk-test-key');
 	});
 
-	it('when a key is stored, offers to clear it and does not show the raw value', () => {
-		const { container } = render(OnlineAnswersPanel, { props: { ...base, hasKey: true } });
+	it('when a key is stored, offers to clear it and does not show the raw value', async () => {
+		const { container } = await render(OnlineAnswersPanel, { props: { ...base, hasKey: true } });
 		expect(container.querySelector('.online-key__clear')).not.toBeNull();
 	});
 
-	it('registers the key input so a relock scrub wipes a typed-but-unsaved key (DOM hygiene)', () => {
-		const { container } = render(OnlineAnswersPanel, { props: { ...base } });
+	it('registers the key input so a relock scrub wipes a typed-but-unsaved key (DOM hygiene)', async () => {
+		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
 		flushSync(); // let the registration $effect run
 		const input = container.querySelector('.online-key__input') as HTMLInputElement;
 		input.value = 'sk-ant-secret';

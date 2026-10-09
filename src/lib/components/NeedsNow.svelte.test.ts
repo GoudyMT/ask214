@@ -35,12 +35,12 @@ const empty: NeedsNowGroups = {
 };
 
 describe('NeedsNow', () => {
-	it('renders nothing when no task needs attention', () => {
-		const { container } = render(NeedsNow, { props: { groups: empty } });
+	it('renders nothing when no task needs attention', async () => {
+		const { container } = await render(NeedsNow, { props: { groups: empty } });
 		expect(container.querySelector('section')).toBeNull();
 	});
 
-	it('shows the count, only the non-empty groups, and rows that link to their cards', () => {
+	it('shows the count, only the non-empty groups, and rows that link to their cards', async () => {
 		const groups: NeedsNowGroups = {
 			...empty,
 			closingSoon: [item('bdd', 'File your VA claim through BDD', { daysLeft: 17 })],
@@ -51,7 +51,7 @@ describe('NeedsNow', () => {
 				})
 			]
 		};
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		expect(container.querySelector('h2')?.textContent).toContain('Needs you now');
 		expect(container.querySelector('.needs-now__count')?.textContent).toBe('2');
 		expect([...container.querySelectorAll('h3')].map((h) => h.textContent)).toEqual([
@@ -66,7 +66,7 @@ describe('NeedsNow', () => {
 
 	// A soft window has no closing date to give, so its row names the date the card aims for: the VA claim's row
 	// must never read like a deadline VA does not set.
-	it('gives a soft task the date it aims for, never the end of its window', () => {
+	it('gives a soft task the date it aims for, never the end of its window', async () => {
 		const claim = item('claim', 'File your VA disability claim (if you did not file through BDD)', {
 			status: 'start-now',
 			windowEndDate: '2027-10-03',
@@ -76,26 +76,26 @@ describe('NeedsNow', () => {
 			...empty,
 			justOpened: [{ ...claim, def: { ...claim.def, kind: 'soft' } }]
 		};
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		const row = container.querySelector('a.needs-now__row')?.textContent ?? '';
 		expect(row).toContain('aim for Oct 17, 2026');
 		expect(row).not.toContain('open to');
 		expect(row).not.toContain('2027');
 	});
 
-	it('says when a late task was due and when a closed one closed', () => {
+	it('says when a late task was due and when a closed one closed', async () => {
 		const groups: NeedsNowGroups = {
 			...empty,
 			late: [item('cap', 'Complete your TAP Capstone', { status: 'late' })],
 			justClosed: [item('bdd', 'File your VA claim through BDD', { status: 'closed' })]
 		};
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		const rows = [...container.querySelectorAll('a.needs-now__row')];
 		expect(rows[0]?.textContent).toContain('was due Oct 20, 2026');
 		expect(rows[1]?.textContent).toContain('closed Oct 20, 2026');
 	});
 
-	it('counts a changed task down to its final day, and says "1 day" in the singular', () => {
+	it('counts a changed task down to its final day, and says "1 day" in the singular', async () => {
 		const groups: NeedsNowGroups = {
 			...empty,
 			closingSoon: [
@@ -108,25 +108,25 @@ describe('NeedsNow', () => {
 				item('bdd', 'File your VA claim through BDD', { daysLeft: 1 })
 			]
 		};
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		const rows = [...container.querySelectorAll('a.needs-now__row')];
 		expect(rows[0]?.textContent).toContain('May 17, 2028 - 30 days');
 		expect(rows[1]?.textContent).toContain('Oct 20, 2026 - 1 day');
 		expect(rows[1]?.textContent).not.toContain('1 days');
 	});
 
-	it('says today, not 0 days, on a last day - the same words as the task card', () => {
+	it('says today, not 0 days, on a last day - the same words as the task card', async () => {
 		const groups: NeedsNowGroups = {
 			...empty,
 			closingSoon: [item('bdd', 'File your VA claim through BDD', { daysLeft: 0 })]
 		};
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		const row = container.querySelector('a.needs-now__row')?.textContent ?? '';
 		expect(row).toContain('Oct 20, 2026 - today');
 		expect(row).not.toContain('0 days');
 	});
 
-	it('says a two-edge task closed on its final day', () => {
+	it('says a two-edge task closed on its final day', async () => {
 		const groups: NeedsNowGroups = {
 			...empty,
 			justClosed: [
@@ -137,13 +137,13 @@ describe('NeedsNow', () => {
 				})
 			]
 		};
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		expect(container.querySelector('a.needs-now__row')?.textContent).toContain(
 			'closed May 17, 2028'
 		);
 	});
 
-	it('orders the groups by urgency, counts every task, and marks only the time-bound dates', () => {
+	it('orders the groups by urgency, counts every task, and marks only the time-bound dates', async () => {
 		const groups: NeedsNowGroups = {
 			late: [item('cap', 'Complete your TAP Capstone', { status: 'late' })],
 			closingSoon: [
@@ -154,7 +154,7 @@ describe('NeedsNow', () => {
 			justOpened: [item('pkg', 'Submit your separation package', { status: 'start-now' })],
 			afterYouLeave: []
 		};
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		expect([...container.querySelectorAll('h3')].map((h) => h.textContent)).toEqual([
 			'Late',
 			'Closing soon',
@@ -170,7 +170,7 @@ describe('NeedsNow', () => {
 
 	// 38 CFR 14.629: the words the panel adds around each task - group names and the date lines - make no
 	// personal claim in any group (the task titles are checked with the task data in task-defs.test.ts).
-	it('adds no personal eligibility claim to any row', () => {
+	it('adds no personal eligibility claim to any row', async () => {
 		const soft = item('claim', 'File your VA disability claim', {
 			status: 'start-now',
 			aimDate: '2026-10-17'
@@ -192,14 +192,14 @@ describe('NeedsNow', () => {
 			],
 			afterYouLeave: [item('sha', 'Complete your SHA', { status: 'after-you-leave' })]
 		};
-		const text = textOf(render(NeedsNow, { props: { groups } }).container);
+		const text = textOf((await render(NeedsNow, { props: { groups } })).container);
 		expect(text).toContain('aim for Oct 17, 2026');
 		expect(text).toContain('ask your command');
 		expect(makesPersonalClaim(text), text).toBe(false);
 	});
 
 	it('draws After you leave after Closing soon and before Just closed, its rows not in the hot colour', async () => {
-		const { container } = render(NeedsNow, {
+		const { container } = await render(NeedsNow, {
 			props: {
 				groups: {
 					...empty,
@@ -260,7 +260,7 @@ describe('NeedsNow (layout by width)', () => {
 
 	it('on a 320 px phone the date sits under a long title', async () => {
 		await page.viewport(320, 800);
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		container.style.width = PHONE_CONTENT_WIDTH;
 		expect(box(container, '.needs-now__when').top).toBeGreaterThanOrEqual(
 			box(container, '.needs-now__title').bottom
@@ -269,7 +269,7 @@ describe('NeedsNow (layout by width)', () => {
 
 	it('on a wide screen the date sits on the same line as the title', async () => {
 		await page.viewport(1024, 800);
-		const { container } = render(NeedsNow, { props: { groups } });
+		const { container } = await render(NeedsNow, { props: { groups } });
 		expect(box(container, '.needs-now__when').top).toBeLessThan(
 			box(container, '.needs-now__title').bottom
 		);

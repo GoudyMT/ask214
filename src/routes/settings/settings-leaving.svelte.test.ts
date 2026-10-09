@@ -99,7 +99,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 		'refuses a terminal leave start %s the SkillBridge start, and saves nothing',
 		async (_, offset) => {
 			withLeaving({ skillbridgeStart: isoFromToday(STORED) });
-			render(SettingsPage);
+			await render(SettingsPage);
 			await enter('Terminal leave start', isoFromToday(STORED + offset));
 			await expect.element(page.getByText(AFTER_SKILLBRIDGE)).toBeVisible();
 			expect(store.save).not.toHaveBeenCalled();
@@ -114,7 +114,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 		'refuses a SkillBridge start %s the terminal leave start, and saves nothing',
 		async (_, offset) => {
 			withLeaving({ terminalLeaveStart: isoFromToday(STORED) });
-			render(SettingsPage);
+			await render(SettingsPage);
 			await enter('SkillBridge start', isoFromToday(STORED + offset));
 			await expect.element(page.getByText(BEFORE_TERMINAL_LEAVE)).toBeVisible();
 			expect(store.save).not.toHaveBeenCalled();
@@ -124,7 +124,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 	// A date that breaks both rules gets the separation line: no leaving date can be on or after separation at all.
 	it('refuses a SkillBridge start on separation day and after terminal leave with the separation line', async () => {
 		withLeaving({ terminalLeaveStart: isoFromToday(STORED) });
-		render(SettingsPage);
+		await render(SettingsPage);
 		await enter('SkillBridge start', isoFromToday(SEPARATION));
 		await expect.element(page.getByText(AFTER_SEPARATION)).toBeVisible();
 		expect(page.getByText(BEFORE_TERMINAL_LEAVE).query()).toBeNull();
@@ -136,7 +136,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 			skillbridgeStart: isoFromToday(STORED),
 			terminalLeaveStart: isoFromToday(STORED + 30)
 		});
-		render(SettingsPage);
+		await render(SettingsPage);
 		await enter('SkillBridge start', isoFromToday(STORED + 29));
 		await expect.element(page.getByLabelText('SkillBridge start')).not.toBeInTheDocument();
 		await enter('Terminal leave start', isoFromToday(STORED + 1));
@@ -150,7 +150,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 	// A stored date on or after separation is not used, so it holds no other date back.
 	it('saves a terminal leave start before a SkillBridge start that is not used', async () => {
 		withLeaving({ notUsed: { skillbridgeStart: isoFromToday(SEPARATION + 50) } });
-		render(SettingsPage);
+		await render(SettingsPage);
 		await enter('Terminal leave start', isoFromToday(STORED));
 		await expect.element(page.getByLabelText('Terminal leave start')).not.toBeInTheDocument();
 		expect(store.save).toHaveBeenCalledTimes(1);
@@ -166,7 +166,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 			skillbridgeStart: isoFromToday(STORED),
 			terminalLeaveStart: isoFromToday(STORED + offset)
 		});
-		render(SettingsPage);
+		await render(SettingsPage);
 		await expect.element(page.getByText(ORDER_NOTE)).toBeVisible();
 	});
 
@@ -175,11 +175,11 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 			skillbridgeStart: isoFromToday(STORED),
 			terminalLeaveStart: isoFromToday(STORED + 1)
 		});
-		render(SettingsPage);
+		await render(SettingsPage);
 		// The note renders with the rows, so once a row shows its date the note's absence is settled.
 		await expect
 			.element(timelineSection().getByRole('button', { name: 'Terminal leave start' }))
-			.toHaveTextContent(formatTimelineDate(isoFromToday(STORED + 1)));
+			.toMatchTextContent(formatTimelineDate(isoFromToday(STORED + 1)));
 		expect(page.getByText(ORDER_NOTE).query()).toBeNull();
 	});
 });

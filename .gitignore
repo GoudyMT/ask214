@@ -99,6 +99,7 @@ playwright-report/
 test-results/
 .lighthouseci/
 .vitest-cache/
+.vitest/
 
 # ---- Logs ----
 *.log

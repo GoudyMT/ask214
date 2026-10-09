@@ -26,14 +26,14 @@ const saveButton = (el: Element) => el.querySelector('button');
 
 describe('DocumentSave', () => {
 	it('offers to save the document for offline, stating its size', async () => {
-		const { container } = render(DocumentSave, { props: props() });
+		const { container } = await render(DocumentSave, { props: props() });
 
 		await vi.waitFor(() => expect(text(container)).toBe('Save for offline (0.3 MB)'));
 		expect(saveButton(container)?.getAttribute('aria-disabled')).toBe('false');
 	});
 
 	it('says the document is saved when this device holds it, and offers nothing', async () => {
-		const { container } = render(DocumentSave, {
+		const { container } = await render(DocumentSave, {
 			props: props({ list: async () => [PATH] })
 		});
 
@@ -42,7 +42,7 @@ describe('DocumentSave', () => {
 	});
 
 	it('says it is saved offline too, since what is saved opens without a connection', async () => {
-		const { container } = render(DocumentSave, {
+		const { container } = await render(DocumentSave, {
 			props: props({ list: async () => [PATH], isOnline: () => false })
 		});
 
@@ -51,7 +51,7 @@ describe('DocumentSave', () => {
 
 	// Only an older version is held: the current one is not saved, so it is offered.
 	it('offers to save when only an older copy of the document is held', async () => {
-		const { container } = render(DocumentSave, {
+		const { container } = await render(DocumentSave, {
 			props: props({ list: async () => [OLDER] })
 		});
 
@@ -60,7 +60,7 @@ describe('DocumentSave', () => {
 
 	it('shows nothing offline when the document is not saved', async () => {
 		const list = vi.fn(async () => [] as string[]);
-		const { container } = render(DocumentSave, {
+		const { container } = await render(DocumentSave, {
 			props: props({ list, isOnline: () => false })
 		});
 
@@ -72,7 +72,7 @@ describe('DocumentSave', () => {
 	it('says it is saving, and cannot be pressed again, until the save ends', async () => {
 		let finish!: (result: SaveResult) => void;
 		const save = vi.fn(() => new Promise<SaveResult>((resolve) => (finish = resolve)));
-		const { container } = render(DocumentSave, { props: props({ save }) });
+		const { container } = await render(DocumentSave, { props: props({ save }) });
 
 		await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
 		saveButton(container)?.click();
@@ -90,7 +90,7 @@ describe('DocumentSave', () => {
 	it('keeps focus on itself while it saves', async () => {
 		let finish!: (result: SaveResult) => void;
 		const save = vi.fn(() => new Promise<SaveResult>((resolve) => (finish = resolve)));
-		const { container } = render(DocumentSave, { props: props({ save }) });
+		const { container } = await render(DocumentSave, { props: props({ save }) });
 		await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
 		saveButton(container)?.focus();
 		saveButton(container)?.click();
@@ -105,7 +105,7 @@ describe('DocumentSave', () => {
 	// The button pressed is gone once the save ends, and focus would fall to the page with it. It lands on the
 	// line saying the document is saved, so a keyboard user keeps their place and a screen reader reads it.
 	it('moves focus to the saved line when the save the user started succeeds', async () => {
-		const { container } = render(DocumentSave, { props: props() });
+		const { container } = await render(DocumentSave, { props: props() });
 
 		await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
 		saveButton(container)?.focus();
@@ -130,7 +130,7 @@ describe('DocumentSave', () => {
 		box.append(target, below);
 		document.body.appendChild(box);
 		try {
-			const { container } = render(DocumentSave, { props: props({ save }), target });
+			const { container } = await render(DocumentSave, { props: props({ save }), target });
 			await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
 			saveButton(container)?.focus();
 			saveButton(container)?.click();
@@ -149,7 +149,9 @@ describe('DocumentSave', () => {
 
 	it('moves no focus when the document is already saved as it opens', async () => {
 		const before = document.activeElement;
-		const { container } = render(DocumentSave, { props: props({ list: async () => [PATH] }) });
+		const { container } = await render(DocumentSave, {
+			props: props({ list: async () => [PATH] })
+		});
 
 		await vi.waitFor(() => expect(text(container)).toBe('Saved on this device'));
 		await new Promise((resolve) => setTimeout(resolve, 20));
@@ -163,7 +165,7 @@ describe('DocumentSave', () => {
 		const elsewhere = document.createElement('button');
 		document.body.appendChild(elsewhere);
 		try {
-			const { container } = render(DocumentSave, { props: props({ save }) });
+			const { container } = await render(DocumentSave, { props: props({ save }) });
 			await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
 			saveButton(container)?.focus();
 			saveButton(container)?.click();
@@ -182,7 +184,7 @@ describe('DocumentSave', () => {
 	// A save clears the older copies of the same document with it, and nothing of any other document.
 	it('saves the current copy and clears only its older copies', async () => {
 		const save = vi.fn(async (): Promise<SaveResult> => 'saved');
-		const { container } = render(DocumentSave, {
+		const { container } = await render(DocumentSave, {
 			props: props({ list: async () => [OLDER, OTHER], save })
 		});
 
@@ -199,7 +201,7 @@ describe('DocumentSave', () => {
 		['failed', 'Not saved - the download failed. Try again.']
 	] as const)('says why a save failed (%s) and offers it again', async (result, line) => {
 		const save = vi.fn(async (): Promise<SaveResult> => result);
-		const { container } = render(DocumentSave, { props: props({ save }) });
+		const { container } = await render(DocumentSave, { props: props({ save }) });
 
 		await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
 		saveButton(container)?.click();
@@ -217,7 +219,7 @@ describe('DocumentSave', () => {
 			.fn<(path: string, stale: readonly string[]) => Promise<SaveResult>>()
 			.mockResolvedValueOnce('offline')
 			.mockImplementationOnce(() => new Promise<SaveResult>((resolve) => (finish = resolve)));
-		const { container } = render(DocumentSave, { props: props({ save }) });
+		const { container } = await render(DocumentSave, { props: props({ save }) });
 
 		await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
 		saveButton(container)?.click();
@@ -235,7 +237,7 @@ describe('DocumentSave', () => {
 		let finish!: (result: SaveResult) => void;
 		const pending = new Promise<SaveResult>((resolve) => (finish = resolve));
 		const save = vi.fn(async (): Promise<SaveResult> => 'saved');
-		const { container } = render(DocumentSave, {
+		const { container } = await render(DocumentSave, {
 			props: props({ save, running: (path: string) => (path === PATH ? pending : undefined) })
 		});
 
@@ -251,7 +253,7 @@ describe('DocumentSave', () => {
 	});
 
 	it('says why a save already running failed, and offers it again', async () => {
-		const { container } = render(DocumentSave, {
+		const { container } = await render(DocumentSave, {
 			props: props({ running: async (): Promise<SaveResult> => 'offline' })
 		});
 
@@ -276,12 +278,12 @@ describe('DocumentSave', () => {
 				isOnline: () => true,
 				library: []
 			});
-		const first = render(DocumentSave, { props: props({ save }) });
+		const first = await render(DocumentSave, { props: props({ save }) });
 		await vi.waitFor(() => expect(saveButton(first.container)).not.toBeNull());
 		saveButton(first.container)?.click();
 		await vi.waitFor(() => expect(text(first.container)).toBe('Saving...'));
 
-		const second = render(DocumentSave, { props: props() });
+		const second = await render(DocumentSave, { props: props() });
 		await vi.waitFor(() => expect(text(second.container)).toBe('Saving...'));
 		land();
 		await vi.waitFor(() => expect(text(second.container)).toBe('Saved on this device'));
@@ -292,7 +294,7 @@ describe('DocumentSave', () => {
 		let read!: (held: string[]) => void;
 		let shownAtCall: boolean | null = null;
 		const onshow = vi.fn(() => (shownAtCall = saveButton(container) !== null));
-		const { container } = render(DocumentSave, {
+		const { container } = await render(DocumentSave, {
 			props: props({ list: () => new Promise<string[]>((resolve) => (read = resolve)), onshow })
 		});
 
@@ -307,7 +309,7 @@ describe('DocumentSave', () => {
 	it('leaves another document alone when a save ends after it moved on', async () => {
 		let finish!: (result: SaveResult) => void;
 		const save = vi.fn(() => new Promise<SaveResult>((resolve) => (finish = resolve)));
-		const { container, rerender } = render(DocumentSave, { props: props({ save }) });
+		const { container, rerender } = await render(DocumentSave, { props: props({ save }) });
 		await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
 		saveButton(container)?.click();
 		await vi.waitFor(() => expect(text(container)).toBe('Saving...'));
@@ -323,11 +325,11 @@ describe('DocumentSave', () => {
 	it('does nothing once it is gone', async () => {
 		let read!: (held: string[]) => void;
 		const onshow = vi.fn();
-		const { unmount } = render(DocumentSave, {
+		const { unmount } = await render(DocumentSave, {
 			props: props({ list: () => new Promise<string[]>((resolve) => (read = resolve)), onshow })
 		});
 
-		unmount();
+		await unmount();
 		read([]);
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		expect(onshow).not.toHaveBeenCalled();
@@ -339,7 +341,7 @@ describe('DocumentSave', () => {
 		const reads: ((held: string[]) => void)[] = [];
 		const onshow = vi.fn();
 		const list = () => new Promise<string[]>((resolve) => reads.push(resolve));
-		const { container, rerender } = render(DocumentSave, { props: props({ list, onshow }) });
+		const { container, rerender } = await render(DocumentSave, { props: props({ list, onshow }) });
 		await vi.waitFor(() => expect(reads).toHaveLength(1));
 
 		await rerender({ path: OTHER, bytes: 1_234_567 });
@@ -360,7 +362,7 @@ describe('DocumentSave', () => {
 		const LINE = 'The first save also stores the answer library (7.3 MB), once.';
 
 		it('says it under the Save while the answer library is missing', async () => {
-			const { container } = render(DocumentSave, {
+			const { container } = await render(DocumentSave, {
 				props: props({ libraryHeld: async () => false })
 			});
 			await vi.waitFor(() => expect(text(container)).toContain(LINE));
@@ -369,14 +371,14 @@ describe('DocumentSave', () => {
 
 		it('says nothing of it when the answer library is held', async () => {
 			const libraryHeld = vi.fn(async () => true);
-			const { container } = render(DocumentSave, { props: props({ libraryHeld }) });
+			const { container } = await render(DocumentSave, { props: props({ libraryHeld }) });
 			await vi.waitFor(() => expect(libraryHeld).toHaveBeenCalled());
 			await new Promise((resolve) => setTimeout(resolve, 20));
 			expect(text(container)).toBe('Save for offline (0.3 MB)');
 		});
 
 		it('says nothing of it before the device has answered', async () => {
-			const { container } = render(DocumentSave, {
+			const { container } = await render(DocumentSave, {
 				props: props({ libraryHeld: () => new Promise<boolean>(() => {}) })
 			});
 			await vi.waitFor(() => expect(saveButton(container)).not.toBeNull());
@@ -386,7 +388,7 @@ describe('DocumentSave', () => {
 
 		it('says nothing of it while the save runs', async () => {
 			const save = vi.fn(() => new Promise<SaveResult>(() => {}));
-			const { container } = render(DocumentSave, {
+			const { container } = await render(DocumentSave, {
 				props: props({ save, libraryHeld: async () => false })
 			});
 			await vi.waitFor(() => expect(text(container)).toContain(LINE));
@@ -398,7 +400,7 @@ describe('DocumentSave', () => {
 		// speaks of a device that has changed since.
 		it('drops an answer from the device that arrives after a newer one', async () => {
 			const answers: ((held: boolean) => void)[] = [];
-			const { container, rerender } = render(DocumentSave, {
+			const { container, rerender } = await render(DocumentSave, {
 				props: props({
 					libraryHeld: () => new Promise<boolean>((resolve) => answers.push(resolve)),
 					recheck: 'page'
@@ -418,7 +420,7 @@ describe('DocumentSave', () => {
 		// Opening the text online can store the answer library, so the reader asks again when the view changes.
 		it('reads the device again when told the answer library may have changed', async () => {
 			let held = false;
-			const { container, rerender } = render(DocumentSave, {
+			const { container, rerender } = await render(DocumentSave, {
 				props: props({ libraryHeld: async () => held, recheck: 'page' })
 			});
 			await vi.waitFor(() => expect(text(container)).toContain(LINE));
@@ -431,7 +433,7 @@ describe('DocumentSave', () => {
 
 	// The reader keeps one foot across documents, so a new document is read afresh.
 	it('reads what is held again when it is given another document', async () => {
-		const { container, rerender } = render(DocumentSave, {
+		const { container, rerender } = await render(DocumentSave, {
 			props: props({ list: async () => [PATH] })
 		});
 		await vi.waitFor(() => expect(text(container)).toBe('Saved on this device'));

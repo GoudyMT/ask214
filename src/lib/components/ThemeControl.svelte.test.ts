@@ -16,8 +16,8 @@ function buttonByText(container: Element, text: string): HTMLButtonElement | und
 }
 
 describe('ThemeControl', () => {
-	it('renders System / Light / Dark as a labeled button group', () => {
-		const { container } = render(ThemeControl);
+	it('renders System / Light / Dark as a labeled button group', async () => {
+		const { container } = await render(ThemeControl);
 		const group = container.querySelector('[role="group"]');
 		expect(group?.getAttribute('aria-label')).toBe('Theme');
 		expect(buttonByText(container, 'System')).toBeDefined();
@@ -25,21 +25,21 @@ describe('ThemeControl', () => {
 		expect(buttonByText(container, 'Dark')).toBeDefined();
 	});
 
-	it('marks the persisted choice active (System by default)', () => {
-		const { container } = render(ThemeControl);
+	it('marks the persisted choice active (System by default)', async () => {
+		const { container } = await render(ThemeControl);
 		expect(buttonByText(container, 'System')?.getAttribute('aria-pressed')).toBe('true');
 		expect(buttonByText(container, 'Dark')?.getAttribute('aria-pressed')).toBe('false');
 	});
 
-	it('reflects a persisted explicit choice on mount', () => {
+	it('reflects a persisted explicit choice on mount', async () => {
 		localStorage.setItem('mtc:theme', 'dark');
-		const { container } = render(ThemeControl);
+		const { container } = await render(ThemeControl);
 		expect(buttonByText(container, 'Dark')?.getAttribute('aria-pressed')).toBe('true');
 		expect(buttonByText(container, 'System')?.getAttribute('aria-pressed')).toBe('false');
 	});
 
-	it('clicking Dark applies data-theme=dark, persists it, and moves the active state', () => {
-		const { container } = render(ThemeControl);
+	it('clicking Dark applies data-theme=dark, persists it, and moves the active state', async () => {
+		const { container } = await render(ThemeControl);
 		buttonByText(container, 'Dark')?.click();
 		flushSync();
 		expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
@@ -48,10 +48,10 @@ describe('ThemeControl', () => {
 		expect(buttonByText(container, 'System')?.getAttribute('aria-pressed')).toBe('false');
 	});
 
-	it('clicking System removes the data-theme attribute (OS-driven) and persists system', () => {
+	it('clicking System removes the data-theme attribute (OS-driven) and persists system', async () => {
 		localStorage.setItem('mtc:theme', 'dark');
 		document.documentElement.setAttribute('data-theme', 'dark');
-		const { container } = render(ThemeControl);
+		const { container } = await render(ThemeControl);
 		buttonByText(container, 'System')?.click();
 		flushSync();
 		expect(document.documentElement.hasAttribute('data-theme')).toBe(false);

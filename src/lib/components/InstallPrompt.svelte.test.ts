@@ -4,9 +4,9 @@ import { describe, it, expect, vi } from 'vitest';
 import InstallPrompt from './InstallPrompt.svelte';
 
 describe('InstallPrompt', () => {
-	it('shows an Install button when the browser can prompt, and fires onInstall', () => {
+	it('shows an Install button when the browser can prompt, and fires onInstall', async () => {
 		const onInstall = vi.fn();
-		const { container } = render(InstallPrompt, { props: { canPrompt: true, onInstall } });
+		const { container } = await render(InstallPrompt, { props: { canPrompt: true, onInstall } });
 		const btn = container.querySelector<HTMLButtonElement>('.install-action');
 		expect(btn?.textContent?.trim()).toBe('Install');
 		expect(container.querySelector('.install-steps')).toBeNull();
@@ -14,8 +14,8 @@ describe('InstallPrompt', () => {
 		expect(onInstall).toHaveBeenCalledTimes(1);
 	});
 
-	it('shows the Add-to-Home-Screen steps directly when it cannot prompt (iOS / Settings)', () => {
-		const { container } = render(InstallPrompt, {
+	it('shows the Add-to-Home-Screen steps directly when it cannot prompt (iOS / Settings)', async () => {
+		const { container } = await render(InstallPrompt, {
 			props: { canPrompt: false, onInstall: () => {} }
 		});
 		const steps = container.querySelector<HTMLOListElement>('.install-steps');
@@ -25,8 +25,8 @@ describe('InstallPrompt', () => {
 		expect(container.querySelector('.install-action')).toBeNull();
 	});
 
-	it('collapses the steps behind an accessible "Show me how" disclosure (the Home card)', () => {
-		const { container } = render(InstallPrompt, {
+	it('collapses the steps behind an accessible "Show me how" disclosure (the Home card)', async () => {
+		const { container } = await render(InstallPrompt, {
 			props: { canPrompt: false, onInstall: () => {}, collapsibleSteps: true }
 		});
 		const toggle = container.querySelector<HTMLButtonElement>('.install-action');

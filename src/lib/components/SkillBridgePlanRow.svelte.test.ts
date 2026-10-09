@@ -18,8 +18,10 @@ const toggle = () => page.getByRole('button', { name: /Planning SkillBridge/ });
 
 describe('SkillBridgePlanRow', () => {
 	it('shows Unavailable and offers no change while the answer cannot be read', async () => {
-		const { container } = render(SkillBridgePlanRow, { props: { plan: null, onSave: vi.fn() } });
-		await expect.element(toggle()).toHaveTextContent(/Unavailable/);
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: null, onSave: vi.fn() }
+		});
+		await expect.element(toggle()).toMatchTextContent(/Unavailable/);
 		await expect.element(toggle()).toBeDisabled();
 		await expect
 			.element(
@@ -37,14 +39,14 @@ describe('SkillBridgePlanRow', () => {
 		['not-sure', 'Not sure'],
 		['no', 'No']
 	] as const)('summarises %s as %s', async (answer, summary) => {
-		render(SkillBridgePlanRow, { props: { plan: plan({ answer }), onSave: vi.fn() } });
+		await render(SkillBridgePlanRow, { props: { plan: plan({ answer }), onSave: vi.fn() } });
 		// The summary is the row's last child: an exact match, so "No" cannot pass for "Not sure".
 		await expect.poll(() => toggle().element().lastElementChild?.textContent).toBe(summary);
 	});
 
 	it('saves the picked answer, then closes and returns focus to the row', async () => {
 		const onSave = vi.fn(() => Promise.resolve(null));
-		const { container } = render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+		const { container } = await render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
 		await toggle().click();
 		const save = page.getByRole('button', { name: 'Save' });
 		await expect.element(save).toBeDisabled(); // nothing picked yet
@@ -80,7 +82,7 @@ describe('SkillBridgePlanRow', () => {
 		['a No', plan({ answer: 'no' }), 'No']
 	] as const)('closes without writing when %s is saved again', async (_label, saved, answer) => {
 		const onSave = vi.fn(() => Promise.resolve(null));
-		render(SkillBridgePlanRow, { props: { plan: saved, onSave } });
+		await render(SkillBridgePlanRow, { props: { plan: saved, onSave } });
 		await toggle().click();
 		await expect.element(page.getByRole('radio', { name: answer, exact: true })).toBeChecked();
 		await page.getByRole('button', { name: 'Save' }).click();
@@ -91,7 +93,7 @@ describe('SkillBridgePlanRow', () => {
 
 	it('writes a saved Not sure that has come back, since it is no longer in effect', async () => {
 		const onSave = vi.fn(() => Promise.resolve(null));
-		render(SkillBridgePlanRow, { props: { plan: plan({ answer: 'not-sure' }), onSave } });
+		await render(SkillBridgePlanRow, { props: { plan: plan({ answer: 'not-sure' }), onSave } });
 		await toggle().click();
 		await expect.element(page.getByRole('radio', { name: 'Not sure' })).toBeChecked();
 		await page.getByRole('button', { name: 'Save' }).click();
@@ -102,7 +104,7 @@ describe('SkillBridgePlanRow', () => {
 
 	it('still saves an answer that differs from the saved one', async () => {
 		const onSave = vi.fn(() => Promise.resolve(null));
-		render(SkillBridgePlanRow, {
+		await render(SkillBridgePlanRow, {
 			props: {
 				plan: plan({ answer: 'not-sure', returnsOn: '2027-02-01', notSureReturns: '2027-04-01' }),
 				onSave
@@ -117,7 +119,7 @@ describe('SkillBridgePlanRow', () => {
 	});
 
 	it('shows the late hint once a Not sure shows the steps', async () => {
-		render(SkillBridgePlanRow, {
+		await render(SkillBridgePlanRow, {
 			props: { plan: plan({ notSureReturns: null }), onSave: vi.fn() }
 		});
 		await toggle().click();
@@ -128,7 +130,7 @@ describe('SkillBridgePlanRow', () => {
 
 	// The hint describes the saved answer when it has something to say, else what a choice made today would do.
 	it('names the saved return date while an early Not sure still waits', async () => {
-		render(SkillBridgePlanRow, {
+		await render(SkillBridgePlanRow, {
 			props: {
 				plan: plan({ answer: 'not-sure', returnsOn: '2027-02-01', notSureReturns: '2027-04-01' }),
 				onSave: vi.fn()
@@ -145,7 +147,7 @@ describe('SkillBridgePlanRow', () => {
 	});
 
 	it('reads the late hint for a saved Not sure that shows the steps, whatever a new Not sure would do', async () => {
-		render(SkillBridgePlanRow, {
+		await render(SkillBridgePlanRow, {
 			props: {
 				plan: plan({ answer: 'not-sure', stepsShow: true, notSureReturns: '2027-04-01' }),
 				onSave: vi.fn()
@@ -158,7 +160,7 @@ describe('SkillBridgePlanRow', () => {
 	});
 
 	it('describes what a choice made today would do for a saved Not sure that has come back', async () => {
-		render(SkillBridgePlanRow, {
+		await render(SkillBridgePlanRow, {
 			props: { plan: plan({ answer: 'not-sure', notSureReturns: '2027-04-01' }), onSave: vi.fn() }
 		});
 		await toggle().click();
@@ -172,7 +174,7 @@ describe('SkillBridgePlanRow', () => {
 	});
 
 	it('describes what a choice made today would do after any other saved answer', async () => {
-		render(SkillBridgePlanRow, {
+		await render(SkillBridgePlanRow, {
 			props: { plan: plan({ answer: 'yes', stepsShow: true }), onSave: vi.fn() }
 		});
 		await toggle().click();
@@ -192,12 +194,12 @@ describe('SkillBridgePlanRow', () => {
 				'This was changed in another tab. We reloaded it - please review and save again.'
 			)
 			.mockRejectedValueOnce(new Error('E_TEST'));
-		render(SkillBridgePlanRow, { props: { plan: plan({ answer: 'no' }), onSave } });
+		await render(SkillBridgePlanRow, { props: { plan: plan({ answer: 'no' }), onSave } });
 		await toggle().click();
 		await expect.element(page.getByRole('radio', { name: 'No', exact: true })).toBeChecked();
 		await page.getByRole('radio', { name: 'Not sure' }).click();
 		await page.getByRole('button', { name: 'Save' }).click();
-		await expect.element(page.getByRole('alert')).toHaveTextContent(/changed in another tab/);
+		await expect.element(page.getByRole('alert')).toMatchTextContent(/changed in another tab/);
 		await page.getByRole('button', { name: 'Save' }).click();
 		await expect
 			.element(page.getByRole('alert'))
@@ -211,7 +213,7 @@ describe('SkillBridgePlanRow', () => {
 			.fn<() => Promise<string | null>>()
 			.mockResolvedValueOnce('Something to review.')
 			.mockRejectedValueOnce(new Error('E_TEST'));
-		render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+		await render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
 		await toggle().click();
 		await page.getByRole('radio', { name: 'Yes' }).click();
 		const save = page.getByRole('button', { name: 'Save' });
@@ -229,7 +231,7 @@ describe('SkillBridgePlanRow', () => {
 
 	it('Cancel saves nothing', async () => {
 		const onSave = vi.fn();
-		render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+		await render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
 		await toggle().click();
 		await page.getByRole('radio', { name: 'No', exact: true }).click();
 		await page.getByRole('button', { name: 'Cancel' }).click();
@@ -239,7 +241,7 @@ describe('SkillBridgePlanRow', () => {
 	});
 
 	it('opens and closes in place from the row, naming the group and the form it controls', async () => {
-		render(SkillBridgePlanRow, { props: { plan: plan(), onSave: vi.fn() } });
+		await render(SkillBridgePlanRow, { props: { plan: plan(), onSave: vi.fn() } });
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
 		await toggle().click();
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
@@ -261,7 +263,7 @@ describe('SkillBridgePlanRow', () => {
 	it('closes when the answer becomes unreadable, moves focus to the unavailable line, and stays closed when it returns', async () => {
 		const onSave = vi.fn(() => Promise.resolve('Something to review.'));
 		const props = { plan: plan(), onSave };
-		const { rerender, container } = render(SkillBridgePlanRow, { props });
+		const { rerender, container } = await render(SkillBridgePlanRow, { props });
 		await toggle().click();
 		await page.getByRole('radio', { name: 'Yes' }).click();
 		await page.getByRole('button', { name: 'Save' }).click();
@@ -294,7 +296,7 @@ describe('SkillBridgePlanRow', () => {
 		document.body.appendChild(other);
 		try {
 			const props = { plan: plan(), onSave: vi.fn() };
-			const { rerender } = render(SkillBridgePlanRow, { props });
+			const { rerender } = await render(SkillBridgePlanRow, { props });
 			await toggle().click();
 			await page.getByRole('radio', { name: 'Yes' }).click();
 			other.focus();
@@ -314,13 +316,15 @@ describe('SkillBridgePlanRow', () => {
 		try {
 			let fail: (reason: Error) => void = () => undefined;
 			const onSave = vi.fn(() => new Promise<string | null>((_, reject) => (fail = reject)));
-			render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+			await render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
 			await toggle().click();
 			await page.getByRole('radio', { name: 'Yes' }).click();
 			await page.getByRole('button', { name: 'Save' }).click();
 			other.focus();
 			fail(new Error('E_TEST'));
-			await expect.element(page.getByRole('alert')).toHaveTextContent('Could not update right now');
+			await expect
+				.element(page.getByRole('alert'))
+				.toMatchTextContent('Could not update right now');
 			await expect.element(page.getByRole('button', { name: 'Save' })).toBeEnabled();
 			await new Promise((resolve) => setTimeout(resolve, 0));
 			expect(document.activeElement).toBe(other);
@@ -336,7 +340,7 @@ describe('SkillBridgePlanRow', () => {
 		try {
 			let finish: (message: string | null) => void = () => undefined;
 			const onSave = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
-			render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+			await render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
 			await toggle().click();
 			await page.getByRole('radio', { name: 'Yes' }).click();
 			await page.getByRole('button', { name: 'Save' }).click();
@@ -351,20 +355,20 @@ describe('SkillBridgePlanRow', () => {
 	});
 
 	it('does not take focus for the unavailable line when it was never open', async () => {
-		render(SkillBridgePlanRow, { props: { plan: null, onSave: vi.fn() } });
+		await render(SkillBridgePlanRow, { props: { plan: null, onSave: vi.fn() } });
 		await expect.element(page.getByText(/could not be loaded/)).toBeVisible();
 		expect(document.activeElement).toBe(document.body);
 	});
 
 	it('offers no unavailable line while the answer can be read', async () => {
-		render(SkillBridgePlanRow, { props: { plan: plan(), onSave: vi.fn() } });
+		await render(SkillBridgePlanRow, { props: { plan: plan(), onSave: vi.fn() } });
 		await expect.element(toggle()).toBeEnabled();
 		await expect.element(page.getByText(/could not be loaded/)).not.toBeInTheDocument();
 	});
 
 	it('pre-checks nothing before an answer, and clears the message once another is picked', async () => {
 		const onSave = vi.fn(() => Promise.resolve('Something to review.'));
-		render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+		await render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
 		await toggle().click();
 		for (const name of ['Yes', 'Not sure', 'No']) {
 			await expect.element(page.getByRole('radio', { name, exact: true })).not.toBeChecked();
@@ -377,7 +381,7 @@ describe('SkillBridgePlanRow', () => {
 	});
 
 	it('keeps the form from submitting to the page', async () => {
-		render(SkillBridgePlanRow, {
+		await render(SkillBridgePlanRow, {
 			props: { plan: plan(), onSave: vi.fn(() => Promise.resolve(null)) }
 		});
 		await toggle().click();
@@ -396,7 +400,7 @@ describe('SkillBridgePlanRow', () => {
 	it('holds Save while a save is under way', async () => {
 		let finish: (message: string | null) => void = () => undefined;
 		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
-		render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
+		await render(SkillBridgePlanRow, { props: { plan: plan(), onSave } });
 		await toggle().click();
 		await page.getByRole('radio', { name: 'Yes' }).click();
 		await page.getByRole('button', { name: 'Save' }).click();
@@ -436,7 +440,7 @@ describe('SkillBridgePlanRow (the choices as pills)', () => {
 		}));
 
 	it('marks the chosen pill and leaves the others plain', async () => {
-		const { container } = render(SkillBridgePlanRow, {
+		const { container } = await render(SkillBridgePlanRow, {
 			props: { plan: plan({ answer: 'not-sure' }), onSave: vi.fn() }
 		});
 		await toggle().click();
@@ -466,7 +470,7 @@ describe('SkillBridgePlanRow (the choices as pills)', () => {
 	// Forced colors replace every colour the chosen pill is marked with, so the mark there is a heavier border; the
 	// normal look keeps the 1 px border.
 	it('marks the chosen pill by a heavier border in forced colors only', async () => {
-		const { container } = render(SkillBridgePlanRow, {
+		const { container } = await render(SkillBridgePlanRow, {
 			props: { plan: plan({ answer: 'not-sure' }), onSave: vi.fn() }
 		});
 		await toggle().click();
@@ -503,7 +507,9 @@ describe('SkillBridgePlanRow (the choices as pills)', () => {
 	});
 
 	it('gives every pill a 44 px target that its radio covers', async () => {
-		const { container } = render(SkillBridgePlanRow, { props: { plan: plan(), onSave: vi.fn() } });
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), onSave: vi.fn() }
+		});
 		await toggle().click();
 		const all = pills(container);
 		expect(all).toHaveLength(3);
@@ -518,7 +524,9 @@ describe('SkillBridgePlanRow (the choices as pills)', () => {
 	// The radio is invisible, so the pill's ring is the only sign of where keyboard focus is: the app's 2 px solid
 	// outline with a 2 px gap, as on every button and link. A pointer click does not show it.
 	it('rings the focused pill when focus arrives by keyboard, not by pointer', async () => {
-		const { container } = render(SkillBridgePlanRow, { props: { plan: plan(), onSave: vi.fn() } });
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), onSave: vi.fn() }
+		});
 		await toggle().click();
 		await userEvent.keyboard('{Tab}');
 		const focused = document.activeElement as HTMLInputElement;

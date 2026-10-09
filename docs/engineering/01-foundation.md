@@ -14,8 +14,8 @@ checks, hosting, and license.
 | Language                 | TypeScript         | 6.x       | Strict type checking across all source            |
 | Package manager          | pnpm               | 11.x      | Strict, reproducible installs, pinned by Corepack |
 | Build                    | Vite               | 8.x       | The bundler under SvelteKit                       |
-| Unit and component tests | Vitest             | 4.x       | Vite-native; browser mode through Playwright      |
-| End-to-end tests         | Playwright         | 1.61.x    | Chromium and WebKit                               |
+| Unit and component tests | Vitest             | 5.x       | Vite-native; browser mode through Playwright      |
+| End-to-end tests         | Playwright         | 1.63.x    | Chromium and WebKit                               |
 | Linting                  | ESLint             | 10.x      | TypeScript and Svelte rules, plus project rules   |
 | Formatting               | Prettier           | 3.x       | One code style                                    |
 | Git hooks                | Husky, lint-staged | 9.x, 17.x | Checks on every commit and every message          |
@@ -193,8 +193,8 @@ engineering documents here are the public summary.
 ## How These Pieces Fit Together
 
 Strict TypeScript and pnpm stop errors before a commit, the hooks stop them before the repository, CI stops them
-before `main`, and Playwright stops them before users. For a solo project, each automated check stands in for a reviewer the team
-does not have.
+before `main`, and Playwright stops them before users. Each automated check stands in for the reviewer a solo
+project lacks.
 
 ## Standards Adopted in This Section
 
@@ -225,3 +225,4 @@ does not have.
 - 2026-09-30: The commit-message hook and its CI check.
 - 2026-10-02: Cut to the word cap and brought up to date: Playwright 1.61 on Chromium and WebKit, the full
   pre-commit hook and its measured time, the newer CI checks.
+- 2026-10-09: Vitest 5 and Playwright 1.63.

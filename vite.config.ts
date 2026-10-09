@@ -47,22 +47,31 @@ export default defineConfig({
 	},
 	test: {
 		expect: { requireAssertions: true },
+		// Keeps each mock's recorded calls across tests in a file, as the tests were written to expect; the
+		// tests that need a fresh mock reset it themselves.
+		clearMocks: false,
 		passWithNoTests: true,
 		projects: [
 			{
-				extends: './vite.config.ts',
+				extends: true,
 				test: {
 					name: 'client',
+					// Pin the browser-mode server to IPv4 loopback + a FIXED port outside the Windows
+					// Hyper-V/WinNAT reserved ranges. The default lands on a reserved high port (63315, inside the
+					// 63260-63359 reservation) -> `listen EACCES` -> the run hangs. 31415 is in the registered
+					// range, clear of the reservations (which sit up in the 50000s/60000s dynamic range). Two runs at
+					// once - separate checkouts - each set VITEST_BROWSER_PORT to a port of their own nearby. Set on
+					// this project only, so no other server claims the same port.
+					api: { host: '127.0.0.1', port: Number(process.env.VITEST_BROWSER_PORT ?? 31415) },
 					browser: {
 						enabled: true,
 						provider: playwright({ contextOptions: { timezoneId: TEST_TIME_ZONE } }),
 						instances: [{ browser: 'chromium', headless: true }],
-						// Pin the browser-mode server to IPv4 loopback + a FIXED port outside the Windows
-						// Hyper-V/WinNAT reserved ranges. The default lands on a reserved high port (63315, inside the
-						// 63260-63359 reservation) -> `listen EACCES` -> the run hangs. 31415 is in the registered
-						// range, clear of the reservations (which sit up in the 50000s/60000s dynamic range). Two runs at
-						// once - separate checkouts - each set VITEST_BROWSER_PORT to a port of their own nearby.
-						api: { host: '127.0.0.1', port: Number(process.env.VITEST_BROWSER_PORT ?? 31415) }
+						// No UI around the test frame, as on CI: locally the UI's pane splitter overlaps the frame's
+						// left edge and takes the clicks meant for a control drawn there.
+						ui: false,
+						// Locators match a name or text as a substring, as the tests were written to expect.
+						locators: { exact: false }
 					},
 					include: ['src/**/*.svelte.{test,spec}.{js,ts}', 'src/lib/**/*.browser.test.ts'],
 					exclude: ['src/lib/server/**']
@@ -70,7 +79,7 @@ export default defineConfig({
 			},
 
 			{
-				extends: './vite.config.ts',
+				extends: true,
 				test: {
 					name: 'server',
 					environment: 'node',

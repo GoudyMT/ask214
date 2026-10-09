@@ -16,15 +16,15 @@ const INDEX: SourcesIndex = {
 };
 
 describe('SourceList', () => {
-	it('renders both section headings', () => {
-		const { container } = render(SourceList, { props: { index: INDEX } });
+	it('renders both section headings', async () => {
+		const { container } = await render(SourceList, { props: { index: INDEX } });
 		const heads = [...container.querySelectorAll('h3')].map((h) => h.textContent ?? '');
 		expect(heads.some((h) => /agency pages/i.test(h))).toBe(true);
 		expect(heads.some((h) => /curriculum guides/i.test(h))).toBe(true);
 	});
 
-	it('renders each agency page as a safe external link', () => {
-		const { container } = render(SourceList, { props: { index: INDEX } });
+	it('renders each agency page as a safe external link', async () => {
+		const { container } = await render(SourceList, { props: { index: INDEX } });
 		const link = [...container.querySelectorAll('a')].find(
 			(a) => a.getAttribute('href') === 'https://www.va.gov/test/'
 		);
@@ -35,8 +35,8 @@ describe('SourceList', () => {
 		expect(rel).toContain('noreferrer');
 	});
 
-	it('shows the publisher tag on an agency row', () => {
-		const { container } = render(SourceList, { props: { index: INDEX } });
+	it('shows the publisher tag on an agency row', async () => {
+		const { container } = await render(SourceList, { props: { index: INDEX } });
 		const row = [...container.querySelectorAll('li')].find((li) =>
 			li.textContent?.includes('DoD - Test')
 		);
@@ -45,8 +45,8 @@ describe('SourceList', () => {
 		expect(tag?.textContent ?? '').toContain('Published by');
 	});
 
-	it('renders exactly one TAP library link', () => {
-		const { container } = render(SourceList, { props: { index: INDEX } });
+	it('renders exactly one TAP library link', async () => {
+		const { container } = await render(SourceList, { props: { index: INDEX } });
 		const tapLinks = [...container.querySelectorAll('a')].filter(
 			(a) => a.getAttribute('href') === 'https://www.tapevents.mil/resources/documents'
 		);
@@ -54,8 +54,8 @@ describe('SourceList', () => {
 		expect(tapLinks[0]?.getAttribute('target')).toBe('_blank');
 	});
 
-	it('lists TAP guide titles as plain text, not links', () => {
-		const { container } = render(SourceList, { props: { index: INDEX } });
+	it('lists TAP guide titles as plain text, not links', async () => {
+		const { container } = await render(SourceList, { props: { index: INDEX } });
 		expect(container.textContent ?? '').toContain('TAP - Guide One');
 		const asLink = [...container.querySelectorAll('a')].some((a) =>
 			a.textContent?.includes('TAP - Guide One')
@@ -63,8 +63,8 @@ describe('SourceList', () => {
 		expect(asLink).toBe(false);
 	});
 
-	it('gives every external link a visually-hidden new-tab hint', () => {
-		const { container } = render(SourceList, { props: { index: INDEX } });
+	it('gives every external link a visually-hidden new-tab hint', async () => {
+		const { container } = await render(SourceList, { props: { index: INDEX } });
 		const links = container.querySelectorAll('a[target="_blank"]');
 		expect(links.length).toBeGreaterThan(0);
 		for (const a of links) {

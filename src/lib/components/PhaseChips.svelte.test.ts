@@ -61,8 +61,8 @@ const VIEW: TimelineView = {
 };
 
 describe('PhaseChips', () => {
-	it('renders a chip per phase with its short label and total task count, in order', () => {
-		const { container } = render(PhaseChips, { props: { view: VIEW } });
+	it('renders a chip per phase with its short label and total task count, in order', async () => {
+		const { container } = await render(PhaseChips, { props: { view: VIEW } });
 		const chips = [...container.querySelectorAll('button.phase-chips__chip')];
 		expect(chips.length).toBe(2);
 		expect(chips[0]?.textContent).toContain('18-12 mo');
@@ -71,7 +71,7 @@ describe('PhaseChips', () => {
 		expect(chips[1]?.textContent).toContain('1'); // 1 task
 	});
 
-	it('falls back to the full label when a bucket has no short label', () => {
+	it('falls back to the full label when a bucket has no short label', async () => {
 		const view: TimelineView = {
 			phases: [
 				{
@@ -84,20 +84,20 @@ describe('PhaseChips', () => {
 			],
 			total: 1
 		};
-		const { container } = render(PhaseChips, { props: { view } });
+		const { container } = await render(PhaseChips, { props: { view } });
 		expect(container.querySelector('button.phase-chips__chip')?.textContent).toContain(
 			'After separation'
 		);
 	});
 
-	it('smooth-scrolls to a phase section when its chip is clicked', () => {
+	it('smooth-scrolls to a phase section when its chip is clicked', async () => {
 		// The <section id> lives in TimelineList (a sibling in the page); PhaseChips reaches it by id.
 		const section = document.createElement('section');
 		section.id = 'phase-final-90';
 		document.body.appendChild(section);
 		const scrollSpy = vi.spyOn(section, 'scrollIntoView').mockImplementation(() => {});
 
-		const { container } = render(PhaseChips, { props: { view: VIEW } });
+		const { container } = await render(PhaseChips, { props: { view: VIEW } });
 		const finalChip = [...container.querySelectorAll('button.phase-chips__chip')].find((c) =>
 			c.textContent?.includes('Final 90')
 		) as HTMLButtonElement;

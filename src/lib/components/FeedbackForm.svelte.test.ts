@@ -11,8 +11,8 @@ function fill(container: Element, selector: string, value: string) {
 }
 
 describe('FeedbackForm', () => {
-	it('renders message, include-page (checked), optional email, submit, and a hidden honeypot', () => {
-		const { container } = render(FeedbackForm, {
+	it('renders message, include-page (checked), optional email, submit, and a hidden honeypot', async () => {
+		const { container } = await render(FeedbackForm, {
 			props: { submit: vi.fn(), attachedRoute: '/timeline' }
 		});
 		expect(container.querySelector('textarea')).toBeTruthy();
@@ -27,9 +27,11 @@ describe('FeedbackForm', () => {
 		expect(container.querySelector('.hp')?.getAttribute('aria-hidden')).toBe('true');
 	});
 
-	it('does not submit an empty message; announces + associates the inline error', () => {
+	it('does not submit an empty message; announces + associates the inline error', async () => {
 		const submit = vi.fn();
-		const { container } = render(FeedbackForm, { props: { submit, attachedRoute: '/timeline' } });
+		const { container } = await render(FeedbackForm, {
+			props: { submit, attachedRoute: '/timeline' }
+		});
 		(container.querySelector('form') as HTMLFormElement).requestSubmit();
 		flushSync();
 		expect(submit).not.toHaveBeenCalled();
@@ -41,8 +43,8 @@ describe('FeedbackForm', () => {
 		expect(ta.getAttribute('aria-describedby')).toBe('fb-msg-error');
 	});
 
-	it('clears the inline error as the user types', () => {
-		const { container } = render(FeedbackForm, {
+	it('clears the inline error as the user types', async () => {
+		const { container } = await render(FeedbackForm, {
 			props: { submit: vi.fn(), attachedRoute: '/timeline' }
 		});
 		(container.querySelector('form') as HTMLFormElement).requestSubmit();
@@ -54,7 +56,9 @@ describe('FeedbackForm', () => {
 
 	it('submits message + route + honeypot when the box is checked', async () => {
 		const submit = vi.fn().mockResolvedValue({ ok: true });
-		const { container } = render(FeedbackForm, { props: { submit, attachedRoute: '/timeline' } });
+		const { container } = await render(FeedbackForm, {
+			props: { submit, attachedRoute: '/timeline' }
+		});
 		fill(container, 'textarea', 'hi');
 		(container.querySelector('form') as HTMLFormElement).requestSubmit();
 		await vi.waitFor(() => expect(submit).toHaveBeenCalled());
@@ -67,7 +71,9 @@ describe('FeedbackForm', () => {
 
 	it('omits the route when the box is unchecked', async () => {
 		const submit = vi.fn().mockResolvedValue({ ok: true });
-		const { container } = render(FeedbackForm, { props: { submit, attachedRoute: '/timeline' } });
+		const { container } = await render(FeedbackForm, {
+			props: { submit, attachedRoute: '/timeline' }
+		});
 		fill(container, 'textarea', 'hi');
 		const check = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
 		check.click();
@@ -78,7 +84,7 @@ describe('FeedbackForm', () => {
 	});
 
 	it('shows the success panel and focuses its heading after a successful submit', async () => {
-		const { container } = render(FeedbackForm, {
+		const { container } = await render(FeedbackForm, {
 			props: { submit: vi.fn().mockResolvedValue({ ok: true }), attachedRoute: '/timeline' }
 		});
 		fill(container, 'textarea', 'hi');
@@ -93,7 +99,7 @@ describe('FeedbackForm', () => {
 	});
 
 	it('shows the error panel + a mailto fallback when submit fails', async () => {
-		const { container } = render(FeedbackForm, {
+		const { container } = await render(FeedbackForm, {
 			props: { submit: vi.fn().mockResolvedValue({ ok: false }), attachedRoute: '/timeline' }
 		});
 		fill(container, 'textarea', 'hi');
@@ -104,8 +110,10 @@ describe('FeedbackForm', () => {
 		});
 	});
 
-	it('hides the include-page row when no route is attached', () => {
-		const { container } = render(FeedbackForm, { props: { submit: vi.fn(), attachedRoute: null } });
+	it('hides the include-page row when no route is attached', async () => {
+		const { container } = await render(FeedbackForm, {
+			props: { submit: vi.fn(), attachedRoute: null }
+		});
 		expect(container.querySelector('input[type="checkbox"]')).toBeNull();
 	});
 });

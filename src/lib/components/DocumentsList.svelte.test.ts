@@ -72,8 +72,8 @@ const row = (container: Element, title: string) =>
 	[...container.querySelectorAll('li')].find((li) => li.textContent?.includes(title));
 
 describe('DocumentsList', () => {
-	it('sums what is saved, and offers the rest with its count and size', () => {
-		const { container } = render(DocumentsList, { props: props() });
+	it('sums what is saved, and offers the rest with its count and size', async () => {
+		const { container } = await render(DocumentsList, { props: props() });
 		expect(text(container)).toContain('2 of 4 saved on this device - 0.6 MB');
 		expect(button(container, 'Save 2 remaining (13.4 MB)')).toBeDefined();
 		expect(text(container)).toContain(
@@ -81,8 +81,8 @@ describe('DocumentsList', () => {
 		);
 	});
 
-	it('groups the documents into saved and not saved, an updated one among the not saved', () => {
-		const { container } = render(DocumentsList, { props: props() });
+	it('groups the documents into saved and not saved, an updated one among the not saved', async () => {
+		const { container } = await render(DocumentsList, { props: props() });
 		// The dialogs' headings are in the DOM while closed; only the list's own headings are groups.
 		const groups = [...container.querySelectorAll('h2')]
 			.filter((h) => !h.closest('dialog'))
@@ -95,8 +95,8 @@ describe('DocumentsList', () => {
 		expect(text(unsaved as Element)).toContain('Employment Fundamentals');
 	});
 
-	it("states each row's publisher, pages and size, and whether it is saved or updated", () => {
-		const { container } = render(DocumentsList, { props: props() });
+	it("states each row's publisher, pages and size, and whether it is saved or updated", async () => {
+		const { container } = await render(DocumentsList, { props: props() });
 		expect(text(row(container, 'Vet Centers') as Element)).toContain(
 			'Saved - VA - 2 pages - 0.3 MB'
 		);
@@ -108,10 +108,10 @@ describe('DocumentsList', () => {
 		);
 	});
 
-	it('offers Remove on a saved row, Save on an unsaved one and Save again on an updated one', () => {
+	it('offers Remove on a saved row, Save on an unsaved one and Save again on an updated one', async () => {
 		const onsave = vi.fn();
 		const onremove = vi.fn();
-		const { container } = render(DocumentsList, { props: props({ onsave, onremove }) });
+		const { container } = await render(DocumentsList, { props: props({ onsave, onremove }) });
 		const saved = row(container, 'Vet Centers') as Element;
 		const unsaved = row(container, 'Benefits 101') as Element;
 		const updated = row(container, 'Employment Fundamentals') as Element;
@@ -131,8 +131,8 @@ describe('DocumentsList', () => {
 	describe('an older copy', () => {
 		const OLDER = { count: 1, bytes: 22_000_000 };
 
-		it('is counted with what is saved, and in what Remove all frees', () => {
-			const { container } = render(DocumentsList, { props: props({ older: OLDER }) });
+		it('is counted with what is saved, and in what Remove all frees', async () => {
+			const { container } = await render(DocumentsList, { props: props({ older: OLDER }) });
 			expect(text(container.querySelector('.docs-sum__count') as Element)).toBe(
 				'2 of 4 saved on this device - 0.6 MB, plus 1 older copy (22.0 MB)'
 			);
@@ -141,9 +141,11 @@ describe('DocumentsList', () => {
 			);
 		});
 
-		it("is removed from its row, and focus goes to the row's title", () => {
+		it("is removed from its row, and focus goes to the row's title", async () => {
 			const onremove = vi.fn();
-			const { container } = render(DocumentsList, { props: props({ older: OLDER, onremove }) });
+			const { container } = await render(DocumentsList, {
+				props: props({ older: OLDER, onremove })
+			});
 			const updated = row(container, 'Employment Fundamentals') as Element;
 			expect(button(updated, 'Save again')).toBeDefined();
 
@@ -152,8 +154,8 @@ describe('DocumentsList', () => {
 			expect(document.activeElement).toBe(container.querySelector('#doc-tap_dol_efct'));
 		});
 
-		it('can be removed offline, when it cannot be saved again', () => {
-			const { container } = render(DocumentsList, {
+		it('can be removed offline, when it cannot be saved again', async () => {
+			const { container } = await render(DocumentsList, {
 				props: props({ older: OLDER, online: false })
 			});
 			const updated = row(container, 'Employment Fundamentals') as Element;
@@ -161,9 +163,9 @@ describe('DocumentsList', () => {
 			expect(button(updated, 'Remove')).toBeDefined();
 		});
 
-		it('keeps Remove all when it is all the device holds, and names it in the question', () => {
+		it('keeps Remove all when it is all the device holds, and names it in the question', async () => {
 			const rows = ROWS.map((r) => ({ ...r, state: r.state === 'saved' ? 'unsaved' : r.state }));
-			const { container } = render(DocumentsList, { props: props({ rows, older: OLDER }) });
+			const { container } = await render(DocumentsList, { props: props({ rows, older: OLDER }) });
 			expect(button(container, 'Remove all saved documents')).toBeDefined();
 			button(container, 'Remove all saved documents')?.click();
 
@@ -174,8 +176,8 @@ describe('DocumentsList', () => {
 
 		// The device would not give its size: it is counted without one, and what Remove all frees is not stated,
 		// since any figure would be wrong.
-		it('is counted without a size when its size cannot be read, and what Remove all frees is left out', () => {
-			const { container } = render(DocumentsList, {
+		it('is counted without a size when its size cannot be read, and what Remove all frees is left out', async () => {
+			const { container } = await render(DocumentsList, {
 				props: props({ older: { count: 1, bytes: null } })
 			});
 			expect(text(container.querySelector('.docs-sum__count') as Element)).toBe(
@@ -193,8 +195,8 @@ describe('DocumentsList', () => {
 			expect(button(dialog, 'Remove 2 documents and 1 older copy')).toBeDefined();
 		});
 
-		it('is named beside the documents in the Remove all question, in the plural when more than one', () => {
-			const { container } = render(DocumentsList, {
+		it('is named beside the documents in the Remove all question, in the plural when more than one', async () => {
+			const { container } = await render(DocumentsList, {
 				props: props({ older: { count: 2, bytes: 30_000_000 } })
 			});
 			expect(text(container)).toContain('plus 2 older copies (30.0 MB)');
@@ -206,15 +208,15 @@ describe('DocumentsList', () => {
 		});
 	});
 
-	it('opens a document from its title', () => {
+	it('opens a document from its title', async () => {
 		const onopen = vi.fn();
-		const { container } = render(DocumentsList, { props: props({ onopen }) });
+		const { container } = await render(DocumentsList, { props: props({ onopen }) });
 		button(container, 'TAP - VA Benefits 101 (Resource Guide)')?.click();
 		expect(onopen).toHaveBeenCalledWith('tap_va101');
 	});
 
-	it('offline, says what cannot be saved and turns Save into "Needs a connection"', () => {
-		const { container } = render(DocumentsList, {
+	it('offline, says what cannot be saved and turns Save into "Needs a connection"', async () => {
+		const { container } = await render(DocumentsList, {
 			props: props({ online: false, libraryHeld: true })
 		});
 		expect(text(container)).toContain(
@@ -229,8 +231,8 @@ describe('DocumentsList', () => {
 
 	// A document's text comes from the answer library. Without it on the device, nothing not saved opens offline,
 	// so the line promises nothing.
-	it('offline without the answer library, does not say the text still opens', () => {
-		const { container } = render(DocumentsList, { props: props({ online: false }) });
+	it('offline without the answer library, does not say the text still opens', async () => {
+		const { container } = await render(DocumentsList, { props: props({ online: false }) });
 		expect(
 			container.querySelector('.docs-sum__note')?.textContent?.replace(/\s+/g, ' ').trim()
 		).toBe(
@@ -241,7 +243,7 @@ describe('DocumentsList', () => {
 	// The device holds the page reader and the answer library, so the question names only the documents.
 	it('asks before saving the rest, stating how many and how much', async () => {
 		const onsaveall = vi.fn();
-		const { container } = render(DocumentsList, {
+		const { container } = await render(DocumentsList, {
 			props: props({ onsaveall, libraryHeld: true })
 		});
 		button(container, 'Save 2 remaining (13.4 MB)')?.click();
@@ -260,44 +262,44 @@ describe('DocumentsList', () => {
 	// The first save also stores the page reader and the answer library. The question names whichever of them is
 	// missing, with its size, and the total stays the documents' own, as the list states them.
 	describe('the save-all question names what the first save also stores', () => {
-		const question = (over: Record<string, unknown>) => {
-			const { container } = render(DocumentsList, { props: props(over) });
+		const question = async (over: Record<string, unknown>) => {
+			const { container } = await render(DocumentsList, { props: props(over) });
 			button(container, 'Save 2 remaining (13.4 MB)')?.click();
 			return text(container.querySelector('dialog[open] p') as Element);
 		};
 
-		it('the page reader and the answer library, while both are missing', () => {
-			expect(question({ libraryMissing: true, libraryHeld: false })).toBe(
+		it('the page reader and the answer library, while both are missing', async () => {
+			expect(await question({ libraryMissing: true, libraryHeld: false })).toBe(
 				'They take 13.4 MB and stay on this device until you remove them. The first save also stores the page reader and the answer library (9.1 MB), once, so their text opens offline too. If your data is limited, use Wi-Fi.'
 			);
 		});
 
-		it('the page reader alone, while only it is missing', () => {
-			expect(question({ libraryMissing: true, libraryHeld: true })).toBe(
+		it('the page reader alone, while only it is missing', async () => {
+			expect(await question({ libraryMissing: true, libraryHeld: true })).toBe(
 				'They take 13.4 MB and stay on this device until you remove them. The first save also stores the page reader (1.7 MB), once. If your data is limited, use Wi-Fi.'
 			);
 		});
 
-		it('the answer library alone, while only it is missing', () => {
-			expect(question({ libraryMissing: false, libraryHeld: false })).toBe(
+		it('the answer library alone, while only it is missing', async () => {
+			expect(await question({ libraryMissing: false, libraryHeld: false })).toBe(
 				'They take 13.4 MB and stay on this device until you remove them. The first save also stores the answer library (7.3 MB), once, so their text opens offline too. If your data is limited, use Wi-Fi.'
 			);
 		});
 
 		// Before the device has been read, whether the answer library is here is not known, and it is not named.
-		it('not the answer library while the device has not been read', () => {
-			expect(question({ libraryMissing: true, libraryHeld: null })).toBe(
+		it('not the answer library while the device has not been read', async () => {
+			expect(await question({ libraryMissing: true, libraryHeld: null })).toBe(
 				'They take 13.4 MB and stay on this device until you remove them. The first save also stores the page reader (1.7 MB), once. If your data is limited, use Wi-Fi.'
 			);
-			expect(question({ libraryMissing: false, libraryHeld: null })).toBe(
+			expect(await question({ libraryMissing: false, libraryHeld: null })).toBe(
 				'They take 13.4 MB and stay on this device until you remove them. If your data is limited, use Wi-Fi.'
 			);
 		});
 	});
 
-	it('saves nothing when the user cancels the save-all question', () => {
+	it('saves nothing when the user cancels the save-all question', async () => {
 		const onsaveall = vi.fn();
-		const { container } = render(DocumentsList, { props: props({ onsaveall }) });
+		const { container } = await render(DocumentsList, { props: props({ onsaveall }) });
 		button(container, 'Save 2 remaining (13.4 MB)')?.click();
 		const dialog = container.querySelector('dialog[open]') as HTMLDialogElement;
 		button(dialog, 'Cancel')?.click();
@@ -308,7 +310,7 @@ describe('DocumentsList', () => {
 	// The erase dialog's shape: Cancel is the focused default, the destructive action quiet.
 	it('confirms removing everything saved, with Cancel focused, and says what stays', async () => {
 		const onremoveall = vi.fn();
-		const { container } = render(DocumentsList, { props: props({ onremoveall }) });
+		const { container } = await render(DocumentsList, { props: props({ onremoveall }) });
 		expect(text(container)).toContain(
 			'Frees 0.6 MB. The search model, the answer library and your data stay.'
 		);
@@ -326,9 +328,9 @@ describe('DocumentsList', () => {
 		expect(dialog.open).toBe(false);
 	});
 
-	it('speaks of a single document in the singular', () => {
+	it('speaks of a single document in the singular', async () => {
 		const rows = [ROWS[0], ROWS[1]] as DocumentRow[];
-		const { container } = render(DocumentsList, { props: props({ rows }) });
+		const { container } = await render(DocumentsList, { props: props({ rows }) });
 
 		button(container, 'Save 1 remaining (0.4 MB)')?.click();
 		const save = container.querySelector('dialog[open]') as HTMLDialogElement;
@@ -341,18 +343,18 @@ describe('DocumentsList', () => {
 		expect(button(remove, 'Remove 1 document')).toBeDefined();
 	});
 
-	it('hides Remove all when nothing is saved, and Save all when everything is', () => {
+	it('hides Remove all when nothing is saved, and Save all when everything is', async () => {
 		const none = ROWS.map((r) => ({ ...r, state: 'unsaved' as const }));
 		const all = ROWS.map((r) => ({ ...r, state: 'saved' as const }));
-		const empty = render(DocumentsList, { props: props({ rows: none }) }).container;
+		const empty = (await render(DocumentsList, { props: props({ rows: none }) })).container;
 		expect(button(empty, 'Remove all saved documents')).toBeUndefined();
 		expect(text(empty)).toContain('Save 4 remaining (14.1 MB)');
-		const full = render(DocumentsList, { props: props({ rows: all }) }).container;
+		const full = (await render(DocumentsList, { props: props({ rows: all }) })).container;
 		expect(text(full)).not.toMatch(/Save \d+ remaining/);
 		expect(button(full, 'Remove all saved documents')).toBeDefined();
 	});
 
-	it('shows progress while saving, with a way to stop, and no other save offered', () => {
+	it('shows progress while saving, with a way to stop, and no other save offered', async () => {
 		const onstop = vi.fn();
 		const progress: SaveProgress = {
 			running: true,
@@ -362,7 +364,7 @@ describe('DocumentsList', () => {
 			bytesTotal: 13_440_268,
 			stoppedBy: null
 		};
-		const { container } = render(DocumentsList, { props: props({ progress, onstop }) });
+		const { container } = await render(DocumentsList, { props: props({ progress, onstop }) });
 		expect(text(container)).toContain('Saving 1 of 2 - 0.4 MB of 13.4 MB');
 		expect(text(container)).toContain('(what is already saved stays)');
 		expect(text(container)).not.toMatch(/Save \d+ remaining/);
@@ -380,7 +382,7 @@ describe('DocumentsList', () => {
 		failed: 'Stopped - 1 of 2 saved. A document could not be downloaded; what is saved stays.'
 	} as const;
 	for (const [reason, copy] of Object.entries(STOPPED)) {
-		it(`says how many were saved and why a run stopped (${reason})`, () => {
+		it(`says how many were saved and why a run stopped (${reason})`, async () => {
 			const progress: SaveProgress = {
 				running: false,
 				done: 1,
@@ -389,7 +391,7 @@ describe('DocumentsList', () => {
 				bytesTotal: 13_440_268,
 				stoppedBy: reason as SaveProgress['stoppedBy']
 			};
-			const { container } = render(DocumentsList, { props: props({ progress }) });
+			const { container } = await render(DocumentsList, { props: props({ progress }) });
 			expect(text(container)).toContain(copy);
 		});
 	}
@@ -400,8 +402,8 @@ describe('DocumentsList', () => {
 		failed: 'Not saved - the download failed. Try again.'
 	} as const;
 	for (const [reason, copy] of Object.entries(NOT_SAVED)) {
-		it(`says why one save failed and still offers it (${reason})`, () => {
-			const { container } = render(DocumentsList, {
+		it(`says why one save failed and still offers it (${reason})`, async () => {
+			const { container } = await render(DocumentsList, {
 				props: props({ failed: { tap_va101: reason } })
 			});
 			const failedRow = row(container, 'Benefits 101') as Element;
@@ -412,9 +414,9 @@ describe('DocumentsList', () => {
 
 	// A disabled button drops focus (measured in both engines), so the Save is marked unavailable instead: it keeps
 	// focus and looks as a disabled one does, and a press does nothing.
-	it('marks a row whose save is in progress unavailable, so it cannot be started twice', () => {
+	it('marks a row whose save is in progress unavailable, so it cannot be started twice', async () => {
 		const onsave = vi.fn();
-		const { container } = render(DocumentsList, {
+		const { container } = await render(DocumentsList, {
 			props: props({ busy: ['tap_va101'], onsave })
 		});
 		const saving = button(row(container, 'Benefits 101') as Element, 'Save') as HTMLButtonElement;
@@ -429,7 +431,7 @@ describe('DocumentsList', () => {
 	});
 
 	it("keeps focus on a row's Save while its save runs", async () => {
-		const { container, rerender } = render(DocumentsList, { props: props() });
+		const { container, rerender } = await render(DocumentsList, { props: props() });
 		const pressed = button(row(container, 'Benefits 101') as Element, 'Save') as HTMLElement;
 		pressed.focus();
 		pressed.click();
@@ -440,8 +442,8 @@ describe('DocumentsList', () => {
 	});
 
 	// Its own save already brings it, so Save all neither counts it nor downloads it a second time.
-	it('leaves a row being saved out of Save all, still listing it as not saved', () => {
-		const { container } = render(DocumentsList, { props: props({ busy: ['tap_va101'] }) });
+	it('leaves a row being saved out of Save all, still listing it as not saved', async () => {
+		const { container } = await render(DocumentsList, { props: props({ busy: ['tap_va101'] }) });
 		expect(button(container, 'Save 1 remaining (13.1 MB)')).toBeDefined();
 		button(container, 'Save 1 remaining (13.1 MB)')?.click();
 
@@ -453,8 +455,8 @@ describe('DocumentsList', () => {
 		expect(groups.map(text)).toEqual(['Saved (2)', 'Not saved (2)']);
 	});
 
-	it('offers no Save all while every document not saved is being saved on its own', () => {
-		const { container } = render(DocumentsList, {
+	it('offers no Save all while every document not saved is being saved on its own', async () => {
+		const { container } = await render(DocumentsList, {
 			props: props({ busy: ['tap_va101', 'tap_dol_efct'] })
 		});
 		expect(text(container)).toContain('2 of 4 saved on this device - 0.6 MB');
@@ -464,7 +466,7 @@ describe('DocumentsList', () => {
 	// A screen reader may not speak a live region inserted with its words already in it, so each region is there,
 	// empty, before its words change.
 	it("announces a row's failed save in a status line that was there before it", async () => {
-		const { container, rerender } = render(DocumentsList, { props: props() });
+		const { container, rerender } = await render(DocumentsList, { props: props() });
 		const line = () => (row(container, 'Benefits 101') as Element).querySelector('[role="status"]');
 		const before = line();
 		expect(before).not.toBeNull();
@@ -476,7 +478,7 @@ describe('DocumentsList', () => {
 	});
 
 	it("announces a run's progress and how it ended in a status line that was there before it", async () => {
-		const { container, rerender } = render(DocumentsList, { props: props() });
+		const { container, rerender } = await render(DocumentsList, { props: props() });
 		// Every live region outside the rows but the count.
 		const regions = () =>
 			[...container.querySelectorAll('[role="status"]')].filter(
@@ -504,8 +506,8 @@ describe('DocumentsList', () => {
 	});
 
 	// The line already on screen says what changed, so saying it aloud adds no words of its own.
-	it('announces the saved count as it changes', () => {
-		const { container } = render(DocumentsList, { props: props() });
+	it('announces the saved count as it changes', async () => {
+		const { container } = await render(DocumentsList, { props: props() });
 		const count = container.querySelector('.docs-sum__count') as HTMLElement;
 		expect(text(count)).toBe('2 of 4 saved on this device - 0.6 MB');
 		expect(count.getAttribute('role')).toBe('status');
@@ -521,7 +523,7 @@ describe('DocumentsList', () => {
 	// is gone, and focus would fall to the page with it. It follows the row to its title in its new place.
 	describe('focus after a row moves', () => {
 		it('follows a row saved from its own Save to its title among the saved', async () => {
-			const { container, rerender } = render(DocumentsList, { props: props() });
+			const { container, rerender } = await render(DocumentsList, { props: props() });
 			const pressed = button(row(container, 'Benefits 101') as Element, 'Save') as HTMLElement;
 			pressed.focus();
 			pressed.click();
@@ -535,7 +537,7 @@ describe('DocumentsList', () => {
 		});
 
 		it('follows a removed row to its title among the not saved, and only once', async () => {
-			const { container, rerender } = render(DocumentsList, { props: props() });
+			const { container, rerender } = await render(DocumentsList, { props: props() });
 			const pressed = button(row(container, 'Vet Centers') as Element, 'Remove') as HTMLElement;
 			pressed.focus();
 			pressed.click();
@@ -552,7 +554,7 @@ describe('DocumentsList', () => {
 		});
 
 		it('leaves focus where the user moved it while the save ran', async () => {
-			const { container, rerender } = render(DocumentsList, { props: props() });
+			const { container, rerender } = await render(DocumentsList, { props: props() });
 			const pressed = button(row(container, 'Benefits 101') as Element, 'Save') as HTMLElement;
 			pressed.focus();
 			pressed.click();
@@ -580,7 +582,7 @@ describe('DocumentsList', () => {
 		const count = (container: Element) => container.querySelector('.docs-sum__count');
 
 		it('follows a row that moves on its own to its title in its new place', async () => {
-			const { container, rerender } = render(DocumentsList, { props: props() });
+			const { container, rerender } = await render(DocumentsList, { props: props() });
 			(button(container, BENEFITS) as HTMLElement).focus();
 
 			await rerender({ rows: as({ tap_va101: 'saved' }) });
@@ -592,7 +594,7 @@ describe('DocumentsList', () => {
 		// The reader holds focus while its row is rebuilt; closing it returns focus to a title that is gone, and
 		// the browser leaves it on the page.
 		it('follows a row rebuilt while focus was elsewhere, once focus falls to the page', async () => {
-			const { container, rerender } = render(DocumentsList, { props: props() });
+			const { container, rerender } = await render(DocumentsList, { props: props() });
 			const reader = document.createElement('button');
 			document.body.append(reader);
 			try {
@@ -616,7 +618,7 @@ describe('DocumentsList', () => {
 			const silence = (event: Event) => event.stopPropagation();
 			window.addEventListener('focusout', silence, { capture: true });
 			try {
-				const { container, rerender } = render(DocumentsList, { props: props() });
+				const { container, rerender } = await render(DocumentsList, { props: props() });
 				(button(container, BENEFITS) as HTMLElement).focus();
 
 				await rerender({ rows: as({ tap_va101: 'saved' }) });
@@ -629,7 +631,7 @@ describe('DocumentsList', () => {
 		});
 
 		it("goes to the count when Save all's button goes as the run starts", async () => {
-			const { container, rerender } = render(DocumentsList, { props: props() });
+			const { container, rerender } = await render(DocumentsList, { props: props() });
 			const opener = button(container, 'Save 2 remaining (13.4 MB)') as HTMLElement;
 			opener.focus();
 			opener.click();
@@ -643,7 +645,7 @@ describe('DocumentsList', () => {
 		});
 
 		it('goes to the count when Stop goes as the run ends', async () => {
-			const { container, rerender } = render(DocumentsList, {
+			const { container, rerender } = await render(DocumentsList, {
 				props: props({ progress: RUNNING })
 			});
 			const stop = button(container, 'Stop') as HTMLElement;
@@ -655,7 +657,7 @@ describe('DocumentsList', () => {
 		});
 
 		it("goes to the count when Remove all's question removes the button that opened it", async () => {
-			const { container, rerender } = render(DocumentsList, { props: props() });
+			const { container, rerender } = await render(DocumentsList, { props: props() });
 			const opener = button(container, 'Remove all saved documents') as HTMLElement;
 			opener.focus();
 			opener.click();
@@ -669,7 +671,7 @@ describe('DocumentsList', () => {
 		});
 
 		it("goes to the count when Save all's button can no longer be pressed", async () => {
-			const { container, rerender } = render(DocumentsList, { props: props() });
+			const { container, rerender } = await render(DocumentsList, { props: props() });
 			const saveRest = button(container, 'Save 2 remaining (13.4 MB)') as HTMLButtonElement;
 			saveRest.focus();
 
@@ -681,7 +683,7 @@ describe('DocumentsList', () => {
 		// The Stopped line is shorter than the progress it replaces, above the view here, and the browser would
 		// scroll to keep the view on the same content. That is turned off, so only a focus can scroll the view.
 		it('moves focus without scrolling the view', async () => {
-			const { container, rerender } = render(DocumentsList, {
+			const { container, rerender } = await render(DocumentsList, {
 				props: props({ progress: RUNNING })
 			});
 			const spacer = document.createElement('div');
@@ -706,8 +708,8 @@ describe('DocumentsList', () => {
 		});
 	});
 
-	it('points to the web-page sources on About', () => {
-		const { container } = render(DocumentsList, { props: props() });
+	it('points to the web-page sources on About', async () => {
+		const { container } = await render(DocumentsList, { props: props() });
 		expect(text(container)).toContain(
 			'25 more sources are web pages, read on their official sites.'
 		);

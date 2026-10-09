@@ -12,7 +12,7 @@ live server. Each decision's full reasoning is kept in private working notes.
 | Stage          | Tool                         | Version         | Purpose                                 |
 | -------------- | ---------------------------- | --------------- | --------------------------------------- |
 | Registry       | `content/sources.yaml`, yaml | 2.x             | The legal record of every source        |
-| Web capture    | fetch, Playwright, linkedom  | 1.61.x, 0.18.x  | Page text, captured politely            |
+| Web capture    | fetch, Playwright, linkedom  | 1.63.x, 0.18.x  | Page text, captured politely            |
 | PDF text       | PDF.js, pdftotext            | 6.3.289, n/a    | Text, cross-checked by two tools        |
 | Passages       | Transformers.js tokenizer    | 4.x             | Passage size in the model's own tokens  |
 | Device vectors | all-MiniLM-L6-v2, quantized  | n/a             | The on-device index                     |

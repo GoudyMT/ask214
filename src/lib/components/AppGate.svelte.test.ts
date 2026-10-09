@@ -10,7 +10,7 @@ const childSnippet = createRawSnippet(() => ({
 }));
 
 describe('AppGate', () => {
-	it('renders the UnsupportedBrowser screen when status is unsupported', () => {
+	it('renders the UnsupportedBrowser screen when status is unsupported', async () => {
 		const app: ProfileApp = {
 			status: 'unsupported',
 			store: null,
@@ -21,12 +21,12 @@ describe('AppGate', () => {
 			wipeAll: null,
 			relockAll: null
 		};
-		const { container } = render(AppGate, { props: { app, children: childSnippet } });
+		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.textContent).toContain('securely'); // UnsupportedBrowser heading
 		expect(container.querySelector('[data-testid="app-content"]')).toBeNull();
 	});
 
-	it('renders children (the app shell) while loading - the shell is not gated behind ready', () => {
+	it('renders children (the app shell) while loading - the shell is not gated behind ready', async () => {
 		const app: ProfileApp = {
 			status: 'loading',
 			store: null,
@@ -37,13 +37,13 @@ describe('AppGate', () => {
 			wipeAll: null,
 			relockAll: null
 		};
-		const { container } = render(AppGate, { props: { app, children: childSnippet } });
+		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
 	});
 
 	// A failed start-up leaves the shell up: Ask, About and Documents need no saved data, and the layout shows a
 	// banner above them.
-	it('renders children (the app shell) when start-up failed', () => {
+	it('renders children (the app shell) when start-up failed', async () => {
 		const app: ProfileApp = {
 			status: 'error',
 			store: null,
@@ -54,11 +54,11 @@ describe('AppGate', () => {
 			wipeAll: null,
 			relockAll: null
 		};
-		const { container } = render(AppGate, { props: { app, children: childSnippet } });
+		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
 	});
 
-	it('renders children when status is ready', () => {
+	it('renders children when status is ready', async () => {
 		const app: ProfileApp = {
 			status: 'ready',
 			store: null,
@@ -69,11 +69,11 @@ describe('AppGate', () => {
 			wipeAll: null,
 			relockAll: null
 		};
-		const { container } = render(AppGate, { props: { app, children: childSnippet } });
+		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
 	});
 
-	it('renders the AppUpdated takeover when status is stale', () => {
+	it('renders the AppUpdated takeover when status is stale', async () => {
 		const app: ProfileApp = {
 			status: 'stale',
 			store: null,
@@ -84,7 +84,7 @@ describe('AppGate', () => {
 			wipeAll: null,
 			relockAll: null
 		};
-		const { container } = render(AppGate, { props: { app, children: childSnippet } });
+		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.textContent).toContain('updated in another tab');
 		expect(container.querySelector('[data-testid="app-content"]')).toBeNull();
 	});

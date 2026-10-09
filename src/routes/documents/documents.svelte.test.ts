@@ -65,8 +65,8 @@ function holdDownload(path: string) {
 }
 
 describe('Documents page', () => {
-	it('is headed Documents and says what the page is for', () => {
-		const { container } = render(DocumentsPage);
+	it('is headed Documents and says what the page is for', async () => {
+		const { container } = await render(DocumentsPage);
 		expect(text(container.querySelector('h1') as Element)).toBe('Documents');
 		expect(text(container)).toContain(
 			"The official guides behind Ask 214's answers. Open one to read it whole; save it to read it without a connection."
@@ -74,7 +74,7 @@ describe('Documents page', () => {
 	});
 
 	it('lists every served document, none saved on a device that has saved nothing', async () => {
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		await vi.waitFor(() =>
 			expect(text(container)).toContain(`0 of ${SERVED} saved on this device - 0.0 MB`)
 		);
@@ -85,7 +85,7 @@ describe('Documents page', () => {
 	it('shows a document it finds in the cache as saved', async () => {
 		const vet = LOCAL_DOCUMENTS['tap_vet_centers'] ?? '';
 		await (await caches.open(ASK_ASSET_CACHE)).put(vet, new Response('pdf'));
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		await vi.waitFor(() =>
 			expect(text(container)).toContain(`1 of ${SERVED} saved on this device - 0.1 MB`)
 		);
@@ -97,7 +97,7 @@ describe('Documents page', () => {
 	it('saves a document from its row, then removes it', async () => {
 		const cache = await caches.open(ASK_ASSET_CACHE);
 		for (const file of LIBRARIES) await cache.put(file, new Response('js'));
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const vetRow = () =>
 			[...container.querySelectorAll('li')].find((li) =>
 				li.textContent?.includes('TAP - Vet Centers (Resource Guide)')
@@ -131,7 +131,7 @@ describe('Documents page', () => {
 		];
 		for (const path of held) await cache.put(path, new Response('pdf'));
 		await cache.put('/corpus/corpus-v1.0.2.json', new Response('{}'));
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const button = (root: Element, label: string) =>
 			[...root.querySelectorAll('button')].find((b) => text(b) === label);
 
@@ -157,7 +157,7 @@ describe('Documents page', () => {
 	it('counts an older copy by its stored size, and removes it from its row', async () => {
 		const cache = await caches.open(ASK_ASSET_CACHE);
 		await cache.put('/docs/tap_vet_centers.0badc0de.pdf', new Response(new Uint8Array(250_000)));
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const vetRow = () =>
 			[...container.querySelectorAll('li')].find((li) =>
 				li.textContent?.includes('TAP - Vet Centers (Resource Guide)')
@@ -190,7 +190,7 @@ describe('Documents page', () => {
 			if (String(request) === old) return Promise.reject(new DOMException('E_TEST_READ'));
 			return realMatch.call(this, request, options);
 		});
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 
 		await vi.waitFor(() =>
 			expect(text(container.querySelector('.docs-sum__count') as Element)).toBe(
@@ -210,7 +210,7 @@ describe('Documents page', () => {
 		for (const file of LIBRARIES) await cache.put(file, new Response('js'));
 		await cache.put('/docs/tap_vet_centers.0badc0de.pdf', new Response('old'));
 		const download = holdDownload(LOCAL_DOCUMENTS['tap_vet_centers'] ?? '');
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const vetRow = () =>
 			[...container.querySelectorAll('li')].find((li) =>
 				li.textContent?.includes('TAP - Vet Centers (Resource Guide)')
@@ -242,7 +242,7 @@ describe('Documents page', () => {
 			if (sourceId !== 'tap_vet_centers') await cache.put(path, new Response('pdf'));
 		}
 		for (const file of LIBRARIES) await cache.put(file, new Response('js'));
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const button = (root: Element, label: string) =>
 			[...root.querySelectorAll('button')].find((b) => text(b) === label);
 
@@ -264,7 +264,7 @@ describe('Documents page', () => {
 		for (const file of LIBRARIES) await cache.put(file, new Response('js'));
 		await cache.put(LOCAL_DOCUMENTS['tap_va101'] ?? '', new Response('pdf'));
 		const download = holdDownload(LOCAL_DOCUMENTS['tap_vet_centers'] ?? '');
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const button = (root: Element, label: string) =>
 			[...root.querySelectorAll('button')].find((b) => text(b) === label);
 		const vetRow = () =>
@@ -313,7 +313,7 @@ describe('Documents page', () => {
 			});
 		});
 		release = () => void stopSaves();
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const button = (root: Element, label: string) =>
 			[...root.querySelectorAll('button')].find((b) => text(b) === label);
 
@@ -359,7 +359,7 @@ describe('Documents page', () => {
 			}
 			return realPut.call(this, request, response);
 		});
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const button = (root: Element, label: string) =>
 			[...root.querySelectorAll('button')].find((b) => text(b) === label);
 		const vetRow = () =>
@@ -401,7 +401,7 @@ describe('Documents page', () => {
 		}
 		for (const file of LIBRARIES) await cache.put(file, new Response('js'));
 		const download = holdDownload(LOCAL_DOCUMENTS['tap_vet_centers'] ?? '');
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const button = (root: Element, label: string) =>
 			[...root.querySelectorAll('button')].find((b) => text(b) === label);
 		const vetRow = () =>
@@ -436,7 +436,7 @@ describe('Documents page', () => {
 		const cache = await caches.open(ASK_ASSET_CACHE);
 		for (const file of LIBRARIES) await cache.put(file, new Response('js'));
 		const download = holdDownload(LOCAL_DOCUMENTS['tap_vet_centers'] ?? '');
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const vetRow = () =>
 			[...container.querySelectorAll('li')].find((li) =>
 				li.textContent?.includes('TAP - Vet Centers (Resource Guide)')
@@ -472,7 +472,7 @@ describe('Documents page', () => {
 		const download = holdDownload(vet);
 		void saveDocument(vet, []);
 		await vi.waitFor(() => expect(download.requests()).toBe(1));
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const vetRow = () =>
 			[...container.querySelectorAll('li')].find((li) =>
 				li.textContent?.includes('TAP - Vet Centers (Resource Guide)')
@@ -531,7 +531,7 @@ describe('Documents page', () => {
 
 		it('is not requested while the wait for the service worker lasts, and is once it ends', async () => {
 			const wait = holdWait();
-			const { container } = render(DocumentsPage);
+			const { container } = await render(DocumentsPage);
 			await openText(container);
 
 			await new Promise((resolve) => setTimeout(resolve, 300));
@@ -542,25 +542,25 @@ describe('Documents page', () => {
 
 		it('is not requested when the page is left while the wait still lasts', async () => {
 			const wait = holdWait();
-			const { container, unmount } = render(DocumentsPage);
+			const { container, unmount } = await render(DocumentsPage);
 			await openText(container);
 
-			unmount();
+			await unmount();
 			wait.end();
 			await new Promise((resolve) => setTimeout(resolve, 300));
 			expect(wait.requests()).toBe(0);
 		});
 	});
 
-	it('points to the web-page sources on About', () => {
-		const { container } = render(DocumentsPage);
+	it('points to the web-page sources on About', async () => {
+		const { container } = await render(DocumentsPage);
 		expect(text(container)).toContain(
 			`${SOURCES_INDEX.agency.length} more sources are web pages, read on their official sites.`
 		);
 	});
 
 	it('opens a document whole in the reader from its title', async () => {
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const title = () =>
 			[...container.querySelectorAll('button')].find(
 				(b) => text(b) === 'TAP - Vet Centers (Resource Guide)'
@@ -581,7 +581,7 @@ describe('Documents page', () => {
 	// The connection can drop and return while the page is open; the page follows it.
 	it('follows the connection as it drops and returns', async () => {
 		const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const note = () => text(container.querySelector('.docs-sum__note') as Element);
 		await vi.waitFor(() => expect(note()).not.toContain('You are offline'));
 
@@ -601,16 +601,16 @@ describe('Documents page', () => {
 		const note = (container: Element) =>
 			text(container.querySelector('.docs-sum__note') as Element);
 
-		const without = render(DocumentsPage);
+		const without = await render(DocumentsPage);
 		await vi.waitFor(() => expect(note(without.container)).toContain('You are offline'));
 		await new Promise((resolve) => setTimeout(resolve, 100));
 		expect(note(without.container)).not.toContain('their text still opens');
-		without.unmount();
+		await without.unmount();
 
 		const cache = await caches.open(ASK_ASSET_CACHE);
 		await cache.put(`${CORPUS_BASE}.json`, new Response('{}'));
 		await cache.put(`${CORPUS_BASE}.embeddings.bin`, new Response('vectors'));
-		const held = render(DocumentsPage);
+		const held = await render(DocumentsPage);
 		await vi.waitFor(() => expect(note(held.container)).toContain('but their text still opens.'));
 	});
 
@@ -628,7 +628,7 @@ describe('Documents page', () => {
 			await reading;
 			return has(name);
 		});
-		const { container } = render(DocumentsPage);
+		const { container } = await render(DocumentsPage);
 		const note = () => text(container.querySelector('.docs-sum__note') as Element);
 
 		await vi.waitFor(() => expect(note()).toContain('You are offline'));
@@ -648,36 +648,36 @@ describe('Documents page', () => {
 			return text(container.querySelector('dialog[open] p') as Element);
 		};
 
-		const without = render(DocumentsPage);
+		const without = await render(DocumentsPage);
 		await vi.waitFor(async () =>
 			expect(await question(without.container)).toContain(
 				'The first save also stores the page reader and the answer library (9.1 MB), once, so their text opens offline too.'
 			)
 		);
-		without.unmount();
+		await without.unmount();
 
 		const cache = await caches.open(ASK_ASSET_CACHE);
 		await cache.put(LIBRARY_SRC, new Response('library'));
 		await cache.put(WORKER_SRC, new Response('worker'));
-		const reader = render(DocumentsPage);
+		const reader = await render(DocumentsPage);
 		await vi.waitFor(async () =>
 			expect(await question(reader.container)).toContain(
 				'The first save also stores the answer library (7.3 MB), once, so their text opens offline too.'
 			)
 		);
 		expect(await question(reader.container)).not.toContain('page reader');
-		reader.unmount();
+		await reader.unmount();
 
 		await cache.put(`${CORPUS_BASE}.json`, new Response('{}'));
 		await cache.put(`${CORPUS_BASE}.embeddings.bin`, new Response('vectors'));
-		const held = render(DocumentsPage);
+		const held = await render(DocumentsPage);
 		await new Promise((resolve) => setTimeout(resolve, 100));
 		expect(await question(held.container)).not.toContain('The first save also stores');
 	});
 
 	// Before the device is read, nothing is known to be missing, so the question names nothing it may already hold.
-	it('names nothing more in the save-all question before it has read the device', () => {
-		const { container } = render(DocumentsPage);
+	it('names nothing more in the save-all question before it has read the device', async () => {
+		const { container } = await render(DocumentsPage);
 		[...container.querySelectorAll('button')]
 			.find((b) => /^Save \d+ remaining/.test(text(b)))
 			?.click();

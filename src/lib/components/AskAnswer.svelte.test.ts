@@ -57,7 +57,7 @@ describe('AskAnswer', () => {
 	// presses "More detail" and continues forward reaches the source line and the note - never the text
 	// they asked for. Moving focus onto the revealed passage is what closes that.
 	it('extractive: expanding moves focus to the revealed passage', async () => {
-		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		(container.querySelector('.ask-answer__more') as HTMLButtonElement).click();
 		flushSync();
 		await Promise.resolve();
@@ -70,8 +70,8 @@ describe('AskAnswer', () => {
 	// the extractive answer with no signal at all. A user who enabled the summary and supplied a key
 	// cannot tell "it worked" from "the model output was rejected". The deleted AskSummary disclosed both
 	// cases; the one-slot rewrite dropped the disclosure along with the states.
-	it('extractive: says so when a synthesis was produced and refused', () => {
-		const { container } = render(AskAnswer, {
+	it('extractive: says so when a synthesis was produced and refused', async () => {
+		const { container } = await render(AskAnswer, {
 			props: { view: { ...extractiveView, synthesisNote: 'refused' } as AnswerView }
 		});
 		expect(container.querySelector('.ask-answer__note-synthesis')?.textContent).toMatch(
@@ -82,8 +82,8 @@ describe('AskAnswer', () => {
 	// `unavailable` is reached BOTH when the call failed and when the reader never supplied an API key -
 	// the route collapses those into one `degraded` result. So the copy must not claim an attempt: for the
 	// no-key reader, "could not be produced" is simply false, and it renders under every answer they get.
-	it('extractive: on an unavailable synthesis, states only what it can support', () => {
-		const { container } = render(AskAnswer, {
+	it('extractive: on an unavailable synthesis, states only what it can support', async () => {
+		const { container } = await render(AskAnswer, {
 			props: { view: { ...extractiveView, synthesisNote: 'unavailable' } as AnswerView }
 		});
 		const note = container.querySelector('.ask-answer__note-synthesis')?.textContent ?? '';
@@ -92,16 +92,16 @@ describe('AskAnswer', () => {
 		expect(note).not.toMatch(/could not|failed|attempted|rejected|error/i);
 	});
 
-	it('extractive: carries no synthesis note when synthesis never ran', () => {
-		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+	it('extractive: carries no synthesis note when synthesis never ran', async () => {
+		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		expect(container.querySelector('.ask-answer__note-synthesis')).toBeNull();
 	});
 
 	// (c) These point at the same class of destination as the card's own link - a government PDF up to
 	// 45 MB. The siblings open a new tab; this one replaced the app, discarding the answer and the session
 	// state in an offline-first PWA.
-	it('synthesized: citations open in a new tab, safely', () => {
-		const { container } = render(AskAnswer, { props: { view: synthesizedView } });
+	it('synthesized: citations open in a new tab, safely', async () => {
+		const { container } = await render(AskAnswer, { props: { view: synthesizedView } });
 		const links = [...container.querySelectorAll('.ask-answer__sources a')];
 		expect(links.length).toBeGreaterThan(0);
 		for (const a of links) {
@@ -111,15 +111,15 @@ describe('AskAnswer', () => {
 		}
 	});
 
-	it('extractive: redisplays the section, which carries the governing condition', () => {
-		const { container } = render(AskAnswer, { props: { view: conditionalSectionView } });
+	it('extractive: redisplays the section, which carries the governing condition', async () => {
+		const { container } = await render(AskAnswer, { props: { view: conditionalSectionView } });
 		expect(container.querySelector('.ask-answer__src')?.textContent).toContain(
 			"If you've completed 2 or more qualifying periods of active duty"
 		);
 	});
 
-	it('extractive: shows the short answer and names its source', () => {
-		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+	it('extractive: shows the short answer and names its source', async () => {
+		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		expect(container.textContent).toContain('one year to submit the claim');
 		expect(container.textContent).toContain('VA - Intent to File');
 		expect(container.textContent).toContain('p. 12');
@@ -128,7 +128,7 @@ describe('AskAnswer', () => {
 	// Tier 2. Collapsed by default - a short answer that arrives pre-expanded is not a short answer.
 	// Both tiers stay in the DOM for the disclosure contract, so assert VISIBILITY, not textContent.
 	it('extractive: hides the fuller passage until asked, then shows it', async () => {
-		const { container, getByRole } = render(AskAnswer, { props: { view: extractiveView } });
+		const { container, getByRole } = await render(AskAnswer, { props: { view: extractiveView } });
 		const short = container.querySelector('#ask-answer-short') as HTMLElement;
 		const passage = container.querySelector('#ask-answer-passage') as HTMLElement;
 		expect(passage.hidden).toBe(true);
@@ -139,26 +139,26 @@ describe('AskAnswer', () => {
 		expect(container.textContent).toContain('Show less');
 	});
 
-	it('extractive: offers no expand control when the expansion adds nothing', () => {
+	it('extractive: offers no expand control when the expansion adds nothing', async () => {
 		const short: AnswerView = {
 			kind: 'extractive',
 			answer: { ...extractiveView.answer, passage: extractiveView.answer.text }
 		} as AnswerView;
-		const { container } = render(AskAnswer, { props: { view: short } });
+		const { container } = await render(AskAnswer, { props: { view: short } });
 		expect(container.querySelector('.ask-answer__more')).toBeNull();
 	});
 
 	// The extractive answer is the document's own words - labelling it as AI-generated, or attaching the
 	// model disclaimer to it, would be a false claim about where the text came from.
-	it('extractive: is not labelled as an AI summary and carries no model disclaimer', () => {
-		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+	it('extractive: is not labelled as an AI summary and carries no model disclaimer', async () => {
+		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		const text = container.textContent ?? '';
 		expect(text).not.toContain('AI summary');
 		expect(text).not.toContain('AI-generated');
 	});
 
-	it('synthesized: shows the prose, the disclaimer, and ONLY the citation as a link', () => {
-		const { container } = render(AskAnswer, { props: { view: synthesizedView } });
+	it('synthesized: shows the prose, the disclaimer, and ONLY the citation as a link', async () => {
+		const { container } = await render(AskAnswer, { props: { view: synthesizedView } });
 		expect(container.textContent).toContain('Start at eBenefits');
 		expect(container.textContent).toContain('AI-generated - verify');
 		const links = Array.from(container.querySelectorAll('a')) as HTMLAnchorElement[];
@@ -166,8 +166,8 @@ describe('AskAnswer', () => {
 		expect(links[0]!.getAttribute('href')).toBe('https://www.va.gov/');
 	});
 
-	it('synthesized: a URL the model wrote into prose is NEVER a clickable link (inert by construction)', () => {
-		const { container } = render(AskAnswer, { props: { view: synthesizedView } });
+	it('synthesized: a URL the model wrote into prose is NEVER a clickable link (inert by construction)', async () => {
+		const { container } = await render(AskAnswer, { props: { view: synthesizedView } });
 		const hrefs = Array.from(container.querySelectorAll('a')).map(
 			(a) => a.getAttribute('href') ?? ''
 		);
@@ -178,8 +178,8 @@ describe('AskAnswer', () => {
 	// The prompt asks for 2-3 short paragraphs and the model separates them with a blank line. Nothing in
 	// the repo set a `white-space` rule, so the whole answer collapsed into one run-on block - invisible,
 	// because the old fixture was a single line and no answer had ever rendered in production.
-	it('synthesized: renders the model paragraph breaks instead of collapsing them', () => {
-		const { container } = render(AskAnswer, { props: { view: synthesizedView } });
+	it('synthesized: renders the model paragraph breaks instead of collapsing them', async () => {
+		const { container } = await render(AskAnswer, { props: { view: synthesizedView } });
 		const el = container.querySelector('.ask-answer__text') as HTMLElement;
 		expect(el.textContent).toContain('\n\n');
 		// The composited value is what decides whether the break is visible, so read it rather than
@@ -190,24 +190,24 @@ describe('AskAnswer', () => {
 	// PERMANENT, not conditional. The eligibility gate reads the QUESTION's phrasing, so it misses the
 	// cases that matter most - "can I use VA health care" renders "You're eligible for VA health care" and
 	// never trips it. A quotation is never a determination, so the line is always true and always shown.
-	it('extractive: always carries the 38 CFR note, on any question', () => {
-		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+	it('extractive: always carries the 38 CFR note, on any question', async () => {
+		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		const text = container.textContent ?? '';
 		expect(text).toContain('not a determination of your eligibility');
 		expect(text).toContain('one year to submit the claim'); // the answer is still there
 	});
 
 	// VSO claim help is free; the OGC accreditation search also lists attorneys and agents who may charge.
-	it('extractive: routes to the canonical free-help destination', () => {
-		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+	it('extractive: routes to the canonical free-help destination', async () => {
+		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		const href = container.querySelector('.ask-answer__note a')?.getAttribute('href') ?? '';
 		expect(href).toBe('https://www.va.gov/get-help-from-accredited-representative/');
 	});
 
 	// The label must not assert that this IS the answer: measured end to end on the device path it contains
 	// the answer 39.3% of the time.
-	it('extractive: does not claim to be the answer', () => {
-		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+	it('extractive: does not claim to be the answer', async () => {
+		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		expect(container.querySelector('.ask-answer__label')?.textContent).toContain(
 			'What the source says'
 		);
@@ -215,7 +215,7 @@ describe('AskAnswer', () => {
 
 	// A real disclosure, matching every other one in the app: state announced, target owned by id.
 	it('extractive: the expand control is a real disclosure', async () => {
-		const { container, getByRole } = render(AskAnswer, { props: { view: extractiveView } });
+		const { container, getByRole } = await render(AskAnswer, { props: { view: extractiveView } });
 		const button = container.querySelector('.ask-answer__more') as HTMLButtonElement;
 		expect(button.getAttribute('aria-expanded')).toBe('false');
 		// Both regions: this one button hides the short answer as well as revealing the passage.
@@ -233,7 +233,7 @@ describe('AskAnswer', () => {
 	// no way in, so on ~4 queries in 10 the only reachable source control opened a DIFFERENT document.
 	it('extractive: offers a route into the source it was quoted from', async () => {
 		let opened: [string, string | undefined] | null = null;
-		const { getByRole } = render(AskAnswer, {
+		const { getByRole } = await render(AskAnswer, {
 			props: {
 				view: extractiveView,
 				onOpenSource: (sourceId: string, chunkId?: string) => (opened = [sourceId, chunkId])
@@ -243,34 +243,34 @@ describe('AskAnswer', () => {
 		expect(opened).toEqual(['va_intent_to_file', 'va_intent_to_file:0123456789ab']);
 	});
 
-	it('extractive: offers no source route when the answer carries no chunk id', () => {
+	it('extractive: offers no source route when the answer carries no chunk id', async () => {
 		const noChunk = {
 			kind: 'extractive',
 			answer: { ...extractiveView.answer, chunkId: undefined }
 		} as AnswerView;
-		const { container } = render(AskAnswer, {
+		const { container } = await render(AskAnswer, {
 			props: { view: noChunk, onOpenSource: () => {} }
 		});
 		expect(container.textContent).not.toContain('Read it in the source');
 	});
 
 	// 90 corpus chunks carry an unbreakable run over 40 chars; without this one overflows 320px by 382px.
-	it('extractive: long unbreakable tokens wrap instead of widening the block', () => {
-		const { container } = render(AskAnswer, { props: { view: extractiveView } });
+	it('extractive: long unbreakable tokens wrap instead of widening the block', async () => {
+		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		const el = container.querySelector('.ask-answer__text') as HTMLElement;
 		expect(['anywhere', 'break-word']).toContain(getComputedStyle(el).overflowWrap);
 	});
 
-	it('eligibility: shows the impersonal-info note and the accredited-VSO / va.gov outbound', () => {
-		const { container } = render(AskAnswer, { props: { view: { kind: 'eligibility' } } });
+	it('eligibility: shows the impersonal-info note and the accredited-VSO / va.gov outbound', async () => {
+		const { container } = await render(AskAnswer, { props: { view: { kind: 'eligibility' } } });
 		expect(container.textContent?.toLowerCase()).toContain('general information');
 		expect(container.querySelector('a[href*="va.gov"]')).not.toBeNull();
 	});
 
 	// Rule 3's authorized "the sources do not cover this" answer. It must read as a BOUNDARY of what the
 	// app carries, not as a failure to answer.
-	it('notCovered: names the limit and routes to the official contacts', () => {
-		const { container } = render(AskAnswer, { props: { view: { kind: 'notCovered' } } });
+	it('notCovered: names the limit and routes to the official contacts', async () => {
+		const { container } = await render(AskAnswer, { props: { view: { kind: 'notCovered' } } });
 		const text = (container.textContent ?? '').toLowerCase();
 		expect(text).toContain('none of them cover this');
 		expect(text).toContain('1-800-827-1000');

@@ -64,20 +64,20 @@ function card(over: Partial<ResultCard> = {}): ResultCard {
 }
 
 describe('AskView', () => {
-	it('idle: renders the query input, the question feed, and the privacy line', () => {
-		const { container } = render(AskView, { props: props({ kind: 'idle' }) });
+	it('idle: renders the query input, the question feed, and the privacy line', async () => {
+		const { container } = await render(AskView, { props: props({ kind: 'idle' }) });
 		expect(container.querySelector('.ask-input')).not.toBeNull();
 		expect(container.querySelectorAll('.q-feed__pill').length).toBeGreaterThan(0);
 		expect(container.querySelector('.ask-private')).not.toBeNull();
 	});
 
-	it('the result region announces state changes to assistive tech (aria-live, WCAG 4.1.3)', () => {
-		const { container } = render(AskView, { props: props({ kind: 'idle' }) });
+	it('the result region announces state changes to assistive tech (aria-live, WCAG 4.1.3)', async () => {
+		const { container } = await render(AskView, { props: props({ kind: 'idle' }) });
 		expect(container.querySelector('.ask-result')?.getAttribute('aria-live')).toBe('polite');
 	});
 
-	it('crisis: renders the crisis-line card, not a normal result state', () => {
-		const { container } = render(AskView, { props: props({ kind: 'crisis' }) });
+	it('crisis: renders the crisis-line card, not a normal result state', async () => {
+		const { container } = await render(AskView, { props: props({ kind: 'crisis' }) });
 		expect(container.querySelector('.crisis')).not.toBeNull();
 		expect(container.querySelector('a[href="tel:988"]')).not.toBeNull();
 		expect(container.querySelector('.ask-msg')).toBeNull();
@@ -85,9 +85,9 @@ describe('AskView', () => {
 		expect(container.querySelector('.ask-result')?.getAttribute('aria-live')).not.toBe('polite');
 	});
 
-	it('idle: clicking a feed pill fills the input and asks that question', () => {
+	it('idle: clicking a feed pill fills the input and asks that question', async () => {
 		let asked: string | null = null;
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'idle' }, { onAsk: (q: string) => (asked = q) })
 		});
 		const pill = container.querySelector('.q-feed__pill') as HTMLButtonElement;
@@ -98,9 +98,9 @@ describe('AskView', () => {
 		expect((container.querySelector('.ask-input') as HTMLInputElement).value).toBe(text); // filled the bar
 	});
 
-	it('submitting the query calls onAsk with the typed text', () => {
+	it('submitting the query calls onAsk with the typed text', async () => {
 		let asked: string | null = null;
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'idle' }, { onAsk: (q: string) => (asked = q) })
 		});
 		const input = container.querySelector('.ask-input') as HTMLInputElement;
@@ -112,8 +112,10 @@ describe('AskView', () => {
 		expect(asked).toBe('how do I file a claim');
 	});
 
-	it('not ready: the input stays usable but Search is gated until the corpus loads', () => {
-		const { container } = render(AskView, { props: props({ kind: 'idle' }, { ready: false }) });
+	it('not ready: the input stays usable but Search is gated until the corpus loads', async () => {
+		const { container } = await render(AskView, {
+			props: props({ kind: 'idle' }, { ready: false })
+		});
 		const input = container.querySelector('.ask-input') as HTMLInputElement;
 		const search = container.querySelector('.ask-search') as HTMLButtonElement;
 		// Usable at once so the first interaction (focus/type) can kick off the deferred corpus load.
@@ -122,8 +124,8 @@ describe('AskView', () => {
 		expect(search.disabled).toBe(true);
 	});
 
-	it('the Search button keeps the accessible name "Search" (icon-only on mobile stays labelled)', () => {
-		const { container } = render(AskView, { props: props({ kind: 'idle' }) });
+	it('the Search button keeps the accessible name "Search" (icon-only on mobile stays labelled)', async () => {
+		const { container } = await render(AskView, { props: props({ kind: 'idle' }) });
 		const search = container.querySelector('.ask-search') as HTMLButtonElement;
 		// The visible label provides the accessible name; the magnifier svg is hidden from AT, so the
 		// name stays "Search" even when the label is visually clipped at narrow widths.
@@ -131,10 +133,10 @@ describe('AskView', () => {
 		expect(search.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
 	});
 
-	it('needsSetup: shows the consent card with the preserved query; buttons fire onSetUp / onDismiss', () => {
+	it('needsSetup: shows the consent card with the preserved query; buttons fire onSetUp / onDismiss', async () => {
 		let setUp = 0;
 		let dismissed = 0;
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'needsSetup', pendingQuery: 'am I eligible for SkillBridge?' },
 				{ onSetUp: () => setUp++, onDismiss: () => dismissed++ }
@@ -152,28 +154,30 @@ describe('AskView', () => {
 		expect(dismissed).toBe(1);
 	});
 
-	it('modelLoading / embedding / empty / offline / error render their messages', () => {
+	it('modelLoading / embedding / empty / offline / error render their messages', async () => {
 		expect(
-			render(AskView, { props: props({ kind: 'modelLoading' }) }).container.textContent
+			(await render(AskView, { props: props({ kind: 'modelLoading' }) })).container.textContent
 		).toContain('Setting up Ask');
 		expect(
-			render(AskView, { props: props({ kind: 'embedding' }) }).container.textContent
+			(await render(AskView, { props: props({ kind: 'embedding' }) })).container.textContent
 		).toContain('Finding relevant sources');
-		expect(render(AskView, { props: props({ kind: 'empty' }) }).container.textContent).toContain(
-			'No close match'
-		);
-		expect(render(AskView, { props: props({ kind: 'offline' }) }).container.textContent).toContain(
-			'offline'
-		);
 		expect(
-			render(AskView, {
-				props: props({ kind: 'error', code: ASK_ERROR.EMBED })
-			}).container.textContent?.toLowerCase()
+			(await render(AskView, { props: props({ kind: 'empty' }) })).container.textContent
+		).toContain('No close match');
+		expect(
+			(await render(AskView, { props: props({ kind: 'offline' }) })).container.textContent
+		).toContain('offline');
+		expect(
+			(
+				await render(AskView, {
+					props: props({ kind: 'error', code: ASK_ERROR.EMBED })
+				})
+			).container.textContent?.toLowerCase()
 		).toContain("couldn't run");
 	});
 
-	it('empty: keeps the rephrase hint, hedges coverage, and gives a way out of the app', () => {
-		const { container } = render(AskView, { props: props({ kind: 'empty' }) });
+	it('empty: keeps the rephrase hint, hedges coverage, and gives a way out of the app', async () => {
+		const { container } = await render(AskView, { props: props({ kind: 'empty' }) });
 		const text = container.textContent ?? '';
 		expect(text).toContain('No close match');
 		expect(text).toMatch(/rephras/i);
@@ -191,13 +195,13 @@ describe('AskView', () => {
 		expect(link?.getAttribute('rel')).toBe('external noopener');
 	});
 
-	it('results: renders the lead card; extra hits collapse behind a "similar sources" toggle', () => {
+	it('results: renders the lead card; extra hits collapse behind a "similar sources" toggle', async () => {
 		const cards = [
 			card({ sourceTitle: 'Lead Source' }),
 			card({ sourceTitle: 'Similar A' }),
 			card({ sourceTitle: 'Similar B' })
 		];
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards })
 		});
 		expect(container.querySelector('.ask-card--lead')?.textContent).toContain('Lead Source');
@@ -209,8 +213,8 @@ describe('AskView', () => {
 		expect(container.querySelectorAll('.ask-similar .ask-card').length).toBe(2); // expanded
 	});
 
-	it('results: a single hit shows the lead with no similar toggle', () => {
-		const { container } = render(AskView, {
+	it('results: a single hit shows the lead with no similar toggle', async () => {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [card()] })
 		});
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
@@ -230,7 +234,7 @@ describe('AskView', () => {
 	it('results: "Read full source" loads the source on demand and opens the offline reader', async () => {
 		const lead = card({ sourceId: 'va_intent', sourceTitle: 'VA - Intent to File' });
 		const loadSource = vi.fn(async () => heldSource());
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [lead] }, { loadSource })
 		});
 		expect(container.querySelector('.reader__title')).toBeNull(); // reader closed initially
@@ -244,7 +248,7 @@ describe('AskView', () => {
 
 	it('results: "Read more" opens the reader highlighting the passage the card cited', async () => {
 		const lead = card({ sourceId: 'va_intent', chunkId: 'h2' });
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'results', origin: 'device', cards: [lead] },
 				{ loadSource: async () => heldSource() }
@@ -260,10 +264,10 @@ describe('AskView', () => {
 		expect(document.activeElement).toBe(cited); // focus moved to the cited block once content loaded
 	});
 
-	it('results: "Read more" opens the reader in a loading state immediately (no silent dead button)', () => {
+	it('results: "Read more" opens the reader in a loading state immediately (no silent dead button)', async () => {
 		const lead = card({ sourceId: 'va_intent' });
 		// A pending load: the reader must still open right away and show loading, not do nothing.
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'results', origin: 'device', cards: [lead] },
 				{ loadSource: () => new Promise(() => {}) }
@@ -279,7 +283,7 @@ describe('AskView', () => {
 		const lead = card({ sourceId: 'va_intent' });
 		let resolveLoad!: (s: Source | null) => void;
 		const loadSource = () => new Promise<Source | null>((r) => (resolveLoad = r));
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [lead] }, { loadSource })
 		});
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
@@ -304,7 +308,7 @@ describe('AskView', () => {
 
 	it('results: a failed source load shows the reader error state, not a silent no-op', async () => {
 		const lead = card({ sourceId: 'va_intent' });
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'results', origin: 'device', cards: [lead] },
 				{
@@ -324,7 +328,7 @@ describe('AskView', () => {
 
 	it('reminder: appears after [Not now] returns to idle, and the x dismisses it for the session', async () => {
 		sessionStorage.removeItem('mtc:ask:reminder-dismissed'); // start not-yet-dismissed
-		const { container, rerender } = render(AskView, {
+		const { container, rerender } = await render(AskView, {
 			props: props({ kind: 'needsSetup', pendingQuery: 'q' })
 		});
 		// [Not now] sets the internal "setup dismissed" flag; the reminder still hides while in needsSetup.
@@ -343,7 +347,7 @@ describe('AskView', () => {
 
 	it('reminder: stays hidden when already dismissed this session', async () => {
 		sessionStorage.setItem('mtc:ask:reminder-dismissed', '1'); // dismissed in a prior view
-		const { container, rerender } = render(AskView, {
+		const { container, rerender } = await render(AskView, {
 			props: props({ kind: 'needsSetup', pendingQuery: 'q' })
 		});
 		(container.querySelector('.ask-setup__skip') as HTMLButtonElement).click();
@@ -356,8 +360,8 @@ describe('AskView', () => {
 
 	// --- online affordances (additive; onlineCapable defaults false, so the device tests above are untouched) ---
 
-	it('online-capable: shows the mode switch and the online privacy copy in online mode', () => {
-		const { container } = render(AskView, {
+	it('online-capable: shows the mode switch and the online privacy copy in online mode', async () => {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'idle' }, { onlineCapable: true, mode: 'online' })
 		});
 		expect(container.querySelector('.ask-mode')).not.toBeNull();
@@ -366,8 +370,8 @@ describe('AskView', () => {
 		);
 	});
 
-	it('device mode keeps the on-device privacy copy', () => {
-		const { container } = render(AskView, {
+	it('device mode keeps the on-device privacy copy', async () => {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'idle' }, { onlineCapable: true, mode: 'device' })
 		});
 		expect(container.querySelector('.ask-private')?.textContent).toContain('on your device');
@@ -378,7 +382,7 @@ describe('AskView', () => {
 		// displayed answer still egressed, so the privacy line and the reader must NOT relabel it as
 		// on-device - the copy keys off the result's snapshot origin, never the current mode.
 		const lead = card({ sourceId: 'va_intent' });
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'results', origin: 'online', cards: [lead] },
 				{ onlineCapable: true, mode: 'device', loadSource: async () => heldSource() }
@@ -406,7 +410,7 @@ describe('AskView', () => {
 			sourceTitle: 'VA - Decision Reviews',
 			excerpt: 'A supplemental claim adds new and relevant evidence to a decided claim.'
 		});
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'results', origin: 'online', cards: [lead, other] },
 				{ onlineCapable: true, mode: 'online', loadSource }
@@ -440,7 +444,7 @@ describe('AskView', () => {
 				chunkId: lead.chunkId
 			}
 		};
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'results', origin: 'online', cards: [lead], answer },
 				{ onlineCapable: true, mode: 'online', loadSource }
@@ -458,7 +462,7 @@ describe('AskView', () => {
 
 	it('still reads an on-device answer from the answer library', async () => {
 		const loadSource = vi.fn(async () => heldSource());
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [card()] }, { loadSource })
 		});
 
@@ -466,10 +470,10 @@ describe('AskView', () => {
 		await vi.waitFor(() => expect(loadSource).toHaveBeenCalledWith('va_intent_to_file'));
 	});
 
-	it('a device answer keeps the on-device copy even after the mode flips to online', () => {
+	it('a device answer keeps the on-device copy even after the mode flips to online', async () => {
 		// The mirror: a genuinely on-device answer keeps its true "nothing sent" assurance, not the neutral
 		// online wording, when the toggle is later moved to online.
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'results', origin: 'device', cards: [card()] },
 				{ onlineCapable: true, mode: 'online' }
@@ -480,8 +484,8 @@ describe('AskView', () => {
 		expect(priv).not.toContain('only your question is sent'); // the online-only phrasing must be absent
 	});
 
-	it('freezes the mode toggle and the nudge button while a query is in flight', () => {
-		const { container } = render(AskView, {
+	it('freezes the mode toggle and the nudge button while a query is in flight', async () => {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'embedding' }, { onlineCapable: true, mode: 'online', showNudge: true })
 		});
 		const modeButtons = container.querySelectorAll('.ask-mode__opt');
@@ -492,10 +496,10 @@ describe('AskView', () => {
 		);
 	});
 
-	it('needsReconsent: quotes the held query; buttons fire onConsentOnline / onStayDevice', () => {
+	it('needsReconsent: quotes the held query; buttons fire onConsentOnline / onStayDevice', async () => {
 		let consented = 0;
 		let stayed = 0;
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'needsReconsent', pendingQuery: 'how do I file a claim' },
 				{
@@ -521,7 +525,7 @@ describe('AskView', () => {
 		expect(stayed).toBe(1);
 	});
 
-	it('results: renders the answer above the cards when present', () => {
+	it('results: renders the answer above the cards when present', async () => {
 		const answer: AnswerView = {
 			kind: 'synthesized',
 			answer: {
@@ -531,7 +535,7 @@ describe('AskView', () => {
 				disclaimer: 'd'
 			}
 		};
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'results', origin: 'online', cards: [card()], answer },
 				{ onlineCapable: true, mode: 'online' }
@@ -543,7 +547,7 @@ describe('AskView', () => {
 
 	// The answer block owns the text at both tiers, so the lead card stops repeating it. The card is not
 	// demoted - it keeps its position, its badge, its citation and both actions.
-	it('results: the card the answer came from yields its excerpt', () => {
+	it('results: the card the answer came from yields its excerpt', async () => {
 		const lead = card();
 		const answer: AnswerView = {
 			kind: 'extractive',
@@ -556,7 +560,7 @@ describe('AskView', () => {
 				chunkId: lead.chunkId
 			}
 		};
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [lead], answer })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).toBeNull();
@@ -568,7 +572,7 @@ describe('AskView', () => {
 	// The answer is now always taken from the lead card, so this branch is DEFENSIVE rather than routine -
 	// it is what stops a future change to which card answers from silently blanking a compact card, and it
 	// is exactly the defect that shipped once when the yield rule was widened beyond the lead.
-	it('results: a card the answer did NOT come from keeps its excerpt', () => {
+	it('results: a card the answer did NOT come from keeps its excerpt', async () => {
 		const lead = card();
 		const other = card();
 		const answer: AnswerView = {
@@ -582,7 +586,7 @@ describe('AskView', () => {
 				chunkId: other.chunkId
 			}
 		};
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [lead, other], answer })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
@@ -593,7 +597,7 @@ describe('AskView', () => {
 	// reader deliberately opened, so there is no accidental double-read to prevent - and suppressing it
 	// leaves a card with a title, two links and NO text. That is how the card which actually produced the
 	// answer ends up being the one that looks broken, on roughly 4 queries in 10.
-	it('results: a compact card keeps its excerpt even when the answer came from it', () => {
+	it('results: a compact card keeps its excerpt even when the answer came from it', async () => {
 		const lead = card();
 		const other = card();
 		const answer: AnswerView = {
@@ -607,7 +611,7 @@ describe('AskView', () => {
 				chunkId: other.chunkId
 			}
 		};
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [lead, other], answer })
 		});
 		(container.querySelector('.ask-toggle') as HTMLButtonElement).click();
@@ -617,7 +621,7 @@ describe('AskView', () => {
 
 	// A synthesized answer paraphrases, so there is no duplication to remove and the card is untouched.
 	// This is the shipped BYO-key surface, which must not change.
-	it('results: the lead card keeps its excerpt under a synthesized answer', () => {
+	it('results: the lead card keeps its excerpt under a synthesized answer', async () => {
 		const answer: AnswerView = {
 			kind: 'synthesized',
 			answer: {
@@ -627,14 +631,14 @@ describe('AskView', () => {
 				disclaimer: 'd'
 			}
 		};
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'online', cards: [card()], answer })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
 	});
 
-	it('results: the lead card keeps its excerpt when there is no answer at all', () => {
-		const { container } = render(AskView, {
+	it('results: the lead card keeps its excerpt when there is no answer at all', async () => {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [card()] })
 		});
 		expect(container.querySelector('.ask-card--lead .ask-card__excerpt')).not.toBeNull();
@@ -642,7 +646,7 @@ describe('AskView', () => {
 
 	// The default and offline user has no key, so the extractive answer is the only one they ever see -
 	// it must render in the same slot, above the same unchanged cards.
-	it('results: renders the extractive answer in the same slot on the device path', () => {
+	it('results: renders the extractive answer in the same slot on the device path', async () => {
 		const answer: AnswerView = {
 			kind: 'extractive',
 			answer: {
@@ -653,7 +657,7 @@ describe('AskView', () => {
 				url: 'https://www.va.gov/'
 			}
 		};
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [card()], answer })
 		});
 		expect(container.querySelector('.ask-answer')).not.toBeNull();
@@ -661,9 +665,9 @@ describe('AskView', () => {
 		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
 	});
 
-	it('degraded offer_device: the button re-runs the kept query on the device path', () => {
+	it('degraded offer_device: the button re-runs the kept query on the device path', async () => {
 		let offered: string | null = null;
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'degraded', rung: 'offer_device', query: 'gi bill' },
 				{ onlineCapable: true, onOfferDevice: (q) => (offered = q) }
@@ -674,9 +678,9 @@ describe('AskView', () => {
 		expect(offered).toBe('gi bill');
 	});
 
-	it('nudge: shows when showNudge and dismisses / switches to device', () => {
+	it('nudge: shows when showNudge and dismisses / switches to device', async () => {
 		let dismissed = 0;
-		const { container } = render(AskView, {
+		const { container } = await render(AskView, {
 			props: props(
 				{ kind: 'idle' },
 				{ onlineCapable: true, showNudge: true, onDismissNudge: () => dismissed++ }

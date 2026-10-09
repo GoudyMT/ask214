@@ -17,8 +17,8 @@ function enter(container: Element, value: string, how: 'change' | 'Enter' = 'cha
 }
 
 describe('DocumentPager', () => {
-	it('shows the page on screen as a number the user can change, and the page count', () => {
-		const { container } = render(DocumentPager, {
+	it('shows the page on screen as a number the user can change, and the page count', async () => {
+		const { container } = await render(DocumentPager, {
 			props: { page: 3, pageCount: 12, onpage: vi.fn() }
 		});
 		expect(field(container).value).toBe('3');
@@ -28,8 +28,8 @@ describe('DocumentPager', () => {
 	});
 
 	// The scroll does what Previous and Next did; the keyboard scrolls the focused page.
-	it('has no Previous or Next, only the page number', () => {
-		const { container } = render(DocumentPager, {
+	it('has no Previous or Next, only the page number', async () => {
+		const { container } = await render(DocumentPager, {
 			props: { page: 3, pageCount: 12, onpage: vi.fn() }
 		});
 		expect(container.querySelectorAll('button')).toHaveLength(0);
@@ -38,7 +38,7 @@ describe('DocumentPager', () => {
 	});
 
 	it('follows the page in view', async () => {
-		const { container, rerender } = render(DocumentPager, {
+		const { container, rerender } = await render(DocumentPager, {
 			props: { page: 3, pageCount: 12, onpage: vi.fn() }
 		});
 		await rerender({ page: 7 });
@@ -48,7 +48,7 @@ describe('DocumentPager', () => {
 	// Scrolling under a half-typed number must not overwrite it; once the reader leaves the field, it
 	// shows the page in view again.
 	it('holds the number still while the reader is typing in it', async () => {
-		const { container, rerender } = render(DocumentPager, {
+		const { container, rerender } = await render(DocumentPager, {
 			props: { page: 3, pageCount: 12, onpage: vi.fn() }
 		});
 		field(container).focus();
@@ -60,9 +60,11 @@ describe('DocumentPager', () => {
 		await vi.waitFor(() => expect(field(container).value).toBe('7'));
 	});
 
-	it('goes to a page typed within the document, on leaving the field or on Enter', () => {
+	it('goes to a page typed within the document, on leaving the field or on Enter', async () => {
 		const onpage = vi.fn();
-		const { container } = render(DocumentPager, { props: { page: 3, pageCount: 12, onpage } });
+		const { container } = await render(DocumentPager, {
+			props: { page: 3, pageCount: 12, onpage }
+		});
 		enter(container, '12');
 		expect(onpage).toHaveBeenLastCalledWith(12);
 		enter(container, '1', 'Enter');
@@ -72,9 +74,11 @@ describe('DocumentPager', () => {
 	// Both edges, a fraction and a blank: a page outside 1..M, or no page, moves nothing, and the field goes
 	// back to the page on screen so it never shows a number the view is not on.
 	for (const typed of ['0', '13', '2.5', '']) {
-		it(`ignores "${typed}" and shows the page on screen again`, () => {
+		it(`ignores "${typed}" and shows the page on screen again`, async () => {
 			const onpage = vi.fn();
-			const { container } = render(DocumentPager, { props: { page: 3, pageCount: 12, onpage } });
+			const { container } = await render(DocumentPager, {
+				props: { page: 3, pageCount: 12, onpage }
+			});
 			enter(container, typed);
 			expect(onpage).not.toHaveBeenCalled();
 			expect(field(container).value).toBe('3');

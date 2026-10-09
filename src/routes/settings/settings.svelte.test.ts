@@ -57,7 +57,7 @@ describe('Settings, the Documents row', () => {
 			if (String(request) === old) return Promise.reject(new DOMException('E_TEST_READ'));
 			return realMatch.call(this, request, options);
 		});
-		const { container } = render(SettingsPage);
+		const { container } = await render(SettingsPage);
 		const summary = () => text(container.querySelector('.documents-summary span') as Element);
 
 		await vi.waitFor(() =>
