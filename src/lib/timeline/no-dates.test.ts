@@ -52,7 +52,9 @@ function project(view: TimelineView) {
 
 // The frozen view is v1.2.0's except for the two tasks whose rule now counts from the leaving day, which falls on
 // separation when no date is entered: the separation package (opens 270, aims 150 and ends 120 days before; v1.2.0 had
-// 120, 75 and 60, so its phase moved too) and the DD-214 review (ends 15 days before, not 1).
+// 120, 75 and 60, so its phase moved too) and the DD-214 review (ends 15 days before, not 1). VGLI's final edge also
+// moved: it counts 1 year and 120 days, so a separation whose year holds a Feb 29 now ends it a day later than the
+// old 485 days.
 describe("the no-dates view is v1.2.0's, but for the two tasks counted from the leaving day", () => {
 	it('matches the frozen view for three separation dates', async () => {
 		const views = [

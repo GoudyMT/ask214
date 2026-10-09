@@ -73,7 +73,7 @@ describe('computeDesiredEvents', () => {
 	});
 
 	it('marks both edges of a two-edge task', () => {
-		const vgli = item(def('v', 'closes', { finalEnd: 485 }), {
+		const vgli = item(def('v', 'closes', { finalEnd: { years: 1, days: 120 } }), {
 			windowEndDate: '2027-09-15',
 			finalEndDate: '2028-05-17'
 		});

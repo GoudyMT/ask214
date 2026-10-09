@@ -67,8 +67,8 @@ export type TaskDef = {
 	windowStart: number; // days vs EAOS, or vs the leaving day for countsFrom; negative = before it
 	windowEnd: number;
 	kind: TaskKind;
-	/** A second edge, days vs EAOS: the task changes at windowEnd and closes here (VGLI). */
-	finalEnd?: number;
+	/** A second edge, in years and days after EAOS: the task changes at windowEnd and closes here (VGLI). */
+	finalEnd?: { years: number; days: number };
 	/** One factual line shown once a firm date passes: what is still possible and where to go. */
 	afterNote?: string;
 	/** One factual line shown between a two-edge task's edges: what changed at the first. */

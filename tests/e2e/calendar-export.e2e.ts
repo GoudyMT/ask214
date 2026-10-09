@@ -77,7 +77,7 @@ test('a kept-off category is absent from the exported file', async ({ page }) =>
 	expect((filtered.match(/BEGIN:VEVENT/g) ?? []).length).toBeLessThan(baselineCount);
 });
 
-// 600 days after separation every window has closed (VGLI's last edge is 485 days after), so nothing is ahead:
+// 600 days after separation every window has closed (VGLI's last edge is 1 year and 120 days after), so nothing is ahead:
 // Settings says so instead of building an empty file, and the timeline does not offer the add at all.
 test('a profile with nothing ahead is not offered the add', async ({ page }) => {
 	await seedProfile(page, -600);

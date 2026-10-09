@@ -684,7 +684,7 @@ describe('generateTimeline (deadline fields)', () => {
 		windowStart: 0,
 		windowEnd: 240,
 		recommendedOffset: 30,
-		finalEnd: 485
+		finalEnd: { years: 1, days: 120 }
 	};
 
 	it('closes a required pre-separation task for a user already separated', () => {
@@ -717,7 +717,7 @@ describe('generateTimeline (deadline fields)', () => {
 		const [first, second] = items(persona, [bdd, vgli]);
 		expect(first?.status).toBe('closing-soon');
 		expect(first?.daysLeft).toBe(17); // Oct 3 -> Oct 20
-		expect(second?.finalEndDate).toBe(eaosOffsetDate(eaos, 485));
+		expect(second?.finalEndDate).toBe('2028-05-17'); // 1 year and 120 days after Jan 18, 2027
 		expect(second?.daysLeft).toBeUndefined(); // upcoming: no countdown
 	});
 
@@ -742,7 +742,7 @@ describe('generateTimeline (deadline fields)', () => {
 	});
 
 	it('counts a two-edge task down to its final edge between the edges, and lists it as closing soon', () => {
-		const separated = '2025-06-25' as EaosString; // the final edge (485 days) falls on Oct 23, 2026
+		const separated = '2025-06-25' as EaosString; // the final edge (1 year and 120 days) falls on Oct 23, 2026
 		const p: PersonaFilters = {
 			completeness: 'eaos-only',
 			eaos: separated,
@@ -752,6 +752,36 @@ describe('generateTimeline (deadline fields)', () => {
 		expect(list[0]?.status).toBe('changed');
 		expect(list[0]?.daysLeft).toBe(20);
 		expect(selectNeedsNow(list, '2026-10-03').closingSoon.map((i) => i.def.id)).toEqual(['vgli']);
+	});
+
+	// va.gov: VGLI within "1 year and 120 days of leaving". Counted as 365 + 120 the edge fell a day early whenever the
+	// year held a Feb 29; the real task is used so the date under test is the one a user sees.
+	describe('the VGLI final edge', () => {
+		const real = TASK_DEFS.filter((d) => d.id === 'vgli-convert');
+		const vgliOn = (separation: string, day: Date) => {
+			const e = separation as EaosString;
+			const p: PersonaFilters = {
+				completeness: 'eaos-only',
+				eaos: e,
+				daysUntilSeparation: daysUntilSeparation(e, day)
+			};
+			const [item] = generateTimeline(p, real, state, day).phases.flatMap((ph) => ph.items);
+			return item;
+		};
+
+		it('ends on the 1 year and 120 days day across a Feb 29', () => {
+			expect(vgliOn('2027-04-30', today)?.finalEndDate).toBe('2028-08-28');
+		});
+
+		// Positive control: the two ways of counting agree here, so the date is the old 485-day one.
+		it('keeps the date where the year holds no Feb 29', () => {
+			expect(vgliOn('2025-06-25', today)?.finalEndDate).toBe('2026-10-23');
+		});
+
+		it('is still changed on the final day and closed the day after', () => {
+			expect(vgliOn('2027-04-30', new Date(2028, 7, 28, 12))?.status).toBe('changed');
+			expect(vgliOn('2027-04-30', new Date(2028, 7, 29, 12))?.status).toBe('closed');
+		});
 	});
 
 	it('aims a soft task at a recommended date that falls today', () => {

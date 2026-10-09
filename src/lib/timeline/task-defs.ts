@@ -462,8 +462,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		kind: 'closes',
 		windowStart: 0,
 		windowEnd: 240,
-		// 1 year and 120 days, counted as 365 + 120: one day early at most across a leap day, never late.
-		finalEnd: 485,
+		// 1 year and 120 days after leaving, the earlier of the two ways to count it, so never late.
+		finalEnd: { years: 1, days: 120 },
 		recommendedOffset: 30,
 		why: 'You can convert with no health questions within 240 days of separation (hard deadline about 485 days).',
 		changeNote:

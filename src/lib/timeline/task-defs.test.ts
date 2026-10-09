@@ -12,6 +12,7 @@ import {
 	BEFORE_TERMINAL_LEAVE
 } from '$lib/profile/leaving-copy';
 import { makesPersonalClaim } from './personal-claim';
+import { addDays, addYearsAndDays } from './day-math';
 
 // Well-formedness guards for the seed: these pass for ANY valid seed, so editing the
 // task CONTENT (titles, windows, why/value, gates) keeps them green as long as the
@@ -89,8 +90,22 @@ describe('task-defs seed', () => {
 	it('gives a two-edge task a later final edge and a note for between the edges', () => {
 		for (const t of TASK_DEFS.filter((d) => d.finalEnd !== undefined)) {
 			expect(t.kind).toBe('closes');
-			expect(t.finalEnd).toBeGreaterThan(t.windowEnd);
 			expect(t.changeNote?.length ?? 0).toBeGreaterThan(0);
+		}
+	});
+
+	// The final edge counts years and days, so its place against the window's end is checked on dates, across
+	// separations that put a Feb 29 before and inside it.
+	it('puts a two-edge task final date after its window end', () => {
+		const two = TASK_DEFS.filter((d) => d.finalEnd !== undefined);
+		expect(two.length).toBeGreaterThan(0);
+		for (const separation of ['2026-08-01', '2027-04-30', '2028-02-29']) {
+			for (const t of two) {
+				if (!t.finalEnd) continue;
+				const windowEnd = addDays(separation, t.windowEnd);
+				const finalEnd = addYearsAndDays(separation, t.finalEnd.years, t.finalEnd.days);
+				expect(finalEnd > windowEnd, `${t.id} from ${separation}`).toBe(true);
+			}
 		}
 	});
 
@@ -231,7 +246,7 @@ describe('firm deadlines match their official sources', () => {
 		// tricare.mil CHCBP - "enroll within 60 days of losing your eligibility for TRICARE"
 		['tricare-elect', 'closes', 60, undefined],
 		// va.gov VGLI - 240 days with no health questions; "within 1 year and 120 days"
-		['vgli-convert', 'closes', 240, 485],
+		['vgli-convert', 'closes', 240, { years: 1, days: 120 }],
 		// militaryonesource.mil - "those separating before retirement have 180 days"
 		['hhg-counseling', 'closes', 180, undefined],
 		// 38 CFR 3.400(b)(2)(i) - a claim "received within 1 year after separation" keeps the earliest effective
@@ -244,7 +259,7 @@ describe('firm deadlines match their official sources', () => {
 		const t = at(id);
 		expect(t?.kind).toBe(kind);
 		expect(t?.windowEnd).toBe(windowEnd);
-		expect(t?.finalEnd).toBe(finalEnd);
+		expect(t?.finalEnd).toEqual(finalEnd);
 	});
 
 	// Copy that has to carry the condition its source carries, so a later edit cannot drop it.

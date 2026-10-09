@@ -73,7 +73,7 @@ describe('buildIcs', () => {
 				kind: 'closes',
 				windowStart: 0,
 				windowEnd: 240,
-				finalEnd: 485,
+				finalEnd: { years: 1, days: 120 },
 				why: '',
 				afterNote: 'n',
 				changeNote: 'c'
