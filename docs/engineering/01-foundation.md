@@ -193,8 +193,8 @@ engineering documents here are the public summary.
 ## How These Pieces Fit Together
 
 Strict TypeScript and pnpm stop errors before a commit, the hooks stop them before the repository, CI stops them
-before `main`, and Playwright stops them before users. For a solo project, each automated check stands in for a reviewer the team
-does not have.
+before `main`, and Playwright stops them before users. Each automated check stands in for the reviewer a solo
+project lacks.
 
 ## Standards Adopted in This Section
 
