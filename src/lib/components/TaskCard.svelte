@@ -55,8 +55,8 @@
 	// after today, so today and the past would be stored and then ignored.
 	let snoozeMin = $state('');
 
-	// The 10-character check is what refuses a year of five or more digits: as text '30000-01-01' sorts after any
-	// real date, so the two comparisons alone would let it through.
+	// The 10-character check is what refuses a year of five or more digits: as text '30000-01-01' compares like a year
+	// 3000 date, after any minimum and before the maximum, so the two comparisons alone would let it through.
 	function canSnoozeTo(value: string, min: string): boolean {
 		return value.length === 10 && value >= min && value <= SNOOZE_DATE_MAX;
 	}

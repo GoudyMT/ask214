@@ -754,8 +754,8 @@ describe('generateTimeline (deadline fields)', () => {
 		expect(selectNeedsNow(list, '2026-10-03').closingSoon.map((i) => i.def.id)).toEqual(['vgli']);
 	});
 
-	// va.gov: VGLI within "1 year and 120 days of leaving". Counted as 365 + 120 the edge fell a day early whenever the
-	// year held a Feb 29; the real task is used so the date under test is the one a user sees.
+	// va.gov: VGLI within "1 year and 120 days of leaving". Counting 365 + 120 puts the edge a day early whenever the
+	// year holds a Feb 29; the real task is used so the date under test is the one a user sees.
 	describe('the VGLI final edge', () => {
 		const real = TASK_DEFS.filter((d) => d.id === 'vgli-convert');
 		const vgliOn = (separation: string, day: Date) => {
@@ -773,7 +773,7 @@ describe('generateTimeline (deadline fields)', () => {
 			expect(vgliOn('2027-04-30', today)?.finalEndDate).toBe('2028-08-28');
 		});
 
-		// Positive control: the two ways of counting agree here, so the date is the old 485-day one.
+		// Control: the two ways of counting agree here, and 365 + 120 lands on the same day.
 		it('keeps the date where the year holds no Feb 29', () => {
 			expect(vgliOn('2025-06-25', today)?.finalEndDate).toBe('2026-10-23');
 		});

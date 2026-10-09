@@ -512,7 +512,7 @@ describe('TaskCard (custom snooze date)', () => {
 		expect(onSetSnooze).not.toHaveBeenCalled();
 	});
 
-	// Positive control: this holds on the old code too.
+	// Control: tomorrow, the earliest date allowed, is taken, so the refusals above are not a button that never works.
 	it('takes tomorrow: the button is on and a tap sets the snooze', async () => {
 		const onSetSnooze = vi.fn();
 		const { go, type } = await openCustomize(onSetSnooze);

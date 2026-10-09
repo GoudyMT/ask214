@@ -54,6 +54,23 @@ describe('addYearsAndDays', () => {
 	});
 });
 
+// The dates are calendar days with no time zone: a count built on local midnight would land a day early in a zone east
+// of UTC, where local midnight is still the day before in UTC.
+describe('year counts in a zone east of UTC', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it('give the same days as in the pinned zone', () => {
+		vi.stubEnv('TZ', 'Asia/Tokyo');
+		expect(new Date('2027-01-01T03:00:00Z').getDate()).toBe(1); // the zone took effect
+		expect(addYears('2027-04-30', 1)).toBe('2028-04-30');
+		expect(addYears('2028-02-29', 1)).toBe('2029-02-28');
+		expect(addYearsAndDays('2027-04-30', 1, 120)).toBe('2028-08-28');
+		expect(addYearsAndDays('2027-11-01', 1, 120)).toBe('2029-02-28');
+	});
+});
+
 // A deadline is a calendar day where the user lives. The same instant is already tomorrow in UTC on a US evening
 // and still yesterday in UTC on an Asian morning, so today is read from the device clock.
 describe('localTodayIso', () => {
