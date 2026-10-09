@@ -77,7 +77,7 @@ describe('SourceDocument', () => {
 	// the loading box states its size while the file arrives.
 	it('opens the page at once, online, when the document is not saved, stating its size', async () => {
 		const pending = () => new Promise<PdfRuntime>(() => {});
-		const { container } = render(SourceDocument, {
+		const { container } = await render(SourceDocument, {
 			props: props(pending, { isSaved: async () => false })
 		});
 
@@ -91,7 +91,7 @@ describe('SourceDocument', () => {
 
 	it('fetches a document not saved as soon as it opens, online', async () => {
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, {
+		const { container } = await render(SourceDocument, {
 			props: props(loader, { isSaved: async () => false })
 		});
 
@@ -101,7 +101,7 @@ describe('SourceDocument', () => {
 
 	it('opens straight to the page, without asking, when the document is already saved', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, { props: props(loader) });
+		const { container } = await render(SourceDocument, { props: props(loader) });
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__page')).not.toBeNull());
 		expect(button(container, 'Open page 3')).toBeUndefined();
@@ -111,7 +111,7 @@ describe('SourceDocument', () => {
 	it('falls back to the text, offline, when the document was never saved', async () => {
 		const onfallback = vi.fn();
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, {
+		const { container } = await render(SourceDocument, {
 			props: props(loader, { isSaved: async () => false, isOnline: () => false, onfallback })
 		});
 
@@ -125,7 +125,7 @@ describe('SourceDocument', () => {
 	it('falls back to the text, offline, saying the new version is not saved when an older copy is', async () => {
 		const onfallback = vi.fn();
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		render(SourceDocument, {
+		await render(SourceDocument, {
 			props: props(loader, {
 				path: '/docs/tap_vet_centers.1dcfd966.pdf',
 				isSaved: async () => false,
@@ -145,7 +145,7 @@ describe('SourceDocument', () => {
 		const onfallback = vi.fn();
 		let read: ((paths: string[]) => void) | undefined;
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { rerender } = render(SourceDocument, {
+		const { rerender } = await render(SourceDocument, {
 			props: props(loader, {
 				isSaved: async () => false,
 				isOnline: () => false,
@@ -164,7 +164,7 @@ describe('SourceDocument', () => {
 	it('says only that the document is not saved when what is held is another document', async () => {
 		const onfallback = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		render(SourceDocument, {
+		await render(SourceDocument, {
 			props: props(loader, {
 				path: '/docs/tap_vet_centers.1dcfd966.pdf',
 				isSaved: async () => false,
@@ -180,7 +180,7 @@ describe('SourceDocument', () => {
 	it('falls back to the text when the document cannot be loaded', async () => {
 		const onfallback = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { fail: true });
-		render(SourceDocument, { props: props(loader, { onfallback }) });
+		await render(SourceDocument, { props: props(loader, { onfallback }) });
 
 		await vi.waitFor(() => expect(onfallback).toHaveBeenCalledWith('failed'));
 	});
@@ -188,7 +188,7 @@ describe('SourceDocument', () => {
 	// The page number lives in the reader's page bar, so the held line says only what the pages are, once.
 	it('says once, at the top, that the pages are a copy of the official document', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, { props: props(loader) });
+		const { container } = await render(SourceDocument, { props: props(loader) });
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__bar')).not.toBeNull());
 		expect(
@@ -204,7 +204,7 @@ describe('SourceDocument', () => {
 	// pictures are gone; every other document's says they all are.
 	it('says a guide that kept some of its pictures is without most of them', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, {
+		const { container } = await render(SourceDocument, {
 			props: props(loader, { path: LOCAL_DOCUMENTS['tap_va_benefits_guide'] })
 		});
 
@@ -216,7 +216,7 @@ describe('SourceDocument', () => {
 
 	it('says a guide that kept none of its pictures is without them', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, {
+		const { container } = await render(SourceDocument, {
 			props: props(loader, { path: LOCAL_DOCUMENTS['tap_vet_centers'] })
 		});
 
@@ -229,7 +229,7 @@ describe('SourceDocument', () => {
 	it('marks the quote the answer showed, not the whole passage', async () => {
 		expect(selectAnswer(PASSAGE).split('. ').length).toBeLessThan(SENTENCES.length);
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, { props: props(loader) });
+		const { container } = await render(SourceDocument, { props: props(loader) });
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__bar')).not.toBeNull());
 		const quoteLines = selectAnswer(PASSAGE).split('. ').length;
@@ -241,7 +241,7 @@ describe('SourceDocument', () => {
 	it('lands on a passage found on another page, and notes both pages', async () => {
 		const onnote = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, { props: props(loader, { onnote }) });
+		const { container } = await render(SourceDocument, { props: props(loader, { onnote }) });
 
 		await vi.waitFor(() =>
 			expect(onnote).toHaveBeenLastCalledWith({ kind: 'elsewhere', cited: 3, found: 4 })
@@ -262,7 +262,7 @@ describe('SourceDocument', () => {
 			elsewhere.focus();
 			const onview = vi.fn();
 			const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE, FILLER]);
-			render(SourceDocument, { props: props(loader, { onview, mayFocus: () => false }) });
+			await render(SourceDocument, { props: props(loader, { onview, mayFocus: () => false }) });
 
 			await vi.waitFor(() => expect(onview).toHaveBeenLastCalledWith({ page: 3, pages: 4 }));
 			expect(document.activeElement).toBe(elsewhere);
@@ -274,7 +274,7 @@ describe('SourceDocument', () => {
 	it('notes a passage found nowhere as unmarked, and stays on the cited page', async () => {
 		const onnote = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER]);
-		const { container } = render(SourceDocument, { props: props(loader, { onnote }) });
+		const { container } = await render(SourceDocument, { props: props(loader, { onnote }) });
 
 		await vi.waitFor(() => expect(onnote).toHaveBeenLastCalledWith({ kind: 'unmarked' }));
 		await vi.waitFor(() =>
@@ -287,7 +287,7 @@ describe('SourceDocument', () => {
 	it('says nothing about a passage when the document was opened without one', async () => {
 		const onnote = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER]);
-		const { container } = render(SourceDocument, {
+		const { container } = await render(SourceDocument, {
 			props: props(loader, { page: 1, anchor: '', passageText: '', cited: false, onnote })
 		});
 
@@ -302,14 +302,14 @@ describe('SourceDocument', () => {
 	it('reports the page on screen and the page count once the page is located', async () => {
 		const onview = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE, FILLER]);
-		render(SourceDocument, { props: props(loader, { onview }) });
+		await render(SourceDocument, { props: props(loader, { onview }) });
 		await vi.waitFor(() => expect(onview).toHaveBeenLastCalledWith({ page: 3, pages: 4 }));
 	});
 
 	it('scrolls to a page the reader asks for, and reports it', async () => {
 		const onview = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE, FILLER]);
-		const { rerender } = render(SourceDocument, { props: props(loader, { onview }) });
+		const { rerender } = await render(SourceDocument, { props: props(loader, { onview }) });
 		await vi.waitFor(() => expect(onview).toHaveBeenLastCalledWith({ page: 3, pages: 4 }));
 
 		await rerender({ request: { page: 1 } });
@@ -320,7 +320,7 @@ describe('SourceDocument', () => {
 	it('notes the passage once, however the reader moves through the document', async () => {
 		const onnote = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER, WITH_PASSAGE]);
-		const { rerender } = render(SourceDocument, { props: props(loader, { onnote }) });
+		const { rerender } = await render(SourceDocument, { props: props(loader, { onnote }) });
 		await vi.waitFor(() =>
 			expect(onnote).toHaveBeenLastCalledWith({ kind: 'elsewhere', cited: 3, found: 4 })
 		);
@@ -334,7 +334,7 @@ describe('SourceDocument', () => {
 	it('notes nothing when the passage is marked on its cited page', async () => {
 		const onnote = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(SourceDocument, { props: props(loader, { onnote }) });
+		const { container } = await render(SourceDocument, { props: props(loader, { onnote }) });
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__bar')).not.toBeNull());
 		await vi.waitFor(() => expect(onnote).toHaveBeenLastCalledWith(null));

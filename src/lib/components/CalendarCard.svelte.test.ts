@@ -35,7 +35,7 @@ function item(d: TaskDef): TimelineItem {
 describe('CalendarCard', () => {
 	it('adds the pending, non-excluded deadlines in one tap (direct add)', async () => {
 		const onAdd = vi.fn();
-		const { container } = render(CalendarCard, {
+		const { container } = await render(CalendarCard, {
 			props: {
 				items: [item(def('a', 'admin')), item(def('m', 'medical'))],
 				exclusions: { taskIds: [], categories: ['medical'] },
@@ -52,9 +52,9 @@ describe('CalendarCard', () => {
 		expect(container.textContent).toContain('On a computer:'); // the test browser is desktop Chromium
 	});
 
-	it('the dismiss control calls onDismiss', () => {
+	it('the dismiss control calls onDismiss', async () => {
 		const onDismiss = vi.fn();
-		const { container } = render(CalendarCard, {
+		const { container } = await render(CalendarCard, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
@@ -69,8 +69,8 @@ describe('CalendarCard', () => {
 
 	// 38 CFR 14.629: the card's own words make no personal claim (the sentences per device are checked with the
 	// task data in task-defs.test.ts).
-	it('adds no personal eligibility claim', () => {
-		const { container } = render(CalendarCard, {
+	it('adds no personal eligibility claim', async () => {
+		const { container } = await render(CalendarCard, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
@@ -85,8 +85,8 @@ describe('CalendarCard', () => {
 
 	// The file stays in the downloads after the calendar takes it, outside Erase all data, so the card says it can go:
 	// a line of its own, after the steps for this device.
-	it('says the downloaded file can be deleted once it is added', () => {
-		const { container } = render(CalendarCard, {
+	it('says the downloaded file can be deleted once it is added', async () => {
+		const { container } = await render(CalendarCard, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },

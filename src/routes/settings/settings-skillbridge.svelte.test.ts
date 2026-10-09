@@ -84,7 +84,7 @@ async function pickAndSave(answer: 'Yes' | 'No'): Promise<void> {
 describe('Settings, the Planning SkillBridge row', () => {
 	it('shows the other-tab message and re-reads the store when the save lost a race', async () => {
 		timeline.setStatus.mockRejectedValue(new OccConflictError());
-		render(SettingsPage);
+		await render(SettingsPage);
 		await pickAndSave('Yes');
 		await expect.element(page.getByText(OCC_MESSAGE)).toBeVisible();
 		expect(timeline.refresh).toHaveBeenCalledTimes(1);
@@ -92,7 +92,7 @@ describe('Settings, the Planning SkillBridge row', () => {
 
 	it('shows the try-again message and re-reads the store when the save failed otherwise', async () => {
 		timeline.setStatus.mockRejectedValue(new Error('E_TEST'));
-		render(SettingsPage);
+		await render(SettingsPage);
 		await pickAndSave('Yes');
 		await expect.element(page.getByText(FAILED)).toBeVisible();
 		expect(page.getByText(OCC_MESSAGE).query()).toBeNull();
@@ -100,7 +100,7 @@ describe('Settings, the Planning SkillBridge row', () => {
 	});
 
 	it('writes Yes as done and closes the row', async () => {
-		render(SettingsPage);
+		await render(SettingsPage);
 		await pickAndSave('Yes');
 		await expect.element(choice('Yes')).not.toBeInTheDocument();
 		expect(timeline.setStatus).toHaveBeenCalledTimes(1);
@@ -109,7 +109,7 @@ describe('Settings, the Planning SkillBridge row', () => {
 	});
 
 	it('writes No as skipped, not as the Yes it would be if the answer were fixed', async () => {
-		render(SettingsPage);
+		await render(SettingsPage);
 		await pickAndSave('No');
 		await expect.element(choice('No')).not.toBeInTheDocument();
 		expect(timeline.setStatus).toHaveBeenCalledTimes(1);
@@ -117,21 +117,21 @@ describe('Settings, the Planning SkillBridge row', () => {
 	});
 
 	it('reads Not answered and is enabled when the timeline has read', async () => {
-		render(SettingsPage);
+		await render(SettingsPage);
 		await expect.element(toggle()).toBeEnabled();
 		await expect.element(toggle()).toHaveTextContent('Not answered');
 	});
 
 	it('reads Unavailable and is disabled when the timeline failed to read', async () => {
 		timeline.failed = true;
-		render(SettingsPage);
+		await render(SettingsPage);
 		await expect.element(toggle()).toBeDisabled();
 		await expect.element(toggle()).toHaveTextContent('Unavailable');
 	});
 
 	it('reads Unavailable and is disabled when the timeline is locked', async () => {
 		timeline.locked = true;
-		render(SettingsPage);
+		await render(SettingsPage);
 		await expect.element(toggle()).toBeDisabled();
 		await expect.element(toggle()).toHaveTextContent('Unavailable');
 	});

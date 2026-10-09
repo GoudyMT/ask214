@@ -39,7 +39,7 @@ vi.mock('$lib/install/context', () => ({
 
 describe('Settings, when the saved data cannot be read', () => {
 	it('offers only the erase, with what it does', async () => {
-		const { container } = render(SettingsPage);
+		const { container } = await render(SettingsPage);
 		await expect
 			.element(page.getByRole('heading', { level: 2, name: 'Privacy and security' }))
 			.toBeVisible();
@@ -66,7 +66,7 @@ describe('Settings, when the saved data cannot be read', () => {
 			throw new Error('E_NO_LONGER_DAMAGED');
 		});
 		try {
-			render(SettingsPage);
+			await render(SettingsPage);
 			await page.getByRole('button', { name: 'Erase all data on this device' }).click();
 			await page.getByRole('button', { name: 'Erase everything' }).click();
 			await vi.waitFor(() => expect(wipeAll).toHaveBeenCalled());
@@ -79,7 +79,7 @@ describe('Settings, when the saved data cannot be read', () => {
 	});
 
 	it('erases through the same dialog, and says so when the erase refuses', async () => {
-		render(SettingsPage);
+		await render(SettingsPage);
 		await page.getByRole('button', { name: 'Erase all data on this device' }).click();
 		await expect
 			.element(page.getByRole('heading', { name: 'Erase all data on this device?' }))

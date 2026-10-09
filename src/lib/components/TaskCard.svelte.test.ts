@@ -36,7 +36,7 @@ function makeItem(overrides: Partial<TimelineItem> = {}): TimelineItem {
 	};
 }
 
-function renderCard(
+async function renderCard(
 	item: TimelineItem,
 	handlers: {
 		onSetStatus?: (taskId: string, status: TaskStatus | undefined) => void;
@@ -44,7 +44,7 @@ function renderCard(
 		onSetNote?: (taskId: string, note: string | undefined) => void;
 	} = {}
 ) {
-	return render(TaskCard, {
+	return await render(TaskCard, {
 		props: {
 			item,
 			onSetStatus: handlers.onSetStatus ?? noop,
@@ -59,15 +59,15 @@ function buttonByText(container: Element, text: string): HTMLButtonElement | und
 }
 
 describe('TaskCard (open states)', () => {
-	it('renders the title, category chip, and why', () => {
-		const { container } = renderCard(makeItem());
+	it('renders the title, category chip, and why', async () => {
+		const { container } = await renderCard(makeItem());
 		expect(container.textContent).toContain('Research SkillBridge hosts');
 		expect(container.textContent).toContain('Career'); // category label, capitalized
 		expect(container.textContent).toContain('Find approved programs that fit your rate.');
 	});
 
-	it('shows a collapsed "Related resources (N)" disclosure for a task with mapped resources', () => {
-		const { container } = renderCard(makeItem({ def: { ...DEF, id: 'job-search' } }));
+	it('shows a collapsed "Related resources (N)" disclosure for a task with mapped resources', async () => {
+		const { container } = await renderCard(makeItem({ def: { ...DEF, id: 'job-search' } }));
 		const toggle = [...container.querySelectorAll('button')].find((b) =>
 			/^Related resources \(\d+\)/.test(b.textContent?.trim() ?? '')
 		);
@@ -76,16 +76,16 @@ describe('TaskCard (open states)', () => {
 		expect(container.querySelector('.task-card__related-list')).toBeNull(); // collapsed
 	});
 
-	it('shows no disclosure for a task with no mapped resources', () => {
-		const { container } = renderCard(makeItem({ def: { ...DEF, id: 'dd214-copies' } }));
+	it('shows no disclosure for a task with no mapped resources', async () => {
+		const { container } = await renderCard(makeItem({ def: { ...DEF, id: 'dd214-copies' } }));
 		const toggle = [...container.querySelectorAll('button')].find((b) =>
 			/^Related resources/.test(b.textContent?.trim() ?? '')
 		);
 		expect(toggle).toBeUndefined();
 	});
 
-	it('expands to show the mapped resources as safe new-tab links', () => {
-		const { container } = renderCard(makeItem({ def: { ...DEF, id: 'job-search' } }));
+	it('expands to show the mapped resources as safe new-tab links', async () => {
+		const { container } = await renderCard(makeItem({ def: { ...DEF, id: 'job-search' } }));
 		const toggle = [...container.querySelectorAll('button')].find((b) =>
 			/^Related resources \(\d+\)/.test(b.textContent?.trim() ?? '')
 		);
@@ -99,8 +99,8 @@ describe('TaskCard (open states)', () => {
 		expect(rel).toContain('noreferrer');
 	});
 
-	it('upcoming: "Upcoming" + when the window opens', () => {
-		const { container } = renderCard(
+	it('upcoming: "Upcoming" + when the window opens', async () => {
+		const { container } = await renderCard(
 			makeItem({ status: 'upcoming', windowStartDate: '2027-03-16' })
 		);
 		expect(container.querySelector('article')?.classList.contains('status-upcoming')).toBe(true);
@@ -108,24 +108,26 @@ describe('TaskCard (open states)', () => {
 		expect(container.textContent).toContain('Opens Mar 16, 2027');
 	});
 
-	it('start-now, soft: "Start now" + "Aim for <aim date>"', () => {
-		const { container } = renderCard(makeItem({ status: 'start-now', aimDate: '2026-10-15' }));
+	it('start-now, soft: "Start now" + "Aim for <aim date>"', async () => {
+		const { container } = await renderCard(
+			makeItem({ status: 'start-now', aimDate: '2026-10-15' })
+		);
 		expect(container.textContent).toContain('Start now');
 		expect(container.textContent).toContain('Aim for Oct 15, 2026');
 	});
 
-	it('start-now, firm: "Last day <end>" and a "Firm deadline" tag', () => {
+	it('start-now, firm: "Last day <end>" and a "Firm deadline" tag', async () => {
 		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'start-now', windowEndDate: '2026-10-20' })
 		);
 		expect(container.textContent).toContain('Last day Oct 20, 2026');
 		expect(container.querySelector('.task-card__firm')?.textContent).toBe('Firm deadline');
 	});
 
-	it('closing-soon: the last day and the days left', () => {
+	it('closing-soon: the last day and the days left', async () => {
 		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'closing-soon', windowEndDate: '2026-10-20', daysLeft: 17 })
 		);
 		expect(container.querySelector('article')?.classList.contains('status-closing-soon')).toBe(
@@ -136,19 +138,21 @@ describe('TaskCard (open states)', () => {
 		expect(container.textContent).toContain('17 days');
 	});
 
-	it('closing-soon: the countdown reads "1 day" the day before and "today" on the last day', () => {
+	it('closing-soon: the countdown reads "1 day" the day before and "today" on the last day', async () => {
 		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
-		const days = (daysLeft: number) =>
-			renderCard(
-				makeItem({ def, status: 'closing-soon', windowEndDate: '2026-10-20', daysLeft })
+		const days = async (daysLeft: number) =>
+			(
+				await renderCard(
+					makeItem({ def, status: 'closing-soon', windowEndDate: '2026-10-20', daysLeft })
+				)
 			).container.querySelector('.task-card__days')?.textContent;
-		expect(days(1)).toBe('1 day');
-		expect(days(0)).toBe('today');
+		expect(await days(1)).toBe('1 day');
+		expect(await days(0)).toBe('today');
 	});
 
-	it('late: "Late", when it was due, and the What now note; Mark done stays', () => {
+	it('late: "Late", when it was due, and the What now note; Mark done stays', async () => {
 		const def = { ...DEF, kind: 'required' as const, afterNote: 'Still required.' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'late', windowEndDate: '2026-10-20' })
 		);
 		expect(container.textContent).toContain('Late');
@@ -159,9 +163,9 @@ describe('TaskCard (open states)', () => {
 		expect(buttonByText(container, 'Mark done')).toBeDefined();
 	});
 
-	it('closed: "Closed" + the date + What now', () => {
+	it('closed: "Closed" + the date + What now', async () => {
 		const def = { ...DEF, kind: 'closes' as const, afterNote: 'Gone.' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
 		);
 		expect(container.querySelector('article')?.classList.contains('status-closed')).toBe(true);
@@ -170,9 +174,9 @@ describe('TaskCard (open states)', () => {
 		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain('Gone.');
 	});
 
-	it('closed two-edge task: the date is its final day', () => {
+	it('closed two-edge task: the date is its final day', async () => {
 		const def = { ...DEF, kind: 'closes' as const, finalEnd: 485, afterNote: 'Gone.' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({
 				def,
 				status: 'closed',
@@ -184,20 +188,20 @@ describe('TaskCard (open states)', () => {
 	});
 
 	// A required task's note says what to do before separation; once separation has passed it no longer applies.
-	it('closed after separation: a required task shows no What now note', () => {
+	it('closed after separation: a required task shows no What now note', async () => {
 		const def = {
 			...DEF,
 			kind: 'required' as const,
 			afterNote: 'Still required before you separate.'
 		};
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
 		);
 		expect(container.textContent).toContain('Closed');
 		expect(container.querySelector('.task-card__whatnow')).toBeNull();
 	});
 
-	it('changed: "Changed", the final last day, and What changed', () => {
+	it('changed: "Changed", the final last day, and What changed', async () => {
 		const def = {
 			...DEF,
 			kind: 'closes' as const,
@@ -205,7 +209,7 @@ describe('TaskCard (open states)', () => {
 			changeNote: 'Now asks health questions.',
 			finalEnd: 485
 		};
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'changed', windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' })
 		);
 		expect(container.textContent).toContain('Changed');
@@ -215,8 +219,8 @@ describe('TaskCard (open states)', () => {
 		expect(box).toContain('Now asks health questions.');
 	});
 
-	it('still-to-do: calm "Still to do", "Aimed for <end>", no tag, no What now', () => {
-		const { container } = renderCard(
+	it('still-to-do: calm "Still to do", "Aimed for <end>", no tag, no What now', async () => {
+		const { container } = await renderCard(
 			makeItem({ status: 'still-to-do', windowEndDate: '2026-07-22' })
 		);
 		expect(container.querySelector('article')?.classList.contains('status-still-to-do')).toBe(true);
@@ -226,14 +230,14 @@ describe('TaskCard (open states)', () => {
 		expect(container.querySelector('.task-card__whatnow')).toBeNull();
 	});
 
-	it('an open card carries an anchor id the summary links to', () => {
-		const { container } = renderCard(makeItem());
+	it('an open card carries an anchor id the summary links to', async () => {
+		const { container } = await renderCard(makeItem());
 		expect(container.querySelector('article')?.id).toBe('task-skillbridge-hosts');
 	});
 
-	it('What now links to the official page for the task, in a new tab, under an uppercase label', () => {
+	it('What now links to the official page for the task, in a new tab, under an uppercase label', async () => {
 		const def = { ...DEF, id: 'va-bdd-claim', kind: 'closes' as const, afterNote: 'Gone.' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
 		);
 		const link = container.querySelector('.task-card__whatnow a');
@@ -248,68 +252,70 @@ describe('TaskCard (open states)', () => {
 		expect(getComputedStyle(label).textTransform).toBe('uppercase');
 	});
 
-	it('a firm card with no curated page shows its note without a link', () => {
+	it('a firm card with no curated page shows its note without a link', async () => {
 		const def = { ...DEF, kind: 'closes' as const, afterNote: 'Gone.' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
 		);
 		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain('Gone.');
 		expect(container.querySelector('.task-card__whatnow a')).toBeNull();
 	});
 
-	it('the "Firm deadline" tag keeps to one line', () => {
+	it('the "Firm deadline" tag keeps to one line', async () => {
 		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
-		const { container } = renderCard(makeItem({ def, status: 'start-now' }));
+		const { container } = await renderCard(makeItem({ def, status: 'start-now' }));
 		const tag = container.querySelector('.task-card__firm') as HTMLElement;
 		expect(getComputedStyle(tag).whiteSpace).toBe('nowrap');
 	});
 
-	it('color-codes the category chip via a category-<name> class (text label still present)', () => {
-		const career = renderCard(makeItem());
+	it('color-codes the category chip via a category-<name> class (text label still present)', async () => {
+		const career = await renderCard(makeItem());
 		const careerChip = career.container.querySelector('.task-card__chip');
 		expect(careerChip?.classList.contains('category-career')).toBe(true);
 		expect(careerChip?.textContent).toBe('Career'); // color is an aid; the label still carries it
 
-		const medical = renderCard(makeItem({ def: { ...DEF, category: 'medical' } }));
+		const medical = await renderCard(makeItem({ def: { ...DEF, category: 'medical' } }));
 		expect(
 			medical.container.querySelector('.task-card__chip')?.classList.contains('category-medical')
 		).toBe(true);
 	});
 
-	it('renders Mark done, Skip, and Snooze actions on an open card', () => {
-		const { container } = renderCard(makeItem());
+	it('renders Mark done, Skip, and Snooze actions on an open card', async () => {
+		const { container } = await renderCard(makeItem());
 		expect(buttonByText(container, 'Mark done')).toBeDefined();
 		expect(buttonByText(container, 'Skip')).toBeDefined();
 		expect(buttonByText(container, 'Snooze')).toBeDefined();
 	});
 
-	it('Mark done calls onSetStatus(id, "done")', () => {
+	it('Mark done calls onSetStatus(id, "done")', async () => {
 		const onSetStatus = vi.fn();
-		const { container } = renderCard(makeItem(), { onSetStatus });
+		const { container } = await renderCard(makeItem(), { onSetStatus });
 		buttonByText(container, 'Mark done')?.click();
 		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', 'done');
 	});
 
-	it('Skip calls onSetStatus(id, "skipped")', () => {
+	it('Skip calls onSetStatus(id, "skipped")', async () => {
 		const onSetStatus = vi.fn();
-		const { container } = renderCard(makeItem(), { onSetStatus });
+		const { container } = await renderCard(makeItem(), { onSetStatus });
 		buttonByText(container, 'Skip')?.click();
 		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', 'skipped');
 	});
 
 	// A snooze can never hide a firm warning, so the card does not offer one there: the tap would change nothing.
-	it('offers Snooze only where a snooze can quiet the card', () => {
+	it('offers Snooze only where a snooze can quiet the card', async () => {
 		const firmDef = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
 		for (const status of ['closing-soon', 'late', 'changed', 'closed'] as const) {
-			const card = renderCard(
-				makeItem({ def: firmDef, status, windowEndDate: '2026-10-20', daysLeft: 5 })
+			const card = (
+				await renderCard(
+					makeItem({ def: firmDef, status, windowEndDate: '2026-10-20', daysLeft: 5 })
+				)
 			).container;
 			expect(buttonByText(card, 'Snooze'), status).toBeUndefined();
 			expect(buttonByText(card, 'Mark done'), status).toBeDefined();
 		}
 		for (const status of ['upcoming', 'start-now', 'still-to-do'] as const) {
 			expect(
-				buttonByText(renderCard(makeItem({ status })).container, 'Snooze'),
+				buttonByText((await renderCard(makeItem({ status }))).container, 'Snooze'),
 				status
 			).toBeDefined();
 		}
@@ -317,7 +323,7 @@ describe('TaskCard (open states)', () => {
 
 	// The day can turn (or a date change land from another tab) while the picker is open; when the card turns firm
 	// the picker closes with its button, so no preset is left that would change nothing.
-	it('closes an open Snooze picker when the card turns firm', () => {
+	it('closes an open Snooze picker when the card turns firm', async () => {
 		const firmDef = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
 		const props = $state<{
 			item: TimelineItem;
@@ -328,7 +334,7 @@ describe('TaskCard (open states)', () => {
 			onSetStatus: noop,
 			onSetSnooze: noop
 		});
-		const { container } = render(TaskCard, { props });
+		const { container } = await render(TaskCard, { props });
 		buttonByText(container, 'Snooze')?.click();
 		flushSync();
 		expect(buttonByText(container, '1 week')).toBeDefined();
@@ -345,7 +351,7 @@ describe('TaskCard (open states)', () => {
 
 	// 38 CFR 14.629: the words the card adds around a task - status, dates, tags, What now and What changed - make
 	// no personal claim in any state (the task data itself is checked in task-defs.test.ts).
-	it('adds no personal eligibility claim in any state', () => {
+	it('adds no personal eligibility claim in any state', async () => {
 		const firm = { ...DEF, id: 'va-bdd-claim', kind: 'closes' as const, afterNote: 'n' };
 		const twoEdge = { ...firm, finalEnd: 485, changeNote: 'c' };
 		const states: Partial<TimelineItem>[] = [
@@ -362,13 +368,13 @@ describe('TaskCard (open states)', () => {
 			{ status: 'snoozed', snoozeUntil: '2026-11-01' }
 		];
 		for (const state of states) {
-			const text = textOf(renderCard(makeItem(state)).container);
+			const text = textOf((await renderCard(makeItem(state))).container);
 			expect(makesPersonalClaim(text), text).toBe(false);
 		}
 	});
 
-	it('Snooze opens a picker with presets and a pick-a-date option', () => {
-		const { container } = renderCard(makeItem());
+	it('Snooze opens a picker with presets and a pick-a-date option', async () => {
+		const { container } = await renderCard(makeItem());
 		buttonByText(container, 'Snooze')?.click();
 		flushSync();
 		expect(buttonByText(container, '1 week')).toBeDefined();
@@ -377,18 +383,18 @@ describe('TaskCard (open states)', () => {
 		expect(buttonByText(container, 'Customize')).toBeDefined();
 	});
 
-	it('a snooze preset calls onSetSnooze with the computed ISO date', () => {
+	it('a snooze preset calls onSetSnooze with the computed ISO date', async () => {
 		const onSetSnooze = vi.fn();
-		const { container } = renderCard(makeItem(), { onSetSnooze });
+		const { container } = await renderCard(makeItem(), { onSetSnooze });
 		buttonByText(container, 'Snooze')?.click();
 		flushSync();
 		buttonByText(container, '1 week')?.click();
 		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', snoozeUntilIso(new Date(), 7));
 	});
 
-	it('Customize reveals a date input; confirming calls onSetSnooze with that date', () => {
+	it('Customize reveals a date input; confirming calls onSetSnooze with that date', async () => {
 		const onSetSnooze = vi.fn();
-		const { container } = renderCard(makeItem(), { onSetSnooze });
+		const { container } = await renderCard(makeItem(), { onSetSnooze });
 		buttonByText(container, 'Snooze')?.click();
 		flushSync();
 		buttonByText(container, 'Customize')?.click();
@@ -405,8 +411,8 @@ describe('TaskCard (open states)', () => {
 		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', '2026-08-01');
 	});
 
-	it('asks the browser not to keep a typed snooze date in its autofill history', () => {
-		const { container } = renderCard(makeItem());
+	it('asks the browser not to keep a typed snooze date in its autofill history', async () => {
+		const { container } = await renderCard(makeItem());
 		buttonByText(container, 'Snooze')?.click();
 		flushSync();
 		buttonByText(container, 'Customize')?.click();
@@ -416,8 +422,8 @@ describe('TaskCard (open states)', () => {
 		expect(input.getAttribute('autocomplete')).toBe('off');
 	});
 
-	it('keeps a typed note away from cloud spellcheck', () => {
-		const { container } = renderCard(makeItem());
+	it('keeps a typed note away from cloud spellcheck', async () => {
+		const { container } = await renderCard(makeItem());
 		buttonByText(container, 'Add note')?.click();
 		flushSync();
 		const textarea = container.querySelector('textarea');
@@ -425,9 +431,9 @@ describe('TaskCard (open states)', () => {
 		expect(textarea.getAttribute('spellcheck')).toBe('false');
 	});
 
-	it('Add note reveals a textarea; Save calls onSetNote with the text', () => {
+	it('Add note reveals a textarea; Save calls onSetNote with the text', async () => {
 		const onSetNote = vi.fn();
-		const { container } = renderCard(makeItem(), { onSetNote });
+		const { container } = await renderCard(makeItem(), { onSetNote });
 		buttonByText(container, 'Add note')?.click();
 		flushSync();
 		const textarea = container.querySelector('textarea') as HTMLTextAreaElement | null;
@@ -439,9 +445,9 @@ describe('TaskCard (open states)', () => {
 		expect(onSetNote).toHaveBeenCalledWith('skillbridge-hosts', 'Call the VSO Monday');
 	});
 
-	it('Cancel closes the note editor without saving', () => {
+	it('Cancel closes the note editor without saving', async () => {
 		const onSetNote = vi.fn();
-		const { container } = renderCard(makeItem(), { onSetNote });
+		const { container } = await renderCard(makeItem(), { onSetNote });
 		buttonByText(container, 'Add note')?.click();
 		flushSync();
 		buttonByText(container, 'Cancel')?.click();
@@ -460,8 +466,8 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		return container.querySelector('button.task-line');
 	}
 
-	it('done: collapses to a disclosure line (aria-expanded=false), no date, why hidden', () => {
-		const { container } = renderCard(makeItem({ status: 'done' }));
+	it('done: collapses to a disclosure line (aria-expanded=false), no date, why hidden', async () => {
+		const { container } = await renderCard(makeItem({ status: 'done' }));
 		const line = lineButton(container);
 		expect(line).not.toBeNull();
 		expect(line?.getAttribute('aria-expanded')).toBe('false');
@@ -471,20 +477,22 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		expect(container.textContent).not.toContain('Find approved programs that fit your rate.');
 	});
 
-	it('snoozed: collapsed line shows "Snoozed" + "to <date>" (decision A)', () => {
-		const { container } = renderCard(makeItem({ status: 'snoozed', snoozeUntil: '2026-08-01' }));
+	it('snoozed: collapsed line shows "Snoozed" + "to <date>" (decision A)', async () => {
+		const { container } = await renderCard(
+			makeItem({ status: 'snoozed', snoozeUntil: '2026-08-01' })
+		);
 		expect(lineButton(container)?.textContent).toContain('Snoozed');
 		expect(container.querySelector('.task-line__date')?.textContent).toContain('to Aug 1, 2026');
 	});
 
-	it('skipped: collapsed line shows "Skipped" + no date (decision A)', () => {
-		const { container } = renderCard(makeItem({ status: 'skipped' }));
+	it('skipped: collapsed line shows "Skipped" + no date (decision A)', async () => {
+		const { container } = await renderCard(makeItem({ status: 'skipped' }));
 		expect(lineButton(container)?.textContent).toContain('Skipped');
 		expect(container.querySelector('.task-line__date')).toBeNull();
 	});
 
-	it('expanding a resolved task reveals the full card + a Restore action', () => {
-		const { container } = renderCard(makeItem({ status: 'done' }));
+	it('expanding a resolved task reveals the full card + a Restore action', async () => {
+		const { container } = await renderCard(makeItem({ status: 'done' }));
 		lineButton(container)?.click();
 		flushSync();
 		expect(container.textContent).toContain('Find approved programs that fit your rate.');
@@ -492,25 +500,25 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		expect(container.querySelector('button[aria-expanded="true"]')).not.toBeNull();
 	});
 
-	it('the expanded collapse control is the header row (contains the title), not a bare caret', () => {
-		const { container } = renderCard(makeItem({ status: 'done' }));
+	it('the expanded collapse control is the header row (contains the title), not a bare caret', async () => {
+		const { container } = await renderCard(makeItem({ status: 'done' }));
 		(container.querySelector('button.task-line') as HTMLButtonElement | null)?.click();
 		flushSync();
 		const toggle = container.querySelector('button[aria-expanded="true"]');
 		expect(toggle?.textContent).toContain('Research SkillBridge hosts'); // tap the whole header, not a caret
 	});
 
-	it('Restore clears the status via onSetStatus(id, undefined) (decision B)', () => {
+	it('Restore clears the status via onSetStatus(id, undefined) (decision B)', async () => {
 		const onSetStatus = vi.fn();
-		const { container } = renderCard(makeItem({ status: 'done' }), { onSetStatus });
+		const { container } = await renderCard(makeItem({ status: 'done' }), { onSetStatus });
 		lineButton(container)?.click();
 		flushSync();
 		buttonByText(container, 'Restore')?.click();
 		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', undefined);
 	});
 
-	it('an expanded resolved card re-collapses back to the line', () => {
-		const { container } = renderCard(makeItem({ status: 'done' }));
+	it('an expanded resolved card re-collapses back to the line', async () => {
+		const { container } = await renderCard(makeItem({ status: 'done' }));
 		lineButton(container)?.click();
 		flushSync();
 		const collapse = container.querySelector(
@@ -522,19 +530,19 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		expect(container.textContent).not.toContain('Find approved programs that fit your rate.');
 	});
 
-	it('open states are not collapsed (upcoming renders the full card immediately)', () => {
-		const { container } = renderCard(makeItem({ status: 'upcoming' }));
+	it('open states are not collapsed (upcoming renders the full card immediately)', async () => {
+		const { container } = await renderCard(makeItem({ status: 'upcoming' }));
 		expect(lineButton(container)).toBeNull();
 		expect(container.textContent).toContain('Find approved programs that fit your rate.');
 	});
 
-	it('auto-collapses on a status transition, even from an expanded card (no manual close)', () => {
+	it('auto-collapses on a status transition, even from an expanded card (no manual close)', async () => {
 		const props = $state<{
 			item: TimelineItem;
 			onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
 			onSetSnooze: (taskId: string, untilIso: string) => void;
 		}>({ item: makeItem({ status: 'done' }), onSetStatus: noop, onSetSnooze: noop });
-		const { container } = render(TaskCard, { props });
+		const { container } = await render(TaskCard, { props });
 
 		// User deliberately expands the resolved card to review it.
 		(container.querySelector('button.task-line') as HTMLButtonElement | null)?.click();
@@ -549,8 +557,8 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		expect(container.textContent).not.toContain('Find approved programs that fit your rate.');
 	});
 
-	it('rapid taps toggle deterministically and never stick (some users will mash it)', () => {
-		const { container } = renderCard(makeItem({ status: 'done' }));
+	it('rapid taps toggle deterministically and never stick (some users will mash it)', async () => {
+		const { container } = await renderCard(makeItem({ status: 'done' }));
 		const toggle = () =>
 			container.querySelector('button[aria-expanded]') as HTMLButtonElement | null;
 		expect(toggle()?.getAttribute('aria-expanded')).toBe('false');
@@ -564,8 +572,8 @@ describe('TaskCard (resolved / collapsed states)', () => {
 		expect(toggle()?.getAttribute('aria-expanded')).toBe('true'); // odd -> expanded; never stuck
 	});
 
-	it('disclosure toggles set touch-action: manipulation (no double-tap zoom / tap delay)', () => {
-		const { container } = renderCard(makeItem({ status: 'done' }));
+	it('disclosure toggles set touch-action: manipulation (no double-tap zoom / tap delay)', async () => {
+		const { container } = await renderCard(makeItem({ status: 'done' }));
 		const line = container.querySelector('button.task-line') as HTMLElement;
 		expect(getComputedStyle(line).touchAction).toBe('manipulation');
 		line.click();
@@ -576,25 +584,27 @@ describe('TaskCard (resolved / collapsed states)', () => {
 });
 
 describe('TaskCard (notes display)', () => {
-	it('shows a saved note on an open card, with the action as "Edit note"', () => {
-		const { container } = renderCard(makeItem({ note: 'Reached out to 3 hosts.' }));
+	it('shows a saved note on an open card, with the action as "Edit note"', async () => {
+		const { container } = await renderCard(makeItem({ note: 'Reached out to 3 hosts.' }));
 		expect(container.textContent).toContain('Reached out to 3 hosts.');
 		expect(buttonByText(container, 'Edit note')).toBeDefined();
 		expect(buttonByText(container, 'Add note')).toBeUndefined(); // Add -> Edit once a note exists
 	});
 
-	it('shows a saved note on an expanded resolved card', () => {
-		const { container } = renderCard(makeItem({ status: 'done', note: 'Filed via eBenefits.' }));
+	it('shows a saved note on an expanded resolved card', async () => {
+		const { container } = await renderCard(
+			makeItem({ status: 'done', note: 'Filed via eBenefits.' })
+		);
 		(container.querySelector('button.task-line') as HTMLButtonElement | null)?.click();
 		flushSync();
 		expect(container.textContent).toContain('Filed via eBenefits.');
 		expect(buttonByText(container, 'Edit note')).toBeDefined();
 	});
 
-	it('marks a collapsed resolved line with a note-dot when a note exists', () => {
-		const withNote = renderCard(makeItem({ status: 'done', note: 'see VSO' }));
+	it('marks a collapsed resolved line with a note-dot when a note exists', async () => {
+		const withNote = await renderCard(makeItem({ status: 'done', note: 'see VSO' }));
 		expect(withNote.container.querySelector('.task-line__note-dot')).not.toBeNull();
-		const without = renderCard(makeItem({ status: 'done' }));
+		const without = await renderCard(makeItem({ status: 'done' }));
 		expect(without.container.querySelector('.task-line__note-dot')).toBeNull();
 	});
 });
@@ -622,7 +632,7 @@ describe('TaskCard (layout by width)', () => {
 
 	it('on a 320 px phone the status line sits above the title', async () => {
 		await page.viewport(320, 800);
-		const { container } = renderCard(closing);
+		const { container } = await renderCard(closing);
 		expect(box(container, '.task-card__meta').bottom).toBeLessThanOrEqual(
 			box(container, '.task-card__title').top
 		);
@@ -630,7 +640,7 @@ describe('TaskCard (layout by width)', () => {
 
 	it('on a phone a wrapping status line keeps the date and its countdown together', async () => {
 		await page.viewport(320, 800);
-		const { container } = renderCard(closing);
+		const { container } = await renderCard(closing);
 		(container as HTMLElement).style.width = '288px';
 		const status = box(container, '.task-card__status');
 		const date = box(container, '.task-card__date');
@@ -641,7 +651,7 @@ describe('TaskCard (layout by width)', () => {
 
 	it('on a phone a moved date wraps before its reason and stays inside the card', async () => {
 		await page.viewport(320, 800);
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({
 				def: firm,
 				status: 'closing-soon',
@@ -663,7 +673,7 @@ describe('TaskCard (layout by width)', () => {
 
 	it('on a wide screen the status line sits beside the title', async () => {
 		await page.viewport(1024, 800);
-		const { container } = renderCard(closing);
+		const { container } = await renderCard(closing);
 		const meta = box(container, '.task-card__meta');
 		const title = box(container, '.task-card__title');
 		expect(meta.top).toBeLessThan(title.bottom);
@@ -674,7 +684,7 @@ describe('TaskCard (layout by width)', () => {
 		await page.viewport(320, 800);
 		// One unbroken word: a hyphen is a line-break opportunity, so it would not test the overflow.
 		const def = { ...firm, afterNote: 'ContactYourCommandsTransitionAssistanceOfficeToStartNow.' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
 		);
 		const note = container.querySelector('.task-card__whatnow') as HTMLElement;
@@ -687,7 +697,7 @@ describe('TaskCard (layout by width)', () => {
 		await page.viewport(320, 800);
 		const note =
 			'https://www.example.gov/a/very/long/address/with/no/spaces/that/a/user/pasted/into/a/note';
-		const { container } = renderCard(makeItem({ def: firm, status: 'start-now', note }));
+		const { container } = await renderCard(makeItem({ def: firm, status: 'start-now', note }));
 		expect(box(container, '.task-card__body').right).toBeLessThanOrEqual(
 			box(container, 'article').right
 		);
@@ -697,7 +707,7 @@ describe('TaskCard (layout by width)', () => {
 		await page.viewport(320, 800);
 		const note =
 			'https://www.example.gov/a/very/long/address/with/no/spaces/that/a/user/pasted/into/a/note';
-		const { container } = renderCard(makeItem({ def: firm, status: 'start-now', note }));
+		const { container } = await renderCard(makeItem({ def: firm, status: 'start-now', note }));
 		const shown = container.querySelector('.task-card__note-shown') as HTMLElement;
 		expect(shown.scrollWidth).toBeLessThanOrEqual(shown.clientWidth);
 	});
@@ -705,9 +715,9 @@ describe('TaskCard (layout by width)', () => {
 
 // What a keyboard or screen-reader user meets: the link's place, the jump's landing, and words kept apart.
 describe('TaskCard (for keyboard and screen reader)', () => {
-	it('puts the What now link on its own line, under the note', () => {
+	it('puts the What now link on its own line, under the note', async () => {
 		const def = { ...DEF, id: 'tricare-elect', kind: 'closes' as const, afterNote: 'Gone.' };
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def, status: 'closed', windowEndDate: '2026-10-20' })
 		);
 		const box = container.querySelector('.task-card__whatnow') as HTMLElement;
@@ -720,21 +730,21 @@ describe('TaskCard (for keyboard and screen reader)', () => {
 		);
 	});
 
-	it('takes focus when the timeline jumps to it', () => {
-		const card = renderCard(makeItem({ status: 'start-now' })).container.querySelector(
+	it('takes focus when the timeline jumps to it', async () => {
+		const card = (await renderCard(makeItem({ status: 'start-now' }))).container.querySelector(
 			'article'
 		) as HTMLElement;
 		card.focus();
 		expect(document.activeElement).toBe(card);
 	});
 
-	it('separates the tags from the text with spaces, so they are not read as one word', () => {
+	it('separates the tags from the text with spaces, so they are not read as one word', async () => {
 		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
-		const open = renderCard(makeItem({ def, status: 'start-now' })).container;
+		const open = (await renderCard(makeItem({ def, status: 'start-now' }))).container;
 		expect(open.querySelector('.task-card__why')?.textContent).toMatch(
 			/^Career Firm deadline Find approved/
 		);
-		const resolved = renderCard(makeItem({ status: 'done' })).container;
+		const resolved = (await renderCard(makeItem({ status: 'done' }))).container;
 		(resolved.querySelector('button.task-line') as HTMLButtonElement).click();
 		flushSync();
 		expect(resolved.querySelector('.task-card__why')?.textContent).toMatch(/^Career Find approved/);
@@ -745,7 +755,7 @@ describe('leaving your command', () => {
 	const firmDef: TaskDef = { ...DEF, id: 'sha', kind: 'required' };
 
 	it('names the reason on a date Fit moved', async () => {
-		renderCard(
+		await renderCard(
 			makeItem({
 				def: firmDef,
 				status: 'closing-soon',
@@ -758,7 +768,7 @@ describe('leaving your command', () => {
 	});
 
 	it('names no reason on a date Fit left alone', async () => {
-		renderCard(
+		await renderCard(
 			makeItem({
 				status: 'start-now',
 				aimDate: '2026-09-02',
@@ -806,13 +816,13 @@ describe('leaving your command', () => {
 	];
 	for (const [name, over, text] of REASON_CASES) {
 		it(`names the reason on ${name}`, async () => {
-			renderCard(makeItem({ windowEndDate: '2026-10-31', fit: FIT, ...over }));
+			await renderCard(makeItem({ windowEndDate: '2026-10-31', fit: FIT, ...over }));
 			await expect.element(page.getByText(text)).toBeVisible();
 		});
 	}
 
 	it('a firm task that cannot fit warns: the opening, the What now box, no Snooze', async () => {
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })
 		);
 		await expect.element(page.getByText('After you leave', { exact: true })).toBeVisible();
@@ -829,15 +839,15 @@ describe('leaving your command', () => {
 	});
 
 	it('a soft task that cannot fit stays calm and keeps Snooze', async () => {
-		const { container } = renderCard(
+		const { container } = await renderCard(
 			makeItem({ status: 'after-you-leave', windowStartDate: '2027-01-30' })
 		);
 		await expect.element(page.getByRole('button', { name: /^snooze$/i })).toBeVisible();
 		expect(container.querySelector('article')?.classList.contains('task-card--calm')).toBe(true);
 	});
 
-	it('says nothing about what the user qualifies for', () => {
-		const { container } = renderCard(
+	it('says nothing about what the user qualifies for', async () => {
+		const { container } = await renderCard(
 			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })
 		);
 		for (const line of textOf(container).split('\n')) expect(makesPersonalClaim(line)).toBe(false);
@@ -849,7 +859,7 @@ describe("the line above a SkillBridge step's links", () => {
 
 	it('shows the command-instructions line first in the open list, outside the links', async () => {
 		if (!request) throw new Error('E_TEST_TASK_MISSING');
-		const { container } = render(TaskCard, {
+		const { container } = await render(TaskCard, {
 			props: { item: makeItem({ def: request }), onSetStatus: noop, onSetSnooze: noop }
 		});
 		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
@@ -864,7 +874,7 @@ describe("the line above a SkillBridge step's links", () => {
 	});
 
 	it('shows no line for a task without one', async () => {
-		const { container } = render(TaskCard, {
+		const { container } = await render(TaskCard, {
 			props: { item: makeItem(), onSetStatus: noop, onSetSnooze: noop }
 		});
 		const toggle = page.getByRole('button', { name: /^Related resources/ });
@@ -873,7 +883,7 @@ describe("the line above a SkillBridge step's links", () => {
 	});
 
 	it('shows no line above the open links of a task that has links but no line', async () => {
-		const { container } = render(TaskCard, {
+		const { container } = await render(TaskCard, {
 			props: {
 				item: makeItem({ def: { ...DEF, id: 'job-search' } }),
 				onSetStatus: noop,
@@ -887,7 +897,7 @@ describe("the line above a SkillBridge step's links", () => {
 
 	it('shows the line only while the links are open', async () => {
 		if (!request) throw new Error('E_TEST_TASK_MISSING');
-		const { container } = render(TaskCard, {
+		const { container } = await render(TaskCard, {
 			props: { item: makeItem({ def: request }), onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(container.querySelector('.task-card__related-note')).toBeNull();

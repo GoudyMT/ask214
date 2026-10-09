@@ -50,8 +50,8 @@ const VIEW: TimelineView = {
 const noop = () => {};
 
 describe('TimelineList', () => {
-	it('renders one section per phase, in order, with a scroll-target id', () => {
-		const { container } = render(TimelineList, {
+	it('renders one section per phase, in order, with a scroll-target id', async () => {
+		const { container } = await render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const ids = [...container.querySelectorAll('section')].map((s) => s.id);
@@ -60,8 +60,8 @@ describe('TimelineList', () => {
 		expect(container.querySelector('section#phase-final-90')).not.toBeNull();
 	});
 
-	it('labels each section by its heading (aria-labelledby) for landmark navigation', () => {
-		const { container } = render(TimelineList, {
+	it('labels each section by its heading (aria-labelledby) for landmark navigation', async () => {
+		const { container } = await render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const section = container.querySelector('section#phase-18-12');
@@ -70,8 +70,8 @@ describe('TimelineList', () => {
 		expect(container.querySelector(`#${labelledby}`)?.textContent).toContain('18-12 months out'); // heading now also carries the progress count
 	});
 
-	it('renders a TaskCard per item across all phases', () => {
-		const { container } = render(TimelineList, {
+	it('renders a TaskCard per item across all phases', async () => {
+		const { container } = await render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(container.querySelectorAll('article.task-card').length).toBe(3);
@@ -82,8 +82,8 @@ describe('TimelineList', () => {
 });
 
 describe('TimelineList phase progress counts', () => {
-	it('active phase header shows the "N to do" count (Format 1)', () => {
-		const { container } = render(TimelineList, {
+	it('active phase header shows the "N to do" count (Format 1)', async () => {
+		const { container } = await render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent);
@@ -91,7 +91,7 @@ describe('TimelineList phase progress counts', () => {
 		expect(headings[1]).toContain('2 to do'); // phase-final-90: 2 active tasks
 	});
 
-	it('resolved phase header shows the done/skipped breakdown', () => {
+	it('resolved phase header shows the done/skipped breakdown', async () => {
 		const resolvedView: TimelineView = {
 			phases: [
 				{
@@ -109,7 +109,7 @@ describe('TimelineList phase progress counts', () => {
 			],
 			total: 4
 		};
-		const { container } = render(TimelineList, {
+		const { container } = await render(TimelineList, {
 			props: { view: resolvedView, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const heading = container.querySelector('h2')?.textContent;
@@ -117,7 +117,7 @@ describe('TimelineList phase progress counts', () => {
 		expect(heading).toContain('1 skipped');
 	});
 
-	it('counts snoozed tasks as "to do" (snoozed is paused, not done)', () => {
+	it('counts snoozed tasks as "to do" (snoozed is paused, not done)', async () => {
 		const view: TimelineView = {
 			phases: [
 				{
@@ -130,7 +130,7 @@ describe('TimelineList phase progress counts', () => {
 			],
 			total: 3
 		};
-		const { container } = render(TimelineList, {
+		const { container } = await render(TimelineList, {
 			props: { view, onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(container.querySelector('h2')?.textContent).toContain('2 to do'); // 1 active + 1 snoozed
@@ -154,8 +154,8 @@ describe('TimelineList section auto-collapse', () => {
 		total: 2
 	};
 
-	it('collapses a fully-resolved phase by default (disclosure button, cards hidden)', () => {
-		const { container } = render(TimelineList, {
+	it('collapses a fully-resolved phase by default (disclosure button, cards hidden)', async () => {
+		const { container } = await render(TimelineList, {
 			props: { view: resolvedView, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const toggle = container.querySelector('button.timeline-list__toggle');
@@ -163,8 +163,8 @@ describe('TimelineList section auto-collapse', () => {
 		expect(container.textContent).not.toContain('Request medical records'); // cards hidden until expanded
 	});
 
-	it('expands a collapsed phase on tap (cards shown)', () => {
-		const { container } = render(TimelineList, {
+	it('expands a collapsed phase on tap (cards shown)', async () => {
+		const { container } = await render(TimelineList, {
 			props: { view: resolvedView, onSetStatus: noop, onSetSnooze: noop }
 		});
 		(container.querySelector('button.timeline-list__toggle') as HTMLButtonElement | null)?.click();
@@ -175,21 +175,21 @@ describe('TimelineList section auto-collapse', () => {
 		expect(container.textContent).toContain('Request medical records');
 	});
 
-	it('an active phase has no disclosure (no caret/tap), cards shown directly', () => {
-		const { container } = render(TimelineList, {
+	it('an active phase has no disclosure (no caret/tap), cards shown directly', async () => {
+		const { container } = await render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(container.querySelector('button.timeline-list__toggle')).toBeNull();
 		expect(container.textContent).toContain('Request medical records');
 	});
 
-	it('auto-collapses a phase that becomes resolved again (no stale expand after restore)', () => {
+	it('auto-collapses a phase that becomes resolved again (no stale expand after restore)', async () => {
 		const props = $state<{
 			view: TimelineView;
 			onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
 			onSetSnooze: (taskId: string, untilIso: string) => void;
 		}>({ view: resolvedView, onSetStatus: noop, onSetSnooze: noop });
-		const { container } = render(TimelineList, { props });
+		const { container } = await render(TimelineList, { props });
 		const toggle = () => container.querySelector('button.timeline-list__toggle');
 
 		// User expands the collapsed phase.
@@ -225,9 +225,9 @@ describe('TimelineList section auto-collapse', () => {
 });
 
 describe('TimelineList Today marker', () => {
-	it('renders the Today marker before the phase at todayMarkerIndex', () => {
+	it('renders the Today marker before the phase at todayMarkerIndex', async () => {
 		const view: TimelineView = { ...VIEW, todayMarkerIndex: 1, todayDate: '2026-06-09' };
-		const { container } = render(TimelineList, {
+		const { container } = await render(TimelineList, {
 			props: { view, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const marker = container.querySelector('.timeline-today');
@@ -244,34 +244,34 @@ describe('TimelineList Today marker', () => {
 		expect(markerIdx).toBeLessThan(sec1Idx);
 	});
 
-	it('renders no Today marker when todayMarkerIndex is absent', () => {
-		const { container } = render(TimelineList, {
+	it('renders no Today marker when todayMarkerIndex is absent', async () => {
+		const { container } = await render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(container.querySelector('.timeline-today')).toBeNull();
 	});
 
-	it('shows the days-left count by the marker when separation is in the future', () => {
+	it('shows the days-left count by the marker when separation is in the future', async () => {
 		const view: TimelineView = {
 			...VIEW,
 			todayMarkerIndex: 1,
 			todayDate: '2026-06-09',
 			daysToSeparation: 100
 		};
-		const { container } = render(TimelineList, {
+		const { container } = await render(TimelineList, {
 			props: { view, onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(container.querySelector('.timeline-today')?.textContent).toContain('100 days left');
 	});
 
-	it('hides the days-left count once separation has passed', () => {
+	it('hides the days-left count once separation has passed', async () => {
 		const view: TimelineView = {
 			...VIEW,
 			todayMarkerIndex: 2,
 			todayDate: '2027-05-01',
 			daysToSeparation: 0
 		};
-		const { container } = render(TimelineList, {
+		const { container } = await render(TimelineList, {
 			props: { view, onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(container.querySelector('.timeline-today')?.textContent).not.toContain('days left');

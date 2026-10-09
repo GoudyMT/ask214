@@ -23,8 +23,8 @@ function source(over: Partial<Source> = {}): Source {
 }
 
 describe('SourceReader', () => {
-	it('opens as a modal dialog showing the source title and every held passage', () => {
-		const { container } = render(SourceReader, {
+	it('opens as a modal dialog showing the source title and every held passage', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), onClose: () => {} }
 		});
 		flushSync();
@@ -38,8 +38,8 @@ describe('SourceReader', () => {
 		expect(passages[1]?.textContent).toContain('effective date');
 	});
 
-	it('links to the official site safely (new tab, noopener noreferrer)', () => {
-		const { container } = render(SourceReader, {
+	it('links to the official site safely (new tab, noopener noreferrer)', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), onClose: () => {} }
 		});
 		flushSync();
@@ -51,7 +51,7 @@ describe('SourceReader', () => {
 
 	// A modal reader holds the page behind it still, so a scroll moves the document, never the page.
 	it('locks the page behind it while open, and releases it when closed', async () => {
-		const { container, rerender } = render(SourceReader, {
+		const { container, rerender } = await render(SourceReader, {
 			props: { source: source(), onClose: () => {} }
 		});
 		flushSync();
@@ -64,9 +64,9 @@ describe('SourceReader', () => {
 		expect(getComputedStyle(document.documentElement).overflow).not.toBe('hidden');
 	});
 
-	it('the close button fires onClose', () => {
+	it('the close button fires onClose', async () => {
 		let closed = 0;
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), onClose: () => closed++ }
 		});
 		flushSync();
@@ -75,8 +75,10 @@ describe('SourceReader', () => {
 		expect(closed).toBe(1);
 	});
 
-	it('renders no dialog content and stays closed when there is no source', () => {
-		const { container } = render(SourceReader, { props: { source: null, onClose: () => {} } });
+	it('renders no dialog content and stays closed when there is no source', async () => {
+		const { container } = await render(SourceReader, {
+			props: { source: null, onClose: () => {} }
+		});
 		flushSync();
 		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
 		expect(dialog.open).toBe(false);
@@ -85,8 +87,8 @@ describe('SourceReader', () => {
 		expect(container.querySelector('.reader__title')).toBeNull();
 	});
 
-	it('opens in a loading state while the source is being fetched (no silent dead button)', () => {
-		const { container } = render(SourceReader, {
+	it('opens in a loading state while the source is being fetched (no silent dead button)', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: null, loading: true, onClose: () => {} }
 		});
 		flushSync();
@@ -96,8 +98,8 @@ describe('SourceReader', () => {
 		expect(container.querySelector('.reader__passage')).toBeNull(); // no content yet
 	});
 
-	it('opens in an error state when the source cannot be loaded', () => {
-		const { container } = render(SourceReader, {
+	it('opens in an error state when the source cannot be loaded', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: null, error: true, onClose: () => {} }
 		});
 		flushSync();
@@ -108,8 +110,8 @@ describe('SourceReader', () => {
 		);
 	});
 
-	it('error: moves focus to the alert message so a screen reader hears the failure', () => {
-		const { container } = render(SourceReader, {
+	it('error: moves focus to the alert message so a screen reader hears the failure', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: null, error: true, onClose: () => {} }
 		});
 		flushSync();
@@ -118,8 +120,8 @@ describe('SourceReader', () => {
 		expect(document.activeElement).toBe(status); // focus lands on the alert, matching the success path
 	});
 
-	it('marks the block whose id matches highlightId as the cited passage', () => {
-		const { container } = render(SourceReader, {
+	it('marks the block whose id matches highlightId as the cited passage', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), highlightId: 's2', onClose: () => {} }
 		});
 		flushSync();
@@ -133,21 +135,21 @@ describe('SourceReader', () => {
 		expect(cited[0]?.getAttribute('tabindex')).toBe('-1');
 	});
 
-	it('highlights nothing when highlightId is null or matches no block (graceful fallback)', () => {
-		const nullId = render(SourceReader, {
+	it('highlights nothing when highlightId is null or matches no block (graceful fallback)', async () => {
+		const nullId = await render(SourceReader, {
 			props: { source: source(), highlightId: null, onClose: () => {} }
 		});
 		flushSync();
 		expect(nullId.container.querySelectorAll('.reader__passage--cited').length).toBe(0);
 
-		const noMatch = render(SourceReader, {
+		const noMatch = await render(SourceReader, {
 			props: { source: source(), highlightId: 'does-not-exist', onClose: () => {} }
 		});
 		flushSync();
 		expect(noMatch.container.querySelectorAll('.reader__passage--cited').length).toBe(0);
 	});
 
-	it('renders a section heading and a page marker where the metadata changes', () => {
+	it('renders a section heading and a page marker where the metadata changes', async () => {
 		const src: Source = {
 			sourceId: 's',
 			title: 'S',
@@ -158,7 +160,7 @@ describe('SourceReader', () => {
 				{ id: 'c', text: 'third', page: 4, section: 'How to apply' }
 			]
 		};
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: src, highlightId: null, onClose: () => {} }
 		});
 		flushSync();
@@ -169,7 +171,7 @@ describe('SourceReader', () => {
 		expect(container.querySelectorAll('.reader__page').length).toBe(2); // page 3, then page 4
 	});
 
-	it('scrolls the cited passage into view and focuses it on open', () => {
+	it('scrolls the cited passage into view and focuses it on open', async () => {
 		const passages = Array.from({ length: 24 }, (_, i) => ({
 			id: `p${i}`,
 			text: `Passage number ${i} with enough words to give the reader real height to scroll through.`
@@ -180,7 +182,7 @@ describe('SourceReader', () => {
 			url: 'https://www.va.gov/',
 			passages
 		};
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: tall, highlightId: 'p20', onClose: () => {} }
 		});
 		flushSync();
@@ -190,8 +192,8 @@ describe('SourceReader', () => {
 		expect(document.activeElement).toBe(cited); // focus landed on the cited region
 	});
 
-	it('device mode (default): copy references on-device storage and no-connection', () => {
-		const { container } = render(SourceReader, {
+	it('device mode (default): copy references on-device storage and no-connection', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), onClose: () => {} }
 		});
 		flushSync();
@@ -201,8 +203,8 @@ describe('SourceReader', () => {
 		expect(container.querySelector('.reader__muted')?.textContent).toMatch(/no connection needed/i);
 	});
 
-	it('online mode: neutral copy, no on-device / no-connection framing', () => {
-		const { container } = render(SourceReader, {
+	it('online mode: neutral copy, no on-device / no-connection framing', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), online: true, onClose: () => {} }
 		});
 		flushSync();
@@ -227,8 +229,8 @@ describe('SourceReader', () => {
 		});
 
 	// A web page is never re-hosted, so the reader says there is no document to open and where the link goes.
-	it('device mode, web page: says there is no document to open and the link goes to the live page', () => {
-		const { container } = render(SourceReader, {
+	it('device mode, web page: says there is no document to open and the link goes to the live page', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), onClose: () => {} }
 		});
 		flushSync();
@@ -237,8 +239,8 @@ describe('SourceReader', () => {
 		);
 	});
 
-	it('online mode, web page: says there is no document to open and the link goes to the live page', () => {
-		const { container } = render(SourceReader, {
+	it('online mode, web page: says there is no document to open and the link goes to the live page', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), online: true, onClose: () => {} }
 		});
 		flushSync();
@@ -248,8 +250,8 @@ describe('SourceReader', () => {
 	});
 
 	// A PDF source has a document, so it never claims to be a web page.
-	it('device mode, PDF source: keeps pointing to the official site for the complete original', () => {
-		const { container } = render(SourceReader, {
+	it('device mode, PDF source: keeps pointing to the official site for the complete original', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: pdfSource(), onClose: () => {} }
 		});
 		flushSync();
@@ -260,12 +262,12 @@ describe('SourceReader', () => {
 
 	// The text lands on the cited passage, often far down, so a line at the top of the scroll would be out of
 	// sight the moment the reader opens. A web page's line says why there is no page view: it stays pinned.
-	it("pins a web page's line above the scroll, in sight after landing on a passage far down", () => {
+	it("pins a web page's line above the scroll, in sight after landing on a passage far down", async () => {
 		const passages = Array.from({ length: 24 }, (_, i) => ({
 			id: `p${i}`,
 			text: `Passage number ${i} with enough words to give the reader real height to scroll through.`
 		}));
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: source({ passages }), highlightId: 'p20', onClose: () => {} }
 		});
 		flushSync();
@@ -283,8 +285,8 @@ describe('SourceReader', () => {
 		);
 	});
 
-	it("keeps a PDF source's line at the top of its text, inside the scroll", () => {
-		const { container } = render(SourceReader, {
+	it("keeps a PDF source's line at the top of its text, inside the scroll", async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: pdfSource(), onClose: () => {} }
 		});
 		flushSync();
@@ -292,8 +294,8 @@ describe('SourceReader', () => {
 		expect(body.contains(container.querySelector('.reader__held'))).toBe(true);
 	});
 
-	it('online mode, PDF source: keeps saying the whole text comes with the offline library', () => {
-		const { container } = render(SourceReader, {
+	it('online mode, PDF source: keeps saying the whole text comes with the offline library', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: pdfSource(), online: true, onClose: () => {} }
 		});
 		flushSync();
@@ -302,8 +304,8 @@ describe('SourceReader', () => {
 		);
 	});
 
-	it('online mode loading: status drops the on-device wording', () => {
-		const { container } = render(SourceReader, {
+	it('online mode loading: status drops the on-device wording', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: null, loading: true, online: true, onClose: () => {} }
 		});
 		flushSync();
@@ -315,8 +317,8 @@ describe('SourceReader', () => {
 	// The reader is the deepest tier: it is ALREADY showing the exact passage. Sending its link out to the
 	// shared TAP library directory page would walk the reader back to a list of 21 documents, so it
 	// resolves the guide and anchors the highlighted passage's own page.
-	it('links a TAP guide to the highlighted passage page in the real document', () => {
-		const { container } = render(SourceReader, {
+	it('links a TAP guide to the highlighted passage page in the real document', async () => {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: source({
 					sourceId: 'tap_vet_centers',
@@ -337,8 +339,8 @@ describe('SourceReader', () => {
 		);
 	});
 
-	it('links a TAP guide to the document itself when no passage is highlighted', () => {
-		const { container } = render(SourceReader, {
+	it('links a TAP guide to the document itself when no passage is highlighted', async () => {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: source({
 					sourceId: 'tap_vet_centers',
@@ -417,7 +419,7 @@ describe('SourceReader with a served document', () => {
 	};
 
 	it('opens on the original page, with a switch to the text', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: pendingLoader }
 		});
 
@@ -433,7 +435,7 @@ describe('SourceReader with a served document', () => {
 	});
 
 	it('shows the text, with the cited passage focused, when the switch picks Text', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {} }
 		});
 
@@ -449,7 +451,7 @@ describe('SourceReader with a served document', () => {
 	});
 
 	it('falls back to the text, disabling the page and saying why, when the document fails to load', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: failingLoader }
 		});
 
@@ -467,7 +469,7 @@ describe('SourceReader with a served document', () => {
 	// An online answer's text is the passage the search found, and nothing of it is kept on the device. The alert
 	// is heard alone, so it says what the reader now shows.
 	it('says it shows the passage the answer found when an online answer cannot open the page', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: served(),
 				highlightId: 's2',
@@ -490,7 +492,7 @@ describe('SourceReader with a served document', () => {
 	it('goes straight to the text, saying so, when offline with the document never saved', async () => {
 		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
 		try {
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: served(), highlightId: 's2', onClose: () => {} }
 			});
 
@@ -515,7 +517,7 @@ describe('SourceReader with a served document', () => {
 	it('checks the Save line about the answer library again when the view changes', async () => {
 		await caches.delete(ASK_ASSET_CACHE);
 		try {
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: pendingLoader }
 			});
 			const line = () => container.querySelector('.save__line');
@@ -542,7 +544,7 @@ describe('SourceReader with a served document', () => {
 		).put('/docs/tap_vet_centers.0badc0de.pdf', new Response('pdf'));
 		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
 		try {
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: served(), highlightId: 's2', onClose: () => {} }
 			});
 
@@ -560,7 +562,7 @@ describe('SourceReader with a served document', () => {
 	});
 
 	it('switches to the text when the page view offers it and the user takes it', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: withoutPassage }
 		});
 		const instead = () =>
@@ -586,7 +588,7 @@ describe('SourceReader with a served document', () => {
 			await held;
 			return runtime;
 		};
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: loader }
 		});
 		// The spacing and the rule the app defines globally, so an empty line that kept them would show it.
@@ -611,7 +613,7 @@ describe('SourceReader with a served document', () => {
 		const size = { width: window.innerWidth, height: window.innerHeight };
 		try {
 			await page.viewport(844, 800);
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: withoutPassage }
 			});
 			const act = () => container.querySelector('.reader__act');
@@ -670,7 +672,7 @@ describe('SourceReader with a served document', () => {
 
 		it('leaves focus on a link the user moved to, and still shows the passage', async () => {
 			const { loader, arrive } = heldLoader();
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: loader }
 			});
 			const link = () => container.querySelectorAll('.reader__link')[1] as HTMLElement;
@@ -689,7 +691,7 @@ describe('SourceReader with a served document', () => {
 		});
 
 		it('leaves focus on a link the user moved to when the document fails and the text shows', async () => {
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: failingLoader }
 			});
 			const link = () => container.querySelectorAll('.reader__link')[1] as HTMLElement;
@@ -723,7 +725,7 @@ describe('SourceReader with a served document', () => {
 		};
 
 		it('still shows the passage in the text when the user moved focus out of the scroll', async () => {
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: long(), highlightId: 's2', onClose: () => {}, pdfLoader: failingLoader }
 			});
 			const link = () => container.querySelectorAll('.reader__link')[1] as HTMLElement;
@@ -744,7 +746,7 @@ describe('SourceReader with a served document', () => {
 			const size = { width: window.innerWidth, height: window.innerHeight };
 			try {
 				await page.viewport(844, 390);
-				const { container } = render(SourceReader, {
+				const { container } = await render(SourceReader, {
 					props: { source: long(), highlightId: 's2', onClose: () => {}, pdfLoader: failingLoader }
 				});
 				const body = container.querySelector('.reader__body') as HTMLElement;
@@ -793,7 +795,7 @@ describe('SourceReader with a served document', () => {
 				};
 				return { getDocument: () => ({ promise: Promise.resolve(doc), destroy: async () => {} }) };
 			};
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: found }
 			});
 
@@ -806,7 +808,7 @@ describe('SourceReader with a served document', () => {
 	// Opened while its source still loads, the reader's title bar is drawn again once the source arrives, and the
 	// Close that held focus goes with it. Focus fallen to the page is the landing's to take.
 	it('lands on the cited passage when the source arrives after the loading state', async () => {
-		const { container, rerender } = render(SourceReader, {
+		const { container, rerender } = await render(SourceReader, {
 			props: { source: null, loading: true, onClose: () => {} }
 		});
 		await vi.waitFor(() =>
@@ -824,7 +826,7 @@ describe('SourceReader with a served document', () => {
 	// ahead of the links out. This document is not in the cache here, so the Save is offered.
 	it('offers to save the document for offline, first in the foot', async () => {
 		await caches.delete(ASK_ASSET_CACHE);
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: pendingLoader }
 		});
 
@@ -868,7 +870,7 @@ describe('SourceReader with a served document', () => {
 			};
 			return { getDocument: () => ({ promise: Promise.resolve(doc), destroy: async () => {} }) };
 		};
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: found }
 		});
 
@@ -894,10 +896,10 @@ describe('SourceReader with a served document', () => {
 	// "Held on your device" is true of the answer library's text, not of a document the user has not saved.
 	// Where a document is served, its Save says exactly what is kept, so the foot claims nothing more.
 	it('claims nothing is held on the device where a document is served, from an answer or the list', async () => {
-		const answer = render(SourceReader, {
+		const answer = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: pendingLoader }
 		});
-		const whole = render(SourceReader, {
+		const whole = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: { sourceId: 'tap_vet_centers', title: 'TAP - Vet Centers (Resource Guide)' },
@@ -955,7 +957,7 @@ describe('SourceReader with a served document', () => {
 			page: 9,
 			anchor: 'Services are free and confidential.'
 		});
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: source({ sourceId: 'tap_vet_centers', passages }),
 				highlightId: 'cited',
@@ -1048,7 +1050,7 @@ describe('SourceReader with a served document', () => {
 			// showing late, waited for below.
 			await caches.delete(ASK_ASSET_CACHE);
 			await page.viewport(390, 844);
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: {
 					source: source({ sourceId: 'tap_vet_centers', passages }),
 					highlightId: 'cited',
@@ -1156,7 +1158,7 @@ describe('SourceReader with a served document', () => {
 			page: 9,
 			anchor: 'Services are free and confidential.'
 		});
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: source({ sourceId: 'tap_vet_centers', passages }),
 				highlightId: 'cited',
@@ -1201,7 +1203,7 @@ describe('SourceReader with a served document', () => {
 			id: `t${i}`,
 			text: `Passage number ${i} with enough words to give the reader real height to scroll through.`
 		}));
-		const { container, rerender } = render(SourceReader, {
+		const { container, rerender } = await render(SourceReader, {
 			props: {
 				source: source({ ...served(), passages: [...served().passages, ...long] }),
 				highlightId: 's2',
@@ -1226,8 +1228,8 @@ describe('SourceReader with a served document', () => {
 		expect(body.scrollTop).toBe(0);
 	});
 
-	it('keeps a web-page source on the text view, with no switch', () => {
-		const { container } = render(SourceReader, {
+	it('keeps a web-page source on the text view, with no switch', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: source(), highlightId: 's1', onClose: () => {} }
 		});
 		flushSync();
@@ -1258,7 +1260,7 @@ describe('SourceReader, a document opened whole', () => {
 
 	it('opens titled, on its first page, at once, stating its size, with no text built', async () => {
 		const loadSource = vi.fn(async () => vetSource());
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1280,7 +1282,7 @@ describe('SourceReader, a document opened whole', () => {
 
 	it('builds the text when the user picks it, and shows the whole document with nothing cited', async () => {
 		const loadSource = vi.fn(async () => vetSource());
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: null, doc: DOC, loadSource, onClose: () => {} }
 		});
 
@@ -1296,7 +1298,7 @@ describe('SourceReader, a document opened whole', () => {
 
 	// A document from the list is always a served PDF, so its text never claims to be a web page.
 	it("says a listed document's text is the device's copy, never a web page", async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: null, doc: DOC, loadSource: async () => vetSource(), onClose: () => {} }
 		});
 
@@ -1314,7 +1316,7 @@ describe('SourceReader, a document opened whole', () => {
 		const loadSource = vi.fn(
 			() => new Promise<Source | null>((resolve) => setTimeout(() => resolve(null), 0))
 		);
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: null, doc: DOC, loadSource, onClose: () => {} }
 		});
 
@@ -1333,7 +1335,7 @@ describe('SourceReader, a document opened whole', () => {
 		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
 		try {
 			const loadSource = vi.fn(async () => vetSource());
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: null, doc: DOC, loadSource, onClose: () => {} }
 			});
 
@@ -1373,7 +1375,7 @@ describe('SourceReader, a document opened whole', () => {
 		const pdfLoader = async (): Promise<PdfRuntime> => ({
 			getDocument: () => ({ promise: Promise.resolve(page), destroy: async () => {} })
 		});
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: { source: null, doc: DOC, loadSource: async () => null, onClose: () => {}, pdfLoader }
 		});
 
@@ -1390,7 +1392,7 @@ describe('SourceReader, a document opened whole', () => {
 				destroy: async () => {}
 			})
 		});
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1411,7 +1413,7 @@ describe('SourceReader, a document opened whole', () => {
 	// WebKit's Tab passes over a scrolling box with nothing in it to focus, so the keys could not reach a whole
 	// document's text, which lands on no passage. The text is a named stop of its own, as the pages are.
 	it('makes the text a named stop in the tab order, as the pages are', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1431,8 +1433,10 @@ describe('SourceReader, a document opened whole', () => {
 	});
 
 	// A web page's text is not a document's, and it lands on its passage, which takes focus.
-	it("leaves a web page's text out of the tab order, unnamed", () => {
-		const { container } = render(SourceReader, { props: { source: source(), onClose: () => {} } });
+	it("leaves a web page's text out of the tab order, unnamed", async () => {
+		const { container } = await render(SourceReader, {
+			props: { source: source(), onClose: () => {} }
+		});
 		flushSync();
 		const text = container.querySelector('.reader__text') as HTMLElement;
 		expect(text.hasAttribute('role')).toBe(false);
@@ -1450,7 +1454,7 @@ describe('SourceReader, a document opened whole', () => {
 				text: `Passage number ${i} with enough words to give the reader real height to scroll through.`
 			}))
 		});
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1512,7 +1516,7 @@ describe('SourceReader, a document opened whole', () => {
 
 	// Pinned: a sibling of the scrolling body, between it and the foot, so it never scrolls away.
 	it('pages through the whole document with a pager pinned between the page and the foot', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1547,7 +1551,7 @@ describe('SourceReader, a document opened whole', () => {
 	// The line saying what the pages are sits above the first page, so opening at the first page's own top
 	// would scroll it out of view the moment the document opens.
 	it('opens a document from the list at its very top, the line above the first page in view', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1570,7 +1574,7 @@ describe('SourceReader, a document opened whole', () => {
 	// The pages are out of the tab order - each takes focus only to land on it - so once focus leaves them the
 	// keyboard needs a stop of its own to come back to the pages and scroll them.
 	it('lets the keyboard return to the pages from the pager and scroll them', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1595,7 +1599,7 @@ describe('SourceReader, a document opened whole', () => {
 	});
 
 	it('shows no pager on the text view', async () => {
-		const { container } = render(SourceReader, {
+		const { container } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1610,7 +1614,7 @@ describe('SourceReader, a document opened whole', () => {
 	});
 
 	it('carries no pager over to the next document', async () => {
-		const { container, rerender } = render(SourceReader, {
+		const { container, rerender } = await render(SourceReader, {
 			props: {
 				source: null,
 				doc: DOC,
@@ -1631,12 +1635,12 @@ describe('SourceReader, a document opened whole', () => {
 	});
 
 	// From every entry, an answer's included: the official site first, then the Documents area.
-	it('links to all documents after the official site, and closes the reader on the way', () => {
+	it('links to all documents after the official site, and closes the reader on the way', async () => {
 		const onClose = vi.fn();
-		const whole = render(SourceReader, {
+		const whole = await render(SourceReader, {
 			props: { source: null, doc: DOC, loadSource: async () => null, onClose }
 		});
-		const answer = render(SourceReader, { props: { source: source(), onClose: () => {} } });
+		const answer = await render(SourceReader, { props: { source: source(), onClose: () => {} } });
 		flushSync();
 		for (const { container } of [whole, answer]) {
 			const links = [...container.querySelectorAll('.reader__link')];
@@ -1654,8 +1658,8 @@ describe('SourceReader, a document opened whole', () => {
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
-	it('links to the document itself on the official site', () => {
-		const { container } = render(SourceReader, {
+	it('links to the document itself on the official site', async () => {
+		const { container } = await render(SourceReader, {
 			props: { source: null, doc: DOC, loadSource: async () => null, onClose: () => {} }
 		});
 		flushSync();
@@ -1677,8 +1681,8 @@ describe('SourceReader, a document opened whole', () => {
 			await page.viewport(size.width, size.height);
 		});
 
-		const open = () =>
-			render(SourceReader, {
+		const open = async () =>
+			await render(SourceReader, {
 				props: {
 					source: null,
 					doc: DOC,
@@ -1690,7 +1694,7 @@ describe('SourceReader, a document opened whole', () => {
 
 		it('fills the screen, pins the title bar and the page bar, and scrolls the rest with the foot first', async () => {
 			await page.viewport(844, 390);
-			const { container } = open();
+			const { container } = await open();
 			await vi.waitFor(() => expect(container.querySelector('.pager')).not.toBeNull());
 
 			const body = container.querySelector('.reader__body') as HTMLElement;
@@ -1725,7 +1729,7 @@ describe('SourceReader, a document opened whole', () => {
 		// can be read whole.
 		it('wraps the title rather than cutting it on a screen both short and narrow', async () => {
 			await page.viewport(320, 256);
-			const { container } = open();
+			const { container } = await open();
 			const title = () => container.querySelector('.reader__title') as HTMLElement;
 			await vi.waitFor(() => expect(title()).not.toBeNull());
 			expect(getComputedStyle(title()).whiteSpace).toBe('normal');
@@ -1735,7 +1739,7 @@ describe('SourceReader, a document opened whole', () => {
 		// The text lands on the cited passage, often far down; the line says why there is no page view.
 		it("keeps a web page's line pinned under the title bar", async () => {
 			await page.viewport(844, 390);
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: source(), onClose: () => {} }
 			});
 			flushSync();
@@ -1746,7 +1750,7 @@ describe('SourceReader, a document opened whole', () => {
 
 		it('keeps the head, the switch and the foot pinned on a screen tall enough', async () => {
 			await page.viewport(1280, 800);
-			const { container } = open();
+			const { container } = await open();
 			await vi.waitFor(() => expect(container.querySelector('.pager')).not.toBeNull());
 
 			const body = container.querySelector('.reader__body') as HTMLElement;
@@ -1786,7 +1790,7 @@ describe('SourceReader, a document opened whole', () => {
 			}
 			try {
 				await page.viewport(844, 800);
-				const { container } = open();
+				const { container } = await open();
 				const body = container.querySelector('.reader__body') as HTMLElement;
 				const number = () => (container.querySelector('.pager input') as HTMLInputElement).value;
 				await landed();
@@ -1819,7 +1823,7 @@ describe('SourceReader, a document opened whole', () => {
 			['the text', '.reader__text', true]
 		])('draws the focus ring of %s inside it', async (_name, selector, onText) => {
 			await page.viewport(844, 390);
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: {
 					source: null,
 					doc: DOC,
@@ -1845,7 +1849,7 @@ describe('SourceReader, a document opened whole', () => {
 		// control far above them in the scroll, and the reader stays where they were.
 		it('takes Shift+Tab from the page bar to the pages, leaving the scroll where it was', async () => {
 			await page.viewport(844, 390);
-			const { container } = open();
+			const { container } = await open();
 			await landed();
 			const body = container.querySelector('.reader__body') as HTMLElement;
 			const second = container.querySelector('[data-page="2"]') as HTMLElement;
@@ -1864,7 +1868,7 @@ describe('SourceReader, a document opened whole', () => {
 		// A web page has no Save, so nothing shows late: its link has focus back as soon as it is built again.
 		it("gives focus back to a web page's link when the screen turns", async () => {
 			await page.viewport(844, 800);
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: { source: source(), onClose: () => {} }
 			});
 			const link = () => container.querySelectorAll('.reader__link')[1];
@@ -1880,7 +1884,7 @@ describe('SourceReader, a document opened whole', () => {
 		it('leaves focus where the user moved it before the Save showed again', async () => {
 			await caches.delete(ASK_ASSET_CACHE);
 			await page.viewport(844, 800);
-			const { container } = open();
+			const { container } = await open();
 			await landed();
 			await vi.waitFor(() => expect(container.querySelector('.save')).not.toBeNull());
 			(container.querySelector('.save') as HTMLElement).focus();
@@ -1946,7 +1950,7 @@ describe('SourceReader, a document opened whole', () => {
 		])('centres the title, the switch and the foot on %s', async (_name, width, height) => {
 			await caches.delete(ASK_ASSET_CACHE);
 			await page.viewport(width, height);
-			const { container } = render(SourceReader, {
+			const { container } = await render(SourceReader, {
 				props: {
 					source: null,
 					doc: DOC,
@@ -1974,7 +1978,7 @@ describe('SourceReader, a document opened whole', () => {
 		// Centring the title must not narrow it: a column held empty on each side to balance Close cost a long title
 		// a line on a phone and, at 400% zoom, most of the reading pane.
 		const openDoc = async (title = DOC.title) => {
-			const view = render(SourceReader, {
+			const view = await render(SourceReader, {
 				props: {
 					source: null,
 					doc: { ...DOC, title },

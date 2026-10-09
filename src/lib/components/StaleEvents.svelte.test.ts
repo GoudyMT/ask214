@@ -25,7 +25,7 @@ const E: HandedOverEvent[] = [
 
 describe('StaleEvents', () => {
 	it('lists each event by its old title and date, from the earliest add', async () => {
-		render(StaleEvents, { props: { events: E, onAcknowledge: vi.fn(async () => {}) } });
+		await render(StaleEvents, { props: { events: E, onAcknowledge: vi.fn(async () => {}) } });
 		await expect.element(page.getByText('Your calendar is out of date')).toBeVisible();
 		await expect
 			.element(
@@ -40,7 +40,7 @@ describe('StaleEvents', () => {
 
 	// A screen reader moving by heading finds the box, and the button names what it confirms.
 	it('heads the box, and describes its button by the heading and the lead', async () => {
-		render(StaleEvents, { props: { events: E, onAcknowledge: vi.fn(async () => {}) } });
+		await render(StaleEvents, { props: { events: E, onAcknowledge: vi.fn(async () => {}) } });
 		await expect
 			.element(page.getByRole('heading', { level: 3, name: 'Your calendar is out of date' }))
 			.toBeVisible();
@@ -53,14 +53,14 @@ describe('StaleEvents', () => {
 
 	it("clears through I've deleted these", async () => {
 		const onAcknowledge = vi.fn(async () => {});
-		render(StaleEvents, { props: { events: E, onAcknowledge } });
+		await render(StaleEvents, { props: { events: E, onAcknowledge } });
 		await page.getByRole('button', { name: "I've deleted these" }).click();
 		expect(onAcknowledge).toHaveBeenCalledOnce();
 	});
 
 	it('says so when the save fails, and keeps the list', async () => {
 		const onAcknowledge = vi.fn(async () => Promise.reject(new Error('E_TEST_SAVE')));
-		render(StaleEvents, { props: { events: E, onAcknowledge } });
+		await render(StaleEvents, { props: { events: E, onAcknowledge } });
 		await page.getByRole('button', { name: "I've deleted these" }).click();
 		await expect
 			.element(page.getByText('Could not update right now - please try again.'))
@@ -73,7 +73,7 @@ describe('StaleEvents', () => {
 			.fn<() => Promise<void>>()
 			.mockRejectedValueOnce(new Error('E_TEST_SAVE'))
 			.mockImplementationOnce(() => new Promise<void>(() => {}));
-		render(StaleEvents, { props: { events: E, onAcknowledge } });
+		await render(StaleEvents, { props: { events: E, onAcknowledge } });
 		const ack = page.getByRole('button', { name: "I've deleted these" });
 		await ack.click();
 		await expect.element(page.getByRole('alert')).toBeVisible();
@@ -81,15 +81,15 @@ describe('StaleEvents', () => {
 		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
 	});
 
-	it('draws nothing with nothing to list', () => {
-		const { container } = render(StaleEvents, {
+	it('draws nothing with nothing to list', async () => {
+		const { container } = await render(StaleEvents, {
 			props: { events: [], onAcknowledge: vi.fn(async () => {}) }
 		});
 		expect(container.textContent?.trim()).toBe('');
 	});
 
-	it('says nothing personal', () => {
-		const { container } = render(StaleEvents, {
+	it('says nothing personal', async () => {
+		const { container } = await render(StaleEvents, {
 			props: { events: E, onAcknowledge: vi.fn(async () => {}) }
 		});
 		const text = textOf(container);
@@ -135,7 +135,7 @@ describe('StaleEvents (layout by width)', () => {
 	});
 	const phoneList = async () => {
 		await page.viewport(320, 800);
-		const { container } = render(StaleEvents, {
+		const { container } = await render(StaleEvents, {
 			props: { events: LONG, onAcknowledge: vi.fn(async () => {}) }
 		});
 		container.style.width = PHONE_LIST_WIDTH;
@@ -179,12 +179,12 @@ describe('StaleEvents (layout by width)', () => {
 
 	// The heading looks as the box's bold first line did. The app's global h3 rule (a larger size and line height) is
 	// put on the page here, as app.css does, and the box must set it back to its own text.
-	it('draws the heading at the size and line height of the lead, in bold', () => {
+	it('draws the heading at the size and line height of the lead, in bold', async () => {
 		const globalRule = document.createElement('style');
 		globalRule.textContent = 'h3 { font-size: 22px; line-height: 1.4; }';
 		document.head.append(globalRule);
 		try {
-			const { container } = render(StaleEvents, {
+			const { container } = await render(StaleEvents, {
 				props: { events: E, onAcknowledge: vi.fn(async () => {}) }
 			});
 			container.style.lineHeight = '1.5';

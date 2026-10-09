@@ -32,16 +32,16 @@ const FIXTURE: Resource[] = [
 ];
 
 describe('ResourceList', () => {
-	it('renders a heading for each display category with its label', () => {
-		const { container } = render(ResourceList, { props: { resources: FIXTURE } });
+	it('renders a heading for each display category with its label', async () => {
+		const { container } = await render(ResourceList, { props: { resources: FIXTURE } });
 		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent?.trim());
 		expect(headings).toContain('Benefits & VA');
 		expect(headings).toContain('Claims filing (VSO)');
 		expect(headings).toContain('Employment');
 	});
 
-	it('renders each resource as an external link that opens in a new tab safely', () => {
-		const { container } = render(ResourceList, { props: { resources: FIXTURE } });
+	it('renders each resource as an external link that opens in a new tab safely', async () => {
+		const { container } = await render(ResourceList, { props: { resources: FIXTURE } });
 		const link = [...container.querySelectorAll('a')].find(
 			(a) => a.getAttribute('href') === 'https://www.usajobs.gov'
 		);
@@ -52,16 +52,16 @@ describe('ResourceList', () => {
 		expect(rel).toContain('noreferrer');
 	});
 
-	it('shows the 38 CFR boundary note inside the Claims filing group only', () => {
-		const { container } = render(ResourceList, { props: { resources: FIXTURE } });
+	it('shows the 38 CFR boundary note inside the Claims filing group only', async () => {
+		const { container } = await render(ResourceList, { props: { resources: FIXTURE } });
 		const claims = container.querySelector('[aria-labelledby="rg-claims-vso"]');
 		expect(claims?.textContent ?? '').toMatch(/does(n't| not) help with VA claims/i);
 		const benefits = container.querySelector('[aria-labelledby="rg-benefits-va"]');
 		expect(benefits?.textContent ?? '').not.toMatch(/does(n't| not) help with VA claims/i);
 	});
 
-	it('renders resource descriptions', () => {
-		const { container } = render(ResourceList, { props: { resources: FIXTURE } });
+	it('renders resource descriptions', async () => {
+		const { container } = await render(ResourceList, { props: { resources: FIXTURE } });
 		expect(container.textContent ?? '').toContain('Federal jobs.');
 	});
 
@@ -78,8 +78,8 @@ describe('ResourceList', () => {
 			return section;
 		}
 
-		it('sits under the SkillBridge & Transition heading and before its links', () => {
-			const { container } = render(ResourceList, { props: { resources: RESOURCES } });
+		it('sits under the SkillBridge & Transition heading and before its links', async () => {
+			const { container } = await render(ResourceList, { props: { resources: RESOURCES } });
 			const section = groupOf(container, 'SkillBridge & Transition');
 			const notes = [...section.querySelectorAll('p')].filter(
 				(p) => p.textContent?.trim() === LINE
@@ -93,8 +93,8 @@ describe('ResourceList', () => {
 			expect(list.contains(note)).toBe(false);
 		});
 
-		it('appears in no other group', () => {
-			const { container } = render(ResourceList, { props: { resources: RESOURCES } });
+		it('appears in no other group', async () => {
+			const { container } = await render(ResourceList, { props: { resources: RESOURCES } });
 			const sections = [...container.querySelectorAll('section')];
 			const others = sections.filter(
 				(s) => s.querySelector('h2')?.textContent?.trim() !== 'SkillBridge & Transition'
@@ -104,8 +104,8 @@ describe('ResourceList', () => {
 			expect(sections.filter((s) => (s.textContent ?? '').includes(LINE))).toHaveLength(1);
 		});
 
-		it('makes no personal claim anywhere in the group', () => {
-			const { container } = render(ResourceList, { props: { resources: RESOURCES } });
+		it('makes no personal claim anywhere in the group', async () => {
+			const { container } = await render(ResourceList, { props: { resources: RESOURCES } });
 			const section = groupOf(container, 'SkillBridge & Transition');
 			expect(textOf(section)).toContain(LINE);
 			expect(makesPersonalClaim(textOf(section))).toBe(false);

@@ -61,7 +61,7 @@ describe('Settings, the calendar add', () => {
 	// task state: the add could carry a task the user marked done, and the list could name an event that is not out
 	// of date.
 	it('waits for the timeline store as well as the calendar store', async () => {
-		const { container } = render(SettingsPage);
+		const { container } = await render(SettingsPage);
 		await expect
 			.element(page.getByText(/could not be loaded, so adding is unavailable right now/))
 			.toBeVisible();

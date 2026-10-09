@@ -174,7 +174,7 @@ describe('PdfView', () => {
 		let release!: () => void;
 		const hold = new Promise<void>((resolve) => (release = resolve));
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { hold });
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		expect(container.querySelector('[role="status"]')?.textContent).toMatch(/loading page 3/i);
 		release();
@@ -183,7 +183,7 @@ describe('PdfView', () => {
 
 	it('names every page as one image, the page carrying the passage as marked', async () => {
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() => expect(calls.render).toContain(3));
 		// Read once the page is ready: the name says whether a passage is marked, which is known only then.
@@ -204,7 +204,7 @@ describe('PdfView', () => {
 
 	it('names the page without claiming a mark when none is drawn', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER]);
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() => expect(container.querySelector('[role="status"]')).toBeNull());
 		expect(container.querySelector('[data-page="3"]')?.getAttribute('aria-label')).toBe(
@@ -217,7 +217,7 @@ describe('PdfView', () => {
 		let release!: () => void;
 		const hold = new Promise<void>((resolve) => (release = resolve));
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { hold });
-		const { container } = render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
+		const { container } = await render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
 
 		const status = container.querySelector('[role="status"]') as HTMLElement;
 		expect(status.textContent?.trim()).toBe('Loading page 3 of the document (6.9 MB)...');
@@ -227,10 +227,10 @@ describe('PdfView', () => {
 	});
 
 	// The box is a page tall, so a line centred in it starts below the fold on a phone. It sits at the top.
-	it('states the loading line at the top of the page-shaped box, where it is in view', () => {
+	it('states the loading line at the top of the page-shaped box, where it is in view', async () => {
 		const hold = new Promise<void>(() => {});
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { hold });
-		const { container } = render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
+		const { container } = await render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
 
 		const status = container.querySelector('[role="status"]') as HTMLElement;
 		const content = document.createRange();
@@ -240,10 +240,10 @@ describe('PdfView', () => {
 		expect(content.getBoundingClientRect().top - box.top).toBeLessThan(box.height / 4);
 	});
 
-	it('states no size, and draws no bar, while loading when none is given', () => {
+	it('states no size, and draws no bar, while loading when none is given', async () => {
 		const hold = new Promise<void>(() => {});
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { hold });
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		expect(container.querySelector('[role="status"]')?.textContent?.trim()).toBe(
 			'Loading page 3 of the document...'
@@ -257,7 +257,7 @@ describe('PdfView', () => {
 		let release!: () => void;
 		const holdDocument = new Promise<void>((resolve) => (release = resolve));
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { holdDocument });
-		const { container } = render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
+		const { container } = await render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
 
 		await vi.waitFor(() => expect(calls.tasks).toHaveLength(1));
 		const report = calls.tasks[0]?.onProgress;
@@ -285,7 +285,7 @@ describe('PdfView', () => {
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], {
 			holdDocument: new Promise<void>(() => {})
 		});
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { bytes: 6_900_000, onfail, stallAfter: 100 })
 		});
 
@@ -299,7 +299,7 @@ describe('PdfView', () => {
 		const holdDocument = new Promise<void>((resolve) => (release = resolve));
 		const onfail = vi.fn();
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { holdDocument });
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { bytes: 6_900_000, onfail, stallAfter: 300 })
 		});
 		await vi.waitFor(() => expect(calls.tasks).toHaveLength(1));
@@ -328,12 +328,12 @@ describe('PdfView', () => {
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], {
 			holdDocument: new Promise<void>(() => {})
 		});
-		const { unmount } = render(PdfView, {
+		const { unmount } = await render(PdfView, {
 			props: props(loader, { bytes: 6_900_000, onfail, stallAfter: 100 })
 		});
 		await vi.waitFor(() => expect(calls.tasks).toHaveLength(1));
 
-		unmount();
+		await unmount();
 		await new Promise((resolve) => setTimeout(resolve, 250));
 		expect(calls.destroyed).toBe(1);
 		expect(onfail).not.toHaveBeenCalled();
@@ -343,11 +343,11 @@ describe('PdfView', () => {
 	it('stops the download when it is closed before the document arrives', async () => {
 		const holdDocument = new Promise<void>(() => {});
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { holdDocument });
-		const { unmount } = render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
+		const { unmount } = await render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
 
 		await vi.waitFor(() => expect(calls.tasks).toHaveLength(1));
 		expect(calls.destroyed).toBe(0);
-		unmount();
+		await unmount();
 		expect(calls.destroyed).toBe(1);
 	});
 
@@ -355,7 +355,7 @@ describe('PdfView', () => {
 	// screen reader user arrives where a sighted user's eye does.
 	it('lands focus on the cited page once it is ready', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() => expect(container.querySelector('[role="status"]')).toBeNull());
 		const pageEl = container.querySelector('[data-page="3"]');
@@ -367,7 +367,7 @@ describe('PdfView', () => {
 	// a range read of it would be misread, and the host ignores ranges anyway. So the document is fetched whole.
 	it('fetches the document whole, never in byte ranges', async () => {
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		render(PdfView, { props: props(loader) });
+		await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() =>
 			expect(calls.getDocument).toEqual([
@@ -378,7 +378,7 @@ describe('PdfView', () => {
 
 	it('marks the cited passage when it sits on the rendered page', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		// The passage spans two lines of the page, so it is two bands, not one and not four.
 		await vi.waitFor(() => expect(container.querySelectorAll('.pdf__mark')).toHaveLength(2));
@@ -388,7 +388,7 @@ describe('PdfView', () => {
 	// its name does not say a passage is marked on it.
 	it('claims no mark on a page that failed to draw', async () => {
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { failRender: [3] });
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() => expect(calls.render).toContain(3));
 		const page = container.querySelector('[data-page="3"]') as HTMLElement;
@@ -401,7 +401,7 @@ describe('PdfView', () => {
 
 	it('renders the page without marks when the passage is not in the document', async () => {
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, FILLER]);
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() => expect(calls.render).toContain(3));
 		await vi.waitFor(() => expect(container.querySelector('[role="status"]')).toBeNull());
@@ -412,7 +412,7 @@ describe('PdfView', () => {
 	// cited one. The marks go where the passage is, never onto the cited page in its place.
 	it('marks a passage found only on the next page there, and nothing on the cited page', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() => expect(container.querySelector('[role="status"]')).toBeNull());
 		expect(container.querySelectorAll('[data-page="3"] .pdf__mark')).toHaveLength(0);
@@ -431,7 +431,7 @@ describe('PdfView', () => {
 	// Drawing a page fetches it too, so the search is measured by the text it reads.
 	it('reads the text of exactly the pages the search may read', async () => {
 		const { loader, calls } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE, FILLER, FILLER, FILLER]);
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() => expect(container.querySelector('[role="status"]')).toBeNull());
 		expect([...new Set(calls.text)].sort((a, b) => a - b)).toEqual(searchPages(3, 6));
@@ -442,7 +442,7 @@ describe('PdfView', () => {
 	it('reports a load failure and shows no page', async () => {
 		const onfail = vi.fn();
 		const { loader } = fakeRuntime([WITH_PASSAGE], { fail: true });
-		const { container } = render(PdfView, { props: props(loader, { page: 1, onfail }) });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1, onfail }) });
 
 		await vi.waitFor(() => expect(onfail).toHaveBeenCalledTimes(1));
 		expect(container.querySelector('.pdf__page')).toBeNull();
@@ -453,7 +453,7 @@ describe('PdfView', () => {
 	// is exposed as text alongside the image rather than left locked inside the pixels.
 	it('exposes the cited passage as text once the page is ready', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		const { container } = render(PdfView, { props: props(loader) });
+		const { container } = await render(PdfView, { props: props(loader) });
 
 		await vi.waitFor(() =>
 			expect(container.querySelector('.pdf__passage')?.textContent).toContain(PASSAGE)
@@ -465,7 +465,7 @@ describe('PdfView', () => {
 	it('says nothing of a cited passage when there is none', async () => {
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER]);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 1, anchor: '', onlocate })
 		});
 
@@ -479,7 +479,7 @@ describe('PdfView', () => {
 	// so the eye lands on the quote while the page still shows where the source runs.
 	it('tints only the quoted lines when the quote sits inside the passage', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_LONG_PASSAGE]);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { anchor: LONG_PASSAGE, quote: QUOTE })
 		});
 
@@ -489,15 +489,15 @@ describe('PdfView', () => {
 
 	it('bars the whole passage, from its first line to its last, while the tint covers the quote', async () => {
 		const plain = fakeRuntime([FILLER, FILLER, WITH_LONG_PASSAGE]);
-		const whole = render(PdfView, { props: props(plain.loader, { anchor: LONG_PASSAGE }) });
+		const whole = await render(PdfView, { props: props(plain.loader, { anchor: LONG_PASSAGE }) });
 		await vi.waitFor(() => expect(whole.container.querySelectorAll('.pdf__mark')).toHaveLength(4));
 		const lines = [...whole.container.querySelectorAll('.pdf__mark')].map(box);
 		const first = lines[0];
 		const last = lines[3];
-		whole.unmount();
+		await whole.unmount();
 
 		const quoted = fakeRuntime([FILLER, FILLER, WITH_LONG_PASSAGE]);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(quoted.loader, { anchor: LONG_PASSAGE, quote: QUOTE })
 		});
 		await vi.waitFor(() => expect(container.querySelectorAll('.pdf__bar')).toHaveLength(1));
@@ -509,7 +509,7 @@ describe('PdfView', () => {
 
 	it('tints the whole passage when the quote cannot be found', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_LONG_PASSAGE]);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, {
 				anchor: LONG_PASSAGE,
 				quote: 'Words that appear nowhere on this page or any other.'
@@ -523,7 +523,7 @@ describe('PdfView', () => {
 	// A quote matched outside its own passage would point the eye at text the answer did not come from.
 	it('tints the whole passage when the quote is found only outside it', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_LONG_PASSAGE]);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { anchor: LONG_PASSAGE, quote: 'Lead in text.' })
 		});
 
@@ -533,7 +533,7 @@ describe('PdfView', () => {
 
 	it('draws neither a bar nor a mark when the passage is not on the page', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER]);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { anchor: LONG_PASSAGE, quote: QUOTE })
 		});
 
@@ -547,7 +547,7 @@ describe('PdfView', () => {
 	it('reports a marked passage on the cited page, and the page count', async () => {
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
-		render(PdfView, { props: props(loader, { onlocate }) });
+		await render(PdfView, { props: props(loader, { onlocate }) });
 
 		await vi.waitFor(() => expect(onlocate).toHaveBeenCalledTimes(1));
 		expect(onlocate).toHaveBeenCalledWith({ marked: true, foundOn: [3], pageCount: 3 });
@@ -556,7 +556,7 @@ describe('PdfView', () => {
 	it('reports a passage found only on the next page as unmarked, naming that page', async () => {
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER, WITH_PASSAGE]);
-		render(PdfView, { props: props(loader, { onlocate }) });
+		await render(PdfView, { props: props(loader, { onlocate }) });
 
 		await vi.waitFor(() => expect(onlocate).toHaveBeenCalledTimes(1));
 		expect(onlocate).toHaveBeenCalledWith({ marked: false, foundOn: [4], pageCount: 4 });
@@ -565,7 +565,7 @@ describe('PdfView', () => {
 	it('reports a passage found nowhere as unmarked, on no page', async () => {
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime([FILLER, FILLER, FILLER]);
-		render(PdfView, { props: props(loader, { onlocate }) });
+		await render(PdfView, { props: props(loader, { onlocate }) });
 
 		await vi.waitFor(() => expect(onlocate).toHaveBeenCalledTimes(1));
 		expect(onlocate).toHaveBeenCalledWith({ marked: false, foundOn: [], pageCount: 3 });
@@ -573,7 +573,7 @@ describe('PdfView', () => {
 
 	it('exposes the quote, not the whole passage, as text when the quote is what is tinted', async () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_LONG_PASSAGE]);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { anchor: LONG_PASSAGE, quote: QUOTE })
 		});
 
@@ -610,7 +610,7 @@ describe('PdfView, the whole document', () => {
 	it('draws the pages near the view, holding every other page to its size with its number', async () => {
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 
 		await vi.waitFor(() => expect(calls.render).toContain(2));
 		expect(container.querySelectorAll('.pdf__page')).toHaveLength(12);
@@ -625,7 +625,7 @@ describe('PdfView, the whole document', () => {
 	it('releases a page scrolled far away, keeping its size, and draws the one scrolled to', async () => {
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 		await vi.waitFor(() => expect(container.querySelectorAll('.pdf__page')).toHaveLength(12));
 		await vi.waitFor(() => expect(calls.render).toContain(1));
 		const firstHeight = pageAt(container, 1).getBoundingClientRect().height;
@@ -646,7 +646,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[0] = WITH_PASSAGE;
 		const { loader, calls } = fakeRuntime(pages, { failRender: [1] });
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 		await vi.waitFor(() => expect(calls.render).toContain(1));
 		await vi.waitFor(() =>
 			expect(pageAt(container, 1).getAttribute('aria-label')).toBe('Page 1 of VA Benefits Guide')
@@ -671,7 +671,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[0] = WITH_PASSAGE;
 		const { loader, calls } = fakeRuntime(pages, { holdRender: new Promise<void>(() => {}) });
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 		await vi.waitFor(() => expect(calls.render).toContain(1));
 
 		box.scrollTop = box.scrollHeight;
@@ -687,7 +687,7 @@ describe('PdfView, the whole document', () => {
 	it('lets the library free a page it releases', async () => {
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 		await vi.waitFor(() => expect(container.querySelectorAll('.pdf__page')).toHaveLength(12));
 		await vi.waitFor(() => expect(calls.render).toContain(1));
 		expect(calls.cleanup).not.toContain(1);
@@ -701,7 +701,7 @@ describe('PdfView, the whole document', () => {
 	it('frees every canvas when it closes', async () => {
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container, unmount } = render(PdfView, {
+		const { container, unmount } = await render(PdfView, {
 			props: props(loader, { page: 1 }),
 			target: box
 		});
@@ -709,14 +709,14 @@ describe('PdfView, the whole document', () => {
 		const canvases = [...container.querySelectorAll('canvas')];
 		expect(canvases.filter((canvas) => canvas.width > 0).length).toBeGreaterThan(0);
 
-		unmount();
+		await unmount();
 		expect(canvases.filter((canvas) => canvas.width !== 0 || canvas.height !== 0)).toEqual([]);
 	});
 
 	it('frees every canvas when it moves to another document', async () => {
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container, rerender } = render(PdfView, {
+		const { container, rerender } = await render(PdfView, {
 			props: props(loader, { page: 1 }),
 			target: box
 		});
@@ -734,7 +734,7 @@ describe('PdfView, the whole document', () => {
 	it('draws the pages in view again when the view changes width', async () => {
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 		const canvas = () => pageAt(container, 1).querySelector('canvas') as HTMLCanvasElement;
 		// How far the canvas is from the page's width in device pixels. Within a pixel is drawn to it: the width
 		// passes through the library's scale on its way to the canvas.
@@ -758,7 +758,7 @@ describe('PdfView, the whole document', () => {
 		const holder = document.createElement('div');
 		box.append(holder);
 		const { loader, calls } = fakeRuntime(TWELVE());
-		render(PdfView, { props: props(loader, { page: 1 }), target: holder });
+		await render(PdfView, { props: props(loader, { page: 1 }), target: holder });
 		await vi.waitFor(() => expect(calls.render).toContain(2));
 		await frames(3);
 		const draws = calls.render.length;
@@ -773,7 +773,7 @@ describe('PdfView, the whole document', () => {
 		const holdRender = new Promise<void>((resolve) => (finish = resolve));
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE(), { holdRender });
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 		const canvas = () => pageAt(container, 1).querySelector('canvas') as HTMLCanvasElement;
 		const offBy = () =>
 			Math.abs(canvas().width - Math.floor(pageAt(container, 1).clientWidth * devicePixelRatio));
@@ -793,7 +793,7 @@ describe('PdfView, the whole document', () => {
 	it('sizes every page to its own shape before it is drawn', async () => {
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE(), { sizes: { 12: [800, 600] } });
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 		await vi.waitFor(() => expect(container.querySelectorAll('.pdf__page')).toHaveLength(12));
 
 		const portrait = pageAt(container, 1).getBoundingClientRect();
@@ -811,7 +811,7 @@ describe('PdfView, the whole document', () => {
 		const onfail = vi.fn();
 		const landscape: [number, number] = [800, 600];
 		const { loader } = fakeRuntime(TWELVE(), { failGetPage: [7], sizes: { 1: landscape } });
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 1, onfail }),
 			target: box
 		});
@@ -838,7 +838,7 @@ describe('PdfView, the whole document', () => {
 		const { loader, calls } = fakeRuntime(pages, {
 			sizes: { 6: landscape, 7: landscape, 8: landscape }
 		});
-		const { container } = render(PdfView, { props: props(loader, { page: 9 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 9 }), target: box });
 
 		await vi.waitFor(() => expect(calls.render).toEqual(expect.arrayContaining([7, 8])));
 		await frames(2);
@@ -853,7 +853,7 @@ describe('PdfView, the whole document', () => {
 		pages[2] = [run('Lead in text.', 40, 740), run('The notice explains who may apply', 40, 60)];
 		pages[3] = [run('and what evidence is required.', 40, 760), run('Trailing text.', 40, 740)];
 		const { loader } = fakeRuntime(pages);
-		const { container } = render(PdfView, { props: props(loader, { page: 3 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 3 }), target: box });
 		await vi.waitFor(() => expect(container.querySelectorAll('.pdf__page')).toHaveLength(12));
 
 		await vi.waitFor(() =>
@@ -871,7 +871,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[0] = WITH_PASSAGE;
 		const { loader } = fakeRuntime(pages);
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__passage')).not.toBeNull());
 		expect(pageAt(container, 1).nextElementSibling).toBe(container.querySelector('.pdf__passage'));
@@ -884,7 +884,7 @@ describe('PdfView, the whole document', () => {
 		pages[2] = [run('Lead in text.', 40, 740), run('The notice explains who may apply', 40, 60)];
 		pages[3] = [run('and what evidence is required.', 40, 760), run('Trailing text.', 40, 740)];
 		const { loader } = fakeRuntime(pages);
-		const { container } = render(PdfView, { props: props(loader, { page: 3 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 3 }), target: box });
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__passage')).not.toBeNull());
 		expect(pageAt(container, 4).querySelectorAll('.pdf__mark').length).toBeGreaterThan(0);
@@ -894,7 +894,7 @@ describe('PdfView, the whole document', () => {
 	it("puts the cited passage's text after the page it lands on when it is marked on none", async () => {
 		const box = scroller();
 		const { loader } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, { props: props(loader, { page: 2 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 2 }), target: box });
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__passage')).not.toBeNull());
 		expect(pageAt(container, 2).nextElementSibling).toBe(container.querySelector('.pdf__passage'));
@@ -906,7 +906,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[4] = WITH_PASSAGE;
 		const { loader } = fakeRuntime(pages);
-		const { container } = render(PdfView, { props: props(loader, { page: 5 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 5 }), target: box });
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__bar')).not.toBeNull());
 		await vi.waitFor(() => {
@@ -924,7 +924,7 @@ describe('PdfView, the whole document', () => {
 		const box = scroller();
 		const onpage = vi.fn();
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 1, onpage }),
 			target: box
 		});
@@ -941,7 +941,7 @@ describe('PdfView, the whole document', () => {
 		const box = scroller();
 		const onpage = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 1, onpage }),
 			target: box
 		});
@@ -959,7 +959,7 @@ describe('PdfView, the whole document', () => {
 		const box = scroller();
 		const onpage = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		const { rerender } = render(PdfView, {
+		const { rerender } = await render(PdfView, {
 			props: props(loader, { page: 1, onpage }),
 			target: box
 		});
@@ -989,7 +989,7 @@ describe('PdfView, the whole document', () => {
 		box.append(holder, text);
 		const onpage = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		render(PdfView, { props: props(loader, { page: 1, onpage }), target: holder });
+		await render(PdfView, { props: props(loader, { page: 1, onpage }), target: holder });
 		await vi.waitFor(() => expect(onpage).toHaveBeenLastCalledWith(1));
 
 		holder.hidden = true;
@@ -1012,7 +1012,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[4] = WITH_PASSAGE;
 		const { loader } = fakeRuntime(pages);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 5, onlocate }),
 			target: holder
 		});
@@ -1039,7 +1039,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[4] = WITH_PASSAGE;
 		const { loader } = fakeRuntime(pages);
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 5, onlocate, onpage }),
 			target: box
 		});
@@ -1069,7 +1069,7 @@ describe('PdfView, the whole document', () => {
 			const pages = TWELVE();
 			pages[4] = WITH_PASSAGE;
 			const { loader } = fakeRuntime(pages);
-			const { container, rerender } = render(PdfView, {
+			const { container, rerender } = await render(PdfView, {
 				props: props(loader, { page: 5, onlocate }),
 				target: holder
 			});
@@ -1164,7 +1164,7 @@ describe('PdfView, the whole document', () => {
 			const pages = TWELVE();
 			pages[4] = WITH_PASSAGE;
 			const { loader } = fakeRuntime(pages);
-			render(PdfView, { props: props(loader, { page: 5, onlocate }), target: holder });
+			await render(PdfView, { props: props(loader, { page: 5, onlocate }), target: holder });
 			await vi.waitFor(() => expect(onlocate).toHaveBeenCalledTimes(1));
 			await frames(2);
 
@@ -1193,7 +1193,7 @@ describe('PdfView, the whole document', () => {
 			const pages = TWELVE();
 			pages[4] = WITH_PASSAGE;
 			const { loader } = fakeRuntime(pages);
-			render(PdfView, {
+			await render(PdfView, {
 				props: props(loader, { page: 5, mayFocus: () => false, onlocate }),
 				target: holder
 			});
@@ -1247,7 +1247,7 @@ describe('PdfView, the whole document', () => {
 			// Landed in a task of its own, as a download's end is: inside a frame, the browser would report the
 			// line's size before the landing's scroll is read, and put right what this is here to catch.
 			await new Promise((resolve) => setTimeout(resolve));
-			const { container } = render(PdfView, {
+			const { container } = await render(PdfView, {
 				props: props(loader, { page: 5, onlocate }),
 				target: holder
 			});
@@ -1272,7 +1272,7 @@ describe('PdfView, the whole document', () => {
 			pages[4] = WITH_PASSAGE;
 			const { loader } = fakeRuntime(pages);
 			await new Promise((resolve) => setTimeout(resolve));
-			const { container } = render(PdfView, {
+			const { container } = await render(PdfView, {
 				props: props(loader, { page: 5, onlocate }),
 				target: holder
 			});
@@ -1293,7 +1293,10 @@ describe('PdfView, the whole document', () => {
 		text.hidden = true;
 		box.append(holder, text);
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: holder });
+		const { container } = await render(PdfView, {
+			props: props(loader, { page: 1 }),
+			target: holder
+		});
 		await vi.waitFor(() => expect(calls.render).toContain(1));
 		box.scrollTop = topIn(pageAt(container, 8), box) + 0.3 * pageAt(container, 8).clientHeight;
 		await frames(2);
@@ -1321,7 +1324,10 @@ describe('PdfView, the whole document', () => {
 		text.hidden = true;
 		box.append(holder, text);
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: holder });
+		const { container } = await render(PdfView, {
+			props: props(loader, { page: 1 }),
+			target: holder
+		});
 		await vi.waitFor(() => expect(calls.render).toContain(1));
 		box.scrollTop = topIn(pageAt(container, 8), box) + 0.3 * pageAt(container, 8).clientHeight;
 		await frames(2);
@@ -1351,7 +1357,7 @@ describe('PdfView, the whole document', () => {
 		box.append(holder, text);
 		const onpage = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 1, onpage }),
 			target: holder
 		});
@@ -1391,7 +1397,7 @@ describe('PdfView, the whole document', () => {
 			});
 		});
 		const first = fakeRuntime(TWELVE());
-		const { rerender } = render(PdfView, {
+		const { rerender } = await render(PdfView, {
 			props: props(first.loader, { page: 1, onpage, onlocate }),
 			target: holder
 		});
@@ -1428,7 +1434,7 @@ describe('PdfView, the whole document', () => {
 			const pages = TWELVE();
 			pages[4] = WITH_PASSAGE;
 			const { loader } = fakeRuntime(pages);
-			const { container } = render(PdfView, {
+			const { container } = await render(PdfView, {
 				props: props(loader, { page: 5, mayFocus: () => false }),
 				target: box
 			});
@@ -1459,7 +1465,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[4] = WITH_PASSAGE;
 		const { loader } = fakeRuntime(pages);
-		render(PdfView, {
+		await render(PdfView, {
 			props: props(loader, { page: 5, mayFocus: () => false, onlocate, onpage }),
 			target: holder
 		});
@@ -1484,7 +1490,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[4] = WITH_PASSAGE;
 		const { loader } = fakeRuntime(pages);
-		render(PdfView, {
+		await render(PdfView, {
 			props: props(loader, { page: 5, mayFocus: () => false, onlocate, onpage }),
 			target: holder
 		});
@@ -1508,7 +1514,7 @@ describe('PdfView, the whole document', () => {
 		const onpage = vi.fn();
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		render(PdfView, {
+		await render(PdfView, {
 			props: props(loader, { page: 1, anchor: '', onpage, onlocate }),
 			target: holder
 		});
@@ -1523,7 +1529,7 @@ describe('PdfView, the whole document', () => {
 	it('moves to a page asked for, and again when asked for the same page twice', async () => {
 		const box = scroller();
 		const { loader, calls } = fakeRuntime(TWELVE());
-		const { container, rerender } = render(PdfView, {
+		const { container, rerender } = await render(PdfView, {
 			props: props(loader, { page: 1 }),
 			target: box
 		});
@@ -1547,7 +1553,7 @@ describe('PdfView, the whole document', () => {
 		const box = scroller();
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 1, anchor: '', onlocate }),
 			target: box
 		});
@@ -1565,7 +1571,7 @@ describe('PdfView, the whole document', () => {
 		box.style.overflowAnchor = 'none';
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		const { container } = render(PdfView, {
+		const { container } = await render(PdfView, {
 			props: props(loader, { page: 1, anchor: '', onlocate }),
 			target: box
 		});
@@ -1590,7 +1596,7 @@ describe('PdfView, the whole document', () => {
 		box.append(holder, text);
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		render(PdfView, {
+		await render(PdfView, {
 			props: props(loader, { page: 1, anchor: '', onlocate }),
 			target: holder
 		});
@@ -1612,7 +1618,7 @@ describe('PdfView, the whole document', () => {
 		const box = scroller();
 		const onlocate = vi.fn();
 		const { loader } = fakeRuntime(TWELVE());
-		const { container, rerender } = render(PdfView, {
+		const { container, rerender } = await render(PdfView, {
 			props: props(loader, { page: 5, onlocate }),
 			target: box
 		});
@@ -1634,7 +1640,7 @@ describe('PdfView, the whole document', () => {
 			run('and what evidence is required.', 40, 385)
 		];
 		const { loader } = fakeRuntime(pages);
-		const { container } = render(PdfView, { props: props(loader, { page: 1 }), target: box });
+		const { container } = await render(PdfView, { props: props(loader, { page: 1 }), target: box });
 		box.prepend(above());
 
 		await vi.waitFor(() => expect(container.querySelector('.pdf__bar')).not.toBeNull());
@@ -1653,7 +1659,7 @@ describe('PdfView, the whole document', () => {
 		const pages = TWELVE();
 		pages[5] = WITH_PASSAGE;
 		const { loader, calls } = fakeRuntime(pages);
-		const { container, rerender } = render(PdfView, {
+		const { container, rerender } = await render(PdfView, {
 			props: props(loader, { page: 5, onlocate }),
 			target: box
 		});

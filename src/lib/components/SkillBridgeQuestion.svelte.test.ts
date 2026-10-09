@@ -9,7 +9,7 @@ const SKILLBRIDGE = RESOURCES.find((r) => r.id === 'skillbridge');
 // The Timeline's calendar card has a button named Dismiss too, so this one carries the full name.
 const CLOSE = { name: 'Dismiss SkillBridge message', exact: true } as const;
 
-function card(
+async function card(
 	props: Partial<{
 		wording: 'first' | 'again';
 		onAnswer: (a: string) => Promise<string | null>;
@@ -18,7 +18,7 @@ function card(
 ) {
 	const onAnswer = props.onAnswer ?? vi.fn(() => Promise.resolve(null));
 	const onClose = props.onClose ?? vi.fn();
-	const r = render(SkillBridgeQuestion, {
+	const r = await render(SkillBridgeQuestion, {
 		props: { wording: 'first', ...props, onAnswer, onClose }
 	});
 	return { ...r, onAnswer, onClose };
@@ -103,7 +103,7 @@ const ANSWERED_CASES = [
 
 describe('SkillBridgeQuestion', () => {
 	it('asks in the first wording with three equal answers in a named group', async () => {
-		const { container } = card();
+		const { container } = await card();
 		await expect
 			.element(page.getByRole('heading', { name: 'Planning to do SkillBridge?' }))
 			.toBeVisible();
@@ -128,7 +128,7 @@ describe('SkillBridgeQuestion', () => {
 	});
 
 	it('asks in the second wording', async () => {
-		const { container } = card({ wording: 'again' });
+		const { container } = await card({ wording: 'again' });
 		await expect
 			.element(page.getByRole('heading', { name: 'Still thinking about SkillBridge?' }))
 			.toBeVisible();
@@ -141,7 +141,9 @@ describe('SkillBridgeQuestion', () => {
 	it.each(ANSWERED_CASES)(
 		'after %s (save resolves to %s) fits the frame to its message, focuses one line and offers only Dismiss',
 		async (label, returns, answer, line) => {
-			const { container, onAnswer } = card({ onAnswer: vi.fn(() => Promise.resolve(returns)) });
+			const { container, onAnswer } = await card({
+				onAnswer: vi.fn(() => Promise.resolve(returns))
+			});
 			const section = container.querySelector('section');
 			const before = section?.getBoundingClientRect().height ?? 0;
 			await page.getByRole('button', { name: label, exact: true }).click();
@@ -164,7 +166,7 @@ describe('SkillBridgeQuestion', () => {
 		'after %s (save resolves to %s) the message stops before the close button and the button stays inside the frame',
 		async (label, returns, _answer, line) => {
 			await page.viewport(320, 800);
-			const { container } = card({ onAnswer: vi.fn(() => Promise.resolve(returns)) });
+			const { container } = await card({ onAnswer: vi.fn(() => Promise.resolve(returns)) });
 			container.style.width = '288px';
 			await page.getByRole('button', { name: label, exact: true }).click();
 			const status = page.getByRole('status');
@@ -181,7 +183,7 @@ describe('SkillBridgeQuestion', () => {
 	);
 
 	it('shows no close button before an answer', async () => {
-		const { container } = card();
+		const { container } = await card();
 		await expect
 			.element(page.getByRole('heading', { name: 'Planning to do SkillBridge?' }))
 			.toBeVisible();
@@ -190,7 +192,7 @@ describe('SkillBridgeQuestion', () => {
 	});
 
 	it('offers a 44 px close button at the top right after an answer, and calls onClose once when tapped', async () => {
-		const { container, onClose } = card();
+		const { container, onClose } = await card();
 		await page.getByRole('button', { name: 'No', exact: true }).click();
 		const close = page.getByRole('button', CLOSE);
 		await expect.element(close).toBeVisible();
@@ -208,7 +210,7 @@ describe('SkillBridgeQuestion', () => {
 	});
 
 	it('says a failed save and keeps the question', async () => {
-		card({ onAnswer: vi.fn(() => Promise.reject(new Error('E_TEST'))) });
+		await card({ onAnswer: vi.fn(() => Promise.reject(new Error('E_TEST'))) });
 		await page.getByRole('button', { name: 'Yes', exact: true }).click();
 		await expect
 			.element(page.getByRole('alert'))
@@ -218,7 +220,7 @@ describe('SkillBridgeQuestion', () => {
 
 	// The tapped button is disabled during the save, which drops focus to the body; the person must land back on it.
 	it.each(['Yes', 'Not sure', 'No'])('puts focus back on %s after a failed save', async (label) => {
-		card({ onAnswer: vi.fn(() => Promise.reject(new Error('E_TEST'))) });
+		await card({ onAnswer: vi.fn(() => Promise.reject(new Error('E_TEST'))) });
 		const tapped = page.getByRole('button', { name: label, exact: true });
 		await tapped.click();
 		await expect.element(page.getByRole('alert')).toBeVisible();
@@ -239,7 +241,9 @@ describe('SkillBridgeQuestion', () => {
 
 		it.each(['Yes', 'Not sure'])('leaves focus there after a failed save of %s', async (label) => {
 			let fail: (e: Error) => void = () => {};
-			card({ onAnswer: vi.fn(() => new Promise<string | null>((_, reject) => (fail = reject))) });
+			await card({
+				onAnswer: vi.fn(() => new Promise<string | null>((_, reject) => (fail = reject)))
+			});
 			await page.getByRole('button', { name: label, exact: true }).click();
 			outside.focus();
 			fail(new Error('E_TEST'));
@@ -250,7 +254,9 @@ describe('SkillBridgeQuestion', () => {
 
 		it('leaves focus there after a save that worked, and still shows the status line', async () => {
 			let finish: (day: string | null) => void = () => {};
-			card({ onAnswer: vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve))) });
+			await card({
+				onAnswer: vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)))
+			});
 			await page.getByRole('button', { name: 'Yes', exact: true }).click();
 			outside.focus();
 			finish(null);
@@ -260,7 +266,7 @@ describe('SkillBridgeQuestion', () => {
 	});
 
 	it('names the card, and opens the link in a new tab and says so', async () => {
-		const { container } = card();
+		const { container } = await card();
 		await expect
 			.element(page.getByRole('region', { name: 'Planning to do SkillBridge?' }))
 			.toBeVisible();
@@ -278,7 +284,7 @@ describe('SkillBridgeQuestion', () => {
 			.mockImplementationOnce(
 				() => new Promise<string | null>((resolve) => (finishSecond = resolve))
 			);
-		const { container } = card({ onAnswer });
+		const { container } = await card({ onAnswer });
 		const yes = page.getByRole('button', { name: 'Yes', exact: true });
 		const disabledStates = () =>
 			Array.from(container.querySelectorAll('button')).map((b) => b.disabled);
@@ -330,7 +336,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 		await page.viewport(320, 800);
 		const { onAnswer, settle } = pending();
 		const props = { wording: 'first' as const, onAnswer, onClose };
-		const { container, rerender } = render(SkillBridgeQuestion, { props });
+		const { container, rerender } = await render(SkillBridgeQuestion, { props });
 		const section = container.querySelector('section');
 		const before = section?.getBoundingClientRect().height ?? 0;
 		expect(before).toBeGreaterThan(0);
@@ -353,7 +359,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 	it('fits the frame to the status line, even when the layout changes during the save', async () => {
 		await page.viewport(700, 800);
 		const { onAnswer, settle } = pending();
-		const { container } = render(SkillBridgeQuestion, {
+		const { container } = await render(SkillBridgeQuestion, {
 			props: { wording: 'first', onAnswer, onClose }
 		});
 		const section = container.querySelector('section');
@@ -374,7 +380,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 	it('fits the frame to the status line on a retry, after the error line is gone', async () => {
 		await page.viewport(320, 800);
 		const { onAnswer, settle } = pending();
-		const { container } = render(SkillBridgeQuestion, {
+		const { container } = await render(SkillBridgeQuestion, {
 			props: { wording: 'first', onAnswer, onClose }
 		});
 		const section = container.querySelector('section');
@@ -401,7 +407,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 	it('words a Not sure line from the day the save resolves to, whatever the wording rerendered to meanwhile', async () => {
 		const { onAnswer, settle } = pending();
 		const props = { wording: 'first' as const, onAnswer, onClose };
-		const { rerender } = render(SkillBridgeQuestion, { props });
+		const { rerender } = await render(SkillBridgeQuestion, { props });
 		await page.getByRole('button', { name: 'Not sure', exact: true }).click();
 		await rerender({ ...props, wording: 'again' });
 		settle().resolve('2027-04-01');
@@ -413,7 +419,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 	it('words a Not sure line as the steps line when the save resolves to no day', async () => {
 		const { onAnswer, settle } = pending();
 		const props = { wording: 'first' as const, onAnswer, onClose };
-		const { rerender } = render(SkillBridgeQuestion, { props });
+		const { rerender } = await render(SkillBridgeQuestion, { props });
 		await page.getByRole('button', { name: 'Not sure', exact: true }).click();
 		await rerender({ ...props, wording: 'again' });
 		settle().resolve(null);
@@ -427,7 +433,7 @@ describe('SkillBridgeQuestion when its props change during the save', () => {
 	it('shows the current question again when the save fails', async () => {
 		const { onAnswer, settle } = pending();
 		const props = { wording: 'first' as const, onAnswer, onClose };
-		const { rerender } = render(SkillBridgeQuestion, { props });
+		const { rerender } = await render(SkillBridgeQuestion, { props });
 		await page.getByRole('button', { name: 'Yes', exact: true }).click();
 		await rerender({ ...props, wording: 'again' });
 		settle().reject(new Error('E_TEST'));

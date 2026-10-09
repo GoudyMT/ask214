@@ -48,7 +48,7 @@ describe('Settings, the calendar add after the timeline fails to re-read', () =>
 	// The statuses in memory may be out of date, so a file built from them could carry a task another tab marked done.
 	it('turns Add off while the timeline says its last read failed', async () => {
 		current.failed = true;
-		render(SettingsPage);
+		await render(SettingsPage);
 		await expect
 			.element(page.getByRole('button', { name: /^add to my calendar$/i }))
 			.toBeDisabled();
@@ -56,7 +56,7 @@ describe('Settings, the calendar add after the timeline fails to re-read', () =>
 
 	it('offers Add once the timeline has read', async () => {
 		current.failed = false;
-		render(SettingsPage);
+		await render(SettingsPage);
 		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toBeEnabled();
 	});
 });

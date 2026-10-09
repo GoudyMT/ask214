@@ -5,8 +5,8 @@ import type { ComponentProps } from 'svelte';
 import SettingsDateRow from './SettingsDateRow.svelte';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
-const row = (over: Partial<ComponentProps<typeof SettingsDateRow>> = {}) =>
-	render(SettingsDateRow, {
+const row = async (over: Partial<ComponentProps<typeof SettingsDateRow>> = {}) =>
+	await render(SettingsDateRow, {
 		props: {
 			id: 'skillbridge-start',
 			label: 'SkillBridge start',
@@ -19,15 +19,15 @@ const row = (over: Partial<ComponentProps<typeof SettingsDateRow>> = {}) =>
 
 describe('SettingsDateRow', () => {
 	it('shows Not set, or the date as Mon D, YYYY', async () => {
-		row();
+		await row();
 		await expect.element(page.getByText('Not set')).toBeVisible();
-		row({ id: 'terminal-leave-start', label: 'Terminal leave start', value: '2027-04-01' });
+		await row({ id: 'terminal-leave-start', label: 'Terminal leave start', value: '2027-04-01' });
 		await expect.element(page.getByText('Apr 1, 2027')).toBeVisible();
 	});
 
 	it('saves the typed date, closes, and returns focus to the row', async () => {
 		const onSave = vi.fn(async () => null);
-		row({ onSave });
+		await row({ onSave });
 		const toggle = page.getByRole('button', { name: /skillbridge start/i });
 		await toggle.click();
 		await page.getByLabelText('SkillBridge start').fill('2026-11-01');
@@ -38,7 +38,7 @@ describe('SettingsDateRow', () => {
 	});
 
 	it('shows the message a refused save returns, and stays open', async () => {
-		row({ onSave: vi.fn(async () => 'This date needs to be before your separation date.') });
+		await row({ onSave: vi.fn(async () => 'This date needs to be before your separation date.') });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		await page.getByRole('button', { name: /^save$/i }).click();
 		await expect
@@ -48,7 +48,7 @@ describe('SettingsDateRow', () => {
 	});
 
 	it('says so when a save fails, rather than failing silently', async () => {
-		row({ onSave: vi.fn(async () => Promise.reject(new Error('E_LOCK_TIMEOUT'))) });
+		await row({ onSave: vi.fn(async () => Promise.reject(new Error('E_LOCK_TIMEOUT'))) });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		await page.getByRole('button', { name: /^save$/i }).click();
 		await expect
@@ -61,7 +61,7 @@ describe('SettingsDateRow', () => {
 			.fn<(draft: string) => Promise<string | null>>()
 			.mockResolvedValueOnce('This date needs to be before your separation date.')
 			.mockResolvedValueOnce(null);
-		row({ onSave });
+		await row({ onSave });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		await page.getByLabelText('SkillBridge start').fill('2027-06-01');
 		await page.getByRole('button', { name: /^save$/i }).click();
@@ -78,7 +78,7 @@ describe('SettingsDateRow', () => {
 
 	it('opens on the stored date and saves it as it stands', async () => {
 		const onSave = vi.fn(async () => null);
-		row({ value: '2026-11-01', onSave });
+		await row({ value: '2026-11-01', onSave });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		await expect.element(page.getByLabelText('SkillBridge start')).toHaveValue('2026-11-01');
 		await page.getByRole('button', { name: /^save$/i }).click();
@@ -86,7 +86,7 @@ describe('SettingsDateRow', () => {
 	});
 
 	it('closes on a second tap of the row', async () => {
-		const { container } = row();
+		const { container } = await row();
 		const toggle = page.getByRole('button', { name: /skillbridge start/i });
 		await toggle.click();
 		await toggle.click();
@@ -97,7 +97,7 @@ describe('SettingsDateRow', () => {
 	// The second press is a DOM click: a locator waits for an enabled button, so it would time out, not count.
 	it('saves once while a save is still running', async () => {
 		const onSave = vi.fn(() => new Promise<string | null>(() => {}));
-		const { container } = row({ onSave });
+		const { container } = await row({ onSave });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		await page.getByLabelText('SkillBridge start').fill('2026-11-01');
 		await page.getByRole('button', { name: /^save$/i }).click();
@@ -108,21 +108,21 @@ describe('SettingsDateRow', () => {
 
 	it('offers Remove only on a removable row with a date', async () => {
 		const onRemove = vi.fn(async () => null);
-		row({ value: '2026-11-01', onRemove });
+		await row({ value: '2026-11-01', onRemove });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		await page.getByRole('button', { name: /^remove$/i }).click();
 		expect(onRemove).toHaveBeenCalledOnce();
 	});
 
 	it('draws no Remove without a date or without onRemove', async () => {
-		row({ onRemove: vi.fn(async () => null) });
+		await row({ onRemove: vi.fn(async () => null) });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		expect(page.getByRole('button', { name: /^remove$/i }).query()).toBeNull();
 	});
 
 	it('gives every row its own ids', async () => {
-		row();
-		row({ id: 'terminal-leave-start', label: 'Terminal leave start' });
+		await row();
+		await row({ id: 'terminal-leave-start', label: 'Terminal leave start' });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		await page.getByRole('button', { name: /terminal leave start/i }).click();
 		const ids = [...document.querySelectorAll('[id]')].map((e) => e.id);
@@ -131,7 +131,7 @@ describe('SettingsDateRow', () => {
 	});
 
 	it('says nothing about what the user qualifies for', async () => {
-		const { container } = row({ value: '2026-11-01', onRemove: vi.fn(async () => null) });
+		const { container } = await row({ value: '2026-11-01', onRemove: vi.fn(async () => null) });
 		for (const line of textOf(container).split('\n')) expect(makesPersonalClaim(line)).toBe(false);
 	});
 });
@@ -162,7 +162,11 @@ describe('SettingsDateRow (layout by width)', () => {
 
 	it('on a 320 px phone the date reads on one line beside a label that wraps', async () => {
 		await page.viewport(320, 800);
-		const { container } = row({ id: 'eaos', label: 'Separation date (EAOS)', value: '2027-04-30' });
+		const { container } = await row({
+			id: 'eaos',
+			label: 'Separation date (EAOS)',
+			value: '2027-04-30'
+		});
 		container.style.width = PHONE_ROW_WIDTH;
 		const summary = container.querySelector('.settings-disclosure__summary') as HTMLElement;
 		const lines = document.createRange();
@@ -173,7 +177,7 @@ describe('SettingsDateRow (layout by width)', () => {
 
 	it('on a 320 px phone an open row keeps every button inside it, each row a 44 px target', async () => {
 		await page.viewport(320, 800);
-		const { container } = row({ value: '2026-11-01', onRemove: vi.fn(async () => null) });
+		const { container } = await row({ value: '2026-11-01', onRemove: vi.fn(async () => null) });
 		container.style.width = PHONE_ROW_WIDTH;
 		const toggle = container.querySelector('.settings-disclosure__toggle') as HTMLElement;
 		toggle.click();

@@ -43,7 +43,7 @@ describe('CalendarPanel', () => {
 	it('downloads an .ics of the pending, non-excluded items when "Add to calendar" is clicked', async () => {
 		const onAdd = vi.fn();
 		const items = [item(def('a', 'admin')), item(def('m', 'medical'))];
-		const { container } = render(CalendarPanel, {
+		const { container } = await render(CalendarPanel, {
 			props: {
 				items,
 				exclusions: { taskIds: [], categories: ['medical'] },
@@ -63,8 +63,8 @@ describe('CalendarPanel', () => {
 		expect(container.textContent).toContain('On a computer:'); // the test browser is desktop Chromium
 	});
 
-	it('keeps the category toggles collapsed until "Customize" is expanded (inline, matches the snooze date-adjust)', () => {
-		const { container } = render(CalendarPanel, {
+	it('keeps the category toggles collapsed until "Customize" is expanded (inline, matches the snooze date-adjust)', async () => {
+		const { container } = await render(CalendarPanel, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
@@ -80,9 +80,9 @@ describe('CalendarPanel', () => {
 		expect(container.querySelector('input[value="medical"]')).not.toBeNull(); // expanded in place
 	});
 
-	it('fails closed when the store is not ready: no export against an unknown exclusion set', () => {
+	it('fails closed when the store is not ready: no export against an unknown exclusion set', async () => {
 		const onAdd = vi.fn();
-		const { container } = render(CalendarPanel, {
+		const { container } = await render(CalendarPanel, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the empty DEFAULT, not a real record
@@ -102,14 +102,14 @@ describe('CalendarPanel', () => {
 	});
 
 	// While the settings are unknown the panel says only that; "Nothing ahead" would be a second, unproven reason.
-	it('does not also say nothing is ahead while the settings are unknown', () => {
+	it('does not also say nothing is ahead while the settings are unknown', async () => {
 		const passed: TimelineItem = {
 			...item(def('p', 'admin')),
 			windowEndDate: '2020-01-01',
 			aimDate: '2020-01-01',
 			status: 'still-to-do'
 		};
-		const { container } = render(CalendarPanel, {
+		const { container } = await render(CalendarPanel, {
 			props: {
 				items: [passed],
 				exclusions: { taskIds: [], categories: [] },
@@ -125,7 +125,7 @@ describe('CalendarPanel', () => {
 
 	// Today is the date on the device clock: on a US evening the UTC date is already tomorrow, and a task aimed for
 	// today must still keep the add on.
-	it('keeps the add on for a task aimed at today, on a US evening', () => {
+	it('keeps the add on for a task aimed at today, on a US evening', async () => {
 		vi.useFakeTimers({ toFake: ['Date'] });
 		try {
 			vi.setSystemTime(new Date('2026-10-04T01:00:00Z'));
@@ -135,7 +135,7 @@ describe('CalendarPanel', () => {
 				windowEndDate: '2026-10-03',
 				aimDate: '2026-10-03'
 			};
-			const { container } = render(CalendarPanel, {
+			const { container } = await render(CalendarPanel, {
 				props: {
 					items: [today],
 					exclusions: { taskIds: [], categories: [] },
@@ -154,25 +154,30 @@ describe('CalendarPanel', () => {
 
 	// The file never carries an event before today, so with nothing ahead (or everything kept off) there is nothing
 	// to add: the button stays off and says why, instead of handing over an empty file.
-	it('with nothing ahead to add, keeps the button off and says so', () => {
+	it('with nothing ahead to add, keeps the button off and says so', async () => {
 		const passed: TimelineItem = {
 			...item(def('p', 'admin')),
 			windowEndDate: '2020-01-01',
 			aimDate: '2020-01-01',
 			status: 'still-to-do'
 		};
-		const panel = (items: TimelineItem[], categories: TaskDef['category'][]) =>
-			render(CalendarPanel, {
-				props: {
-					items,
-					exclusions: { taskIds: [], categories },
-					ready: true,
-					...NO_RECORD,
-					onSetExclusions: vi.fn(),
-					onAdd: vi.fn()
-				}
-			}).container;
-		for (const container of [panel([passed], []), panel([item(def('a', 'admin'))], ['admin'])]) {
+		const panel = async (items: TimelineItem[], categories: TaskDef['category'][]) =>
+			(
+				await render(CalendarPanel, {
+					props: {
+						items,
+						exclusions: { taskIds: [], categories },
+						ready: true,
+						...NO_RECORD,
+						onSetExclusions: vi.fn(),
+						onAdd: vi.fn()
+					}
+				})
+			).container;
+		for (const container of [
+			await panel([passed], []),
+			await panel([item(def('a', 'admin'))], ['admin'])
+		]) {
 			expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(true);
 			expect(container.textContent).toContain('Nothing ahead to add right now.');
 		}
@@ -180,47 +185,51 @@ describe('CalendarPanel', () => {
 
 	// Not every calendar app updates an event on a re-add, so after a date change the old events are the user's to
 	// remove. Said wherever there is something to add, and only there.
-	it('tells the user to remove old events after a date change, when there is something to add', () => {
+	it('tells the user to remove old events after a date change, when there is something to add', async () => {
 		const LINE = 'Changed a date? Remove the events you added before, then add again.';
-		const panel = (items: TimelineItem[]) =>
-			render(CalendarPanel, {
-				props: {
-					items,
-					exclusions: { taskIds: [], categories: [] },
-					ready: true,
-					...NO_RECORD,
-					onSetExclusions: vi.fn(),
-					onAdd: vi.fn()
-				}
-			}).container;
-		expect(panel([item(def('a', 'admin'))]).textContent).toContain(LINE);
+		const panel = async (items: TimelineItem[]) =>
+			(
+				await render(CalendarPanel, {
+					props: {
+						items,
+						exclusions: { taskIds: [], categories: [] },
+						ready: true,
+						...NO_RECORD,
+						onSetExclusions: vi.fn(),
+						onAdd: vi.fn()
+					}
+				})
+			).container;
+		expect((await panel([item(def('a', 'admin'))])).textContent).toContain(LINE);
 		const passed: TimelineItem = {
 			...item(def('p', 'admin')),
 			windowEndDate: '2020-01-01',
 			aimDate: '2020-01-01',
 			status: 'still-to-do'
 		};
-		expect(panel([passed]).textContent).not.toContain(LINE);
+		expect((await panel([passed])).textContent).not.toContain(LINE);
 	});
 
 	// The downloaded file outlives Erase all data, so wherever there is a file to add, the panel says it can go once
 	// it is in the calendar: a line of its own, right after the steps for this device.
-	it('says the downloaded file can be deleted once added, when there is something to add', () => {
+	it('says the downloaded file can be deleted once added, when there is something to add', async () => {
 		const LINE = "Once it's added, you can delete the downloaded file.";
-		const panel = (items: TimelineItem[]) =>
-			render(CalendarPanel, {
-				props: {
-					items,
-					exclusions: { taskIds: [], categories: [] },
-					ready: true,
-					...NO_RECORD,
-					onSetExclusions: vi.fn(),
-					onAdd: vi.fn()
-				}
-			}).container;
-		const lines = [...panel([item(def('a', 'admin'))]).querySelectorAll('.cal-hint--device')].map(
-			(p) => p.textContent?.trim()
-		);
+		const panel = async (items: TimelineItem[]) =>
+			(
+				await render(CalendarPanel, {
+					props: {
+						items,
+						exclusions: { taskIds: [], categories: [] },
+						ready: true,
+						...NO_RECORD,
+						onSetExclusions: vi.fn(),
+						onAdd: vi.fn()
+					}
+				})
+			).container;
+		const lines = [
+			...(await panel([item(def('a', 'admin'))])).querySelectorAll('.cal-hint--device')
+		].map((p) => p.textContent?.trim());
 		expect(lines[1]).toBe(LINE);
 		const passed: TimelineItem = {
 			...item(def('p', 'admin')),
@@ -228,12 +237,12 @@ describe('CalendarPanel', () => {
 			aimDate: '2020-01-01',
 			status: 'still-to-do'
 		};
-		expect(panel([passed]).textContent).not.toContain(LINE);
+		expect((await panel([passed])).textContent).not.toContain(LINE);
 	});
 
-	it('toggling a category once expanded calls onSetExclusions with the updated set', () => {
+	it('toggling a category once expanded calls onSetExclusions with the updated set', async () => {
 		const onSetExclusions = vi.fn();
-		const { container } = render(CalendarPanel, {
+		const { container } = await render(CalendarPanel, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
@@ -261,14 +270,14 @@ describe('CalendarPanel', () => {
 	// The saved set reaches the panel only after the save lands, so two quick taps happen against the same, older
 	// set. Each toggle must apply to the set as saved, in order (as the store does), or the second tap writes a
 	// set without the first and that category goes back into the calendar file.
-	it('keeps both of two quick toggles made before the first save lands', () => {
+	it('keeps both of two quick toggles made before the first save lands', async () => {
 		let saved: TaskExclusions = { taskIds: [], categories: [] };
 		const onSetExclusions = async (
 			next: TaskExclusions | ((current: TaskExclusions) => TaskExclusions)
 		) => {
 			saved = typeof next === 'function' ? next(saved) : next;
 		};
-		const { container } = render(CalendarPanel, {
+		const { container } = await render(CalendarPanel, {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the save has not landed yet
@@ -287,7 +296,7 @@ describe('CalendarPanel', () => {
 	});
 
 	it('puts a category toggle back, and says so, when the save fails', async () => {
-		render(CalendarPanel, {
+		await render(CalendarPanel, {
 			props: {
 				items: [],
 				exclusions: { taskIds: [], categories: [] },
@@ -311,7 +320,7 @@ describe('CalendarPanel', () => {
 			.fn()
 			.mockRejectedValueOnce(new Error('E_OCC_CONFLICT'))
 			.mockResolvedValueOnce(undefined);
-		render(CalendarPanel, {
+		await render(CalendarPanel, {
 			props: {
 				items: [],
 				exclusions: { taskIds: [], categories: [] },
@@ -335,25 +344,27 @@ describe('CalendarPanel', () => {
 		isoDate: '2027-01-30',
 		addedOn: '2026-10-03'
 	};
-	const withRecord = (
+	const withRecord = async (
 		ready: boolean,
 		stale: HandedOverEvent[],
 		onAcknowledge = NO_RECORD.onAcknowledge
 	) =>
-		render(CalendarPanel, {
-			props: {
-				items: [item(def('a', 'admin'))],
-				exclusions: { taskIds: [], categories: [] },
-				ready,
-				stale,
-				onAcknowledge,
-				onSetExclusions: vi.fn(),
-				onAdd: vi.fn()
-			}
-		}).container;
+		(
+			await render(CalendarPanel, {
+				props: {
+					items: [item(def('a', 'admin'))],
+					exclusions: { taskIds: [], categories: [] },
+					ready,
+					stale,
+					onAcknowledge,
+					onSetExclusions: vi.fn(),
+					onAdd: vi.fn()
+				}
+			})
+		).container;
 
-	it('lists the events to delete above the Add button, once its settings are loaded', () => {
-		const container = withRecord(true, [HELD]);
+	it('lists the events to delete above the Add button, once its settings are loaded', async () => {
+		const container = await withRecord(true, [HELD]);
 		const head = [...container.querySelectorAll('h3')].find(
 			(h) => h.textContent === 'Your calendar is out of date'
 		);
@@ -366,23 +377,25 @@ describe('CalendarPanel', () => {
 
 	// Until both stores load, the list would be built from a stand-in empty task state and could name an event
 	// that is not out of date.
-	it('shows no list while its settings are not loaded', () => {
-		expect(withRecord(false, [HELD]).textContent).not.toContain('Your calendar is out of date');
+	it('shows no list while its settings are not loaded', async () => {
+		expect((await withRecord(false, [HELD])).textContent).not.toContain(
+			'Your calendar is out of date'
+		);
 	});
 
 	// Nothing is listed while the settings load, so the general line stands, even when the list would name events.
-	it('keeps the general line while its settings are not loaded', () => {
-		expect(withRecord(false, [HELD]).textContent).toContain(
+	it('keeps the general line while its settings are not loaded', async () => {
+		expect((await withRecord(false, [HELD])).textContent).toContain(
 			'Changed a date? Remove the events you added before, then add again.'
 		);
 	});
 
 	// Nothing listed - no add recorded yet, or every listed event acknowledged - leaves the general line, which also
 	// says to add again; while the list names events, it replaces the line.
-	it('shows the general line whenever nothing is listed, and the list in its place', () => {
+	it('shows the general line whenever nothing is listed, and the list in its place', async () => {
 		const LINE = 'Changed a date? Remove the events you added before, then add again.';
-		expect(withRecord(true, []).textContent).toContain(LINE);
-		expect(withRecord(true, [HELD]).textContent).not.toContain(LINE);
+		expect((await withRecord(true, [])).textContent).toContain(LINE);
+		expect((await withRecord(true, [HELD])).textContent).not.toContain(LINE);
 	});
 
 	// The list unmounts with focus on its button; focus goes to the next step the list names, adding again. The rerender
@@ -399,7 +412,7 @@ describe('CalendarPanel', () => {
 				await screen.rerender({ ...props, stale: [] });
 			}
 		};
-		const screen = render(CalendarPanel, { props });
+		const screen = await render(CalendarPanel, { props });
 		await page.getByRole('button', { name: "I've deleted these" }).click();
 		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
 	});
@@ -422,7 +435,7 @@ describe('CalendarPanel', () => {
 					};
 				})
 		};
-		const screen = render(CalendarPanel, { props });
+		const screen = await render(CalendarPanel, { props });
 		await page.getByRole('button', { name: "I've deleted these" }).click();
 		const toggle = page
 			.getByRole('button', { name: /customize what's included/i })
@@ -452,7 +465,7 @@ describe('CalendarPanel', () => {
 					};
 				})
 		};
-		const screen = render(CalendarPanel, { props });
+		const screen = await render(CalendarPanel, { props });
 		// The panel sits below a tall block and the reader scrolls back to the top, so the panel is out of view and the
 		// list going away below it shifts nothing on screen; only a focus move that scrolls would change the position.
 		const spacer = document.createElement('div');
@@ -486,7 +499,7 @@ describe('CalendarPanel', () => {
 				await screen.rerender({ ...props, stale: [] });
 			}
 		};
-		const screen = render(CalendarPanel, { props });
+		const screen = await render(CalendarPanel, { props });
 		// The ring's colour token is set as the app defines it, so a ring drawn here would be a solid outline.
 		document.documentElement.style.setProperty('--color-accent', '#1a66c2');
 		try {
@@ -514,7 +527,7 @@ describe('CalendarPanel', () => {
 				await screen.rerender({ ...props, stale: [] });
 			}
 		};
-		const screen = render(CalendarPanel, { props });
+		const screen = await render(CalendarPanel, { props });
 		// Component tests run without app.css; the ring's colour token is set here as the app defines it, and removed.
 		document.documentElement.style.setProperty('--color-accent', '#1a66c2');
 		try {
@@ -534,7 +547,7 @@ describe('CalendarPanel', () => {
 	});
 
 	it("keeps focus on I've deleted these when the save fails", async () => {
-		withRecord(
+		await withRecord(
 			true,
 			[HELD],
 			vi.fn(async () => Promise.reject(new Error('E_TEST_SAVE')))
@@ -547,14 +560,14 @@ describe('CalendarPanel', () => {
 
 	it("passes I've deleted these to its handler", async () => {
 		const onAcknowledge = vi.fn(async () => {});
-		withRecord(true, [HELD], onAcknowledge);
+		await withRecord(true, [HELD], onAcknowledge);
 		await page.getByRole('button', { name: "I've deleted these" }).click();
 		expect(onAcknowledge).toHaveBeenCalledOnce();
 	});
 
 	// 38 CFR 14.629: the panel's own words make no personal claim, with something to add, with nothing ahead, or
 	// while its settings are unknown (the sentences per device are checked with the task data in task-defs.test.ts).
-	it('adds no personal eligibility claim in any state', () => {
+	it('adds no personal eligibility claim in any state', async () => {
 		const passed: TimelineItem = {
 			...item(def('p', 'admin')),
 			windowEndDate: '2020-01-01',
@@ -567,7 +580,7 @@ describe('CalendarPanel', () => {
 			{ items: [item(def('a', 'admin'))], ready: false }
 		];
 		for (const { items, ready } of states) {
-			const { container } = render(CalendarPanel, {
+			const { container } = await render(CalendarPanel, {
 				props: {
 					items,
 					exclusions: { taskIds: [], categories: [] },
@@ -604,16 +617,16 @@ describe('CalendarPanel (the sentence for this device)', () => {
 		onAdd: vi.fn()
 	});
 
-	it('tells an Android phone what happens after the tap', () => {
+	it('tells an Android phone what happens after the tap', async () => {
 		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(ANDROID);
-		const { container } = render(CalendarPanel, { props: panelProps() });
+		const { container } = await render(CalendarPanel, { props: panelProps() });
 		expect(container.querySelector('.cal-hint--device')?.textContent).toContain('On this phone:');
 	});
 
-	it('reads an iPad, which asks for desktop pages, from its touch points', () => {
+	it('reads an iPad, which asks for desktop pages, from its touch points', async () => {
 		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(MAC);
 		vi.spyOn(Navigator.prototype, 'maxTouchPoints', 'get').mockReturnValue(5);
-		const { container } = render(CalendarPanel, { props: panelProps() });
+		const { container } = await render(CalendarPanel, { props: panelProps() });
 		expect(container.querySelector('.cal-hint--device')?.textContent).toContain(
 			'On iPhone or iPad'
 		);
@@ -624,24 +637,24 @@ describe('CalendarPanel (the sentence for this device)', () => {
 	const hintOf = (container: Element) =>
 		container.querySelector('.cal-hint--device')?.textContent ?? '';
 
-	it('never sends the installed iPhone app to Safari', () => {
+	it('never sends the installed iPhone app to Safari', async () => {
 		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(IPHONE);
 		// An installed app answers yes to this one query and no to every other, so a check that asked the wrong
 		// question would not pass.
 		vi.spyOn(window, 'matchMedia').mockImplementation(
 			(query) => ({ matches: query === '(display-mode: standalone)' }) as MediaQueryList
 		);
-		const hint = hintOf(render(CalendarPanel, { props: panelProps() }).container);
+		const hint = hintOf((await render(CalendarPanel, { props: panelProps() })).container);
 		expect(hint).toContain('Open it from Downloads');
 		expect(hint).not.toContain('Safari');
 	});
 
 	// The app installed from iPhone Safari does not report the display mode; it sets navigator.standalone instead.
-	it('reads the installed iPhone app from navigator.standalone too', () => {
+	it('reads the installed iPhone app from navigator.standalone too', async () => {
 		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(IPHONE);
 		Object.defineProperty(navigator, 'standalone', { value: true, configurable: true });
 		try {
-			const hint = hintOf(render(CalendarPanel, { props: panelProps() }).container);
+			const hint = hintOf((await render(CalendarPanel, { props: panelProps() })).container);
 			expect(hint).toContain('Open it from Downloads');
 			expect(hint).not.toContain('Safari');
 		} finally {
@@ -651,7 +664,7 @@ describe('CalendarPanel (the sentence for this device)', () => {
 
 	// Chrome, Firefox and Edge on iPhone keep their own data, apart from Safari's, so they are not sent there
 	// either. Safari in a browser tab still is: its data is the app's there.
-	it('never sends another iPhone browser to Safari', () => {
+	it('never sends another iPhone browser to Safari', async () => {
 		const OTHER_BROWSERS = [
 			'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.7390.41 Mobile/15E148 Safari/604.1',
 			'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/143.0 Mobile/15E148 Safari/605.1.15',
@@ -659,13 +672,13 @@ describe('CalendarPanel (the sentence for this device)', () => {
 		];
 		for (const userAgent of OTHER_BROWSERS) {
 			vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(userAgent);
-			const hint = hintOf(render(CalendarPanel, { props: panelProps() }).container);
+			const hint = hintOf((await render(CalendarPanel, { props: panelProps() })).container);
 			expect(hint, userAgent).toContain('Open it from Downloads');
 			expect(hint, userAgent).not.toContain('Safari');
 			vi.restoreAllMocks();
 		}
 		vi.spyOn(Navigator.prototype, 'userAgent', 'get').mockReturnValue(IPHONE);
-		expect(hintOf(render(CalendarPanel, { props: panelProps() }).container)).toContain(
+		expect(hintOf((await render(CalendarPanel, { props: panelProps() })).container)).toContain(
 			'use Safari'
 		);
 	});
@@ -716,7 +729,7 @@ describe('CalendarPanel (layout by width)', () => {
 
 	it('on a 320 px phone the label wraps from one edge and the summary keeps one line', async () => {
 		await page.viewport(320, 800);
-		const { container } = render(CalendarPanel, { props: props() });
+		const { container } = await render(CalendarPanel, { props: props() });
 		container.style.width = SETTINGS_PANEL_WIDTH;
 		container.style.fontFamily = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 		container.style.lineHeight = '1.5';
@@ -730,7 +743,7 @@ describe('CalendarPanel (layout by width)', () => {
 
 	it('on a wide screen the label and the summary share one line', async () => {
 		await page.viewport(1024, 800);
-		const { container } = render(CalendarPanel, { props: props() });
+		const { container } = await render(CalendarPanel, { props: props() });
 		const [labelLine] = lines(label(container));
 		const summaryLines = lines(summary(container));
 		expect(lines(label(container))).toHaveLength(1);

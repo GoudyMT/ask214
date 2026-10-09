@@ -12,8 +12,8 @@ const baseProps = {
 };
 
 describe('EaosInput', () => {
-	it('renders a native date input carrying the given value, label, and hint', () => {
-		const { container } = render(EaosInput, { props: { ...baseProps, value: '2027-04-30' } });
+	it('renders a native date input carrying the given value, label, and hint', async () => {
+		const { container } = await render(EaosInput, { props: { ...baseProps, value: '2027-04-30' } });
 		const input = container.querySelector('input');
 		expect(input?.getAttribute('type')).toBe('date');
 		expect(input?.value).toBe('2027-04-30');
@@ -21,16 +21,16 @@ describe('EaosInput', () => {
 		expect(container.textContent).toContain('The date your service ends.');
 	});
 
-	it('associates the label with the input', () => {
-		const { container } = render(EaosInput, { props: baseProps });
+	it('associates the label with the input', async () => {
+		const { container } = await render(EaosInput, { props: baseProps });
 		const label = container.querySelector('label');
 		const input = container.querySelector('input');
 		expect(input?.id).toBeTruthy();
 		expect(label?.getAttribute('for')).toBe(input?.id);
 	});
 
-	it('hideLabel visually hides the label but keeps it in the DOM and associated', () => {
-		const { container } = render(EaosInput, { props: { ...baseProps, hideLabel: true } });
+	it('hideLabel visually hides the label but keeps it in the DOM and associated', async () => {
+		const { container } = await render(EaosInput, { props: { ...baseProps, hideLabel: true } });
 		const label = container.querySelector('label');
 		const input = container.querySelector('input');
 		// Visually hidden via the modifier, but retained + associated so the input keeps its accessible
@@ -40,9 +40,9 @@ describe('EaosInput', () => {
 		expect(label?.getAttribute('for')).toBe(input?.id);
 	});
 
-	it('calls onchange with the new value on input', () => {
+	it('calls onchange with the new value on input', async () => {
 		const onchange = vi.fn();
-		const { container } = render(EaosInput, { props: { ...baseProps, onchange } });
+		const { container } = await render(EaosInput, { props: { ...baseProps, onchange } });
 		const input = container.querySelector('input');
 		if (!input) throw new Error('no input rendered');
 		input.value = '2027-04-30';
@@ -50,8 +50,8 @@ describe('EaosInput', () => {
 		expect(onchange).toHaveBeenCalledWith('2027-04-30');
 	});
 
-	it('shows the error and marks the input invalid when error is set', () => {
-		const { container } = render(EaosInput, {
+	it('shows the error and marks the input invalid when error is set', async () => {
+		const { container } = await render(EaosInput, {
 			props: { ...baseProps, error: 'Enter a valid date' }
 		});
 		const input = container.querySelector('input');
@@ -62,20 +62,20 @@ describe('EaosInput', () => {
 		expect(input?.getAttribute('aria-describedby')).toContain(alert?.id);
 	});
 
-	it('shows no error and is not marked invalid when error is absent', () => {
-		const { container } = render(EaosInput, { props: baseProps });
+	it('shows no error and is not marked invalid when error is absent', async () => {
+		const { container } = await render(EaosInput, { props: baseProps });
 		const input = container.querySelector('input');
 		expect(container.querySelector('[role="alert"]')).toBeNull();
 		expect(input?.getAttribute('aria-invalid')).not.toBe('true');
 	});
 
-	it('asks the browser not to keep the typed date in its autofill history', () => {
-		const { container } = render(EaosInput, { props: baseProps });
+	it('asks the browser not to keep the typed date in its autofill history', async () => {
+		const { container } = await render(EaosInput, { props: baseProps });
 		expect(container.querySelector('input')?.getAttribute('autocomplete')).toBe('off');
 	});
 
 	it('registers its input so a relock scrub clears the typed value (DOM hygiene)', async () => {
-		const { container } = render(EaosInput, { props: { ...baseProps, value: '2027-04-15' } });
+		const { container } = await render(EaosInput, { props: { ...baseProps, value: '2027-04-15' } });
 		const input = container.querySelector('input');
 		await tick(); // let the registration $effect run
 		expect(input?.value).toBe('2027-04-15');
