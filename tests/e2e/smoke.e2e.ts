@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 test('home page renders with header + main + footer landmarks', async ({ page }) => {
@@ -39,6 +40,34 @@ test('About link navigates to /about', async ({ page }) => {
 	await page.getByRole('link', { name: /about/i }).first().click();
 	await expect(page).toHaveURL(/\/about\/?$/);
 	await expect(page.locator('h1')).toContainText(/about/i);
+});
+
+// The footer names the release the page was built from, read from package.json at build time, and links to its notes.
+test('the footer shows the version from package.json, linked to its release notes', async ({
+	page
+}) => {
+	const { version } = JSON.parse(readFileSync('package.json', 'utf-8')) as { version: string };
+	await page.goto('/');
+	const link = page
+		.getByRole('contentinfo')
+		.getByRole('link', { name: `v${version}`, exact: true });
+	await expect(link).toHaveAttribute(
+		'href',
+		`https://github.com/GoudyMT/ask214/releases/tag/v${version}`
+	);
+	await expect(link).toHaveAttribute('rel', 'external');
+});
+
+// At the narrowest phone width the app supports, the footer's links, the version included, stay on one line.
+test('the footer links stay on one line at 320 px', async ({ page }) => {
+	await page.setViewportSize({ width: 320, height: 640 });
+	await page.goto('/');
+	const links = page.getByRole('contentinfo').getByRole('link');
+	await expect(links).toHaveCount(4);
+	const tops = await links.evaluateAll((els) =>
+		els.map((el) => Math.round(el.getBoundingClientRect().top))
+	);
+	expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(2);
 });
 
 // The header is `position: sticky` (pure CSS, no JS). Tested via computed style

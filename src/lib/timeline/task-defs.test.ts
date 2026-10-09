@@ -7,7 +7,9 @@ import {
 	LEAVING_HINT,
 	PAYGRADE_NOTE,
 	ORDER_NOTE,
-	AFTER_SEPARATION
+	AFTER_SEPARATION,
+	AFTER_SKILLBRIDGE,
+	BEFORE_TERMINAL_LEAVE
 } from '$lib/profile/leaving-copy';
 import { makesPersonalClaim } from './personal-claim';
 
@@ -205,6 +207,8 @@ describe('task-defs seed', () => {
 			PAYGRADE_NOTE,
 			ORDER_NOTE,
 			AFTER_SEPARATION,
+			AFTER_SKILLBRIDGE,
+			BEFORE_TERMINAL_LEAVE,
 			...skillbridgeLines,
 			...Object.values(TASK_LINK_NOTE)
 		];

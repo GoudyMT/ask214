@@ -40,7 +40,9 @@ meets WCAG AA contrast (4.5:1, and 3:1 for interface edges) in both themes.
 ### Layout and accessibility
 
 **What it is.** One layout wraps every page: a sticky header with the wordmark and navigation, a `main` region,
-and a footer with the not-affiliated statement and links to About, Source and Feedback. A "Skip to content" link
+and a footer with the not-affiliated statement, links to About, Source and Feedback, and the release version. The
+version comes from `package.json`, which each release's pull request bumps; a small Vite plugin writes it into the
+layout as plain text before Svelte compiles, and it links to that release's notes. A "Skip to content" link
 comes first in keyboard order. The landmarks are plain `header`, labelled `nav`, `main` and `footer` elements,
 which carry their roles natively.
 
@@ -135,9 +137,9 @@ live site sends.
 ### Budgets and Lighthouse
 
 **What they are.** `size-limit` caps the gzipped JavaScript: the SvelteKit entry at 10 KB, the root layout
-loaded on every page at 7,060 bytes, and the code of all pages together at 46,880 bytes. `pnpm check:chunks` caps what
+loaded on every page at 7,080 bytes, and the code of all pages together at 46,930 bytes. `pnpm check:chunks` caps what
 one page downloads (60,930 bytes), the code loaded on demand (7,300 bytes) and the service worker's install set
-(60 files, 148,425 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
+(60 files, 148,505 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
 production build: accessibility below 0.95 or performance below 0.9 fails the build, and best practices or SEO
 below 0.9 warns. Reports stay in a CI artifact.
 
