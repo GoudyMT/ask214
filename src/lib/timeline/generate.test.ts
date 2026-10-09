@@ -10,6 +10,7 @@ import { selectNeedsNow } from './needs-now';
 import { TASK_DEFS } from './task-defs';
 import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
+import { addDays, daysBetween, localTodayIso } from './day-math';
 import type { PersonaFilters } from '../profile/persona';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
 
@@ -230,7 +231,38 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		};
 		const phase = generateTimeline(persona, defs, state, today).phases[0];
 		expect(phase?.collapsible).toBe(true);
-		expect(phase?.counts).toEqual({ done: 1, skipped: 1, snoozed: 0, toDo: 0 });
+		expect(phase?.counts).toEqual({ done: 1, skipped: 1, snoozed: 0, toDo: 0, closed: 0 });
+	});
+
+	// A closed task can no longer be done, so it is counted apart from "to do". Its card stays reachable for 14 days,
+	// because "Needs you now" lists it under "Just closed" and those rows jump to the card, which a folded phase hides.
+	describe('a closed task in a phase', () => {
+		const closedDaysAgo = (days: number) => {
+			const closedOn = addDays(localTodayIso(today), -days);
+			const firm = (id: string): TaskDef => ({
+				...mk(id, daysBetween(EAOS, closedOn) - 30),
+				kind: 'closes',
+				windowEnd: daysBetween(EAOS, closedOn),
+				afterNote: 'n'
+			});
+			const state: TimelineState = { schemaVersion: 1, tasks: { a: { status: 'done' } } };
+			const phases = generateTimeline(persona, [firm('a'), firm('c')], state, today).phases;
+			expect(phases.length).toBe(1);
+			return phases[0];
+		};
+
+		it('is counted as closed, not to do, and the phase folds once it closed more than 14 days ago', () => {
+			const phase = closedDaysAgo(15);
+			expect(phase?.items.map((i) => i.status)).toEqual(['done', 'closed']);
+			expect(phase?.counts).toEqual({ done: 1, skipped: 0, snoozed: 0, toDo: 0, closed: 1 });
+			expect(phase?.collapsible).toBe(true);
+		});
+
+		it('keeps the phase open while it closed 14 days ago or less', () => {
+			const phase = closedDaysAgo(14);
+			expect(phase?.counts).toEqual({ done: 1, skipped: 0, snoozed: 0, toDo: 0, closed: 1 });
+			expect(phase?.collapsible).toBe(false);
+		});
 	});
 
 	it('keeps a phase non-collapsible when an active task remains, counting toDo', () => {

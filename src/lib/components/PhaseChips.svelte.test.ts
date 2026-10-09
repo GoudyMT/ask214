@@ -40,7 +40,7 @@ const VIEW: TimelineView = {
 			},
 			items: [makeItem('A'), makeItem('B'), makeItem('C')],
 			count: 3,
-			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 3 },
+			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 3, closed: 0 },
 			collapsible: false
 		},
 		{
@@ -53,7 +53,7 @@ const VIEW: TimelineView = {
 			},
 			items: [makeItem('D')],
 			count: 1,
-			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 1 },
+			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 1, closed: 0 },
 			collapsible: false
 		}
 	],
@@ -78,7 +78,7 @@ describe('PhaseChips', () => {
 					bucket: { id: 'p', label: 'After separation', startOffset: 0, endOffset: 730 },
 					items: [makeItem('A')],
 					count: 1,
-					counts: { done: 0, skipped: 0, snoozed: 0, toDo: 1 },
+					counts: { done: 0, skipped: 0, snoozed: 0, toDo: 1, closed: 0 },
 					collapsible: false
 				}
 			],
