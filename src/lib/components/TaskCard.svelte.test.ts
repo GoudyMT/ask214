@@ -4,6 +4,7 @@ import { page } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import TaskCard from './TaskCard.svelte';
 import { snoozeUntilIso } from '$lib/timeline/snooze';
+import { addDays, localTodayIso } from '$lib/timeline/day-math';
 import { TASK_DEFS } from '$lib/timeline';
 import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
@@ -401,14 +402,15 @@ describe('TaskCard (open states)', () => {
 		flushSync();
 		const input = container.querySelector('input[type="date"]') as HTMLInputElement | null;
 		if (!input) throw new Error('no date input rendered');
-		input.value = '2026-08-01';
+		const tomorrow = snoozeUntilIso(new Date(), 1);
+		input.value = tomorrow;
 		input.dispatchEvent(new Event('input', { bubbles: true }));
 		flushSync();
 		const confirm = container.querySelector(
 			'.task-card__date-row button'
 		) as HTMLButtonElement | null;
 		confirm?.click();
-		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', '2026-08-01');
+		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', tomorrow);
 	});
 
 	it('asks the browser not to keep a typed snooze date in its autofill history', async () => {
@@ -454,6 +456,97 @@ describe('TaskCard (open states)', () => {
 		flushSync();
 		expect(onSetNote).not.toHaveBeenCalled();
 		expect(container.querySelector('textarea')).toBeNull();
+	});
+});
+
+// A snooze is live only while its date is after today, so the custom picker offers tomorrow at the earliest, and
+// nothing past the largest year a date field holds in four digits.
+describe('TaskCard (custom snooze date)', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	async function openCustomize(onSetSnooze: (taskId: string, untilIso: string) => void) {
+		const { container } = await renderCard(makeItem(), { onSetSnooze });
+		buttonByText(container, 'Snooze')?.click();
+		flushSync();
+		buttonByText(container, 'Customize')?.click();
+		flushSync();
+		const input = container.querySelector('input[type="date"]') as HTMLInputElement | null;
+		if (!input) throw new Error('no date input rendered');
+		const go = container.querySelector('.task-card__date-row button') as HTMLButtonElement | null;
+		if (!go) throw new Error('no snooze button rendered');
+		const type = (value: string) => {
+			input.value = value;
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			flushSync();
+		};
+		return { input, go, type };
+	}
+
+	it('offers tomorrow as the earliest date', async () => {
+		const { input } = await openCustomize(noop);
+		expect(input.min).toBe(snoozeUntilIso(new Date(), 1));
+	});
+
+	it('refuses today: the button is off and a tap sets no snooze', async () => {
+		const onSetSnooze = vi.fn();
+		const { go, type } = await openCustomize(onSetSnooze);
+		type(snoozeUntilIso(new Date(), 0));
+		expect(go.disabled).toBe(true);
+		go.click();
+		expect(onSetSnooze).not.toHaveBeenCalled();
+	});
+
+	it('refuses a past date: the button is off and a tap sets no snooze', async () => {
+		const onSetSnooze = vi.fn();
+		const { go, type } = await openCustomize(onSetSnooze);
+		type(snoozeUntilIso(new Date(), -3));
+		expect(go.disabled).toBe(true);
+		go.click();
+		expect(onSetSnooze).not.toHaveBeenCalled();
+	});
+
+	// Positive control: this holds on the old code too.
+	it('takes tomorrow: the button is on and a tap sets the snooze', async () => {
+		const onSetSnooze = vi.fn();
+		const { go, type } = await openCustomize(onSetSnooze);
+		const tomorrow = snoozeUntilIso(new Date(), 1);
+		type(tomorrow);
+		expect(go.disabled).toBe(false);
+		go.click();
+		expect(onSetSnooze).toHaveBeenCalledTimes(1);
+		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', tomorrow);
+	});
+
+	it('re-reads today at the tap: a date that was tomorrow at midnight is refused', async () => {
+		const evening = new Date();
+		evening.setHours(23, 59, 0, 0);
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(evening);
+		const onSetSnooze = vi.fn();
+		const { go, type } = await openCustomize(onSetSnooze);
+		const nextDay = addDays(localTodayIso(evening), 1);
+		type(nextDay);
+		expect(go.disabled).toBe(false);
+		vi.setSystemTime(
+			new Date(evening.getFullYear(), evening.getMonth(), evening.getDate() + 1, 0, 1)
+		);
+		go.click();
+		flushSync();
+		expect(onSetSnooze).not.toHaveBeenCalled();
+		expect(go.disabled).toBe(true);
+	});
+
+	it('stops at year 9999: the field says so and a five-digit year is refused', async () => {
+		const onSetSnooze = vi.fn();
+		const { input, go, type } = await openCustomize(onSetSnooze);
+		expect(input.max).toBe('9999-12-31');
+		type('30000-01-01');
+		expect(input.value).toBe('30000-01-01');
+		expect(go.disabled).toBe(true);
+		go.click();
+		expect(onSetSnooze).not.toHaveBeenCalled();
 	});
 });
 

@@ -49,8 +49,31 @@
 		closeSnooze();
 	}
 
+	// The last day a four-digit year can hold; a date field accepts a longer year that no calendar can show.
+	const SNOOZE_DATE_MAX = '9999-12-31';
+	// The earliest custom date, read when Customize opens and again at the tap. A snooze is live only while its date is
+	// after today, so today and the past would be stored and then ignored.
+	let snoozeMin = $state('');
+
+	// The 10-character check is what refuses a year of five or more digits: as text '30000-01-01' sorts after any
+	// real date, so the two comparisons alone would let it through.
+	function canSnoozeTo(value: string, min: string): boolean {
+		return value.length === 10 && value >= min && value <= SNOOZE_DATE_MAX;
+	}
+
+	function openDateInput(): void {
+		snoozeMin = snoozeUntilIso(new Date(), 1);
+		showDateInput = true;
+	}
+
 	function snoozeToDate(): void {
-		if (!dateValue) return;
+		// The day can turn while the picker is open, so the minimum is read again here; a refused date turns the
+		// button off rather than leaving a tap that does nothing.
+		const min = snoozeUntilIso(new Date(), 1);
+		if (!canSnoozeTo(dateValue, min)) {
+			snoozeMin = min;
+			return;
+		}
 		onSetSnooze(item.def.id, dateValue);
 		closeSnooze();
 	}
@@ -295,7 +318,7 @@
 								{preset.label}
 							</button>
 						{/each}
-						<button type="button" class="task-card__preset" onclick={() => (showDateInput = true)}>
+						<button type="button" class="task-card__preset" onclick={openDateInput}>
 							Customize
 						</button>
 						<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
@@ -308,13 +331,15 @@
 								type="date"
 								autocomplete="off"
 								bind:value={dateValue}
+								min={snoozeMin}
+								max={SNOOZE_DATE_MAX}
 								aria-label="Snooze until date"
 							/>
 							<button
 								type="button"
 								class="task-card__snooze-go"
 								onclick={snoozeToDate}
-								disabled={!dateValue}>Snooze</button
+								disabled={!canSnoozeTo(dateValue, snoozeMin)}>Snooze</button
 							>
 						</div>
 					{/if}
