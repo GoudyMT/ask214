@@ -34,6 +34,7 @@
 	import { staleEvents } from '$lib/calendar/handed-over';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { localTodayIso } from '$lib/timeline/day-math';
+	import { LocalToday } from '$lib/timeline/local-today.svelte';
 	import { readablePlan, type PlanAnswer } from '$lib/timeline/skillbridge-plan';
 	import { savePlanAnswer } from '$lib/timeline/skillbridge-save';
 	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
@@ -44,6 +45,8 @@
 
 	const app = getProfileApp();
 	const install = getInstallApp();
+	// Everything derived from today reads this clock, which turns at local midnight; an act at a tap reads the clock at the tap.
+	const clock = new LocalToday();
 
 	// The Documents row's summary, read from the asset cache on arrival like the Documents page itself. It
 	// counts from the paths and sizes alone; the titles stay with the Documents page, which shows them.
@@ -140,7 +143,7 @@
 
 	// The answer lives in the timeline store, which can still be loading, locked or failed while the profile is open:
 	// the row shows a value and offers Save only once that store is readable.
-	const plan = $derived(readablePlan(app.timeline, currentEaos, localTodayIso(new Date())));
+	const plan = $derived(readablePlan(app.timeline, currentEaos, localTodayIso(clock.now)));
 
 	async function savePlan(answer: PlanAnswer): Promise<string | null> {
 		const timeline = app.timeline;
@@ -235,14 +238,14 @@
 		const persona = app.store?.persona;
 		if (!persona || persona.completeness === 'none') return [];
 		const state = app.timeline?.state ?? EMPTY_STATE;
-		return generateTimeline(persona, [...TASK_DEFS], state, new Date()).phases.flatMap(
+		return generateTimeline(persona, [...TASK_DEFS], state, clock.now).phases.flatMap(
 			(p) => p.items
 		);
 	});
 
 	// The events handed to the calendar that the file would no longer carry as they are.
 	const stale = $derived.by(() => {
-		const today = localTodayIso(new Date());
+		const today = localTodayIso(clock.now);
 		const exclusions = app.calendar?.exclusions ?? { taskIds: [], categories: [] };
 		return staleEvents(
 			app.calendar?.lastAdd,
