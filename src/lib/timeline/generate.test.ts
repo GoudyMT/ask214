@@ -265,6 +265,63 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		});
 	});
 
+	// A required task stays late until separation, so its real last day is the separation date, not its window end
+	// months earlier: the 14 days its card stays reachable run from separation.
+	describe('a required task closed by separation', () => {
+		const required: TaskDef = {
+			...mk('req', -120),
+			kind: 'required',
+			windowEnd: -90, // ends 90 days before separation
+			afterNote: 'n'
+		};
+		const done = mk('d', -110);
+		const state: TimelineState = { schemaVersion: 1, tasks: { d: { status: 'done' } } };
+		const afterSeparation = (days: number) => {
+			const view = generateTimeline(
+				persona,
+				[required, done],
+				state,
+				new Date(`${addDays(EAOS, days)}T12:00:00Z`)
+			);
+			expect(view.phases.length).toBe(1);
+			return view.phases[0];
+		};
+
+		it('is dated closed on the separation date, and keeps its phase open for 14 days', () => {
+			const phase = afterSeparation(1);
+			const item = phase?.items.find((i) => i.def.id === 'req');
+			expect(item?.status).toBe('closed');
+			expect(phase?.collapsible).toBe(false);
+			expect(afterSeparation(14)?.collapsible).toBe(false);
+			expect(item?.closedOn).toBe(EAOS);
+		});
+
+		it('lets the phase fold on the 15th day after separation', () => {
+			expect(afterSeparation(15)?.collapsible).toBe(true);
+		});
+
+		it('leaves closedOn off a task that is not required, and off one that is not closed', () => {
+			const closes: TaskDef = { ...required, id: 'cl', kind: 'closes' };
+			const items = generateTimeline(
+				persona,
+				[required, closes, done],
+				state,
+				new Date(`${addDays(EAOS, 1)}T12:00:00Z`)
+			).phases.flatMap((p) => p.items);
+			const byId = (id: string) => items.find((i) => i.def.id === id);
+			expect(byId('cl')?.status).toBe('closed');
+			expect(byId('cl')?.closedOn).toBeUndefined();
+			expect(byId('d')?.status).toBe('done');
+			expect(byId('d')?.closedOn).toBeUndefined();
+		});
+
+		it('leaves closedOn off a required task that is still late on separation day', () => {
+			const lateItem = afterSeparation(0)?.items.find((i) => i.def.id === 'req');
+			expect(lateItem?.status).toBe('late');
+			expect(lateItem?.closedOn).toBeUndefined();
+		});
+	});
+
 	it('keeps a phase non-collapsible when an active task remains, counting toDo', () => {
 		const defs = [mk('a', -600), mk('a2', -560)];
 		const state: TimelineState = { schemaVersion: 1, tasks: { a: { status: 'done' } } };

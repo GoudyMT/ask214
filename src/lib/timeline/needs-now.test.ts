@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { selectNeedsNow } from './needs-now';
-import type { TimelineItem, DisplayStatus } from './generate';
+import { generateTimeline, type TimelineItem, type DisplayStatus } from './generate';
+import { addDays, localTodayIso } from './day-math';
+import type { EaosString } from '../profile/eaos';
+import type { PersonaFilters } from '../profile/persona';
+import type { TaskDef } from './types';
 
 const TODAY = '2026-10-03';
 
@@ -53,6 +57,41 @@ describe('selectNeedsNow', () => {
 			TODAY
 		);
 		expect(ids(g.justClosed)).toEqual(['c14', 'final']);
+	});
+
+	// A required task stays late until separation, so its 14 days run from the separation date, not from its window end.
+	it('counts a required task closed by separation from the separation date', () => {
+		const SEPARATION = '2027-04-15' as EaosString;
+		const required: TaskDef = {
+			id: 'req',
+			title: 'req',
+			category: 'admin',
+			finishBefore: 'separation',
+			kind: 'required',
+			windowStart: -120,
+			windowEnd: -90,
+			recommendedOffset: -120,
+			afterNote: 'n',
+			why: ''
+		};
+		const persona: PersonaFilters = {
+			completeness: 'eaos-only',
+			eaos: SEPARATION,
+			daysUntilSeparation: 100
+		};
+		const justClosedOn = (daysAfter: number) => {
+			const day = new Date(`${addDays(SEPARATION, daysAfter)}T12:00:00Z`);
+			const items = generateTimeline(
+				persona,
+				[required],
+				{ schemaVersion: 1, tasks: {} },
+				day
+			).phases.flatMap((p) => p.items);
+			return ids(selectNeedsNow(items, localTodayIso(day)).justClosed);
+		};
+		expect(justClosedOn(1)).toEqual(['req']);
+		expect(justClosedOn(14)).toEqual(['req']);
+		expect(justClosedOn(15)).toEqual([]);
 	});
 
 	it('shows a window opened in the last 14 days', () => {

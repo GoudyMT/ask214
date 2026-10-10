@@ -207,6 +207,11 @@ export type TimelineItem = {
 	windowEndDate: string;
 	status: DisplayStatus;
 	finalEndDate?: string;
+	/**
+	 * The last day a closed task could still be done, where that is not its window's end: a required task stays late
+	 * until separation, so it closes after the separation date. Present only on such a closed task.
+	 */
+	closedOn?: string;
 	daysLeft?: number; // days to the next firm edge while it counts down
 	aimDate?: string; // soft tasks: the recommended date, or the window end once that passed
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
@@ -215,12 +220,14 @@ export type TimelineItem = {
 	fit?: { reason: FitReason; date: string };
 };
 
+/** The day a closed task closed: the one date the "Just closed" rule and its row in "Needs you now" both name. */
+export function closedOnDate(item: TimelineItem): string {
+	return item.closedOn ?? item.finalEndDate ?? item.windowEndDate;
+}
+
 /** Whether a closed task closed within the last JUST_CLOSED_DAYS: "Needs you now" lists it under "Just closed". */
 export function isJustClosed(item: TimelineItem, todayIso: string): boolean {
-	return (
-		item.status === 'closed' &&
-		daysBetween(item.finalEndDate ?? item.windowEndDate, todayIso) <= JUST_CLOSED_DAYS
-	);
+	return item.status === 'closed' && daysBetween(closedOnDate(item), todayIso) <= JUST_CLOSED_DAYS;
 }
 
 /** Per-phase progress tally derived from item display status (drives the header count + collapse). */
@@ -348,6 +355,7 @@ export function generateTimeline(
 				windowEndDate,
 				status,
 				...(a.finalEndDate !== undefined ? { finalEndDate: a.finalEndDate } : {}),
+				...(status === 'closed' && a.def.kind === 'required' ? { closedOn: a.separationDate } : {}),
 				...(nextEdge !== undefined ? { daysLeft: daysBetween(todayIso, nextEdge) } : {}),
 				...(a.def.kind === 'soft'
 					? { aimDate: a.targetDate >= todayIso ? a.targetDate : windowEndDate }
