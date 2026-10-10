@@ -18,16 +18,19 @@
 	// Phase header progress count: an open phase shows what's left = active + snoozed ("N to do";
 	// a snoozed task is paused, still pending - not done) and what closed, which can no longer be done.
 	// A folded phase shows the done/skipped/closed breakdown. Derived from the engine's per-phase counts.
+	// Each part's words are joined by non-breaking spaces, so a narrow header wraps only between parts.
+	const NBSP = String.fromCharCode(160);
 	function phaseCount(phase: TimelineView['phases'][number]): string {
 		const { done, skipped, snoozed, toDo, closed } = phase.counts;
 		const parts: string[] = [];
+		const add = (n: number, word: string) => {
+			if (n > 0) parts.push(n + NBSP + word);
+		};
 		if (phase.collapsible) {
-			if (done > 0) parts.push(`${done} done`);
-			if (skipped > 0) parts.push(`${skipped} skipped`);
-		} else if (toDo + snoozed > 0) {
-			parts.push(`${toDo + snoozed} to do`);
-		}
-		if (closed > 0) parts.push(`${closed} closed`);
+			add(done, 'done');
+			add(skipped, 'skipped');
+		} else add(toDo + snoozed, 'to' + NBSP + 'do');
+		add(closed, 'closed');
 		return parts.join(' - ');
 	}
 

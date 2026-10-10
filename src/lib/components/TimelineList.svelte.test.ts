@@ -81,14 +81,17 @@ describe('TimelineList', () => {
 	});
 });
 
+// Each count's number and words are joined by non-breaking spaces, so a header wraps only at its " - " separators.
+const NBSP = String.fromCharCode(160);
+
 describe('TimelineList phase progress counts', () => {
 	it('active phase header shows the "N to do" count (Format 1)', async () => {
 		const { container } = await render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent);
-		expect(headings[0]).toContain('1 to do'); // phase-18-12: 1 active task
-		expect(headings[1]).toContain('2 to do'); // phase-final-90: 2 active tasks
+		expect(headings[0]).toContain(`1${NBSP}to${NBSP}do`); // phase-18-12: 1 active task
+		expect(headings[1]).toContain(`2${NBSP}to${NBSP}do`); // phase-final-90: 2 active tasks
 	});
 
 	it('resolved phase header shows the done/skipped breakdown', async () => {
@@ -113,8 +116,8 @@ describe('TimelineList phase progress counts', () => {
 			props: { view: resolvedView, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const heading = container.querySelector('h2')?.textContent;
-		expect(heading).toContain('3 done');
-		expect(heading).toContain('1 skipped');
+		expect(heading).toContain(`3${NBSP}done`);
+		expect(heading).toContain(`1${NBSP}skipped`);
 	});
 
 	it('counts snoozed tasks as "to do" (snoozed is paused, not done)', async () => {
@@ -133,7 +136,7 @@ describe('TimelineList phase progress counts', () => {
 		const { container } = await render(TimelineList, {
 			props: { view, onSetStatus: noop, onSetSnooze: noop }
 		});
-		expect(container.querySelector('h2')?.textContent).toContain('2 to do'); // 1 active + 1 snoozed
+		expect(container.querySelector('h2')?.textContent).toContain(`2${NBSP}to${NBSP}do`); // 1 active + 1 snoozed
 	});
 
 	// A closed task can no longer be done, so the count says so apart from what is left to do.
@@ -174,21 +177,40 @@ describe('TimelineList phase progress counts', () => {
 
 		it('an open phase says what is left to do and what closed', async () => {
 			expect(await countOf({ done: 3, skipped: 0, toDo: 2, closed: 5 }, false)).toBe(
-				'- 2 to do - 5 closed'
+				`- 2${NBSP}to${NBSP}do - 5${NBSP}closed`
 			);
 		});
 
 		it('an open phase with only a just-closed task left says only that', async () => {
-			expect(await countOf({ done: 1, skipped: 0, toDo: 0, closed: 1 }, false)).toBe('- 1 closed');
+			expect(await countOf({ done: 1, skipped: 0, toDo: 0, closed: 1 }, false)).toBe(
+				`- 1${NBSP}closed`
+			);
 		});
 
 		it('a folded phase says what was done, skipped and closed', async () => {
 			expect(await countOf({ done: 5, skipped: 0, toDo: 0, closed: 5 }, true)).toBe(
-				'- 5 done - 5 closed'
+				`- 5${NBSP}done - 5${NBSP}closed`
 			);
 			expect(await countOf({ done: 2, skipped: 1, toDo: 0, closed: 1 }, true)).toBe(
-				'- 2 done - 1 skipped - 1 closed'
+				`- 2${NBSP}done - 1${NBSP}skipped - 1${NBSP}closed`
 			);
+		});
+
+		// A whitespace-folding matcher reads a non-breaking space as a space, so the character itself is checked here.
+		it('keeps each count whole: a line can break only at the separators', async () => {
+			for (const [counts, collapsible] of [
+				[{ done: 0, skipped: 0, toDo: 2, closed: 5 }, false],
+				[{ done: 2, skipped: 1, toDo: 0, closed: 1 }, true]
+			] as const) {
+				const parts = (await countOf(counts, collapsible))?.slice(2).split(' - ') ?? [];
+				expect(parts.length).toBeGreaterThan(1);
+				for (const part of parts) {
+					expect(part).not.toContain(' ');
+					const [count, ...words] = part.split(NBSP);
+					expect(Number(count)).toBeGreaterThan(0);
+					expect(words.length).toBeGreaterThan(0);
+				}
+			}
 		});
 	});
 });
