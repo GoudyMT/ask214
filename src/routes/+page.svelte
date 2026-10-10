@@ -99,6 +99,7 @@
 		const { embed, dispose } = createRecoveringEmbed(() => new EmbedWorker());
 		// Whether this device keeps every on-device file is read from the cache - a lookup, no download - before
 		// the store exists, so the store asks before any download the device does not already hold.
+		// eslint-disable-next-line no-restricted-properties -- a read-only lookup of which public files the device holds
 		void deviceFilesKept(globalThis.caches).then((deviceKept) => {
 			if (left) return;
 			store = createAskStore({

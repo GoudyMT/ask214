@@ -1,6 +1,5 @@
 import { encryptRecord, decryptRecord, type RecordCtx } from '$lib/crypto/record-crypto';
-import { verifyRecordHmac, type KeystoreRecordV1 } from '$lib/keystore/record';
-import { KeystoreNotInitializedError, KeystoreHmacMismatchError } from '$lib/profile/store.svelte';
+import { readKeystoreRow } from '$lib/profile/store.svelte';
 import { withStores, reqToPromise } from '$lib/db/schema';
 
 /**
@@ -15,32 +14,24 @@ const BYOK_CTX: RecordCtx = { storeName: 'byok', recordId: 'self', schemaVersion
 // Fixed: with no HWM there is no generation to track - the key is a single, overwritten self-row.
 const BYOK_GENERATION = 1;
 
-type KeystoreRow = KeystoreRecordV1 & { id: number };
 type KeyRow = { id: number; rec: Uint8Array };
 
 export function createByokStore(db: IDBDatabase) {
 	// Fail-closed: a missing or tampered keystore must stop the read/write, never silently succeed.
-	async function readVerifiedKeystore(): Promise<KeystoreRow> {
-		const ks = await withStores(db, 'keystore', 'readonly', (tx) =>
-			reqToPromise<KeystoreRow | undefined>(tx.objectStore('keystore').get(0))
-		);
-		if (!ks) throw new KeystoreNotInitializedError();
-		if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
-			throw new KeystoreHmacMismatchError();
-		}
-		return ks;
-	}
+	const readVerifiedKeystore = () => readKeystoreRow(db);
 
 	return {
 		/** Encrypt + persist the API key as the single byok self-row. */
 		async saveApiKey(key: string): Promise<void> {
 			const keystore = await readVerifiedKeystore();
-			const blob = await encryptRecord(
-				BYOK_CTX,
-				new TextEncoder().encode(key),
-				keystore,
-				BYOK_GENERATION
-			);
+			const plaintext = new TextEncoder().encode(key);
+			let blob: Uint8Array;
+			try {
+				// Awaited inside the try: the wipe must wait for the cipher to finish with the buffer.
+				blob = await encryptRecord(BYOK_CTX, plaintext, keystore, BYOK_GENERATION);
+			} finally {
+				plaintext.fill(0);
+			}
 			await withStores(db, 'byok', 'readwrite', (tx) => {
 				// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord.
 				tx.objectStore('byok').put({ id: 0, rec: blob });
@@ -55,7 +46,11 @@ export function createByokStore(db: IDBDatabase) {
 			);
 			if (!row) return null;
 			const bytes = await decryptRecord(BYOK_CTX, row.rec, keystore, BYOK_GENERATION);
-			return new TextDecoder().decode(bytes);
+			try {
+				return new TextDecoder().decode(bytes);
+			} finally {
+				bytes.fill(0);
+			}
 		},
 
 		/** Remove the stored key. */

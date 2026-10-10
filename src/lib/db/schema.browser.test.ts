@@ -135,15 +135,22 @@ describe('openMtcDb schema (v6)', () => {
 		upgrading.close();
 	});
 
-	it('cannot rescue a tab already running the pre-v3 bundle', async () => {
+	it('keeps waiting on a tab already running the pre-v3 bundle, and opens once it closes', async () => {
 		// The handler has to exist in the tab doing the BLOCKING, and the deployed v2 bundle opens
 		// without one. Nothing shipped now can change that, so the 2 -> 3 upgrade still blocks while an
-		// old tab is open; the handler above protects 3 -> 4 onward. Telling the user to close the
-		// other tab is the only mitigation available for this one upgrade.
+		// old tab is open; the handler above protects 3 -> 4 onward. The open reports the block and
+		// stays queued: closing the other tab is the only mitigation, and the same request then
+		// finishes the upgrade by itself, with no reload.
 		const name = 'mtc-test-' + crypto.randomUUID();
 		const oldTab = await openV2Db(name);
-		await expect(openMtcDb(name)).rejects.toThrow('idb-open-blocked');
+		const blocked = vi.fn();
+		const pending = openMtcDb(name, undefined, blocked);
+		await vi.waitFor(() => expect(blocked).toHaveBeenCalledOnce());
 		oldTab.close();
+		const db = await pending;
+		opened.push(db);
+		expect(db.version).toBe(DB_VERSION);
+		expect(blocked).toHaveBeenCalledOnce();
 	});
 
 	it('each store uses keyPath "id" (single self-row pattern)', async () => {

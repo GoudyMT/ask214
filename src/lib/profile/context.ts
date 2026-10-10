@@ -17,6 +17,18 @@ export function afterStartupFailure(current: AppStatus, next: AppStatus): AppSta
 }
 
 /**
+ * The status a finished start-up leaves. A start-up still loading takes it, and so does one that outlasted its timeout
+ * or was blocked (`error`): a start-up that ends late opens the app, so a slow or blocked open recovers without a
+ * Reload. A takeover (`stale`, `unsupported`) names a cause no result can undo.
+ */
+export function afterStartupResult(
+	current: AppStatus,
+	next: 'ready' | 'damaged' | 'unsupported'
+): AppStatus {
+	return current === 'loading' || current === 'error' ? next : current;
+}
+
+/**
  * Reactive app-wide container for the profile subsystem. Set ONCE in +layout (synchronously
  * at component init, since setContext must run during init), then populated by the async
  * app-init. Components read it via getProfileApp() and react to status/store changes.

@@ -1,6 +1,17 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { subscribeBus, installLifecycle, createRelockEcho, type Relockable } from './app-init';
+import {
+	subscribeBus,
+	installLifecycle,
+	createRelockEcho,
+	initProfileApp,
+	superviseStartup,
+	type Relockable
+} from './app-init';
 import { createProfileBus, type ProfileBus } from '../broadcast/bus';
+import { createProfileStore } from './store.svelte';
+import { bootstrapLocalKeystore } from '../keystore/bootstrap';
+import { openTestDb, deleteTestDb } from '../db/_test-helpers';
+import type { AppStatus } from './context';
 import type { IdleTimerOptions, IdleTimer } from './idle-timer';
 
 const buses: ProfileBus[] = [];
@@ -330,5 +341,137 @@ describe('installLifecycle', () => {
 		expect(a.lock).toHaveBeenCalledTimes(1);
 		expect(a.relockSync).not.toHaveBeenCalled();
 		expect(b.relockSync).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('a re-read that fails', () => {
+	/** Counts the rejections nothing handled while `run` and a settle delay played out. */
+	async function unhandledDuring(run: () => void): Promise<number> {
+		let count = 0;
+		const onUnhandled = (e: PromiseRejectionEvent): void => {
+			count++;
+			e.preventDefault();
+		};
+		window.addEventListener('unhandledrejection', onUnhandled);
+		try {
+			run();
+			await delay(150);
+		} finally {
+			window.removeEventListener('unhandledrejection', onUnhandled);
+		}
+		return count;
+	}
+
+	// The store's own state shows a failed re-read, so a rejection nobody handles adds only noise.
+	it('leaves no unhandled rejection from a peer signal', async () => {
+		const name = uniqueName();
+		const tabA = makeBus(name);
+		const tabB = makeBus(name);
+		// Not a vi.fn: the spy records each result through a handler of its own, which would hide the rejection.
+		let reads = 0;
+		subscribeBus(tabB, {
+			'profile-updated': () => {
+				reads++;
+				return Promise.reject(new Error('E_TEST'));
+			}
+		});
+		const unhandled = await unhandledDuring(() => tabA.publish({ type: 'profile-updated' }));
+		expect(reads).toBe(1);
+		expect(unhandled).toBe(0);
+	});
+
+	it('leaves no unhandled rejection from a page restore', async () => {
+		let reads = 0;
+		const doc = new EventTarget();
+		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		installLifecycle(
+			[
+				{
+					relockSync: vi.fn(),
+					refresh: () => {
+						reads++;
+						return Promise.reject(new Error('E_TEST'));
+					}
+				}
+			],
+			{
+				win: new EventTarget(),
+				doc,
+				isHidden: () => false,
+				createIdleTimer: () => timer,
+				idleThresholdMs: 900_000
+			}
+		);
+		const unhandled = await unhandledDuring(() => doc.dispatchEvent(new Event('resume')));
+		expect(reads).toBe(1);
+		expect(unhandled).toBe(0);
+	});
+});
+
+describe('a real start-up', () => {
+	let db: IDBDatabase | null = null;
+	afterEach(async () => {
+		if (db) await deleteTestDb(db);
+		db = null;
+	});
+
+	/** A returning user's database: keystore and a saved profile. */
+	async function seeded(): Promise<IDBDatabase> {
+		db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		await createProfileStore(db).save({
+			eaos: new TextEncoder().encode('2027-04-15'),
+			setupIntent: 'completed'
+		});
+		return db;
+	}
+
+	function startUp(seededDb: IDBDatabase) {
+		const made: { store?: ReturnType<typeof createProfileStore> } = {};
+		const start = initProfileApp({
+			checkSupport: async () => ({ ok: true }),
+			openDb: async () => seededDb,
+			bootstrap: bootstrapLocalKeystore,
+			createStore: (d) => (made.store = createProfileStore(d))
+		});
+		return { made, start };
+	}
+
+	// The test page is shown, so only an injected answer can stand in for a tab hidden while it started.
+	it('that ends while the page is hidden holds no plaintext, and reads it back when shown', async () => {
+		const { made, start } = startUp(await seeded());
+		const result = await start;
+		expect(result.status).toBe('ready');
+		expect(made.store?._getStateForTest()).not.toBeNull();
+
+		let hidden = true;
+		const doc = new EventTarget();
+		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		const off = installLifecycle(made.store ? [made.store] : [], {
+			win: new EventTarget(),
+			doc,
+			isHidden: () => hidden,
+			createIdleTimer: () => timer,
+			idleThresholdMs: 900_000
+		});
+		expect(made.store?._getStateForTest()).toBeNull();
+
+		hidden = false;
+		doc.dispatchEvent(new Event('visibilitychange'));
+		await vi.waitFor(() => expect(made.store?._getStateForTest()).not.toBeNull());
+		off();
+	});
+
+	it('that ends after the tab went stale holds no plaintext and releases the database', async () => {
+		const seededDb = await seeded();
+		const { made, start } = startUp(seededDb);
+		const app: { status: AppStatus } = { status: 'stale' };
+		const onResult = vi.fn();
+		superviseStartup(() => start, app, onResult);
+		await start;
+		await delay(0);
+		expect(made.store?._getStateForTest()).toBeNull();
+		expect(onResult).not.toHaveBeenCalled();
+		expect(() => seededDb.transaction('profile')).toThrow();
 	});
 });

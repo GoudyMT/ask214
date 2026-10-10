@@ -12,7 +12,7 @@
 		view: TimelineView;
 		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
 		onSetSnooze: (taskId: string, untilIso: string) => void;
-		onSetNote?: (taskId: string, note: string | undefined) => void;
+		onSetNote?: (taskId: string, note: string | undefined) => Promise<void>;
 	} = $props();
 
 	// Phase header progress count: an open phase shows what's left = active + snoozed ("N to do";

@@ -281,8 +281,8 @@
 		try {
 			await app.store?.clearClockBackward();
 		} catch {
-			// Clear failed (e.g. another tab edited concurrently); the store rolled the in-memory
-			// mark back, so the banner/notice correctly stay up. Tell the user they can retry.
+			// Clear failed (e.g. another tab edited concurrently); the store lowers the mark only when
+			// the save lands, so the banner/notice correctly stay up. Tell the user they can retry.
 			clockError = 'Could not update right now - please try again.';
 		}
 	}
@@ -302,7 +302,9 @@
 					if (!('caches' in window)) return;
 					// A document save still writing would store its document again after the caches are gone.
 					await stopSaves();
+					// eslint-disable-next-line no-restricted-properties -- the erase clears the public document caches
 					const keys = await window.caches.keys();
+					// eslint-disable-next-line no-restricted-properties -- the erase clears the public document caches
 					await Promise.all(keys.map((key) => window.caches.delete(key)));
 				},
 				// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
@@ -525,8 +527,16 @@
 					synthesisEnabled = on;
 					setSynthesisEnabled(on);
 				}}
-				onSaveKey={(k) => void app.byok?.saveApiKey(k).then(() => (hasKey = true))}
-				onClearKey={() => void app.byok?.clearApiKey().then(() => (hasKey = false))}
+				onSaveKey={async (k) => {
+					if (!app.byok) return;
+					await app.byok.saveApiKey(k);
+					hasKey = true;
+				}}
+				onClearKey={async () => {
+					if (!app.byok) return;
+					await app.byok.clearApiKey();
+					hasKey = false;
+				}}
 			/>
 
 			{@render eraseDialog()}

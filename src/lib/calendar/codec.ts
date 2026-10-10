@@ -1,5 +1,6 @@
-import type { CalendarSyncState, HandedOverEvent, EventMoment } from './types';
+import type { CalendarSyncState, HandedOverEvent, EventMoment, TaskExclusions } from './types';
 import { handedOverKey } from './handed-over';
+import { isDay } from '../timeline/day-check';
 
 const SCHEMA_VERSION = 1;
 // A record over every moment, so a new moment fails the type-check until it is accepted here too.
@@ -11,18 +12,6 @@ const MOMENT_KEYS: Record<EventMoment, true> = {
 	leave: true
 };
 const MOMENTS: ReadonlySet<string> = new Set(Object.keys(MOMENT_KEYS));
-
-/**
- * A day as the app writes it, YYYY-MM-DD: only a string a UTC round trip gives back unchanged. The string check
- * comes first, because turning an object into text can throw. A date with extra text, or one that names no day
- * (2026-02-30: some engines roll it over to March 2, others give no date at all), fails. UTC on both sides, so the
- * device's time zone cannot move the day.
- */
-function isDay(v: unknown): boolean {
-	if (typeof v !== 'string') return false;
-	const t = new Date(`${v}T00:00:00Z`);
-	return !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === v;
-}
 
 /** A stored list the app wrote itself, checked anyway: a bad shape must read as "no record yet", never throw later. */
 function isHandedOverList(v: unknown): v is HandedOverEvent[] {
@@ -43,10 +32,23 @@ function isHandedOverList(v: unknown): v is HandedOverEvent[] {
 	);
 }
 
+function isStrings(v: unknown): boolean {
+	return Array.isArray(v) && v.every((s: unknown) => typeof s === 'string');
+}
+
+/** The dismissal bookkeeping the store writes, both numbers; anything else reads as no dismissal yet. */
+function isCard(v: unknown): boolean {
+	return (
+		typeof v === 'object' &&
+		v !== null &&
+		typeof (v as { dismissedAt?: unknown }).dismissedAt === 'number' &&
+		typeof (v as { dismissCount?: unknown }).dismissCount === 'number'
+	);
+}
+
 export class CalendarSchemaError extends Error {
 	constructor() {
 		super('E_CALENDAR_SCHEMA');
-		this.name = 'CalendarSchemaError';
 	}
 }
 
@@ -68,11 +70,11 @@ export function decodeCalendarSyncState(bytes: Uint8Array): CalendarSyncState {
 	) {
 		throw new CalendarSchemaError();
 	}
-	const state = parsed as CalendarSyncState & { lastAdd?: unknown };
-	if (state.lastAdd !== undefined && !isHandedOverList(state.lastAdd)) {
-		const rest = { ...state };
-		delete rest.lastAdd;
-		return rest;
-	}
+	const state = { ...parsed } as CalendarSyncState & { lastAdd?: unknown; card?: unknown };
+	// Types only, never membership: a category name an older release wrote must still read.
+	const { taskIds, categories } = (state.exclusions ?? {}) as Partial<TaskExclusions>;
+	if (!isStrings(taskIds) || !isStrings(categories)) throw new CalendarSchemaError();
+	if (state.lastAdd !== undefined && !isHandedOverList(state.lastAdd)) delete state.lastAdd;
+	if (state.card !== undefined && !isCard(state.card)) delete state.card;
 	return state as CalendarSyncState;
 }

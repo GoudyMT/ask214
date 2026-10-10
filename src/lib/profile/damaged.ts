@@ -5,11 +5,14 @@ import { KeystoreHmacMismatchError } from './store.svelte';
 /**
  * Whether a profile load failed because the data saved on this device fails the app's own checks. A reload reads the
  * same bytes and fails the same way, so this is the one start-up failure offered an erase. Anything else - an app older
- * than its database, a blocked open, a lock timeout, a storage error, any other throw - can pass, so its data is never
- * offered for erase. Bootstrap writes the key record and the high-water mark in one transaction, so a mark missing
- * beside a key record, or a body missing once the mark says one was saved, is damage too. This holds only while every
- * change to how saved data is checked raises DB_VERSION (schema.ts): an older app must stop at the version, never
- * here, where it would read a newer release's data as damaged.
+ * than its database, a blocked open, a lock timeout, a storage error - can pass, so its data is never offered for
+ * erase. Some failures that do not pass are still not offered, such as a body that decrypts but fails its schema (not
+ * JSON, or a field of the wrong type): it keeps the start-up banner on every reload, and only a fault in this app's
+ * own writer can make one. Bootstrap
+ * writes the key record and the high-water mark in one transaction, so a mark missing beside a key record, or a body
+ * missing once the mark says one was saved, is damage too. This holds only while every change to how saved data is
+ * checked raises DB_VERSION (schema.ts): an older app must stop at the version, never here, where it would read a
+ * newer release's data as damaged.
  */
 export function isDamagedRecord(e: unknown): boolean {
 	return (

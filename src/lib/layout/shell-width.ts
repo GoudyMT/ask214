@@ -8,9 +8,10 @@
 const SHELL_WIDTH = '900px';
 
 // Per-route width overrides - EMPTY now (one width for every route). Add a route here to give it a
-// different width later without touching the layout wiring (keeps the route-aware seam).
-const ROUTE_SHELL_WIDTH: ReadonlyMap<string, string> = new Map();
+// different width later without touching the layout wiring (keeps the route-aware seam). A plain object, not a
+// Map, is smaller in the root layout; every route id starts with "/", so no inherited key can ever match.
+const ROUTE_SHELL_WIDTH: Readonly<Record<string, string>> = {};
 
 export function shellWidthFor(routeId: string | null): string {
-	return (routeId !== null && ROUTE_SHELL_WIDTH.get(routeId)) || SHELL_WIDTH;
+	return (routeId !== null && ROUTE_SHELL_WIDTH[routeId]) || SHELL_WIDTH;
 }

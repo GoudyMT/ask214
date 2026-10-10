@@ -5,7 +5,7 @@ import { decryptProfileRecord, encryptProfileRecord } from './crypto-boundary';
 import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar } from './sidecars';
 import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
-import { withStores, reqToPromise } from '../db/schema';
+import { withStores, reqToPromise, type StoreName } from '../db/schema';
 import {
 	freezeRelock,
 	zeroizeRecord,
@@ -60,18 +60,45 @@ type KeystoreRow = KeystoreRecordV1 & { id: number };
 type HwmRow = SignedSidecar<ProfileHwmPayload> & { id: number };
 type ProfileRow = { id: number; rec: Uint8Array };
 
-function getRow<T>(
-	db: IDBDatabase,
-	store: 'keystore' | 'profile-hwm' | 'profile'
-): Promise<T | undefined> {
+/** A store's single self-row (id 0), shared by every encrypted store. */
+export function getRow<T>(db: IDBDatabase, store: StoreName): Promise<T | undefined> {
 	return withStores(db, store, 'readonly', (tx) =>
 		reqToPromise<T | undefined>(tx.objectStore(store).get(0))
 	);
 }
 
+/** The keystore row, verified: a missing or tampered keystore stops the read, never silently succeeds. */
+export async function readKeystoreRow(db: IDBDatabase): Promise<KeystoreRow> {
+	const ks = await getRow<KeystoreRow>(db, 'keystore');
+	if (!ks) throw new KeystoreNotInitializedError();
+	if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
+		throw new KeystoreHmacMismatchError();
+	}
+	return ks;
+}
+
+/** A store's current generation from its verified HWM sidecar (0 = no HWM yet = nothing written). */
+export async function readHwmGeneration(
+	db: IDBDatabase,
+	store: 'timeline-state-hwm' | 'calendar-sync-hwm',
+	hmacKey: CryptoKey
+): Promise<number> {
+	const row = await getRow<SignedSidecar<{ generation: number }>>(db, store);
+	if (!row) return 0;
+	const hwm = await verifySidecar<{ generation: number }>(
+		store,
+		{ v: 1, payload: row.payload, mac: row.mac },
+		hmacKey
+	);
+	return hwm.generation;
+}
+
 export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = {}) {
 	let _profile = $state<ProfileV1 | null>(null);
 	let saveInFlight = false;
+	// Set by clearClockBackward for the one save it starts: that save stages lastSeenAt as now instead of
+	// holding the monotonic mark. Not a parameter, so no other caller can lower the mark.
+	let resetClockNext = false;
 	// The reason a relock was deferred past an in-flight save, or null if none is pending.
 	let pendingRelock: RelockReason | null = null;
 	let relockEpoch = 0;
@@ -159,20 +186,18 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 * "I fixed my clock" reset. Forcibly lower lastSeenAt to now - the ONE sanctioned
 		 * retreat of the monotonic mark - and persist it durably (else the stored future mark
 		 * re-triggers the warning on every reload). No-op when no profile is loaded.
+		 *
+		 * The lowered mark is set by the save itself, inside the write lock, on the record that save
+		 * stages from. Setting it on the live record first would let a re-read already queued on the
+		 * lock bring the stored future mark back before the save runs, and the monotonic mark would
+		 * then keep it. A failed save leaves the live record untouched, so the mark is never left
+		 * lowered in memory with the stored one still ahead.
 		 */
 		async clearClockBackward(): Promise<void> {
 			if (!_profile) return;
-			const prev = _profile.lastSeenAt;
-			_profile.lastSeenAt = Date.now();
 			safeLog({ code: 'E_CLOCK_BACKWARD' });
-			try {
-				await api.save({});
-			} catch (e) {
-				// Save failed (e.g. OCC / lock timeout): roll the in-memory mark back so the
-				// monotonic invariant is not left violated in memory; the caller surfaces it.
-				if (_profile) _profile.lastSeenAt = prev;
-				throw e;
-			}
+			resetClockNext = true;
+			await api.save({});
 		},
 
 		/**
@@ -187,9 +212,15 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 * Gated on `lockState`, NOT on `locked`. `locked` is derived state, so it reads false for a
 		 * first-run tab that has relocked (hasProfile is still false) - which left exactly that tab
 		 * open to a peer's setup decrypting into it.
+		 *
+		 * A hidden page does not decrypt on its own: nobody can see the result, and a page that goes
+		 * hidden relocks and comes back through the lifecycle's visible restore, which calls this.
+		 * load() is not gated - Unlock and start-up use it, and they are the user asking.
 		 */
 		refresh(): Promise<ProfileV1 | null> {
-			if (lockState === 'locked') return Promise.resolve(null);
+			if (lockState === 'locked' || document.visibilityState === 'hidden') {
+				return Promise.resolve(_profile);
+			}
 			return api.load();
 		},
 
@@ -231,6 +262,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 
 					// First run: generation 0 = keystore exists, no profile body written yet.
 					if (hwm.generation === 0) {
+						if (_profile) zeroizeRecord(_profile as unknown as Record<string, unknown>);
 						_profile = null;
 						hasProfile = false;
 						// Report the store open only if no relock landed while this was in flight. There
@@ -254,6 +286,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						freezeRelock(decrypted as unknown as Record<string, unknown>);
 						return null;
 					}
+					// The record this read replaces holds the same plaintext in other bytes (see save()). Nothing
+					// outside this store keeps it: persona copies the bytes into strings, and no caller retains
+					// what load() returns.
+					if (_profile) zeroizeRecord(_profile as unknown as Record<string, unknown>);
 					_profile = decrypted;
 					lockState = 'unlocked';
 					return _profile;
@@ -262,6 +298,9 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		},
 
 		async save(patch: ProfilePatch): Promise<{ generation: number }> {
+			// Taken before the first await, so it belongs to the call that set it.
+			const resetClock = resetClockNext;
+			resetClockNext = false;
 			saveInFlight = true;
 			const relockAtStart = relockEpoch;
 			try {
@@ -321,7 +360,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							...patch,
 							schemaVersion: 1,
 							generation: nextGen,
-							lastSeenAt: updateLastSeen(base.lastSeenAt, now),
+							lastSeenAt: resetClock ? now : updateLastSeen(base.lastSeenAt, now),
 							setupIntent: nextSetupIntent,
 							setupIntentChangedAt:
 								nextSetupIntent !== base.setupIntent ? now : base.setupIntentChangedAt
@@ -336,33 +375,43 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							);
 						}
 
-						// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
-						const ivBump = bumpIvCounter(keystore.ivCounter);
-						const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
-						updatedKs.recordHmac = await computeRecordHmac(updatedKs, keystore.hmacKeyRef);
+						// The deep copies exist from here, so a throw before the commit below would strand
+						// them in the heap unreferenced and unwiped. The catch ends BEFORE the commit on
+						// purpose: past it `next` is the live profile, and the broadcast after the lock
+						// releases may throw without this being able to reach it. Before the clone loop `next`
+						// held _profile's arrays and the caller's own - those are never ours to wipe.
+						try {
+							// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
+							const ivBump = bumpIvCounter(keystore.ivCounter);
+							const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
+							updatedKs.recordHmac = await computeRecordHmac(updatedKs, keystore.hmacKeyRef);
 
-						// Encrypt with the UPDATED keystore state bound into the AAD.
-						const blob = await encryptProfileRecord(next, updatedKs);
+							// Encrypt with the UPDATED keystore state bound into the AAD.
+							const blob = await encryptProfileRecord(next, updatedKs);
 
-						// Sign the new HWM under the single hmacKey.
-						const newHwm = await signSidecar(
-							'profile-hwm',
-							{
-								generation: nextGen,
-								keystoreGeneration: keystore.keystoreGeneration,
-								epoch: keystore.epoch,
-								ts: now
-							},
-							keystore.hmacKeyRef
-						);
+							// Sign the new HWM under the single hmacKey.
+							const newHwm = await signSidecar(
+								'profile-hwm',
+								{
+									generation: nextGen,
+									keystoreGeneration: keystore.keystoreGeneration,
+									epoch: keystore.epoch,
+									ts: now
+								},
+								keystore.hmacKeyRef
+							);
 
-						// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.
-						await withStores(db, ['profile', 'profile-hwm', 'keystore'], 'readwrite', (tx) => {
-							// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptProfileRecord, under withWriteLocks.
-							tx.objectStore('profile').put({ id: 0, rec: blob });
-							tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
-							tx.objectStore('keystore').put(updatedKs);
-						});
+							// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.
+							await withStores(db, ['profile', 'profile-hwm', 'keystore'], 'readwrite', (tx) => {
+								// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptProfileRecord, under withWriteLocks.
+								tx.objectStore('profile').put({ id: 0, rec: blob });
+								tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
+								tx.objectStore('keystore').put(updatedKs);
+							});
+						} catch (e) {
+							zeroizeRecord(next as unknown as Record<string, unknown>);
+							throw e;
+						}
 
 						// A profile body now exists in storage (generation >= 1). Record it so the
 						// locked signal can tell "relocked - unlock to view" from "never set up" even

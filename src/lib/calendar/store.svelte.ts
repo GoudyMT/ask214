@@ -3,16 +3,18 @@ import type { CardDismissal } from './card-visibility';
 import { encodeCalendarSyncState, decodeCalendarSyncState } from './codec';
 import { mergeHandedOver, acknowledge } from './handed-over';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
-import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
-import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
+import type { KeystoreRecordV1 } from '../keystore/record';
+import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
 import {
 	KeystoreNotInitializedError,
-	KeystoreHmacMismatchError,
-	OccConflictError
+	OccConflictError,
+	getRow,
+	readKeystoreRow,
+	readHwmGeneration
 } from '../profile/store.svelte';
 import { withWriteLocks } from '../db/locks';
-import { withStores, reqToPromise } from '../db/schema';
+import { withStores } from '../db/schema';
 
 /**
  * CalendarSyncStore - orchestration over keystore + the generic record-crypto
@@ -38,7 +40,6 @@ import { withStores, reqToPromise } from '../db/schema';
 export class CalendarRelockedError extends Error {
 	constructor() {
 		super('E_CALENDAR_RELOCKED');
-		this.name = 'CalendarRelockedError';
 	}
 }
 
@@ -52,17 +53,7 @@ type CalendarHwmPayload = {
 };
 
 type KeystoreRow = KeystoreRecordV1 & { id: number };
-type HwmRow = SignedSidecar<CalendarHwmPayload> & { id: number };
 type StateRow = { id: number; rec: Uint8Array };
-
-function getRow<T>(
-	db: IDBDatabase,
-	store: 'keystore' | 'calendar-sync-hwm' | 'calendar-sync'
-): Promise<T | undefined> {
-	return withStores(db, store, 'readonly', (tx) =>
-		reqToPromise<T | undefined>(tx.objectStore(store).get(0))
-	);
-}
 
 export type CalendarBroadcastEvent = { type: 'calendar-updated' | 'relocked' };
 export type CalendarStoreOptions = { onBroadcast?: (e: CalendarBroadcastEvent) => void };
@@ -83,26 +74,10 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
-	async function readVerifiedKeystore(): Promise<KeystoreRow> {
-		const ks = await getRow<KeystoreRow>(db, 'keystore');
-		if (!ks) throw new KeystoreNotInitializedError();
-		if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
-			throw new KeystoreHmacMismatchError();
-		}
-		return ks;
-	}
-
+	const readVerifiedKeystore = () => readKeystoreRow(db);
 	/** Current calendar generation (0 = no HWM yet = no calendar state written). */
-	async function readCurrentGeneration(keystore: KeystoreRow): Promise<number> {
-		const hwmRow = await getRow<HwmRow>(db, 'calendar-sync-hwm');
-		if (!hwmRow) return 0;
-		const hwm = await verifySidecar<CalendarHwmPayload>(
-			'calendar-sync-hwm',
-			{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
-			keystore.hmacKeyRef
-		);
-		return hwm.generation;
-	}
+	const readCurrentGeneration = (keystore: KeystoreRow) =>
+		readHwmGeneration(db, 'calendar-sync-hwm', keystore.hmacKeyRef);
 
 	/**
 	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
@@ -136,7 +111,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 					keystore,
 					nextGen
 				);
-				const newHwm = await signSidecar(
+				const newHwm = await signSidecar<CalendarHwmPayload>(
 					'calendar-sync-hwm',
 					{
 						generation: nextGen,
@@ -166,8 +141,8 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 
 	const api = {
 		/**
-		 * Whether the record is loaded and writable. FALSE before the first load and after a relock,
-		 * when the current record is UNKNOWN. Callers MUST gate on this and fail closed rather than
+		 * Whether the record is loaded and writable. FALSE before the first load, after a relock, and
+		 * after a read that failed, when the current record is UNKNOWN. Callers MUST gate on this and fail closed rather than
 		 * read the empty defaults below as "the user excluded nothing".
 		 */
 		get ready(): boolean {
@@ -197,34 +172,46 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
-			await withWriteLocks(
-				async () => {
-					ks = await readVerifiedKeystore();
-					return ks.keystoreGeneration;
-				},
-				async () => {
-					if (!ks) throw new KeystoreNotInitializedError();
-					const keystore = ks;
-					const gen = await readCurrentGeneration(keystore);
-					_generation = gen;
-					if (gen === 0) {
+			try {
+				await withWriteLocks(
+					async () => {
+						ks = await readVerifiedKeystore();
+						return ks.keystoreGeneration;
+					},
+					async () => {
+						if (!ks) throw new KeystoreNotInitializedError();
+						const keystore = ks;
+						const gen = await readCurrentGeneration(keystore);
+						// The generation moves only with the record it belongs to: a read that fails after a
+						// peer's save would otherwise pair the newer generation with the older record, and a
+						// write from them would pass the conflict check and lay it over the peer's save.
+						if (gen === 0) {
+							_generation = gen;
+							if (relockEpoch === relockAtStart) {
+								_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
+								lockState = 'unlocked';
+							}
+							return;
+						}
+						const row = await getRow<StateRow>(db, 'calendar-sync');
+						if (!row) throw new Error('E_CALENDAR_BODY_MISSING');
+						const decoded = decodeCalendarSyncState(
+							await decryptRecord(CALENDAR_CTX, row.rec, keystore, gen)
+						);
+						_generation = gen;
 						if (relockEpoch === relockAtStart) {
-							_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
+							_state = decoded;
 							lockState = 'unlocked';
 						}
-						return;
 					}
-					const row = await getRow<StateRow>(db, 'calendar-sync');
-					if (!row) throw new Error('E_CALENDAR_BODY_MISSING');
-					const decoded = decodeCalendarSyncState(
-						await decryptRecord(CALENDAR_CTX, row.rec, keystore, gen)
-					);
-					if (relockEpoch === relockAtStart) {
-						_state = decoded;
-						lockState = 'unlocked';
-					}
-				}
-			);
+				);
+			} catch (e) {
+				// The stored record could not be read, so what is held is no longer known to be current.
+				// Say so (not ready, empty defaults) rather than serve it. lockState stays as it was, so
+				// the next automatic re-read still tries.
+				_state = null;
+				throw e;
+			}
 		},
 
 		/**
@@ -235,9 +222,15 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		 * would reverse that. An `evicted` store lost its plaintext to page hygiene on the way out
 		 * and the page has come back, so the re-read is the undo it is owed. An unlocked store
 		 * re-reads so a peer's change still lands.
+		 *
+		 * A hidden page does not decrypt on its own: nobody can see the result, and a page that goes
+		 * hidden relocks and comes back through the lifecycle's visible restore, which calls this.
+		 * load() is not gated - Unlock and start-up use it, and they are the user asking.
 		 */
 		refresh(): Promise<void> {
-			if (lockState === 'locked') return Promise.resolve();
+			if (lockState === 'locked' || document.visibilityState === 'hidden') {
+				return Promise.resolve();
+			}
 			return api.load();
 		},
 

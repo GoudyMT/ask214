@@ -62,10 +62,15 @@ export async function aesGcmDecrypt(
 			ciphertext
 		);
 		return new Uint8Array(pt);
-	} catch {
+	} catch (e) {
 		// SubtleCrypto throws OperationError for any auth failure (AAD mismatch,
-		// ciphertext mutation, wrong key, wrong IV). Map to a typed error; never
-		// include the original error message (PII risk).
-		throw new AesGcmAuthError();
+		// ciphertext mutation or truncation, wrong key, wrong IV). Only that is
+		// proof the bytes fail their check. Any other failure (an unsupported
+		// algorithm, a bad argument, a TypeError) says nothing about the bytes, so
+		// it must not read as damage. Both map to a static code; never include the
+		// original error message (PII risk).
+		throw e instanceof DOMException && e.name === 'OperationError'
+			? new AesGcmAuthError()
+			: new Error('E_AES_GCM_DECRYPT');
 	}
 }

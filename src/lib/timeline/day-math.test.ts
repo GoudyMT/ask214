@@ -1,5 +1,37 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { daysBetween, addDays, localTodayIso } from './day-math';
+import { isDay } from './day-check';
+
+describe('isDay', () => {
+	it('accepts a day the app writes, including the leap day and the last day it can name', () => {
+		for (const d of ['2026-10-04', '2028-02-29', '9999-12-30', '0001-01-01']) {
+			expect(isDay(d), d).toBe(true);
+		}
+	});
+
+	it('refuses anything a UTC round trip does not give back unchanged', () => {
+		for (const d of [
+			'2026-02-30',
+			'2026-13-01',
+			'2026-13-45',
+			'2026-4-1',
+			'2026-12-01x',
+			'2026-12-01T00:00:00Z',
+			'3abcdefghi',
+			'10000-01-01',
+			'',
+			' 2026-10-04'
+		]) {
+			expect(isDay(d), d).toBe(false);
+		}
+	});
+
+	it('refuses a value that is not a string without turning it into text', () => {
+		for (const v of [null, undefined, 20261004, ['2026-10-04'], { toString: 0 }]) {
+			expect(isDay(v)).toBe(false);
+		}
+	});
+});
 
 describe('daysBetween', () => {
 	it('counts whole calendar days, positive when the second date is later', () => {

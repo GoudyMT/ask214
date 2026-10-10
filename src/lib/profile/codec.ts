@@ -84,6 +84,37 @@ export function encodeProfile(p: ProfileV1): Uint8Array {
 	return new TextEncoder().encode(JSON.stringify(canon));
 }
 
+const isNumber = (v: unknown): boolean => typeof v === 'number';
+const isText = (v: unknown): boolean => {
+	if (typeof v !== 'string') return false;
+	try {
+		atob(v);
+		return true;
+	} catch {
+		return false;
+	}
+};
+
+// The type each key has when the encoder writes it. A key the record holds with any other type, falsy or not, is a
+// record this release cannot vouch for; a key it does not hold is read as absent, and a key not listed is ignored.
+const WIRE_TYPES: Record<string, (v: unknown) => boolean> = {
+	generation: isNumber,
+	lastSeenAt: isNumber,
+	setupIntent: (v) => typeof v === 'string',
+	setupIntentChangedAt: (v) => v === null || isNumber(v),
+	eaos: (v) => v === null || isText(v),
+	rate: isText,
+	rank: isText,
+	yearsOfService: isNumber,
+	anticipatedDisabilityRating: isNumber,
+	familyStatus: isText,
+	intendedPath: isText,
+	geographicDestination: isText,
+	specialSituations: (v) => Array.isArray(v) && v.every(isText),
+	skillbridgeStart: isText,
+	terminalLeaveStart: isText
+};
+
 export function decodeProfile(bytes: Uint8Array): ProfileV1 {
 	let wire: WireProfile;
 	try {
@@ -91,7 +122,15 @@ export function decodeProfile(bytes: Uint8Array): ProfileV1 {
 	} catch {
 		throw new ProfileSchemaError();
 	}
-	if (wire.schemaVersion !== 1) throw new ProfileSchemaError();
+	if (typeof wire !== 'object' || wire === null || wire.schemaVersion !== 1) {
+		throw new ProfileSchemaError();
+	}
+	// Every check runs before any byte is decoded, so a record that fails leaves no decoded field behind.
+	for (const [key, isValid] of Object.entries(WIRE_TYPES)) {
+		if (Object.hasOwn(wire, key) && !isValid((wire as Record<string, unknown>)[key])) {
+			throw new ProfileSchemaError();
+		}
+	}
 	return {
 		schemaVersion: 1,
 		generation: wire.generation,

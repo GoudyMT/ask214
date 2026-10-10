@@ -28,6 +28,8 @@
 		month: 'Please enter a valid date.',
 		day: 'Please enter a valid date.'
 	};
+	// A failed save is said, never left as a silent rejection (the same line the Settings rows show).
+	const FAILED = 'Could not update right now - please try again.';
 
 	function onInput(next: string): void {
 		value = next;
@@ -57,17 +59,23 @@
 			// they built. (Skip, below, stays on Home since nothing was set up.)
 			await goto(resolve('/timeline'));
 		} catch (err) {
+			// OCC: another tab set up the profile first. Re-read the authoritative state and ask the user
+			// to review + retry (reload, don't clobber). refresh, not load: the user asked to SAVE, not
+			// to unlock, so if the write lost its race to a relock this must not re-open the store. If
+			// the re-read fails too, "we reloaded it" would be false, so the failed line stands.
+			error = FAILED;
 			if (err instanceof OccConflictError) {
-				// Another tab set up the profile first. Re-read the authoritative state and ask
-				// the user to review + retry (OCC: reload, don't clobber). refresh, not load: the
-				// user asked to SAVE, not to unlock, so if the write lost its race to a relock this
-				// must not re-open the store.
-				await store.refresh();
-				error = 'This was changed in another tab. We reloaded it - please review and save again.';
-				return;
+				try {
+					await store.refresh();
+					error = 'This was changed in another tab. We reloaded it - please review and save again.';
+				} catch {
+					// FAILED is already set.
+				}
 			}
-			throw err;
 		} finally {
+			// The store copies the bytes it keeps, so once the save has settled this array only
+			// holds the typed date; wiping it earlier would wipe what is being saved.
+			bytes.fill(0);
 			saving = false;
 		}
 	}

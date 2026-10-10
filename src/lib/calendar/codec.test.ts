@@ -25,6 +25,78 @@ describe('calendar-sync codec', () => {
 		expect(() => decodeCalendarSyncState(bytes)).toThrow(CalendarSchemaError);
 	});
 
+	// The exclusion set decides what leaves for the calendar, so one the app cannot read makes the whole calendar
+	// unavailable rather than being read as "nothing excluded".
+	describe('an exclusion set it cannot read', () => {
+		const withExclusions = (exclusions: unknown) =>
+			new TextEncoder().encode(JSON.stringify({ schemaVersion: 1, exclusions }));
+		const unreadable: [string, unknown][] = [
+			['missing', undefined],
+			['null', null],
+			['a string', 'medical'],
+			['an array', []],
+			['taskIds missing', { categories: [] }],
+			['categories missing', { taskIds: [] }],
+			['taskIds not an array', { taskIds: 'a', categories: [] }],
+			['categories not an array', { taskIds: [], categories: 'medical' }],
+			['taskIds null', { taskIds: null, categories: [] }],
+			['a non-string in taskIds', { taskIds: ['a', 1], categories: [] }],
+			['a null in categories', { taskIds: [], categories: [null] }],
+			['an object in categories', { taskIds: [], categories: [{}] }]
+		];
+		for (const [name, exclusions] of unreadable) {
+			it(`throws for ${name}`, () => {
+				expect(() => decodeCalendarSyncState(withExclusions(exclusions))).toThrow(
+					CalendarSchemaError
+				);
+			});
+		}
+
+		// Types only, never membership: a category name an older release wrote must still read.
+		it('still reads a category name this release does not know, and a key it does not know', () => {
+			const s = decodeCalendarSyncState(
+				withExclusions({ taskIds: ['t'], categories: ['retired-category'], extra: 1 })
+			);
+			expect(s.exclusions.categories).toEqual(['retired-category']);
+			expect(s.exclusions.taskIds).toEqual(['t']);
+		});
+	});
+
+	describe('a card it cannot read', () => {
+		const withCard = (card: unknown) =>
+			new TextEncoder().encode(
+				JSON.stringify({
+					schemaVersion: 1,
+					exclusions: { taskIds: [], categories: ['medical'] },
+					card
+				})
+			);
+
+		it('keeps a card holding a dismissal time and a count', () => {
+			const card = { dismissedAt: 1716700000000, dismissCount: 2 };
+			expect(decodeCalendarSyncState(withCard(card)).card).toEqual(card);
+		});
+
+		const bad: [string, unknown][] = [
+			['a string', 'x'],
+			['an array', []],
+			['a number', 7],
+			['null', null],
+			['a time that is not a number', { dismissedAt: '1', dismissCount: 1 }],
+			['a count that is not a number', { dismissedAt: 1, dismissCount: '1' }],
+			['a missing count', { dismissedAt: 1 }],
+			['a missing time', { dismissCount: 1 }],
+			['an empty object', {}]
+		];
+		for (const [name, card] of bad) {
+			it(`drops ${name} and keeps the rest of the record`, () => {
+				const s = decodeCalendarSyncState(withCard(card));
+				expect('card' in s).toBe(false);
+				expect(s.exclusions.categories).toEqual(['medical']);
+			});
+		}
+	});
+
 	it('drops a malformed lastAdd at decode, keeping the rest of the record', () => {
 		const bytes = new TextEncoder().encode(
 			JSON.stringify({

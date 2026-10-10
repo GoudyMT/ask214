@@ -8,8 +8,10 @@
 		hasKey: boolean;
 		onSetDefaultMode: (m: 'device' | 'online') => void;
 		onToggleSynthesis: (on: boolean) => void;
-		onSaveKey: (key: string) => void;
-		onClearKey: () => void;
+		/** Rejects when the key could not be stored; the panel says so. */
+		onSaveKey: (key: string) => Promise<void>;
+		/** Rejects when the key could not be removed; the panel says so. */
+		onClearKey: () => Promise<void>;
 	};
 	let {
 		defaultMode,
@@ -32,11 +34,29 @@
 		if (keyInputEl) return registerSecureInput(keyInputEl);
 	});
 
-	function save(): void {
+	let keyError = $state<string | null>(null);
+
+	// The draft is cleared before the save is awaited: the raw key must not linger in the field. A failed save
+	// therefore says to enter it again.
+	async function save(): Promise<void> {
 		const key = keyDraft.trim();
 		if (key === '') return;
-		onSaveKey(key);
+		keyError = null;
 		keyDraft = '';
+		try {
+			await onSaveKey(key);
+		} catch {
+			keyError = 'Could not save your key - please enter it again.';
+		}
+	}
+
+	async function clear(): Promise<void> {
+		keyError = null;
+		try {
+			await onClearKey();
+		} catch {
+			keyError = 'Could not update right now - please try again.';
+		}
 	}
 </script>
 
@@ -91,9 +111,12 @@
 			/>
 			<button class="online-key__save" type="button" onclick={save}>Save</button>
 			{#if hasKey}
-				<button class="online-key__clear" type="button" onclick={onClearKey}>Remove</button>
+				<button class="online-key__clear" type="button" onclick={clear}>Remove</button>
 			{/if}
 		</div>
+		{#if keyError}
+			<p class="online-key__error" role="alert">{keyError}</p>
+		{/if}
 		<p class="online-hint">
 			Your key is encrypted on this device and sent only to Anthropic - never to us.
 			<a href="https://console.anthropic.com/settings/keys" rel="external noopener">
@@ -190,6 +213,11 @@
 		display: flex;
 		gap: var(--space-s);
 		margin-bottom: var(--space-s);
+	}
+	.online-key__error {
+		margin: 0;
+		color: var(--color-danger);
+		font-size: var(--font-size-s);
 	}
 	.online-key__input {
 		flex: 1;

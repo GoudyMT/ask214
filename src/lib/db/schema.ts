@@ -37,7 +37,8 @@ export type StoreName = (typeof STORES)[number];
 
 export function openMtcDb(
 	name: string = DB_NAME,
-	onVersionChange?: () => void
+	onVersionChange?: () => void,
+	onBlocked?: () => void
 ): Promise<IDBDatabase> {
 	return new Promise<IDBDatabase>((resolve, reject) => {
 		const req = indexedDB.open(name, DB_VERSION);
@@ -65,7 +66,9 @@ export function openMtcDb(
 			resolve(db);
 		};
 		req.onerror = () => reject(req.error ?? new Error('idb-open-failed'));
-		req.onblocked = () => reject(new Error('idb-open-blocked'));
+		// Another tab still holds an older connection and has not closed it. The request stays queued: when
+		// that tab closes it resumes and succeeds on its own, so the caller only needs to be told it waits.
+		req.onblocked = onBlocked ?? null;
 	});
 }
 

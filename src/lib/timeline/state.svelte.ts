@@ -1,16 +1,18 @@
 import type { TimelineState, TaskStatus, TimelineTaskState } from './types';
-import { encodeTimelineState, decodeTimelineState } from './state-codec';
+import { encodeTimelineState, decodeTimelineState, isSnoozeDate } from './state-codec';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
-import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
-import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
+import type { KeystoreRecordV1 } from '../keystore/record';
+import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
 import {
 	KeystoreNotInitializedError,
-	KeystoreHmacMismatchError,
-	OccConflictError
+	OccConflictError,
+	getRow,
+	readKeystoreRow,
+	readHwmGeneration
 } from '../profile/store.svelte';
 import { withWriteLocks } from '../db/locks';
-import { withStores, reqToPromise } from '../db/schema';
+import { withStores } from '../db/schema';
 
 /**
  * TimelineStateStore - orchestration over keystore + the generic record-crypto
@@ -55,25 +57,19 @@ type TimelineHwmPayload = {
 };
 
 type KeystoreRow = KeystoreRecordV1 & { id: number };
-type HwmRow = SignedSidecar<TimelineHwmPayload> & { id: number };
 type StateRow = { id: number; rec: Uint8Array };
 
-function getRow<T>(
-	db: IDBDatabase,
-	store: 'keystore' | 'timeline-state-hwm' | 'timeline-state'
-): Promise<T | undefined> {
-	return withStores(db, store, 'readonly', (tx) =>
-		reqToPromise<T | undefined>(tx.objectStore(store).get(0))
-	);
-}
-
-/** Drop undefined fields so an empty task entry can be pruned and JSON stays minimal. */
+/**
+ * Keep every field the entry holds except the cleared ones (undefined), so an empty entry can be pruned and JSON stays
+ * minimal. A field this release does not know (a newer release wrote it) is kept, or this tab's next write would drop it.
+ * An own `__proto__` key is never copied: assigning it would set the prototype instead of adding a key.
+ */
 function cleanTaskState(s: TimelineTaskState): TimelineTaskState {
-	const out: TimelineTaskState = {};
-	if (s.status !== undefined) out.status = s.status;
-	if (s.snoozeUntil !== undefined) out.snoozeUntil = s.snoozeUntil;
-	if (s.notes !== undefined) out.notes = s.notes;
-	return out;
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(s)) {
+		if (key !== '__proto__' && value !== undefined) out[key] = value;
+	}
+	return out as TimelineTaskState;
 }
 
 export type TimelineBroadcastEvent = { type: 'timeline-updated' | 'relocked' };
@@ -99,26 +95,10 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
-	async function readVerifiedKeystore(): Promise<KeystoreRow> {
-		const ks = await getRow<KeystoreRow>(db, 'keystore');
-		if (!ks) throw new KeystoreNotInitializedError();
-		if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
-			throw new KeystoreHmacMismatchError();
-		}
-		return ks;
-	}
-
+	const readVerifiedKeystore = () => readKeystoreRow(db);
 	/** Current timeline generation (0 = no HWM yet = no timeline state written). */
-	async function readCurrentGeneration(keystore: KeystoreRow): Promise<number> {
-		const hwmRow = await getRow<HwmRow>(db, 'timeline-state-hwm');
-		if (!hwmRow) return 0;
-		const hwm = await verifySidecar<TimelineHwmPayload>(
-			'timeline-state-hwm',
-			{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
-			keystore.hmacKeyRef
-		);
-		return hwm.generation;
-	}
+	const readCurrentGeneration = (keystore: KeystoreRow) =>
+		readHwmGeneration(db, 'timeline-state-hwm', keystore.hmacKeyRef);
 
 	/**
 	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
@@ -153,7 +133,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					keystore,
 					nextGen
 				);
-				const newHwm = await signSidecar(
+				const newHwm = await signSidecar<TimelineHwmPayload>(
 					'timeline-state-hwm',
 					{
 						generation: nextGen,
@@ -186,7 +166,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			const merged = cleanTaskState({ ...base.tasks[taskId], ...patch });
 			const nextTasks: Record<string, TimelineTaskState> = {};
 			for (const [id, st] of Object.entries(base.tasks)) {
-				if (id !== taskId) nextTasks[id] = st;
+				if (id !== taskId && id !== '__proto__') nextTasks[id] = st;
 			}
 			if (Object.keys(merged).length > 0) nextTasks[taskId] = merged;
 			return { schemaVersion: 1, tasks: nextTasks };
@@ -279,9 +259,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		 * screen, in a tab that locked itself is precisely what it must not do. An `evicted` store
 		 * lost its plaintext to page hygiene on the way out and the page has come back, so the
 		 * re-read is the undo it is owed. An unlocked store re-reads so a peer's change still lands.
+		 *
+		 * Reads nothing while the page is hidden: nobody can see what it would decrypt, and a page that is seen again
+		 * re-reads then.
 		 */
 		refresh(): Promise<void> {
-			if (lockState === 'locked') return Promise.resolve();
+			if (lockState === 'locked' || document.visibilityState === 'hidden') return Promise.resolve();
 			return api.load();
 		},
 
@@ -290,8 +273,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return update(taskId, { status, snoozeUntil: undefined });
 		},
 
-		/** Snooze a task until an ISO date (sets status 'snoozed'). */
+		/**
+		 * Snooze a task until an ISO date (sets status 'snoozed'). Refuses a date the calendar file cannot write; never
+		 * one that is merely past, since a stored record must stay valid after a clock change.
+		 */
 		setSnooze(taskId: string, untilIso: string): Promise<void> {
+			if (!isSnoozeDate(untilIso)) return Promise.reject(new Error('E_SNOOZE_DATE'));
 			return update(taskId, { status: 'snoozed', snoozeUntil: untilIso });
 		},
 

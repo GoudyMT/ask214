@@ -1,10 +1,25 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createCalendarSyncStore, CalendarRelockedError } from './store.svelte';
 import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { withStores, reqToPromise } from '../db/schema';
 import type { DesiredEvent, HandedOverEvent, TaskExclusions } from './types';
+
+// A passthrough over the cipher that counts decrypts, so a re-read that must not happen can be shown not to.
+// The path is a `$lib` alias on purpose: with a relative path the mock silently never applied to the store's own
+// import in this browser runner.
+const seams = vi.hoisted(() => ({ decrypts: 0 }));
+vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../crypto/record-crypto')>();
+	return {
+		...real,
+		decryptRecord: (...args: Parameters<typeof real.decryptRecord>) => {
+			seams.decrypts++;
+			return real.decryptRecord(...args);
+		}
+	};
+});
 
 // Real Chromium (SubtleCrypto + IndexedDB + navigator.locks). The calendar-sync
 // store mirrors the timeline-state store's load/save/OCC/relock/wipe spine over the
@@ -186,6 +201,169 @@ describe('calendar-sync store', () => {
 		await b.load();
 		expect(b.exclusions).toEqual({ taskIds: [], categories: ['medical', 'admin'] });
 		await deleteTestDb(db);
+	});
+
+	// Damages the stored body so the next read fails after the generation was read; the returned function puts it back.
+	async function damageBody(db: IDBDatabase): Promise<() => Promise<void>> {
+		const row = await withStores(db, 'calendar-sync', 'readonly', (tx) =>
+			reqToPromise<{ id: number; rec: Uint8Array } | undefined>(
+				tx.objectStore('calendar-sync').get(0)
+			)
+		);
+		if (!row) throw new Error('test setup: no calendar body');
+		const bad = new Uint8Array(row.rec);
+		bad[20] = (bad[20] ?? 0) ^ 0xff;
+		const put = (rec: Uint8Array) =>
+			withStores(db, 'calendar-sync', 'readwrite', (tx) => {
+				tx.objectStore('calendar-sync').put({ id: 0, rec });
+			});
+		await put(bad);
+		return () => put(row.rec);
+	}
+	const EMPTY: TaskExclusions = { taskIds: [], categories: [] };
+
+	// A read that fails after a peer's save must not pair the peer's generation with the older record it still holds:
+	// a write from it would pass the conflict check and lay the old record over the peer's save.
+	it('refuses a write after a failed re-read, so a peer save survives', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		const peer = createCalendarSyncStore(db);
+		await peer.load();
+		await peer.setExclusions({ taskIds: ['peer'], categories: [] });
+		const restore = await damageBody(db);
+
+		await expect(a.load()).rejects.toThrow();
+		await restore();
+
+		await expect(a.setExclusions({ taskIds: ['mine'], categories: [] })).rejects.toThrow(
+			OccConflictError
+		);
+		const fresh = createCalendarSyncStore(db);
+		await fresh.load();
+		expect(fresh.exclusions).toEqual({ taskIds: ['peer'], categories: [] });
+		await deleteTestDb(db);
+	});
+
+	// After a failed read the stored record is UNKNOWN, so the store says so (the timeline's `failed`) instead of
+	// serving the older record as if it were current.
+	it('reads as not ready, with the empty defaults, after a re-read fails', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		const peer = createCalendarSyncStore(db);
+		await peer.load();
+		await peer.setExclusions({ taskIds: [], categories: ['admin'] });
+		expect(a.ready).toBe(true);
+		expect(a.exclusions.categories).toEqual(['medical']);
+		const restore = await damageBody(db);
+
+		await expect(a.refresh()).rejects.toThrow();
+
+		expect(a.ready).toBe(false);
+		expect(a.exclusions).toEqual(EMPTY);
+		await expect(a.setExclusions({ taskIds: ['mine'], categories: [] })).rejects.toThrow(
+			OccConflictError
+		);
+
+		// The next read that succeeds puts the store back.
+		await restore();
+		await a.refresh();
+		expect(a.ready).toBe(true);
+		expect(a.exclusions).toEqual({ taskIds: [], categories: ['admin'] });
+		await deleteTestDb(db);
+	});
+
+	describe('refresh while the page is hidden', () => {
+		const stubVisibility = (state: DocumentVisibilityState) =>
+			vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);
+		beforeEach(() => {
+			seams.decrypts = 0;
+		});
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it('does not decrypt on a hidden re-read, and reads again once the page is visible', async () => {
+			expect(document.visibilityState).toBe('visible');
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await store.setExclusions({ taskIds: [], categories: ['medical'] });
+			store.relockSync('hygiene');
+			seams.decrypts = 0;
+
+			const visibility = stubVisibility('hidden');
+			await store.refresh();
+			expect(seams.decrypts).toBe(0);
+			expect(store.ready).toBe(false);
+
+			visibility.mockReturnValue('visible');
+			await store.refresh();
+			expect(seams.decrypts).toBe(1);
+			expect(store.exclusions).toEqual({ taskIds: [], categories: ['medical'] });
+			await deleteTestDb(db);
+		});
+
+		it('leaves an unlocked store on what it holds until the page is visible', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			const peer = createCalendarSyncStore(db);
+			await peer.load();
+			await peer.setExclusions({ taskIds: [], categories: ['admin'] });
+			seams.decrypts = 0;
+
+			const visibility = stubVisibility('hidden');
+			await store.refresh();
+			expect(seams.decrypts).toBe(0);
+			expect(store.exclusions).toEqual(EMPTY);
+
+			visibility.mockReturnValue('visible');
+			await store.refresh();
+			expect(store.exclusions).toEqual({ taskIds: [], categories: ['admin'] });
+			await deleteTestDb(db);
+		});
+
+		it('still refuses a locked store, hidden or not', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await store.setExclusions({ taskIds: [], categories: ['medical'] });
+			store.relockSync('user');
+			seams.decrypts = 0;
+
+			await store.refresh();
+			stubVisibility('hidden');
+			await store.refresh();
+
+			expect(seams.decrypts).toBe(0);
+			expect(store.ready).toBe(false);
+			await deleteTestDb(db);
+		});
+
+		it('does not gate load, which is the user asking', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await store.setExclusions({ taskIds: [], categories: ['medical'] });
+			store.relockSync('user');
+			seams.decrypts = 0;
+
+			stubVisibility('hidden');
+			await store.load();
+
+			expect(seams.decrypts).toBe(1);
+			expect(store.ready).toBe(true);
+			await deleteTestDb(db);
+		});
 	});
 
 	describe('the handed-over record', () => {

@@ -1,4 +1,4 @@
-import { aesGcmEncrypt, aesGcmDecrypt } from './aes-gcm';
+import { aesGcmEncrypt, aesGcmDecrypt, AesGcmAuthError } from './aes-gcm';
 import { buildAAD, computeKeystoreRecordHash } from '../profile/aad';
 import type { KeystoreRecordV1 } from '../keystore/record';
 
@@ -14,6 +14,7 @@ import type { KeystoreRecordV1 } from '../keystore/record';
  * or keystore-diverged record fails authentication.
  */
 const IV_LENGTH = 12;
+const TAG_LENGTH = 16;
 
 /** The store context an encrypted record is bound to via its AAD. */
 export type RecordCtx = { storeName: string; recordId: string; schemaVersion: number };
@@ -45,7 +46,9 @@ export async function encryptRecord(
 	const iv = new Uint8Array(IV_LENGTH);
 	crypto.getRandomValues(iv);
 	const aad = await buildRecordAad(ctx, keystore, generation);
-	const ct = await aesGcmEncrypt(keystore.dataKeyRef, iv, aad, new Uint8Array(plaintext));
+	// WebCrypto copies its input at the call, so the copy holds the plaintext for nothing once the call settles.
+	const copy = new Uint8Array(plaintext);
+	const ct = await aesGcmEncrypt(keystore.dataKeyRef, iv, aad, copy).finally(() => copy.fill(0));
 
 	const out = new Uint8Array(iv.length + ct.length);
 	out.set(iv, 0);
@@ -60,6 +63,12 @@ export async function decryptRecord(
 	keystore: KeystoreRecordV1,
 	expectedGeneration: number
 ): Promise<Uint8Array> {
+	// The IV is read from the stored bytes, so a blob too short to hold an IV and a tag is stored data that fails its
+	// check - never a wrong argument from the caller. Checked before slicing, which would turn a short blob into a
+	// short IV.
+	if (!(blob instanceof Uint8Array) || blob.length < IV_LENGTH + TAG_LENGTH) {
+		throw new AesGcmAuthError();
+	}
 	const bytes = new Uint8Array(blob); // normalize to ArrayBuffer-backed (Bytes)
 	const iv = bytes.subarray(0, IV_LENGTH);
 	const ct = bytes.subarray(IV_LENGTH);
