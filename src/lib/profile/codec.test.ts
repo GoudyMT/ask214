@@ -104,6 +104,142 @@ describe('encodeProfile / decodeProfile', () => {
 	});
 });
 
+// A stored record this release cannot vouch for fails closed to a schema error (the start-up banner), never a
+// half-read profile: every key the record holds must have the type the encoder writes, falsy values included.
+describe('a record with a key of the wrong type', () => {
+	const bytes = (o: Record<string, unknown>) => new TextEncoder().encode(JSON.stringify(o));
+	const valid = (): Record<string, unknown> => ({
+		schemaVersion: 1,
+		generation: 1,
+		lastSeenAt: 0,
+		setupIntent: 'completed',
+		setupIntentChangedAt: 0,
+		eaos: null
+	});
+	const b64 = (s: string) => btoa(s);
+
+	it('reads the valid record the cases below start from', () => {
+		expect(decodeProfile(bytes(valid())).generation).toBe(1);
+	});
+
+	const wrong: [string, unknown][] = [
+		['generation', '1'],
+		['generation', null],
+		['generation', false],
+		['lastSeenAt', '0'],
+		['lastSeenAt', null],
+		['setupIntent', 0],
+		['setupIntent', null],
+		['setupIntentChangedAt', '0'],
+		['setupIntentChangedAt', false],
+		['eaos', 0],
+		['eaos', false],
+		['eaos', 20270430],
+		['eaos', ['2027-04-30']],
+		['rate', 0],
+		['rate', false],
+		['rate', null],
+		['rank', 0],
+		['rank', {}],
+		['yearsOfService', '9'],
+		['yearsOfService', null],
+		['yearsOfService', false],
+		['anticipatedDisabilityRating', '30'],
+		['anticipatedDisabilityRating', null],
+		['familyStatus', 0],
+		['familyStatus', false],
+		['intendedPath', 0],
+		['intendedPath', null],
+		['geographicDestination', 0],
+		['geographicDestination', false],
+		['specialSituations', 0],
+		['specialSituations', false],
+		['specialSituations', null],
+		['specialSituations', b64('combat-vet')],
+		['specialSituations', [b64('combat-vet'), 0]],
+		['specialSituations', [null]],
+		['skillbridgeStart', 0],
+		['skillbridgeStart', false],
+		['skillbridgeStart', null],
+		['terminalLeaveStart', 0],
+		['terminalLeaveStart', false],
+		['terminalLeaveStart', ['x']]
+	];
+	for (const [key, value] of wrong) {
+		it(`throws a schema error for ${key} = ${JSON.stringify(value)}`, () => {
+			expect(() => decodeProfile(bytes({ ...valid(), [key]: value }))).toThrow(ProfileSchemaError);
+		});
+	}
+
+	// atob throws a DOMException on text that is not base64; that must read as a schema error, whichever field holds it.
+	const notBase64 = ['not base64!', '***', 'abcde', 'YQ=a'];
+	for (const key of [
+		'eaos',
+		'rate',
+		'rank',
+		'familyStatus',
+		'intendedPath',
+		'geographicDestination',
+		'skillbridgeStart',
+		'terminalLeaveStart'
+	]) {
+		it(`throws a schema error, not a DOMException, for text in ${key} that is not base64`, () => {
+			for (const text of notBase64) {
+				let thrown: unknown;
+				try {
+					decodeProfile(bytes({ ...valid(), [key]: text }));
+				} catch (e) {
+					thrown = e;
+				}
+				expect(thrown, text).toBeInstanceOf(ProfileSchemaError);
+			}
+		});
+	}
+
+	it('throws a schema error for an entry of specialSituations that is not base64', () => {
+		const rec = { ...valid(), specialSituations: [b64('combat-vet'), 'not base64!'] };
+		expect(() => decodeProfile(bytes(rec))).toThrow(ProfileSchemaError);
+	});
+
+	it('throws a schema error for JSON that is not an object', () => {
+		for (const text of ['null', '7', '"x"', 'true', '[]']) {
+			expect(() => decodeProfile(new TextEncoder().encode(text)), text).toThrow(ProfileSchemaError);
+		}
+	});
+
+	it('reads a record whose key the encoder writes as null, and ignores a key it does not know', () => {
+		const dec = decodeProfile(
+			bytes({ ...valid(), setupIntentChangedAt: null, eaos: null, futureField: 0, another: false })
+		);
+		expect(dec.setupIntentChangedAt).toBeNull();
+		expect(dec.eaos).toBeNull();
+		expect('futureField' in dec).toBe(false);
+	});
+
+	it('round-trips a record with every field set', () => {
+		const enc = (s: string) => new TextEncoder().encode(s);
+		const full: ProfileV1 = {
+			schemaVersion: 1,
+			generation: 7,
+			lastSeenAt: 1716700000000,
+			setupIntent: 'completed',
+			setupIntentChangedAt: 1716700000001,
+			eaos: enc('2027-04-30'),
+			rate: enc('IT2'),
+			rank: enc('E-5'),
+			yearsOfService: 9,
+			anticipatedDisabilityRating: 30,
+			familyStatus: enc('married'),
+			intendedPath: enc('civilian-it'),
+			geographicDestination: enc('TX'),
+			specialSituations: [enc('combat-vet'), enc('post-911')],
+			skillbridgeStart: enc('2026-11-01'),
+			terminalLeaveStart: enc('2027-04-01')
+		};
+		expect(decodeProfile(encodeProfile(full))).toEqual(full);
+	});
+});
+
 describe('the leaving dates', () => {
 	const enc = (s: string) => new TextEncoder().encode(s);
 	const base = (): ProfileV1 => ({
