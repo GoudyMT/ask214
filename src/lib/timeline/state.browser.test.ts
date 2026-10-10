@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { createTimelineStateStore, TimelineRelockedError } from './state.svelte';
+import { readPlan, SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import { OccConflictError } from '../profile/store.svelte';
 import { signSidecar } from '../profile/sidecars';
 import { encryptRecord } from '../crypto/record-crypto';
@@ -404,6 +405,21 @@ describe('timeline-state store', () => {
 			await a.setStatus('a', undefined);
 			await a.setNote('a', undefined);
 			expect((await reload(db)).state.tasks['a']).toEqual({ pinned: true });
+			await deleteTestDb(db);
+		});
+
+		it('does not hide a SkillBridge answer saved on the same task', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			await seedRecord(
+				db,
+				`{"schemaVersion":1,"tasks":{"${SKILLBRIDGE_PLAN_KEY}":{"pinned":true}}}`
+			);
+			const a = await reload(db);
+			await a.setStatus(SKILLBRIDGE_PLAN_KEY, 'done');
+
+			const stored = (await reload(db)).state.tasks[SKILLBRIDGE_PLAN_KEY];
+			expect(readPlan(stored, '2028-06-30', '2026-10-07')).toMatchObject({ answer: 'yes' });
 			await deleteTestDb(db);
 		});
 

@@ -6,8 +6,8 @@ import type { TimelineState, TimelineTaskState } from './types';
  * The SkillBridge question's answer and what it means for the Timeline. It is kept in the timeline state under a key
  * no task uses, in the shapes the store already writes: Yes = { status: 'done' }; No = { status: 'skipped' }; Not
  * sure before the second ask = { status: 'snoozed', snoozeUntil }; Not sure from the second ask on = { status:
- * 'snoozed' } with no date, which shows the steps. A note on the key is the user's own text and is ignored. Any other
- * shape reads as no answer, so a damaged record asks again and never shows steps nobody chose.
+ * 'snoozed' } with no date, which shows the steps. Any other field on the key (the user's own note, one a newer release
+ * added) is ignored. Any other combination of status and date reads as no answer, so a damaged record asks again and never shows steps nobody chose.
  */
 export const SKILLBRIDGE_PLAN_KEY = 'skillbridge-plan';
 
@@ -40,20 +40,17 @@ type Saved =
 	| { kind: 'early'; until: string }
 	| { kind: 'late' };
 
-// The stored value comes from disk, so it can be anything: null or a non-object reads as no answer.
+// The stored value comes from disk, so it can be anything: null or a non-object reads as no answer. Only the status and
+// the date are read; any other field on the task (the user's note, one a newer release added) is not part of the answer.
 function recognise(raw: unknown): Saved {
 	if (typeof raw !== 'object' || raw === null) return { kind: 'none' };
-	const s = raw as TimelineTaskState;
-	const keys = Object.entries(s)
-		.filter(([k, v]) => v !== undefined && k !== 'notes')
-		.map(([k]) => k)
-		.sort()
-		.join(',');
-	if (keys === 'status' && s.status === 'done') return { kind: 'yes' };
-	if (keys === 'status' && s.status === 'skipped') return { kind: 'no' };
-	if (keys === 'status' && s.status === 'snoozed') return { kind: 'late' };
-	if (keys === 'snoozeUntil,status' && s.status === 'snoozed' && isDay(s.snoozeUntil)) {
-		return { kind: 'early', until: s.snoozeUntil };
+	const { status, snoozeUntil } = raw as TimelineTaskState;
+	if (snoozeUntil === undefined) {
+		if (status === 'done') return { kind: 'yes' };
+		if (status === 'skipped') return { kind: 'no' };
+		if (status === 'snoozed') return { kind: 'late' };
+	} else if (status === 'snoozed' && isDay(snoozeUntil)) {
+		return { kind: 'early', until: snoozeUntil };
 	}
 	return { kind: 'none' };
 }

@@ -158,6 +158,31 @@ describe('the SkillBridge answer', () => {
 		});
 	});
 
+	// A field a newer release added to the task is kept by the store's writes and is not part of the answer.
+	it('reads the answer through a field it does not know', () => {
+		const pinned = { pinned: true };
+		expect(read({ status: 'done', ...pinned }, '2026-10-07')).toMatchObject({ answer: 'yes' });
+		expect(read({ status: 'skipped', ...pinned }, '2026-10-07')).toMatchObject({ answer: 'no' });
+		expect(read({ status: 'snoozed', ...pinned }, '2027-06-01')).toMatchObject({
+			answer: 'not-sure',
+			stepsShow: true
+		});
+		expect(
+			read({ status: 'snoozed', snoozeUntil: AGAIN, pinned: 1 } as TimelineTaskState, '2027-03-31')
+		).toMatchObject({ answer: 'not-sure', stepsShow: false, returnsOn: AGAIN });
+	});
+
+	it('still reads a combination it never writes as no answer when an unknown field comes with it', () => {
+		const odd = [
+			{ status: 'skipped', snoozeUntil: AGAIN, pinned: true },
+			{ status: 'snoozed', snoozeUntil: '2027-02-30', pinned: true },
+			{ pinned: true }
+		] as unknown as TimelineTaskState[];
+		for (const s of odd) {
+			expect(read(s, '2027-03-31'), JSON.stringify(s)).toMatchObject({ answer: 'none' });
+		}
+	});
+
 	it('writes Yes as done, No as skipped, and Not sure by the second ask', () => {
 		expect(planWrite('yes', SEP, '2026-10-07')).toEqual({ status: 'done' });
 		expect(planWrite('no', SEP, '2026-10-07')).toEqual({ status: 'skipped' });
