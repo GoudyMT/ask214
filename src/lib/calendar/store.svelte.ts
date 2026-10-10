@@ -3,16 +3,18 @@ import type { CardDismissal } from './card-visibility';
 import { encodeCalendarSyncState, decodeCalendarSyncState } from './codec';
 import { mergeHandedOver, acknowledge } from './handed-over';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
-import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
-import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
+import type { KeystoreRecordV1 } from '../keystore/record';
+import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
 import {
 	KeystoreNotInitializedError,
-	KeystoreHmacMismatchError,
-	OccConflictError
+	OccConflictError,
+	getRow,
+	readKeystoreRow,
+	readHwmGeneration
 } from '../profile/store.svelte';
 import { withWriteLocks } from '../db/locks';
-import { withStores, reqToPromise } from '../db/schema';
+import { withStores } from '../db/schema';
 
 /**
  * CalendarSyncStore - orchestration over keystore + the generic record-crypto
@@ -52,17 +54,7 @@ type CalendarHwmPayload = {
 };
 
 type KeystoreRow = KeystoreRecordV1 & { id: number };
-type HwmRow = SignedSidecar<CalendarHwmPayload> & { id: number };
 type StateRow = { id: number; rec: Uint8Array };
-
-function getRow<T>(
-	db: IDBDatabase,
-	store: 'keystore' | 'calendar-sync-hwm' | 'calendar-sync'
-): Promise<T | undefined> {
-	return withStores(db, store, 'readonly', (tx) =>
-		reqToPromise<T | undefined>(tx.objectStore(store).get(0))
-	);
-}
 
 export type CalendarBroadcastEvent = { type: 'calendar-updated' | 'relocked' };
 export type CalendarStoreOptions = { onBroadcast?: (e: CalendarBroadcastEvent) => void };
@@ -83,26 +75,10 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
-	async function readVerifiedKeystore(): Promise<KeystoreRow> {
-		const ks = await getRow<KeystoreRow>(db, 'keystore');
-		if (!ks) throw new KeystoreNotInitializedError();
-		if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
-			throw new KeystoreHmacMismatchError();
-		}
-		return ks;
-	}
-
+	const readVerifiedKeystore = () => readKeystoreRow(db);
 	/** Current calendar generation (0 = no HWM yet = no calendar state written). */
-	async function readCurrentGeneration(keystore: KeystoreRow): Promise<number> {
-		const hwmRow = await getRow<HwmRow>(db, 'calendar-sync-hwm');
-		if (!hwmRow) return 0;
-		const hwm = await verifySidecar<CalendarHwmPayload>(
-			'calendar-sync-hwm',
-			{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
-			keystore.hmacKeyRef
-		);
-		return hwm.generation;
-	}
+	const readCurrentGeneration = (keystore: KeystoreRow) =>
+		readHwmGeneration(db, 'calendar-sync-hwm', keystore.hmacKeyRef);
 
 	/**
 	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
@@ -136,7 +112,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 					keystore,
 					nextGen
 				);
-				const newHwm = await signSidecar(
+				const newHwm = await signSidecar<CalendarHwmPayload>(
 					'calendar-sync-hwm',
 					{
 						generation: nextGen,

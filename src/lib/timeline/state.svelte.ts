@@ -1,16 +1,18 @@
 import type { TimelineState, TaskStatus, TimelineTaskState } from './types';
 import { encodeTimelineState, decodeTimelineState, isSnoozeDate } from './state-codec';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
-import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
-import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
+import type { KeystoreRecordV1 } from '../keystore/record';
+import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
 import {
 	KeystoreNotInitializedError,
-	KeystoreHmacMismatchError,
-	OccConflictError
+	OccConflictError,
+	getRow,
+	readKeystoreRow,
+	readHwmGeneration
 } from '../profile/store.svelte';
 import { withWriteLocks } from '../db/locks';
-import { withStores, reqToPromise } from '../db/schema';
+import { withStores } from '../db/schema';
 
 /**
  * TimelineStateStore - orchestration over keystore + the generic record-crypto
@@ -55,17 +57,7 @@ type TimelineHwmPayload = {
 };
 
 type KeystoreRow = KeystoreRecordV1 & { id: number };
-type HwmRow = SignedSidecar<TimelineHwmPayload> & { id: number };
 type StateRow = { id: number; rec: Uint8Array };
-
-function getRow<T>(
-	db: IDBDatabase,
-	store: 'keystore' | 'timeline-state-hwm' | 'timeline-state'
-): Promise<T | undefined> {
-	return withStores(db, store, 'readonly', (tx) =>
-		reqToPromise<T | undefined>(tx.objectStore(store).get(0))
-	);
-}
 
 /** Drop undefined fields so an empty task entry can be pruned and JSON stays minimal. */
 function cleanTaskState(s: TimelineTaskState): TimelineTaskState {
@@ -99,26 +91,10 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
-	async function readVerifiedKeystore(): Promise<KeystoreRow> {
-		const ks = await getRow<KeystoreRow>(db, 'keystore');
-		if (!ks) throw new KeystoreNotInitializedError();
-		if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
-			throw new KeystoreHmacMismatchError();
-		}
-		return ks;
-	}
-
+	const readVerifiedKeystore = () => readKeystoreRow(db);
 	/** Current timeline generation (0 = no HWM yet = no timeline state written). */
-	async function readCurrentGeneration(keystore: KeystoreRow): Promise<number> {
-		const hwmRow = await getRow<HwmRow>(db, 'timeline-state-hwm');
-		if (!hwmRow) return 0;
-		const hwm = await verifySidecar<TimelineHwmPayload>(
-			'timeline-state-hwm',
-			{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
-			keystore.hmacKeyRef
-		);
-		return hwm.generation;
-	}
+	const readCurrentGeneration = (keystore: KeystoreRow) =>
+		readHwmGeneration(db, 'timeline-state-hwm', keystore.hmacKeyRef);
 
 	/**
 	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
@@ -153,7 +129,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					keystore,
 					nextGen
 				);
-				const newHwm = await signSidecar(
+				const newHwm = await signSidecar<TimelineHwmPayload>(
 					'timeline-state-hwm',
 					{
 						generation: nextGen,

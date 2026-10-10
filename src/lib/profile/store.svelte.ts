@@ -5,7 +5,7 @@ import { decryptProfileRecord, encryptProfileRecord } from './crypto-boundary';
 import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar } from './sidecars';
 import { bumpIvCounter } from '../keystore/iv-counter';
 import { withWriteLocks } from '../db/locks';
-import { withStores, reqToPromise } from '../db/schema';
+import { withStores, reqToPromise, type StoreName } from '../db/schema';
 import {
 	freezeRelock,
 	zeroizeRecord,
@@ -60,13 +60,37 @@ type KeystoreRow = KeystoreRecordV1 & { id: number };
 type HwmRow = SignedSidecar<ProfileHwmPayload> & { id: number };
 type ProfileRow = { id: number; rec: Uint8Array };
 
-function getRow<T>(
-	db: IDBDatabase,
-	store: 'keystore' | 'profile-hwm' | 'profile'
-): Promise<T | undefined> {
+/** A store's single self-row (id 0), shared by every encrypted store. */
+export function getRow<T>(db: IDBDatabase, store: StoreName): Promise<T | undefined> {
 	return withStores(db, store, 'readonly', (tx) =>
 		reqToPromise<T | undefined>(tx.objectStore(store).get(0))
 	);
+}
+
+/** The keystore row, verified: a missing or tampered keystore stops the read, never silently succeeds. */
+export async function readKeystoreRow(db: IDBDatabase): Promise<KeystoreRow> {
+	const ks = await getRow<KeystoreRow>(db, 'keystore');
+	if (!ks) throw new KeystoreNotInitializedError();
+	if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
+		throw new KeystoreHmacMismatchError();
+	}
+	return ks;
+}
+
+/** A store's current generation from its verified HWM sidecar (0 = no HWM yet = nothing written). */
+export async function readHwmGeneration(
+	db: IDBDatabase,
+	store: 'timeline-state-hwm' | 'calendar-sync-hwm',
+	hmacKey: CryptoKey
+): Promise<number> {
+	const row = await getRow<SignedSidecar<{ generation: number }>>(db, store);
+	if (!row) return 0;
+	const hwm = await verifySidecar<{ generation: number }>(
+		store,
+		{ v: 1, payload: row.payload, mac: row.mac },
+		hmacKey
+	);
+	return hwm.generation;
 }
 
 export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = {}) {

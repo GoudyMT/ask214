@@ -1,6 +1,5 @@
 import { encryptRecord, decryptRecord, type RecordCtx } from '$lib/crypto/record-crypto';
-import { verifyRecordHmac, type KeystoreRecordV1 } from '$lib/keystore/record';
-import { KeystoreNotInitializedError, KeystoreHmacMismatchError } from '$lib/profile/store.svelte';
+import { readKeystoreRow } from '$lib/profile/store.svelte';
 import { withStores, reqToPromise } from '$lib/db/schema';
 
 /**
@@ -15,21 +14,11 @@ const BYOK_CTX: RecordCtx = { storeName: 'byok', recordId: 'self', schemaVersion
 // Fixed: with no HWM there is no generation to track - the key is a single, overwritten self-row.
 const BYOK_GENERATION = 1;
 
-type KeystoreRow = KeystoreRecordV1 & { id: number };
 type KeyRow = { id: number; rec: Uint8Array };
 
 export function createByokStore(db: IDBDatabase) {
 	// Fail-closed: a missing or tampered keystore must stop the read/write, never silently succeed.
-	async function readVerifiedKeystore(): Promise<KeystoreRow> {
-		const ks = await withStores(db, 'keystore', 'readonly', (tx) =>
-			reqToPromise<KeystoreRow | undefined>(tx.objectStore('keystore').get(0))
-		);
-		if (!ks) throw new KeystoreNotInitializedError();
-		if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
-			throw new KeystoreHmacMismatchError();
-		}
-		return ks;
-	}
+	const readVerifiedKeystore = () => readKeystoreRow(db);
 
 	return {
 		/** Encrypt + persist the API key as the single byok self-row. */
