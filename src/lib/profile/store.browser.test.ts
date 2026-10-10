@@ -411,7 +411,7 @@ describe('ProfileStore.clockBackward', () => {
 		expect(store2.clockBackward).toBe(false);
 	});
 
-	it('restores the in-memory lastSeenAt if the clear save fails (OCC), staying backward', async () => {
+	it('leaves the in-memory lastSeenAt as it was if the clear save fails (OCC), staying backward', async () => {
 		await stageFutureProfile(Date.now() + 48 * 3600 * 1000);
 		const store = createProfileStore(db);
 		await store.load();
@@ -424,7 +424,7 @@ describe('ProfileStore.clockBackward', () => {
 		await other.save({ setupIntent: 'completed' });
 
 		await expect(store.clearClockBackward()).rejects.toThrow(OccConflictError);
-		// The lowered mark must be rolled back (not left violating monotonicity in memory).
+		// The mark is lowered only when the save lands, so a failed save never lowered it in memory.
 		expect(store._getStateForTest()?.lastSeenAt).toBe(before);
 		expect(store.clockBackward).toBe(true);
 	});

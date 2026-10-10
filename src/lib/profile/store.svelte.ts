@@ -72,6 +72,9 @@ function getRow<T>(
 export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = {}) {
 	let _profile = $state<ProfileV1 | null>(null);
 	let saveInFlight = false;
+	// Set by clearClockBackward for the one save it starts: that save stages lastSeenAt as now instead of
+	// holding the monotonic mark. Not a parameter, so no other caller can lower the mark.
+	let resetClockNext = false;
 	// The reason a relock was deferred past an in-flight save, or null if none is pending.
 	let pendingRelock: RelockReason | null = null;
 	let relockEpoch = 0;
@@ -169,7 +172,8 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		async clearClockBackward(): Promise<void> {
 			if (!_profile) return;
 			safeLog({ code: 'E_CLOCK_BACKWARD' });
-			await api.save({}, { resetClock: true });
+			resetClockNext = true;
+			await api.save({});
 		},
 
 		/**
@@ -269,14 +273,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			);
 		},
 
-		/**
-		 * Persist `patch` over the current record. `resetClock` is for clearClockBackward alone: it
-		 * stages the new lastSeenAt as now instead of holding the monotonic mark.
-		 */
-		async save(
-			patch: ProfilePatch,
-			{ resetClock = false }: { resetClock?: boolean } = {}
-		): Promise<{ generation: number }> {
+		async save(patch: ProfilePatch): Promise<{ generation: number }> {
+			// Taken before the first await, so it belongs to the call that set it.
+			const resetClock = resetClockNext;
+			resetClockNext = false;
 			saveInFlight = true;
 			const relockAtStart = relockEpoch;
 			try {
