@@ -489,22 +489,39 @@ describe('TaskCard (custom snooze date)', () => {
 		expect(input.min).toBe(snoozeUntilIso(new Date(), 1));
 	});
 
-	it('refuses today: the button is off and a tap sets no snooze', async () => {
+	// A refused date can still be tapped: the browser then moves focus to the field and shows its own reason.
+	async function expectRefusedWithReason(
+		input: HTMLInputElement,
+		go: HTMLButtonElement,
+		onSetSnooze: ReturnType<typeof vi.fn>
+	): Promise<void> {
+		expect(go.disabled).toBe(false);
+		go.click();
+		await expect.poll(() => document.activeElement).toBe(input);
+		expect(input.validationMessage).not.toBe('');
+		expect(onSetSnooze).not.toHaveBeenCalled();
+	}
+
+	it('keeps the button off while no date is typed', async () => {
 		const onSetSnooze = vi.fn();
-		const { go, type } = await openCustomize(onSetSnooze);
-		type(snoozeUntilIso(new Date(), 0));
+		const { go } = await openCustomize(onSetSnooze);
 		expect(go.disabled).toBe(true);
 		go.click();
 		expect(onSetSnooze).not.toHaveBeenCalled();
 	});
 
-	it('refuses a past date: the button is off and a tap sets no snooze', async () => {
+	it('refuses today: a tap sets no snooze and the field says why', async () => {
 		const onSetSnooze = vi.fn();
-		const { go, type } = await openCustomize(onSetSnooze);
+		const { input, go, type } = await openCustomize(onSetSnooze);
+		type(snoozeUntilIso(new Date(), 0));
+		await expectRefusedWithReason(input, go, onSetSnooze);
+	});
+
+	it('refuses a past date: a tap sets no snooze and the field says why', async () => {
+		const onSetSnooze = vi.fn();
+		const { input, go, type } = await openCustomize(onSetSnooze);
 		type(snoozeUntilIso(new Date(), -3));
-		expect(go.disabled).toBe(true);
-		go.click();
-		expect(onSetSnooze).not.toHaveBeenCalled();
+		await expectRefusedWithReason(input, go, onSetSnooze);
 	});
 
 	// Control: tomorrow, the earliest date allowed, is taken, so the refusals above are not a button that never works.
@@ -525,17 +542,15 @@ describe('TaskCard (custom snooze date)', () => {
 		vi.useFakeTimers({ toFake: ['Date'] });
 		vi.setSystemTime(evening);
 		const onSetSnooze = vi.fn();
-		const { go, type } = await openCustomize(onSetSnooze);
+		const { input, go, type } = await openCustomize(onSetSnooze);
 		const nextDay = addDays(localTodayIso(evening), 1);
 		type(nextDay);
 		expect(go.disabled).toBe(false);
+		expect(input.validationMessage).toBe('');
 		vi.setSystemTime(
 			new Date(evening.getFullYear(), evening.getMonth(), evening.getDate() + 1, 0, 1)
 		);
-		go.click();
-		flushSync();
-		expect(onSetSnooze).not.toHaveBeenCalled();
-		expect(go.disabled).toBe(true);
+		await expectRefusedWithReason(input, go, onSetSnooze);
 	});
 
 	it('stops at year 9999: the field says so and a five-digit year is refused', async () => {
@@ -544,9 +559,7 @@ describe('TaskCard (custom snooze date)', () => {
 		expect(input.max).toBe(SNOOZE_DATE_MAX);
 		type('30000-01-01');
 		expect(input.value).toBe('30000-01-01');
-		expect(go.disabled).toBe(true);
-		go.click();
-		expect(onSetSnooze).not.toHaveBeenCalled();
+		await expectRefusedWithReason(input, go, onSetSnooze);
 	});
 
 	// The calendar event of a snoozed task ends the next day, so the latest date is the one whose next day is still in
@@ -565,12 +578,11 @@ describe('TaskCard (custom snooze date)', () => {
 		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', '9999-12-30');
 	});
 
-	it('refuses 9999-12-31: a tap sets no snooze', async () => {
+	it('refuses 9999-12-31: a tap sets no snooze and the field says why', async () => {
 		const onSetSnooze = vi.fn();
-		const { go, type } = await openCustomize(onSetSnooze);
+		const { input, go, type } = await openCustomize(onSetSnooze);
 		type('9999-12-31');
-		go.click();
-		expect(onSetSnooze).not.toHaveBeenCalled();
+		await expectRefusedWithReason(input, go, onSetSnooze);
 	});
 });
 

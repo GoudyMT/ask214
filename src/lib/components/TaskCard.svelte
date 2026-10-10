@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
@@ -52,6 +53,7 @@
 	// The earliest custom date, read when Customize opens and again at the tap. A snooze is live only while its date is
 	// after today, so today and the past would be stored and then ignored.
 	let snoozeMin = $state('');
+	let dateInput = $state<HTMLInputElement>();
 
 	// The 10-character check is what refuses a year of five or more digits: as text '30000-01-01' compares like a year
 	// 3000 date, after any minimum and before the maximum, so the two comparisons alone would let it through.
@@ -64,12 +66,15 @@
 		showDateInput = true;
 	}
 
-	function snoozeToDate(): void {
-		// The day can turn while the picker is open, so the minimum is read again here; a refused date turns the
-		// button off rather than leaving a tap that does nothing.
+	async function snoozeToDate(): Promise<void> {
+		// The day can turn while the picker is open, so the minimum is read again here; a refused date is handed to the
+		// browser, which moves focus to the field and says why.
 		const min = snoozeUntilIso(new Date(), 1);
 		if (!canSnoozeTo(dateValue, min)) {
 			snoozeMin = min;
+			// The field must carry the new minimum before the browser checks it: past midnight the old one still accepts the date.
+			await tick();
+			dateInput?.reportValidity();
 			return;
 		}
 		onSetSnooze(item.def.id, dateValue);
@@ -328,6 +333,7 @@
 							<input
 								type="date"
 								autocomplete="off"
+								bind:this={dateInput}
 								bind:value={dateValue}
 								min={snoozeMin}
 								max={SNOOZE_DATE_MAX}
@@ -336,8 +342,8 @@
 							<button
 								type="button"
 								class="task-card__snooze-go"
-								onclick={snoozeToDate}
-								disabled={!canSnoozeTo(dateValue, snoozeMin)}>Snooze</button
+								onclick={() => void snoozeToDate()}
+								disabled={!dateValue}>Snooze</button
 							>
 						</div>
 					{/if}
