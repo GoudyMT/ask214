@@ -193,6 +193,38 @@ describe('TimelineList phase progress counts', () => {
 	});
 });
 
+// A button sets its own case and letter spacing, so a folded phase's label could read unlike the open headings.
+it('a folded phase label has the case and letter spacing of an open phase heading', async () => {
+	const phase = (id: string, collapsible: boolean, status: DisplayStatus) => ({
+		bucket: { id, label: `${id} months out`, startOffset: -540, endOffset: -360 },
+		items: [makeItem(`Task ${id}`, status)],
+		count: 1,
+		counts: {
+			done: status === 'done' ? 1 : 0,
+			skipped: 0,
+			snoozed: 0,
+			toDo: status === 'done' ? 0 : 1,
+			closed: 0
+		},
+		collapsible
+	});
+	const view: TimelineView = {
+		phases: [phase('folded', true, 'done'), phase('open', false, 'late')],
+		total: 2
+	};
+	const { container } = await render(TimelineList, {
+		props: { view, onSetStatus: noop, onSetSnooze: noop }
+	});
+	const toggle = container.querySelector('button.timeline-list__toggle');
+	const openHeading = container.querySelector('#open-heading');
+	if (!toggle || !openHeading) throw new Error('no folded toggle or open heading rendered');
+	const folded = getComputedStyle(toggle);
+	const open = getComputedStyle(openHeading);
+	expect(open.textTransform).toBe('uppercase');
+	expect(folded.textTransform).toBe(open.textTransform);
+	expect(folded.letterSpacing).toBe(open.letterSpacing);
+});
+
 describe('TimelineList section auto-collapse', () => {
 	const resolvedView: TimelineView = {
 		phases: [

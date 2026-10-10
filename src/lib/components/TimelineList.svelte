@@ -122,7 +122,8 @@
 	}
 
 	/* Collapsible phase disclosure: the header becomes a full-width toggle button inside the
-	   <h2> (preserves the heading + aria-labelledby). Tap-safe like the task cards. */
+	   <h2> (preserves the heading + aria-labelledby). Tap-safe like the task cards. A button sets its
+	   own case and letter spacing, so they are taken from the heading to read like an open phase. */
 	.timeline-list__toggle {
 		display: inline-flex;
 		align-items: center;
@@ -132,6 +133,8 @@
 		background: none;
 		border: none;
 		font: inherit;
+		text-transform: inherit;
+		letter-spacing: inherit;
 		color: inherit;
 		text-align: left;
 		cursor: pointer;
