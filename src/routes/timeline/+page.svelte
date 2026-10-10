@@ -152,8 +152,9 @@
 	}
 
 	// Runs a write to a store; true when it landed. On any failure (incl. an OCC conflict from a concurrent tab) the store
-	// is read again rather than clobbered, so the view re-derives. A re-read that fails too is not passed on: the store's
-	// failed flag then shows the page's note, and a rejection nothing awaits would reach the console as unhandled.
+	// is read again rather than clobbered, so the view re-derives. A re-read that fails too is not passed on: the store
+	// then reads as unavailable (the timeline's failed flag shows the page's note; a calendar that is not ready takes its
+	// card away), and a rejection nothing awaits would reach the console as unhandled.
 	async function attempt(
 		store: { refresh(): Promise<void> },
 		write: () => Promise<void>
@@ -165,7 +166,7 @@
 			try {
 				await store.refresh();
 			} catch {
-				// Shown by the store's failed flag.
+				// Shown by the store reading as unavailable.
 			}
 			return false;
 		}
