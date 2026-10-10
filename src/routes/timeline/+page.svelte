@@ -193,17 +193,14 @@
 		}
 	}
 
-	// The calendar card's Dismiss. A failed write re-reads the calendar and leaves the card up to try again; a landed one
-	// removes the card, so focus that sat on its button goes to the next thing to act on.
+	// The calendar card's Dismiss. A landed write removes the card, and so can the re-read after a failed one (a peer
+	// dismissed it, or the calendar could not be read): focus that sat on its button then goes to the next thing to act on.
+	// A card that stays up keeps the focus, which focusAfterCard leaves alone.
 	async function dismissCalendarCard(): Promise<void> {
 		const calendar = app.calendar;
-		if (
-			calendar &&
-			!justClosed() &&
-			(await attempt(calendar, () => calendar.dismissCard(Date.now())))
-		) {
-			await focusAfterCard();
-		}
+		if (!calendar || justClosed()) return;
+		await attempt(calendar, () => calendar.dismissCard(Date.now()));
+		await focusAfterCard();
 	}
 </script>
 

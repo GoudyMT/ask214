@@ -654,13 +654,15 @@ describe('Timeline, a write or a Dismiss that fails', () => {
 		expect(lost).toEqual([]);
 	});
 
-	// A calendar store whose card state changes when a Dismiss lands, as the real one does.
-	function liveCalendar(dismiss: 'lands' | 'fails') {
+	// A calendar store whose card state changes when a Dismiss lands, as the real one does. 'raced': the write is refused
+	// because a peer tab dismissed the card first, and the re-read brings that dismissal in.
+	function liveCalendar(dismiss: 'lands' | 'fails' | 'raced') {
 		const refresh = vi.fn(async () => {
 			if (dismiss === 'fails') throw new Error('E_TEST');
+			if (dismiss === 'raced') calendar.card = { dismissedAt: Date.now(), dismissCount: 1 };
 		});
 		const dismissCard = vi.fn(async (now: number) => {
-			if (dismiss === 'fails') throw new Error('E_TEST');
+			if (dismiss !== 'lands') throw new Error('E_TEST');
 			calendar.card = { dismissedAt: now, dismissCount: 1 };
 		});
 		const calendar = $state({
@@ -705,5 +707,38 @@ describe('Timeline, a write or a Dismiss that fails', () => {
 		await expect.poll(() => document.activeElement).toBe(first);
 		expect(dismissCard).toHaveBeenCalledOnce();
 		expect(refresh).not.toHaveBeenCalled();
+	});
+
+	// The write is refused and the re-read takes the card away: the button that held focus goes with it.
+	it('a calendar card Dismiss that fails, with a re-read that removes the card, moves focus to the first task', async () => {
+		const { calendar, dismissCard, refresh } = liveCalendar('raced');
+		current.calendar = calendar;
+		current.timeline = { ready: true, failed: false, state: EMPTY };
+		const { container } = await render(TimelinePage);
+		await expect.element(page.getByRole('button', { name: 'Dismiss', exact: true })).toBeVisible();
+		dismissButton().focus();
+		expect(document.activeElement).toBe(dismissButton());
+		dismissButton().click();
+		await expect.poll(() => container.querySelector('.cal-card')).toBeNull();
+		const first = document.querySelector<HTMLElement>('[id^="task-"]');
+		expect(first).not.toBeNull();
+		await expect.poll(() => document.activeElement).toBe(first);
+		expect(dismissCard).toHaveBeenCalledOnce();
+		expect(refresh).toHaveBeenCalledOnce();
+	});
+
+	it('a calendar card Dismiss that fails and leaves the card up keeps focus on its button', async () => {
+		const { calendar, refresh } = liveCalendar('fails');
+		current.calendar = calendar;
+		current.timeline = { ready: true, failed: false, state: EMPTY };
+		const { container } = await render(TimelinePage);
+		await expect.element(page.getByRole('button', { name: 'Dismiss', exact: true })).toBeVisible();
+		const button = dismissButton();
+		button.focus();
+		button.click();
+		await expect.poll(() => refresh.mock.calls.length).toBe(1);
+		await settle();
+		expect(container.querySelector('.cal-card')).not.toBeNull();
+		expect(document.activeElement).toBe(button);
 	});
 });
