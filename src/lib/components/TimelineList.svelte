@@ -15,8 +15,8 @@
 		onSetNote?: (taskId: string, note: string | undefined) => void;
 	} = $props();
 
-	// Phase header progress count: an open phase shows what's left = active + snoozed (Format 1
-	// "N to do"; a snoozed task is paused, still pending - not done) and what closed, which can no longer be done.
+	// Phase header progress count: an open phase shows what's left = active + snoozed ("N to do";
+	// a snoozed task is paused, still pending - not done) and what closed, which can no longer be done.
 	// A folded phase shows the done/skipped/closed breakdown. Derived from the engine's per-phase counts.
 	function phaseCount(phase: TimelineView['phases'][number]): string {
 		const { done, skipped, snoozed, toDo, closed } = phase.counts;
