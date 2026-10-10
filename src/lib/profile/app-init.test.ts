@@ -319,7 +319,15 @@ describe('superviseStartup', () => {
 		});
 		const db = { close: vi.fn() };
 		const onResult = vi.fn();
-		const cancel = superviseStartup(start, app, onResult);
+		let blocked!: () => void;
+		const cancel = superviseStartup(
+			(onBlocked) => {
+				blocked = onBlocked;
+				return start;
+			},
+			app,
+			onResult
+		);
 		const ready = (store = makeStore()) =>
 			settle({ status: 'ready', store, db: db as unknown as IDBDatabase });
 		return {
@@ -327,6 +335,7 @@ describe('superviseStartup', () => {
 			setStatus: (s: AppStatus) => (app.status = s),
 			db,
 			onResult,
+			blocked,
 			cancel,
 			settle,
 			fail,
@@ -358,6 +367,24 @@ describe('superviseStartup', () => {
 		await vi.advanceTimersByTimeAsync(0);
 		expect(h.status()).toBe('damaged');
 		expect(h.onResult).toHaveBeenCalledOnce();
+	});
+
+	// Another tab holds an older connection open: the open waits, and the banner says so at once instead of at the
+	// timeout. When that tab closes the same open succeeds, and the app opens without a Reload.
+	it('shows the banner status when the open is blocked, then opens when it succeeds', async () => {
+		const h = harness();
+		h.blocked();
+		expect(h.status()).toBe('error');
+		h.ready();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(h.status()).toBe('ready');
+		expect(h.onResult).toHaveBeenCalledOnce();
+	});
+
+	it('keeps a takeover over a blocked open', () => {
+		const h = harness('stale');
+		h.blocked();
+		expect(h.status()).toBe('stale');
 	});
 
 	it('does not replace a takeover with the timeout', async () => {

@@ -7,7 +7,7 @@
 	import AppGate from '$lib/components/AppGate.svelte';
 	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
 	import InitErrorBanner from '$lib/components/InitErrorBanner.svelte';
-	import { afterStartupFailure, setProfileApp, type ProfileApp } from '$lib/profile/context';
+	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
 	import {
 		initProfileApp,
 		provisionStore,
@@ -101,23 +101,24 @@
 		// Client-only: IndexedDB + crypto are browser-only. The status is set by superviseStartup (the timeout, a late
 		// result, a takeover that came first), so the callbacks below only wire what each outcome needs.
 		const cancelStartup = superviseStartup(
-			initProfileApp({
-				checkSupport: checkBrowserSupport,
-				openDb: () =>
-					openMtcDb(
-						undefined,
-						() => {
-							// Another tab on a newer bundle upgraded the shared DB and closed this connection;
-							// the takeover offers a reload onto the new bundle instead of a silent, data-less tab.
-							if (!destroyed) app.status = 'stale';
-						},
-						// Another tab still holds an older connection open. The open waits and finishes by itself once
-						// that tab closes; meanwhile the banner says so instead of an empty shell.
-						() => (app.status = afterStartupFailure(app.status, 'error'))
-					),
-				bootstrap: bootstrapLocalKeystore,
-				createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
-			}),
+			// onBlocked: another tab still holds an older connection open. The open waits and finishes by itself once
+			// that tab closes; meanwhile the banner says so instead of an empty shell.
+			(onBlocked) =>
+				initProfileApp({
+					checkSupport: checkBrowserSupport,
+					openDb: () =>
+						openMtcDb(
+							undefined,
+							() => {
+								// Another tab on a newer bundle upgraded the shared DB and closed this connection;
+								// the takeover offers a reload onto the new bundle instead of a silent, data-less tab.
+								if (!destroyed) app.status = 'stale';
+							},
+							onBlocked
+						),
+					bootstrap: bootstrapLocalKeystore,
+					createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
+				}),
 			app,
 			(result) => {
 				if (destroyed) return;

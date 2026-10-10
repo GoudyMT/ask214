@@ -69,17 +69,21 @@ export const START_TIMEOUT_MS = 10_000;
  * Settles a start-up against the app's status. The timeout, a result and a failure all meet here because each must
  * read the status as it stands: a takeover set meanwhile (`stale`, `unsupported`) outranks all three.
  *
+ * `start` receives the callback for a blocked open (another tab holds an older connection): it raises the banner at once,
+ * and the open, which stays queued, opens the app by itself when it later succeeds.
+ *
  * A result the tab cannot use because a takeover came first is not wired, so the store it already decrypted is zeroized
- * and the connection closed. Returns the cancel for teardown.
+ * and the connection closed. The returned cancel only stops the timer: a result that lands after it still reaches
+ * `onResult`, which must ignore it (the root layout is torn down only when the page unloads, which frees what it holds).
  */
 export function superviseStartup<S extends LoadableStore & Pick<Relockable, 'relockSync'>>(
-	start: Promise<AppInitResult<S>>,
+	start: (onBlocked: () => void) => Promise<AppInitResult<S>>,
 	app: { status: AppStatus },
 	onResult: (result: AppInitResult<S>) => void
 ): () => void {
 	const banner = () => (app.status = afterStartupFailure(app.status, 'error'));
 	const timer = setTimeout(banner, START_TIMEOUT_MS);
-	start
+	start(banner)
 		.then((r) => {
 			const next = afterStartupResult(app.status, r.status);
 			if (next === r.status) {

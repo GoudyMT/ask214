@@ -467,7 +467,7 @@ describe('a real start-up', () => {
 		const { made, start } = startUp(seededDb);
 		const app: { status: AppStatus } = { status: 'stale' };
 		const onResult = vi.fn();
-		superviseStartup(start, app, onResult);
+		superviseStartup(() => start, app, onResult);
 		await start;
 		await delay(0);
 		expect(made.store?._getStateForTest()).toBeNull();
