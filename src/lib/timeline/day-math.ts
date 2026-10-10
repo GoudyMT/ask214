@@ -27,10 +27,10 @@ export function addDays(iso: string, days: number): string {
  */
 export function addYears(iso: string, years: number): string {
 	const [y, m, d] = iso.split('-').map(Number);
-	const target = y! + years;
-	const isLeap = (target % 4 === 0 && target % 100 !== 0) || target % 400 === 0;
-	const day = m === 2 && d === 29 && !isLeap ? 28 : d!;
-	return new Date(Date.UTC(target, m! - 1, day)).toISOString().slice(0, 10);
+	const date = new Date(Date.UTC(y! + years, m! - 1, d!));
+	// Only a Feb 29 can spill into the next month (to Mar 1); day 0 of that month is the last day of February.
+	if (date.getUTCDate() !== d) date.setUTCDate(0);
+	return date.toISOString().slice(0, 10);
 }
 
 /**
