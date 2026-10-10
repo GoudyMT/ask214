@@ -235,9 +235,15 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		 * would reverse that. An `evicted` store lost its plaintext to page hygiene on the way out
 		 * and the page has come back, so the re-read is the undo it is owed. An unlocked store
 		 * re-reads so a peer's change still lands.
+		 *
+		 * A hidden page does not decrypt on its own: nobody can see the result, and a page that goes
+		 * hidden relocks and comes back through the lifecycle's visible restore, which calls this.
+		 * load() is not gated - Unlock and start-up use it, and they are the user asking.
 		 */
 		refresh(): Promise<void> {
-			if (lockState === 'locked') return Promise.resolve();
+			if (lockState === 'locked' || document.visibilityState === 'hidden') {
+				return Promise.resolve();
+			}
 			return api.load();
 		},
 

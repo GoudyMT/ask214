@@ -17,12 +17,14 @@ import type { ProfileV1 } from './types';
 type Store = 'keystore' | 'profile-hwm' | 'profile';
 type Row = Record<string, unknown>;
 
-// Seams over two modules, each a passthrough until a test arms it:
+// Seams over three modules, each a passthrough until a test arms it:
 // - cloneField records every byte array the save stages, so a test can look at the copies the store
 //   made and the caller never sees;
+// - decryptProfileRecord counts decrypts, so a refresh that must not read can be shown not to;
 // - computeRecordHmac can be made to throw, which reaches the step right after the staged copies exist.
 const seams = vi.hoisted(() => ({
 	cloned: [] as Uint8Array[],
+	decrypts: 0,
 	failHmac: false
 }));
 
@@ -43,6 +45,17 @@ vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
 	};
 });
 
+vi.mock('$lib/profile/crypto-boundary', async (importOriginal) => {
+	const real = await importOriginal<typeof import('./crypto-boundary')>();
+	return {
+		...real,
+		decryptProfileRecord: (...args: Parameters<typeof real.decryptProfileRecord>) => {
+			seams.decrypts++;
+			return real.decryptProfileRecord(...args);
+		}
+	};
+});
+
 vi.mock('$lib/keystore/record', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../keystore/record')>();
 	return {
@@ -59,6 +72,7 @@ let db: IDBDatabase;
 beforeEach(async () => {
 	db = await openTestDb();
 	seams.cloned.length = 0;
+	seams.decrypts = 0;
 	seams.failHmac = false;
 });
 
@@ -673,6 +687,79 @@ describe('ProfileStore.save failure hygiene', () => {
 			}
 		});
 		await expect(store.save({ eaos: bytes('2027-04-15') })).rejects.toThrow('E_TEST_BROADCAST');
+		expect(text(store._getStateForTest()?.eaos)).toBe('2027-04-15');
+	});
+});
+
+describe('ProfileStore.refresh while the page is hidden', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	const stubVisibility = (state: DocumentVisibilityState) =>
+		vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);
+
+	it('does not decrypt on a hidden re-read, and reads again once the page is visible', async () => {
+		expect(document.visibilityState).toBe('visible');
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15') });
+		store.relockSync('hygiene');
+		seams.decrypts = 0;
+
+		const visibility = stubVisibility('hidden');
+		await expect(store.refresh()).resolves.toBeNull();
+		expect(seams.decrypts).toBe(0);
+		expect(store._getStateForTest()).toBeNull();
+
+		visibility.mockReturnValue('visible');
+		await expect(store.refresh()).resolves.not.toBeNull();
+		expect(seams.decrypts).toBe(1);
+		expect(text(store._getStateForTest()?.eaos)).toBe('2027-04-15');
+	});
+
+	it('leaves an unlocked store on what it holds until the page is visible', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15') });
+		const peer = createProfileStore(db);
+		await peer.load();
+		await peer.save({ eaos: bytes('2028-08-20') });
+		seams.decrypts = 0;
+
+		const visibility = stubVisibility('hidden');
+		expect(await store.refresh()).toBe(store._getStateForTest());
+		expect(seams.decrypts).toBe(0);
+		expect(text(store._getStateForTest()?.eaos)).toBe('2027-04-15');
+
+		visibility.mockReturnValue('visible');
+		await store.refresh();
+		expect(text(store._getStateForTest()?.eaos)).toBe('2028-08-20');
+	});
+
+	it('still refuses a locked store, hidden or not', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15') });
+		store.relockSync('user');
+		seams.decrypts = 0;
+
+		await store.refresh();
+		stubVisibility('hidden');
+		await store.refresh();
+
+		expect(seams.decrypts).toBe(0);
+		expect(store._getStateForTest()).toBeNull();
+	});
+
+	// Unlock and start-up read through load(), and they must work whatever the page is doing.
+	it('does not gate load, which is the user asking', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15') });
+		store.relockSync('user');
+		seams.decrypts = 0;
+
+		stubVisibility('hidden');
+		await store.load();
+
+		expect(seams.decrypts).toBe(1);
 		expect(text(store._getStateForTest()?.eaos)).toBe('2027-04-15');
 	});
 });

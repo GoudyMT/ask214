@@ -187,9 +187,15 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 * Gated on `lockState`, NOT on `locked`. `locked` is derived state, so it reads false for a
 		 * first-run tab that has relocked (hasProfile is still false) - which left exactly that tab
 		 * open to a peer's setup decrypting into it.
+		 *
+		 * A hidden page does not decrypt on its own: nobody can see the result, and a page that goes
+		 * hidden relocks and comes back through the lifecycle's visible restore, which calls this.
+		 * load() is not gated - Unlock and start-up use it, and they are the user asking.
 		 */
 		refresh(): Promise<ProfileV1 | null> {
-			if (lockState === 'locked') return Promise.resolve(null);
+			if (lockState === 'locked' || document.visibilityState === 'hidden') {
+				return Promise.resolve(_profile);
+			}
 			return api.load();
 		},
 
