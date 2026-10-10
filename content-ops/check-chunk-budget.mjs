@@ -207,6 +207,16 @@ const STATIC = 'static';
 //     done-or-skipped in one line (0 B) and an hourly re-check of the day (+5 B page) not kept. Not taken: the
 //     calendar text escape in one pass (it needs escapes typed into the source) and a lazy calendar builder (the
 //     worker still downloads those bytes at install).
+//     Page 60,970 -> 61,595, precache 148,505 -> 149,405 and route nodes 46,955 -> 47,200 (package.json's size-limit)
+//     (owner's call, 2026-10-10): the store hardening - stored records checked field by field before they are used
+//     (about 400 B page), the start-up timeout and its late recovery, decrypt errors told apart from damage, the
+//     plaintext buffers zeroized, and a failed save said on screen in the wizard, Settings' key row and the note editor
+//     (about 250 B route nodes) - two builds measured page 61,552-61,554 B, precache 149,352-149,365 B and route nodes
+//     47,150-47,161 B, about 40 B of room above the highest. Trim pass, each measured on a full build: the day check
+//     and the snooze limit in a module of their own, so the day arithmetic leaves the code every page loads (-85 B
+//     page, -12 B precache), and one keystore and generation read shared by the stores (-92 B root layout, -28 B page,
+//     -127 B precache), kept; a rewrite of the profile field-type table (inside the noise or larger), not kept. Not
+//     found: the shared chunk the build now splits in two (no importer of the asset constants changed).
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -216,10 +226,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 60_970,
+	page: 61_595,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 148_505,
+	precacheBytes: 149_405,
 	workerScripts: 147_200
 };
 

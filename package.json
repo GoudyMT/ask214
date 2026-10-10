@@ -76,7 +76,7 @@
 		{
 			"name": "Lazy route nodes (sum; no single page loads all of them)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
-			"limit": "46955 B",
+			"limit": "47200 B",
 			"gzip": true
 		}
 	],
