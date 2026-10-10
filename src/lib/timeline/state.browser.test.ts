@@ -14,6 +14,28 @@ async function reload(db: IDBDatabase) {
 	return store;
 }
 
+// A record as another writer left it (a peer, a newer build, a tampered disk), stored at generation 1.
+async function seedRecord(db: IDBDatabase, json: string) {
+	const ks = await withStores(db, 'keystore', 'readonly', (tx) =>
+		reqToPromise<KeystoreRecordV1>(tx.objectStore('keystore').get(0))
+	);
+	const blob = await encryptRecord(
+		{ storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 },
+		new TextEncoder().encode(json),
+		ks,
+		1
+	);
+	const hwm = await signSidecar(
+		'timeline-state-hwm',
+		{ generation: 1, keystoreGeneration: ks.keystoreGeneration, epoch: ks.epoch, ts: Date.now() },
+		ks.hmacKeyRef
+	);
+	await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
+		tx.objectStore('timeline-state').put({ id: 0, rec: blob });
+		tx.objectStore('timeline-state-hwm').put({ id: 0, ...hwm });
+	});
+}
+
 // The page's visibility is the browser's to report; a test sets it for one check and puts it back.
 function stubVisibility() {
 	const spy = vi.spyOn(document, 'visibilityState', 'get');
@@ -326,25 +348,10 @@ describe('timeline-state store', () => {
 	it('a stored task named __proto__ never reaches the tasks the next write keeps', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);
-		const ks = await withStores(db, 'keystore', 'readonly', (tx) =>
-			reqToPromise<KeystoreRecordV1>(tx.objectStore('keystore').get(0))
+		await seedRecord(
+			db,
+			'{"schemaVersion":1,"tasks":{"__proto__":{"status":"done"},"x":{"notes":"keep"}}}'
 		);
-		const json = '{"schemaVersion":1,"tasks":{"__proto__":{"status":"done"},"x":{"notes":"keep"}}}';
-		const blob = await encryptRecord(
-			{ storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 },
-			new TextEncoder().encode(json),
-			ks,
-			1
-		);
-		const hwm = await signSidecar(
-			'timeline-state-hwm',
-			{ generation: 1, keystoreGeneration: ks.keystoreGeneration, epoch: ks.epoch, ts: Date.now() },
-			ks.hmacKeyRef
-		);
-		await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
-			tx.objectStore('timeline-state').put({ id: 0, rec: blob });
-			tx.objectStore('timeline-state-hwm').put({ id: 0, ...hwm });
-		});
 
 		const a = createTimelineStateStore(db);
 		await a.load();
@@ -357,6 +364,78 @@ describe('timeline-state store', () => {
 			expect(tasks['status' as string]).toBeUndefined();
 		}
 		await deleteTestDb(db);
+	});
+
+	// A field a newer release wrote on a task is kept when decoding, and must survive this tab's own write to that task.
+	describe('a task field this release does not know', () => {
+		it('survives a status write to the same task', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			await seedRecord(
+				db,
+				'{"schemaVersion":1,"tasks":{"a":{"status":"done","pinned":true},"b":{"flag":[1,2]}}}'
+			);
+			const a = await reload(db);
+			await a.setStatus('a', 'skipped');
+			expect(a.state.tasks['a']).toEqual({ status: 'skipped', pinned: true });
+
+			const b = await reload(db);
+			expect(b.state.tasks).toEqual({
+				a: { status: 'skipped', pinned: true },
+				b: { flag: [1, 2] }
+			});
+			await deleteTestDb(db);
+		});
+
+		it('survives a snooze and a note write, and clearing a known field still removes it', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			await seedRecord(db, '{"schemaVersion":1,"tasks":{"a":{"pinned":true}}}');
+			const a = await reload(db);
+			await a.setSnooze('a', '2027-04-01');
+			await a.setNote('a', 'call back');
+			expect((await reload(db)).state.tasks['a']).toEqual({
+				status: 'snoozed',
+				snoozeUntil: '2027-04-01',
+				notes: 'call back',
+				pinned: true
+			});
+
+			await a.setStatus('a', undefined);
+			await a.setNote('a', undefined);
+			expect((await reload(db)).state.tasks['a']).toEqual({ pinned: true });
+			await deleteTestDb(db);
+		});
+
+		it('leaves no entry behind once no field is left, known or not', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			await seedRecord(db, '{"schemaVersion":1,"tasks":{"a":{"status":"done"}}}');
+			const a = await reload(db);
+			await a.setStatus('a', undefined);
+			expect(a.state.tasks).toEqual({});
+			expect((await reload(db)).state.tasks).toEqual({});
+			await deleteTestDb(db);
+		});
+
+		it('never copies a __proto__ key onto the entry a write keeps', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			await seedRecord(
+				db,
+				'{"schemaVersion":1,"tasks":{"a":{"status":"done","pinned":true,"__proto__":{"polluted":true}}}}'
+			);
+			const a = await reload(db);
+			await a.setStatus('a', 'skipped');
+			for (const state of [a.state, (await reload(db)).state]) {
+				const task = state.tasks['a'];
+				expect(task).toEqual({ status: 'skipped', pinned: true });
+				expect(Object.getPrototypeOf(task)).toBe(Object.prototype);
+				expect(Object.hasOwn(task as object, '__proto__')).toBe(false);
+				expect((task as Record<string, unknown>)['polluted']).toBeUndefined();
+			}
+			await deleteTestDb(db);
+		});
 	});
 
 	describe('refresh while the page is hidden', () => {

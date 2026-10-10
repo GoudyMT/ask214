@@ -59,13 +59,17 @@ type TimelineHwmPayload = {
 type KeystoreRow = KeystoreRecordV1 & { id: number };
 type StateRow = { id: number; rec: Uint8Array };
 
-/** Drop undefined fields so an empty task entry can be pruned and JSON stays minimal. */
+/**
+ * Keep every field the entry holds except the cleared ones (undefined), so an empty entry can be pruned and JSON stays
+ * minimal. A field this release does not know (a newer release wrote it) is kept, or this tab's next write would drop it.
+ * An own `__proto__` key is never copied: assigning it would set the prototype instead of adding a key.
+ */
 function cleanTaskState(s: TimelineTaskState): TimelineTaskState {
-	const out: TimelineTaskState = {};
-	if (s.status !== undefined) out.status = s.status;
-	if (s.snoozeUntil !== undefined) out.snoozeUntil = s.snoozeUntil;
-	if (s.notes !== undefined) out.notes = s.notes;
-	return out;
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(s)) {
+		if (key !== '__proto__' && value !== undefined) out[key] = value;
+	}
+	return out as TimelineTaskState;
 }
 
 export type TimelineBroadcastEvent = { type: 'timeline-updated' | 'relocked' };
