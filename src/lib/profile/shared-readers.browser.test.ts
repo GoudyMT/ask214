@@ -8,10 +8,11 @@ import { createTimelineStateStore } from '../timeline/state.svelte';
 import { createCalendarSyncStore } from '../calendar/store.svelte';
 import { createByokStore } from '../ask/byok/store';
 
-// The keystore row and the high-water marks are read by four stores through shared readers. The profile
-// store's own tests tamper them through the profile store's path only, so a reader that stopped
-// verifying would leave those green while the timeline, calendar and byok stores accepted forged rows.
-// Each test here goes in through another store's entry point.
+// The keystore row is read through a shared reader by the timeline, calendar and byok stores, and the
+// high-water marks by the timeline and calendar stores; the profile store reads both inline. The profile
+// store's own tests tamper them through its own path only, so a shared reader that stopped verifying
+// would leave those green while the other stores accepted forged rows. Each test here goes in through
+// another store's entry point.
 
 type Store = 'keystore' | 'byok' | 'timeline-state-hwm' | 'calendar-sync-hwm';
 type HwmStore = 'timeline-state-hwm' | 'calendar-sync-hwm';
