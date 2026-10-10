@@ -10,6 +10,7 @@ import { selectNeedsNow } from './needs-now';
 import { TASK_DEFS } from './task-defs';
 import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
+import { addDays, daysBetween, localTodayIso } from './day-math';
 import type { PersonaFilters } from '../profile/persona';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
 
@@ -230,7 +231,108 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		};
 		const phase = generateTimeline(persona, defs, state, today).phases[0];
 		expect(phase?.collapsible).toBe(true);
-		expect(phase?.counts).toEqual({ done: 1, skipped: 1, snoozed: 0, toDo: 0 });
+		expect(phase?.counts).toEqual({ done: 1, skipped: 1, snoozed: 0, toDo: 0, closed: 0 });
+	});
+
+	// Today is Jun 4, 2026 and these windows end on Jan 15 and Jan 25, 2027, so they are still ahead: a date rule that
+	// ignored the status would read the days since a window end as negative, call each task just closed, and keep the
+	// phase open.
+	it('folds a phase whose tasks were all done before their windows end', () => {
+		const defs = [mk('a', -120), mk('a2', -110)];
+		const state: TimelineState = {
+			schemaVersion: 1,
+			tasks: { a: { status: 'done' }, a2: { status: 'done' } }
+		};
+		const phase = generateTimeline(persona, defs, state, today).phases[0];
+		expect(phase?.collapsible).toBe(true);
+	});
+
+	// A closed task can no longer be done, so it is counted apart from "to do". Its card stays reachable for 14 days,
+	// because "Needs you now" lists it under "Just closed" and those rows jump to the card, which a folded phase hides.
+	describe('a closed task in a phase', () => {
+		const closedDaysAgo = (days: number) => {
+			const closedOn = addDays(localTodayIso(today), -days);
+			const firm = (id: string): TaskDef => ({
+				...mk(id, daysBetween(EAOS, closedOn) - 30),
+				kind: 'closes',
+				windowEnd: daysBetween(EAOS, closedOn),
+				afterNote: 'n'
+			});
+			const state: TimelineState = { schemaVersion: 1, tasks: { a: { status: 'done' } } };
+			const phases = generateTimeline(persona, [firm('a'), firm('c')], state, today).phases;
+			expect(phases.length).toBe(1);
+			return phases[0];
+		};
+
+		it('is counted as closed, not to do, and the phase folds once it closed more than 14 days ago', () => {
+			const phase = closedDaysAgo(15);
+			expect(phase?.items.map((i) => i.status)).toEqual(['done', 'closed']);
+			expect(phase?.counts).toEqual({ done: 1, skipped: 0, snoozed: 0, toDo: 0, closed: 1 });
+			expect(phase?.collapsible).toBe(true);
+		});
+
+		it('keeps the phase open while it closed 14 days ago or less', () => {
+			const phase = closedDaysAgo(14);
+			expect(phase?.counts).toEqual({ done: 1, skipped: 0, snoozed: 0, toDo: 0, closed: 1 });
+			expect(phase?.collapsible).toBe(false);
+		});
+	});
+
+	// A required task stays late until separation, so its real last day is the separation date, not its window end
+	// months earlier: the 14 days its card stays reachable run from separation.
+	describe('a required task closed by separation', () => {
+		const required: TaskDef = {
+			...mk('req', -120),
+			kind: 'required',
+			windowEnd: -90, // ends 90 days before separation
+			afterNote: 'n'
+		};
+		const done = mk('d', -110);
+		const state: TimelineState = { schemaVersion: 1, tasks: { d: { status: 'done' } } };
+		const afterSeparation = (days: number) => {
+			const view = generateTimeline(
+				persona,
+				[required, done],
+				state,
+				new Date(`${addDays(EAOS, days)}T12:00:00Z`)
+			);
+			expect(view.phases.length).toBe(1);
+			return view.phases[0];
+		};
+
+		it('is dated closed on the separation date, and keeps its phase open for 14 days', () => {
+			const phase = afterSeparation(1);
+			const item = phase?.items.find((i) => i.def.id === 'req');
+			expect(item?.status).toBe('closed');
+			expect(phase?.collapsible).toBe(false);
+			expect(afterSeparation(14)?.collapsible).toBe(false);
+			expect(item?.closedOn).toBe(EAOS);
+		});
+
+		it('lets the phase fold on the 15th day after separation', () => {
+			expect(afterSeparation(15)?.collapsible).toBe(true);
+		});
+
+		it('leaves closedOn off a task that is not required, and off one that is not closed', () => {
+			const closes: TaskDef = { ...required, id: 'cl', kind: 'closes' };
+			const items = generateTimeline(
+				persona,
+				[required, closes, done],
+				state,
+				new Date(`${addDays(EAOS, 1)}T12:00:00Z`)
+			).phases.flatMap((p) => p.items);
+			const byId = (id: string) => items.find((i) => i.def.id === id);
+			expect(byId('cl')?.status).toBe('closed');
+			expect(byId('cl')?.closedOn).toBeUndefined();
+			expect(byId('d')?.status).toBe('done');
+			expect(byId('d')?.closedOn).toBeUndefined();
+		});
+
+		it('leaves closedOn off a required task that is still late on separation day', () => {
+			const lateItem = afterSeparation(0)?.items.find((i) => i.def.id === 'req');
+			expect(lateItem?.status).toBe('late');
+			expect(lateItem?.closedOn).toBeUndefined();
+		});
 	});
 
 	it('keeps a phase non-collapsible when an active task remains, counting toDo', () => {
@@ -717,7 +819,7 @@ describe('generateTimeline (deadline fields)', () => {
 		const [first, second] = items(persona, [bdd, vgli]);
 		expect(first?.status).toBe('closing-soon');
 		expect(first?.daysLeft).toBe(17); // Oct 3 -> Oct 20
-		expect(second?.finalEndDate).toBe(eaosOffsetDate(eaos, 485));
+		expect(second?.finalEndDate).toBe('2028-05-17'); // 485 days after Jan 18, 2027
 		expect(second?.daysLeft).toBeUndefined(); // upcoming: no countdown
 	});
 
@@ -752,6 +854,36 @@ describe('generateTimeline (deadline fields)', () => {
 		expect(list[0]?.status).toBe('changed');
 		expect(list[0]?.daysLeft).toBe(20);
 		expect(selectNeedsNow(list, '2026-10-03').closingSoon.map((i) => i.def.id)).toEqual(['vgli']);
+	});
+
+	// VA counts VGLI's last day as 485 days after separation. Read as a calendar year and 120 days, a Feb 29 inside the
+	// span would make it a day later, so the leap-day case is where a calendar count would show; the real task is used
+	// so the date under test is the one a user sees.
+	describe('the VGLI final edge', () => {
+		const real = TASK_DEFS.filter((d) => d.id === 'vgli-convert');
+		const vgliOn = (separation: string, day: Date) => {
+			const e = separation as EaosString;
+			const p: PersonaFilters = {
+				completeness: 'eaos-only',
+				eaos: e,
+				daysUntilSeparation: daysUntilSeparation(e, day)
+			};
+			const [item] = generateTimeline(p, real, state, day).phases.flatMap((ph) => ph.items);
+			return item;
+		};
+
+		it('ends 485 days after separation across a Feb 29', () => {
+			expect(vgliOn('2027-04-30', today)?.finalEndDate).toBe('2028-08-27');
+		});
+
+		it('ends 485 days after separation where no Feb 29 falls between', () => {
+			expect(vgliOn('2025-06-25', today)?.finalEndDate).toBe('2026-10-23');
+		});
+
+		it('is still changed on the 485th day and closed the day after', () => {
+			expect(vgliOn('2027-04-30', new Date(2028, 7, 27, 12))?.status).toBe('changed');
+			expect(vgliOn('2027-04-30', new Date(2028, 7, 28, 12))?.status).toBe('closed');
+		});
 	});
 
 	it('aims a soft task at a recommended date that falls today', () => {

@@ -73,39 +73,30 @@ export function readPlan(
 	const again = addDays(separation, -ASK_AGAIN_DAYS);
 	const canAsk = todayIso < addDays(separation, -LAST_ASK_DAYS);
 	const notSureReturns = todayIso < again ? again : null;
-	// The second wording ("Still thinking...") only follows a real first ask, so no answer reads the first wording
-	// however late the visit.
-	const asking = (answer: PlanRead['answer'], card: 'first' | 'again'): PlanRead => ({
-		answer,
-		card: canAsk ? card : null,
-		stepsShow: false,
-		notSureReturns,
-		returnsOn: null
-	});
+	const read = (
+		answer: PlanRead['answer'],
+		card: PlanRead['card'],
+		stepsShow = false,
+		returnsOn: string | null = null
+	): PlanRead => ({ answer, card, stepsShow, notSureReturns, returnsOn });
 	const saved = recognise(stored);
 	switch (saved.kind) {
 		case 'yes':
-			return { answer: 'yes', card: null, stepsShow: true, notSureReturns, returnsOn: null };
+			return read('yes', null, true);
 		case 'no':
-			return { answer: 'no', card: null, stepsShow: false, notSureReturns, returnsOn: null };
+			return read('no', null);
 		case 'late':
-			return { answer: 'not-sure', card: null, stepsShow: true, notSureReturns, returnsOn: null };
+			return read('not-sure', null, true);
 		case 'early': {
 			// Judged against the current separation date too, so moving it earlier never hides the card past its time.
 			const back = saved.until < again ? saved.until : again;
-			if (todayIso < back) {
-				return {
-					answer: 'not-sure',
-					card: null,
-					stepsShow: false,
-					notSureReturns,
-					returnsOn: back
-				};
-			}
-			return asking('not-sure', 'again');
+			if (todayIso < back) return read('not-sure', null, false, back);
+			return read('not-sure', canAsk ? 'again' : null);
 		}
 		default:
-			return asking('none', 'first');
+			// The second wording ("Still thinking...") only follows a real first ask, so no answer reads the first
+			// wording however late the visit.
+			return read('none', canAsk ? 'first' : null);
 	}
 }
 

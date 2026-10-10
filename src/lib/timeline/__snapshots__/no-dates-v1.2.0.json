@@ -10,7 +10,8 @@
 					"done": 1,
 					"skipped": 0,
 					"snoozed": 1,
-					"toDo": 8
+					"toDo": 8,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -112,7 +113,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 5
+					"toDo": 5,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -169,7 +171,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 10
+					"toDo": 10,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -266,7 +269,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 3
+					"toDo": 3,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -304,7 +308,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 5
+					"toDo": 5,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -368,7 +373,8 @@
 					"done": 1,
 					"skipped": 0,
 					"snoozed": 1,
-					"toDo": 8
+					"toDo": 8,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -470,7 +476,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 5
+					"toDo": 5,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -527,7 +534,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 10
+					"toDo": 9,
+					"closed": 1
 				},
 				"collapsible": false,
 				"items": [
@@ -624,7 +632,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 3
+					"toDo": 3,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -662,7 +671,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 5
+					"toDo": 5,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -726,7 +736,8 @@
 					"done": 1,
 					"skipped": 0,
 					"snoozed": 1,
-					"toDo": 8
+					"toDo": 7,
+					"closed": 1
 				},
 				"collapsible": false,
 				"items": [
@@ -828,7 +839,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 5
+					"toDo": 5,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
@@ -885,7 +897,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 10
+					"toDo": 5,
+					"closed": 5
 				},
 				"collapsible": false,
 				"items": [
@@ -982,7 +995,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 3
+					"toDo": 2,
+					"closed": 1
 				},
 				"collapsible": false,
 				"items": [
@@ -1020,7 +1034,8 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 5
+					"toDo": 5,
+					"closed": 0
 				},
 				"collapsible": false,
 				"items": [

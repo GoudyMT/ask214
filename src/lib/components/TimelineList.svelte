@@ -15,17 +15,23 @@
 		onSetNote?: (taskId: string, note: string | undefined) => void;
 	} = $props();
 
-	// Phase header progress count: an open phase shows what's left = active + snoozed (Format 1
-	// "N to do"; a snoozed task is paused, still pending - not done). A fully-resolved phase shows the
-	// done/skipped breakdown. Derived from the engine's per-phase counts.
+	// Phase header progress count: an open phase shows what's left = active + snoozed ("N to do";
+	// a snoozed task is paused, still pending - not done) and what closed, which can no longer be done.
+	// A folded phase shows the done/skipped/closed breakdown. Derived from the engine's per-phase counts.
+	// Each part's words are joined by non-breaking spaces, so a narrow header wraps only between parts.
+	const NBSP = String.fromCharCode(160);
 	function phaseCount(phase: TimelineView['phases'][number]): string {
+		const { done, skipped, snoozed, toDo, closed } = phase.counts;
+		const parts: string[] = [];
+		const add = (n: number, word: string) => {
+			if (n > 0) parts.push(n + NBSP + word);
+		};
 		if (phase.collapsible) {
-			const parts: string[] = [];
-			if (phase.counts.done > 0) parts.push(`${phase.counts.done} done`);
-			if (phase.counts.skipped > 0) parts.push(`${phase.counts.skipped} skipped`);
-			return parts.join(' - ');
-		}
-		return `${phase.counts.toDo + phase.counts.snoozed} to do`;
+			add(done, 'done');
+			add(skipped, 'skipped');
+		} else add(toDo + snoozed, 'to' + NBSP + 'do');
+		add(closed, 'closed');
+		return parts.join(' - ');
 	}
 
 	// Per-phase ephemeral expand state: a fully-resolved (collapsible) phase defaults to
@@ -119,7 +125,8 @@
 	}
 
 	/* Collapsible phase disclosure: the header becomes a full-width toggle button inside the
-	   <h2> (preserves the heading + aria-labelledby). Tap-safe like the task cards. */
+	   <h2> (preserves the heading + aria-labelledby). Tap-safe like the task cards. A button sets its
+	   own case and letter spacing, so they are taken from the heading to read like an open phase. */
 	.timeline-list__toggle {
 		display: inline-flex;
 		align-items: center;
@@ -129,6 +136,8 @@
 		background: none;
 		border: none;
 		font: inherit;
+		text-transform: inherit;
+		letter-spacing: inherit;
 		color: inherit;
 		text-align: left;
 		cursor: pointer;

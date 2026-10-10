@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
-	import { SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
+	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
 	import { resourcesForTask, afterLinkForTask, linkNoteForTask } from '$lib/resources';
-	import { isFirmWarning, type FitReason } from '$lib/timeline/generate';
+	import { closedOnDate, isFirmWarning, type FitReason } from '$lib/timeline/generate';
 
 	let {
 		item,
@@ -49,8 +49,18 @@
 		closeSnooze();
 	}
 
+	// The earliest custom date is tomorrow, read when the field opens and again at the tap. A snooze is live only while
+	// its date is after today, so today and the past would be stored and then ignored.
+	let dateInput = $state<HTMLInputElement>();
+
 	function snoozeToDate(): void {
-		if (!dateValue) return;
+		// The day can turn while the picker is open, so the minimum is read again here and set on the field at once, before
+		// the browser checks the date against its min and max (a year of five digits is past the max). The field is
+		// required, so no date or one it cannot read (Feb 30) is refused too. A refused date stays, with the browser's own
+		// reason and focus on the field.
+		if (!dateInput) return;
+		dateInput.min = snoozeUntilIso(new Date(), 1);
+		if (!dateInput.reportValidity()) return;
 		onSetSnooze(item.def.id, dateValue);
 		closeSnooze();
 	}
@@ -140,7 +150,7 @@
 			case 'changed':
 				return { text: `Last day ${f(item.finalEndDate ?? item.windowEndDate)}` };
 			case 'closed':
-				return { text: f(item.finalEndDate ?? item.windowEndDate) };
+				return { text: f(closedOnDate(item)) };
 			case 'still-to-do':
 				return at('Aimed for', item.windowEndDate);
 			default:
@@ -307,14 +317,15 @@
 							<input
 								type="date"
 								autocomplete="off"
+								bind:this={dateInput}
 								bind:value={dateValue}
+								min={snoozeUntilIso(new Date(), 1)}
+								max={SNOOZE_DATE_MAX}
+								required
 								aria-label="Snooze until date"
 							/>
-							<button
-								type="button"
-								class="task-card__snooze-go"
-								onclick={snoozeToDate}
-								disabled={!dateValue}>Snooze</button
+							<button type="button" class="task-card__snooze-go" onclick={snoozeToDate}
+								>Snooze</button
 							>
 						</div>
 					{/if}
@@ -574,11 +585,6 @@
 		font-size: var(--font-size-s);
 		font-weight: 600;
 		cursor: pointer;
-	}
-
-	.task-card__snooze-go:disabled {
-		opacity: 0.6;
-		cursor: default;
 	}
 
 	/* Inline note editor: a full-width textarea + Save/Cancel, styled like the

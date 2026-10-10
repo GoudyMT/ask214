@@ -138,6 +138,9 @@ export type DisplayStatus =
 /** A firm last day this close or closer reads "closing soon": the same distance as the first calendar alert. */
 export const CLOSING_SOON_DAYS = 30;
 
+/** A closed task counts as "just closed" for this many days after its last day: what remains possible is still shown. */
+export const JUST_CLOSED_DAYS = 14;
+
 /** States a snooze may never hide: a snooze quiets a task, it must not make anyone miss a deadline. */
 export const FIRM_WARNINGS: ReadonlySet<DisplayStatus> = new Set([
 	'closing-soon',
@@ -204,6 +207,11 @@ export type TimelineItem = {
 	windowEndDate: string;
 	status: DisplayStatus;
 	finalEndDate?: string;
+	/**
+	 * The last day a closed task could still be done, where that is not its window's end: a required task stays late
+	 * until separation, so it closes after the separation date. Present only on such a closed task.
+	 */
+	closedOn?: string;
 	daysLeft?: number; // days to the next firm edge while it counts down
 	aimDate?: string; // soft tasks: the recommended date, or the window end once that passed
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
@@ -212,16 +220,27 @@ export type TimelineItem = {
 	fit?: { reason: FitReason; date: string };
 };
 
+/** The day a closed task closed: the one date the "Just closed" rule and its row in "Needs you now" both name. */
+export function closedOnDate(item: TimelineItem): string {
+	return item.closedOn ?? item.finalEndDate ?? item.windowEndDate;
+}
+
+/** Whether a closed task closed within the last JUST_CLOSED_DAYS: "Needs you now" lists it under "Just closed". */
+export function isJustClosed(item: TimelineItem, todayIso: string): boolean {
+	return item.status === 'closed' && daysBetween(closedOnDate(item), todayIso) <= JUST_CLOSED_DAYS;
+}
+
 /** Per-phase progress tally derived from item display status (drives the header count + collapse). */
 export type PhaseCounts = {
 	done: number;
 	skipped: number;
 	snoozed: number;
-	toDo: number; // active: every status but done / skipped / snoozed
+	toDo: number; // active: every status but done / skipped / snoozed / closed
+	closed: number; // the date has passed for good and the task can no longer be done
 };
 
-/** A non-empty phase bucket with its (sorted) items, a chip-strip count, a progress tally, and
- *  whether it is fully resolved (every task done or skipped -> collapsible). */
+/** A non-empty phase bucket with its (sorted) items, a chip-strip count, a progress tally, and whether nothing in it
+ *  is left to act on (every task done, skipped, or closed for more than JUST_CLOSED_DAYS -> collapsible). */
 export type TimelinePhase = {
 	bucket: PhaseBucket;
 	items: TimelineItem[];
@@ -255,7 +274,7 @@ function bucketIndexFor(offset: number): number {
 
 /** Tally a phase's items by display status (header progress count + the collapse decision). */
 function tallyCounts(items: TimelineItem[]): PhaseCounts {
-	const counts: PhaseCounts = { done: 0, skipped: 0, snoozed: 0, toDo: 0 };
+	const counts: PhaseCounts = { done: 0, skipped: 0, snoozed: 0, toDo: 0, closed: 0 };
 	for (const item of items) {
 		switch (item.status) {
 			case 'done':
@@ -267,8 +286,11 @@ function tallyCounts(items: TimelineItem[]): PhaseCounts {
 			case 'snoozed':
 				counts.snoozed++;
 				break;
+			case 'closed':
+				counts.closed++;
+				break;
 			default:
-				counts.toDo++; // every active status
+				counts.toDo++; // every other active status
 		}
 	}
 	return counts;
@@ -333,6 +355,7 @@ export function generateTimeline(
 				windowEndDate,
 				status,
 				...(a.finalEndDate !== undefined ? { finalEndDate: a.finalEndDate } : {}),
+				...(status === 'closed' && a.def.kind === 'required' ? { closedOn: a.separationDate } : {}),
 				...(nextEdge !== undefined ? { daysLeft: daysBetween(todayIso, nextEdge) } : {}),
 				...(a.def.kind === 'soft'
 					? { aimDate: a.targetDate >= todayIso ? a.targetDate : windowEndDate }
@@ -360,9 +383,13 @@ export function generateTimeline(
 			.map((entry) => entry.item);
 		if (items.length === 0) continue;
 		const counts = tallyCounts(items);
-		// Collapsible only when every task is resolved as done/skipped - any snoozed (paused) or
-		// active task keeps the phase open.
-		const collapsible = counts.toDo === 0 && counts.snoozed === 0;
+		// Collapsible only when nothing in it is left to act on: any snoozed (paused) or active task keeps the phase
+		// open, and so does a task closed in the last JUST_CLOSED_DAYS - "Needs you now" lists it under "Just closed",
+		// its row jumps to the card, and a folded phase draws no cards.
+		const collapsible =
+			counts.toDo === 0 &&
+			counts.snoozed === 0 &&
+			!items.some((item) => isJustClosed(item, todayIso));
 		phases.push({ bucket, items, count: items.length, counts, collapsible });
 	}
 

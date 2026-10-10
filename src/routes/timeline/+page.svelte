@@ -19,8 +19,11 @@
 	import { readablePlan, type PlanAnswer } from '$lib/timeline/skillbridge-plan';
 	import { savePlanAnswer } from '$lib/timeline/skillbridge-save';
 	import { localTodayIso } from '$lib/timeline/day-math';
+	import { LocalToday } from '$lib/timeline/local-today.svelte';
 
 	const app = getProfileApp();
+	// Everything derived from today reads this clock, which turns at local midnight; an act at a tap reads the clock at the tap.
+	const clock = new LocalToday();
 
 	let unlocking = $state(false);
 
@@ -41,12 +44,13 @@
 	});
 
 	// The generated timeline projection (pure): re-derives when the persona or the stored
-	// per-task state changes. TASK_DEFS is readonly; generateTimeline takes a mutable array.
+	// per-task state changes, and when the day turns at local midnight. TASK_DEFS is readonly;
+	// generateTimeline takes a mutable array.
 	const view = $derived.by(() => {
 		const persona = app.store?.persona;
 		if (!persona || persona.completeness === 'none') return null;
 		const state = app.timeline?.state ?? EMPTY_STATE;
-		return generateTimeline(persona, [...TASK_DEFS], state, new Date());
+		return generateTimeline(persona, [...TASK_DEFS], state, clock.now);
 	});
 
 	// The flat pending-task list the calendar card projects to events (same shared projection the
@@ -76,7 +80,7 @@
 			shouldShowCalendarCard(app.calendar?.card ?? {}, Date.now())
 	);
 
-	const plan = $derived(readablePlan(app.timeline, eaos, localTodayIso(new Date())));
+	const plan = $derived(readablePlan(app.timeline, eaos, localTodayIso(clock.now)));
 	// Set at the tap, before the save lands: the store's answer ends the question, but the card stays on the page to show
 	// what happened, until the person closes it or leaves.
 	let planHeld = $state(false);

@@ -462,7 +462,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		kind: 'closes',
 		windowStart: 0,
 		windowEnd: 240,
-		// 1 year and 120 days, counted as 365 + 120: one day early at most across a leap day, never late.
+		// 485 days, as VA counts it: "SGLI can no longer be converted after 485 Days" (VA's Guard and Reserve benefits
+		// page) and "1 YEAR & 120 DAYS (485 DAYS)" (the TAP VA Benefits and Services Participant Guide). Read as a
+		// calendar year and 120 days, a Feb 29 in between makes it a day later, so 485 is never late under any reading.
 		finalEnd: 485,
 		recommendedOffset: 30,
 		why: 'You can convert with no health questions within 240 days of separation (hard deadline about 485 days).',

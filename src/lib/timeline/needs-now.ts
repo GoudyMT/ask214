@@ -1,9 +1,8 @@
-import { CLOSING_SOON_DAYS, type TimelineItem } from './generate';
+import { CLOSING_SOON_DAYS, isJustClosed, type TimelineItem } from './generate';
 import { daysBetween } from './day-math';
 
-/** How long a window counts as "just opened", and a closed one as "just closed". */
+/** How long a window counts as "just opened". */
 export const JUST_OPENED_DAYS = 14;
-export const JUST_CLOSED_DAYS = 14;
 
 export type NeedsNowGroups = {
 	late: TimelineItem[];
@@ -37,8 +36,7 @@ export function selectNeedsNow(items: TimelineItem[], todayIso: string): NeedsNo
 			// Only a firm task needs a word with the command now; a soft one stays out of the summary.
 			if (item.def.kind !== 'soft') groups.afterYouLeave.push(item);
 		} else if (item.status === 'closed') {
-			const closedOn = item.finalEndDate ?? item.windowEndDate;
-			if (daysBetween(closedOn, todayIso) <= JUST_CLOSED_DAYS) groups.justClosed.push(item);
+			if (isJustClosed(item, todayIso)) groups.justClosed.push(item);
 		} else if (item.status === 'start-now') {
 			if (daysBetween(item.windowStartDate, todayIso) < JUST_OPENED_DAYS)
 				groups.justOpened.push(item);

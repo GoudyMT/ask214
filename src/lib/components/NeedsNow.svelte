@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
+	import { closedOnDate } from '$lib/timeline/generate';
 	import type { TimelineItem } from '$lib/timeline';
 	import type { NeedsNowGroups } from '$lib/timeline/needs-now';
 
@@ -28,7 +29,7 @@
 			case 'changed':
 				return `${f(item.finalEndDate ?? item.windowEndDate)} - ${days}`;
 			case 'closed':
-				return `closed ${f(item.finalEndDate ?? item.windowEndDate)}`;
+				return `closed ${f(closedOnDate(item))}`;
 			case 'after-you-leave':
 				return 'ask your command';
 			default:

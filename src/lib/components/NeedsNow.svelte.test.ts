@@ -5,6 +5,7 @@ import NeedsNow from './NeedsNow.svelte';
 import type { TimelineItem } from '$lib/timeline';
 import type { NeedsNowGroups } from '$lib/timeline/needs-now';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { formatTimelineDate } from '$lib/timeline/format-date';
 
 function item(id: string, title: string, extra: Partial<TimelineItem> = {}): TimelineItem {
 	return {
@@ -93,6 +94,25 @@ describe('NeedsNow', () => {
 		const rows = [...container.querySelectorAll('a.needs-now__row')];
 		expect(rows[0]?.textContent).toContain('was due Oct 20, 2026');
 		expect(rows[1]?.textContent).toContain('closed Oct 20, 2026');
+	});
+
+	// A required task closes after separation, long after its window ended: its row names the day the rule counts from.
+	it('dates a closed row from closedOn when the item has one, not from its window end', async () => {
+		const closedOn = '2027-03-05';
+		const groups: NeedsNowGroups = {
+			...empty,
+			justClosed: [
+				item('cap', 'Complete your TAP Capstone', {
+					status: 'closed',
+					windowEndDate: '2026-10-20',
+					closedOn
+				})
+			]
+		};
+		const { container } = await render(NeedsNow, { props: { groups } });
+		const row = container.querySelector('a.needs-now__row')?.textContent ?? '';
+		expect(row).toContain(`closed ${formatTimelineDate(closedOn)}`);
+		expect(row).not.toContain(formatTimelineDate('2026-10-20'));
 	});
 
 	it('counts a changed task down to its final day, and says "1 day" in the singular', async () => {

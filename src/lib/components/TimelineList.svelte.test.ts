@@ -33,14 +33,14 @@ const VIEW: TimelineView = {
 			bucket: { id: 'phase-18-12', label: '18-12 months out', startOffset: -540, endOffset: -360 },
 			items: [makeItem('Request medical records')],
 			count: 1,
-			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 1 },
+			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 1, closed: 0 },
 			collapsible: false
 		},
 		{
 			bucket: { id: 'phase-final-90', label: 'Final 90 days', startOffset: -90, endOffset: 0 },
 			items: [makeItem('File VA intent-to-file', 'late'), makeItem('DD-214 review')],
 			count: 2,
-			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 2 },
+			counts: { done: 0, skipped: 0, snoozed: 0, toDo: 2, closed: 0 },
 			collapsible: false
 		}
 	],
@@ -81,14 +81,17 @@ describe('TimelineList', () => {
 	});
 });
 
+// Each count's number and words are joined by non-breaking spaces, so a header wraps only at its " - " separators.
+const NBSP = String.fromCharCode(160);
+
 describe('TimelineList phase progress counts', () => {
 	it('active phase header shows the "N to do" count (Format 1)', async () => {
 		const { container } = await render(TimelineList, {
 			props: { view: VIEW, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent);
-		expect(headings[0]).toContain('1 to do'); // phase-18-12: 1 active task
-		expect(headings[1]).toContain('2 to do'); // phase-final-90: 2 active tasks
+		expect(headings[0]).toContain(`1${NBSP}to${NBSP}do`); // phase-18-12: 1 active task
+		expect(headings[1]).toContain(`2${NBSP}to${NBSP}do`); // phase-final-90: 2 active tasks
 	});
 
 	it('resolved phase header shows the done/skipped breakdown', async () => {
@@ -103,7 +106,7 @@ describe('TimelineList phase progress counts', () => {
 						makeItem('D', 'skipped')
 					],
 					count: 4,
-					counts: { done: 3, skipped: 1, snoozed: 0, toDo: 0 },
+					counts: { done: 3, skipped: 1, snoozed: 0, toDo: 0, closed: 0 },
 					collapsible: true
 				}
 			],
@@ -113,8 +116,8 @@ describe('TimelineList phase progress counts', () => {
 			props: { view: resolvedView, onSetStatus: noop, onSetSnooze: noop }
 		});
 		const heading = container.querySelector('h2')?.textContent;
-		expect(heading).toContain('3 done');
-		expect(heading).toContain('1 skipped');
+		expect(heading).toContain(`3${NBSP}done`);
+		expect(heading).toContain(`1${NBSP}skipped`);
 	});
 
 	it('counts snoozed tasks as "to do" (snoozed is paused, not done)', async () => {
@@ -124,7 +127,7 @@ describe('TimelineList phase progress counts', () => {
 					bucket: { id: 'phase-y', label: '12-6 months out', startOffset: -360, endOffset: -180 },
 					items: [makeItem('A', 'late'), makeItem('B', 'snoozed'), makeItem('C', 'done')],
 					count: 3,
-					counts: { done: 1, skipped: 0, snoozed: 1, toDo: 1 },
+					counts: { done: 1, skipped: 0, snoozed: 1, toDo: 1, closed: 0 },
 					collapsible: false
 				}
 			],
@@ -133,8 +136,115 @@ describe('TimelineList phase progress counts', () => {
 		const { container } = await render(TimelineList, {
 			props: { view, onSetStatus: noop, onSetSnooze: noop }
 		});
-		expect(container.querySelector('h2')?.textContent).toContain('2 to do'); // 1 active + 1 snoozed
+		expect(container.querySelector('h2')?.textContent).toContain(`2${NBSP}to${NBSP}do`); // 1 active + 1 snoozed
 	});
+
+	// A closed task can no longer be done, so the count says so apart from what is left to do.
+	describe('closed tasks in the header count', () => {
+		const countOf = async (
+			counts: { done: number; skipped: number; toDo: number; closed: number },
+			collapsible: boolean
+		) => {
+			// A task's id is made of the letters of its title, so each title differs in its letters.
+			const letter = (n: number) => String.fromCharCode(97 + n);
+			const items = [
+				...Array.from({ length: counts.done }, (_, n) => makeItem(`Done ${letter(n)}`, 'done')),
+				...Array.from({ length: counts.skipped }, (_, n) =>
+					makeItem(`Skipped ${letter(n)}`, 'skipped')
+				),
+				...Array.from({ length: counts.toDo }, (_, n) => makeItem(`Open ${letter(n)}`, 'late')),
+				...Array.from({ length: counts.closed }, (_, n) =>
+					makeItem(`Closed ${letter(n)}`, 'closed')
+				)
+			];
+			const view: TimelineView = {
+				phases: [
+					{
+						bucket: { id: 'phase-z', label: '6-3 months out', startOffset: -180, endOffset: -90 },
+						items,
+						count: items.length,
+						counts: { ...counts, snoozed: 0 },
+						collapsible
+					}
+				],
+				total: items.length
+			};
+			const { container } = await render(TimelineList, {
+				props: { view, onSetStatus: noop, onSetSnooze: noop }
+			});
+			return container.querySelector('h2 .timeline-list__count')?.textContent;
+		};
+
+		it('an open phase says what is left to do and what closed', async () => {
+			expect(await countOf({ done: 3, skipped: 0, toDo: 2, closed: 5 }, false)).toBe(
+				`- 2${NBSP}to${NBSP}do - 5${NBSP}closed`
+			);
+		});
+
+		it('an open phase with only a just-closed task left says only that', async () => {
+			expect(await countOf({ done: 1, skipped: 0, toDo: 0, closed: 1 }, false)).toBe(
+				`- 1${NBSP}closed`
+			);
+		});
+
+		it('a folded phase says what was done, skipped and closed', async () => {
+			expect(await countOf({ done: 5, skipped: 0, toDo: 0, closed: 5 }, true)).toBe(
+				`- 5${NBSP}done - 5${NBSP}closed`
+			);
+			expect(await countOf({ done: 2, skipped: 1, toDo: 0, closed: 1 }, true)).toBe(
+				`- 2${NBSP}done - 1${NBSP}skipped - 1${NBSP}closed`
+			);
+		});
+
+		// A whitespace-folding matcher reads a non-breaking space as a space, so the character itself is checked here.
+		it('keeps each count whole: a line can break only at the separators', async () => {
+			for (const [counts, collapsible] of [
+				[{ done: 0, skipped: 0, toDo: 2, closed: 5 }, false],
+				[{ done: 2, skipped: 1, toDo: 0, closed: 1 }, true]
+			] as const) {
+				const parts = (await countOf(counts, collapsible))?.slice(2).split(' - ') ?? [];
+				expect(parts.length).toBeGreaterThan(1);
+				for (const part of parts) {
+					expect(part).not.toContain(' ');
+					const [count, ...words] = part.split(NBSP);
+					expect(Number(count)).toBeGreaterThan(0);
+					expect(words.length).toBeGreaterThan(0);
+				}
+			}
+		});
+	});
+});
+
+// A button sets its own case and letter spacing, so a folded phase's label could read unlike the open headings.
+it('a folded phase label has the case and letter spacing of an open phase heading', async () => {
+	const phase = (id: string, collapsible: boolean, status: DisplayStatus) => ({
+		bucket: { id, label: `${id} months out`, startOffset: -540, endOffset: -360 },
+		items: [makeItem(`Task ${id}`, status)],
+		count: 1,
+		counts: {
+			done: status === 'done' ? 1 : 0,
+			skipped: 0,
+			snoozed: 0,
+			toDo: status === 'done' ? 0 : 1,
+			closed: 0
+		},
+		collapsible
+	});
+	const view: TimelineView = {
+		phases: [phase('folded', true, 'done'), phase('open', false, 'late')],
+		total: 2
+	};
+	const { container } = await render(TimelineList, {
+		props: { view, onSetStatus: noop, onSetSnooze: noop }
+	});
+	const toggle = container.querySelector('button.timeline-list__toggle');
+	const openHeading = container.querySelector('#open-heading');
+	if (!toggle || !openHeading) throw new Error('no folded toggle or open heading rendered');
+	const folded = getComputedStyle(toggle);
+	const open = getComputedStyle(openHeading);
+	expect(open.textTransform).toBe('uppercase');
+	expect(folded.textTransform).toBe(open.textTransform);
+	expect(folded.letterSpacing).toBe(open.letterSpacing);
 });
 
 describe('TimelineList section auto-collapse', () => {
@@ -147,7 +257,7 @@ describe('TimelineList section auto-collapse', () => {
 					makeItem('Separation physical', 'skipped')
 				],
 				count: 2,
-				counts: { done: 1, skipped: 1, snoozed: 0, toDo: 0 },
+				counts: { done: 1, skipped: 1, snoozed: 0, toDo: 0, closed: 0 },
 				collapsible: true
 			}
 		],
@@ -207,7 +317,7 @@ describe('TimelineList section auto-collapse', () => {
 						makeItem('Separation physical', 'skipped')
 					],
 					count: 2,
-					counts: { done: 0, skipped: 1, snoozed: 0, toDo: 1 },
+					counts: { done: 0, skipped: 1, snoozed: 0, toDo: 1, closed: 0 },
 					collapsible: false
 				}
 			],

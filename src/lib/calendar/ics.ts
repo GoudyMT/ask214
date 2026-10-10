@@ -32,16 +32,10 @@ function foldLine(line: string): string {
 	return chunks.join('\r\n ');
 }
 
-function pad2(n: number): string {
-	return String(n).padStart(2, '0');
-}
-
-/** UTC Date -> iCalendar UTC DATE-TIME YYYYMMDDTHHMMSSZ (for DTSTAMP). */
+/** UTC Date -> iCalendar UTC DATE-TIME YYYYMMDDTHHMMSSZ (for DTSTAMP): the ISO form without its separators and
+ *  milliseconds. */
 function formatDtstamp(now: Date): string {
-	return (
-		`${now.getUTCFullYear()}${pad2(now.getUTCMonth() + 1)}${pad2(now.getUTCDate())}` +
-		`T${pad2(now.getUTCHours())}${pad2(now.getUTCMinutes())}${pad2(now.getUTCSeconds())}Z`
-	);
+	return now.toISOString().replace(/[-:]|\.\d+/g, '');
 }
 
 /** ISO YYYY-MM-DD -> DATE YYYYMMDD. */

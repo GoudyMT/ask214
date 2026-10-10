@@ -122,8 +122,9 @@ leave, whichever starts first). Once that date is entered, the last day moves to
 while the opening stays, so every date keeps its source; the separation package and DD-214 review count their
 whole window from it. A device clock that jumps back over a day shows a warning rather than quietly reshuffling
 deadlines. The export is an `.ics` file the user saves, named by the day of the add: an all-day event for each
-moment still ahead (a window opening, a last day, or a soft task's target date), with alerts before each firm
-date and target date, never an event before today. Events and alerts carry only a stable ID, the date and the
+moment still ahead (a window opening, a change in how a window works, a last day, the last day before leaving the
+command for a task that cannot fit there, or a soft task's target date), with alerts before each firm date and
+target date, never an event before today. Events and alerts carry only a stable ID, the date and the
 task's title with its moment, never notes or profile details, though the dates can reveal the separation and
 leaving days, and the two SkillBridge steps reveal that the sailor plans SkillBridge. Stable IDs and a rising
 version number let an app that honors them update events rather than duplicate them. Not every app does, so the
@@ -160,3 +161,4 @@ behind. Only a calendar file the user saves and the API key, sent to its own pro
 
 - 2026-10-02: First draft.
 - 2026-10-05: The leaving dates and the record of handed-over calendar events.
+- 2026-10-09: Every calendar moment named.

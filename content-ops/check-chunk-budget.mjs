@@ -196,6 +196,17 @@ const STATIC = 'static';
 //     layout and 148,448-148,464 B precache, about 40 B of room above the highest. Trim pass: the version written into
 //     the page as text before compiling instead of a runtime constant (-22 B, kept); the version as a literal
 //     expression (0 B) and the two refusals merged into one block (+6 B), not kept.
+//     Page 60,930 -> 60,970 and route nodes 46,930 -> 46,955 (package.json's size-limit) (owner's call, 2026-10-09):
+//     the timeline fixes - closed tasks counted apart in the phase header, with the fold rule; one local today that
+//     turns at midnight, with focus handed on when the new day takes the focused card away; and the custom snooze
+//     date's limits, refused with the browser's own message - builds measured page 60,925-60,932 B and route nodes
+//     46,912-46,918 B, 38-45 and 37-43 B of room. Trim passes, each measured on a full build: the calendar timestamp from the
+//     ISO form (-46 B page), one helper for every SkillBridge plan reading (-18 B page), the midnight focus hand-off in
+//     one effect, and the date field checking its own date in place of a separate check (together -58 B route nodes),
+//     kept; the midnight delay as a date subtraction (-4 B, inside the noise), the view's today reused (0 B),
+//     done-or-skipped in one line (0 B) and an hourly re-check of the day (+5 B page) not kept. Not taken: the
+//     calendar text escape in one pass (it needs escapes typed into the source) and a lazy calendar builder (the
+//     worker still downloads those bytes at install).
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -205,7 +216,7 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 60_930,
+	page: 60_970,
 	onDemand: 7_300,
 	precacheFiles: 60,
 	precacheBytes: 148_505,

@@ -3,6 +3,7 @@ import { buildIcs } from './build-ics';
 import { computeIcsUid } from './uid';
 import { generateTimeline, type TimelineItem } from '../timeline/generate';
 import { TASK_DEFS } from '../timeline/task-defs';
+import { SNOOZE_DATE_MAX } from '../timeline/snooze';
 import type { EaosString } from '../profile/eaos';
 import type { TimelineState } from '../timeline/types';
 
@@ -285,5 +286,38 @@ describe('buildIcs on the device clock', () => {
 		);
 		expect(file.events.map((e) => e.title)).toEqual(['Aim for: A']);
 		expect(file.ics).toContain('SUMMARY:Aim for: A');
+	});
+
+	// A snoozed task's event ends the day after its date; the latest snooze must still write a four-digit year
+	// (RFC 5545 allows no more) on both lines.
+	it('writes a four-digit year on every date line for a task snoozed to the latest date', async () => {
+		const { ics } = await buildIcs(
+			[
+				{
+					def: {
+						id: 'late',
+						title: 'Late',
+						category: 'admin',
+						finishBefore: 'separation',
+						kind: 'soft',
+						windowStart: -180,
+						windowEnd: -90,
+						why: ''
+					},
+					targetDate: '2026-11-01',
+					windowStartDate: '2026-11-01',
+					windowEndDate: '2027-02-01',
+					status: 'snoozed',
+					snoozeUntil: SNOOZE_DATE_MAX
+				}
+			],
+			{ taskIds: [], categories: [] },
+			new Date(2026, 9, 4, 12)
+		);
+		const dateLines = ics.split('\r\n').filter((l) => /^DT(START|END)/.test(l));
+		expect(dateLines).toHaveLength(2);
+		for (const line of dateLines) {
+			expect(line.split(':')[1], line).toMatch(/^\d{8}$/);
+		}
 	});
 });
