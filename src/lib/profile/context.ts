@@ -18,8 +18,8 @@ export function afterStartupFailure(current: AppStatus, next: AppStatus): AppSta
 
 /**
  * The status a finished start-up leaves. A start-up still loading takes it, and so does one that outlasted its timeout
- * (`error`): the user chose late recovery over a banner that stays. A takeover (`stale`, `unsupported`) names a cause no
- * result can undo.
+ * or was blocked (`error`): a start-up that ends late opens the app, so a slow or blocked open recovers without a
+ * Reload. A takeover (`stale`, `unsupported`) names a cause no result can undo.
  */
 export function afterStartupResult(
 	current: AppStatus,

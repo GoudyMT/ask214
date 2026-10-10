@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { afterStartupFailure, afterStartupResult } from './context';
 
 describe('afterStartupResult', () => {
-	// A start-up that outlasted its timeout left `error` up; its later result is the recovery the user chose.
+	// A start-up that outlasted its timeout left `error` up; it still ends, and its result opens the app without a Reload.
 	it('takes the result over a start-up still loading or timed out', () => {
 		expect(afterStartupResult('loading', 'ready')).toBe('ready');
 		expect(afterStartupResult('error', 'ready')).toBe('ready');
