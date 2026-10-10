@@ -3,7 +3,7 @@
 	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
 	import { resourcesForTask, afterLinkForTask, linkNoteForTask } from '$lib/resources';
-	import { isFirmWarning, type FitReason } from '$lib/timeline/generate';
+	import { closedOnDate, isFirmWarning, type FitReason } from '$lib/timeline/generate';
 
 	let {
 		item,
@@ -150,7 +150,7 @@
 			case 'changed':
 				return { text: `Last day ${f(item.finalEndDate ?? item.windowEndDate)}` };
 			case 'closed':
-				return { text: f(item.finalEndDate ?? item.windowEndDate) };
+				return { text: f(closedOnDate(item)) };
 			case 'still-to-do':
 				return at('Aimed for', item.windowEndDate);
 			default:

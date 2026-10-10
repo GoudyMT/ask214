@@ -188,6 +188,15 @@ describe('TaskCard (open states)', () => {
 		expect(container.querySelector('.task-card__date')?.textContent).toBe('May 17, 2028');
 	});
 
+	// The card and the "Just closed" row name the same day: a required task closes at separation, not at its window end.
+	it('closed required task: the date is the day it closed, as in Just closed', async () => {
+		const def = { ...DEF, kind: 'required' as const };
+		const { container } = await renderCard(
+			makeItem({ def, status: 'closed', windowEndDate: '2027-01-20', closedOn: '2027-03-05' })
+		);
+		expect(container.querySelector('.task-card__date')?.textContent).toBe('Mar 5, 2027');
+	});
+
 	// A required task's note says what to do before separation; once separation has passed it no longer applies.
 	it('closed after separation: a required task shows no What now note', async () => {
 		const def = {
