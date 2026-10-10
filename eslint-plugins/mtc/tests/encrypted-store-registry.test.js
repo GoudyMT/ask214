@@ -93,6 +93,20 @@ describe('mtc/encrypted-store-registry', () => {
 		).not.toThrow();
 	});
 
+	it('keeps all four sanctioned writes allowed by their disables, each disable used', () => {
+		const disabled = (store) =>
+			`// eslint-disable-next-line rule-to-test/encrypted-store-registry -- sanctioned\ntx.objectStore('${store}').put({ id: 0, rec: blob });`;
+		expect(() =>
+			ruleTester.run('encrypted-store-registry', rule, {
+				valid: ['profile', 'timeline-state', 'calendar-sync', 'byok'].map((store) => ({
+					code: disabled(store),
+					linterOptions: { reportUnusedDisableDirectives: 'error' }
+				})),
+				invalid: []
+			})
+		).not.toThrow();
+	});
+
 	describe('refuses a cursor on an encrypted store, whose update() writes without put or add', () => {
 		it.each([
 			['openCursor in a chain', "tx.objectStore('profile').openCursor();"],
@@ -105,7 +119,18 @@ describe('mtc/encrypted-store-registry', () => {
 			['a computed method name', "tx.objectStore('calendar-sync')['openCursor']();"],
 			['a computed method in a template literal', "tx.objectStore('byok')[`openCursor`]();"],
 			['a const-named store', "const S = 'profile'; tx.objectStore(S).openCursor();"],
-			['an optional call', "tx.objectStore('profile')?.openCursor();"]
+			['an optional call', "tx.objectStore('profile')?.openCursor();"],
+			['an index cursor in a chain', "tx.objectStore('profile').index('x').openCursor();"],
+			['an index key cursor in a chain', "tx.objectStore('profile').index('x').openKeyCursor();"],
+			[
+				'an index cursor on a variable holding the store',
+				"const s = tx.objectStore('profile'); s.index('x').openCursor();"
+			],
+			['a method name held in a const', "const m = 'openCursor'; tx.objectStore('profile')[m]();"],
+			[
+				'a method name held in a const, on a variable holding the store',
+				"const m = 'openKeyCursor'; const s = tx.objectStore('byok'); s[m]();"
+			]
 		])('%s', (_label, code) => {
 			expect(() =>
 				ruleTester.run('encrypted-store-registry', rule, {
@@ -121,7 +146,12 @@ describe('mtc/encrypted-store-registry', () => {
 					valid: [
 						{ code: "tx.objectStore('keystore').openCursor();" },
 						{ code: "const s = tx.objectStore('profile-hwm'); s.openKeyCursor();" },
-						{ code: 'tx.objectStore(name).openCursor();' }
+						{ code: 'tx.objectStore(name).openCursor();' },
+						{ code: "tx.objectStore('keystore').index('x').openCursor();" },
+						{ code: "const s = tx.objectStore('profile-hwm'); s.index('x').openKeyCursor();" },
+						{ code: "const m = 'openCursor'; tx.objectStore('keystore')[m]();" },
+						// A method name known only at run time cannot be judged here.
+						{ code: "tx.objectStore('profile')[name]();" }
 					],
 					invalid: []
 				})
@@ -146,6 +176,14 @@ describe('mtc/encrypted-store-registry', () => {
 				"const t = tx.objectStore('profile'); const s = t; s.put(x);"
 			],
 			['a const-named store', "const S = 'profile'; tx.objectStore(S).put(x);"],
+			[
+				'a method name held in a const',
+				"const w = 'put'; const s = tx.objectStore('profile'); s[w](x);"
+			],
+			[
+				'a method name held in a const, in a chain',
+				"const w = 'add'; tx.objectStore('byok')[w](x);"
+			],
 			['a template-literal store name', 'tx.objectStore(`calendar-sync`).put(x);'],
 			[
 				'a const-named store in a variable with a computed put',

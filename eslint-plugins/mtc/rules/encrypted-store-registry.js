@@ -12,8 +12,12 @@
  * `X.objectStore(<name>)` call with <name> in the set below. The same write is caught in the
  * shapes that would otherwise slip past a literal chain match: the store held in a variable
  * (`const s = tx.objectStore('profile'); s.put(x)`), a computed member (`store['put'](x)`), and
- * the name held in a variable declared once from a string (`const S = 'profile'`). A store name
- * known only at run time (a parameter, a reassigned variable) cannot be judged and is allowed.
+ * the name held in a variable declared once from a string (`const S = 'profile'`), an index of the
+ * store (`s.index('x').openCursor()`), and the method name held in such a variable
+ * (`const w = 'put'; s[w](x)`). A store name known only at run time (a parameter, a reassigned
+ * variable) cannot be judged and is allowed. `bind` / `call` / `apply` forms and a method name
+ * reached any other way are NOT followed: this guard catches mistakes, it is not a proof against
+ * deliberate evasion.
  *
  * The set duplicates `src/lib/db/registry.ts` because an ESLint plugin is plain JS
  * and cannot import the TypeScript registry - and the registry cannot move to JS
@@ -74,9 +78,9 @@ export default {
 			return null;
 		}
 
-		/** The name a member access reads: `.name` or a plain-string `['name']`; null when it is not knowable. */
+		/** The name a member access reads: `.name`, `['name']`, or `[v]` for a const `v` holding a string; null when it is not knowable. */
 		function memberName(member) {
-			if (member.computed) return plainString(member.property);
+			if (member.computed) return resolveString(member.property);
 			return member.property.type === 'Identifier' ? member.property.name : null;
 		}
 
@@ -110,7 +114,10 @@ export default {
 			return init ? plainString(unwrap(init)) : null;
 		}
 
-		/** Whether an expression is `<tx>.objectStore('<encrypted>')`, directly or through a variable declared once. */
+		/**
+		 * Whether an expression is `<tx>.objectStore('<encrypted>')` or an index of it (`.index(...)`, whose
+		 * cursor writes the same rows), directly or through a variable declared once.
+		 */
 		function isEncryptedStore(node, hops = 0) {
 			const expression = unwrap(node);
 			if (expression.type === 'Identifier') {
@@ -118,13 +125,13 @@ export default {
 				const init = hops < MAX_ALIAS_HOPS ? initializerOf(expression) : null;
 				return init ? isEncryptedStore(init, hops + 1) : false;
 			}
-			if (
-				expression.type !== 'CallExpression' ||
-				expression.callee.type !== 'MemberExpression' ||
-				memberName(expression.callee) !== 'objectStore'
-			) {
+			if (expression.type !== 'CallExpression' || expression.callee.type !== 'MemberExpression') {
 				return false;
 			}
+			if (memberName(expression.callee) === 'index') {
+				return hops < MAX_ALIAS_HOPS && isEncryptedStore(expression.callee.object, hops + 1);
+			}
+			if (memberName(expression.callee) !== 'objectStore') return false;
 			const storeArg = expression.arguments[0];
 			if (!storeArg) return false;
 			const name = resolveString(storeArg);
