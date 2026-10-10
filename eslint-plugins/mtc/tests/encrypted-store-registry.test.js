@@ -93,6 +93,42 @@ describe('mtc/encrypted-store-registry', () => {
 		).not.toThrow();
 	});
 
+	describe('refuses a cursor on an encrypted store, whose update() writes without put or add', () => {
+		it.each([
+			['openCursor in a chain', "tx.objectStore('profile').openCursor();"],
+			['openKeyCursor in a chain', "tx.objectStore('profile').openKeyCursor();"],
+			['a variable holding the store', "const s = tx.objectStore('byok'); s.openCursor();"],
+			[
+				'openKeyCursor on a variable holding the store',
+				"const s = tx.objectStore('timeline-state'); s.openKeyCursor();"
+			],
+			['a computed method name', "tx.objectStore('calendar-sync')['openCursor']();"],
+			['a computed method in a template literal', "tx.objectStore('byok')[`openCursor`]();"],
+			['a const-named store', "const S = 'profile'; tx.objectStore(S).openCursor();"],
+			['an optional call', "tx.objectStore('profile')?.openCursor();"]
+		])('%s', (_label, code) => {
+			expect(() =>
+				ruleTester.run('encrypted-store-registry', rule, {
+					valid: [],
+					invalid: [{ code, errors: [{ messageId: 'cursorOnEncryptedStore' }] }]
+				})
+			).not.toThrow();
+		});
+
+		it('allows a cursor on a store that is not encrypted', () => {
+			expect(() =>
+				ruleTester.run('encrypted-store-registry', rule, {
+					valid: [
+						{ code: "tx.objectStore('keystore').openCursor();" },
+						{ code: "const s = tx.objectStore('profile-hwm'); s.openKeyCursor();" },
+						{ code: 'tx.objectStore(name).openCursor();' }
+					],
+					invalid: []
+				})
+			).not.toThrow();
+		});
+	});
+
 	describe('catches the same write in another shape', () => {
 		it.each([
 			['a variable holding the store', "const s = tx.objectStore('profile'); s.put(x);"],

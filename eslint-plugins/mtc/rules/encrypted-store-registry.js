@@ -5,6 +5,8 @@
  * sanctioned store paths (the profile, timeline-state, calendar-sync and BYO-key stores)
  * may write ciphertext, each carrying an inline eslint-disable at its one call
  * site. Test files that stage fixtures are exempted in eslint.config.js.
+ * Opening a cursor (`openCursor`, `openKeyCursor`) on an encrypted store is refused too, because
+ * `cursor.update()` writes the row it points at without any put or add call.
  *
  * Heuristic: a CallExpression `<store>.{put|add}(...)` flags as a violation when <store> is an
  * `X.objectStore(<name>)` call with <name> in the set below. The same write is caught in the
@@ -27,6 +29,8 @@ export const ENCRYPTED_STORES_LITERAL = new Set([
 	'byok'
 ]);
 const FORBIDDEN_WRITE_METHODS = new Set(['put', 'add']);
+// A cursor's update() and delete() write the row it points at, with no put or add call to see.
+const FORBIDDEN_CURSOR_METHODS = new Set(['openCursor', 'openKeyCursor']);
 const MAX_ALIAS_HOPS = 4;
 
 export default {
@@ -38,7 +42,9 @@ export default {
 		},
 		messages: {
 			writeUnsanctioned:
-				'Direct write to an encrypted IDB store bypasses the encryption boundary; route through the sanctioned store path (withWriteLocks + encryptRecord)'
+				'Direct write to an encrypted IDB store bypasses the encryption boundary; route through the sanctioned store path (withWriteLocks + encryptRecord)',
+			cursorOnEncryptedStore:
+				'A cursor on an encrypted IDB store can write through update() and bypass the encryption boundary; read with get and write through the sanctioned store path'
 		},
 		schema: []
 	},
@@ -130,10 +136,15 @@ export default {
 				const callee = unwrap(node.callee);
 				if (callee.type !== 'MemberExpression') return;
 				const method = memberName(callee);
-				if (method === null || !FORBIDDEN_WRITE_METHODS.has(method)) return;
-				if (!isEncryptedStore(callee.object)) return;
+				if (method === null) return;
+				const messageId = FORBIDDEN_WRITE_METHODS.has(method)
+					? 'writeUnsanctioned'
+					: FORBIDDEN_CURSOR_METHODS.has(method)
+						? 'cursorOnEncryptedStore'
+						: null;
+				if (messageId === null || !isEncryptedStore(callee.object)) return;
 
-				context.report({ node, messageId: 'writeUnsanctioned' });
+				context.report({ node, messageId });
 			}
 		};
 	}
