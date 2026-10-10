@@ -121,16 +121,6 @@
 		}
 	}
 
-	// The day turning at midnight re-derives the view: a phase can fold, or the SkillBridge question go, under the
-	// person's focus; a relock takes the whole view away (its day reads as none). Read before the page updates, focus
-	// held then and dropped by the update is handed on as after a card goes (focusAfterCard waits for the update).
-	let day: string | undefined;
-	$effect.pre(() => {
-		const today = view?.todayDate;
-		if (day && today !== day && document.activeElement !== document.body) void focusAfterCard();
-		day = today;
-	});
-
 	// The close moves the calendar card up under the spot of the close button and focus onto its Add button, so a second
 	// tap or key on the button (a double click, a held Enter) would dismiss or download. These handlers wait out a
 	// double-click's time; a tap after reading still works.
