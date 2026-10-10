@@ -16,12 +16,17 @@ export async function encryptProfileRecord(
 	profile: ProfileV1,
 	keystore: KeystoreRecordV1
 ): Promise<Uint8Array> {
-	return encryptRecord(
-		PROFILE_CTX,
-		new Uint8Array(encodeProfile(profile)),
-		keystore,
-		profile.generation
-	);
+	const encoded = encodeProfile(profile);
+	const plaintext = new Uint8Array(encoded);
+	try {
+		// Awaited inside the try: the wipe below must wait for the cipher to finish with the buffer.
+		return await encryptRecord(PROFILE_CTX, plaintext, keystore, profile.generation);
+	} finally {
+		// The whole profile as JSON, in two buffers. The cipher keeps its own copy and the ciphertext
+		// is all that is stored, so neither has a use once encryption ends.
+		encoded.fill(0);
+		plaintext.fill(0);
+	}
 }
 
 export async function decryptProfileRecord(
@@ -29,5 +34,12 @@ export async function decryptProfileRecord(
 	keystore: KeystoreRecordV1,
 	expectedGeneration: number
 ): Promise<ProfileV1> {
-	return decodeProfile(await decryptRecord(PROFILE_CTX, blob, keystore, expectedGeneration));
+	const plaintext = await decryptRecord(PROFILE_CTX, blob, keystore, expectedGeneration);
+	try {
+		return decodeProfile(plaintext);
+	} finally {
+		// The decoded record owns copies of every byte field, so this buffer is spent on success and on a
+		// schema error alike. (Strings JSON.parse made from it cannot be overwritten; that much stays.)
+		plaintext.fill(0);
+	}
 }

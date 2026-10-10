@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import {
@@ -11,18 +11,59 @@ import { withStores, reqToPromise } from '../db/schema';
 import { encryptProfileRecord } from './crypto-boundary';
 import { signSidecar, SidecarTamperError, type ProfileHwmPayload } from './sidecars';
 import { registerSecureInput } from './lifecycle';
+import { IV_HARD_STOP, IvCounterExhaustedError } from '../keystore/iv-counter';
 import type { ProfileV1 } from './types';
 
 type Store = 'keystore' | 'profile-hwm' | 'profile';
 type Row = Record<string, unknown>;
 
+// Seams over two modules, each a passthrough until a test arms it:
+// - cloneField records every byte array the save stages, so a test can look at the copies the store
+//   made and the caller never sees;
+// - computeRecordHmac can be made to throw, which reaches the step right after the staged copies exist.
+const seams = vi.hoisted(() => ({
+	cloned: [] as Uint8Array[],
+	failHmac: false
+}));
+
+// The paths are `$lib` aliases on purpose: with a relative path the mock silently never applied to the
+// store's own import in this browser runner.
+vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
+	const real = await importOriginal<typeof import('./lifecycle')>();
+	return {
+		...real,
+		cloneField: (v: unknown): unknown => {
+			const out = real.cloneField(v);
+			if (out instanceof Uint8Array) seams.cloned.push(out);
+			else if (Array.isArray(out)) {
+				for (const item of out) if (item instanceof Uint8Array) seams.cloned.push(item);
+			}
+			return out;
+		}
+	};
+});
+
+vi.mock('$lib/keystore/record', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../keystore/record')>();
+	return {
+		...real,
+		computeRecordHmac: (...args: Parameters<typeof real.computeRecordHmac>) => {
+			if (seams.failHmac) throw new Error('E_TEST_HMAC');
+			return real.computeRecordHmac(...args);
+		}
+	};
+});
+
 let db: IDBDatabase;
 
 beforeEach(async () => {
 	db = await openTestDb();
+	seams.cloned.length = 0;
+	seams.failHmac = false;
 });
 
 afterEach(async () => {
+	vi.restoreAllMocks();
 	await deleteTestDb(db);
 });
 
@@ -505,6 +546,134 @@ describe('ProfileStore.wipe', () => {
 		await store.wipe();
 
 		await expect(store.load()).rejects.toThrow(KeystoreNotInitializedError);
+	});
+});
+
+const bytes = (s: string): Uint8Array => new TextEncoder().encode(s);
+const text = (b: Uint8Array | null | undefined): string => new TextDecoder().decode(b ?? undefined);
+const allZero = (b: Uint8Array): boolean => b.every((x) => x === 0);
+
+function need<T>(v: T | null | undefined): T {
+	if (v === null || v === undefined) throw new Error('test setup: missing value');
+	return v;
+}
+
+// Wraps a database so a test can make every read-write transaction fail, which is the failure that
+// lands after the staged record has been encrypted and signed.
+function failableWrites(real: IDBDatabase, flag: { on: boolean }): IDBDatabase {
+	return new Proxy(real, {
+		get(target, prop) {
+			if (prop === 'transaction') {
+				return (stores: string | string[], mode?: IDBTransactionMode) => {
+					if (flag.on && mode === 'readwrite') throw new Error('E_TEST_WRITE');
+					return target.transaction(stores, mode);
+				};
+			}
+			const value: unknown = Reflect.get(target, prop, target);
+			return typeof value === 'function' ? value.bind(target) : value;
+		}
+	});
+}
+
+describe('ProfileStore.load memory hygiene', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	// The record a load replaces holds the profile the heap was already holding; dropping it to the
+	// collector leaves that plaintext in memory until some later GC, exactly what a relock exists to stop.
+	it('zeroizes the record a load replaces', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15'), rank: bytes('E5') });
+		const old = need(store._getStateForTest());
+		const oldEaos = need(old.eaos);
+		const oldRank = need(old.rank);
+		expect(oldEaos.some((b) => b !== 0)).toBe(true);
+
+		await store.load();
+
+		expect(allZero(oldEaos)).toBe(true);
+		expect(allZero(oldRank)).toBe(true);
+		// The replacement is a fresh decrypt, untouched.
+		expect(text(store._getStateForTest()?.eaos)).toBe('2027-04-15');
+	});
+
+	it('zeroizes the record a first-run load replaces with nothing', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15') });
+		const oldEaos = need(need(store._getStateForTest()).eaos);
+		const ks = need(await readRow('keystore'));
+		const zeroHwm = await signSidecar(
+			'profile-hwm',
+			{ generation: 0, keystoreGeneration: 0, epoch: 0, ts: 1 },
+			ks.hmacKeyRef as CryptoKey
+		);
+		await putRow('profile-hwm', { id: 0, ...zeroHwm });
+
+		await expect(store.load()).resolves.toBeNull();
+
+		expect(store._getStateForTest()).toBeNull();
+		expect(allZero(oldEaos)).toBe(true);
+	});
+});
+
+describe('ProfileStore.save failure hygiene', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	// A save that throws after the copies are made leaves them unreachable but still full of the
+	// profile. Everything the store staged must be wiped; nothing the caller or the live record owns may be.
+	async function failedSaveLeavesNothing(
+		arm: (flag: { on: boolean }) => Promise<void> | void,
+		message: string
+	): Promise<void> {
+		const flag = { on: false };
+		const store = createProfileStore(failableWrites(db, flag));
+		await store.save({ eaos: bytes('2027-04-15'), rank: bytes('E5') });
+		const live = need(store._getStateForTest());
+		seams.cloned.length = 0;
+		await arm(flag);
+
+		const patch = bytes('2028-08-20');
+		await expect(store.save({ eaos: patch })).rejects.toThrow(message);
+
+		expect(seams.cloned.length).toBeGreaterThan(0);
+		expect(seams.cloned.every(allZero)).toBe(true);
+		expect(text(patch)).toBe('2028-08-20');
+		expect(text(live.eaos)).toBe('2027-04-15');
+		expect(text(live.rank)).toBe('E5');
+	}
+
+	it('wipes the staged copies when the iv counter is exhausted', async () => {
+		await failedSaveLeavesNothing(async () => {
+			const ks = need(await readRow('keystore'));
+			await putRow('keystore', { ...ks, ivCounter: IV_HARD_STOP });
+		}, new IvCounterExhaustedError().message);
+	});
+
+	it('wipes the staged copies when signing the keystore record throws', async () => {
+		await failedSaveLeavesNothing(() => {
+			seams.failHmac = true;
+		}, 'E_TEST_HMAC');
+	});
+
+	it('wipes the staged copies when the write fails', async () => {
+		await failedSaveLeavesNothing((flag) => {
+			flag.on = true;
+		}, 'E_TEST_WRITE');
+	});
+
+	// The broadcast runs after the lock releases, when the staged record IS the live profile. A wipe
+	// that covered it would erase the profile the user just saved.
+	it('keeps the live profile when the broadcast after a committed save throws', async () => {
+		const store = createProfileStore(db, {
+			onBroadcast: () => {
+				throw new Error('E_TEST_BROADCAST');
+			}
+		});
+		await expect(store.save({ eaos: bytes('2027-04-15') })).rejects.toThrow('E_TEST_BROADCAST');
+		expect(text(store._getStateForTest()?.eaos)).toBe('2027-04-15');
 	});
 });
 

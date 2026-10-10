@@ -231,6 +231,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 
 					// First run: generation 0 = keystore exists, no profile body written yet.
 					if (hwm.generation === 0) {
+						if (_profile) zeroizeRecord(_profile as unknown as Record<string, unknown>);
 						_profile = null;
 						hasProfile = false;
 						// Report the store open only if no relock landed while this was in flight. There
@@ -254,6 +255,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						freezeRelock(decrypted as unknown as Record<string, unknown>);
 						return null;
 					}
+					// The record this read replaces holds the same plaintext in other bytes (see save()). Nothing
+					// outside this store keeps it: persona copies the bytes into strings, and no caller retains
+					// what load() returns.
+					if (_profile) zeroizeRecord(_profile as unknown as Record<string, unknown>);
 					_profile = decrypted;
 					lockState = 'unlocked';
 					return _profile;
@@ -336,33 +341,43 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							);
 						}
 
-						// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
-						const ivBump = bumpIvCounter(keystore.ivCounter);
-						const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
-						updatedKs.recordHmac = await computeRecordHmac(updatedKs, keystore.hmacKeyRef);
+						// The deep copies exist from here, so a throw before the commit below would strand
+						// them in the heap unreferenced and unwiped. The catch ends BEFORE the commit on
+						// purpose: past it `next` is the live profile, and the broadcast after the lock
+						// releases may throw without this being able to reach it. Before the clone loop `next`
+						// held _profile's arrays and the caller's own - those are never ours to wipe.
+						try {
+							// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
+							const ivBump = bumpIvCounter(keystore.ivCounter);
+							const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
+							updatedKs.recordHmac = await computeRecordHmac(updatedKs, keystore.hmacKeyRef);
 
-						// Encrypt with the UPDATED keystore state bound into the AAD.
-						const blob = await encryptProfileRecord(next, updatedKs);
+							// Encrypt with the UPDATED keystore state bound into the AAD.
+							const blob = await encryptProfileRecord(next, updatedKs);
 
-						// Sign the new HWM under the single hmacKey.
-						const newHwm = await signSidecar(
-							'profile-hwm',
-							{
-								generation: nextGen,
-								keystoreGeneration: keystore.keystoreGeneration,
-								epoch: keystore.epoch,
-								ts: now
-							},
-							keystore.hmacKeyRef
-						);
+							// Sign the new HWM under the single hmacKey.
+							const newHwm = await signSidecar(
+								'profile-hwm',
+								{
+									generation: nextGen,
+									keystoreGeneration: keystore.keystoreGeneration,
+									epoch: keystore.epoch,
+									ts: now
+								},
+								keystore.hmacKeyRef
+							);
 
-						// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.
-						await withStores(db, ['profile', 'profile-hwm', 'keystore'], 'readwrite', (tx) => {
-							// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptProfileRecord, under withWriteLocks.
-							tx.objectStore('profile').put({ id: 0, rec: blob });
-							tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
-							tx.objectStore('keystore').put(updatedKs);
-						});
+							// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.
+							await withStores(db, ['profile', 'profile-hwm', 'keystore'], 'readwrite', (tx) => {
+								// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptProfileRecord, under withWriteLocks.
+								tx.objectStore('profile').put({ id: 0, rec: blob });
+								tx.objectStore('profile-hwm').put({ id: 0, ...newHwm });
+								tx.objectStore('keystore').put(updatedKs);
+							});
+						} catch (e) {
+							zeroizeRecord(next as unknown as Record<string, unknown>);
+							throw e;
+						}
 
 						// A profile body now exists in storage (generation >= 1). Record it so the
 						// locked signal can tell "relocked - unlock to view" from "never set up" even
