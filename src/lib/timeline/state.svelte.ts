@@ -1,5 +1,5 @@
 import type { TimelineState, TaskStatus, TimelineTaskState } from './types';
-import { encodeTimelineState, decodeTimelineState } from './state-codec';
+import { encodeTimelineState, decodeTimelineState, isSnoozeDate } from './state-codec';
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar, verifySidecar, type SignedSidecar } from '../profile/sidecars';
@@ -186,7 +186,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			const merged = cleanTaskState({ ...base.tasks[taskId], ...patch });
 			const nextTasks: Record<string, TimelineTaskState> = {};
 			for (const [id, st] of Object.entries(base.tasks)) {
-				if (id !== taskId) nextTasks[id] = st;
+				if (id !== taskId && id !== '__proto__') nextTasks[id] = st;
 			}
 			if (Object.keys(merged).length > 0) nextTasks[taskId] = merged;
 			return { schemaVersion: 1, tasks: nextTasks };
@@ -279,9 +279,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		 * screen, in a tab that locked itself is precisely what it must not do. An `evicted` store
 		 * lost its plaintext to page hygiene on the way out and the page has come back, so the
 		 * re-read is the undo it is owed. An unlocked store re-reads so a peer's change still lands.
+		 *
+		 * Reads nothing while the page is hidden: nobody can see what it would decrypt, and a page that is seen again
+		 * re-reads then.
 		 */
 		refresh(): Promise<void> {
-			if (lockState === 'locked') return Promise.resolve();
+			if (lockState === 'locked' || document.visibilityState === 'hidden') return Promise.resolve();
 			return api.load();
 		},
 
@@ -290,8 +293,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return update(taskId, { status, snoozeUntil: undefined });
 		},
 
-		/** Snooze a task until an ISO date (sets status 'snoozed'). */
+		/**
+		 * Snooze a task until an ISO date (sets status 'snoozed'). Refuses a date the calendar file cannot write; never
+		 * one that is merely past, since a stored record must stay valid after a clock change.
+		 */
 		setSnooze(taskId: string, untilIso: string): Promise<void> {
+			if (!isSnoozeDate(untilIso)) return Promise.reject(new Error('E_SNOOZE_DATE'));
 			return update(taskId, { status: 'snoozed', snoozeUntil: untilIso });
 		},
 

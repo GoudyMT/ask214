@@ -1,9 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { createTimelineStateStore, TimelineRelockedError } from './state.svelte';
 import { OccConflictError } from '../profile/store.svelte';
+import { signSidecar } from '../profile/sidecars';
+import { encryptRecord } from '../crypto/record-crypto';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
+import type { KeystoreRecordV1 } from '../keystore/record';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { withStores, reqToPromise } from '../db/schema';
+
+async function reload(db: IDBDatabase) {
+	const store = createTimelineStateStore(db);
+	await store.load();
+	return store;
+}
+
+// The page's visibility is the browser's to report; a test sets it for one check and puts it back.
+function stubVisibility() {
+	const spy = vi.spyOn(document, 'visibilityState', 'get');
+	return {
+		set: (v: DocumentVisibilityState) => spy.mockReturnValue(v),
+		restore: () => spy.mockRestore()
+	};
+}
 
 // Real Chromium (SubtleCrypto + IndexedDB + navigator.locks). The timeline-state
 // store mirrors the profile store's load/save/OCC/relock/wipe spine but uses the
@@ -252,6 +270,186 @@ describe('timeline-state store', () => {
 		await a.refresh();
 		expect(a.state.tasks['x']?.status).toBe('done');
 		await deleteTestDb(db);
+	});
+
+	// The calendar file cannot write a snooze date that is no day or lies past the last one it can name, so no such date
+	// is stored. The check never looks at today or at the input's minimum: a stored record must stay valid after a clock
+	// change, and the SkillBridge answer stores a date the user did not type.
+	describe('setSnooze with a date the calendar file cannot write', () => {
+		const stored = (db: IDBDatabase) =>
+			withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readonly', async (tx) => ({
+				state: await reqToPromise(tx.objectStore('timeline-state').get(0)),
+				hwm: await reqToPromise(tx.objectStore('timeline-state-hwm').get(0))
+			}));
+
+		for (const bad of ['2026-13-45', '3abcdefghi', '10000-01-01', '9999-12-31', '', '2027-02-30']) {
+			it(`rejects ${JSON.stringify(bad)} with E_SNOOZE_DATE and writes nothing`, async () => {
+				const db = await openTestDb();
+				await bootstrapLocalKeystore(db);
+				const a = createTimelineStateStore(db);
+				await a.load();
+				await a.setStatus('x', 'done');
+				const before = await stored(db);
+
+				let pending: Promise<void> | undefined;
+				expect(() => {
+					pending = a.setSnooze('x', bad);
+				}).not.toThrow();
+				await expect(pending).rejects.toThrow('E_SNOOZE_DATE');
+
+				expect(await stored(db)).toEqual(before);
+				expect(a.state.tasks).toEqual({ x: { status: 'done' } });
+				const b = createTimelineStateStore(db);
+				await b.load();
+				expect(b.state.tasks).toEqual({ x: { status: 'done' } });
+				await deleteTestDb(db);
+			});
+		}
+
+		for (const good of ['9999-12-30', '2027-04-01', '2020-01-01']) {
+			it(`accepts ${good}, whatever today is`, async () => {
+				const db = await openTestDb();
+				await bootstrapLocalKeystore(db);
+				const a = createTimelineStateStore(db);
+				await a.load();
+				await a.setSnooze('x', good);
+				const b = createTimelineStateStore(db);
+				await b.load();
+				expect(b.state.tasks['x']).toEqual({ status: 'snoozed', snoozeUntil: good });
+				await deleteTestDb(db);
+			});
+		}
+	});
+
+	// A record written by hand (a peer, an older build, a tampered disk) can hold a task named __proto__; it must never
+	// become the prototype of the tasks this tab keeps and writes back.
+	it('a stored task named __proto__ never reaches the tasks the next write keeps', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const ks = await withStores(db, 'keystore', 'readonly', (tx) =>
+			reqToPromise<KeystoreRecordV1>(tx.objectStore('keystore').get(0))
+		);
+		const json = '{"schemaVersion":1,"tasks":{"__proto__":{"status":"done"},"x":{"notes":"keep"}}}';
+		const blob = await encryptRecord(
+			{ storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 },
+			new TextEncoder().encode(json),
+			ks,
+			1
+		);
+		const hwm = await signSidecar(
+			'timeline-state-hwm',
+			{ generation: 1, keystoreGeneration: ks.keystoreGeneration, epoch: ks.epoch, ts: Date.now() },
+			ks.hmacKeyRef
+		);
+		await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').put({ id: 0, rec: blob });
+			tx.objectStore('timeline-state-hwm').put({ id: 0, ...hwm });
+		});
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		expect(Object.getPrototypeOf(a.state.tasks)).toBe(Object.prototype);
+		await a.setStatus('y', 'done');
+		for (const tasks of [a.state.tasks, (await reload(db)).state.tasks]) {
+			expect(Object.getPrototypeOf(tasks)).toBe(Object.prototype);
+			expect(Object.hasOwn(tasks, '__proto__')).toBe(false);
+			expect(Object.keys(tasks).sort()).toEqual(['x', 'y']);
+			expect(tasks['status' as string]).toBeUndefined();
+		}
+		await deleteTestDb(db);
+	});
+
+	describe('refresh while the page is hidden', () => {
+		let visibility: ReturnType<typeof stubVisibility>;
+		let decrypt: MockInstance<SubtleCrypto['decrypt']>;
+		beforeEach(() => {
+			visibility = stubVisibility();
+			decrypt = vi.spyOn(crypto.subtle, 'decrypt');
+		});
+		afterEach(() => {
+			visibility.restore();
+			decrypt.mockRestore();
+		});
+
+		it('runs in a page the browser reports visible', () => {
+			visibility.restore();
+			expect(document.visibilityState).toBe('visible');
+		});
+
+		it('reads nothing after page hygiene until the page is visible again', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const a = createTimelineStateStore(db);
+			await a.load();
+			await a.setStatus('x', 'done');
+			a.relockSync('hygiene');
+			decrypt.mockClear();
+
+			visibility.set('hidden');
+			await a.refresh();
+			expect(decrypt).not.toHaveBeenCalled();
+			expect(a.ready).toBe(false);
+			expect(a.state.tasks).toEqual({});
+
+			visibility.set('visible');
+			await a.refresh();
+			expect(decrypt).toHaveBeenCalled();
+			expect(a.state.tasks['x']?.status).toBe('done');
+			await deleteTestDb(db);
+		});
+
+		it('leaves an unlocked store as it is, so a peer change lands when the page is seen again', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const a = createTimelineStateStore(db);
+			const b = createTimelineStateStore(db);
+			await a.load();
+			await b.load();
+			await a.setStatus('x', 'done');
+			decrypt.mockClear();
+
+			visibility.set('hidden');
+			await b.refresh();
+			expect(decrypt).not.toHaveBeenCalled();
+			expect(b.state.tasks).toEqual({});
+
+			visibility.set('visible');
+			await b.refresh();
+			expect(b.state.tasks['x']?.status).toBe('done');
+			await deleteTestDb(db);
+		});
+
+		it('never reads a locked store, hidden or visible', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const a = createTimelineStateStore(db);
+			await a.load();
+			await a.setStatus('x', 'done');
+			a.relockSync('user');
+			decrypt.mockClear();
+
+			for (const state of ['hidden', 'visible'] as const) {
+				visibility.set(state);
+				await a.refresh();
+				expect(decrypt, state).not.toHaveBeenCalled();
+				expect(a.state.tasks, state).toEqual({});
+			}
+			await deleteTestDb(db);
+		});
+
+		it('does not gate load, which is the user unlocking', async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const a = createTimelineStateStore(db);
+			await a.load();
+			await a.setStatus('x', 'done');
+			a.relockSync('user');
+
+			visibility.set('hidden');
+			await a.load();
+			expect(a.state.tasks['x']?.status).toBe('done');
+			await deleteTestDb(db);
+		});
 	});
 
 	it('wipe clears the timeline state', async () => {
