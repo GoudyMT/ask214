@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
-	import { SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
+	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
 	import { resourcesForTask, afterLinkForTask, linkNoteForTask } from '$lib/resources';
 	import { isFirmWarning, type FitReason } from '$lib/timeline/generate';
@@ -49,8 +49,6 @@
 		closeSnooze();
 	}
 
-	// The last day a four-digit year can hold; a date field accepts a longer year that no calendar can show.
-	const SNOOZE_DATE_MAX = '9999-12-31';
 	// The earliest custom date, read when Customize opens and again at the tap. A snooze is live only while its date is
 	// after today, so today and the past would be stored and then ignored.
 	let snoozeMin = $state('');

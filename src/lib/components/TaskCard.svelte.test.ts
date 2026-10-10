@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import TaskCard from './TaskCard.svelte';
-import { snoozeUntilIso } from '$lib/timeline/snooze';
+import { SNOOZE_DATE_MAX, snoozeUntilIso } from '$lib/timeline/snooze';
 import { addDays, localTodayIso } from '$lib/timeline/day-math';
 import { TASK_DEFS } from '$lib/timeline';
 import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
@@ -541,10 +541,34 @@ describe('TaskCard (custom snooze date)', () => {
 	it('stops at year 9999: the field says so and a five-digit year is refused', async () => {
 		const onSetSnooze = vi.fn();
 		const { input, go, type } = await openCustomize(onSetSnooze);
-		expect(input.max).toBe('9999-12-31');
+		expect(input.max).toBe(SNOOZE_DATE_MAX);
 		type('30000-01-01');
 		expect(input.value).toBe('30000-01-01');
 		expect(go.disabled).toBe(true);
+		go.click();
+		expect(onSetSnooze).not.toHaveBeenCalled();
+	});
+
+	// The calendar event of a snoozed task ends the next day, so the latest date is the one whose next day is still in
+	// year 9999.
+	it('names 9999-12-30 as the latest date', () => {
+		expect(SNOOZE_DATE_MAX).toBe('9999-12-30');
+	});
+
+	// Control: the latest date allowed is taken, so the refusal below is not a button that never works.
+	it('takes 9999-12-30: a tap sets the snooze', async () => {
+		const onSetSnooze = vi.fn();
+		const { go, type } = await openCustomize(onSetSnooze);
+		type('9999-12-30');
+		go.click();
+		expect(onSetSnooze).toHaveBeenCalledTimes(1);
+		expect(onSetSnooze).toHaveBeenCalledWith('skillbridge-hosts', '9999-12-30');
+	});
+
+	it('refuses 9999-12-31: a tap sets no snooze', async () => {
+		const onSetSnooze = vi.fn();
+		const { go, type } = await openCustomize(onSetSnooze);
+		type('9999-12-31');
 		go.click();
 		expect(onSetSnooze).not.toHaveBeenCalled();
 	});

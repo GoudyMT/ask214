@@ -16,6 +16,10 @@ export const SNOOZE_PRESETS: readonly SnoozePreset[] = [
 	{ label: '3 months', days: 90 }
 ];
 
+// The calendar event of a snoozed soft task ends the next day, and a year past 9999 is not a calendar date, so the
+// latest date a snooze can name is the one before the last day of year 9999.
+export const SNOOZE_DATE_MAX = '9999-12-30';
+
 export function snoozeUntilIso(today: Date, days: number): string {
 	return addDays(localTodayIso(today), days);
 }
