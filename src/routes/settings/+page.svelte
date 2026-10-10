@@ -302,7 +302,9 @@
 					if (!('caches' in window)) return;
 					// A document save still writing would store its document again after the caches are gone.
 					await stopSaves();
+					// eslint-disable-next-line no-restricted-properties -- the erase clears the public document caches
 					const keys = await window.caches.keys();
+					// eslint-disable-next-line no-restricted-properties -- the erase clears the public document caches
 					await Promise.all(keys.map((key) => window.caches.delete(key)));
 				},
 				// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.

@@ -13,7 +13,46 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
 const STORAGE_MESSAGE =
 	'Personal data persists only in the encrypted IndexedDB stores. A device setting with nothing personal belongs in an exempt file, or in a disable with its reason.';
+const CACHE_MESSAGE =
+	'Personal data must not reach unencrypted storage, and the Cache API and the origin-private file system are unencrypted. Public documents are cached only in src/lib/sources/document-cache.ts and src/service-worker.ts; anything else needs a disable with its reason.';
 const SAFELOG_MESSAGE = 'getDiagnosticsForTest is for tests only; app code logs through safeLog.';
+
+// The two restriction lists below are built from these pieces because a later config block replaces a rule's options
+// rather than merging them: each file group needs its own full list.
+const STORAGE_GLOBALS = [
+	{ name: 'localStorage', message: STORAGE_MESSAGE },
+	{ name: 'sessionStorage', message: STORAGE_MESSAGE },
+	{ name: 'cookieStore', message: STORAGE_MESSAGE }
+];
+// By property name alone, whatever the object: a rule keyed to `window` misses a Window passed in as a
+// parameter, an alias, `frames` or `window.document`.
+const STORAGE_PROPERTIES = [
+	{ property: 'localStorage', message: STORAGE_MESSAGE },
+	{ property: 'sessionStorage', message: STORAGE_MESSAGE },
+	{ property: 'cookie', message: STORAGE_MESSAGE },
+	{ property: 'cookieStore', message: STORAGE_MESSAGE }
+];
+const CACHE_GLOBALS = [{ name: 'caches', message: CACHE_MESSAGE }];
+const CACHE_PROPERTIES = [
+	{ property: 'caches', message: CACHE_MESSAGE },
+	{ property: 'getDirectory', message: CACHE_MESSAGE }
+];
+
+const TEST_FILES = [
+	'src/**/*.test.ts',
+	'src/**/*.test.js',
+	'src/**/*.browser.test.ts',
+	'src/**/*.svelte.test.ts'
+];
+// Device settings with nothing personal, free to use web storage.
+const STORAGE_EXEMPT = [
+	'src/lib/theme/theme.ts',
+	'src/lib/install/dismissed.ts',
+	'src/lib/ask/online-prefs.ts',
+	'src/lib/feedback/context.ts'
+];
+// Public documents only, free to use the Cache API and the origin-private file system.
+const CACHE_EXEMPT = ['src/lib/sources/document-cache.ts', 'src/service-worker.ts'];
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
@@ -84,36 +123,31 @@ export default defineConfig(
 		}
 	},
 	{
-		// Personal data persists only through the encrypted IndexedDB stores, so web storage and cookies are banned in
-		// app source. The files below hold device settings with nothing personal (theme, the install nudge, online
-		// preferences, the feedback page's return route); three other lines carry their own disable with the reason.
+		// Personal data persists only through the encrypted IndexedDB stores, so web storage, cookies, the Cache API and
+		// the origin-private file system are banned in app source. The storage-exempt files hold device settings with
+		// nothing personal (theme, the install nudge, online preferences, the feedback page's return route); the
+		// cache-exempt files hold public documents only. The few other lines that need one carry their own disable
+		// with the reason.
 		files: ['src/**/*.{ts,js,svelte}'],
-		ignores: [
-			'src/**/*.test.ts',
-			'src/**/*.test.js',
-			'src/**/*.browser.test.ts',
-			'src/**/*.svelte.test.ts',
-			'src/lib/theme/theme.ts',
-			'src/lib/install/dismissed.ts',
-			'src/lib/ask/online-prefs.ts',
-			'src/lib/feedback/context.ts'
-		],
+		ignores: [...TEST_FILES, ...STORAGE_EXEMPT, ...CACHE_EXEMPT],
 		rules: {
-			'no-restricted-globals': [
-				'error',
-				{ name: 'localStorage', message: STORAGE_MESSAGE },
-				{ name: 'sessionStorage', message: STORAGE_MESSAGE },
-				{ name: 'cookieStore', message: STORAGE_MESSAGE }
-			],
-			// By property name alone, whatever the object: a rule keyed to `window` misses a Window passed in as a
-			// parameter, an alias, `frames` or `window.document`.
-			'no-restricted-properties': [
-				'error',
-				{ property: 'localStorage', message: STORAGE_MESSAGE },
-				{ property: 'sessionStorage', message: STORAGE_MESSAGE },
-				{ property: 'cookie', message: STORAGE_MESSAGE },
-				{ property: 'cookieStore', message: STORAGE_MESSAGE }
-			]
+			'no-restricted-globals': ['error', ...STORAGE_GLOBALS, ...CACHE_GLOBALS],
+			'no-restricted-properties': ['error', ...STORAGE_PROPERTIES, ...CACHE_PROPERTIES]
+		}
+	},
+	{
+		// An exemption from one ban is not an exemption from the other, so each exempt group keeps the other's list.
+		files: STORAGE_EXEMPT,
+		rules: {
+			'no-restricted-globals': ['error', ...CACHE_GLOBALS],
+			'no-restricted-properties': ['error', ...CACHE_PROPERTIES]
+		}
+	},
+	{
+		files: CACHE_EXEMPT,
+		rules: {
+			'no-restricted-globals': ['error', ...STORAGE_GLOBALS],
+			'no-restricted-properties': ['error', ...STORAGE_PROPERTIES]
 		}
 	},
 	{

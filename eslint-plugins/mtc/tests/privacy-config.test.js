@@ -76,6 +76,70 @@ describe('personal data stays out of web storage and cookies', () => {
 	});
 });
 
+describe('the Cache API and the origin-private file system stay closed to app code', () => {
+	it.each([
+		['await caches.open("c");', 'no-restricted-globals'],
+		['export const names = caches.keys();', 'no-restricted-globals'],
+		['await window.caches.open("c");', 'no-restricted-properties'],
+		['await globalThis.caches.open("c");', 'no-restricted-properties'],
+		['await self.caches.open("c");', 'no-restricted-properties'],
+		['export const { caches: held } = window;', 'no-restricted-properties'],
+		['await navigator.storage.getDirectory();', 'no-restricted-properties'],
+		[
+			'const dir = await navigator.storage.getDirectory(); export { dir };',
+			'no-restricted-properties'
+		]
+	])('flags %s in app source', async (code, rule) => {
+		expect(await ruleIds(code, 'src/lib/planted/cache.ts')).toContain(rule);
+	});
+
+	it('flags the Cache API in a Svelte template', async () => {
+		const code = '<button onclick={() => caches.delete("c")}>Clear</button>\n';
+		expect(await ruleIds(code, 'src/lib/components/EaosInput.svelte')).toContain(
+			'no-restricted-globals'
+		);
+	});
+
+	it.each(['src/lib/sources/document-cache.ts', 'src/service-worker.ts'])(
+		'allows %s, which holds public documents only',
+		async (filePath) => {
+			const ids = await ruleIds(
+				'await caches.open("c"); await globalThis.caches.keys(); await navigator.storage.getDirectory();',
+				filePath
+			);
+			expect(ids).not.toContain('no-restricted-globals');
+			expect(ids).not.toContain('no-restricted-properties');
+		}
+	);
+
+	it.each(['src/lib/sources/document-cache.ts', 'src/service-worker.ts'])(
+		'keeps web storage banned in %s',
+		async (filePath) => {
+			expect(await ruleIds('localStorage.setItem("k", "v");', filePath)).toContain(
+				'no-restricted-globals'
+			);
+		}
+	);
+
+	it.each([
+		'src/lib/theme/theme.ts',
+		'src/lib/install/dismissed.ts',
+		'src/lib/ask/online-prefs.ts',
+		'src/lib/feedback/context.ts'
+	])('keeps the Cache API banned in %s, which only holds device settings', async (filePath) => {
+		expect(await ruleIds('await caches.open("c");', filePath)).toContain('no-restricted-globals');
+	});
+
+	it('leaves tests free to use the Cache API', async () => {
+		const ids = await ruleIds(
+			'await caches.open("c"); await window.caches.keys();',
+			'src/lib/planted/cache.test.ts'
+		);
+		expect(ids).not.toContain('no-restricted-globals');
+		expect(ids).not.toContain('no-restricted-properties');
+	});
+});
+
 describe('the safelog test accessor stays out of app code', () => {
 	it.each([
 		["import { getDiagnosticsForTest } from '$lib/log/safelog';", 'no-restricted-imports'],
