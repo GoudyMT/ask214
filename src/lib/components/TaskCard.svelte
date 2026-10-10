@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { tick } from 'svelte';
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
@@ -50,33 +49,17 @@
 		closeSnooze();
 	}
 
-	// The earliest custom date, read when Customize opens and again at the tap. A snooze is live only while its date is
-	// after today, so today and the past would be stored and then ignored.
-	let snoozeMin = $state('');
+	// The earliest custom date is tomorrow, read when the field opens and again at the tap. A snooze is live only while
+	// its date is after today, so today and the past would be stored and then ignored.
 	let dateInput = $state<HTMLInputElement>();
 
-	// The 10-character check is what refuses a year of five or more digits: as text '30000-01-01' compares like a year
-	// 3000 date, after any minimum and before the maximum, so the two comparisons alone would let it through.
-	function canSnoozeTo(value: string, min: string): boolean {
-		return value.length === 10 && value >= min && value <= SNOOZE_DATE_MAX;
-	}
-
-	function openDateInput(): void {
-		snoozeMin = snoozeUntilIso(new Date(), 1);
-		showDateInput = true;
-	}
-
-	async function snoozeToDate(): Promise<void> {
-		// The day can turn while the picker is open, so the minimum is read again here; a refused date is handed to the
-		// browser, which moves focus to the field and says why.
-		const min = snoozeUntilIso(new Date(), 1);
-		if (!canSnoozeTo(dateValue, min)) {
-			snoozeMin = min;
-			// The field must carry the new minimum before the browser checks it: past midnight the old one still accepts the date.
-			await tick();
-			dateInput?.reportValidity();
-			return;
-		}
+	function snoozeToDate(): void {
+		// The day can turn while the picker is open, so the minimum is read again here and set on the field at once, before
+		// the browser checks the date against its min and max (a year of five digits is past the max). A refused date
+		// stays, with the browser's own reason and focus on the field.
+		if (!dateInput) return;
+		dateInput.min = snoozeUntilIso(new Date(), 1);
+		if (!dateInput.reportValidity()) return;
 		onSetSnooze(item.def.id, dateValue);
 		closeSnooze();
 	}
@@ -321,7 +304,7 @@
 								{preset.label}
 							</button>
 						{/each}
-						<button type="button" class="task-card__preset" onclick={openDateInput}>
+						<button type="button" class="task-card__preset" onclick={() => (showDateInput = true)}>
 							Customize
 						</button>
 						<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
@@ -335,14 +318,14 @@
 								autocomplete="off"
 								bind:this={dateInput}
 								bind:value={dateValue}
-								min={snoozeMin}
+								min={snoozeUntilIso(new Date(), 1)}
 								max={SNOOZE_DATE_MAX}
 								aria-label="Snooze until date"
 							/>
 							<button
 								type="button"
 								class="task-card__snooze-go"
-								onclick={() => void snoozeToDate()}
+								onclick={snoozeToDate}
 								disabled={!dateValue}>Snooze</button
 							>
 						</div>
