@@ -525,8 +525,16 @@
 					synthesisEnabled = on;
 					setSynthesisEnabled(on);
 				}}
-				onSaveKey={(k) => void app.byok?.saveApiKey(k).then(() => (hasKey = true))}
-				onClearKey={() => void app.byok?.clearApiKey().then(() => (hasKey = false))}
+				onSaveKey={async (k) => {
+					if (!app.byok) return;
+					await app.byok.saveApiKey(k);
+					hasKey = true;
+				}}
+				onClearKey={async () => {
+					if (!app.byok) return;
+					await app.byok.clearApiKey();
+					hasKey = false;
+				}}
 			/>
 
 			{@render eraseDialog()}
