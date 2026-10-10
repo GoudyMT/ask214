@@ -117,7 +117,6 @@ describe('the SkillBridge answer', () => {
 
 	it('reads every shape it never writes as no answer', () => {
 		const odd = [
-			{ status: 'done', notes: 'x' },
 			{ status: 'skipped', snoozeUntil: AGAIN },
 			{ status: 'snoozed', snoozeUntil: '2026-13-40' },
 			{ status: 'snoozed', snoozeUntil: '2027-02-30' },
@@ -138,6 +137,25 @@ describe('the SkillBridge answer', () => {
 				stepsShow: false
 			});
 		}
+	});
+
+	// A note on the answer's key is the user's own text; it never hides the answer.
+	it('reads the answer through a note kept with it', () => {
+		const notes = 'x';
+		expect(read({ status: 'done', notes }, '2026-10-07')).toMatchObject({
+			answer: 'yes',
+			stepsShow: true
+		});
+		expect(read({ status: 'skipped', notes }, '2026-10-07')).toMatchObject({ answer: 'no' });
+		expect(read({ status: 'snoozed', notes }, '2027-06-01')).toMatchObject({
+			answer: 'not-sure',
+			stepsShow: true
+		});
+		expect(read({ status: 'snoozed', snoozeUntil: AGAIN, notes }, '2027-03-31')).toMatchObject({
+			answer: 'not-sure',
+			stepsShow: false,
+			returnsOn: AGAIN
+		});
 	});
 
 	it('writes Yes as done, No as skipped, and Not sure by the second ask', () => {

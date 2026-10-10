@@ -5,8 +5,8 @@ import type { TimelineState, TimelineTaskState } from './types';
  * The SkillBridge question's answer and what it means for the Timeline. It is kept in the timeline state under a key
  * no task uses, in the shapes the store already writes: Yes = { status: 'done' }; No = { status: 'skipped' }; Not
  * sure before the second ask = { status: 'snoozed', snoozeUntil }; Not sure from the second ask on = { status:
- * 'snoozed' } with no date, which shows the steps. Any other shape reads as no answer, so a damaged record asks again
- * and never shows steps nobody chose.
+ * 'snoozed' } with no date, which shows the steps. A note on the key is the user's own text and is ignored. Any other
+ * shape reads as no answer, so a damaged record asks again and never shows steps nobody chose.
  */
 export const SKILLBRIDGE_PLAN_KEY = 'skillbridge-plan';
 
@@ -44,7 +44,7 @@ function recognise(raw: unknown): Saved {
 	if (typeof raw !== 'object' || raw === null) return { kind: 'none' };
 	const s = raw as TimelineTaskState;
 	const keys = Object.entries(s)
-		.filter(([, v]) => v !== undefined)
+		.filter(([k, v]) => v !== undefined && k !== 'notes')
 		.map(([k]) => k)
 		.sort()
 		.join(',');
