@@ -49,7 +49,6 @@ function isCard(v: unknown): boolean {
 export class CalendarSchemaError extends Error {
 	constructor() {
 		super('E_CALENDAR_SCHEMA');
-		this.name = 'CalendarSchemaError';
 	}
 }
 

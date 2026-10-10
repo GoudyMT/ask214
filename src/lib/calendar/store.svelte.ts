@@ -40,7 +40,6 @@ import { withStores } from '../db/schema';
 export class CalendarRelockedError extends Error {
 	constructor() {
 		super('E_CALENDAR_RELOCKED');
-		this.name = 'CalendarRelockedError';
 	}
 }
 

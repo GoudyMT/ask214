@@ -5,7 +5,6 @@ import { withStores, reqToPromise } from '../db/schema';
 export class KeystoreAlreadyExistsError extends Error {
 	constructor() {
 		super('E_KEYSTORE_ALREADY_EXISTS');
-		this.name = 'KeystoreAlreadyExistsError';
 	}
 }
 
