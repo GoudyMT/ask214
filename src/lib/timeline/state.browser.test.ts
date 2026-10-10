@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { createTimelineStateStore, TimelineRelockedError } from './state.svelte';
 import { readPlan, SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
+import type { TimelineTaskState } from './types';
 import { OccConflictError } from '../profile/store.svelte';
 import { signSidecar } from '../profile/sidecars';
 import { encryptRecord } from '../crypto/record-crypto';
@@ -434,6 +435,10 @@ describe('timeline-state store', () => {
 			await deleteTestDb(db);
 		});
 
+		// Two guards stand in the way of this key: reading the record drops it (readTask in state-codec.ts) and the write
+		// skips it (cleanTaskState in state.svelte.ts). The read drops it before any write can see it, so this checks the
+		// end-to-end result: it goes red when the read guard is removed (the loaded entry then has a polluted prototype),
+		// and removing the write guard alone stays green because the store gives it no such key to skip.
 		it('never copies a __proto__ key onto the entry a write keeps', async () => {
 			const db = await openTestDb();
 			await bootstrapLocalKeystore(db);
@@ -442,13 +447,16 @@ describe('timeline-state store', () => {
 				'{"schemaVersion":1,"tasks":{"a":{"status":"done","pinned":true,"__proto__":{"polluted":true}}}}'
 			);
 			const a = await reload(db);
-			await a.setStatus('a', 'skipped');
-			for (const state of [a.state, (await reload(db)).state]) {
-				const task = state.tasks['a'];
-				expect(task).toEqual({ status: 'skipped', pinned: true });
+			const plain = (task: TimelineTaskState | undefined) => {
 				expect(Object.getPrototypeOf(task)).toBe(Object.prototype);
 				expect(Object.hasOwn(task as object, '__proto__')).toBe(false);
 				expect((task as Record<string, unknown>)['polluted']).toBeUndefined();
+			};
+			plain(a.state.tasks['a']);
+			await a.setStatus('a', 'skipped');
+			for (const state of [a.state, (await reload(db)).state]) {
+				expect(state.tasks['a']).toEqual({ status: 'skipped', pinned: true });
+				plain(state.tasks['a']);
 			}
 			await deleteTestDb(db);
 		});
