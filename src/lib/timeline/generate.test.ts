@@ -234,6 +234,19 @@ describe('generateTimeline (sort + group + assemble)', () => {
 		expect(phase?.counts).toEqual({ done: 1, skipped: 1, snoozed: 0, toDo: 0, closed: 0 });
 	});
 
+	// Today is Jun 4, 2026 and these windows end on Jan 15 and Jan 25, 2027, so they are still ahead: a date rule that
+	// ignored the status would read the days since a window end as negative, call each task just closed, and keep the
+	// phase open.
+	it('folds a phase whose tasks were all done before their windows end', () => {
+		const defs = [mk('a', -120), mk('a2', -110)];
+		const state: TimelineState = {
+			schemaVersion: 1,
+			tasks: { a: { status: 'done' }, a2: { status: 'done' } }
+		};
+		const phase = generateTimeline(persona, defs, state, today).phases[0];
+		expect(phase?.collapsible).toBe(true);
+	});
+
 	// A closed task can no longer be done, so it is counted apart from "to do". Its card stays reachable for 14 days,
 	// because "Needs you now" lists it under "Just closed" and those rows jump to the card, which a folded phase hides.
 	describe('a closed task in a phase', () => {
