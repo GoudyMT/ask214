@@ -1,6 +1,6 @@
 import type { CalendarSyncState, HandedOverEvent, EventMoment, TaskExclusions } from './types';
 import { handedOverKey } from './handed-over';
-import { isDay } from '../timeline/day-math';
+import { isDay } from '../timeline/day-check';
 
 const SCHEMA_VERSION = 1;
 // A record over every moment, so a new moment fails the type-check until it is accepted here too.

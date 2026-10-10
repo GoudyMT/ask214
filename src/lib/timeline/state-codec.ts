@@ -1,5 +1,4 @@
-import { isDay } from './day-math';
-import { SNOOZE_DATE_MAX } from './snooze';
+import { isDay, SNOOZE_DATE_MAX } from './day-check';
 import type { TimelineState, TimelineTaskState } from './types';
 
 /**

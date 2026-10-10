@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { daysBetween, addDays, localTodayIso, isDay } from './day-math';
+import { daysBetween, addDays, localTodayIso } from './day-math';
+import { isDay } from './day-check';
 
 describe('isDay', () => {
 	it('accepts a day the app writes, including the leap day and the last day it can name', () => {

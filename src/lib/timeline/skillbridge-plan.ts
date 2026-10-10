@@ -1,4 +1,5 @@
-import { addDays, isDay } from './day-math';
+import { addDays } from './day-math';
+import { isDay } from './day-check';
 import type { TimelineState, TimelineTaskState } from './types';
 
 /**
