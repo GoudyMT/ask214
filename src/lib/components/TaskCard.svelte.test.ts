@@ -502,12 +502,20 @@ describe('TaskCard (custom snooze date)', () => {
 		expect(onSetSnooze).not.toHaveBeenCalled();
 	}
 
-	it('keeps the button off while no date is typed', async () => {
+	it('refuses an empty date: a tap sets no snooze and the field says why', async () => {
 		const onSetSnooze = vi.fn();
-		const { go } = await openCustomize(onSetSnooze);
-		expect(go.disabled).toBe(true);
-		go.click();
-		expect(onSetSnooze).not.toHaveBeenCalled();
+		const { input, go } = await openCustomize(onSetSnooze);
+		expect(input.required).toBe(true);
+		await expectRefusedWithReason(input, go, onSetSnooze);
+	});
+
+	// A date the field cannot read (Feb 30, a partly typed date) leaves its value empty, so it is refused as no date.
+	it('refuses a date the field cannot read: a tap sets no snooze and the field says why', async () => {
+		const onSetSnooze = vi.fn();
+		const { input, go, type } = await openCustomize(onSetSnooze);
+		type('2027-02-30');
+		expect(input.value).toBe('');
+		await expectRefusedWithReason(input, go, onSetSnooze);
 	});
 
 	it('refuses today: a tap sets no snooze and the field says why', async () => {

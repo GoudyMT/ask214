@@ -55,8 +55,9 @@
 
 	function snoozeToDate(): void {
 		// The day can turn while the picker is open, so the minimum is read again here and set on the field at once, before
-		// the browser checks the date against its min and max (a year of five digits is past the max). A refused date
-		// stays, with the browser's own reason and focus on the field.
+		// the browser checks the date against its min and max (a year of five digits is past the max). The field is
+		// required, so no date or one it cannot read (Feb 30) is refused too. A refused date stays, with the browser's own
+		// reason and focus on the field.
 		if (!dateInput) return;
 		dateInput.min = snoozeUntilIso(new Date(), 1);
 		if (!dateInput.reportValidity()) return;
@@ -320,13 +321,11 @@
 								bind:value={dateValue}
 								min={snoozeUntilIso(new Date(), 1)}
 								max={SNOOZE_DATE_MAX}
+								required
 								aria-label="Snooze until date"
 							/>
-							<button
-								type="button"
-								class="task-card__snooze-go"
-								onclick={snoozeToDate}
-								disabled={!dateValue}>Snooze</button
+							<button type="button" class="task-card__snooze-go" onclick={snoozeToDate}
+								>Snooze</button
 							>
 						</div>
 					{/if}
@@ -586,11 +585,6 @@
 		font-size: var(--font-size-s);
 		font-weight: 600;
 		cursor: pointer;
-	}
-
-	.task-card__snooze-go:disabled {
-		opacity: 0.6;
-		cursor: default;
 	}
 
 	/* Inline note editor: a full-width textarea + Save/Cancel, styled like the
