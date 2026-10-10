@@ -176,12 +176,7 @@ describe('TaskCard (open states)', () => {
 	});
 
 	it('closed two-edge task: the date is its final day', async () => {
-		const def = {
-			...DEF,
-			kind: 'closes' as const,
-			finalEnd: { years: 1, days: 120 },
-			afterNote: 'Gone.'
-		};
+		const def = { ...DEF, kind: 'closes' as const, finalEnd: 485, afterNote: 'Gone.' };
 		const { container } = await renderCard(
 			makeItem({
 				def,
@@ -213,7 +208,7 @@ describe('TaskCard (open states)', () => {
 			kind: 'closes' as const,
 			afterNote: 'Gone.',
 			changeNote: 'Now asks health questions.',
-			finalEnd: { years: 1, days: 120 }
+			finalEnd: 485
 		};
 		const { container } = await renderCard(
 			makeItem({ def, status: 'changed', windowEndDate: '2027-09-15', finalEndDate: '2028-05-17' })
@@ -359,7 +354,7 @@ describe('TaskCard (open states)', () => {
 	// no personal claim in any state (the task data itself is checked in task-defs.test.ts).
 	it('adds no personal eligibility claim in any state', async () => {
 		const firm = { ...DEF, id: 'va-bdd-claim', kind: 'closes' as const, afterNote: 'n' };
-		const twoEdge = { ...firm, finalEnd: { years: 1, days: 120 }, changeNote: 'c' };
+		const twoEdge = { ...firm, finalEnd: 485, changeNote: 'c' };
 		const states: Partial<TimelineItem>[] = [
 			{ status: 'upcoming' },
 			{ status: 'start-now', aimDate: '2026-10-15' },

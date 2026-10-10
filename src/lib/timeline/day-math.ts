@@ -22,29 +22,6 @@ export function addDays(iso: string, days: number): string {
 }
 
 /**
- * The ISO date `years` after `iso`, on the same month and day. A Feb 29 in a year without one becomes Feb 28, the
- * earlier day, so a deadline counted this way is never late.
- */
-export function addYears(iso: string, years: number): string {
-	const [y, m, d] = iso.split('-').map(Number);
-	const date = new Date(Date.UTC(y! + years, m! - 1, d!));
-	// Only a Feb 29 can spill into the next month (to Mar 1); day 0 of that month is the last day of February.
-	if (date.getUTCDate() !== d) date.setUTCDate(0);
-	return date.toISOString().slice(0, 10);
-}
-
-/**
- * `years` and `days` after `iso`. A source that says "1 year and 120 days" does not say which part is counted first,
- * and a Feb 29 in between makes the two orders differ by a day. The earlier of the two is exact when they agree and
- * never late when they differ.
- */
-export function addYearsAndDays(iso: string, years: number, days: number): string {
-	const yearFirst = addDays(addYears(iso, years), days);
-	const daysFirst = addYears(addDays(iso, days), years);
-	return yearFirst < daysFirst ? yearFirst : daysFirst;
-}
-
-/**
  * Today as an ISO date, read from the device clock. A deadline is a calendar day where the user lives, and the
  * UTC date is already tomorrow on a US evening, so the UTC date would close a window a day early.
  */

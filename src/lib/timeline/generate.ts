@@ -8,7 +8,7 @@
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import type { PersonaFilters, LeavingDates } from '../profile/persona';
 import { PHASE_BUCKETS } from './task-defs';
-import { addDays, addYearsAndDays, daysBetween, localTodayIso } from './day-math';
+import { addDays, daysBetween, localTodayIso } from './day-math';
 import { readPlan, SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import type { TaskDef, TaskKind, TimelineTaskState, TimelineState, PhaseBucket } from './types';
 
@@ -95,9 +95,7 @@ function anchorTask(
 		targetDate,
 		windowStartDate,
 		windowEndDate,
-		...(def.finalEnd !== undefined
-			? { finalEndDate: addYearsAndDays(separationDate, def.finalEnd.years, def.finalEnd.days) }
-			: {}),
+		...(def.finalEnd !== undefined ? { finalEndDate: eaosOffsetDate(eaos, def.finalEnd) } : {}),
 		separationDate,
 		...(fitted && anchor
 			? {

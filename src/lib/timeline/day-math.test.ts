@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { daysBetween, addDays, addYears, addYearsAndDays, localTodayIso } from './day-math';
+import { daysBetween, addDays, localTodayIso } from './day-math';
 
 describe('daysBetween', () => {
 	it('counts whole calendar days, positive when the second date is later', () => {
@@ -18,56 +18,6 @@ describe('addDays', () => {
 	it('moves forward and back by whole days', () => {
 		expect(addDays('2026-10-20', -30)).toBe('2026-09-20');
 		expect(addDays('2027-01-18', 240)).toBe('2027-09-15');
-	});
-});
-
-describe('addYears', () => {
-	it('keeps the month and day', () => {
-		expect(addYears('2027-04-30', 1)).toBe('2028-04-30');
-		expect(addYears('2026-01-31', 1)).toBe('2027-01-31');
-	});
-
-	it('moves a Feb 29 to Feb 28 in a year without one, never to Mar 1', () => {
-		expect(addYears('2028-02-29', 1)).toBe('2029-02-28');
-	});
-
-	it('keeps a Feb 29 in a leap target year', () => {
-		expect(addYears('2028-02-29', 4)).toBe('2032-02-29');
-	});
-});
-
-// va.gov says "1 year and 120 days" and not which is counted first, so the edge is the earlier of the two orders:
-// exact when they agree, never late when a Feb 29 makes them differ.
-describe('addYearsAndDays', () => {
-	it('is the same day when both orders agree', () => {
-		expect(addYearsAndDays('2027-04-30', 1, 120)).toBe('2028-08-28');
-	});
-
-	it('takes the year-first day when the days-first order lands a day later', () => {
-		// Year first: 2027-11-01 then 120 days = 2028-02-29. Days first: 2027-03-01 then 1 year = 2028-03-01.
-		expect(addYearsAndDays('2026-11-01', 1, 120)).toBe('2028-02-29');
-	});
-
-	it('takes the days-first day when the year-first order lands a day later', () => {
-		// Year first: 2028-11-01 then 120 days = 2029-03-01. Days first: 2028-02-29 then 1 year = 2029-02-28.
-		expect(addYearsAndDays('2027-11-01', 1, 120)).toBe('2029-02-28');
-	});
-});
-
-// The dates are calendar days with no time zone: a count built on local midnight would land a day early in a zone east
-// of UTC, where local midnight is still the day before in UTC.
-describe('year counts in a zone east of UTC', () => {
-	afterEach(() => {
-		vi.unstubAllEnvs();
-	});
-
-	it('give the same days as in the pinned zone', () => {
-		vi.stubEnv('TZ', 'Asia/Tokyo');
-		expect(new Date('2027-01-01T03:00:00Z').getDate()).toBe(1); // the zone took effect
-		expect(addYears('2027-04-30', 1)).toBe('2028-04-30');
-		expect(addYears('2028-02-29', 1)).toBe('2029-02-28');
-		expect(addYearsAndDays('2027-04-30', 1, 120)).toBe('2028-08-28');
-		expect(addYearsAndDays('2027-11-01', 1, 120)).toBe('2029-02-28');
 	});
 });
 
