@@ -179,8 +179,8 @@ export function subscribeBus(
 	handlers: Partial<Record<BusSignal['type'], () => unknown>>
 ): () => void {
 	return bus.subscribe((signal) => {
-		// A handler may hand back a re-read. Its failure shows in the store's own state, so it is not rethrown
-		// into the page as an unhandled rejection.
+		// A handler may hand back a re-read. It is not rethrown into the page as an unhandled rejection: the timeline
+		// and calendar show a failed re-read in their own state; the profile has no failed state, so it keeps what it held.
 		void Promise.resolve(handlers[signal.type]?.()).catch(() => {});
 	});
 }
@@ -278,7 +278,8 @@ export function installLifecycle(
 	// The page came back. Ask every store to re-read; each answers from how its own plaintext went
 	// away, so an evicted store restores and a locked one stays shut. No policy belongs here.
 	const restore = (): void => {
-		// A failed re-read shows in the store's own state, so it is not left as an unhandled rejection.
+		// A failed re-read is not left as an unhandled rejection: the timeline and calendar show it in their own
+		// state; the profile has no failed state, so it keeps what it held.
 		for (const r of relockables) r.refresh().catch(() => {});
 	};
 	// Two ways back in, deliberately routed through the same branch rather than paired by arrival

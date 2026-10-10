@@ -214,9 +214,10 @@ const STATIC = 'static';
 //     (about 250 B route nodes) - two builds measured page 61,552-61,554 B, precache 149,352-149,365 B and route nodes
 //     47,150-47,161 B, about 40 B of room above the highest. Trim pass, each measured on a full build: the day check
 //     and the snooze limit in a module of their own, so the day arithmetic leaves the code every page loads (-85 B
-//     page, -12 B precache), and one keystore and generation read shared by the stores (-92 B root layout, -28 B page,
-//     -127 B precache), kept; a rewrite of the profile field-type table (inside the noise or larger), not kept. Not
-//     found: the shared chunk the build now splits in two (no importer of the asset constants changed).
+//     page, -12 B precache, +72 B route nodes), and one keystore and generation read shared by the stores (-92 B
+//     root layout, -28 B page, -127 B precache), kept; a rewrite of the profile field-type table (inside the noise or
+//     larger), not kept. Not found: the shared chunk the build now splits in two (no importer of the asset constants
+//     changed).
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
