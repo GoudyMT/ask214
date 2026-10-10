@@ -14,7 +14,7 @@
 		item: TimelineItem;
 		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
 		onSetSnooze: (taskId: string, untilIso: string) => void;
-		onSetNote?: (taskId: string, note: string | undefined) => void;
+		onSetNote?: (taskId: string, note: string | undefined) => Promise<void>;
 	} = $props();
 
 	// Inline snooze picker state (ephemeral; not persisted). Snooze toggles it open; a preset or a
@@ -76,14 +76,29 @@
 	let noteOpen = $state(false);
 	let noteValue = $state('');
 
+	let noteFailed = $state(false);
+	let noteSaving = false;
+
 	function openNote(): void {
 		noteValue = item.note ?? '';
+		noteFailed = false;
 		noteOpen = true;
 	}
 
-	function saveNote(): void {
-		onSetNote?.(item.def.id, noteValue);
-		closeNote();
+	// The editor closes only once the save has landed: a failed save keeps it open with the typed text, so the person
+	// can try again instead of retyping. A second tap while a save is pending is ignored (not disabled: a disabled
+	// button that holds focus can drop it).
+	async function saveNote(): Promise<void> {
+		if (noteSaving) return;
+		noteSaving = true;
+		noteFailed = false;
+		try {
+			await onSetNote?.(item.def.id, noteValue);
+			closeNote();
+		} catch {
+			noteFailed = true;
+		}
+		noteSaving = false;
 	}
 
 	function closeNote(): void {
@@ -184,6 +199,11 @@
 				spellcheck="false"
 				aria-label="Note"
 				placeholder="Add a note..."></textarea>
+			{#if noteFailed}
+				<p class="task-card__note-error" role="alert">
+					Could not update right now - please try again.
+				</p>
+			{/if}
 			<div class="task-card__note-actions">
 				<button type="button" class="task-card__note-save" onclick={saveNote}>Save</button>
 				<button type="button" class="task-card__note-cancel" onclick={closeNote}>Cancel</button>
@@ -610,6 +630,12 @@
 	.task-card__note-input:focus {
 		outline: none;
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
+	}
+
+	.task-card__note-error {
+		margin: 0;
+		color: var(--color-danger);
+		font-size: var(--font-size-s);
 	}
 
 	.task-card__note-actions {

@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
@@ -25,8 +25,9 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 		calendar: null as null | {
 			ready: boolean;
 			exclusions: { taskIds: string[]; categories: string[] };
-			card: Record<string, never>;
+			card: { dismissedAt?: number; dismissCount?: number };
 			dismissCard: (now: number) => Promise<void>;
+			refresh?: () => Promise<void>;
 		},
 		timeline: null as null | {
 			ready: boolean;
@@ -38,6 +39,7 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 			};
 			setStatus?: (taskId: string, status: 'done' | 'skipped' | 'snoozed') => Promise<void>;
 			setSnooze?: (taskId: string, untilIso: string) => Promise<void>;
+			setNote?: (taskId: string, note: string | undefined) => Promise<void>;
 			refresh?: () => Promise<void>;
 		}
 	}
@@ -574,5 +576,134 @@ describe('Timeline, the SkillBridge question', () => {
 				current.calendar = null;
 			}
 		});
+	});
+});
+
+// A write that fails must reach the person (the card, or the note that the progress could not be read), never the
+// console as an unhandled rejection. The page's own listener sees what the browser would report.
+describe('Timeline, a write or a Dismiss that fails', () => {
+	const lost: unknown[] = [];
+	const onLost = (event: PromiseRejectionEvent) => {
+		lost.push(event.reason);
+		event.preventDefault();
+	};
+	const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
+
+	beforeEach(() => {
+		lost.length = 0;
+		window.addEventListener('unhandledrejection', onLost);
+	});
+	afterEach(() => {
+		window.removeEventListener('unhandledrejection', onLost);
+		current.calendar = null;
+	});
+
+	// Every write fails, and so does the re-read that follows it.
+	function brokenStore() {
+		const fail = async () => {
+			throw new Error('E_TEST');
+		};
+		return {
+			ready: true,
+			failed: false,
+			state: EMPTY,
+			setStatus: vi.fn(fail),
+			setSnooze: vi.fn(fail),
+			setNote: vi.fn(fail),
+			refresh: vi.fn(fail)
+		};
+	}
+
+	it('a status write that fails, with a re-read that fails too, leaves no unhandled rejection', async () => {
+		const store = brokenStore();
+		current.timeline = store;
+		await render(TimelinePage);
+		await page.getByRole('button', { name: 'Mark done' }).first().click();
+		await expect.poll(() => store.refresh.mock.calls.length).toBe(1);
+		await settle();
+		expect(store.setStatus).toHaveBeenCalledOnce();
+		expect(lost).toEqual([]);
+	});
+
+	it('a snooze write that fails, with a re-read that fails too, leaves no unhandled rejection', async () => {
+		const store = brokenStore();
+		current.timeline = store;
+		await render(TimelinePage);
+		await page.getByRole('button', { name: 'Snooze', exact: true }).first().click();
+		await page.getByRole('button', { name: '1 week' }).click();
+		await expect.poll(() => store.refresh.mock.calls.length).toBe(1);
+		await settle();
+		expect(store.setSnooze).toHaveBeenCalledOnce();
+		expect(lost).toEqual([]);
+	});
+
+	it('a note write that fails, with a re-read that fails too, keeps the note and leaves no unhandled rejection', async () => {
+		const store = brokenStore();
+		current.timeline = store;
+		const { container } = await render(TimelinePage);
+		await page.getByRole('button', { name: 'Add note' }).first().click();
+		await page.getByRole('textbox', { name: 'Note' }).fill('Call the VSO Monday');
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent('Could not update right now - please try again.');
+		await settle();
+		expect(store.setNote).toHaveBeenCalledOnce();
+		expect(store.refresh).toHaveBeenCalledOnce();
+		expect(container.querySelector('textarea')?.value).toBe('Call the VSO Monday');
+		expect(lost).toEqual([]);
+	});
+
+	// A calendar store whose card state changes when a Dismiss lands, as the real one does.
+	function liveCalendar(dismiss: 'lands' | 'fails') {
+		const refresh = vi.fn(async () => {
+			if (dismiss === 'fails') throw new Error('E_TEST');
+		});
+		const dismissCard = vi.fn(async (now: number) => {
+			if (dismiss === 'fails') throw new Error('E_TEST');
+			calendar.card = { dismissedAt: now, dismissCount: 1 };
+		});
+		const calendar = $state({
+			ready: true,
+			exclusions: { taskIds: [] as string[], categories: [] as string[] },
+			card: {} as { dismissedAt?: number; dismissCount?: number },
+			dismissCard,
+			refresh
+		});
+		return { calendar, dismissCard, refresh };
+	}
+
+	const dismissButton = () =>
+		page.getByRole('button', { name: 'Dismiss', exact: true }).element() as HTMLElement;
+
+	it('a calendar card Dismiss that fails re-reads the calendar and leaves no unhandled rejection', async () => {
+		const { calendar, dismissCard, refresh } = liveCalendar('fails');
+		current.calendar = calendar;
+		current.timeline = { ready: true, failed: false, state: EMPTY };
+		const { container } = await render(TimelinePage);
+		await expect.element(page.getByRole('button', { name: 'Dismiss', exact: true })).toBeVisible();
+		dismissButton().click();
+		await expect.poll(() => refresh.mock.calls.length).toBe(1);
+		await settle();
+		expect(dismissCard).toHaveBeenCalledOnce();
+		expect(lost).toEqual([]);
+		// The write did not land, so the card is still there to try again.
+		expect(container.querySelector('.cal-card')).not.toBeNull();
+	});
+
+	it('a calendar card Dismiss that lands while focus is on the page moves focus to the first task', async () => {
+		const { calendar, dismissCard, refresh } = liveCalendar('lands');
+		current.calendar = calendar;
+		current.timeline = { ready: true, failed: false, state: EMPTY };
+		const { container } = await render(TimelinePage);
+		await expect.element(page.getByRole('button', { name: 'Dismiss', exact: true })).toBeVisible();
+		expect(document.activeElement).toBe(document.body);
+		dismissButton().click();
+		await expect.poll(() => container.querySelector('.cal-card')).toBeNull();
+		const first = document.querySelector<HTMLElement>('[id^="task-"]');
+		expect(first).not.toBeNull();
+		await expect.poll(() => document.activeElement).toBe(first);
+		expect(dismissCard).toHaveBeenCalledOnce();
+		expect(refresh).not.toHaveBeenCalled();
 	});
 });

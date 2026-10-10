@@ -42,7 +42,7 @@ async function renderCard(
 	handlers: {
 		onSetStatus?: (taskId: string, status: TaskStatus | undefined) => void;
 		onSetSnooze?: (taskId: string, untilIso: string) => void;
-		onSetNote?: (taskId: string, note: string | undefined) => void;
+		onSetNote?: (taskId: string, note: string | undefined) => Promise<void>;
 	} = {}
 ) {
 	return await render(TaskCard, {
@@ -50,7 +50,7 @@ async function renderCard(
 			item,
 			onSetStatus: handlers.onSetStatus ?? noop,
 			onSetSnooze: handlers.onSetSnooze ?? noop,
-			onSetNote: handlers.onSetNote ?? noop
+			onSetNote: handlers.onSetNote ?? (async () => {})
 		}
 	});
 }
@@ -465,6 +465,95 @@ describe('TaskCard (open states)', () => {
 		flushSync();
 		expect(onSetNote).not.toHaveBeenCalled();
 		expect(container.querySelector('textarea')).toBeNull();
+	});
+
+	const SAVE_FAILED = 'Could not update right now - please try again.';
+
+	async function typeNote(container: Element, text: string): Promise<HTMLTextAreaElement> {
+		buttonByText(container, 'Add note')?.click();
+		flushSync();
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement | null;
+		if (!textarea) throw new Error('no note textarea rendered');
+		textarea.value = text;
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		return textarea;
+	}
+
+	it('a failed Save keeps the editor open with the typed text and says so', async () => {
+		const onSetNote = vi.fn(async () => {
+			throw new Error('E_NOTE_SAVE');
+		});
+		const { container } = await renderCard(makeItem(), { onSetNote });
+		await typeNote(container, 'Call the VSO Monday');
+		buttonByText(container, 'Save')?.click();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(SAVE_FAILED);
+		const textarea = container.querySelector('textarea');
+		expect(textarea?.value).toBe('Call the VSO Monday');
+		expect(container.querySelector('.task-card__note [role="alert"]')).not.toBeNull();
+	});
+
+	it('a Save that works after a failed one closes the editor and drops the line', async () => {
+		const onSetNote = vi
+			.fn<(taskId: string, note: string | undefined) => Promise<void>>()
+			.mockRejectedValueOnce(new Error('E_NOTE_SAVE'))
+			.mockResolvedValueOnce(undefined);
+		const { container } = await renderCard(makeItem(), { onSetNote });
+		await typeNote(container, 'Call the VSO Monday');
+		buttonByText(container, 'Save')?.click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		buttonByText(container, 'Save')?.click();
+		await expect.poll(() => container.querySelector('textarea')).toBeNull();
+		expect(container.querySelector('[role="alert"]')).toBeNull();
+		expect(onSetNote).toHaveBeenCalledTimes(2);
+	});
+
+	it('Cancel after a failed Save drops the line, and the next edit starts without it', async () => {
+		const onSetNote = vi.fn(async () => {
+			throw new Error('E_NOTE_SAVE');
+		});
+		const { container } = await renderCard(makeItem(), { onSetNote });
+		await typeNote(container, 'Call the VSO Monday');
+		buttonByText(container, 'Save')?.click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		buttonByText(container, 'Cancel')?.click();
+		flushSync();
+		expect(container.querySelector('textarea')).toBeNull();
+		buttonByText(container, 'Add note')?.click();
+		flushSync();
+		expect(container.querySelector('textarea')).not.toBeNull();
+		expect(container.querySelector('[role="alert"]')).toBeNull();
+	});
+
+	it('the line goes when the next Save starts', async () => {
+		let release: () => void = () => {};
+		const onSetNote = vi
+			.fn<(taskId: string, note: string | undefined) => Promise<void>>()
+			.mockRejectedValueOnce(new Error('E_NOTE_SAVE'))
+			.mockImplementationOnce(() => new Promise<void>((resolve) => (release = resolve)));
+		const { container } = await renderCard(makeItem(), { onSetNote });
+		await typeNote(container, 'Call the VSO Monday');
+		buttonByText(container, 'Save')?.click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		buttonByText(container, 'Save')?.click();
+		await expect.poll(() => container.querySelector('[role="alert"]')).toBeNull();
+		release();
+		await expect.poll(() => container.querySelector('textarea')).toBeNull();
+	});
+
+	it('a second Save while one is pending is ignored, and the button stays enabled', async () => {
+		let release: () => void = () => {};
+		const onSetNote = vi.fn(() => new Promise<void>((resolve) => (release = resolve)));
+		const { container } = await renderCard(makeItem(), { onSetNote });
+		await typeNote(container, 'Call the VSO Monday');
+		const save = buttonByText(container, 'Save');
+		save?.click();
+		save?.click();
+		flushSync();
+		expect(onSetNote).toHaveBeenCalledTimes(1);
+		expect(save?.disabled).toBe(false);
+		release();
+		await expect.poll(() => container.querySelector('textarea')).toBeNull();
 	});
 });
 

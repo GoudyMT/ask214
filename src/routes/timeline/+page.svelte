@@ -151,38 +151,57 @@
 		}
 	}
 
-	// A status action -> the encrypted timeline store. On any write failure (incl. an OCC
-	// conflict from a concurrent tab) reload authoritative state rather than clobber; the
-	// view re-derives. No-op until the store has provisioned.
+	// Runs a write to a store; true when it landed. On any failure (incl. an OCC conflict from a concurrent tab) the store
+	// is read again rather than clobbered, so the view re-derives. A re-read that fails too is not passed on: the store's
+	// failed flag then shows the page's note, and a rejection nothing awaits would reach the console as unhandled.
+	async function attempt(
+		store: { refresh(): Promise<void> },
+		write: () => Promise<void>
+	): Promise<boolean> {
+		try {
+			await write();
+			return true;
+		} catch {
+			try {
+				await store.refresh();
+			} catch {
+				// Shown by the store's failed flag.
+			}
+			return false;
+		}
+	}
+
+	// A status action -> the encrypted timeline store. No-op until the store has provisioned.
 	async function setStatus(taskId: string, status: TaskStatus | undefined): Promise<void> {
 		const timeline = app.timeline;
-		if (!timeline) return;
-		try {
-			await timeline.setStatus(taskId, status);
-		} catch {
-			await timeline.refresh();
-		}
+		if (timeline) await attempt(timeline, () => timeline.setStatus(taskId, status));
 	}
 
 	// Snooze a task until an ISO date; same OCC-safe reload as setStatus.
 	async function setSnooze(taskId: string, untilIso: string): Promise<void> {
 		const timeline = app.timeline;
-		if (!timeline) return;
-		try {
-			await timeline.setSnooze(taskId, untilIso);
-		} catch {
-			await timeline.refresh();
+		if (timeline) await attempt(timeline, () => timeline.setSnooze(taskId, untilIso));
+	}
+
+	// Set or clear a free-text note; same OCC-safe reload as the other actions. The card waits on this, so a failed save
+	// is told to it (and it keeps the typed text) after the re-read.
+	async function setNote(taskId: string, note: string | undefined): Promise<void> {
+		const timeline = app.timeline;
+		if (timeline && !(await attempt(timeline, () => timeline.setNote(taskId, note)))) {
+			throw new Error('E_NOTE_SAVE');
 		}
 	}
 
-	// Set or clear a free-text note; same OCC-safe reload as the other actions.
-	async function setNote(taskId: string, note: string | undefined): Promise<void> {
-		const timeline = app.timeline;
-		if (!timeline) return;
-		try {
-			await timeline.setNote(taskId, note);
-		} catch {
-			await timeline.refresh();
+	// The calendar card's Dismiss. A failed write re-reads the calendar and leaves the card up to try again; a landed one
+	// removes the card, so focus that sat on its button goes to the next thing to act on.
+	async function dismissCalendarCard(): Promise<void> {
+		const calendar = app.calendar;
+		if (
+			calendar &&
+			!justClosed() &&
+			(await attempt(calendar, () => calendar.dismissCard(Date.now())))
+		) {
+			await focusAfterCard();
 		}
 	}
 </script>
@@ -239,9 +258,7 @@
 						onAdd={(file) => {
 							if (!justClosed()) void handOver(file, app.calendar, new Date());
 						}}
-						onDismiss={() => {
-							if (!justClosed()) void app.calendar?.dismissCard(Date.now());
-						}}
+						onDismiss={dismissCalendarCard}
 					/>
 				{/if}
 				<PhaseChips {view} />
