@@ -19,10 +19,17 @@ const { current, handOver } = vi.hoisted(() => ({
 vi.mock('$lib/profile/context', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
+		// Read at each use, so a test can relock the profile: a locked one reads as no persona.
 		store: {
-			locked: false,
+			get locked() {
+				return lock.locked;
+			},
 			clockBackward: false,
-			persona: { completeness: 'eaos-only', eaos: current.eaos, daysUntilSeparation: 0 }
+			get persona() {
+				return lock.locked
+					? { completeness: 'none' }
+					: { completeness: 'eaos-only', eaos: current.eaos, daysUntilSeparation: 0 };
+			}
 		},
 		timeline: { ready: true, failed: false, state: { schemaVersion: 1, tasks: current.tasks } },
 		calendar: {
@@ -38,6 +45,9 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
+
+// Whether the profile is locked; reactive, so the page re-derives when a test relocks it.
+const lock = $state({ locked: false });
 
 // The page's own hand-over of the calendar file would start a real download.
 vi.mock('$lib/calendar/hand-over', () => ({ handOver }));
@@ -56,6 +66,7 @@ afterEach(() => {
 	vi.useRealTimers();
 	handOver.mockReset();
 	current.tasks = {};
+	lock.locked = false;
 });
 
 // The clock stopped ten seconds before local midnight; the separation date puts the soft task's recommended day on
@@ -188,5 +199,22 @@ describe('Timeline, focus when the day turns at midnight', () => {
 		await tick();
 		await tick();
 		expect(document.activeElement).toBe(document.body);
+	});
+
+	// A relock takes the list away as well (a locked profile has no view), and the focus a card held is handed on the
+	// same way: to the page heading, the one thing left to land on.
+	it('hands focus on when a relock takes the list away', async () => {
+		startWithJustClosedTask();
+		const { container } = await render(TimelinePage);
+		const card = container.querySelector<HTMLElement>(`#task-${CLOSING_ID}`);
+		expect(card).not.toBeNull();
+		card?.focus();
+		expect(document.activeElement).toBe(card);
+
+		lock.locked = true;
+		await expect.poll(() => container.querySelector(`#task-${CLOSING_ID}`)).toBeNull();
+		const heading = container.querySelector<HTMLElement>('h1');
+		expect(heading).not.toBeNull();
+		await expect.poll(() => document.activeElement).toBe(heading);
 	});
 });

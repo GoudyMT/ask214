@@ -122,8 +122,8 @@
 	}
 
 	// The day turning at midnight re-derives the view: a phase can fold, or the SkillBridge question go, under the
-	// person's focus. Read before the page updates, focus held then and dropped by the update is handed on as after a
-	// card goes (focusAfterCard waits for the update).
+	// person's focus; a relock takes the whole view away (its day reads as none). Read before the page updates, focus
+	// held then and dropped by the update is handed on as after a card goes (focusAfterCard waits for the update).
 	let day: string | undefined;
 	$effect.pre(() => {
 		const today = view?.todayDate;
