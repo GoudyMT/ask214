@@ -1,4 +1,4 @@
-import type { CalendarSyncState, HandedOverEvent, EventMoment } from './types';
+import type { CalendarSyncState, HandedOverEvent, EventMoment, TaskExclusions } from './types';
 import { handedOverKey } from './handed-over';
 import { isDay } from '../timeline/day-math';
 
@@ -32,6 +32,20 @@ function isHandedOverList(v: unknown): v is HandedOverEvent[] {
 	);
 }
 
+function isStrings(v: unknown): boolean {
+	return Array.isArray(v) && v.every((s: unknown) => typeof s === 'string');
+}
+
+/** The dismissal bookkeeping the store writes, both numbers; anything else reads as no dismissal yet. */
+function isCard(v: unknown): boolean {
+	return (
+		typeof v === 'object' &&
+		v !== null &&
+		typeof (v as { dismissedAt?: unknown }).dismissedAt === 'number' &&
+		typeof (v as { dismissCount?: unknown }).dismissCount === 'number'
+	);
+}
+
 export class CalendarSchemaError extends Error {
 	constructor() {
 		super('E_CALENDAR_SCHEMA');
@@ -57,11 +71,11 @@ export function decodeCalendarSyncState(bytes: Uint8Array): CalendarSyncState {
 	) {
 		throw new CalendarSchemaError();
 	}
-	const state = parsed as CalendarSyncState & { lastAdd?: unknown };
-	if (state.lastAdd !== undefined && !isHandedOverList(state.lastAdd)) {
-		const rest = { ...state };
-		delete rest.lastAdd;
-		return rest;
-	}
+	const state = { ...parsed } as CalendarSyncState & { lastAdd?: unknown; card?: unknown };
+	// Types only, never membership: a category name an older release wrote must still read.
+	const { taskIds, categories } = (state.exclusions ?? {}) as Partial<TaskExclusions>;
+	if (!isStrings(taskIds) || !isStrings(categories)) throw new CalendarSchemaError();
+	if (state.lastAdd !== undefined && !isHandedOverList(state.lastAdd)) delete state.lastAdd;
+	if (state.card !== undefined && !isCard(state.card)) delete state.card;
 	return state as CalendarSyncState;
 }
