@@ -23,8 +23,22 @@ describe('isDamagedRecord', () => {
 	});
 
 	// Failures that can pass, or that say nothing about the bytes: never offered an erase, so good data survives them.
-	// A decrypt that fails without saying the bytes are wrong: read through the real decrypt, so the test follows
-	// what it throws, not what it was once known to throw.
+	it.each([
+		['an app older than its database', new DOMException('version', 'VersionError')],
+		['a closed connection', new DOMException('closed', 'InvalidStateError')],
+		['a lock timeout', new LockAcquisitionTimeout()],
+		['a write race', new OccConflictError()],
+		['a missing key record', new KeystoreNotInitializedError()],
+		['a type error', new TypeError('x')],
+		['a thrown string', 'E_HWM_MISSING'],
+		['nothing', undefined]
+	])('is not damage for %s', (_, e) => {
+		expect(isDamagedRecord(e)).toBe(false);
+	});
+
+	// Only an authentication failure says the stored bytes are wrong. A decrypt that fails for any other reason (an
+	// engine that cannot run the algorithm, a rejected argument) says nothing about them, so it must not offer an erase.
+	// Read through the real decrypt, so these follow what it throws, not what it was once known to throw.
 	it.each([
 		['an engine that cannot run the algorithm', new DOMException('x', 'NotSupportedError')],
 		['a rejected argument', new DOMException('x', 'InvalidAccessError')],
@@ -61,19 +75,6 @@ describe('isDamagedRecord', () => {
 			new Uint8Array(16)
 		).catch((err: unknown) => err);
 		expect(isDamagedRecord(e)).toBe(true);
-	});
-
-	it.each([
-		['an app older than its database', new DOMException('version', 'VersionError')],
-		['a closed connection', new DOMException('closed', 'InvalidStateError')],
-		['a lock timeout', new LockAcquisitionTimeout()],
-		['a write race', new OccConflictError()],
-		['a missing key record', new KeystoreNotInitializedError()],
-		['a type error', new TypeError('x')],
-		['a thrown string', 'E_HWM_MISSING'],
-		['nothing', undefined]
-	])('is not damage for %s', (_, e) => {
-		expect(isDamagedRecord(e)).toBe(false);
 	});
 });
 
