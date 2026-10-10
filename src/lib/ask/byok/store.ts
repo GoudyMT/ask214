@@ -24,12 +24,14 @@ export function createByokStore(db: IDBDatabase) {
 		/** Encrypt + persist the API key as the single byok self-row. */
 		async saveApiKey(key: string): Promise<void> {
 			const keystore = await readVerifiedKeystore();
-			const blob = await encryptRecord(
-				BYOK_CTX,
-				new TextEncoder().encode(key),
-				keystore,
-				BYOK_GENERATION
-			);
+			const plaintext = new TextEncoder().encode(key);
+			let blob: Uint8Array;
+			try {
+				// Awaited inside the try: the wipe must wait for the cipher to finish with the buffer.
+				blob = await encryptRecord(BYOK_CTX, plaintext, keystore, BYOK_GENERATION);
+			} finally {
+				plaintext.fill(0);
+			}
 			await withStores(db, 'byok', 'readwrite', (tx) => {
 				// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord.
 				tx.objectStore('byok').put({ id: 0, rec: blob });
@@ -44,7 +46,11 @@ export function createByokStore(db: IDBDatabase) {
 			);
 			if (!row) return null;
 			const bytes = await decryptRecord(BYOK_CTX, row.rec, keystore, BYOK_GENERATION);
-			return new TextDecoder().decode(bytes);
+			try {
+				return new TextDecoder().decode(bytes);
+			} finally {
+				bytes.fill(0);
+			}
 		},
 
 		/** Remove the stored key. */
