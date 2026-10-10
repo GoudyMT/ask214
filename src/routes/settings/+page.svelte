@@ -281,8 +281,8 @@
 		try {
 			await app.store?.clearClockBackward();
 		} catch {
-			// Clear failed (e.g. another tab edited concurrently); the store rolled the in-memory
-			// mark back, so the banner/notice correctly stay up. Tell the user they can retry.
+			// Clear failed (e.g. another tab edited concurrently); the store lowers the mark only when
+			// the save lands, so the banner/notice correctly stay up. Tell the user they can retry.
 			clockError = 'Could not update right now - please try again.';
 		}
 	}
