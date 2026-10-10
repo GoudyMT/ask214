@@ -196,14 +196,17 @@ const STATIC = 'static';
 //     layout and 148,448-148,464 B precache, about 40 B of room above the highest. Trim pass: the version written into
 //     the page as text before compiling instead of a runtime constant (-22 B, kept); the version as a literal
 //     expression (0 B) and the two refusals merged into one block (+6 B), not kept.
-//     Page 60,930 -> 61,030 (owner's call, 2026-10-09): the timeline fixes - VGLI's last day counted as the earlier of
-//     both readings of "1 year and 120 days", closed tasks counted apart with the phase fold rule, one local today
-//     that turns at midnight, and the custom snooze date's limits - 60,984 B measured, about 46 B of room. Trim pass,
-//     each measured on a full build: the calendar timestamp from the ISO form (-46 B), one helper for every SkillBridge
-//     plan reading (-18 B) and the leap day rolled back by the date itself (-26 B) kept; the midnight delay as a date
-//     subtraction (-4 B, inside the noise), the view's today reused (0 B) and done-or-skipped in one line (0 B) not
-//     kept. Not taken: the calendar text escape in one pass (it needs escapes typed into the source) and a lazy
-//     calendar builder (the worker still downloads those bytes at install).
+//     Page 60,930 -> 60,970 and route nodes 46,930 -> 46,955 (package.json's size-limit) (owner's call, 2026-10-09):
+//     the timeline fixes - closed tasks counted apart in the phase header, with the fold rule; one local today that
+//     turns at midnight, with focus handed on when the new day takes the focused card away; and the custom snooze
+//     date's limits, refused with the browser's own message - two builds measured page 60,925 B and route nodes about
+//     46,913 B, about 45 and 42 B of room. Trim passes, each measured on a full build: the calendar timestamp from the
+//     ISO form (-46 B page), one helper for every SkillBridge plan reading (-18 B page), the midnight focus hand-off in
+//     one effect, and the date field checking its own date in place of a separate check (together -58 B route nodes),
+//     kept; the midnight delay as a date subtraction (-4 B, inside the noise), the view's today reused (0 B),
+//     done-or-skipped in one line (0 B) and an hourly re-check of the day (+5 B page) not kept. Not taken: the
+//     calendar text escape in one pass (it needs escapes typed into the source) and a lazy calendar builder (the
+//     worker still downloads those bytes at install).
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -213,7 +216,7 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 61_030,
+	page: 60_970,
 	onDemand: 7_300,
 	precacheFiles: 60,
 	precacheBytes: 148_505,
