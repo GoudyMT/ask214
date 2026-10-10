@@ -2,12 +2,16 @@
  * Forbids direct raw-IndexedDB writes to encrypted stores -
  * `<tx>.objectStore('<encrypted>').{put|add}(...)` - outside the sanctioned
  * store path. Direct writes bypass the single encryption boundary: only the
- * sanctioned store paths (the profile, timeline-state, and calendar-sync stores)
+ * sanctioned store paths (the profile, timeline-state, calendar-sync and BYO-key stores)
  * may write ciphertext, each carrying an inline eslint-disable at its one call
  * site. Test files that stage fixtures are exempted in eslint.config.js.
  *
- * Heuristic: a CallExpression `X.objectStore('<name>').{put|add}(...)` with
- * <name> in the set below flags as a violation.
+ * Heuristic: a CallExpression `<store>.{put|add}(...)` flags as a violation when <store> is an
+ * `X.objectStore(<name>)` call with <name> in the set below. The same write is caught in the
+ * shapes that would otherwise slip past a literal chain match: the store held in a variable
+ * (`const s = tx.objectStore('profile'); s.put(x)`), a computed member (`store['put'](x)`), and
+ * the name held in a variable declared once from a string (`const S = 'profile'`). A store name
+ * known only at run time (a parameter, a reassigned variable) cannot be judged and is allowed.
  *
  * The set duplicates `src/lib/db/registry.ts` because an ESLint plugin is plain JS
  * and cannot import the TypeScript registry - and the registry cannot move to JS
@@ -23,6 +27,7 @@ export const ENCRYPTED_STORES_LITERAL = new Set([
 	'byok'
 ]);
 const FORBIDDEN_WRITE_METHODS = new Set(['put', 'add']);
+const MAX_ALIAS_HOPS = 4;
 
 export default {
 	meta: {
@@ -38,29 +43,95 @@ export default {
 		schema: []
 	},
 	create(context) {
+		const sourceCode = context.sourceCode;
+
+		/** The expression under any TypeScript-only wrapper (`as`, `satisfies`, `!`, `<T>`). */
+		function unwrap(node) {
+			let current = node;
+			while (
+				current.type === 'TSAsExpression' ||
+				current.type === 'TSSatisfiesExpression' ||
+				current.type === 'TSNonNullExpression' ||
+				current.type === 'TSTypeAssertion'
+			) {
+				current = current.expression;
+			}
+			return current;
+		}
+
+		/** The string a literal or an expression-free template holds, or null for anything else. */
+		function plainString(node) {
+			if (node.type === 'Literal' && typeof node.value === 'string') return node.value;
+			if (node.type === 'TemplateLiteral' && node.expressions.length === 0) {
+				return node.quasis[0]?.value.cooked ?? null;
+			}
+			return null;
+		}
+
+		/** The name a member access reads: `.name` or a plain-string `['name']`; null when it is not knowable. */
+		function memberName(member) {
+			if (member.computed) return plainString(member.property);
+			return member.property.type === 'Identifier' ? member.property.name : null;
+		}
+
+		/** The initializer of a variable that is declared once and never assigned again, so it still holds that value. */
+		function initializerOf(identifier) {
+			for (let scope = sourceCode.getScope(identifier); scope; scope = scope.upper) {
+				const variable = scope.set.get(identifier.name);
+				if (!variable) continue;
+				const [definition] = variable.defs;
+				const writes = variable.references.filter((reference) => reference.isWrite());
+				if (
+					variable.defs.length !== 1 ||
+					writes.length !== 1 ||
+					definition?.type !== 'Variable' ||
+					definition.node.id.type !== 'Identifier'
+				) {
+					return null;
+				}
+				return definition.node.init;
+			}
+			return null;
+		}
+
+		/** The string an expression holds: a literal, or a variable declared once from one. */
+		function resolveString(node) {
+			const expression = unwrap(node);
+			const direct = plainString(expression);
+			if (direct !== null) return direct;
+			if (expression.type !== 'Identifier') return null;
+			const init = initializerOf(expression);
+			return init ? plainString(unwrap(init)) : null;
+		}
+
+		/** Whether an expression is `<tx>.objectStore('<encrypted>')`, directly or through a variable declared once. */
+		function isEncryptedStore(node, hops = 0) {
+			const expression = unwrap(node);
+			if (expression.type === 'Identifier') {
+				// The hop limit stops a variable that names itself (`const a = a`) from looping.
+				const init = hops < MAX_ALIAS_HOPS ? initializerOf(expression) : null;
+				return init ? isEncryptedStore(init, hops + 1) : false;
+			}
+			if (
+				expression.type !== 'CallExpression' ||
+				expression.callee.type !== 'MemberExpression' ||
+				memberName(expression.callee) !== 'objectStore'
+			) {
+				return false;
+			}
+			const storeArg = expression.arguments[0];
+			if (!storeArg) return false;
+			const name = resolveString(storeArg);
+			return name !== null && ENCRYPTED_STORES_LITERAL.has(name);
+		}
+
 		return {
 			CallExpression(node) {
-				// Match chain: <obj>.objectStore('<name>').{put|add}(...)
-				if (
-					node.callee.type !== 'MemberExpression' ||
-					node.callee.property.type !== 'Identifier' ||
-					!FORBIDDEN_WRITE_METHODS.has(node.callee.property.name)
-				) {
-					return;
-				}
-				const inner = node.callee.object;
-				if (
-					inner.type !== 'CallExpression' ||
-					inner.callee.type !== 'MemberExpression' ||
-					inner.callee.property.type !== 'Identifier' ||
-					inner.callee.property.name !== 'objectStore'
-				) {
-					return;
-				}
-				const storeArg = inner.arguments[0];
-				if (!storeArg || storeArg.type !== 'Literal') return;
-				if (typeof storeArg.value !== 'string') return;
-				if (!ENCRYPTED_STORES_LITERAL.has(storeArg.value)) return;
+				const callee = unwrap(node.callee);
+				if (callee.type !== 'MemberExpression') return;
+				const method = memberName(callee);
+				if (method === null || !FORBIDDEN_WRITE_METHODS.has(method)) return;
+				if (!isEncryptedStore(callee.object)) return;
 
 				context.report({ node, messageId: 'writeUnsanctioned' });
 			}
