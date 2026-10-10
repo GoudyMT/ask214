@@ -199,8 +199,8 @@ const STATIC = 'static';
 //     Page 60,930 -> 60,970 and route nodes 46,930 -> 46,955 (package.json's size-limit) (owner's call, 2026-10-09):
 //     the timeline fixes - closed tasks counted apart in the phase header, with the fold rule; one local today that
 //     turns at midnight, with focus handed on when the new day takes the focused card away; and the custom snooze
-//     date's limits, refused with the browser's own message - two builds measured page 60,925 B and route nodes about
-//     46,913 B, about 45 and 42 B of room. Trim passes, each measured on a full build: the calendar timestamp from the
+//     date's limits, refused with the browser's own message - builds measured page 60,925-60,932 B and route nodes
+//     46,912-46,918 B, 38-45 and 37-43 B of room. Trim passes, each measured on a full build: the calendar timestamp from the
 //     ISO form (-46 B page), one helper for every SkillBridge plan reading (-18 B page), the midnight focus hand-off in
 //     one effect, and the date field checking its own date in place of a separate check (together -58 B route nodes),
 //     kept; the midnight delay as a date subtraction (-4 B, inside the noise), the view's today reused (0 B),
