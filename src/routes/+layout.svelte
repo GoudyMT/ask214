@@ -79,11 +79,6 @@
 	});
 	setInstallApp(install);
 
-	// Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable, so
-	// even a fresh no-timeline user has something to set there (the timeline sections hide inside Settings).
-	// And when the saved data is damaged, where its erase is the only way back.
-	const showSettings = $derived(app.status === 'ready' || app.status === 'damaged');
-
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/service-worker.js', { type: 'module' });
@@ -303,7 +298,10 @@
 			<ul>
 				<li><a href={resolve('/timeline')}>Timeline</a></li>
 				<li><a href={resolve('/resources')}>Resources</a></li>
-				{#if showSettings}
+				<!-- Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable,
+				     so even a fresh no-timeline user has something to set there (the timeline sections hide inside
+				     Settings). And when the saved data is damaged, where its erase is the only way back. -->
+				{#if app.status === 'ready' || app.status === 'damaged'}
 					<li><a href={resolve('/settings')}>Settings</a></li>
 				{/if}
 			</ul>
