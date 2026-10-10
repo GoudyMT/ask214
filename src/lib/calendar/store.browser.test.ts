@@ -203,7 +203,79 @@ describe('calendar-sync store', () => {
 		await deleteTestDb(db);
 	});
 
+	// Damages the stored body so the next read fails after the generation was read; the returned function puts it back.
+	async function damageBody(db: IDBDatabase): Promise<() => Promise<void>> {
+		const row = await withStores(db, 'calendar-sync', 'readonly', (tx) =>
+			reqToPromise<{ id: number; rec: Uint8Array } | undefined>(
+				tx.objectStore('calendar-sync').get(0)
+			)
+		);
+		if (!row) throw new Error('test setup: no calendar body');
+		const bad = new Uint8Array(row.rec);
+		bad[20] = (bad[20] ?? 0) ^ 0xff;
+		const put = (rec: Uint8Array) =>
+			withStores(db, 'calendar-sync', 'readwrite', (tx) => {
+				tx.objectStore('calendar-sync').put({ id: 0, rec });
+			});
+		await put(bad);
+		return () => put(row.rec);
+	}
 	const EMPTY: TaskExclusions = { taskIds: [], categories: [] };
+
+	// A read that fails after a peer's save must not pair the peer's generation with the older record it still holds:
+	// a write from it would pass the conflict check and lay the old record over the peer's save.
+	it('refuses a write after a failed re-read, so a peer save survives', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		const peer = createCalendarSyncStore(db);
+		await peer.load();
+		await peer.setExclusions({ taskIds: ['peer'], categories: [] });
+		const restore = await damageBody(db);
+
+		await expect(a.load()).rejects.toThrow();
+		await restore();
+
+		await expect(a.setExclusions({ taskIds: ['mine'], categories: [] })).rejects.toThrow(
+			OccConflictError
+		);
+		const fresh = createCalendarSyncStore(db);
+		await fresh.load();
+		expect(fresh.exclusions).toEqual({ taskIds: ['peer'], categories: [] });
+		await deleteTestDb(db);
+	});
+
+	// After a failed read the stored record is UNKNOWN, so the store says so (the timeline's `failed`) instead of
+	// serving the older record as if it were current.
+	it('reads as not ready, with the empty defaults, after a re-read fails', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		const peer = createCalendarSyncStore(db);
+		await peer.load();
+		await peer.setExclusions({ taskIds: [], categories: ['admin'] });
+		expect(a.ready).toBe(true);
+		expect(a.exclusions.categories).toEqual(['medical']);
+		const restore = await damageBody(db);
+
+		await expect(a.refresh()).rejects.toThrow();
+
+		expect(a.ready).toBe(false);
+		expect(a.exclusions).toEqual(EMPTY);
+		await expect(a.setExclusions({ taskIds: ['mine'], categories: [] })).rejects.toThrow(
+			OccConflictError
+		);
+
+		// The next read that succeeds puts the store back.
+		await restore();
+		await a.refresh();
+		expect(a.ready).toBe(true);
+		expect(a.exclusions).toEqual({ taskIds: [], categories: ['admin'] });
+		await deleteTestDb(db);
+	});
 
 	describe('refresh while the page is hidden', () => {
 		const stubVisibility = (state: DocumentVisibilityState) =>

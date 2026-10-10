@@ -166,8 +166,8 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 
 	const api = {
 		/**
-		 * Whether the record is loaded and writable. FALSE before the first load and after a relock,
-		 * when the current record is UNKNOWN. Callers MUST gate on this and fail closed rather than
+		 * Whether the record is loaded and writable. FALSE before the first load, after a relock, and
+		 * after a read that failed, when the current record is UNKNOWN. Callers MUST gate on this and fail closed rather than
 		 * read the empty defaults below as "the user excluded nothing".
 		 */
 		get ready(): boolean {
@@ -197,34 +197,46 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
-			await withWriteLocks(
-				async () => {
-					ks = await readVerifiedKeystore();
-					return ks.keystoreGeneration;
-				},
-				async () => {
-					if (!ks) throw new KeystoreNotInitializedError();
-					const keystore = ks;
-					const gen = await readCurrentGeneration(keystore);
-					_generation = gen;
-					if (gen === 0) {
+			try {
+				await withWriteLocks(
+					async () => {
+						ks = await readVerifiedKeystore();
+						return ks.keystoreGeneration;
+					},
+					async () => {
+						if (!ks) throw new KeystoreNotInitializedError();
+						const keystore = ks;
+						const gen = await readCurrentGeneration(keystore);
+						// The generation moves only with the record it belongs to: a read that fails after a
+						// peer's save would otherwise pair the newer generation with the older record, and a
+						// write from them would pass the conflict check and lay it over the peer's save.
+						if (gen === 0) {
+							_generation = gen;
+							if (relockEpoch === relockAtStart) {
+								_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
+								lockState = 'unlocked';
+							}
+							return;
+						}
+						const row = await getRow<StateRow>(db, 'calendar-sync');
+						if (!row) throw new Error('E_CALENDAR_BODY_MISSING');
+						const decoded = decodeCalendarSyncState(
+							await decryptRecord(CALENDAR_CTX, row.rec, keystore, gen)
+						);
+						_generation = gen;
 						if (relockEpoch === relockAtStart) {
-							_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
+							_state = decoded;
 							lockState = 'unlocked';
 						}
-						return;
 					}
-					const row = await getRow<StateRow>(db, 'calendar-sync');
-					if (!row) throw new Error('E_CALENDAR_BODY_MISSING');
-					const decoded = decodeCalendarSyncState(
-						await decryptRecord(CALENDAR_CTX, row.rec, keystore, gen)
-					);
-					if (relockEpoch === relockAtStart) {
-						_state = decoded;
-						lockState = 'unlocked';
-					}
-				}
-			);
+				);
+			} catch (e) {
+				// The stored record could not be read, so what is held is no longer known to be current.
+				// Say so (not ready, empty defaults) rather than serve it. lockState stays as it was, so
+				// the next automatic re-read still tries.
+				_state = null;
+				throw e;
+			}
 		},
 
 		/**
