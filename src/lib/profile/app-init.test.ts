@@ -344,6 +344,16 @@ describe('reloadWhenShown', () => {
 		expect(t.reload).toHaveBeenCalledTimes(1);
 	});
 
+	// Another tab's erase and fresh setup send several signals in a row; the hidden tab must still reload once.
+	it('reloads once for a burst of signals that arrived while hidden', () => {
+		const t = setup(true);
+		t.signal();
+		t.signal();
+		t.signal();
+		t.show();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+	});
+
 	it('reloads at once when the page is shown', () => {
 		const t = setup(false);
 		t.signal();
