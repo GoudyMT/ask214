@@ -5,6 +5,7 @@ import {
 	provisionStore,
 	createRelockEcho,
 	relockAll,
+	reloadWhenShown,
 	superviseStartup,
 	START_TIMEOUT_MS,
 	type AppInitResult
@@ -302,6 +303,60 @@ describe('installLifecycle when the page is already hidden', () => {
 			expect(s.relockSync).not.toHaveBeenCalled();
 			expect(s.refresh).not.toHaveBeenCalled();
 		}
+	});
+});
+
+describe('reloadWhenShown', () => {
+	function setup(hidden: boolean) {
+		let handler: ((s: BusSignal) => void) | undefined;
+		const unsubscribe = vi.fn(() => void (handler = undefined));
+		const bus: ProfileBus = {
+			publish: () => {},
+			subscribe: (h) => {
+				handler = h;
+				return unsubscribe;
+			},
+			close: () => {}
+		};
+		const doc = Object.assign(new EventTarget(), { hidden });
+		const reload = vi.fn();
+		const stop = reloadWhenShown(bus, doc, reload);
+		return {
+			reload,
+			stop,
+			signal: () => handler?.({ type: 'relocked' }),
+			show: () => {
+				doc.hidden = false;
+				doc.dispatchEvent(new Event('visibilitychange'));
+			}
+		};
+	}
+
+	// A reload runs the start-up again, which decrypts whatever another tab left behind; in a hidden tab
+	// that would put plaintext in the heap of a page nobody is looking at.
+	it('holds the reload while hidden, then reloads once when shown', () => {
+		const t = setup(true);
+		t.signal();
+		expect(t.reload).not.toHaveBeenCalled();
+		t.show();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+		t.show();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+	});
+
+	it('reloads at once when the page is shown', () => {
+		const t = setup(false);
+		t.signal();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+	});
+
+	it('does nothing after teardown, whether the reload was waiting or not', () => {
+		const t = setup(true);
+		t.signal();
+		t.stop();
+		t.show();
+		t.signal();
+		expect(t.reload).not.toHaveBeenCalled();
 	});
 });
 

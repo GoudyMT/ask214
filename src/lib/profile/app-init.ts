@@ -185,6 +185,32 @@ export function subscribeBus(
 	});
 }
 
+/**
+ * Reload on a peer's signal, but never while hidden: the reload runs the start-up again, which
+ * decrypts whatever the peer left, and a hidden tab must not hold plaintext. A hidden tab waits and
+ * reloads once, when it is next shown. Returns the teardown (bus and any pending wait).
+ */
+export function reloadWhenShown(
+	bus: ProfileBus,
+	doc: EventTarget & { hidden: boolean },
+	reload: () => void
+): () => void {
+	// The same function added twice is one listener, so a burst of signals while hidden still reloads once.
+	const onShow = (): void => {
+		if (doc.hidden) return;
+		doc.removeEventListener('visibilitychange', onShow);
+		reload();
+	};
+	const off = bus.subscribe(() => {
+		doc.addEventListener('visibilitychange', onShow);
+		onShow();
+	});
+	return () => {
+		off();
+		doc.removeEventListener('visibilitychange', onShow);
+	};
+}
+
 /** User-input events that reset the idle countdown. Passive listeners (no scroll-jank). */
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'touchstart'] as const;
 
