@@ -77,8 +77,8 @@ control. Timeline notes and the calendar record are not overwritten in memory li
 
 **What it is.** Writes take Web Locks: ordinary writes share the key lock, profile writes go one at a time, and
 erase takes the key lock alone. After writing, a tab posts a bare event over BroadcastChannel; the others
-read again from IndexedDB when shown, and a lock in one tab locks the others. A tab still on an older version
-steps aside when a newer tab upgrades the database, and asks the user to reload.
+read again from IndexedDB, a hidden one starting only when shown, and a lock in one tab locks the others. A tab
+still on an older version steps aside when a newer tab upgrades the database, and asks the user to reload.
 
 **Tradeoffs accepted.** The channel is not authenticated, but its events carry no data, so a forged one (which
 needs code already on the site) can at most cause an extra read or a lock. Without BroadcastChannel, other tabs
