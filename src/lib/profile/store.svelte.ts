@@ -159,20 +159,17 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 * "I fixed my clock" reset. Forcibly lower lastSeenAt to now - the ONE sanctioned
 		 * retreat of the monotonic mark - and persist it durably (else the stored future mark
 		 * re-triggers the warning on every reload). No-op when no profile is loaded.
+		 *
+		 * The lowered mark is set by the save itself, inside the write lock, on the record that save
+		 * stages from. Setting it on the live record first would let a re-read already queued on the
+		 * lock bring the stored future mark back before the save runs, and the monotonic mark would
+		 * then keep it. A failed save leaves the live record untouched, so the mark is never left
+		 * lowered in memory with the stored one still ahead.
 		 */
 		async clearClockBackward(): Promise<void> {
 			if (!_profile) return;
-			const prev = _profile.lastSeenAt;
-			_profile.lastSeenAt = Date.now();
 			safeLog({ code: 'E_CLOCK_BACKWARD' });
-			try {
-				await api.save({});
-			} catch (e) {
-				// Save failed (e.g. OCC / lock timeout): roll the in-memory mark back so the
-				// monotonic invariant is not left violated in memory; the caller surfaces it.
-				if (_profile) _profile.lastSeenAt = prev;
-				throw e;
-			}
+			await api.save({}, { resetClock: true });
 		},
 
 		/**
@@ -272,7 +269,14 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			);
 		},
 
-		async save(patch: ProfilePatch): Promise<{ generation: number }> {
+		/**
+		 * Persist `patch` over the current record. `resetClock` is for clearClockBackward alone: it
+		 * stages the new lastSeenAt as now instead of holding the monotonic mark.
+		 */
+		async save(
+			patch: ProfilePatch,
+			{ resetClock = false }: { resetClock?: boolean } = {}
+		): Promise<{ generation: number }> {
 			saveInFlight = true;
 			const relockAtStart = relockEpoch;
 			try {
@@ -332,7 +336,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							...patch,
 							schemaVersion: 1,
 							generation: nextGen,
-							lastSeenAt: updateLastSeen(base.lastSeenAt, now),
+							lastSeenAt: resetClock ? now : updateLastSeen(base.lastSeenAt, now),
 							setupIntent: nextSetupIntent,
 							setupIntentChangedAt:
 								nextSetupIntent !== base.setupIntent ? now : base.setupIntentChangedAt

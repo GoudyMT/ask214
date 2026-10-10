@@ -428,6 +428,27 @@ describe('ProfileStore.clockBackward', () => {
 		expect(store._getStateForTest()?.lastSeenAt).toBe(before);
 		expect(store.clockBackward).toBe(true);
 	});
+
+	// A re-read queued on the write lock ahead of the reset reads the stored future mark back. The reset
+	// must be decided inside the lock, on the record its own save stages from, or the monotonic mark
+	// keeps the future value and the "I fixed my clock" is silently undone.
+	it('is not undone by a re-read queued ahead of the reset', async () => {
+		await stageFutureProfile(Date.now() + 48 * 3600 * 1000);
+		const store = createProfileStore(db);
+		await store.load();
+
+		const queued = store.refresh();
+		const reset = store.clearClockBackward();
+		await Promise.all([queued, reset]);
+
+		const ceiling = Date.now();
+		expect(need(store._getStateForTest()).lastSeenAt).toBeLessThanOrEqual(ceiling);
+		expect(store.clockBackward).toBe(false);
+		const fresh = createProfileStore(db);
+		await fresh.load();
+		expect(need(fresh._getStateForTest()).lastSeenAt).toBeLessThanOrEqual(ceiling);
+		expect(fresh.clockBackward).toBe(false);
+	});
 });
 
 describe('ProfileStore relock-vs-save race', () => {
