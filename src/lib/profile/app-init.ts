@@ -4,6 +4,8 @@ import type { CapabilityResult, CapabilityCause } from '../crypto/capability';
 import type { ProfileBus, BusSignal } from '../broadcast/bus';
 import type { IdleTimer, IdleTimerOptions } from './idle-timer';
 import type { RelockReason } from './lifecycle';
+import { afterStartupFailure, afterStartupResult, type AppStatus } from './context';
+import { safeLog } from '../log/safelog';
 
 /**
  * App-init orchestration for the profile subsystem. Pure + dependency-injected so the
@@ -59,6 +61,46 @@ export async function initProfileApp<S extends LoadableStore>(
 	return { status: 'ready', store, db };
 }
 
+// A start-up slower than this shows the banner (Reload) instead of an empty shell; it keeps running, and a late
+// result still takes over from the banner.
+export const START_TIMEOUT_MS = 10_000;
+
+/**
+ * Settles a start-up against the app's status. The timeout, a result and a failure all meet here because each must
+ * read the status as it stands: a takeover set meanwhile (`stale`, `unsupported`) outranks all three.
+ *
+ * A result the tab cannot use because a takeover came first is not wired, so the store it already decrypted is zeroized
+ * and the connection closed. Returns the cancel for teardown.
+ */
+export function superviseStartup<S extends LoadableStore & Pick<Relockable, 'relockSync'>>(
+	start: Promise<AppInitResult<S>>,
+	app: { status: AppStatus },
+	onResult: (result: AppInitResult<S>) => void
+): () => void {
+	const banner = () => (app.status = afterStartupFailure(app.status, 'error'));
+	const timer = setTimeout(banner, START_TIMEOUT_MS);
+	start
+		.then((r) => {
+			const next = afterStartupResult(app.status, r.status);
+			if (next === r.status) {
+				app.status = next;
+				onResult(r);
+			} else if ('db' in r) {
+				if ('store' in r) r.store.relockSync('hygiene');
+				r.db.close();
+			}
+		})
+		.catch(() => {
+			// A hard failure past the capability gate: an app older than its database (a newer release raised the
+			// version), a storage error - damaged saved data resolves as `damaged` instead. Opaque log only (no PII).
+			// The shell stays usable - Ask, About and Documents need no saved data - and a banner says so, with Reload.
+			safeLog({ code: 'E_INIT_FAILED' });
+			banner();
+		})
+		.finally(() => clearTimeout(timer));
+	return () => clearTimeout(timer);
+}
+
 /**
  * Provision a secondary store on the already-open db: create it, hand it over, then run the initial
  * load. Mirrors initProfileApp's create-then-load tail, kept separate so a store can ride on the
@@ -71,14 +113,18 @@ export async function initProfileApp<S extends LoadableStore>(
  * the one that had just finished reading the user's records into memory. Handing it over early
  * costs nothing - a relock during the load is caught by the load's own residency guard.
  */
-export async function provisionStore<S extends LoadableStore>(
+export async function provisionStore<S extends LoadableStore & Pick<Relockable, 'relockSync'>>(
 	db: IDBDatabase,
 	makeStore: (db: IDBDatabase) => S,
-	onCreated?: (store: S) => void
+	onCreated?: (store: S) => void,
+	isHidden?: () => boolean
 ): Promise<S> {
 	const store = makeStore(db);
 	onCreated?.(store);
 	await store.load();
+	// load() decrypts whatever the store's state, so a read that ended after the page was hidden left plaintext in
+	// a hidden tab; the hide event it needed to answer came before it finished.
+	if (isHidden?.()) store.relockSync('hygiene');
 	return store;
 }
 
@@ -126,10 +172,12 @@ export function createRelockEcho(bus: ProfileBus): {
  */
 export function subscribeBus(
 	bus: ProfileBus,
-	handlers: Partial<Record<BusSignal['type'], () => void>>
+	handlers: Partial<Record<BusSignal['type'], () => unknown>>
 ): () => void {
 	return bus.subscribe((signal) => {
-		handlers[signal.type]?.();
+		// A handler may hand back a re-read. Its failure shows in the store's own state, so it is not rethrown
+		// into the page as an unhandled rejection.
+		void Promise.resolve(handlers[signal.type]?.()).catch(() => {});
 	});
 }
 
@@ -226,7 +274,8 @@ export function installLifecycle(
 	// The page came back. Ask every store to re-read; each answers from how its own plaintext went
 	// away, so an evicted store restores and a locked one stays shut. No policy belongs here.
 	const restore = (): void => {
-		for (const r of relockables) void r.refresh();
+		// A failed re-read shows in the store's own state, so it is not left as an unhandled rejection.
+		for (const r of relockables) r.refresh().catch(() => {});
 	};
 	// Two ways back in, deliberately routed through the same branch rather than paired by arrival
 	// order: which of these fires, and in what sequence, is not consistent across browsers.
@@ -256,6 +305,9 @@ export function installLifecycle(
 		deps.win.addEventListener(ev, onActivity, { passive: true });
 	}
 	idle.start();
+	// A start-up that ends with the page already hidden missed the visibilitychange that hid it: no listener
+	// existed yet, and nothing else would ever answer it.
+	if (deps.isHidden()) onHide();
 
 	return () => {
 		idle.stop();

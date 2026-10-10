@@ -15,6 +15,7 @@
 		installLifecycle,
 		createRelockEcho,
 		relockAll,
+		superviseStartup,
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
@@ -96,23 +97,32 @@
 		let destroyed = false;
 		let teardownRuntime: (() => void) | null = null;
 
-		// Client-only: IndexedDB + crypto are browser-only.
-		void initProfileApp({
-			checkSupport: checkBrowserSupport,
-			openDb: () =>
-				openMtcDb(undefined, () => {
-					// Another tab on a newer bundle upgraded the shared DB and closed this connection;
-					// the takeover offers a reload onto the new bundle instead of a silent, data-less tab.
-					if (!destroyed) app.status = 'stale';
-				}),
-			bootstrap: bootstrapLocalKeystore,
-			createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
-		})
-			.then((result) => {
+		const isHidden = () => document.visibilityState === 'hidden';
+		// Client-only: IndexedDB + crypto are browser-only. The status is set by superviseStartup (the timeout, a late
+		// result, a takeover that came first), so the callbacks below only wire what each outcome needs.
+		const cancelStartup = superviseStartup(
+			initProfileApp({
+				checkSupport: checkBrowserSupport,
+				openDb: () =>
+					openMtcDb(
+						undefined,
+						() => {
+							// Another tab on a newer bundle upgraded the shared DB and closed this connection;
+							// the takeover offers a reload onto the new bundle instead of a silent, data-less tab.
+							if (!destroyed) app.status = 'stale';
+						},
+						// Another tab still holds an older connection open. The open waits and finishes by itself once
+						// that tab closes; meanwhile the banner says so instead of an empty shell.
+						() => (app.status = afterStartupFailure(app.status, 'error'))
+					),
+				bootstrap: bootstrapLocalKeystore,
+				createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
+			}),
+			app,
+			(result) => {
 				if (destroyed) return;
 				if (result.status === 'unsupported') {
 					app.cause = result.cause;
-					app.status = 'unsupported';
 					return;
 				}
 				// The saved data failed its own checks: no reload can read it, so the erase is the way back. It needs only
@@ -136,7 +146,6 @@
 						}
 						await wipeAllStores(result.db);
 					};
-					app.status = afterStartupFailure(app.status, 'damaged');
 					return;
 				}
 				app.store = result.store;
@@ -146,7 +155,6 @@
 				// The BYO-key store rides on the same db; it reads on demand and caches nothing, so it needs
 				// no relock join and no async load - just make it available once the keystore is usable.
 				app.byok = createByokStore(result.db);
-				app.status = 'ready';
 
 				// Wire the profile's relock/lifecycle FIRST and unconditionally (security: the
 				// decrypted profile must always relock on idle/background). relockables is shared +
@@ -160,14 +168,14 @@
 				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
 					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync('peer'))),
-					'profile-updated': () => void result.store.refresh(),
-					'timeline-updated': () => void app.timeline?.refresh(),
-					'calendar-updated': () => void app.calendar?.refresh()
+					'profile-updated': () => result.store.refresh(),
+					'timeline-updated': () => app.timeline?.refresh(),
+					'calendar-updated': () => app.calendar?.refresh()
 				});
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,
 					doc: document,
-					isHidden: () => document.visibilityState === 'hidden',
+					isHidden,
 					createIdleTimer,
 					idleThresholdMs: IDLE_THRESHOLD_MS
 				});
@@ -186,7 +194,8 @@
 					(timeline) => {
 						relockables.push(timeline);
 						timelineStore = timeline;
-					}
+					},
+					isHidden
 				)
 					.then((timeline) => {
 						if (destroyed) return;
@@ -204,25 +213,20 @@
 				void provisionStore(
 					result.db,
 					(db) => createCalendarSyncStore(db, { onBroadcast: (e) => echo.publish(e) }),
-					(calendar) => relockables.push(calendar)
+					(calendar) => relockables.push(calendar),
+					isHidden
 				)
 					.then((calendar) => {
 						if (destroyed) return;
 						app.calendar = calendar;
 					})
 					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
-			})
-			.catch(() => {
-				// Hard init failure past the capability gate: an app older than its database (a newer release raised
-				// the version), an open another tab blocks, a storage error - damaged saved data resolves as `damaged`
-				// above instead. Opaque log only (no PII). The shell stays usable - Ask, About and Documents need no saved
-				// data - and a banner says so, with Reload.
-				safeLog({ code: 'E_INIT_FAILED' });
-				if (!destroyed) app.status = afterStartupFailure(app.status, 'error');
-			});
+			}
+		);
 
 		return () => {
 			destroyed = true;
+			cancelStartup();
 			teardownRuntime?.();
 			bus.close();
 		};

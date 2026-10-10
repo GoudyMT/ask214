@@ -1,12 +1,24 @@
-import { describe, it, expect, vi } from 'vitest';
-import { initProfileApp, provisionStore, createRelockEcho, relockAll } from './app-init';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import {
+	initProfileApp,
+	installLifecycle,
+	provisionStore,
+	createRelockEcho,
+	relockAll,
+	superviseStartup,
+	START_TIMEOUT_MS,
+	type AppInitResult
+} from './app-init';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import { KeystoreHmacMismatchError } from './store.svelte';
 import { LockAcquisitionTimeout } from '../db/locks';
+import { getDiagnosticsForTest } from '../log/safelog';
+import type { AppStatus } from './context';
+import type { IdleTimer } from './idle-timer';
 import type { BusSignal, ProfileBus } from '../broadcast/bus';
 
 const fakeDb = {} as IDBDatabase;
-const makeStore = () => ({ load: vi.fn().mockResolvedValue(null) });
+const makeStore = () => ({ load: vi.fn().mockResolvedValue(null), relockSync: vi.fn() });
 
 function recordingBus(): { bus: ProfileBus; sent: BusSignal[] } {
 	const sent: BusSignal[] = [];
@@ -224,12 +236,203 @@ describe('provisionStore', () => {
 	// startup zeroizes every store except the one that just finished reading the user's notes.
 	it('hands the store over before it decrypts, not after', async () => {
 		const order: string[] = [];
-		const store = { load: vi.fn(async () => void order.push('load')) };
+		const store = { load: vi.fn(async () => void order.push('load')), relockSync: vi.fn() };
 		await provisionStore(
 			fakeDb,
 			() => store,
 			() => order.push('joined the relock set')
 		);
 		expect(order).toEqual(['joined the relock set', 'load']);
+	});
+
+	// load() ignores how the plaintext went away, so a store whose first read finishes after the page was hidden
+	// holds decrypted data in a hidden tab, and the hide event it should have answered is already past.
+	it('relocks as hygiene after a first read that finished while the page is hidden', async () => {
+		const order: string[] = [];
+		const store = {
+			load: vi.fn(async () => void order.push('load')),
+			relockSync: vi.fn((reason: string) => void order.push('relock ' + reason))
+		};
+		await provisionStore(
+			fakeDb,
+			() => store,
+			undefined,
+			() => true
+		);
+		expect(order).toEqual(['load', 'relock hygiene']);
+	});
+
+	it('leaves a store loaded while the page is shown', async () => {
+		const store = makeStore();
+		await provisionStore(
+			fakeDb,
+			() => store,
+			undefined,
+			() => false
+		);
+		expect(store.relockSync).not.toHaveBeenCalled();
+	});
+});
+
+describe('installLifecycle when the page is already hidden', () => {
+	const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+	function install(hidden: boolean) {
+		const a = { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
+		const b = { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
+		installLifecycle([a, b], {
+			win: new EventTarget(),
+			doc: new EventTarget(),
+			isHidden: () => hidden,
+			createIdleTimer: () => timer,
+			idleThresholdMs: 900_000
+		});
+		return [a, b];
+	}
+
+	// The visibilitychange that hid the page fired before these listeners existed, so nothing else would ever answer it.
+	it('relocks every store as hygiene once at install, and never re-reads', () => {
+		for (const s of install(true)) {
+			expect(s.relockSync).toHaveBeenCalledExactlyOnceWith('hygiene');
+			expect(s.refresh).not.toHaveBeenCalled();
+		}
+	});
+
+	it('leaves the stores alone when the page is shown', () => {
+		for (const s of install(false)) {
+			expect(s.relockSync).not.toHaveBeenCalled();
+			expect(s.refresh).not.toHaveBeenCalled();
+		}
+	});
+});
+
+describe('superviseStartup', () => {
+	beforeEach(() => vi.useFakeTimers());
+	afterEach(() => vi.useRealTimers());
+
+	function harness(initial: AppStatus = 'loading') {
+		const app = { status: initial };
+		let settle!: (r: AppInitResult<ReturnType<typeof makeStore>>) => void;
+		let fail!: () => void;
+		const start = new Promise<AppInitResult<ReturnType<typeof makeStore>>>((resolve, reject) => {
+			settle = resolve;
+			fail = () => reject(new Error('E_TEST'));
+		});
+		const db = { close: vi.fn() };
+		const onResult = vi.fn();
+		const cancel = superviseStartup(start, app, onResult);
+		const ready = (store = makeStore()) =>
+			settle({ status: 'ready', store, db: db as unknown as IDBDatabase });
+		return {
+			status: () => app.status,
+			setStatus: (s: AppStatus) => (app.status = s),
+			db,
+			onResult,
+			cancel,
+			settle,
+			fail,
+			ready
+		};
+	}
+
+	it('shows the banner status once the start-up outlasts its timeout, not before', async () => {
+		const h = harness();
+		await vi.advanceTimersByTimeAsync(START_TIMEOUT_MS - 1);
+		expect(h.status()).toBe('loading');
+		await vi.advanceTimersByTimeAsync(1);
+		expect(h.status()).toBe('error');
+	});
+
+	it('recovers by itself when the slow start-up later succeeds', async () => {
+		const h = harness();
+		await vi.advanceTimersByTimeAsync(START_TIMEOUT_MS);
+		h.ready();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(h.status()).toBe('ready');
+		expect(h.onResult).toHaveBeenCalledOnce();
+	});
+
+	it('shows the erase offer when the slow start-up later finds the data damaged', async () => {
+		const h = harness();
+		await vi.advanceTimersByTimeAsync(START_TIMEOUT_MS);
+		h.settle({ status: 'damaged', db: h.db as unknown as IDBDatabase });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(h.status()).toBe('damaged');
+		expect(h.onResult).toHaveBeenCalledOnce();
+	});
+
+	it('does not replace a takeover with the timeout', async () => {
+		const h = harness();
+		h.setStatus('stale');
+		await vi.advanceTimersByTimeAsync(START_TIMEOUT_MS);
+		expect(h.status()).toBe('stale');
+	});
+
+	it('clears the timer when the start-up settles, by result or by failure', async () => {
+		const done = harness();
+		done.ready();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(vi.getTimerCount()).toBe(0);
+		const failed = harness();
+		failed.fail();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it('shows the banner status and logs an opaque code when the start-up fails', async () => {
+		const h = harness();
+		const logged = getDiagnosticsForTest().length;
+		h.fail();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(h.status()).toBe('error');
+		expect(
+			getDiagnosticsForTest()
+				.slice(logged)
+				.map((e) => e.code)
+		).toEqual(['E_INIT_FAILED']);
+	});
+
+	it('keeps a takeover over a failure', async () => {
+		const stale = harness('stale');
+		stale.fail();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(stale.status()).toBe('stale');
+	});
+
+	it('clears the timer on teardown', () => {
+		const h = harness();
+		expect(vi.getTimerCount()).toBe(1);
+		h.cancel();
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	// The tab went stale (or cannot run) while the start-up was loading: nothing is wired, so nothing may stay
+	// decrypted, and the connection is released.
+	it('zeroizes the loaded store and closes the database when the tab went stale meanwhile', async () => {
+		const h = harness();
+		const store = makeStore();
+		h.setStatus('stale');
+		h.ready(store);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(store.relockSync).toHaveBeenCalledExactlyOnceWith('hygiene');
+		expect(h.db.close).toHaveBeenCalledOnce();
+		expect(h.onResult).not.toHaveBeenCalled();
+		expect(h.status()).toBe('stale');
+	});
+
+	it('closes the database of damaged data found after the tab went stale', async () => {
+		const h = harness('stale');
+		h.settle({ status: 'damaged', db: h.db as unknown as IDBDatabase });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(h.db.close).toHaveBeenCalledOnce();
+		expect(h.onResult).not.toHaveBeenCalled();
+		expect(h.status()).toBe('stale');
+	});
+
+	it('hands an unsupported result over untouched', async () => {
+		const h = harness('error');
+		h.settle({ status: 'unsupported', cause: 'indexed-db' });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(h.status()).toBe('unsupported');
+		expect(h.onResult).toHaveBeenCalledOnce();
 	});
 });
