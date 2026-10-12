@@ -13,8 +13,10 @@
 		onSetNote
 	}: {
 		item: TimelineItem;
-		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
-		onSetSnooze: (taskId: string, untilIso: string) => void;
+		/** Resolves false when the write did not land (the page then reads the store again). */
+		onSetStatus: (taskId: string, status: TaskStatus | undefined) => Promise<boolean> | void;
+		/** Resolves false when the write did not land. */
+		onSetSnooze: (taskId: string, untilIso: string) => Promise<boolean> | void;
 		onSetNote?: (taskId: string, note: string | undefined) => Promise<void>;
 	} = $props();
 
@@ -81,17 +83,22 @@
 		void returnFocus();
 	}
 
-	function snooze(days: number): void {
-		onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days));
-		closeSnooze();
+	// The change this card made moves focus once it lands. A write that did not land changes nothing here, so the mark
+	// goes, or the next change from elsewhere would take focus.
+	async function markApplied(write: Promise<boolean> | void): Promise<void> {
 		appliedHere = true;
+		if ((await write) === false) appliedHere = false;
+	}
+
+	function snooze(days: number): void {
+		void markApplied(onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days)));
+		closeSnooze();
 		void returnFocus();
 	}
 
 	// Mark done, Skip and Restore remove the pressed button when the card changes state; focus follows the card.
 	function setStatus(status: TaskStatus | undefined): void {
-		onSetStatus(item.def.id, status);
-		appliedHere = true;
+		void markApplied(onSetStatus(item.def.id, status));
 	}
 
 	// The earliest custom date is tomorrow, read when the field opens and again at the tap. A snooze is live only while
@@ -106,9 +113,8 @@
 		if (!dateInput) return;
 		dateInput.min = snoozeUntilIso(new Date(), 1);
 		if (!dateInput.reportValidity()) return;
-		onSetSnooze(item.def.id, dateValue);
+		void markApplied(onSetSnooze(item.def.id, dateValue));
 		closeSnooze();
-		appliedHere = true;
 		void returnFocus();
 	}
 

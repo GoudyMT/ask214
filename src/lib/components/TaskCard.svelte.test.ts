@@ -1178,6 +1178,55 @@ describe('TaskCard (focus after an editor closes)', () => {
 		expect(document.activeElement).toBe(done);
 	});
 
+	it('returns focus to the collapsed line once a custom-date snooze moves the card there', async () => {
+		const onSetSnooze = vi.fn();
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item, { onSetSnooze });
+		const snooze = press(container, 'Snooze');
+		press(container, 'Customize');
+		const until = snoozeUntilIso(new Date(), 10);
+		const field = container.querySelector('input[type="date"]') as HTMLInputElement;
+		field.value = until;
+		field.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		(container.querySelector('.task-card__snooze-go') as HTMLButtonElement).click();
+		flushSync();
+		expect(onSetSnooze).toHaveBeenCalledWith(item.def.id, until);
+		await expect.poll(() => document.activeElement).toBe(snooze);
+		await update({ ...item, status: 'snoozed', snoozeUntil: until });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-line'));
+	});
+
+	it('takes no focus from a later change elsewhere once its own change has landed', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		(buttonByText(container, 'Mark done') as HTMLButtonElement).focus();
+		press(container, 'Mark done');
+		await update({ ...item, status: 'done' });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-line'));
+		(document.activeElement as HTMLElement).blur();
+		await update({ ...item, status: 'start-now' });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(document.body);
+	});
+
+	// A write the page could not land changes nothing here, so a later change from elsewhere is not this card's.
+	it('takes no focus later when a change made on the card did not land', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item, { onSetStatus: async () => false });
+		press(container, 'Mark done');
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		(document.activeElement as HTMLElement | null)?.blur();
+		await update({ ...item, status: 'skipped' });
+		expect(container.querySelector('button.task-line')).not.toBeNull();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(document.body);
+	});
+
 	it('takes no focus when the status changes elsewhere', async () => {
 		const item = makeItem({ status: 'start-now' });
 		const { container, update } = await mountCard(item);
