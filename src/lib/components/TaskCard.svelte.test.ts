@@ -1092,6 +1092,23 @@ describe('TaskCard (focus after an editor closes)', () => {
 		await expect.poll(() => document.activeElement).toBe(add);
 	});
 
+	it('keeps focus on a resolved task as its line opens and closes', async () => {
+		const { container } = await mountCard(makeItem({ status: 'done' }));
+		const line = container.querySelector('button.task-line') as HTMLButtonElement;
+		line.focus();
+		line.click();
+		flushSync();
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-card__header'));
+		const header = document.activeElement as HTMLButtonElement;
+		header.click();
+		flushSync();
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-line'));
+	});
+
 	it('returns focus to the collapsed line once a snooze moves the card there', async () => {
 		const onSetSnooze = vi.fn();
 		const item = makeItem({ status: 'start-now' });

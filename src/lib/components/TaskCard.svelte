@@ -55,6 +55,15 @@
 	let appliedHere = false;
 	let cardEl = $state<HTMLElement | null>(null);
 	let lineEl = $state<HTMLElement | null>(null);
+	let headerEl = $state<HTMLElement | null>(null);
+
+	// Opening or closing a resolved task swaps its button for another; when the pressed one held focus, the new one takes it.
+	async function setExpanded(open: boolean, event: MouseEvent): Promise<void> {
+		const held = document.activeElement === event.currentTarget;
+		expanded = open;
+		await tick();
+		if (held) (open ? headerEl : lineEl)?.focus();
+	}
 
 	async function returnFocus(): Promise<void> {
 		await tick();
@@ -265,7 +274,7 @@
 		class="task-line line-{item.status}"
 		bind:this={lineEl}
 		aria-expanded="false"
-		onclick={() => (expanded = true)}
+		onclick={(e) => void setExpanded(true, e)}
 	>
 		<span class="task-line__title">{item.def.title}</span>
 		{#if item.note}
@@ -286,8 +295,9 @@
 		<button
 			type="button"
 			class="task-card__header"
+			bind:this={headerEl}
 			aria-expanded="true"
-			onclick={() => (expanded = false)}
+			onclick={(e) => void setExpanded(false, e)}
 		>
 			<span class="task-card__header-title">{item.def.title}</span>
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
