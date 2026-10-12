@@ -229,12 +229,12 @@ const STATIC = 'static';
 //     a change of the card's own that landed, one opener per editor, the date column capped in its base rules, the
 //     chosen theme marked by a border in forced colours, and one file for a held Enter on Add (each key repeat made
 //     another). Three builds measured route nodes 48,039-48,051 B and precache 150,368-150,387 B: the limits were set
-//     40 B above the first two, and the third leaves 39 B and 35 B of room. The root layout was not over (7,059-7,060 B, 21 B of room): its raise only restores the 40 B
-//     of room. Trim pass, each measured on a full build: one branch for the two failed lines (+15 B route nodes), the
-//     four margin rules under Add merged (+3 B, inside the noise) and one shared key-repeat handler in the calendar
-//     delivery module (+18 B route nodes, +49 B precache), not kept; the locked line written into the template not
-//     tried, as it would leave the copy module the personal-claim test reads in full. The sweep fixes, read line by
-//     line: each line carries its fix, none removed.
+//     40 B above the first two, and the third leaves 39 B and 35 B of room. The root layout was not over
+//     (7,059-7,060 B, 21 B of room): its raise only restores the 40 B of room. Trim pass, each measured on a full
+//     build: one branch for the two failed lines (+15 B route nodes), the four margin rules under Add merged (+3 B,
+//     inside the noise) and one shared key-repeat handler in the calendar delivery module (+18 B route nodes, +49 B
+//     precache), not kept; the locked line written into the template not tried, as it would leave the copy module the
+//     personal-claim test reads in full. The sweep fixes, read line by line: each line carries its fix, none removed.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
