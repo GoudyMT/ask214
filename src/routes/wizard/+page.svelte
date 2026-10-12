@@ -173,11 +173,6 @@
 		background: var(--color-accent-muted);
 	}
 
-	.wizard__save:disabled {
-		opacity: 0.6;
-		cursor: default;
-	}
-
 	/* Quiet CTA: muted text, underline. De-emphasized but clearly visible. */
 	.wizard__skip {
 		padding: var(--space-s);
