@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-svelte';
-import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
@@ -8,16 +8,18 @@ import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 // Its own file so the mock reaches no other test: the first build rejects, as a browser that cannot make the file would.
 // The path is a `$lib` alias on purpose: a relative path silently never applies to the component's own import here.
-const seams = vi.hoisted(() => ({ failNext: true }));
+// A build can also be held: it finishes only once `gate` is open, so a test can look at the page while it runs.
+const seams = vi.hoisted(() => ({ failNext: true, gate: null as Promise<void> | null }));
 vi.mock('$lib/calendar/build-ics', async (importOriginal) => {
 	const real = await importOriginal<typeof import('$lib/calendar/build-ics')>();
 	return {
 		...real,
-		buildIcs: (...args: Parameters<typeof real.buildIcs>) => {
+		buildIcs: async (...args: Parameters<typeof real.buildIcs>) => {
 			if (seams.failNext) {
 				seams.failNext = false;
-				return Promise.reject(new Error('E_TEST_BUILD'));
+				throw new Error('E_TEST_BUILD');
 			}
+			await seams.gate;
 			return real.buildIcs(...args);
 		}
 	};
@@ -46,8 +48,16 @@ const task: TimelineItem = {
 	aimDate: ahead
 };
 
+const DANGER = 'rgb(200, 0, 0)';
+
 beforeEach(() => {
 	seams.failNext = true;
+	seams.gate = null;
+	// Component tests run without app.css, so the colour token is set here and put back.
+	document.documentElement.style.setProperty('--color-danger', DANGER);
+});
+afterEach(() => {
+	document.documentElement.style.removeProperty('--color-danger');
 });
 
 describe('CalendarPanel, when the file cannot be made', () => {
@@ -72,8 +82,37 @@ describe('CalendarPanel, when the file cannot be made', () => {
 		expect(onAdd).not.toHaveBeenCalled();
 		const text = textOf(container);
 		expect(makesPersonalClaim(text), text).toBe(false);
+		// Right under the button that asked for the file, in the danger colour.
+		const alert = container.querySelector('[role="alert"]') as HTMLElement;
+		expect(container.querySelector('.cal-add')?.nextElementSibling).toBe(alert);
+		expect(getComputedStyle(alert).color).toBe(DANGER);
+	});
 
+	// The line goes at the tap, not when the next file is made: a build that is still running leaves no stale failure up.
+	it('takes the line away at the next tap, while that build is still running', async () => {
+		const onAdd = vi.fn();
+		await render(CalendarPanel, {
+			props: {
+				items: [task],
+				exclusions: { taskIds: [], categories: [] },
+				access: 'ready',
+				stale: [],
+				onAcknowledge: async () => {},
+				onSetExclusions: vi.fn(),
+				onAdd
+			}
+		});
+		const add = page.getByRole('button', { name: /^add to my calendar$/i });
 		await add.click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+
+		let open = () => {};
+		seams.gate = new Promise<void>((resolve) => (open = resolve));
+		await add.click();
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+		expect(onAdd).not.toHaveBeenCalled();
+
+		open();
 		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
 		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
 	});

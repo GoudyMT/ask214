@@ -656,15 +656,47 @@ describe('CalendarPanel (the states it cannot add in)', () => {
 		expect(summaryOf(container)).toBe('Unavailable');
 	});
 
-	it('says the timeline is locked, in the quiet colour, with a link to the Timeline page', async () => {
+	it('says the timeline is locked, with a link to the Timeline page', async () => {
 		const { container } = await render(CalendarPanel, { props: propsFor('timeline-locked') });
 		await expect.element(page.getByText(LOCKED_LINE)).toBeVisible();
 		const link = page.getByRole('link', { name: 'Timeline' });
 		await expect.element(link).toHaveAttribute('href', resolve('/timeline'));
-		const line = link.element().closest('p');
-		expect(line?.classList.contains('cal-hint--unavailable')).toBe(false);
 		expect(container.textContent).not.toContain('could not be loaded');
 		expect(summaryOf(container)).toBe('Locked');
+	});
+
+	// A failure is in the danger colour and a lock the user holds is in the muted one, as drawn. Component tests run
+	// without app.css, so the two tokens are set here and put back.
+	describe('colours', () => {
+		const DANGER = 'rgb(200, 0, 0)';
+		const MUTED = 'rgb(100, 100, 100)';
+		beforeEach(() => {
+			document.documentElement.style.setProperty('--color-danger', DANGER);
+			document.documentElement.style.setProperty('--color-fg-muted', MUTED);
+		});
+		afterEach(() => {
+			document.documentElement.style.removeProperty('--color-danger');
+			document.documentElement.style.removeProperty('--color-fg-muted');
+		});
+		const colourOf = (text: string) => getComputedStyle(page.getByText(text).element()).color;
+
+		it('puts the calendar settings line in the danger colour', async () => {
+			await render(CalendarPanel, { props: propsFor('calendar-failed') });
+			expect(colourOf(CALENDAR_LINE)).toBe(DANGER);
+		});
+
+		it('puts the saved progress line in the danger colour', async () => {
+			await render(CalendarPanel, { props: propsFor('timeline-failed') });
+			expect(colourOf(PROGRESS_LINE)).toBe(DANGER);
+		});
+
+		it('puts the locked line in the muted colour of the hints beside it, not the danger colour', async () => {
+			const { container } = await render(CalendarPanel, { props: propsFor('timeline-locked') });
+			const hint = container.querySelector('.cal-hint--device') as HTMLElement;
+			expect(getComputedStyle(hint).color).toBe(MUTED);
+			expect(colourOf(LOCKED_LINE)).toBe(getComputedStyle(hint).color);
+			expect(colourOf(LOCKED_LINE)).not.toBe(DANGER);
+		});
 	});
 
 	// Every state but ready leaves the exclusion set or the task state unknown, so none may export or list events.
