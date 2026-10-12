@@ -31,7 +31,7 @@
 		setSynthesisEnabled
 	} from '$lib/ask/online-prefs';
 	import { handOver } from '$lib/calendar/hand-over';
-	import { panelAccess } from '$lib/timeline/store-access';
+	import { panelAccess, timelineAccess } from '$lib/timeline/store-access';
 	import { staleEvents } from '$lib/calendar/handed-over';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { localTodayIso } from '$lib/timeline/day-math';
@@ -432,7 +432,11 @@
 						hint="Your End of Active Obligated Service - the date your current obligation ends."
 						onSave={saveEaos}
 					/>
-					<SkillBridgePlanRow {plan} onSave={savePlan} />
+					<SkillBridgePlanRow
+						{plan}
+						access={timelineAccess(app.timeline, unlocking)}
+						onSave={savePlan}
+					/>
 					<SettingsDateRow
 						id="skillbridge-start"
 						label="SkillBridge start"

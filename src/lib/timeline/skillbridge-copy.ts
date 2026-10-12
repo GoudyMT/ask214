@@ -40,7 +40,14 @@ export const ROW_SUMMARY: Record<PlanAnswer | 'none', string> = {
 };
 export const ROW_UNAVAILABLE_SUMMARY = 'Unavailable';
 export const ROW_UNAVAILABLE =
-	"Your timeline progress could not be loaded, so this answer can't be changed right now. Reload the app to try again.";
+	"Your saved progress could not be loaded, so this answer can't be changed right now. Reload the app to try again.";
+export const ROW_LOADING_SUMMARY = 'Loading';
+export const ROW_LOCKED_SUMMARY = 'Locked';
+// The locked line is three pieces because its middle is a link to the Timeline page.
+export const ROW_LOCKED_BEFORE =
+	"Your timeline is locked, so this answer can't be changed right now. Unlock it on the ";
+export const ROW_LOCKED_LINK = 'Timeline';
+export const ROW_LOCKED_AFTER = ' page.';
 export function rowHintEarly(day: string): string {
 	return `Yes adds SkillBridge's steps to your timeline. Not sure asks again on ${formatTimelineDate(day)}.`;
 }

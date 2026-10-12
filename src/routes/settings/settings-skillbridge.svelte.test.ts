@@ -19,22 +19,36 @@ const { isoFromToday, timeline } = vi.hoisted(() => ({
 		state: { schemaVersion: 1, tasks: {} },
 		setStatus: vi.fn(),
 		setSnooze: vi.fn(),
-		refresh: vi.fn()
+		refresh: vi.fn(),
+		load: vi.fn()
 	}
 }));
 
 // The profile is unlocked with a separation date: without one the page does not render the Transition timeline section,
 // and the row is inside it.
+// Reactive, unlike the store flags above: Unlock opens the profile, and the page swaps its locked panel for the
+// sections at that moment.
+const profile = $state({ locked: false });
 vi.mock('$lib/profile/context', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
-			locked: false,
+			get locked() {
+				return profile.locked;
+			},
+			load: async () => {
+				profile.locked = false;
+			},
 			clockBackward: false,
 			persona: { completeness: 'eaos-only', eaos: isoFromToday(200), daysUntilSeparation: 200 }
 		},
 		timeline,
-		calendar: { ready: true, exclusions: { taskIds: [], categories: [] }, lastAdd: [] },
+		calendar: {
+			ready: true,
+			exclusions: { taskIds: [], categories: [] },
+			lastAdd: [],
+			load: async () => {}
+		},
 		byok: null,
 		cause: null,
 		wipeAll: null,
@@ -64,6 +78,8 @@ beforeEach(() => {
 	timeline.setStatus.mockReset().mockResolvedValue(undefined);
 	timeline.setSnooze.mockReset().mockResolvedValue(undefined);
 	timeline.refresh.mockReset().mockResolvedValue(undefined);
+	timeline.load.mockReset().mockResolvedValue(undefined);
+	profile.locked = false;
 });
 
 const toggle = () => page.getByRole('button', { name: /^planning skillbridge/i });
@@ -129,10 +145,42 @@ describe('Settings, the Planning SkillBridge row', () => {
 		await expect.element(toggle()).toMatchTextContent('Unavailable');
 	});
 
-	it('reads Unavailable and is disabled when the timeline is locked', async () => {
+	it('reads Locked and is disabled when the timeline is locked', async () => {
+		timeline.ready = false;
 		timeline.locked = true;
 		await render(SettingsPage);
 		await expect.element(toggle()).toBeDisabled();
-		await expect.element(toggle()).toMatchTextContent('Unavailable');
+		await expect.element(toggle()).toMatchTextContent('Locked');
+	});
+
+	// The first read has not finished: that is not a failure, so the row says only that it is loading.
+	it('reads Loading and is disabled while the timeline has not read yet', async () => {
+		timeline.ready = false;
+		await render(SettingsPage);
+		await expect.element(toggle()).toBeDisabled();
+		await expect.element(toggle()).toMatchTextContent('Loading');
+		expect(page.getByText(/could not be loaded/).query()).toBeNull();
+	});
+
+	// The timeline stays locked until its own read lands, so while Unlock reads it the row would flash the lock line
+	// before settling. It says loading for the whole read, then follows the store.
+	it('reads Loading, not Locked, while its own Unlock reads the stores', async () => {
+		profile.locked = true;
+		timeline.ready = false;
+		timeline.locked = true;
+		let finish = () => {};
+		timeline.load.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+		await render(SettingsPage);
+
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(toggle()).toMatchTextContent('Loading');
+		expect(page.getByText(/is locked, so this answer/).query()).toBeNull();
+
+		// A read the page hid away from leaves the timeline locked: once the Unlock is over, the row says so. (The page's
+		// plan is cached over these plain mock flags, so this is the state to follow; the store's own change of
+		// state is covered where the stores are real.)
+		finish();
+		await expect.element(toggle()).toMatchTextContent('Locked');
+		await expect.element(page.getByText(/is locked, so this answer/)).toBeVisible();
 	});
 });

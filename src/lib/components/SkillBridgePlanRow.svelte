@@ -7,17 +7,26 @@
 		ROW_SUMMARY,
 		ROW_UNAVAILABLE,
 		ROW_UNAVAILABLE_SUMMARY,
+		ROW_LOADING_SUMMARY,
+		ROW_LOCKED_SUMMARY,
+		ROW_LOCKED_BEFORE,
+		ROW_LOCKED_LINK,
+		ROW_LOCKED_AFTER,
 		ROW_HINT_LATE,
 		rowHintEarly
 	} from '$lib/timeline/skillbridge-copy';
+	import { resolve } from '$app/paths';
+	import type { TimelineAccess } from '$lib/timeline/store-access';
 
 	type Props = {
 		/** The answer, or null while the timeline store cannot be read (no value is shown and nothing is offered). */
 		plan: PlanRead | null;
+		/** Why `plan` is null: still loading (nothing to say yet), could not be read, or locked. Ignored while there is a plan. */
+		access: TimelineAccess;
 		/** Save the picked answer; resolves to a message to show, or null once saved. */
 		onSave: (answer: PlanAnswer) => Promise<string | null>;
 	};
-	let { plan, onSave }: Props = $props();
+	let { plan, access, onSave }: Props = $props();
 
 	const FAILED = 'Could not update right now - please try again.';
 	const ANSWERS: readonly PlanAnswer[] = ['yes', 'not-sure', 'no'];
@@ -28,18 +37,31 @@
 	let busy = $state(false);
 	let toggleEl = $state<HTMLButtonElement | null>(null);
 	let unavailableEl = $state<HTMLElement | null>(null);
+	let rowEl = $state<HTMLElement | null>(null);
 	let saveEl = $state<HTMLButtonElement | null>(null);
 
 	// When the answer turns unreadable the row closes for good: the form's controls are gone and the toggle is disabled,
 	// and coming back must not reopen a stale choice. A row that was never open leaves focus alone. Focus moves to the
-	// unavailable line (a disabled button cannot take it) when it fell to the page or was left on the now-disabled
-	// toggle, which an engine may keep there; it is never taken from anywhere else.
+	// line that says why (a disabled button cannot take it), or to the row itself while loading, when there is no line:
+	// only when it fell to the page or was left on the now-disabled toggle, which an engine may keep there; it is never
+	// taken from anywhere else.
 	$effect(() => {
 		if (plan !== null || !untrack(() => editing)) return;
 		editing = false;
 		const active = document.activeElement;
-		if (active === document.body || active === toggleEl) unavailableEl?.focus();
+		if (active === document.body || active === toggleEl) (unavailableEl ?? rowEl)?.focus();
 	});
+
+	// What the row's value reads: the answer, or why there is none.
+	const summary = $derived(
+		plan
+			? ROW_SUMMARY[plan.answer]
+			: access === 'locked'
+				? ROW_LOCKED_SUMMARY
+				: access === 'failed'
+					? ROW_UNAVAILABLE_SUMMARY
+					: ROW_LOADING_SUMMARY
+	);
 
 	// A saved Not sure says what it does itself; any other saved answer is described by what a choice made today would do.
 	const hint = $derived.by(() => {
@@ -92,7 +114,8 @@
 	}
 </script>
 
-<div class="settings-disclosure">
+<!-- tabindex -1: a target for the focus move above while loading, never a stop on the Tab order. -->
+<div bind:this={rowEl} class="settings-disclosure" tabindex="-1">
 	<button
 		bind:this={toggleEl}
 		class="settings-disclosure__toggle"
@@ -104,14 +127,16 @@
 	>
 		<span class="settings-chevron" class:settings-chevron--open={editing} aria-hidden="true"></span>
 		<span>{ROW_LABEL}</span>
-		<span class="settings-disclosure__summary"
-			>{plan ? ROW_SUMMARY[plan.answer] : ROW_UNAVAILABLE_SUMMARY}</span
-		>
+		<span class="settings-disclosure__summary">{summary}</span>
 	</button>
-	{#if plan === null}
+	{#if plan === null && access === 'locked'}
 		<!-- tabindex -1: a target for the focus move above, never a stop on the Tab order. -->
+		<p bind:this={unavailableEl} class="sb-row__hint" tabindex="-1">
+			{ROW_LOCKED_BEFORE}<a href={resolve('/timeline')}>{ROW_LOCKED_LINK}</a>{ROW_LOCKED_AFTER}
+		</p>
+	{:else if plan === null && access === 'failed'}
 		<p bind:this={unavailableEl} class="sb-row__hint" tabindex="-1">{ROW_UNAVAILABLE}</p>
-	{:else if editing}
+	{:else if editing && plan !== null}
 		<form
 			id="skillbridge-plan-edit"
 			class="settings-edit"
@@ -156,6 +181,12 @@
 <style>
 	/* SettingsDateRow's disclosure, hand-copied (the app has no shared disclosure component yet), so the rows read
 	   as siblings. */
+	/* The row takes focus when it turns unreadable while loading, with no line to take it: the app's ring, as on a
+	   button. */
+	.settings-disclosure:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
 	/* min-height: the 44px touch target, which also keeps the stacked rows apart. */
 	.settings-disclosure__toggle {
 		display: flex;
@@ -296,6 +327,9 @@
 		margin: var(--space-xs) 0 0;
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+	.sb-row__hint a {
+		color: var(--color-accent);
 	}
 	.sb-row__error {
 		margin: 0;
