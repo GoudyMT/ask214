@@ -10,8 +10,8 @@
 		onSetNote
 	}: {
 		view: TimelineView;
-		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
-		onSetSnooze: (taskId: string, untilIso: string) => void;
+		onSetStatus: (taskId: string, status: TaskStatus | undefined) => Promise<boolean> | void;
+		onSetSnooze: (taskId: string, untilIso: string) => Promise<boolean> | void;
 		onSetNote?: (taskId: string, note: string | undefined) => Promise<void>;
 	} = $props();
 

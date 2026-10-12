@@ -915,6 +915,50 @@ describe('TaskCard (layout by width)', () => {
 		expect(meta.left).toBeGreaterThanOrEqual(title.right);
 	});
 
+	// Just above the phone breakpoint the status column sits beside the title; a moved date's reason must wrap after
+	// the date's comma, or the one-line date takes the width and leaves the title a sliver.
+	const moved = makeItem({
+		def: firm,
+		status: 'closing-soon',
+		windowEndDate: '2026-10-31',
+		daysLeft: 120,
+		fit: { reason: 'terminal-leave', date: '2026-10-31' }
+	});
+
+	it('at 481 px a moved date wraps after its comma and leaves the title its room', async () => {
+		await page.viewport(481, 800);
+		const { container } = await renderCard(moved);
+		const meta = box(container, '.task-card__meta');
+		// The line wraps (the case under test is reached), the reason starting a line below the date...
+		expect(box(container, '.task-card__reason-words').top).toBeGreaterThan(
+			box(container, '.task-card__date').top
+		);
+		// ...the status column still sits beside the title, and the title column is no narrower than it.
+		expect(meta.left).toBeGreaterThanOrEqual(box(container, '.task-card__title').right);
+		expect(box(container, '.task-card__body').width).toBeGreaterThanOrEqual(meta.width);
+	});
+
+	// The column's cap is the wide layout's; on a phone the status line runs the card's full width above the title.
+	it("on a phone the status line runs the card's full width, not the column's cap", async () => {
+		await page.viewport(320, 800);
+		const { container } = await renderCard(moved);
+		expect(box(container, '.task-card__meta').width).toBeGreaterThanOrEqual(
+			Math.floor(box(container, '.task-card__body').width)
+		);
+	});
+
+	it('from 481 to 561 px a moved date stays inside the card and the page does not scroll sideways', async () => {
+		for (let width = 481; width <= 561; width += 10) {
+			await page.viewport(width, 800);
+			const { container, unmount } = await renderCard(moved);
+			expect(box(container, '.task-card__when').right).toBeLessThanOrEqual(
+				box(container, 'article').right
+			);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+			await unmount();
+		}
+	});
+
 	it('on a 320 px phone a long word stays inside the What now box', async () => {
 		await page.viewport(320, 800);
 		// One unbroken word: a hyphen is a line-break opportunity, so it would not test the overflow.
@@ -983,6 +1027,245 @@ describe('TaskCard (for keyboard and screen reader)', () => {
 		(resolved.querySelector('button.task-line') as HTMLButtonElement).click();
 		flushSync();
 		expect(resolved.querySelector('.task-card__why')?.textContent).toMatch(/^Career Find approved/);
+	});
+});
+
+// An editor's own buttons leave the page when it closes, which drops focus to the page; the card hands it back to
+// the control that opened the editor - and only when nothing else has taken it since.
+describe('TaskCard (focus after an editor closes)', () => {
+	type Handlers = {
+		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
+		onSetSnooze: (taskId: string, untilIso: string) => void;
+		onSetNote: (taskId: string, note: string | undefined) => Promise<void>;
+	};
+
+	// The page re-delivers the item and every handler on each update.
+	async function mountCard(item: TimelineItem, overrides: Partial<Handlers> = {}) {
+		const handlers: Handlers = {
+			onSetStatus: noop,
+			onSetSnooze: noop,
+			onSetNote: async () => {},
+			...overrides
+		};
+		const view = await render(TaskCard, { props: { item, ...handlers } });
+		const update = (next: TimelineItem) => view.rerender({ item: next, ...handlers });
+		return { container: view.container, update };
+	}
+
+	const press = (container: Element, text: string) => {
+		const button = buttonByText(container, text);
+		if (!button) throw new Error('E_NO_BUTTON');
+		button.click();
+		flushSync();
+		return button;
+	};
+
+	const typeNote = (container: Element, value: string) => {
+		const field = container.querySelector('textarea') as HTMLTextAreaElement;
+		field.value = value;
+		field.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+	};
+
+	it('returns focus to Snooze when its picker is cancelled', async () => {
+		const { container } = await mountCard(makeItem({ status: 'start-now' }));
+		const snooze = press(container, 'Snooze');
+		press(container, 'Cancel');
+		await expect.poll(() => document.activeElement).toBe(snooze);
+	});
+
+	it('returns focus to Add note when its editor is cancelled', async () => {
+		const { container } = await mountCard(makeItem({ status: 'start-now' }));
+		const add = press(container, 'Add note');
+		press(container, 'Cancel');
+		await expect.poll(() => document.activeElement).toBe(add);
+	});
+
+	it('returns focus to Edit note once a saved note lands', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		const add = press(container, 'Add note');
+		typeNote(container, 'see VSO');
+		press(container, 'Save');
+		await update({ ...item, note: 'see VSO' });
+		await expect.poll(() => document.activeElement).toBe(add);
+		expect(add.textContent?.trim()).toBe('Edit note');
+	});
+
+	it('returns focus to Add note in the expanded resolved card', async () => {
+		const { container } = await mountCard(makeItem({ status: 'done' }));
+		(container.querySelector('button.task-line') as HTMLButtonElement).click();
+		flushSync();
+		const add = press(container, 'Add note');
+		press(container, 'Cancel');
+		await expect.poll(() => document.activeElement).toBe(add);
+	});
+
+	// The two editors can be open together; each gives focus back to its own control.
+	it('returns focus to Snooze when its picker is cancelled with the note editor open too', async () => {
+		const { container } = await mountCard(makeItem({ status: 'start-now' }));
+		const snooze = press(container, 'Snooze');
+		press(container, 'Add note');
+		(container.querySelector('.task-card__snooze-cancel') as HTMLButtonElement).click();
+		flushSync();
+		await expect.poll(() => document.activeElement).toBe(snooze);
+	});
+
+	it('returns focus to Edit note once a saved note lands with the Snooze picker open too', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		const add = press(container, 'Add note');
+		press(container, 'Snooze');
+		typeNote(container, 'see VSO');
+		press(container, 'Save');
+		await update({ ...item, note: 'see VSO' });
+		await expect.poll(() => document.activeElement).toBe(add);
+	});
+
+	it('keeps focus on a resolved task as its line opens and closes', async () => {
+		const { container } = await mountCard(makeItem({ status: 'done' }));
+		const line = container.querySelector('button.task-line') as HTMLButtonElement;
+		line.focus();
+		line.click();
+		flushSync();
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-card__header'));
+		const header = document.activeElement as HTMLButtonElement;
+		header.click();
+		flushSync();
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-line'));
+	});
+
+	it('returns focus to the collapsed line once a snooze moves the card there', async () => {
+		const onSetSnooze = vi.fn();
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item, { onSetSnooze });
+		const snooze = press(container, 'Snooze');
+		press(container, '1 week');
+		expect(onSetSnooze).toHaveBeenCalledTimes(1);
+		// The page's update arrives a moment after the tap, once focus is already back on Snooze.
+		await expect.poll(() => document.activeElement).toBe(snooze);
+		const snoozeUntil = snoozeUntilIso(new Date(), 7);
+		await update({ ...item, status: 'snoozed', snoozeUntil });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-line'));
+	});
+
+	it.each([
+		['Mark done', 'done'],
+		['Skip', 'skipped']
+	] as const)(
+		'returns focus to the collapsed line once %s moves the card there',
+		async (label, status) => {
+			const onSetStatus = vi.fn();
+			const item = makeItem({ status: 'start-now' });
+			const { container, update } = await mountCard(item, { onSetStatus });
+			(buttonByText(container, label) as HTMLButtonElement).focus();
+			press(container, label);
+			expect(onSetStatus).toHaveBeenCalledWith(item.def.id, status);
+			await update({ ...item, status });
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(container.querySelector('button.task-line'));
+		}
+	);
+
+	it('returns focus to the open card once Restore moves it there', async () => {
+		const onSetStatus = vi.fn();
+		const item = makeItem({ status: 'done' });
+		const { container, update } = await mountCard(item, { onSetStatus });
+		(container.querySelector('button.task-line') as HTMLButtonElement).click();
+		flushSync();
+		(buttonByText(container, 'Restore') as HTMLButtonElement).focus();
+		press(container, 'Restore');
+		expect(onSetStatus).toHaveBeenCalledWith(item.def.id, undefined);
+		await update({ ...item, status: 'start-now' });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('article.task-card'));
+	});
+
+	it('leaves focus alone when the person has moved on before a save lands', async () => {
+		let land: () => void = noop;
+		const pending = new Promise<void>((resolve) => {
+			land = resolve;
+		});
+		const { container } = await mountCard(makeItem({ status: 'start-now' }), {
+			onSetNote: () => pending
+		});
+		press(container, 'Add note');
+		typeNote(container, 'see VSO');
+		press(container, 'Save');
+		const done = buttonByText(container, 'Mark done') as HTMLButtonElement;
+		done.focus();
+		land();
+		await pending;
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(done);
+	});
+
+	it('returns focus to the collapsed line once a custom-date snooze moves the card there', async () => {
+		const onSetSnooze = vi.fn();
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item, { onSetSnooze });
+		const snooze = press(container, 'Snooze');
+		press(container, 'Customize');
+		const until = snoozeUntilIso(new Date(), 10);
+		const field = container.querySelector('input[type="date"]') as HTMLInputElement;
+		field.value = until;
+		field.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		(container.querySelector('.task-card__snooze-go') as HTMLButtonElement).click();
+		flushSync();
+		expect(onSetSnooze).toHaveBeenCalledWith(item.def.id, until);
+		await expect.poll(() => document.activeElement).toBe(snooze);
+		await update({ ...item, status: 'snoozed', snoozeUntil: until });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-line'));
+	});
+
+	it('takes no focus from a later change elsewhere once its own change has landed', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		(buttonByText(container, 'Mark done') as HTMLButtonElement).focus();
+		press(container, 'Mark done');
+		await update({ ...item, status: 'done' });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-line'));
+		(document.activeElement as HTMLElement).blur();
+		await update({ ...item, status: 'start-now' });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(document.body);
+	});
+
+	// A write the page could not land changes nothing here, so a later change from elsewhere is not this card's.
+	it('takes no focus later when a change made on the card did not land', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item, { onSetStatus: async () => false });
+		press(container, 'Mark done');
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		(document.activeElement as HTMLElement | null)?.blur();
+		await update({ ...item, status: 'skipped' });
+		expect(container.querySelector('button.task-line')).not.toBeNull();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(document.body);
+	});
+
+	it('takes no focus when the status changes elsewhere', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		(document.activeElement as HTMLElement | null)?.blur();
+		expect(document.activeElement).toBe(document.body);
+		await update({ ...item, status: 'done' });
+		expect(container.querySelector('button.task-line')).not.toBeNull();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(document.body);
 	});
 });
 

@@ -8,17 +8,19 @@
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
 	import { localTodayIso } from '$lib/timeline/day-math';
+	import { resolve } from '$app/paths';
+	import type { PanelAccess } from '$lib/timeline/store-access';
 
 	type Props = {
 		items: TimelineItem[];
 		exclusions: TaskExclusions;
 		/**
-		 * Whether `exclusions` reflects the persisted record. FALSE while the store is unloaded or
-		 * relocked, when the real exclusion set is UNKNOWN. Required (no default) so a caller cannot
-		 * silently fail open: exporting against an unknown set would leak the categories the user
-		 * deliberately kept off their calendar.
+		 * Whether `exclusions` and `items` reflect the persisted records, and if not, why. Anything but 'ready'
+		 * means the real exclusion set or task state is UNKNOWN (not read yet, could not be read, or locked).
+		 * Required (no default) so a caller cannot silently fail open: exporting against an unknown set would leak
+		 * the categories the user deliberately kept off their calendar.
 		 */
-		ready: boolean;
+		access: PanelAccess;
 		/** Receives an update to apply to the set as saved, not a whole new set; rejects when the save fails. */
 		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => Promise<void>;
 		/** Injected so the built file is testable and the actual hand-over stays the caller's concern. */
@@ -28,7 +30,15 @@
 		/** Forgets the listed events; rejects when the save fails. */
 		onAcknowledge: () => Promise<void>;
 	};
-	let { items, exclusions, ready, onSetExclusions, onAdd, stale, onAcknowledge }: Props = $props();
+	let { items, exclusions, access, onSetExclusions, onAdd, stale, onAcknowledge }: Props = $props();
+	const ready = $derived(access === 'ready');
+	// What Customize's summary says while the record is not usable; a ready panel says what is kept off instead.
+	const SUMMARY: Partial<Record<PanelAccess, string>> = {
+		loading: 'Loading',
+		'calendar-failed': 'Unavailable',
+		'timeline-failed': 'Unavailable',
+		'timeline-locked': 'Locked'
+	};
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
@@ -80,13 +90,24 @@
 			(addEl && !addEl.disabled ? addEl : headingEl)?.focus({ preventScroll: true });
 	}
 
+	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
+	let addFailed = $state(false);
+
 	async function addToCalendar(): Promise<void> {
 		building = true;
+		addFailed = false;
+		let file: CalendarFile;
 		try {
-			onAdd(await buildIcs(items, exclusions, new Date()));
+			file = await buildIcs(items, exclusions, new Date());
+		} catch {
+			addFailed = true;
+			return;
 		} finally {
 			building = false;
+			// Add was off while the file built, which dropped focus to the page; it gets it back unless the person moved on.
+			void tick().then(() => document.activeElement === document.body && addEl?.focus());
 		}
+		onAdd(file);
 	}
 </script>
 
@@ -103,15 +124,41 @@
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
 	{/if}
 
+	<!-- A held key repeats, and each repeat would make and hand over another file: only a new press adds. -->
 	<button
 		bind:this={addEl}
 		class="cal-add"
 		type="button"
 		disabled={building || !ready || !hasEvents}
 		onclick={() => void addToCalendar()}
+		onkeydown={(e) => e.repeat && e.preventDefault()}
 	>
 		Add to my calendar
 	</button>
+	{#if addFailed}
+		<p class="cal-hint cal-hint--error" role="alert">
+			Could not make the calendar file right now - please try again.
+		</p>
+	{/if}
+	<!-- Under Add, since it says why Add is off. No line while loading: a normal start-up passes through it, and a
+	     failure flashed there would be false. -->
+	{#if access === 'calendar-failed'}
+		<p class="cal-hint cal-hint--unavailable">
+			Your calendar settings could not be loaded, so adding is unavailable right now. Reload the app
+			to try again.
+		</p>
+	{:else if access === 'timeline-failed'}
+		<p class="cal-hint cal-hint--unavailable">
+			Your saved progress could not be loaded, so adding is unavailable right now. Reload the app to
+			try again.
+		</p>
+	{:else if access === 'timeline-locked'}
+		<!-- Muted, not danger: nothing failed, the user's own lock holds. -->
+		<p class="cal-hint cal-hint--locked">
+			Your timeline is locked, so adding is unavailable right now. Unlock it on the
+			<a href={resolve('/timeline')}>Timeline</a> page.
+		</p>
+	{/if}
 	{#if ready && !hasEvents}
 		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
 	{:else}
@@ -128,13 +175,6 @@
 		{/if}
 	{/if}
 
-	{#if !ready}
-		<p class="cal-hint cal-hint--unavailable">
-			Your calendar settings could not be loaded, so adding is unavailable right now. Reload the app
-			to try again.
-		</p>
-	{/if}
-
 	<div class="cal-customize">
 		<button
 			class="cal-customize__toggle"
@@ -147,7 +187,7 @@
 			<span class="cal-chevron" class:cal-chevron--open={expanded} aria-hidden="true"></span>
 			<span>Customize what's included</span>
 			<span class="cal-customize__summary">
-				{!ready ? 'Unavailable' : hiddenCount === 0 ? 'All included' : `${hiddenCount} kept off`}
+				{SUMMARY[access] ?? (hiddenCount === 0 ? 'All included' : `${hiddenCount} kept off`)}
 			</span>
 		</button>
 
@@ -223,6 +263,18 @@
 		margin: var(--space-s) 0 0;
 		color: var(--color-danger);
 	}
+	/* The file could not be made: right under the button that asked for it. */
+	.cal-hint--error {
+		margin: var(--space-s) 0 0;
+		color: var(--color-danger);
+	}
+	/* The user's own lock, not a failure: the same place as the failure line, in the quiet colour. */
+	.cal-hint--locked {
+		margin: var(--space-s) 0 0;
+	}
+	.cal-hint--locked a {
+		color: var(--color-accent);
+	}
 	.cal-customize__toggle:disabled {
 		opacity: 0.6;
 		cursor: default;
@@ -239,6 +291,7 @@
 		align-items: center;
 		gap: var(--space-s);
 		width: 100%;
+		min-height: 44px;
 		padding: 0;
 		background: none;
 		border: none;

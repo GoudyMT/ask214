@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
@@ -12,8 +13,10 @@
 		onSetNote
 	}: {
 		item: TimelineItem;
-		onSetStatus: (taskId: string, status: TaskStatus | undefined) => void;
-		onSetSnooze: (taskId: string, untilIso: string) => void;
+		/** Resolves false when the write did not land (the page then reads the store again). */
+		onSetStatus: (taskId: string, status: TaskStatus | undefined) => Promise<boolean> | void;
+		/** Resolves false when the write did not land. */
+		onSetSnooze: (taskId: string, untilIso: string) => Promise<boolean> | void;
 		onSetNote?: (taskId: string, note: string | undefined) => Promise<void>;
 	} = $props();
 
@@ -40,13 +43,64 @@
 		if (prevStatus !== undefined && item.status !== prevStatus) {
 			expanded = false;
 			closeSnooze();
+			// Only a change made on this card moves focus: a change made in another tab must not take it.
+			if (appliedHere) void returnFocus();
+			appliedHere = false;
 		}
 		prevStatus = item.status;
 	});
 
-	function snooze(days: number): void {
-		onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days));
+	// Closing an editor removes the button the person pressed, which drops focus to the page. The control that
+	// opened the editor gets it back; if the card's status change has removed that control too, the card's
+	// collapsed line (or the open card itself) does. Focus someone has already moved elsewhere is left alone. Each editor
+	// keeps its own opener, as both can be open at once.
+	let snoozeOpener: HTMLElement | undefined;
+	let noteOpener: HTMLElement | undefined;
+	let appliedHere = false;
+	let cardEl = $state<HTMLElement | null>(null);
+	let lineEl = $state<HTMLElement | null>(null);
+	let headerEl = $state<HTMLElement | null>(null);
+
+	// Opening or closing a resolved task swaps its button for another; when the pressed one held focus, the new one takes it.
+	async function setExpanded(open: boolean, event: MouseEvent): Promise<void> {
+		const held = document.activeElement === event.currentTarget;
+		expanded = open;
+		await tick();
+		if (held) (open ? headerEl : lineEl)?.focus();
+	}
+
+	async function returnFocus(opener?: HTMLElement): Promise<void> {
+		await tick();
+		if (document.activeElement !== document.body) return;
+		(opener?.isConnected ? opener : (lineEl ?? cardEl))?.focus();
+	}
+
+	function toggleSnooze(event: MouseEvent): void {
+		snoozeOpen = !snoozeOpen;
+		snoozeOpener = event.currentTarget as HTMLElement;
+	}
+
+	function cancelSnooze(): void {
 		closeSnooze();
+		void returnFocus(snoozeOpener);
+	}
+
+	// The change this card made moves focus once it lands. A write that did not land changes nothing here, so the mark
+	// goes, or the next change from elsewhere would take focus.
+	async function markApplied(write: Promise<boolean> | void): Promise<void> {
+		appliedHere = true;
+		if ((await write) === false) appliedHere = false;
+	}
+
+	function snooze(days: number): void {
+		void markApplied(onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days)));
+		closeSnooze();
+		void returnFocus(snoozeOpener);
+	}
+
+	// Mark done, Skip and Restore remove the pressed button when the card changes state; focus follows the card.
+	function setStatus(status: TaskStatus | undefined): void {
+		void markApplied(onSetStatus(item.def.id, status));
 	}
 
 	// The earliest custom date is tomorrow, read when the field opens and again at the tap. A snooze is live only while
@@ -61,8 +115,9 @@
 		if (!dateInput) return;
 		dateInput.min = snoozeUntilIso(new Date(), 1);
 		if (!dateInput.reportValidity()) return;
-		onSetSnooze(item.def.id, dateValue);
+		void markApplied(onSetSnooze(item.def.id, dateValue));
 		closeSnooze();
+		void returnFocus(snoozeOpener);
 	}
 
 	function closeSnooze(): void {
@@ -79,7 +134,8 @@
 	let noteFailed = $state(false);
 	let noteSaving = false;
 
-	function openNote(): void {
+	function openNote(event: MouseEvent): void {
+		noteOpener = event.currentTarget as HTMLElement;
 		noteValue = item.note ?? '';
 		noteFailed = false;
 		noteOpen = true;
@@ -104,6 +160,7 @@
 	function closeNote(): void {
 		noteOpen = false;
 		noteValue = '';
+		void returnFocus(noteOpener);
 	}
 
 	// Contextual outbound resources: the links curated for this specific task, collapsed by default.
@@ -223,8 +280,9 @@
 	<button
 		type="button"
 		class="task-line line-{item.status}"
+		bind:this={lineEl}
 		aria-expanded="false"
-		onclick={() => (expanded = true)}
+		onclick={(e) => void setExpanded(true, e)}
 	>
 		<span class="task-line__title">{item.def.title}</span>
 		{#if item.note}
@@ -245,8 +303,9 @@
 		<button
 			type="button"
 			class="task-card__header"
+			bind:this={headerEl}
 			aria-expanded="true"
-			onclick={() => (expanded = false)}
+			onclick={(e) => void setExpanded(false, e)}
 		>
 			<span class="task-card__header-title">{item.def.title}</span>
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
@@ -264,7 +323,7 @@
 			</p>
 			<!-- Decision B: a single unified Restore clears the stored status (un-mark / un-snooze). -->
 			<div class="task-card__actions">
-				<button type="button" onclick={() => onSetStatus(item.def.id, undefined)}>Restore</button>
+				<button type="button" onclick={() => setStatus(undefined)}>Restore</button>
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
 			{@render noteSection()}
@@ -276,6 +335,7 @@
 		class="task-card status-{item.status}"
 		class:task-card--calm={item.status === 'after-you-leave' && !firm}
 		id="task-{item.def.id}"
+		bind:this={cardEl}
 		tabindex="-1"
 	>
 		<div class="task-card__body">
@@ -308,11 +368,11 @@
 				</div>
 			{/if}
 			<div class="task-card__actions">
-				<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
-				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
+				<button type="button" onclick={() => setStatus('done')}>Mark done</button>
+				<button type="button" onclick={() => setStatus('skipped')}>Skip</button>
 				<!-- A snooze never hides a firm warning, so it is not offered where it would change nothing. -->
 				{#if !isFirmWarning(item.status, item.def.kind)}
-					<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
+					<button type="button" onclick={toggleSnooze}>Snooze</button>
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
@@ -328,7 +388,7 @@
 						<button type="button" class="task-card__preset" onclick={() => (showDateInput = true)}>
 							Customize
 						</button>
-						<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
+						<button type="button" class="task-card__snooze-cancel" onclick={cancelSnooze}
 							>Cancel</button
 						>
 					</div>
@@ -689,8 +749,11 @@
 		font-size: var(--font-size-s);
 	}
 
+	/* Beside the title, the status column is capped: a moved date on one line would take most of the card's width. The cap
+	   sits here, not under a min-width query, so no width between whole pixels falls between two layouts. */
 	.task-card__meta {
 		flex: none;
+		max-width: 11rem;
 		text-align: right;
 		white-space: nowrap;
 	}
@@ -729,6 +792,7 @@
 
 		.task-card__meta {
 			order: -1;
+			max-width: none;
 			text-align: left;
 			white-space: normal;
 		}
@@ -752,12 +816,12 @@
 		.task-card__meta .task-card__days::before {
 			content: '\00a0-\00a0';
 		}
+	}
 
-		/* A moved date's reason may start the next line, kept whole and joined to its countdown: the one break
-		   the date line allows is the space after the date's comma. */
-		.task-card__meta .task-card__reason {
-			white-space: normal;
-		}
+	/* A moved date's reason may start the next line, kept whole and joined to its countdown: the one break the date line
+	   allows is the space after the date's comma. */
+	.task-card__reason {
+		white-space: normal;
 	}
 
 	.task-card__reason-words {
@@ -807,7 +871,10 @@
 		background: var(--color-accent);
 	}
 
+	/* scroll-margin-top: where focus lands, clear of the sticky header and chips - focus() alone scrolls a target only
+	   to the viewport's edge, and a line already inside the viewport not at all. */
 	.task-line {
+		scroll-margin-top: 6.5rem;
 		display: flex;
 		align-items: center;
 		gap: var(--space-s);

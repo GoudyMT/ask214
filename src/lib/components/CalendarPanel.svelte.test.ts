@@ -7,6 +7,8 @@ import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
 import type { HandedOverEvent, TaskExclusions } from '$lib/calendar/types';
 import type { CalendarFile } from '$lib/calendar/build-ics';
+import type { PanelAccess } from '$lib/timeline/store-access';
+import { resolve } from '$app/paths';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
 function def(id: string, category: TaskDef['category']): TaskDef {
@@ -47,7 +49,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items,
 				exclusions: { taskIds: [], categories: ['medical'] },
-				ready: true,
+				access: 'ready',
 				...NO_RECORD,
 				onSetExclusions: vi.fn(),
 				onAdd
@@ -68,7 +70,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
-				ready: true,
+				access: 'ready',
 				...NO_RECORD,
 				onSetExclusions: vi.fn(),
 				onAdd: vi.fn()
@@ -86,7 +88,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the empty DEFAULT, not a real record
-				ready: false,
+				access: 'calendar-failed',
 				...NO_RECORD,
 				onSetExclusions: vi.fn(),
 				onAdd
@@ -113,7 +115,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items: [passed],
 				exclusions: { taskIds: [], categories: [] },
-				ready: false,
+				access: 'calendar-failed',
 				...NO_RECORD,
 				onSetExclusions: vi.fn(),
 				onAdd: vi.fn()
@@ -139,7 +141,7 @@ describe('CalendarPanel', () => {
 				props: {
 					items: [today],
 					exclusions: { taskIds: [], categories: [] },
-					ready: true,
+					access: 'ready',
 					...NO_RECORD,
 					onSetExclusions: vi.fn(),
 					onAdd: vi.fn()
@@ -167,7 +169,7 @@ describe('CalendarPanel', () => {
 					props: {
 						items,
 						exclusions: { taskIds: [], categories },
-						ready: true,
+						access: 'ready',
 						...NO_RECORD,
 						onSetExclusions: vi.fn(),
 						onAdd: vi.fn()
@@ -193,7 +195,7 @@ describe('CalendarPanel', () => {
 					props: {
 						items,
 						exclusions: { taskIds: [], categories: [] },
-						ready: true,
+						access: 'ready',
 						...NO_RECORD,
 						onSetExclusions: vi.fn(),
 						onAdd: vi.fn()
@@ -220,7 +222,7 @@ describe('CalendarPanel', () => {
 					props: {
 						items,
 						exclusions: { taskIds: [], categories: [] },
-						ready: true,
+						access: 'ready',
 						...NO_RECORD,
 						onSetExclusions: vi.fn(),
 						onAdd: vi.fn()
@@ -246,7 +248,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] },
-				ready: true,
+				access: 'ready',
 				...NO_RECORD,
 				onSetExclusions,
 				onAdd: vi.fn()
@@ -281,7 +283,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items: [item(def('a', 'admin'))],
 				exclusions: { taskIds: [], categories: [] }, // the save has not landed yet
-				ready: true,
+				access: 'ready',
 				...NO_RECORD,
 				onSetExclusions,
 				onAdd: vi.fn()
@@ -300,7 +302,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items: [],
 				exclusions: { taskIds: [], categories: [] },
-				ready: true,
+				access: 'ready',
 				...NO_RECORD,
 				onSetExclusions: () => Promise.reject(new Error('E_OCC_CONFLICT')),
 				onAdd: () => {}
@@ -324,7 +326,7 @@ describe('CalendarPanel', () => {
 			props: {
 				items: [],
 				exclusions: { taskIds: [], categories: [] },
-				ready: true,
+				access: 'ready',
 				...NO_RECORD,
 				onSetExclusions,
 				onAdd: () => {}
@@ -345,7 +347,7 @@ describe('CalendarPanel', () => {
 		addedOn: '2026-10-03'
 	};
 	const withRecord = async (
-		ready: boolean,
+		access: PanelAccess,
 		stale: HandedOverEvent[],
 		onAcknowledge = NO_RECORD.onAcknowledge
 	) =>
@@ -354,7 +356,7 @@ describe('CalendarPanel', () => {
 				props: {
 					items: [item(def('a', 'admin'))],
 					exclusions: { taskIds: [], categories: [] },
-					ready,
+					access,
 					stale,
 					onAcknowledge,
 					onSetExclusions: vi.fn(),
@@ -364,7 +366,7 @@ describe('CalendarPanel', () => {
 		).container;
 
 	it('lists the events to delete above the Add button, once its settings are loaded', async () => {
-		const container = await withRecord(true, [HELD]);
+		const container = await withRecord('ready', [HELD]);
 		const head = [...container.querySelectorAll('h3')].find(
 			(h) => h.textContent === 'Your calendar is out of date'
 		);
@@ -378,14 +380,14 @@ describe('CalendarPanel', () => {
 	// Until both stores load, the list would be built from a stand-in empty task state and could name an event
 	// that is not out of date.
 	it('shows no list while its settings are not loaded', async () => {
-		expect((await withRecord(false, [HELD])).textContent).not.toContain(
+		expect((await withRecord('calendar-failed', [HELD])).textContent).not.toContain(
 			'Your calendar is out of date'
 		);
 	});
 
 	// Nothing is listed while the settings load, so the general line stands, even when the list would name events.
 	it('keeps the general line while its settings are not loaded', async () => {
-		expect((await withRecord(false, [HELD])).textContent).toContain(
+		expect((await withRecord('calendar-failed', [HELD])).textContent).toContain(
 			'Changed a date? Remove the events you added before, then add again.'
 		);
 	});
@@ -394,8 +396,8 @@ describe('CalendarPanel', () => {
 	// says to add again; while the list names events, it replaces the line.
 	it('shows the general line whenever nothing is listed, and the list in its place', async () => {
 		const LINE = 'Changed a date? Remove the events you added before, then add again.';
-		expect((await withRecord(true, [])).textContent).toContain(LINE);
-		expect((await withRecord(true, [HELD])).textContent).not.toContain(LINE);
+		expect((await withRecord('ready', [])).textContent).toContain(LINE);
+		expect((await withRecord('ready', [HELD])).textContent).not.toContain(LINE);
 	});
 
 	// The list unmounts with focus on its button; focus goes to the next step the list names, adding again. The rerender
@@ -404,7 +406,7 @@ describe('CalendarPanel', () => {
 		const props = {
 			items: [item(def('a', 'admin'))],
 			exclusions: { taskIds: [], categories: [] },
-			ready: true,
+			access: 'ready' as const,
 			stale: [HELD],
 			onSetExclusions: vi.fn(),
 			onAdd: vi.fn(),
@@ -423,7 +425,7 @@ describe('CalendarPanel', () => {
 		const props = {
 			items: [item(def('a', 'admin'))],
 			exclusions: { taskIds: [], categories: [] },
-			ready: true,
+			access: 'ready' as const,
 			stale: [HELD],
 			onSetExclusions: vi.fn(),
 			onAdd: vi.fn(),
@@ -453,7 +455,7 @@ describe('CalendarPanel', () => {
 		const props = {
 			items: [item(def('a', 'admin'))],
 			exclusions: { taskIds: [], categories: [] },
-			ready: true,
+			access: 'ready' as const,
 			stale: [HELD],
 			onSetExclusions: vi.fn(),
 			onAdd: vi.fn(),
@@ -491,7 +493,7 @@ describe('CalendarPanel', () => {
 		const props = {
 			items: [],
 			exclusions: { taskIds: [], categories: [] },
-			ready: true,
+			access: 'ready' as const,
 			stale: [HELD],
 			onSetExclusions: vi.fn(),
 			onAdd: vi.fn(),
@@ -519,7 +521,7 @@ describe('CalendarPanel', () => {
 		const props = {
 			items: [],
 			exclusions: { taskIds: [], categories: [] },
-			ready: true,
+			access: 'ready' as const,
 			stale: [HELD],
 			onSetExclusions: vi.fn(),
 			onAdd: vi.fn(),
@@ -548,7 +550,7 @@ describe('CalendarPanel', () => {
 
 	it("keeps focus on I've deleted these when the save fails", async () => {
 		await withRecord(
-			true,
+			'ready',
 			[HELD],
 			vi.fn(async () => Promise.reject(new Error('E_TEST_SAVE')))
 		);
@@ -560,7 +562,7 @@ describe('CalendarPanel', () => {
 
 	it("passes I've deleted these to its handler", async () => {
 		const onAcknowledge = vi.fn(async () => {});
-		await withRecord(true, [HELD], onAcknowledge);
+		await withRecord('ready', [HELD], onAcknowledge);
 		await page.getByRole('button', { name: "I've deleted these" }).click();
 		expect(onAcknowledge).toHaveBeenCalledOnce();
 	});
@@ -574,17 +576,23 @@ describe('CalendarPanel', () => {
 			aimDate: '2020-01-01',
 			status: 'still-to-do'
 		};
-		const states: { items: TimelineItem[]; ready: boolean }[] = [
-			{ items: [item(def('a', 'admin'))], ready: true },
-			{ items: [passed], ready: true },
-			{ items: [item(def('a', 'admin'))], ready: false }
+		const ACCESSES: PanelAccess[] = [
+			'ready',
+			'loading',
+			'calendar-failed',
+			'timeline-failed',
+			'timeline-locked'
 		];
-		for (const { items, ready } of states) {
+		const states: { items: TimelineItem[]; access: PanelAccess }[] = [
+			{ items: [passed], access: 'ready' },
+			...ACCESSES.map((access) => ({ items: [item(def('a', 'admin'))], access }))
+		];
+		for (const { items, access } of states) {
 			const { container } = await render(CalendarPanel, {
 				props: {
 					items,
 					exclusions: { taskIds: [], categories: [] },
-					ready,
+					access,
 					...NO_RECORD,
 					onSetExclusions: vi.fn(),
 					onAdd: vi.fn()
@@ -595,6 +603,146 @@ describe('CalendarPanel', () => {
 			const text = textOf(container);
 			expect(makesPersonalClaim(text), text).toBe(false);
 		}
+	});
+});
+
+// One line per reason adding is off, so a normal start-up (loading) never flashes a failure and a failure says which
+// record could not be read.
+describe('CalendarPanel (the states it cannot add in)', () => {
+	const CALENDAR_LINE =
+		'Your calendar settings could not be loaded, so adding is unavailable right now. Reload the app to try again.';
+	const PROGRESS_LINE =
+		'Your saved progress could not be loaded, so adding is unavailable right now. Reload the app to try again.';
+	const LOCKED_LINE =
+		'Your timeline is locked, so adding is unavailable right now. Unlock it on the Timeline page.';
+	const HELD: HandedOverEvent = {
+		taskId: 'tap-capstone',
+		moment: 'last',
+		title: 'Last day: Complete your TAP Capstone',
+		isoDate: '2027-01-30',
+		addedOn: '2026-10-03'
+	};
+	const propsFor = (access: PanelAccess, onAdd = vi.fn()) => ({
+		items: [item(def('a', 'admin'))],
+		exclusions: { taskIds: [], categories: [] },
+		access,
+		stale: [HELD],
+		onAcknowledge: async () => {},
+		onSetExclusions: vi.fn(),
+		onAdd
+	});
+	const summaryOf = (container: Element) =>
+		container.querySelector('.cal-customize__summary')?.textContent?.trim();
+
+	it('says nothing while it loads, and the summary reads Loading', async () => {
+		const { container } = await render(CalendarPanel, { props: propsFor('loading') });
+		expect(container.textContent).not.toContain('could not be loaded');
+		expect(container.textContent).not.toContain('locked');
+		expect(summaryOf(container)).toBe('Loading');
+		expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it('says its saved progress could not be loaded, and the summary reads Unavailable', async () => {
+		const { container } = await render(CalendarPanel, { props: propsFor('timeline-failed') });
+		await expect.element(page.getByText(PROGRESS_LINE, { exact: true })).toBeVisible();
+		expect(container.textContent).not.toContain('calendar settings could not');
+		expect(summaryOf(container)).toBe('Unavailable');
+		expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it('says its calendar settings could not be loaded, and the summary reads Unavailable', async () => {
+		const { container } = await render(CalendarPanel, { props: propsFor('calendar-failed') });
+		await expect.element(page.getByText(CALENDAR_LINE, { exact: true })).toBeVisible();
+		expect(summaryOf(container)).toBe('Unavailable');
+	});
+
+	it('says the timeline is locked, with a link to the Timeline page', async () => {
+		const { container } = await render(CalendarPanel, { props: propsFor('timeline-locked') });
+		await expect.element(page.getByText(LOCKED_LINE, { exact: true })).toBeVisible();
+		const link = page.getByRole('link', { name: 'Timeline' });
+		await expect.element(link).toHaveAttribute('href', resolve('/timeline'));
+		expect(container.textContent).not.toContain('could not be loaded');
+		expect(summaryOf(container)).toBe('Locked');
+	});
+
+	// The line says why Add is off, so it sits directly under it, above the how-to hints.
+	it.each([
+		['calendar-failed', CALENDAR_LINE],
+		['timeline-failed', PROGRESS_LINE],
+		['timeline-locked', LOCKED_LINE]
+	] as const)('puts the %s line directly under Add', async (access, line) => {
+		const { container } = await render(CalendarPanel, { props: propsFor(access) });
+		expect(container.querySelector('.cal-add')?.nextElementSibling).toBe(
+			page.getByText(line, { exact: true }).element()
+		);
+	});
+
+	// A failure is in the danger colour and a lock the user holds is in the muted one, as drawn. Component tests run
+	// without app.css, so the two tokens are set here and put back.
+	describe('colours', () => {
+		const DANGER = 'rgb(200, 0, 0)';
+		const MUTED = 'rgb(100, 100, 100)';
+		beforeEach(() => {
+			document.documentElement.style.setProperty('--color-danger', DANGER);
+			document.documentElement.style.setProperty('--color-fg-muted', MUTED);
+		});
+		afterEach(() => {
+			document.documentElement.style.removeProperty('--color-danger');
+			document.documentElement.style.removeProperty('--color-fg-muted');
+		});
+		const colourOf = (text: string) =>
+			getComputedStyle(page.getByText(text, { exact: true }).element()).color;
+
+		it('puts the calendar settings line in the danger colour', async () => {
+			await render(CalendarPanel, { props: propsFor('calendar-failed') });
+			expect(colourOf(CALENDAR_LINE)).toBe(DANGER);
+		});
+
+		it('puts the saved progress line in the danger colour', async () => {
+			await render(CalendarPanel, { props: propsFor('timeline-failed') });
+			expect(colourOf(PROGRESS_LINE)).toBe(DANGER);
+		});
+
+		it('puts the locked line in the muted colour of the hints beside it, not the danger colour', async () => {
+			const { container } = await render(CalendarPanel, { props: propsFor('timeline-locked') });
+			const hint = container.querySelector('.cal-hint--device') as HTMLElement;
+			expect(getComputedStyle(hint).color).toBe(MUTED);
+			expect(colourOf(LOCKED_LINE)).toBe(getComputedStyle(hint).color);
+			expect(colourOf(LOCKED_LINE)).not.toBe(DANGER);
+		});
+	});
+
+	// Every state but ready leaves the exclusion set or the task state unknown, so none may export or list events.
+	it.each(['loading', 'calendar-failed', 'timeline-failed', 'timeline-locked'] as const)(
+		'fails closed while %s',
+		async (access) => {
+			const onAdd = vi.fn();
+			const { container } = await render(CalendarPanel, { props: propsFor(access, onAdd) });
+			const add = container.querySelector('.cal-add') as HTMLButtonElement;
+			const customize = container.querySelector('.cal-customize__toggle') as HTMLButtonElement;
+			expect(add.disabled).toBe(true);
+			expect(customize.disabled).toBe(true);
+			expect(container.textContent).not.toContain('Your calendar is out of date');
+			add.click();
+			await new Promise((r) => setTimeout(r, 50));
+			expect(onAdd).not.toHaveBeenCalled();
+		}
+	);
+
+	// The page's own update: a store that re-reads while Customize is open takes the panel out of ready.
+	it('turns Add off when the state leaves ready while Customize is open', async () => {
+		const onAdd = vi.fn();
+		const props = propsFor('ready', onAdd);
+		const screen = await render(CalendarPanel, { props });
+		(screen.container.querySelector('.cal-customize__toggle') as HTMLButtonElement).click();
+		flushSync();
+		expect(screen.container.querySelector('input[value="medical"]')).not.toBeNull();
+		await screen.rerender({ ...props, access: 'loading' });
+		const add = screen.container.querySelector('.cal-add') as HTMLButtonElement;
+		expect(add.disabled).toBe(true);
+		add.click();
+		await new Promise((r) => setTimeout(r, 50));
+		expect(onAdd).not.toHaveBeenCalled();
 	});
 });
 
@@ -611,7 +759,7 @@ describe('CalendarPanel (the sentence for this device)', () => {
 	const panelProps = () => ({
 		items: [item(def('a', 'admin'))],
 		exclusions: { taskIds: [], categories: [] },
-		ready: true,
+		access: 'ready' as const,
 		...NO_RECORD,
 		onSetExclusions: vi.fn(),
 		onAdd: vi.fn()
@@ -712,7 +860,7 @@ describe('CalendarPanel (layout by width)', () => {
 	const props = () => ({
 		items: [item(def('a', 'admin'))],
 		exclusions: { taskIds: [], categories: [] },
-		ready: true,
+		access: 'ready' as const,
 		...NO_RECORD,
 		onSetExclusions: vi.fn(),
 		onAdd: vi.fn()
@@ -739,6 +887,13 @@ describe('CalendarPanel (layout by width)', () => {
 		for (const line of labelLines)
 			expect(Math.abs(line.left - (labelLines[0]?.left ?? 0))).toBeLessThan(1);
 		expect(lines(summary(container))).toHaveLength(1);
+	});
+
+	// A thumb has to land on it: the row is a button, so it is at least as tall as the app's other touch targets.
+	it('Customize is a 44 px target', async () => {
+		const { container } = await render(CalendarPanel, { props: props() });
+		const toggle = container.querySelector('.cal-customize__toggle') as HTMLButtonElement;
+		expect(toggle.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
 	});
 
 	it('on a wide screen the label and the summary share one line', async () => {

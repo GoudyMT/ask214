@@ -172,16 +172,17 @@
 		}
 	}
 
-	// A status action -> the encrypted timeline store. No-op until the store has provisioned.
-	async function setStatus(taskId: string, status: TaskStatus | undefined): Promise<void> {
+	// A status action -> the encrypted timeline store; true when it landed (the card keeps focus only for a landed change).
+	// No-op until the store has provisioned.
+	async function setStatus(taskId: string, status: TaskStatus | undefined): Promise<boolean> {
 		const timeline = app.timeline;
-		if (timeline) await attempt(timeline, () => timeline.setStatus(taskId, status));
+		return timeline ? attempt(timeline, () => timeline.setStatus(taskId, status)) : false;
 	}
 
 	// Snooze a task until an ISO date; same OCC-safe reload as setStatus.
-	async function setSnooze(taskId: string, untilIso: string): Promise<void> {
+	async function setSnooze(taskId: string, untilIso: string): Promise<boolean> {
 		const timeline = app.timeline;
-		if (timeline) await attempt(timeline, () => timeline.setSnooze(taskId, untilIso));
+		return timeline ? attempt(timeline, () => timeline.setSnooze(taskId, untilIso)) : false;
 	}
 
 	// Set or clear a free-text note; same OCC-safe reload as the other actions. The card waits on this, so a failed save

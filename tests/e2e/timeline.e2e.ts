@@ -83,6 +83,52 @@ test('marking a task done collapses it to a line and persists across reload', as
 	await expect(page.locator('button.task-line.line-done', { hasText: title })).toBeVisible(); // re-decrypted from IndexedDB
 });
 
+// The pressed button goes with the open card; a keyboard user keeps their place on the task's line. The phase keeps
+// other open cards, so it does not fold away with the task.
+test("Mark done by keyboard leaves focus on the task's collapsed line", async ({ page }) => {
+	await setEaos(page);
+	await page.goto('/timeline');
+
+	const firstCard = page.locator('article.task-card').first();
+	await expect(firstCard).toBeVisible();
+	const phase = page.locator('section').filter({ has: firstCard });
+	expect(await phase.locator('article.task-card').count()).toBeGreaterThan(1);
+	const title = (await firstCard.locator('.task-card__title').innerText()).trim();
+	await firstCard.getByRole('button', { name: 'Mark done' }).focus();
+	await page.keyboard.press('Enter');
+
+	await expect(page.locator('button.task-line.line-done', { hasText: title })).toBeFocused();
+});
+
+// The line takes the card's place; with the card's top scrolled under the sticky header and phase chips, the focused
+// line must still come out below them.
+test("the task's line that takes focus after Mark done is clear of the sticky header", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 320, height: 640 });
+	await setEaos(page);
+	await page.goto('/timeline');
+
+	const firstCard = page.locator('article.task-card').first();
+	await expect(firstCard).toBeVisible();
+	const phase = page.locator('section').filter({ has: firstCard });
+	expect(await phase.locator('article.task-card').count()).toBeGreaterThan(1);
+	const title = (await firstCard.locator('.task-card__title').innerText()).trim();
+	await firstCard.evaluate((card) => window.scrollBy(0, card.getBoundingClientRect().top - 40));
+	await firstCard.getByRole('button', { name: 'Mark done' }).focus();
+	await page.keyboard.press('Enter');
+
+	const line = page.locator('button.task-line.line-done', { hasText: title });
+	await expect(line).toBeFocused();
+	const chips = page.locator('.phase-chips');
+	await expect
+		.poll(async () => {
+			const [l, c] = await Promise.all([line.boundingBox(), chips.boundingBox()]);
+			return l && c ? Math.round(l.y - (c.y + c.height)) : null;
+		})
+		.toBeGreaterThanOrEqual(0);
+});
+
 test('snoozing a task collapses it to a line and persists across reload', async ({ page }) => {
 	await setEaos(page);
 	await page.goto('/timeline');

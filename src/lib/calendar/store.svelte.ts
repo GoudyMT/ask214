@@ -60,11 +60,17 @@ export type CalendarStoreOptions = { onBroadcast?: (e: CalendarBroadcastEvent) =
 
 export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOptions = {}) {
 	let _state = $state<CalendarSyncState | null>(null);
+	// Whether the last load failed: not loaded can mean not read YET, which a page waits out, or could not be read,
+	// which it says.
+	let _failed = $state(false);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
 	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
-	let lockState: LockState = 'unlocked';
+	// Reactive: a page reads `locked` to tell a calendar that has no read coming from one still loading. It also holds
+	// while a read the user asked for is running (it clears when that read lands), so a page that runs the Unlock itself
+	// sets that apart by its own flag.
+	let lockState = $state<LockState>('unlocked');
 
 	function relockNow(reason: RelockReason): void {
 		_state = null;
@@ -149,6 +155,21 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 			return _state !== null;
 		},
 
+		/** Whether the last load failed, so the saved calendar settings could not be read; a load that succeeds clears it. */
+		get failed(): boolean {
+			return _failed;
+		},
+
+		/**
+		 * Whether the user's lock holds: only a load the user asks for opens it, and page hygiene on top of it does not
+		 * move it. A page hidden while Unlock read the calendar leaves it locked, and then only Unlock reads it again -
+		 * an automatic re-read refuses a locked store. While an Unlock is still reading it also holds, until that read
+		 * lands; the page that runs the Unlock knows that by its own flag, and without one this means no read is coming.
+		 */
+		get locked(): boolean {
+			return lockState === 'locked';
+		},
+
 		/** Reactive exclusion set; EMPTY before load / when relocked - gate on `ready` first. */
 		get exclusions(): TaskExclusions {
 			return _state?.exclusions ?? { taskIds: [], categories: [] };
@@ -172,6 +193,10 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
+			// The user's Unlock is a new attempt: a page waits for it instead of repeating the last failure while it
+			// runs. An automatic re-read keeps the failure, so a note that stays true is not taken down and put up
+			// again on every return to the page.
+			if (lockState === 'locked') _failed = false;
 			try {
 				await withWriteLocks(
 					async () => {
@@ -210,8 +235,10 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 				// Say so (not ready, empty defaults) rather than serve it. lockState stays as it was, so
 				// the next automatic re-read still tries.
 				_state = null;
+				_failed = true;
 				throw e;
 			}
+			_failed = false;
 		},
 
 		/**

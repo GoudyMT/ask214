@@ -57,8 +57,10 @@
 		color: var(--color-fg);
 	}
 
+	/* min-height: the 44px touch target. */
 	.clock-banner__fix {
 		flex: none;
+		min-height: 44px;
 		padding: 0;
 		background: none;
 		border: none;

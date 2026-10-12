@@ -196,7 +196,7 @@ describe('task-defs seed', () => {
 		const skillbridgeLines = Object.values(SKILLBRIDGE_COPY).flatMap((v): string[] =>
 			typeof v === 'string' ? [v] : typeof v === 'function' ? [v('2027-04-01')] : Object.values(v)
 		);
-		expect(skillbridgeLines.length).toBeGreaterThanOrEqual(17);
+		expect(skillbridgeLines.length).toBeGreaterThanOrEqual(27);
 		const lines = [
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),

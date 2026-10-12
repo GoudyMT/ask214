@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
@@ -18,13 +19,24 @@
 
 	// One tap = the calendar file, no chooser and no second screen. The exclusions the user set in
 	// Settings are honoured here because both surfaces build from the same shared projection.
-	async function add(): Promise<void> {
+	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
+	let addFailed = $state(false);
+
+	async function add(button: HTMLButtonElement): Promise<void> {
 		building = true;
+		addFailed = false;
+		let file: CalendarFile;
 		try {
-			onAdd(await buildIcs(items, exclusions, new Date()));
+			file = await buildIcs(items, exclusions, new Date());
+		} catch {
+			addFailed = true;
+			return;
 		} finally {
 			building = false;
+			// Add was off while the file built, which dropped focus to the page; it gets it back unless the person moved on.
+			void tick().then(() => document.activeElement === document.body && button.focus());
 		}
+		onAdd(file);
 	}
 </script>
 
@@ -32,9 +44,21 @@
 	<div class="cal-card__body">
 		<h2 id="cal-card-heading" class="cal-card__heading">Keep your deadlines in sight</h2>
 		<p class="cal-card__copy">Your upcoming deadlines, with alerts before each firm one.</p>
-		<button class="cal-card__add" type="button" disabled={building} onclick={() => void add()}>
+		<!-- A held key repeats, and each repeat would make and hand over another file: only a new press adds. -->
+		<button
+			class="cal-card__add"
+			type="button"
+			disabled={building}
+			onclick={(e) => void add(e.currentTarget)}
+			onkeydown={(e) => e.repeat && e.preventDefault()}
+		>
 			Add to my calendar
 		</button>
+		{#if addFailed}
+			<p class="cal-card__error" role="alert">
+				Could not make the calendar file right now - please try again.
+			</p>
+		{/if}
 		<p class="cal-card__hint"><b>{hint.lead}</b> {hint.text}</p>
 		<p class="cal-card__hint">{DELETE_FILE_HINT}</p>
 	</div>
@@ -90,6 +114,12 @@
 	.cal-card__hint {
 		margin: var(--space-s) 0 0;
 		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+	/* The file could not be made: right under the button that asked for it, in the danger colour. */
+	.cal-card__error {
+		margin: var(--space-s) 0 0;
+		color: var(--color-danger);
 		font-size: var(--font-size-s);
 	}
 	.cal-card__hint b {

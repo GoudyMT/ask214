@@ -277,6 +277,136 @@ describe('calendar-sync store', () => {
 		await deleteTestDb(db);
 	});
 
+	// A failed load says so, so the Settings page can tell "could not be read" from "still loading"; a load that
+	// succeeds clears it.
+	it('says its load failed, until a load succeeds', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		const restore = await damageBody(db);
+
+		const b = createCalendarSyncStore(db);
+		expect(b.failed).toBe(false);
+		await expect(b.load()).rejects.toThrow();
+		expect(b.failed).toBe(true);
+
+		await restore();
+		await b.load();
+		expect(b.failed).toBe(false);
+		expect(b.ready).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	// The user's Unlock is a new attempt: the page waits for it instead of repeating the last failure.
+	it('clears a past failure when the user unlocks', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		const restore = await damageBody(db);
+		const b = createCalendarSyncStore(db);
+		await expect(b.load()).rejects.toThrow();
+		expect(b.failed).toBe(true);
+		await restore();
+
+		b.relockSync('user');
+		const retry = b.load();
+		expect(b.failed).toBe(false);
+		await retry;
+		expect(b.ready).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	// An automatic re-read (a page coming back, a peer's change) keeps the failure while it runs, so a note that stays
+	// true is not taken down and put up again on every return.
+	it('keeps a failure through an automatic re-read', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		await damageBody(db);
+		const b = createCalendarSyncStore(db);
+		await expect(b.load()).rejects.toThrow();
+		expect(b.failed).toBe(true);
+
+		b.relockSync('hygiene');
+		const reread = b.refresh();
+		expect(b.failed).toBe(true);
+		await expect(reread).rejects.toThrow();
+		expect(b.failed).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	// Locked is the user's lock, which only a load the user asks for opens: page hygiene on top of it does not move it, so
+	// a page that sees it can tell a calendar left locked from one still loading.
+	it('is locked from a lock until a load opens it', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createCalendarSyncStore(db);
+		await store.load();
+		expect(store.locked).toBe(false);
+		store.relockSync('user');
+		expect(store.locked).toBe(true);
+		store.relockSync('hygiene');
+		expect(store.locked).toBe(true);
+		await store.load();
+		expect(store.locked).toBe(false);
+		await deleteTestDb(db);
+	});
+
+	// The unlock has to clear the lock on both ways a load can succeed: with nothing saved yet (above) and with a record
+	// to decrypt, which is the one a returning user has.
+	it('is not locked once a load has read a saved record', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createCalendarSyncStore(db);
+		await store.load();
+		await store.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		store.relockSync('user');
+		expect(store.locked).toBe(true);
+		await store.load();
+		expect(store.locked).toBe(false);
+		expect(store.exclusions.categories).toEqual(['medical']);
+		await deleteTestDb(db);
+	});
+
+	// Page hygiene alone is not the user's lock: that store is re-read when the page comes back, so a page must not
+	// call it left locked.
+	it('is not locked by page hygiene alone', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createCalendarSyncStore(db);
+		await store.load();
+		store.relockSync('hygiene');
+		expect(store.ready).toBe(false);
+		expect(store.locked).toBe(false);
+		await deleteTestDb(db);
+	});
+
+	// Unlock reads the calendar and the page is hidden meanwhile: the hide relocks the store under the read, the read
+	// does not undo it, and an automatic re-read refuses a locked store - so it stays locked, neither failed nor ready.
+	it('stays locked when the page is hidden during an unlock', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createCalendarSyncStore(db);
+		await store.load();
+		await store.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		store.relockSync('user');
+
+		const unlock = store.load();
+		store.relockSync('hygiene');
+		await unlock;
+
+		expect(store.locked).toBe(true);
+		expect(store.failed).toBe(false);
+		expect(store.ready).toBe(false);
+		await deleteTestDb(db);
+	});
+
 	describe('refresh while the page is hidden', () => {
 		const stubVisibility = (state: DocumentVisibilityState) =>
 			vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);
