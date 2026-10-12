@@ -665,6 +665,18 @@ describe('CalendarPanel (the states it cannot add in)', () => {
 		expect(summaryOf(container)).toBe('Locked');
 	});
 
+	// The line says why Add is off, so it sits directly under it, above the how-to hints.
+	it.each([
+		['calendar-failed', CALENDAR_LINE],
+		['timeline-failed', PROGRESS_LINE],
+		['timeline-locked', LOCKED_LINE]
+	] as const)('puts the %s line directly under Add', async (access, line) => {
+		const { container } = await render(CalendarPanel, { props: propsFor(access) });
+		expect(container.querySelector('.cal-add')?.nextElementSibling).toBe(
+			page.getByText(line).element()
+		);
+	});
+
 	// A failure is in the danger colour and a lock the user holds is in the muted one, as drawn. Component tests run
 	// without app.css, so the two tokens are set here and put back.
 	describe('colours', () => {

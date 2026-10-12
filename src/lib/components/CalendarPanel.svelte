@@ -136,23 +136,8 @@
 			Could not make the calendar file right now - please try again.
 		</p>
 	{/if}
-	{#if ready && !hasEvents}
-		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
-	{:else}
-		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
-		<p class="cal-hint cal-hint--device">{DELETE_FILE_HINT}</p>
-		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. While the
-		     list above names events it says this instead; with nothing listed (no add recorded yet, every listed
-		     event deleted, or the settings still loading, when the list is not shown) the line stands, and it also
-		     says to add again. -->
-		{#if !ready || stale.length === 0}
-			<p class="cal-hint cal-hint--device">
-				Changed a date? Remove the events you added before, then add again.
-			</p>
-		{/if}
-	{/if}
-
-	<!-- No line while loading: a normal start-up passes through it, and a failure flashed there would be false. -->
+	<!-- Under Add, since it says why Add is off. No line while loading: a normal start-up passes through it, and a
+	     failure flashed there would be false. -->
 	{#if access === 'calendar-failed'}
 		<p class="cal-hint cal-hint--unavailable">
 			Your calendar settings could not be loaded, so adding is unavailable right now. Reload the app
@@ -169,6 +154,21 @@
 			Your timeline is locked, so adding is unavailable right now. Unlock it on the
 			<a href={resolve('/timeline')}>Timeline</a> page.
 		</p>
+	{/if}
+	{#if ready && !hasEvents}
+		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
+	{:else}
+		<p class="cal-hint cal-hint--device"><b>{hint.lead}</b> {hint.text}</p>
+		<p class="cal-hint cal-hint--device">{DELETE_FILE_HINT}</p>
+		<!-- Not every calendar app updates an event on a re-add, so the old ones are the user's to remove. While the
+		     list above names events it says this instead; with nothing listed (no add recorded yet, every listed
+		     event deleted, or the settings still loading, when the list is not shown) the line stands, and it also
+		     says to add again. -->
+		{#if !ready || stale.length === 0}
+			<p class="cal-hint cal-hint--device">
+				Changed a date? Remove the events you added before, then add again.
+			</p>
+		{/if}
 	{/if}
 
 	<div class="cal-customize">
