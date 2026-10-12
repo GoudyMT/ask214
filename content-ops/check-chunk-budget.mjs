@@ -235,6 +235,15 @@ const STATIC = 'static';
 //     inside the noise) and one shared key-repeat handler in the calendar delivery module (+18 B route nodes, +49 B
 //     precache), not kept; the locked line written into the template not tried, as it would leave the copy module the
 //     personal-claim test reads in full. The sweep fixes, read line by line: each line carries its fix, none removed.
+//     Page 61,595 -> 61,711, route nodes 48,096 -> 48,352 (package.json's size-limit) and precache 150,434 -> 150,805
+//     (owner's call, 2026-10-12): focus kept or handed on where a pressed button goes away - Lock to Unlock, Unlock to
+//     the page heading with a line when it fails (the shared locked panel, about +115 B page), the clock fix, a key's
+//     Remove, Install and a failed erase in Settings (about +150 B), the Timeline's Unlock (+63 B), the Home install
+//     nudge (+54 B), and the wizard and note editor kept usable while a save is pending. Three builds measured page
+//     61,669-61,671 B, route nodes 48,304-48,312 B and precache 150,752-150,765 B, 40 B of room above the highest.
+//     Trim pass, each measured on a full build: the wizard Save's disabled style, which no longer applies (-16 B route
+//     nodes, -44 B precache), kept; the Unlock failure line written into the locked panel instead of each page (-14 B
+//     route nodes, -21 B precache, a prop's type change on top), not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -244,10 +253,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 61_595,
+	page: 61_711,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 150_434,
+	precacheBytes: 150_805,
 	workerScripts: 147_200
 };
 
