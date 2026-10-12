@@ -213,6 +213,16 @@ describe('SettingsDateRow', () => {
 			settle('This date needs to be before your separation date.');
 			await expect.element(cancel).toBeEnabled();
 		});
+
+		it('keeps the form open when its toggle is pressed while a save runs, so a failure shows', async () => {
+			let fail: (reason: Error) => void = () => {};
+			await openAndSave(() => new Promise((_, reject) => (fail = reject)));
+			const toggle = page.getByRole('button', { name: /skillbridge start/i });
+			await toggle.click();
+			await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
+			fail(new Error('E_LOCK_TIMEOUT'));
+			await expect.element(page.getByText(FAILED, { exact: true })).toBeVisible();
+		});
 	});
 
 	it('gives every row its own ids', async () => {

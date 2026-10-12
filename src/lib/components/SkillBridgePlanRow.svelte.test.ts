@@ -441,6 +441,22 @@ describe('SkillBridgePlanRow (while a save runs)', () => {
 		finish(null);
 		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
 	});
+
+	it('keeps the form open when its toggle is pressed while a save runs, so a failure shows', async () => {
+		let fail: (reason: Error) => void = () => undefined;
+		const onSave = vi.fn(() => new Promise<string | null>((_, reject) => (fail = reject)));
+		await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+		await toggle().click();
+		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
+		fail(new Error('E_LOCK_TIMEOUT'));
+		await expect
+			.element(page.getByText('Could not update right now - please try again.', { exact: true }))
+			.toBeVisible();
+	});
 });
 
 // One line for each reason the answer cannot be changed, so a normal start-up (loading) never flashes a failure and a

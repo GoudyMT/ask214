@@ -39,6 +39,8 @@
 	}
 
 	function toggle(): void {
+		// The toggle closes the form as Cancel does, so it waits for a save to settle too: a failure needs the form to show.
+		if (busy) return;
 		if (editing) {
 			void close();
 			return;
