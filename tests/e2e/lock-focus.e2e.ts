@@ -14,8 +14,12 @@ test('Lock hands focus to Unlock, and Unlock hands it to the heading', async ({ 
 	await seedProfile(page);
 	await page.goto('/settings');
 
+	// Reach Lock as a keyboard user does: Tab from the page heading until it holds focus.
 	const lock = page.getByRole('button', { name: /^lock$/i });
-	await lock.focus();
+	await page.getByRole('heading', { level: 1, name: 'Settings' }).evaluate((el) => el.focus());
+	for (let i = 0; i < 40 && !(await lock.evaluate((el) => el === document.activeElement)); i++) {
+		await page.keyboard.press('Tab');
+	}
 	await expect(lock).toBeFocused();
 	await page.keyboard.press('Enter');
 

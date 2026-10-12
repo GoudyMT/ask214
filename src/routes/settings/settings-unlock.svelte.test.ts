@@ -188,27 +188,22 @@ describe('Settings, Unlock', () => {
 
 	// A second failure that reads the same as the first is announced again only if the line was taken away at the press.
 	it('takes the line away at the next press and shows it again', async () => {
-		ctl.load = endsAfter(0, true);
-		const { container } = await render(SettingsPage);
-		let removed = 0;
-		const watch = new MutationObserver((records) => {
-			for (const record of records) {
-				for (const node of record.removedNodes) {
-					if (node instanceof Element && node.matches('[role="alert"]')) removed += 1;
-				}
-			}
-		});
-		watch.observe(container, { childList: true, subtree: true });
-		try {
-			await page.getByRole('button', { name: 'Unlock' }).click();
-			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
-			expect(removed).toBe(0);
+		// The second read stays pending, so the line can only be gone because the press started it, not because it failed.
+		let fail: (reason: Error) => void = () => {};
+		let attempt = 0;
+		ctl.load = () =>
+			++attempt === 1
+				? Promise.reject(new Error('E_TEST_LOAD'))
+				: new Promise<void>((_, reject) => (fail = reject));
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
 
-			await page.getByRole('button', { name: 'Unlock' }).click();
-			await expect.poll(() => removed).toBe(1);
-			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
-		} finally {
-			watch.disconnect();
-		}
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.poll(() => attempt).toBe(2);
+		await expect.poll(() => page.getByRole('alert').query()).toBeNull();
+
+		fail(new Error('E_TEST_LOAD'));
+		await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
 	});
 });
