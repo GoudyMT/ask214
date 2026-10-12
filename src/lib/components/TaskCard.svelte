@@ -871,7 +871,10 @@
 		background: var(--color-accent);
 	}
 
+	/* scroll-margin-top: where focus lands, clear of the sticky header and chips - focus() alone scrolls a target only
+	   to the viewport's edge, and a line already inside the viewport not at all. */
 	.task-line {
+		scroll-margin-top: 6.5rem;
 		display: flex;
 		align-items: center;
 		gap: var(--space-s);
