@@ -67,7 +67,9 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 	let relockEpoch = 0;
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
 	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
-	// Reactive: a page tells a calendar left locked from one still loading by `locked`.
+	// Reactive: a page reads `locked` to tell a calendar that has no read coming from one still loading. It also holds
+	// while a read the user asked for is running (it clears when that read lands), so a page that runs the Unlock itself
+	// sets that apart by its own flag.
 	let lockState = $state<LockState>('unlocked');
 
 	function relockNow(reason: RelockReason): void {
@@ -161,7 +163,8 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		/**
 		 * Whether the user's lock holds: only a load the user asks for opens it, and page hygiene on top of it does not
 		 * move it. A page hidden while Unlock read the calendar leaves it locked, and then only Unlock reads it again -
-		 * an automatic re-read refuses a locked store - so a page that sees this knows the read is not coming.
+		 * an automatic re-read refuses a locked store. While an Unlock is still reading it also holds, until that read
+		 * lands; the page that runs the Unlock knows that by its own flag, and without one this means no read is coming.
 		 */
 		get locked(): boolean {
 			return lockState === 'locked';

@@ -22,12 +22,14 @@ const { isoFromToday, timeline, calendar } = vi.hoisted(() => {
 			state: { schemaVersion: 1, tasks: {} },
 			setStatus: () => Promise.resolve(),
 			setSnooze: () => Promise.resolve(),
-			refresh: () => Promise.resolve()
+			refresh: () => Promise.resolve(),
+			load: (): Promise<void> => Promise.resolve()
 		},
 		calendar: {
 			ready: true,
 			failed: false,
 			locked: false,
+			load: (): Promise<void> => Promise.resolve(),
 			exclusions: { taskIds: [], categories: [] },
 			lastAdd: [
 				{
@@ -45,11 +47,19 @@ const { isoFromToday, timeline, calendar } = vi.hoisted(() => {
 // The page reads the app's state from the layout's context. Here the profile is unlocked with a separation date, the
 // calendar store has loaded a record of one event the file no longer holds, and the timeline store has not loaded,
 // so the stored done, skip and snooze marks are still unknown.
+// Reactive, unlike the store flags above: Unlock opens the profile, and the page swaps its locked panel for the
+// sections at that moment.
+const profile = $state({ locked: false });
 vi.mock('$lib/profile/context', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
-			locked: false,
+			get locked() {
+				return profile.locked;
+			},
+			load: async () => {
+				profile.locked = false;
+			},
 			clockBackward: false,
 			persona: { completeness: 'eaos-only', eaos: isoFromToday(200), daysUntilSeparation: 200 }
 		},
@@ -87,6 +97,9 @@ beforeEach(() => {
 	calendar.ready = true;
 	calendar.failed = false;
 	calendar.locked = false;
+	timeline.load = () => Promise.resolve();
+	calendar.load = () => Promise.resolve();
+	profile.locked = false;
 });
 
 const customizeSummary = () => page.getByRole('button', { name: /^customize what's included/i });
@@ -147,5 +160,33 @@ describe('Settings, the calendar add', () => {
 		await render(SettingsPage);
 		await expect.element(page.getByText(CALENDAR_LINE)).toBeVisible();
 		await expect.element(customizeSummary()).toMatchTextContent('Unavailable');
+	});
+
+	// Both stores stay locked until their own read lands, so while Unlock reads them the page would flash the lock line
+	// and then today's failure line before settling. It says loading for the whole read, then follows the stores.
+	it('reads loading, not a lock or a failure, while its own Unlock reads the stores', async () => {
+		profile.locked = true;
+		timeline.locked = true;
+		calendar.ready = false;
+		calendar.locked = true;
+		let finish = () => {};
+		const reading = new Promise<void>((resolve) => (finish = resolve));
+		timeline.load = () => reading;
+		calendar.load = () => reading;
+		await render(SettingsPage);
+
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(customizeSummary()).toMatchTextContent('Loading');
+		expect(page.getByText(LOCKED_LINE).query()).toBeNull();
+		expect(page.getByText(CALENDAR_LINE).query()).toBeNull();
+		expect(page.getByText(PROGRESS_LINE).query()).toBeNull();
+
+		timeline.ready = true;
+		timeline.locked = false;
+		calendar.ready = true;
+		calendar.locked = false;
+		finish();
+		await expect.element(customizeSummary()).toMatchTextContent('All included');
+		expect(page.getByText(CALENDAR_LINE).query()).toBeNull();
 	});
 });

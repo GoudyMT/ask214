@@ -15,6 +15,31 @@ describe('timelineAccess', () => {
 	});
 });
 
+// The page's own Unlock reads the timeline, then the calendar, and each stays locked until its own read lands: the
+// page says loading for the whole read, not a lock or a failure that the read is about to clear.
+describe('while the page opens the stores itself', () => {
+	const LOCKED = { ready: false, failed: false, locked: true };
+	const T = { ready: true, failed: false, locked: false };
+
+	it('reads a locked timeline as loading, and as locked when it is not opening', () => {
+		expect(timelineAccess(LOCKED, true)).toBe('loading');
+		expect(timelineAccess(LOCKED, false)).toBe('locked');
+		expect(timelineAccess(LOCKED)).toBe('locked');
+	});
+
+	it('reads locked stores as loading, and as they are when it is not opening', () => {
+		expect(panelAccess(LOCKED, LOCKED, true)).toBe('loading');
+		expect(panelAccess(LOCKED, LOCKED, false)).toBe('timeline-locked');
+		expect(panelAccess(T, LOCKED, true)).toBe('loading');
+		expect(panelAccess(T, LOCKED, false)).toBe('calendar-failed');
+	});
+
+	it('reads a failure as loading too, since the read that is running may clear it', () => {
+		expect(timelineAccess({ ready: false, failed: true }, true)).toBe('loading');
+		expect(panelAccess(T, { ready: false, failed: true }, true)).toBe('loading');
+	});
+});
+
 describe('panelAccess', () => {
 	const T = { ready: true, failed: false, locked: false };
 	const C = { ready: true, failed: false };

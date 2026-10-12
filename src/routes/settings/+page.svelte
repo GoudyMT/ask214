@@ -494,7 +494,7 @@
 				<CalendarPanel
 					items={calendarItems}
 					exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-					access={panelAccess(app.timeline, app.calendar)}
+					access={panelAccess(app.timeline, app.calendar, unlocking)}
 					onSetExclusions={(next) =>
 						app.calendar
 							? app.calendar.setExclusions(next).catch(async (err) => {
