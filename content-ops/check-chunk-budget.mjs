@@ -218,7 +218,7 @@ const STATIC = 'static';
 //     root layout, -28 B page, -127 B precache), kept; a rewrite of the profile field-type table (inside the noise or
 //     larger), not kept. Not found: the shared chunk the build now splits in two (no importer of the asset constants
 //     changed).
-//     Route nodes 47,200 -> 48,090 (package.json's size-limit), precache 149,405 -> 150,422 and the root layout
+//     Route nodes 47,200 -> 48,096 (package.json's size-limit), precache 149,405 -> 150,434 and the root layout
 //     7,080 -> 7,100 B (owner's calls, 2026-10-12): the accessibility and copy fixes - one line for each state the
 //     Calendar panel and the SkillBridge row cannot be used in, with a file that cannot be made said under Add (the
 //     Settings and timeline route nodes), focus kept or handed back by the task card's editors and the date rows, the
@@ -228,8 +228,8 @@ const STATIC = 'static';
 //     a resolved task's line as it opens and closes and the line kept clear of the sticky header, focus moved only for
 //     a change of the card's own that landed, one opener per editor, the date column capped in its base rules, the
 //     chosen theme marked by a border in forced colours, and one file for a held Enter on Add (each key repeat made
-//     another). Three builds measured route nodes 48,039-48,051 B and precache 150,368-150,387 B: the limits were set
-//     40 B above the first two, and the third leaves 39 B and 35 B of room. The root layout was not over
+//     another). Four builds measured route nodes 48,039-48,056 B and precache 150,368-150,394 B (they varied by about
+//     17 B that day), 40 B of room above the highest. The root layout was not over
 //     (7,059-7,060 B, 21 B of room): its raise only restores the 40 B of room. Trim pass, each measured on a full
 //     build: one branch for the two failed lines (+15 B route nodes), the four margin rules under Add merged (+3 B,
 //     inside the noise) and one shared key-repeat handler in the calendar delivery module (+18 B route nodes, +49 B
@@ -247,7 +247,7 @@ const LIMIT = {
 	page: 61_595,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 150_422,
+	precacheBytes: 150_434,
 	workerScripts: 147_200
 };
 
