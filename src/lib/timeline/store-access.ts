@@ -24,7 +24,8 @@ export function panelAccess(t: Flags, c: Flags): PanelAccess {
 	const timeline = timelineAccess(t);
 	if (timeline === 'locked') return 'timeline-locked';
 	if (timeline === 'failed') return 'timeline-failed';
-	if (c?.failed) return 'calendar-failed';
+	// A calendar left locked (a page hidden while Unlock read it) is never re-read on its own, so it is not "loading".
+	if (c?.failed || c?.locked) return 'calendar-failed';
 	if (timeline === 'loading' || !c?.ready) return 'loading';
 	return 'ready';
 }

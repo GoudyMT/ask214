@@ -27,6 +27,7 @@ const { isoFromToday, timeline, calendar } = vi.hoisted(() => {
 		calendar: {
 			ready: true,
 			failed: false,
+			locked: false,
 			exclusions: { taskIds: [], categories: [] },
 			lastAdd: [
 				{
@@ -85,6 +86,7 @@ beforeEach(() => {
 	timeline.locked = false;
 	calendar.ready = true;
 	calendar.failed = false;
+	calendar.locked = false;
 });
 
 const customizeSummary = () => page.getByRole('button', { name: /^customize what's included/i });
@@ -133,6 +135,17 @@ describe('Settings, the calendar add', () => {
 		await render(SettingsPage);
 		await expect.element(page.getByText(CALENDAR_LINE)).toBeVisible();
 		expect(page.getByText(PROGRESS_LINE).query()).toBeNull();
+		await expect.element(customizeSummary()).toMatchTextContent('Unavailable');
+	});
+
+	// Unlock reads the timeline, then the calendar; a page hidden during the second read leaves the calendar locked, and
+	// nothing re-reads a locked store, so the panel gives today's line instead of waiting on a read that is not coming.
+	it('says the calendar settings could not be loaded when that store was left locked', async () => {
+		timeline.ready = true;
+		calendar.ready = false;
+		calendar.locked = true;
+		await render(SettingsPage);
+		await expect.element(page.getByText(CALENDAR_LINE)).toBeVisible();
 		await expect.element(customizeSummary()).toMatchTextContent('Unavailable');
 	});
 });

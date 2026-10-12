@@ -24,6 +24,7 @@ describe('panelAccess', () => {
 		[T, { ready: false, failed: false }, 'loading'],
 		[T, null, 'loading'],
 		[T, { ready: false, failed: true }, 'calendar-failed'],
+		[T, { ready: false, failed: false, locked: true }, 'calendar-failed'],
 		[{ ...T, failed: true }, C, 'timeline-failed'],
 		[{ ...T, failed: true }, { ready: false, failed: true }, 'timeline-failed'],
 		[
@@ -31,7 +32,12 @@ describe('panelAccess', () => {
 			{ ready: false, failed: true },
 			'timeline-locked'
 		],
-		[{ ready: false, failed: false, locked: true }, C, 'timeline-locked']
+		[{ ready: false, failed: false, locked: true }, C, 'timeline-locked'],
+		[
+			{ ready: false, failed: false, locked: true },
+			{ ready: false, failed: false, locked: true },
+			'timeline-locked'
+		]
 	] as const)('%o %o -> %s', (t, c, want) => {
 		expect(panelAccess(t, c)).toBe(want);
 	});
