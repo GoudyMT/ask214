@@ -21,7 +21,7 @@
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
 	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline';
-	import { createCalendarSyncStore } from '$lib/calendar/store.svelte';
+	import { createCalendarSyncStore, type CalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
@@ -207,17 +207,26 @@
 
 				// Calendar-sync store rides on the same db + bus and joins the relock set the same
 				// way; an init failure degrades to calendar-off, never blocking the wiring above.
+				let calendarStore: CalendarSyncStore | null = null;
 				void provisionStore(
 					result.db,
 					(db) => createCalendarSyncStore(db, { onBroadcast: (e) => echo.publish(e) }),
-					(calendar) => relockables.push(calendar),
+					(calendar) => {
+						relockables.push(calendar);
+						calendarStore = calendar;
+					},
 					isHidden
 				)
 					.then((calendar) => {
 						if (destroyed) return;
 						app.calendar = calendar;
 					})
-					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
+					.catch(() => {
+						safeLog({ code: 'E_INIT_FAILED' });
+						// Handed over all the same: the store says its load failed, so Settings says the calendar
+						// settings could not be read instead of waiting on a store that never arrives.
+						if (!destroyed) app.calendar = calendarStore;
+					});
 			}
 		);
 
