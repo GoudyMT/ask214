@@ -796,6 +796,18 @@
 		}
 	}
 
+	/* Above the phone layout the status column sits beside the title. A moved date on one line would take most of the
+	   card's width, so the column is capped and the reason may drop to a second line after the date's comma. */
+	@media (min-width: 481px) {
+		.task-card__meta {
+			max-width: 11rem;
+		}
+
+		.task-card__reason {
+			white-space: normal;
+		}
+	}
+
 	.task-card__reason-words {
 		white-space: nowrap;
 	}

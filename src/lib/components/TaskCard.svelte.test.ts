@@ -915,6 +915,41 @@ describe('TaskCard (layout by width)', () => {
 		expect(meta.left).toBeGreaterThanOrEqual(title.right);
 	});
 
+	// Just above the phone breakpoint the status column sits beside the title; a moved date's reason must wrap after
+	// the date's comma, or the one-line date takes the width and leaves the title a sliver.
+	const moved = makeItem({
+		def: firm,
+		status: 'closing-soon',
+		windowEndDate: '2026-10-31',
+		daysLeft: 120,
+		fit: { reason: 'terminal-leave', date: '2026-10-31' }
+	});
+
+	it('at 481 px a moved date wraps after its comma and leaves the title its room', async () => {
+		await page.viewport(481, 800);
+		const { container } = await renderCard(moved);
+		const meta = box(container, '.task-card__meta');
+		// The line wraps (the case under test is reached), the reason starting a line below the date...
+		expect(box(container, '.task-card__reason-words').top).toBeGreaterThan(
+			box(container, '.task-card__date').top
+		);
+		// ...the status column still sits beside the title, and the title column is no narrower than it.
+		expect(meta.left).toBeGreaterThanOrEqual(box(container, '.task-card__title').right);
+		expect(box(container, '.task-card__body').width).toBeGreaterThanOrEqual(meta.width);
+	});
+
+	it('from 481 to 561 px a moved date stays inside the card and the page does not scroll sideways', async () => {
+		for (let width = 481; width <= 561; width += 10) {
+			await page.viewport(width, 800);
+			const { container, unmount } = await renderCard(moved);
+			expect(box(container, '.task-card__when').right).toBeLessThanOrEqual(
+				box(container, 'article').right
+			);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+			await unmount();
+		}
+	});
+
 	it('on a 320 px phone a long word stays inside the What now box', async () => {
 		await page.viewport(320, 800);
 		// One unbroken word: a hyphen is a line-break opportunity, so it would not test the overflow.
