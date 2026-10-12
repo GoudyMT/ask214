@@ -426,6 +426,23 @@ describe('SkillBridgePlanRow', () => {
 	});
 });
 
+describe('SkillBridgePlanRow (while a save runs)', () => {
+	// Closing mid-save would unmount the form while its write is still on the way, and the person would not see how
+	// it ended.
+	it('holds Cancel while a save is under way, and closes once it lands', async () => {
+		let finish: (message: string | null) => void = () => undefined;
+		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
+		await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+		finish(null);
+		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
+	});
+});
+
 // One line for each reason the answer cannot be changed, so a normal start-up (loading) never flashes a failure and a
 // lock says where to open it.
 describe('SkillBridgePlanRow (the states it cannot be changed in)', () => {

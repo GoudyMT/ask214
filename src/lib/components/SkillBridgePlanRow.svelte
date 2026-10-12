@@ -172,7 +172,9 @@
 					type="submit"
 					disabled={busy || choice === null}>Save</button
 				>
-				<button class="settings-cancel" type="button" onclick={() => void close()}>Cancel</button>
+				<button class="settings-cancel" type="button" disabled={busy} onclick={() => void close()}
+					>Cancel</button
+				>
 			</div>
 		</form>
 	{/if}
@@ -270,6 +272,11 @@
 		font: inherit;
 		text-decoration: underline;
 		cursor: pointer;
+	}
+
+	.settings-cancel:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 
 	.sb-row__choices {
