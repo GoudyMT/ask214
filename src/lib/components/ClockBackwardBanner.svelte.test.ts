@@ -18,6 +18,12 @@ describe('ClockBackwardBanner', () => {
 		expect(onfix).toHaveBeenCalledTimes(1);
 	});
 
+	it('gives "Fix this" a 44 px target', async () => {
+		const { container } = await render(ClockBackwardBanner, { props: { onfix: () => {} } });
+		const fix = container.querySelector('.clock-banner__fix') as HTMLButtonElement;
+		expect(fix.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+	});
+
 	it('has no dismiss control (non-dismissible by design - a wrong clock must keep warning)', async () => {
 		const { container } = await render(ClockBackwardBanner, { props: { onfix: () => {} } });
 		expect(container.querySelector('.clock-banner__dismiss')).toBeNull();
