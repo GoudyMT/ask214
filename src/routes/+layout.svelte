@@ -47,7 +47,7 @@
 
 	// Shell content width: one width for every route (shell-width.ts), set on nav, main and footer through
 	// the --shell-width CSS var. The 720px in the styles below is only the fallback for a missing var.
-	const shellWidth = $derived(shellWidthFor(page.route.id));
+	const shellWidth = $derived(shellWidthFor());
 
 	// Auto-lock the in-memory profile after 15 minutes of no user input (memory hygiene;
 	// unlock is a transparent local-key re-decrypt in v1.0).
