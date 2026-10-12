@@ -844,6 +844,13 @@ describe('CalendarPanel (layout by width)', () => {
 		expect(lines(summary(container))).toHaveLength(1);
 	});
 
+	// A thumb has to land on it: the row is a button, so it is at least as tall as the app's other touch targets.
+	it('Customize is a 44 px target', async () => {
+		const { container } = await render(CalendarPanel, { props: props() });
+		const toggle = container.querySelector('.cal-customize__toggle') as HTMLButtonElement;
+		expect(toggle.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+	});
+
 	it('on a wide screen the label and the summary share one line', async () => {
 		await page.viewport(1024, 800);
 		const { container } = await render(CalendarPanel, { props: props() });

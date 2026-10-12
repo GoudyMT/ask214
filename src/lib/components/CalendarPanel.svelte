@@ -287,6 +287,7 @@
 		align-items: center;
 		gap: var(--space-s);
 		width: 100%;
+		min-height: 44px;
 		padding: 0;
 		background: none;
 		border: none;
