@@ -749,8 +749,11 @@
 		font-size: var(--font-size-s);
 	}
 
+	/* Beside the title, the status column is capped: a moved date on one line would take most of the card's width. The cap
+	   sits here, not under a min-width query, so no width between whole pixels falls between two layouts. */
 	.task-card__meta {
 		flex: none;
+		max-width: 11rem;
 		text-align: right;
 		white-space: nowrap;
 	}
@@ -789,6 +792,7 @@
 
 		.task-card__meta {
 			order: -1;
+			max-width: none;
 			text-align: left;
 			white-space: normal;
 		}
@@ -812,24 +816,12 @@
 		.task-card__meta .task-card__days::before {
 			content: '\00a0-\00a0';
 		}
-
-		/* A moved date's reason may start the next line, kept whole and joined to its countdown: the one break
-		   the date line allows is the space after the date's comma. */
-		.task-card__meta .task-card__reason {
-			white-space: normal;
-		}
 	}
 
-	/* Above the phone layout the status column sits beside the title. A moved date on one line would take most of the
-	   card's width, so the column is capped and the reason may drop to a second line after the date's comma. */
-	@media (min-width: 481px) {
-		.task-card__meta {
-			max-width: 11rem;
-		}
-
-		.task-card__reason {
-			white-space: normal;
-		}
+	/* A moved date's reason may start the next line, kept whole and joined to its countdown: the one break the date line
+	   allows is the space after the date's comma. */
+	.task-card__reason {
+		white-space: normal;
 	}
 
 	.task-card__reason-words {

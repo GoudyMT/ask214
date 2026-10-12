@@ -938,6 +938,15 @@ describe('TaskCard (layout by width)', () => {
 		expect(box(container, '.task-card__body').width).toBeGreaterThanOrEqual(meta.width);
 	});
 
+	// The column's cap is the wide layout's; on a phone the status line runs the card's full width above the title.
+	it("on a phone the status line runs the card's full width, not the column's cap", async () => {
+		await page.viewport(320, 800);
+		const { container } = await renderCard(moved);
+		expect(box(container, '.task-card__meta').width).toBeGreaterThanOrEqual(
+			Math.floor(box(container, '.task-card__body').width)
+		);
+	});
+
 	it('from 481 to 561 px a moved date stays inside the card and the page does not scroll sideways', async () => {
 		for (let width = 481; width <= 561; width += 10) {
 			await page.viewport(width, 800);
