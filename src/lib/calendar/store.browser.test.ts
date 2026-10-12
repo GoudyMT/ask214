@@ -358,6 +358,22 @@ describe('calendar-sync store', () => {
 		await deleteTestDb(db);
 	});
 
+	// The unlock has to clear the lock on both ways a load can succeed: with nothing saved yet (above) and with a record
+	// to decrypt, which is the one a returning user has.
+	it('is not locked once a load has read a saved record', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createCalendarSyncStore(db);
+		await store.load();
+		await store.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		store.relockSync('user');
+		expect(store.locked).toBe(true);
+		await store.load();
+		expect(store.locked).toBe(false);
+		expect(store.exclusions.categories).toEqual(['medical']);
+		await deleteTestDb(db);
+	});
+
 	// Page hygiene alone is not the user's lock: that store is re-read when the page comes back, so a page must not
 	// call it left locked.
 	it('is not locked by page hygiene alone', async () => {
