@@ -31,6 +31,7 @@
 		setSynthesisEnabled
 	} from '$lib/ask/online-prefs';
 	import { handOver } from '$lib/calendar/hand-over';
+	import { panelAccess } from '$lib/timeline/store-access';
 	import { staleEvents } from '$lib/calendar/handed-over';
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { localTodayIso } from '$lib/timeline/day-math';
@@ -493,9 +494,7 @@
 				<CalendarPanel
 					items={calendarItems}
 					exclusions={app.calendar?.exclusions ?? { taskIds: [], categories: [] }}
-					ready={(app.calendar?.ready ?? false) &&
-						(app.timeline?.ready ?? false) &&
-						!(app.timeline?.failed ?? false)}
+					access={panelAccess(app.timeline, app.calendar)}
 					onSetExclusions={(next) =>
 						app.calendar
 							? app.calendar.setExclusions(next).catch(async (err) => {

@@ -8,17 +8,19 @@
 	import { computeDesiredEvents } from '$lib/calendar/desired';
 	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
 	import { localTodayIso } from '$lib/timeline/day-math';
+	import { resolve } from '$app/paths';
+	import type { PanelAccess } from '$lib/timeline/store-access';
 
 	type Props = {
 		items: TimelineItem[];
 		exclusions: TaskExclusions;
 		/**
-		 * Whether `exclusions` reflects the persisted record. FALSE while the store is unloaded or
-		 * relocked, when the real exclusion set is UNKNOWN. Required (no default) so a caller cannot
-		 * silently fail open: exporting against an unknown set would leak the categories the user
-		 * deliberately kept off their calendar.
+		 * Whether `exclusions` and `items` reflect the persisted records, and if not, why. Anything but 'ready'
+		 * means the real exclusion set or task state is UNKNOWN (not read yet, could not be read, or locked).
+		 * Required (no default) so a caller cannot silently fail open: exporting against an unknown set would leak
+		 * the categories the user deliberately kept off their calendar.
 		 */
-		ready: boolean;
+		access: PanelAccess;
 		/** Receives an update to apply to the set as saved, not a whole new set; rejects when the save fails. */
 		onSetExclusions: (update: (current: TaskExclusions) => TaskExclusions) => Promise<void>;
 		/** Injected so the built file is testable and the actual hand-over stays the caller's concern. */
@@ -28,7 +30,15 @@
 		/** Forgets the listed events; rejects when the save fails. */
 		onAcknowledge: () => Promise<void>;
 	};
-	let { items, exclusions, ready, onSetExclusions, onAdd, stale, onAcknowledge }: Props = $props();
+	let { items, exclusions, access, onSetExclusions, onAdd, stale, onAcknowledge }: Props = $props();
+	const ready = $derived(access === 'ready');
+	// What Customize's summary says while the record is not usable; a ready panel says what is kept off instead.
+	const SUMMARY: Partial<Record<PanelAccess, string>> = {
+		loading: 'Loading',
+		'calendar-failed': 'Unavailable',
+		'timeline-failed': 'Unavailable',
+		'timeline-locked': 'Locked'
+	};
 
 	const CATEGORIES: TaskCategory[] = ['medical', 'admin', 'benefits', 'career', 'finance'];
 	let building = $state(false);
@@ -128,10 +138,22 @@
 		{/if}
 	{/if}
 
-	{#if !ready}
+	<!-- No line while loading: a normal start-up passes through it, and a failure flashed there would be false. -->
+	{#if access === 'calendar-failed'}
 		<p class="cal-hint cal-hint--unavailable">
 			Your calendar settings could not be loaded, so adding is unavailable right now. Reload the app
 			to try again.
+		</p>
+	{:else if access === 'timeline-failed'}
+		<p class="cal-hint cal-hint--unavailable">
+			Your saved progress could not be loaded, so adding is unavailable right now. Reload the app to
+			try again.
+		</p>
+	{:else if access === 'timeline-locked'}
+		<!-- Muted, not danger: nothing failed, the user's own lock holds. -->
+		<p class="cal-hint cal-hint--locked">
+			Your timeline is locked, so adding is unavailable right now. Unlock it on the
+			<a href={resolve('/timeline')}>Timeline</a> page.
 		</p>
 	{/if}
 
@@ -147,7 +169,7 @@
 			<span class="cal-chevron" class:cal-chevron--open={expanded} aria-hidden="true"></span>
 			<span>Customize what's included</span>
 			<span class="cal-customize__summary">
-				{!ready ? 'Unavailable' : hiddenCount === 0 ? 'All included' : `${hiddenCount} kept off`}
+				{SUMMARY[access] ?? (hiddenCount === 0 ? 'All included' : `${hiddenCount} kept off`)}
 			</span>
 		</button>
 
@@ -222,6 +244,13 @@
 	.cal-hint--unavailable {
 		margin: var(--space-s) 0 0;
 		color: var(--color-danger);
+	}
+	/* The user's own lock, not a failure: the same place as the failure line, in the quiet colour. */
+	.cal-hint--locked {
+		margin: var(--space-s) 0 0;
+	}
+	.cal-hint--locked a {
+		color: var(--color-accent);
 	}
 	.cal-customize__toggle:disabled {
 		opacity: 0.6;
