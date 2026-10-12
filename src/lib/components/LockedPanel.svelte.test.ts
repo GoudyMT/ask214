@@ -16,10 +16,30 @@ describe('LockedPanel', () => {
 		expect(onunlock).toHaveBeenCalledTimes(1);
 	});
 
-	it('disables the button and shows progress while busy', async () => {
-		const { container } = await render(LockedPanel, { props: { onunlock: () => {}, busy: true } });
+	// A disabled button that holds focus drops it, so busy ignores a press instead.
+	it('shows progress while busy and ignores a press', async () => {
+		const onunlock = vi.fn();
+		const { container } = await render(LockedPanel, { props: { onunlock, busy: true } });
 		const btn = container.querySelector('button');
-		expect(btn?.disabled).toBe(true);
+		expect(btn?.disabled).toBe(false);
 		expect(btn?.textContent?.trim()).toBe('Unlocking...');
+		btn?.click();
+		expect(onunlock).toHaveBeenCalledTimes(0);
+	});
+
+	it('says why an unlock failed, as an alert after the button', async () => {
+		const LINE = 'Could not unlock right now - please try again.';
+		const { container } = await render(LockedPanel, { props: { onunlock: () => {}, error: LINE } });
+		const alert = container.querySelector('[role="alert"]');
+		expect(alert?.textContent?.trim()).toBe(LINE);
+		const btn = container.querySelector('button');
+		expect(
+			btn && alert && btn.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
+	});
+
+	it('shows no alert without an error', async () => {
+		const { container } = await render(LockedPanel, { props: { onunlock: () => {} } });
+		expect(container.querySelector('[role="alert"]')).toBeNull();
 	});
 });

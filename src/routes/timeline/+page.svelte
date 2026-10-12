@@ -25,7 +25,10 @@
 	// Everything derived from today reads this clock, which turns at local midnight; an act at a tap reads the clock at the tap.
 	const clock = new LocalToday();
 
+	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
+	let unlockError = $state<string | null>(null);
+	let headingEl: HTMLElement | undefined;
 
 	// Until the timeline-state store loads (async, after the profile store), the view is built from an empty state. The
 	// list and the calendar card render only once the store is `ready`, so nothing shows a task as not started that the
@@ -137,6 +140,7 @@
 	async function unlock(): Promise<void> {
 		const store = app.store;
 		if (!store) return;
+		unlockError = null;
 		unlocking = true;
 		try {
 			await store.load();
@@ -146,9 +150,16 @@
 			// Both then fail closed on `ready`, and a timeline load that fails says so in place of the list
 			// (the store's `failed`).
 			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
+		} catch {
+			// The button keeps focus (it is never turned off) and the panel says so.
+			unlockError = UNLOCK_FAILED;
+			return;
 		} finally {
 			unlocking = false;
 		}
+		// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+		await tick();
+		if (document.activeElement === document.body) headingEl?.focus();
 	}
 
 	// Runs a write to a store; true when it landed. On any failure (incl. an OCC conflict from a concurrent tab) the store
@@ -212,14 +223,14 @@
 <!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
      separation date. -->
 <div translate="no">
-	<h1 tabindex="-1">Timeline</h1>
+	<h1 bind:this={headingEl} tabindex="-1">Timeline</h1>
 
 	{#if app.status === 'ready'}
 		<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
 	     Unless its load failed: then the note below says so, since Unlock would only fail again. And only with something
 	     saved: a first run has nothing to unlock, so it keeps the setup. -->
 		{#if app.store?.locked || (app.timeline?.locked && !app.timeline.failed && app.store?.persona.completeness !== 'none')}
-			<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
+			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else if app.store?.persona.completeness === 'none'}
 			<SetupCTA />
 		{:else if eaos}

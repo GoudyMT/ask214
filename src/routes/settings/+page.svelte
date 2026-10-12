@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import SettingsDateRow from '$lib/components/SettingsDateRow.svelte';
 	import SkillBridgePlanRow from '$lib/components/SkillBridgePlanRow.svelte';
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
@@ -97,7 +98,10 @@
 	// timeline-dependent sections (separation date, calendar) hide until there is a timeline to manage.
 	const hasTimeline = $derived((app.store?.persona.completeness ?? 'none') !== 'none');
 
+	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
+	let unlockError = $state<string | null>(null);
+	let headingEl: HTMLElement | undefined;
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
 	let clockError = $state<string | null>(null);
@@ -255,15 +259,22 @@
 		);
 	});
 
-	function lock(): void {
+	async function lock(): Promise<void> {
 		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
 		// leaving them in memory is precisely what this button exists to prevent.
 		app.relockAll?.();
+		// The Lock button is gone with the unlocked page; focus goes to the Unlock button that replaces it, unless the
+		// person already moved it.
+		await tick();
+		if (document.activeElement === document.body) {
+			document.querySelector<HTMLElement>('.locked-panel__unlock')?.focus();
+		}
 	}
 
 	async function unlock(): Promise<void> {
 		const store = app.store;
 		if (!store) return;
+		unlockError = null;
 		unlocking = true;
 		try {
 			await store.load();
@@ -272,9 +283,16 @@
 			// timeline route for the full reasoning). allSettled so a secondary failure leaves that
 			// store not-ready rather than blocking the unlock.
 			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
+		} catch {
+			// The button keeps focus (it is never turned off) and the panel says so.
+			unlockError = UNLOCK_FAILED;
+			return;
 		} finally {
 			unlocking = false;
 		}
+		// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+		await tick();
+		if (document.activeElement === document.body) headingEl?.focus();
 	}
 
 	async function clearClock(): Promise<void> {
@@ -348,7 +366,7 @@
 <!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
      separation date. -->
 <div translate="no">
-	<h1>Settings</h1>
+	<h1 bind:this={headingEl} tabindex="-1">Settings</h1>
 
 	{#if app.status === 'ready'}
 		<!-- Outside the locked/unlocked split on purpose: the erase zeroizes memory before it touches
@@ -419,7 +437,7 @@
 			</p>
 		</section>
 		{#if app.store?.locked}
-			<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
+			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else}
 			{#if hasTimeline}
 				<section class="settings-section" aria-labelledby="timeline-heading">
@@ -481,7 +499,7 @@
 			{#if hasTimeline}
 				<section class="settings-section" aria-labelledby="privacy-heading">
 					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-					<button class="settings-lock" type="button" onclick={lock}>Lock</button>
+					<button class="settings-lock" type="button" onclick={() => void lock()}>Lock</button>
 					<p class="settings-hint">
 						Clears your profile from this screen. Use Unlock to view it again.
 					</p>

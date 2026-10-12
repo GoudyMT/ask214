@@ -1,6 +1,11 @@
 <script lang="ts">
-	type Props = { onunlock: () => void; busy?: boolean };
-	let { onunlock, busy = false }: Props = $props();
+	type Props = { onunlock: () => void; busy?: boolean; error?: string | null };
+	let { onunlock, busy = false, error = null }: Props = $props();
+
+	// Not `disabled`: a disabled button that holds focus drops it, so a busy press is ignored instead.
+	function press(): void {
+		if (!busy) onunlock();
+	}
 </script>
 
 <!--
@@ -13,9 +18,10 @@
 	<p class="locked-panel__body">
 		Your information is encrypted on this device. Unlock to view and edit it.
 	</p>
-	<button class="locked-panel__unlock" type="button" onclick={onunlock} disabled={busy}>
+	<button class="locked-panel__unlock" type="button" onclick={press} aria-busy={busy}>
 		{busy ? 'Unlocking...' : 'Unlock'}
 	</button>
+	{#if error}<p class="locked-panel__error" role="alert">{error}</p>{/if}
 </section>
 
 <style>
@@ -56,8 +62,13 @@
 		background: var(--color-accent-muted);
 	}
 
-	.locked-panel__unlock:disabled {
+	.locked-panel__unlock[aria-busy='true'] {
 		opacity: 0.6;
 		cursor: default;
+	}
+
+	.locked-panel__error {
+		margin: 0;
+		color: var(--color-danger);
 	}
 </style>

@@ -18,6 +18,8 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 	// The timeline store as the layout hands it over: null until its first load settles. `firstRun` is a profile with
 	// nothing saved yet.
 	current: {
+		// What the profile store's load does; the Unlock cases set it and put it back.
+		load: async (): Promise<void> => {},
 		firstRun: false,
 		// Days from today to the separation date.
 		daysOut: 200,
@@ -41,16 +43,24 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 			setSnooze?: (taskId: string, untilIso: string) => Promise<void>;
 			setNote?: (taskId: string, note: string | undefined) => Promise<void>;
 			refresh?: () => Promise<void>;
+			load?: () => Promise<void>;
 		}
 	}
 }));
+
+// Reactive, unlike the flags in `current`: Unlock opens the profile and the page swaps its locked panel for the list at that
+// moment.
+const profile = $state({ locked: false });
 
 // The profile is unlocked with a separation date; each test sets where the timeline's saved progress stands.
 vi.mock('$lib/profile/context', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
-			locked: false,
+			get locked() {
+				return profile.locked;
+			},
+			load: () => current.load(),
 			clockBackward: false,
 			persona: current.firstRun
 				? { completeness: 'none' }
@@ -106,6 +116,68 @@ describe('Timeline, its saved progress', () => {
 		const { container } = await render(TimelinePage);
 		await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
 		expect(container.querySelector('.timeline-list')).toBeNull();
+	});
+
+	describe('Unlock', () => {
+		const FAILED = 'Could not unlock right now - please try again.';
+		const unhandled: unknown[] = [];
+		const onUnhandled = (e: PromiseRejectionEvent) => unhandled.push(e.reason);
+		// A profile load that ends after `ms`: it opens the profile, or it rejects.
+		const endsAfter = (ms: number, fails: boolean) => () =>
+			new Promise<void>((resolve, reject) =>
+				setTimeout(() => {
+					if (fails) return reject(new Error('E_TEST_LOAD'));
+					profile.locked = false;
+					resolve();
+				}, ms)
+			);
+		const timings = [
+			['ends at once', 0],
+			['takes a while', 100]
+		] as const;
+
+		beforeEach(() => {
+			unhandled.length = 0;
+			window.addEventListener('unhandledrejection', onUnhandled);
+			profile.locked = true;
+			current.timeline = {
+				ready: true,
+				failed: false,
+				state: EMPTY,
+				load: () => Promise.resolve()
+			};
+		});
+		afterEach(() => {
+			window.removeEventListener('unhandledrejection', onUnhandled);
+			profile.locked = false;
+			current.load = async () => {};
+		});
+
+		it.each(timings)(
+			'says so and keeps focus on Unlock when the load %s and fails',
+			async (_, ms) => {
+				current.load = endsAfter(ms, true);
+				const { container } = await render(TimelinePage);
+				await page.getByRole('button', { name: 'Unlock' }).click();
+
+				await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+				await expect
+					.poll(() => document.activeElement)
+					.toBe(container.querySelector('.locked-panel__unlock'));
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				expect(unhandled).toEqual([]);
+			}
+		);
+
+		it.each(timings)('puts focus on the heading when the load %s and succeeds', async (_, ms) => {
+			current.load = endsAfter(ms, false);
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+
+			const heading = page.getByRole('heading', { level: 1, name: 'Timeline' });
+			await expect.poll(() => document.activeElement).toBe(heading.element());
+			expect(page.getByRole('alert').query()).toBeNull();
+		});
 	});
 
 	// With nothing saved there is nothing to unlock: a first-run tab locked by idle or another tab still offers setup.
