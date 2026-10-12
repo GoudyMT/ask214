@@ -277,6 +277,70 @@ describe('calendar-sync store', () => {
 		await deleteTestDb(db);
 	});
 
+	// A failed load says so, so the Settings page can tell "could not be read" from "still loading"; a load that
+	// succeeds clears it.
+	it('says its load failed, until a load succeeds', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		const restore = await damageBody(db);
+
+		const b = createCalendarSyncStore(db);
+		expect(b.failed).toBe(false);
+		await expect(b.load()).rejects.toThrow();
+		expect(b.failed).toBe(true);
+
+		await restore();
+		await b.load();
+		expect(b.failed).toBe(false);
+		expect(b.ready).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	// The user's Unlock is a new attempt: the page waits for it instead of repeating the last failure.
+	it('clears a past failure when the user unlocks', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		const restore = await damageBody(db);
+		const b = createCalendarSyncStore(db);
+		await expect(b.load()).rejects.toThrow();
+		expect(b.failed).toBe(true);
+		await restore();
+
+		b.relockSync('user');
+		const retry = b.load();
+		expect(b.failed).toBe(false);
+		await retry;
+		expect(b.ready).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	// An automatic re-read (a page coming back, a peer's change) keeps the failure while it runs, so a note that stays
+	// true is not taken down and put up again on every return.
+	it('keeps a failure through an automatic re-read', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		await damageBody(db);
+		const b = createCalendarSyncStore(db);
+		await expect(b.load()).rejects.toThrow();
+		expect(b.failed).toBe(true);
+
+		b.relockSync('hygiene');
+		const reread = b.refresh();
+		expect(b.failed).toBe(true);
+		await expect(reread).rejects.toThrow();
+		expect(b.failed).toBe(true);
+		await deleteTestDb(db);
+	});
+
 	describe('refresh while the page is hidden', () => {
 		const stubVisibility = (state: DocumentVisibilityState) =>
 			vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);

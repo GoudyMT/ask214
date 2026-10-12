@@ -60,6 +60,9 @@ export type CalendarStoreOptions = { onBroadcast?: (e: CalendarBroadcastEvent) =
 
 export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOptions = {}) {
 	let _state = $state<CalendarSyncState | null>(null);
+	// Whether the last load failed: not loaded can mean not read YET, which a page waits out, or could not be read,
+	// which it says.
+	let _failed = $state(false);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
@@ -149,6 +152,11 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 			return _state !== null;
 		},
 
+		/** Whether the last load failed, so the saved calendar settings could not be read; a load that succeeds clears it. */
+		get failed(): boolean {
+			return _failed;
+		},
+
 		/** Reactive exclusion set; EMPTY before load / when relocked - gate on `ready` first. */
 		get exclusions(): TaskExclusions {
 			return _state?.exclusions ?? { taskIds: [], categories: [] };
@@ -172,6 +180,10 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
 			let ks: KeystoreRow | undefined;
+			// The user's Unlock is a new attempt: a page waits for it instead of repeating the last failure while it
+			// runs. An automatic re-read keeps the failure, so a note that stays true is not taken down and put up
+			// again on every return to the page.
+			if (lockState === 'locked') _failed = false;
 			try {
 				await withWriteLocks(
 					async () => {
@@ -210,8 +222,10 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 				// Say so (not ready, empty defaults) rather than serve it. lockState stays as it was, so
 				// the next automatic re-read still tries.
 				_state = null;
+				_failed = true;
 				throw e;
 			}
+			_failed = false;
 		},
 
 		/**
