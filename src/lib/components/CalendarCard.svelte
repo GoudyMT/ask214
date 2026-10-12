@@ -18,13 +18,22 @@
 
 	// One tap = the calendar file, no chooser and no second screen. The exclusions the user set in
 	// Settings are honoured here because both surfaces build from the same shared projection.
+	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
+	let addFailed = $state(false);
+
 	async function add(): Promise<void> {
 		building = true;
+		addFailed = false;
+		let file: CalendarFile;
 		try {
-			onAdd(await buildIcs(items, exclusions, new Date()));
+			file = await buildIcs(items, exclusions, new Date());
+		} catch {
+			addFailed = true;
+			return;
 		} finally {
 			building = false;
 		}
+		onAdd(file);
 	}
 </script>
 
@@ -35,6 +44,11 @@
 		<button class="cal-card__add" type="button" disabled={building} onclick={() => void add()}>
 			Add to my calendar
 		</button>
+		{#if addFailed}
+			<p class="cal-card__error" role="alert">
+				Could not make the calendar file right now - please try again.
+			</p>
+		{/if}
 		<p class="cal-card__hint"><b>{hint.lead}</b> {hint.text}</p>
 		<p class="cal-card__hint">{DELETE_FILE_HINT}</p>
 	</div>
@@ -90,6 +104,12 @@
 	.cal-card__hint {
 		margin: var(--space-s) 0 0;
 		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+	/* The file could not be made: right under the button that asked for it, in the danger colour. */
+	.cal-card__error {
+		margin: var(--space-s) 0 0;
+		color: var(--color-danger);
 		font-size: var(--font-size-s);
 	}
 	.cal-card__hint b {

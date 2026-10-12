@@ -90,13 +90,22 @@
 			(addEl && !addEl.disabled ? addEl : headingEl)?.focus({ preventScroll: true });
 	}
 
+	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
+	let addFailed = $state(false);
+
 	async function addToCalendar(): Promise<void> {
 		building = true;
+		addFailed = false;
+		let file: CalendarFile;
 		try {
-			onAdd(await buildIcs(items, exclusions, new Date()));
+			file = await buildIcs(items, exclusions, new Date());
+		} catch {
+			addFailed = true;
+			return;
 		} finally {
 			building = false;
 		}
+		onAdd(file);
 	}
 </script>
 
@@ -122,6 +131,11 @@
 	>
 		Add to my calendar
 	</button>
+	{#if addFailed}
+		<p class="cal-hint cal-hint--error" role="alert">
+			Could not make the calendar file right now - please try again.
+		</p>
+	{/if}
 	{#if ready && !hasEvents}
 		<p class="cal-hint cal-hint--device">Nothing ahead to add right now.</p>
 	{:else}
@@ -242,6 +256,11 @@
 	/* Shown only when the exclusion set is unknown - the export is refused rather than run against
 	   defaults, so the user is told why instead of silently getting everything. */
 	.cal-hint--unavailable {
+		margin: var(--space-s) 0 0;
+		color: var(--color-danger);
+	}
+	/* The file could not be made: right under the button that asked for it. */
+	.cal-hint--error {
 		margin: var(--space-s) 0 0;
 		color: var(--color-danger);
 	}
