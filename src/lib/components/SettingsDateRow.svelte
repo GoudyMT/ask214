@@ -26,12 +26,16 @@
 	let busy = $state(false);
 	let toggleEl = $state<HTMLButtonElement | null>(null);
 
-	// Closing unmounts the focused button; focus goes back to the row, so a keyboard user is not dropped.
+	let saveEl = $state<HTMLButtonElement | null>(null);
+	let removeEl = $state<HTMLButtonElement | null>(null);
+
+	// Closing unmounts the focused button; focus goes back to the row, so a keyboard user is not dropped - unless
+	// they have already moved on to another control.
 	async function close(): Promise<void> {
 		editing = false;
 		error = null;
 		await tick();
-		toggleEl?.focus();
+		if (document.activeElement === document.body) toggleEl?.focus();
 	}
 
 	function toggle(): void {
@@ -44,17 +48,25 @@
 		editing = true;
 	}
 
-	async function run(action: () => Promise<string | null>): Promise<void> {
+	// The button that ran the action was turned off while it ran, which dropped focus to the page; after a message or a
+	// failure it gets focus back so the person can try again, unless they have already moved on.
+	async function run(
+		action: () => Promise<string | null>,
+		button: () => HTMLElement | null
+	): Promise<void> {
 		busy = true;
+		let message: string | null;
 		try {
-			const message = await action();
-			if (message === null) await close();
-			else error = message;
+			message = await action();
 		} catch {
-			error = FAILED;
-		} finally {
-			busy = false;
+			message = FAILED;
 		}
+		if (message === null) await close();
+		else error = message;
+		busy = false;
+		if (message === null) return;
+		await tick();
+		if (document.activeElement === document.body) button()?.focus();
 	}
 </script>
 
@@ -78,7 +90,10 @@
 			class="settings-edit"
 			onsubmit={(e) => {
 				e.preventDefault();
-				void run(() => onSave(draft));
+				void run(
+					() => onSave(draft),
+					() => saveEl
+				);
 			}}
 		>
 			<EaosInput
@@ -94,14 +109,17 @@
 				hideLabel
 			/>
 			<div class="settings-edit__actions">
-				<button class="settings-save" type="submit" disabled={busy}>Save</button>
-				<button class="settings-cancel" type="button" onclick={() => void close()}>Cancel</button>
+				<button bind:this={saveEl} class="settings-save" type="submit" disabled={busy}>Save</button>
+				<button class="settings-cancel" type="button" disabled={busy} onclick={() => void close()}
+					>Cancel</button
+				>
 				{#if onRemove && value}
 					<button
+						bind:this={removeEl}
 						class="settings-remove"
 						type="button"
 						disabled={busy}
-						onclick={() => void run(onRemove)}>Remove</button
+						onclick={() => void run(onRemove, () => removeEl)}>Remove</button
 					>
 				{/if}
 			</div>
@@ -191,6 +209,11 @@
 		font: inherit;
 		text-decoration: underline;
 		cursor: pointer;
+	}
+
+	.settings-cancel:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 
 	/* Remove: the row's one destructive action, set apart at the end and in the danger colour, the size of Save. */

@@ -120,6 +120,101 @@ describe('SettingsDateRow', () => {
 		expect(page.getByRole('button', { name: /^remove$/i }).query()).toBeNull();
 	});
 
+	// Focus follows the person: a save that ends while they are still on the row's own button hands focus back to it,
+	// and one that ends after they moved to another control leaves it there.
+	describe('focus around a save', () => {
+		const FAILED = 'Could not update right now - please try again.';
+		const outside: HTMLButtonElement[] = [];
+		afterEach(() => {
+			for (const button of outside.splice(0)) button.remove();
+		});
+
+		function addOutsideButton(): HTMLButtonElement {
+			const button = document.createElement('button');
+			button.textContent = 'Elsewhere';
+			document.body.append(button);
+			outside.push(button);
+			return button;
+		}
+
+		async function openAndSave(onSave: () => Promise<string | null>, over = {}) {
+			await row({ onSave, ...over });
+			await page.getByRole('button', { name: /skillbridge start/i }).click();
+			await page.getByLabelText('SkillBridge start').fill('2026-11-01');
+			await page.getByRole('button', { name: /^save$/i }).click();
+		}
+
+		const saveButton = () => document.querySelector('.settings-save');
+
+		it('leaves focus on the control the person moved to when a save works', async () => {
+			let settle: (message: string | null) => void = () => {};
+			await openAndSave(() => new Promise((resolve) => (settle = resolve)));
+			const elsewhere = addOutsideButton();
+			elsewhere.focus();
+			settle(null);
+			await expect.element(page.getByRole('button', { name: /^save$/i })).not.toBeInTheDocument();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(document.activeElement).toBe(elsewhere);
+		});
+
+		// The save runs long enough for the button to be turned off, which is what drops focus to the page.
+		it('puts focus back on Save when a save fails', async () => {
+			let fail: (reason: Error) => void = () => {};
+			await openAndSave(() => new Promise((_, reject) => (fail = reject)));
+			await expect.element(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
+			fail(new Error('E_LOCK_TIMEOUT'));
+			await expect.element(page.getByText(FAILED)).toBeVisible();
+			await expect.poll(() => document.activeElement).toBe(saveButton());
+		});
+
+		it('puts focus back on Save when a save is refused with a message', async () => {
+			let settle: (message: string | null) => void = () => {};
+			await openAndSave(() => new Promise((resolve) => (settle = resolve)));
+			await expect.element(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
+			settle('This date needs to be before your separation date.');
+			await expect
+				.element(page.getByText('This date needs to be before your separation date.'))
+				.toBeVisible();
+			await expect.poll(() => document.activeElement).toBe(saveButton());
+		});
+
+		it('puts focus back on Remove when a remove fails', async () => {
+			let fail: (reason: Error) => void = () => {};
+			await row({
+				value: '2026-11-01',
+				onRemove: () => new Promise((_, reject) => (fail = reject))
+			});
+			await page.getByRole('button', { name: /skillbridge start/i }).click();
+			await page.getByRole('button', { name: /^remove$/i }).click();
+			await expect.element(page.getByRole('button', { name: /^remove$/i })).toBeDisabled();
+			fail(new Error('E_LOCK_TIMEOUT'));
+			await expect.element(page.getByText(FAILED)).toBeVisible();
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(document.querySelector('.settings-remove'));
+		});
+
+		it('leaves focus on the control the person moved to when a save fails', async () => {
+			let fail: (reason: Error) => void = () => {};
+			await openAndSave(() => new Promise((_, reject) => (fail = reject)));
+			const elsewhere = addOutsideButton();
+			elsewhere.focus();
+			fail(new Error('E_LOCK_TIMEOUT'));
+			await expect.element(page.getByText(FAILED)).toBeVisible();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(document.activeElement).toBe(elsewhere);
+		});
+
+		it('turns Cancel off while a save runs and on again once it settles', async () => {
+			let settle: (message: string | null) => void = () => {};
+			await openAndSave(() => new Promise((resolve) => (settle = resolve)));
+			const cancel = page.getByRole('button', { name: /^cancel$/i });
+			await expect.element(cancel).toBeDisabled();
+			settle('This date needs to be before your separation date.');
+			await expect.element(cancel).toBeEnabled();
+		});
+	});
+
 	it('gives every row its own ids', async () => {
 		await row();
 		await row({ id: 'terminal-leave-start', label: 'Terminal leave start' });
