@@ -57,11 +57,12 @@ describe('ThemeControl', () => {
 		const buttons = [...container.querySelectorAll('button')];
 		const rings = () =>
 			buttons.map((b) =>
-				getComputedStyle(b).outlineStyle === 'none' ? 'none' : getComputedStyle(b).outlineWidth
+				getComputedStyle(b).borderTopStyle === 'none' ? 'none' : getComputedStyle(b).borderTopWidth
 			);
-		const widths = () => buttons.map((b) => b.getBoundingClientRect().width);
+		const sizes = () =>
+			buttons.map((b) => [b.getBoundingClientRect().width, b.getBoundingClientRect().height]);
 		expect(rings()).toEqual(['none', 'none', 'none']);
-		const before = widths();
+		const before = sizes();
 		const session = cdp();
 		await session.send('Emulation.setEmulatedMedia', {
 			features: [{ name: 'forced-colors', value: 'active' }]
@@ -73,9 +74,17 @@ describe('ThemeControl', () => {
 			const probe = document.createElement('span');
 			probe.style.color = 'Highlight';
 			document.body.append(probe);
-			expect(getComputedStyle(buttons[1]!).outlineColor).toBe(getComputedStyle(probe).color);
+			expect(getComputedStyle(buttons[1]!).borderTopColor).toBe(getComputedStyle(probe).color);
 			probe.remove();
-			expect(widths()).toEqual(before);
+			expect(sizes()).toEqual(before);
+			// The mark leaves the outline free, so the chosen pill shows the same focus ring as the others.
+			const focusRing = (b: HTMLButtonElement) => {
+				b.focus();
+				expect(b.matches(':focus-visible')).toBe(true);
+				const s = getComputedStyle(b);
+				return [s.outlineStyle, s.outlineWidth, s.outlineOffset, s.outlineColor];
+			};
+			expect(focusRing(buttons[1]!)).toEqual(focusRing(buttons[0]!));
 		} finally {
 			await session.send('Emulation.setEmulatedMedia', {
 				features: [{ name: 'forced-colors', value: 'none' }]

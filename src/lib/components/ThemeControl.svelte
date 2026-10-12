@@ -60,13 +60,13 @@
 		background: var(--color-accent);
 		color: var(--color-bg);
 	}
-	/* Forced colors replace the fill that marks the chosen theme, so there a 3px ring in the system highlight colour
-	   marks it, as on the SkillBridge pills. Inside the button and rounded like the pill, so the button keeps its
-	   size and the pill's rounded ends do not clip the ring. */
+	/* Forced colors replace the fill that marks the chosen theme, so there a 3px border in the system highlight colour
+	   marks it, as on the SkillBridge pills. A border leaves the outline to the focus ring. The padding gives up the
+	   border's 3px so the button keeps its size, and the border is rounded like the pill so its ends are not clipped. */
 	@media (forced-colors: active) {
 		.seg button[aria-pressed='true'] {
-			outline: 3px solid Highlight;
-			outline-offset: -3px;
+			border: 3px solid Highlight;
+			padding: 3px 12px;
 			border-radius: 999px;
 		}
 	}
