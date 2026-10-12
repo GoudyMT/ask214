@@ -263,12 +263,8 @@
 		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
 		// leaving them in memory is precisely what this button exists to prevent.
 		app.relockAll?.();
-		// The Lock button is gone with the unlocked page; focus goes to the Unlock button that replaces it, unless the
-		// person already moved it.
-		await tick();
-		if (document.activeElement === document.body) {
-			document.querySelector<HTMLElement>('.locked-panel__unlock')?.focus();
-		}
+		// The Lock button is gone with the unlocked page; focus goes to the Unlock button that replaces it.
+		await handFocusOn('.locked-panel__unlock');
 	}
 
 	async function unlock(): Promise<void> {
@@ -303,12 +299,31 @@
 			// Clear failed (e.g. another tab edited concurrently); the store lowers the mark only when
 			// the save lands, so the banner/notice correctly stay up. Tell the user they can retry.
 			clockError = 'Could not update right now - please try again.';
+			return;
 		}
+		// The notice and its button are gone; focus goes to the heading of their section, unless the person already moved it.
+		await handFocusOn('#timeline-heading');
+	}
+
+	// Focus that fell to the page when the pressed control went away is handed to `selector`; focus the person moved stays.
+	async function handFocusOn(selector: string): Promise<void> {
+		await tick();
+		if (document.activeElement === document.body)
+			document.querySelector<HTMLElement>(selector)?.focus();
+	}
+
+	async function promptInstall(): Promise<void> {
+		await install.promptInstall();
+		// Accepted or dismissed, the controller has taken the button away: focus goes to the section's heading.
+		await handFocusOn('#install-heading');
 	}
 
 	async function confirmErase(): Promise<void> {
 		eraseError = null;
 		wipeDialog?.close();
+		// Where the closing dialog left focus: its opener, which stays on a damaged page and goes with the page when the
+		// erase locks it.
+		const left = document.activeElement;
 		try {
 			await eraseEverything({
 				relock: () => app.relockAll?.(),
@@ -339,6 +354,11 @@
 			// more than usual: the user asked for their data to be gone and would otherwise walk away
 			// believing it was, because the dialog closed and the screen locked.
 			eraseError = 'Could not erase your data. Nothing was deleted - please try again.';
+			// Focus the person has not moved since the dialog closed goes to the line that says what happened.
+			await tick();
+			if (document.activeElement === document.body || document.activeElement === left) {
+				document.querySelector<HTMLElement>('.erase-error')?.focus();
+			}
 		}
 	}
 
@@ -374,7 +394,7 @@
 	     swapped to the locked panel. Rendered in the section that raised it, this message would be
 	     unmounted before the user ever saw it. -->
 		{#if eraseError}
-			<p class="erase-error" role="alert">{eraseError}</p>
+			<p class="erase-error" role="alert" tabindex="-1">{eraseError}</p>
 		{/if}
 		<!-- Above the lock gate on purpose: the theme is a non-PII device preference, so an idle-locked
 	     user can still switch light/dark without unlocking. -->
@@ -392,7 +412,7 @@
 	     Permanent (no dismiss) - a user who dismissed the Home nudge can still install from here. -->
 		{#if install.installed}
 			<section class="settings-section" aria-labelledby="install-heading">
-				<h2 id="install-heading" class="settings-section__heading">Install</h2>
+				<h2 id="install-heading" class="settings-section__heading" tabindex="-1">Install</h2>
 				{#if install.persisted}
 					<p class="settings-hint">
 						Ask 214 is installed, and its data is set to stay on this device.
@@ -403,15 +423,14 @@
 			</section>
 		{:else}
 			<section class="settings-section" aria-labelledby="install-heading">
-				<h2 id="install-heading" class="settings-section__heading">Install Ask 214</h2>
+				<h2 id="install-heading" class="settings-section__heading" tabindex="-1">
+					Install Ask 214
+				</h2>
 				<p class="settings-hint">
 					Install it so it opens like an app and is less likely to have its data cleared.
 				</p>
 				{#if install.canPrompt || install.ios}
-					<InstallPrompt
-						canPrompt={install.canPrompt}
-						onInstall={() => void install.promptInstall()}
-					/>
+					<InstallPrompt canPrompt={install.canPrompt} onInstall={() => void promptInstall()} />
 				{:else}
 					<p class="settings-hint">
 						If your browser supports it, open its menu and choose Install or Add to Home Screen.
@@ -441,7 +460,9 @@
 		{:else}
 			{#if hasTimeline}
 				<section class="settings-section" aria-labelledby="timeline-heading">
-					<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
+					<h2 id="timeline-heading" class="settings-section__heading" tabindex="-1">
+						Transition timeline
+					</h2>
 
 					<SettingsDateRow
 						id="eaos"
@@ -566,7 +587,7 @@
 		<!-- The saved data failed its own checks at start-up, so no reload can read it: only the way back is offered - the
 	     same erase, from the same dialog. -->
 		{#if eraseError}
-			<p class="erase-error" role="alert">{eraseError}</p>
+			<p class="erase-error" role="alert" tabindex="-1">{eraseError}</p>
 		{/if}
 		<section class="settings-section" aria-labelledby="privacy-heading">
 			<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>

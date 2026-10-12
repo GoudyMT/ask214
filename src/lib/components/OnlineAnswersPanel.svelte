@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { registerSecureInput } from '../profile/lifecycle';
 
 	type Props = {
@@ -56,7 +57,11 @@
 			await onClearKey();
 		} catch {
 			keyError = 'Could not update right now - please try again.';
+			return;
 		}
+		// Remove goes with the key; focus goes to the field a new key is typed in, unless the person already moved it.
+		await tick();
+		if (document.activeElement === document.body) keyInputEl?.focus();
 	}
 </script>
 

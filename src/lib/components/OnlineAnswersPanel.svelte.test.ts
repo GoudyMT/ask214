@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import OnlineAnswersPanel from './OnlineAnswersPanel.svelte';
 import { scrubSecureInputs } from '../profile/lifecycle';
 
@@ -147,6 +148,50 @@ describe('OnlineAnswersPanel', () => {
 
 			click(container, '.online-key__clear');
 			await vi.waitFor(() => expect(container.querySelector('.online-key__error')).toBeNull());
+		});
+	});
+
+	// The Remove button goes with the key it removes; focus goes to the key field, where a new key is typed, instead of
+	// falling to the page. The parent turns hasKey off when the removal lands, as the rerender here does.
+	describe('after Remove', () => {
+		const remove = () => page.getByRole('button', { name: 'Remove' });
+
+		it('hands focus to the key field when the removal lands', async () => {
+			const props: Props = { ...base, hasKey: true };
+			const screen = await render(OnlineAnswersPanel, {
+				props: {
+					...props,
+					onClearKey: async () => {
+						await new Promise((resolve) => setTimeout(resolve, 50));
+						await screen.rerender({ ...props, hasKey: false });
+					}
+				}
+			});
+			await remove().click();
+
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(document.getElementById('online-key-input'));
+			expect(remove().query()).toBeNull();
+		});
+
+		// Guard: a removal that fails leaves the button where it is, with the line that says so.
+		it('keeps focus on Remove, with the line, when the removal fails', async () => {
+			const { container } = await render(OnlineAnswersPanel, {
+				props: {
+					...base,
+					hasKey: true,
+					onClearKey: () => Promise.reject(new Error('E_TEST_WRITE'))
+				}
+			});
+			await remove().click();
+
+			await vi.waitFor(() =>
+				expect(container.querySelector('.online-key__error')?.textContent).toBe(
+					'Could not update right now - please try again.'
+				)
+			);
+			await expect.poll(() => document.activeElement).toBe(remove().element());
 		});
 	});
 
