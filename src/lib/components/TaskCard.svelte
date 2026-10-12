@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
@@ -40,13 +41,42 @@
 		if (prevStatus !== undefined && item.status !== prevStatus) {
 			expanded = false;
 			closeSnooze();
+			// Only a snooze applied here moves focus: a change made in another tab must not take it.
+			if (snoozeApplied) void returnFocus();
+			snoozeApplied = false;
 		}
 		prevStatus = item.status;
 	});
 
+	// Closing an editor removes the button the person pressed, which drops focus to the page. The control that
+	// opened the editor gets it back; if the card's status change has removed that control too, the card's
+	// collapsed line (or the open card itself) does. Focus someone has already moved elsewhere is left alone.
+	let opener: HTMLElement | undefined;
+	let snoozeApplied = false;
+	let cardEl = $state<HTMLElement | null>(null);
+	let lineEl = $state<HTMLElement | null>(null);
+
+	async function returnFocus(): Promise<void> {
+		await tick();
+		if (document.activeElement !== document.body) return;
+		(opener?.isConnected ? opener : (lineEl ?? cardEl))?.focus();
+	}
+
+	function toggleSnooze(event: MouseEvent): void {
+		snoozeOpen = !snoozeOpen;
+		opener = event.currentTarget as HTMLElement;
+	}
+
+	function cancelSnooze(): void {
+		closeSnooze();
+		void returnFocus();
+	}
+
 	function snooze(days: number): void {
 		onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days));
 		closeSnooze();
+		snoozeApplied = true;
+		void returnFocus();
 	}
 
 	// The earliest custom date is tomorrow, read when the field opens and again at the tap. A snooze is live only while
@@ -63,6 +93,8 @@
 		if (!dateInput.reportValidity()) return;
 		onSetSnooze(item.def.id, dateValue);
 		closeSnooze();
+		snoozeApplied = true;
+		void returnFocus();
 	}
 
 	function closeSnooze(): void {
@@ -79,7 +111,8 @@
 	let noteFailed = $state(false);
 	let noteSaving = false;
 
-	function openNote(): void {
+	function openNote(event: MouseEvent): void {
+		opener = event.currentTarget as HTMLElement;
 		noteValue = item.note ?? '';
 		noteFailed = false;
 		noteOpen = true;
@@ -104,6 +137,7 @@
 	function closeNote(): void {
 		noteOpen = false;
 		noteValue = '';
+		void returnFocus();
 	}
 
 	// Contextual outbound resources: the links curated for this specific task, collapsed by default.
@@ -223,6 +257,7 @@
 	<button
 		type="button"
 		class="task-line line-{item.status}"
+		bind:this={lineEl}
 		aria-expanded="false"
 		onclick={() => (expanded = true)}
 	>
@@ -276,6 +311,7 @@
 		class="task-card status-{item.status}"
 		class:task-card--calm={item.status === 'after-you-leave' && !firm}
 		id="task-{item.def.id}"
+		bind:this={cardEl}
 		tabindex="-1"
 	>
 		<div class="task-card__body">
@@ -312,7 +348,7 @@
 				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
 				<!-- A snooze never hides a firm warning, so it is not offered where it would change nothing. -->
 				{#if !isFirmWarning(item.status, item.def.kind)}
-					<button type="button" onclick={() => (snoozeOpen = !snoozeOpen)}>Snooze</button>
+					<button type="button" onclick={toggleSnooze}>Snooze</button>
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
@@ -328,7 +364,7 @@
 						<button type="button" class="task-card__preset" onclick={() => (showDateInput = true)}>
 							Customize
 						</button>
-						<button type="button" class="task-card__snooze-cancel" onclick={closeSnooze}
+						<button type="button" class="task-card__snooze-cancel" onclick={cancelSnooze}
 							>Cancel</button
 						>
 					</div>
