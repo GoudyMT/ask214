@@ -442,6 +442,23 @@ describe('SkillBridgePlanRow (while a save runs)', () => {
 		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
 	});
 
+	// A retry clears the last message, so the same failure is put back on the page and read out again.
+	it('takes the failure away while a retry runs, so the same failure is said again', async () => {
+		const FAILED = 'Could not update right now - please try again.';
+		let fail: (reason: Error) => void = () => undefined;
+		const onSave = vi.fn(() => new Promise<string | null>((_, reject) => (fail = reject)));
+		await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		await page.getByRole('button', { name: 'Save' }).click();
+		fail(new Error('E_LOCK_TIMEOUT'));
+		await expect.element(page.getByText(FAILED, { exact: true })).toBeVisible();
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.element(page.getByText(FAILED, { exact: true })).not.toBeInTheDocument();
+		fail(new Error('E_LOCK_TIMEOUT'));
+		await expect.element(page.getByText(FAILED, { exact: true })).toBeVisible();
+	});
+
 	it('keeps the form open when its toggle is pressed while a save runs, so a failure shows', async () => {
 		let fail: (reason: Error) => void = () => undefined;
 		const onSave = vi.fn(() => new Promise<string | null>((_, reject) => (fail = reject)));

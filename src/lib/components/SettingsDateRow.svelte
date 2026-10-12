@@ -57,6 +57,8 @@
 		button: () => HTMLElement | null
 	): Promise<void> {
 		busy = true;
+		// Cleared first, so the same failure on a retry is put back on the page and read out again.
+		error = null;
 		let message: string | null;
 		try {
 			message = await action();

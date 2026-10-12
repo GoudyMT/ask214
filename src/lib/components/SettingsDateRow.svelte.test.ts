@@ -214,6 +214,18 @@ describe('SettingsDateRow', () => {
 			await expect.element(cancel).toBeEnabled();
 		});
 
+		// A retry clears the last message, so the same failure is put back on the page and read out again.
+		it('takes the failure away while a retry runs, so the same failure is said again', async () => {
+			let fail: (reason: Error) => void = () => {};
+			await openAndSave(() => new Promise((_, reject) => (fail = reject)));
+			fail(new Error('E_LOCK_TIMEOUT'));
+			await expect.element(page.getByText(FAILED, { exact: true })).toBeVisible();
+			await page.getByRole('button', { name: /^save$/i }).click();
+			await expect.element(page.getByText(FAILED, { exact: true })).not.toBeInTheDocument();
+			fail(new Error('E_LOCK_TIMEOUT'));
+			await expect.element(page.getByText(FAILED, { exact: true })).toBeVisible();
+		});
+
 		it('keeps the form open when its toggle is pressed while a save runs, so a failure shows', async () => {
 			let fail: (reason: Error) => void = () => {};
 			await openAndSave(() => new Promise((_, reject) => (fail = reject)));
