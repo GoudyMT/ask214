@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
@@ -21,7 +22,7 @@
 	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
 	let addFailed = $state(false);
 
-	async function add(): Promise<void> {
+	async function add(button: HTMLButtonElement): Promise<void> {
 		building = true;
 		addFailed = false;
 		let file: CalendarFile;
@@ -32,6 +33,8 @@
 			return;
 		} finally {
 			building = false;
+			// Add was off while the file built, which dropped focus to the page; it gets it back unless the person moved on.
+			void tick().then(() => document.activeElement === document.body && button.focus());
 		}
 		onAdd(file);
 	}
@@ -41,7 +44,12 @@
 	<div class="cal-card__body">
 		<h2 id="cal-card-heading" class="cal-card__heading">Keep your deadlines in sight</h2>
 		<p class="cal-card__copy">Your upcoming deadlines, with alerts before each firm one.</p>
-		<button class="cal-card__add" type="button" disabled={building} onclick={() => void add()}>
+		<button
+			class="cal-card__add"
+			type="button"
+			disabled={building}
+			onclick={(e) => void add(e.currentTarget)}
+		>
 			Add to my calendar
 		</button>
 		{#if addFailed}

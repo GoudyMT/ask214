@@ -104,6 +104,8 @@
 			return;
 		} finally {
 			building = false;
+			// Add was off while the file built, which dropped focus to the page; it gets it back unless the person moved on.
+			void tick().then(() => document.activeElement === document.body && addEl?.focus());
 		}
 		onAdd(file);
 	}

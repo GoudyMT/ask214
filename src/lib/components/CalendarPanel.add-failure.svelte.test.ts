@@ -15,11 +15,11 @@ vi.mock('$lib/calendar/build-ics', async (importOriginal) => {
 	return {
 		...real,
 		buildIcs: async (...args: Parameters<typeof real.buildIcs>) => {
+			await seams.gate;
 			if (seams.failNext) {
 				seams.failNext = false;
 				throw new Error('E_TEST_BUILD');
 			}
-			await seams.gate;
 			return real.buildIcs(...args);
 		}
 	};
@@ -115,5 +115,34 @@ describe('CalendarPanel, when the file cannot be made', () => {
 		open();
 		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
 		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+	});
+
+	// Add is off while the file builds, which drops focus to the page; it gets focus back, so the person can try again.
+	it.each([
+		['cannot be made', true],
+		['is made', false]
+	] as const)('puts focus back on Add once the file %s', async (_, fails) => {
+		seams.failNext = fails;
+		let open = () => {};
+		seams.gate = new Promise<void>((resolve) => (open = resolve));
+		const onAdd = vi.fn();
+		const { container } = await render(CalendarPanel, {
+			props: {
+				items: [task],
+				exclusions: { taskIds: [], categories: [] },
+				access: 'ready',
+				stale: [],
+				onAcknowledge: async () => {},
+				onSetExclusions: vi.fn(),
+				onAdd
+			}
+		});
+		const add = page.getByRole('button', { name: /^add to my calendar$/i });
+		await add.click();
+		await expect.element(add).toBeDisabled();
+		open();
+		await expect.element(add).toBeEnabled();
+		expect(onAdd).toHaveBeenCalledTimes(fails ? 0 : 1);
+		await expect.poll(() => document.activeElement).toBe(container.querySelector('.cal-add'));
 	});
 });
