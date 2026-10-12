@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { cdp, page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
 import type { TimelineItem } from '$lib/timeline/generate';
 import type { TaskDef } from '$lib/timeline/types';
@@ -49,6 +49,13 @@ const task: TimelineItem = {
 };
 
 const DANGER = 'rgb(200, 0, 0)';
+// Enter as a keyboard sends it: the key, its code and the carriage return it types.
+const ENTER = {
+	key: 'Enter',
+	code: 'Enter',
+	windowsVirtualKeyCode: 13,
+	text: String.fromCharCode(13)
+};
 
 beforeEach(() => {
 	seams.failNext = true;
@@ -144,5 +151,42 @@ describe('CalendarPanel, when the file cannot be made', () => {
 		await expect.element(add).toBeEnabled();
 		expect(onAdd).toHaveBeenCalledTimes(fails ? 0 : 1);
 		await expect.poll(() => document.activeElement).toBe(container.querySelector('.cal-add'));
+	});
+
+	// A held key repeats about every 40 ms; each repeat that reached Add would make and hand over another file. A new
+	// press still makes one. The keys go through the browser's own input, so a repeat is a real one.
+	it.each([
+		['builds at once', 0],
+		['takes a while to build', 100]
+	] as const)('makes one file for a held Enter on Add when the file %s', async (_, ms) => {
+		seams.failNext = false;
+		const onAdd = vi.fn();
+		const { container } = await render(CalendarPanel, {
+			props: {
+				items: [task],
+				exclusions: { taskIds: [], categories: [] },
+				access: 'ready',
+				stale: [],
+				onAcknowledge: async () => {},
+				onSetExclusions: vi.fn(),
+				onAdd
+			}
+		});
+		const add = page.getByRole('button', { name: /^add to my calendar$/i });
+		(container.querySelector('.cal-add') as HTMLButtonElement).focus();
+		if (ms) seams.gate = new Promise<void>((resolve) => setTimeout(resolve, ms));
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 15; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await expect.element(add).toBeEnabled();
+		expect(onAdd).toHaveBeenCalledOnce();
+
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledTimes(2));
 	});
 });

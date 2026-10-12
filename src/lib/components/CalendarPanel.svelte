@@ -124,12 +124,14 @@
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
 	{/if}
 
+	<!-- A held key repeats, and each repeat would make and hand over another file: only a new press adds. -->
 	<button
 		bind:this={addEl}
 		class="cal-add"
 		type="button"
 		disabled={building || !ready || !hasEvents}
 		onclick={() => void addToCalendar()}
+		onkeydown={(e) => e.repeat && e.preventDefault()}
 	>
 		Add to my calendar
 	</button>
