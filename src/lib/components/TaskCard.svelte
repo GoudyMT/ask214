@@ -52,8 +52,10 @@
 
 	// Closing an editor removes the button the person pressed, which drops focus to the page. The control that
 	// opened the editor gets it back; if the card's status change has removed that control too, the card's
-	// collapsed line (or the open card itself) does. Focus someone has already moved elsewhere is left alone.
-	let opener: HTMLElement | undefined;
+	// collapsed line (or the open card itself) does. Focus someone has already moved elsewhere is left alone. Each editor
+	// keeps its own opener, as both can be open at once.
+	let snoozeOpener: HTMLElement | undefined;
+	let noteOpener: HTMLElement | undefined;
 	let appliedHere = false;
 	let cardEl = $state<HTMLElement | null>(null);
 	let lineEl = $state<HTMLElement | null>(null);
@@ -67,7 +69,7 @@
 		if (held) (open ? headerEl : lineEl)?.focus();
 	}
 
-	async function returnFocus(): Promise<void> {
+	async function returnFocus(opener?: HTMLElement): Promise<void> {
 		await tick();
 		if (document.activeElement !== document.body) return;
 		(opener?.isConnected ? opener : (lineEl ?? cardEl))?.focus();
@@ -75,12 +77,12 @@
 
 	function toggleSnooze(event: MouseEvent): void {
 		snoozeOpen = !snoozeOpen;
-		opener = event.currentTarget as HTMLElement;
+		snoozeOpener = event.currentTarget as HTMLElement;
 	}
 
 	function cancelSnooze(): void {
 		closeSnooze();
-		void returnFocus();
+		void returnFocus(snoozeOpener);
 	}
 
 	// The change this card made moves focus once it lands. A write that did not land changes nothing here, so the mark
@@ -93,7 +95,7 @@
 	function snooze(days: number): void {
 		void markApplied(onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days)));
 		closeSnooze();
-		void returnFocus();
+		void returnFocus(snoozeOpener);
 	}
 
 	// Mark done, Skip and Restore remove the pressed button when the card changes state; focus follows the card.
@@ -115,7 +117,7 @@
 		if (!dateInput.reportValidity()) return;
 		void markApplied(onSetSnooze(item.def.id, dateValue));
 		closeSnooze();
-		void returnFocus();
+		void returnFocus(snoozeOpener);
 	}
 
 	function closeSnooze(): void {
@@ -133,7 +135,7 @@
 	let noteSaving = false;
 
 	function openNote(event: MouseEvent): void {
-		opener = event.currentTarget as HTMLElement;
+		noteOpener = event.currentTarget as HTMLElement;
 		noteValue = item.note ?? '';
 		noteFailed = false;
 		noteOpen = true;
@@ -158,7 +160,7 @@
 	function closeNote(): void {
 		noteOpen = false;
 		noteValue = '';
-		void returnFocus();
+		void returnFocus(noteOpener);
 	}
 
 	// Contextual outbound resources: the links curated for this specific task, collapsed by default.

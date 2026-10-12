@@ -1092,6 +1092,27 @@ describe('TaskCard (focus after an editor closes)', () => {
 		await expect.poll(() => document.activeElement).toBe(add);
 	});
 
+	// The two editors can be open together; each gives focus back to its own control.
+	it('returns focus to Snooze when its picker is cancelled with the note editor open too', async () => {
+		const { container } = await mountCard(makeItem({ status: 'start-now' }));
+		const snooze = press(container, 'Snooze');
+		press(container, 'Add note');
+		(container.querySelector('.task-card__snooze-cancel') as HTMLButtonElement).click();
+		flushSync();
+		await expect.poll(() => document.activeElement).toBe(snooze);
+	});
+
+	it('returns focus to Edit note once a saved note lands with the Snooze picker open too', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		const add = press(container, 'Add note');
+		press(container, 'Snooze');
+		typeNote(container, 'see VSO');
+		press(container, 'Save');
+		await update({ ...item, note: 'see VSO' });
+		await expect.poll(() => document.activeElement).toBe(add);
+	});
+
 	it('keeps focus on a resolved task as its line opens and closes', async () => {
 		const { container } = await mountCard(makeItem({ status: 'done' }));
 		const line = container.querySelector('button.task-line') as HTMLButtonElement;
