@@ -41,9 +41,9 @@
 		if (prevStatus !== undefined && item.status !== prevStatus) {
 			expanded = false;
 			closeSnooze();
-			// Only a snooze applied here moves focus: a change made in another tab must not take it.
-			if (snoozeApplied) void returnFocus();
-			snoozeApplied = false;
+			// Only a change made on this card moves focus: a change made in another tab must not take it.
+			if (appliedHere) void returnFocus();
+			appliedHere = false;
 		}
 		prevStatus = item.status;
 	});
@@ -52,7 +52,7 @@
 	// opened the editor gets it back; if the card's status change has removed that control too, the card's
 	// collapsed line (or the open card itself) does. Focus someone has already moved elsewhere is left alone.
 	let opener: HTMLElement | undefined;
-	let snoozeApplied = false;
+	let appliedHere = false;
 	let cardEl = $state<HTMLElement | null>(null);
 	let lineEl = $state<HTMLElement | null>(null);
 
@@ -75,8 +75,14 @@
 	function snooze(days: number): void {
 		onSetSnooze(item.def.id, snoozeUntilIso(new Date(), days));
 		closeSnooze();
-		snoozeApplied = true;
+		appliedHere = true;
 		void returnFocus();
+	}
+
+	// Mark done, Skip and Restore remove the pressed button when the card changes state; focus follows the card.
+	function setStatus(status: TaskStatus | undefined): void {
+		onSetStatus(item.def.id, status);
+		appliedHere = true;
 	}
 
 	// The earliest custom date is tomorrow, read when the field opens and again at the tap. A snooze is live only while
@@ -93,7 +99,7 @@
 		if (!dateInput.reportValidity()) return;
 		onSetSnooze(item.def.id, dateValue);
 		closeSnooze();
-		snoozeApplied = true;
+		appliedHere = true;
 		void returnFocus();
 	}
 
@@ -299,7 +305,7 @@
 			</p>
 			<!-- Decision B: a single unified Restore clears the stored status (un-mark / un-snooze). -->
 			<div class="task-card__actions">
-				<button type="button" onclick={() => onSetStatus(item.def.id, undefined)}>Restore</button>
+				<button type="button" onclick={() => setStatus(undefined)}>Restore</button>
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
 			{@render noteSection()}
@@ -344,8 +350,8 @@
 				</div>
 			{/if}
 			<div class="task-card__actions">
-				<button type="button" onclick={() => onSetStatus(item.def.id, 'done')}>Mark done</button>
-				<button type="button" onclick={() => onSetStatus(item.def.id, 'skipped')}>Skip</button>
+				<button type="button" onclick={() => setStatus('done')}>Mark done</button>
+				<button type="button" onclick={() => setStatus('skipped')}>Skip</button>
 				<!-- A snooze never hides a firm warning, so it is not offered where it would change nothing. -->
 				{#if !isFirmWarning(item.status, item.def.kind)}
 					<button type="button" onclick={toggleSnooze}>Snooze</button>

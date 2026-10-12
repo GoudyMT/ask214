@@ -1108,6 +1108,40 @@ describe('TaskCard (focus after an editor closes)', () => {
 			.toBe(container.querySelector('button.task-line'));
 	});
 
+	it.each([
+		['Mark done', 'done'],
+		['Skip', 'skipped']
+	] as const)(
+		'returns focus to the collapsed line once %s moves the card there',
+		async (label, status) => {
+			const onSetStatus = vi.fn();
+			const item = makeItem({ status: 'start-now' });
+			const { container, update } = await mountCard(item, { onSetStatus });
+			(buttonByText(container, label) as HTMLButtonElement).focus();
+			press(container, label);
+			expect(onSetStatus).toHaveBeenCalledWith(item.def.id, status);
+			await update({ ...item, status });
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(container.querySelector('button.task-line'));
+		}
+	);
+
+	it('returns focus to the open card once Restore moves it there', async () => {
+		const onSetStatus = vi.fn();
+		const item = makeItem({ status: 'done' });
+		const { container, update } = await mountCard(item, { onSetStatus });
+		(container.querySelector('button.task-line') as HTMLButtonElement).click();
+		flushSync();
+		(buttonByText(container, 'Restore') as HTMLButtonElement).focus();
+		press(container, 'Restore');
+		expect(onSetStatus).toHaveBeenCalledWith(item.def.id, undefined);
+		await update({ ...item, status: 'start-now' });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('article.task-card'));
+	});
+
 	it('leaves focus alone when the person has moved on before a save lands', async () => {
 		let land: () => void = noop;
 		const pending = new Promise<void>((resolve) => {
