@@ -124,7 +124,7 @@ describe('Settings, the calendar add', () => {
 	it('says the saved progress could not be loaded when the timeline failed to read', async () => {
 		timeline.failed = true;
 		await render(SettingsPage);
-		await expect.element(page.getByText(PROGRESS_LINE)).toBeVisible();
+		await expect.element(page.getByText(PROGRESS_LINE, { exact: true })).toBeVisible();
 		await expect
 			.element(page.getByRole('button', { name: /^add to my calendar$/i }))
 			.toBeDisabled();
@@ -134,9 +134,9 @@ describe('Settings, the calendar add', () => {
 	it('says the timeline is locked, with a link to the Timeline page, when it is', async () => {
 		timeline.locked = true;
 		await render(SettingsPage);
-		await expect.element(page.getByText(LOCKED_LINE)).toBeVisible();
+		await expect.element(page.getByText(LOCKED_LINE, { exact: true })).toBeVisible();
 		await expect
-			.element(page.getByText(LOCKED_LINE).getByRole('link', { name: 'Timeline' }))
+			.element(page.getByText(LOCKED_LINE, { exact: true }).getByRole('link', { name: 'Timeline' }))
 			.toHaveAttribute('href', resolve('/timeline'));
 		await expect.element(customizeSummary()).toMatchTextContent('Locked');
 	});
@@ -146,7 +146,7 @@ describe('Settings, the calendar add', () => {
 		calendar.ready = false;
 		calendar.failed = true;
 		await render(SettingsPage);
-		await expect.element(page.getByText(CALENDAR_LINE)).toBeVisible();
+		await expect.element(page.getByText(CALENDAR_LINE, { exact: true })).toBeVisible();
 		expect(page.getByText(PROGRESS_LINE).query()).toBeNull();
 		await expect.element(customizeSummary()).toMatchTextContent('Unavailable');
 	});
@@ -158,7 +158,7 @@ describe('Settings, the calendar add', () => {
 		calendar.ready = false;
 		calendar.locked = true;
 		await render(SettingsPage);
-		await expect.element(page.getByText(CALENDAR_LINE)).toBeVisible();
+		await expect.element(page.getByText(CALENDAR_LINE, { exact: true })).toBeVisible();
 		await expect.element(customizeSummary()).toMatchTextContent('Unavailable');
 	});
 

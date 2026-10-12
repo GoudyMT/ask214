@@ -62,7 +62,7 @@ test('a calendar record that cannot be read says so in Settings and keeps adding
 	await damageCalendarRecord(page);
 	await page.goto('/settings');
 
-	await expect(page.getByText(LINE)).toBeVisible();
+	await expect(page.getByText(LINE, { exact: true })).toBeVisible();
 	await expect(page.getByRole('button', { name: /^customize what's included/i })).toContainText(
 		'Unavailable'
 	);

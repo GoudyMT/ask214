@@ -644,7 +644,7 @@ describe('CalendarPanel (the states it cannot add in)', () => {
 
 	it('says its saved progress could not be loaded, and the summary reads Unavailable', async () => {
 		const { container } = await render(CalendarPanel, { props: propsFor('timeline-failed') });
-		await expect.element(page.getByText(PROGRESS_LINE)).toBeVisible();
+		await expect.element(page.getByText(PROGRESS_LINE, { exact: true })).toBeVisible();
 		expect(container.textContent).not.toContain('calendar settings could not');
 		expect(summaryOf(container)).toBe('Unavailable');
 		expect((container.querySelector('.cal-add') as HTMLButtonElement).disabled).toBe(true);
@@ -652,13 +652,13 @@ describe('CalendarPanel (the states it cannot add in)', () => {
 
 	it('says its calendar settings could not be loaded, and the summary reads Unavailable', async () => {
 		const { container } = await render(CalendarPanel, { props: propsFor('calendar-failed') });
-		await expect.element(page.getByText(CALENDAR_LINE)).toBeVisible();
+		await expect.element(page.getByText(CALENDAR_LINE, { exact: true })).toBeVisible();
 		expect(summaryOf(container)).toBe('Unavailable');
 	});
 
 	it('says the timeline is locked, with a link to the Timeline page', async () => {
 		const { container } = await render(CalendarPanel, { props: propsFor('timeline-locked') });
-		await expect.element(page.getByText(LOCKED_LINE)).toBeVisible();
+		await expect.element(page.getByText(LOCKED_LINE, { exact: true })).toBeVisible();
 		const link = page.getByRole('link', { name: 'Timeline' });
 		await expect.element(link).toHaveAttribute('href', resolve('/timeline'));
 		expect(container.textContent).not.toContain('could not be loaded');
@@ -673,7 +673,7 @@ describe('CalendarPanel (the states it cannot add in)', () => {
 	] as const)('puts the %s line directly under Add', async (access, line) => {
 		const { container } = await render(CalendarPanel, { props: propsFor(access) });
 		expect(container.querySelector('.cal-add')?.nextElementSibling).toBe(
-			page.getByText(line).element()
+			page.getByText(line, { exact: true }).element()
 		);
 	});
 
@@ -690,7 +690,8 @@ describe('CalendarPanel (the states it cannot add in)', () => {
 			document.documentElement.style.removeProperty('--color-danger');
 			document.documentElement.style.removeProperty('--color-fg-muted');
 		});
-		const colourOf = (text: string) => getComputedStyle(page.getByText(text).element()).color;
+		const colourOf = (text: string) =>
+			getComputedStyle(page.getByText(text, { exact: true }).element()).color;
 
 		it('puts the calendar settings line in the danger colour', async () => {
 			await render(CalendarPanel, { props: propsFor('calendar-failed') });

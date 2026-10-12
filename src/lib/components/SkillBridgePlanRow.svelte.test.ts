@@ -27,7 +27,8 @@ describe('SkillBridgePlanRow', () => {
 		await expect
 			.element(
 				page.getByText(
-					"Your saved progress could not be loaded, so this answer can't be changed right now. Reload the app to try again."
+					"Your saved progress could not be loaded, so this answer can't be changed right now. Reload the app to try again.",
+					{ exact: true }
 				)
 			)
 			.toBeVisible();
@@ -499,7 +500,7 @@ describe('SkillBridgePlanRow (the states it cannot be changed in)', () => {
 			props: { plan: null, access: 'locked', onSave: vi.fn() }
 		});
 		expect(summaryOf(container)).toBe('Locked');
-		await expect.element(page.getByText(LOCKED_LINE)).toBeVisible();
+		await expect.element(page.getByText(LOCKED_LINE, { exact: true })).toBeVisible();
 		await expect
 			.element(page.getByRole('link', { name: 'Timeline' }))
 			.toHaveAttribute('href', resolve('/timeline'));
