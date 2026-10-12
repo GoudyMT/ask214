@@ -218,6 +218,16 @@ const STATIC = 'static';
 //     root layout, -28 B page, -127 B precache), kept; a rewrite of the profile field-type table (inside the noise or
 //     larger), not kept. Not found: the shared chunk the build now splits in two (no importer of the asset constants
 //     changed).
+//     Route nodes 47,200 -> 47,910 (package.json's size-limit), precache 149,405 -> 150,260 and the root layout
+//     7,080 -> 7,100 B (owner's call, 2026-10-12): the accessibility and copy fixes - one line for each state the
+//     Calendar panel and the SkillBridge row cannot be used in, with a file that cannot be made said under Add (the
+//     Settings and timeline route nodes), focus kept or handed back by the task card's editors and the date rows, the
+//     task card's date column capped above 480 px, and the calendar store handed to the page when its load fails (root
+//     layout) - two builds measured route nodes 47,867-47,868 B, precache 150,215-150,218 B and root layout
+//     7,059-7,060 B, about 40 B of room above the highest. Trim pass, each measured on a full build: one branch for the
+//     two failed lines (+15 B route nodes) and the four margin rules under Add merged (+3 B, inside the noise), not
+//     kept; the locked line written into the template not tried, as it would leave the copy module the personal-claim
+//     test reads in full.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -230,7 +240,7 @@ const LIMIT = {
 	page: 61_595,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 149_405,
+	precacheBytes: 150_260,
 	workerScripts: 147_200
 };
 
