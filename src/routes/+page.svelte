@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { waitForControl } from '$lib/ask/when-controlled';
 	import AskView from '$lib/components/AskView.svelte';
@@ -91,6 +91,15 @@
 	function dismissInstall(): void {
 		dismissNudge();
 		nudgeDismissed = true;
+	}
+	// Install and Dismiss both remove the nudge, and the button that was pressed goes with it: focus falls to the
+	// page unless the person has already moved on, so it goes to the question field, the page's first control.
+	async function closeNudge(action: () => unknown): Promise<void> {
+		await action();
+		await tick();
+		if (document.activeElement === document.body) {
+			document.querySelector<HTMLElement>('.ask-input')?.focus();
+		}
 	}
 
 	onMount(() => {
@@ -185,8 +194,8 @@
 		<div class="home-install">
 			<InstallNudge
 				canPrompt={install.canPrompt}
-				onInstall={() => void install.promptInstall()}
-				ondismiss={dismissInstall}
+				onInstall={() => void closeNudge(install.promptInstall)}
+				ondismiss={() => void closeNudge(dismissInstall)}
 			/>
 		</div>
 	{/if}
