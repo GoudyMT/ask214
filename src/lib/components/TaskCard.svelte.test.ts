@@ -555,6 +555,35 @@ describe('TaskCard (open states)', () => {
 		release();
 		await expect.poll(() => container.querySelector('textarea')).toBeNull();
 	});
+
+	// Cancel would close the editor under a save that may still fail, leaving that failure nowhere to show and the typed
+	// text lost, so it is off while the note saves and back on once the save has failed.
+	it('Cancel is off while a note saves, and a save that then fails keeps the text and gives Cancel back', async () => {
+		let fail: (reason: unknown) => void = () => {};
+		const onSetNote = vi
+			.fn<(taskId: string, note: string | undefined) => Promise<void>>()
+			.mockImplementation(() => new Promise<void>((_, reject) => (fail = reject)));
+		const { container } = await renderCard(makeItem(), { onSetNote });
+		await typeNote(container, 'Call the VSO Monday');
+		const cancel = buttonByText(container, 'Cancel') as HTMLButtonElement;
+		expect(cancel.disabled).toBe(false);
+
+		buttonByText(container, 'Save')?.click();
+		await expect.poll(() => cancel.disabled).toBe(true);
+		expect(onSetNote).toHaveBeenCalledTimes(1);
+		cancel.click();
+		flushSync();
+		expect(container.querySelector('textarea')).not.toBeNull();
+		expect(buttonByText(container, 'Save')?.disabled).toBe(false);
+
+		fail(new Error('E_NOTE_SAVE'));
+		await expect.element(page.getByRole('alert')).toHaveTextContent(SAVE_FAILED);
+		expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+			'Call the VSO Monday'
+		);
+		await expect.poll(() => cancel.disabled).toBe(false);
+		expect(buttonByText(container, 'Cancel')).toBe(cancel);
+	});
 });
 
 // A snooze is live only while its date is after today, so the custom picker offers tomorrow at the earliest, and

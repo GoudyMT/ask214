@@ -132,7 +132,7 @@
 	let noteValue = $state('');
 
 	let noteFailed = $state(false);
-	let noteSaving = false;
+	let noteSaving = $state(false);
 
 	function openNote(event: MouseEvent): void {
 		noteOpener = event.currentTarget as HTMLElement;
@@ -263,7 +263,12 @@
 			{/if}
 			<div class="task-card__note-actions">
 				<button type="button" class="task-card__note-save" onclick={saveNote}>Save</button>
-				<button type="button" class="task-card__note-cancel" onclick={closeNote}>Cancel</button>
+				<button
+					type="button"
+					class="task-card__note-cancel"
+					disabled={noteSaving}
+					onclick={closeNote}>Cancel</button
+				>
 			</div>
 		</div>
 	{:else if item.note}
