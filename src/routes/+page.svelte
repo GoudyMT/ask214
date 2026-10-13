@@ -53,7 +53,7 @@
 	let earlyMode = $state(getDefaultMode());
 	// `keyboard`: the pill was pressed by keyboard or screen reader, so focus goes to the field once the question runs.
 	let earlyQuery: { query: string; mode: 'device' | 'online'; keyboard: boolean } | undefined;
-	let askView: ReturnType<typeof AskView> | undefined = $state();
+	let askView: ReturnType<typeof AskView> | undefined;
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
@@ -189,7 +189,7 @@
 				: (earlyQuery = {
 						query: q,
 						mode: earlyMode,
-						keyboard: press !== undefined && !press.detail
+						keyboard: !!press && !press.detail
 					})}
 		onSetUp={() => store?.setUp()}
 		onDismiss={() => store?.dismissSetup()}
