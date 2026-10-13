@@ -466,6 +466,34 @@ describe('SourceReader with a served document', () => {
 		expect(container.querySelector('.reader__notice')?.getAttribute('role')).toBe('alert');
 	});
 
+	// The Page button is turned off when the page cannot be had; if it held focus, focus goes to Text, the view now shown.
+	it('hands focus to Text when the document fails while Page holds focus', async () => {
+		let fail: ((reason: Error) => void) | undefined;
+		const slowFailingLoader = async (): Promise<PdfRuntime> => ({
+			getDocument: () => ({
+				promise: new Promise((_, reject) => (fail = reject)),
+				destroy: async () => {}
+			})
+		});
+		const { container } = await render(SourceReader, {
+			props: {
+				source: served(),
+				highlightId: 's2',
+				onClose: () => {},
+				pdfLoader: slowFailingLoader
+			}
+		});
+		await vi.waitFor(() => expect(seg(container, 'Page')).toBeDefined());
+		seg(container, 'Page')?.focus();
+		expect(document.activeElement).toBe(seg(container, 'Page'));
+
+		// The document is asked for once the page view has loaded its parts.
+		await vi.waitFor(() => expect(fail).toBeDefined());
+		fail?.(new Error('E_TEST_LOAD'));
+		await vi.waitFor(() => expect(seg(container, 'Page')?.disabled).toBe(true));
+		await expect.poll(() => document.activeElement).toBe(seg(container, 'Text'));
+	});
+
 	// An online answer's text is the passage the search found, and nothing of it is kept on the device. The alert
 	// is heard alone, so it says what the reader now shows.
 	it('says it shows the passage the answer found when an online answer cannot open the page', async () => {
