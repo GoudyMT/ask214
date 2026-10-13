@@ -270,6 +270,9 @@ const STATIC = 'static';
 //     measured page 61,746-61,749 B, route nodes 48,989-48,997 B and precache 151,655-151,661 B, at least 40 B of room
 //     above the highest. Trim pass on a full build: the Home page's AskView reference kept out of $state and a shorter
 //     keyboard check, inside the noise (0-4 B), kept as harmless.
+//     Page 61,790 -> 61,805 (owner's call, 2026-10-13): the re-check's two fixes - the document reader leaving focus
+//     on the cited passage when the text view took it first, and the reminder's Set up stamping the question field's
+//     guard - left the page at 61,762 B, 28 B of room; the raise restores about 40 B.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -279,7 +282,7 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 61_790,
+	page: 61_805,
 	onDemand: 7_300,
 	precacheFiles: 60,
 	precacheBytes: 151_710,
