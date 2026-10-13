@@ -258,8 +258,8 @@ const STATIC = 'static';
 //     Ask cards and bars to the question field, Feedback's buttons to the message box, Calendar's Add and Customize to
 //     its heading, a Snooze picker closed from elsewhere to its opener, a Lock that lands after a save to Unlock - and
 //     a 44 px tap area on the theme and answer mode pills. Two builds measured route nodes 48,878-48,880 B and precache
-//     151,486-151,495 B, 40-54 B of room. Trim pass on a full build: the Ask card buttons routed through one hand-off
-//     helper (+19 B route nodes) not kept; element references moved out of $state not tried, as that grew the code when
+//     151,486-151,495 B, 40-54 B of room. Trim pass on a full build: Not now and the reminder's Dismiss routed through the
+//     same wrapper as the other Ask card buttons, in place of their own hand-off calls (+19 B route nodes), not kept; element references moved out of $state not tried, as that grew the code when
 //     measured before.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download

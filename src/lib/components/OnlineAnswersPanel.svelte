@@ -194,9 +194,9 @@
 		position: absolute;
 		inset: calc(50% - 22px) 0;
 	}
-	/* The keyboard focus ring sits on the container, outset, so it is never clipped by the pill's
-	   overflow:hidden + rounded ends (an inset per-segment ring loses its corners there). The accent
-	   fill still marks which segment is active. WCAG 2.4.7. */
+	/* The keyboard focus ring sits on the container, outset, so it follows the whole pill's rounded ends (an inset
+	   per-segment ring would lose its corners on the end buttons). The accent fill still marks which segment is
+	   active. WCAG 2.4.7. */
 	.online-mode:has(:focus-visible) {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
