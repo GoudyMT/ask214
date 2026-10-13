@@ -884,7 +884,8 @@ describe('AskView, focus after the pressed button goes away', () => {
 	// A second quick Enter, a new press and not a repeat, is the key that gave the focus, or a double press: it asks
 	// nothing. A press after the guard asks.
 	it.each([
-		['ignores a second Enter at once', 0, 0],
+		// 300 ms: inside the guard, and long enough to catch a guard too short for a real double press.
+		['ignores a second Enter soon after', 300, 0],
 		['asks on a second Enter after the guard', 600, 1]
 	] as const)('%s, after Not now', async (_, wait, asked) => {
 		const onAsk = vi.fn();

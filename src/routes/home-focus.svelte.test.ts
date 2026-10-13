@@ -4,7 +4,7 @@ import { page, userEvent } from 'vitest/browser';
 import type { AskState } from '$lib/ask';
 import HomePage from './+page.svelte';
 
-// The Ask store is replaced by one the test controls, and the cache read that makes it is held until `landStore()`.
+// The Ask store is replaced by one the test controls, and the cache read that makes it is held until `gate.land()`.
 const gate = vi.hoisted(() => ({ land: () => {}, held: Promise.resolve(true) }));
 const fake = $state<{ state: AskState; mode: 'device' | 'online' }>({
 	state: { kind: 'idle' },
@@ -105,8 +105,10 @@ describe('Home, the install nudge', () => {
 		await expect.poll(() => document.activeElement).toBe(input);
 	};
 
-	it('ignores a second Enter just after its Dismiss hands focus to the field', async () => {
+	it('ignores a second Enter soon after its Dismiss hands focus to the field', async () => {
 		await ready();
+		// Well inside the guard, but long enough that a guard too short for a real double press would let it through.
+		await pause(300);
 		await userEvent.keyboard('{Enter}');
 		await pause(50);
 

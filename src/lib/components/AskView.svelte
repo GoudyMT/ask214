@@ -199,7 +199,7 @@
 {/if}
 
 <!-- A button that goes away under a held Enter hands focus to the field (the install nudge), so the key's repeats would
-     ask: only a new press of Enter does. -->
+     ask: only a new press of Enter does, and not within the guard after a hand-off (see `focusField`). -->
 <form
 	class="ask-bar"
 	onsubmit={(e) => {

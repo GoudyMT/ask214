@@ -85,8 +85,9 @@
 	let customizeEl = $state<HTMLButtonElement | null>(null);
 	let headingEl = $state<HTMLHeadingElement | null>(null);
 
-	// A change from the stores that turns off the button holding focus would drop focus to the top of the page; the
-	// heading takes it instead, without scrolling. Add's own busy state is not this: it has its own way back to Add.
+	// A change from the stores, or the panel's own category save, that turns off the button holding focus would drop
+	// focus to the top of the page; the heading takes it instead, without scrolling. Add's own busy state is not this:
+	// it has its own way back to Add.
 	$effect(() => {
 		// Both are read first so the effect follows them whatever holds focus now.
 		const addOff = !(ready && hasEvents);

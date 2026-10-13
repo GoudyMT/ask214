@@ -1492,6 +1492,10 @@ describe('TaskCard (focus after an editor closes)', () => {
 			await key('keyDown');
 			await key('keyUp');
 			await expect.poll(() => container.querySelector('button.task-line')).not.toBeNull();
+			// A keyboard close hands focus to the line; without it the second Enter below would test nothing.
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(container.querySelector('button.task-line'));
 			await key('keyDown');
 			await key('keyUp');
 			await wait(50);
