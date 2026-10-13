@@ -18,12 +18,13 @@
 	<p class="locked-panel__body">
 		Your information is encrypted on this device. Unlock to view and edit it.
 	</p>
-	<!-- Lock hands focus here mid-press, so a held key's repeats would unlock again: only a new press counts. -->
+	<!-- Lock hands focus here mid-press, so a held Enter's repeats would unlock again: only a new press counts. Space
+	     clicks on release, and other held keys (Tab, arrows) must still work. -->
 	<button
 		class="locked-panel__unlock"
 		type="button"
 		onclick={press}
-		onkeydown={(e) => e.repeat && e.preventDefault()}
+		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 		aria-busy={busy}
 	>
 		{busy ? 'Unlocking...' : 'Unlock'}

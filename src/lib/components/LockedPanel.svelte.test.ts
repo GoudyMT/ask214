@@ -27,6 +27,23 @@ describe('LockedPanel', () => {
 		expect(onunlock).toHaveBeenCalledTimes(0);
 	});
 
+	// Only a held Enter is held back: a held Tab still moves on, and arrow keys still scroll.
+	it('holds back a repeated Enter and no other repeated key', async () => {
+		const { container } = await render(LockedPanel, { props: { onunlock: vi.fn() } });
+		const btn = container.querySelector('button')!;
+		const held = (key: string) => {
+			const e = new KeyboardEvent('keydown', {
+				key,
+				repeat: true,
+				cancelable: true,
+				bubbles: true
+			});
+			btn.dispatchEvent(e);
+			return e.defaultPrevented;
+		};
+		expect([held('Enter'), held('Tab'), held('ArrowDown')]).toEqual([true, false, false]);
+	});
+
 	// The button keeps focus while busy: a dim on the whole button would fade its focus ring too (below 3:1), so only its
 	// fill and text dim.
 	it('dims the fill while busy, not the whole button', async () => {
