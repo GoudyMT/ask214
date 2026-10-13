@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { EXAMPLE_QUESTIONS } from '$lib/ask/example-questions';
 
-	let { onPick }: { onPick: (question: string) => void } = $props();
+	let { onPick }: { onPick: (question: string, press: MouseEvent) => void } = $props();
 
 	// Plain, not state: read once, on mount, when the binding is already set.
 	let maskEl: HTMLDivElement | undefined;
@@ -79,7 +79,7 @@
 		<ul class="q-feed__track" aria-label="Example questions">
 			{#each EXAMPLE_QUESTIONS as q (q)}
 				<li>
-					<button class="q-feed__pill" type="button" onclick={() => onPick(q)}>{q}</button>
+					<button class="q-feed__pill" type="button" onclick={(e) => onPick(q, e)}>{q}</button>
 				</li>
 			{/each}
 			{#each EXAMPLE_QUESTIONS as q, i (i)}

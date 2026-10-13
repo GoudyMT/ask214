@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { AskState } from '$lib/ask/types';
 	import { sourceFromCard, type Source } from '$lib/ask/sources';
 	import AskResultCard from './AskResultCard.svelte';
@@ -79,18 +80,35 @@
 
 	// A feed pill behaves exactly like typing the question + Search: fill the visible input, then run
 	// it through the same ask path (so the first query still hits the one-time model opt-in).
-	function pick(q: string) {
+	function pick(q: string, press: MouseEvent) {
 		query = q;
 		onAsk(q);
+		void toField(press);
 	}
-	function skipSetup() {
+	// The pressed button goes away with its card or bar, and focus falls to the page unless the person has moved on:
+	// it goes to the field. Not after a tap or a click (detail 1+): a focused text field would open a phone's keyboard.
+	// A keyboard or a screen reader presses with detail 0.
+	async function toField(press: MouseEvent): Promise<void> {
+		await tick();
+		if (!press.detail && document.activeElement === document.body) inputEl?.focus();
+	}
+	function skipSetup(press: MouseEvent) {
 		setupDismissed = true;
 		onDismiss();
+		void toField(press);
 	}
-	function dismissReminder() {
+	function dismissReminder(press: MouseEvent) {
 		reminderDismissed = true;
 		// eslint-disable-next-line no-restricted-globals -- a "reminder hidden" flag for this tab, nothing personal
 		if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(REMINDER_DISMISSED_KEY, '1');
+		void toField(press);
+	}
+	// A card or bar button that runs a parent action and goes away with its card or bar.
+	function act(action: () => void) {
+		return (press: MouseEvent) => {
+			action();
+			void toField(press);
+		};
 	}
 	// "Read more" -> open the reader on the source this card cites. An online answer carries its passage,
 	// so its reader opens on that passage at once. An on-device answer reads the corpus (which holds the
@@ -160,10 +178,13 @@
 				class="ask-reminder__set"
 				type="button"
 				disabled={inFlight}
-				onclick={() => onSetMode('device')}>On-device</button
+				onclick={act(() => onSetMode('device'))}>On-device</button
 			>
-			<button class="ask-reminder__x" type="button" aria-label="Dismiss" onclick={onDismissNudge}
-				>&times;</button
+			<button
+				class="ask-reminder__x"
+				type="button"
+				aria-label="Dismiss"
+				onclick={act(onDismissNudge)}>&times;</button
 			>
 		</span>
 	</div>
@@ -248,7 +269,9 @@
 				browser keeps it, answers are instant and work offline.
 			</p>
 			<div class="ask-setup__actions">
-				<button class="ask-setup__go" type="button" onclick={onSetUp}>Set up &amp; answer</button>
+				<button class="ask-setup__go" type="button" onclick={act(onSetUp)}
+					>Set up &amp; answer</button
+				>
 				<button class="ask-setup__skip" type="button" onclick={skipSetup}>Not now</button>
 			</div>
 		</div>
@@ -265,8 +288,12 @@
 				leave your device. You can switch to on-device answers any time.
 			</p>
 			<div class="ask-setup__actions">
-				<button class="ask-setup__go" type="button" onclick={onConsentOnline}>Use online</button>
-				<button class="ask-setup__skip" type="button" onclick={onStayDevice}>Stay on device</button>
+				<button class="ask-setup__go" type="button" onclick={act(onConsentOnline)}
+					>Use online</button
+				>
+				<button class="ask-setup__skip" type="button" onclick={act(onStayDevice)}
+					>Stay on device</button
+				>
 			</div>
 		</div>
 	{:else if askState.kind === 'modelLoading'}
