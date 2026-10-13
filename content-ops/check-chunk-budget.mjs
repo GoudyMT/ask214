@@ -253,6 +253,14 @@ const STATIC = 'static';
 //     selector for the Settings targets (+2 B) and a shorter open check (-3 B) not kept, inside the noise; the busy
 //     fill set to the hover colour (-29 B precache) not kept, as it changed the look - the busy fill then went (the
 //     owner's call).
+//     Route nodes 48,485 -> 48,920 (package.json's size-limit) and precache 151,025 -> 151,540 (owner's call,
+//     2026-10-13): focus handed on where a pressed button goes away on more screens - Home's example questions and the
+//     Ask cards and bars to the question field, Feedback's buttons to the message box, Calendar's Add and Customize to
+//     its heading, a Snooze picker closed from elsewhere to its opener, a Lock that lands after a save to Unlock - and
+//     a 44 px tap area on the theme and answer mode pills. Two builds measured route nodes 48,878-48,880 B and precache
+//     151,486-151,495 B, 40-54 B of room. Trim pass on a full build: the Ask card buttons routed through one hand-off
+//     helper (+19 B route nodes) not kept; element references moved out of $state not tried, as that grew the code when
+//     measured before.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -265,7 +273,7 @@ const LIMIT = {
 	page: 61_740,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 151_025,
+	precacheBytes: 151_540,
 	workerScripts: 147_200
 };
 
