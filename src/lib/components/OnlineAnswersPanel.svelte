@@ -52,6 +52,8 @@
 	}
 
 	async function clear(): Promise<void> {
+		// A keyboard press shows the focus ring; a tap does not, and a text field it focused would open a phone's keyboard.
+		const byKey = document.activeElement?.matches(':focus-visible');
 		keyError = null;
 		try {
 			await onClearKey();
@@ -61,7 +63,7 @@
 		}
 		// Remove goes with the key; focus goes to the field a new key is typed in, unless the person already moved it.
 		await tick();
-		if (document.activeElement === document.body) keyInputEl?.focus();
+		if (byKey && document.activeElement === document.body) keyInputEl?.focus();
 	}
 </script>
 

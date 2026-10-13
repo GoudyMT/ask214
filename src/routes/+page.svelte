@@ -95,9 +95,11 @@
 	// Install and Dismiss both remove the nudge, and the button that was pressed goes with it: focus falls to the
 	// page unless the person has already moved on, so it goes to the question field, the page's first control.
 	async function closeNudge(action: () => unknown): Promise<void> {
+		// Only after a keyboard press (it shows the focus ring): a tap that focused the field would open a phone's keyboard.
+		const byKey = document.activeElement?.matches(':focus-visible');
 		await action();
 		await tick();
-		if (document.activeElement === document.body) {
+		if (byKey && document.activeElement === document.body) {
 			document.querySelector<HTMLElement>('.ask-input')?.focus();
 		}
 	}
