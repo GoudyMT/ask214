@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
@@ -39,12 +39,22 @@
 	// undefined (NOT snapshotting the prop) so there is no spurious reset on mount. An open Snooze picker closes
 	// too: its presets may no longer apply to the new status.
 	let prevStatus = $state<DisplayStatus | undefined>(undefined);
+	// Read before the DOM updates: by the time the effect below runs the picker is gone and focus has fallen to the page.
+	// Untracked, or the picker leaving the page would run this again and overwrite the answer.
+	let snoozeEl: HTMLElement | undefined = $state();
+	let pickerHeldFocus = false;
+	$effect.pre(() => {
+		void item.status;
+		pickerHeldFocus = untrack(() => !!snoozeEl?.contains(document.activeElement));
+	});
 	$effect(() => {
 		if (prevStatus !== undefined && item.status !== prevStatus) {
 			expanded = false;
 			closeSnooze();
-			// Only a change made on this card moves focus: a change made in another tab must not take it.
+			// Only a change made on this card moves focus, or a person who was inside the picker that the change closed:
+			// a change made in another tab must not take focus from anywhere else.
 			if (appliedHere) void returnFocus();
+			else if (pickerHeldFocus) void returnFocus(snoozeOpener);
 			appliedHere = false;
 		}
 		prevStatus = item.status;
@@ -66,13 +76,32 @@
 		const held = document.activeElement === event.currentTarget;
 		expanded = open;
 		await tick();
-		if (held) (open ? headerEl : lineEl)?.focus();
+		if (!held) return;
+		if (open) headerEl?.focus();
+		else focusLine();
+	}
+
+	// A key press that reaches the collapsed line just after the card gave it focus is the key that gave it (a held key's
+	// repeats, or a second quick press), not a new request to open it. A mouse click or a press after the guard still opens.
+	const LINE_GUARD_MS = 500;
+	let lineFocusedAt = 0;
+
+	function focusLine(): void {
+		lineFocusedAt = Date.now();
+		lineEl?.focus();
+	}
+
+	function openLine(e: MouseEvent): void {
+		if (e.detail === 0 && Date.now() - lineFocusedAt < LINE_GUARD_MS) return;
+		void setExpanded(true, e);
 	}
 
 	async function returnFocus(opener?: HTMLElement): Promise<void> {
 		await tick();
 		if (document.activeElement !== document.body) return;
-		(opener?.isConnected ? opener : (lineEl ?? cardEl))?.focus();
+		if (opener?.isConnected) opener.focus();
+		else if (lineEl) focusLine();
+		else cardEl?.focus();
 	}
 
 	function toggleSnooze(event: MouseEvent): void {
@@ -287,7 +316,8 @@
 		class="task-line line-{item.status}"
 		bind:this={lineEl}
 		aria-expanded="false"
-		onclick={(e) => void setExpanded(true, e)}
+		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
+		onclick={openLine}
 	>
 		<span class="task-line__title">{item.def.title}</span>
 		{#if item.note}
@@ -382,7 +412,7 @@
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
 			{#if snoozeOpen}
-				<div class="task-card__snooze">
+				<div class="task-card__snooze" bind:this={snoozeEl}>
 					<span class="task-card__snooze-label">Snooze until</span>
 					<div class="task-card__presets">
 						{#each SNOOZE_PRESETS as preset (preset.days)}

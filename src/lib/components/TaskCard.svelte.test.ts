@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { cdp, page } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import TaskCard from './TaskCard.svelte';
 import { SNOOZE_DATE_MAX, snoozeUntilIso } from '$lib/timeline/snooze';
@@ -1295,6 +1295,159 @@ describe('TaskCard (focus after an editor closes)', () => {
 		expect(container.querySelector('button.task-line')).not.toBeNull();
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(document.activeElement).toBe(document.body);
+	});
+
+	// A change from another tab closes the open picker; a person who was inside it keeps their place.
+	it('returns focus to Snooze when a change elsewhere closes the picker and the card stays open', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		const snooze = press(container, 'Snooze');
+		const preset = buttonByText(container, '1 week') as HTMLButtonElement;
+		preset.focus();
+		expect(document.activeElement).toBe(preset);
+		await update({ ...item, status: 'still-to-do' });
+		expect(container.querySelector('.task-card__snooze')).toBeNull();
+		await expect.poll(() => document.activeElement).toBe(snooze);
+	});
+
+	it('returns focus to the card when the change elsewhere also removes Snooze', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		press(container, 'Snooze');
+		(buttonByText(container, '1 week') as HTMLButtonElement).focus();
+		await update({ ...item, status: 'closing-soon' });
+		expect(buttonByText(container, 'Snooze')).toBeUndefined();
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('article.task-card'));
+	});
+
+	it('returns focus to the collapsed line when a change elsewhere resolves the card', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		press(container, 'Snooze');
+		(buttonByText(container, '1 week') as HTMLButtonElement).focus();
+		await update({ ...item, status: 'done' });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('button.task-line'));
+	});
+
+	it('leaves focus alone when a change elsewhere closes the picker and focus is outside it', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		press(container, 'Snooze');
+		const note = buttonByText(container, 'Add note') as HTMLButtonElement;
+		note.focus();
+		await update({ ...item, status: 'still-to-do' });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(note);
+	});
+
+	it('takes no focus from a change elsewhere when the picker is open but nothing in it held focus', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		press(container, 'Snooze');
+		(document.activeElement as HTMLElement | null)?.blur();
+		expect(document.activeElement).toBe(document.body);
+		await update({ ...item, status: 'still-to-do' });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(document.activeElement).toBe(document.body);
+	});
+
+	describe('Enter on the collapsed line', () => {
+		// Enter as a keyboard sends it: the key, its code and the carriage return it types.
+		const ENTER = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+		const GUARD_WAIT_MS = 600;
+		const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+		// Mark done resolves after `ms` (a timer even at 0, as a real write is never synchronous); the page then delivers
+		// the done task.
+		async function mountSlowDone(ms: number) {
+			const item = makeItem({ status: 'start-now' });
+			let deliver: (next: TimelineItem) => Promise<void> = async () => {};
+			const view = await mountCard(item, {
+				onSetStatus: async () => {
+					await wait(ms);
+					await deliver({ ...item, status: 'done' });
+				}
+			});
+			deliver = view.update;
+			return view;
+		}
+
+		const key = (type: 'keyDown' | 'keyUp', autoRepeat = false) =>
+			cdp().send('Input.dispatchKeyEvent', { type, autoRepeat, ...ENTER });
+
+		// A held key repeats about every 40 ms; Mark done hands focus to the line it collapses to, so the repeats that follow
+		// land on the line and must not open it.
+		it.each([
+			['at once', 0],
+			['after a while', 100]
+		] as const)(
+			'is not opened by a held Enter on Mark done when the write lands %s',
+			async (_, ms) => {
+				const { container } = await mountSlowDone(ms);
+				// Each repeat that opened the line would be undone by the next one (the header closes it again), so the end
+				// state alone hides it: count the times the opened card appears.
+				let opened = 0;
+				const watch = new MutationObserver(() => {
+					if (container.querySelector('button.task-card__header')) opened++;
+				});
+				watch.observe(container, { childList: true, subtree: true });
+				(buttonByText(container, 'Mark done') as HTMLButtonElement).focus();
+				await key('keyDown');
+				for (let i = 0; i < 15; i++) {
+					await wait(40);
+					await key('keyDown', true);
+				}
+				await key('keyUp');
+				watch.disconnect();
+				expect(opened).toBe(0);
+				const line = container.querySelector('button.task-line');
+				expect(line).not.toBeNull();
+				expect(line?.getAttribute('aria-expanded')).toBe('false');
+				expect(container.querySelector('button.task-card__header')).toBeNull();
+				expect(document.activeElement).toBe(line);
+			}
+		);
+
+		it('is not opened by a second Enter just after it took focus, but is opened by one later', async () => {
+			const { container } = await mountSlowDone(0);
+			(buttonByText(container, 'Mark done') as HTMLButtonElement).focus();
+			await key('keyDown');
+			await key('keyUp');
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(container.querySelector('button.task-line'));
+			await key('keyDown');
+			await key('keyUp');
+			await wait(50);
+			expect(container.querySelector('button.task-card__header')).toBeNull();
+			expect(container.querySelector('button.task-line')).not.toBeNull();
+
+			await wait(GUARD_WAIT_MS);
+			await key('keyDown');
+			await key('keyUp');
+			await expect.poll(() => container.querySelector('button.task-card__header')).not.toBeNull();
+		});
+
+		it('is opened by a mouse click just after it took focus', async () => {
+			const { container } = await mountSlowDone(0);
+			(buttonByText(container, 'Mark done') as HTMLButtonElement).focus();
+			await key('keyDown');
+			await key('keyUp');
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(container.querySelector('button.task-line'));
+			await page.getByRole('button', { name: /Research SkillBridge hosts/ }).click();
+			await expect.poll(() => container.querySelector('button.task-card__header')).not.toBeNull();
+		});
 	});
 });
 
