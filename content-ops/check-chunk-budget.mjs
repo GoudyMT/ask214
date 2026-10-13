@@ -242,8 +242,8 @@ const STATIC = 'static';
 //     nudge (+54 B), and the wizard and note editor kept usable while a save is pending. Three builds measured page
 //     61,669-61,671 B, route nodes 48,304-48,312 B and precache 150,752-150,765 B, 40 B of room above the highest.
 //     Trim pass, each measured on a full build: the wizard Save's disabled style, which no longer applies (-16 B route
-//     nodes, -44 B precache), kept; the Unlock failure line written into the locked panel instead of each page (-14 B
-//     route nodes, -21 B precache, a prop's type change on top), not kept.
+//     nodes, -44 B precache), kept; the Unlock failure text written once in the locked panel, with a boolean prop in place
+//     of the string (-14 B route nodes, -21 B precache), not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B

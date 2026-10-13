@@ -198,8 +198,8 @@ describe('Wizard, the buttons while a save is pending', () => {
 	});
 });
 
-// A failed save used to switch Save off, which dropped the keyboard's place to the page: the person had to tab back
-// to Save from the top. Whether the drop shows depends on the save outlasting a frame, so both lengths run.
+// A failed save keeps the keyboard's place on Save: Save is never switched off, since a switched-off button that holds
+// focus drops it to the page. Whether a drop would show depends on the save outlasting a frame, so both lengths run.
 describe('Wizard, a failed save from the keyboard', () => {
 	it.each([
 		['fails at once', 0],

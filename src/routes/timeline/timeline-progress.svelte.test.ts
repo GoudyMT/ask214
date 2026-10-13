@@ -179,6 +179,35 @@ describe('Timeline, its saved progress', () => {
 			expect(page.getByRole('alert').query()).toBeNull();
 		});
 
+		it('leaves focus alone when the person moved it while the load ran', async () => {
+			current.load = endsAfter(100, false);
+			await render(TimelinePage);
+			const elsewhere = document.body.appendChild(document.createElement('button'));
+			try {
+				await page.getByRole('button', { name: 'Unlock' }).click();
+				elsewhere.focus();
+				await expect.poll(() => profile.locked).toBe(false);
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				expect(document.activeElement).toBe(elsewhere);
+			} finally {
+				elsewhere.remove();
+			}
+		});
+
+		// A second failure that reads the same as the first is announced again only if the line was taken away at the press.
+		it('takes the line away at the next press', async () => {
+			let attempt = 0;
+			current.load = () =>
+				++attempt === 1 ? Promise.reject(new Error('E_TEST_LOAD')) : new Promise<void>(() => {});
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.poll(() => attempt).toBe(2);
+			await expect.poll(() => page.getByRole('alert').query()).toBeNull();
+		});
+
 		// The profile can open without this page's Unlock (Settings', in another tab), so a failure line must not outlive
 		// the lock.
 		it('drops the failure line when the profile opens some other way', async () => {

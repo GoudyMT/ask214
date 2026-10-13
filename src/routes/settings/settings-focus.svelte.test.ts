@@ -14,6 +14,8 @@ const { isoFromToday, ctl } = vi.hoisted(() => ({
 	ctl: {
 		clearClock: async (): Promise<void> => {},
 		prompt: async (): Promise<'accepted' | 'dismissed'> => 'dismissed',
+		// Whether the erase's first step locks the page, as it does once the profile has loaded.
+		relocks: true,
 		wipeAll: async (): Promise<void> => {
 			throw new Error('E_TEST_WIPE');
 		}
@@ -57,7 +59,7 @@ vi.mock('$lib/profile/context', () => ({
 		wipeAll: () => ctl.wipeAll(),
 		// As the layout's is: the profile reads as locked at once.
 		relockAll: () => {
-			profile.locked = true;
+			if (ctl.relocks) profile.locked = true;
 		}
 	}),
 	setProfileApp: () => {}
@@ -95,6 +97,7 @@ beforeEach(() => {
 	install.persisted = false;
 	ctl.clearClock = async () => {};
 	ctl.prompt = async () => 'dismissed';
+	ctl.relocks = true;
 	ctl.wipeAll = async () => {
 		throw new Error('E_TEST_WIPE');
 	};
@@ -102,6 +105,16 @@ beforeEach(() => {
 
 const after = <T>(ms: number, value: () => T) =>
 	new Promise<T>((resolve) => setTimeout(() => resolve(value()), ms));
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// A control outside the page, which the person moves focus to while the page works.
+async function withFocusElsewhere(run: (elsewhere: HTMLElement) => Promise<void>): Promise<void> {
+	const elsewhere = document.body.appendChild(document.createElement('button'));
+	try {
+		await run(elsewhere);
+	} finally {
+		elsewhere.remove();
+	}
+}
 const clockFix = () => page.getByRole('button', { name: 'I fixed my clock' });
 
 describe('Settings, the clock fix', () => {
@@ -116,6 +129,21 @@ describe('Settings, the clock fix', () => {
 		const heading = page.getByRole('heading', { level: 2, name: 'Transition timeline' });
 		await expect.poll(() => document.activeElement).toBe(heading.element());
 		expect(clockFix().query()).toBeNull();
+	});
+
+	it('leaves focus alone when the person moved it while the fix ran', async () => {
+		ctl.clearClock = () =>
+			after(100, () => {
+				profile.clockBackward = false;
+			});
+		await render(SettingsPage);
+		await withFocusElsewhere(async (elsewhere) => {
+			await clockFix().click();
+			elsewhere.focus();
+			await expect.poll(() => clockFix().query()).toBeNull();
+			await pause(50);
+			expect(document.activeElement).toBe(elsewhere);
+		});
 	});
 
 	// Guard: a fix that fails leaves the button where it is, with the line that says so.
@@ -169,5 +197,32 @@ describe('Settings, an erase that fails', () => {
 
 		await expect.element(page.getByRole('alert')).toBeVisible();
 		await expect.poll(() => document.activeElement).toBe(container.querySelector('.erase-error'));
+	});
+
+	// The erase can fail before it locks the page: focus is then still on the button that opened the dialog.
+	it('hands focus to the failure line from the button that opened the dialog', async () => {
+		ctl.relocks = false;
+		const { container } = await render(SettingsPage);
+		const opener = page.getByRole('button', { name: 'Erase all data on this device' });
+		await opener.click();
+		await page.getByRole('button', { name: 'Erase everything' }).click();
+
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		expect(opener.query()).not.toBeNull();
+		await expect.poll(() => document.activeElement).toBe(container.querySelector('.erase-error'));
+	});
+
+	it('leaves focus alone when the person moved it while the erase ran', async () => {
+		ctl.wipeAll = () =>
+			new Promise((_, reject) => setTimeout(() => reject(new Error('E_TEST_WIPE')), 100));
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Erase all data on this device' }).click();
+		await withFocusElsewhere(async (elsewhere) => {
+			await page.getByRole('button', { name: 'Erase everything' }).click();
+			elsewhere.focus();
+			await expect.element(page.getByRole('alert')).toBeVisible();
+			await pause(50);
+			expect(document.activeElement).toBe(elsewhere);
+		});
 	});
 });

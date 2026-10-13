@@ -175,6 +175,29 @@ describe('OnlineAnswersPanel', () => {
 			expect(remove().query()).toBeNull();
 		});
 
+		it('leaves focus alone when the person moved it while the removal ran', async () => {
+			const props: Props = { ...base, hasKey: true };
+			const screen = await render(OnlineAnswersPanel, {
+				props: {
+					...props,
+					onClearKey: async () => {
+						await new Promise((resolve) => setTimeout(resolve, 100));
+						await screen.rerender({ ...props, hasKey: false });
+					}
+				}
+			});
+			const elsewhere = document.body.appendChild(document.createElement('button'));
+			try {
+				await remove().click();
+				elsewhere.focus();
+				await expect.poll(() => remove().query()).toBeNull();
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				expect(document.activeElement).toBe(elsewhere);
+			} finally {
+				elsewhere.remove();
+			}
+		});
+
 		// Guard: a removal that fails leaves the button where it is, with the line that says so.
 		it('keeps focus on Remove, with the line, when the removal fails', async () => {
 			const { container } = await render(OnlineAnswersPanel, {
