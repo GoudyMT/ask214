@@ -888,48 +888,61 @@ describe('AskView, focus after the pressed button goes away', () => {
 		['ignores a second Enter soon after', 300, 0],
 		['asks on a second Enter after the guard', 600, 1]
 	] as const)('%s, after Not now', async (_, wait, asked) => {
-		const onAsk = vi.fn();
-		const { container } = await mountLeaving(
-			'onDismiss',
-			{ ...setup, onAsk },
-			{ ...props({ kind: 'idle' }), onAsk }
-		);
-		const input = field(container)!;
-		input.value = 'how do I file a claim';
-		input.dispatchEvent(new Event('input', { bubbles: true }));
-		await press(container.querySelector<HTMLButtonElement>('.ask-setup__skip'));
-		await expect.poll(() => document.activeElement).toBe(input);
-		await pause(wait);
-		await userEvent.keyboard('{Enter}');
-		await pause(50);
+		// The guard reads the clock, and on a slow machine the test browser's own delays can push a real 300 ms past it.
+		// Only Date is faked, so the time the guard sees between the hand-off and the key is exactly `wait`.
+		vi.useFakeTimers({ toFake: ['Date'] });
+		try {
+			const onAsk = vi.fn();
+			const { container } = await mountLeaving(
+				'onDismiss',
+				{ ...setup, onAsk },
+				{ ...props({ kind: 'idle' }), onAsk }
+			);
+			const input = field(container)!;
+			input.value = 'how do I file a claim';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			await press(container.querySelector<HTMLButtonElement>('.ask-setup__skip'));
+			await expect.poll(() => document.activeElement).toBe(input);
+			vi.setSystemTime(Date.now() + wait);
+			await userEvent.keyboard('{Enter}');
+			await pause(50);
 
-		expect(onAsk).toHaveBeenCalledTimes(asked);
+			expect(onAsk).toHaveBeenCalledTimes(asked);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("ignores a second Enter soon after the reminder's Set up hands focus to the field", async () => {
 		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
-		const onAsk = vi.fn();
-		const { container, rerender } = await render(AskView, { props: { ...setup, onAsk } });
-		// A pointer click, so Not now hands no focus of its own and the guard is not already running.
-		container
-			.querySelector<HTMLButtonElement>('.ask-setup__skip')
-			?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-		await rerender({ ...props({ kind: 'idle' }), onAsk });
-		const input = field(container)!;
-		input.value = 'how do I file a claim';
-		input.dispatchEvent(new Event('input', { bubbles: true }));
-		const setUp = container.querySelector<HTMLButtonElement>('.ask-reminder__set')!;
-		setUp.focus();
-		expect(document.activeElement).toBe(setUp);
-		await pause(600);
-		await userEvent.keyboard('{Enter}');
-		await expect.poll(() => document.activeElement).toBe(input);
-		await pause(300);
-		await userEvent.keyboard('{Enter}');
-		await pause(50);
+		// Only Date is faked, as above, so the guard sees exactly the time set between the keys.
+		vi.useFakeTimers({ toFake: ['Date'] });
+		try {
+			const onAsk = vi.fn();
+			const { container, rerender } = await render(AskView, { props: { ...setup, onAsk } });
+			// A pointer click, so Not now hands no focus of its own and the guard is not already running.
+			container
+				.querySelector<HTMLButtonElement>('.ask-setup__skip')
+				?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+			await rerender({ ...props({ kind: 'idle' }), onAsk });
+			const input = field(container)!;
+			input.value = 'how do I file a claim';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			const setUp = container.querySelector<HTMLButtonElement>('.ask-reminder__set')!;
+			setUp.focus();
+			expect(document.activeElement).toBe(setUp);
+			vi.setSystemTime(Date.now() + 600);
+			await userEvent.keyboard('{Enter}');
+			await expect.poll(() => document.activeElement).toBe(input);
+			vi.setSystemTime(Date.now() + 300);
+			await userEvent.keyboard('{Enter}');
+			await pause(50);
 
-		expect(onAsk).not.toHaveBeenCalled();
-		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
+			expect(onAsk).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+			sessionStorage.removeItem('mtc:ask:reminder-dismissed');
+		}
 	});
 
 	it('hands focus to the field when the reminder is dismissed by keyboard', async () => {

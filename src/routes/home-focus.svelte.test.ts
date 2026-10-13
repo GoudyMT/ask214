@@ -106,13 +106,20 @@ describe('Home, the install nudge', () => {
 	};
 
 	it('ignores a second Enter soon after its Dismiss hands focus to the field', async () => {
-		await ready();
-		// Well inside the guard, but long enough that a guard too short for a real double press would let it through.
-		await pause(300);
-		await userEvent.keyboard('{Enter}');
-		await pause(50);
+		// The guard reads the clock, and on a slow machine the test browser's own delays can push a real 300 ms past it.
+		// Only Date is faked, so the time the guard sees between the hand-off and the key is exactly what is set here.
+		vi.useFakeTimers({ toFake: ['Date'] });
+		try {
+			await ready();
+			// Well inside the guard, but long enough that a guard too short for a real double press would let it through.
+			vi.setSystemTime(Date.now() + 300);
+			await userEvent.keyboard('{Enter}');
+			await pause(50);
 
-		expect(asks).not.toHaveBeenCalled();
+			expect(asks).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('asks on a second Enter once the guard has ended', async () => {

@@ -1420,25 +1420,32 @@ describe('TaskCard (focus after an editor closes)', () => {
 		);
 
 		it('is not opened by a second Enter just after it took focus, but is opened by one later', async () => {
-			const { container } = await mountSlowDone(0);
-			(buttonByText(container, 'Mark done') as HTMLButtonElement).focus();
-			await key('keyDown');
-			await key('keyUp');
-			await expect
-				.poll(() => document.activeElement)
-				.toBe(container.querySelector('button.task-line'));
-			// Well inside the guard but long after a press could be the same one.
-			await wait(300);
-			await key('keyDown');
-			await key('keyUp');
-			await wait(50);
-			expect(container.querySelector('button.task-card__header')).toBeNull();
-			expect(container.querySelector('button.task-line')).not.toBeNull();
+			// The guard reads the clock, and on a slow machine the test browser's own delays can push a real 300 ms past it.
+			// Only Date is faked, so the time the guard sees between the hand-off and each key is exactly what is set here.
+			vi.useFakeTimers({ toFake: ['Date'] });
+			try {
+				const { container } = await mountSlowDone(0);
+				(buttonByText(container, 'Mark done') as HTMLButtonElement).focus();
+				await key('keyDown');
+				await key('keyUp');
+				await expect
+					.poll(() => document.activeElement)
+					.toBe(container.querySelector('button.task-line'));
+				// Well inside the guard but long after a press could be the same one.
+				vi.setSystemTime(Date.now() + 300);
+				await key('keyDown');
+				await key('keyUp');
+				await wait(50);
+				expect(container.querySelector('button.task-card__header')).toBeNull();
+				expect(container.querySelector('button.task-line')).not.toBeNull();
 
-			await wait(GUARD_WAIT_MS);
-			await key('keyDown');
-			await key('keyUp');
-			await expect.poll(() => container.querySelector('button.task-card__header')).not.toBeNull();
+				vi.setSystemTime(Date.now() + GUARD_WAIT_MS);
+				await key('keyDown');
+				await key('keyUp');
+				await expect.poll(() => container.querySelector('button.task-card__header')).not.toBeNull();
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 
 		// The line hands focus to the card's header as it opens, so the rest of the same press (a held key's repeats, or a
