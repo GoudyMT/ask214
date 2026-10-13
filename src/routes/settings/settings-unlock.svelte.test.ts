@@ -274,6 +274,23 @@ describe('Settings, Unlock', () => {
 		expect(page.getByRole('alert').query()).toBeNull();
 	});
 
+	// A read that fails after the profile has opened another way belongs to no lock: the next lock starts without it.
+	it('shows no line at the next lock when the read failed after the profile had opened', async () => {
+		ctl.load = () =>
+			new Promise<void>((_, reject) => {
+				setTimeout(() => (profile.locked = false), 30);
+				setTimeout(() => reject(new Error('E_TEST_LOAD')), 80);
+			});
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible();
+		await pause(100);
+
+		await page.getByRole('button', { name: 'Lock', exact: true }).click();
+		await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
+		expect(page.getByRole('alert').query()).toBeNull();
+	});
+
 	// A second failure that reads the same as the first is announced again only if the line was taken away at the press.
 	it('takes the line away at the next press and shows it again', async () => {
 		// The second read stays pending, so the line can only be gone because the press started it, not because it failed.

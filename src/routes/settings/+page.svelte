@@ -101,10 +101,12 @@
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
-	// The profile can open without Unlock (the app re-reads it on its own, as when the tab is shown again): a failure
-	// line must not outlive the lock it failed on.
+	const lockedView = $derived(!!app.store?.locked);
+	// A failure line belongs to the lock it failed on, so it goes whenever the locked panel comes or goes: the profile can
+	// open without Unlock (the app re-reads it on its own, as when the tab is shown again), and a read can fail after it.
 	$effect(() => {
-		if (app.store?.locked === false) unlockError = null;
+		void lockedView;
+		unlockError = null;
 	});
 	let headingEl: HTMLElement | undefined;
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
@@ -459,7 +461,7 @@
 				Read the official guides behind the answers, and choose which stay on this device.
 			</p>
 		</section>
-		{#if app.store?.locked}
+		{#if lockedView}
 			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else}
 			{#if hasTimeline}

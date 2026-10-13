@@ -50,7 +50,8 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 
 // Reactive, unlike the flags in `current`: Unlock opens the profile and the page swaps its locked panel for the list at that
 // moment.
-const profile = $state({ locked: false });
+// `reads` counts the store's re-reads: a real re-read assigns the profile again, which wakes every reader of `locked`.
+const profile = $state({ locked: false, reads: 0 });
 
 // The profile is unlocked with a separation date; each test sets where the timeline's saved progress stands.
 vi.mock('$lib/profile/context', () => ({
@@ -58,6 +59,7 @@ vi.mock('$lib/profile/context', () => ({
 		status: 'ready',
 		store: {
 			get locked() {
+				void profile.reads;
 				return profile.locked;
 			},
 			load: () => current.load(),
@@ -243,6 +245,20 @@ describe('Timeline, its saved progress', () => {
 			profile.locked = true;
 			await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
 			expect(page.getByRole('alert').query()).toBeNull();
+		});
+
+		// The profile is open and the timeline stays locked: a re-read of the profile does not end the timeline's lock.
+		it('keeps the failure line while the timeline stays locked through a re-read of the profile', async () => {
+			profile.locked = false;
+			current.timeline = { ready: false, failed: false, locked: true, state: EMPTY };
+			current.load = endsAfter(0, true);
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+
+			profile.reads++;
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
 		});
 	});
 

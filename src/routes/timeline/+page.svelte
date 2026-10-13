@@ -28,10 +28,15 @@
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
-	// The profile can open without Unlock (the app re-reads it on its own, as when the tab is shown again): a failure
-	// line must not outlive the lock it failed on.
+	const lockedView = $derived(
+		app.store?.locked ||
+			(app.timeline?.locked && !app.timeline.failed && app.store?.persona.completeness !== 'none')
+	);
+	// A failure line belongs to the lock it failed on, so it goes whenever the locked panel comes or goes: the profile can
+	// open without Unlock (the app re-reads it on its own, as when the tab is shown again), and a read can fail after it.
 	$effect(() => {
-		if (app.store?.locked === false) unlockError = null;
+		void lockedView;
+		unlockError = null;
 	});
 	let headingEl: HTMLElement | undefined;
 
@@ -234,7 +239,7 @@
 		<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
 	     Unless its load failed: then the note below says so, since Unlock would only fail again. And only with something
 	     saved: a first run has nothing to unlock, so it keeps the setup. -->
-		{#if app.store?.locked || (app.timeline?.locked && !app.timeline.failed && app.store?.persona.completeness !== 'none')}
+		{#if lockedView}
 			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else if app.store?.persona.completeness === 'none'}
 			<SetupCTA />
