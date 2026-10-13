@@ -1161,7 +1161,9 @@ describe('TaskCard (focus after an editor closes)', () => {
 			.poll(() => document.activeElement)
 			.toBe(container.querySelector('button.task-card__header'));
 		const header = document.activeElement as HTMLButtonElement;
-		header.click();
+		// A pointer click (detail 1): a keyboard-style click (detail 0) this soon after the line handed focus over is the
+		// same press and is ignored.
+		header.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
 		flushSync();
 		await expect
 			.poll(() => document.activeElement)
@@ -1425,6 +1427,8 @@ describe('TaskCard (focus after an editor closes)', () => {
 			await expect
 				.poll(() => document.activeElement)
 				.toBe(container.querySelector('button.task-line'));
+			// Well inside the guard but long after a press could be the same one.
+			await wait(300);
 			await key('keyDown');
 			await key('keyUp');
 			await wait(50);
@@ -1435,6 +1439,64 @@ describe('TaskCard (focus after an editor closes)', () => {
 			await key('keyDown');
 			await key('keyUp');
 			await expect.poll(() => container.querySelector('button.task-card__header')).not.toBeNull();
+		});
+
+		// The line hands focus to the card's header as it opens, so the rest of the same press (a held key's repeats, or a
+		// quick second press) lands on the header and must not close it again.
+		it('stays open for a held Enter on the line of a done task', async () => {
+			const { container } = await mountCard(makeItem({ status: 'done' }));
+			// Each repeat that closed the card would be undone by the next one, so the end state alone hides it: count the
+			// times the collapsed line comes back.
+			let closed = 0;
+			const watch = new MutationObserver(() => {
+				if (container.querySelector('button.task-line')) closed++;
+			});
+			(container.querySelector('button.task-line') as HTMLButtonElement).focus();
+			watch.observe(container, { childList: true, subtree: true });
+			await key('keyDown');
+			for (let i = 0; i < 15; i++) {
+				await wait(40);
+				await key('keyDown', true);
+			}
+			await key('keyUp');
+			watch.disconnect();
+			expect(closed).toBe(0);
+			const header = container.querySelector('button.task-card__header');
+			expect(header).not.toBeNull();
+			expect(container.querySelector('button.task-line')).toBeNull();
+			expect(document.activeElement).toBe(header);
+		});
+
+		it('stays open for a second Enter just after the line opened', async () => {
+			const { container } = await mountCard(makeItem({ status: 'done' }));
+			(container.querySelector('button.task-line') as HTMLButtonElement).focus();
+			await key('keyDown');
+			await key('keyUp');
+			await expect.poll(() => container.querySelector('button.task-card__header')).not.toBeNull();
+			await wait(50);
+			await key('keyDown');
+			await key('keyUp');
+			await wait(50);
+			expect(container.querySelector('button.task-card__header')).not.toBeNull();
+			expect(container.querySelector('button.task-line')).toBeNull();
+		});
+
+		// The header hands focus back to the line as it closes, so a second press right after must not open it again.
+		it('stays closed for a second Enter just after the header closed the card', async () => {
+			const { container } = await mountCard(makeItem({ status: 'done' }));
+			(container.querySelector('button.task-line') as HTMLButtonElement).focus();
+			await key('keyDown');
+			await key('keyUp');
+			await expect.poll(() => container.querySelector('button.task-card__header')).not.toBeNull();
+			await wait(GUARD_WAIT_MS);
+			await key('keyDown');
+			await key('keyUp');
+			await expect.poll(() => container.querySelector('button.task-line')).not.toBeNull();
+			await key('keyDown');
+			await key('keyUp');
+			await wait(50);
+			expect(container.querySelector('button.task-line')).not.toBeNull();
+			expect(container.querySelector('button.task-card__header')).toBeNull();
 		});
 
 		it('is opened by a mouse click just after it took focus', async () => {

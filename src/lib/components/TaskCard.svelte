@@ -76,31 +76,32 @@
 		const held = document.activeElement === event.currentTarget;
 		expanded = open;
 		await tick();
-		if (!held) return;
-		if (open) headerEl?.focus();
-		else focusLine();
+		if (held) handFocus(open ? headerEl : lineEl);
 	}
 
-	// A key press that reaches the collapsed line just after the card gave it focus is the key that gave it (a held key's
-	// repeats, or a second quick press), not a new request to open it. A mouse click or a press after the guard still opens.
+	// A key press that reaches the collapsed line or the open header just after the card gave it focus is the key that
+	// gave it (a held key's repeats, or a second quick press), not a new request to flip it back. A mouse click or a
+	// press after the guard still flips it.
 	const LINE_GUARD_MS = 500;
-	let lineFocusedAt = 0;
+	let handedAt = 0;
 
-	function focusLine(): void {
-		lineFocusedAt = Date.now();
-		lineEl?.focus();
+	function handFocus(el: HTMLElement | null): void {
+		handedAt = Date.now();
+		el?.focus();
 	}
 
-	function openLine(e: MouseEvent): void {
-		if (e.detail === 0 && Date.now() - lineFocusedAt < LINE_GUARD_MS) return;
-		void setExpanded(true, e);
+	function toggleResolved(open: boolean, e: MouseEvent): void {
+		if (e.detail === 0 && Date.now() - handedAt < LINE_GUARD_MS) return;
+		void setExpanded(open, e);
 	}
+
+	const ignoreRepeat = (e: KeyboardEvent) => e.repeat && e.key === 'Enter' && e.preventDefault();
 
 	async function returnFocus(opener?: HTMLElement): Promise<void> {
 		await tick();
 		if (document.activeElement !== document.body) return;
 		if (opener?.isConnected) opener.focus();
-		else if (lineEl) focusLine();
+		else if (lineEl) handFocus(lineEl);
 		else cardEl?.focus();
 	}
 
@@ -316,8 +317,8 @@
 		class="task-line line-{item.status}"
 		bind:this={lineEl}
 		aria-expanded="false"
-		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
-		onclick={openLine}
+		onkeydown={ignoreRepeat}
+		onclick={(e) => toggleResolved(true, e)}
 	>
 		<span class="task-line__title">{item.def.title}</span>
 		{#if item.note}
@@ -340,7 +341,8 @@
 			class="task-card__header"
 			bind:this={headerEl}
 			aria-expanded="true"
-			onclick={(e) => void setExpanded(false, e)}
+			onkeydown={ignoreRepeat}
+			onclick={(e) => toggleResolved(false, e)}
 		>
 			<span class="task-card__header-title">{item.def.title}</span>
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
