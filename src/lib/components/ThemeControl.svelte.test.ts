@@ -94,6 +94,21 @@ describe('ThemeControl', () => {
 		expect(rings()).toEqual(['none', 'none', 'none']);
 	});
 
+	// A 44 px target without a bigger pill: each button takes taps up to 22 px from its middle, above and below, while
+	// the pill keeps its height.
+	it('takes a tap 22 px above or below the middle of each button, with the pill under 44 px tall', async () => {
+		const { container } = await render(ThemeControl);
+		(container as HTMLElement).style.padding = '40px';
+		for (const b of container.querySelectorAll('button')) {
+			const r = b.getBoundingClientRect();
+			const x = r.left + r.width / 2;
+			const mid = r.top + r.height / 2;
+			expect(r.height).toBeLessThan(44);
+			expect(document.elementFromPoint(x, mid - 21.5)).toBe(b);
+			expect(document.elementFromPoint(x, mid + 21.5)).toBe(b);
+		}
+	});
+
 	it('clicking System removes the data-theme attribute (OS-driven) and persists system', async () => {
 		localStorage.setItem('mtc:theme', 'dark');
 		document.documentElement.setAttribute('data-theme', 'dark');

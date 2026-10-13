@@ -25,6 +25,20 @@ const base: Props = {
 };
 
 describe('OnlineAnswersPanel', () => {
+	// A 44 px target without a bigger pill, as on the theme pills.
+	it('takes a tap 22 px above or below the middle of each answer mode button, with the pill under 44 px', async () => {
+		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
+		(container as HTMLElement).style.padding = '40px';
+		for (const b of container.querySelectorAll('.online-mode__opt')) {
+			const r = b.getBoundingClientRect();
+			const x = r.left + r.width / 2;
+			const mid = r.top + r.height / 2;
+			expect(r.height).toBeLessThan(44);
+			expect(document.elementFromPoint(x, mid - 21.5)).toBe(b);
+			expect(document.elementFromPoint(x, mid + 21.5)).toBe(b);
+		}
+	});
+
 	it('states plainly that the key is encrypted on-device and sent only to Anthropic, never to us', async () => {
 		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
 		expect(container.textContent?.replace(/\s+/g, ' ')).toContain(

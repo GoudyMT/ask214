@@ -173,11 +173,26 @@
 	.online-row {
 		margin-top: var(--space-m);
 	}
+	/* As on the theme pills: the ends are rounded on the end buttons, not clipped, so the tap area below is not cut. */
 	.online-mode {
 		display: inline-flex;
 		border: 1px solid var(--color-border);
 		border-radius: 999px;
-		overflow: hidden;
+	}
+	.online-mode__opt:first-child {
+		border-radius: 999px 0 0 999px;
+	}
+	.online-mode__opt:last-child {
+		border-radius: 0 999px 999px 0;
+	}
+	/* A 44 px tap target with the pill's look unchanged (WCAG 2.5.5). */
+	.online-mode__opt {
+		position: relative;
+	}
+	.online-mode__opt::after {
+		content: '';
+		position: absolute;
+		inset: calc(50% - 22px) 0;
 	}
 	/* The keyboard focus ring sits on the container, outset, so it is never clipped by the pill's
 	   overflow:hidden + rounded ends (an inset per-segment ring loses its corners there). The accent
