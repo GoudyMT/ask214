@@ -44,9 +44,9 @@ describe('LockedPanel', () => {
 		expect([held('Enter'), held('Tab'), held('ArrowDown')]).toEqual([true, false, false]);
 	});
 
-	// The button keeps focus while busy: a dim on the whole button would fade its focus ring too (below 3:1), so only its
-	// fill and text dim.
-	it('dims the fill while busy, not the whole button', async () => {
+	// The button keeps focus while busy, and its label says it is working: a dim would fade its focus ring (below 3:1) or
+	// its label (below 4.5:1), so it keeps its normal look.
+	it('keeps its normal look while busy', async () => {
 		// Component tests run without app.css; the colour tokens are set here as the app defines them, and removed.
 		const root = document.documentElement.style;
 		root.setProperty('--color-accent', '#1a66c2');
@@ -58,7 +58,7 @@ describe('LockedPanel', () => {
 			const { container } = await render(LockedPanel, { props: { onunlock: vi.fn(), busy: true } });
 			const busy = getComputedStyle(container.querySelector('button')!);
 			expect(busy.opacity).toBe('1');
-			expect(busy.backgroundColor).not.toBe(idleFill);
+			expect(busy.backgroundColor).toBe(idleFill);
 		} finally {
 			root.removeProperty('--color-accent');
 			root.removeProperty('--color-bg');

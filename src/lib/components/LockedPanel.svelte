@@ -70,9 +70,10 @@
 		background: var(--color-accent-muted);
 	}
 
-	/* The fill dims, not the button: it keeps focus while busy, and a faded focus ring would drop below 3:1. */
+	/* No dim while busy: the label says it is working, and a dim would fade the focus ring or the label below their
+	   contrast minimums. The hover fill stays off too, as a press does nothing. */
 	.locked-panel__unlock[aria-busy='true'] {
-		background: color-mix(in srgb, var(--color-accent) 60%, var(--color-bg));
+		background: var(--color-accent);
 		cursor: default;
 	}
 
