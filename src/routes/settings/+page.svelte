@@ -410,9 +410,13 @@
 		</section>
 		<!-- Install control: non-PII + device-level, so it sits above the lock gate like Appearance.
 	     Permanent (no dismiss) - a user who dismissed the Home nudge can still install from here. -->
-		{#if install.installed}
-			<section class="settings-section" aria-labelledby="install-heading">
-				<h2 id="install-heading" class="settings-section__heading" tabindex="-1">Install</h2>
+		<!-- One section and one heading in both states: the browser says it installed after the prompt is answered, by
+		     which time focus may be on this heading, and a swapped heading would drop it. -->
+		<section class="settings-section" aria-labelledby="install-heading">
+			<h2 id="install-heading" class="settings-section__heading" tabindex="-1">
+				{install.installed ? 'Install' : 'Install Ask 214'}
+			</h2>
+			{#if install.installed}
 				{#if install.persisted}
 					<p class="settings-hint">
 						Ask 214 is installed, and its data is set to stay on this device.
@@ -420,12 +424,7 @@
 				{:else}
 					<p class="settings-hint">Ask 214 is installed on this device.</p>
 				{/if}
-			</section>
-		{:else}
-			<section class="settings-section" aria-labelledby="install-heading">
-				<h2 id="install-heading" class="settings-section__heading" tabindex="-1">
-					Install Ask 214
-				</h2>
+			{:else}
 				<p class="settings-hint">
 					Install it so it opens like an app and is less likely to have its data cleared.
 				</p>
@@ -436,8 +435,8 @@
 						If your browser supports it, open its menu and choose Install or Add to Home Screen.
 					</p>
 				{/if}
-			</section>
-		{/if}
+			{/if}
+		</section>
 		<!-- Documents: public government guides, no personal data, so like Install it sits above the lock gate
 	     and a user with no timeline still reaches them. -->
 		<section class="settings-section" aria-labelledby="documents-heading">

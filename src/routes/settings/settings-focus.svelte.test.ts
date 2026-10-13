@@ -137,13 +137,28 @@ describe('Settings, Install', () => {
 			await render(SettingsPage);
 			await page.getByRole('button', { name: 'Install', exact: true }).click();
 
-			// Read inside the poll: an accepted install swaps the section's heading for a new element.
+			// Read inside the poll: focus arrives only after the prompt's answer.
 			await expect
 				.poll(() => document.activeElement === document.getElementById('install-heading'))
 				.toBe(true);
 			expect(page.getByRole('button', { name: 'Install', exact: true }).query()).toBeNull();
 		}
 	);
+
+	// In a real browser the prompt's answer comes first and the installed signal (`appinstalled`) later, so the section
+	// changes after focus has reached its heading.
+	it('keeps focus on the Install heading when the installed signal comes after the answer', async () => {
+		ctl.prompt = async () => 'dismissed';
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Install', exact: true }).click();
+		await expect
+			.poll(() => document.activeElement === document.getElementById('install-heading'))
+			.toBe(true);
+
+		install.installed = true;
+		await expect.element(page.getByText('Ask 214 is installed on this device.')).toBeVisible();
+		expect(document.activeElement).toBe(document.getElementById('install-heading'));
+	});
 });
 
 describe('Settings, an erase that fails', () => {
