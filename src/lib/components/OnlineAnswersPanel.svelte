@@ -214,6 +214,15 @@
 		background: var(--color-accent);
 		color: var(--color-bg);
 	}
+	/* As on the theme pills: forced colors drop the fill, so a 3px Highlight border marks the chosen mode, with the
+	   padding giving up those 3px so the button keeps its size. */
+	@media (forced-colors: active) {
+		.online-mode__opt[aria-pressed='true'] {
+			border: 3px solid Highlight;
+			padding: 3px 12px;
+			border-radius: 999px;
+		}
+	}
 	.online-synth {
 		margin-top: var(--space-l);
 		padding-top: var(--space-m);
