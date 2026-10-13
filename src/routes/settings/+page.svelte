@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import SettingsDateRow from '$lib/components/SettingsDateRow.svelte';
 	import SkillBridgePlanRow from '$lib/components/SkillBridgePlanRow.svelte';
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
@@ -97,7 +98,17 @@
 	// timeline-dependent sections (separation date, calendar) hide until there is a timeline to manage.
 	const hasTimeline = $derived((app.store?.persona.completeness ?? 'none') !== 'none');
 
+	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
+	let unlockError = $state<string | null>(null);
+	const lockedView = $derived(!!app.store?.locked);
+	// A failure line belongs to the lock it failed on, so it goes whenever the locked panel comes or goes: the profile can
+	// open without Unlock (the app re-reads it on its own, as when the tab is shown again), and a read can fail after it.
+	$effect(() => {
+		void lockedView;
+		unlockError = null;
+	});
+	let headingEl: HTMLElement | undefined;
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
 	let clockError = $state<string | null>(null);
@@ -255,15 +266,18 @@
 		);
 	});
 
-	function lock(): void {
+	async function lock(): Promise<void> {
 		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
 		// leaving them in memory is precisely what this button exists to prevent.
 		app.relockAll?.();
+		// The Lock button is gone with the unlocked page; focus goes to the Unlock button that replaces it.
+		await handFocusOn('.locked-panel__unlock');
 	}
 
 	async function unlock(): Promise<void> {
 		const store = app.store;
 		if (!store) return;
+		unlockError = null;
 		unlocking = true;
 		try {
 			await store.load();
@@ -272,9 +286,16 @@
 			// timeline route for the full reasoning). allSettled so a secondary failure leaves that
 			// store not-ready rather than blocking the unlock.
 			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
+		} catch {
+			// The button keeps focus (it is never turned off) and the panel says so.
+			unlockError = UNLOCK_FAILED;
+			return;
 		} finally {
 			unlocking = false;
 		}
+		// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+		await tick();
+		if (document.activeElement === document.body) headingEl?.focus();
 	}
 
 	async function clearClock(): Promise<void> {
@@ -285,12 +306,31 @@
 			// Clear failed (e.g. another tab edited concurrently); the store lowers the mark only when
 			// the save lands, so the banner/notice correctly stay up. Tell the user they can retry.
 			clockError = 'Could not update right now - please try again.';
+			return;
 		}
+		// The notice and its button are gone; focus goes to the heading of their section, unless the person already moved it.
+		await handFocusOn('#timeline-heading');
+	}
+
+	// Focus that fell to the page when the pressed control went away is handed to `selector`; focus the person moved stays.
+	async function handFocusOn(selector: string): Promise<void> {
+		await tick();
+		if (document.activeElement === document.body)
+			document.querySelector<HTMLElement>(selector)?.focus();
+	}
+
+	async function promptInstall(): Promise<void> {
+		await install.promptInstall();
+		// Accepted or dismissed, the controller has taken the button away: focus goes to the section's heading.
+		await handFocusOn('#install-heading');
 	}
 
 	async function confirmErase(): Promise<void> {
 		eraseError = null;
 		wipeDialog?.close();
+		// Where the closing dialog left focus: its opener, which stays on a damaged page and goes with the page when the
+		// erase locks it.
+		const left = document.activeElement;
 		try {
 			await eraseEverything({
 				relock: () => app.relockAll?.(),
@@ -321,6 +361,11 @@
 			// more than usual: the user asked for their data to be gone and would otherwise walk away
 			// believing it was, because the dialog closed and the screen locked.
 			eraseError = 'Could not erase your data. Nothing was deleted - please try again.';
+			// Focus the person has not moved since the dialog closed goes to the line that says what happened.
+			await tick();
+			if (document.activeElement === document.body || document.activeElement === left) {
+				document.querySelector<HTMLElement>('.erase-error')?.focus();
+			}
 		}
 	}
 
@@ -348,7 +393,7 @@
 <!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
      separation date. -->
 <div translate="no">
-	<h1>Settings</h1>
+	<h1 bind:this={headingEl} tabindex="-1">Settings</h1>
 
 	{#if app.status === 'ready'}
 		<!-- Outside the locked/unlocked split on purpose: the erase zeroizes memory before it touches
@@ -356,7 +401,7 @@
 	     swapped to the locked panel. Rendered in the section that raised it, this message would be
 	     unmounted before the user ever saw it. -->
 		{#if eraseError}
-			<p class="erase-error" role="alert">{eraseError}</p>
+			<p class="erase-error" role="alert" tabindex="-1">{eraseError}</p>
 		{/if}
 		<!-- Above the lock gate on purpose: the theme is a non-PII device preference, so an idle-locked
 	     user can still switch light/dark without unlocking. -->
@@ -372,9 +417,13 @@
 		</section>
 		<!-- Install control: non-PII + device-level, so it sits above the lock gate like Appearance.
 	     Permanent (no dismiss) - a user who dismissed the Home nudge can still install from here. -->
-		{#if install.installed}
-			<section class="settings-section" aria-labelledby="install-heading">
-				<h2 id="install-heading" class="settings-section__heading">Install</h2>
+		<!-- One section and one heading in both states: the browser says it installed after the prompt is answered, by
+		     which time focus may be on this heading, and a swapped heading would drop it. -->
+		<section class="settings-section" aria-labelledby="install-heading">
+			<h2 id="install-heading" class="settings-section__heading" tabindex="-1">
+				{install.installed ? 'Install' : 'Install Ask 214'}
+			</h2>
+			{#if install.installed}
 				{#if install.persisted}
 					<p class="settings-hint">
 						Ask 214 is installed, and its data is set to stay on this device.
@@ -382,25 +431,19 @@
 				{:else}
 					<p class="settings-hint">Ask 214 is installed on this device.</p>
 				{/if}
-			</section>
-		{:else}
-			<section class="settings-section" aria-labelledby="install-heading">
-				<h2 id="install-heading" class="settings-section__heading">Install Ask 214</h2>
+			{:else}
 				<p class="settings-hint">
 					Install it so it opens like an app and is less likely to have its data cleared.
 				</p>
 				{#if install.canPrompt || install.ios}
-					<InstallPrompt
-						canPrompt={install.canPrompt}
-						onInstall={() => void install.promptInstall()}
-					/>
+					<InstallPrompt canPrompt={install.canPrompt} onInstall={() => void promptInstall()} />
 				{:else}
 					<p class="settings-hint">
 						If your browser supports it, open its menu and choose Install or Add to Home Screen.
 					</p>
 				{/if}
-			</section>
-		{/if}
+			{/if}
+		</section>
 		<!-- Documents: public government guides, no personal data, so like Install it sits above the lock gate
 	     and a user with no timeline still reaches them. -->
 		<section class="settings-section" aria-labelledby="documents-heading">
@@ -418,12 +461,14 @@
 				Read the official guides behind the answers, and choose which stay on this device.
 			</p>
 		</section>
-		{#if app.store?.locked}
-			<LockedPanel onunlock={() => void unlock()} busy={unlocking} />
+		{#if lockedView}
+			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else}
 			{#if hasTimeline}
 				<section class="settings-section" aria-labelledby="timeline-heading">
-					<h2 id="timeline-heading" class="settings-section__heading">Transition timeline</h2>
+					<h2 id="timeline-heading" class="settings-section__heading" tabindex="-1">
+						Transition timeline
+					</h2>
 
 					<SettingsDateRow
 						id="eaos"
@@ -481,7 +526,7 @@
 			{#if hasTimeline}
 				<section class="settings-section" aria-labelledby="privacy-heading">
 					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-					<button class="settings-lock" type="button" onclick={lock}>Lock</button>
+					<button class="settings-lock" type="button" onclick={() => void lock()}>Lock</button>
 					<p class="settings-hint">
 						Clears your profile from this screen. Use Unlock to view it again.
 					</p>
@@ -548,7 +593,7 @@
 		<!-- The saved data failed its own checks at start-up, so no reload can read it: only the way back is offered - the
 	     same erase, from the same dialog. -->
 		{#if eraseError}
-			<p class="erase-error" role="alert">{eraseError}</p>
+			<p class="erase-error" role="alert" tabindex="-1">{eraseError}</p>
 		{/if}
 		<section class="settings-section" aria-labelledby="privacy-heading">
 			<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
@@ -589,6 +634,14 @@
 <style>
 	h1 {
 		margin: 0 0 var(--space-l);
+	}
+
+	/* Where focus goes when a pressed button goes away: the app's ring (app.css), as on a button. */
+	h1:focus-visible,
+	.settings-section__heading:focus-visible,
+	.erase-error:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 
 	.settings-section {

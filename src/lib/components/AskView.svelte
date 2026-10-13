@@ -169,6 +169,8 @@
 	</div>
 {/if}
 
+<!-- A button that goes away under a held Enter hands focus to the field (the install nudge), so the key's repeats would
+     ask: only a new press of Enter does. -->
 <form
 	class="ask-bar"
 	onsubmit={(e) => {
@@ -182,6 +184,7 @@
 		class="ask-input"
 		placeholder="Ask about benefits, SkillBridge, VA..."
 		aria-label="Ask a question"
+		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 	/>
 	<button class="ask-search" type="submit" disabled={!ready}>
 		<span class="ask-search__label">Search</span>

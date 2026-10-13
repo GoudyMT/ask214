@@ -1,6 +1,11 @@
 <script lang="ts">
-	type Props = { onunlock: () => void; busy?: boolean };
-	let { onunlock, busy = false }: Props = $props();
+	type Props = { onunlock: () => void; busy?: boolean; error?: string | null };
+	let { onunlock, busy = false, error = null }: Props = $props();
+
+	// Not `disabled`: a disabled button that holds focus drops it, so a busy press is ignored instead.
+	function press(): void {
+		if (!busy) onunlock();
+	}
 </script>
 
 <!--
@@ -13,9 +18,18 @@
 	<p class="locked-panel__body">
 		Your information is encrypted on this device. Unlock to view and edit it.
 	</p>
-	<button class="locked-panel__unlock" type="button" onclick={onunlock} disabled={busy}>
+	<!-- Lock hands focus here mid-press, so a held Enter's repeats would unlock again: only a new press counts. Space
+	     clicks on release, and other held keys (Tab, arrows) must still work. -->
+	<button
+		class="locked-panel__unlock"
+		type="button"
+		onclick={press}
+		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
+		aria-busy={busy}
+	>
 		{busy ? 'Unlocking...' : 'Unlock'}
 	</button>
+	{#if error}<p class="locked-panel__error" role="alert">{error}</p>{/if}
 </section>
 
 <style>
@@ -56,8 +70,15 @@
 		background: var(--color-accent-muted);
 	}
 
-	.locked-panel__unlock:disabled {
-		opacity: 0.6;
+	/* No dim while busy: the label says it is working, and a dim would fade the focus ring or the label below their
+	   contrast minimums. The hover fill stays off too, as a press does nothing. */
+	.locked-panel__unlock[aria-busy='true'] {
+		background: var(--color-accent);
 		cursor: default;
+	}
+
+	.locked-panel__error {
+		margin: 0;
+		color: var(--color-danger);
 	}
 </style>

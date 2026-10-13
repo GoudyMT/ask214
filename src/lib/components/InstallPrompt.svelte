@@ -9,7 +9,7 @@
 		collapsibleSteps = false
 	}: {
 		canPrompt: boolean;
-		onInstall: () => void;
+		onInstall: (press: MouseEvent) => void;
 		collapsibleSteps?: boolean;
 	} = $props();
 

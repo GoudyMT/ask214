@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
+import { cdp } from 'vitest/browser';
 import AskView from './AskView.svelte';
 import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
@@ -110,6 +111,32 @@ describe('AskView', () => {
 		(container.querySelector('.ask-search') as HTMLButtonElement).click();
 		flushSync();
 		expect(asked).toBe('how do I file a claim');
+	});
+
+	// A button that goes away under a held Enter hands focus to this field (the install nudge), so the key's repeats
+	// land here: only a new press of Enter asks.
+	it('asks on a new Enter but not on a held Enter that repeats into the field', async () => {
+		const onAsk = vi.fn();
+		const { container } = await render(AskView, { props: props({ kind: 'idle' }, { onAsk }) });
+		const input = container.querySelector('.ask-input') as HTMLInputElement;
+		input.value = 'how do I file a claim';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		input.focus();
+		const enter = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...enter });
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...enter });
+		expect(onAsk).not.toHaveBeenCalled();
+
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...enter });
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...enter });
+		await vi.waitFor(() => expect(onAsk).toHaveBeenCalledWith('how do I file a claim'));
 	});
 
 	it('not ready: the input stays usable but Search is gated until the corpus loads', async () => {

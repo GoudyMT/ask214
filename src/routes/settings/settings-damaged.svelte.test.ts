@@ -90,4 +90,15 @@ describe('Settings, when the saved data cannot be read', () => {
 			.element(page.getByText('Could not erase your data. Nothing was deleted - please try again.'))
 			.toBeVisible();
 	});
+
+	// The dialog closes and the erase refuses; the failure line is above the page, so focus goes to it rather than
+	// falling to the page.
+	it('hands focus to the failure line when the erase refuses', async () => {
+		const { container } = await render(SettingsPage);
+		await page.getByRole('button', { name: 'Erase all data on this device' }).click();
+		await page.getByRole('button', { name: 'Erase everything' }).click();
+
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await expect.poll(() => document.activeElement).toBe(container.querySelector('.erase-error'));
+	});
 });

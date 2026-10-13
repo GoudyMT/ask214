@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 import OnlineAnswersPanel from './OnlineAnswersPanel.svelte';
 import { scrubSecureInputs } from '../profile/lifecycle';
 
@@ -147,6 +148,95 @@ describe('OnlineAnswersPanel', () => {
 
 			click(container, '.online-key__clear');
 			await vi.waitFor(() => expect(container.querySelector('.online-key__error')).toBeNull());
+		});
+	});
+
+	// The Remove button goes with the key it removes; focus goes to the key field, where a new key is typed, instead of
+	// falling to the page, for a person on a keyboard. A tap leaves it: a focused text field would open a phone's on-screen
+	// keyboard. The parent turns hasKey off when the removal lands, as the rerender here does.
+	describe('after Remove', () => {
+		const remove = () => page.getByRole('button', { name: 'Remove' });
+		async function pressRemoveByKey(): Promise<void> {
+			(remove().element() as HTMLElement).focus();
+			await userEvent.keyboard('{Enter}');
+		}
+		async function renderRemovable(ms: number): Promise<void> {
+			const props: Props = { ...base, hasKey: true };
+			const screen = await render(OnlineAnswersPanel, {
+				props: {
+					...props,
+					onClearKey: async () => {
+						await new Promise((resolve) => setTimeout(resolve, ms));
+						await screen.rerender({ ...props, hasKey: false });
+					}
+				}
+			});
+		}
+
+		it('hands focus to the key field when the removal lands', async () => {
+			await renderRemovable(50);
+			await pressRemoveByKey();
+
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(document.getElementById('online-key-input'));
+			expect(remove().query()).toBeNull();
+		});
+
+		// A screen reader's browse mode presses a button with a click that carries no pointer (detail 0), and no focus ring
+		// when the last real input was a pointer: it is a press without a tap, so the field takes focus.
+		it("hands focus to the key field when a screen reader's click presses Remove", async () => {
+			await renderRemovable(50);
+			await page.getByLabelText('Your Anthropic API key').click();
+			const button = remove().element() as HTMLElement;
+			button.focus();
+			button.click();
+
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(document.getElementById('online-key-input'));
+		});
+
+		it('leaves the key field alone when Remove was pressed by pointer', async () => {
+			await renderRemovable(50);
+			await remove().click();
+
+			await expect.poll(() => remove().query()).toBeNull();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(document.activeElement).not.toBe(document.getElementById('online-key-input'));
+		});
+
+		it('leaves focus alone when the person moved it while the removal ran', async () => {
+			await renderRemovable(100);
+			const elsewhere = document.body.appendChild(document.createElement('button'));
+			try {
+				await pressRemoveByKey();
+				elsewhere.focus();
+				await expect.poll(() => remove().query()).toBeNull();
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				expect(document.activeElement).toBe(elsewhere);
+			} finally {
+				elsewhere.remove();
+			}
+		});
+
+		// Guard: a removal that fails leaves the button where it is, with the line that says so.
+		it('keeps focus on Remove, with the line, when the removal fails', async () => {
+			const { container } = await render(OnlineAnswersPanel, {
+				props: {
+					...base,
+					hasKey: true,
+					onClearKey: () => Promise.reject(new Error('E_TEST_WRITE'))
+				}
+			});
+			await remove().click();
+
+			await vi.waitFor(() =>
+				expect(container.querySelector('.online-key__error')?.textContent).toBe(
+					'Could not update right now - please try again.'
+				)
+			);
+			await expect.poll(() => document.activeElement).toBe(remove().element());
 		});
 	});
 

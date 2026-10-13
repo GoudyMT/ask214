@@ -38,6 +38,8 @@
 
 	async function save(e: SubmitEvent): Promise<void> {
 		e.preventDefault();
+		// Guarded, not disabled: a disabled button that holds focus can drop it, and a held Enter must save once.
+		if (saving) return;
 		const store = app.store;
 		if (!store) return;
 
@@ -108,8 +110,10 @@
 			<p class="wizard__today">Today on this device: {todayDisplay}</p>
 
 			<div class="wizard__actions">
-				<button class="wizard__save" type="submit" disabled={saving}>Save and continue</button>
-				<button class="wizard__skip" type="button" onclick={() => void skip()}>Skip for now</button>
+				<button class="wizard__save" type="submit">Save and continue</button>
+				<button class="wizard__skip" type="button" disabled={saving} onclick={() => void skip()}
+					>Skip for now</button
+				>
 			</div>
 		</form>
 	{/if}
@@ -167,11 +171,6 @@
 
 	.wizard__save:hover {
 		background: var(--color-accent-muted);
-	}
-
-	.wizard__save:disabled {
-		opacity: 0.6;
-		cursor: default;
 	}
 
 	/* Quiet CTA: muted text, underline. De-emphasized but clearly visible. */

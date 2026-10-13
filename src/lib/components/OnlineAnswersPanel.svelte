@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { registerSecureInput } from '../profile/lifecycle';
 
 	type Props = {
@@ -50,13 +51,19 @@
 		}
 	}
 
-	async function clear(): Promise<void> {
+	async function clear(press: MouseEvent): Promise<void> {
 		keyError = null;
 		try {
 			await onClearKey();
 		} catch {
 			keyError = 'Could not update right now - please try again.';
+			return;
 		}
+		// Remove goes with the key; focus goes to the field a new key is typed in, unless the person already moved it. Not
+		// after a tap or a click (detail 1+): a focused text field would open a phone's keyboard. A keyboard or a screen
+		// reader presses with detail 0.
+		await tick();
+		if (!press.detail && document.activeElement === document.body) keyInputEl?.focus();
 	}
 </script>
 

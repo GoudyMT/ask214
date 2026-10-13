@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 import { formatTimelineDate } from '$lib/timeline/format-date';
@@ -18,6 +18,8 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 	// The timeline store as the layout hands it over: null until its first load settles. `firstRun` is a profile with
 	// nothing saved yet.
 	current: {
+		// What the profile store's load does; the Unlock cases set it and put it back.
+		load: async (): Promise<void> => {},
 		firstRun: false,
 		// Days from today to the separation date.
 		daysOut: 200,
@@ -41,16 +43,26 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 			setSnooze?: (taskId: string, untilIso: string) => Promise<void>;
 			setNote?: (taskId: string, note: string | undefined) => Promise<void>;
 			refresh?: () => Promise<void>;
+			load?: () => Promise<void>;
 		}
 	}
 }));
+
+// Reactive, unlike the flags in `current`: Unlock opens the profile and the page swaps its locked panel for the list at that
+// moment.
+// `reads` counts the store's re-reads: a real re-read assigns the profile again, which wakes every reader of `locked`.
+const profile = $state({ locked: false, reads: 0 });
 
 // The profile is unlocked with a separation date; each test sets where the timeline's saved progress stands.
 vi.mock('$lib/profile/context', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
-			locked: false,
+			get locked() {
+				void profile.reads;
+				return profile.locked;
+			},
+			load: () => current.load(),
 			clockBackward: false,
 			persona: current.firstRun
 				? { completeness: 'none' }
@@ -106,6 +118,148 @@ describe('Timeline, its saved progress', () => {
 		const { container } = await render(TimelinePage);
 		await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
 		expect(container.querySelector('.timeline-list')).toBeNull();
+	});
+
+	describe('Unlock', () => {
+		const FAILED = 'Could not unlock right now - please try again.';
+		const unhandled: unknown[] = [];
+		const onUnhandled = (e: PromiseRejectionEvent) => unhandled.push(e.reason);
+		// A profile load that ends after `ms`: it opens the profile, or it rejects.
+		const endsAfter = (ms: number, fails: boolean) => () =>
+			new Promise<void>((resolve, reject) =>
+				setTimeout(() => {
+					if (fails) return reject(new Error('E_TEST_LOAD'));
+					profile.locked = false;
+					resolve();
+				}, ms)
+			);
+		const timings = [
+			['ends at once', 0],
+			['takes a while', 100]
+		] as const;
+
+		beforeEach(() => {
+			unhandled.length = 0;
+			window.addEventListener('unhandledrejection', onUnhandled);
+			profile.locked = true;
+			current.timeline = {
+				ready: true,
+				failed: false,
+				state: EMPTY,
+				load: () => Promise.resolve()
+			};
+		});
+		afterEach(() => {
+			window.removeEventListener('unhandledrejection', onUnhandled);
+			profile.locked = false;
+			current.load = async () => {};
+		});
+
+		it.each(timings)(
+			'says so and keeps focus on Unlock when the load %s and fails',
+			async (_, ms) => {
+				current.load = endsAfter(ms, true);
+				const { container } = await render(TimelinePage);
+				await page.getByRole('button', { name: 'Unlock' }).click();
+
+				await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+				await expect
+					.poll(() => document.activeElement)
+					.toBe(container.querySelector('.locked-panel__unlock'));
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				expect(unhandled).toEqual([]);
+			}
+		);
+
+		it.each(timings)('puts focus on the heading when the load %s and succeeds', async (_, ms) => {
+			current.load = endsAfter(ms, false);
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+
+			const heading = page.getByRole('heading', { level: 1, name: 'Timeline' });
+			await expect.poll(() => document.activeElement).toBe(heading.element());
+			expect(page.getByRole('alert').query()).toBeNull();
+		});
+
+		// By keyboard the heading shows the app's focus ring - a 2 px solid outline with a 2 px gap, as on every button.
+		it('rings the heading the way the app rings a button, when Unlock was pressed by keyboard', async () => {
+			current.load = endsAfter(0, false);
+			// Component tests run without app.css; the ring's colour token is set here as the app defines it, and removed.
+			document.documentElement.style.setProperty('--color-accent', '#1a66c2');
+			try {
+				const { container } = await render(TimelinePage);
+				container.querySelector<HTMLElement>('.locked-panel__unlock')?.focus();
+				await userEvent.keyboard('{Enter}');
+				const heading = page.getByRole('heading', { level: 1, name: 'Timeline' });
+				await expect.poll(() => document.activeElement).toBe(heading.element());
+				const ring = getComputedStyle(heading.element());
+				expect([
+					ring.outlineStyle,
+					ring.outlineWidth,
+					ring.outlineOffset,
+					ring.outlineColor
+				]).toEqual(['solid', '2px', '2px', 'rgb(26, 102, 194)']);
+			} finally {
+				document.documentElement.style.removeProperty('--color-accent');
+			}
+		});
+
+		it('leaves focus alone when the person moved it while the load ran', async () => {
+			current.load = endsAfter(100, false);
+			await render(TimelinePage);
+			const elsewhere = document.body.appendChild(document.createElement('button'));
+			try {
+				await page.getByRole('button', { name: 'Unlock' }).click();
+				elsewhere.focus();
+				await expect.poll(() => profile.locked).toBe(false);
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				expect(document.activeElement).toBe(elsewhere);
+			} finally {
+				elsewhere.remove();
+			}
+		});
+
+		// A second failure that reads the same as the first is announced again only if the line was taken away at the press.
+		it('takes the line away at the next press', async () => {
+			let attempt = 0;
+			current.load = () =>
+				++attempt === 1 ? Promise.reject(new Error('E_TEST_LOAD')) : new Promise<void>(() => {});
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.poll(() => attempt).toBe(2);
+			await expect.poll(() => page.getByRole('alert').query()).toBeNull();
+		});
+
+		// The profile can open without Unlock (the app re-reads it on its own), so a failure line must not outlive the lock.
+		it('drops the failure line when the profile opens some other way', async () => {
+			current.load = endsAfter(0, true);
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+
+			profile.locked = false;
+			await expect.poll(() => page.getByRole('button', { name: 'Unlock' }).query()).toBeNull();
+			profile.locked = true;
+			await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
+			expect(page.getByRole('alert').query()).toBeNull();
+		});
+
+		// The profile is open and the timeline stays locked: a re-read of the profile does not end the timeline's lock.
+		it('keeps the failure line while the timeline stays locked through a re-read of the profile', async () => {
+			profile.locked = false;
+			current.timeline = { ready: false, failed: false, locked: true, state: EMPTY };
+			current.load = endsAfter(0, true);
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+
+			profile.reads++;
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+		});
 	});
 
 	// With nothing saved there is nothing to unlock: a first-run tab locked by idle or another tab still offers setup.
