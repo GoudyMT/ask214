@@ -101,7 +101,8 @@
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
-	// The profile can open another way (another tab's Unlock): a failure line must not outlive the lock it failed on.
+	// The profile can open without Unlock (the app re-reads it on its own, as when the tab is shown again): a failure
+	// line must not outlive the lock it failed on.
 	$effect(() => {
 		if (app.store?.locked === false) unlockError = null;
 	});
