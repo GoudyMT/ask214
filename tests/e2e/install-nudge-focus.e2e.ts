@@ -40,6 +40,24 @@ test('Install on the install nudge, pressed by keyboard, hands focus to the ques
 	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeFocused();
 });
 
+// A screen reader's browse mode presses with a click that carries no pointer (detail 0), with no focus ring when the
+// last real input was a pointer.
+test("Dismiss on the install nudge, pressed by a screen reader's click, hands focus to the question field", async ({
+	page
+}) => {
+	await showNudge(page, 'dismissed');
+	await page.getByRole('textbox', { name: /ask a question/i }).click();
+	await page
+		.locator('.install-nudge')
+		.getByRole('button', { name: 'Dismiss' })
+		.evaluate((button: HTMLElement) => {
+			button.focus();
+			button.click();
+		});
+	await expect(page.locator('.install-nudge')).toHaveCount(0);
+	await expect(page.getByRole('textbox', { name: /ask a question/i })).toBeFocused();
+});
+
 test('Dismiss on the install nudge, pressed by pointer, leaves the question field alone', async ({
 	page
 }) => {

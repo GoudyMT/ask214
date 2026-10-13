@@ -51,9 +51,7 @@
 		}
 	}
 
-	async function clear(): Promise<void> {
-		// A keyboard press shows the focus ring; a tap does not, and a text field it focused would open a phone's keyboard.
-		const byKey = document.activeElement?.matches(':focus-visible');
+	async function clear(press: MouseEvent): Promise<void> {
 		keyError = null;
 		try {
 			await onClearKey();
@@ -61,9 +59,11 @@
 			keyError = 'Could not update right now - please try again.';
 			return;
 		}
-		// Remove goes with the key; focus goes to the field a new key is typed in, unless the person already moved it.
+		// Remove goes with the key; focus goes to the field a new key is typed in, unless the person already moved it. Not
+		// after a tap or a click (detail 1+): a focused text field would open a phone's keyboard. A keyboard or a screen
+		// reader presses with detail 0.
 		await tick();
-		if (byKey && document.activeElement === document.body) keyInputEl?.focus();
+		if (!press.detail && document.activeElement === document.body) keyInputEl?.focus();
 	}
 </script>
 

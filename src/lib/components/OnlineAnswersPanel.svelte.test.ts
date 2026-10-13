@@ -183,6 +183,20 @@ describe('OnlineAnswersPanel', () => {
 			expect(remove().query()).toBeNull();
 		});
 
+		// A screen reader's browse mode presses a button with a click that carries no pointer (detail 0), and no focus ring
+		// when the last real input was a pointer: it is a press without a tap, so the field takes focus.
+		it("hands focus to the key field when a screen reader's click presses Remove", async () => {
+			await renderRemovable(50);
+			await page.getByLabelText('Your Anthropic API key').click();
+			const button = remove().element() as HTMLElement;
+			button.focus();
+			button.click();
+
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(document.getElementById('online-key-input'));
+		});
+
 		it('leaves the key field alone when Remove was pressed by pointer', async () => {
 			await renderRemovable(50);
 			await remove().click();

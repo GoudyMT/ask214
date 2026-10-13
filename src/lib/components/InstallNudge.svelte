@@ -10,8 +10,8 @@
 		ondismiss
 	}: {
 		canPrompt: boolean;
-		onInstall: () => void;
-		ondismiss: () => void;
+		onInstall: (press: MouseEvent) => void;
+		ondismiss: (press: MouseEvent) => void;
 	} = $props();
 </script>
 
