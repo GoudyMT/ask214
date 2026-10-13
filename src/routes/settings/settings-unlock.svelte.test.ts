@@ -149,11 +149,22 @@ describe('Settings, Unlock', () => {
 			await userEvent.keyboard('{Enter}');
 			await expect.poll(() => document.activeElement).toBe(heading().element());
 			const ring = getComputedStyle(heading().element());
-			expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual([
-				'solid',
-				'2px',
-				'2px'
-			]);
+			expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset, ring.outlineColor]).toEqual(
+				['solid', '2px', '2px', 'rgb(26, 102, 194)']
+			);
+		} finally {
+			document.documentElement.style.removeProperty('--color-accent');
+		}
+	});
+
+	// Focus that follows a pointer press shows no ring: the rule is :focus-visible, which a pointer does not raise.
+	it('shows no ring on the heading when Unlock was pressed by pointer', async () => {
+		document.documentElement.style.setProperty('--color-accent', '#1a66c2');
+		try {
+			await render(SettingsPage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.poll(() => document.activeElement).toBe(heading().element());
+			expect(getComputedStyle(heading().element()).outlineStyle).not.toBe('solid');
 		} finally {
 			document.documentElement.style.removeProperty('--color-accent');
 		}
@@ -226,24 +237,31 @@ describe('Settings, Unlock', () => {
 		expect(document.activeElement).toBe(unlockButton(container));
 	});
 
-	it('reads once for a held Enter on an Unlock that fails', async () => {
-		ctl.load = endsAfter(100, true);
-		const { container } = await render(SettingsPage);
-		unlockButton(container)?.focus();
-		const session = cdp();
-		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
-		for (let i = 0; i < 6; i++) {
-			await pause(40);
-			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+	it.each(TIMINGS)(
+		'reads once for a held Enter on an Unlock whose load %s and fails',
+		async (_, ms) => {
+			ctl.load = endsAfter(ms, true);
+			const { container } = await render(SettingsPage);
+			unlockButton(container)?.focus();
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+			for (let i = 0; i < 6; i++) {
+				await pause(40);
+				await session.send('Input.dispatchKeyEvent', {
+					type: 'keyDown',
+					autoRepeat: true,
+					...ENTER
+				});
+			}
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+			await pause(150);
+			expect(loads).toHaveBeenCalledOnce();
 		}
-		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+	);
 
-		await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
-		await pause(150);
-		expect(loads).toHaveBeenCalledOnce();
-	});
-
-	// The profile can open without this page's Unlock (another page's), so a failure line must not outlive the lock.
+	// The profile can open without Unlock (the app re-reads it on its own), so a failure line must not outlive the lock.
 	it('drops the failure line when the profile opens some other way', async () => {
 		ctl.load = endsAfter(0, true);
 		await render(SettingsPage);

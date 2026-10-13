@@ -122,10 +122,11 @@ async function expectAppRing(target: () => Element | null): Promise<void> {
 	try {
 		await expect.poll(() => document.activeElement).toBe(target());
 		const ring = getComputedStyle(target()!);
-		expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual([
+		expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset, ring.outlineColor]).toEqual([
 			'solid',
 			'2px',
-			'2px'
+			'2px',
+			'rgb(26, 102, 194)'
 		]);
 	} finally {
 		document.documentElement.style.removeProperty('--color-accent');

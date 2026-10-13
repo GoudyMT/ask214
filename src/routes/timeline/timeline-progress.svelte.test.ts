@@ -191,11 +191,12 @@ describe('Timeline, its saved progress', () => {
 				const heading = page.getByRole('heading', { level: 1, name: 'Timeline' });
 				await expect.poll(() => document.activeElement).toBe(heading.element());
 				const ring = getComputedStyle(heading.element());
-				expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual([
-					'solid',
-					'2px',
-					'2px'
-				]);
+				expect([
+					ring.outlineStyle,
+					ring.outlineWidth,
+					ring.outlineOffset,
+					ring.outlineColor
+				]).toEqual(['solid', '2px', '2px', 'rgb(26, 102, 194)']);
 			} finally {
 				document.documentElement.style.removeProperty('--color-accent');
 			}
@@ -230,8 +231,7 @@ describe('Timeline, its saved progress', () => {
 			await expect.poll(() => page.getByRole('alert').query()).toBeNull();
 		});
 
-		// The profile can open without this page's Unlock (Settings', in another tab), so a failure line must not outlive
-		// the lock.
+		// The profile can open without Unlock (the app re-reads it on its own), so a failure line must not outlive the lock.
 		it('drops the failure line when the profile opens some other way', async () => {
 			current.load = endsAfter(0, true);
 			await render(TimelinePage);
