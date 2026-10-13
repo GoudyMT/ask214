@@ -287,6 +287,12 @@
 		margin: 0 0 var(--space-s);
 	}
 
+	/* Focus comes here after Unlock or a closed card: the app's ring (app.css), as on a button. */
+	h1:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
 	.timeline-subline {
 		margin: 0 0 var(--space-xs);
 		color: var(--color-fg-muted);

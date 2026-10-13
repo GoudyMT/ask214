@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { cdp, page } from 'vitest/browser';
+import { cdp, page, userEvent } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
 
 const { isoFromToday, ctl } = vi.hoisted(() => ({
@@ -137,6 +137,26 @@ describe('Settings, Unlock', () => {
 		await expect.element(heading()).toBeVisible();
 		await expect.poll(() => document.activeElement).toBe(heading().element());
 		expect(page.getByRole('alert').query()).toBeNull();
+	});
+
+	// By keyboard the heading shows the app's focus ring - a 2 px solid outline with a 2 px gap, as on every button.
+	it('rings the heading the way the app rings a button, when Unlock was pressed by keyboard', async () => {
+		// Component tests run without app.css; the ring's colour token is set here as the app defines it, and removed.
+		document.documentElement.style.setProperty('--color-accent', '#1a66c2');
+		try {
+			const { container } = await render(SettingsPage);
+			unlockButton(container)?.focus();
+			await userEvent.keyboard('{Enter}');
+			await expect.poll(() => document.activeElement).toBe(heading().element());
+			const ring = getComputedStyle(heading().element());
+			expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual([
+				'solid',
+				'2px',
+				'2px'
+			]);
+		} finally {
+			document.documentElement.style.removeProperty('--color-accent');
+		}
 	});
 
 	it('leaves focus alone when the person moved it while the load ran', async () => {

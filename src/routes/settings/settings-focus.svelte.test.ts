@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
 
 const { isoFromToday, ctl } = vi.hoisted(() => ({
@@ -115,6 +115,22 @@ async function withFocusElsewhere(run: (elsewhere: HTMLElement) => Promise<void>
 		elsewhere.remove();
 	}
 }
+// By keyboard a focus target shows the app's focus ring - a 2 px solid outline with a 2 px gap, as on every button.
+// Component tests run without app.css; the ring's colour token is set here as the app defines it, and removed.
+async function expectAppRing(target: () => Element | null): Promise<void> {
+	document.documentElement.style.setProperty('--color-accent', '#1a66c2');
+	try {
+		await expect.poll(() => document.activeElement).toBe(target());
+		const ring = getComputedStyle(target()!);
+		expect([ring.outlineStyle, ring.outlineWidth, ring.outlineOffset]).toEqual([
+			'solid',
+			'2px',
+			'2px'
+		]);
+	} finally {
+		document.documentElement.style.removeProperty('--color-accent');
+	}
+}
 const clockFix = () => page.getByRole('button', { name: 'I fixed my clock' });
 
 describe('Settings, the clock fix', () => {
@@ -129,6 +145,16 @@ describe('Settings, the clock fix', () => {
 		const heading = page.getByRole('heading', { level: 2, name: 'Transition timeline' });
 		await expect.poll(() => document.activeElement).toBe(heading.element());
 		expect(clockFix().query()).toBeNull();
+	});
+
+	it('rings the timeline heading the way the app rings a button, after a keyboard press', async () => {
+		ctl.clearClock = async () => {
+			profile.clockBackward = false;
+		};
+		await render(SettingsPage);
+		(clockFix().element() as HTMLElement).focus();
+		await userEvent.keyboard('{Enter}');
+		await expectAppRing(() => document.getElementById('timeline-heading'));
 	});
 
 	it('leaves focus alone when the person moved it while the fix ran', async () => {
@@ -210,6 +236,14 @@ describe('Settings, an erase that fails', () => {
 		await expect.element(page.getByRole('alert')).toBeVisible();
 		expect(opener.query()).not.toBeNull();
 		await expect.poll(() => document.activeElement).toBe(container.querySelector('.erase-error'));
+	});
+
+	it('rings the failure line the way the app rings a button, after a keyboard press', async () => {
+		const { container } = await render(SettingsPage);
+		await page.getByRole('button', { name: 'Erase all data on this device' }).click();
+		(page.getByRole('button', { name: 'Erase everything' }).element() as HTMLElement).focus();
+		await userEvent.keyboard('{Enter}');
+		await expectAppRing(() => container.querySelector('.erase-error'));
 	});
 
 	it('leaves focus alone when the person moved it while the erase ran', async () => {

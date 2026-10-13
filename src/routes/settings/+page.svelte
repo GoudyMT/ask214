@@ -633,6 +633,14 @@
 		margin: 0 0 var(--space-l);
 	}
 
+	/* Where focus goes when a pressed button goes away: the app's ring (app.css), as on a button. */
+	h1:focus-visible,
+	.settings-section__heading:focus-visible,
+	.erase-error:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
 	.settings-section {
 		background: var(--color-surface);
 		border: 1px solid var(--color-border);
