@@ -65,6 +65,33 @@ beforeEach(() => {
 	gate.held = new Promise<boolean>((resolve) => (gate.land = () => resolve(true)));
 });
 
+const pill = () => document.querySelector<HTMLButtonElement>('.q-feed__pill')!;
+
+describe('Home, a feed question pressed before the Ask store exists', () => {
+	it('hands focus to the field once the store asks it, after a keyboard press', async () => {
+		await render(HomePage);
+		pill().focus();
+		await userEvent.keyboard('{Enter}');
+		expect(document.activeElement).toBe(pill());
+		const text = pill().textContent?.trim();
+
+		gate.land();
+		await expect.poll(() => asks.mock.calls).toEqual([[text]]);
+		await expect.poll(() => document.activeElement).toBe(field());
+	});
+
+	it('moves no focus to the field after a tap', async () => {
+		await render(HomePage);
+		await userEvent.click(pill());
+
+		gate.land();
+		await expect.poll(() => asks.mock.calls.length).toBe(1);
+		await vi.waitFor(() => expect(document.querySelector('.q-feed')).toBeNull());
+		await pause(50);
+		expect(document.activeElement).not.toBe(field());
+	});
+});
+
 describe('Home, the install nudge', () => {
 	const ready = async () => {
 		await render(HomePage);

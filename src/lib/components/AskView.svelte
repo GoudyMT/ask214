@@ -28,7 +28,7 @@
 	}: {
 		askState: AskState;
 		ready: boolean;
-		onAsk: (query: string) => void;
+		onAsk: (query: string, press?: MouseEvent) => void;
 		onSetUp: () => void;
 		onDismiss: () => void;
 		loadSource: (sourceId: string) => Promise<Source | null>;
@@ -82,7 +82,7 @@
 	// it through the same ask path (so the first query still hits the one-time model opt-in).
 	function pick(q: string, press: MouseEvent) {
 		query = q;
-		onAsk(q);
+		onAsk(q, press);
 		void toField(press);
 	}
 	// The pressed button goes away with its card or bar, and focus falls to the page unless the person has moved on:

@@ -51,7 +51,8 @@
 	// handed to the store when it is made, so an early tap is not lost. The toggle shows the held mode until then:
 	// the saved default, or the one just picked. A question keeps the mode it was picked in.
 	let earlyMode = $state(getDefaultMode());
-	let earlyQuery: { query: string; mode: 'device' | 'online' } | undefined;
+	// `keyboard`: the pill was pressed by keyboard or screen reader, so focus goes to the field once the question runs.
+	let earlyQuery: { query: string; mode: 'device' | 'online'; keyboard: boolean } | undefined;
 	let askView: ReturnType<typeof AskView> | undefined = $state();
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
@@ -149,7 +150,11 @@
 			// after it then applies to the next question.
 			const first = earlyQuery?.mode ?? earlyMode;
 			if (first === 'device') store.setMode('device');
-			if (earlyQuery !== undefined) void store.ask(earlyQuery.query);
+			if (earlyQuery !== undefined) {
+				void store.ask(earlyQuery.query);
+				// The pill unmounts with the feed now, outside any press, so focus falls: hand it on as a press would.
+				void toQuestionField(earlyQuery.keyboard);
+			}
 			if (earlyMode !== first) store.setMode(earlyMode);
 		});
 		return () => {
@@ -178,7 +183,14 @@
 		onlineCapable={true}
 		mode={store?.mode ?? earlyMode}
 		showNudge={store?.showNudge ?? false}
-		onAsk={(q) => (store ? void store.ask(q) : (earlyQuery = { query: q, mode: earlyMode }))}
+		onAsk={(q, press) =>
+			store
+				? void store.ask(q)
+				: (earlyQuery = {
+						query: q,
+						mode: earlyMode,
+						keyboard: press !== undefined && !press.detail
+					})}
 		onSetUp={() => store?.setUp()}
 		onDismiss={() => store?.dismissSetup()}
 		onSetMode={(m) => (store ? store.setMode(m) : (earlyMode = m))}
