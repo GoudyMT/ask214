@@ -906,6 +906,32 @@ describe('AskView, focus after the pressed button goes away', () => {
 		expect(onAsk).toHaveBeenCalledTimes(asked);
 	});
 
+	it("ignores a second Enter soon after the reminder's Set up hands focus to the field", async () => {
+		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
+		const onAsk = vi.fn();
+		const { container, rerender } = await render(AskView, { props: { ...setup, onAsk } });
+		// A pointer click, so Not now hands no focus of its own and the guard is not already running.
+		container
+			.querySelector<HTMLButtonElement>('.ask-setup__skip')
+			?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+		await rerender({ ...props({ kind: 'idle' }), onAsk });
+		const input = field(container)!;
+		input.value = 'how do I file a claim';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		const setUp = container.querySelector<HTMLButtonElement>('.ask-reminder__set')!;
+		setUp.focus();
+		expect(document.activeElement).toBe(setUp);
+		await pause(600);
+		await userEvent.keyboard('{Enter}');
+		await expect.poll(() => document.activeElement).toBe(input);
+		await pause(300);
+		await userEvent.keyboard('{Enter}');
+		await pause(50);
+
+		expect(onAsk).not.toHaveBeenCalled();
+		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
+	});
+
 	it('hands focus to the field when the reminder is dismissed by keyboard', async () => {
 		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
 		const { container, rerender } = await render(AskView, { props: setup });

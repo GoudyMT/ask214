@@ -165,9 +165,7 @@
 	<div class="ask-reminder">
 		<span>Want to set up Ask and keep planning offline? One-time, about 55 MB.</span>
 		<span class="ask-reminder__actions">
-			<button class="ask-reminder__set" type="button" onclick={() => inputEl?.focus()}
-				>Set up</button
-			>
+			<button class="ask-reminder__set" type="button" onclick={focusField}>Set up</button>
 			<button class="ask-reminder__x" type="button" aria-label="Dismiss" onclick={dismissReminder}
 				>&times;</button
 			>
