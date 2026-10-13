@@ -55,6 +55,8 @@
 	);
 
 	let toggleError = $state<string | null>(null);
+	// Category saves in flight. Customize is off meanwhile: closing the list would hide the line a failed save shows.
+	let saving = $state(0);
 
 	// Applied to the set as saved, not to `exclusions`: that prop changes only once a save lands, so quick taps
 	// would each start from the same older set and overwrite one another. A failed write puts the box back and
@@ -65,6 +67,7 @@
 		box: HTMLInputElement
 	): Promise<void> {
 		toggleError = null;
+		saving++;
 		try {
 			await onSetExclusions((current) => {
 				const categories = current.categories.filter((c) => c !== cat);
@@ -73,11 +76,25 @@
 		} catch {
 			box.checked = !on;
 			toggleError = 'Could not update right now - please try again.';
+		} finally {
+			saving--;
 		}
 	}
 
 	let addEl = $state<HTMLButtonElement | null>(null);
+	let customizeEl = $state<HTMLButtonElement | null>(null);
 	let headingEl = $state<HTMLHeadingElement | null>(null);
+
+	// A change from the stores that turns off the button holding focus would drop focus to the top of the page; the
+	// heading takes it instead, without scrolling. Add's own busy state is not this: it has its own way back to Add.
+	$effect(() => {
+		// Both are read first so the effect follows them whatever holds focus now.
+		const addOff = !(ready && hasEvents);
+		const customizeOff = !ready;
+		const held = document.activeElement;
+		if ((held === addEl && addOff) || (held === customizeEl && customizeOff))
+			headingEl?.focus({ preventScroll: true });
+	});
 
 	// "I've deleted these" takes the list away with focus on its button, so focus moves to Add, the next step the list
 	// names - or, with nothing ahead to add, to the Calendar heading, since a disabled button cannot take focus. Only
@@ -177,9 +194,10 @@
 
 	<div class="cal-customize">
 		<button
+			bind:this={customizeEl}
 			class="cal-customize__toggle"
 			type="button"
-			disabled={!ready}
+			disabled={!ready || saving > 0}
 			aria-expanded={expanded}
 			aria-controls="cal-excl-list"
 			onclick={() => (expanded = !expanded)}
