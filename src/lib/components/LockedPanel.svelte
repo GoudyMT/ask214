@@ -69,8 +69,9 @@
 		background: var(--color-accent-muted);
 	}
 
+	/* The fill dims, not the button: it keeps focus while busy, and a faded focus ring would drop below 3:1. */
 	.locked-panel__unlock[aria-busy='true'] {
-		opacity: 0.6;
+		background: color-mix(in srgb, var(--color-accent) 60%, var(--color-bg));
 		cursor: default;
 	}
 

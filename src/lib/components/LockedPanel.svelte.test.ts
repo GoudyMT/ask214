@@ -27,6 +27,27 @@ describe('LockedPanel', () => {
 		expect(onunlock).toHaveBeenCalledTimes(0);
 	});
 
+	// The button keeps focus while busy: a dim on the whole button would fade its focus ring too (below 3:1), so only its
+	// fill and text dim.
+	it('dims the fill while busy, not the whole button', async () => {
+		// Component tests run without app.css; the colour tokens are set here as the app defines them, and removed.
+		const root = document.documentElement.style;
+		root.setProperty('--color-accent', '#1a66c2');
+		root.setProperty('--color-bg', '#ffffff');
+		try {
+			const idle = await render(LockedPanel, { props: { onunlock: vi.fn() } });
+			const idleFill = getComputedStyle(idle.container.querySelector('button')!).backgroundColor;
+			idle.unmount();
+			const { container } = await render(LockedPanel, { props: { onunlock: vi.fn(), busy: true } });
+			const busy = getComputedStyle(container.querySelector('button')!);
+			expect(busy.opacity).toBe('1');
+			expect(busy.backgroundColor).not.toBe(idleFill);
+		} finally {
+			root.removeProperty('--color-accent');
+			root.removeProperty('--color-bg');
+		}
+	});
+
 	it('says why an unlock failed, as an alert after the button', async () => {
 		const LINE = 'Could not unlock right now - please try again.';
 		const { container } = await render(LockedPanel, { props: { onunlock: () => {}, error: LINE } });
