@@ -244,6 +244,14 @@ const STATIC = 'static';
 //     Trim pass, each measured on a full build: the wizard Save's disabled style, which no longer applies (-16 B route
 //     nodes, -44 B precache), kept; the Unlock failure text written once in the locked panel, with a boolean prop in place
 //     of the string (-14 B route nodes, -21 B precache), not kept.
+//     Page 61,711 -> 61,740, route nodes 48,352 -> 48,450 (package.json's size-limit) and precache 150,805 -> 150,980
+//     (owner's call, 2026-10-13): the review's fixes - a held Enter on Lock no longer unlocks, one Install heading in
+//     both states, the Unlock line cleared when the profile opens without Unlock, focus into a text field only after
+//     a keyboard or screen-reader press, and the app's focus ring on the new focus targets. Two builds measured page
+//     61,705-61,707 B, route nodes 48,396-48,409 B and precache 150,926-150,937 B, about 40 B of room above the
+//     highest (page 33 B, the approved ceiling). Trim pass, each measured on a full build: one ring selector for the
+//     Settings targets (+2 B) and a shorter open check (-3 B) not kept, inside the noise; the busy fill set to the
+//     hover colour (-29 B precache) not kept, as it changed the look - the busy fill then went (the owner's call).
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -253,10 +261,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 61_711,
+	page: 61_740,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 150_805,
+	precacheBytes: 150_980,
 	workerScripts: 147_200
 };
 
