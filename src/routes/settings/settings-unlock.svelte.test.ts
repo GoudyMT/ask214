@@ -186,6 +186,43 @@ describe('Settings, Unlock', () => {
 		expect(loads).toHaveBeenCalledOnce();
 	});
 
+	// Lock hands focus to Unlock during the key press, so the same held key's repeats land on Unlock.
+	it.each(TIMINGS)('stays locked for a held Enter on Lock (a load that %s)', async (_, ms) => {
+		ctl.load = endsAfter(ms, false);
+		profile.locked = false;
+		const { container } = await render(SettingsPage);
+		(page.getByRole('button', { name: 'Lock', exact: true }).element() as HTMLElement).focus();
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 6; i++) {
+			await pause(40);
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await pause(ms + 50);
+
+		expect(loads).not.toHaveBeenCalled();
+		expect(profile.locked).toBe(true);
+		expect(document.activeElement).toBe(unlockButton(container));
+	});
+
+	it('reads once for a held Enter on an Unlock that fails', async () => {
+		ctl.load = endsAfter(100, true);
+		const { container } = await render(SettingsPage);
+		unlockButton(container)?.focus();
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 6; i++) {
+			await pause(40);
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+
+		await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+		await pause(150);
+		expect(loads).toHaveBeenCalledOnce();
+	});
+
 	// A second failure that reads the same as the first is announced again only if the line was taken away at the press.
 	it('takes the line away at the next press and shows it again', async () => {
 		// The second read stays pending, so the line can only be gone because the press started it, not because it failed.
