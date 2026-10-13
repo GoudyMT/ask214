@@ -199,6 +199,32 @@ describe('FeedbackForm, focus', () => {
 		expect(message(container)?.value).toBe(kept);
 	});
 
+	// The box remembers no press from its last visit: focus arriving starts it over.
+	it('types nothing for a held Enter on Try again, though an Enter was pressed in the box before', async () => {
+		const { container } = await render(FeedbackForm, {
+			props: { submit: vi.fn().mockResolvedValue({ ok: false }) }
+		});
+		fill(container, 'textarea', 'hi');
+		message(container)?.focus();
+		await userEvent.keyboard('{Enter}');
+		container.querySelector('form')?.requestSubmit();
+		await vi.waitFor(() => expect(container.querySelector('.panel')).not.toBeNull());
+		button(container, 'Try again')?.focus();
+		await holdEnter();
+
+		expect(document.activeElement).toBe(message(container));
+		expect(message(container)?.value).toBe('hi\n');
+	});
+
+	// Only a press that began before focus arrived is held back: a person who presses Enter in the box and holds it types.
+	it('types a line for every repeat of an Enter that began in the box', async () => {
+		const { container } = await render(FeedbackForm, { props: { submit: vi.fn() } });
+		message(container)?.focus();
+		await holdEnter();
+
+		expect(message(container)?.value).toBe('\n'.repeat(7));
+	});
+
 	// The button that holds focus is not turned off for the work, or the focus falls to the page.
 	it('keeps Send enabled, reading "Sending...", while the message goes, and sends once', async () => {
 		const submit = vi.fn(() => new Promise<{ ok: boolean }>(() => {}));
@@ -210,8 +236,9 @@ describe('FeedbackForm, focus', () => {
 
 		await vi.waitFor(() => expect(send.textContent?.trim()).toBe('Sending...'));
 		expect(send.disabled).toBe(false);
-		// Still announced as off, and still dimmed, as the disabled button was.
-		expect(send.getAttribute('aria-disabled')).toBe('true');
+		// Announced as working; at full colour, as the Unlock button is (a dim would fade its focus ring).
+		expect(send.getAttribute('aria-busy')).toBe('true');
+		expect(send.getAttribute('aria-disabled')).toBeNull();
 		expect(document.activeElement).toBe(send);
 		await userEvent.keyboard('{Enter}');
 		await pause(50);

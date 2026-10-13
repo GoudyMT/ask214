@@ -42,6 +42,15 @@
 		}
 	}
 
+	// A button that hands focus to the box mid-press leaves a held Enter repeating into it: those repeats type nothing.
+	// Once the box has seen a new press of Enter, a held Enter types as usual.
+	let freshEnter = false;
+	function guardEnter(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		if (!e.repeat) freshEnter = true;
+		else if (!freshEnter) e.preventDefault();
+	}
+
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		// The button that sends is not turned off for the work (it holds focus), so a press while it works does nothing.
@@ -98,7 +107,8 @@
 				id="fb-msg"
 				bind:value={message}
 				oninput={() => (showEmpty = false)}
-				onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
+				onfocus={() => (freshEnter = false)}
+				onkeydown={guardEnter}
 				aria-invalid={showEmpty}
 				aria-describedby={showEmpty ? 'fb-msg-error' : undefined}
 				placeholder="What happened, or what would help?"></textarea>
@@ -135,7 +145,7 @@
 			include sensitive details such as your SSN or medical or financial information.
 		</p>
 
-		<button type="submit" class="btn" aria-disabled={phase === 'submitting'}>
+		<button type="submit" class="btn" aria-busy={phase === 'submitting'}>
 			{phase === 'submitting' ? 'Sending...' : 'Send feedback'}
 		</button>
 	</form>
@@ -234,8 +244,10 @@
 	.btn:hover {
 		background: var(--color-accent-muted);
 	}
-	.btn[aria-disabled='true'] {
-		opacity: 0.6;
+	/* No dim while busy: the label says it is working, and a dim would fade the focus ring or the label below their
+	   contrast minimums. The hover fill stays off too, as a press does nothing. */
+	.btn[aria-busy='true'] {
+		background: var(--color-accent);
 		cursor: default;
 	}
 	.panel {
