@@ -173,15 +173,30 @@
 	.online-row {
 		margin-top: var(--space-m);
 	}
+	/* As on the theme pills: the ends are rounded on the end buttons, not clipped, so the tap area below is not cut. */
 	.online-mode {
 		display: inline-flex;
 		border: 1px solid var(--color-border);
 		border-radius: 999px;
-		overflow: hidden;
 	}
-	/* The keyboard focus ring sits on the container, outset, so it is never clipped by the pill's
-	   overflow:hidden + rounded ends (an inset per-segment ring loses its corners there). The accent
-	   fill still marks which segment is active. WCAG 2.4.7. */
+	.online-mode__opt:first-child {
+		border-radius: 999px 0 0 999px;
+	}
+	.online-mode__opt:last-child {
+		border-radius: 0 999px 999px 0;
+	}
+	/* A 44 px tap target with the pill's look unchanged (WCAG 2.5.5). */
+	.online-mode__opt {
+		position: relative;
+	}
+	.online-mode__opt::after {
+		content: '';
+		position: absolute;
+		inset: calc(50% - 22px) 0;
+	}
+	/* The keyboard focus ring sits on the container, outset, so it follows the whole pill's rounded ends (an inset
+	   per-segment ring would lose its corners on the end buttons). The accent fill still marks which segment is
+	   active. WCAG 2.4.7. */
 	.online-mode:has(:focus-visible) {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
@@ -198,6 +213,15 @@
 	.online-mode__opt[aria-pressed='true'] {
 		background: var(--color-accent);
 		color: var(--color-bg);
+	}
+	/* As on the theme pills: forced colors drop the fill, so a 3px Highlight border marks the chosen mode, with the
+	   padding giving up those 3px so the button keeps its size. */
+	@media (forced-colors: active) {
+		.online-mode__opt[aria-pressed='true'] {
+			border: 3px solid Highlight;
+			padding: 3px 12px;
+			border-radius: 999px;
+		}
 	}
 	.online-synth {
 		margin-top: var(--space-l);

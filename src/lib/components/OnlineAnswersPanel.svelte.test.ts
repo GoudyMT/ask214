@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { cdp, page, userEvent } from 'vitest/browser';
 import OnlineAnswersPanel from './OnlineAnswersPanel.svelte';
 import { scrubSecureInputs } from '../profile/lifecycle';
 
@@ -25,6 +25,56 @@ const base: Props = {
 };
 
 describe('OnlineAnswersPanel', () => {
+	// A 44 px target without a bigger pill, as on the theme pills.
+	it('takes a tap 22 px above or below the middle of each answer mode button, with the pill under 44 px', async () => {
+		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
+		(container as HTMLElement).style.padding = '40px';
+		for (const b of container.querySelectorAll('.online-mode__opt')) {
+			const r = b.getBoundingClientRect();
+			const x = r.left + r.width / 2;
+			const mid = r.top + r.height / 2;
+			expect(r.height).toBeLessThan(44);
+			expect(document.elementFromPoint(x, mid - 21.5)).toBe(b);
+			expect(document.elementFromPoint(x, mid + 21.5)).toBe(b);
+		}
+	});
+
+	// Forced colors drop the accent fill that marks the chosen mode, so there a ring marks it, as on the theme pills.
+	it('marks the chosen answer mode by a 3 px ring in forced colors only', async () => {
+		const { container } = await render(OnlineAnswersPanel, {
+			props: { ...base, defaultMode: 'device' }
+		});
+		const buttons = [...container.querySelectorAll<HTMLButtonElement>('.online-mode__opt')];
+		const rings = () =>
+			buttons.map((b) =>
+				getComputedStyle(b).borderTopStyle === 'none' ? 'none' : getComputedStyle(b).borderTopWidth
+			);
+		const sizes = () =>
+			buttons.map((b) => [b.getBoundingClientRect().width, b.getBoundingClientRect().height]);
+		expect(rings()).toEqual(['none', 'none']);
+		const before = sizes();
+		const session = cdp();
+		await session.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'forced-colors', value: 'active' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			expect(rings()).toEqual(['none', '3px']);
+			const probe = document.createElement('span');
+			probe.style.color = 'Highlight';
+			document.body.append(probe);
+			expect(getComputedStyle(buttons[1]!).borderTopColor).toBe(getComputedStyle(probe).color);
+			probe.remove();
+			expect(sizes()).toEqual(before);
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+		}
+		await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(false);
+		expect(rings()).toEqual(['none', 'none']);
+	});
+
 	it('states plainly that the key is encrypted on-device and sent only to Anthropic, never to us', async () => {
 		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
 		expect(container.textContent?.replace(/\s+/g, ' ')).toContain(

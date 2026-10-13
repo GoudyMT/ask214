@@ -10,8 +10,8 @@ const { isoFromToday, ctl } = vi.hoisted(() => ({
 		const pad = (n: number) => String(n).padStart(2, '0');
 		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 	},
-	// What the profile store's load does this test: the cases set it, beforeEach resets it.
-	ctl: { load: async (): Promise<void> => {} }
+	// What the profile store's load and relock do this test: the cases set them, beforeEach resets them.
+	ctl: { load: async (): Promise<void> => {}, relock: (): void => {} }
 }));
 
 // Reactive, unlike a plain flag: Unlock opens the profile and Lock closes it, and the page swaps its sections at that moment.
@@ -50,10 +50,7 @@ vi.mock('$lib/profile/context', () => ({
 		byok: null,
 		cause: null,
 		wipeAll: null,
-		// As the layout's is: the profile reads as locked at once.
-		relockAll: () => {
-			profile.locked = true;
-		}
+		relockAll: () => ctl.relock()
 	}),
 	setProfileApp: () => {}
 }));
@@ -87,6 +84,10 @@ beforeEach(() => {
 	loads.mockClear();
 	ctl.load = async () => {
 		profile.locked = false;
+	};
+	// As the layout's is: the profile reads as locked at once.
+	ctl.relock = () => {
+		profile.locked = true;
 	};
 });
 afterEach(() => {
@@ -231,6 +232,38 @@ describe('Settings, Unlock', () => {
 		}
 		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
 		await pause(ms + 50);
+
+		expect(loads).not.toHaveBeenCalled();
+		expect(profile.locked).toBe(true);
+		expect(document.activeElement).toBe(unlockButton(container));
+	});
+
+	// A Lock pressed while a profile save runs is held until the save ends (the store defers the relock), so the page
+	// swaps to the locked panel later than the press.
+	it('hands focus to Unlock when a Lock pressed during a save lands later', async () => {
+		ctl.relock = () => void setTimeout(() => (profile.locked = true), 100);
+		profile.locked = false;
+		const { container } = await render(SettingsPage);
+		(page.getByRole('button', { name: 'Lock', exact: true }).element() as HTMLElement).focus();
+		await userEvent.keyboard('{Enter}');
+
+		await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
+		await expect.poll(() => document.activeElement).toBe(unlockButton(container));
+	});
+
+	it('stays locked for a held Enter on a Lock pressed during a save', async () => {
+		ctl.relock = () => void setTimeout(() => (profile.locked = true), 100);
+		profile.locked = false;
+		const { container } = await render(SettingsPage);
+		(page.getByRole('button', { name: 'Lock', exact: true }).element() as HTMLElement).focus();
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 6; i++) {
+			await pause(40);
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await pause(150);
 
 		expect(loads).not.toHaveBeenCalled();
 		expect(profile.locked).toBe(true);

@@ -34,15 +34,32 @@
 </div>
 
 <style>
+	/* The pill's rounded ends are cut on the end buttons, not by clipping the group: a clip would also cut the tap area
+	   below. */
 	.seg {
 		display: inline-flex;
 		border: 1px solid var(--color-border);
 		border-radius: 999px;
-		overflow: hidden;
 	}
-	/* The keyboard focus ring sits on the container, outset, so it is never clipped by the pill's
-	   overflow:hidden + rounded ends (an inset per-segment ring loses its corners there). The accent
-	   fill still marks which segment is active. WCAG 2.4.7. */
+	.seg button:first-child {
+		border-radius: 999px 0 0 999px;
+	}
+	.seg button:last-child {
+		border-radius: 0 999px 999px 0;
+	}
+	/* A 44 px tap target with the pill's look unchanged: an invisible area reaches 22 px above and below each
+	   button's middle. WCAG 2.5.5. */
+	.seg button {
+		position: relative;
+	}
+	.seg button::after {
+		content: '';
+		position: absolute;
+		inset: calc(50% - 22px) 0;
+	}
+	/* The keyboard focus ring sits on the container, outset, so it follows the whole pill's rounded ends (an inset
+	   per-segment ring would lose its corners on the end buttons). The accent fill still marks which segment is
+	   active. WCAG 2.4.7. */
 	.seg:has(:focus-visible) {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;

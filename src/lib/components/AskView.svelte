@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { AskState } from '$lib/ask/types';
 	import { sourceFromCard, type Source } from '$lib/ask/sources';
 	import AskResultCard from './AskResultCard.svelte';
@@ -27,7 +28,7 @@
 	}: {
 		askState: AskState;
 		ready: boolean;
-		onAsk: (query: string) => void;
+		onAsk: (query: string, press?: MouseEvent) => void;
 		onSetUp: () => void;
 		onDismiss: () => void;
 		loadSource: (sourceId: string) => Promise<Source | null>;
@@ -79,18 +80,43 @@
 
 	// A feed pill behaves exactly like typing the question + Search: fill the visible input, then run
 	// it through the same ask path (so the first query still hits the one-time model opt-in).
-	function pick(q: string) {
+	function pick(q: string, press: MouseEvent) {
 		query = q;
-		onAsk(q);
+		onAsk(q, press);
+		void toField(press);
 	}
-	function skipSetup() {
+	// The pressed button goes away with its card or bar, and focus falls to the page unless the person has moved on:
+	// it goes to the field. Not after a tap or a click (detail 1+): a focused text field would open a phone's keyboard.
+	// A keyboard or a screen reader presses with detail 0.
+	async function toField(press: MouseEvent): Promise<void> {
+		await tick();
+		if (!press.detail && document.activeElement === document.body) focusField();
+	}
+	// An Enter just after focus was handed to the field is the key that gave it, or a double press, not a new question
+	// (a held key's repeats are held back apart from this). The page uses this too, for its own hand-offs.
+	const FIELD_GUARD_MS = 500;
+	let fieldFocusedAt = 0;
+	export function focusField(): void {
+		fieldFocusedAt = Date.now();
+		inputEl?.focus();
+	}
+	function skipSetup(press: MouseEvent) {
 		setupDismissed = true;
 		onDismiss();
+		void toField(press);
 	}
-	function dismissReminder() {
+	function dismissReminder(press: MouseEvent) {
 		reminderDismissed = true;
 		// eslint-disable-next-line no-restricted-globals -- a "reminder hidden" flag for this tab, nothing personal
 		if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(REMINDER_DISMISSED_KEY, '1');
+		void toField(press);
+	}
+	// A card or bar button that runs a parent action and goes away with its card or bar.
+	function act(action: () => void) {
+		return (press: MouseEvent) => {
+			action();
+			void toField(press);
+		};
 	}
 	// "Read more" -> open the reader on the source this card cites. An online answer carries its passage,
 	// so its reader opens on that passage at once. An on-device answer reads the corpus (which holds the
@@ -139,9 +165,7 @@
 	<div class="ask-reminder">
 		<span>Want to set up Ask and keep planning offline? One-time, about 55 MB.</span>
 		<span class="ask-reminder__actions">
-			<button class="ask-reminder__set" type="button" onclick={() => inputEl?.focus()}
-				>Set up</button
-			>
+			<button class="ask-reminder__set" type="button" onclick={focusField}>Set up</button>
 			<button class="ask-reminder__x" type="button" aria-label="Dismiss" onclick={dismissReminder}
 				>&times;</button
 			>
@@ -160,17 +184,20 @@
 				class="ask-reminder__set"
 				type="button"
 				disabled={inFlight}
-				onclick={() => onSetMode('device')}>On-device</button
+				onclick={act(() => onSetMode('device'))}>On-device</button
 			>
-			<button class="ask-reminder__x" type="button" aria-label="Dismiss" onclick={onDismissNudge}
-				>&times;</button
+			<button
+				class="ask-reminder__x"
+				type="button"
+				aria-label="Dismiss"
+				onclick={act(onDismissNudge)}>&times;</button
 			>
 		</span>
 	</div>
 {/if}
 
 <!-- A button that goes away under a held Enter hands focus to the field (the install nudge), so the key's repeats would
-     ask: only a new press of Enter does. -->
+     ask: only a new press of Enter does, and not within the guard after a hand-off (see `focusField`). -->
 <form
 	class="ask-bar"
 	onsubmit={(e) => {
@@ -184,7 +211,10 @@
 		class="ask-input"
 		placeholder="Ask about benefits, SkillBridge, VA..."
 		aria-label="Ask a question"
-		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
+		onkeydown={(e) =>
+			e.key === 'Enter' &&
+			(e.repeat || Date.now() - fieldFocusedAt < FIELD_GUARD_MS) &&
+			e.preventDefault()}
 	/>
 	<button class="ask-search" type="submit" disabled={!ready}>
 		<span class="ask-search__label">Search</span>
@@ -248,7 +278,9 @@
 				browser keeps it, answers are instant and work offline.
 			</p>
 			<div class="ask-setup__actions">
-				<button class="ask-setup__go" type="button" onclick={onSetUp}>Set up &amp; answer</button>
+				<button class="ask-setup__go" type="button" onclick={act(onSetUp)}
+					>Set up &amp; answer</button
+				>
 				<button class="ask-setup__skip" type="button" onclick={skipSetup}>Not now</button>
 			</div>
 		</div>
@@ -265,8 +297,12 @@
 				leave your device. You can switch to on-device answers any time.
 			</p>
 			<div class="ask-setup__actions">
-				<button class="ask-setup__go" type="button" onclick={onConsentOnline}>Use online</button>
-				<button class="ask-setup__skip" type="button" onclick={onStayDevice}>Stay on device</button>
+				<button class="ask-setup__go" type="button" onclick={act(onConsentOnline)}
+					>Use online</button
+				>
+				<button class="ask-setup__skip" type="button" onclick={act(onStayDevice)}
+					>Stay on device</button
+				>
 			</div>
 		</div>
 	{:else if askState.kind === 'modelLoading'}
@@ -354,12 +390,12 @@
 			{#if askState.rung === 'offer_device'}
 				<p class="ask-msg__title">Online is unavailable right now</p>
 				<p class="ask-msg__body">You can answer this question fully on your device instead.</p>
-				<button class="ask-setup__go" type="button" onclick={() => onOfferDevice(q)}
+				<button class="ask-setup__go" type="button" onclick={act(() => onOfferDevice(q))}
 					>Answer on your device</button
 				>
 			{:else if askState.rung === 'offer_online'}
 				<p class="ask-msg__title">That didn't work</p>
-				<button class="ask-setup__go" type="button" onclick={() => onRetryOnline(q)}
+				<button class="ask-setup__go" type="button" onclick={act(() => onRetryOnline(q))}
 					>Try online</button
 				>
 			{:else}

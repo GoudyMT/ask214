@@ -36,6 +36,9 @@ vi.mock('$lib/profile/context', () => ({
 				return profile.clockBackward;
 			},
 			clearClockBackward: () => ctl.clearClock(),
+			load: async () => {
+				profile.locked = false;
+			},
 			persona: { completeness: 'eaos-only', eaos: isoFromToday(200), daysUntilSeparation: 200 }
 		},
 		timeline: {
@@ -224,6 +227,20 @@ describe('Settings, an erase that fails', () => {
 
 		await expect.element(page.getByRole('alert')).toBeVisible();
 		await expect.poll(() => document.activeElement).toBe(container.querySelector('.erase-error'));
+	});
+
+	// A Lock pressed earlier is spent once its lock lands: the erase's own lock must not send focus to Unlock.
+	it('hands focus to the failure line after an earlier Lock and Unlock', async () => {
+		const { container } = await render(SettingsPage);
+		await page.getByRole('button', { name: 'Lock', exact: true }).click();
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible();
+
+		await page.getByRole('button', { name: 'Erase all data on this device' }).click();
+		await page.getByRole('button', { name: 'Erase everything' }).click();
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await pause(50);
+		expect(document.activeElement).toBe(container.querySelector('.erase-error'));
 	});
 
 	// The erase can fail before it locks the page: focus is then still on the button that opened the dialog.

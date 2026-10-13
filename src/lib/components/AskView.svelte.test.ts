@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
-import { cdp } from 'vitest/browser';
+import { cdp, userEvent } from 'vitest/browser';
 import AskView from './AskView.svelte';
 import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
@@ -718,4 +718,298 @@ describe('AskView', () => {
 		flushSync();
 		expect(dismissed).toBe(1);
 	});
+});
+
+type Handler =
+	| 'onAsk'
+	| 'onSetUp'
+	| 'onDismiss'
+	| 'onConsentOnline'
+	| 'onStayDevice'
+	| 'onDismissNudge'
+	| 'onSetMode'
+	| 'onOfferDevice'
+	| 'onRetryOnline';
+
+// Enter as a keyboard sends it: the key, its code and the carriage return it types.
+const ENTER = {
+	key: 'Enter',
+	code: 'Enter',
+	windowsVirtualKeyCode: 13,
+	text: String.fromCharCode(13)
+};
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const TIMINGS = [
+	['ends at once', 0],
+	['takes a while', 100]
+] as const;
+
+// Mounts the view in `from`; the handler `name` records its call, moves the view to `to` as the page does (the pressed
+// control goes away at once), and returns work that ends after `ms`.
+async function mountLeaving(
+	name: Handler,
+	from: ViewProps,
+	to: ViewProps,
+	ms = 0
+): Promise<{ container: HTMLElement; calls: ReturnType<typeof vi.fn> }> {
+	const calls = vi.fn();
+	let leave = () => {};
+	const work = (...args: unknown[]) => {
+		calls(...args);
+		leave();
+		return new Promise<void>((resolve) => setTimeout(resolve, ms));
+	};
+	const view = await render(AskView, { props: { ...from, [name]: work } as ViewProps });
+	leave = () => void view.rerender({ ...to, [name]: work } as ViewProps);
+	return { container: view.container, calls };
+}
+
+const field = (container: Element) => container.querySelector<HTMLInputElement>('.ask-input');
+const press = async (button: HTMLElement | null) => {
+	button?.focus();
+	await userEvent.keyboard('{Enter}');
+};
+
+describe('AskView, focus after the pressed button goes away', () => {
+	it('hands focus to the field, holding the question, when a feed pill is pressed by keyboard', async () => {
+		const { container, calls } = await mountLeaving(
+			'onAsk',
+			props({ kind: 'idle' }),
+			props({ kind: 'embedding' })
+		);
+		const pill = container.querySelector<HTMLButtonElement>('.q-feed__pill');
+		const text = pill?.textContent?.trim() ?? '';
+		await press(pill);
+
+		await expect.poll(() => document.activeElement).toBe(field(container));
+		expect(field(container)?.value).toBe(text);
+		expect(calls).toHaveBeenCalledOnce();
+	});
+
+	it('moves no focus to the field when a feed pill is tapped', async () => {
+		const { container } = await mountLeaving(
+			'onAsk',
+			props({ kind: 'idle' }),
+			props({ kind: 'embedding' })
+		);
+		await userEvent.click(container.querySelector<HTMLButtonElement>('.q-feed__pill')!);
+
+		await vi.waitFor(() => expect(container.querySelector('.q-feed')).toBeNull());
+		await pause(50);
+		expect(document.activeElement).not.toBe(field(container));
+	});
+
+	it('leaves focus alone when the person moved it after pressing a pill', async () => {
+		const elsewhere = document.body.appendChild(document.createElement('button'));
+		try {
+			const { container } = await mountLeaving(
+				'onAsk',
+				props({ kind: 'idle' }),
+				props({ kind: 'embedding' })
+			);
+			const pill = container.querySelector<HTMLButtonElement>('.q-feed__pill');
+			pill?.addEventListener('click', () => elsewhere.focus());
+			await press(pill);
+
+			await vi.waitFor(() => expect(container.querySelector('.q-feed')).toBeNull());
+			await pause(50);
+			expect(document.activeElement).toBe(elsewhere);
+		} finally {
+			elsewhere.remove();
+		}
+	});
+
+	const setup = props({ kind: 'needsSetup', pendingQuery: 'q' });
+	const consent = props({ kind: 'needsReconsent', pendingQuery: 'q' }, { onlineCapable: true });
+	const offerDevice = props(
+		{ kind: 'degraded', rung: 'offer_device', query: 'q' },
+		{ onlineCapable: true }
+	);
+	const offerOnline = props(
+		{ kind: 'degraded', rung: 'offer_online', query: 'q' },
+		{ onlineCapable: true }
+	);
+
+	it.each([
+		['Set up & answer', 'onSetUp', '.ask-setup__go', setup, props({ kind: 'modelLoading' })],
+		['Not now', 'onDismiss', '.ask-setup__skip', setup, props({ kind: 'idle' })],
+		['Use online', 'onConsentOnline', '.ask-setup__go', consent, props({ kind: 'embedding' })],
+		['Stay on device', 'onStayDevice', '.ask-setup__skip', consent, props({ kind: 'idle' })],
+		[
+			'Answer on your device',
+			'onOfferDevice',
+			'.ask-msg--warn button',
+			offerDevice,
+			props({ kind: 'embedding' })
+		],
+		[
+			'Try online',
+			'onRetryOnline',
+			'.ask-msg--warn button',
+			offerOnline,
+			props({ kind: 'embedding' })
+		]
+	] as const)(
+		'hands focus to the field when %s is pressed by keyboard',
+		async (_, name, selector, from, to) => {
+			const { container, calls } = await mountLeaving(name, from, to);
+			await press(container.querySelector<HTMLButtonElement>(selector));
+
+			await expect.poll(() => document.activeElement).toBe(field(container));
+			expect(calls).toHaveBeenCalledOnce();
+		}
+	);
+
+	it('moves no focus to the field when Not now is tapped', async () => {
+		const { container } = await mountLeaving('onDismiss', setup, props({ kind: 'idle' }));
+		await userEvent.click(container.querySelector<HTMLButtonElement>('.ask-setup__skip')!);
+
+		await vi.waitFor(() => expect(container.querySelector('.ask-setup')).toBeNull());
+		await pause(50);
+		expect(document.activeElement).not.toBe(field(container));
+	});
+
+	it.each([
+		['Answer on your device', 'onOfferDevice', offerDevice],
+		['Try online', 'onRetryOnline', offerOnline]
+	] as const)('moves no focus to the field when %s is tapped', async (_, name, from) => {
+		const { container } = await mountLeaving(name, from, props({ kind: 'embedding' }));
+		await userEvent.click(container.querySelector<HTMLButtonElement>('.ask-msg--warn button')!);
+
+		await vi.waitFor(() => expect(container.querySelector('.ask-msg--warn')).toBeNull());
+		await pause(50);
+		expect(document.activeElement).not.toBe(field(container));
+	});
+
+	// A second quick Enter, a new press and not a repeat, is the key that gave the focus, or a double press: it asks
+	// nothing. A press after the guard asks.
+	it.each([
+		// 300 ms: inside the guard, and long enough to catch a guard too short for a real double press.
+		['ignores a second Enter soon after', 300, 0],
+		['asks on a second Enter after the guard', 600, 1]
+	] as const)('%s, after Not now', async (_, wait, asked) => {
+		const onAsk = vi.fn();
+		const { container } = await mountLeaving(
+			'onDismiss',
+			{ ...setup, onAsk },
+			{ ...props({ kind: 'idle' }), onAsk }
+		);
+		const input = field(container)!;
+		input.value = 'how do I file a claim';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		await press(container.querySelector<HTMLButtonElement>('.ask-setup__skip'));
+		await expect.poll(() => document.activeElement).toBe(input);
+		await pause(wait);
+		await userEvent.keyboard('{Enter}');
+		await pause(50);
+
+		expect(onAsk).toHaveBeenCalledTimes(asked);
+	});
+
+	it("ignores a second Enter soon after the reminder's Set up hands focus to the field", async () => {
+		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
+		const onAsk = vi.fn();
+		const { container, rerender } = await render(AskView, { props: { ...setup, onAsk } });
+		// A pointer click, so Not now hands no focus of its own and the guard is not already running.
+		container
+			.querySelector<HTMLButtonElement>('.ask-setup__skip')
+			?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+		await rerender({ ...props({ kind: 'idle' }), onAsk });
+		const input = field(container)!;
+		input.value = 'how do I file a claim';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		const setUp = container.querySelector<HTMLButtonElement>('.ask-reminder__set')!;
+		setUp.focus();
+		expect(document.activeElement).toBe(setUp);
+		await pause(600);
+		await userEvent.keyboard('{Enter}');
+		await expect.poll(() => document.activeElement).toBe(input);
+		await pause(300);
+		await userEvent.keyboard('{Enter}');
+		await pause(50);
+
+		expect(onAsk).not.toHaveBeenCalled();
+		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
+	});
+
+	it('hands focus to the field when the reminder is dismissed by keyboard', async () => {
+		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
+		const { container, rerender } = await render(AskView, { props: setup });
+		container.querySelector<HTMLButtonElement>('.ask-setup__skip')?.click();
+		await rerender(props({ kind: 'idle' }));
+		await press(container.querySelector<HTMLButtonElement>('.ask-reminder__x'));
+
+		await expect.poll(() => document.activeElement).toBe(field(container));
+		expect(container.querySelector('.ask-reminder')).toBeNull();
+		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
+	});
+
+	it.each([
+		['On-device', 'onSetMode', '.ask-reminder__set'],
+		['Dismiss', 'onDismissNudge', '.ask-reminder__x']
+	] as const)(
+		'hands focus to the field when the online nudge %s is pressed by keyboard',
+		async (_, name, selector) => {
+			const { container, calls } = await mountLeaving(
+				name,
+				props({ kind: 'idle' }, { onlineCapable: true, showNudge: true }),
+				props({ kind: 'idle' }, { onlineCapable: true, showNudge: false })
+			);
+			await press(container.querySelector<HTMLButtonElement>(selector));
+
+			await expect.poll(() => document.activeElement).toBe(field(container));
+			expect(calls).toHaveBeenCalledOnce();
+		}
+	);
+
+	// A held Enter repeats about every 40 ms. The pressed button hands focus to the field, so the repeats land there:
+	// the field's guard must keep them from asking again.
+	const hold = async () => {
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 6; i++) {
+			await pause(40);
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+	};
+
+	it.each(TIMINGS)('asks once for a held Enter on a feed pill when the work %s', async (_, ms) => {
+		const { container, calls } = await mountLeaving(
+			'onAsk',
+			props({ kind: 'idle' }),
+			props({ kind: 'embedding' }),
+			ms
+		);
+		container.querySelector<HTMLButtonElement>('.q-feed__pill')?.focus();
+		await hold();
+		await pause(ms + 50);
+
+		expect(calls).toHaveBeenCalledOnce();
+		expect(document.activeElement).toBe(field(container));
+	});
+
+	it.each(TIMINGS)(
+		'sets up once for a held Enter on Set up & answer when the work %s',
+		async (_, ms) => {
+			const onAsk = vi.fn();
+			const { container, calls } = await mountLeaving(
+				'onSetUp',
+				{ ...setup, onAsk },
+				{ ...props({ kind: 'modelLoading' }), onAsk },
+				ms
+			);
+			// A question in the field is what a second Enter there would ask.
+			const input = field(container)!;
+			input.value = 'how do I file a claim';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			container.querySelector<HTMLButtonElement>('.ask-setup__go')?.focus();
+			await hold();
+			await pause(ms + 50);
+
+			expect(calls).toHaveBeenCalledOnce();
+			expect(onAsk).not.toHaveBeenCalled();
+			expect(document.activeElement).toBe(input);
+		}
+	);
 });

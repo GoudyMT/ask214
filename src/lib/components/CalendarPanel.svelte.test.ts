@@ -339,6 +339,163 @@ describe('CalendarPanel', () => {
 		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
 	});
 
+	// Closing the list would hide the line a failed save shows, so Customize is off while a save is pending; the box
+	// the person pressed keeps focus, not the toggle.
+	it.each([
+		['lands', false],
+		['fails', true]
+	] as const)(
+		'keeps Customize off while a category save is pending, and on again once it %s',
+		async (_, fails) => {
+			let settle: (error?: Error) => void = () => {};
+			const onSetExclusions = vi.fn(
+				() =>
+					new Promise<void>((resolve, reject) => {
+						settle = (error) => (error ? reject(error) : resolve());
+					})
+			);
+			await render(CalendarPanel, {
+				props: {
+					items: [item(def('a', 'admin'))],
+					exclusions: { taskIds: [], categories: [] },
+					access: 'ready',
+					...NO_RECORD,
+					onSetExclusions,
+					onAdd: vi.fn()
+				}
+			});
+			const toggle = page.getByRole('button', { name: /customize what's included/i });
+			await toggle.click();
+			const box = page.getByRole('checkbox', { name: 'medical' });
+			await box.click();
+			await expect.element(toggle).toBeDisabled();
+			await expect.element(box).toHaveFocus();
+
+			settle(fails ? new Error('E_OCC_CONFLICT') : undefined);
+			await expect.element(toggle).toBeEnabled();
+			if (fails) {
+				await expect.element(box).not.toBeChecked();
+				await expect.element(page.getByRole('alert')).toBeVisible();
+			}
+		}
+	);
+
+	// A change from the stores turns Add or Customize off under the person's hands, which would drop focus to the top of
+	// the page; the Calendar heading takes it, as it does when Add is off after the list clears.
+	describe('when a store change turns the focused button off', () => {
+		const ADD = /^add to my calendar$/i;
+		const CUSTOMIZE = /customize what's included/i;
+		const start = async (items: TimelineItem[] = [item(def('a', 'admin'))]) => {
+			const props = {
+				items,
+				exclusions: { taskIds: [], categories: [] },
+				access: 'ready' as const,
+				...NO_RECORD,
+				onSetExclusions: vi.fn(),
+				onAdd: vi.fn()
+			};
+			const screen = await render(CalendarPanel, { props });
+			const focusOn = (name: RegExp) =>
+				(page.getByRole('button', { name }).element() as HTMLElement).focus();
+			const heading = () => page.getByRole('heading', { level: 2, name: 'Calendar' });
+			return { props, screen, focusOn, heading };
+		};
+
+		it.each([
+			['Add', ADD, 'timeline-locked'],
+			['Add', ADD, 'loading'],
+			['Customize', CUSTOMIZE, 'timeline-locked'],
+			['Customize', CUSTOMIZE, 'calendar-failed']
+		] as const)(
+			'hands focus on %s to the heading when access becomes %s',
+			async (_, name, access) => {
+				const { props, screen, focusOn, heading } = await start();
+				focusOn(name);
+				await screen.rerender({ ...props, access });
+				await expect.element(heading()).toHaveFocus();
+			}
+		);
+
+		it('hands focus on Add to the heading when nothing ahead is left to add', async () => {
+			const { props, screen, focusOn, heading } = await start();
+			focusOn(ADD);
+			await screen.rerender({ ...props, items: [] });
+			await expect.element(heading()).toHaveFocus();
+		});
+
+		// The reader may have scrolled on, so the move does not scroll.
+		it('hands focus to the heading without scrolling the page', async () => {
+			const { props, screen, focusOn, heading } = await start();
+			const spacer = document.createElement('div');
+			spacer.style.height = '5000px';
+			document.body.prepend(spacer);
+			try {
+				focusOn(ADD);
+				window.scrollTo(0, 0);
+				await screen.rerender({ ...props, access: 'timeline-locked' });
+				await expect.element(heading()).toHaveFocus();
+				expect(window.scrollY).toBe(0);
+			} finally {
+				spacer.remove();
+				window.scrollTo(0, 0);
+			}
+		});
+
+		it('leaves focus on Customize when nothing ahead is left to add, as it stays on', async () => {
+			const { props, screen, focusOn } = await start();
+			focusOn(CUSTOMIZE);
+			await screen.rerender({ ...props, items: [] });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(document.activeElement).toBe(page.getByRole('button', { name: CUSTOMIZE }).element());
+		});
+
+		it('leaves focus alone when it is on neither button', async () => {
+			const { props, screen } = await start();
+			await page.getByRole('button', { name: CUSTOMIZE }).click();
+			const box = page.getByRole('checkbox', { name: 'medical' }).element() as HTMLElement;
+			box.focus();
+			await screen.rerender({ ...props, access: 'timeline-locked' });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(document.activeElement).toBe(box);
+		});
+
+		// On WebKit a tap on a checkbox does not move focus, so a keyboard user's focus can still be on the toggle when a
+		// category save turns it off; a programmatic click moves no focus either.
+		it('hands focus on Customize to the heading when a category save turns it off', async () => {
+			await render(CalendarPanel, {
+				props: {
+					items: [item(def('a', 'admin'))],
+					exclusions: { taskIds: [], categories: [] },
+					access: 'ready',
+					...NO_RECORD,
+					onSetExclusions: () => new Promise<void>(() => {}),
+					onAdd: vi.fn()
+				}
+			});
+			const toggle = page.getByRole('button', { name: CUSTOMIZE }).element() as HTMLButtonElement;
+			toggle.focus();
+			toggle.click();
+			const box = (await vi.waitFor(() =>
+				page.getByRole('checkbox', { name: 'medical' }).element()
+			)) as HTMLInputElement;
+			expect(document.activeElement).toBe(toggle);
+			box.click();
+			await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+			expect(toggle.disabled).toBe(true);
+			expect(document.activeElement).toBe(
+				page.getByRole('heading', { level: 2, name: 'Calendar' }).element()
+			);
+		});
+
+		it('leaves focus on the page when nothing held it', async () => {
+			const { props, screen } = await start();
+			expect(document.activeElement).toBe(document.body);
+			await screen.rerender({ ...props, access: 'timeline-locked' });
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(document.activeElement).toBe(document.body);
+		});
+	});
+
 	const HELD: HandedOverEvent = {
 		taskId: 'tap-capstone',
 		moment: 'last',

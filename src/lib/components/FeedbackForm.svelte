@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { routeLabel, type FeedbackInput, type KnownRoute } from '$lib/feedback/types';
 
 	let {
@@ -18,14 +19,42 @@
 
 	// Move focus to the outcome heading when the form swaps to a panel, so keyboard/SR users land on
 	// the result instead of being dropped to <body> (the focused submit button unmounts). Mirrors
-	// SourceReader's focus-the-new-node pattern.
+	// SourceReader's focus-the-new-node pattern. Only from the page: focus the person moved while the message
+	// went is left alone.
 	let panelHeading = $state<HTMLHeadingElement | null>(null);
 	$effect(() => {
-		if ((phase === 'success' || phase === 'error') && panelHeading) panelHeading.focus();
+		if (
+			(phase === 'success' || phase === 'error') &&
+			panelHeading &&
+			document.activeElement === document.body
+		)
+			panelHeading.focus();
 	});
+
+	// The panel's button goes away with the panel, and focus falls to the page unless the person has moved on: it
+	// goes back to the message box. Not after a tap or a click (detail 1+): a focused text box would open a phone's
+	// keyboard. A keyboard or a screen reader presses with detail 0.
+	async function backToForm(press: MouseEvent, change: () => void) {
+		change();
+		await tick();
+		if (!press.detail && document.activeElement === document.body) {
+			document.getElementById('fb-msg')?.focus();
+		}
+	}
+
+	// A button that hands focus to the box mid-press leaves a held Enter repeating into it: those repeats type nothing.
+	// Once the box has seen a new press of Enter, a held Enter types as usual.
+	let freshEnter = false;
+	function guardEnter(e: KeyboardEvent) {
+		if (e.key !== 'Enter') return;
+		if (!e.repeat) freshEnter = true;
+		else if (!freshEnter) e.preventDefault();
+	}
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
+		// The button that sends is not turned off for the work (it holds focus), so a press while it works does nothing.
+		if (phase === 'submitting') return;
 		if (message.trim() === '') {
 			showEmpty = true;
 			return;
@@ -56,7 +85,7 @@
 	<div class="panel" role="status">
 		<h2 bind:this={panelHeading} tabindex="-1">Thanks - your feedback was sent.</h2>
 		<p>I read every message. If you left an email, I'll get back to you.</p>
-		<button type="button" class="btn" onclick={reset}>Send another</button>
+		<button type="button" class="btn" onclick={(e) => backToForm(e, reset)}>Send another</button>
 	</div>
 {:else if phase === 'error'}
 	<div class="panel err" role="alert">
@@ -65,7 +94,9 @@
 			Something went wrong on our end - your message wasn't lost, it just didn't reach me. Try
 			again, or email me directly at <a href="mailto:feedback@ask214.com">feedback@ask214.com</a>.
 		</p>
-		<button type="button" class="btn" onclick={() => (phase = 'idle')}>Try again</button>
+		<button type="button" class="btn" onclick={(e) => backToForm(e, () => (phase = 'idle'))}
+			>Try again</button
+		>
 	</div>
 {:else}
 	<form onsubmit={handleSubmit}>
@@ -75,6 +106,8 @@
 				id="fb-msg"
 				bind:value={message}
 				oninput={() => (showEmpty = false)}
+				onfocus={() => (freshEnter = false)}
+				onkeydown={guardEnter}
 				aria-invalid={showEmpty}
 				aria-describedby={showEmpty ? 'fb-msg-error' : undefined}
 				placeholder="What happened, or what would help?"></textarea>
@@ -111,7 +144,7 @@
 			include sensitive details such as your SSN or medical or financial information.
 		</p>
 
-		<button type="submit" class="btn" disabled={phase === 'submitting'}>
+		<button type="submit" class="btn" aria-busy={phase === 'submitting'}>
 			{phase === 'submitting' ? 'Sending...' : 'Send feedback'}
 		</button>
 	</form>
@@ -210,8 +243,10 @@
 	.btn:hover {
 		background: var(--color-accent-muted);
 	}
-	.btn[disabled] {
-		opacity: 0.6;
+	/* No dim while busy: the label says it is working, and a dim would fade the focus ring or the label below their
+	   contrast minimums. The hover fill stays off too, as a press does nothing. */
+	.btn[aria-busy='true'] {
+		background: var(--color-accent);
 		cursor: default;
 	}
 	.panel {

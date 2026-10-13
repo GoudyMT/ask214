@@ -253,6 +253,26 @@ const STATIC = 'static';
 //     selector for the Settings targets (+2 B) and a shorter open check (-3 B) not kept, inside the noise; the busy
 //     fill set to the hover colour (-29 B precache) not kept, as it changed the look - the busy fill then went (the
 //     owner's call).
+//     Route nodes 48,485 -> 48,920 (package.json's size-limit) and precache 151,025 -> 151,540 (owner's call,
+//     2026-10-13): focus handed on where a pressed button goes away on more screens - Home's example questions and the
+//     Ask cards and bars to the question field, Feedback's buttons to the message box, Calendar's Add and Customize to
+//     its heading, a Snooze picker closed from elsewhere to its opener, a Lock that lands after a save to Unlock - and
+//     a 44 px tap area on the theme and answer mode pills. Two builds measured route nodes 48,878-48,880 B and precache
+//     151,486-151,495 B, 40-54 B of room. Trim pass on a full build: Not now and the reminder's Dismiss routed through the
+//     same wrapper as the other Ask card buttons, in place of their own hand-off calls (+19 B route nodes), not kept;
+//     element references moved out of $state not tried, as that grew the code when measured before.
+//     Page 61,740 -> 61,790, route nodes 48,920 -> 49,040 (package.json's size-limit) and precache 151,540 -> 151,710
+//     (owner's call, 2026-10-13): the pre-PR sweep's fixes - a 500 ms guard on Enter after focus is handed to the
+//     question field (about +67 B route nodes, the largest), the same held and double Enter guard on a task's open
+//     header, the degraded Ask card's offers and an early example question handing focus to the question field, the
+//     document reader handing focus to Text when its Page view fails (about +37 B page), Customize handing
+//     focus to the heading while a category saves, and the chosen answer mode marked in forced colours. Builds
+//     measured page 61,746-61,749 B, route nodes 48,989-48,997 B and precache 151,655-151,661 B, at least 40 B of room
+//     above the highest. Trim pass on a full build: the Home page's AskView reference kept out of $state and a shorter
+//     keyboard check, inside the noise (0-4 B), kept as harmless.
+//     Page 61,790 -> 61,805 (owner's call, 2026-10-13): the re-check's two fixes - the document reader leaving focus
+//     on the cited passage when the text view took it first, and the reminder's Set up stamping the question field's
+//     guard - left the page at 61,762 B, 28 B of room; the raise restores about 40 B.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -262,10 +282,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 61_740,
+	page: 61_805,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 151_025,
+	precacheBytes: 151_710,
 	workerScripts: 147_200
 };
 

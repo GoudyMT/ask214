@@ -101,6 +101,22 @@
 	let note = $state<PassageNote | null>(null);
 	// The page first; the text when the user picks it, or when the page cannot be had.
 	const view = $derived(served === null || fallback !== null ? 'text' : (chosen ?? 'page'));
+	// A page that cannot be had turns the Page button off; if it held focus, focus goes to Text, the view now shown,
+	// instead of falling to the page. Not when the text's landing took it first: the cited passage is the better place.
+	// On a short screen Text sits above the document in the scroll, so the reader's place stays put.
+	function fallBack(reason: NonNullable<typeof fallback>): void {
+		const page = dialogEl?.querySelector('[data-refocus="page"]');
+		const held = !!page && document.activeElement === page;
+		fallback = reason;
+		if (held)
+			void tick().then(() => {
+				const active = document.activeElement;
+				if (active !== page && active !== document.body) return;
+				dialogEl
+					?.querySelector<HTMLElement>('[data-refocus="text"]')
+					?.focus({ preventScroll: true });
+			});
+	}
 
 	// Every new source opens on its page again, with nothing carried over from the last one.
 	$effect(() => {
@@ -152,9 +168,7 @@
 				Pager = parts.DocumentPager;
 				Save = parts.DocumentSave;
 			})
-			.catch(() => {
-				fallback = 'failed';
-			});
+			.catch(() => fallBack('failed'));
 	});
 
 	// Sync the native dialog's open-state. showModal() (not the `open` attribute) is what gives the
@@ -380,7 +394,7 @@
 						passageText={cited?.text ?? ''}
 						cited={!served.whole}
 						mayFocus={mayFocusPages}
-						onfallback={(reason) => (fallback = reason)}
+						onfallback={fallBack}
 						onnote={(found) => (note = found)}
 						request={pageRequest}
 						onview={(shownView) => {
