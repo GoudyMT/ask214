@@ -266,12 +266,20 @@
 		);
 	});
 
-	async function lock(): Promise<void> {
+	// The Lock button goes with the unlocked page; focus goes to the Unlock button that replaces it. The swap can come
+	// after the press: the profile store holds a relock until a save it is running ends.
+	let lockPressed = false;
+	$effect(() => {
+		if (!lockedView || !lockPressed) return;
+		lockPressed = false;
+		void handFocusOn('.locked-panel__unlock');
+	});
+
+	function lock(): void {
+		lockPressed = true;
 		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
 		// leaving them in memory is precisely what this button exists to prevent.
 		app.relockAll?.();
-		// The Lock button is gone with the unlocked page; focus goes to the Unlock button that replaces it.
-		await handFocusOn('.locked-panel__unlock');
 	}
 
 	async function unlock(): Promise<void> {
@@ -526,7 +534,7 @@
 			{#if hasTimeline}
 				<section class="settings-section" aria-labelledby="privacy-heading">
 					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-					<button class="settings-lock" type="button" onclick={() => void lock()}>Lock</button>
+					<button class="settings-lock" type="button" onclick={lock}>Lock</button>
 					<p class="settings-hint">
 						Clears your profile from this screen. Use Unlock to view it again.
 					</p>
