@@ -55,7 +55,6 @@
 		e.preventDefault();
 		// The button that sends is not turned off for the work (it holds focus), so a press while it works does nothing.
 		if (phase === 'submitting') return;
-		// The button that sends is not turned off for the work (it holds focus), so a press while it works does nothing.
 		if (message.trim() === '') {
 			showEmpty = true;
 			return;
