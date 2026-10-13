@@ -259,8 +259,17 @@ const STATIC = 'static';
 //     its heading, a Snooze picker closed from elsewhere to its opener, a Lock that lands after a save to Unlock - and
 //     a 44 px tap area on the theme and answer mode pills. Two builds measured route nodes 48,878-48,880 B and precache
 //     151,486-151,495 B, 40-54 B of room. Trim pass on a full build: Not now and the reminder's Dismiss routed through the
-//     same wrapper as the other Ask card buttons, in place of their own hand-off calls (+19 B route nodes), not kept; element references moved out of $state not tried, as that grew the code when
-//     measured before.
+//     same wrapper as the other Ask card buttons, in place of their own hand-off calls (+19 B route nodes), not kept;
+//     element references moved out of $state not tried, as that grew the code when measured before.
+//     Page 61,740 -> 61,790, route nodes 48,920 -> 49,040 (package.json's size-limit) and precache 151,540 -> 151,710
+//     (owner's call, 2026-10-13): the pre-PR sweep's fixes - a 500 ms guard on Enter after focus is handed to the
+//     question field (about +67 B route nodes, the largest), the same held and double Enter guard on a task's open
+//     header, the degraded Ask card's offers and an early example question handing focus to the question field, the
+//     document reader handing focus to Text when its Page view fails (about +37 B page), Customize handing
+//     focus to the heading while a category saves, and the chosen answer mode marked in forced colours. Builds
+//     measured page 61,746-61,749 B, route nodes 48,989-48,997 B and precache 151,655-151,661 B, at least 40 B of room
+//     above the highest. Trim pass on a full build: the Home page's AskView reference kept out of $state and a shorter
+//     keyboard check, inside the noise (0-4 B), kept as harmless.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -270,10 +279,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 61_740,
+	page: 61_790,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 151_540,
+	precacheBytes: 151_710,
 	workerScripts: 147_200
 };
 
