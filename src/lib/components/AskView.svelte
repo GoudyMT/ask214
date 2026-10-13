@@ -90,7 +90,15 @@
 	// A keyboard or a screen reader presses with detail 0.
 	async function toField(press: MouseEvent): Promise<void> {
 		await tick();
-		if (!press.detail && document.activeElement === document.body) inputEl?.focus();
+		if (!press.detail && document.activeElement === document.body) focusField();
+	}
+	// An Enter just after focus was handed to the field is the key that gave it, or a double press, not a new question
+	// (a held key's repeats are held back apart from this). The page uses this too, for its own hand-offs.
+	const FIELD_GUARD_MS = 500;
+	let fieldFocusedAt = 0;
+	export function focusField(): void {
+		fieldFocusedAt = Date.now();
+		inputEl?.focus();
 	}
 	function skipSetup(press: MouseEvent) {
 		setupDismissed = true;
@@ -205,7 +213,10 @@
 		class="ask-input"
 		placeholder="Ask about benefits, SkillBridge, VA..."
 		aria-label="Ask a question"
-		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
+		onkeydown={(e) =>
+			e.key === 'Enter' &&
+			(e.repeat || Date.now() - fieldFocusedAt < FIELD_GUARD_MS) &&
+			e.preventDefault()}
 	/>
 	<button class="ask-search" type="submit" disabled={!ready}>
 		<span class="ask-search__label">Search</span>

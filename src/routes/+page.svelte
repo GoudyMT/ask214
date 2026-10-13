@@ -52,6 +52,7 @@
 	// the saved default, or the one just picked. A question keeps the mode it was picked in.
 	let earlyMode = $state(getDefaultMode());
 	let earlyQuery: { query: string; mode: 'device' | 'online' } | undefined;
+	let askView: ReturnType<typeof AskView> | undefined = $state();
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
@@ -96,12 +97,13 @@
 	// page unless the person has already moved on, so it goes to the question field, the page's first control.
 	async function closeNudge(action: () => unknown, press: MouseEvent): Promise<void> {
 		await action();
-		await tick();
 		// Not after a tap or a click (detail 1+): a focused text field would open a phone's keyboard. A keyboard or a
 		// screen reader presses with detail 0.
-		if (!press.detail && document.activeElement === document.body) {
-			document.querySelector<HTMLElement>('.ask-input')?.focus();
-		}
+		await toQuestionField(!press.detail);
+	}
+	async function toQuestionField(keyboard: boolean): Promise<void> {
+		await tick();
+		if (keyboard && document.activeElement === document.body) askView?.focusField();
 	}
 
 	onMount(() => {
@@ -169,6 +171,7 @@
 	<h1 class="home-hero">Answers for your military transition, from sources you can trust.</h1>
 
 	<AskView
+		bind:this={askView}
 		{askState}
 		{ready}
 		{loadSource}

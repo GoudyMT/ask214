@@ -881,6 +881,30 @@ describe('AskView, focus after the pressed button goes away', () => {
 		expect(document.activeElement).not.toBe(field(container));
 	});
 
+	// A second quick Enter, a new press and not a repeat, is the key that gave the focus, or a double press: it asks
+	// nothing. A press after the guard asks.
+	it.each([
+		['ignores a second Enter at once', 0, 0],
+		['asks on a second Enter after the guard', 600, 1]
+	] as const)('%s, after Not now', async (_, wait, asked) => {
+		const onAsk = vi.fn();
+		const { container } = await mountLeaving(
+			'onDismiss',
+			{ ...setup, onAsk },
+			{ ...props({ kind: 'idle' }), onAsk }
+		);
+		const input = field(container)!;
+		input.value = 'how do I file a claim';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		await press(container.querySelector<HTMLButtonElement>('.ask-setup__skip'));
+		await expect.poll(() => document.activeElement).toBe(input);
+		await pause(wait);
+		await userEvent.keyboard('{Enter}');
+		await pause(50);
+
+		expect(onAsk).toHaveBeenCalledTimes(asked);
+	});
+
 	it('hands focus to the field when the reminder is dismissed by keyboard', async () => {
 		sessionStorage.removeItem('mtc:ask:reminder-dismissed');
 		const { container, rerender } = await render(AskView, { props: setup });
