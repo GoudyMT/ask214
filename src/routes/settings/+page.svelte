@@ -101,6 +101,10 @@
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
+	// The profile can open another way (another tab's Unlock): a failure line must not outlive the lock it failed on.
+	$effect(() => {
+		if (app.store?.locked === false) unlockError = null;
+	});
 	let headingEl: HTMLElement | undefined;
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);

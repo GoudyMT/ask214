@@ -178,6 +178,21 @@ describe('Timeline, its saved progress', () => {
 			await expect.poll(() => document.activeElement).toBe(heading.element());
 			expect(page.getByRole('alert').query()).toBeNull();
 		});
+
+		// The profile can open without this page's Unlock (Settings', in another tab), so a failure line must not outlive
+		// the lock.
+		it('drops the failure line when the profile opens some other way', async () => {
+			current.load = endsAfter(0, true);
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+
+			profile.locked = false;
+			await expect.poll(() => page.getByRole('button', { name: 'Unlock' }).query()).toBeNull();
+			profile.locked = true;
+			await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
+			expect(page.getByRole('alert').query()).toBeNull();
+		});
 	});
 
 	// With nothing saved there is nothing to unlock: a first-run tab locked by idle or another tab still offers setup.

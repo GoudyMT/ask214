@@ -223,6 +223,19 @@ describe('Settings, Unlock', () => {
 		expect(loads).toHaveBeenCalledOnce();
 	});
 
+	// The profile can open without this page's Unlock (another page's), so a failure line must not outlive the lock.
+	it('drops the failure line when the profile opens some other way', async () => {
+		ctl.load = endsAfter(0, true);
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+
+		profile.locked = false;
+		await page.getByRole('button', { name: 'Lock', exact: true }).click();
+		await expect.element(page.getByRole('button', { name: 'Unlock' })).toBeVisible();
+		expect(page.getByRole('alert').query()).toBeNull();
+	});
+
 	// A second failure that reads the same as the first is announced again only if the line was taken away at the press.
 	it('takes the line away at the next press and shows it again', async () => {
 		// The second read stays pending, so the line can only be gone because the press started it, not because it failed.
