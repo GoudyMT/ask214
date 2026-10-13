@@ -727,7 +727,9 @@ type Handler =
 	| 'onConsentOnline'
 	| 'onStayDevice'
 	| 'onDismissNudge'
-	| 'onSetMode';
+	| 'onSetMode'
+	| 'onOfferDevice'
+	| 'onRetryOnline';
 
 // Enter as a keyboard sends it: the key, its code and the carriage return it types.
 const ENTER = {
@@ -819,12 +821,34 @@ describe('AskView, focus after the pressed button goes away', () => {
 
 	const setup = props({ kind: 'needsSetup', pendingQuery: 'q' });
 	const consent = props({ kind: 'needsReconsent', pendingQuery: 'q' }, { onlineCapable: true });
+	const offerDevice = props(
+		{ kind: 'degraded', rung: 'offer_device', query: 'q' },
+		{ onlineCapable: true }
+	);
+	const offerOnline = props(
+		{ kind: 'degraded', rung: 'offer_online', query: 'q' },
+		{ onlineCapable: true }
+	);
 
 	it.each([
 		['Set up & answer', 'onSetUp', '.ask-setup__go', setup, props({ kind: 'modelLoading' })],
 		['Not now', 'onDismiss', '.ask-setup__skip', setup, props({ kind: 'idle' })],
 		['Use online', 'onConsentOnline', '.ask-setup__go', consent, props({ kind: 'embedding' })],
-		['Stay on device', 'onStayDevice', '.ask-setup__skip', consent, props({ kind: 'idle' })]
+		['Stay on device', 'onStayDevice', '.ask-setup__skip', consent, props({ kind: 'idle' })],
+		[
+			'Answer on your device',
+			'onOfferDevice',
+			'.ask-msg--warn button',
+			offerDevice,
+			props({ kind: 'embedding' })
+		],
+		[
+			'Try online',
+			'onRetryOnline',
+			'.ask-msg--warn button',
+			offerOnline,
+			props({ kind: 'embedding' })
+		]
 	] as const)(
 		'hands focus to the field when %s is pressed by keyboard',
 		async (_, name, selector, from, to) => {
@@ -841,6 +865,18 @@ describe('AskView, focus after the pressed button goes away', () => {
 		await userEvent.click(container.querySelector<HTMLButtonElement>('.ask-setup__skip')!);
 
 		await vi.waitFor(() => expect(container.querySelector('.ask-setup')).toBeNull());
+		await pause(50);
+		expect(document.activeElement).not.toBe(field(container));
+	});
+
+	it.each([
+		['Answer on your device', 'onOfferDevice', offerDevice],
+		['Try online', 'onRetryOnline', offerOnline]
+	] as const)('moves no focus to the field when %s is tapped', async (_, name, from) => {
+		const { container } = await mountLeaving(name, from, props({ kind: 'embedding' }));
+		await userEvent.click(container.querySelector<HTMLButtonElement>('.ask-msg--warn button')!);
+
+		await vi.waitFor(() => expect(container.querySelector('.ask-msg--warn')).toBeNull());
 		await pause(50);
 		expect(document.activeElement).not.toBe(field(container));
 	});

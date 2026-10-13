@@ -381,12 +381,12 @@
 			{#if askState.rung === 'offer_device'}
 				<p class="ask-msg__title">Online is unavailable right now</p>
 				<p class="ask-msg__body">You can answer this question fully on your device instead.</p>
-				<button class="ask-setup__go" type="button" onclick={() => onOfferDevice(q)}
+				<button class="ask-setup__go" type="button" onclick={act(() => onOfferDevice(q))}
 					>Answer on your device</button
 				>
 			{:else if askState.rung === 'offer_online'}
 				<p class="ask-msg__title">That didn't work</p>
-				<button class="ask-setup__go" type="button" onclick={() => onRetryOnline(q)}
+				<button class="ask-setup__go" type="button" onclick={act(() => onRetryOnline(q))}
 					>Try online</button
 				>
 			{:else}
