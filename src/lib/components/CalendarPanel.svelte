@@ -90,7 +90,7 @@
 	$effect(() => {
 		// Both are read first so the effect follows them whatever holds focus now.
 		const addOff = !(ready && hasEvents);
-		const customizeOff = !ready;
+		const customizeOff = !ready || saving > 0;
 		const held = document.activeElement;
 		if ((held === addEl && addOff) || (held === customizeEl && customizeOff))
 			headingEl?.focus({ preventScroll: true });

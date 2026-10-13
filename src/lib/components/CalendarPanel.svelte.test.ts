@@ -459,6 +459,34 @@ describe('CalendarPanel', () => {
 			expect(document.activeElement).toBe(box);
 		});
 
+		// On WebKit a tap on a checkbox does not move focus, so a keyboard user's focus can still be on the toggle when a
+		// category save turns it off; a programmatic click moves no focus either.
+		it('hands focus on Customize to the heading when a category save turns it off', async () => {
+			await render(CalendarPanel, {
+				props: {
+					items: [item(def('a', 'admin'))],
+					exclusions: { taskIds: [], categories: [] },
+					access: 'ready',
+					...NO_RECORD,
+					onSetExclusions: () => new Promise<void>(() => {}),
+					onAdd: vi.fn()
+				}
+			});
+			const toggle = page.getByRole('button', { name: CUSTOMIZE }).element() as HTMLButtonElement;
+			toggle.focus();
+			toggle.click();
+			const box = (await vi.waitFor(() =>
+				page.getByRole('checkbox', { name: 'medical' }).element()
+			)) as HTMLInputElement;
+			expect(document.activeElement).toBe(toggle);
+			box.click();
+			await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+			expect(toggle.disabled).toBe(true);
+			expect(document.activeElement).toBe(
+				page.getByRole('heading', { level: 2, name: 'Calendar' }).element()
+			);
+		});
+
 		it('leaves focus on the page when nothing held it', async () => {
 			const { props, screen } = await start();
 			expect(document.activeElement).toBe(document.body);
