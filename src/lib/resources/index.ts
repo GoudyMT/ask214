@@ -1,6 +1,7 @@
 export type { DisplayCategory, Resource } from './types';
 export {
 	resourcesForTask,
+	guidesForTask,
 	afterLinkForTask,
 	linkNoteForTask,
 	groupByDisplayCategory,

@@ -1,5 +1,12 @@
 import type { DisplayCategory, Resource } from './types';
-import { RESOURCES, TASK_RESOURCES, TASK_AFTER_LINK, TASK_LINK_NOTE } from './resources';
+import {
+	RESOURCES,
+	TASK_RESOURCES,
+	TASK_AFTER_LINK,
+	TASK_LINK_NOTE,
+	TASK_GUIDES
+} from './resources';
+import { LOCAL_DOCUMENT_INFO } from '$lib/sources/local-document-info.data';
 
 // Human-readable heading for each browse category, shown on the Resources page.
 export const DISPLAY_CATEGORY_LABEL: Record<DisplayCategory, string> = {
@@ -24,6 +31,19 @@ export function resourcesForTask(
 	return (map[taskId] ?? []).flatMap((id) => {
 		const r = byId.get(id);
 		return r ? [r] : [];
+	});
+}
+
+// The TAP guides a timeline task opens in the app's reader, with the titles the reader shows. An id the app no
+// longer serves is dropped, never shown as a dead entry. Map + guide info are injectable for testing.
+export function guidesForTask(
+	taskId: string,
+	map: Record<string, readonly string[]> = TASK_GUIDES,
+	info: Record<string, { title: string }> = LOCAL_DOCUMENT_INFO
+): { sourceId: string; title: string }[] {
+	return (map[taskId] ?? []).flatMap((sourceId) => {
+		const guide = info[sourceId];
+		return guide ? [{ sourceId, title: guide.title }] : [];
 	});
 }
 

@@ -358,6 +358,43 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'va-claim-fallback': ['va-disability', 'va-accredited-rep']
 };
 
+// The TAP guides a task opens in the app's own reader, listed first under its Related resources. Curated by hand
+// (S121, approved by the owner): each guide checked to cover the task, by its own pages, 0-2 per task. Keys are
+// timeline task ids; values are the served guides' source ids (src/lib/sources/local-document-info.data.ts), in the
+// order to show them. Tasks absent here open no guide.
+export const TASK_GUIDES: Record<string, readonly string[]> = {
+	'va-gov-account': ['tap_va_benefits_guide'],
+	'login-gov-account': ['tap_va_benefits_guide'],
+	'update-sgli': ['tap_va_life_insurance'],
+	'will-poa': ['tap_financial_planning'],
+	'financial-counselor': ['tap_financial_planning'],
+	'master-resume': ['tap_dol_employment_workshop'],
+	'gi-bill-research': ['tap_va_education_benefits', 'tap_managing_education'],
+	'document-medical': ['tap_va_disability_comp'],
+	'preseparation-counseling': ['tap_pre_separation_brief'],
+	'tap-course': ['tap_va_benefits_guide', 'tap_dol_efct'],
+	'tap-track': ['tap_dol_employment_workshop', 'tap_managing_education'],
+	'job-search': ['tap_dol_employment_workshop', 'tap_moc_crosswalk'],
+	'health-insurance-research': ['tap_financial_planning', 'tap_pre_separation_brief'],
+	'life-insurance-research': ['tap_va_life_insurance'],
+	'va-career-guidance': ['tap_va_benefits_guide'],
+	'jst-order': ['tap_managing_education'],
+	'reserve-affiliation': ['tap_va_reserve_natl_guard', 'tap_reserve_dual_pay'],
+	'school-apply': ['tap_managing_education', 'tap_va_education_benefits'],
+	'sha-schedule': ['tap_va_benefits_guide'],
+	'sha-complete': ['tap_va_benefits_guide'],
+	'va-bdd-claim': ['tap_va_disability_comp'],
+	'tap-capstone': ['tap_managing_transition'],
+	'va-benefits-advisor': ['tap_va_benefits_guide'],
+	'financial-docs': ['tap_financial_planning'],
+	'dd214-review': ['tap_pre_separation_brief'],
+	'tricare-elect': ['tap_financial_planning'],
+	'tsp-decision': ['tap_financial_planning'],
+	'vgli-convert': ['tap_va_life_insurance'],
+	'final-pay-check': ['tap_financial_planning'],
+	'va-claim-fallback': ['tap_va_disability_comp']
+};
+
 // The one official page to go to once a firm task's date passes (or changes), shown in its What now box. Keys are
 // the timeline tasks whose kind is 'required' or 'closes'; each names a resource above and the link text to show.
 export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }> = {
