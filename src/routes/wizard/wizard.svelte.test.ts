@@ -170,8 +170,10 @@ describe('Wizard, the buttons while a save is pending', () => {
 		const { settle } = await startPendingSave();
 		const save = page.getByRole('button', SAVE).element() as HTMLButtonElement;
 		expect(save.disabled).toBe(false);
+		expect(save.getAttribute('aria-busy')).toBe('true');
 		settle({ ok: false, reason: new Error('E_TEST_WRITE') });
 		await expect.element(page.getByText(FAILED)).toBeVisible();
+		expect(save.getAttribute('aria-busy')).toBe('false');
 	});
 
 	it('turns Skip off, and gives it back once the save has failed', async () => {

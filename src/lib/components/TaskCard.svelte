@@ -304,6 +304,7 @@
 				<button
 					type="button"
 					class="task-card__note-save"
+					aria-busy={noteSaving}
 					onkeydown={ignoreRepeat}
 					onclick={saveNote}>Save</button
 				>

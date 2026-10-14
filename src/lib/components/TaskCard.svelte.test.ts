@@ -1256,6 +1256,27 @@ describe('TaskCard (focus after an editor closes)', () => {
 			.toBe(container.querySelector('article.task-card'));
 	});
 
+	it('marks the note Save busy while its save runs, and not after', async () => {
+		let land: () => void = noop;
+		const pending = new Promise<void>((resolve) => {
+			land = resolve;
+		});
+		const { container } = await mountCard(makeItem({ status: 'start-now' }), {
+			onSetNote: () => pending
+		});
+		press(container, 'Add note');
+		typeNote(container, 'see VSO');
+		const save = buttonByText(container, 'Save') as HTMLButtonElement;
+		expect(save.getAttribute('aria-busy')).toBe('false');
+		press(container, 'Save');
+		await expect.poll(() => save.getAttribute('aria-busy')).toBe('true');
+		land();
+		await pending;
+		await expect
+			.poll(() => save.isConnected && save.getAttribute('aria-busy') === 'true')
+			.toBe(false);
+	});
+
 	it('leaves focus alone when the person has moved on before a save lands', async () => {
 		let land: () => void = noop;
 		const pending = new Promise<void>((resolve) => {

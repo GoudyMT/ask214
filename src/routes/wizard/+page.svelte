@@ -118,7 +118,7 @@
 			<p class="wizard__today">Today on this device: {todayDisplay}</p>
 
 			<div class="wizard__actions">
-				<button class="wizard__save" type="submit">Save and continue</button>
+				<button class="wizard__save" type="submit" aria-busy={saving}>Save and continue</button>
 				<button class="wizard__skip" type="button" disabled={saving} onclick={() => void skip()}
 					>Skip for now</button
 				>
