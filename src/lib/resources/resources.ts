@@ -387,7 +387,6 @@ export const TASK_GUIDES: Record<string, readonly string[]> = {
 	'tap-capstone': ['tap_managing_transition'],
 	'va-benefits-advisor': ['tap_va_benefits_guide'],
 	'financial-docs': ['tap_financial_planning'],
-	'dd214-review': ['tap_pre_separation_brief'],
 	'tricare-elect': ['tap_financial_planning'],
 	'tsp-decision': ['tap_financial_planning'],
 	'vgli-convert': ['tap_va_life_insurance'],
