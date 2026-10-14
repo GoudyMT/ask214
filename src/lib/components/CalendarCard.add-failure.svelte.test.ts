@@ -121,11 +121,11 @@ describe('CalendarCard, when the file cannot be made', () => {
 		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
 	});
 
-	// Add is off while the file builds, which drops focus to the page; it gets focus back, so the person can try again.
+	// Add stays on while the file builds, so it never drops focus; a press while it builds does nothing.
 	it.each([
 		['cannot be made', true],
 		['is made', false]
-	] as const)('puts focus back on Add once the file %s', async (_, fails) => {
+	] as const)('keeps focus on Add while the file builds and once it %s', async (_, fails) => {
 		seams.failNext = fails;
 		let open = () => {};
 		seams.gate = new Promise<void>((resolve) => (open = resolve));
@@ -138,13 +138,18 @@ describe('CalendarCard, when the file cannot be made', () => {
 				onDismiss: vi.fn()
 			}
 		});
+		const button = container.querySelector('.cal-card__add') as HTMLButtonElement;
 		const add = page.getByRole('button', { name: /^add to my calendar$/i });
 		await add.click();
-		await expect.element(add).toBeDisabled();
+		await expect.poll(() => button.getAttribute('aria-busy')).toBe('true');
+		expect(button.disabled).toBe(false);
+		expect(document.activeElement).toBe(button);
+		await add.click();
 		open();
-		await expect.element(add).toBeEnabled();
+		await expect.poll(() => button.getAttribute('aria-busy')).toBe('false');
+		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(onAdd).toHaveBeenCalledTimes(fails ? 0 : 1);
-		await expect.poll(() => document.activeElement).toBe(container.querySelector('.cal-card__add'));
+		expect(document.activeElement).toBe(button);
 	});
 
 	// A held key repeats about every 40 ms; each repeat that reached Add would make and hand over another file. A new
