@@ -1256,10 +1256,11 @@ describe('TaskCard (focus after an editor closes)', () => {
 			.toBe(container.querySelector('article.task-card'));
 	});
 
+	// Checked on a failed save, where the editor and its Save stay on the page once the save settles.
 	it('marks the note Save busy while its save runs, and not after', async () => {
-		let land: () => void = noop;
-		const pending = new Promise<void>((resolve) => {
-			land = resolve;
+		let fail: () => void = noop;
+		const pending = new Promise<void>((_, reject) => {
+			fail = () => reject(new Error('E_TEST_NOTE'));
 		});
 		const { container } = await mountCard(makeItem({ status: 'start-now' }), {
 			onSetNote: () => pending
@@ -1270,11 +1271,10 @@ describe('TaskCard (focus after an editor closes)', () => {
 		expect(save.getAttribute('aria-busy')).toBe('false');
 		press(container, 'Save');
 		await expect.poll(() => save.getAttribute('aria-busy')).toBe('true');
-		land();
-		await pending;
-		await expect
-			.poll(() => save.isConnected && save.getAttribute('aria-busy') === 'true')
-			.toBe(false);
+		fail();
+		await expect.poll(() => container.querySelector('.task-card__note-error')).not.toBeNull();
+		expect(save.isConnected).toBe(true);
+		expect(save.getAttribute('aria-busy')).toBe('false');
 	});
 
 	it('leaves focus alone when the person has moved on before a save lands', async () => {
