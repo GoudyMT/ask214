@@ -324,6 +324,8 @@ const STATIC = 'static';
 //     nodes 49,424-49,426 B, at least 42 B of room above the highest. Trim pass: the failed row first made the new
 //     loader a shared chunk of its own (one more precached file, page +283 B); moving the row out of the timeline code
 //     removed that, kept.
+//     Page 64,110 -> 64,120 (owner's call, 2026-10-14): the re-sweep's focus fix (the retry hands focus on from the
+//     cited passage too) left 30-32 B of room on 64,078-64,080 B measured; raised to 40 B above the highest.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -333,7 +335,7 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 64_110,
+	page: 64_120,
 	onDemand: 8_090,
 	precacheFiles: 62,
 	precacheBytes: 155_840,
