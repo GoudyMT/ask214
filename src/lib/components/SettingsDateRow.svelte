@@ -23,11 +23,11 @@
 	let editing = $state(false);
 	let draft = $state('');
 	let error = $state<string | null>(null);
-	let busy = $state(false);
+	// The action that is running. Its own button stays on (a disabled button that holds focus drops it) and ignores a
+	// press; the other action is off until it settles.
+	let running = $state<'save' | 'remove' | null>(null);
+	const busy = $derived(running !== null);
 	let toggleEl = $state<HTMLButtonElement | null>(null);
-
-	let saveEl = $state<HTMLButtonElement | null>(null);
-	let removeEl = $state<HTMLButtonElement | null>(null);
 
 	// Closing unmounts the focused button; focus goes back to the row, so a keyboard user is not dropped - unless
 	// they have already moved on to another control.
@@ -50,13 +50,12 @@
 		editing = true;
 	}
 
-	// The button that ran the action was turned off while it ran, which dropped focus to the page; after a message or a
-	// failure it gets focus back so the person can try again, unless they have already moved on.
 	async function run(
-		action: () => Promise<string | null>,
-		button: () => HTMLElement | null
+		which: 'save' | 'remove',
+		action: () => Promise<string | null>
 	): Promise<void> {
-		busy = true;
+		if (busy) return;
+		running = which;
 		// Cleared first, so the same failure on a retry is put back on the page and read out again.
 		error = null;
 		let message: string | null;
@@ -67,10 +66,7 @@
 		}
 		if (message === null) await close();
 		else error = message;
-		busy = false;
-		if (message === null) return;
-		await tick();
-		if (document.activeElement === document.body) button()?.focus();
+		running = null;
 	}
 </script>
 
@@ -89,16 +85,18 @@
 		>
 	</button>
 	{#if editing}
+		<!-- A held Enter repeats, in the field or on Save, and each repeat would submit again once the last save settled:
+		     only a new press submits. The form only filters its controls' keys; it is not a control itself, so the
+		     compiler's rule against key listeners on a non-interactive element does not fit. -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<form
 			id="{id}-edit"
 			class="settings-edit"
 			onsubmit={(e) => {
 				e.preventDefault();
-				void run(
-					() => onSave(draft),
-					() => saveEl
-				);
+				void run('save', () => onSave(draft));
 			}}
+			onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 		>
 			<EaosInput
 				id="{id}-input"
@@ -113,17 +111,22 @@
 				hideLabel
 			/>
 			<div class="settings-edit__actions">
-				<button bind:this={saveEl} class="settings-save" type="submit" disabled={busy}>Save</button>
+				<button
+					class="settings-save"
+					type="submit"
+					disabled={running === 'remove'}
+					aria-busy={running === 'save'}>Save</button
+				>
 				<button class="settings-cancel" type="button" disabled={busy} onclick={() => void close()}
 					>Cancel</button
 				>
 				{#if onRemove && value}
 					<button
-						bind:this={removeEl}
 						class="settings-remove"
 						type="button"
-						disabled={busy}
-						onclick={() => void run(onRemove, () => removeEl)}>Remove</button
+						disabled={running === 'save'}
+						aria-busy={running === 'remove'}
+						onclick={() => void run('remove', onRemove)}>Remove</button
 					>
 				{/if}
 			</div>
@@ -203,6 +206,12 @@
 		opacity: 0.6;
 		cursor: default;
 	}
+	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The hover fill
+	   stays off too, as a press does nothing. */
+	.settings-save[aria-busy='true'] {
+		background: var(--color-accent);
+		cursor: default;
+	}
 
 	/* Quiet CTA: muted text, underline. */
 	.settings-cancel {
@@ -234,6 +243,9 @@
 
 	.settings-remove:disabled {
 		opacity: 0.6;
+		cursor: default;
+	}
+	.settings-remove[aria-busy='true'] {
 		cursor: default;
 	}
 </style>
