@@ -317,6 +317,13 @@ const STATIC = 'static';
 //     pass: the retry first rebuilt the whole page view in a keyed block (+526 B precache); passing a retry count
 //     into the view's own check key instead saved about 430 B, kept. The retry's prop left onDemand 18 B of room (8,047 B
 //     measured), inside the build-to-build drift, so onDemand 8,065 -> 8,090 too.
+//     Page 64,040 -> 64,110, precache 155,745 -> 155,840 and route nodes 49,440 -> 49,470 (owner's call, 2026-10-14):
+//     the Pre-PR sweep's fixes - Home's row says it could not load when its code never arrives, focus kept on the shown
+//     view when a guide is tried again, "nothing left to do" when a task closed unanswered - and the SHA task's wording
+//     matched to the official pages. Two builds measured page 64,066-64,068 B, precache 155,794-155,795 B and route
+//     nodes 49,424-49,426 B, at least 42 B of room above the highest. Trim pass: the failed row first made the new
+//     loader a shared chunk of its own (one more precached file, page +283 B); moving the row out of the timeline code
+//     removed that, kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -326,10 +333,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 64_040,
+	page: 64_110,
 	onDemand: 8_090,
 	precacheFiles: 62,
-	precacheBytes: 155_745,
+	precacheBytes: 155_840,
 	workerScripts: 147_200
 };
 
