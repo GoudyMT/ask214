@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
@@ -20,6 +20,11 @@
 	import { savePlanAnswer } from '$lib/timeline/skillbridge-save';
 	import { localTodayIso } from '$lib/timeline/day-math';
 	import { LocalToday } from '$lib/timeline/local-today.svelte';
+	import SourceReader from '$lib/components/SourceReader.svelte';
+	import { CORPUS_BASE, loadCorpus } from '$lib/ask/corpus-load';
+	import { createLazyCorpus } from '$lib/ask/corpus-loader';
+	import { waitForControl } from '$lib/ask/when-controlled';
+	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 
 	const app = getProfileApp();
 	// Everything derived from today reads this clock, which turns at local midnight; an act at a tap reads the clock at the tap.
@@ -224,6 +229,30 @@
 		await attempt(calendar, () => calendar.dismissCard(Date.now()));
 		await focusAfterCard();
 	}
+
+	// A task's TAP guide, opened over the list as the Documents page opens one, so the person keeps their place: the
+	// dialog hands focus back to the entry that opened it. Its text view comes from the corpus, loaded only when asked.
+	let guide = $state<{ sourceId: string; title: string } | null>(null);
+	let sources = new Map<string, Source>();
+	// Set when the page is left, so a load still waiting for the service worker starts nothing once it takes charge.
+	let left = false;
+	onMount(() => () => {
+		left = true;
+	});
+	const getCorpus = createLazyCorpus(
+		async () => {
+			await waitForControl();
+			if (left) throw new Error('E_PAGE_LEFT');
+			return loadCorpus(fetch, CORPUS_BASE);
+		},
+		(corpus) => {
+			sources = sourcesFromCorpus(corpus);
+		}
+	);
+	async function loadSource(sourceId: string): Promise<Source | null> {
+		await getCorpus();
+		return sources.get(sourceId) ?? null;
+	}
 </script>
 
 <svelte:head>
@@ -282,11 +311,19 @@
 					/>
 				{/if}
 				<PhaseChips {view} />
-				<TimelineList {view} onSetStatus={setStatus} onSetSnooze={setSnooze} onSetNote={setNote} />
+				<TimelineList
+					{view}
+					onSetStatus={setStatus}
+					onSetSnooze={setSnooze}
+					onSetNote={setNote}
+					onOpenGuide={(sourceId, title) => (guide = { sourceId, title })}
+				/>
 			{/if}
 		{/if}
 	{/if}
 </div>
+
+<SourceReader source={null} doc={guide} {loadSource} onClose={() => (guide = null)} />
 
 <style>
 	h1 {

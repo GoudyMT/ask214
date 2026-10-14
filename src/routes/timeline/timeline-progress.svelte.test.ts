@@ -896,3 +896,25 @@ describe('Timeline, a write or a Dismiss that fails', () => {
 		expect(document.activeElement).toBe(button);
 	});
 });
+
+describe('Timeline, a task guide read in the app', () => {
+	// The reader opens over the list, so the person keeps their place: closing it hands focus back to the entry.
+	it('opens the guide in the reader on the page and hands focus back on close', async () => {
+		current.timeline = { ready: true, failed: false, state: EMPTY };
+		const { container } = await render(TimelinePage);
+		await vi.waitFor(() => expect(container.querySelector('.timeline-list')).not.toBeNull());
+		for (const toggle of container.querySelectorAll<HTMLButtonElement>(
+			'.task-card__related-toggle'
+		))
+			toggle.click();
+		const title = 'TAP - VA Benefits and Services Participant Guide';
+		const entry = page.getByRole('button', { name: `Read in the app: ${title}` }).first();
+		await entry.click();
+		const reader = container.querySelector('dialog.reader') as HTMLDialogElement;
+		await vi.waitFor(() => expect(reader.open).toBe(true));
+		expect(reader.textContent).toContain(title);
+		(reader.querySelector('.reader__close') as HTMLButtonElement).click();
+		await vi.waitFor(() => expect(reader.open).toBe(false));
+		await expect.element(entry).toHaveFocus();
+	});
+});

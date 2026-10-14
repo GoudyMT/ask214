@@ -7,12 +7,14 @@
 		view,
 		onSetStatus,
 		onSetSnooze,
-		onSetNote
+		onSetNote,
+		onOpenGuide
 	}: {
 		view: TimelineView;
 		onSetStatus: (taskId: string, status: TaskStatus | undefined) => Promise<boolean> | void;
 		onSetSnooze: (taskId: string, untilIso: string) => Promise<boolean> | void;
 		onSetNote?: (taskId: string, note: string | undefined) => Promise<void>;
+		onOpenGuide?: (sourceId: string, title: string) => void;
 	} = $props();
 
 	// Phase header progress count: an open phase shows what's left = active + snoozed ("N to do";
@@ -85,7 +87,7 @@
 				</h2>
 				{#if expanded[phase.bucket.id]}
 					{#each phase.items as item (item.def.id)}
-						<TaskCard {item} {onSetStatus} {onSetSnooze} {onSetNote} />
+						<TaskCard {item} {onSetStatus} {onSetSnooze} {onSetNote} {onOpenGuide} />
 					{/each}
 				{/if}
 			{:else}
@@ -93,7 +95,7 @@
 					{phase.bucket.label} <span class="timeline-list__count">- {phaseCount(phase)}</span>
 				</h2>
 				{#each phase.items as item (item.def.id)}
-					<TaskCard {item} {onSetStatus} {onSetSnooze} {onSetNote} />
+					<TaskCard {item} {onSetStatus} {onSetSnooze} {onSetNote} {onOpenGuide} />
 				{/each}
 			{/if}
 		</section>
