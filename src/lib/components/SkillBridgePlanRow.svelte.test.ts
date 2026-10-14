@@ -223,9 +223,8 @@ describe('SkillBridgePlanRow', () => {
 			.toHaveTextContent('Could not update right now - please try again.');
 	});
 
-	// Save is disabled while the save runs, which drops focus to the page; after a failure it goes back to Save so a
-	// keyboard user can try again.
-	it('puts focus back on Save after a save that fails or returns a message', async () => {
+	// Save stays on while the save runs, so a keyboard user is still on it after a failure and can try again.
+	it('keeps focus on Save after a save that fails or returns a message', async () => {
 		const onSave = vi
 			.fn<() => Promise<string | null>>()
 			.mockResolvedValueOnce('Something to review.')
@@ -414,16 +413,80 @@ describe('SkillBridgePlanRow', () => {
 		expect(prevented).toBe(true);
 	});
 
+	// Save stays on while it runs, so it keeps focus; a second press does nothing.
 	it('holds Save while a save is under way', async () => {
 		let finish: (message: string | null) => void = () => undefined;
 		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
-		await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), access: 'ready', onSave }
+		});
 		await toggle().click();
 		await page.getByRole('radio', { name: 'Yes' }).click();
 		await page.getByRole('button', { name: 'Save' }).click();
-		await expect.element(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+		const save = container.querySelector('.settings-save') as HTMLButtonElement;
+		await expect.poll(() => save.getAttribute('aria-busy')).toBe('true');
+		expect(save.disabled).toBe(false);
+		expect(document.activeElement).toBe(save);
+		await page.getByRole('button', { name: 'Save' }).click();
+		expect(onSave).toHaveBeenCalledOnce();
 		finish(null);
 		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
+	});
+});
+
+// A held key repeats about every 40 ms; each repeat that reached the form would save again once the last save settled.
+// Only a new press saves. The keys go through the browser's own input, so a repeat is a real one.
+describe('SkillBridgePlanRow (a held Enter)', () => {
+	const ENTER = {
+		key: 'Enter',
+		code: 'Enter',
+		windowsVirtualKeyCode: 13,
+		text: String.fromCharCode(13)
+	};
+	async function hold(): Promise<void> {
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 15; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+	}
+	const refusedAfter = (ms: number) =>
+		vi.fn(
+			() =>
+				new Promise<string | null>((resolve) =>
+					setTimeout(() => resolve('Something to review.'), ms)
+				)
+		);
+
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)('saves once for a held Enter on Save when the save is refused %s', async (_, ms) => {
+		const onSave = refusedAfter(ms);
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), access: 'ready', onSave }
+		});
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		const save = container.querySelector('.settings-save') as HTMLButtonElement;
+		save.focus();
+		await hold();
+		await expect.poll(() => save.getAttribute('aria-busy')).toBe('false');
+		expect(onSave).toHaveBeenCalledOnce();
+		expect(document.activeElement).toBe(save);
+	});
+
+	it('saves once for a held Enter on a choice', async () => {
+		const onSave = refusedAfter(0);
+		await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		(page.getByRole('radio', { name: 'Yes' }).element() as HTMLInputElement).focus();
+		await hold();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(onSave).toHaveBeenCalledOnce();
 	});
 });
 
