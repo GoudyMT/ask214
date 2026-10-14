@@ -309,6 +309,14 @@ const STATIC = 'static';
 //     store, replaced by direct imports; the status words shared with the task card (page +119 B), not kept. The
 //     code always loaded measured smaller totals (page 499 B, precache 1,733 B over) but 14 KB more on Home's
 //     first visit; on demand was the owner's pick.
+//     Page 63,910 -> 64,040, precache 155,545 -> 155,745 and route nodes 49,420 -> 49,440 (owner's call, 2026-10-14):
+//     the last PR's carry-overs - a guide opened offline tried again when the connection returns, the SkillBridge
+//     answers held while a save runs, a calendar file finished after a Lock dropped, the guide entry's link colour
+//     under forced colours - and the SHA task's corrected wording. Two builds measured page 63,991-63,995 B,
+//     precache 155,678-155,700 B and route nodes 49,382-49,394 B, at least 45 B of room above the highest. Trim
+//     pass: the retry first rebuilt the whole page view in a keyed block (+526 B precache); passing a retry count
+//     into the view's own check key instead saved about 430 B, kept. The retry's prop left onDemand 18 B of room (8,047 B
+//     measured), inside the build-to-build drift, so onDemand 8,065 -> 8,090 too.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -318,10 +326,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 63_910,
-	onDemand: 8_065,
+	page: 64_040,
+	onDemand: 8_090,
 	precacheFiles: 62,
-	precacheBytes: 155_545,
+	precacheBytes: 155_745,
 	workerScripts: 147_200
 };
 
