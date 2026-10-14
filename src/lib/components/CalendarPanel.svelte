@@ -141,7 +141,8 @@
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
 	{/if}
 
-	<!-- A held key repeats, and each repeat would make and hand over another file: only a new press adds. -->
+	<!-- A held Enter repeats, and each repeat would make and hand over another file: only a new press adds. Space clicks
+	     on release, and other held keys (Tab, arrows) must still work. -->
 	<button
 		bind:this={addEl}
 		class="cal-add"
@@ -149,7 +150,7 @@
 		disabled={!ready || !hasEvents}
 		aria-busy={building}
 		onclick={() => void addToCalendar()}
-		onkeydown={(e) => e.repeat && e.preventDefault()}
+		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 	>
 		Add to my calendar
 	</button>

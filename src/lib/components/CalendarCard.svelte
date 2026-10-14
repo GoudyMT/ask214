@@ -43,13 +43,14 @@
 	<div class="cal-card__body">
 		<h2 id="cal-card-heading" class="cal-card__heading">Keep your deadlines in sight</h2>
 		<p class="cal-card__copy">Your upcoming deadlines, with alerts before each firm one.</p>
-		<!-- A held key repeats, and each repeat would make and hand over another file: only a new press adds. -->
+		<!-- A held Enter repeats, and each repeat would make and hand over another file: only a new press adds. Space
+		     clicks on release, and other held keys (Tab, arrows) must still work. -->
 		<button
 			class="cal-card__add"
 			type="button"
 			aria-busy={building}
 			onclick={() => void add()}
-			onkeydown={(e) => e.repeat && e.preventDefault()}
+			onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 		>
 			Add to my calendar
 		</button>

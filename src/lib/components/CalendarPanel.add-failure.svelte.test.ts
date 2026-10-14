@@ -158,6 +158,35 @@ describe('CalendarPanel, when the file cannot be made', () => {
 		expect(document.activeElement).toBe(button);
 	});
 
+	// Only Enter's repeats are held back: Space clicks on release, and a held Tab or arrow must still move.
+	it('holds back a repeated Enter on Add but lets other repeated keys through', async () => {
+		const { container } = await render(CalendarPanel, {
+			props: {
+				items: [task],
+				exclusions: { taskIds: [], categories: [] },
+				access: 'ready',
+				stale: [],
+				onAcknowledge: async () => {},
+				onSetExclusions: vi.fn(),
+				onAdd: vi.fn()
+			}
+		});
+		const add = container.querySelector('.cal-add') as HTMLButtonElement;
+		const held = (key: string) => {
+			const e = new KeyboardEvent('keydown', {
+				key,
+				repeat: true,
+				bubbles: true,
+				cancelable: true
+			});
+			add.dispatchEvent(e);
+			return e.defaultPrevented;
+		};
+		expect(held('Enter')).toBe(true);
+		expect(held('Tab')).toBe(false);
+		expect(held('ArrowDown')).toBe(false);
+	});
+
 	// A held key repeats about every 40 ms; each repeat that reached Add would make and hand over another file. A new
 	// press still makes one. The keys go through the browser's own input, so a repeat is a real one.
 	it.each([
