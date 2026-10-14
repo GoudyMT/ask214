@@ -273,6 +273,13 @@ const STATIC = 'static';
 //     Page 61,790 -> 61,805 (owner's call, 2026-10-13): the re-check's two fixes - the document reader leaving focus
 //     on the cited passage when the text view took it first, and the reminder's Set up stamping the question field's
 //     guard - left the page at 61,762 B, 28 B of room; the raise restores about 40 B.
+//     Route nodes 49,040 -> 49,100 (package.json's size-limit) and precache 151,710 -> 151,840 (owner's call,
+//     2026-10-13): busy buttons that keep focus - Calendar's Add, a Settings date's Save and Remove, the SkillBridge
+//     plan's Save and answers - marked busy in place of turned off, and a held Enter that acts once on those, the
+//     wizard's Save and a task note's Save. Every built file compared with main: only the touched ones grew, about
+//     105 B in all. Two builds measured route nodes 49,044-49,052 B and precache 151,786-151,794 B, at least 46 B of
+//     room above the highest. Trim pass on a full build: one shared held-Enter handler in place of eight inline ones
+//     added a chunk (+100 B precache, the page over by 40 B), not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -285,7 +292,7 @@ const LIMIT = {
 	page: 61_805,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 151_710,
+	precacheBytes: 151_840,
 	workerScripts: 147_200
 };
 
