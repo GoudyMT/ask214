@@ -1739,6 +1739,24 @@ describe('the TAP guides a task opens in the app', () => {
 		expect(onOpenGuide).toHaveBeenCalledExactlyOnceWith('tap_financial_planning', GUIDE);
 	});
 
+	// A claim task's guide is VA's own: its entry reads as a document to read, never as help with a claim.
+	it('makes no personal claim on a claim task with its guide open', async () => {
+		const bdd = TASK_DEFS.find((t) => t.id === 'va-bdd-claim');
+		if (!bdd) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: {
+				item: makeItem({ def: bdd }),
+				onSetStatus: noop,
+				onSetSnooze: noop,
+				onOpenGuide: noop
+			}
+		});
+		await page.getByRole('button', { name: /^Related resources/ }).click();
+		expect(container.textContent).toContain('Read in the app: TAP - VA Disability Compensation');
+		const text = textOf(container);
+		expect(makesPersonalClaim(text), text).toBe(false);
+	});
+
 	it('shows the list for a task whose only entry is a guide', async () => {
 		if (!sgli) throw new Error('E_TEST_TASK_MISSING');
 		const { container } = await render(TaskCard, {

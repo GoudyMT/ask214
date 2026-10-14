@@ -323,7 +323,16 @@
 	{/if}
 </div>
 
-<SourceReader source={null} doc={guide} {loadSource} onClose={() => (guide = null)} />
+<SourceReader
+	source={null}
+	doc={guide}
+	{loadSource}
+	onClose={() => {
+		guide = null;
+		// The dialog hands focus back to the entry; when the entry went while it was open, to the next thing instead.
+		void focusAfterCard();
+	}}
+/>
 
 <style>
 	h1 {
