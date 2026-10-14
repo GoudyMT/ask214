@@ -1572,6 +1572,63 @@ describe('SourceReader, a document opened whole', () => {
 		}
 	});
 
+	// A real download takes time: focus must not sit on the bare page while it does, nor stay there if it fails.
+	it('hands focus from the hidden text to the pages while a retried download is still on its way', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const { container } = await render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: () => new Promise<PdfRuntime>(() => {})
+				}
+			});
+			const text = container.querySelector<HTMLElement>('.reader__text')!;
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			text.focus();
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() => expect(text.hidden).toBe(true));
+			await vi.waitFor(() =>
+				expect(container.querySelector('.reader__doc')?.contains(document.activeElement)).toBe(true)
+			);
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
+	it('hands focus back to the text when the retried download fails', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const { container } = await render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: () =>
+						new Promise<PdfRuntime>((_, reject) => setTimeout(() => reject(new Error('lost')), 100))
+				}
+			});
+			const text = container.querySelector<HTMLElement>('.reader__text')!;
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			text.focus();
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() => expect(text.hidden).toBe(true));
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			await vi.waitFor(() => expect(document.activeElement).toBe(text));
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
 	it('builds the text again when the connection comes back, once per return', async () => {
 		const loadSource = vi
 			.fn<(id: string) => Promise<Source | null>>()
