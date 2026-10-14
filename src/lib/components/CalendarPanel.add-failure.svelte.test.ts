@@ -9,12 +9,18 @@ import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 // Its own file so the mock reaches no other test: the first build rejects, as a browser that cannot make the file would.
 // The path is a `$lib` alias on purpose: a relative path silently never applies to the component's own import here.
 // A build can also be held: it finishes only once `gate` is open, so a test can look at the page while it runs.
-const seams = vi.hoisted(() => ({ failNext: true, gate: null as Promise<void> | null }));
+// `builds` counts the builds started, so a second build is seen at once, not after a wait.
+const seams = vi.hoisted(() => ({
+	failNext: true,
+	gate: null as Promise<void> | null,
+	builds: 0
+}));
 vi.mock('$lib/calendar/build-ics', async (importOriginal) => {
 	const real = await importOriginal<typeof import('$lib/calendar/build-ics')>();
 	return {
 		...real,
 		buildIcs: async (...args: Parameters<typeof real.buildIcs>) => {
+			seams.builds++;
 			await seams.gate;
 			if (seams.failNext) {
 				seams.failNext = false;
@@ -60,6 +66,7 @@ const ENTER = {
 beforeEach(() => {
 	seams.failNext = true;
 	seams.gate = null;
+	seams.builds = 0;
 	// Component tests run without app.css, so the colour token is set here and put back.
 	document.documentElement.style.setProperty('--color-danger', DANGER);
 });
@@ -151,11 +158,38 @@ describe('CalendarPanel, when the file cannot be made', () => {
 		expect(button.disabled).toBe(false);
 		expect(document.activeElement).toBe(button);
 		await add.click();
+		expect(seams.builds).toBe(1);
 		open();
 		await expect.poll(() => button.getAttribute('aria-busy')).toBe('false');
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(onAdd).toHaveBeenCalledTimes(fails ? 0 : 1);
 		expect(document.activeElement).toBe(button);
+	});
+
+	// A relock while the file builds turns Add off under focus: the heading takes it, as for any change from the stores.
+	it('moves focus to the Calendar heading when Add loses its access while the file builds', async () => {
+		seams.failNext = false;
+		let open = () => {};
+		seams.gate = new Promise<void>((resolve) => (open = resolve));
+		const props = {
+			items: [task],
+			exclusions: { taskIds: [], categories: [] },
+			access: 'ready' as const,
+			stale: [],
+			onAcknowledge: async () => {},
+			onSetExclusions: vi.fn(),
+			onAdd: vi.fn()
+		};
+		const { container, rerender } = await render(CalendarPanel, { props });
+		const button = container.querySelector('.cal-add') as HTMLButtonElement;
+		await page.getByRole('button', { name: /^add to my calendar$/i }).click();
+		await expect.poll(() => button.getAttribute('aria-busy')).toBe('true');
+		expect(document.activeElement).toBe(button);
+		await rerender({ ...props, access: 'timeline-locked' });
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(container.querySelector('#calendar-heading'));
+		open();
 	});
 
 	// Only Enter's repeats are held back: Space clicks on release, and a held Tab or arrow must still move.

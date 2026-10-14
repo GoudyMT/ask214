@@ -223,61 +223,105 @@ describe('SettingsDateRow', () => {
 			await expect.poll(() => document.activeElement).toBe(remove());
 		});
 
-		// A held key repeats about every 40 ms; each repeat that reached the form would save again once the last save
-		// settled. Only a new press saves. The keys go through the browser's own input, so a repeat is a real one.
+		// A held key repeats about every 40 ms; each repeat that reached the form would act again once the last action
+		// settled. Only a new press acts: after the hold, one more press must still go through. The keys go through the
+		// browser's own input, so a repeat is a real one.
+		const REFUSED = 'This date needs to be before your separation date.';
+		const press = async (type: 'keyDown' | 'keyUp', autoRepeat = false) =>
+			cdp().send('Input.dispatchKeyEvent', { type, autoRepeat, ...ENTER });
+		async function hold(): Promise<void> {
+			await press('keyDown');
+			for (let i = 0; i < 15; i++) {
+				await new Promise((resolve) => setTimeout(resolve, 40));
+				await press('keyDown', true);
+			}
+			await press('keyUp');
+		}
+		async function pressOnce(): Promise<void> {
+			await press('keyDown');
+			await press('keyUp');
+		}
+		const refusedAfter = (ms: number) =>
+			vi.fn(() => new Promise<string | null>((resolve) => setTimeout(() => resolve(REFUSED), ms)));
+
 		it.each([
 			['at once', 0],
 			['after a while', 100]
 		] as const)(
 			'saves once for a held Enter on Save when the save is refused %s',
 			async (_, ms) => {
-				const onSave = vi.fn(
-					() =>
-						new Promise<string | null>((resolve) =>
-							setTimeout(() => resolve('This date needs to be before your separation date.'), ms)
-						)
-				);
+				const onSave = refusedAfter(ms);
 				await row({ onSave });
 				await page.getByRole('button', { name: /skillbridge start/i }).click();
 				await page.getByLabelText('SkillBridge start').fill('2026-11-01');
 				(saveButton() as HTMLButtonElement).focus();
-				const session = cdp();
-				await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
-				for (let i = 0; i < 15; i++) {
-					await new Promise((resolve) => setTimeout(resolve, 40));
-					await session.send('Input.dispatchKeyEvent', {
-						type: 'keyDown',
-						autoRepeat: true,
-						...ENTER
-					});
-				}
-				await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
-				await expect.poll(() => saveButton()?.getAttribute('aria-busy')).toBe('false');
+				await hold();
+				await expect.element(page.getByText(REFUSED)).toBeVisible();
+				await new Promise((resolve) => setTimeout(resolve, ms + 50));
 				expect(onSave).toHaveBeenCalledOnce();
 				expect(document.activeElement).toBe(saveButton());
+				await pressOnce();
+				await vi.waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
 			}
 		);
 
-		it('saves once for a held Enter in the date field', async () => {
-			const onSave = vi.fn(async () => 'This date needs to be before your separation date.');
-			await row({ onSave });
-			await page.getByRole('button', { name: /skillbridge start/i }).click();
-			const field = page.getByLabelText('SkillBridge start');
-			await field.fill('2026-11-01');
-			(field.element() as HTMLInputElement).focus();
-			const session = cdp();
-			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
-			for (let i = 0; i < 15; i++) {
-				await new Promise((resolve) => setTimeout(resolve, 40));
-				await session.send('Input.dispatchKeyEvent', {
-					type: 'keyDown',
-					autoRepeat: true,
-					...ENTER
-				});
+		it.each([
+			['at once', 0],
+			['after a while', 100]
+		] as const)(
+			'saves once for a held Enter in the date field when the save is refused %s',
+			async (_, ms) => {
+				const onSave = refusedAfter(ms);
+				await row({ onSave });
+				await page.getByRole('button', { name: /skillbridge start/i }).click();
+				const field = page.getByLabelText('SkillBridge start');
+				await field.fill('2026-11-01');
+				(field.element() as HTMLInputElement).focus();
+				await hold();
+				await expect.element(page.getByText(REFUSED)).toBeVisible();
+				await new Promise((resolve) => setTimeout(resolve, ms + 50));
+				expect(onSave).toHaveBeenCalledOnce();
+				await pressOnce();
+				await vi.waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
 			}
-			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
-			await new Promise((resolve) => setTimeout(resolve, 50));
-			expect(onSave).toHaveBeenCalledOnce();
+		);
+
+		it.each([
+			['at once', 0],
+			['after a while', 100]
+		] as const)(
+			'removes once for a held Enter on Remove when the remove fails %s',
+			async (_, ms) => {
+				const onRemove = vi.fn(
+					() =>
+						new Promise<string | null>((_, reject) =>
+							setTimeout(() => reject(new Error('E_LOCK_TIMEOUT')), ms)
+						)
+				);
+				await row({ value: '2026-11-01', onRemove });
+				await page.getByRole('button', { name: /skillbridge start/i }).click();
+				const remove = document.querySelector('.settings-remove') as HTMLButtonElement;
+				remove.focus();
+				await hold();
+				await expect.element(page.getByText(FAILED)).toBeVisible();
+				await new Promise((resolve) => setTimeout(resolve, ms + 50));
+				expect(onRemove).toHaveBeenCalledOnce();
+				expect(document.activeElement).toBe(remove);
+				await pressOnce();
+				await vi.waitFor(() => expect(onRemove).toHaveBeenCalledTimes(2));
+			}
+		);
+
+		it('keeps Remove and Cancel off while a save runs, and a press on Remove does nothing', async () => {
+			const onRemove = vi.fn(async () => null);
+			await openAndSave(() => new Promise(() => {}), { value: '2026-11-01', onRemove });
+			await expect.poll(() => saveButton()?.getAttribute('aria-busy')).toBe('true');
+			const remove = document.querySelector('.settings-remove') as HTMLButtonElement;
+			const cancel = page.getByRole('button', { name: /^cancel$/i }).element() as HTMLButtonElement;
+			expect(remove.disabled).toBe(true);
+			expect(cancel.disabled).toBe(true);
+			remove.click();
+			expect(onRemove).not.toHaveBeenCalled();
 		});
 
 		it('leaves focus on the control the person moved to when a save fails', async () => {

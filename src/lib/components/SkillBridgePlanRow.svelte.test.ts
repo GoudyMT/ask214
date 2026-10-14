@@ -443,14 +443,21 @@ describe('SkillBridgePlanRow (a held Enter)', () => {
 		windowsVirtualKeyCode: 13,
 		text: String.fromCharCode(13)
 	};
+	const press = async (type: 'keyDown' | 'keyUp', autoRepeat = false) =>
+		cdp().send('Input.dispatchKeyEvent', { type, autoRepeat, ...ENTER });
 	async function hold(): Promise<void> {
-		const session = cdp();
-		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await press('keyDown');
 		for (let i = 0; i < 15; i++) {
 			await new Promise((resolve) => setTimeout(resolve, 40));
-			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+			await press('keyDown', true);
 		}
-		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await press('keyUp');
+	}
+	// After the hold, one more press must still save: a guard that never let go would pass the count alone.
+	async function pressOnceSaves(onSave: ReturnType<typeof vi.fn>): Promise<void> {
+		await press('keyDown');
+		await press('keyUp');
+		await vi.waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
 	}
 	const refusedAfter = (ms: number) =>
 		vi.fn(
@@ -473,21 +480,31 @@ describe('SkillBridgePlanRow (a held Enter)', () => {
 		const save = container.querySelector('.settings-save') as HTMLButtonElement;
 		save.focus();
 		await hold();
-		await expect.poll(() => save.getAttribute('aria-busy')).toBe('false');
+		await expect.element(page.getByRole('alert')).toHaveTextContent('Something to review.');
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
 		expect(onSave).toHaveBeenCalledOnce();
 		expect(document.activeElement).toBe(save);
+		await pressOnceSaves(onSave);
 	});
 
-	it('saves once for a held Enter on a choice', async () => {
-		const onSave = refusedAfter(0);
-		await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
-		await toggle().click();
-		await page.getByRole('radio', { name: 'Yes' }).click();
-		(page.getByRole('radio', { name: 'Yes' }).element() as HTMLInputElement).focus();
-		await hold();
-		await new Promise((resolve) => setTimeout(resolve, 50));
-		expect(onSave).toHaveBeenCalledOnce();
-	});
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)(
+		'saves once for a held Enter on a choice when the save is refused %s',
+		async (_, ms) => {
+			const onSave = refusedAfter(ms);
+			await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
+			await toggle().click();
+			await page.getByRole('radio', { name: 'Yes' }).click();
+			(page.getByRole('radio', { name: 'Yes' }).element() as HTMLInputElement).focus();
+			await hold();
+			await expect.element(page.getByRole('alert')).toHaveTextContent('Something to review.');
+			await new Promise((resolve) => setTimeout(resolve, ms + 50));
+			expect(onSave).toHaveBeenCalledOnce();
+			await pressOnceSaves(onSave);
+		}
+	);
 });
 
 describe('SkillBridgePlanRow (while a save runs)', () => {

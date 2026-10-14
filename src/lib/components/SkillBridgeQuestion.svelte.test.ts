@@ -292,9 +292,14 @@ describe('SkillBridgeQuestion', () => {
 		}
 		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
 		await expect.element(page.getByRole('alert')).toBeVisible();
-		await expect.element(yes).toHaveAttribute('aria-busy', 'false');
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
 		expect(onAnswer).toHaveBeenCalledOnce();
 		expect(document.activeElement).toBe(yes.element());
+
+		// After the hold, one more press must still answer: a guard that never let go would pass the count alone.
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledTimes(2));
 	});
 
 	it('names the card, and opens the link in a new tab and says so', async () => {
