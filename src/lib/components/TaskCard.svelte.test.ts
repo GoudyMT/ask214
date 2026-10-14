@@ -1794,6 +1794,36 @@ describe('the TAP guides a task opens in the app', () => {
 		expect(guide.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
 	});
 
+	// Forced colours draw a button in ButtonText and a link in LinkText; the guide entry reads as one of the links, so it
+	// keeps the links' colour there too.
+	it('draws a guide entry in the link colour under forced colours', async () => {
+		if (!tsp) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: {
+				item: makeItem({ def: tsp }),
+				onSetStatus: noop,
+				onSetSnooze: noop,
+				onOpenGuide: noop
+			}
+		});
+		await page.getByRole('button', { name: /^Related resources/ }).click();
+		const guide = container.querySelector('.task-card__guide') as HTMLButtonElement;
+		const link = container.querySelector('.task-card__related-list a') as HTMLAnchorElement;
+		const session = cdp();
+		await session.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'forced-colors', value: 'active' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			expect(getComputedStyle(guide).color).toBe(getComputedStyle(link).color);
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+		}
+		await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(false);
+	});
+
 	it('shows the list for a task whose only entry is a guide', async () => {
 		if (!sgli) throw new Error('E_TEST_TASK_MISSING');
 		const { container } = await render(TaskCard, {
