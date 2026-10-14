@@ -64,6 +64,41 @@ describe('SourceReader', () => {
 		expect(getComputedStyle(document.documentElement).overflow).not.toBe('hidden');
 	});
 
+	// The entry that opened the reader sits outside the centred dialog on a wide screen, so a double click's second click
+	// lands on the backdrop: only a single click there closes.
+	it('closes on a backdrop click, but not on the second click of a double click', async () => {
+		let closed = 0;
+		const { container } = await render(SourceReader, {
+			props: { source: source(), onClose: () => closed++ }
+		});
+		flushSync();
+		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
+		dialog.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
+		expect(dialog.open).toBe(true);
+		expect(closed).toBe(0);
+		dialog.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+		expect(dialog.open).toBe(false);
+		// The native close event that tells the parent fires after close() returns.
+		await vi.waitFor(() => expect(closed).toBe(1));
+	});
+
+	// Close takes focus as the reader opens, often mid-press of the Enter that opened it: only a new press closes.
+	it('holds back a held Enter on Close, and only that', async () => {
+		const { container } = await render(SourceReader, {
+			props: { source: source(), onClose: () => {} }
+		});
+		flushSync();
+		const close = container.querySelector('.reader__close') as HTMLButtonElement;
+		const press = (key: string, repeat: boolean) => {
+			const e = new KeyboardEvent('keydown', { key, repeat, bubbles: true, cancelable: true });
+			close.dispatchEvent(e);
+			return e.defaultPrevented;
+		};
+		expect(press('Enter', true)).toBe(true);
+		expect(press('Enter', false)).toBe(false);
+		expect(press('Tab', true)).toBe(false);
+	});
+
 	it('the close button fires onClose', async () => {
 		let closed = 0;
 		const { container } = await render(SourceReader, {
