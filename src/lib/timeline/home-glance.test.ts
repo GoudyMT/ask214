@@ -136,6 +136,17 @@ describe('timelineRow', () => {
 		expect(row.detail).toBe('Next: Title of jan - opens Jan 10, 2027');
 	});
 
+	it('names a soft task that opens after you leave by its opening date, against other later tasks', () => {
+		const leave = item('leave', 'after-you-leave', {
+			def: { ...item('leave', 'upcoming').def, kind: 'soft' },
+			windowStartDate: '2027-01-10'
+		});
+		const march = item('march', 'upcoming', { windowStartDate: '2027-03-01' });
+		expect(timelineRow(ready([march, leave])).detail).toBe(
+			'Next: Title of leave - opens Jan 10, 2027'
+		);
+	});
+
 	it('prefers an open task over a snoozed one for Next', () => {
 		const row = timelineRow(
 			ready([
