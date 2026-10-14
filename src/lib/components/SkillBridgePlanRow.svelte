@@ -116,6 +116,8 @@
 
 <!-- tabindex -1: a target for the focus move above while loading, never a stop on the Tab order. -->
 <div bind:this={rowEl} class="settings-disclosure" tabindex="-1">
+	<!-- A save that lands hands focus here mid-press, so a held Enter's repeats would open the form again: only a new
+	     press toggles. -->
 	<button
 		bind:this={toggleEl}
 		class="settings-disclosure__toggle"
@@ -124,6 +126,7 @@
 		aria-controls="skillbridge-plan-edit"
 		disabled={plan === null}
 		onclick={toggle}
+		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 	>
 		<span class="settings-chevron" class:settings-chevron--open={editing} aria-hidden="true"></span>
 		<span>{ROW_LABEL}</span>

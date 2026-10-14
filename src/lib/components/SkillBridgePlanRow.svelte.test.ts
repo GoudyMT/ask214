@@ -467,6 +467,27 @@ describe('SkillBridgePlanRow (a held Enter)', () => {
 				)
 		);
 
+	// A save that lands closes the form and hands focus to the toggle; the rest of the held key must not open it again.
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)('leaves the form closed after a held Enter on Save saves %s', async (_, ms) => {
+		const onSave = vi.fn(
+			() => new Promise<string | null>((resolve) => setTimeout(() => resolve(null), ms))
+		);
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), access: 'ready', onSave }
+		});
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		(container.querySelector('.settings-save') as HTMLButtonElement).focus();
+		await hold();
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
+		expect(onSave).toHaveBeenCalledOnce();
+		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
+		expect(document.activeElement).toBe(toggle().element());
+	});
+
 	it.each([
 		['at once', 0],
 		['after a while', 100]

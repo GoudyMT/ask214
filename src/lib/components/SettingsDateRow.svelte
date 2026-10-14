@@ -71,6 +71,8 @@
 </script>
 
 <div class="settings-disclosure">
+	<!-- A save or remove that lands hands focus here mid-press, so a held Enter's repeats would open the form again:
+	     only a new press toggles. -->
 	<button
 		bind:this={toggleEl}
 		class="settings-disclosure__toggle"
@@ -78,6 +80,7 @@
 		aria-expanded={editing}
 		aria-controls="{id}-edit"
 		onclick={toggle}
+		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 	>
 		<span class="settings-chevron" class:settings-chevron--open={editing} aria-hidden="true"></span>
 		<span>{label}</span>
