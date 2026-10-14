@@ -99,7 +99,15 @@
 	</p>
 
 	{#if app.status === 'ready'}
-		<form class="wizard__form" onsubmit={(e) => void save(e)}>
+		<!-- A held Enter repeats, in the field or on Save, and each repeat would save again once a failed save settled:
+		     only a new press submits. The form only filters its controls' keys; it is not a control itself, so the
+		     compiler's rule against key listeners on a non-interactive element does not fit. -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<form
+			class="wizard__form"
+			onsubmit={(e) => void save(e)}
+			onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
+		>
 			<EaosInput
 				{value}
 				{error}

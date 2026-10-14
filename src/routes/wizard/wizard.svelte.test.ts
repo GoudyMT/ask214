@@ -261,4 +261,33 @@ describe('Wizard, a failed save from the keyboard', () => {
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/timeline'));
 		expect(store.save).toHaveBeenCalledTimes(1);
 	});
+
+	// A save that fails inside the hold leaves the form up, so the repeats after it would save again; only a new press
+	// does.
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)('saves once for a held Enter on Save when the save fails %s', async (_, ms) => {
+		store.save.mockImplementation(
+			() =>
+				new Promise((_resolve, reject) => setTimeout(() => reject(new Error('E_TEST_WRITE')), ms))
+		);
+		const save = await renderWithFocusOnSave();
+
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 15; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await expect.element(page.getByText(FAILED)).toBeVisible();
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
+		expect(store.save).toHaveBeenCalledTimes(1);
+		expect(document.activeElement).toBe(save);
+
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(2));
+	});
 });
