@@ -18,6 +18,9 @@
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
 	import { deviceFilesKept } from '$lib/ask/device-files';
 	import { getProfileApp } from '$lib/profile/context';
+	import { LocalToday } from '$lib/timeline/local-today.svelte';
+	import type { HomeRow } from '$lib/timeline/home-glance';
+	import GlanceRow from '$lib/components/GlanceRow.svelte';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
 	import InstallNudge from '$lib/components/InstallNudge.svelte';
@@ -32,10 +35,40 @@
 
 	const app = getProfileApp();
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a
-	// timeline exists it is replaced by the returning-user "next deadlines" strip (a later increment).
+	// timeline exists the timeline's glance row takes its place.
 	const showOnramp = $derived(
 		app.status === 'ready' && !app.store?.locked && app.store?.persona.completeness === 'none'
 	);
+
+	// The returning user's row, read from the stores the layout loads. Locked follows the Timeline page: the profile, or
+	// a timeline store locked with a set-up profile. Still loading shows no row, so it never reads as nothing due.
+	const clock = new LocalToday();
+	// The timeline code (its task list and date rules) loads only for someone with a profile, so a first visit to Home
+	// downloads none of it. The row waits for it, as it waits for the stores.
+	const returning = $derived(
+		app.status === 'ready' &&
+			!!app.store &&
+			(app.store.locked || app.store.persona.completeness !== 'none')
+	);
+	let glanceCode = $state<typeof import('$lib/timeline/home-glance') | null>(null);
+	$effect(() => {
+		if (returning && !glanceCode) {
+			void import('$lib/timeline/home-glance').then((m) => (glanceCode = m));
+		}
+	});
+	const row = $derived.by((): HomeRow | null => {
+		const code = glanceCode;
+		if (!code || app.status !== 'ready' || !app.store) return null;
+		if (app.store.locked) return code.timelineRow({ kind: 'locked' });
+		const persona = app.store.persona;
+		const timeline = app.timeline;
+		if (persona.completeness === 'none' || !timeline) return null;
+		if (timeline.failed) return code.timelineRow({ kind: 'failed' });
+		if (timeline.locked) return code.timelineRow({ kind: 'locked' });
+		if (!timeline.ready) return null;
+		const glance = code.readyGlance(persona, timeline.state, clock.now);
+		return glance && code.timelineRow(glance);
+	});
 
 	// Ask store wiring: the store is created once the cache has been read (a lookup, no download - see onMount),
 	// so the input, mode toggle, and feed are live at once. The corpus is fetched lazily - only a device query or
@@ -227,6 +260,13 @@
 			</p>
 			<a class="home-onramp__action" href={resolve('/wizard')}>Set up your timeline</a>
 		</section>
+	{:else if isIdle && row}
+		<hr class="home-divider" />
+		<!-- A plain region, not a live one: it is read when reached, never announced on load. -->
+		<section class="home-glance" aria-labelledby="home-glance-heading">
+			<h2 id="home-glance-heading" class="home-glance__heading">For you</h2>
+			<GlanceRow {row} to="/timeline" />
+		</section>
 	{/if}
 </div>
 
@@ -284,5 +324,21 @@
 	}
 	.home-onramp__action:hover {
 		background: var(--color-accent-muted);
+	}
+	/* The rows read as content under the hero, left-aligned like the results. */
+	.home-glance {
+		text-align: left;
+	}
+	/* Named for screen readers only; on screen each row names its own tool. The same rule several components carry. */
+	.home-glance__heading {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>
