@@ -166,12 +166,15 @@
 	$effect(() => {
 		const retry = (): void => {
 			if (fallback === 'offline' || fallback === 'updated') {
-				const held = !!dialogEl?.querySelector('.reader__text')?.contains(document.activeElement);
+				const held = document.activeElement;
+				const inText = !!held && !!dialogEl?.querySelector('.reader__text')?.contains(held);
 				fallback = null;
 				attempt++;
-				if (held)
+				// The browser moves focus off the hidden text only later, so focus still on it counts as lost too.
+				if (inText)
 					void tick().then(() => {
-						if (document.activeElement !== document.body) return;
+						const active = document.activeElement;
+						if (active !== held && active !== document.body) return;
 						dialogEl?.querySelector<HTMLElement>('.reader__doc')?.focus({ preventScroll: true });
 					});
 			}

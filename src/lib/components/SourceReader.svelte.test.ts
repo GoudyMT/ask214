@@ -502,6 +502,36 @@ describe('SourceReader with a served document', () => {
 		return { getDocument: () => ({ promise: Promise.resolve(doc), destroy: async () => {} }) };
 	};
 
+	// The text's landing puts focus on the cited passage, inside the text: the usual place focus is when the
+	// connection comes back. The browser moves focus off a hidden element only later, so the hand-off must not wait for it.
+	it('hands focus from the cited passage to the pages while a retried download is on its way', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const { container } = await render(SourceReader, {
+				props: {
+					source: served(),
+					highlightId: 's2',
+					onClose: () => {},
+					pdfLoader: () => new Promise<PdfRuntime>(() => {})
+				}
+			});
+			const text = container.querySelector<HTMLElement>('.reader__text')!;
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			const cited = container.querySelector<HTMLElement>('.reader__passage--cited')!;
+			cited.focus();
+			expect(document.activeElement).toBe(cited);
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() => expect(text.hidden).toBe(true));
+			await new Promise((r) => setTimeout(r, 100));
+			expect(container.querySelector('.reader__doc')?.contains(document.activeElement)).toBe(true);
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
 	it('opens on the original page, with a switch to the text', async () => {
 		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: pendingLoader }
