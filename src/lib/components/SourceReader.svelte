@@ -409,27 +409,25 @@
 					tabindex="0"
 					hidden={view !== 'page'}
 				>
-					<!-- Made again on each retry, so its check of the device and the network runs again. -->
-					{#key attempt}
-						<DocumentView
-							path={served.path}
-							bytes={served.bytes}
-							{title}
-							page={served.page}
-							anchor={cited?.anchor ?? ''}
-							passageText={cited?.text ?? ''}
-							cited={!served.whole}
-							mayFocus={mayFocusPages}
-							onfallback={fallBack}
-							onnote={(found) => (note = found)}
-							request={pageRequest}
-							onview={(shownView) => {
-								pagerPage = shownView.page;
-								pagerCount = shownView.pages;
-							}}
-							{...pdfLoader ? { loader: pdfLoader } : {}}
-						/>
-					{/key}
+					<DocumentView
+						path={served.path}
+						bytes={served.bytes}
+						{title}
+						page={served.page}
+						anchor={cited?.anchor ?? ''}
+						passageText={cited?.text ?? ''}
+						cited={!served.whole}
+						mayFocus={mayFocusPages}
+						onfallback={fallBack}
+						onnote={(found) => (note = found)}
+						request={pageRequest}
+						retry={attempt}
+						onview={(shownView) => {
+							pagerPage = shownView.page;
+							pagerCount = shownView.pages;
+						}}
+						{...pdfLoader ? { loader: pdfLoader } : {}}
+					/>
 				</div>
 			{/if}
 			<!-- A served document's text is a named stop of its own too, as the pages are: a whole document's text

@@ -27,6 +27,7 @@
 		onfallback,
 		cited = true,
 		request = null,
+		retry = 0,
 		onview,
 		onnote,
 		mayFocus = () => true,
@@ -51,6 +52,8 @@
 		cited?: boolean;
 		// A page the reader's pager asks for. Each request is a new object, so asking twice still moves.
 		request?: { page: number } | null;
+		// Raised by the reader when the connection comes back after a fall-back: the device and network are checked again.
+		retry?: number;
 		// Told the page in view and the page count as the reader scrolls, so the pager can show them.
 		onview?: (view: { page: number; pages: number }) => void;
 		// Told what to say about the passage once it is located - or null when there is nothing to say.
@@ -79,9 +82,9 @@
 	// A guide that kept the pictures whose own metadata states Public Domain is without most of its pictures, not
 	// all of them.
 	const somePictures = $derived(LOCAL_DOCUMENTS_WITH_PICTURES.includes(documentSourceId(path)));
-	// The document and the cited page, compared by value: a props update that hands over the same ones - the
-	// reader re-rendering to pass a page request - must not reset the landing or say the note again.
-	const opened = $derived(`${path}\n${page}`);
+	// The document, the cited page and the reader's retry count, compared by value: a props update that hands over the
+	// same ones - the reader re-rendering to pass a page request - must not reset the landing or say the note again.
+	const opened = $derived(`${path}\n${page}\n${retry}`);
 	const savedCheck = $derived(isSaved);
 	const onlineCheck = $derived(isOnline);
 
