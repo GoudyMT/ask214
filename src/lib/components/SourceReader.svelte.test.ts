@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { cdp, page, userEvent } from 'vitest/browser';
 import SourceReader from './SourceReader.svelte';
 import type { Source } from '$lib/ask/sources';
 import type { PdfDocument, PdfRuntime } from '$lib/sources/pdf-runtime';
@@ -62,6 +62,90 @@ describe('SourceReader', () => {
 		await rerender({ source: null });
 		flushSync();
 		expect(getComputedStyle(document.documentElement).overflow).not.toBe('hidden');
+	});
+
+	// The entry that opened the reader sits outside the centred dialog on a wide screen, so a double click's second click
+	// lands on the backdrop: only a single click there closes. The clicks go through the browser's own input, so the
+	// click count is the one a real double click carries.
+	it('closes on a backdrop click, but not on the second click of a double click', async () => {
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		await page.viewport(1280, 800);
+		let closed = 0;
+		try {
+			const { container } = await render(SourceReader, {
+				props: { source: source(), onClose: () => closed++ }
+			});
+			flushSync();
+			const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
+			const click = async (clickCount: number) => {
+				for (const type of ['mousePressed', 'mouseReleased'] as const)
+					await cdp().send('Input.dispatchMouseEvent', {
+						type,
+						x: 5,
+						y: 5,
+						button: 'left',
+						clickCount
+					});
+			};
+			await click(2);
+			expect(dialog.open).toBe(true);
+			expect(closed).toBe(0);
+			await click(1);
+			expect(dialog.open).toBe(false);
+			// The native close event that tells the parent fires after close() returns.
+			await vi.waitFor(() => expect(closed).toBe(1));
+		} finally {
+			await page.viewport(size.width, size.height);
+		}
+	});
+
+	// Close takes focus as the reader opens, often mid-press of the Enter that opened it: the held key's repeats land on
+	// Close and must not close; a new press does. The keys go through the browser's own input.
+	it('ignores a held Enter that reaches Close, and closes on a new press', async () => {
+		let closed = 0;
+		const { container } = await render(SourceReader, {
+			props: { source: source(), onClose: () => closed++ }
+		});
+		flushSync();
+		(container.querySelector('.reader__close') as HTMLButtonElement).focus();
+		const ENTER = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+		const key = (type: 'keyDown' | 'keyUp', autoRepeat = false) =>
+			cdp().send('Input.dispatchKeyEvent', { type, autoRepeat, ...ENTER });
+		for (let i = 0; i < 10; i++) await key('keyDown', true);
+		await key('keyUp');
+		expect(closed).toBe(0);
+		await key('keyDown');
+		await key('keyUp');
+		expect(closed).toBe(1);
+	});
+
+	// The way out of the reader on a phone: a 44 px target around the x, with the x and the title bar their own size.
+	// The x sits at the screen's top right on a phone, so up and to the right the area runs to the edge, where a tap ends.
+	it('takes a tap up to 22 px from the middle of Close, all four ways', async () => {
+		const { container } = await render(SourceReader, {
+			props: { source: source(), onClose: () => {} }
+		});
+		flushSync();
+		const close = container.querySelector('.reader__close') as HTMLButtonElement;
+		const r = close.getBoundingClientRect();
+		const x = r.left + r.width / 2;
+		const y = r.top + r.height / 2;
+		expect(r.height).toBeLessThan(44);
+		const right = Math.min(21.5, window.innerWidth - 1 - x);
+		const up = Math.min(21.5, y);
+		const taps: [number, number][] = [
+			[-21.5, 0],
+			[right, 0],
+			[0, -up],
+			[0, 21.5]
+		];
+		for (const [dx, dy] of taps)
+			expect(document.elementFromPoint(x + dx, y + dy), `${dx},${dy}`).toBe(close);
 	});
 
 	it('the close button fires onClose', async () => {

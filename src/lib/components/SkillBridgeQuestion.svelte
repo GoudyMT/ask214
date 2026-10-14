@@ -31,14 +31,17 @@
 	// wording as soon as the store takes the answer.
 	let tapped = $state<typeof QUESTION_FIRST | null>(null);
 	const shown = $derived(tapped ?? words);
-	let busy = $state(false);
+	// The answer being saved. Its button stays on (a disabled button that holds focus drops it) and ignores a press; the
+	// other two are off until the save settles.
+	let pending = $state<PlanAnswer | null>(null);
 	let error = $state<string | null>(null);
 	let answered = $state<string | null>(null);
 	let lineEl = $state<HTMLElement | null>(null);
 
-	async function answer(choice: PlanAnswer, button: HTMLButtonElement): Promise<void> {
+	async function answer(choice: PlanAnswer): Promise<void> {
+		if (pending !== null) return;
 		tapped = words;
-		busy = true;
+		pending = choice;
 		error = null;
 		try {
 			// The line follows the write that was made, so it cannot disagree with what is saved.
@@ -55,10 +58,7 @@
 		} catch {
 			tapped = null;
 			error = FAILED;
-			busy = false;
-			// The button was disabled during the save, which dropped focus to the page; same rule as above.
-			await tick();
-			if (document.activeElement === document.body) button.focus();
+			pending = null;
 		}
 	}
 </script>
@@ -73,8 +73,14 @@
 		<h2 id="sb-card-heading" class="sb-card__heading">{shown.heading}</h2>
 		<p class="sb-card__copy">{shown.line}</p>
 		<div class="sb-card__answers" role="group" aria-labelledby="sb-card-heading">
+			<!-- A held Enter repeats, and each repeat after a failed save would answer again: only a new press answers. -->
 			{#each ANSWERS as choice (choice)}
-				<button type="button" disabled={busy} onclick={(e) => void answer(choice, e.currentTarget)}
+				<button
+					type="button"
+					disabled={pending !== null && pending !== choice}
+					aria-busy={pending === choice}
+					onclick={() => void answer(choice)}
+					onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 					>{ANSWER_LABEL[choice]}</button
 				>
 			{/each}
@@ -137,6 +143,13 @@
 	}
 	.sb-card__answers button:disabled {
 		opacity: 0.6;
+		cursor: default;
+	}
+	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The label does not
+	   change either, so only aria-busy marks the work - accepted, as the work is local and usually over before it
+	   could be seen. The hover edge stays off too, as a press does nothing. */
+	.sb-card__answers button[aria-busy='true'] {
+		border-color: var(--color-border);
 		cursor: default;
 	}
 	.sb-card__hint {

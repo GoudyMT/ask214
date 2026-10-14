@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { tick } from 'svelte';
 	import type { TimelineItem } from '$lib/timeline/generate';
 	import type { TaskExclusions } from '$lib/calendar/types';
 	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
@@ -22,7 +21,9 @@
 	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
 	let addFailed = $state(false);
 
-	async function add(button: HTMLButtonElement): Promise<void> {
+	// Not `disabled` while the file builds: a disabled button that holds focus drops it, so a press then is ignored.
+	async function add(): Promise<void> {
+		if (building) return;
 		building = true;
 		addFailed = false;
 		let file: CalendarFile;
@@ -33,8 +34,6 @@
 			return;
 		} finally {
 			building = false;
-			// Add was off while the file built, which dropped focus to the page; it gets it back unless the person moved on.
-			void tick().then(() => document.activeElement === document.body && button.focus());
 		}
 		onAdd(file);
 	}
@@ -44,13 +43,14 @@
 	<div class="cal-card__body">
 		<h2 id="cal-card-heading" class="cal-card__heading">Keep your deadlines in sight</h2>
 		<p class="cal-card__copy">Your upcoming deadlines, with alerts before each firm one.</p>
-		<!-- A held key repeats, and each repeat would make and hand over another file: only a new press adds. -->
+		<!-- A held Enter repeats, and each repeat would make and hand over another file: only a new press adds. Space
+		     clicks on release, and other held keys (Tab, arrows) must still work. -->
 		<button
 			class="cal-card__add"
 			type="button"
-			disabled={building}
-			onclick={(e) => void add(e.currentTarget)}
-			onkeydown={(e) => e.repeat && e.preventDefault()}
+			aria-busy={building}
+			onclick={() => void add()}
+			onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 		>
 			Add to my calendar
 		</button>
@@ -107,8 +107,11 @@
 	.cal-card__add:hover {
 		background: var(--color-accent-muted);
 	}
-	.cal-card__add:disabled {
-		opacity: 0.6;
+	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The label does not
+	   change either, so only aria-busy marks the work - accepted, as the work is local and usually over before it
+	   could be seen. The hover fill stays off too, as a press does nothing. */
+	.cal-card__add[aria-busy='true'] {
+		background: var(--color-accent);
 		cursor: default;
 	}
 	.cal-card__hint {

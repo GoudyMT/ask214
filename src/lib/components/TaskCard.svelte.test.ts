@@ -556,6 +556,42 @@ describe('TaskCard (open states)', () => {
 		await expect.poll(() => container.querySelector('textarea')).toBeNull();
 	});
 
+	// A held key repeats about every 40 ms; a save that fails inside the hold leaves the editor open with focus on Save,
+	// so the repeats after it would save again. Only a new press saves. The keys go through the browser's own input.
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)('a held Enter on Save saves once when the save fails %s', async (_, ms) => {
+		const ENTER = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+		const onSetNote = vi.fn(
+			() => new Promise<void>((_, reject) => setTimeout(() => reject(new Error('E_NOTE_SAVE')), ms))
+		);
+		const { container } = await renderCard(makeItem(), { onSetNote });
+		await typeNote(container, 'Call the VSO Monday');
+		const save = buttonByText(container, 'Save') as HTMLButtonElement;
+		save.focus();
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 15; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await expect.element(page.getByRole('alert')).toHaveTextContent(SAVE_FAILED);
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
+		expect(onSetNote).toHaveBeenCalledTimes(1);
+		expect(document.activeElement).toBe(save);
+
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await vi.waitFor(() => expect(onSetNote).toHaveBeenCalledTimes(2));
+	});
+
 	// Cancel would close the editor under a save that may still fail, leaving that failure nowhere to show and the typed
 	// text lost, so it is off while the note saves and back on once the save has failed.
 	it('Cancel is off while a note saves, and a save that then fails keeps the text and gives Cancel back', async () => {
@@ -1220,6 +1256,27 @@ describe('TaskCard (focus after an editor closes)', () => {
 			.toBe(container.querySelector('article.task-card'));
 	});
 
+	// Checked on a failed save, where the editor and its Save stay on the page once the save settles.
+	it('marks the note Save busy while its save runs, and not after', async () => {
+		let fail: () => void = noop;
+		const pending = new Promise<void>((_, reject) => {
+			fail = () => reject(new Error('E_TEST_NOTE'));
+		});
+		const { container } = await mountCard(makeItem({ status: 'start-now' }), {
+			onSetNote: () => pending
+		});
+		press(container, 'Add note');
+		typeNote(container, 'see VSO');
+		const save = buttonByText(container, 'Save') as HTMLButtonElement;
+		expect(save.getAttribute('aria-busy')).toBe('false');
+		press(container, 'Save');
+		await expect.poll(() => save.getAttribute('aria-busy')).toBe('true');
+		fail();
+		await expect.poll(() => container.querySelector('.task-card__note-error')).not.toBeNull();
+		expect(save.isConnected).toBe(true);
+		expect(save.getAttribute('aria-busy')).toBe('false');
+	});
+
 	it('leaves focus alone when the person has moved on before a save lands', async () => {
 		let land: () => void = noop;
 		const pending = new Promise<void>((resolve) => {
@@ -1678,5 +1735,92 @@ describe("the line above a SkillBridge step's links", () => {
 		expect(container.querySelector('.task-card__related-note')).not.toBeNull();
 		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
 		expect(container.querySelector('.task-card__related-note')).toBeNull();
+	});
+});
+
+describe('the TAP guides a task opens in the app', () => {
+	const tsp = TASK_DEFS.find((t) => t.id === 'tsp-decision');
+	const sgli = TASK_DEFS.find((t) => t.id === 'update-sgli');
+	const GUIDE = 'TAP - Financial Planning for Transition';
+
+	it('lists the guide first, counted with the links, and opens it in the app on a press', async () => {
+		if (!tsp) throw new Error('E_TEST_TASK_MISSING');
+		const onOpenGuide = vi.fn();
+		const { container } = await render(TaskCard, {
+			props: { item: makeItem({ def: tsp }), onSetStatus: noop, onSetSnooze: noop, onOpenGuide }
+		});
+		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		const items = container.querySelectorAll('.task-card__related-list li');
+		expect(items).toHaveLength(2);
+		const guide = items[0]?.querySelector('button');
+		expect(guide?.textContent?.trim()).toBe(`Read in the app: ${GUIDE}`);
+		expect(items[0]?.textContent).toContain('Works offline once saved');
+		expect(items[1]?.querySelector('a')?.getAttribute('target')).toBe('_blank');
+		await page.getByRole('button', { name: `Read in the app: ${GUIDE}` }).click();
+		expect(onOpenGuide).toHaveBeenCalledExactlyOnceWith('tap_financial_planning', GUIDE);
+	});
+
+	// A claim task's guide is VA's own: its entry reads as a document to read, never as help with a claim.
+	it('makes no personal claim on a claim task with its guide open', async () => {
+		const bdd = TASK_DEFS.find((t) => t.id === 'va-bdd-claim');
+		if (!bdd) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: {
+				item: makeItem({ def: bdd }),
+				onSetStatus: noop,
+				onSetSnooze: noop,
+				onOpenGuide: noop
+			}
+		});
+		await page.getByRole('button', { name: /^Related resources/ }).click();
+		expect(container.textContent).toContain('Read in the app: TAP - VA Disability Compensation');
+		const text = textOf(container);
+		expect(makesPersonalClaim(text), text).toBe(false);
+	});
+
+	// The app's tap rule: a guide entry is a 44 px target even when its title fits on one line.
+	it('gives each guide entry a 44 px tap area', async () => {
+		if (!tsp) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: {
+				item: makeItem({ def: tsp }),
+				onSetStatus: noop,
+				onSetSnooze: noop,
+				onOpenGuide: noop
+			}
+		});
+		await page.getByRole('button', { name: /^Related resources/ }).click();
+		const guide = container.querySelector('.task-card__guide') as HTMLButtonElement;
+		expect(guide.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+	});
+
+	it('shows the list for a task whose only entry is a guide', async () => {
+		if (!sgli) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: {
+				item: makeItem({ def: sgli }),
+				onSetStatus: noop,
+				onSetSnooze: noop,
+				onOpenGuide: noop
+			}
+		});
+		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
+		expect(container.querySelector('.task-card__related-list button')?.textContent?.trim()).toBe(
+			'Read in the app: TAP - VA Life Insurance Benefits (Resource Guide)'
+		);
+	});
+
+	it('offers no guide where nothing can open it', async () => {
+		if (!sgli || !tsp) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: { item: makeItem({ def: sgli }), onSetStatus: noop, onSetSnooze: noop }
+		});
+		expect(page.getByRole('button', { name: /^Related resources/ }).elements()).toHaveLength(0);
+		const other = await render(TaskCard, {
+			props: { item: makeItem({ def: tsp }), onSetStatus: noop, onSetSnooze: noop }
+		});
+		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
+		expect(other.container.querySelector('.task-card__related-list button')).toBeNull();
+		expect(container.textContent).not.toContain('Read in the app');
 	});
 });

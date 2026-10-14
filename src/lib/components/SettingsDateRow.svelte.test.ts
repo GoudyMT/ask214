@@ -1,9 +1,17 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { cdp, page } from 'vitest/browser';
 import type { ComponentProps } from 'svelte';
 import SettingsDateRow from './SettingsDateRow.svelte';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+
+// Enter as a keyboard sends it: the key, its code and the carriage return it types.
+const ENTER = {
+	key: 'Enter',
+	code: 'Enter',
+	windowsVirtualKeyCode: 13,
+	text: String.fromCharCode(13)
+};
 
 const row = async (over: Partial<ComponentProps<typeof SettingsDateRow>> = {}) =>
 	await render(SettingsDateRow, {
@@ -94,16 +102,35 @@ describe('SettingsDateRow', () => {
 		expect(container.querySelector('form')).toBeNull();
 	});
 
-	// The second press is a DOM click: a locator waits for an enabled button, so it would time out, not count.
+	// Save stays on while it runs, so it keeps focus; a second press does nothing.
 	it('saves once while a save is still running', async () => {
 		const onSave = vi.fn(() => new Promise<string | null>(() => {}));
 		const { container } = await row({ onSave });
 		await page.getByRole('button', { name: /skillbridge start/i }).click();
 		await page.getByLabelText('SkillBridge start').fill('2026-11-01');
 		await page.getByRole('button', { name: /^save$/i }).click();
-		await expect.element(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
-		(container.querySelector('.settings-save') as HTMLButtonElement).click();
+		const save = container.querySelector('.settings-save') as HTMLButtonElement;
+		await expect.poll(() => save.getAttribute('aria-busy')).toBe('true');
+		expect(save.disabled).toBe(false);
+		expect(document.activeElement).toBe(save);
+		await page.getByRole('button', { name: /^save$/i }).click();
 		expect(onSave).toHaveBeenCalledOnce();
+	});
+
+	it('removes once while a remove is still running, and keeps Save off meanwhile', async () => {
+		const onRemove = vi.fn(() => new Promise<string | null>(() => {}));
+		const onSave = vi.fn(async () => null);
+		const { container } = await row({ value: '2026-11-01', onRemove, onSave });
+		await page.getByRole('button', { name: /skillbridge start/i }).click();
+		await page.getByRole('button', { name: /^remove$/i }).click();
+		const remove = container.querySelector('.settings-remove') as HTMLButtonElement;
+		await expect.poll(() => remove.getAttribute('aria-busy')).toBe('true');
+		expect(remove.disabled).toBe(false);
+		expect(document.activeElement).toBe(remove);
+		await page.getByRole('button', { name: /^remove$/i }).click();
+		expect(onRemove).toHaveBeenCalledOnce();
+		expect((container.querySelector('.settings-save') as HTMLButtonElement).disabled).toBe(true);
+		expect(onSave).not.toHaveBeenCalled();
 	});
 
 	it('offers Remove only on a removable row with a date', async () => {
@@ -157,20 +184,22 @@ describe('SettingsDateRow', () => {
 			expect(document.activeElement).toBe(elsewhere);
 		});
 
-		// The save runs long enough for the button to be turned off, which is what drops focus to the page.
-		it('puts focus back on Save when a save fails', async () => {
+		// Save stays on while the save runs, so focus is still on it, through the save and after it.
+		it('keeps focus on Save while a save runs and when it fails', async () => {
 			let fail: (reason: Error) => void = () => {};
 			await openAndSave(() => new Promise((_, reject) => (fail = reject)));
-			await expect.element(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
+			await expect.poll(() => saveButton()?.getAttribute('aria-busy')).toBe('true');
+			expect(document.activeElement).toBe(saveButton());
 			fail(new Error('E_LOCK_TIMEOUT'));
 			await expect.element(page.getByText(FAILED)).toBeVisible();
 			await expect.poll(() => document.activeElement).toBe(saveButton());
 		});
 
-		it('puts focus back on Save when a save is refused with a message', async () => {
+		it('keeps focus on Save while a save runs and when it is refused with a message', async () => {
 			let settle: (message: string | null) => void = () => {};
 			await openAndSave(() => new Promise((resolve) => (settle = resolve)));
-			await expect.element(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
+			await expect.poll(() => saveButton()?.getAttribute('aria-busy')).toBe('true');
+			expect(document.activeElement).toBe(saveButton());
 			settle('This date needs to be before your separation date.');
 			await expect
 				.element(page.getByText('This date needs to be before your separation date.'))
@@ -178,7 +207,7 @@ describe('SettingsDateRow', () => {
 			await expect.poll(() => document.activeElement).toBe(saveButton());
 		});
 
-		it('puts focus back on Remove when a remove fails', async () => {
+		it('keeps focus on Remove while a remove runs and when it fails', async () => {
 			let fail: (reason: Error) => void = () => {};
 			await row({
 				value: '2026-11-01',
@@ -186,12 +215,136 @@ describe('SettingsDateRow', () => {
 			});
 			await page.getByRole('button', { name: /skillbridge start/i }).click();
 			await page.getByRole('button', { name: /^remove$/i }).click();
-			await expect.element(page.getByRole('button', { name: /^remove$/i })).toBeDisabled();
+			const remove = () => document.querySelector('.settings-remove');
+			await expect.poll(() => remove()?.getAttribute('aria-busy')).toBe('true');
+			expect(document.activeElement).toBe(remove());
 			fail(new Error('E_LOCK_TIMEOUT'));
 			await expect.element(page.getByText(FAILED)).toBeVisible();
-			await expect
-				.poll(() => document.activeElement)
-				.toBe(document.querySelector('.settings-remove'));
+			await expect.poll(() => document.activeElement).toBe(remove());
+		});
+
+		// A held key repeats about every 40 ms; each repeat that reached the form would act again once the last action
+		// settled. Only a new press acts: after the hold, one more press must still go through. The keys go through the
+		// browser's own input, so a repeat is a real one.
+		const REFUSED = 'This date needs to be before your separation date.';
+		const press = async (type: 'keyDown' | 'keyUp', autoRepeat = false) =>
+			cdp().send('Input.dispatchKeyEvent', { type, autoRepeat, ...ENTER });
+		async function hold(): Promise<void> {
+			await press('keyDown');
+			for (let i = 0; i < 15; i++) {
+				await new Promise((resolve) => setTimeout(resolve, 40));
+				await press('keyDown', true);
+			}
+			await press('keyUp');
+		}
+		async function pressOnce(): Promise<void> {
+			await press('keyDown');
+			await press('keyUp');
+		}
+		const refusedAfter = (ms: number) =>
+			vi.fn(() => new Promise<string | null>((resolve) => setTimeout(() => resolve(REFUSED), ms)));
+
+		// A save that lands closes the form and hands focus to the row's toggle; the rest of the held key must not open
+		// the form again.
+		it.each([
+			['at once', 0],
+			['after a while', 100]
+		] as const)('leaves the form closed after a held Enter on Save saves %s', async (_, ms) => {
+			const onSave = vi.fn(
+				() => new Promise<string | null>((resolve) => setTimeout(() => resolve(null), ms))
+			);
+			await row({ onSave });
+			const toggle = page.getByRole('button', { name: /skillbridge start/i });
+			await toggle.click();
+			await page.getByLabelText('SkillBridge start').fill('2026-11-01');
+			(saveButton() as HTMLButtonElement).focus();
+			await hold();
+			await new Promise((resolve) => setTimeout(resolve, ms + 50));
+			expect(onSave).toHaveBeenCalledOnce();
+			await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
+			expect(document.activeElement).toBe(toggle.element());
+			await pressOnce();
+			await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
+		});
+
+		it.each([
+			['at once', 0],
+			['after a while', 100]
+		] as const)(
+			'saves once for a held Enter on Save when the save is refused %s',
+			async (_, ms) => {
+				const onSave = refusedAfter(ms);
+				await row({ onSave });
+				await page.getByRole('button', { name: /skillbridge start/i }).click();
+				await page.getByLabelText('SkillBridge start').fill('2026-11-01');
+				(saveButton() as HTMLButtonElement).focus();
+				await hold();
+				await expect.element(page.getByText(REFUSED)).toBeVisible();
+				await new Promise((resolve) => setTimeout(resolve, ms + 50));
+				expect(onSave).toHaveBeenCalledOnce();
+				expect(document.activeElement).toBe(saveButton());
+				await pressOnce();
+				await vi.waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+			}
+		);
+
+		it.each([
+			['at once', 0],
+			['after a while', 100]
+		] as const)(
+			'saves once for a held Enter in the date field when the save is refused %s',
+			async (_, ms) => {
+				const onSave = refusedAfter(ms);
+				await row({ onSave });
+				await page.getByRole('button', { name: /skillbridge start/i }).click();
+				const field = page.getByLabelText('SkillBridge start');
+				await field.fill('2026-11-01');
+				(field.element() as HTMLInputElement).focus();
+				await hold();
+				await expect.element(page.getByText(REFUSED)).toBeVisible();
+				await new Promise((resolve) => setTimeout(resolve, ms + 50));
+				expect(onSave).toHaveBeenCalledOnce();
+				await pressOnce();
+				await vi.waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+			}
+		);
+
+		it.each([
+			['at once', 0],
+			['after a while', 100]
+		] as const)(
+			'removes once for a held Enter on Remove when the remove fails %s',
+			async (_, ms) => {
+				const onRemove = vi.fn(
+					() =>
+						new Promise<string | null>((_, reject) =>
+							setTimeout(() => reject(new Error('E_LOCK_TIMEOUT')), ms)
+						)
+				);
+				await row({ value: '2026-11-01', onRemove });
+				await page.getByRole('button', { name: /skillbridge start/i }).click();
+				const remove = document.querySelector('.settings-remove') as HTMLButtonElement;
+				remove.focus();
+				await hold();
+				await expect.element(page.getByText(FAILED)).toBeVisible();
+				await new Promise((resolve) => setTimeout(resolve, ms + 50));
+				expect(onRemove).toHaveBeenCalledOnce();
+				expect(document.activeElement).toBe(remove);
+				await pressOnce();
+				await vi.waitFor(() => expect(onRemove).toHaveBeenCalledTimes(2));
+			}
+		);
+
+		it('keeps Remove and Cancel off while a save runs, and a press on Remove does nothing', async () => {
+			const onRemove = vi.fn(async () => null);
+			await openAndSave(() => new Promise(() => {}), { value: '2026-11-01', onRemove });
+			await expect.poll(() => saveButton()?.getAttribute('aria-busy')).toBe('true');
+			const remove = document.querySelector('.settings-remove') as HTMLButtonElement;
+			const cancel = page.getByRole('button', { name: /^cancel$/i }).element() as HTMLButtonElement;
+			expect(remove.disabled).toBe(true);
+			expect(cancel.disabled).toBe(true);
+			remove.click();
+			expect(onRemove).not.toHaveBeenCalled();
 		});
 
 		it('leaves focus on the control the person moved to when a save fails', async () => {

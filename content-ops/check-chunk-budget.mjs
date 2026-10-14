@@ -273,6 +273,29 @@ const STATIC = 'static';
 //     Page 61,790 -> 61,805 (owner's call, 2026-10-13): the re-check's two fixes - the document reader leaving focus
 //     on the cited passage when the text view took it first, and the reminder's Set up stamping the question field's
 //     guard - left the page at 61,762 B, 28 B of room; the raise restores about 40 B.
+//     Route nodes 49,040 -> 49,100 (package.json's size-limit) and precache 151,710 -> 151,840 (owner's call,
+//     2026-10-13): busy buttons that keep focus - Calendar's Add, a Settings date's Save and Remove, the SkillBridge
+//     plan's Save and answers - marked busy in place of turned off, and a held Enter that acts once on those, the
+//     wizard's Save and a task note's Save. Every built file compared with main: only the touched ones grew, about
+//     105 B in all. Two builds measured route nodes 49,044-49,052 B and precache 151,786-151,794 B, at least 46 B of
+//     room above the highest. Trim pass on a full build: one shared held-Enter handler in place of eight inline ones
+//     added a chunk (+100 B precache, the page over by 40 B), not kept.
+//     Page 61,805 -> 62,900 and precache 151,840 -> 152,620 (owner's call, 2026-10-14): a timeline task's TAP guides,
+//     read in the app - the curated task-to-guide list (+367 B), the reader opened over the timeline (+348 B), the
+//     entry styles (+25 B), and the 20 guide titles moved from the Documents page into a file both pages share (+59 B
+//     net; the page budget counts that whole file, 741 B, as the titles left a route node for a shared chunk). Two
+//     builds measured page 62,851-62,855 B and precache 152,563-152,574 B, at least 45 B of room above the highest.
+//     Trim pass: a link to the Documents page in place of the reader saves only the reader's 348 B, as the entries
+//     still need the titles; not taken, as it leaves the timeline (owner's pick).
+//     Page 62,900 -> 62,940 and precache 152,620 -> 152,700 (owner's call, 2026-10-14): the pre-PR sweep's fixes -
+//     the guide lookups reading only their own entries (security, never a trim candidate), the reader kept open
+//     through a double click and a held Enter, focus handed on when the entry went, the wizard and note Save marked
+//     busy - and the guide entry's 44 px tap area, about 90 B in all. Two builds measured page 62,897 B and precache
+//     152,641-152,652 B, at least 43 B of room above the highest.
+//     Precache 152,700 -> 152,760 (owner's call, 2026-10-14): the break-it testers' fixes - a settings row's toggle
+//     ignoring a held Enter after a save, and the reader's Close given a 44 px tap area with the same look. Four builds
+//     measured 152,702-152,718 B (about 15 B between builds of the same code), 42 B of room above the highest. Trim
+//     pass: the guide entry's note and hover merged into the link rules, inside the noise, not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -282,10 +305,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 61_805,
+	page: 62_940,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 151_710,
+	precacheBytes: 152_760,
 	workerScripts: 147_200
 };
 

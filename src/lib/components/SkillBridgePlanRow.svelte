@@ -38,7 +38,6 @@
 	let toggleEl = $state<HTMLButtonElement | null>(null);
 	let unavailableEl = $state<HTMLElement | null>(null);
 	let rowEl = $state<HTMLElement | null>(null);
-	let saveEl = $state<HTMLButtonElement | null>(null);
 
 	// When the answer turns unreadable the row closes for good: the form's controls are gone and the toggle is disabled,
 	// and coming back must not reopen a stale choice. A row that was never open leaves focus alone. Focus moves to the
@@ -92,8 +91,9 @@
 		editing = true;
 	}
 
+	// Not `disabled` while it runs: a disabled button that holds focus drops it, so a press then is ignored.
 	async function save(): Promise<void> {
-		if (choice === null) return;
+		if (busy || choice === null) return;
 		// The saved answer, still in effect: a new write would only move a waiting Not sure's day or hide the steps a late
 		// one shows.
 		if (choice === plan?.answer && (choice !== 'not-sure' || plan.returnsOn || plan.stepsShow)) {
@@ -111,15 +111,13 @@
 		busy = false;
 		if (message === null) return close();
 		error = message;
-		// Save was disabled while the save ran, which dropped focus to the page; put it back so the person can try
-		// again, unless they have already moved on.
-		await tick();
-		if (document.activeElement === document.body) saveEl?.focus();
 	}
 </script>
 
 <!-- tabindex -1: a target for the focus move above while loading, never a stop on the Tab order. -->
 <div bind:this={rowEl} class="settings-disclosure" tabindex="-1">
+	<!-- A save that lands hands focus here mid-press, so a held Enter's repeats would open the form again: only a new
+	     press toggles. -->
 	<button
 		bind:this={toggleEl}
 		class="settings-disclosure__toggle"
@@ -128,6 +126,7 @@
 		aria-controls="skillbridge-plan-edit"
 		disabled={plan === null}
 		onclick={toggle}
+		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 	>
 		<span class="settings-chevron" class:settings-chevron--open={editing} aria-hidden="true"></span>
 		<span>{ROW_LABEL}</span>
@@ -141,6 +140,10 @@
 	{:else if plan === null && access === 'failed'}
 		<p bind:this={unavailableEl} class="sb-row__hint" tabindex="-1">{ROW_UNAVAILABLE}</p>
 	{:else if editing && plan !== null}
+		<!-- A held Enter repeats, on a choice or on Save, and each repeat would submit again once the last save settled:
+		     only a new press submits. The form only filters its controls' keys; it is not a control itself, so the
+		     compiler's rule against key listeners on a non-interactive element does not fit. -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<form
 			id="skillbridge-plan-edit"
 			class="settings-edit"
@@ -148,6 +151,7 @@
 				e.preventDefault();
 				void save();
 			}}
+			onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 		>
 			<fieldset class="sb-row__choices">
 				<legend class="visually-hidden">{ROW_LABEL}</legend>
@@ -170,11 +174,8 @@
 			<p class="sb-row__hint">{hint}</p>
 			{#if error}<p class="sb-row__error" role="alert">{error}</p>{/if}
 			<div class="settings-edit__actions">
-				<button
-					bind:this={saveEl}
-					class="settings-save"
-					type="submit"
-					disabled={busy || choice === null}>Save</button
+				<button class="settings-save" type="submit" disabled={choice === null} aria-busy={busy}
+					>Save</button
 				>
 				<button class="settings-cancel" type="button" disabled={busy} onclick={() => void close()}
 					>Cancel</button
@@ -264,6 +265,13 @@
 
 	.settings-save:disabled {
 		opacity: 0.6;
+		cursor: default;
+	}
+	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The label does not
+	   change either, so only aria-busy marks the work - accepted, as the work is local and usually over before it
+	   could be seen. The hover fill stays off too, as a press does nothing. */
+	.settings-save[aria-busy='true'] {
+		background: var(--color-accent);
 		cursor: default;
 	}
 

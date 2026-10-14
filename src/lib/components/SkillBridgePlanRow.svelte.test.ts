@@ -223,9 +223,8 @@ describe('SkillBridgePlanRow', () => {
 			.toHaveTextContent('Could not update right now - please try again.');
 	});
 
-	// Save is disabled while the save runs, which drops focus to the page; after a failure it goes back to Save so a
-	// keyboard user can try again.
-	it('puts focus back on Save after a save that fails or returns a message', async () => {
+	// Save stays on while the save runs, so a keyboard user is still on it after a failure and can try again.
+	it('keeps focus on Save after a save that fails or returns a message', async () => {
 		const onSave = vi
 			.fn<() => Promise<string | null>>()
 			.mockResolvedValueOnce('Something to review.')
@@ -414,17 +413,119 @@ describe('SkillBridgePlanRow', () => {
 		expect(prevented).toBe(true);
 	});
 
+	// Save stays on while it runs, so it keeps focus; a second press does nothing.
 	it('holds Save while a save is under way', async () => {
 		let finish: (message: string | null) => void = () => undefined;
 		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
-		await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), access: 'ready', onSave }
+		});
 		await toggle().click();
 		await page.getByRole('radio', { name: 'Yes' }).click();
 		await page.getByRole('button', { name: 'Save' }).click();
-		await expect.element(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+		const save = container.querySelector('.settings-save') as HTMLButtonElement;
+		await expect.poll(() => save.getAttribute('aria-busy')).toBe('true');
+		expect(save.disabled).toBe(false);
+		expect(document.activeElement).toBe(save);
+		await page.getByRole('button', { name: 'Save' }).click();
+		expect(onSave).toHaveBeenCalledOnce();
 		finish(null);
 		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
 	});
+});
+
+// A held key repeats about every 40 ms; each repeat that reached the form would save again once the last save settled.
+// Only a new press saves. The keys go through the browser's own input, so a repeat is a real one.
+describe('SkillBridgePlanRow (a held Enter)', () => {
+	const ENTER = {
+		key: 'Enter',
+		code: 'Enter',
+		windowsVirtualKeyCode: 13,
+		text: String.fromCharCode(13)
+	};
+	const press = async (type: 'keyDown' | 'keyUp', autoRepeat = false) =>
+		cdp().send('Input.dispatchKeyEvent', { type, autoRepeat, ...ENTER });
+	async function hold(): Promise<void> {
+		await press('keyDown');
+		for (let i = 0; i < 15; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			await press('keyDown', true);
+		}
+		await press('keyUp');
+	}
+	// After the hold, one more press must still save: a guard that never let go would pass the count alone.
+	async function pressOnceSaves(onSave: ReturnType<typeof vi.fn>): Promise<void> {
+		await press('keyDown');
+		await press('keyUp');
+		await vi.waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+	}
+	const refusedAfter = (ms: number) =>
+		vi.fn(
+			() =>
+				new Promise<string | null>((resolve) =>
+					setTimeout(() => resolve('Something to review.'), ms)
+				)
+		);
+
+	// A save that lands closes the form and hands focus to the toggle; the rest of the held key must not open it again.
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)('leaves the form closed after a held Enter on Save saves %s', async (_, ms) => {
+		const onSave = vi.fn(
+			() => new Promise<string | null>((resolve) => setTimeout(() => resolve(null), ms))
+		);
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), access: 'ready', onSave }
+		});
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		(container.querySelector('.settings-save') as HTMLButtonElement).focus();
+		await hold();
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
+		expect(onSave).toHaveBeenCalledOnce();
+		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
+		expect(document.activeElement).toBe(toggle().element());
+	});
+
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)('saves once for a held Enter on Save when the save is refused %s', async (_, ms) => {
+		const onSave = refusedAfter(ms);
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), access: 'ready', onSave }
+		});
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		const save = container.querySelector('.settings-save') as HTMLButtonElement;
+		save.focus();
+		await hold();
+		await expect.element(page.getByRole('alert')).toHaveTextContent('Something to review.');
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
+		expect(onSave).toHaveBeenCalledOnce();
+		expect(document.activeElement).toBe(save);
+		await pressOnceSaves(onSave);
+	});
+
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)(
+		'saves once for a held Enter on a choice when the save is refused %s',
+		async (_, ms) => {
+			const onSave = refusedAfter(ms);
+			await render(SkillBridgePlanRow, { props: { plan: plan(), access: 'ready', onSave } });
+			await toggle().click();
+			await page.getByRole('radio', { name: 'Yes' }).click();
+			(page.getByRole('radio', { name: 'Yes' }).element() as HTMLInputElement).focus();
+			await hold();
+			await expect.element(page.getByRole('alert')).toHaveTextContent('Something to review.');
+			await new Promise((resolve) => setTimeout(resolve, ms + 50));
+			expect(onSave).toHaveBeenCalledOnce();
+			await pressOnceSaves(onSave);
+		}
+	);
 });
 
 describe('SkillBridgePlanRow (while a save runs)', () => {

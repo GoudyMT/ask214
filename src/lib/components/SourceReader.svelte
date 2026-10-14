@@ -272,9 +272,11 @@
 	function onNativeClose() {
 		if (isOpen) onClose();
 	}
-	// A click whose target is the dialog element itself is a backdrop click (content clicks target children).
+	// A click whose target is the dialog element itself is a backdrop click (content clicks target children). Not the
+	// second click of a double click: the button that opened the reader can sit outside the centred dialog, so that
+	// click would close the reader it just opened.
 	function onBackdropClick(e: MouseEvent) {
-		if (e.target === dialogEl) dialogEl?.close();
+		if (e.target === dialogEl && e.detail < 2) dialogEl?.close();
 	}
 </script>
 
@@ -292,8 +294,14 @@
 				<p class="reader__src">Source</p>
 				<h2 id="ask-reader-title" class="reader__title">{heading}</h2>
 			</div>
-			<button class="reader__close" type="button" aria-label="Close" onclick={onClose}
-				>&times;</button
+			<!-- Close takes focus as the reader opens, often while the Enter that opened it is still held: only a new press
+			     closes. -->
+			<button
+				class="reader__close"
+				type="button"
+				aria-label="Close"
+				onclick={onClose}
+				onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}>&times;</button
 			>
 		</div>
 	{/snippet}
@@ -602,6 +610,13 @@
 		line-height: 1;
 		cursor: pointer;
 		padding: 0 4px;
+		position: relative;
+	}
+	/* A 44 px tap area around the x, as on the theme pills: the x and the title bar keep their size. */
+	.reader__close::after {
+		content: '';
+		position: absolute;
+		inset: calc(50% - 22px);
 	}
 
 	.reader__body {

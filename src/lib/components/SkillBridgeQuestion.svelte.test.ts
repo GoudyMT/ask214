@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { page } from 'vitest/browser';
+import { cdp, page } from 'vitest/browser';
 import SkillBridgeQuestion from './SkillBridgeQuestion.svelte';
 import { RESOURCES } from '$lib/resources';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
@@ -218,8 +218,8 @@ describe('SkillBridgeQuestion', () => {
 		expect(page.getByRole('button', { name: 'Yes', exact: true }).elements()).toHaveLength(1);
 	});
 
-	// The tapped button is disabled during the save, which drops focus to the body; the person must land back on it.
-	it.each(['Yes', 'Not sure', 'No'])('puts focus back on %s after a failed save', async (label) => {
+	// The tapped button stays on during the save, so the person is still on it after a failure and can try again.
+	it.each(['Yes', 'Not sure', 'No'])('keeps focus on %s after a failed save', async (label) => {
 		await card({ onAnswer: vi.fn(() => Promise.reject(new Error('E_TEST'))) });
 		const tapped = page.getByRole('button', { name: label, exact: true });
 		await tapped.click();
@@ -265,6 +265,43 @@ describe('SkillBridgeQuestion', () => {
 		});
 	});
 
+	// A held key repeats about every 40 ms; each repeat that reached an answer after a failed save would save again.
+	// Only a new press answers. The keys go through the browser's own input, so a repeat is a real one.
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)('answers once for a held Enter on Yes when the save fails %s', async (_, ms) => {
+		const ENTER = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+		const onAnswer = vi.fn(
+			() =>
+				new Promise<string | null>((_, reject) => setTimeout(() => reject(new Error('E_TEST')), ms))
+		);
+		await card({ onAnswer });
+		const yes = page.getByRole('button', { name: 'Yes', exact: true });
+		(yes.element() as HTMLButtonElement).focus();
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 15; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
+		expect(onAnswer).toHaveBeenCalledOnce();
+		expect(document.activeElement).toBe(yes.element());
+
+		// After the hold, one more press must still answer: a guard that never let go would pass the count alone.
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledTimes(2));
+	});
+
 	it('names the card, and opens the link in a new tab and says so', async () => {
 		const { container } = await card();
 		await expect
@@ -286,18 +323,26 @@ describe('SkillBridgeQuestion', () => {
 			);
 		const { container } = await card({ onAnswer });
 		const yes = page.getByRole('button', { name: 'Yes', exact: true });
+		// The tapped answer stays on (it holds focus) and ignores a tap; the other two are off until the save settles.
 		const disabledStates = () =>
 			Array.from(container.querySelectorAll('button')).map((b) => b.disabled);
+		const busyStates = () =>
+			Array.from(container.querySelectorAll('button')).map((b) => b.getAttribute('aria-busy'));
 
 		await yes.click();
-		expect(disabledStates()).toEqual([true, true, true]);
+		expect(disabledStates()).toEqual([false, true, true]);
+		expect(busyStates()).toEqual(['true', 'false', 'false']);
+		expect(document.activeElement).toBe(yes.element());
+		await yes.click();
+		expect(onAnswer).toHaveBeenCalledOnce();
 		failFirst(new Error('E_TEST'));
 		await expect.element(page.getByRole('alert')).toBeVisible();
 		expect(disabledStates()).toEqual([false, false, false]);
+		expect(busyStates()).toEqual(['false', 'false', 'false']);
 
 		await yes.click();
 		expect(page.getByRole('alert').elements()).toHaveLength(0);
-		expect(disabledStates()).toEqual([true, true, true]);
+		expect(disabledStates()).toEqual([false, true, true]);
 		finishSecond(null);
 		await expect.element(page.getByRole('status')).toBeVisible();
 		expect(container.querySelector('section')?.hasAttribute('aria-labelledby')).toBe(false);

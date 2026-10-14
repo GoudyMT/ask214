@@ -1,5 +1,12 @@
 import type { DisplayCategory, Resource } from './types';
-import { RESOURCES, TASK_RESOURCES, TASK_AFTER_LINK, TASK_LINK_NOTE } from './resources';
+import {
+	RESOURCES,
+	TASK_RESOURCES,
+	TASK_AFTER_LINK,
+	TASK_LINK_NOTE,
+	TASK_GUIDES
+} from './resources';
+import { LOCAL_DOCUMENT_INFO } from '$lib/sources/local-document-info.data';
 
 // Human-readable heading for each browse category, shown on the Resources page.
 export const DISPLAY_CATEGORY_LABEL: Record<DisplayCategory, string> = {
@@ -25,6 +32,20 @@ export function resourcesForTask(
 		const r = byId.get(id);
 		return r ? [r] : [];
 	});
+}
+
+// The TAP guides a timeline task opens in the app's reader, with the titles the reader shows. An id the app no
+// longer serves is dropped, never shown as a dead entry. Map + guide info are injectable for testing.
+export function guidesForTask(
+	taskId: string,
+	map: Record<string, readonly string[]> = TASK_GUIDES,
+	info: Record<string, { title: string }> = LOCAL_DOCUMENT_INFO
+): { sourceId: string; title: string }[] {
+	// Own entries only: a bare index reaches Object.prototype, so "constructor" would read as a task or a guide.
+	if (!Object.hasOwn(map, taskId)) return [];
+	return (map[taskId] ?? []).flatMap((sourceId) =>
+		Object.hasOwn(info, sourceId) ? [{ sourceId, title: info[sourceId]?.title ?? '' }] : []
+	);
 }
 
 // The one official page a firm task's What now box links to, as its link text and url. Undefined for a task with no

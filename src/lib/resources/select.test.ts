@@ -1,6 +1,40 @@
 import { describe, it, expect } from 'vitest';
 import type { Resource } from './types';
-import { resourcesForTask, groupByDisplayCategory, afterLinkForTask } from './select';
+import {
+	resourcesForTask,
+	groupByDisplayCategory,
+	afterLinkForTask,
+	guidesForTask
+} from './select';
+
+describe('guidesForTask', () => {
+	const INFO = { g1: { title: 'Guide one' }, g2: { title: 'Guide two' } };
+
+	it('returns the mapped guides with their titles, in the mapped order', () => {
+		expect(guidesForTask('t1', { t1: ['g2', 'g1'] }, INFO)).toEqual([
+			{ sourceId: 'g2', title: 'Guide two' },
+			{ sourceId: 'g1', title: 'Guide one' }
+		]);
+	});
+
+	it('returns empty for a task id that is not in the map', () => {
+		expect(guidesForTask('unknown', { t1: ['g1'] }, INFO)).toEqual([]);
+	});
+
+	// The maps are plain objects: a name every object inherits is not a task or a guide.
+	it('reads only the maps own entries, never what every object inherits', () => {
+		expect(guidesForTask('constructor', { t1: ['g1'] }, INFO)).toEqual([]);
+		expect(guidesForTask('t1', { t1: ['toString', 'g1'] }, INFO)).toEqual([
+			{ sourceId: 'g1', title: 'Guide one' }
+		]);
+	});
+
+	it('drops a mapped id the app does not serve', () => {
+		expect(guidesForTask('t1', { t1: ['gone', 'g1'] }, INFO)).toEqual([
+			{ sourceId: 'g1', title: 'Guide one' }
+		]);
+	});
+});
 
 function res(id: string, displayCategory: Resource['displayCategory']): Resource {
 	return {

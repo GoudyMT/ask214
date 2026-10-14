@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { DisplayCategory } from './types';
-import { RESOURCES, TASK_RESOURCES, TASK_AFTER_LINK, TASK_LINK_NOTE } from './resources';
+import {
+	RESOURCES,
+	TASK_RESOURCES,
+	TASK_AFTER_LINK,
+	TASK_LINK_NOTE,
+	TASK_GUIDES
+} from './resources';
+import { LOCAL_DOCUMENT_INFO } from '$lib/sources/local-document-info.data';
 import { linkNoteForTask, resourcesForTask } from './select';
 import * as INDEX from './index';
 import { TASK_DEFS } from '$lib/timeline/task-defs';
@@ -79,6 +86,60 @@ describe('task-to-resource mapping integrity', () => {
 		for (const [taskId, resIds] of Object.entries(TASK_RESOURCES)) {
 			expect(new Set(resIds).size, taskId).toBe(resIds.length);
 		}
+	});
+});
+
+describe('task-to-guide mapping: the TAP guides a task opens in the app', () => {
+	it('every mapped guide is a guide the app serves (no dangling ids)', () => {
+		for (const [taskId, guideIds] of Object.entries(TASK_GUIDES)) {
+			for (const id of guideIds) {
+				expect(Object.hasOwn(LOCAL_DOCUMENT_INFO, id), `${taskId} -> ${id}`).toBe(true);
+			}
+		}
+	});
+
+	it('every mapped task id is a real timeline task, with one or two guides, none twice', () => {
+		const taskIds = new Set(TASK_DEFS.map((t) => t.id));
+		for (const [taskId, guideIds] of Object.entries(TASK_GUIDES)) {
+			expect(taskIds.has(taskId), taskId).toBe(true);
+			expect(guideIds.length, taskId).toBeGreaterThanOrEqual(1);
+			expect(guideIds.length, taskId).toBeLessThanOrEqual(2);
+			expect(new Set(guideIds).size, taskId).toBe(guideIds.length);
+		}
+	});
+
+	// The list Max approved (S121), task by task: a change to it is a curation decision, made here on purpose.
+	it('matches the approved list', () => {
+		expect(TASK_GUIDES).toEqual({
+			'va-gov-account': ['tap_va_benefits_guide'],
+			'login-gov-account': ['tap_va_benefits_guide'],
+			'update-sgli': ['tap_va_life_insurance'],
+			'will-poa': ['tap_financial_planning'],
+			'financial-counselor': ['tap_financial_planning'],
+			'master-resume': ['tap_dol_employment_workshop'],
+			'gi-bill-research': ['tap_va_education_benefits', 'tap_managing_education'],
+			'document-medical': ['tap_va_benefits_guide'],
+			'preseparation-counseling': ['tap_pre_separation_brief'],
+			'tap-course': ['tap_va_benefits_guide', 'tap_dol_efct'],
+			'tap-track': ['tap_dol_employment_workshop', 'tap_managing_education'],
+			'job-search': ['tap_dol_employment_workshop', 'tap_moc_crosswalk'],
+			'health-insurance-research': ['tap_financial_planning', 'tap_pre_separation_brief'],
+			'life-insurance-research': ['tap_va_life_insurance'],
+			'va-career-guidance': ['tap_va_benefits_guide'],
+			'jst-order': ['tap_managing_education'],
+			'school-apply': ['tap_managing_education', 'tap_va_education_benefits'],
+			'sha-schedule': ['tap_va_benefits_guide'],
+			'sha-complete': ['tap_va_benefits_guide'],
+			'va-bdd-claim': ['tap_va_disability_comp'],
+			'tap-capstone': ['tap_managing_transition'],
+			'va-benefits-advisor': ['tap_va_benefits_guide'],
+			'financial-docs': ['tap_financial_planning'],
+			'tricare-elect': ['tap_financial_planning'],
+			'tsp-decision': ['tap_financial_planning'],
+			'vgli-convert': ['tap_va_life_insurance'],
+			'final-pay-check': ['tap_financial_planning'],
+			'va-claim-fallback': ['tap_va_disability_comp']
+		});
 	});
 });
 

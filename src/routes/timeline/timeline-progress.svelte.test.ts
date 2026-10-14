@@ -896,3 +896,55 @@ describe('Timeline, a write or a Dismiss that fails', () => {
 		expect(document.activeElement).toBe(button);
 	});
 });
+
+describe('Timeline, a task guide read in the app', () => {
+	// The reader opens over the list, so the person keeps their place: closing it hands focus back to the entry.
+	it('opens the guide in the reader on the page and hands focus back on close', async () => {
+		current.timeline = { ready: true, failed: false, state: EMPTY };
+		const { container } = await render(TimelinePage);
+		await vi.waitFor(() => expect(container.querySelector('.timeline-list')).not.toBeNull());
+		for (const toggle of container.querySelectorAll<HTMLButtonElement>(
+			'.task-card__related-toggle'
+		))
+			toggle.click();
+		const title = 'TAP - VA Benefits and Services Participant Guide';
+		const entry = page.getByRole('button', { name: `Read in the app: ${title}` }).first();
+		await entry.click();
+		const reader = container.querySelector('dialog.reader') as HTMLDialogElement;
+		await vi.waitFor(() => expect(reader.open).toBe(true));
+		expect(reader.textContent).toContain(title);
+		// The reader took focus, so the hand-back on close is the page's doing, not focus that never moved.
+		expect(reader.contains(document.activeElement)).toBe(true);
+		(reader.querySelector('.reader__close') as HTMLButtonElement).click();
+		await vi.waitFor(() => expect(reader.open).toBe(false));
+		await expect.element(entry).toHaveFocus();
+	});
+
+	// The list can go while the reader is open (a Lock from another tab, a re-read that resolves the task): the entry
+	// is gone, so focus goes to the next thing to act on, never to the top of the page.
+	it('puts focus on the page, not nowhere, when the entry went while the reader was open', async () => {
+		current.timeline = { ready: true, failed: false, state: EMPTY };
+		const { container } = await render(TimelinePage);
+		await vi.waitFor(() => expect(container.querySelector('.timeline-list')).not.toBeNull());
+		for (const toggle of container.querySelectorAll<HTMLButtonElement>(
+			'.task-card__related-toggle'
+		))
+			toggle.click();
+		await page
+			.getByRole('button', { name: /^Read in the app: / })
+			.first()
+			.click();
+		const reader = container.querySelector('dialog.reader') as HTMLDialogElement;
+		await vi.waitFor(() => expect(reader.open).toBe(true));
+		profile.locked = true;
+		try {
+			await vi.waitFor(() => expect(container.querySelector('.timeline-list')).toBeNull());
+			(reader.querySelector('.reader__close') as HTMLButtonElement).click();
+			await vi.waitFor(() => expect(reader.open).toBe(false));
+			await vi.waitFor(() => expect(document.activeElement).not.toBe(document.body));
+			expect(document.activeElement?.tagName).toBe('H1');
+		} finally {
+			profile.locked = false;
+		}
+	});
+});

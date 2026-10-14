@@ -9,12 +9,18 @@ import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 // Its own file so the mock reaches no other test: the first build rejects, as a browser that cannot make the file would.
 // The path is a `$lib` alias on purpose: a relative path silently never applies to the component's own import here.
 // A build can also be held: it finishes only once `gate` is open, so a test can look at the page while it runs.
-const seams = vi.hoisted(() => ({ failNext: true, gate: null as Promise<void> | null }));
+// `builds` counts the builds started, so a second build is seen at once, not after a wait.
+const seams = vi.hoisted(() => ({
+	failNext: true,
+	gate: null as Promise<void> | null,
+	builds: 0
+}));
 vi.mock('$lib/calendar/build-ics', async (importOriginal) => {
 	const real = await importOriginal<typeof import('$lib/calendar/build-ics')>();
 	return {
 		...real,
 		buildIcs: async (...args: Parameters<typeof real.buildIcs>) => {
+			seams.builds++;
 			await seams.gate;
 			if (seams.failNext) {
 				seams.failNext = false;
@@ -60,6 +66,7 @@ const ENTER = {
 beforeEach(() => {
 	seams.failNext = true;
 	seams.gate = null;
+	seams.builds = 0;
 	// Component tests run without app.css, so the colour token is set here and put back.
 	document.documentElement.style.setProperty('--color-danger', DANGER);
 });
@@ -121,11 +128,11 @@ describe('CalendarCard, when the file cannot be made', () => {
 		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
 	});
 
-	// Add is off while the file builds, which drops focus to the page; it gets focus back, so the person can try again.
+	// Add stays on while the file builds, so it never drops focus; a press while it builds does nothing.
 	it.each([
 		['cannot be made', true],
 		['is made', false]
-	] as const)('puts focus back on Add once the file %s', async (_, fails) => {
+	] as const)('keeps focus on Add while the file builds and once it %s', async (_, fails) => {
 		seams.failNext = fails;
 		let open = () => {};
 		seams.gate = new Promise<void>((resolve) => (open = resolve));
@@ -138,13 +145,45 @@ describe('CalendarCard, when the file cannot be made', () => {
 				onDismiss: vi.fn()
 			}
 		});
+		const button = container.querySelector('.cal-card__add') as HTMLButtonElement;
 		const add = page.getByRole('button', { name: /^add to my calendar$/i });
 		await add.click();
-		await expect.element(add).toBeDisabled();
+		await expect.poll(() => button.getAttribute('aria-busy')).toBe('true');
+		expect(button.disabled).toBe(false);
+		expect(document.activeElement).toBe(button);
+		await add.click();
+		expect(seams.builds).toBe(1);
 		open();
-		await expect.element(add).toBeEnabled();
+		await expect.poll(() => button.getAttribute('aria-busy')).toBe('false');
+		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(onAdd).toHaveBeenCalledTimes(fails ? 0 : 1);
-		await expect.poll(() => document.activeElement).toBe(container.querySelector('.cal-card__add'));
+		expect(document.activeElement).toBe(button);
+	});
+
+	// Only Enter's repeats are held back: Space clicks on release, and a held Tab or arrow must still move.
+	it('holds back a repeated Enter on Add but lets other repeated keys through', async () => {
+		const { container } = await render(CalendarCard, {
+			props: {
+				items: [task],
+				exclusions: { taskIds: [], categories: [] },
+				onAdd: vi.fn(),
+				onDismiss: vi.fn()
+			}
+		});
+		const add = container.querySelector('.cal-card__add') as HTMLButtonElement;
+		const held = (key: string) => {
+			const e = new KeyboardEvent('keydown', {
+				key,
+				repeat: true,
+				bubbles: true,
+				cancelable: true
+			});
+			add.dispatchEvent(e);
+			return e.defaultPrevented;
+		};
+		expect(held('Enter')).toBe(true);
+		expect(held('Tab')).toBe(false);
+		expect(held('ArrowDown')).toBe(false);
 	});
 
 	// A held key repeats about every 40 ms; each repeat that reached Add would make and hand over another file. A new
@@ -173,7 +212,7 @@ describe('CalendarCard, when the file cannot be made', () => {
 			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
 		}
 		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
-		await expect.element(add).toBeEnabled();
+		await expect.element(add).toHaveAttribute('aria-busy', 'false');
 		expect(onAdd).toHaveBeenCalledOnce();
 
 		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
