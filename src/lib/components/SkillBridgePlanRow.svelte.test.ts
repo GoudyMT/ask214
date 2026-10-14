@@ -432,6 +432,47 @@ describe('SkillBridgePlanRow', () => {
 		finish(null);
 		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
 	});
+
+	// The form closes when the save lands, so a pick made meanwhile would be dropped unseen. The choices hold while a
+	// save is under way, as Save does: the pick being saved stays the one shown.
+	it('holds the choices while a save is under way', async () => {
+		let finish: (message: string | null) => void = () => undefined;
+		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), access: 'ready', onSave }
+		});
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		await page.getByRole('button', { name: 'Save' }).click();
+		const save = container.querySelector('.settings-save') as HTMLButtonElement;
+		await expect.poll(() => save.getAttribute('aria-busy')).toBe('true');
+
+		const radio = (name: string) =>
+			container.querySelector<HTMLInputElement>(`input[value="${name}"]`)!;
+		await page.getByRole('radio', { name: 'No', exact: true }).click();
+		radio('yes').focus();
+		await userEvent.keyboard('{ArrowRight}');
+		expect(radio('yes').checked).toBe(true);
+		expect(radio('no').checked).toBe(false);
+		expect(radio('not-sure').checked).toBe(false);
+
+		finish(null);
+		await expect.element(page.getByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
+		expect(onSave).toHaveBeenCalledExactlyOnceWith('yes');
+	});
+
+	it('takes a new pick again once a failed save settles', async () => {
+		const onSave = vi.fn(() => Promise.resolve('Could not update right now - please try again.'));
+		const { container } = await render(SkillBridgePlanRow, {
+			props: { plan: plan(), access: 'ready', onSave }
+		});
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Yes' }).click();
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.element(page.getByRole('alert')).toBeInTheDocument();
+		await page.getByRole('radio', { name: 'No', exact: true }).click();
+		expect(container.querySelector<HTMLInputElement>('input[value="no"]')!.checked).toBe(true);
+	});
 });
 
 // A held key repeats about every 40 ms; each repeat that reached the form would save again once the last save settled.
