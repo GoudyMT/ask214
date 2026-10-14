@@ -17,7 +17,7 @@ describe('handOver', () => {
 		const recordAdd = vi.fn(async () => {
 			order.push('record');
 		});
-		await handOver(FILE, { recordAdd }, NOW, download);
+		await handOver(FILE, { locked: false, recordAdd }, NOW, download);
 		expect(order).toEqual(['download', 'record']);
 		expect(download).toHaveBeenCalledWith(FILE.ics);
 		expect(recordAdd).toHaveBeenCalledWith(FILE.events, '2026-10-04', '2026-10-04');
@@ -26,7 +26,9 @@ describe('handOver', () => {
 	it('does not throw when the record fails: the file still reached the user', async () => {
 		const download = vi.fn();
 		const recordAdd = vi.fn(async () => Promise.reject(new Error('E_CALENDAR_RELOCKED')));
-		await expect(handOver(FILE, { recordAdd }, NOW, download)).resolves.toBeUndefined();
+		await expect(
+			handOver(FILE, { locked: false, recordAdd }, NOW, download)
+		).resolves.toBeUndefined();
 		expect(download).toHaveBeenCalledOnce();
 	});
 

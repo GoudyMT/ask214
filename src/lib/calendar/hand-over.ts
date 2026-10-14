@@ -5,8 +5,8 @@ import type { CalendarFile } from './build-ics';
 import type { DesiredEvent } from './types';
 
 type Recorder = {
-	/** True once the app has locked: the stores' contents are out of memory. */
-	readonly locked?: boolean;
+	/** True once the app has locked: the stores' contents are out of memory. Required, so no caller can wrap the store and lose it. */
+	readonly locked: boolean;
 	recordAdd(events: DesiredEvent[], addedOn: string, todayIso: string): Promise<void>;
 };
 
