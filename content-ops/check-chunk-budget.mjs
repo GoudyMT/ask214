@@ -287,6 +287,11 @@ const STATIC = 'static';
 //     builds measured page 62,851-62,855 B and precache 152,563-152,574 B, at least 45 B of room above the highest.
 //     Trim pass: a link to the Documents page in place of the reader saves only the reader's 348 B, as the entries
 //     still need the titles; not taken, as it leaves the timeline (owner's pick).
+//     Page 62,900 -> 62,940 and precache 152,620 -> 152,700 (owner's call, 2026-10-14): the pre-PR sweep's fixes -
+//     the guide lookups reading only their own entries (security, never a trim candidate), the reader kept open
+//     through a double click and a held Enter, focus handed on when the entry went, the wizard and note Save marked
+//     busy - and the guide entry's 44 px tap area, about 90 B in all. Two builds measured page 62,897 B and precache
+//     152,641-152,652 B, at least 43 B of room above the highest.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -296,10 +301,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 62_900,
+	page: 62_940,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 152_620,
+	precacheBytes: 152_700,
 	workerScripts: 147_200
 };
 
