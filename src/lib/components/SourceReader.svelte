@@ -610,6 +610,13 @@
 		line-height: 1;
 		cursor: pointer;
 		padding: 0 4px;
+		position: relative;
+	}
+	/* A 44 px tap area around the x, as on the theme pills: the x and the title bar keep their size. */
+	.reader__close::after {
+		content: '';
+		position: absolute;
+		inset: calc(50% - 22px);
 	}
 
 	.reader__body {

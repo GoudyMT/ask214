@@ -124,6 +124,30 @@ describe('SourceReader', () => {
 		expect(closed).toBe(1);
 	});
 
+	// The way out of the reader on a phone: a 44 px target around the x, with the x and the title bar their own size.
+	// The x sits at the screen's top right on a phone, so up and to the right the area runs to the edge, where a tap ends.
+	it('takes a tap up to 22 px from the middle of Close, all four ways', async () => {
+		const { container } = await render(SourceReader, {
+			props: { source: source(), onClose: () => {} }
+		});
+		flushSync();
+		const close = container.querySelector('.reader__close') as HTMLButtonElement;
+		const r = close.getBoundingClientRect();
+		const x = r.left + r.width / 2;
+		const y = r.top + r.height / 2;
+		expect(r.height).toBeLessThan(44);
+		const right = Math.min(21.5, window.innerWidth - 1 - x);
+		const up = Math.min(21.5, y);
+		const taps: [number, number][] = [
+			[-21.5, 0],
+			[right, 0],
+			[0, -up],
+			[0, 21.5]
+		];
+		for (const [dx, dy] of taps)
+			expect(document.elementFromPoint(x + dx, y + dy), `${dx},${dy}`).toBe(close);
+	});
+
 	it('the close button fires onClose', async () => {
 		let closed = 0;
 		const { container } = await render(SourceReader, {
