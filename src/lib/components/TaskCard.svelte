@@ -3,14 +3,20 @@
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
-	import { resourcesForTask, afterLinkForTask, linkNoteForTask } from '$lib/resources';
+	import {
+		resourcesForTask,
+		guidesForTask,
+		afterLinkForTask,
+		linkNoteForTask
+	} from '$lib/resources';
 	import { closedOnDate, isFirmWarning, type FitReason } from '$lib/timeline/generate';
 
 	let {
 		item,
 		onSetStatus,
 		onSetSnooze,
-		onSetNote
+		onSetNote,
+		onOpenGuide
 	}: {
 		item: TimelineItem;
 		/** Resolves false when the write did not land (the page then reads the store again). */
@@ -18,6 +24,8 @@
 		/** Resolves false when the write did not land. */
 		onSetSnooze: (taskId: string, untilIso: string) => Promise<boolean> | void;
 		onSetNote?: (taskId: string, note: string | undefined) => Promise<void>;
+		/** Opens a TAP guide in the app's reader. Without it the card offers no guide, as nothing could open one. */
+		onOpenGuide?: (sourceId: string, title: string) => void;
 	} = $props();
 
 	// Inline snooze picker state (ephemeral; not persisted). Snooze toggles it open; a preset or a
@@ -195,6 +203,7 @@
 
 	// Contextual outbound resources: the links curated for this specific task, collapsed by default.
 	const related = $derived(resourcesForTask(item.def.id));
+	const guides = $derived(onOpenGuide ? guidesForTask(item.def.id) : []);
 	const linkNote = $derived(linkNoteForTask(item.def.id));
 	let relatedOpen = $state(false);
 
@@ -454,7 +463,7 @@
 				</div>
 			{/if}
 			{@render noteSection()}
-			{#if related.length > 0}
+			{#if related.length + guides.length > 0}
 				<div class="task-card__related">
 					<button
 						type="button"
@@ -462,12 +471,24 @@
 						aria-expanded={relatedOpen}
 						onclick={() => (relatedOpen = !relatedOpen)}
 					>
-						Related resources ({related.length})
+						Related resources ({related.length + guides.length})
 						<span class="caret" class:caret--right={!relatedOpen} aria-hidden="true"></span>
 					</button>
 					{#if relatedOpen}
 						{#if linkNote}<p class="task-card__related-note">{linkNote}</p>{/if}
 						<ul class="task-card__related-list">
+							<!-- The guides first: read here, in the app's own reader, where the links leave for other sites. -->
+							{#each guides as g (g.sourceId)}
+								<li>
+									<button
+										type="button"
+										class="task-card__guide"
+										onclick={() => onOpenGuide?.(g.sourceId, g.title)}
+										>Read in the app: {g.title}</button
+									>
+									<span class="task-card__guide-note">Works offline once saved</span>
+								</li>
+							{/each}
 							{#each related as r (r.id)}
 								<li>
 									<a href={r.url} target="_blank" rel="noopener noreferrer external">
@@ -1161,6 +1182,28 @@
 
 	.task-card__related-list a:hover {
 		text-decoration: underline;
+	}
+
+	/* A guide entry reads as one of the links: the same colour and size, though it opens the reader, not a site. */
+	.task-card__guide {
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-size: var(--font-size-s);
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.task-card__guide:hover {
+		text-decoration: underline;
+	}
+
+	.task-card__guide-note {
+		display: block;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
 	}
 
 	.visually-hidden {

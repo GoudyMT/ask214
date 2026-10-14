@@ -1716,3 +1716,56 @@ describe("the line above a SkillBridge step's links", () => {
 		expect(container.querySelector('.task-card__related-note')).toBeNull();
 	});
 });
+
+describe('the TAP guides a task opens in the app', () => {
+	const tsp = TASK_DEFS.find((t) => t.id === 'tsp-decision');
+	const sgli = TASK_DEFS.find((t) => t.id === 'update-sgli');
+	const GUIDE = 'TAP - Financial Planning for Transition';
+
+	it('lists the guide first, counted with the links, and opens it in the app on a press', async () => {
+		if (!tsp) throw new Error('E_TEST_TASK_MISSING');
+		const onOpenGuide = vi.fn();
+		const { container } = await render(TaskCard, {
+			props: { item: makeItem({ def: tsp }), onSetStatus: noop, onSetSnooze: noop, onOpenGuide }
+		});
+		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		const items = container.querySelectorAll('.task-card__related-list li');
+		expect(items).toHaveLength(2);
+		const guide = items[0]?.querySelector('button');
+		expect(guide?.textContent?.trim()).toBe(`Read in the app: ${GUIDE}`);
+		expect(items[0]?.textContent).toContain('Works offline once saved');
+		expect(items[1]?.querySelector('a')?.getAttribute('target')).toBe('_blank');
+		await page.getByRole('button', { name: `Read in the app: ${GUIDE}` }).click();
+		expect(onOpenGuide).toHaveBeenCalledExactlyOnceWith('tap_financial_planning', GUIDE);
+	});
+
+	it('shows the list for a task whose only entry is a guide', async () => {
+		if (!sgli) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: {
+				item: makeItem({ def: sgli }),
+				onSetStatus: noop,
+				onSetSnooze: noop,
+				onOpenGuide: noop
+			}
+		});
+		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
+		expect(container.querySelector('.task-card__related-list button')?.textContent?.trim()).toBe(
+			'Read in the app: TAP - VA Life Insurance Benefits (Resource Guide)'
+		);
+	});
+
+	it('offers no guide where nothing can open it', async () => {
+		if (!sgli || !tsp) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: { item: makeItem({ def: sgli }), onSetStatus: noop, onSetSnooze: noop }
+		});
+		expect(page.getByRole('button', { name: /^Related resources/ }).elements()).toHaveLength(0);
+		const other = await render(TaskCard, {
+			props: { item: makeItem({ def: tsp }), onSetStatus: noop, onSetSnooze: noop }
+		});
+		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
+		expect(other.container.querySelector('.task-card__related-list button')).toBeNull();
+		expect(container.textContent).not.toContain('Read in the app');
+	});
+});
