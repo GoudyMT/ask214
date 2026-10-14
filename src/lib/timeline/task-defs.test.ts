@@ -405,3 +405,13 @@ describe('what each task must finish before', () => {
 		for (const t of leavingTasks) expect(t.windowEnd, t.id).toBeLessThan(0);
 	});
 });
+
+// health.mil: one separation exam, and none again for a VA claim; VA does it for a BDD filer and shares the results.
+// The task must not tell a member to expect a second separation exam.
+describe('the separation exam task', () => {
+	it('says there is one separation exam, done by VA and shared for a BDD claim', () => {
+		const why = TASK_DEFS.find((t) => t.id === 'sha-schedule')!.why;
+		expect(why).toContain('VA usually does this exam and shares the results with the military');
+		expect(why).not.toMatch(/its own exams|count for both/);
+	});
+});
