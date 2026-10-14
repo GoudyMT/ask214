@@ -21,6 +21,14 @@ describe('guidesForTask', () => {
 		expect(guidesForTask('unknown', { t1: ['g1'] }, INFO)).toEqual([]);
 	});
 
+	// The maps are plain objects: a name every object inherits is not a task or a guide.
+	it('reads only the maps own entries, never what every object inherits', () => {
+		expect(guidesForTask('constructor', { t1: ['g1'] }, INFO)).toEqual([]);
+		expect(guidesForTask('t1', { t1: ['toString', 'g1'] }, INFO)).toEqual([
+			{ sourceId: 'g1', title: 'Guide one' }
+		]);
+	});
+
 	it('drops a mapped id the app does not serve', () => {
 		expect(guidesForTask('t1', { t1: ['gone', 'g1'] }, INFO)).toEqual([
 			{ sourceId: 'g1', title: 'Guide one' }

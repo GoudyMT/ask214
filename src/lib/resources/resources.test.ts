@@ -93,7 +93,7 @@ describe('task-to-guide mapping: the TAP guides a task opens in the app', () => 
 	it('every mapped guide is a guide the app serves (no dangling ids)', () => {
 		for (const [taskId, guideIds] of Object.entries(TASK_GUIDES)) {
 			for (const id of guideIds) {
-				expect(id in LOCAL_DOCUMENT_INFO, `${taskId} -> ${id}`).toBe(true);
+				expect(Object.hasOwn(LOCAL_DOCUMENT_INFO, id), `${taskId} -> ${id}`).toBe(true);
 			}
 		}
 	});

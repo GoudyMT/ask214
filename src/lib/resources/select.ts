@@ -41,10 +41,11 @@ export function guidesForTask(
 	map: Record<string, readonly string[]> = TASK_GUIDES,
 	info: Record<string, { title: string }> = LOCAL_DOCUMENT_INFO
 ): { sourceId: string; title: string }[] {
-	return (map[taskId] ?? []).flatMap((sourceId) => {
-		const guide = info[sourceId];
-		return guide ? [{ sourceId, title: guide.title }] : [];
-	});
+	// Own entries only: a bare index reaches Object.prototype, so "constructor" would read as a task or a guide.
+	if (!Object.hasOwn(map, taskId)) return [];
+	return (map[taskId] ?? []).flatMap((sourceId) =>
+		Object.hasOwn(info, sourceId) ? [{ sourceId, title: info[sourceId]?.title ?? '' }] : []
+	);
 }
 
 // The one official page a firm task's What now box links to, as its link text and url. Undefined for a task with no
