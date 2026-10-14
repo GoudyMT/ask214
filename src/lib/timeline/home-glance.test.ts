@@ -181,11 +181,5 @@ describe('timelineRow', () => {
 		});
 		expect(JSON.stringify(row)).not.toMatch(/Title of|20[0-9][0-9]/);
 	});
-
-	it('says it could not load, and where to go, when the timeline failed', () => {
-		expect(timelineRow({ kind: 'failed' })).toEqual({
-			name: 'Your timeline',
-			detail: 'Could not load it here - open the Timeline'
-		});
-	});
+	// The failed row needs none of this code: Home's page tests pin it, for a failed store and for code that never came.
 });

@@ -2,7 +2,6 @@ import { formatTimelineDate } from './format-date';
 import { selectNeedsNow } from './needs-now';
 import { generateTimeline, type DisplayStatus, type TimelineItem } from './generate';
 import { TASK_DEFS } from './task-defs';
-import { FAILED_ROW } from './load-home-glance';
 import type { TimelineState } from './types';
 import type { PersonaFilters } from '../profile/persona';
 
@@ -15,11 +14,12 @@ export type HomeRow = {
 	detail: string;
 };
 
-/** What Home knows about the timeline: locked and failed carry nothing personal, so the row can show no task. */
+/**
+ * What Home knows about the timeline: locked carries nothing personal, so the row can show no task. A timeline that
+ * failed needs none of this code: Home shows `FAILED_ROW` from `./load-home-glance`.
+ */
 export type TimelineGlance =
-	| { kind: 'locked' }
-	| { kind: 'failed' }
-	| { kind: 'ready'; items: TimelineItem[]; todayIso: string };
+	{ kind: 'locked' } | { kind: 'ready'; items: TimelineItem[]; todayIso: string };
 
 const NAME = 'Your timeline';
 
@@ -77,9 +77,6 @@ export function readyGlance(
 export function timelineRow(glance: TimelineGlance): HomeRow {
 	if (glance.kind === 'locked') {
 		return { name: NAME, count: 'locked', detail: 'Unlock to see what is due' };
-	}
-	if (glance.kind === 'failed') {
-		return FAILED_ROW;
 	}
 	const g = selectNeedsNow(glance.items, glance.todayIso);
 	const urgent = [

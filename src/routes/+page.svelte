@@ -70,7 +70,7 @@
 		const persona = app.store.persona;
 		const timeline = app.timeline;
 		if (persona.completeness === 'none' || !timeline) return null;
-		if (timeline.failed) return code.timelineRow({ kind: 'failed' });
+		if (timeline.failed) return FAILED_ROW;
 		if (timeline.locked) return code.timelineRow({ kind: 'locked' });
 		if (!timeline.ready) return null;
 		const glance = code.readyGlance(persona, timeline.state, clock.now);
