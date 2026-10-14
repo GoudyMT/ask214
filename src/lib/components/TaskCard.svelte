@@ -1185,8 +1185,12 @@
 		text-decoration: underline;
 	}
 
-	/* A guide entry reads as one of the links: the same colour and size, though it opens the reader, not a site. */
+	/* A guide entry reads as one of the links: the same colour and size, though it opens the reader, not a site. Its
+	   tap area is the app's 44 px, the text-link look kept. */
 	.task-card__guide {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
 		padding: 0;
 		background: none;
 		border: none;

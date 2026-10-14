@@ -1778,6 +1778,22 @@ describe('the TAP guides a task opens in the app', () => {
 		expect(makesPersonalClaim(text), text).toBe(false);
 	});
 
+	// The app's tap rule: a guide entry is a 44 px target even when its title fits on one line.
+	it('gives each guide entry a 44 px tap area', async () => {
+		if (!tsp) throw new Error('E_TEST_TASK_MISSING');
+		const { container } = await render(TaskCard, {
+			props: {
+				item: makeItem({ def: tsp }),
+				onSetStatus: noop,
+				onSetSnooze: noop,
+				onOpenGuide: noop
+			}
+		});
+		await page.getByRole('button', { name: /^Related resources/ }).click();
+		const guide = container.querySelector('.task-card__guide') as HTMLButtonElement;
+		expect(guide.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+	});
+
 	it('shows the list for a task whose only entry is a guide', async () => {
 		if (!sgli) throw new Error('E_TEST_TASK_MISSING');
 		const { container } = await render(TaskCard, {
