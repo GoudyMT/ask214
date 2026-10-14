@@ -113,5 +113,8 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 			detail: `Next: ${next.def.title} - ${nextWhen(next)}`
 		};
 	}
-	return { name: NAME, count: 'all tasks done', detail: 'See what you finished' };
+	// A task that closed unanswered was missed, not done, so "all done" waits for every task to be done or skipped.
+	return glance.items.every((i) => i.status === 'done' || i.status === 'skipped')
+		? { name: NAME, count: 'all tasks done', detail: 'See what you finished' }
+		: { name: NAME, count: 'nothing left to do', detail: 'See your timeline' };
 }

@@ -157,18 +157,24 @@ describe('timelineRow', () => {
 		expect(row.detail).toBe('Next: Title of up - opens Jan 10, 2027');
 	});
 
-	it('says all tasks are done when nothing is left to act on', () => {
-		const row = timelineRow(
-			ready([
-				item('a', 'done'),
-				item('b', 'skipped'),
-				item('c', 'closed', { windowEndDate: '2026-01-01' })
-			])
-		);
+	it('says all tasks are done when every task is done or skipped', () => {
+		const row = timelineRow(ready([item('a', 'done'), item('b', 'skipped')]));
 		expect(row).toEqual({
 			name: 'Your timeline',
 			count: 'all tasks done',
 			detail: 'See what you finished'
+		});
+	});
+
+	// A task whose window closed long ago was missed, not done: the row must not call it finished.
+	it('says nothing is left to do, not that all is done, when a missed task closed long ago', () => {
+		const row = timelineRow(
+			ready([item('a', 'done'), item('c', 'closed', { windowEndDate: '2026-01-01' })])
+		);
+		expect(row).toEqual({
+			name: 'Your timeline',
+			count: 'nothing left to do',
+			detail: 'See your timeline'
 		});
 	});
 
