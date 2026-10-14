@@ -292,6 +292,10 @@ const STATIC = 'static';
 //     through a double click and a held Enter, focus handed on when the entry went, the wizard and note Save marked
 //     busy - and the guide entry's 44 px tap area, about 90 B in all. Two builds measured page 62,897 B and precache
 //     152,641-152,652 B, at least 43 B of room above the highest.
+//     Precache 152,700 -> 152,760 (owner's call, 2026-10-14): the break-it testers' fixes - a settings row's toggle
+//     ignoring a held Enter after a save, and the reader's Close given a 44 px tap area with the same look. Four builds
+//     measured 152,702-152,718 B (about 15 B between builds of the same code), 42 B of room above the highest. Trim
+//     pass: the guide entry's note and hover merged into the link rules, inside the noise, not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -304,7 +308,7 @@ const LIMIT = {
 	page: 62_940,
 	onDemand: 7_300,
 	precacheFiles: 60,
-	precacheBytes: 152_700,
+	precacheBytes: 152_760,
 	workerScripts: 147_200
 };
 
