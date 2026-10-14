@@ -302,7 +302,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: 'The SHA is one exam that serves both your separation and your VA claim - book it early.',
+		why: "Book your separation exam early through your command's medical department. If you file a VA claim through BDD, VA schedules its own exams too - ask your medical department whether VA's exam can count for both.",
 		afterNote: "Still required before you separate. Contact your command's medical department."
 	},
 	{
