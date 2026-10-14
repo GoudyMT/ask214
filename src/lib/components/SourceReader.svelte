@@ -154,6 +154,22 @@
 			});
 	});
 
+	// A page or a text that could not be had for want of a connection is tried again when it comes back, as reopening
+	// the reader would: the page view checks the device and the network afresh, and a failed text is built again.
+	// Once per return of the connection, never in a loop.
+	let attempt = $state(0);
+	$effect(() => {
+		const retry = (): void => {
+			if (fallback === 'offline' || fallback === 'updated') {
+				fallback = null;
+				attempt++;
+			}
+			if (building === 'failed') building = 'idle';
+		};
+		window.addEventListener('online', retry);
+		return () => window.removeEventListener('online', retry);
+	});
+
 	// The page view carries the matcher and the viewer, so it is loaded only when a served document is
 	// opened, never with the Ask page. The pager and the foot's Save come with it: both exist only for a
 	// served document.
@@ -393,24 +409,27 @@
 					tabindex="0"
 					hidden={view !== 'page'}
 				>
-					<DocumentView
-						path={served.path}
-						bytes={served.bytes}
-						{title}
-						page={served.page}
-						anchor={cited?.anchor ?? ''}
-						passageText={cited?.text ?? ''}
-						cited={!served.whole}
-						mayFocus={mayFocusPages}
-						onfallback={fallBack}
-						onnote={(found) => (note = found)}
-						request={pageRequest}
-						onview={(shownView) => {
-							pagerPage = shownView.page;
-							pagerCount = shownView.pages;
-						}}
-						{...pdfLoader ? { loader: pdfLoader } : {}}
-					/>
+					<!-- Made again on each retry, so its check of the device and the network runs again. -->
+					{#key attempt}
+						<DocumentView
+							path={served.path}
+							bytes={served.bytes}
+							{title}
+							page={served.page}
+							anchor={cited?.anchor ?? ''}
+							passageText={cited?.text ?? ''}
+							cited={!served.whole}
+							mayFocus={mayFocusPages}
+							onfallback={fallBack}
+							onnote={(found) => (note = found)}
+							request={pageRequest}
+							onview={(shownView) => {
+								pagerPage = shownView.page;
+								pagerCount = shownView.pages;
+							}}
+							{...pdfLoader ? { loader: pdfLoader } : {}}
+						/>
+					{/key}
 				</div>
 			{/if}
 			<!-- A served document's text is a named stop of its own too, as the pages are: a whole document's text

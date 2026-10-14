@@ -1505,6 +1505,102 @@ describe('SourceReader, a document opened whole', () => {
 		}
 	});
 
+	// Opened offline and never saved, a guide shows its text, or says the text could not be had either. When the
+	// connection comes back it is tried again, as reopening it would: the page, then the text if the user picks it.
+	it('tries the page again when the connection comes back', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const loadSource = vi.fn(async () => null);
+			const { container } = await render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource,
+					onClose: () => {},
+					pdfLoader: () => new Promise<PdfRuntime>(() => {})
+				}
+			});
+			await vi.waitFor(() =>
+				expect(shown(container)).toContain(
+					'This source could not be loaded right now. Check your connection and try again.'
+				)
+			);
+			expect(seg(container, 'Page')?.disabled).toBe(true);
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() =>
+				expect(seg(container, 'Page')?.getAttribute('aria-pressed')).toBe('true')
+			);
+			await vi.waitFor(() =>
+				expect(shown(container)).toContain(
+					'Downloading the whole document (0.1 MB) to show page 1...'
+				)
+			);
+			expect(container.querySelector('.reader__notice')).toBeNull();
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
+	it('leaves no focus on the page when the retry hides the text that held it', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const { container } = await render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: threePages()
+				}
+			});
+			const text = container.querySelector<HTMLElement>('.reader__text')!;
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			text.focus();
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() => expect(text.hidden).toBe(true));
+			await vi.waitFor(() =>
+				expect(container.querySelector('.reader__doc')?.contains(document.activeElement)).toBe(true)
+			);
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
+	it('builds the text again when the connection comes back, once per return', async () => {
+		const loadSource = vi
+			.fn<(id: string) => Promise<Source | null>>()
+			.mockResolvedValueOnce(null)
+			.mockResolvedValue(vetSource());
+		const { container } = await render(SourceReader, {
+			props: {
+				source: null,
+				doc: DOC,
+				loadSource,
+				onClose: () => {},
+				pdfLoader: () => new Promise<PdfRuntime>(() => {})
+			}
+		});
+		await vi.waitFor(() => expect(seg(container, 'Text')).toBeDefined());
+		seg(container, 'Text')?.click();
+		await vi.waitFor(() =>
+			expect(shown(container)).toContain('This source could not be loaded right now.')
+		);
+		expect(loadSource).toHaveBeenCalledTimes(1);
+
+		window.dispatchEvent(new Event('online'));
+		await vi.waitFor(() =>
+			expect(shown(container)).toContain('Services are free and confidential.')
+		);
+		expect(loadSource).toHaveBeenCalledTimes(2);
+		expect(seg(container, 'Text')?.getAttribute('aria-pressed')).toBe('true');
+	});
+
 	// Nothing was cited, so the page carries no mark and the reader reports no passage it could not find.
 	it('opens the first page with no notice about a passage', async () => {
 		const page: PdfDocument = {
