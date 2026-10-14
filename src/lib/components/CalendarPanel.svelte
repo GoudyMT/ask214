@@ -86,8 +86,7 @@
 	let headingEl = $state<HTMLHeadingElement | null>(null);
 
 	// A change from the stores, or the panel's own category save, that turns off the button holding focus would drop
-	// focus to the top of the page; the heading takes it instead, without scrolling. Add's own busy state is not this:
-	// it has its own way back to Add.
+	// focus to the top of the page; the heading takes it instead, without scrolling. Add's own build never turns it off.
 	$effect(() => {
 		// Both are read first so the effect follows them whatever holds focus now.
 		const addOff = !(ready && hasEvents);
@@ -111,7 +110,9 @@
 	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
 	let addFailed = $state(false);
 
+	// Not `disabled` while the file builds: a disabled button that holds focus drops it, so a press then is ignored.
 	async function addToCalendar(): Promise<void> {
+		if (building) return;
 		building = true;
 		addFailed = false;
 		let file: CalendarFile;
@@ -122,8 +123,6 @@
 			return;
 		} finally {
 			building = false;
-			// Add was off while the file built, which dropped focus to the page; it gets it back unless the person moved on.
-			void tick().then(() => document.activeElement === document.body && addEl?.focus());
 		}
 		onAdd(file);
 	}
@@ -147,7 +146,8 @@
 		bind:this={addEl}
 		class="cal-add"
 		type="button"
-		disabled={building || !ready || !hasEvents}
+		disabled={!ready || !hasEvents}
+		aria-busy={building}
 		onclick={() => void addToCalendar()}
 		onkeydown={(e) => e.repeat && e.preventDefault()}
 	>
@@ -266,6 +266,12 @@
 	}
 	.cal-add:disabled {
 		opacity: 0.6;
+		cursor: default;
+	}
+	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The hover fill
+	   stays off too, as a press does nothing. */
+	.cal-add[aria-busy='true'] {
+		background: var(--color-accent);
 		cursor: default;
 	}
 	/* The sentence under the button: what this device does after the tap. */

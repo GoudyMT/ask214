@@ -178,7 +178,7 @@ describe('CalendarCard, when the file cannot be made', () => {
 			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
 		}
 		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
-		await expect.element(add).toBeEnabled();
+		await expect.element(add).toHaveAttribute('aria-busy', 'false');
 		expect(onAdd).toHaveBeenCalledOnce();
 
 		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
