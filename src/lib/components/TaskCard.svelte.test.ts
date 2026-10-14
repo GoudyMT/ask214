@@ -556,6 +556,42 @@ describe('TaskCard (open states)', () => {
 		await expect.poll(() => container.querySelector('textarea')).toBeNull();
 	});
 
+	// A held key repeats about every 40 ms; a save that fails inside the hold leaves the editor open with focus on Save,
+	// so the repeats after it would save again. Only a new press saves. The keys go through the browser's own input.
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)('a held Enter on Save saves once when the save fails %s', async (_, ms) => {
+		const ENTER = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+		const onSetNote = vi.fn(
+			() => new Promise<void>((_, reject) => setTimeout(() => reject(new Error('E_NOTE_SAVE')), ms))
+		);
+		const { container } = await renderCard(makeItem(), { onSetNote });
+		await typeNote(container, 'Call the VSO Monday');
+		const save = buttonByText(container, 'Save') as HTMLButtonElement;
+		save.focus();
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 15; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await expect.element(page.getByRole('alert')).toHaveTextContent(SAVE_FAILED);
+		await new Promise((resolve) => setTimeout(resolve, ms + 50));
+		expect(onSetNote).toHaveBeenCalledTimes(1);
+		expect(document.activeElement).toBe(save);
+
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await vi.waitFor(() => expect(onSetNote).toHaveBeenCalledTimes(2));
+	});
+
 	// Cancel would close the editor under a save that may still fail, leaving that failure nowhere to show and the typed
 	// text lost, so it is off while the note saves and back on once the save has failed.
 	it('Cancel is off while a note saves, and a save that then fails keeps the text and gives Cancel back', async () => {

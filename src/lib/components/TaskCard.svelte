@@ -292,7 +292,12 @@
 				</p>
 			{/if}
 			<div class="task-card__note-actions">
-				<button type="button" class="task-card__note-save" onclick={saveNote}>Save</button>
+				<button
+					type="button"
+					class="task-card__note-save"
+					onkeydown={ignoreRepeat}
+					onclick={saveNote}>Save</button
+				>
 				<button
 					type="button"
 					class="task-card__note-cancel"
