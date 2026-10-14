@@ -513,7 +513,9 @@ describe('SourceReader with a served document', () => {
 		expect(seg(container, 'Text')?.getAttribute('aria-pressed')).toBe('false');
 		// This document is not in the test browser's cache; online, the page view opens at once and states its size.
 		await vi.waitFor(() =>
-			expect(shown(container)).toContain('Loading page 2 of the document (0.1 MB)...')
+			expect(shown(container)).toContain(
+				'Downloading the whole document (0.1 MB) to show page 2...'
+			)
 		);
 		expect(container.querySelector('.reader__text')?.hasAttribute('hidden')).toBe(true);
 	});
@@ -1421,7 +1423,9 @@ describe('SourceReader, a document opened whole', () => {
 		});
 
 		await vi.waitFor(() =>
-			expect(shown(container)).toContain('Loading page 1 of the document (0.1 MB)...')
+			expect(shown(container)).toContain(
+				'Downloading the whole document (0.1 MB) to show page 1...'
+			)
 		);
 		expect((container.querySelector('dialog.reader') as HTMLDialogElement).open).toBe(true);
 		expect(container.querySelector('.reader__title')?.textContent).toBe(DOC.title);
@@ -1780,7 +1784,7 @@ describe('SourceReader, a document opened whole', () => {
 			doc: { sourceId: 'tap_va101', title: 'TAP - VA Benefits 101 (Resource Guide)' },
 			pdfLoader: () => new Promise<PdfRuntime>(() => {})
 		});
-		await vi.waitFor(() => expect(shown(container)).toContain('Loading page 1 of the document'));
+		await vi.waitFor(() => expect(shown(container)).toContain('to show page 1...'));
 		expect(container.querySelector('.pager')).toBeNull();
 	});
 

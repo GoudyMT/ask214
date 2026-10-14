@@ -176,7 +176,7 @@ describe('PdfView', () => {
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { hold });
 		const { container } = await render(PdfView, { props: props(loader) });
 
-		expect(container.querySelector('[role="status"]')?.textContent).toMatch(/loading page 3/i);
+		expect(container.querySelector('[role="status"]')?.textContent).toContain('to show page 3');
 		release();
 		await vi.waitFor(() => expect(container.querySelector('[role="status"]')).toBeNull());
 	});
@@ -220,7 +220,9 @@ describe('PdfView', () => {
 		const { container } = await render(PdfView, { props: props(loader, { bytes: 6_900_000 }) });
 
 		const status = container.querySelector('[role="status"]') as HTMLElement;
-		expect(status.textContent?.trim()).toBe('Loading page 3 of the document (6.9 MB)...');
+		expect(status.textContent?.trim()).toBe(
+			'Downloading the whole document (6.9 MB) to show page 3...'
+		);
 		expect(getComputedStyle(status).aspectRatio).toBe('1 / 1.294');
 		release();
 		await vi.waitFor(() => expect(container.querySelector('[role="status"]')).toBeNull());
@@ -240,13 +242,26 @@ describe('PdfView', () => {
 		expect(content.getBoundingClientRect().top - box.top).toBeLessThan(box.height / 4);
 	});
 
+	// A saved document is read from the device, not downloaded, so the line says so and names no download.
+	it('says the page opens from the device when the document is saved', async () => {
+		const hold = new Promise<void>(() => {});
+		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { hold });
+		const { container } = await render(PdfView, {
+			props: props(loader, { bytes: 6_900_000, saved: true })
+		});
+
+		expect(container.querySelector('[role="status"]')?.textContent?.trim()).toBe(
+			'Opening page 3 from your device...'
+		);
+	});
+
 	it('states no size, and draws no bar, while loading when none is given', async () => {
 		const hold = new Promise<void>(() => {});
 		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE], { hold });
 		const { container } = await render(PdfView, { props: props(loader) });
 
 		expect(container.querySelector('[role="status"]')?.textContent?.trim()).toBe(
-			'Loading page 3 of the document...'
+			'Downloading the whole document to show page 3...'
 		);
 		expect(container.querySelector('progress')).toBeNull();
 	});

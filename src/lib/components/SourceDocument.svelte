@@ -65,6 +65,8 @@
 	} = $props();
 
 	let phase = $state<'checking' | 'view'>('checking');
+	// What the check found, for the page view's loading line.
+	let saved = $state(false);
 	// The page the view lands on: the cited page, or where the passage starts when it was found on another.
 	let landing = $state(0);
 	// Plain, not state: read only when a page report is passed on, never by the markup or an effect.
@@ -94,9 +96,10 @@
 		pageCount = 0;
 		reported = false;
 
-		void check(target.path).then((saved) => {
+		void check(target.path).then((found) => {
 			if (cancelled) return;
-			if (saved || online()) {
+			saved = found;
+			if (found || online()) {
 				phase = 'view';
 				return;
 			}
@@ -146,6 +149,7 @@
 		{quote}
 		{title}
 		{bytes}
+		{saved}
 		{loader}
 		{request}
 		{mayFocus}
