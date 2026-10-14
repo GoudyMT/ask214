@@ -30,6 +30,22 @@ describe('handOver', () => {
 		expect(download).toHaveBeenCalledOnce();
 	});
 
+	// The file is built after the tap and handed over when it is ready. A Lock pressed in between means nothing personal
+	// leaves the app after it, so a file finished after the Lock is dropped, unrecorded.
+	it('drops the file when the app locked while it was built', async () => {
+		const download = vi.fn();
+		const recordAdd = vi.fn(async () => {});
+		await handOver(FILE, { locked: true, recordAdd }, NOW, download);
+		expect(download).not.toHaveBeenCalled();
+		expect(recordAdd).not.toHaveBeenCalled();
+	});
+
+	it('hands the file over while the app is unlocked', async () => {
+		const download = vi.fn();
+		await handOver(FILE, { locked: false, recordAdd: vi.fn(async () => {}) }, NOW, download);
+		expect(download).toHaveBeenCalledOnce();
+	});
+
 	it('still hands the file over when there is no store to record in', async () => {
 		const download = vi.fn();
 		await handOver(FILE, undefined, NOW, download);
