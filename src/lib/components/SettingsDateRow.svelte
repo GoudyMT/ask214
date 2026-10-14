@@ -206,8 +206,9 @@
 		opacity: 0.6;
 		cursor: default;
 	}
-	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The hover fill
-	   stays off too, as a press does nothing. */
+	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The label does not
+	   change either, so only aria-busy marks the work - accepted, as the work is local and usually over before it
+	   could be seen. The hover fill stays off too, as a press does nothing. */
 	.settings-save[aria-busy='true'] {
 		background: var(--color-accent);
 		cursor: default;
