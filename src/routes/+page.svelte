@@ -20,6 +20,7 @@
 	import { getProfileApp } from '$lib/profile/context';
 	import { LocalToday } from '$lib/timeline/local-today.svelte';
 	import type { HomeRow } from '$lib/timeline/home-glance';
+	import { FAILED_ROW, loadHomeGlance } from '$lib/timeline/load-home-glance';
 	import GlanceRow from '$lib/components/GlanceRow.svelte';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
@@ -50,13 +51,19 @@
 			!!app.store &&
 			(app.store.locked || app.store.persona.completeness !== 'none')
 	);
-	let glanceCode = $state<typeof import('$lib/timeline/home-glance') | null>(null);
+	let glanceCode = $state<Awaited<ReturnType<typeof loadHomeGlance>> | null>(null);
+	// Code that never arrived (offline, before it was ever stored) still gets a row that says so, not a silent gap.
+	let glanceLost = $state(false);
 	$effect(() => {
-		if (returning && !glanceCode) {
-			void import('$lib/timeline/home-glance').then((m) => (glanceCode = m));
+		if (returning && !glanceCode && !glanceLost) {
+			loadHomeGlance().then(
+				(m) => (glanceCode = m),
+				() => (glanceLost = true)
+			);
 		}
 	});
 	const row = $derived.by((): HomeRow | null => {
+		if (glanceLost && returning) return FAILED_ROW;
 		const code = glanceCode;
 		if (!code || app.status !== 'ready' || !app.store) return null;
 		if (app.store.locked) return code.timelineRow({ kind: 'locked' });

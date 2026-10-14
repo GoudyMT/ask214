@@ -43,6 +43,14 @@ vi.mock('$lib/ask', async (importOriginal) => ({
 vi.mock('$lib/ask/embed-worker?worker', () => ({ default: class {} }));
 vi.mock('$lib/ask/device-files', () => ({ deviceFilesKept: async () => true }));
 vi.mock('$lib/profile/context', () => ({ getProfileApp: () => app, setProfileApp: () => {} }));
+// The Home row's code is fetched through this loader, so a test can see whether it was fetched, and make it fail.
+type Loader = typeof import('$lib/timeline/load-home-glance').loadHomeGlance;
+const glance = vi.hoisted(() => ({ load: vi.fn(), real: null as unknown as Loader }));
+vi.mock('$lib/timeline/load-home-glance', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/timeline/load-home-glance')>();
+	glance.real = real.loadHomeGlance;
+	return { ...real, loadHomeGlance: () => glance.load() };
+});
 vi.mock('$lib/install/context', () => ({
 	getInstallApp: () => ({ canPrompt: false, installed: true, ios: false, persisted: false }),
 	setInstallApp: () => {}
@@ -65,6 +73,8 @@ const lines = () => [
 ];
 
 beforeEach(() => {
+	glance.load.mockReset();
+	glance.load.mockImplementation(() => glance.real());
 	fake.state = { kind: 'idle' };
 	app.status = 'ready';
 	app.store = { locked: false, persona };
@@ -125,6 +135,9 @@ describe('Home, the timeline row', () => {
 	it('shows no row while the timeline is still loading, never a false "nothing"', async () => {
 		app.timeline = { locked: false, ready: false, failed: false, state: EMPTY };
 		await render(HomePage);
+		// The row's code is in, so only the loading timeline holds the row back.
+		await expect.poll(() => glance.load.mock.results.length).toBe(1);
+		await glance.load.mock.results[0]!.value;
 		await new Promise((r) => setTimeout(r, 50));
 		expect(document.querySelector('.ask-input')).not.toBeNull();
 		expect(row()).toBeNull();
@@ -132,11 +145,40 @@ describe('Home, the timeline row', () => {
 		await expect.poll(() => row()).not.toBeNull();
 	});
 
-	it('keeps the first-run card, and no row, for a user with no timeline', async () => {
+	it('keeps the first-run card, and no row, for a user with no timeline - and fetches none of its code', async () => {
 		app.store = { locked: false, persona: NO_PERSONA };
 		await render(HomePage);
 		await expect.poll(() => document.querySelector('.home-onramp')).not.toBeNull();
+		await new Promise((r) => setTimeout(r, 50));
 		expect(row()).toBeNull();
+		expect(glance.load).not.toHaveBeenCalled();
+	});
+
+	it('says it could not load when the row code fails to arrive', async () => {
+		glance.load.mockImplementation(() => Promise.reject(new Error('chunk failed')));
+		await render(HomePage);
+		await expect.poll(() => row()).not.toBeNull();
+		expect(lines()).toEqual(['Your timeline', 'Could not load it here - open the Timeline']);
+		expect(glance.load).toHaveBeenCalledOnce();
+	});
+
+	it('turns to the locked row, with no task left on screen, when the app locks while Home is open', async () => {
+		await render(HomePage);
+		await expect.poll(() => lines()[0]).toMatch(/need you now$/);
+		app.store = { locked: true, persona: NO_PERSONA };
+		await expect
+			.poll(() => lines())
+			.toEqual(['Your timeline - locked', 'Unlock to see what is due']);
+		for (const def of TASK_DEFS) expect(textOf(row()!)).not.toContain(def.title);
+	});
+
+	it('turns to the locked row when the timeline store alone locks while Home is open', async () => {
+		await render(HomePage);
+		await expect.poll(() => lines()[0]).toMatch(/need you now$/);
+		app.timeline = { locked: true, ready: false, failed: false, state: EMPTY };
+		await expect
+			.poll(() => lines())
+			.toEqual(['Your timeline - locked', 'Unlock to see what is due']);
 	});
 
 	it('steps aside while answers show', async () => {

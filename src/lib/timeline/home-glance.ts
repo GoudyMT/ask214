@@ -2,6 +2,7 @@ import { formatTimelineDate } from './format-date';
 import { selectNeedsNow } from './needs-now';
 import { generateTimeline, type DisplayStatus, type TimelineItem } from './generate';
 import { TASK_DEFS } from './task-defs';
+import { FAILED_ROW } from './load-home-glance';
 import type { TimelineState } from './types';
 import type { PersonaFilters } from '../profile/persona';
 
@@ -78,7 +79,7 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 		return { name: NAME, count: 'locked', detail: 'Unlock to see what is due' };
 	}
 	if (glance.kind === 'failed') {
-		return { name: NAME, detail: 'Could not load it here - open the Timeline' };
+		return FAILED_ROW;
 	}
 	const g = selectNeedsNow(glance.items, glance.todayIso);
 	const urgent = [
