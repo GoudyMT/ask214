@@ -108,7 +108,7 @@ describe('task-to-guide mapping: the TAP guides a task opens in the app', () => 
 		}
 	});
 
-	// The list Max approved (S121), task by task: a change to it is a curation decision, made here on purpose.
+	// The list the owner approved, task by task: a change to it is a curation decision, made here on purpose.
 	it('matches the approved list', () => {
 		expect(TASK_GUIDES).toEqual({
 			'va-gov-account': ['tap_va_benefits_guide'],

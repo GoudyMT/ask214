@@ -358,8 +358,8 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'va-claim-fallback': ['va-disability', 'va-accredited-rep']
 };
 
-// The TAP guides a task opens in the app's own reader, listed first under its Related resources. Curated by hand
-// (S121, approved by the owner): each guide checked to cover the task, by its own pages, 0-2 per task. Keys are
+// The TAP guides a task opens in the app's own reader, listed first under its Related resources. Curated by hand and
+// approved by the owner: each guide checked to cover the task, by its own pages, 0-2 per task. Keys are
 // timeline task ids; values are the served guides' source ids (src/lib/sources/local-document-info.data.ts), in the
 // order to show them. Tasks absent here open no guide.
 export const TASK_GUIDES: Record<string, readonly string[]> = {
