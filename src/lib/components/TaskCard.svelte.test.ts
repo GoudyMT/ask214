@@ -337,6 +337,12 @@ describe('TaskCard (open states)', () => {
 		const upcoming = (await renderCard(makeItem({ status: 'upcoming' }))).container;
 		expect(buttonByText(upcoming, 'Snooze')).toBeUndefined();
 		expect(buttonByText(upcoming, 'Mark done')).toBeDefined();
+		// A task moved to fit before leaving, from its last day there: a snooze would not quiet it.
+		for (const status of ['start-now', 'still-to-do'] as const) {
+			const closed = (await renderCard(makeItem({ status, snoozeClosed: true }))).container;
+			expect(buttonByText(closed, 'Snooze'), status).toBeUndefined();
+			expect(buttonByText(closed, 'Mark done'), status).toBeDefined();
+		}
 		for (const status of ['start-now', 'still-to-do'] as const) {
 			expect(
 				buttonByText((await renderCard(makeItem({ status }))).container, 'Snooze'),

@@ -427,8 +427,9 @@
 				<button type="button" onclick={() => setStatus('done')}>Mark done</button>
 				<button type="button" onclick={() => setStatus('skipped')}>Skip</button>
 				<!-- A snooze never hides a firm warning, and before a window opens there is nothing to quiet, so it is not
-				     offered where it would change nothing. -->
-				{#if item.status !== 'upcoming' && !isFirmWarning(item.status, item.def.kind)}
+				     offered where it would change nothing; nor from the last day at the command on a task moved to fit
+				     before leaving. -->
+				{#if item.status !== 'upcoming' && !item.snoozeClosed && !isFirmWarning(item.status, item.def.kind)}
 					<button type="button" onclick={toggleSnooze}>Snooze</button>
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>

@@ -1219,6 +1219,13 @@ describe('A snooze on a task moved to fit before leaving', () => {
 		expect(on(new Date(2026, 11, 2, 12))?.status).toBe('still-to-do');
 	});
 
+	// From the last day there no snooze can quiet it, so the card must not offer one that does nothing.
+	it('closes snoozing from the last day there on, and not before', () => {
+		expect(on(new Date(2026, 10, 29, 12))?.snoozeClosed).toBeUndefined();
+		expect(on(new Date(2026, 10, 30, 12))?.snoozeClosed).toBe(true);
+		expect(on(new Date(2026, 11, 2, 12))?.snoozeClosed).toBe(true);
+	});
+
 	it('keeps a snooze that ends before the last day there as it is', () => {
 		const u1 = on(new Date(2026, 10, 1, 12), '2026-11-10');
 		expect(u1?.status).toBe('snoozed');
@@ -1234,10 +1241,16 @@ describe('A soft aim from before separation', () => {
 		windowStart: 30,
 		windowEnd: 60
 	};
+	const onSeparation: TaskDef = {
+		...noRecommended,
+		id: 'on-separation',
+		windowStart: -30,
+		windowEnd: 0
+	};
 	const on = (today: Date) => {
 		const items = generateTimeline(
 			{ completeness: 'eaos-only', eaos: EAOS, daysUntilSeparation: 0 },
-			[universal, afterSeparation],
+			[universal, afterSeparation, onSeparation],
 			{ schemaVersion: 1, tasks: {} },
 			today
 		).phases.flatMap((p) => p.items);
@@ -1254,6 +1267,13 @@ describe('A soft aim from before separation', () => {
 		const u1 = on(new Date(2027, 3, 16, 12))('u1');
 		expect(u1?.status).toBe('still-to-do');
 		expect(u1?.aimLapsed).toBe(true);
+	});
+
+	it('lapses an aim set on separation day itself, the day after', () => {
+		expect(on(new Date(2027, 3, 15, 12))('on-separation')?.aimLapsed).toBeUndefined();
+		const day = on(new Date(2027, 3, 16, 12))('on-separation');
+		expect(day?.status).toBe('still-to-do');
+		expect(day?.aimLapsed).toBe(true);
 	});
 
 	it('never lapses an aim set after separation', () => {
