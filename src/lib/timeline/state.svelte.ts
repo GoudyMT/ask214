@@ -169,12 +169,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	}
 
 	const api = {
-		/** Reactive timeline state; EMPTY before load / when relocked. */
+		/** Reactive timeline state; EMPTY before load / when relocked / after a load that failed. */
 		get state(): TimelineState {
 			return _state ?? EMPTY_STATE;
 		},
 
-		/** Whether the record is loaded. FALSE before the first load and after a relock: the stored statuses are
+		/** Whether the record is loaded. FALSE before the first load, after a relock and after a load that failed: the stored statuses are
 		 *  then UNKNOWN, and an add built from the empty defaults would put done tasks back in the calendar. */
 		get ready(): boolean {
 			return _state !== null;

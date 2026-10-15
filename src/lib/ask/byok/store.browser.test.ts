@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createByokStore } from './store';
 import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 import { KeystoreNotInitializedError } from '$lib/profile/store.svelte';
-import { withStores, reqToPromise } from '$lib/db/schema';
+import { withStores, reqToPromise, STORES } from '$lib/db/schema';
 import { openTestDb, deleteTestDb } from '$lib/db/_test-helpers';
 
 // Real Chromium (SubtleCrypto + IndexedDB). The byok store persists the user's BYO API key as a single
@@ -174,7 +174,25 @@ describe('byok store against an erase', () => {
 		await deleteTestDb(db);
 	});
 
+	// The erase's own effect, made while the peer holds the lock: every store cleared in one transaction, the
+	// keystore with them. A save that read the keystore before the erase would still hold it and write after.
 	it('a key save straddling an Erase writes nothing', async () => {
+		const peer = await hold('mtc-keystore', 'exclusive');
+		let save: Promise<void> | undefined;
+		try {
+			save = createByokStore(db).saveApiKey(KEY);
+			expect(await outcomeOf(save)).toBe('still waiting');
+			await withStores(db, [...STORES], 'readwrite', (tx) => {
+				for (const store of STORES) tx.objectStore(store).clear();
+			});
+		} finally {
+			await peer.release();
+		}
+		await expect(save).rejects.toThrow(KeystoreNotInitializedError);
+		expect(await byokRow(db)).toBeUndefined();
+	});
+
+	it('a key save waits for an Erase holding the keystore lock', async () => {
 		const peer = await hold('mtc-keystore', 'exclusive');
 		let save: Promise<void> | undefined;
 		try {
