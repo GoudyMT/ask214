@@ -240,6 +240,36 @@ describe('AskView', () => {
 		expect(container.querySelectorAll('.ask-similar .ask-card').length).toBe(2); // expanded
 	});
 
+	// A passage of a few words is a heading cut off from its text ("Option 1: Online Request a COE"): it answers
+	// nothing, so Similar leaves it out. The lead is never touched - it is what the answer is measured on.
+	it('results: Similar leaves out a passage of only a few words, and keeps a short lead', async () => {
+		const cards = [
+			card({ sourceTitle: 'Lead Source', excerpt: 'DOW SkillBridge' }),
+			card({ sourceTitle: 'Heading Only', excerpt: 'Option 1: Online Request a COE' }),
+			card({ sourceTitle: 'Similar A' })
+		];
+		const { container } = await render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards })
+		});
+		expect(container.querySelector('.ask-card--lead')?.textContent).toContain('Lead Source');
+		const toggle = container.querySelector('.ask-toggle') as HTMLButtonElement;
+		expect(toggle.textContent).toContain('Show 1 similar');
+		toggle.click();
+		flushSync();
+		const similar = [...container.querySelectorAll('.ask-similar .ask-card')];
+		expect(similar.map((c) => c.textContent?.includes('Similar A'))).toEqual([true]);
+		expect(container.textContent).not.toContain('Heading Only');
+	});
+
+	it('results: no similar toggle when every other passage is only a few words', async () => {
+		const cards = [card(), card({ excerpt: 'Ages 30 to 34' }), card({ excerpt: 'Apply online' })];
+		const { container } = await render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards })
+		});
+		expect(container.querySelector('.ask-card--lead')).not.toBeNull();
+		expect(container.querySelector('.ask-toggle')).toBeNull();
+	});
+
 	it('results: a single hit shows the lead with no similar toggle', async () => {
 		const { container } = await render(AskView, {
 			props: props({ kind: 'results', origin: 'device', cards: [card()] })
