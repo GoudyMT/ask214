@@ -32,7 +32,7 @@ function makeItem(overrides: Partial<TimelineItem> = {}): TimelineItem {
 		targetDate: '2026-10-15',
 		windowStartDate: '2025-10-23',
 		windowEndDate: '2026-04-15',
-		status: 'upcoming',
+		status: 'start-now',
 		...overrides
 	};
 }
@@ -240,6 +240,16 @@ describe('TaskCard (open states)', () => {
 		expect(container.querySelector('.task-card__whatnow')).toBeNull();
 	});
 
+	it('still-to-do with a lapsed aim: "Still to do" and no date', async () => {
+		const { container } = await renderCard(
+			makeItem({ status: 'still-to-do', windowEndDate: '2024-06-03', aimLapsed: true })
+		);
+		expect(container.textContent).toContain('Still to do');
+		expect(container.textContent).not.toContain('Aimed for');
+		expect(container.textContent).not.toContain('2024');
+		expect(container.querySelector('.task-card__date')).toBeNull();
+	});
+
 	it('an open card carries an anchor id the summary links to', async () => {
 		const { container } = await renderCard(makeItem());
 		expect(container.querySelector('article')?.id).toBe('task-skillbridge-hosts');
@@ -311,7 +321,8 @@ describe('TaskCard (open states)', () => {
 		expect(onSetStatus).toHaveBeenCalledWith('skillbridge-hosts', 'skipped');
 	});
 
-	// A snooze can never hide a firm warning, so the card does not offer one there: the tap would change nothing.
+	// A snooze can never hide a firm warning, so the card does not offer one there: the tap would change nothing. Before
+	// a window opens there is nothing to quiet either, and a snooze date would fall before the opening the card names.
 	it('offers Snooze only where a snooze can quiet the card', async () => {
 		const firmDef = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
 		for (const status of ['closing-soon', 'late', 'changed', 'closed'] as const) {
@@ -323,7 +334,10 @@ describe('TaskCard (open states)', () => {
 			expect(buttonByText(card, 'Snooze'), status).toBeUndefined();
 			expect(buttonByText(card, 'Mark done'), status).toBeDefined();
 		}
-		for (const status of ['upcoming', 'start-now', 'still-to-do'] as const) {
+		const upcoming = (await renderCard(makeItem({ status: 'upcoming' }))).container;
+		expect(buttonByText(upcoming, 'Snooze')).toBeUndefined();
+		expect(buttonByText(upcoming, 'Mark done')).toBeDefined();
+		for (const status of ['start-now', 'still-to-do'] as const) {
 			expect(
 				buttonByText((await renderCard(makeItem({ status }))).container, 'Snooze'),
 				status
@@ -969,6 +983,19 @@ describe('TaskCard (layout by width)', () => {
 		expect(box(container, '.task-card__when').right).toBeLessThanOrEqual(
 			box(container, 'article').right
 		);
+	});
+
+	// The dash between the status and the date is drawn by CSS, so with no date it would dangle after the status.
+	it('on a phone a status with no date line ends without a dash', async () => {
+		await page.viewport(320, 800);
+		const { container } = await renderCard(
+			makeItem({ status: 'still-to-do', windowEndDate: '2024-06-03', aimLapsed: true })
+		);
+		const status = container.querySelector('.task-card__status') as HTMLElement;
+		expect(getComputedStyle(status, '::after').content).toBe('none');
+		const dated = await renderCard(closing);
+		const datedStatus = dated.container.querySelector('.task-card__status') as HTMLElement;
+		expect(getComputedStyle(datedStatus, '::after').content).toContain('-');
 	});
 
 	it('on a wide screen the status line sits beside the title', async () => {

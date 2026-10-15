@@ -263,7 +263,7 @@
 			case 'closed':
 				return { text: f(closedOnDate(item)) };
 			case 'still-to-do':
-				return at('Aimed for', item.windowEndDate);
+				return item.aimLapsed ? { text: '' } : at('Aimed for', item.windowEndDate);
 			default:
 				return { text: f(item.targetDate) };
 		}
@@ -422,8 +422,9 @@
 			<div class="task-card__actions">
 				<button type="button" onclick={() => setStatus('done')}>Mark done</button>
 				<button type="button" onclick={() => setStatus('skipped')}>Skip</button>
-				<!-- A snooze never hides a firm warning, so it is not offered where it would change nothing. -->
-				{#if !isFirmWarning(item.status, item.def.kind)}
+				<!-- A snooze never hides a firm warning, and before a window opens there is nothing to quiet, so it is not
+				     offered where it would change nothing. -->
+				{#if item.status !== 'upcoming' && !isFirmWarning(item.status, item.def.kind)}
 					<button type="button" onclick={toggleSnooze}>Snooze</button>
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
@@ -506,13 +507,16 @@
 		</div>
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
-			<span class="task-card__when"
-				><span class="task-card__date"
-					>{dateLine.text}{#if dateLine.reason}<span class="task-card__reason"
-							>, <span class="task-card__reason-words">{dateLine.reason}</span></span
-						>{/if}</span
-				>{#if daysLeftLine}<span class="task-card__days">{daysLeftLine}</span>{/if}</span
-			>
+			<!-- A countdown only runs beside a date, so a card with no date line has nothing here. -->
+			{#if dateLine.text}
+				<span class="task-card__when"
+					><span class="task-card__date"
+						>{dateLine.text}{#if dateLine.reason}<span class="task-card__reason"
+								>, <span class="task-card__reason-words">{dateLine.reason}</span></span
+							>{/if}</span
+					>{#if daysLeftLine}<span class="task-card__days">{daysLeftLine}</span>{/if}</span
+				>
+			{/if}
 		</div>
 	</article>
 {/if}
@@ -869,7 +873,7 @@
 
 		/* The line may break only after the status's dash: the date and its countdown move as one, so no line
 		   starts with "- 17 days". \00a0 is a no-break space. */
-		.task-card__meta .task-card__status::after {
+		.task-card__meta .task-card__status:not(:last-child)::after {
 			content: '\00a0- ';
 		}
 

@@ -214,6 +214,11 @@ export type TimelineItem = {
 	closedOn?: string;
 	daysLeft?: number; // days to the next firm edge while it counts down
 	aimDate?: string; // soft tasks: the recommended date, or the window end once that passed
+	/**
+	 * A still-to-do task whose aim fell before separation, once separation has passed: a soft task never closes, so
+	 * its old date would read as overdue for years. The card and Home show it with no date.
+	 */
+	aimLapsed?: true;
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
 	note?: string; // the user's saved note for this task, if any (shown on any status)
 	/** Present when Fit pulled the last day in: why, and the date it moved to (the card names the reason there). */
@@ -359,6 +364,11 @@ export function generateTimeline(
 				...(nextEdge !== undefined ? { daysLeft: daysBetween(todayIso, nextEdge) } : {}),
 				...(a.def.kind === 'soft'
 					? { aimDate: a.targetDate >= todayIso ? a.targetDate : windowEndDate }
+					: {}),
+				...(status === 'still-to-do' &&
+				todayIso > a.separationDate &&
+				windowEndDate < a.separationDate
+					? { aimLapsed: true as const }
 					: {}),
 				// snoozeUntil rides the view only while the item is actively snoozed; gating on the
 				// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.

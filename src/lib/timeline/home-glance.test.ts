@@ -147,6 +147,25 @@ describe('timelineRow', () => {
 		);
 	});
 
+	it('names a still-to-do task with a lapsed aim without its old date', () => {
+		const soft = { ...item('soft', 'upcoming').def, kind: 'soft' as const };
+		const old = item('old', 'still-to-do', { def: { ...soft, id: 'old' }, aimLapsed: true });
+		expect(timelineRow(ready([old])).detail).toBe('Next: Title of soft - still to do');
+	});
+
+	// An aim already passed is weaker than a window open now, whatever the list order.
+	it('prefers a task open now over a still-to-do one for Next', () => {
+		const soft = { ...item('soft', 'upcoming').def, kind: 'soft' as const, title: 'Old aim' };
+		const old = item('old', 'still-to-do', { def: soft });
+		const now = item('now', 'start-now', { windowStartDate: '2026-08-01' });
+		expect(timelineRow(ready([old, now])).detail).toBe(
+			'Next: Title of now - last day Nov 20, 2026'
+		);
+		expect(timelineRow(ready([old, item('up', 'upcoming')])).detail).toBe(
+			'Next: Old aim - aimed for Nov 20, 2026'
+		);
+	});
+
 	it('prefers an open task over a snoozed one for Next', () => {
 		const row = timelineRow(
 			ready([

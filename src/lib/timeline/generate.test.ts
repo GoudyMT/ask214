@@ -1148,3 +1148,51 @@ describe('the SkillBridge steps follow the saved answer', () => {
 		expect(request?.fit).toEqual({ reason: 'skillbridge', date: '2027-08-31' });
 	});
 });
+
+// A soft task never closes, so years later its card would still say "Aimed for" a date from before separation.
+describe('A soft aim from before separation', () => {
+	const afterSeparation: TaskDef = {
+		...noRecommended,
+		id: 'after',
+		windowStart: 30,
+		windowEnd: 60
+	};
+	const on = (today: Date) => {
+		const items = generateTimeline(
+			{ completeness: 'eaos-only', eaos: EAOS, daysUntilSeparation: 0 },
+			[universal, afterSeparation],
+			{ schemaVersion: 1, tasks: {} },
+			today
+		).phases.flatMap((p) => p.items);
+		return (id: string) => items.find((i) => i.def.id === id);
+	};
+
+	it('keeps its date through separation day', () => {
+		const u1 = on(new Date(2027, 3, 15, 12))('u1');
+		expect(u1?.status).toBe('still-to-do');
+		expect(u1?.aimLapsed).toBeUndefined();
+	});
+
+	it('lapses the day after separation', () => {
+		const u1 = on(new Date(2027, 3, 16, 12))('u1');
+		expect(u1?.status).toBe('still-to-do');
+		expect(u1?.aimLapsed).toBe(true);
+	});
+
+	it('never lapses an aim set after separation', () => {
+		const after = on(new Date(2029, 5, 1, 12))('after');
+		expect(after?.status).toBe('still-to-do');
+		expect(after?.aimLapsed).toBeUndefined();
+	});
+
+	it('marks no task that is not still to do', () => {
+		const u1 = generateTimeline(
+			{ completeness: 'eaos-only', eaos: EAOS, daysUntilSeparation: 0 },
+			[universal],
+			{ schemaVersion: 1, tasks: { u1: { status: 'done' } } },
+			new Date(2029, 5, 1, 12)
+		).phases.flatMap((p) => p.items)[0];
+		expect(u1?.status).toBe('done');
+		expect(u1?.aimLapsed).toBeUndefined();
+	});
+});
