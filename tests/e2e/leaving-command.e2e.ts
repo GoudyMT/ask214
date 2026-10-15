@@ -224,7 +224,7 @@ test('a date outside the input range or on separation is refused, and nothing is
 }) => {
 	await seedProfile(page, SEP_IN);
 	await enterSkillBridge(page, isoFromToday(-6 * 365)); // a year typo: more than the five years back allowed
-	await expect(page.getByText('Enter a date within about 15 years from today.')).toBeVisible();
+	await expect(page.getByText('Enter a date from 5 years ago to 15 years from now.')).toBeVisible();
 	await page.getByLabel('SkillBridge start').fill(isoFromToday(SEP_IN));
 	await page
 		.getByLabel('Transition timeline')

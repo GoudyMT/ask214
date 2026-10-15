@@ -121,6 +121,17 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 		}
 	);
 
+	// The range runs back 5 years as well as forward 15, so the message names both ends: a year typo into the past
+	// was told "within about 15 years from today", which it already was.
+	it('names both ends of the range when a date is too far back, and saves nothing', async () => {
+		await render(SettingsPage);
+		await enter('SkillBridge start', isoFromToday(-6 * 365));
+		await expect
+			.element(page.getByText('Enter a date from 5 years ago to 15 years from now.'))
+			.toBeVisible();
+		expect(store.save).not.toHaveBeenCalled();
+	});
+
 	// A date that breaks both rules gets the separation line: no leaving date can be on or after separation at all.
 	it('refuses a SkillBridge start on separation day and after terminal leave with the separation line', async () => {
 		withLeaving({ terminalLeaveStart: isoFromToday(STORED) });

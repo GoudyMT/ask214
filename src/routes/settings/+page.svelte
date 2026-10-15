@@ -117,7 +117,7 @@
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
 		format: 'Please enter your separation date.',
-		'year-range': 'Enter a date within about 15 years from today.',
+		'year-range': 'Enter a date from 5 years ago to 15 years from now.',
 		month: 'Please enter a valid date.',
 		day: 'Please enter a valid date.'
 	};
