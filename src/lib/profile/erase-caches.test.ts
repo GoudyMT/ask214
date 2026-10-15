@@ -77,4 +77,17 @@ describe('eraseCaches (what an erase leaves in Cache Storage)', () => {
 		});
 		await expect(eraseCaches(api)).rejects.toThrow('E_DELETE');
 	});
+
+	it('lets a failed delete of a page kept in the app code cache fail the erase too', async () => {
+		const { api } = namedCaches({ 'app-2': { '/': 'shell', '/timeline': 'page' } });
+		const open = api.open.bind(api);
+		api.open = vi.fn(async (name: string) => {
+			const cache = await open(name);
+			cache.delete = vi.fn(async () => {
+				throw new Error('E_ENTRY_DELETE');
+			});
+			return cache;
+		});
+		await expect(eraseCaches(api)).rejects.toThrow('E_ENTRY_DELETE');
+	});
 });
