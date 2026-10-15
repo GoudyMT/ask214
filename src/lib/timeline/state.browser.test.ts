@@ -655,6 +655,28 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	// The tasks held from the last good read are not known to be current once a read fails: they must not stay on
+	// screen as if they were, and an add built from them must not run.
+	it('a failed load reads not-ready', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('dd214-review', 'done');
+		expect(a.ready).toBe(true);
+		expect(a.state.tasks['dd214-review']?.status).toBe('done');
+
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').delete(0);
+		});
+		await expect(a.load()).rejects.toThrow('E_TIMELINE_BODY_MISSING');
+
+		expect(a.ready).toBe(false);
+		expect(a.state).toEqual({ schemaVersion: 1, tasks: {} });
+		expect(a.failed).toBe(true);
+		await deleteTestDb(db);
+	});
+
 	// Locked is the user's lock, which only a load the user asks for opens: page hygiene on top of it does not move it, so
 	// a page that sees it can offer Unlock.
 	it('is locked from a lock until a load opens it', async () => {

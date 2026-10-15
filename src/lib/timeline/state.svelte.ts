@@ -238,6 +238,10 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					}
 				);
 			} catch (e) {
+				// A failed read must not leave the statuses from an older read on screen as if they were current, and
+				// `ready` must read false so an add built from them cannot run. lockState stays as it was, so the next
+				// automatic re-read still tries.
+				_state = null;
 				_failed = true;
 				throw e;
 			}
