@@ -240,6 +240,15 @@ describe('AskView', () => {
 		expect(container.querySelectorAll('.ask-similar .ask-card').length).toBe(2); // expanded
 	});
 
+	it('results: names one similar source in the singular', async () => {
+		const cards = [card({ sourceTitle: 'Lead Source' }), card({ sourceTitle: 'Similar A' })];
+		const { container } = await render(AskView, {
+			props: props({ kind: 'results', origin: 'device', cards })
+		});
+		const toggle = container.querySelector('.ask-toggle') as HTMLButtonElement;
+		expect(toggle.textContent?.trim()).toBe('Show 1 similar source');
+	});
+
 	// A passage of a few words is a heading cut off from its text ("Option 1: Online Request a COE"): it answers
 	// nothing, so Similar leaves it out. The lead is never touched - it is what the answer is measured on.
 	it('results: Similar leaves out a passage of only a few words, and keeps a short lead', async () => {

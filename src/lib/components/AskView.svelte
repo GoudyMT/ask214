@@ -344,7 +344,9 @@
 		{@const similar = similarCards(cards)}
 		{#if similar.length > 0}
 			<button class="ask-toggle" type="button" onclick={() => (showSimilar = !showSimilar)}>
-				{showSimilar ? 'Hide' : `Show ${similar.length}`} similar sources
+				{showSimilar ? 'Hide' : `Show ${similar.length}`} similar {similar.length === 1
+					? 'source'
+					: 'sources'}
 			</button>
 			{#if showSimilar}
 				<div class="ask-similar">
