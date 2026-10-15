@@ -601,7 +601,7 @@ describe('reloadOnSignalWhenShown', () => {
 		'data-replaced'
 	];
 
-	function setup(opts: { hidden: boolean; locked?: boolean }) {
+	function setup(opts: { hidden: boolean; locked?: boolean; type?: BusSignal['type'] }) {
 		let handler: ((s: BusSignal) => void) | undefined;
 		const unsubscribe = vi.fn(() => void (handler = undefined));
 		const bus: ProfileBus = {
@@ -618,7 +618,7 @@ describe('reloadOnSignalWhenShown', () => {
 		const onLocked = vi.fn();
 		const stop = reloadOnSignalWhenShown(
 			bus,
-			'data-replaced',
+			opts.type ?? 'data-replaced',
 			doc,
 			() => state.locked,
 			onLocked,
@@ -670,6 +670,27 @@ describe('reloadOnSignalWhenShown', () => {
 		t.signal();
 		expect(t.onLocked).toHaveBeenCalledTimes(1);
 		expect(t.reload).not.toHaveBeenCalled();
+	});
+
+	// A tab that is both hidden and locked must record the pending reload at the signal, not only when it is
+	// later shown: it may never be shown before the user unlocks.
+	it('marks reload-on-unlock at the signal when the tab is hidden and locked', () => {
+		const t = setup({ hidden: true, locked: true });
+		t.signal();
+		expect(t.onLocked).toHaveBeenCalledTimes(1);
+		expect(t.reload).not.toHaveBeenCalled();
+		t.show();
+		expect(t.onLocked).toHaveBeenCalledTimes(1);
+		expect(t.reload).not.toHaveBeenCalled();
+	});
+
+	// The type is a parameter, not a constant: a helper built for another type reacts to that one only.
+	it('reacts to the type it was given and ignores data-replaced otherwise', () => {
+		const t = setup({ hidden: false, type: 'relocked' });
+		t.signal('data-replaced');
+		expect(t.reload).not.toHaveBeenCalled();
+		t.signal('relocked');
+		expect(t.reload).toHaveBeenCalledTimes(1);
 	});
 
 	it('marks reload-on-unlock when the tab locked while it waited hidden', () => {
