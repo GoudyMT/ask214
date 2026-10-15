@@ -158,8 +158,6 @@ export async function synthesize(
 		}
 		const json: unknown = await res.json();
 		stopReason = (json as { stop_reason?: unknown } | null)?.stop_reason;
-		// A declined request carries no answer to show, whatever text came with it.
-		if (stopReason === 'refusal') return { kind: 'serviceFailed' };
 		modelText = extractText(json);
 	} catch {
 		// throw / abort (timeout) / unreadable body -> the document is quoted instead
@@ -195,6 +193,9 @@ export async function synthesize(
 	// resources must stay an answer, not become a crisis card.
 	const validCited = citedIds.filter((id) => retrievedIds.has(id));
 	if (validCited.length === 0 && mentionsCrisisLine(modelText)) return { kind: 'crisis' };
+	// A declined request carries no answer to show, whatever text came with it - but only after the crisis check,
+	// the backstop for the indirect phrasing the question's keyword net misses on purpose.
+	if (stopReason === 'refusal') return { kind: 'serviceFailed' };
 	// After the crisis check, so a cut-off crisis reply still shows the crisis card - the safe direction. Before
 	// every other check: a cut-off answer can pass every gate on what is left while its caveat is gone.
 	if (stopReason === 'max_tokens') return { kind: 'cutShort' };

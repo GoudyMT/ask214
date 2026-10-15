@@ -109,6 +109,30 @@ describe('synthesize', () => {
 		}
 	});
 
+	// The documents keep the order search ranked them in, not the order the model happened to cite them.
+	it('lists the cited documents in search order', async () => {
+		const guide: RetrievedChunk = {
+			id: 'tap_vet_centers:0fb72e844a79',
+			text: 'Vet Centers offer readjustment counseling to combat veterans and their families.',
+			sourceId: 'tap_vet_centers',
+			page: 2,
+			url: 'https://www.tapevents.mil/resources/documents',
+			title: 'TAP - Vet Centers'
+		};
+		const impl = stubFetch(
+			'SkillBridge lets you train [tap_moc_crosswalk], and Vet Centers offer counseling ' +
+				'[tap_vet_centers:0fb72e844a79].'
+		);
+		const result = await synthesize('What is a Vet Center?', [guide, CHUNKS[0]!], deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.citations.map((c) => c.title)).toEqual([
+				'TAP - Vet Centers',
+				'SkillBridge'
+			]);
+		}
+	});
+
 	it('short-circuits a personalized-eligibility query with no provider call', async () => {
 		const impl = stubFetch('unused');
 		const result = await synthesize('Do I qualify for the housing grant?', CHUNKS, deps(impl));
@@ -275,6 +299,19 @@ describe('synthesize', () => {
 		expect(result.kind).toBe('notCovered');
 	});
 
+	// A cut-off reply is never shown, whatever shape is left of it: the cut can fall before the part that mattered.
+	it('reports a cut-off official-fallback reply as cut short', async () => {
+		const impl = stubFetch('These sources do not cover state income tax. Try va.gov or', {
+			stopReason: 'max_tokens'
+		});
+		const result = await synthesize(
+			'what is the state income tax deadline',
+			REAL_ID_CHUNKS,
+			deps(impl)
+		);
+		expect(result).toEqual({ kind: 'cutShort' });
+	});
+
 	// The gate stays strict for everything else: an uncited answer that reaches for neither authorized
 	// contact is still the ungrounded output the gates exist to stop.
 	it('still refuses an uncited answer that is neither authorized shape', async () => {
@@ -343,6 +380,23 @@ describe('synthesize', () => {
 		const impl = stubFetch('SkillBridge lets you train [tap_moc_crosswalk].', {
 			stopReason: 'refusal'
 		});
+		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'serviceFailed' });
+	});
+
+	// The model-side crisis check is the backstop for the indirect phrasing the question's keyword net misses on
+	// purpose, so a declined reply that points to the crisis line still shows the crisis card.
+	it('still shows the crisis card when the provider declines with the crisis line', async () => {
+		const impl = stubFetch(
+			'I cannot help with that, but please reach the Veterans Crisis Line: dial 988 then press 1.',
+			{ stopReason: 'refusal' }
+		);
+		const result = await synthesize('i dont see a way forward anymore', REAL_ID_CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'crisis' });
+	});
+
+	it('reports a failed service when the provider declines with no text', async () => {
+		const impl = stubFetch('', { stopReason: 'refusal' });
 		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
 		expect(result).toEqual({ kind: 'serviceFailed' });
 	});
