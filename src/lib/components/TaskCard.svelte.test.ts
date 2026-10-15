@@ -640,6 +640,93 @@ describe('TaskCard (open states)', () => {
 		await expect.poll(() => cancel.disabled).toBe(false);
 		expect(buttonByText(container, 'Cancel')).toBe(cancel);
 	});
+
+	// A note is capped at 100,000 UTF-16 units. The page wraps every store refusal into one generic failure, so the card
+	// checks the length itself and says why.
+	const TOO_LONG = 'This note is over 100,000 characters. Shorten it to save.';
+
+	async function openTooLong(
+		onSetNote: (taskId: string, note: string | undefined) => Promise<void>
+	) {
+		const { container } = await renderCard(makeItem({ note: 'a'.repeat(100_001) }), { onSetNote });
+		buttonByText(container, 'Edit note')?.click();
+		flushSync();
+		return container;
+	}
+
+	it('the note field has maxlength 100000', async () => {
+		const { container } = await renderCard(makeItem());
+		buttonByText(container, 'Add note')?.click();
+		flushSync();
+		expect(container.querySelector('textarea')?.getAttribute('maxlength')).toBe('100000');
+	});
+
+	it('a pre-filled 100,001-unit note shows the too-long line on Save and calls no onSetNote', async () => {
+		const onSetNote = vi.fn(async () => {});
+		const container = await openTooLong(onSetNote);
+		buttonByText(container, 'Save')?.click();
+		flushSync();
+		expect(onSetNote).not.toHaveBeenCalled();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(TOO_LONG);
+		expect(container.querySelector('.task-card__note [role="alert"]')).not.toBeNull();
+		expect(container.querySelector('textarea')).not.toBeNull();
+	});
+
+	it('the generic line is not shown for a too-long note, even right after a failed save', async () => {
+		const onSetNote = vi.fn(async () => {
+			throw new Error('E_NOTE_SAVE');
+		});
+		const container = await openTooLong(onSetNote);
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+		textarea.value = 'short';
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		buttonByText(container, 'Save')?.click();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(SAVE_FAILED);
+
+		textarea.value = 'a'.repeat(100_001);
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		buttonByText(container, 'Save')?.click();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(TOO_LONG);
+		expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1);
+		expect(container.textContent).not.toContain(SAVE_FAILED);
+		expect(onSetNote).toHaveBeenCalledTimes(1);
+	});
+
+	it('shortening it to 100,000 saves, and the line goes when that Save starts', async () => {
+		let release: () => void = () => {};
+		const onSetNote = vi.fn(() => new Promise<void>((resolve) => (release = resolve)));
+		const container = await openTooLong(onSetNote);
+		buttonByText(container, 'Save')?.click();
+		flushSync();
+		expect(container.querySelector('[role="alert"]')).not.toBeNull();
+
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+		textarea.value = 'a'.repeat(100_000);
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		buttonByText(container, 'Save')?.click();
+		await expect.poll(() => onSetNote.mock.calls.length).toBe(1);
+		expect(onSetNote).toHaveBeenCalledWith('skillbridge-hosts', 'a'.repeat(100_000));
+		await expect.poll(() => container.querySelector('[role="alert"]')).toBeNull();
+		release();
+		await expect.poll(() => container.querySelector('textarea')).toBeNull();
+	});
+
+	it('Cancel drops the too-long line, and the next edit starts without it', async () => {
+		const onSetNote = vi.fn(async () => {});
+		const container = await openTooLong(onSetNote);
+		buttonByText(container, 'Save')?.click();
+		flushSync();
+		expect(container.querySelector('[role="alert"]')).not.toBeNull();
+		buttonByText(container, 'Cancel')?.click();
+		flushSync();
+		buttonByText(container, 'Edit note')?.click();
+		flushSync();
+		expect(container.querySelector('textarea')).not.toBeNull();
+		expect(container.querySelector('[role="alert"]')).toBeNull();
+	});
 });
 
 // A snooze is live only while its date is after today, so the custom picker offers tomorrow at the earliest, and

@@ -1,5 +1,7 @@
 import type { TimelineState, TaskStatus, TimelineTaskState } from './types';
 import { isSnoozeDate } from './state-codec';
+import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
+import { MAX_NOTE_UNITS } from '../backup/caps';
 import { encryptTimelineRecord, decryptTimelineRecord } from './crypto-boundary';
 import type { KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar } from '../profile/sidecars';
@@ -273,8 +275,15 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return update(taskId, { status: 'snoozed', snoozeUntil: untilIso });
 		},
 
-		/** Set or clear a free-text note (empty string clears it). */
+		/**
+		 * Set or clear a free-text note (empty string clears it). Refuses the SkillBridge plan's record, which the Timeline
+		 * never shows a note for, and a note over the cap, which a backup file could not hold.
+		 */
 		setNote(taskId: string, note: string | undefined): Promise<void> {
+			if (taskId === SKILLBRIDGE_PLAN_KEY) return Promise.reject(new Error('E_NOTE_KEY'));
+			if (typeof note === 'string' && note.length > MAX_NOTE_UNITS) {
+				return Promise.reject(new Error('E_NOTE_TOO_LONG'));
+			}
 			return update(taskId, { notes: note ? note : undefined });
 		},
 

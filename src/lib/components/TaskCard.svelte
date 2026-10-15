@@ -9,6 +9,7 @@
 		afterLinkForTask,
 		linkNoteForTask
 	} from '$lib/resources';
+	import { MAX_NOTE_UNITS } from '$lib/backup/caps';
 	import { closedOnDate, isFirmWarning, type FitReason } from '$lib/timeline/generate';
 
 	let {
@@ -171,11 +172,13 @@
 
 	let noteFailed = $state(false);
 	let noteSaving = $state(false);
+	let noteTooLong = $state(false);
 
 	function openNote(event: MouseEvent): void {
 		noteOpener = event.currentTarget as HTMLElement;
 		noteValue = item.note ?? '';
 		noteFailed = false;
+		noteTooLong = false;
 		noteOpen = true;
 	}
 
@@ -184,6 +187,10 @@
 	// button that holds focus can drop it).
 	async function saveNote(): Promise<void> {
 		if (noteSaving) return;
+		// The page turns every refusal into one generic failure, so a note over the cap is caught here, where it can be
+		// named. The field's maxlength stops typing past the cap, but not a note already longer when the editor opened.
+		noteTooLong = noteValue.length > MAX_NOTE_UNITS;
+		if (noteTooLong) return;
 		noteSaving = true;
 		noteFailed = false;
 		try {
@@ -197,6 +204,7 @@
 
 	function closeNote(): void {
 		noteOpen = false;
+		noteTooLong = false;
 		noteValue = '';
 		void returnFocus(noteOpener);
 	}
@@ -298,8 +306,13 @@
 				bind:value={noteValue}
 				spellcheck="false"
 				aria-label="Note"
+				maxlength={MAX_NOTE_UNITS}
 				placeholder="Add a note..."></textarea>
-			{#if noteFailed}
+			{#if noteTooLong}
+				<p class="task-card__note-error" role="alert">
+					This note is over 100,000 characters. Shorten it to save.
+				</p>
+			{:else if noteFailed}
 				<p class="task-card__note-error" role="alert">
 					Could not update right now - please try again.
 				</p>

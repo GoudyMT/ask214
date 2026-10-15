@@ -96,6 +96,49 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	it('setNote rejects 100,001 units and writes nothing', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setNote('skillbridge', 'an earlier short note');
+		await expect(a.setNote('skillbridge', 'a'.repeat(100_001))).rejects.toThrow('E_NOTE_TOO_LONG');
+
+		const b = await reload(db);
+		expect(b.state.tasks['skillbridge']?.notes).toBe('an earlier short note');
+		await deleteTestDb(db);
+	});
+
+	it('50,000 surrogate pairs = 100,000 units is accepted', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const pairs = String.fromCharCode(0xd83d, 0xde00).repeat(50_000);
+		expect(pairs.length).toBe(100_000);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setNote('skillbridge', pairs);
+
+		const b = await reload(db);
+		expect(b.state.tasks['skillbridge']?.notes).toBe(pairs);
+		await deleteTestDb(db);
+	});
+
+	it('setNote rejects the plan key and writes nothing', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setNote('y', 'kept');
+		await expect(a.setNote(SKILLBRIDGE_PLAN_KEY, 'x')).rejects.toThrow('E_NOTE_KEY');
+
+		const b = await reload(db);
+		expect(b.state.tasks).toEqual({ y: { notes: 'kept' } });
+		await deleteTestDb(db);
+	});
+
 	it('rejects a stale write with OccConflictError', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);
