@@ -1,6 +1,19 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import type { AnswerView } from '$lib/ask/answer/answer-view';
+	import type { AnswerView, SynthesisNote } from '$lib/ask/answer/answer-view';
+
+	// Each reason in its own words - only the one that actually applied is true for the reader.
+	const SYNTHESIS_NOTE: Record<SynthesisNote, string> = {
+		refused:
+			'An AI summary was produced but did not pass our accuracy checks, so the document is quoted instead.',
+		suppressed:
+			'No AI summary is shown on questions about your own eligibility. The document is quoted instead.',
+		unavailable: 'No AI summary is shown for this answer.',
+		keyRejected: 'Your API key was not accepted, so no AI summary is shown. Check it in Settings.',
+		serviceFailed: 'The AI service did not answer, so the document is quoted instead.',
+		cutShort: 'The AI summary was cut short, so the document is quoted instead.'
+	};
+
 	let {
 		view,
 		onOpenSource
@@ -113,11 +126,7 @@
 		     reader who supplied a key and got no summary is owed the reason that actually applied. -->
 		{#if view.synthesisNote}
 			<p class="ask-answer__note-synthesis">
-				{view.synthesisNote === 'refused'
-					? 'An AI summary was produced but did not pass our accuracy checks, so the document is quoted instead.'
-					: view.synthesisNote === 'suppressed'
-						? 'No AI summary is shown on questions about your own eligibility. The document is quoted instead.'
-						: 'No AI summary is shown for this answer.'}
+				{SYNTHESIS_NOTE[view.synthesisNote]}
 			</p>
 		{/if}
 		<!-- PERMANENT, not conditional on the eligibility gate. That gate reads the QUESTION's phrasing, so

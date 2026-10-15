@@ -38,4 +38,11 @@ describe('toSynthesisView', () => {
 	it('maps degraded to the unavailable view (no banner; cards stand alone)', () => {
 		expect(toSynthesisView({ kind: 'degraded' })).toEqual({ kind: 'unavailable' });
 	});
+
+	// Each failure keeps its own view, so the reader is told the reason that actually applied.
+	it('keeps a rejected key, a failed service and a cut-off answer apart', () => {
+		expect(toSynthesisView({ kind: 'keyRejected' })).toEqual({ kind: 'keyRejected' });
+		expect(toSynthesisView({ kind: 'serviceFailed' })).toEqual({ kind: 'serviceFailed' });
+		expect(toSynthesisView({ kind: 'cutShort' })).toEqual({ kind: 'cutShort' });
+	});
 });

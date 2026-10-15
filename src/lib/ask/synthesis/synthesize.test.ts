@@ -16,7 +16,13 @@ const CHUNKS: RetrievedChunk[] = [
 // Mirror the online-retrieve stub: a plain object cast to Response, no global constructor.
 function stubFetch(
 	text: string,
-	init: { ok?: boolean; status?: number; throws?: boolean; badJson?: boolean } = {}
+	init: {
+		ok?: boolean;
+		status?: number;
+		throws?: boolean;
+		badJson?: boolean;
+		stopReason?: string;
+	} = {}
 ) {
 	return vi.fn<FetchLike>(async (): Promise<Response> => {
 		if (init.throws) throw new Error('network down');
@@ -25,7 +31,10 @@ function stubFetch(
 			status: init.status ?? 200,
 			json: async () => {
 				if (init.badJson) throw new Error('bad json');
-				return { content: [{ type: 'text', text }] };
+				return {
+					content: [{ type: 'text', text }],
+					stop_reason: init.stopReason ?? 'end_turn'
+				};
 			}
 		} as Response;
 	});
@@ -264,25 +273,62 @@ describe('synthesize', () => {
 		expect(result).toEqual({ kind: 'refusal', reason: 'no_citations' });
 	});
 
-	it('degrades when the provider request throws', async () => {
+	it('reports a failed service when the provider request throws', async () => {
 		const impl = stubFetch('', { throws: true });
 		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
-		expect(result).toEqual({ kind: 'degraded' });
+		expect(result).toEqual({ kind: 'serviceFailed' });
 	});
 
-	it('degrades on a non-ok provider response (bad or expired key)', async () => {
-		const impl = stubFetch('', { ok: false, status: 401 });
+	// A key the provider refuses is the one failure the reader can fix, so it is told apart from the rest.
+	it.each([401, 403])('reports a rejected key on a %i response', async (status) => {
+		const impl = stubFetch('', { ok: false, status });
 		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
-		expect(result).toEqual({ kind: 'degraded' });
+		expect(result).toEqual({ kind: 'keyRejected' });
 	});
 
-	it('degrades on a malformed provider body', async () => {
+	it.each([400, 402, 404, 429, 500, 529])(
+		'reports a failed service on a %i response',
+		async (status) => {
+			const impl = stubFetch('', { ok: false, status });
+			const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
+			expect(result).toEqual({ kind: 'serviceFailed' });
+		}
+	);
+
+	it('reports a failed service on a malformed provider body', async () => {
 		const impl = stubFetch('', { badJson: true });
 		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
-		expect(result).toEqual({ kind: 'degraded' });
+		expect(result).toEqual({ kind: 'serviceFailed' });
 	});
 
-	it('aborts and degrades to raw cards when the provider request exceeds the timeout', async () => {
+	// An answer cut off at the token limit can lose its last sentence, caveat included, and every gate would
+	// still pass on what is left.
+	it('reports a cut-off answer instead of showing it as complete', async () => {
+		const impl = stubFetch('SkillBridge lets you train with an employer [tap_moc_crosswalk], and', {
+			stopReason: 'max_tokens'
+		});
+		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'cutShort' });
+	});
+
+	it('reports a failed service when the provider declines the request', async () => {
+		const impl = stubFetch('SkillBridge lets you train [tap_moc_crosswalk].', {
+			stopReason: 'refusal'
+		});
+		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'serviceFailed' });
+	});
+
+	// The crisis card is the safe direction: a cut-off reply naming the crisis line still shows it.
+	it('still shows the crisis card when a crisis reply is cut off', async () => {
+		const impl = stubFetch('Please call the Veterans Crisis Line: dial 988 then press 1, or', {
+			stopReason: 'max_tokens'
+		});
+		const result = await synthesize('I feel hopeless', CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'crisis' });
+	});
+
+	it('aborts and reports a failed service when the provider request exceeds the timeout', async () => {
 		// A connection that accepts but never settles, rejecting only when the caller aborts.
 		const hanging = vi.fn<FetchLike>(
 			(_url, options) =>
@@ -297,7 +343,7 @@ describe('synthesize', () => {
 			apiKey: 'test-key',
 			timeoutMs: 10
 		});
-		expect(result).toEqual({ kind: 'degraded' });
+		expect(result).toEqual({ kind: 'serviceFailed' });
 	});
 
 	it('feeds the model display-cleaned source text, not the raw extraction artifacts', async () => {

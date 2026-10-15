@@ -21,6 +21,14 @@ export type ExtractiveAnswer = {
 };
 
 /**
+ * Why a synthesis the reader enabled did not reach them. `keyRejected`, `serviceFailed` and `cutShort` name a
+ * call that was made and failed in a way the reader is owed by name: a key they can fix, a service that did not
+ * answer, an answer that ran out of room.
+ */
+export type SynthesisNote =
+	'refused' | 'unavailable' | 'suppressed' | 'keyRejected' | 'serviceFailed' | 'cutShort';
+
+/**
  * The single answer slot. Exactly one occupant, ever - the surface must never carry two blocks that both
  * claim to be the answer, which is why this is a union rather than a pair of optional fields.
  */
@@ -45,7 +53,7 @@ export type AnswerView =
 			 * reader who enabled the summary and supplied a key unable to tell "it worked" from "the model
 			 * output was rejected". WHICH gate fired stays a safety-log detail; that one did is the reader's.
 			 */
-			synthesisNote?: 'refused' | 'unavailable' | 'suppressed';
+			synthesisNote?: SynthesisNote;
 	  }
 	| { kind: 'synthesized'; answer: CitedAnswer }
 	| { kind: 'eligibility' }
@@ -127,10 +135,17 @@ export function toExtractiveAnswer(cards: ResultCard[]): ExtractiveAnswer | unde
 function synthesisNoteFor(
 	synthesis: SlotSynthesis | undefined,
 	suppressedByGate: boolean
-): 'refused' | 'unavailable' | 'suppressed' | undefined {
+): SynthesisNote | undefined {
 	if (synthesis === undefined) return undefined;
 	if (synthesis.kind === 'refusal') return 'refused';
-	if (synthesis.kind === 'unavailable') return 'unavailable';
+	if (
+		synthesis.kind === 'unavailable' ||
+		synthesis.kind === 'keyRejected' ||
+		synthesis.kind === 'serviceFailed' ||
+		synthesis.kind === 'cutShort'
+	) {
+		return synthesis.kind;
+	}
 	return suppressedByGate && synthesis.kind === 'answer' ? 'suppressed' : undefined;
 }
 

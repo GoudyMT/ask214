@@ -92,6 +92,20 @@ describe('AskAnswer', () => {
 		expect(note).not.toMatch(/could not|failed|attempted|rejected|error/i);
 	});
 
+	it.each([
+		[
+			'keyRejected',
+			'Your API key was not accepted, so no AI summary is shown. Check it in Settings.'
+		],
+		['serviceFailed', 'The AI service did not answer, so the document is quoted instead.'],
+		['cutShort', 'The AI summary was cut short, so the document is quoted instead.']
+	] as const)('extractive: on %s, says why in its own words', async (note, words) => {
+		const { container } = await render(AskAnswer, {
+			props: { view: { ...extractiveView, synthesisNote: note } as AnswerView }
+		});
+		expect(container.querySelector('.ask-answer__note-synthesis')?.textContent?.trim()).toBe(words);
+	});
+
 	it('extractive: carries no synthesis note when synthesis never ran', async () => {
 		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		expect(container.querySelector('.ask-answer__note-synthesis')).toBeNull();
