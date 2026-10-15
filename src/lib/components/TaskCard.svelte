@@ -237,7 +237,7 @@
 	const AFTER_YOU_LEAVE_NOTE =
 		'This opens after you leave your command. Ask your command how to fit it in.';
 	const LEFT_COMMAND_NOTE =
-		'You have left your command. Do this before your separation date if you can.';
+		'You have left your command. Do this by your separation date if you can.';
 
 	// The date line by status: when a window opens, a soft task's aim, a firm task's last day, when a passed date
 	// was due. Resolved states use the collapsed treatment instead.

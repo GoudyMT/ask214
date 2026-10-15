@@ -10,7 +10,7 @@
 			'No AI summary is shown on questions about your own eligibility. The document is quoted instead.',
 		unavailable: 'No AI summary is shown for this answer.',
 		keyRejected: 'Your API key was not accepted, so no AI summary is shown. Check it in Settings.',
-		serviceFailed: 'The AI service did not answer, so the document is quoted instead.',
+		serviceFailed: 'No AI summary came back this time, so the document is quoted instead.',
 		cutShort: 'The AI summary was cut short, so the document is quoted instead.'
 	};
 

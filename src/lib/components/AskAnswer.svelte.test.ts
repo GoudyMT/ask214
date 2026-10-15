@@ -97,7 +97,7 @@ describe('AskAnswer', () => {
 			'keyRejected',
 			'Your API key was not accepted, so no AI summary is shown. Check it in Settings.'
 		],
-		['serviceFailed', 'The AI service did not answer, so the document is quoted instead.'],
+		['serviceFailed', 'No AI summary came back this time, so the document is quoted instead.'],
 		['cutShort', 'The AI summary was cut short, so the document is quoted instead.']
 	] as const)('extractive: on %s, says why in its own words', async (note, words) => {
 		const { container } = await render(AskAnswer, {

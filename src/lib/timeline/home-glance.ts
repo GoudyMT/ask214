@@ -43,8 +43,12 @@ function nextWhen(item: TimelineItem): string {
 	const f = formatTimelineDate;
 	switch (item.status) {
 		case 'upcoming':
-		case 'after-you-leave':
 			return `opens ${f(item.windowStartDate)}`;
+		case 'after-you-leave':
+			// An opening already past is not news once the user has left; the card drops it too.
+			return item.leftCommand?.opened
+				? 'before your separation date'
+				: `opens ${f(item.windowStartDate)}`;
 		case 'start-now':
 			return item.def.kind === 'soft'
 				? `aim for ${f(item.aimDate ?? item.windowEndDate)}`

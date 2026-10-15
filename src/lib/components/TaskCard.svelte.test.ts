@@ -1712,7 +1712,7 @@ describe('leaving your command', () => {
 		);
 		const box = container.querySelector('.task-card__whatnow')?.textContent ?? '';
 		expect(box).toContain(
-			'You have left your command. Do this before your separation date if you can.'
+			'You have left your command. Do this by your separation date if you can.'
 		);
 		expect(box).not.toContain('Ask your command');
 		await expect.element(page.getByText('Opens Dec 1, 2026')).toBeVisible();

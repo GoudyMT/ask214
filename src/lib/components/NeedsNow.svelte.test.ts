@@ -237,6 +237,26 @@ describe('NeedsNow', () => {
 		);
 		expect(ask?.classList.contains('needs-now__when--hot')).toBe(false);
 	});
+
+	// The card stops telling the user to ask their command once they have left it; the row says the same.
+	it('drops "ask your command" once the user has left the command', async () => {
+		const { container } = await render(NeedsNow, {
+			props: {
+				groups: {
+					...empty,
+					afterYouLeave: [
+						item('sha', 'Complete your SHA', {
+							status: 'after-you-leave',
+							leftCommand: { opened: true }
+						})
+					]
+				}
+			}
+		});
+		const text = textOf(container);
+		expect(text).toContain('before your separation date');
+		expect(text).not.toContain('ask your command');
+	});
 });
 
 // On a phone a long title and the date do not fit side by side, so the date drops under the title instead of

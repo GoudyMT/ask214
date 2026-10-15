@@ -31,7 +31,8 @@
 			case 'closed':
 				return `closed ${f(closedOnDate(item))}`;
 			case 'after-you-leave':
-				return 'ask your command';
+				// Once the user has left, there is no command to ask: the card says the same.
+				return item.leftCommand ? 'before your separation date' : 'ask your command';
 			default:
 				// A soft window has no closing date to give: name the date the card aims for.
 				return item.def.kind === 'soft'
