@@ -8,6 +8,7 @@ import {
 	KeystoreNotInitializedError,
 	KeystoreHmacMismatchError,
 	OccConflictError,
+	readDeviceState,
 	type BroadcastEvent
 } from './store.svelte';
 import { withStores, reqToPromise } from '../db/schema';
@@ -17,16 +18,19 @@ import { registerSecureInput } from './lifecycle';
 import { IV_HARD_STOP, IvCounterExhaustedError } from '../keystore/iv-counter';
 import type { ProfileV1 } from './types';
 
-type Store = 'keystore' | 'profile-hwm' | 'profile';
+type Store = 'keystore' | 'profile-hwm' | 'profile' | 'timeline-state-hwm' | 'calendar-sync-hwm';
 type Row = Record<string, unknown>;
 
 // Seams over three modules, each a passthrough until a test arms it:
 // - cloneField records every byte array the save stages, so a test can look at the copies the store
 //   made and the caller never sees;
+// - zeroizeRecord records every record the store discards, so a test can show which one was wiped;
 // - decryptProfileRecord counts decrypts, so a refresh that must not read can be shown not to;
 // - computeRecordHmac can be made to throw, which reaches the step right after the staged copies exist.
 const seams = vi.hoisted(() => ({
 	cloned: [] as Uint8Array[],
+	zeroized: [] as Record<string, unknown>[],
+	noWipe: false, // makes zeroizeRecord record but not wipe: the stand-in for a reader that forgot to zeroize
 	decrypts: 0,
 	failHmac: false
 }));
@@ -37,6 +41,10 @@ vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./lifecycle')>();
 	return {
 		...real,
+		zeroizeRecord: (rec: Record<string, unknown>): void => {
+			seams.zeroized.push(rec);
+			if (!seams.noWipe) real.zeroizeRecord(rec);
+		},
 		cloneField: (v: unknown): unknown => {
 			const out = real.cloneField(v);
 			if (out instanceof Uint8Array) seams.cloned.push(out);
@@ -75,6 +83,8 @@ let db: IDBDatabase;
 beforeEach(async () => {
 	db = await openTestDb();
 	seams.cloned.length = 0;
+	seams.zeroized.length = 0;
+	seams.noWipe = false;
 	seams.decrypts = 0;
 	seams.failHmac = false;
 });
@@ -820,6 +830,152 @@ describe('ProfileStore.refresh while the page is hidden', () => {
 
 		expect(seams.decrypts).toBe(1);
 		expect(text(store._getStateForTest()?.eaos)).toBe('2027-04-15');
+	});
+});
+
+describe('readDeviceState', () => {
+	const MARK = {
+		lastBackupAt: 1716800000000,
+		backupGenProfile: 1,
+		backupGenTimeline: 3,
+		backupGenCalendar: 0
+	};
+	const ROWS = ['keystore', 'profile', 'profile-hwm', 'timeline-state-hwm', 'calendar-sync-hwm'];
+
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	async function putSidecar(
+		store: 'timeline-state-hwm' | 'calendar-sync-hwm',
+		generation: number,
+		ts: number
+	): Promise<void> {
+		const ks = need(await readRow('keystore'));
+		const signed = await signSidecar(
+			store,
+			{ generation, keystoreGeneration: 0, epoch: 0, ts },
+			ks.hmacKeyRef as CryptoKey
+		);
+		await putRow(store, { id: 0, ...signed });
+	}
+
+	it('a fresh bootstrap reads all generations 0 and no mark', async () => {
+		const hwm = need(await readRow('profile-hwm'));
+		const state = await readDeviceState(db);
+		expect(state.gens).toEqual({ profile: 0, timeline: 0, calendar: 0 });
+		// Bootstrap signs the profile mark; the two other sidecars do not exist yet, so they have no time.
+		expect(state.ts).toEqual({
+			profile: (hwm.payload as ProfileHwmPayload).ts,
+			timeline: null,
+			calendar: null
+		});
+		expect(state.mark).toBeNull();
+		expect(state.lastSeenAt).toBeNull();
+	});
+
+	it('reads the generations and times the three sidecars carry', async () => {
+		await createProfileStore(db).save({ eaos: bytes('2027-04-15') });
+		await putSidecar('timeline-state-hwm', 5, 111);
+		await putSidecar('calendar-sync-hwm', 2, 222);
+		const state = await readDeviceState(db);
+		expect(state.gens).toEqual({ profile: 1, timeline: 5, calendar: 2 });
+		expect(state.ts.timeline).toBe(111);
+		expect(state.ts.calendar).toBe(222);
+		expect(typeof state.lastSeenAt).toBe('number');
+	});
+
+	it('readDeviceState reads all five rows in one transaction', async () => {
+		const spy = vi.spyOn(db, 'transaction');
+		await readDeviceState(db);
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(spy.mock.calls[0]?.[0]).toEqual(ROWS);
+		expect(spy.mock.calls[0]?.[1]).toBe('readonly');
+	});
+
+	it('readDeviceState zeroizes the decoded profile', async () => {
+		await createProfileStore(db).save({ eaos: bytes('2027-04-15'), ...MARK });
+		seams.zeroized.length = 0;
+		await readDeviceState(db);
+		expect(seams.zeroized).toHaveLength(1);
+		const decoded = need(seams.zeroized[0]);
+		expect(decoded.generation).toBe(1);
+		expect(decoded.lastBackupAt).toBe(MARK.lastBackupAt);
+		expect(allZero(decoded.eaos as Uint8Array)).toBe(true);
+	});
+
+	it('the zeroize check fails when the decoded profile is not wiped', async () => {
+		await createProfileStore(db).save({ eaos: bytes('2027-04-15') });
+		seams.zeroized.length = 0;
+		seams.noWipe = true;
+		await readDeviceState(db);
+		const decoded = need(seams.zeroized[0]);
+		expect(allZero(decoded.eaos as Uint8Array)).toBe(false);
+	});
+
+	it('readDeviceState returns a mark only when all four fields are present', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15'), lastBackupAt: 5, backupGenProfile: 1 });
+		await store.save({ backupGenTimeline: 3 });
+		expect((await readDeviceState(db)).mark).toBeNull();
+		await store.save({ backupGenCalendar: 0 });
+		const state = await readDeviceState(db);
+		expect(state.mark).toEqual({ at: 5, gens: { profile: 1, timeline: 3, calendar: 0 } });
+		expect(state.gens.profile).toBe(3);
+	});
+
+	it('a tampered timeline sidecar is DEVICE_DAMAGED', async () => {
+		await putSidecar('timeline-state-hwm', 5, 111);
+		const row = need(await readRow('timeline-state-hwm'));
+		const payload = row.payload as ProfileHwmPayload;
+		await putRow('timeline-state-hwm', { ...row, payload: { ...payload, generation: 6 } });
+		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
+	});
+
+	it('a tampered calendar sidecar is DEVICE_DAMAGED', async () => {
+		await putSidecar('calendar-sync-hwm', 2, 222);
+		const row = need(await readRow('calendar-sync-hwm'));
+		const payload = row.payload as ProfileHwmPayload;
+		await putRow('calendar-sync-hwm', { ...row, payload: { ...payload, generation: 3 } });
+		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
+	});
+
+	it('a tampered profile mark is DEVICE_DAMAGED', async () => {
+		const hwm = need(await readRow('profile-hwm'));
+		const payload = hwm.payload as ProfileHwmPayload;
+		await putRow('profile-hwm', { ...hwm, payload: { ...payload, generation: 9 } });
+		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
+	});
+
+	it('a tampered keystore record is DEVICE_DAMAGED', async () => {
+		const ks = need(await readRow('keystore'));
+		await putRow('keystore', { ...ks, keystoreGeneration: 7 }); // not re-signed
+		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
+	});
+
+	it('a profile mark of 1 or more with no body row is DEVICE_DAMAGED', async () => {
+		await createProfileStore(db).save({ eaos: bytes('2027-04-15') });
+		await withStores(db, 'profile', 'readwrite', (tx) => {
+			tx.objectStore('profile').clear();
+		});
+		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
+	});
+
+	it('a body that no longer decrypts is DEVICE_DAMAGED', async () => {
+		await createProfileStore(db).save({ eaos: bytes('2027-04-15') });
+		const row = need(await readRow('profile'));
+		const rec = new Uint8Array(row.rec as Uint8Array);
+		rec[rec.length - 1] = (rec[rec.length - 1] ?? 0) ^ 1;
+		await putRow('profile', { ...row, rec });
+		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
+	});
+
+	it('does not touch the live store: a read leaves a loaded profile as it was', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15') });
+		const live = need(store._getStateForTest());
+		await readDeviceState(db);
+		expect(text(need(live.eaos))).toBe('2027-04-15');
 	});
 });
 

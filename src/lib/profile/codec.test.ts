@@ -240,6 +240,86 @@ describe('a record with a key of the wrong type', () => {
 	});
 });
 
+describe('the backup mark', () => {
+	const MARK = {
+		lastBackupAt: 1716800000000,
+		backupGenProfile: 4,
+		backupGenTimeline: 2,
+		backupGenCalendar: 0
+	};
+	const base = (): ProfileV1 => ({
+		schemaVersion: 1,
+		generation: 1,
+		lastSeenAt: 0,
+		setupIntent: 'completed',
+		setupIntentChangedAt: 0,
+		eaos: null
+	});
+
+	it('the four backup-mark fields round-trip', () => {
+		const dec = decodeProfile(encodeProfile({ ...base(), ...MARK }));
+		expect(dec.lastBackupAt).toBe(MARK.lastBackupAt);
+		expect(dec.backupGenProfile).toBe(4);
+		expect(dec.backupGenTimeline).toBe(2);
+		// Zero is a real generation (nothing written yet), so it must survive, not read as absent.
+		expect(dec.backupGenCalendar).toBe(0);
+	});
+
+	it('a profile without the mark encodes with none of its keys', () => {
+		const wire = JSON.parse(new TextDecoder().decode(encodeProfile(base()))) as Record<
+			string,
+			unknown
+		>;
+		for (const key of Object.keys(MARK)) expect(key in wire).toBe(false);
+	});
+
+	it('a field of the wrong type is a schema error', () => {
+		for (const key of Object.keys(MARK)) {
+			const wire = {
+				...JSON.parse(new TextDecoder().decode(encodeProfile(base()))),
+				[key]: '1'
+			} as Record<string, unknown>;
+			expect(() => decodeProfile(new TextEncoder().encode(JSON.stringify(wire)))).toThrow(
+				ProfileSchemaError
+			);
+		}
+	});
+
+	// The table as the release before the mark shipped it. An older tab reads a newer tab's record with this table, so
+	// the record must pass it and the mark's keys must fall outside it (a key not listed is ignored).
+	const OLDER_WIRE_TYPES: Record<string, (v: unknown) => boolean> = {
+		generation: (v) => typeof v === 'number',
+		lastSeenAt: (v) => typeof v === 'number',
+		setupIntent: (v) => typeof v === 'string',
+		setupIntentChangedAt: (v) => v === null || typeof v === 'number',
+		eaos: (v) => v === null || typeof v === 'string',
+		rate: (v) => typeof v === 'string',
+		rank: (v) => typeof v === 'string',
+		yearsOfService: (v) => typeof v === 'number',
+		anticipatedDisabilityRating: (v) => typeof v === 'number',
+		familyStatus: (v) => typeof v === 'string',
+		intendedPath: (v) => typeof v === 'string',
+		geographicDestination: (v) => typeof v === 'string',
+		specialSituations: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+		skillbridgeStart: (v) => typeof v === 'string',
+		terminalLeaveStart: (v) => typeof v === 'string'
+	};
+
+	it("a record with the mark decodes in a copy of today's WIRE_TYPES", () => {
+		const wire = JSON.parse(
+			new TextDecoder().decode(encodeProfile({ ...base(), ...MARK }))
+		) as Record<string, unknown>;
+		const rejected = Object.entries(OLDER_WIRE_TYPES).filter(
+			([key, isValid]) => Object.hasOwn(wire, key) && !isValid(wire[key])
+		);
+		expect(rejected).toEqual([]);
+		const ignoredByOlder = Object.keys(wire)
+			.filter((key) => key !== 'schemaVersion' && !Object.hasOwn(OLDER_WIRE_TYPES, key))
+			.sort();
+		expect(ignoredByOlder).toEqual(Object.keys(MARK).sort());
+	});
+});
+
 describe('the leaving dates', () => {
 	const enc = (s: string) => new TextEncoder().encode(s);
 	const base = (): ProfileV1 => ({
