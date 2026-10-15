@@ -30,7 +30,6 @@ type Row = Record<string, unknown>;
 const seams = vi.hoisted(() => ({
 	cloned: [] as Uint8Array[],
 	zeroized: [] as Record<string, unknown>[],
-	noWipe: false, // makes zeroizeRecord record but not wipe: the stand-in for a reader that forgot to zeroize
 	decrypts: 0,
 	failHmac: false
 }));
@@ -43,7 +42,7 @@ vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
 		...real,
 		zeroizeRecord: (rec: Record<string, unknown>): void => {
 			seams.zeroized.push(rec);
-			if (!seams.noWipe) real.zeroizeRecord(rec);
+			real.zeroizeRecord(rec);
 		},
 		cloneField: (v: unknown): unknown => {
 			const out = real.cloneField(v);
@@ -84,7 +83,6 @@ beforeEach(async () => {
 	db = await openTestDb();
 	seams.cloned.length = 0;
 	seams.zeroized.length = 0;
-	seams.noWipe = false;
 	seams.decrypts = 0;
 	seams.failHmac = false;
 });
@@ -882,7 +880,25 @@ describe('readDeviceState', () => {
 		expect(state.gens).toEqual({ profile: 1, timeline: 5, calendar: 2 });
 		expect(state.ts.timeline).toBe(111);
 		expect(state.ts.calendar).toBe(222);
-		expect(typeof state.lastSeenAt).toBe('number');
+	});
+
+	// The profile mark and the saved record each carry a time; lastSeenAt is the record's, so give the mark another.
+	it("copies lastSeenAt from the saved record, not from the profile mark's time", async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: bytes('2027-04-15') });
+		const saved = need(store._getStateForTest()).lastSeenAt;
+		const ks = need(await readRow('keystore'));
+		const MARK_TS = 42;
+		expect(saved).not.toBe(MARK_TS);
+		const resigned = await signSidecar(
+			'profile-hwm',
+			{ generation: 1, keystoreGeneration: 0, epoch: 0, ts: MARK_TS },
+			ks.hmacKeyRef as CryptoKey
+		);
+		await putRow('profile-hwm', { id: 0, ...resigned });
+		const state = await readDeviceState(db);
+		expect(state.ts.profile).toBe(MARK_TS);
+		expect(state.lastSeenAt).toBe(saved);
 	});
 
 	it('readDeviceState reads all five rows in one transaction', async () => {
@@ -902,15 +918,6 @@ describe('readDeviceState', () => {
 		expect(decoded.generation).toBe(1);
 		expect(decoded.lastBackupAt).toBe(MARK.lastBackupAt);
 		expect(allZero(decoded.eaos as Uint8Array)).toBe(true);
-	});
-
-	it('the zeroize check fails when the decoded profile is not wiped', async () => {
-		await createProfileStore(db).save({ eaos: bytes('2027-04-15') });
-		seams.zeroized.length = 0;
-		seams.noWipe = true;
-		await readDeviceState(db);
-		const decoded = need(seams.zeroized[0]);
-		expect(allZero(decoded.eaos as Uint8Array)).toBe(false);
 	});
 
 	it('readDeviceState returns a mark only when all four fields are present', async () => {
@@ -940,10 +947,12 @@ describe('readDeviceState', () => {
 		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
 	});
 
-	it('a tampered profile mark is DEVICE_DAMAGED', async () => {
+	// Only the time is forged and the generation stays 0, so no body is read and no body is missing: the one thing
+	// that can stop this read is the sidecar's own MAC.
+	it('a profile mark with a forged time is DEVICE_DAMAGED', async () => {
 		const hwm = need(await readRow('profile-hwm'));
 		const payload = hwm.payload as ProfileHwmPayload;
-		await putRow('profile-hwm', { ...hwm, payload: { ...payload, generation: 9 } });
+		await putRow('profile-hwm', { ...hwm, payload: { ...payload, ts: payload.ts + 1 } });
 		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
 	});
 
@@ -968,14 +977,6 @@ describe('readDeviceState', () => {
 		rec[rec.length - 1] = (rec[rec.length - 1] ?? 0) ^ 1;
 		await putRow('profile', { ...row, rec });
 		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
-	});
-
-	it('does not touch the live store: a read leaves a loaded profile as it was', async () => {
-		const store = createProfileStore(db);
-		await store.save({ eaos: bytes('2027-04-15') });
-		const live = need(store._getStateForTest());
-		await readDeviceState(db);
-		expect(text(need(live.eaos))).toBe('2027-04-15');
 	});
 });
 

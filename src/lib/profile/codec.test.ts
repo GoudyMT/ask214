@@ -287,22 +287,32 @@ describe('the backup mark', () => {
 
 	// The table as the release before the mark shipped it. An older tab reads a newer tab's record with this table, so
 	// the record must pass it and the mark's keys must fall outside it (a key not listed is ignored).
+	const isNumber = (v: unknown): boolean => typeof v === 'number';
+	const isText = (v: unknown): boolean => {
+		if (typeof v !== 'string') return false;
+		try {
+			atob(v);
+			return true;
+		} catch {
+			return false;
+		}
+	};
 	const OLDER_WIRE_TYPES: Record<string, (v: unknown) => boolean> = {
-		generation: (v) => typeof v === 'number',
-		lastSeenAt: (v) => typeof v === 'number',
+		generation: isNumber,
+		lastSeenAt: isNumber,
 		setupIntent: (v) => typeof v === 'string',
-		setupIntentChangedAt: (v) => v === null || typeof v === 'number',
-		eaos: (v) => v === null || typeof v === 'string',
-		rate: (v) => typeof v === 'string',
-		rank: (v) => typeof v === 'string',
-		yearsOfService: (v) => typeof v === 'number',
-		anticipatedDisabilityRating: (v) => typeof v === 'number',
-		familyStatus: (v) => typeof v === 'string',
-		intendedPath: (v) => typeof v === 'string',
-		geographicDestination: (v) => typeof v === 'string',
-		specialSituations: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
-		skillbridgeStart: (v) => typeof v === 'string',
-		terminalLeaveStart: (v) => typeof v === 'string'
+		setupIntentChangedAt: (v) => v === null || isNumber(v),
+		eaos: (v) => v === null || isText(v),
+		rate: isText,
+		rank: isText,
+		yearsOfService: isNumber,
+		anticipatedDisabilityRating: isNumber,
+		familyStatus: isText,
+		intendedPath: isText,
+		geographicDestination: isText,
+		specialSituations: (v) => Array.isArray(v) && v.every(isText),
+		skillbridgeStart: isText,
+		terminalLeaveStart: isText
 	};
 
 	it("a record with the mark decodes in a copy of today's WIRE_TYPES", () => {
