@@ -138,7 +138,8 @@ the summary.
   otherwise the summary is refused and the source cards stand alone.
 - A crisis or "not covered" reply is recognised, and the app shows its own wording instead of the model's.
 - A summary cut off at the token limit is not shown, since its last sentence may be a caveat. A key the provider
-  rejects, a call that fails and a cut-off summary each get their own note, and the document is quoted instead.
+  rejects, a call that fails or is declined, and a cut-off summary each get their own note beside the quoted
+  document.
 
 **Tradeoffs accepted.** The user needs a key and pays the provider for their own use. Strict checks sometimes
 refuse a correct summary.

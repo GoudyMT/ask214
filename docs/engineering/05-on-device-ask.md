@@ -77,7 +77,7 @@ set-up device.
 **What it is.** The question vector is compared with all 1,992 passage vectors by cosine similarity, using the
 same code as the server. The top 5 are kept, and any scoring below 0.4 are dropped; the cutoff is set by the
 corpus quality gate. Each card shows its passage and opens the official document at the cited place; a passage of
-eight words or fewer is a heading cut off from its text, so the similar list leaves it out. The index
+eight words or fewer is almost always a heading cut off from its text, so the similar list leaves it out. The index
 loads with the first on-device question, not with the page. When nothing clears the cutoff, the app says it
 found no close match and suggests rephrasing or va.gov; it does not claim the documents lack the answer, since
 other wording often finds it.

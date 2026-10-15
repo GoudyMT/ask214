@@ -115,15 +115,15 @@
 		<!-- A synthesis did not reach the reader. Shown only when synthesis was ENABLED, so the default user
 		     - for whom the toggle is off - sees nothing. It is a note on the one answer, not a second block
 		     competing to BE the answer.
-		     The three cases say different things, and the difference is what makes them honest. `refused`
-		     CAN claim an attempt: a summary was produced and a safety gate rejected it. `unavailable`
-		     CANNOT, because the store reaches it both when the call failed AND when there was no API key to
-		     call with - the route collapses those into one `degraded` result, so a sentence like "could not
-		     be produced" would be plainly false for the reader who simply never supplied a key. It states
-		     the fact it can actually support: that no summary is here. `suppressed` is the 38 CFR case: a
+		     The six cases say different things, and the difference is what makes them honest: a reader who
+		     supplied a key and got no summary is owed the reason that actually applied. `refused` CAN claim an
+		     attempt: a summary was produced and a safety gate rejected it. `suppressed` is the 38 CFR case: a
 		     summary WAS produced and we dropped it because the question asks about the reader's own
-		     eligibility. Neither of the other two can say that without being false about the reason, and a
-		     reader who supplied a key and got no summary is owed the reason that actually applied. -->
+		     eligibility. `keyRejected`, `serviceFailed` and `cutShort` each name what the provider call did: a
+		     key it refused, a call that failed or declined, a summary cut off at the token limit. `unavailable`
+		     claims no attempt, because the route reaches it when there was no API key to call with, or the
+		     stored key could not be read - so a sentence like "could not be produced" would be false for the
+		     reader who never supplied a key. It states the fact it can support: that no summary is here. -->
 		{#if view.synthesisNote}
 			<p class="ask-answer__note-synthesis">
 				{SYNTHESIS_NOTE[view.synthesisNote]}

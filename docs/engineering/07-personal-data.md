@@ -106,7 +106,7 @@ progress can write a row back; then local storage and the caches, saved document
 app's code so it opens offline; then a reload into a fresh first run. It refuses to start unless it can
 clear every store, and if it stops, it says nothing was deleted.
 
-**Tradeoffs accepted.** Saved documents download again when saved.
+**Tradeoffs accepted.** Saved documents must be downloaded again.
 
 ---
 
