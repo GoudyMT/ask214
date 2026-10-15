@@ -52,7 +52,10 @@ type CalendarHwmPayload = {
 type KeystoreRow = KeystoreRecordV1 & { id: number };
 type StateRow = { id: number; rec: Uint8Array };
 
-export type CalendarBroadcastEvent = { type: 'calendar-updated' | 'relocked' };
+export type CalendarBroadcastEvent = {
+	type: 'calendar-updated' | 'relocked';
+	reason?: 'idle' | 'user';
+};
 export type CalendarStoreOptions = { onBroadcast?: (e: CalendarBroadcastEvent) => void };
 
 export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOptions = {}) {
@@ -74,7 +77,8 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		relockEpoch++;
 		lockState = nextLockState(lockState, reason);
 		// Only an intentional relock is other tabs' business - see the profile store's relockNow.
-		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
+		if (reason === 'idle' || reason === 'user') opts.onBroadcast?.({ type: 'relocked', reason });
+		else if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	const readVerifiedKeystore = () => readKeystoreRow(db);

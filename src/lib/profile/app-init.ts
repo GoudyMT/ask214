@@ -176,12 +176,12 @@ export function createRelockEcho(bus: ProfileBus): {
  */
 export function subscribeBus(
 	bus: ProfileBus,
-	handlers: Partial<Record<BusSignal['type'], () => unknown>>
+	handlers: Partial<Record<BusSignal['type'], (s: BusSignal) => unknown>>
 ): () => void {
 	return bus.subscribe((signal) => {
 		// A handler may hand back a re-read. It is not rethrown into the page as an unhandled rejection: the timeline
 		// and calendar show a failed re-read in their own state; the profile has no failed state, so it keeps what it held.
-		void Promise.resolve(handlers[signal.type]?.()).catch(() => {});
+		void Promise.resolve(handlers[signal.type]?.(signal)).catch(() => {});
 	});
 }
 
@@ -227,9 +227,12 @@ const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'tou
  * `refresh`, not `load`: everything reached through this type is AUTOMATIC (a lifecycle event, a
  * peer's signal), never the user asking to unlock. load() is deliberately absent so this seam
  * cannot decrypt on its own say-so; the store's own gate is what actually enforces it.
+ *
+ * `detail` is the extra a peer relock can carry: why the other tab locked. The shipped stores ignore it; a
+ * later joiner may use it.
  */
 export type Relockable = {
-	relockSync: (reason: RelockReason) => void;
+	relockSync: (reason: RelockReason, detail?: { peerReason?: 'idle' | 'user' }) => void;
 	refresh: () => Promise<unknown>;
 	lock?: (reason: RelockReason) => Promise<void>;
 };
@@ -267,10 +270,15 @@ export function relockAll(relockables: Relockable[], reason: RelockReason): void
  * stores after it in memory. The walk reads a copy so a store leaving the shared list during its own
  * relock cannot shift the index and make the walk skip the next one.
  */
-export function relockEachSync(relockables: Relockable[], reason: RelockReason): void {
+export function relockEachSync(
+	relockables: Relockable[],
+	reason: RelockReason,
+	detail?: { peerReason?: 'idle' | 'user' }
+): void {
 	for (const r of [...relockables]) {
 		try {
-			r.relockSync(reason);
+			// Spread, so a walk with no detail calls each store with the reason alone, as before.
+			r.relockSync(reason, ...(detail ? [detail] : []));
 		} catch {
 			/* isolated: the next store's PII still gets zeroized */
 		}

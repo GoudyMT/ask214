@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
-import { createTimelineStateStore, TimelineRelockedError } from './state.svelte';
+import {
+	createTimelineStateStore,
+	TimelineRelockedError,
+	type TimelineBroadcastEvent
+} from './state.svelte';
 import { readPlan, SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import type { TimelineTaskState } from './types';
 import { OccConflictError } from '../profile/store.svelte';
@@ -674,6 +678,26 @@ describe('timeline-state store', () => {
 		expect(a.ready).toBe(false);
 		expect(a.state).toEqual({ schemaVersion: 1, tasks: {} });
 		expect(a.failed).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	it('a non-hygiene relock broadcasts its reason', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const events: TimelineBroadcastEvent[] = [];
+		const store = createTimelineStateStore(db, { onBroadcast: (e) => events.push(e) });
+
+		store.relockSync('idle');
+		store.relockSync('user');
+		store.relockSync('peer');
+		store.relockSync('hygiene');
+
+		expect(events).toEqual([
+			{ type: 'relocked', reason: 'idle' },
+			{ type: 'relocked', reason: 'user' },
+			{ type: 'relocked' }
+		]);
+		expect('reason' in (events[2] ?? { reason: 1 })).toBe(false);
 		await deleteTestDb(db);
 	});
 

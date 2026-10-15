@@ -7,7 +7,8 @@ import {
 	createProfileStore,
 	KeystoreNotInitializedError,
 	KeystoreHmacMismatchError,
-	OccConflictError
+	OccConflictError,
+	type BroadcastEvent
 } from './store.svelte';
 import { withStores, reqToPromise } from '../db/schema';
 import { encryptProfileRecord } from './crypto-boundary';
@@ -315,6 +316,23 @@ describe('ProfileStore.relockSync', () => {
 
 		expect(store._getStateForTest()).toBeNull();
 		expect(events).not.toContain('relocked');
+	});
+
+	it('a non-hygiene relock broadcasts its reason', () => {
+		const events: BroadcastEvent[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e) });
+
+		store.relockSync('idle');
+		store.relockSync('user');
+		store.relockSync('peer');
+		store.relockSync('hygiene');
+
+		expect(events).toEqual([
+			{ type: 'relocked', reason: 'idle' },
+			{ type: 'relocked', reason: 'user' },
+			{ type: 'relocked' }
+		]);
+		expect('reason' in (events[2] ?? { reason: 1 })).toBe(false);
 	});
 
 	// A save puts the profile back in memory just as surely as a load does. If it does not say so,

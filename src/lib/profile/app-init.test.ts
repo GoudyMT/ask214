@@ -8,6 +8,7 @@ import {
 	relockEachSync,
 	createJoinRelock,
 	reloadWhenShown,
+	subscribeBus,
 	superviseStartup,
 	START_TIMEOUT_MS,
 	type AppInitResult,
@@ -125,6 +126,16 @@ describe('walking the relock list', () => {
 		expect(c.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
 	});
 
+	it('relockEachSync passes the detail to every relockable', () => {
+		const a = fake();
+		const boom = throwing();
+		const c = fake();
+		relockEachSync([a, boom, c], 'peer', { peerReason: 'user' });
+		expect(a.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'user' });
+		expect(boom.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'user' });
+		expect(c.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'user' });
+	});
+
 	it('onHide relocks every store when one throws', () => {
 		const a = fake();
 		const boom = throwing();
@@ -193,6 +204,14 @@ describe('createJoinRelock', () => {
 		const entry = list[0];
 		if (!entry) throw new Error('test setup: no entry joined');
 		(entry.relockSync as (...a: unknown[]) => void)('peer', { peerReason: 'idle' });
+		expect(joiner.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'idle' });
+	});
+
+	it('a joined relockable receives the detail', () => {
+		const list: Relockable[] = [];
+		const joiner = fake();
+		createJoinRelock(list)(joiner);
+		relockEachSync(list, 'peer', { peerReason: 'idle' });
 		expect(joiner.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'idle' });
 	});
 
@@ -486,6 +505,25 @@ describe('installLifecycle when the page is already hidden', () => {
 			expect(s.relockSync).not.toHaveBeenCalled();
 			expect(s.refresh).not.toHaveBeenCalled();
 		}
+	});
+});
+
+describe('subscribeBus', () => {
+	it('passes the signal to its handler', () => {
+		let deliver: ((s: BusSignal) => void) | undefined;
+		const bus: ProfileBus = {
+			publish: () => {},
+			subscribe: (h) => {
+				deliver = h;
+				return () => {};
+			},
+			close: () => {}
+		};
+		const onRelocked = vi.fn();
+		subscribeBus(bus, { relocked: onRelocked });
+		const signal: BusSignal = { type: 'relocked', reason: 'idle' };
+		deliver?.(signal);
+		expect(onRelocked).toHaveBeenCalledExactlyOnceWith(signal);
 	});
 });
 

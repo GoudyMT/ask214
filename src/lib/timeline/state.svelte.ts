@@ -72,7 +72,10 @@ function cleanTaskState(s: TimelineTaskState): TimelineTaskState {
 	return out as TimelineTaskState;
 }
 
-export type TimelineBroadcastEvent = { type: 'timeline-updated' | 'relocked' };
+export type TimelineBroadcastEvent = {
+	type: 'timeline-updated' | 'relocked';
+	reason?: 'idle' | 'user';
+};
 export type TimelineStoreOptions = { onBroadcast?: (e: TimelineBroadcastEvent) => void };
 
 export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOptions = {}) {
@@ -92,7 +95,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		relockEpoch++;
 		lockState = nextLockState(lockState, reason);
 		// Only an intentional relock is other tabs' business - see the profile store's relockNow.
-		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
+		if (reason === 'idle' || reason === 'user') opts.onBroadcast?.({ type: 'relocked', reason });
+		else if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	const readVerifiedKeystore = () => readKeystoreRow(db);

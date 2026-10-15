@@ -53,7 +53,7 @@ export type ProfilePatch = Partial<
 	Omit<ProfileV1, 'schemaVersion' | 'generation' | 'lastSeenAt' | 'setupIntentChangedAt'>
 >;
 
-export type BroadcastEvent = { type: 'profile-updated' | 'relocked' };
+export type BroadcastEvent = { type: 'profile-updated' | 'relocked'; reason?: 'idle' | 'user' };
 export type ProfileStoreOptions = { onBroadcast?: (e: BroadcastEvent) => void };
 
 type KeystoreRow = KeystoreRecordV1 & { id: number };
@@ -133,7 +133,9 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		// The relocked signal means "the user locked - you should too". Page hygiene is not that: THIS
 		// page is going away and the others are not, so telling them turns switching tabs into locking
 		// every other tab, and a peer relock is not one a page restore may undo.
-		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
+		// The reason rides along only for an idle or user relock, so a tab can tell a timeout from the user's Lock.
+		if (reason === 'idle' || reason === 'user') opts.onBroadcast?.({ type: 'relocked', reason });
+		else if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	const api = {

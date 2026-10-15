@@ -6,11 +6,17 @@
  * re-read - it cannot inject or read state. The authenticated-envelope design
  * (HMAC + replay defense + derived channel name) is deferred to v1.1.
  *
+ * A relock may name why it happened (an idle timeout or the user's own Lock). That is not
+ * state and decides nothing in a store: it only lets a tab tell a background idle lock
+ * from a lock the user chose. A receiver rebuilds the signal from the checked fields, so
+ * a spoofed reason or any extra field degrades to a bare signal.
+ *
  * BroadcastChannel is intentionally NOT gated by the capability check (multi-tab is
  * best-effort), so its absence degrades to a no-op bus rather than blocking core use.
  */
 export type BusSignal = {
-	type: 'profile-updated' | 'relocked' | 'timeline-updated' | 'calendar-updated';
+	type: 'profile-updated' | 'relocked' | 'timeline-updated' | 'calendar-updated' | 'data-replaced';
+	reason?: 'idle' | 'user';
 };
 
 export type ProfileBus = {
@@ -21,15 +27,23 @@ export type ProfileBus = {
 
 const CHANNEL_NAME = 'mtc-profile';
 
-function isBusSignal(value: unknown): value is BusSignal {
-	if (typeof value !== 'object' || value === null || !('type' in value)) return false;
-	const t = (value as { type: unknown }).type;
-	return (
-		t === 'profile-updated' ||
-		t === 'relocked' ||
-		t === 'timeline-updated' ||
-		t === 'calendar-updated'
-	);
+/**
+ * Rebuilds a signal from the checked fields only, or null for anything else. The incoming object is
+ * never handed on: it may carry extra fields, and a reason other than idle or user is dropped.
+ */
+function toBusSignal(value: unknown): BusSignal | null {
+	if (typeof value !== 'object' || value === null || !('type' in value)) return null;
+	const { type, reason } = value as { type: unknown; reason?: unknown };
+	if (
+		type !== 'profile-updated' &&
+		type !== 'relocked' &&
+		type !== 'timeline-updated' &&
+		type !== 'calendar-updated' &&
+		type !== 'data-replaced'
+	) {
+		return null;
+	}
+	return reason === 'idle' || reason === 'user' ? { type, reason } : { type };
 }
 
 export function createProfileBus(channelName: string = CHANNEL_NAME): ProfileBus {
@@ -55,7 +69,8 @@ export function createProfileBus(channelName: string = CHANNEL_NAME): ProfileBus
 		},
 		subscribe(handler: (signal: BusSignal) => void): () => void {
 			const listener = (ev: MessageEvent): void => {
-				if (isBusSignal(ev.data)) handler(ev.data);
+				const signal = toBusSignal(ev.data);
+				if (signal) handler(signal);
 			};
 			channel.addEventListener('message', listener);
 			return () => channel.removeEventListener('message', listener);

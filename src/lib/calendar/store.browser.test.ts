@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createCalendarSyncStore, CalendarRelockedError } from './store.svelte';
+import {
+	createCalendarSyncStore,
+	CalendarRelockedError,
+	type CalendarBroadcastEvent
+} from './store.svelte';
 import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
@@ -338,6 +342,26 @@ describe('calendar-sync store', () => {
 		expect(b.failed).toBe(true);
 		await expect(reread).rejects.toThrow();
 		expect(b.failed).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	it('a non-hygiene relock broadcasts its reason', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const events: CalendarBroadcastEvent[] = [];
+		const store = createCalendarSyncStore(db, { onBroadcast: (e) => events.push(e) });
+
+		store.relockSync('idle');
+		store.relockSync('user');
+		store.relockSync('peer');
+		store.relockSync('hygiene');
+
+		expect(events).toEqual([
+			{ type: 'relocked', reason: 'idle' },
+			{ type: 'relocked', reason: 'user' },
+			{ type: 'relocked' }
+		]);
+		expect('reason' in (events[2] ?? { reason: 1 })).toBe(false);
 		await deleteTestDb(db);
 	});
 
