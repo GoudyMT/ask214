@@ -59,7 +59,7 @@ export type ProfileApp = {
 	relockAll: (() => void) | null;
 	/**
 	 * Joins a relockable to the app's relock list for as long as it lives; the function it returns leaves the list.
-	 * Null until app-init resolves ready, and under `damaged`.
+	 * Null until app-init resolves ready or damaged.
 	 */
 	joinRelock: ((r: Relockable) => () => void) | null;
 	/**

@@ -33,7 +33,20 @@ const app = $state<{
 	store: { locked: boolean; persona: PersonaFilters } | null;
 	timeline: { locked: boolean; ready: boolean; failed: boolean; state: typeof EMPTY } | null;
 	byok: null;
-}>({ status: 'ready', store: null, timeline: null, byok: null });
+	joinRelock: null;
+	publish: null;
+	reloadOnUnlock: boolean;
+	replacedNotice: boolean;
+}>({
+	status: 'ready',
+	store: null,
+	timeline: null,
+	byok: null,
+	joinRelock: null,
+	publish: null,
+	reloadOnUnlock: false,
+	replacedNotice: false
+});
 
 vi.mock('$lib/ask', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/ask')>()),

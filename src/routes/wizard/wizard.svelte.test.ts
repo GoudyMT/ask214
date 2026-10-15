@@ -15,7 +15,14 @@ const { store, goto } = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/profile/context', () => ({
-	getProfileApp: () => ({ status: 'ready', store }),
+	getProfileApp: () => ({
+		status: 'ready',
+		store,
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
+	}),
 	setProfileApp: () => {}
 }));
 vi.mock('$app/navigation', () => ({ goto }));

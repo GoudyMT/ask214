@@ -22,7 +22,11 @@ vi.mock('$lib/profile/context', () => ({
 		byok: null,
 		cause: null,
 		wipeAll,
-		relockAll: null
+		relockAll: null,
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
 	}),
 	setProfileApp: () => {}
 }));

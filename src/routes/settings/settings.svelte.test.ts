@@ -17,7 +17,11 @@ const { app, store } = vi.hoisted(() => ({
 		byok: null as object | null,
 		cause: null,
 		wipeAll: null,
-		relockAll: null
+		relockAll: null,
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
 	},
 	store: {
 		locked: false,

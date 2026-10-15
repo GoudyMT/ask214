@@ -286,9 +286,9 @@ export function relockEachSync(relockables: Relockable[], reason: RelockReason):
 export function createJoinRelock(relockables: Relockable[]): (r: Relockable) => () => void {
 	return (r) => {
 		const entry: Relockable = {
-			relockSync: (reason: Parameters<Relockable['relockSync']>[0]) => {
+			relockSync: (reason, ...rest) => {
 				try {
-					r.relockSync(reason);
+					r.relockSync(reason, ...rest);
 				} catch {
 					/* isolated: a joiner can never stop the stores after it from relocking */
 				}
