@@ -137,6 +137,8 @@ the summary.
 - Every citation must name a passage that was sent, and every number must appear in the cited passages;
   otherwise the summary is refused and the source cards stand alone.
 - A crisis or "not covered" reply is recognised, and the app shows its own wording instead of the model's.
+- A summary cut off at the token limit is not shown, since its last sentence may be a caveat. A key the provider
+  rejects, a call that fails and a cut-off summary each get their own note, and the document is quoted instead.
 
 **Tradeoffs accepted.** The user needs a key and pays the provider for their own use. Strict checks sometimes
 refuse a correct summary.
