@@ -65,6 +65,8 @@ function anySignal(signals: (AbortSignal | undefined)[]): AbortSignal {
 	return ctl.signal;
 }
 
+// An aborted run's outcome is thrown away, so any failure inside it reports as
+// the abort; a callback that resolves is never remapped.
 function mapLockError(err: unknown, runSignal: AbortSignal | undefined): unknown {
 	if (runSignal?.aborted) return new RunAbortedError();
 	if (isAbortOrTimeout(err)) return new LockAcquisitionTimeout();

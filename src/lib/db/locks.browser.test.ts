@@ -85,8 +85,8 @@ describe('rotateOrUpgrade', () => {
 });
 
 /**
- * A peer holding a lock: `request` resolves once the lock is granted, and
- * `release` frees it and waits for the lock to be gone.
+ * A peer holding a lock: `hold(...)` resolves once the peer holds the lock,
+ * and `release` frees it and waits for the lock to be gone.
  */
 async function hold(name: string, mode: LockMode): Promise<{ release: () => Promise<void> }> {
 	let release: () => void = () => {};
@@ -136,38 +136,65 @@ describe('a run signal', () => {
 		expect(fn).not.toHaveBeenCalled();
 	});
 
-	it('withWriteLocks passes the run signal to the outer shared request', async () => {
-		const peer = await hold('mtc-keystore', 'exclusive');
-		const load = vi.fn(async () => 0);
-		const fn = vi.fn(async () => 'ran');
-		const ctl = new AbortController();
-		try {
-			const run = withWriteLocks(load, fn, LOCK_TIMEOUT_MS, ctl.signal);
-			ctl.abort();
-			expect(await outcomeOf(run)).toBeInstanceOf(RunAbortedError);
-		} finally {
-			await peer.release();
-		}
-		await nextTurn();
-		expect(load).not.toHaveBeenCalled();
-		expect(fn).not.toHaveBeenCalled();
+	describe('withWriteLocks passes the run signal to both nested requests', () => {
+		it('the outer shared request', async () => {
+			const peer = await hold('mtc-keystore', 'exclusive');
+			const load = vi.fn(async () => 0);
+			const fn = vi.fn(async () => 'ran');
+			const ctl = new AbortController();
+			try {
+				const run = withWriteLocks(load, fn, LOCK_TIMEOUT_MS, ctl.signal);
+				ctl.abort();
+				expect(await outcomeOf(run)).toBeInstanceOf(RunAbortedError);
+			} finally {
+				await peer.release();
+			}
+			await nextTurn();
+			expect(load).not.toHaveBeenCalled();
+			expect(fn).not.toHaveBeenCalled();
+		});
+
+		it('the inner exclusive request', async () => {
+			const peer = await hold('profile-write', 'exclusive');
+			const fn = vi.fn(async () => 'ran');
+			const ctl = new AbortController();
+			try {
+				const run = withWriteLocks(async () => 0, fn, LOCK_TIMEOUT_MS, ctl.signal);
+				// The outer shared request is granted at once; give the inner one time to queue.
+				await nextTurn();
+				ctl.abort();
+				expect(await outcomeOf(run)).toBeInstanceOf(RunAbortedError);
+			} finally {
+				await peer.release();
+			}
+			await nextTurn();
+			expect(fn).not.toHaveBeenCalled();
+		});
 	});
 
-	it('withWriteLocks passes the run signal to the inner exclusive request', async () => {
-		const peer = await hold('profile-write', 'exclusive');
-		const fn = vi.fn(async () => 'ran');
+	it('a callback error after the run was aborted reports as RunAbortedError', async () => {
 		const ctl = new AbortController();
-		try {
-			const run = withWriteLocks(async () => 0, fn, LOCK_TIMEOUT_MS, ctl.signal);
-			// The outer shared request is granted at once; give the inner one time to queue.
-			await nextTurn();
-			ctl.abort();
-			expect(await outcomeOf(run)).toBeInstanceOf(RunAbortedError);
-		} finally {
-			await peer.release();
-		}
-		await nextTurn();
-		expect(fn).not.toHaveBeenCalled();
+		let started: () => void = () => {};
+		const hasStarted = new Promise<void>((r) => {
+			started = r;
+		});
+		let proceed: () => void = () => {};
+		const mayThrow = new Promise<void>((r) => {
+			proceed = r;
+		});
+		const run = rotateOrUpgrade(
+			async () => {
+				started();
+				await mayThrow;
+				throw new Error('E_PROBE');
+			},
+			LOCK_TIMEOUT_MS,
+			ctl.signal
+		);
+		await hasStarted;
+		ctl.abort();
+		proceed();
+		expect(await outcomeOf(run)).toBeInstanceOf(RunAbortedError);
 	});
 
 	it('an already-aborted run signal rejects without running', async () => {
@@ -184,7 +211,7 @@ describe('a run signal', () => {
 		expect(fn).not.toHaveBeenCalled();
 	});
 
-	describe('when AbortSignal.any is missing', () => {
+	describe('the fallback combines signals when AbortSignal.any is missing', () => {
 		const original = Object.getOwnPropertyDescriptor(AbortSignal, 'any');
 
 		beforeEach(() => {
