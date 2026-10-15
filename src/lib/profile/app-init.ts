@@ -247,13 +247,30 @@ export type Relockable = {
  * in every store after it in the list.
  *
  * NOT for the cross-tab bus handler - that path must stay fully synchronous inside the relock echo's
- * answer() frame, so it calls relockSync directly.
+ * answer() frame, so it uses relockEachSync, which never defers through lock().
  */
 export function relockAll(relockables: Relockable[], reason: RelockReason): void {
-	for (const r of relockables) {
+	// A copy, so a store leaving the list during its own relock cannot make the walk skip the next one.
+	for (const r of [...relockables]) {
 		try {
 			if (r.lock) void r.lock(reason);
 			else r.relockSync(reason);
+		} catch {
+			/* isolated: the next store's PII still gets zeroized */
+		}
+	}
+}
+
+/**
+ * Relock every store synchronously, one throw never stopping the rest. The page-hide and peer-relock
+ * paths cannot defer through lock(), and a store that throws must not leave the plaintext of the
+ * stores after it in memory. The walk reads a copy so a store leaving the shared list during its own
+ * relock cannot shift the index and make the walk skip the next one.
+ */
+export function relockEachSync(relockables: Relockable[], reason: RelockReason): void {
+	for (const r of [...relockables]) {
+		try {
+			r.relockSync(reason);
 		} catch {
 			/* isolated: the next store's PII still gets zeroized */
 		}
@@ -298,15 +315,20 @@ export function installLifecycle(
 	// The page is going away, so its plaintext goes with it. That is hygiene, not a decision the
 	// user made, so it stays undoable - pagehide and freeze both land here and their order is not
 	// consistent across browsers, which the state ladder absorbs.
-	const onHide = (): void => {
-		for (const r of relockables) r.relockSync('hygiene');
-	};
+	const onHide = (): void => relockEachSync(relockables, 'hygiene');
 	// The page came back. Ask every store to re-read; each answers from how its own plaintext went
 	// away, so an evicted store restores and a locked one stays shut. No policy belongs here.
 	const restore = (): void => {
 		// A failed re-read is not left as an unhandled rejection: the timeline and calendar show it in their own
 		// state; the profile has no failed state, so it keeps what it held.
-		for (const r of relockables) r.refresh().catch(() => {});
+		// A synchronous throw is not covered by that catch, so each store is also isolated by its own try.
+		for (const r of [...relockables]) {
+			try {
+				r.refresh().catch(() => {});
+			} catch {
+				/* isolated: the next store still re-reads */
+			}
+		}
 	};
 	// Two ways back in, deliberately routed through the same branch rather than paired by arrival
 	// order: which of these fires, and in what sequence, is not consistent across browsers.

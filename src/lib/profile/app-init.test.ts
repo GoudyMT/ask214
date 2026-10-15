@@ -5,10 +5,12 @@ import {
 	provisionStore,
 	createRelockEcho,
 	relockAll,
+	relockEachSync,
 	reloadWhenShown,
 	superviseStartup,
 	START_TIMEOUT_MS,
-	type AppInitResult
+	type AppInitResult,
+	type Relockable
 } from './app-init';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import { KeystoreHmacMismatchError } from './store.svelte';
@@ -85,6 +87,88 @@ describe('relockAll', () => {
 		// A store failing to relock must not strand PII in every store after it in the list.
 		expect(() => relockAll([boom, after], 'user')).not.toThrow();
 		expect(after.relockSync).toHaveBeenCalledOnce();
+	});
+});
+
+describe('walking the relock list', () => {
+	const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+	const fake = () => ({ relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) });
+	const throwing = () => ({
+		relockSync: vi.fn(() => {
+			throw new Error('relock blew up');
+		}),
+		refresh: vi.fn().mockResolvedValue(null)
+	});
+
+	function install(relockables: Relockable[]) {
+		const win = new EventTarget();
+		const doc = new EventTarget();
+		installLifecycle(relockables, {
+			win,
+			doc,
+			isHidden: () => false,
+			createIdleTimer: () => timer,
+			idleThresholdMs: 900_000
+		});
+		return { win, doc };
+	}
+
+	it('relockEachSync relocks every store when one throws', () => {
+		const a = fake();
+		const boom = throwing();
+		const c = fake();
+		expect(() => relockEachSync([a, boom, c], 'peer')).not.toThrow();
+		expect(a.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
+		expect(boom.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
+		expect(c.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
+	});
+
+	it('onHide relocks every store when one throws', () => {
+		const a = fake();
+		const boom = throwing();
+		const c = fake();
+		const { win } = install([a, boom, c]);
+		win.dispatchEvent(new Event('pagehide'));
+		expect(c.relockSync).toHaveBeenCalledExactlyOnceWith('hygiene');
+	});
+
+	// A store that leaves the shared list during its own relock shifts every later index by one, so a walk
+	// over the live array skips the store right after it.
+	const walkers: [string, (list: Relockable[]) => void][] = [
+		['relockAll', (list) => relockAll(list, 'user')],
+		['relockEachSync', (list) => relockEachSync(list, 'peer')],
+		['onHide', (list) => install(list).win.dispatchEvent(new Event('pagehide'))]
+	];
+	it.each(walkers)(
+		'%s: a relockable that leaves during the walk does not make the walk skip the next one',
+		(_name, walk) => {
+			const list: Relockable[] = [];
+			const a = {
+				relockSync: vi.fn(() => void list.splice(list.indexOf(a), 1)),
+				refresh: vi.fn().mockResolvedValue(null)
+			};
+			const b = fake();
+			list.push(a, b);
+			walk(list);
+			expect(a.relockSync).toHaveBeenCalledOnce();
+			expect(b.relockSync).toHaveBeenCalledOnce();
+		}
+	);
+
+	it('restore re-reads every store when one refresh throws synchronously', () => {
+		const a = fake();
+		const boom = {
+			relockSync: vi.fn(),
+			refresh: vi.fn(() => {
+				throw new Error('refresh blew up');
+			})
+		};
+		const c = fake();
+		const { doc } = install([a, boom, c]);
+		doc.dispatchEvent(new Event('resume'));
+		expect(a.refresh).toHaveBeenCalledOnce();
+		expect(boom.refresh).toHaveBeenCalledOnce();
+		expect(c.refresh).toHaveBeenCalledOnce();
 	});
 });
 

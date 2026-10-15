@@ -15,6 +15,7 @@
 		installLifecycle,
 		createRelockEcho,
 		relockAll,
+		relockEachSync,
 		reloadWhenShown,
 		superviseStartup,
 		type Relockable
@@ -164,7 +165,7 @@
 				// refresh, not load: a peer's change is not the user asking to unlock, so each store
 				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
-					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync('peer'))),
+					relocked: () => echo.answer(() => relockEachSync(relockables, 'peer')),
 					'profile-updated': () => result.store.refresh(),
 					'timeline-updated': () => app.timeline?.refresh(),
 					'calendar-updated': () => app.calendar?.refresh()
