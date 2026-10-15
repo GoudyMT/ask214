@@ -236,6 +236,8 @@
 	};
 	const AFTER_YOU_LEAVE_NOTE =
 		'This opens after you leave your command. Ask your command how to fit it in.';
+	const LEFT_COMMAND_NOTE =
+		'You have left your command. Do this before your separation date if you can.';
 
 	// The date line by status: when a window opens, a soft task's aim, a firm task's last day, when a passed date
 	// was due. Resolved states use the collapsed treatment instead.
@@ -247,8 +249,10 @@
 			...(item.fit && iso === item.fit.date ? { reason: REASON[item.fit.reason] } : {})
 		});
 		switch (item.status) {
-			case 'upcoming':
 			case 'after-you-leave':
+				if (item.leftCommand?.opened) return { text: '' };
+				return { text: `Opens ${f(item.windowStartDate)}` };
+			case 'upcoming':
 				return { text: `Opens ${f(item.windowStartDate)}` };
 			case 'start-now':
 				return firm
@@ -275,7 +279,7 @@
 	// required task closes only after separation, when its note about doing it first no longer applies.
 	const afterNote = $derived(
 		item.status === 'after-you-leave'
-			? { label: 'What now', text: AFTER_YOU_LEAVE_NOTE }
+			? { label: 'What now', text: item.leftCommand ? LEFT_COMMAND_NOTE : AFTER_YOU_LEAVE_NOTE }
 			: item.status === 'changed'
 				? { label: 'What changed', text: item.def.changeNote }
 				: item.status === 'late' || (item.status === 'closed' && item.def.kind === 'closes')

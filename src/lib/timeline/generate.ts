@@ -219,6 +219,11 @@ export type TimelineItem = {
 	 * its old date would read as overdue for years. The card and Home show it with no date.
 	 */
 	aimLapsed?: true;
+	/**
+	 * An "after you leave" task once the leaving day has come: the card stops telling the user to ask their command,
+	 * and `opened` says whether the window has opened (an opening already past is not shown).
+	 */
+	leftCommand?: { opened: boolean };
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
 	note?: string; // the user's saved note for this task, if any (shown on any status)
 	/** Present when Fit pulled the last day in: why, and the date it moved to (the card names the reason there). */
@@ -364,6 +369,10 @@ export function generateTimeline(
 				...(nextEdge !== undefined ? { daysLeft: daysBetween(todayIso, nextEdge) } : {}),
 				...(a.def.kind === 'soft'
 					? { aimDate: a.targetDate >= todayIso ? a.targetDate : windowEndDate }
+					: {}),
+				// A task that cannot fit ends the day before the leaving day, so the day after its last day is that day.
+				...(status === 'after-you-leave' && todayIso > a.windowEndDate
+					? { leftCommand: { opened: todayIso >= a.windowStartDate } }
 					: {}),
 				...(status === 'still-to-do' &&
 				todayIso > a.separationDate &&

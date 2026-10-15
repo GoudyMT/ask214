@@ -1695,6 +1695,39 @@ describe('leaving your command', () => {
 		expect(container.querySelector('article')?.classList.contains('task-card--calm')).toBe(false);
 	});
 
+	it('once the user has left the command, says so instead of "ask your command"', async () => {
+		const { container } = await renderCard(
+			makeItem({
+				def: firmDef,
+				status: 'after-you-leave',
+				windowStartDate: '2026-12-01',
+				leftCommand: { opened: false }
+			})
+		);
+		const box = container.querySelector('.task-card__whatnow')?.textContent ?? '';
+		expect(box).toContain(
+			'You have left your command. Do this before your separation date if you can.'
+		);
+		expect(box).not.toContain('Ask your command');
+		await expect.element(page.getByText('Opens Dec 1, 2026')).toBeVisible();
+	});
+
+	it('once the user has left and the window has opened, shows no past opening date', async () => {
+		const { container } = await renderCard(
+			makeItem({
+				def: firmDef,
+				status: 'after-you-leave',
+				windowStartDate: '2026-12-01',
+				leftCommand: { opened: true }
+			})
+		);
+		expect(container.textContent).not.toContain('Opens');
+		expect(container.textContent).not.toContain('Dec 1, 2026');
+		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain(
+			'You have left your command.'
+		);
+	});
+
 	it('a soft task that cannot fit stays calm and keeps Snooze', async () => {
 		const { container } = await renderCard(
 			makeItem({ status: 'after-you-leave', windowStartDate: '2027-01-30' })

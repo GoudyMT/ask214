@@ -964,6 +964,41 @@ describe('After you leave', () => {
 		expect(on(new Date(2027, 3, 30, 12))('sha-complete')?.windowEndDate).toBe('2026-11-14');
 	});
 
+	// Once the leaving day has come, "ask your command" no longer applies, and an opening already past is not news.
+	describe('once the user has left the command', () => {
+		const item = (today: Date) =>
+			generateTimeline(
+				{
+					completeness: 'eaos-only',
+					eaos: SEP,
+					daysUntilSeparation: 208,
+					leaving: { terminalLeaveStart: '2026-11-15' } as never
+				},
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				today
+			)
+				.phases.flatMap((p) => p.items)
+				.find((i) => i.def.id === 'sha-complete');
+
+		it('carries nothing before the leaving day', () => {
+			const sha = item(new Date(2026, 10, 14, 12));
+			expect(sha?.status).toBe('after-you-leave');
+			expect(sha?.leftCommand).toBeUndefined();
+		});
+
+		it('says the user has left from the leaving day, and whether the window has opened', () => {
+			const onLeaving = item(new Date(2026, 10, 15, 12));
+			expect(onLeaving?.status).toBe('after-you-leave');
+			expect(onLeaving?.leftCommand).toEqual({
+				opened: onLeaving!.windowStartDate <= '2026-11-15'
+			});
+			const opened = item(new Date(2027, 3, 1, 12));
+			expect((opened?.windowStartDate ?? '9999-12-31') <= '2027-04-01').toBe(true);
+			expect(opened?.leftCommand).toEqual({ opened: true });
+		});
+	});
+
 	it('holds through separation day and hands over the day after', () => {
 		const leave = { terminalLeaveStart: '2026-11-15' };
 		expect(at(new Date(2027, 3, 30, 12), leave)['sha-complete']).toBe('after-you-leave');
