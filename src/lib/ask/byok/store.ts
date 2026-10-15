@@ -1,6 +1,7 @@
 import { encryptRecord, decryptRecord, type RecordCtx } from '$lib/crypto/record-crypto';
 import { readKeystoreRow } from '$lib/profile/store.svelte';
 import { withStores, reqToPromise } from '$lib/db/schema';
+import { isAnthropicKeyShape } from './key-shape';
 
 /**
  * byok store - persists the user's BYO API key as ONE encrypted self-row through the shared
@@ -23,6 +24,8 @@ export function createByokStore(db: IDBDatabase) {
 	return {
 		/** Encrypt + persist the API key as the single byok self-row. */
 		async saveApiKey(key: string): Promise<void> {
+			// First, before the keystore is read: no caller may store text that is not a key.
+			if (!isAnthropicKeyShape(key)) throw new Error('E_KEY_SHAPE');
 			const keystore = await readVerifiedKeystore();
 			const plaintext = new TextEncoder().encode(key);
 			let blob: Uint8Array;

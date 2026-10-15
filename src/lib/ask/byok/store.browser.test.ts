@@ -104,6 +104,26 @@ describe('byok store', () => {
 		await expect(store.readApiKey()).rejects.toThrow(KeystoreNotInitializedError);
 		await deleteTestDb(db);
 	});
+
+	// Run on a database with no keystore: a refusal that comes first throws its own code, one that reads the
+	// keystore first would throw KeystoreNotInitializedError instead.
+	it('saveApiKey refuses a bad shape and writes nothing', async () => {
+		const db = await openTestDb();
+
+		await expect(createByokStore(db).saveApiKey('apple harbor cable dog echo fox')).rejects.toThrow(
+			'E_KEY_SHAPE'
+		);
+		expect(seen.cipherInput).toHaveLength(0);
+
+		await bootstrapLocalKeystore(db);
+		await expect(createByokStore(db).saveApiKey('sk-test-key')).rejects.toThrow('E_KEY_SHAPE');
+		const row = await withStores(db, 'byok', 'readonly', (tx) =>
+			reqToPromise<unknown>(tx.objectStore('byok').get(0))
+		);
+		expect(row).toBeUndefined();
+		expect(seen.cipherInput).toHaveLength(0);
+		await deleteTestDb(db);
+	});
 });
 
 describe('byok store plaintext buffers', () => {

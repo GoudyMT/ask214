@@ -110,12 +110,69 @@ describe('OnlineAnswersPanel', () => {
 			}
 		});
 		const input = container.querySelector('.online-key__input') as HTMLInputElement;
-		input.value = 'sk-test-key';
+		input.value = 'sk-ant-test-key';
 		input.dispatchEvent(new Event('input', { bubbles: true }));
 		flushSync();
 		(container.querySelector('.online-key__save') as HTMLButtonElement).click();
 		flushSync();
-		expect(saved).toBe('sk-test-key');
+		expect(saved).toBe('sk-ant-test-key');
+	});
+
+	// Load-bearing: a password manager must not offer to store or fill an API key.
+	it('the key input keeps autocomplete off', async () => {
+		const { container } = await render(OnlineAnswersPanel, { props: { ...base } });
+		expect(
+			(container.querySelector('.online-key__input') as HTMLInputElement).getAttribute(
+				'autocomplete'
+			)
+		).toBe('off');
+	});
+
+	describe('a value that is not an Anthropic key', () => {
+		const NOT_A_KEY =
+			'That is not an Anthropic API key. Keys start with sk-ant-. Nothing was saved.';
+
+		async function typeAndSave(typed: string) {
+			const onSaveKey = vi.fn<Props['onSaveKey']>(async () => {});
+			const { container } = await render(OnlineAnswersPanel, { props: { ...base, onSaveKey } });
+			const input = container.querySelector('.online-key__input') as HTMLInputElement;
+			input.value = typed;
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			flushSync();
+			(container.querySelector('.online-key__save') as HTMLButtonElement).click();
+			flushSync();
+			return { container, input, onSaveKey };
+		}
+
+		it('a value not starting sk-ant- is refused, cleared and not saved', async () => {
+			const { container, input, onSaveKey } = await typeAndSave('sk-test-key');
+
+			expect(onSaveKey).not.toHaveBeenCalled();
+			expect(input.value).toBe('');
+			expect(container.querySelector('.online-key__error[role="alert"]')?.textContent).toBe(
+				NOT_A_KEY
+			);
+		});
+
+		it('six lowercase words are refused', async () => {
+			const { container, input, onSaveKey } = await typeAndSave('apple harbor cable dog echo fox');
+
+			expect(onSaveKey).not.toHaveBeenCalled();
+			expect(input.value).toBe('');
+			expect(container.querySelector('.online-key__error[role="alert"]')?.textContent).toBe(
+				NOT_A_KEY
+			);
+		});
+
+		it('the refusal never contains the value', async () => {
+			const { container } = await typeAndSave('apple harbor cable dog echo fox');
+
+			const text = container.textContent ?? '';
+			expect(text).toContain(NOT_A_KEY);
+			for (const word of ['apple', 'harbor', 'cable', 'dog', 'echo', 'fox']) {
+				expect(text).not.toContain(word);
+			}
+		});
 	});
 
 	it('when a key is stored, offers to clear it and does not show the raw value', async () => {
