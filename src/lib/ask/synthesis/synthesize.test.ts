@@ -16,7 +16,13 @@ const CHUNKS: RetrievedChunk[] = [
 // Mirror the online-retrieve stub: a plain object cast to Response, no global constructor.
 function stubFetch(
 	text: string,
-	init: { ok?: boolean; status?: number; throws?: boolean; badJson?: boolean } = {}
+	init: {
+		ok?: boolean;
+		status?: number;
+		throws?: boolean;
+		badJson?: boolean;
+		stopReason?: string;
+	} = {}
 ) {
 	return vi.fn<FetchLike>(async (): Promise<Response> => {
 		if (init.throws) throw new Error('network down');
@@ -25,7 +31,10 @@ function stubFetch(
 			status: init.status ?? 200,
 			json: async () => {
 				if (init.badJson) throw new Error('bad json');
-				return { content: [{ type: 'text', text }] };
+				return {
+					content: [{ type: 'text', text }],
+					stop_reason: init.stopReason ?? 'end_turn'
+				};
 			}
 		} as Response;
 	});
@@ -72,6 +81,58 @@ describe('synthesize', () => {
 			);
 		}
 	});
+	// Three passages from one guide used to list the guide's title three times under the summary.
+	it('lists each cited document once, opening the page cited first', async () => {
+		const guide = (id: string, page: number): RetrievedChunk => ({
+			id: `tap_vet_centers:${id}`,
+			text: 'Vet Centers offer readjustment counseling to combat veterans and their families.',
+			sourceId: 'tap_vet_centers',
+			page,
+			url: 'https://www.tapevents.mil/resources/documents',
+			title: 'TAP - Vet Centers'
+		});
+		const chunks = [guide('0fb72e844a79', 2), CHUNKS[0]!, guide('1ab72e844a70', 5)];
+		const impl = stubFetch(
+			'Vet Centers offer counseling [tap_vet_centers:1ab72e844a70] to veterans ' +
+				'[tap_vet_centers:0fb72e844a79], and SkillBridge lets you train [tap_moc_crosswalk].'
+		);
+		const result = await synthesize('What is a Vet Center?', chunks, deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.citations.map((c) => [c.title, c.url])).toEqual([
+				[
+					'TAP - Vet Centers',
+					'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf#page=5'
+				],
+				['SkillBridge', 'https://example.gov/skillbridge']
+			]);
+		}
+	});
+
+	// The documents keep the order search ranked them in, not the order the model happened to cite them.
+	it('lists the cited documents in search order', async () => {
+		const guide: RetrievedChunk = {
+			id: 'tap_vet_centers:0fb72e844a79',
+			text: 'Vet Centers offer readjustment counseling to combat veterans and their families.',
+			sourceId: 'tap_vet_centers',
+			page: 2,
+			url: 'https://www.tapevents.mil/resources/documents',
+			title: 'TAP - Vet Centers'
+		};
+		const impl = stubFetch(
+			'SkillBridge lets you train [tap_moc_crosswalk], and Vet Centers offer counseling ' +
+				'[tap_vet_centers:0fb72e844a79].'
+		);
+		const result = await synthesize('What is a Vet Center?', [guide, CHUNKS[0]!], deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.citations.map((c) => c.title)).toEqual([
+				'TAP - Vet Centers',
+				'SkillBridge'
+			]);
+		}
+	});
+
 	it('short-circuits a personalized-eligibility query with no provider call', async () => {
 		const impl = stubFetch('unused');
 		const result = await synthesize('Do I qualify for the housing grant?', CHUNKS, deps(impl));
@@ -238,6 +299,19 @@ describe('synthesize', () => {
 		expect(result.kind).toBe('notCovered');
 	});
 
+	// A cut-off reply is never shown, whatever shape is left of it: the cut can fall before the part that mattered.
+	it('reports a cut-off official-fallback reply as cut short', async () => {
+		const impl = stubFetch('These sources do not cover state income tax. Try va.gov or', {
+			stopReason: 'max_tokens'
+		});
+		const result = await synthesize(
+			'what is the state income tax deadline',
+			REAL_ID_CHUNKS,
+			deps(impl)
+		);
+		expect(result).toEqual({ kind: 'cutShort' });
+	});
+
 	// The gate stays strict for everything else: an uncited answer that reaches for neither authorized
 	// contact is still the ungrounded output the gates exist to stop.
 	it('still refuses an uncited answer that is neither authorized shape', async () => {
@@ -264,25 +338,79 @@ describe('synthesize', () => {
 		expect(result).toEqual({ kind: 'refusal', reason: 'no_citations' });
 	});
 
-	it('degrades when the provider request throws', async () => {
+	it('reports a failed service when the provider request throws', async () => {
 		const impl = stubFetch('', { throws: true });
 		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
-		expect(result).toEqual({ kind: 'degraded' });
+		expect(result).toEqual({ kind: 'serviceFailed' });
 	});
 
-	it('degrades on a non-ok provider response (bad or expired key)', async () => {
-		const impl = stubFetch('', { ok: false, status: 401 });
+	// A key the provider refuses is the one failure the reader can fix, so it is told apart from the rest.
+	it.each([401, 403])('reports a rejected key on a %i response', async (status) => {
+		const impl = stubFetch('', { ok: false, status });
 		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
-		expect(result).toEqual({ kind: 'degraded' });
+		expect(result).toEqual({ kind: 'keyRejected' });
 	});
 
-	it('degrades on a malformed provider body', async () => {
+	it.each([400, 402, 404, 429, 500, 529])(
+		'reports a failed service on a %i response',
+		async (status) => {
+			const impl = stubFetch('', { ok: false, status });
+			const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
+			expect(result).toEqual({ kind: 'serviceFailed' });
+		}
+	);
+
+	it('reports a failed service on a malformed provider body', async () => {
 		const impl = stubFetch('', { badJson: true });
 		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
-		expect(result).toEqual({ kind: 'degraded' });
+		expect(result).toEqual({ kind: 'serviceFailed' });
 	});
 
-	it('aborts and degrades to raw cards when the provider request exceeds the timeout', async () => {
+	// An answer cut off at the token limit can lose its last sentence, caveat included, and every gate would
+	// still pass on what is left.
+	it('reports a cut-off answer instead of showing it as complete', async () => {
+		const impl = stubFetch('SkillBridge lets you train with an employer [tap_moc_crosswalk], and', {
+			stopReason: 'max_tokens'
+		});
+		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'cutShort' });
+	});
+
+	it('reports a failed service when the provider declines the request', async () => {
+		const impl = stubFetch('SkillBridge lets you train [tap_moc_crosswalk].', {
+			stopReason: 'refusal'
+		});
+		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'serviceFailed' });
+	});
+
+	// The model-side crisis check is the backstop for the indirect phrasing the question's keyword net misses on
+	// purpose, so a declined reply that points to the crisis line still shows the crisis card.
+	it('still shows the crisis card when the provider declines with the crisis line', async () => {
+		const impl = stubFetch(
+			'I cannot help with that, but please reach the Veterans Crisis Line: dial 988 then press 1.',
+			{ stopReason: 'refusal' }
+		);
+		const result = await synthesize('i dont see a way forward anymore', REAL_ID_CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'crisis' });
+	});
+
+	it('reports a failed service when the provider declines with no text', async () => {
+		const impl = stubFetch('', { stopReason: 'refusal' });
+		const result = await synthesize('What is SkillBridge?', CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'serviceFailed' });
+	});
+
+	// The crisis card is the safe direction: a cut-off reply naming the crisis line still shows it.
+	it('still shows the crisis card when a crisis reply is cut off', async () => {
+		const impl = stubFetch('Please call the Veterans Crisis Line: dial 988 then press 1, or', {
+			stopReason: 'max_tokens'
+		});
+		const result = await synthesize('I feel hopeless', CHUNKS, deps(impl));
+		expect(result).toEqual({ kind: 'crisis' });
+	});
+
+	it('aborts and reports a failed service when the provider request exceeds the timeout', async () => {
 		// A connection that accepts but never settles, rejecting only when the caller aborts.
 		const hanging = vi.fn<FetchLike>(
 			(_url, options) =>
@@ -297,7 +425,7 @@ describe('synthesize', () => {
 			apiKey: 'test-key',
 			timeoutMs: 10
 		});
-		expect(result).toEqual({ kind: 'degraded' });
+		expect(result).toEqual({ kind: 'serviceFailed' });
 	});
 
 	it('feeds the model display-cleaned source text, not the raw extraction artifacts', async () => {

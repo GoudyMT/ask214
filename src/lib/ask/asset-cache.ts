@@ -415,7 +415,7 @@ export async function restoreLibraries(
  * Where the built embed worker's script is served from. `workers/assets/` beside it is where SvelteKit writes a
  * worker's non-script files.
  */
-const WORKER_SCRIPT_FOLDER = '/_app/immutable/workers/';
+export const WORKER_SCRIPT_FOLDER = '/_app/immutable/workers/';
 
 /**
  * The worker scripts a built chunk starts, as absolute pathnames.

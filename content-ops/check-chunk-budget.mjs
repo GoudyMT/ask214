@@ -326,6 +326,13 @@ const STATIC = 'static';
 //     removed that, kept.
 //     Page 64,110 -> 64,120 (owner's call, 2026-10-14): the re-sweep's focus fix (the retry hands focus on from the
 //     cited passage too) left 30-32 B of room on 64,078-64,080 B measured; raised to 40 B above the highest.
+//     Page 64,120 -> 64,240, precache 155,840 -> 156,640 and route nodes 49,470 -> 50,090 (owner's call, 2026-10-14):
+//     clearer Ask answers (a note for a rejected key, a failed or declined call and a cut-off summary; one citation
+//     per document; the similar list without heading-only passages), the Timeline wording for a user who has left
+//     the command, the snooze that ends on the last day there, and Erase keeping the app's own code. Measured against
+//     a build of v1.6.0: Ask +322 B, Settings +128 B, Timeline +151 B. Two builds measured page 64,193 B, precache
+//     156,590-156,594 B and route nodes 50,045-50,049 B, at least 41 B of room above the highest. Trim pass: the new
+//     code is one function or one string per feature in the build; nothing found to cut short of the approved copy.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -335,10 +342,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 64_120,
+	page: 64_240,
 	onDemand: 8_090,
 	precacheFiles: 62,
-	precacheBytes: 155_840,
+	precacheBytes: 156_640,
 	workerScripts: 147_200
 };
 

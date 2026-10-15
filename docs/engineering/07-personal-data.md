@@ -102,11 +102,11 @@ after seven days, and these exemptions are untested on a real iPhone.
 
 **What it is.** Erase, in Settings after a confirmation, runs in one safe order: decrypted data leaves memory
 first; then all eight stores are cleared in one transaction while erase holds the key lock alone, so no save in
-progress can write a row back; then local storage and every cache, saved documents included; then a reload into
-a fresh first run. It refuses to start unless it can clear every store, and if it stops, it says nothing was
-deleted.
+progress can write a row back; then local storage and the caches, saved documents included, keeping only the
+app's code so it opens offline; then a reload into a fresh first run. It refuses to start unless it can
+clear every store, and if it stops, it says nothing was deleted.
 
-**Tradeoffs accepted.** Erase removes the saved documents too, so they download again on the next save.
+**Tradeoffs accepted.** Saved documents must be downloaded again.
 
 ---
 
@@ -119,7 +119,7 @@ SkillBridge question, or Not sure when it asks a second time. Each window has a 
 soft (good timing only), required until separation, closing for good, or changing how it works. Each task also
 names what it must finish before: separation, terminal leave, or leaving the command (SkillBridge or terminal
 leave, whichever starts first). Once that date is entered, the last day moves to the day before it if earlier,
-while the opening stays, so every date keeps its source; the separation package and DD-214 review count their
+while the opening stays where its source puts it; the separation package and DD-214 review count their
 whole window from it. A device clock that jumps back over a day shows a warning rather than quietly reshuffling
 deadlines. The export is an `.ics` file the user saves, named by the day of the add: an all-day event for each
 moment still ahead (a window opening, a change in how a window works, a last day, the last day before leaving the

@@ -147,6 +147,39 @@ describe('timelineRow', () => {
 		);
 	});
 
+	// The card stops naming an opening already past once the user has left; Home words it the same way.
+	it('gives a task already open after the user left no past opening date', () => {
+		const leave = item('leave', 'after-you-leave', {
+			def: { ...item('leave', 'upcoming').def, kind: 'soft' },
+			windowStartDate: '2026-06-01',
+			leftCommand: { opened: true }
+		});
+		expect(timelineRow(ready([leave])).detail).toBe(
+			'Next: Title of leave - by your separation date'
+		);
+		const notYet = { ...leave, windowStartDate: '2027-01-10', leftCommand: { opened: false } };
+		expect(timelineRow(ready([notYet])).detail).toBe('Next: Title of leave - opens Jan 10, 2027');
+	});
+
+	it('names a still-to-do task with a lapsed aim without its old date', () => {
+		const soft = { ...item('soft', 'upcoming').def, kind: 'soft' as const };
+		const old = item('old', 'still-to-do', { def: { ...soft, id: 'old' }, aimLapsed: true });
+		expect(timelineRow(ready([old])).detail).toBe('Next: Title of soft - still to do');
+	});
+
+	// An aim already passed is weaker than a window open now, whatever the list order.
+	it('prefers a task open now over a still-to-do one for Next', () => {
+		const soft = { ...item('soft', 'upcoming').def, kind: 'soft' as const, title: 'Old aim' };
+		const old = item('old', 'still-to-do', { def: soft });
+		const now = item('now', 'start-now', { windowStartDate: '2026-08-01' });
+		expect(timelineRow(ready([old, now])).detail).toBe(
+			'Next: Title of now - last day Nov 20, 2026'
+		);
+		expect(timelineRow(ready([old, item('up', 'upcoming')])).detail).toBe(
+			'Next: Old aim - aimed for Nov 20, 2026'
+		);
+	});
+
 	it('prefers an open task over a snoozed one for Next', () => {
 		const row = timelineRow(
 			ready([

@@ -15,6 +15,77 @@ test.skip(
 	'Playwright WebKit offline fails a worker-controlled request before the worker can answer it'
 );
 
+async function workerInCharge(page: import('@playwright/test').Page): Promise<void> {
+	await page.evaluate(async () => {
+		await navigator.serviceWorker.ready;
+		if (!navigator.serviceWorker.controller)
+			await new Promise<void>((resolve) =>
+				navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
+					once: true
+				})
+			);
+	});
+}
+
+// Erase keeps the app's own code, so the app still opens offline afterwards; everything else in Cache Storage goes.
+test('after an erase, pages never opened still open offline and the asset cache is gone', async ({
+	page,
+	context
+}) => {
+	await page.goto('/');
+	await workerInCharge(page);
+	await page.goto('/wizard');
+	await page.getByLabel(/separation date/i).fill('2027-04-15');
+	await page.getByRole('button', { name: /save and continue/i }).click();
+	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
+	await page.evaluate(async () => {
+		await (await caches.open('ask-assets-v1')).put('/docs/a.1.pdf', new Response('doc'));
+	});
+
+	await page.goto('/settings');
+	await expect(page.getByText('Apr 15, 2027')).toBeVisible();
+	await page.getByRole('button', { name: /erase all data on this device/i }).click();
+	// The date leaves the screen at the relock, the erase's first step; the caches are cleared just before its last,
+	// the reload, so the reload is what to wait for.
+	const reloaded = page.waitForEvent('load', { timeout: 15_000 });
+	await page.getByRole('button', { name: /^erase everything$/i }).click();
+	await reloaded;
+	await expect(page.getByText('Apr 15, 2027')).toBeHidden();
+	await workerInCharge(page);
+
+	// The reloaded page opens the asset cache again to read whether the device is set up, so its name may come
+	// back; what must not come back is anything in it.
+	const leftOutsideAppCode = await page.evaluate(async () => {
+		const left: string[] = [];
+		for (const name of await caches.keys()) {
+			if (name.startsWith('app-')) continue;
+			for (const request of await (await caches.open(name)).keys())
+				left.push(`${name} ${new URL(request.url).pathname}`);
+		}
+		return left;
+	});
+	expect(leftOutsideAppCode).toEqual([]);
+	const pagesKept = await page.evaluate(async () => {
+		const kept: string[] = [];
+		for (const name of await caches.keys())
+			for (const request of await (await caches.open(name)).keys())
+				kept.push(new URL(request.url).pathname);
+		return kept.filter((path) => ['/timeline', '/wizard'].includes(path));
+	});
+	expect(pagesKept).toEqual([]);
+
+	await context.setOffline(true);
+	const pages: [string, string][] = [
+		['/documents', 'Documents'],
+		['/about', 'About']
+	];
+	for (const [path, heading] of pages) {
+		const response = await page.goto(path);
+		expect(response?.fromServiceWorker()).toBe(true);
+		await expect(page.getByRole('heading', { level: 1 })).toContainText(heading);
+	}
+});
+
 test('a page never opened while the worker was in charge opens offline, with its security policy', async ({
 	page,
 	context

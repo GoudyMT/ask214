@@ -38,7 +38,14 @@ export type SynthesisResult =
 	| { kind: 'crisis' }
 	| { kind: 'notCovered' }
 	| { kind: 'refusal'; reason: 'invalid_citation' | 'ungrounded_number' | 'no_citations' }
-	| { kind: 'degraded' };
+	// No call was made: no key, or the key could not be read.
+	| { kind: 'degraded' }
+	// The provider refused the key - the one failure the reader can fix themselves.
+	| { kind: 'keyRejected' }
+	// Any other failed call: a busy or limited service, a timeout, a network fault, a body we cannot read.
+	| { kind: 'serviceFailed' }
+	// The answer hit the token limit, so its last sentence - a caveat included - may be missing.
+	| { kind: 'cutShort' };
 
 const ENDPOINT = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-5';
@@ -56,7 +63,10 @@ type SynthesisRequestBody = {
 	messages: { role: 'user'; content: string }[];
 };
 
-// Pull the model's answer text out of the Messages response. A shape we cannot read is a degrade, never a
+// The statuses that mean the provider refused the key itself (invalid, revoked, or not allowed this model).
+const KEY_REJECTED_STATUSES: ReadonlySet<number> = new Set([401, 403]);
+
+// Pull the model's answer text out of the Messages response. A shape we cannot read is a failed call, never a
 // silent empty answer.
 function extractText(json: unknown): string {
 	const content = (json as { content?: unknown } | null)?.content;
@@ -126,6 +136,7 @@ export async function synthesize(
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), deps.timeoutMs ?? SYNTH_TIMEOUT_MS);
 	let modelText: string;
+	let stopReason: unknown;
 	try {
 		const res = await deps.fetch(ENDPOINT, {
 			method: 'POST',
@@ -139,11 +150,18 @@ export async function synthesize(
 			body: JSON.stringify(body),
 			signal: controller.signal
 		});
-		if (!res.ok) return { kind: 'degraded' };
-		modelText = extractText(await res.json());
+		// Only the status is read from a failed response; the key is never logged or shown.
+		if (!res.ok) {
+			return KEY_REJECTED_STATUSES.has(res.status)
+				? { kind: 'keyRejected' }
+				: { kind: 'serviceFailed' };
+		}
+		const json: unknown = await res.json();
+		stopReason = (json as { stop_reason?: unknown } | null)?.stop_reason;
+		modelText = extractText(json);
 	} catch {
-		// throw / abort (timeout) / unreadable body -> degrade to raw cards
-		return { kind: 'degraded' };
+		// throw / abort (timeout) / unreadable body -> the document is quoted instead
+		return { kind: 'serviceFailed' };
 	} finally {
 		clearTimeout(timer);
 	}
@@ -174,10 +192,14 @@ export async function synthesize(
 	// shipped chunks legitimately mention the crisis line and a genuinely cited answer about mental-health
 	// resources must stay an answer, not become a crisis card.
 	const validCited = citedIds.filter((id) => retrievedIds.has(id));
-	if (validCited.length === 0) {
-		if (mentionsCrisisLine(modelText)) return { kind: 'crisis' };
-		if (mentionsOfficialFallback(modelText)) return { kind: 'notCovered' };
-	}
+	if (validCited.length === 0 && mentionsCrisisLine(modelText)) return { kind: 'crisis' };
+	// A declined request carries no answer to show, whatever text came with it - but only after the crisis check,
+	// the backstop for the indirect phrasing the question's keyword net misses on purpose.
+	if (stopReason === 'refusal') return { kind: 'serviceFailed' };
+	// After the crisis check, so a cut-off crisis reply still shows the crisis card - the safe direction. Before
+	// every other check: a cut-off answer can pass every gate on what is left while its caveat is gone.
+	if (stopReason === 'max_tokens') return { kind: 'cutShort' };
+	if (validCited.length === 0 && mentionsOfficialFallback(modelText)) return { kind: 'notCovered' };
 	if (!validateCitations(citedIds, retrievedIds).ok) {
 		return { kind: 'refusal', reason: 'invalid_citation' };
 	}
@@ -207,10 +229,20 @@ export async function synthesize(
 	// directory page - the same on all 21 - so a citation built from it would send a reader who trusted the
 	// one trustworthy link to a list of documents. Falls back to c.url for an html source, whose url is
 	// already the document.
-	const citations: Citation[] = chunks.map((c) => ({
-		id: c.id,
-		url: documentUrl(c.sourceId, c.page) ?? c.url,
-		title: c.title
-	}));
+	//
+	// One link per document: several cited passages from one guide would list its title once per passage. The
+	// link opens the passage the model cited first; documents keep the order retrieval ranked them in.
+	const byId = new Map(chunks.map((c) => [c.id, c]));
+	const firstCited = new Map<string, RetrievedChunk>();
+	for (const id of citedIds) {
+		const c = byId.get(id);
+		if (c && !firstCited.has(c.sourceId)) firstCited.set(c.sourceId, c);
+	}
+	const citations: Citation[] = [];
+	for (const { sourceId } of chunks) {
+		const c = firstCited.get(sourceId);
+		if (c === undefined || citations.some((x) => x.id === c.id)) continue;
+		citations.push({ id: c.id, url: documentUrl(c.sourceId, c.page) ?? c.url, title: c.title });
+	}
 	return { kind: 'answer', answer: toCitedAnswer(modelText, citedIds, citations) };
 }

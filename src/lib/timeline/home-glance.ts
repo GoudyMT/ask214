@@ -33,8 +33,9 @@ const STATUS_WORD: Partial<Record<DisplayStatus, string>> = {
 	'start-now': 'Start now'
 };
 
-// Open today, so the first of these is the Next task; then the one that opens soonest; a snoozed one only after both.
-const OPEN_NOW: ReadonlySet<DisplayStatus> = new Set(['start-now', 'still-to-do', 'changed']);
+// Open today, so the first of these is the Next task, a window open now before an aim already passed; then the one
+// that opens soonest; a snoozed one only after both.
+const OPEN_NOW: ReadonlySet<DisplayStatus> = new Set(['start-now', 'changed']);
 const OPENS_LATER: ReadonlySet<DisplayStatus> = new Set(['upcoming', 'after-you-leave']);
 
 /** The date a Next task is known by, worded as its card words it (lower case, inside a sentence). */
@@ -42,14 +43,18 @@ function nextWhen(item: TimelineItem): string {
 	const f = formatTimelineDate;
 	switch (item.status) {
 		case 'upcoming':
-		case 'after-you-leave':
 			return `opens ${f(item.windowStartDate)}`;
+		case 'after-you-leave':
+			// An opening already past is not news once the user has left; the card drops it too.
+			return item.leftCommand?.opened
+				? 'by your separation date'
+				: `opens ${f(item.windowStartDate)}`;
 		case 'start-now':
 			return item.def.kind === 'soft'
 				? `aim for ${f(item.aimDate ?? item.windowEndDate)}`
 				: `last day ${f(item.windowEndDate)}`;
 		case 'still-to-do':
-			return `aimed for ${f(item.windowEndDate)}`;
+			return item.aimLapsed ? 'still to do' : `aimed for ${f(item.windowEndDate)}`;
 		case 'changed':
 			return `last day ${f(item.finalEndDate ?? item.windowEndDate)}`;
 		default:
@@ -104,6 +109,7 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 		.sort((a, b) => a.windowStartDate.localeCompare(b.windowStartDate));
 	const next =
 		glance.items.find((i) => OPEN_NOW.has(i.status)) ??
+		glance.items.find((i) => i.status === 'still-to-do') ??
 		later[0] ??
 		glance.items.find((i) => i.status === 'snoozed');
 	if (next) {

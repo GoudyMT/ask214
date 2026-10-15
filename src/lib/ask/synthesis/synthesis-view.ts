@@ -11,7 +11,10 @@ export type SynthesisView =
 	| { kind: 'crisis' }
 	| { kind: 'notCovered' }
 	| { kind: 'refusal' }
-	| { kind: 'unavailable' };
+	| { kind: 'unavailable' }
+	| { kind: 'keyRejected' }
+	| { kind: 'serviceFailed' }
+	| { kind: 'cutShort' };
 
 /**
  * Map a synthesis outcome to the banner view the Ask UI renders.
@@ -33,5 +36,9 @@ export function toSynthesisView(result: SynthesisResult): SynthesisView {
 			return { kind: 'refusal' };
 		case 'degraded':
 			return { kind: 'unavailable' };
+		case 'keyRejected':
+		case 'serviceFailed':
+		case 'cutShort':
+			return { kind: result.kind };
 	}
 }

@@ -1,6 +1,19 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import type { AnswerView } from '$lib/ask/answer/answer-view';
+	import type { AnswerView, SynthesisNote } from '$lib/ask/answer/answer-view';
+
+	// Each reason in its own words - only the one that actually applied is true for the reader.
+	const SYNTHESIS_NOTE: Record<SynthesisNote, string> = {
+		refused:
+			'An AI summary was produced but did not pass our accuracy checks, so the document is quoted instead.',
+		suppressed:
+			'No AI summary is shown on questions about your own eligibility. The document is quoted instead.',
+		unavailable: 'No AI summary is shown for this answer.',
+		keyRejected: 'Your API key was not accepted, so no AI summary is shown. Check it in Settings.',
+		serviceFailed: 'No AI summary came back this time, so the document is quoted instead.',
+		cutShort: 'The AI summary was cut short, so the document is quoted instead.'
+	};
+
 	let {
 		view,
 		onOpenSource
@@ -102,22 +115,19 @@
 		<!-- A synthesis did not reach the reader. Shown only when synthesis was ENABLED, so the default user
 		     - for whom the toggle is off - sees nothing. It is a note on the one answer, not a second block
 		     competing to BE the answer.
-		     The three cases say different things, and the difference is what makes them honest. `refused`
-		     CAN claim an attempt: a summary was produced and a safety gate rejected it. `unavailable`
-		     CANNOT, because the store reaches it both when the call failed AND when there was no API key to
-		     call with - the route collapses those into one `degraded` result, so a sentence like "could not
-		     be produced" would be plainly false for the reader who simply never supplied a key. It states
-		     the fact it can actually support: that no summary is here. `suppressed` is the 38 CFR case: a
+		     The six cases say different things, and the difference is what makes them honest: a reader who
+		     supplied a key and got no summary is owed the reason that actually applied. `refused` CAN claim an
+		     attempt: a summary was produced and a safety gate rejected it. `suppressed` is the 38 CFR case: a
 		     summary WAS produced and we dropped it because the question asks about the reader's own
-		     eligibility. Neither of the other two can say that without being false about the reason, and a
-		     reader who supplied a key and got no summary is owed the reason that actually applied. -->
+		     eligibility. `keyRejected`, `serviceFailed` and `cutShort` each name what the provider call did: a
+		     key it refused, a call that failed or declined, a summary cut off at the token limit. `unavailable`
+		     claims no attempt, because the route reaches it when there was no API key to call with, the
+		     stored key could not be read, or the call threw before it could say why - so a sentence like "could
+		     not be produced" would be false for the reader who never supplied a key. It states the fact it can
+		     support: that no summary is here. -->
 		{#if view.synthesisNote}
 			<p class="ask-answer__note-synthesis">
-				{view.synthesisNote === 'refused'
-					? 'An AI summary was produced but did not pass our accuracy checks, so the document is quoted instead.'
-					: view.synthesisNote === 'suppressed'
-						? 'No AI summary is shown on questions about your own eligibility. The document is quoted instead.'
-						: 'No AI summary is shown for this answer.'}
+				{SYNTHESIS_NOTE[view.synthesisNote]}
 			</p>
 		{/if}
 		<!-- PERMANENT, not conditional on the eligibility gate. That gate reads the QUESTION's phrasing, so

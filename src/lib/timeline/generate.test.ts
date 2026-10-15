@@ -964,6 +964,41 @@ describe('After you leave', () => {
 		expect(on(new Date(2027, 3, 30, 12))('sha-complete')?.windowEndDate).toBe('2026-11-14');
 	});
 
+	// Once the leaving day has come, "ask your command" no longer applies, and an opening already past is not news.
+	describe('once the user has left the command', () => {
+		const item = (today: Date) =>
+			generateTimeline(
+				{
+					completeness: 'eaos-only',
+					eaos: SEP,
+					daysUntilSeparation: 208,
+					leaving: { terminalLeaveStart: '2026-11-15' } as never
+				},
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				today
+			)
+				.phases.flatMap((p) => p.items)
+				.find((i) => i.def.id === 'sha-complete');
+
+		it('carries nothing before the leaving day', () => {
+			const sha = item(new Date(2026, 10, 14, 12));
+			expect(sha?.status).toBe('after-you-leave');
+			expect(sha?.leftCommand).toBeUndefined();
+		});
+
+		it('says the user has left from the leaving day, and whether the window has opened', () => {
+			const onLeaving = item(new Date(2026, 10, 15, 12));
+			expect(onLeaving?.status).toBe('after-you-leave');
+			expect(onLeaving?.leftCommand).toEqual({
+				opened: onLeaving!.windowStartDate <= '2026-11-15'
+			});
+			const opened = item(new Date(2027, 3, 1, 12));
+			expect((opened?.windowStartDate ?? '9999-12-31') <= '2027-04-01').toBe(true);
+			expect(opened?.leftCommand).toEqual({ opened: true });
+		});
+	});
+
 	it('holds through separation day and hands over the day after', () => {
 		const leave = { terminalLeaveStart: '2026-11-15' };
 		expect(at(new Date(2027, 3, 30, 12), leave)['sha-complete']).toBe('after-you-leave');
@@ -1146,5 +1181,115 @@ describe('the SkillBridge steps follow the saved answer', () => {
 		expect(request?.windowStartDate).toBe('2027-07-02');
 		expect(request?.windowEndDate).toBe('2027-08-31');
 		expect(request?.fit).toEqual({ reason: 'skillbridge', date: '2027-08-31' });
+	});
+});
+
+// A task that must be done before the user leaves the command, snoozed past that day, stayed quiet after they had
+// left. The snooze now ends on the task's last day there, the same promise a firm warning keeps.
+describe('A snooze on a task moved to fit before leaving', () => {
+	// The window runs Oct 17, 2026 to Jan 15, 2027; SkillBridge from Dec 1 moves its last day to Nov 30.
+	const atCommand: TaskDef = { ...universal, finishBefore: 'leaving' };
+	const on = (today: Date, snoozeUntil = '2027-01-10') =>
+		generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: EAOS,
+				daysUntilSeparation: 0,
+				leaving: { skillbridgeStart: '2026-12-01' } as never
+			},
+			[atCommand],
+			{ schemaVersion: 1, tasks: { u1: { status: 'snoozed', snoozeUntil } } },
+			today
+		).phases.flatMap((p) => p.items)[0];
+
+	it('holds until the last day there, showing that day as its end', () => {
+		const u1 = on(new Date(2026, 10, 29, 12));
+		expect(u1?.windowEndDate).toBe('2026-11-30');
+		expect(u1?.status).toBe('snoozed');
+		expect(u1?.snoozeUntil).toBe('2026-11-30');
+	});
+
+	it('ends on the last day there', () => {
+		const u1 = on(new Date(2026, 10, 30, 12));
+		expect(u1?.status).toBe('start-now');
+		expect(u1?.snoozeUntil).toBeUndefined();
+	});
+
+	it('stays ended once the user has left', () => {
+		expect(on(new Date(2026, 11, 2, 12))?.status).toBe('still-to-do');
+	});
+
+	// From the last day there no snooze can quiet it, so the card must not offer one that does nothing.
+	it('closes snoozing from the last day there on, and not before', () => {
+		expect(on(new Date(2026, 10, 29, 12))?.snoozeClosed).toBeUndefined();
+		expect(on(new Date(2026, 10, 30, 12))?.snoozeClosed).toBe(true);
+		expect(on(new Date(2026, 11, 2, 12))?.snoozeClosed).toBe(true);
+	});
+
+	it('keeps a snooze that ends before the last day there as it is', () => {
+		const u1 = on(new Date(2026, 10, 1, 12), '2026-11-10');
+		expect(u1?.status).toBe('snoozed');
+		expect(u1?.snoozeUntil).toBe('2026-11-10');
+	});
+});
+
+// A soft task never closes, so years later its card would still say "Aimed for" a date from before separation.
+describe('A soft aim from before separation', () => {
+	const afterSeparation: TaskDef = {
+		...noRecommended,
+		id: 'after',
+		windowStart: 30,
+		windowEnd: 60
+	};
+	const onSeparation: TaskDef = {
+		...noRecommended,
+		id: 'on-separation',
+		windowStart: -30,
+		windowEnd: 0
+	};
+	const on = (today: Date) => {
+		const items = generateTimeline(
+			{ completeness: 'eaos-only', eaos: EAOS, daysUntilSeparation: 0 },
+			[universal, afterSeparation, onSeparation],
+			{ schemaVersion: 1, tasks: {} },
+			today
+		).phases.flatMap((p) => p.items);
+		return (id: string) => items.find((i) => i.def.id === id);
+	};
+
+	it('keeps its date through separation day', () => {
+		const u1 = on(new Date(2027, 3, 15, 12))('u1');
+		expect(u1?.status).toBe('still-to-do');
+		expect(u1?.aimLapsed).toBeUndefined();
+	});
+
+	it('lapses the day after separation', () => {
+		const u1 = on(new Date(2027, 3, 16, 12))('u1');
+		expect(u1?.status).toBe('still-to-do');
+		expect(u1?.aimLapsed).toBe(true);
+	});
+
+	it('lapses an aim set on separation day itself, the day after', () => {
+		expect(on(new Date(2027, 3, 15, 12))('on-separation')?.aimLapsed).toBeUndefined();
+		const day = on(new Date(2027, 3, 16, 12))('on-separation');
+		expect(day?.status).toBe('still-to-do');
+		expect(day?.aimLapsed).toBe(true);
+	});
+
+	it('never lapses an aim set after separation', () => {
+		const after = on(new Date(2029, 5, 1, 12))('after');
+		expect(after?.status).toBe('still-to-do');
+		expect(after?.aimLapsed).toBeUndefined();
+	});
+
+	it('marks no task that is not still to do', () => {
+		const u1 = generateTimeline(
+			{ completeness: 'eaos-only', eaos: EAOS, daysUntilSeparation: 0 },
+			[universal],
+			{ schemaVersion: 1, tasks: { u1: { status: 'done' } } },
+			new Date(2029, 5, 1, 12)
+		).phases.flatMap((p) => p.items)[0];
+		expect(u1?.status).toBe('done');
+		expect(u1?.aimLapsed).toBeUndefined();
 	});
 });

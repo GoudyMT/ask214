@@ -8,6 +8,7 @@
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import { eraseEverything } from '$lib/profile/erase';
+	import { eraseCaches } from '$lib/profile/erase-caches';
 	import { OccConflictError, type ProfilePatch } from '$lib/profile/store.svelte';
 	import {
 		LEAVING_HINT,
@@ -117,7 +118,7 @@
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
 		format: 'Please enter your separation date.',
-		'year-range': 'Enter a date within about 15 years from today.',
+		'year-range': 'Enter a date from 5 years ago to 15 years from now.',
 		month: 'Please enter a valid date.',
 		day: 'Please enter a valid date.'
 	};
@@ -352,9 +353,7 @@
 					// A document save still writing would store its document again after the caches are gone.
 					await stopSaves();
 					// eslint-disable-next-line no-restricted-properties -- the erase clears the public document caches
-					const keys = await window.caches.keys();
-					// eslint-disable-next-line no-restricted-properties -- the erase clears the public document caches
-					await Promise.all(keys.map((key) => window.caches.delete(key)));
+					await eraseCaches(window.caches);
 				},
 				// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
 				reload: () => window.location.reload()

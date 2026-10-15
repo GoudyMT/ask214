@@ -195,8 +195,20 @@ export function deriveStatus(
 	const snoozed =
 		stored?.status === 'snoozed' &&
 		stored.snoozeUntil !== undefined &&
-		stored.snoozeUntil > todayIso;
+		stored.snoozeUntil > todayIso &&
+		!snoozeClosedByFit(anchored, todayIso);
 	return snoozed && !isFirmWarning(byDate, anchored.def.kind) ? 'snoozed' : byDate;
+}
+
+/**
+ * A task moved to fit before the user leaves the command wakes on its last day there, whatever the snooze says: a
+ * snooze must not carry it past the day the user leaves. The one rule both the status and the card's Snooze button
+ * read, so the card never offers a snooze that would change nothing.
+ */
+function snoozeClosedByFit(anchored: AnchoredTask, todayIso: string): boolean {
+	return (
+		anchored.fit !== undefined && !anchored.fit.cannotFit && todayIso >= anchored.windowEndDate
+	);
 }
 
 /** One generated, anchored, status-stamped task as rendered in the view. */
@@ -214,6 +226,18 @@ export type TimelineItem = {
 	closedOn?: string;
 	daysLeft?: number; // days to the next firm edge while it counts down
 	aimDate?: string; // soft tasks: the recommended date, or the window end once that passed
+	/**
+	 * A still-to-do task whose aim fell on or before separation, once separation has passed: a soft task never closes, so
+	 * its old date would read as overdue for years. The card and Home show it with no date.
+	 */
+	aimLapsed?: true;
+	/**
+	 * An "after you leave" task once the leaving day has come: the card stops telling the user to ask their command,
+	 * and `opened` says whether the window has opened (an opening already past is not shown).
+	 */
+	leftCommand?: { opened: boolean };
+	/** A task moved to fit before leaving, from its last day there: no snooze can quiet it, so none is offered. */
+	snoozeClosed?: true;
 	snoozeUntil?: string; // ISO YYYY-MM-DD; present only while status === 'snoozed' (decision A)
 	note?: string; // the user's saved note for this task, if any (shown on any status)
 	/** Present when Fit pulled the last day in: why, and the date it moved to (the card names the reason there). */
@@ -360,10 +384,27 @@ export function generateTimeline(
 				...(a.def.kind === 'soft'
 					? { aimDate: a.targetDate >= todayIso ? a.targetDate : windowEndDate }
 					: {}),
+				// A task that cannot fit ends the day before the leaving day, so the day after its last day is that day.
+				...(status === 'after-you-leave' && todayIso > a.windowEndDate
+					? { leftCommand: { opened: todayIso >= a.windowStartDate } }
+					: {}),
+				...(status === 'still-to-do' &&
+				todayIso > a.separationDate &&
+				windowEndDate <= a.separationDate
+					? { aimLapsed: true as const }
+					: {}),
+				...(snoozeClosedByFit(a, todayIso) ? { snoozeClosed: true as const } : {}),
 				// snoozeUntil rides the view only while the item is actively snoozed; gating on the
 				// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.
+				// A fitted task's snooze ends on its last day before leaving, so that is the end the card and the
+				// calendar's Aim for event show.
 				...(status === 'snoozed' && stored?.snoozeUntil !== undefined
-					? { snoozeUntil: stored.snoozeUntil }
+					? {
+							snoozeUntil:
+								a.fit && !a.fit.cannotFit && stored.snoozeUntil > a.windowEndDate
+									? a.windowEndDate
+									: stored.snoozeUntil
+						}
 					: {}),
 				...(stored?.notes !== undefined ? { note: stored.notes } : {}),
 				...(a.fit && !a.fit.cannotFit

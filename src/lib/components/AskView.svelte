@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import type { AskState } from '$lib/ask/types';
 	import { sourceFromCard, type Source } from '$lib/ask/sources';
+	import { similarCards } from '$lib/ask/similar';
 	import AskResultCard from './AskResultCard.svelte';
 	import SourceReader from './SourceReader.svelte';
 	import QuestionFeed from './QuestionFeed.svelte';
@@ -340,13 +341,16 @@
 			showExcerpt={quoted === undefined || cards[0]!.chunkId !== quoted}
 			onReadSource={() => readSource(cards[0]!.sourceId, cards[0]!.chunkId)}
 		/>
-		{#if cards.length > 1}
+		{@const similar = similarCards(cards)}
+		{#if similar.length > 0}
 			<button class="ask-toggle" type="button" onclick={() => (showSimilar = !showSimilar)}>
-				{showSimilar ? 'Hide' : `Show ${cards.length - 1}`} similar sources
+				{showSimilar ? 'Hide' : `Show ${similar.length}`} similar {similar.length === 1
+					? 'source'
+					: 'sources'}
 			</button>
 			{#if showSimilar}
 				<div class="ask-similar">
-					{#each cards.slice(1) as c, i (i)}
+					{#each similar as c, i (i)}
 						<AskResultCard
 							card={c}
 							variant="compact"

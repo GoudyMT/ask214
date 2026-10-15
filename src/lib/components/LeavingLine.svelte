@@ -6,6 +6,9 @@
 	let { leaving }: { leaving: LeavingDates | undefined } = $props();
 
 	const f = formatTimelineDate;
+	const bothNotUsed = $derived(
+		!!(leaving?.notUsed?.terminalLeaveStart && leaving.notUsed.skillbridgeStart)
+	);
 	const notUsed = $derived(
 		leaving?.notUsed?.terminalLeaveStart
 			? { what: 'terminal leave', iso: leaving.notUsed.terminalLeaveStart }
@@ -14,14 +17,20 @@
 				: null
 	);
 	const inUse = $derived(!!(leaving?.skillbridgeStart || leaving?.terminalLeaveStart));
-	// Held here so the sentence stays on one source line: a line break inside it would reach the page's text.
-	const NOT_USED = "is after your separation date, so it isn't used.";
+	// Held here so each sentence stays on one source line: a line break inside it would reach the page's text. A date
+	// ON separation day is not used either, so "on or after".
+	const NOT_USED = "is on or after your separation date, so it isn't used.";
+	const BOTH_NOT_USED =
+		"Your SkillBridge and terminal leave dates are on or after your separation date, so they aren't used.";
 </script>
 
 <!-- The link is a fixed path: no query and no stored flag, so nothing about the dates reaches a URL. Each date sits in
      a span of its own, so a date that does not fit takes the next line whole. -->
 <p class="leaving-line">
-	{#if notUsed}
+	{#if bothNotUsed}
+		{BOTH_NOT_USED}
+		<a href={resolve('/settings')}>Change</a>
+	{:else if notUsed}
 		Your {notUsed.what} date (<span class="leaving-line__date">{f(notUsed.iso)}</span>) {NOT_USED}
 		<a href={resolve('/settings')}>Change</a>
 	{:else if inUse}

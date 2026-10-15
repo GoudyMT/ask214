@@ -31,10 +31,23 @@ describe('LeavingLine', () => {
 		await expect
 			.element(
 				page.getByText(
-					/Your terminal leave date \(Feb 1, 2027\) is after your separation date, so it isn't used\./
+					/Your terminal leave date \(Feb 1, 2027\) is on or after your separation date, so it isn't used\./
 				)
 			)
 			.toBeVisible();
+	});
+
+	// Both stored dates can be unused at once; naming one would leave the other looking used.
+	it('names both dates when neither is used', async () => {
+		await show({ notUsed: { skillbridgeStart: '2027-02-01', terminalLeaveStart: '2027-03-01' } });
+		await expect
+			.element(
+				page.getByText(
+					/^Your SkillBridge and terminal leave dates are on or after your separation date, so they aren't used\./
+				)
+			)
+			.toBeVisible();
+		await expect.element(page.getByRole('link', { name: 'Change' })).toBeVisible();
 	});
 
 	it('names SkillBridge when that is the date not used', async () => {
@@ -52,7 +65,8 @@ describe('LeavingLine', () => {
 		for (const leaving of [
 			undefined,
 			{ skillbridgeStart: '2026-11-01', terminalLeaveStart: '2027-03-04' },
-			{ notUsed: { terminalLeaveStart: '2027-05-04' } }
+			{ notUsed: { terminalLeaveStart: '2027-05-04' } },
+			{ notUsed: { skillbridgeStart: '2027-05-01', terminalLeaveStart: '2027-05-04' } }
 		]) {
 			const { container } = await show(leaving);
 			for (const a of container.querySelectorAll('a'))

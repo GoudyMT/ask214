@@ -236,6 +236,8 @@
 	};
 	const AFTER_YOU_LEAVE_NOTE =
 		'This opens after you leave your command. Ask your command how to fit it in.';
+	const LEFT_COMMAND_NOTE =
+		'You have left your command. Do this by your separation date if you can.';
 
 	// The date line by status: when a window opens, a soft task's aim, a firm task's last day, when a passed date
 	// was due. Resolved states use the collapsed treatment instead.
@@ -247,8 +249,10 @@
 			...(item.fit && iso === item.fit.date ? { reason: REASON[item.fit.reason] } : {})
 		});
 		switch (item.status) {
-			case 'upcoming':
 			case 'after-you-leave':
+				if (item.leftCommand?.opened) return { text: '' };
+				return { text: `Opens ${f(item.windowStartDate)}` };
+			case 'upcoming':
 				return { text: `Opens ${f(item.windowStartDate)}` };
 			case 'start-now':
 				return firm
@@ -263,7 +267,7 @@
 			case 'closed':
 				return { text: f(closedOnDate(item)) };
 			case 'still-to-do':
-				return at('Aimed for', item.windowEndDate);
+				return item.aimLapsed ? { text: '' } : at('Aimed for', item.windowEndDate);
 			default:
 				return { text: f(item.targetDate) };
 		}
@@ -275,7 +279,7 @@
 	// required task closes only after separation, when its note about doing it first no longer applies.
 	const afterNote = $derived(
 		item.status === 'after-you-leave'
-			? { label: 'What now', text: AFTER_YOU_LEAVE_NOTE }
+			? { label: 'What now', text: item.leftCommand ? LEFT_COMMAND_NOTE : AFTER_YOU_LEAVE_NOTE }
 			: item.status === 'changed'
 				? { label: 'What changed', text: item.def.changeNote }
 				: item.status === 'late' || (item.status === 'closed' && item.def.kind === 'closes')
@@ -422,13 +426,15 @@
 			<div class="task-card__actions">
 				<button type="button" onclick={() => setStatus('done')}>Mark done</button>
 				<button type="button" onclick={() => setStatus('skipped')}>Skip</button>
-				<!-- A snooze never hides a firm warning, so it is not offered where it would change nothing. -->
-				{#if !isFirmWarning(item.status, item.def.kind)}
+				<!-- A snooze never hides a firm warning, and before a window opens there is nothing to quiet, so it is not
+				     offered where it would change nothing; nor from the last day at the command on a task moved to fit
+				     before leaving. -->
+				{#if item.status !== 'upcoming' && !item.snoozeClosed && !isFirmWarning(item.status, item.def.kind)}
 					<button type="button" onclick={toggleSnooze}>Snooze</button>
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
-			{#if snoozeOpen}
+			{#if snoozeOpen && !item.snoozeClosed}
 				<div class="task-card__snooze" bind:this={snoozeEl}>
 					<span class="task-card__snooze-label">Snooze until</span>
 					<div class="task-card__presets">
@@ -506,13 +512,16 @@
 		</div>
 		<div class="task-card__meta">
 			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
-			<span class="task-card__when"
-				><span class="task-card__date"
-					>{dateLine.text}{#if dateLine.reason}<span class="task-card__reason"
-							>, <span class="task-card__reason-words">{dateLine.reason}</span></span
-						>{/if}</span
-				>{#if daysLeftLine}<span class="task-card__days">{daysLeftLine}</span>{/if}</span
-			>
+			<!-- A countdown only runs beside a date, so a card with no date line has nothing here. -->
+			{#if dateLine.text}
+				<span class="task-card__when"
+					><span class="task-card__date"
+						>{dateLine.text}{#if dateLine.reason}<span class="task-card__reason"
+								>, <span class="task-card__reason-words">{dateLine.reason}</span></span
+							>{/if}</span
+					>{#if daysLeftLine}<span class="task-card__days">{daysLeftLine}</span>{/if}</span
+				>
+			{/if}
 		</div>
 	</article>
 {/if}
@@ -869,7 +878,7 @@
 
 		/* The line may break only after the status's dash: the date and its countdown move as one, so no line
 		   starts with "- 17 days". \00a0 is a no-break space. */
-		.task-card__meta .task-card__status::after {
+		.task-card__meta .task-card__status:not(:last-child)::after {
 			content: '\00a0- ';
 		}
 

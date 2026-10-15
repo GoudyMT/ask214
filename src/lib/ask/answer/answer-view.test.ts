@@ -131,6 +131,22 @@ describe('chooseAnswer', () => {
 		).toEqual({ kind: 'extractive', answer: extractive, synthesisNote: 'unavailable' });
 	});
 
+	it.each(['keyRejected', 'serviceFailed', 'cutShort'] as const)(
+		'falls back to the extractive answer on %s, and names that reason',
+		(kind) => {
+			expect(chooseAnswer({ eligibilityIntent: false, synthesis: { kind }, extractive })).toEqual({
+				kind: 'extractive',
+				answer: extractive,
+				synthesisNote: kind
+			});
+			expect(chooseAnswer({ eligibilityIntent: true, synthesis: { kind }, extractive })).toEqual({
+				kind: 'extractive',
+				answer: extractive,
+				synthesisNote: kind
+			});
+		}
+	);
+
 	// The exact-match here now also proves the ABSENCE of a note: the default user never ran synthesis, so
 	// telling them one was rejected would be false.
 	it('uses the extractive answer when there is no synthesis at all (the device path)', () => {
