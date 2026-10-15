@@ -1,6 +1,6 @@
 import type { TimelineState, TaskStatus, TimelineTaskState } from './types';
-import { encodeTimelineState, decodeTimelineState, isSnoozeDate } from './state-codec';
-import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
+import { isSnoozeDate } from './state-codec';
+import { encryptTimelineRecord, decryptTimelineRecord } from './crypto-boundary';
 import type { KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
@@ -43,8 +43,6 @@ export class TimelineRelockedError extends Error {
 		this.name = 'TimelineRelockedError';
 	}
 }
-
-const TIMELINE_CTX: RecordCtx = { storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 };
 
 /** Default returned before load / when relocked. Frozen so a consumer cannot mutate the shared default. */
 const EMPTY_STATE: TimelineState = Object.freeze({ schemaVersion: 1, tasks: Object.freeze({}) });
@@ -127,12 +125,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 
 				const next = mutate(_state);
 				const nextGen = currentGen + 1;
-				const blob = await encryptRecord(
-					TIMELINE_CTX,
-					new Uint8Array(encodeTimelineState(next)),
-					keystore,
-					nextGen
-				);
+				const blob = await encryptTimelineRecord(next, keystore, nextGen);
 				const newHwm = await signSidecar<TimelineHwmPayload>(
 					'timeline-state-hwm',
 					{
@@ -234,9 +227,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 						}
 						const row = await getRow<StateRow>(db, 'timeline-state');
 						if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
-						const decoded = decodeTimelineState(
-							await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
-						);
+						const decoded = await decryptTimelineRecord(row.rec, keystore, gen);
 						_generation = gen;
 						if (relockEpoch === relockAtStart) {
 							_state = decoded;

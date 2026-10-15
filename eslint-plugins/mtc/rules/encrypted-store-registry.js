@@ -3,8 +3,9 @@
  * `<tx>.objectStore('<encrypted>').{put|add}(...)` - outside the sanctioned
  * store path. Direct writes bypass the single encryption boundary: only the
  * sanctioned store paths (the profile, timeline-state, calendar-sync and BYO-key stores)
- * may write ciphertext, each carrying an inline eslint-disable at its one call
- * site. Test files that stage fixtures are exempted in eslint.config.js.
+ * may write ciphertext, each carrying an inline eslint-disable at its store's write
+ * site, plus the backup restore writer (`src/lib/backup/restore-writer.ts`), the one
+ * path that replaces the three stores in one transaction. Test files that stage fixtures are exempted in eslint.config.js.
  * Opening a cursor (`openCursor`, `openKeyCursor`) on an encrypted store is refused too, because
  * `cursor.update()` writes the row it points at without any put or add call.
  *
