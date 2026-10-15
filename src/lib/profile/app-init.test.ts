@@ -8,6 +8,7 @@ import {
 	relockEachSync,
 	createJoinRelock,
 	reloadWhenShown,
+	reloadOnSignalWhenShown,
 	subscribeBus,
 	superviseStartup,
 	START_TIMEOUT_MS,
@@ -588,6 +589,111 @@ describe('reloadWhenShown', () => {
 		t.show();
 		t.signal();
 		expect(t.reload).not.toHaveBeenCalled();
+	});
+});
+
+describe('reloadOnSignalWhenShown', () => {
+	const ALL_TYPES: BusSignal['type'][] = [
+		'profile-updated',
+		'relocked',
+		'timeline-updated',
+		'calendar-updated',
+		'data-replaced'
+	];
+
+	function setup(opts: { hidden: boolean; locked?: boolean }) {
+		let handler: ((s: BusSignal) => void) | undefined;
+		const unsubscribe = vi.fn(() => void (handler = undefined));
+		const bus: ProfileBus = {
+			publish: () => {},
+			subscribe: (h) => {
+				handler = h;
+				return unsubscribe;
+			},
+			close: () => {}
+		};
+		const doc = Object.assign(new EventTarget(), { hidden: opts.hidden });
+		const state = { locked: opts.locked ?? false };
+		const reload = vi.fn();
+		const onLocked = vi.fn();
+		const stop = reloadOnSignalWhenShown(
+			bus,
+			'data-replaced',
+			doc,
+			() => state.locked,
+			onLocked,
+			reload
+		);
+		return {
+			reload,
+			onLocked,
+			stop,
+			state,
+			signal: (type: BusSignal['type'] = 'data-replaced') => handler?.({ type }),
+			show: () => {
+				doc.hidden = false;
+				doc.dispatchEvent(new Event('visibilitychange'));
+			}
+		};
+	}
+
+	// Only a replaced-data signal means this tab's view is stale; every other signal has its own handler.
+	it('ignores every other signal type', () => {
+		const t = setup({ hidden: false });
+		for (const type of ALL_TYPES.filter((x) => x !== 'data-replaced')) t.signal(type);
+		expect(t.reload).not.toHaveBeenCalled();
+		expect(t.onLocked).not.toHaveBeenCalled();
+	});
+
+	it('reloads at once when shown and unlocked', () => {
+		const t = setup({ hidden: false });
+		t.signal();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+		expect(t.onLocked).not.toHaveBeenCalled();
+	});
+
+	// A reload runs the start-up again, which decrypts; a hidden tab must not hold that plaintext.
+	it('holds the reload while hidden, then reloads once when shown', () => {
+		const t = setup({ hidden: true });
+		t.signal();
+		t.signal();
+		expect(t.reload).not.toHaveBeenCalled();
+		t.show();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+		t.show();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+	});
+
+	// A locked tab must not open itself: it only remembers to reload when the user unlocks.
+	it('marks reload-on-unlock and does not reload when locked', () => {
+		const t = setup({ hidden: false, locked: true });
+		t.signal();
+		expect(t.onLocked).toHaveBeenCalledTimes(1);
+		expect(t.reload).not.toHaveBeenCalled();
+	});
+
+	it('marks reload-on-unlock when the tab locked while it waited hidden', () => {
+		const t = setup({ hidden: true });
+		t.signal();
+		t.state.locked = true;
+		t.show();
+		expect(t.onLocked).toHaveBeenCalledTimes(1);
+		expect(t.reload).not.toHaveBeenCalled();
+	});
+
+	it('does nothing after teardown, whether the reload was waiting or not', () => {
+		const idle = setup({ hidden: false });
+		idle.stop();
+		idle.signal();
+		expect(idle.reload).not.toHaveBeenCalled();
+		expect(idle.onLocked).not.toHaveBeenCalled();
+
+		const waiting = setup({ hidden: true });
+		waiting.signal();
+		waiting.stop();
+		waiting.show();
+		expect(waiting.reload).not.toHaveBeenCalled();
+		expect(waiting.onLocked).not.toHaveBeenCalled();
 	});
 });
 

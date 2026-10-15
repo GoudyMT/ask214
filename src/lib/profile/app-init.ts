@@ -211,6 +211,43 @@ export function reloadWhenShown(
 	};
 }
 
+/**
+ * Reload when a peer says one particular thing, and only in a tab that is both shown and unlocked. A
+ * reload runs the start-up again, which decrypts: a hidden tab must not hold that plaintext, and a
+ * locked tab must not open itself. A locked tab calls `onLocked` instead, so the caller can remember
+ * to reload when the user unlocks. The lock is checked again when a hidden tab is shown, because it
+ * may have locked while it waited. Returns the teardown (bus and any pending wait).
+ */
+export function reloadOnSignalWhenShown(
+	bus: ProfileBus,
+	type: BusSignal['type'],
+	doc: EventTarget & { hidden: boolean },
+	isLocked: () => boolean,
+	onLocked: () => void,
+	reload: () => void
+): () => void {
+	// The same function added twice is one listener, so a burst of signals while hidden still reloads once.
+	const onShow = (): void => {
+		if (doc.hidden) return;
+		doc.removeEventListener('visibilitychange', onShow);
+		if (isLocked()) onLocked();
+		else reload();
+	};
+	const off = bus.subscribe((signal) => {
+		if (signal.type !== type) return;
+		if (isLocked()) {
+			onLocked();
+			return;
+		}
+		doc.addEventListener('visibilitychange', onShow);
+		onShow();
+	});
+	return () => {
+		off();
+		doc.removeEventListener('visibilitychange', onShow);
+	};
+}
+
 /** User-input events that reset the idle countdown. Passive listeners (no scroll-jank). */
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'touchstart'] as const;
 
