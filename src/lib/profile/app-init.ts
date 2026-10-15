@@ -277,6 +277,32 @@ export function relockEachSync(relockables: Relockable[], reason: RelockReason):
 	}
 }
 
+/**
+ * The seam a later feature joins the relock list through. The joiner is wrapped, never stored: a throw from it
+ * cannot break a walk the shipped stores depend on, and its `refresh` re-reads nothing, because an automatic
+ * re-read is for the stores that own persisted data. `leave()` removes that wrapper by identity (a stored index
+ * goes stale as soon as another entry leaves) and is safe to call twice.
+ */
+export function createJoinRelock(relockables: Relockable[]): (r: Relockable) => () => void {
+	return (r) => {
+		const entry: Relockable = {
+			relockSync: (reason: Parameters<Relockable['relockSync']>[0]) => {
+				try {
+					r.relockSync(reason);
+				} catch {
+					/* isolated: a joiner can never stop the stores after it from relocking */
+				}
+			},
+			refresh: () => Promise.resolve()
+		};
+		relockables.push(entry);
+		return () => {
+			const i = relockables.indexOf(entry);
+			if (i !== -1) relockables.splice(i, 1);
+		};
+	};
+}
+
 /** Injected so the whole path is unit-testable; +layout supplies window, document, the real
  * visibility read, createIdleTimer, and the 15-minute threshold. `isHidden` is injected rather than
  * read off `document` here so the tests can drive this with bare EventTargets. */

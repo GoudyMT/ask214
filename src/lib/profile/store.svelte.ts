@@ -106,7 +106,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	// back. `locked` cannot answer that: it is derived state (hasProfile && _profile === null), so it
 	// reads FALSE for a first-run tab that has relocked, and it says nothing about WHY the profile is
 	// absent. See refresh().
-	let lockState: LockState = 'unlocked';
+	let lockState = $state<LockState>('unlocked');
 	// True once a profile body exists in storage (generation >= 1). Retained across relock
 	// (the encrypted record still exists), so `locked` can distinguish relocked from never-set-up.
 	// $state so `locked` recomputes reactively when it flips without a coincident `_profile` write
@@ -180,6 +180,11 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 */
 		get locked(): boolean {
 			return hasProfile && _profile === null;
+		},
+
+		/** Reactive lock state; unlike `locked` it tells a first-run tab that relocked from one that never loaded. */
+		get lockState(): LockState {
+			return lockState;
 		},
 
 		/**

@@ -26,6 +26,7 @@
 	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
+	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
 	import { wipeAllStores } from '$lib/db/wipe';
@@ -50,10 +51,6 @@
 	// the --shell-width CSS var. The 720px in the styles below is only the fallback for a missing var.
 	const shellWidth = $derived(shellWidthFor());
 
-	// Auto-lock the in-memory profile after 15 minutes of no user input (memory hygiene;
-	// unlock is a transparent local-key re-decrypt in v1.0).
-	const IDLE_THRESHOLD_MS = 15 * 60 * 1000;
-
 	// App-wide profile container, set synchronously (setContext must run during component
 	// init). Populated by the client-only app-init in onMount below. The shell renders for
 	// every status except the two takeovers, `unsupported` and `stale`; store-dependent UI reads `app.store` once ready.
@@ -65,7 +62,11 @@
 		byok: null,
 		cause: null,
 		wipeAll: null,
-		relockAll: null
+		relockAll: null,
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
 	});
 	setProfileApp(app);
 

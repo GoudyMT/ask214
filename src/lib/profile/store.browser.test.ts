@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { flushSync } from 'svelte';
+import { toStore } from 'svelte/store';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import {
@@ -552,6 +554,24 @@ describe('ProfileStore.locked', () => {
 		expect(store.locked).toBe(true);
 		await store.load();
 		expect(store.locked).toBe(false);
+	});
+
+	// A first-run tab has no profile in storage, so `locked` stays false when it relocks: only lockState tells the UI.
+	it('lockState is reactive, and moves for a first-run tab that relocks', async () => {
+		const store = createProfileStore(db);
+		await store.load();
+		const seen: unknown[] = [];
+		// toStore runs the getter inside an effect, which is how a component would read it; this file is not
+		// compiled for runes, so $effect itself is not available here.
+		const stop = toStore(() => store.lockState).subscribe((v) => seen.push(v));
+		flushSync();
+		expect(seen).toEqual(['unlocked']);
+
+		store.relockSync('user');
+		flushSync();
+		expect(seen).toEqual(['unlocked', 'locked']);
+		expect(store.locked).toBe(false);
+		stop();
 	});
 });
 

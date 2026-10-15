@@ -4,6 +4,8 @@ import type { ProfileStore } from './store.svelte';
 import type { TimelineStateStore } from '../timeline';
 import type { CalendarSyncStore } from '../calendar/store.svelte';
 import type { ByokStore } from '../ask/byok/store';
+import type { Relockable } from './app-init';
+import type { BusSignal } from '../broadcast/bus';
 
 // `damaged`: the saved data failed its own checks at start-up, so only the erase is offered (see `isDamagedRecord`).
 export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale' | 'error' | 'damaged';
@@ -55,6 +57,26 @@ export type ProfileApp = {
 	 * its own store).
 	 */
 	relockAll: (() => void) | null;
+	/**
+	 * Joins a relockable to the app's relock list for as long as it lives; the function it returns leaves the list.
+	 * Null until app-init resolves ready, and under `damaged`.
+	 */
+	joinRelock: ((r: Relockable) => () => void) | null;
+	/**
+	 * Broadcasts a signal to the other tabs through the relock echo, so a relock it causes stays local to the peer.
+	 * Null until app-init resolves ready, and under `damaged`.
+	 */
+	publish: ((s: BusSignal) => void) | null;
+	/**
+	 * Set when another tab replaced this device's data while this tab was locked: the next Unlock reloads the page
+	 * instead of re-reading. False until then.
+	 */
+	reloadOnUnlock: boolean;
+	/**
+	 * Set when a first-run tab that is locked learns its data was replaced by another tab; the layout then shows a
+	 * Reload line. False until then.
+	 */
+	replacedNotice: boolean;
 };
 
 const KEY = Symbol('mtc-profile-app');

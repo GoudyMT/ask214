@@ -19,7 +19,11 @@ describe('AppGate', () => {
 			byok: null,
 			cause: 'indexed-db',
 			wipeAll: null,
-			relockAll: null
+			relockAll: null,
+			joinRelock: null,
+			publish: null,
+			reloadOnUnlock: false,
+			replacedNotice: false
 		};
 		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.textContent).toContain('securely'); // UnsupportedBrowser heading
@@ -35,7 +39,11 @@ describe('AppGate', () => {
 			byok: null,
 			cause: null,
 			wipeAll: null,
-			relockAll: null
+			relockAll: null,
+			joinRelock: null,
+			publish: null,
+			reloadOnUnlock: false,
+			replacedNotice: false
 		};
 		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
@@ -52,7 +60,11 @@ describe('AppGate', () => {
 			byok: null,
 			cause: null,
 			wipeAll: null,
-			relockAll: null
+			relockAll: null,
+			joinRelock: null,
+			publish: null,
+			reloadOnUnlock: false,
+			replacedNotice: false
 		};
 		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
@@ -67,7 +79,11 @@ describe('AppGate', () => {
 			byok: null,
 			cause: null,
 			wipeAll: null,
-			relockAll: null
+			relockAll: null,
+			joinRelock: null,
+			publish: null,
+			reloadOnUnlock: false,
+			replacedNotice: false
 		};
 		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.querySelector('[data-testid="app-content"]')).not.toBeNull();
@@ -82,7 +98,11 @@ describe('AppGate', () => {
 			byok: null,
 			cause: null,
 			wipeAll: null,
-			relockAll: null
+			relockAll: null,
+			joinRelock: null,
+			publish: null,
+			reloadOnUnlock: false,
+			replacedNotice: false
 		};
 		const { container } = await render(AppGate, { props: { app, children: childSnippet } });
 		expect(container.textContent).toContain('updated in another tab');

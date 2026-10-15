@@ -6,12 +6,14 @@ import {
 	createRelockEcho,
 	relockAll,
 	relockEachSync,
+	createJoinRelock,
 	reloadWhenShown,
 	superviseStartup,
 	START_TIMEOUT_MS,
 	type AppInitResult,
 	type Relockable
 } from './app-init';
+import { IDLE_THRESHOLD_MS } from './idle-threshold';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import { KeystoreHmacMismatchError } from './store.svelte';
 import { LockAcquisitionTimeout } from '../db/locks';
@@ -169,6 +171,92 @@ describe('walking the relock list', () => {
 		expect(a.refresh).toHaveBeenCalledOnce();
 		expect(boom.refresh).toHaveBeenCalledOnce();
 		expect(c.refresh).toHaveBeenCalledOnce();
+	});
+});
+
+describe('createJoinRelock', () => {
+	const fake = () => ({ relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) });
+
+	it('a joined relockable is relocked by the walk over the list', () => {
+		const list: Relockable[] = [];
+		const joiner = fake();
+		createJoinRelock(list)(joiner);
+		relockEachSync(list, 'peer');
+		expect(joiner.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
+	});
+
+	it('a joiner that throws does not stop the walk', () => {
+		const first = fake();
+		const last = fake();
+		const boom = {
+			relockSync: vi.fn(() => {
+				throw new Error('relock blew up');
+			}),
+			refresh: vi.fn().mockResolvedValue(null)
+		};
+		const list: Relockable[] = [first];
+		createJoinRelock(list)(boom);
+		list.push(last);
+		// The wrapper swallows the throw itself, so even a walk that has no isolation of its own gets through.
+		expect(() => {
+			for (const r of list) r.relockSync('user');
+		}).not.toThrow();
+		expect(boom.relockSync).toHaveBeenCalledOnce();
+		expect(first.relockSync).toHaveBeenCalledOnce();
+		expect(last.relockSync).toHaveBeenCalledOnce();
+	});
+
+	it('the joined entry re-reads nothing: its refresh resolves and calls nothing on the joiner', async () => {
+		const list: Relockable[] = [];
+		const joiner = fake();
+		createJoinRelock(list)(joiner);
+		expect(list).toHaveLength(1);
+		await expect(list[0]?.refresh()).resolves.toBeUndefined();
+		expect(joiner.refresh).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		['first in, first out', 0, 1],
+		['last in, first out', 1, 0]
+	])('leave() removes exactly that entry (%s)', (_name, firstLeaver, secondLeaver) => {
+		const list: Relockable[] = [];
+		const join = createJoinRelock(list);
+		const a = fake();
+		const b = fake();
+		const leaves = [join(a), join(b)];
+		expect(list).toHaveLength(2);
+
+		leaves[firstLeaver]?.();
+		expect(list).toHaveLength(1);
+		relockEachSync(list, 'user');
+		const stayer = firstLeaver === 0 ? b : a;
+		const gone = firstLeaver === 0 ? a : b;
+		expect(stayer.relockSync).toHaveBeenCalledOnce();
+		expect(gone.relockSync).not.toHaveBeenCalled();
+
+		leaves[secondLeaver]?.();
+		expect(list).toHaveLength(0);
+	});
+
+	it('leave() twice removes nothing more', () => {
+		const list: Relockable[] = [];
+		const join = createJoinRelock(list);
+		const a = fake();
+		const b = fake();
+		const leaveA = join(a);
+		join(b);
+		leaveA();
+		leaveA();
+		expect(list).toHaveLength(1);
+		relockEachSync(list, 'user');
+		expect(b.relockSync).toHaveBeenCalledOnce();
+		expect(a.relockSync).not.toHaveBeenCalled();
+	});
+});
+
+describe('IDLE_THRESHOLD_MS', () => {
+	it('is 15 minutes', () => {
+		expect(IDLE_THRESHOLD_MS).toBe(15 * 60 * 1000);
 	});
 });
 
