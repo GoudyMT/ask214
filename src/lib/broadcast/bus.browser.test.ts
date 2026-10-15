@@ -101,7 +101,7 @@ describe('createProfileBus', () => {
 		expect(await received).toEqual({ type: 'data-replaced' });
 	});
 
-	it('isBusSignal keeps reason idle and user and drops any other value', async () => {
+	it('toBusSignal keeps reason idle and user and drops any other value', async () => {
 		const name = uniqueName();
 		const tabB = makeBus(name);
 		const seen: BusSignal[] = [];

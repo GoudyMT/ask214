@@ -277,7 +277,8 @@ export function relockEachSync(
 ): void {
 	for (const r of [...relockables]) {
 		try {
-			// Spread, so a walk with no detail calls each store with the reason alone, as before.
+			// Spread, not `detail` itself: an undefined would still be a second argument, and a walk with no detail must
+			// call each store with the reason alone.
 			r.relockSync(reason, ...(detail ? [detail] : []));
 		} catch {
 			/* isolated: the next store's PII still gets zeroized */

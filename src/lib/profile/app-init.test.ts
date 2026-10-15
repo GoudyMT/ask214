@@ -196,14 +196,14 @@ describe('createJoinRelock', () => {
 		expect(joiner.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
 	});
 
-	// relockSync takes only a reason today; a later unit widens it, and a joiner must receive whatever follows.
+	// A joiner must receive every argument after the reason, so a detail a walk passes reaches it.
 	it('forwards every argument after the reason to the joiner', () => {
 		const list: Relockable[] = [];
 		const joiner = fake();
 		createJoinRelock(list)(joiner);
 		const entry = list[0];
 		if (!entry) throw new Error('test setup: no entry joined');
-		(entry.relockSync as (...a: unknown[]) => void)('peer', { peerReason: 'idle' });
+		entry.relockSync('peer', { peerReason: 'idle' });
 		expect(joiner.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'idle' });
 	});
 
