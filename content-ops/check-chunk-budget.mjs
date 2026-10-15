@@ -105,6 +105,10 @@ const STATIC = 'static';
 //     turned phone, a view switch and lines above it changing, every page sized from its own shape, a landing
 //     that takes focus only when allowed, the top line for guides that kept some pictures, and the Save's
 //     line about the answer library - 7,206 B measured, after one lazy file for the reader's parts (-625 B).
+//     Raised 7,300 -> 8,065 (owner's call, 2026-10-14): Home's glance row for a returning user. Its code - the row's
+//     text and the timeline's task list and date rules it reads - is fetched on demand, only for someone with a
+//     profile, so a first visit to Home stays at 56.2 KB of JS (55.3 KB before; 69.3 KB with the code always
+//     loaded). Two builds measured 8,025 B, 40 B of room.
 //   Cross-checked when this replaced the summed entry: 47.92 + 132.72 = 180.64 KB, size-limit's own figure
 //   for the same build.
 //   precacheFiles 60, precacheBytes 133,000. Measured at registration: 59 files (54 build files + 5 static)
@@ -296,6 +300,32 @@ const STATIC = 'static';
 //     ignoring a held Enter after a save, and the reader's Close given a 44 px tap area with the same look. Four builds
 //     measured 152,702-152,718 B (about 15 B between builds of the same code), 42 B of room above the highest. Trim
 //     pass: the guide entry's note and hover merged into the link rules, inside the noise, not kept.
+//     Page 62,940 -> 63,910, precache 152,760 -> 155,545, precache files 60 -> 62 and route nodes 49,100 -> 49,420
+//     (package.json's size-limit) (owner's call, 2026-10-14): Home's glance row, its code fetched on demand (the
+//     onDemand raise above). The row and Home's wiring grew the Home route node; the timeline's task list and date
+//     rules now sit in chunks the Timeline loads and Home fetches, two more files. Two builds measured page
+//     63,868-63,870 B, precache 155,499-155,501 B and route nodes 49,377-49,378 B, at least 40 B of room above the
+//     highest. Trim pass: a dead empty state removed; Home's import through the timeline index pulled in the 5 KB
+//     store, replaced by direct imports; the status words shared with the task card (page +119 B), not kept. The
+//     code always loaded measured smaller totals (page 499 B, precache 1,733 B over) but 14 KB more on Home's
+//     first visit; on demand was the owner's pick.
+//     Page 63,910 -> 64,040, precache 155,545 -> 155,745 and route nodes 49,420 -> 49,440 (owner's call, 2026-10-14):
+//     the last PR's carry-overs - a guide opened offline tried again when the connection returns, the SkillBridge
+//     answers held while a save runs, a calendar file finished after a Lock dropped, the guide entry's link colour
+//     under forced colours - and the SHA task's corrected wording. Two builds measured page 63,991-63,995 B,
+//     precache 155,678-155,700 B and route nodes 49,382-49,394 B, at least 45 B of room above the highest. Trim
+//     pass: the retry first rebuilt the whole page view in a keyed block (+526 B precache); passing a retry count
+//     into the view's own check key instead saved about 430 B, kept. The retry's prop left onDemand 18 B of room (8,047 B
+//     measured), inside the build-to-build drift, so onDemand 8,065 -> 8,090 too.
+//     Page 64,040 -> 64,110, precache 155,745 -> 155,840 and route nodes 49,440 -> 49,470 (owner's call, 2026-10-14):
+//     the Pre-PR sweep's fixes - Home's row says it could not load when its code never arrives, focus kept on the shown
+//     view when a guide is tried again, "nothing left to do" when a task closed unanswered - and the SHA task's wording
+//     matched to the official pages. Two builds measured page 64,066-64,068 B, precache 155,794-155,795 B and route
+//     nodes 49,424-49,426 B, at least 42 B of room above the highest. Trim pass: the failed row first made the new
+//     loader a shared chunk of its own (one more precached file, page +283 B); moving the row out of the timeline code
+//     removed that, kept.
+//     Page 64,110 -> 64,120 (owner's call, 2026-10-14): the re-sweep's focus fix (the retry hands focus on from the
+//     cited passage too) left 30-32 B of room on 64,078-64,080 B measured; raised to 40 B above the highest.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -305,10 +335,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 62_940,
-	onDemand: 7_300,
-	precacheFiles: 60,
-	precacheBytes: 152_760,
+	page: 64_120,
+	onDemand: 8_090,
+	precacheFiles: 62,
+	precacheBytes: 155_840,
 	workerScripts: 147_200
 };
 

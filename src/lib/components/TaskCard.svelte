@@ -1205,6 +1205,13 @@
 		text-decoration: underline;
 	}
 
+	/* Forced colours draw a button in ButtonText; the entry keeps the links' system colour, as it reads as one of them. */
+	@media (forced-colors: active) {
+		.task-card__guide {
+			color: LinkText;
+		}
+	}
+
 	.task-card__guide-note {
 		display: block;
 		color: var(--color-fg-muted);

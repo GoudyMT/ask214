@@ -102,19 +102,23 @@
 	// The page first; the text when the user picks it, or when the page cannot be had.
 	const view = $derived(served === null || fallback !== null ? 'text' : (chosen ?? 'page'));
 	// A page that cannot be had turns the Page button off; if it held focus, focus goes to Text, the view now shown,
-	// instead of falling to the page. Not when the text's landing took it first: the cited passage is the better place.
+	// instead of falling to the page. Focus in the pages themselves - handed there by a retry - goes to the text they
+	// gave way to. Not when the text's landing took it first: the cited passage is the better place.
 	// On a short screen Text sits above the document in the scroll, so the reader's place stays put.
 	function fallBack(reason: NonNullable<typeof fallback>): void {
-		const page = dialogEl?.querySelector('[data-refocus="page"]');
-		const held = !!page && document.activeElement === page;
+		const held = document.activeElement;
+		const to =
+			held && held === dialogEl?.querySelector('[data-refocus="page"]')
+				? '[data-refocus="text"]'
+				: held && dialogEl?.querySelector('.reader__doc')?.contains(held)
+					? '.reader__text'
+					: null;
 		fallback = reason;
-		if (held)
+		if (to)
 			void tick().then(() => {
 				const active = document.activeElement;
-				if (active !== page && active !== document.body) return;
-				dialogEl
-					?.querySelector<HTMLElement>('[data-refocus="text"]')
-					?.focus({ preventScroll: true });
+				if (active !== held && active !== document.body) return;
+				dialogEl?.querySelector<HTMLElement>(to)?.focus({ preventScroll: true });
 			});
 	}
 
@@ -152,6 +156,32 @@
 			.catch(() => {
 				if (doc?.sourceId === sourceId) building = 'failed';
 			});
+	});
+
+	// A page or a text that could not be had for want of a connection is tried again when it comes back, as reopening
+	// the reader would: the page view checks the device and the network afresh, and a failed text is built again.
+	// Once per return of the connection, never in a loop. Focus in the text it hides goes to the pages, the view now
+	// shown, so it does not sit on the page while the document arrives.
+	let attempt = $state(0);
+	$effect(() => {
+		const retry = (): void => {
+			if (fallback === 'offline' || fallback === 'updated') {
+				const held = document.activeElement;
+				const inText = !!held && !!dialogEl?.querySelector('.reader__text')?.contains(held);
+				fallback = null;
+				attempt++;
+				// The browser moves focus off the hidden text only later, so focus still on it counts as lost too.
+				if (inText)
+					void tick().then(() => {
+						const active = document.activeElement;
+						if (active !== held && active !== document.body) return;
+						dialogEl?.querySelector<HTMLElement>('.reader__doc')?.focus({ preventScroll: true });
+					});
+			}
+			if (building === 'failed') building = 'idle';
+		};
+		window.addEventListener('online', retry);
+		return () => window.removeEventListener('online', retry);
 	});
 
 	// The page view carries the matcher and the viewer, so it is loaded only when a served document is
@@ -405,6 +435,7 @@
 						onfallback={fallBack}
 						onnote={(found) => (note = found)}
 						request={pageRequest}
+						retry={attempt}
 						onview={(shownView) => {
 							pagerPage = shownView.page;
 							pagerCount = shownView.pages;

@@ -502,6 +502,36 @@ describe('SourceReader with a served document', () => {
 		return { getDocument: () => ({ promise: Promise.resolve(doc), destroy: async () => {} }) };
 	};
 
+	// The text's landing puts focus on the cited passage, inside the text: the usual place focus is when the
+	// connection comes back. The browser moves focus off a hidden element only later, so the hand-off must not wait for it.
+	it('hands focus from the cited passage to the pages while a retried download is on its way', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const { container } = await render(SourceReader, {
+				props: {
+					source: served(),
+					highlightId: 's2',
+					onClose: () => {},
+					pdfLoader: () => new Promise<PdfRuntime>(() => {})
+				}
+			});
+			const text = container.querySelector<HTMLElement>('.reader__text')!;
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			const cited = container.querySelector<HTMLElement>('.reader__passage--cited')!;
+			cited.focus();
+			expect(document.activeElement).toBe(cited);
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() => expect(text.hidden).toBe(true));
+			await new Promise((r) => setTimeout(r, 100));
+			expect(container.querySelector('.reader__doc')?.contains(document.activeElement)).toBe(true);
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
 	it('opens on the original page, with a switch to the text', async () => {
 		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: pendingLoader }
@@ -513,7 +543,9 @@ describe('SourceReader with a served document', () => {
 		expect(seg(container, 'Text')?.getAttribute('aria-pressed')).toBe('false');
 		// This document is not in the test browser's cache; online, the page view opens at once and states its size.
 		await vi.waitFor(() =>
-			expect(shown(container)).toContain('Loading page 2 of the document (0.1 MB)...')
+			expect(shown(container)).toContain(
+				'Downloading the whole document (0.1 MB) to show page 2...'
+			)
 		);
 		expect(container.querySelector('.reader__text')?.hasAttribute('hidden')).toBe(true);
 	});
@@ -1421,7 +1453,9 @@ describe('SourceReader, a document opened whole', () => {
 		});
 
 		await vi.waitFor(() =>
-			expect(shown(container)).toContain('Loading page 1 of the document (0.1 MB)...')
+			expect(shown(container)).toContain(
+				'Downloading the whole document (0.1 MB) to show page 1...'
+			)
 		);
 		expect((container.querySelector('dialog.reader') as HTMLDialogElement).open).toBe(true);
 		expect(container.querySelector('.reader__title')?.textContent).toBe(DOC.title);
@@ -1499,6 +1533,159 @@ describe('SourceReader, a document opened whole', () => {
 		} finally {
 			delete (navigator as unknown as Record<string, unknown>).onLine;
 		}
+	});
+
+	// Opened offline and never saved, a guide shows its text, or says the text could not be had either. When the
+	// connection comes back it is tried again, as reopening it would: the page, then the text if the user picks it.
+	it('tries the page again when the connection comes back', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const loadSource = vi.fn(async () => null);
+			const { container } = await render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource,
+					onClose: () => {},
+					pdfLoader: () => new Promise<PdfRuntime>(() => {})
+				}
+			});
+			await vi.waitFor(() =>
+				expect(shown(container)).toContain(
+					'This source could not be loaded right now. Check your connection and try again.'
+				)
+			);
+			expect(seg(container, 'Page')?.disabled).toBe(true);
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() =>
+				expect(seg(container, 'Page')?.getAttribute('aria-pressed')).toBe('true')
+			);
+			await vi.waitFor(() =>
+				expect(shown(container)).toContain(
+					'Downloading the whole document (0.1 MB) to show page 1...'
+				)
+			);
+			expect(container.querySelector('.reader__notice')).toBeNull();
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
+	it('leaves no focus on the page when the retry hides the text that held it', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const { container } = await render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: threePages()
+				}
+			});
+			const text = container.querySelector<HTMLElement>('.reader__text')!;
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			text.focus();
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() => expect(text.hidden).toBe(true));
+			await vi.waitFor(() =>
+				expect(container.querySelector('.reader__doc')?.contains(document.activeElement)).toBe(true)
+			);
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
+	// A real download takes time: focus must not sit on the bare page while it does, nor stay there if it fails.
+	it('hands focus from the hidden text to the pages while a retried download is still on its way', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const { container } = await render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: () => new Promise<PdfRuntime>(() => {})
+				}
+			});
+			const text = container.querySelector<HTMLElement>('.reader__text')!;
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			text.focus();
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() => expect(text.hidden).toBe(true));
+			await vi.waitFor(() =>
+				expect(container.querySelector('.reader__doc')?.contains(document.activeElement)).toBe(true)
+			);
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
+	it('hands focus back to the text when the retried download fails', async () => {
+		let up = false;
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => up });
+		try {
+			const { container } = await render(SourceReader, {
+				props: {
+					source: null,
+					doc: DOC,
+					loadSource: async () => null,
+					onClose: () => {},
+					pdfLoader: () =>
+						new Promise<PdfRuntime>((_, reject) => setTimeout(() => reject(new Error('lost')), 100))
+				}
+			});
+			const text = container.querySelector<HTMLElement>('.reader__text')!;
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			text.focus();
+
+			up = true;
+			window.dispatchEvent(new Event('online'));
+			await vi.waitFor(() => expect(text.hidden).toBe(true));
+			await vi.waitFor(() => expect(text.hidden).toBe(false));
+			await vi.waitFor(() => expect(document.activeElement).toBe(text));
+		} finally {
+			delete (navigator as unknown as Record<string, unknown>).onLine;
+		}
+	});
+
+	it('builds the text again when the connection comes back, once per return', async () => {
+		const loadSource = vi
+			.fn<(id: string) => Promise<Source | null>>()
+			.mockResolvedValueOnce(null)
+			.mockResolvedValue(vetSource());
+		const { container } = await render(SourceReader, {
+			props: {
+				source: null,
+				doc: DOC,
+				loadSource,
+				onClose: () => {},
+				pdfLoader: () => new Promise<PdfRuntime>(() => {})
+			}
+		});
+		await vi.waitFor(() => expect(seg(container, 'Text')).toBeDefined());
+		seg(container, 'Text')?.click();
+		await vi.waitFor(() =>
+			expect(shown(container)).toContain('This source could not be loaded right now.')
+		);
+		expect(loadSource).toHaveBeenCalledTimes(1);
+
+		window.dispatchEvent(new Event('online'));
+		await vi.waitFor(() =>
+			expect(shown(container)).toContain('Services are free and confidential.')
+		);
+		expect(loadSource).toHaveBeenCalledTimes(2);
+		expect(seg(container, 'Text')?.getAttribute('aria-pressed')).toBe('true');
 	});
 
 	// Nothing was cited, so the page carries no mark and the reader reports no passage it could not find.
@@ -1780,7 +1967,7 @@ describe('SourceReader, a document opened whole', () => {
 			doc: { sourceId: 'tap_va101', title: 'TAP - VA Benefits 101 (Resource Guide)' },
 			pdfLoader: () => new Promise<PdfRuntime>(() => {})
 		});
-		await vi.waitFor(() => expect(shown(container)).toContain('Loading page 1 of the document'));
+		await vi.waitFor(() => expect(shown(container)).toContain('to show page 1...'));
 		expect(container.querySelector('.pager')).toBeNull();
 	});
 

@@ -153,6 +153,8 @@
 			}}
 			onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 		>
+			<!-- The form closes when a save lands, so a pick made while it runs would be dropped unseen. The choices hold
+			     until it settles, as Save does: a cancelled click puts the radio back, by mouse or arrow key. -->
 			<fieldset class="sb-row__choices">
 				<legend class="visually-hidden">{ROW_LABEL}</legend>
 				{#each ANSWERS as a (a)}
@@ -162,6 +164,7 @@
 							name="skillbridge-plan"
 							value={a}
 							checked={choice === a}
+							onclick={(e) => busy && e.preventDefault()}
 							onchange={() => {
 								choice = a;
 								error = null;

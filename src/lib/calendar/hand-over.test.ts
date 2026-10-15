@@ -17,7 +17,7 @@ describe('handOver', () => {
 		const recordAdd = vi.fn(async () => {
 			order.push('record');
 		});
-		await handOver(FILE, { recordAdd }, NOW, download);
+		await handOver(FILE, { locked: false, recordAdd }, NOW, download);
 		expect(order).toEqual(['download', 'record']);
 		expect(download).toHaveBeenCalledWith(FILE.ics);
 		expect(recordAdd).toHaveBeenCalledWith(FILE.events, '2026-10-04', '2026-10-04');
@@ -26,7 +26,25 @@ describe('handOver', () => {
 	it('does not throw when the record fails: the file still reached the user', async () => {
 		const download = vi.fn();
 		const recordAdd = vi.fn(async () => Promise.reject(new Error('E_CALENDAR_RELOCKED')));
-		await expect(handOver(FILE, { recordAdd }, NOW, download)).resolves.toBeUndefined();
+		await expect(
+			handOver(FILE, { locked: false, recordAdd }, NOW, download)
+		).resolves.toBeUndefined();
+		expect(download).toHaveBeenCalledOnce();
+	});
+
+	// The file is built after the tap and handed over when it is ready. A Lock pressed in between means nothing personal
+	// leaves the app after it, so a file finished after the Lock is dropped, unrecorded.
+	it('drops the file when the app locked while it was built', async () => {
+		const download = vi.fn();
+		const recordAdd = vi.fn(async () => {});
+		await handOver(FILE, { locked: true, recordAdd }, NOW, download);
+		expect(download).not.toHaveBeenCalled();
+		expect(recordAdd).not.toHaveBeenCalled();
+	});
+
+	it('hands the file over while the app is unlocked', async () => {
+		const download = vi.fn();
+		await handOver(FILE, { locked: false, recordAdd: vi.fn(async () => {}) }, NOW, download);
 		expect(download).toHaveBeenCalledOnce();
 	});
 

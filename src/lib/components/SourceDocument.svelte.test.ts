@@ -83,10 +83,23 @@ describe('SourceDocument', () => {
 
 		await vi.waitFor(() =>
 			expect(container.querySelector('[role="status"]')?.textContent?.trim()).toBe(
-				'Loading page 3 of the document (6.9 MB)...'
+				'Downloading the whole document (6.9 MB) to show page 3...'
 			)
 		);
 		expect(container.querySelector('button')).toBeNull();
+	});
+
+	it('says a saved document opens from the device', async () => {
+		const pending = () => new Promise<PdfRuntime>(() => {});
+		const { container } = await render(SourceDocument, {
+			props: props(pending, { isSaved: async () => true })
+		});
+
+		await vi.waitFor(() =>
+			expect(container.querySelector('[role="status"]')?.textContent?.trim()).toBe(
+				'Opening page 3 from your device...'
+			)
+		);
 	});
 
 	it('fetches a document not saved as soon as it opens, online', async () => {

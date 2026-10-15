@@ -29,6 +29,7 @@
 		quote,
 		title,
 		bytes,
+		saved = false,
 		onfail,
 		onlocate,
 		onpage,
@@ -48,6 +49,8 @@
 		title: string;
 		// The document's size in bytes: stated while the page loads, and the full length of the loading bar.
 		bytes?: number;
+		// Whether the document is saved on the device: the loading line then says it opens from there.
+		saved?: boolean;
 		onfail?: () => void;
 		// For the page landed on: whether the passage is marked there, every page it was found on (empty when
 		// found nowhere), and the page count - so the reader can say so when that page carries no mark.
@@ -588,10 +591,13 @@
 	{#if status === 'loading'}
 		<!-- A box in the page's shape, so the modal does not jump from one line to a full page. -->
 		<div class="pdf__ph" role="status">
+			<!-- The page waits for the whole file, so the line says that is what is coming, and from where. -->
 			<span
-				>Loading page {page} of the document{bytes !== undefined
-					? ` (${(bytes / 1e6).toFixed(1)} MB)`
-					: ''}...</span
+				>{saved
+					? `Opening page ${page} from your device...`
+					: `Downloading the whole document${
+							bytes !== undefined ? ` (${(bytes / 1e6).toFixed(1)} MB)` : ''
+						} to show page ${page}...`}</span
 			>
 			<!-- The line above already says it is loading and how large the file is; the bar only shows it moving. -->
 			{#if bytes !== undefined}
