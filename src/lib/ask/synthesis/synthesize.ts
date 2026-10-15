@@ -228,10 +228,20 @@ export async function synthesize(
 	// directory page - the same on all 21 - so a citation built from it would send a reader who trusted the
 	// one trustworthy link to a list of documents. Falls back to c.url for an html source, whose url is
 	// already the document.
-	const citations: Citation[] = chunks.map((c) => ({
-		id: c.id,
-		url: documentUrl(c.sourceId, c.page) ?? c.url,
-		title: c.title
-	}));
+	//
+	// One link per document: several cited passages from one guide would list its title once per passage. The
+	// link opens the passage the model cited first; documents keep the order retrieval ranked them in.
+	const byId = new Map(chunks.map((c) => [c.id, c]));
+	const firstCited = new Map<string, RetrievedChunk>();
+	for (const id of citedIds) {
+		const c = byId.get(id);
+		if (c && !firstCited.has(c.sourceId)) firstCited.set(c.sourceId, c);
+	}
+	const citations: Citation[] = [];
+	for (const { sourceId } of chunks) {
+		const c = firstCited.get(sourceId);
+		if (c === undefined || citations.some((x) => x.id === c.id)) continue;
+		citations.push({ id: c.id, url: documentUrl(c.sourceId, c.page) ?? c.url, title: c.title });
+	}
 	return { kind: 'answer', answer: toCitedAnswer(modelText, citedIds, citations) };
 }

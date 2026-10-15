@@ -81,6 +81,34 @@ describe('synthesize', () => {
 			);
 		}
 	});
+	// Three passages from one guide used to list the guide's title three times under the summary.
+	it('lists each cited document once, opening the page cited first', async () => {
+		const guide = (id: string, page: number): RetrievedChunk => ({
+			id: `tap_vet_centers:${id}`,
+			text: 'Vet Centers offer readjustment counseling to combat veterans and their families.',
+			sourceId: 'tap_vet_centers',
+			page,
+			url: 'https://www.tapevents.mil/resources/documents',
+			title: 'TAP - Vet Centers'
+		});
+		const chunks = [guide('0fb72e844a79', 2), CHUNKS[0]!, guide('1ab72e844a70', 5)];
+		const impl = stubFetch(
+			'Vet Centers offer counseling [tap_vet_centers:1ab72e844a70] to veterans ' +
+				'[tap_vet_centers:0fb72e844a79], and SkillBridge lets you train [tap_moc_crosswalk].'
+		);
+		const result = await synthesize('What is a Vet Center?', chunks, deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.citations.map((c) => [c.title, c.url])).toEqual([
+				[
+					'TAP - Vet Centers',
+					'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-VETCEN.pdf#page=5'
+				],
+				['SkillBridge', 'https://example.gov/skillbridge']
+			]);
+		}
+	});
+
 	it('short-circuits a personalized-eligibility query with no provider call', async () => {
 		const impl = stubFetch('unused');
 		const result = await synthesize('Do I qualify for the housing grant?', CHUNKS, deps(impl));
