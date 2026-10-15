@@ -254,7 +254,7 @@ describe('NeedsNow', () => {
 			}
 		});
 		const text = textOf(container);
-		expect(text).toContain('before your separation date');
+		expect(text).toContain('by your separation date');
 		expect(text).not.toContain('ask your command');
 	});
 });

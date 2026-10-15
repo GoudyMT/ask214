@@ -121,9 +121,10 @@
 		     summary WAS produced and we dropped it because the question asks about the reader's own
 		     eligibility. `keyRejected`, `serviceFailed` and `cutShort` each name what the provider call did: a
 		     key it refused, a call that failed or declined, a summary cut off at the token limit. `unavailable`
-		     claims no attempt, because the route reaches it when there was no API key to call with, or the
-		     stored key could not be read - so a sentence like "could not be produced" would be false for the
-		     reader who never supplied a key. It states the fact it can support: that no summary is here. -->
+		     claims no attempt, because the route reaches it when there was no API key to call with, the
+		     stored key could not be read, or the call threw before it could say why - so a sentence like "could
+		     not be produced" would be false for the reader who never supplied a key. It states the fact it can
+		     support: that no summary is here. -->
 		{#if view.synthesisNote}
 			<p class="ask-answer__note-synthesis">
 				{SYNTHESIS_NOTE[view.synthesisNote]}

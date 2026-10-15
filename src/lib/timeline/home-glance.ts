@@ -47,7 +47,7 @@ function nextWhen(item: TimelineItem): string {
 		case 'after-you-leave':
 			// An opening already past is not news once the user has left; the card drops it too.
 			return item.leftCommand?.opened
-				? 'before your separation date'
+				? 'by your separation date'
 				: `opens ${f(item.windowStartDate)}`;
 		case 'start-now':
 			return item.def.kind === 'soft'

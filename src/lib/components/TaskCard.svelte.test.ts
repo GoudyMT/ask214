@@ -1172,6 +1172,17 @@ describe('TaskCard (focus after an editor closes)', () => {
 		await expect.poll(() => document.activeElement).toBe(snooze);
 	});
 
+	// The card can stay open across midnight into the last day at the command, where a snooze would change nothing.
+	it('drops an open snooze picker once snoozing has closed', async () => {
+		const item = makeItem({ status: 'start-now' });
+		const { container, update } = await mountCard(item);
+		press(container, 'Snooze');
+		expect(buttonByText(container, 'Cancel')).toBeDefined();
+		await update({ ...item, snoozeClosed: true });
+		flushSync();
+		expect(buttonByText(container, 'Cancel')).toBeUndefined();
+	});
+
 	it('returns focus to Add note when its editor is cancelled', async () => {
 		const { container } = await mountCard(makeItem({ status: 'start-now' }));
 		const add = press(container, 'Add note');

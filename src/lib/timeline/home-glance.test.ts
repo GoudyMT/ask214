@@ -155,7 +155,7 @@ describe('timelineRow', () => {
 			leftCommand: { opened: true }
 		});
 		expect(timelineRow(ready([leave])).detail).toBe(
-			'Next: Title of leave - before your separation date'
+			'Next: Title of leave - by your separation date'
 		);
 		const notYet = { ...leave, windowStartDate: '2027-01-10', leftCommand: { opened: false } };
 		expect(timelineRow(ready([notYet])).detail).toBe('Next: Title of leave - opens Jan 10, 2027');

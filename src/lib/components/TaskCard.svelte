@@ -434,7 +434,7 @@
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
-			{#if snoozeOpen}
+			{#if snoozeOpen && !item.snoozeClosed}
 				<div class="task-card__snooze" bind:this={snoozeEl}>
 					<span class="task-card__snooze-label">Snooze until</span>
 					<div class="task-card__presets">
