@@ -192,10 +192,14 @@ export function deriveStatus(
 	if (stored?.status === 'done') return 'done';
 	if (stored?.status === 'skipped') return 'skipped';
 	const byDate = statusByDate(anchored, todayIso);
+	// A task moved to fit before the user leaves the command wakes on its last day there, whatever the snooze says:
+	// a snooze must not carry it past the day the user leaves.
+	const fitted = anchored.fit !== undefined && !anchored.fit.cannotFit;
 	const snoozed =
 		stored?.status === 'snoozed' &&
 		stored.snoozeUntil !== undefined &&
-		stored.snoozeUntil > todayIso;
+		stored.snoozeUntil > todayIso &&
+		!(fitted && todayIso >= anchored.windowEndDate);
 	return snoozed && !isFirmWarning(byDate, anchored.def.kind) ? 'snoozed' : byDate;
 }
 
@@ -381,8 +385,15 @@ export function generateTimeline(
 					: {}),
 				// snoozeUntil rides the view only while the item is actively snoozed; gating on the
 				// derived status drops it for done/skipped and for expired (auto-reopened) snoozes.
+				// A fitted task's snooze ends on its last day before leaving, so that is the end the card and the
+				// calendar's Aim for event show.
 				...(status === 'snoozed' && stored?.snoozeUntil !== undefined
-					? { snoozeUntil: stored.snoozeUntil }
+					? {
+							snoozeUntil:
+								a.fit && !a.fit.cannotFit && stored.snoozeUntil > a.windowEndDate
+									? a.windowEndDate
+									: stored.snoozeUntil
+						}
 					: {}),
 				...(stored?.notes !== undefined ? { note: stored.notes } : {}),
 				...(a.fit && !a.fit.cannotFit

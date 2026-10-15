@@ -1184,6 +1184,48 @@ describe('the SkillBridge steps follow the saved answer', () => {
 	});
 });
 
+// A task that must be done before the user leaves the command, snoozed past that day, stayed quiet after they had
+// left. The snooze now ends on the task's last day there, the same promise a firm warning keeps.
+describe('A snooze on a task moved to fit before leaving', () => {
+	// The window runs Oct 17, 2026 to Jan 15, 2027; SkillBridge from Dec 1 moves its last day to Nov 30.
+	const atCommand: TaskDef = { ...universal, finishBefore: 'leaving' };
+	const on = (today: Date, snoozeUntil = '2027-01-10') =>
+		generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: EAOS,
+				daysUntilSeparation: 0,
+				leaving: { skillbridgeStart: '2026-12-01' } as never
+			},
+			[atCommand],
+			{ schemaVersion: 1, tasks: { u1: { status: 'snoozed', snoozeUntil } } },
+			today
+		).phases.flatMap((p) => p.items)[0];
+
+	it('holds until the last day there, showing that day as its end', () => {
+		const u1 = on(new Date(2026, 10, 29, 12));
+		expect(u1?.windowEndDate).toBe('2026-11-30');
+		expect(u1?.status).toBe('snoozed');
+		expect(u1?.snoozeUntil).toBe('2026-11-30');
+	});
+
+	it('ends on the last day there', () => {
+		const u1 = on(new Date(2026, 10, 30, 12));
+		expect(u1?.status).toBe('start-now');
+		expect(u1?.snoozeUntil).toBeUndefined();
+	});
+
+	it('stays ended once the user has left', () => {
+		expect(on(new Date(2026, 11, 2, 12))?.status).toBe('still-to-do');
+	});
+
+	it('keeps a snooze that ends before the last day there as it is', () => {
+		const u1 = on(new Date(2026, 10, 1, 12), '2026-11-10');
+		expect(u1?.status).toBe('snoozed');
+		expect(u1?.snoozeUntil).toBe('2026-11-10');
+	});
+});
+
 // A soft task never closes, so years later its card would still say "Aimed for" a date from before separation.
 describe('A soft aim from before separation', () => {
 	const afterSeparation: TaskDef = {
