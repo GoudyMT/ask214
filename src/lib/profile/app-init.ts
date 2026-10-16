@@ -325,9 +325,10 @@ export function relockEachSync(
 
 /**
  * The seam a later feature joins the relock list through. The joiner is wrapped, never stored: a throw from it
- * cannot break a walk the shipped stores depend on, and its `refresh` re-reads nothing, because an automatic
- * re-read is for the stores that own persisted data. `leave()` removes that wrapper by identity (a stored index
- * goes stale as soon as another entry leaves) and is safe to call twice.
+ * cannot break a walk the shipped stores depend on. Its `refresh` is forwarded, and a throw or a rejection from it
+ * is swallowed for the same reason. A joiner's refresh must never decrypt: for the backup session it is the check
+ * that decides whether the screen may show again after the person was away. `leave()` removes that wrapper by
+ * identity (a stored index goes stale as soon as another entry leaves) and is safe to call twice.
  */
 export function createJoinRelock(relockables: Relockable[]): (r: Relockable) => () => void {
 	return (r) => {
@@ -339,7 +340,16 @@ export function createJoinRelock(relockables: Relockable[]): (r: Relockable) => 
 					/* isolated: a joiner can never stop the stores after it from relocking */
 				}
 			},
-			refresh: () => Promise.resolve()
+			refresh: () => {
+				try {
+					return r.refresh().then(
+						() => undefined,
+						() => undefined
+					);
+				} catch {
+					return Promise.resolve();
+				}
+			}
 		};
 		relockables.push(entry);
 		return () => {

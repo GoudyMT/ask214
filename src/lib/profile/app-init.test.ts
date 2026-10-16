@@ -237,13 +237,29 @@ describe('createJoinRelock', () => {
 		expect(last.relockSync).toHaveBeenCalledOnce();
 	});
 
-	it('the joined entry re-reads nothing: its refresh resolves and calls nothing on the joiner', async () => {
+	// A lifecycle restore must reach the joiner's own refresh: the backup session un-conceals there.
+	it('the joined entry forwards its refresh to the joiner', async () => {
 		const list: Relockable[] = [];
 		const joiner = fake();
 		createJoinRelock(list)(joiner);
 		expect(list).toHaveLength(1);
+		await list[0]?.refresh();
+		expect(joiner.refresh).toHaveBeenCalledOnce();
+	});
+
+	// restore() walks every store; a joiner whose refresh throws or rejects must not stop the walk or surface.
+	it.each([
+		[
+			'throws synchronously',
+			() => {
+				throw new Error('refresh blew up');
+			}
+		],
+		['rejects', () => Promise.reject(new Error('refresh rejected'))]
+	])('a joiner whose refresh %s settles quietly', async (_name, refresh) => {
+		const list: Relockable[] = [];
+		createJoinRelock(list)({ relockSync: vi.fn(), refresh });
 		await expect(list[0]?.refresh()).resolves.toBeUndefined();
-		expect(joiner.refresh).not.toHaveBeenCalled();
 	});
 
 	it.each([

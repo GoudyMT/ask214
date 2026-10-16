@@ -841,13 +841,16 @@ describe('relock walk totality', () => {
 	});
 
 	// What the lifecycle's restore calls on the joined entry: it must be the session's own refresh.
-	it('joins an entry whose refresh is the time-away check', async () => {
+	it('joins an entry whose refresh, through the shipped wrapper, is the time-away check', async () => {
 		const h = harness();
-		await exportWithWords(h);
-		const entry = nth(h.joined, 0);
-		entry.relockSync('hygiene');
+		const list: Relockable[] = [];
+		h.s.start(makeApp({ joinRelock: createJoinRelock(list) }).app, 'export');
+		const shown = h.s.showPassphrase();
+		nth(h.workers, 0).answer({ type: 'words', words: WORDS_A });
+		await shown;
+		relockEachSync(list, 'hygiene');
 		h.clock.advance(IDLE_THRESHOLD_MS);
-		await entry.refresh();
+		await nth(list, 0).refresh();
 		expect(h.s.phase).toBe('idle');
 	});
 
