@@ -335,6 +335,13 @@ describe('restoreBackup', () => {
 		const clock = vi.spyOn(Date, 'now').mockReturnValue(ahead);
 		await buildDevice();
 		clock.mockRestore();
+		// A later save on the right clock: the record keeps the high mark, while the mark's own time is now the real one.
+		const later = createProfileStore(db);
+		await later.load();
+		await later.save({ yearsOfService: 2 });
+		const state = await readDeviceState(db);
+		expect(state.lastSeenAt).toBe(ahead);
+		expect(need(state.ts.profile)).toBeLessThan(ahead);
 		const expected = await confirmNow();
 
 		expectSucceeded(await restoreBackup(db, fileInner(), expected, session().options));
