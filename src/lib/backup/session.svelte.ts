@@ -100,7 +100,7 @@ export const PHASE_CLASS: Record<Exclude<Phase, 'idle'>, PhaseClass> = {
 };
 
 /** Why a committing session saw the world move under it. `pagehide` is the page leaving, not a relock. */
-export type EpochMover = RelockReason | 'pagehide';
+export type EpochMover = RelockReason | 'pagehide' | 'navigated';
 
 /**
  * What a flow may hand the session to hold for it. PRE data (`fileBytes`, `parsed`) survives a stopped run; the rest
@@ -118,6 +118,9 @@ const HOLD_SLOTS: readonly HoldSlot[] = [
 	'confirm',
 	'writable'
 ];
+
+/** The only phases in which "Show my passphrase" does anything. */
+const SHOW_PHASES: readonly Phase[] = ['phrase-hidden', 'phrase-shown', 'typed-back'];
 
 /** Anything a buffer-zeroing step can call. A Uint8Array is one. */
 export type Zeroable = { fill: (value: number) => unknown };
@@ -518,11 +521,13 @@ export class BackupSession {
 	 * the same words again. The time stamp is taken when the words appear.
 	 */
 	async showPassphrase(): Promise<void> {
-		if (this.kind !== 'export' || this.phase === 'idle') return;
+		if (this.kind !== 'export' || !SHOW_PHASES.includes(this.phase)) return;
 		if (this.words !== null) {
 			this.revealed = true;
 			return;
 		}
+		// One phrase per session: once the words have appeared and been dropped (the commit), they are never made again.
+		if (this.backupAt !== null) return;
 		const run = this.beginRun();
 		if (run === null) return;
 		let worker: WorkerLike | null = null;
@@ -795,7 +800,9 @@ export class BackupSession {
 	 */
 	cardGone(): void {
 		if (this.phase === 'idle' || this.concealed || !this.#deps.isVisible()) return;
-		this.cancel('navigated');
+		// A write that has begun runs on; the export read-back learns the person left and stops with its own line.
+		if (this.#isCommit()) this.#record('navigated');
+		else this.cancel('navigated');
 	}
 
 	/** The wizard asks Settings to open the Erase dialog. In memory only; never in history. */
@@ -913,9 +920,13 @@ export class BackupSession {
 		);
 	}
 
-	/** A relock that cannot touch a committing session is only written down; the first real lock outranks hygiene. */
+	/**
+	 * A stop that cannot touch a committing session is only written down. An app switch and a navigation are weak:
+	 * the first real lock or page leave outranks them, and nothing outranks that.
+	 */
 	#record(mover: EpochMover): void {
-		if (this.epochMovedBy === null || (this.epochMovedBy === 'hygiene' && mover !== 'hygiene')) {
+		const weak = (m: EpochMover): boolean => m === 'hygiene' || m === 'navigated';
+		if (this.epochMovedBy === null || (weak(this.epochMovedBy) && !weak(mover))) {
 			this.epochMovedBy = mover;
 		}
 	}

@@ -738,6 +738,22 @@ describe('relock while committing', () => {
 		expect(h.s.runId).toBeGreaterThan(before);
 	});
 
+	// The export read-back must know the person left the page, so it can say "saved, but not checked".
+	it('the card leaving while committing is recorded as navigation and does not cancel', () => {
+		const h = harness();
+		startRestore(h);
+		const run = h.s.beginRun() as Run;
+		run.enter('writing');
+		h.s.markCommitting();
+		h.s.cardGone();
+		expect(h.s.epochMovedBy).toBe('navigated');
+		expect(h.s.phase).toBe('writing');
+		expect(run.signal.aborted).toBe(false);
+		// A real lock still outranks it.
+		h.s.relockSync('user');
+		expect(h.s.epochMovedBy).toBe('user');
+	});
+
 	it('a hygiene alone is recorded as hygiene and never overwrites a stronger reason', () => {
 		const h = harness();
 		startRestore(h);
@@ -1044,6 +1060,26 @@ describe('the passphrase worker', () => {
 		expect(h.s.revealed).toBe(true);
 		expect(h.s.words).toEqual(WORDS_A);
 	});
+
+	// After the commit the words are gone from memory; a Show then must not roll a second phrase for this session.
+	it.each<Phase>(['saved', 'picking-save'])(
+		'Show in %s makes no worker and shows nothing',
+		async (phase) => {
+			const h = harness();
+			await exportWithWords(h);
+			const run = h.s.beginRun() as Run;
+			run.enter('writing');
+			run.enter('saved');
+			run.release();
+			h.s.enterPhase(phase);
+			h.s.revealed = false;
+			const workers = h.workers.length;
+			await h.s.showPassphrase();
+			expect(h.workers).toHaveLength(workers);
+			expect(h.s.revealed).toBe(false);
+			expect(h.s.words).toBeNull();
+		}
+	);
 
 	it('a double Show press starts one worker', async () => {
 		const h = harness();
