@@ -23,6 +23,7 @@
 		"build:sources-index": "tsx content-ops/build-sources-index.mjs",
 		"check:sources-index": "tsx content-ops/check-sources-index.mjs",
 		"check:pdf-worker": "tsx content-ops/check-pdf-worker.mjs",
+		"check:backup-vendor": "tsx content-ops/check-backup-vendor.mjs",
 		"curate:backup-words": "tsx content-ops/curate-backup-words.mjs",
 		"build:backup-kdf": "tsx content-ops/build-backup-kdf.mjs",
 		"check:served-history": "node content-ops/check-served-history.mjs",
