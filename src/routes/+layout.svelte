@@ -46,7 +46,6 @@
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 	import { stashRoute } from '$lib/feedback/context';
-
 	let { children } = $props();
 
 	// Shell content width: one width for every route (shell-width.ts), set on nav, main and footer through
@@ -370,17 +369,12 @@
 	{/if}
 
 	<main id="main-content" style:--shell-width={shellWidth}>
-		<!-- The status element is always present: a live region that arrives with its text is often not announced. -->
-		<div role="status">
-			{#if app.replacedNotice}
-				<p>
-					Data on this device was replaced from a backup in another tab. Reload to see it.
-					<button type="button" onclick={() => location.replace(resolve('/timeline'))}
-						>Reload</button
-					>
-				</p>
-			{/if}
-		</div>
+		{#if app.replacedNotice}
+			<p role="status">
+				Data on this device was replaced from a backup in another tab. Reload to see it.
+				<button type="button" onclick={() => location.replace(resolve('/timeline'))}>Reload</button>
+			</p>
+		{/if}
 		{@render children()}
 	</main>
 
