@@ -12,13 +12,60 @@ import { MAX_NOTE_UNITS } from './note-cap';
 import type { Snapshot } from './snapshot';
 import { validateInner } from './validate';
 
-// The validator is the real one; the spy only records whether it ran.
+const encoded = vi.hoisted(() => ({
+	kept: [] as { name: string; buffer: Uint8Array; copy: Uint8Array }[],
+	inValidator: false
+}));
+
+// The validator is the real one; the spy only records whether it ran, and marks the time inside it so the buffers
+// it makes for itself are not counted as the export's.
 vi.mock('./validate', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./validate')>();
-	return { ...real, validateInner: vi.fn(real.validateInner) };
+	return {
+		...real,
+		validateInner: vi.fn((...args: Parameters<typeof real.validateInner>) => {
+			encoded.inValidator = true;
+			try {
+				return real.validateInner(...args);
+			} finally {
+				encoded.inValidator = false;
+			}
+		})
+	};
 });
 
 const validateSpy = vi.mocked(validateInner);
+
+// The real encoders; the wrapper only keeps each buffer it hands out (and a copy of what it held) so a test can look
+// at those buffers after the export.
+const keepBuffer = (name: string, buffer: Uint8Array): Uint8Array => {
+	if (!encoded.inValidator) encoded.kept.push({ name, buffer, copy: buffer.slice() });
+	return buffer;
+};
+vi.mock('../profile/codec', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../profile/codec')>();
+	return {
+		...real,
+		encodeProfile: (...args: Parameters<typeof real.encodeProfile>) =>
+			keepBuffer('profile', real.encodeProfile(...args))
+	};
+});
+vi.mock('../timeline/state-codec', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../timeline/state-codec')>();
+	return {
+		...real,
+		encodeTimelineState: (...args: Parameters<typeof real.encodeTimelineState>) =>
+			keepBuffer('timeline', real.encodeTimelineState(...args))
+	};
+});
+vi.mock('../calendar/codec', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../calendar/codec')>();
+	return {
+		...real,
+		encodeCalendarSyncState: (...args: Parameters<typeof real.encodeCalendarSyncState>) =>
+			keepBuffer('calendar', real.encodeCalendarSyncState(...args))
+	};
+});
 
 type Bag = Record<string, unknown>;
 
@@ -29,6 +76,7 @@ const date = (iso: string) => encodeEaos(parseEaosAtRead(iso));
 
 beforeEach(() => {
 	validateSpy.mockClear();
+	encoded.kept.length = 0;
 });
 
 /** A finished setup as the profile store holds it, backup mark and all. */
@@ -162,6 +210,26 @@ describe('buildExportInner: what a person exports', () => {
 			exclusions: { taskIds: ['job-search', 'tap-course'], categories: ['finance', 'medical'] }
 		});
 		expect(validateInner(parse(bytes)).ok).toBe(true);
+	});
+
+	// The encoders hand back the person's dates and notes as bytes; once the export has read them they have no use, so
+	// none may linger in memory after the export.
+	it('an export leaves no profile, timeline or calendar plaintext behind in the encoder buffers', () => {
+		const timeline: TimelineState = {
+			schemaVersion: 1,
+			tasks: { 'tap-course': { notes: 'Call the TAP office' } }
+		};
+		const calendar: CalendarSyncState = {
+			schemaVersion: 1,
+			exclusions: { taskIds: ['job-search'], categories: ['finance'] }
+		};
+		exported(snapshot({ timeline, calendar }));
+
+		expect(encoded.kept.map((k) => k.name).sort()).toEqual(['calendar', 'profile', 'timeline']);
+		for (const { buffer, copy } of encoded.kept) {
+			expect(copy.some((byte) => byte !== 0)).toBe(true);
+			expect(buffer.every((byte) => byte === 0)).toBe(true);
+		}
 	});
 
 	it('createdAt is written as given', () => {

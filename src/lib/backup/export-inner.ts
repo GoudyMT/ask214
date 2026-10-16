@@ -17,8 +17,17 @@ export type ExportInnerResult =
 // The number the log carries for each store: fields hold numbers, never text.
 const STORE_INDEX: Record<RefusedStore, number> = { profile: 0, timeline: 1, calendar: 2 };
 
-/** The JSON object a shipped encoder writes for a record, which is the shape the file holds. */
-const asJson = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder().decode(bytes));
+/**
+ * The JSON object a shipped encoder writes for a record, which is the shape the file holds. The encoder's bytes have
+ * no use once they are read, so they are zeroed, whether or not the read succeeds.
+ */
+function asJson(bytes: Uint8Array): unknown {
+	try {
+		return JSON.parse(new TextDecoder().decode(bytes));
+	} finally {
+		bytes.fill(0);
+	}
+}
 
 const encodedLength = (value: string): number =>
 	new TextEncoder().encode(JSON.stringify(value)).length;
