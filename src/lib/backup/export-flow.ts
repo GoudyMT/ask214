@@ -406,7 +406,7 @@ export class ExportFlow {
 		// The click is synchronous and cannot be taken back: committed from here.
 		run.enter('saved');
 		await this.#markBackup(run, prepared);
-		run.enter('done');
+		this.#finish(run);
 		return { kind: 'saved', fileName: prepared.fileName, readBack: 'download' };
 	}
 
@@ -447,14 +447,23 @@ export class ExportFlow {
 			await closing;
 		} catch {
 			// Nothing is on the device, and the words are already gone, so the session ends here.
-			run.enter('done');
+			this.#finish(run);
 			return { kind: 'failed', code: 'E_SAVE_FAILED' };
 		}
 		await this.#markBackup(run, prepared);
 		run.enter('checking');
 		const readBack = await this.#readBack(handle, prepared.text);
-		run.enter('done');
+		this.#finish(run);
 		return { kind: 'saved', fileName, readBack };
+	}
+
+	/**
+	 * Past the commit nothing secret is left and the result is handed back to the card, so the session ends here: the
+	 * next row (a Check of this very file) can start at once, and no words or time stamp outlive the backup.
+	 */
+	#finish(run: Run): void {
+		run.enter('done');
+		this.#deps.session.end();
 	}
 
 	/**

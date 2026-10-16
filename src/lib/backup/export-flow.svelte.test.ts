@@ -441,6 +441,7 @@ describe('a saved file', () => {
 		await timeline.setStatus('va-gov-account', 'done');
 		const f = fakeFile();
 		const { session, flow } = await rig(pickerOf(f.handle));
+		const backupAt = session.backupAt;
 
 		expect(await submit(flow, '  Bamboo COPPER harvest\tlantern oxygen thimble ')).toEqual(SAVED);
 
@@ -453,7 +454,7 @@ describe('a saved file', () => {
 		if (!opened.ok) throw new Error('E_TEST_OPEN');
 		const checked = validateInner(opened.inner);
 		if (!checked.ok) throw new Error('E_TEST_VALID');
-		expect(checked.inner.createdAt).toBe(session.backupAt);
+		expect(checked.inner.createdAt).toBe(backupAt);
 		expect(checked.inner.stores.profile.setupIntent).toBe('completed');
 		expect(checked.inner.stores['timeline-state']?.tasks).toEqual({
 			'va-gov-account': { status: 'done' }
@@ -523,23 +524,35 @@ describe('a saved file', () => {
 			phaseAtClick = session.phase;
 		});
 
+		const fileName = session.names?.fileName;
+		const backupAt = session.backupAt;
+
 		const result = await submit(flow);
 
-		expect(result).toEqual({
-			kind: 'saved',
-			fileName: session.names?.fileName,
-			readBack: 'download'
-		});
+		expect(result).toEqual({ kind: 'saved', fileName, readBack: 'download' });
 		expect(download).toHaveBeenCalledTimes(1);
-		expect(download.mock.calls[0]?.[0]).toBe(session.names?.fileName);
+		expect(download.mock.calls[0]?.[0]).toBe(fileName);
 		expect(await readBackupFile(new File([download.mock.calls[0]?.[1] ?? ''], 'x'))).toMatchObject({
 			ok: true
 		});
 		expect(phaseAtClick).toBe('writing');
 		expect(phaseAtMark).toBe('saved');
 		expect(wordsAtMark).toBeNull();
-		expect(session.phase).toBe('done');
-		expect((await readDeviceState(db)).mark?.at).toBe(session.backupAt);
+		expect((await readDeviceState(db)).mark?.at).toBe(backupAt);
+	});
+
+	// "Check this backup now": the result is returned, so the session can end at once and the Check can start right after.
+	it('the session is over after a save, and a Check can start at once', async () => {
+		const { session, flow } = await rig(pickerOf(fakeFile().handle));
+
+		expect(await submit(flow)).toEqual(SAVED);
+
+		expect(session.phase).toBe('idle');
+		expect(session.busy).toBe(false);
+		expect(session.words).toBeNull();
+		session.start({ ...APP, joinRelock: () => () => {} }, 'check');
+		expect(session.kind).toBe('check');
+		expect(session.phase).toBe('getting-ready');
 	});
 });
 
@@ -614,7 +627,7 @@ describe('the commit point', () => {
 
 		expect(f.content).toBe('');
 		expect((await readDeviceState(db)).mark).toBeNull();
-		expect(session.phase).toBe('done');
+		expect(session.phase).toBe('idle');
 		expect(session.committing).toBe(false);
 		expect(session.busy).toBe(false);
 	});
@@ -732,7 +745,7 @@ describe('checking the file after it is saved', () => {
 
 			expect(await within(submit(flow))).toEqual({ ...SAVED, readBack: 'not-checked' });
 
-			expect(session.phase).toBe('done');
+			expect(session.phase).toBe('idle');
 			expect((await readDeviceState(db)).mark).not.toBeNull();
 		}
 	);
