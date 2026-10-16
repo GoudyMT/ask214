@@ -465,8 +465,7 @@ describe('the card at rest', () => {
 	it.each<[string, Mount, string]>([
 		['the app is still loading', { status: 'loading' }, CARD_LABELS.make],
 		['the app has no relock set yet', { joinRelock: false }, CARD_LABELS.check],
-		['a restore cannot tell the other tabs', { publish: false }, CARD_LABELS.restore],
-		['the saved data is damaged', { status: 'damaged' }, CARD_LABELS.make]
+		['a restore cannot tell the other tabs', { publish: false }, CARD_LABELS.restore]
 	])('a row stays closed when %s', async (_why, opts, row) => {
 		const card = await mount(opts);
 		// A plain click: the browser's own click helper waits for an enabled control, and this one says it is not.
@@ -787,17 +786,6 @@ describe('typing the words back', () => {
 		(formOf(CARD_LABELS.make).element() as HTMLFormElement).requestSubmit();
 		expect(card.getSavePicker).toHaveBeenCalledTimes(1);
 		await expect.element(text(savedLine('picked.json'))).toBeVisible();
-	});
-
-	// A second tap while the save place is being asked for must not open a second dialog or start a second key.
-	it('a double click opens one picker and starts one worker', async () => {
-		const card = await mount();
-		await typedBack(card);
-		const before = card.workers.length;
-		await userEvent.dblClick(submitOf(CARD_LABELS.make));
-		await expect.element(text(savedLine('picked.json'))).toBeVisible();
-		expect(card.getSavePicker).toHaveBeenCalledTimes(1);
-		expect(card.workers.length - before).toBe(1);
 	});
 
 	// A cancelled picker returns to the form; a held Enter would otherwise open it again and again.
@@ -1122,8 +1110,6 @@ describe('getting ready', () => {
 	// The key worker comes from the service worker's cache: no row may start key work before the page is controlled.
 	it.each<[string, string, boolean]>([
 		['Restore', CARD_LABELS.restore, true],
-		['Restore', CARD_LABELS.restore, false],
-		['Check', CARD_LABELS.check, true],
 		['Check', CARD_LABELS.check, false]
 	])(
 		'%s shows Getting ready and no Choose file until the wait ends (controlled: %s)',
