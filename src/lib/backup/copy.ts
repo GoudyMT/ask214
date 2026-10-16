@@ -42,9 +42,9 @@ export const COPY_OWED: readonly Readonly<{ code: BackupCode; path: TextPath }>[
 	Object.freeze({ code: 'E_BACKUP_UNAVAILABLE', path: 'restore' } as const)
 ]);
 
-// The shape of the label the app gives a backup: a date and four characters. Anything else could be a pasted
-// passphrase, so it is never printed.
-const LABEL_SHAPE = /^Ask 214 backup [0-9]{4}-[0-9]{2}-[0-9]{2} [A-Z0-9]{4}$/;
+// The shape of the label the app gives a backup: a date and four base32 characters (A-Z and 2-7). Anything else
+// could be a pasted passphrase, so it is never printed.
+const LABEL_SHAPE = /^Ask 214 backup [0-9]{4}-[0-9]{2}-[0-9]{2} [A-Z2-7]{4}$/;
 
 function bad(): never {
 	throw new Error('E_INTERNAL');

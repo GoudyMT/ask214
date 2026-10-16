@@ -422,6 +422,7 @@ describe('backupMessage parameters', () => {
 			'Ask 214 backup 2026-10-15 K7Q',
 			'Ask 214 backup 2026-10-15 K7QMX',
 			'Ask 214 backup 2026-10-15 k7qm',
+			'Ask 214 backup 2026-10-15 0189',
 			'Ask 214 backup 26-10-15 K7QM',
 			'Ask 214 backup 2026-10-15  K7QM',
 			''
