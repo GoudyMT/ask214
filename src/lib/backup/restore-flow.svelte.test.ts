@@ -928,16 +928,23 @@ describe('Replace', () => {
 				tx.objectStore('keystore').put({ ...row, recordHmac: mac.buffer });
 			});
 		},
+		// Setup always writes a profile mark, so a device without one is damaged, as the app's own load treats it.
+		missing: async (db: IDBDatabase): Promise<void> => {
+			await withStores(db, 'profile-hwm', 'readwrite', (tx) => {
+				tx.objectStore('profile-hwm').clear();
+			});
+		},
 		changed: async (db: IDBDatabase): Promise<void> => {
 			await withStores(db, 'keystore', 'readwrite', (tx) => {
 				tx.objectStore('keystore').clear();
 			});
 		}
 	};
-	it.each<['damaged' | 'forged' | 'changed', 'checking' | 'Replace', string]>([
+	it.each<['damaged' | 'forged' | 'missing' | 'changed', 'checking' | 'Replace', string]>([
 		['damaged', 'checking', 'E_RESTORE_DEVICE_DAMAGED'],
 		['damaged', 'Replace', 'E_RESTORE_DEVICE_DAMAGED'],
 		['forged', 'checking', 'E_RESTORE_DEVICE_DAMAGED'],
+		['missing', 'checking', 'E_RESTORE_DEVICE_DAMAGED'],
 		['changed', 'checking', 'E_RESTORE_DEVICE_CHANGED'],
 		['changed', 'Replace', 'E_RESTORE_DEVICE_CHANGED']
 	])('a %s device found while %s writes nothing and says why', async (kind, stage, code) => {

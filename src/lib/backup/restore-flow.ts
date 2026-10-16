@@ -437,6 +437,12 @@ export class RestoreFlow {
 			return;
 		}
 		if (!run.isCurrent()) return;
+		// Setup always signs a profile mark, so none at all is damage. The writer refuses it at Replace; say so now
+		// instead of showing "no saved data yet" over a device the app itself would call damaged.
+		if (device.state.ts.profile === null) {
+			this.#failDevice(run, 'E_RESTORE_DEVICE_DAMAGED');
+			return;
+		}
 		const described = describeDevice(device.state, inner.createdAt);
 		const confirm: ConfirmHold = {
 			gens: device.state.gens,
