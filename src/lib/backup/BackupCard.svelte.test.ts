@@ -628,6 +628,30 @@ describe('leaving the app with the words on screen', () => {
 		expect(getComputedStyle(form).display).toBe('none');
 	});
 
+	// Restore and Check hold a passphrase field and the chooser too: away from the app, none of them may show.
+	it.each<['restore' | 'check', string]>([
+		['restore', CARD_LABELS.restore],
+		['check', CARD_LABELS.check]
+	])('a lifecycle hide gives the %s chooser and form computed display none', async (row, name) => {
+		const card = await mount();
+		card.choose(backupFile());
+		await userEvent.click(toggle(name, false));
+		const chooseEl = button(CARD_LABELS.chooseFile).element();
+		expect(getComputedStyle(chooseEl).display).not.toBe('none');
+
+		card.relock('hygiene');
+		expect(getComputedStyle(chooseEl).display).toBe('none');
+		await card.session.refresh();
+
+		await userEvent.click(button(CARD_LABELS.chooseFile));
+		await expect.element(field()).toBeVisible();
+		const form = formOf(name).element();
+		expect(getComputedStyle(form).display).not.toBe('none');
+		card.relock('hygiene');
+		expect(getComputedStyle(form).display).toBe('none');
+		expect(card.session.kind).toBe(row);
+	});
+
 	it('the fields keep their element and their text through a hide, a fill while away, and the way back', async () => {
 		const card = await mount();
 		await typedBack(card, 'bamboo copper');
