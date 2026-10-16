@@ -585,26 +585,29 @@ describe('restoreBackup', () => {
 		expect(onCommitting).not.toHaveBeenCalled();
 	});
 
-	it.each([
-		[
-			'the run signal aborted before the lock',
-			(s: Session) => {
-				s.ctl.abort();
-				return s;
-			}
-		],
-		[
-			'mayCommit false at the commit check',
-			(s: Session) => {
-				s.mayCommit.mockReturnValue(false);
-				return s;
-			}
-		]
-	])('an abort between step 1 and step 7 writes nothing: %s', async (_name, arm) => {
+	it('an abort while the restore waits for the lock stops it at once and writes nothing', async () => {
 		await buildDevice();
 		const expected = await confirmNow();
 		const before = await snapshot();
-		const s = arm(session());
+		const s = session();
+
+		// The keystore lock is held (a save or an erase in another tab), so the restore is queued behind it. The abort
+		// must withdraw the request: waiting for the lock to free would leave the person's cancel unanswered.
+		await navigator.locks.request('mtc-keystore', { mode: 'exclusive' }, async () => {
+			const restoring = restoreBackup(db, fileInner(), expected, s.options);
+			s.ctl.abort();
+			await expect(restoring).rejects.toBeInstanceOf(RunAbortedError);
+		});
+
+		expect(await snapshot()).toEqual(before);
+		expect(s.onCommitting).not.toHaveBeenCalled();
+	});
+
+	it('an abort between step 1 and step 7 writes nothing: mayCommit false at the commit check', async () => {
+		await buildDevice();
+		const expected = await confirmNow();
+		const before = await snapshot();
+		const s = session({ mayCommit: () => false });
 
 		await expect(restoreBackup(db, fileInner(), expected, s.options)).rejects.toBeInstanceOf(
 			RunAbortedError
