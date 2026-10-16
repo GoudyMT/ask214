@@ -698,8 +698,8 @@ describe('relock while committing', () => {
 		expect(h.s.phase).toBe('writing');
 	});
 
-	// Closing the card while the writer is past its point of no return must not reach the writer's signal.
-	it('ending the session while committing leaves the writer run alone', () => {
+	// Closing the card while the writer is past its point of no return must not reach the writer's run or its session.
+	it('ending the session while committing is ignored and the writer run is left alone', () => {
 		const h = harness();
 		startRestore(h);
 		const run = h.s.beginRun() as Run;
@@ -709,7 +709,33 @@ describe('relock while committing', () => {
 		h.s.end();
 		expect(run.signal.aborted).toBe(false);
 		expect(h.s.runId).toBe(id);
-		expect(h.s.phase).toBe('idle');
+		expect(h.s.phase).toBe('writing');
+		expect(h.s.active).toBe(true);
+		expect(h.leave).not.toHaveBeenCalled();
+	});
+
+	// The idle check on coming back must not clear a session whose write has begun; it only notes the reason.
+	it('a refresh after a long absence only records while committing', async () => {
+		const h = harness();
+		startRestore(h);
+		h.s.relockSync('hygiene');
+		const run = h.s.beginRun() as Run;
+		run.enter('writing');
+		h.s.markCommitting();
+		h.clock.advance(IDLE_THRESHOLD_MS);
+		await h.s.refresh();
+		expect(h.s.phase).toBe('writing');
+		expect(run.signal.aborted).toBe(false);
+		expect(h.s.epochMovedBy).toBe('idle');
+		expect(h.s.concealed).toBe(false);
+	});
+
+	// A run from an earlier session must never look current to the next one.
+	it('start moves the run id past every earlier run', () => {
+		const h = harness();
+		const before = h.s.runId;
+		h.s.start(h.app, 'check');
+		expect(h.s.runId).toBeGreaterThan(before);
 	});
 
 	it('a hygiene alone is recorded as hygiene and never overwrites a stronger reason', () => {
@@ -756,11 +782,58 @@ describe('relock while committing', () => {
 		expect([...held.owned]).toEqual([0, 0, 0]);
 		expect(input.value).toBe('');
 		expect(held.writableAbort).not.toHaveBeenCalled();
+		// The ciphertext envelope stays: the read-back compares against it.
+		expect(h.s.held('envelope')).toEqual({ env: true });
 		h.s.relockSync('user');
 		expect(h.s.phase).toBe('saved');
 		expect(h.s.epochMovedBy).toBe('user');
 		expect(held.run.signal.aborted).toBe(false);
 	});
+
+	// A Check or an export that has reached done holds nothing secret; a lock then just closes it, with no LOCKED line.
+	it('entering done drops every secret and a later lock ends the session quietly', async () => {
+		const h = harness();
+		startRestore(h, 'check');
+		const run = h.s.beginRun() as Run;
+		const owned = new Uint8Array([2, 2]);
+		const record = { field: new Uint8Array([3]) };
+		const input = { value: 'words' };
+		h.s.registerInput(input);
+		run.enter('decrypting');
+		run.hold('key', { key: true });
+		run.hold('fileBytes', new Uint8Array([1]));
+		run.own(owned);
+		run.ownRecord(record);
+		run.enter('done');
+		expect(h.s.held('key')).toBeNull();
+		expect(h.s.held('fileBytes')).toBeNull();
+		expect([...owned]).toEqual([0, 0]);
+		expect([...record.field]).toEqual([0]);
+		expect(input.value).toBe('');
+		h.s.relockSync('user');
+		expect(h.s.phase).toBe('idle');
+		expect(h.s.message).toBeNull();
+		expect(h.leave).toHaveBeenCalledTimes(1);
+		h.s.start(h.app, 'check');
+		expect(h.s.active).toBe(true);
+	});
+
+	it.each(['pagehide', 'cardGone', 'end'] as const)(
+		'a %s in done ends the session quietly',
+		(how) => {
+			const h = harness();
+			h.s.start(h.app, 'export');
+			const run = h.s.beginRun() as Run;
+			run.enter('writing');
+			run.enter('saved');
+			run.enter('done');
+			if (how === 'pagehide') h.win.dispatchEvent(new Event('pagehide'));
+			else if (how === 'cardGone') h.s.cardGone();
+			else h.s.end();
+			expect(h.s.phase).toBe('idle');
+			expect(h.s.message).toBeNull();
+		}
+	);
 });
 
 // ---- walk totality -----------------------------------------------------------------------------------------------

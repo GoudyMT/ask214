@@ -34,6 +34,10 @@ import { isWorkerAnswer, type FromWorker, type WorkerRequest } from './worker/pr
  *     `run.ownRecord`: they zero it on the spot and report false.
  * The restore writer takes `run.signal`, `run.mayCommit` and `session.markCommitting`; the last is the writer's
  * synchronous point of no return.
+ *
+ * What the person reads after a stop: a hide, the deadline and another tab's idle lock set their line at once, because
+ * an aborted run can never commit, so "nothing was saved" is already true. Only the person's own Cancel in key work
+ * waits (`stopping`) until the in-flight step has settled, and then reports.
  */
 
 /** How long one stretch of machine work may take. Waiting on a person is never timed. */
@@ -325,7 +329,7 @@ export class BackupSession {
 				this.#record('pagehide');
 				return;
 			}
-			this.#clear('pagehide', 'E_LOCKED');
+			this.#clear('pagehide', this.#lockedLine());
 		} catch {
 			/* a handler of the page leaving never throws */
 		}
@@ -375,6 +379,8 @@ export class BackupSession {
 		}
 		this.#leave = join(this.#relockable);
 		this.#sessionToken += 1;
+		// No run of an earlier session may ever look current to this one.
+		this.runId += 1;
 		this.#stopRunId = -1;
 		this.stopping = false;
 		this.message = null;
@@ -387,9 +393,12 @@ export class BackupSession {
 		this.#deps.getWindow().addEventListener('pagehide', this.#onPageHide);
 	}
 
-	/** Ends the session: drops everything, leaves the relock set. A no-op when idle. */
+	/**
+	 * Ends the session: drops everything, leaves the relock set. A no-op when idle, and while a write is committing,
+	 * which nothing may cut short (the flow ends the session once it reaches `done`).
+	 */
 	end(): void {
-		if (this.phase === 'idle') return;
+		if (this.phase === 'idle' || this.#isCommit()) return;
 		this.#clear('end', null);
 	}
 
@@ -399,11 +408,13 @@ export class BackupSession {
 		const previous = this.#spanOf(this.phase);
 		this.phase = next;
 		if (next === 'saved') this.committing = true;
+		// Past the commit and the read-back there is nothing left to protect from a stop, only a result line to show.
+		if (next === 'done') this.committing = false;
 		const span = this.#spanOf(next);
 		if (span === null) this.#disarm();
 		else if (span !== previous || this.#timer === null) this.#arm();
 		if (next !== 'deriving') this.progress = null;
-		if (next === 'saved' || next === 'committed') this.#dropSecretsAtCommit();
+		if (next === 'saved' || next === 'committed' || next === 'done') this.#dropSecretsAtCommit();
 		return true;
 	}
 
@@ -817,6 +828,13 @@ export class BackupSession {
 			return;
 		}
 		const isKey = PHASE_CLASS[this.phase] === 'KEY';
+		if (this.phase === 'done') {
+			// Nothing secret is held in done: an app switch and another tab idling change nothing, and a real lock just
+			// closes the result without a LOCKED line.
+			if (reason === 'hygiene' || (reason === 'peer' && detail?.peerReason === 'idle')) return;
+			this.#clear(reason, null);
+			return;
+		}
 		if (reason === 'hygiene') {
 			if (isKey) this.#abortToPre('hygiene', 'E_LEFT_APP');
 			else if (this.phase === 'generating') this.#abortToPre('hygiene', null);
@@ -854,8 +872,17 @@ export class BackupSession {
 			wall < this.#hiddenWall ||
 			wall - this.#hiddenWall >= away ||
 			this.#deps.mono() - this.#hiddenMono >= away;
-		if (expired) this.#clear('idle', 'E_LOCKED');
+		if (expired && this.#isCommit()) {
+			// A write that has begun is never cleared from under itself; its words are already gone.
+			this.#record('idle');
+			this.#setConcealed(false);
+		} else if (expired) this.#clear('idle', this.#lockedLine());
 		else this.#setConcealed(false);
+	}
+
+	/** The line a clear leaves behind: a result that was already finished is closed without one. */
+	#lockedLine(): BackupCode | null {
+		return this.phase === 'done' ? null : 'E_LOCKED';
 	}
 
 	#conceal(): void {
@@ -880,7 +907,10 @@ export class BackupSession {
 	}
 
 	#isCommit(): boolean {
-		return this.committing || (this.phase !== 'idle' && PHASE_CLASS[this.phase] === 'COMMIT');
+		return (
+			this.committing ||
+			(this.phase !== 'idle' && this.phase !== 'done' && PHASE_CLASS[this.phase] === 'COMMIT')
+		);
 	}
 
 	/** A relock that cannot touch a committing session is only written down; the first real lock outranks hygiene. */
@@ -989,11 +1019,14 @@ export class BackupSession {
 		for (const record of records) BackupSession.#zeroRecord(record);
 	}
 
-	/** Drops every key holding; `abortWritable` also aborts a half-written file, which a commit must not. */
+	/**
+	 * Drops every key holding. A stop (`abortWritable`) also aborts a half-written file and drops the envelope; a
+	 * commit does neither: the file is being closed, and the ciphertext envelope is what the read-back compares.
+	 */
 	#dropKeyHoldings(abortWritable: boolean): void {
 		const writable = this.#holds.writable as { abort?: () => unknown } | null;
 		this.#holds.key = null;
-		this.#holds.envelope = null;
+		if (abortWritable) this.#holds.envelope = null;
 		this.#holds.confirm = null;
 		this.#holds.writable = null;
 		this.#holds.saveHandle = null;
