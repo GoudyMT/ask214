@@ -29,6 +29,7 @@ export type ErrorCode =
 	| 'E_CLOCK_BACKWARD'
 	| 'E_TIMEOUT'
 	| 'E_INTERNAL'
+	| 'E_EXPORT_SELF_INVALID'
 	| 'E_TEST'; // tests only: no app code logs it, and nothing enforces that
 
 export type SafeLogEntry = {
