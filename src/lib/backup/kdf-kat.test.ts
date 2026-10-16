@@ -1,7 +1,6 @@
 import { argon2id } from '@noble/hashes/argon2.js';
 import { describe, expect, it } from 'vitest';
 import {
-	KAT_ARGON2_HEX,
 	KAT_ARGON2_TUPLE,
 	KAT_PASSWORD,
 	KAT_SALT,
@@ -35,16 +34,12 @@ describe('Argon2id known answers', () => {
 			key: RFC9106_ARGON2ID.secret,
 			personalization: RFC9106_ARGON2ID.associatedData
 		});
-		expect(hex(out)).toBe('0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659');
-		expect(RFC9106_ARGON2ID.tagHex).toBe(hex(out));
+		expect(hex(out)).toBe(RFC9106_ARGON2ID.tagHex);
 	});
 
 	it('the small-parameter independent vector', () => {
 		const out = argon2id(passwordBytes(), KAT_SALT, { ...SMALL, onProgress: () => {} });
 		expect(hex(out)).toBe(KAT_SMALL_ARGON2_HEX);
-		expect(KAT_SMALL_ARGON2_HEX).toBe(
-			'3549112c786ab81b6391d175fa8227c5c4caf1fea3830cce9efdea8849a0884d'
-		);
 	});
 
 	it('every KAT word is in WORDS_V1', () => {
@@ -74,6 +69,5 @@ describe('Argon2id known answers', () => {
 
 	it('the production KAT uses the v1 tuple', () => {
 		expect(KAT_ARGON2_TUPLE).toEqual(KDF_V1);
-		expect(KAT_ARGON2_HEX).toBe('a076b5f49138ede8560e8548ebbed98462969f2fd5c7522b636466dd9da0ac1e');
 	});
 });

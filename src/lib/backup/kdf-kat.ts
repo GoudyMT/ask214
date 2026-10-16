@@ -10,8 +10,8 @@
  *
  * Where each answer is checked:
  * - `KAT_ARGON2_HEX` uses the production tuple (`KAT_ARGON2_TUPLE`, equal to `KDF_V1`). It is too slow for the unit
- *   suite (about 1.4 s in noble, close to the 5 s test limit on a slow runner), so it is checked through the built
- *   worker in a browser test.
+ *   suite (about 1.4 s in noble, close to the 5 s test limit on a slow runner), so the unit suite never runs it.
+ *   TODO: check it through the built worker in a browser test - no built worker bundle exists yet.
  * - `KAT_SMALL_ARGON2_HEX` (t 1, m 64, p 1) and the RFC 9106 vector run in every unit run.
  *
  * The password is six words of the backup list, because the worker refuses any other word before it runs Argon2id; a
