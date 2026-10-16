@@ -94,6 +94,18 @@ describe('makeBackupNames', () => {
 			expect(text, label).toContain(label);
 		}
 	});
+
+	it('each of 0, 1, 8 and 9 in any position of the id renders the no-label text in copy.ts', () => {
+		const noLabel = backupMessage('E_WRONG_PASSPHRASE', { path: 'restore' });
+		for (const digit of ['0', '1', '8', '9']) {
+			for (let position = 0; position < 4; position++) {
+				const id = 'K7Q2'.slice(0, position) + digit + 'K7Q2'.slice(position + 1);
+				const label = 'Ask 214 backup 2026-10-15 ' + id;
+				const text = backupMessage('E_WRONG_PASSPHRASE', { path: 'restore', label });
+				expect(text, label).toBe(noLabel);
+			}
+		}
+	});
 });
 
 describe('makeBackupId', () => {
@@ -159,6 +171,8 @@ describe('parseBackupLabel', () => {
 		['ask214-backup-2026-10-15-1432-K7Q2.json', null],
 		['ask214-backup-2026-10-15-14-32-K7Q2.json', null],
 		['ask214-backup-26-10-15-K7Q2.json', null],
+		['ask214-backup-2026-1O-15-K7Q2.json', null],
+		['ask214-backup-abcd-ef-gh-K7Q2.json', null],
 		['my ask214-backup-2026-10-15-K7Q2.json', null],
 		['downloads/ask214-backup-2026-10-15-K7Q2.json', null],
 		['C:\\downloads\\ask214-backup-2026-10-15-K7Q2.json', null],
