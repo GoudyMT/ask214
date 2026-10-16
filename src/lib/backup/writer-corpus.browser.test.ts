@@ -25,6 +25,8 @@ import { validateInner } from './validate';
 // Every member below is something a screen can really do, driven through the same public setter the screen calls, on a
 // real IndexedDB. A person who makes a backup must never be told that a record the app itself wrote is not fit to
 // export, and a restore must never refuse one. A new public setter on any of the three stores belongs here too.
+// What keeps refused records out of the corpus is state.browser.test.ts: its two setNote tests prove the setter rejects
+// the plan key and a 100,001-unit note and leaves the saved record untouched.
 
 const DAY_MS = 86_400_000;
 
@@ -197,25 +199,30 @@ const TIMELINE_MEMBERS: Member[] = [
 	}
 ];
 
-// The SkillBridge answer is one entry under its own key. A separation date far out makes a "Not sure" early (it comes
-// back as a snooze to a date); a near one makes it late (the steps show).
+// The SkillBridge answer is one entry under its own key. Both screens pass the saved separation date, so a member that
+// needs a different one saves it first. A separation date far out makes a "Not sure" early (it comes back as a snooze to
+// a date); the first-run date, 400 days out, makes it late (the steps show).
 const FAR_DAYS = 700;
-const NEAR_DAYS = 100;
 const ASK_AGAIN_DAYS = 456;
 
 function planMember(
 	name: string,
 	answer: PlanAnswer,
-	separation: (ctx: Ctx) => string,
-	entry: (ctx: Ctx) => Record<string, string>
+	savedEaos: (ctx: Ctx) => string,
+	entry: (ctx: Ctx, eaos: string) => Record<string, string>
 ): Member {
 	return {
 		name: `plan: ${name}`,
 		run: async (ctx) => {
-			await savePlanAnswer(ctx.timeline, answer, separation(ctx), ctx.today);
+			const eaos = savedEaos(ctx);
+			if (eaos !== ctx.eaos) await moveEaos(ctx, eaos);
+			await savePlanAnswer(ctx.timeline, answer, eaos, ctx.today);
 		},
-		holds: (seen) =>
-			expect(seen.snap.timeline?.tasks[SKILLBRIDGE_PLAN_KEY]).toStrictEqual(entry(seen.ctx))
+		holds: (seen) => {
+			const eaos = savedEaos(seen.ctx);
+			expect(text(seen.snap.profile.eaos ?? undefined)).toBe(eaos);
+			expect(seen.snap.timeline?.tasks[SKILLBRIDGE_PLAN_KEY]).toStrictEqual(entry(seen.ctx, eaos));
+		}
 	};
 }
 
@@ -236,15 +243,12 @@ const PLAN_MEMBERS: Member[] = [
 		'not sure, early',
 		'not-sure',
 		(ctx) => addDays(ctx.today, FAR_DAYS),
-		(ctx) => ({
-			status: 'snoozed',
-			snoozeUntil: addDays(addDays(ctx.today, FAR_DAYS), -ASK_AGAIN_DAYS)
-		})
+		(_ctx, eaos) => ({ status: 'snoozed', snoozeUntil: addDays(eaos, -ASK_AGAIN_DAYS) })
 	),
 	planMember(
 		'not sure, late',
 		'not-sure',
-		(ctx) => addDays(ctx.today, NEAR_DAYS),
+		(ctx) => ctx.eaos,
 		() => ({ status: 'snoozed' })
 	)
 ];
@@ -335,8 +339,8 @@ const CALENDAR_MEMBERS: Member[] = [
 			expect(seen.file.calendar?.exclusions.taskIds).toStrictEqual(ALL_TASK_IDS);
 		}
 	},
-	// The toggle that shipped between 2026-07-16 and 2026-10-04 could save a category twice. The setter takes whatever
-	// list it is given, so the same record can still be written through it.
+	// An earlier release's category toggle could save a category twice, so a device can hold this record; the setter
+	// still accepts it.
 	{
 		name: 'calendar: the historic duplicate-category shape, written through setExclusions',
 		run: async (ctx) => {
@@ -454,7 +458,7 @@ const CLOCKS: Clock[] = [
 	{ name: 'real now', deviceAt: () => null },
 	// Set up and saved at the real time, then the clock goes back two days: the saved last-seen time is now ahead.
 	{
-		name: 'two days back after a backup made now',
+		name: 'two days back after a save made now',
 		deviceAt: () => null,
 		memberAt: (real) => real - 2 * DAY_MS
 	},
@@ -573,47 +577,6 @@ describe('every record the public setters can write validates and round-trips un
 				}
 			},
 			120_000
-		);
-	});
-
-	// The setter itself refuses these, so the corpus can never hold a record the file would refuse.
-	describe('the setter refuses what a file cannot hold', () => {
-		const refusals = [
-			{
-				name: 'a note on the SkillBridge plan key',
-				key: SKILLBRIDGE_PLAN_KEY,
-				note: 'x',
-				code: 'E_NOTE_KEY'
-			},
-			{
-				name: `a note of ${MAX_NOTE_UNITS + 1} units`,
-				key: 'job-search',
-				note: 'n'.repeat(MAX_NOTE_UNITS + 1),
-				code: 'E_NOTE_TOO_LONG'
-			}
-		];
-		it.each(refusals)(
-			'$name: the setter rejects and the saved record is untouched',
-			async ({ key, note, code }) => {
-				const db = await openTestDb();
-				let ctx: Ctx | undefined;
-				try {
-					ctx = await finishedDevice(db, CLOCKS[0] as Clock);
-					await ctx.timeline.setNote('va-gov-account', 'kept');
-					await expect(ctx.timeline.setNote(key, note)).rejects.toThrow(code);
-					await exportAndReadBack(db, ctx, {
-						name: 'after the refusal',
-						run: () => Promise.resolve(),
-						holds: (seen) =>
-							expect(seen.snap.timeline?.tasks).toStrictEqual({
-								'va-gov-account': { notes: 'kept' }
-							})
-					});
-				} finally {
-					ctx?.profile.relockSync('hygiene');
-					await deleteTestDb(db);
-				}
-			}
 		);
 	});
 });
