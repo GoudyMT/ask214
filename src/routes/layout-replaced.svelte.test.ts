@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolve } from '$app/paths';
 import type { ProfileApp } from '$lib/profile/context';
 import { createProfileStore } from '$lib/profile/store.svelte';
+import { BackupSession } from '$lib/backup/session.svelte';
 import { createProfileBus } from '$lib/broadcast/bus';
 import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
@@ -215,5 +216,49 @@ describe('the root layout, when another tab restored a backup', () => {
 		app.publish?.({ type: 'data-replaced' });
 
 		await vi.waitFor(() => expect(heard).toEqual(['data-replaced']));
+	});
+});
+
+describe('the root layout, when another tab locks with a backup session open here', () => {
+	/**
+	 * A real session joined through the layout's own joinRelock, and a real store in the "other tab" that broadcasts
+	 * through the same channel, so the reason on the wire is the one a real idle or Lock puts there and the layout's
+	 * relocked handler is the one that passes it on.
+	 */
+	async function sessionAndPeerStore() {
+		await device(true);
+		await render(Layout, { children });
+		const app = await readyApp(true);
+		const session = new BackupSession({ isVisible: () => true, hasFocus: () => true });
+		session.start(app, 'export');
+		await session.showPassphrase();
+		session.enterPhase('typed-back');
+		const peerStore = createProfileStore(db as IDBDatabase, {
+			onBroadcast: (e) => peer?.publish(e)
+		});
+		await peerStore.load();
+		return { app, session, peerStore };
+	}
+
+	// The person is typing the words back here; a background tab timing out must not cost them the session, though the
+	// profile itself still locks everywhere (shipped).
+	it('a peer idle lock leaves a session that holds no key alone', async () => {
+		const { app, session, peerStore } = await sessionAndPeerStore();
+		await peerStore.lock('idle');
+		await vi.waitFor(() => expect(app.store?.lockState).toBe('locked'));
+		expect(session.phase).toBe('typed-back');
+		expect(session.message).toBeNull();
+		expect(session.concealed).toBe(false);
+		expect(session.words).toHaveLength(6);
+		session.end();
+	});
+
+	// Locking by hand is a decision to be rid of what is open, so the same signal without the reason clears the words.
+	it('a peer Lock clears it and says so', async () => {
+		const { session, peerStore } = await sessionAndPeerStore();
+		await peerStore.lock('user');
+		await vi.waitFor(() => expect(session.phase).toBe('idle'));
+		expect(session.message).toBe('E_LOCKED');
+		expect(session.words).toBeNull();
 	});
 });

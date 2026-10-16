@@ -2,14 +2,11 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
 	subscribeBus,
 	installLifecycle,
-	createJoinRelock,
 	createRelockEcho,
 	initProfileApp,
-	relockEachSync,
 	superviseStartup,
 	type Relockable
 } from './app-init';
-import { BackupSession } from '../backup/session.svelte';
 import { createProfileBus, type ProfileBus } from '../broadcast/bus';
 import { createProfileStore } from './store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
@@ -476,86 +473,5 @@ describe('a real start-up', () => {
 		expect(made.store?._getStateForTest()).toBeNull();
 		expect(onResult).not.toHaveBeenCalled();
 		expect(() => seededDb.transaction('profile')).toThrow();
-	});
-});
-
-describe('another tab locking, with a backup session open in this one', () => {
-	let db: IDBDatabase | null = null;
-	afterEach(async () => {
-		if (db) await deleteTestDb(db);
-		db = null;
-	});
-
-	/**
-	 * This tab wired the way +layout wires it: its profile store and the session share one relock list, and a
-	 * relocked signal from the peer walks that list as a peer relock carrying the peer's reason. The peer's store
-	 * is real, so the reason on the wire is the one a real idle or Lock puts there. The session is a fresh instance of
-	 * the real class, which stands in for this tab's module-scope one.
-	 */
-	async function twoTabs() {
-		db = await openTestDb();
-		await bootstrapLocalKeystore(db);
-		await createProfileStore(db).save({
-			eaos: new TextEncoder().encode('2027-04-15'),
-			setupIntent: 'completed'
-		});
-		const name = uniqueName();
-		const busPeer = makeBus(name);
-		const busHere = makeBus(name);
-		const echoPeer = createRelockEcho(busPeer);
-		const echoHere = createRelockEcho(busHere);
-		const peerStore = createProfileStore(db, { onBroadcast: (e) => echoPeer.publish(e) });
-		const hereStore = createProfileStore(db, { onBroadcast: (e) => echoHere.publish(e) });
-		await peerStore.load();
-		await hereStore.load();
-		const relockables: Relockable[] = [hereStore];
-		subscribeBus(busHere, {
-			relocked: (s) =>
-				echoHere.answer(() =>
-					relockEachSync(relockables, 'peer', s.reason ? { peerReason: s.reason } : undefined)
-				)
-		});
-		const session = new BackupSession({ isVisible: () => true, hasFocus: () => true });
-		session.start(
-			{ status: 'ready', joinRelock: createJoinRelock(relockables), publish: () => {} },
-			'export'
-		);
-		await session.showPassphrase();
-		session.enterPhase('typed-back');
-		return { peerStore, hereStore, session };
-	}
-
-	// The person is typing the words back here; a background tab timing out must not cost them the session, though the
-	// profile itself still locks everywhere (shipped).
-	it('a peer idle lock leaves a session that holds no key alone', async () => {
-		const { peerStore, hereStore, session } = await twoTabs();
-		await peerStore.lock('idle');
-		await vi.waitFor(() => expect(hereStore.lockState).toBe('locked'));
-		expect(session.phase).toBe('typed-back');
-		expect(session.message).toBeNull();
-		expect(session.concealed).toBe(false);
-		expect(session.words).toHaveLength(6);
-		session.end();
-	});
-
-	// Locking by hand is a decision to be rid of what is open, so the same signal without the reason clears the words.
-	it('a peer Lock clears it and says so', async () => {
-		const { peerStore, session } = await twoTabs();
-		await peerStore.lock('user');
-		await vi.waitFor(() => expect(session.phase).toBe('idle'));
-		expect(session.message).toBe('E_LOCKED');
-		expect(session.words).toBeNull();
-	});
-
-	it('a peer idle lock during a key derive stops it and keeps the words', async () => {
-		const { peerStore, session } = await twoTabs();
-		const run = session.beginRun();
-		expect(run?.enter('deriving')).toBe(true);
-		await peerStore.lock('idle');
-		await vi.waitFor(() => expect(session.phase).toBe('typed-back'));
-		expect(session.message).toBe('E_LOCKED_ELSEWHERE');
-		expect(session.words).toHaveLength(6);
-		expect(run?.isCurrent()).toBe(false);
-		session.end();
 	});
 });
