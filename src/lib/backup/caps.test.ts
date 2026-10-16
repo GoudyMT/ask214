@@ -36,7 +36,8 @@ describe('backup caps', () => {
 			data: ''
 		});
 		expect(ENVELOPE_FIXED_BYTES).toBe(new TextEncoder().encode(empty).length);
-		// W4 computed 243 for the same envelope; the real serializer agrees.
+		// Pinned: format v1 fixes the layout, so this number moves only with a format change, and then the file limit
+		// must be re-derived on purpose.
 		expect(ENVELOPE_FIXED_BYTES).toBe(243);
 
 		expect(MAX_FILE_BYTES).toBe(ENVELOPE_FIXED_BYTES + MAX_DATA_B64_CHARS + FILE_SLACK_BYTES);

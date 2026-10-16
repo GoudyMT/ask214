@@ -7,6 +7,7 @@ import {
 	ENVELOPE_FIXED_BYTES
 } from './caps';
 import { buildBackupAad } from './aad';
+import { BackupError } from './codes';
 import { serializeEnvelope } from './envelope-json';
 import {
 	newBackupSalt,
@@ -111,6 +112,22 @@ function edit(text: string, fn: (e: Env) => void): string {
 	const parsed = JSON.parse(text) as Env;
 	fn(parsed);
 	return JSON.stringify(parsed);
+}
+
+// A well-formed envelope around `ctBytes` zero bytes of "ciphertext" whose check is valid for them, so a test can
+// reach every rule that sits before or after the check on its own. It is never decrypted.
+async function handBuilt(ctBytes: number): Promise<string> {
+	const salt = counting(16);
+	const iv = counting(12);
+	const ct = new Uint8Array(ctBytes);
+	const aad = enc.encode(buildBackupAad(salt, iv));
+	const check = await sha256(concat(aad, ct));
+	return serializeEnvelope({
+		salt: toB64(salt),
+		iv: toB64(iv),
+		check: toB64(check),
+		data: toB64(ct)
+	});
 }
 
 function flip(o: Record<string, unknown>, k: string): void {
@@ -245,10 +262,6 @@ describe('field mutations are DAMAGED', () => {
 		['salt a number', (e) => (e.kdf['salt'] = 5)],
 		['check a number', (e) => (e['check'] = 5)],
 		['data a number', (e) => (e['data'] = 5)],
-		['data empty', (e) => (e['data'] = '')],
-		['data 4111 bytes', (e) => (e['data'] = toB64(counting(4111)))],
-		['data 4113 bytes', (e) => (e['data'] = toB64(counting(4113)))],
-		['data 4128 bytes (not 16 past a 4096 multiple)', (e) => (e['data'] = toB64(counting(4128)))],
 		['version missing', (e) => delete e['version']],
 		['version 0', (e) => (e['version'] = 0)],
 		['version -1', (e) => (e['version'] = -1)],
@@ -260,6 +273,26 @@ describe('field mutations are DAMAGED', () => {
 	it.each(rows)('%s', async (_name, mutate) => {
 		const r = await readBackupFile(fileOf(edit(good, mutate)));
 		expect(r).toEqual({ ok: false, code: 'E_DAMAGED' });
+	});
+
+	// Each file below carries a VALID check for its own data, so only the data-shape rule (at least one pad block plus
+	// the tag, and 16 past a multiple of 4,096) can refuse it; the check cannot.
+	it.each([
+		[0, 'empty'],
+		[16, 'a tag alone, below the minimum'],
+		[4111, 'one byte under the minimum'],
+		[4113, 'one byte over a valid length'],
+		[4128, 'a multiple of 16 but not 16 past a 4096 multiple'],
+		[8192, 'a whole number of blocks with no tag'],
+		[8209, 'one byte over the second valid length']
+	])('data of %i bytes (%s) with a valid check is DAMAGED', async (bytes) => {
+		const r = await readBackupFile(fileOf(await handBuilt(bytes)));
+		expect(r).toEqual({ ok: false, code: 'E_DAMAGED' });
+	});
+
+	it.each([4112, 8208])('data of %i bytes with a valid check is accepted', async (bytes) => {
+		const r = await readBackupFile(fileOf(await handBuilt(bytes)));
+		expect(r.ok).toBe(true);
 	});
 
 	it('an own __proto__ key', async () => {
@@ -440,19 +473,19 @@ describe('not a backup', () => {
 });
 
 describe('size caps', () => {
-	async function handBuilt(ctBytes: number): Promise<string> {
-		const salt = counting(16);
-		const iv = counting(12);
-		const ct = new Uint8Array(ctBytes);
-		const aad = enc.encode(buildBackupAad(salt, iv));
-		const check = await sha256(concat(aad, ct));
-		return serializeEnvelope({
-			salt: toB64(salt),
-			iv: toB64(iv),
-			check: toB64(check),
-			data: toB64(ct)
-		});
-	}
+	it('a file of exactly MAX_FILE_BYTES is read', async () => {
+		const padded = good + ' '.repeat(MAX_FILE_BYTES - good.length);
+		const file = fileOf(padded);
+		expect(file.size).toBe(MAX_FILE_BYTES);
+		const r = await readBackupFile(file);
+		expect(r.ok).toBe(true);
+	});
+
+	it('a file of MAX_FILE_BYTES + 1 of whitespace-padded JSON is refused', async () => {
+		const file = fileOf(good + ' '.repeat(MAX_FILE_BYTES + 1 - good.length));
+		expect(file.size).toBe(MAX_FILE_BYTES + 1);
+		expect(await readBackupFile(file)).toEqual({ ok: false, code: 'E_FILE_TOO_LARGE' });
+	});
 
 	it('with FILE_SLACK_BYTES mocked to 8192, a ciphertext one 4,096-byte bucket over the cap is FILE_TOO_LARGE', async () => {
 		const text = await handBuilt(MAX_CIPHERTEXT_BYTES + 4096);
@@ -584,9 +617,13 @@ describe('padding and wiping', () => {
 	});
 
 	it('inner over the cap throws E_CONTENT_TOO_LARGE', async () => {
-		await expect(
-			sealEnvelope(keyA, new Uint8Array(MAX_PADDED_PLAINTEXT_BYTES + 1), SALT)
-		).rejects.toThrow('E_CONTENT_TOO_LARGE');
+		const err = await sealEnvelope(
+			keyA,
+			new Uint8Array(MAX_PADDED_PLAINTEXT_BYTES + 1),
+			SALT
+		).catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(BackupError);
+		expect((err as BackupError).code).toBe('E_CONTENT_TOO_LARGE');
 		expect(seams.plaintexts).toHaveLength(0);
 	});
 
@@ -678,7 +715,7 @@ describe('no result or error carries file text', () => {
 			new Uint8Array(MAX_PADDED_PLAINTEXT_BYTES + 1),
 			SALT
 		).catch((e: unknown) => e);
-		expect(err).toBeInstanceOf(Error);
-		expect((err as Error).message).toBe('E_CONTENT_TOO_LARGE');
+		expect(err).toBeInstanceOf(BackupError);
+		expect((err as BackupError).message).toBe('E_CONTENT_TOO_LARGE');
 	});
 });

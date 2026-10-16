@@ -1,5 +1,6 @@
 import { aesGcmEncrypt, aesGcmDecrypt, AesGcmAuthError } from '../crypto/aes-gcm';
 import { buildBackupAad } from './aad';
+import { BackupError } from './codes';
 import {
 	MAX_PADDED_PLAINTEXT_BYTES,
 	MAX_CIPHERTEXT_BYTES,
@@ -106,7 +107,7 @@ export async function sealEnvelope(
 	salt: Uint8Array
 ): Promise<string> {
 	// The export flow checks first and names the task; this is the guard behind it.
-	if (inner.length > MAX_PADDED_PLAINTEXT_BYTES) throw new Error('E_CONTENT_TOO_LARGE');
+	if (inner.length > MAX_PADDED_PLAINTEXT_BYTES) throw new BackupError('E_CONTENT_TOO_LARGE');
 	const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
 	const aad = new TextEncoder().encode(buildBackupAad(salt, iv));
 	const paddedLength = Math.max(
