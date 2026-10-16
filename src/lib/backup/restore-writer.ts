@@ -187,6 +187,9 @@ async function replaceStores(
 			}
 			throw e;
 		}
+		// Setup always signs a profile mark, so none at all is damage, and the app treats it so on every load. Replacing
+		// the data around it would hand a second tab the chance to save over the restore.
+		if (state.ts.profile === null) return fail('E_RESTORE_DEVICE_DAMAGED');
 		if (
 			state.gens.profile !== expected.gens.profile ||
 			state.gens.timeline !== expected.gens.timeline ||

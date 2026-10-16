@@ -519,12 +519,30 @@ describe('restoreBackup', () => {
 		expect(onCommitting).not.toHaveBeenCalled();
 	});
 
-	it('a tampered device sidecar returns DEVICE_DAMAGED and writes nothing', async () => {
+	it.each([
+		[
+			'a tampered device sidecar',
+			async (expected: RestoreExpected) => {
+				const row = need(await readRaw('timeline-state-hwm'));
+				const payload = row.payload as Bag;
+				await putRaw('timeline-state-hwm', { ...row, payload: { ...payload, generation: 99 } });
+				return expected;
+			}
+		],
+		[
+			// The app calls this device damaged on every load, so a restore must not paper over it: a second tab would
+			// then save over the restored data. A confirm built on it reads the missing mark as generation 0.
+			'a profile mark that is missing',
+			async (expected: RestoreExpected) => {
+				await withStores(db, 'profile-hwm', 'readwrite', (tx) => {
+					tx.objectStore('profile-hwm').clear();
+				});
+				return { ...expected, gens: { ...expected.gens, profile: 0 } };
+			}
+		]
+	])('%s returns DEVICE_DAMAGED and writes nothing', async (_name, damage) => {
 		await buildDevice();
-		const expected = await confirmNow();
-		const row = need(await readRaw('timeline-state-hwm'));
-		const payload = row.payload as Bag;
-		await putRaw('timeline-state-hwm', { ...row, payload: { ...payload, generation: 99 } });
+		const expected = await damage(await confirmNow());
 		const before = await snapshot();
 		const { options, onCommitting } = session();
 
