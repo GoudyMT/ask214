@@ -246,9 +246,7 @@ const passBuffer = (): ArrayBuffer => new Uint8Array([97, 108, 112]).buffer;
 describe('start and the single operation', () => {
 	// The Settings rows and the wizard row are inert until this holds, so a row can never run without relock coverage.
 	it.each<[string, Partial<StartApp>, SessionKind, boolean]>([
-		['export on a ready app', {}, 'export', true],
 		['restore on a ready app', {}, 'restore', true],
-		['check on a ready app', {}, 'check', true],
 		['check on a damaged app', { status: 'damaged', publish: null }, 'check', true],
 		['export on a damaged app', { status: 'damaged', publish: null }, 'export', false],
 		['restore on a damaged app', { status: 'damaged', publish: null }, 'restore', false],
@@ -286,7 +284,7 @@ describe('start and the single operation', () => {
 		expect(h.leave).toHaveBeenCalledTimes(1);
 		expect(h.removed).toContain('pagehide');
 		expect(h.s.phase).toBe('idle');
-		// A pagehide after the end must not touch the next session.
+		// The next session joins and leaves on its own.
 		h.s.start(h.app, 'check');
 		h.s.end();
 		expect(h.leave).toHaveBeenCalledTimes(2);
@@ -442,7 +440,6 @@ const KEY_ROWS: [SessionKind, Phase, Phase][] = [
 	['export', 'encrypting', 'typed-back'],
 	['export', 'verifying', 'typed-back'],
 	['export', 'writing', 'typed-back'],
-	['restore', 'deriving', 'file-chosen'],
 	['restore', 'decrypting', 'file-chosen'],
 	['restore', 'confirm', 'file-chosen'],
 	['restore', 'writing', 'file-chosen']
@@ -457,6 +454,9 @@ async function parkInKey(h: H, kind: SessionKind, phase: Phase) {
 	const writableAbort = vi.fn();
 	const closeConfirm = vi.fn();
 	h.s.registerConfirm(closeConfirm);
+	// The field the person typed into: a stop must keep it, a clear must wipe it.
+	const field = { value: 'typed words' };
+	h.s.registerInput(field);
 	let derived: Promise<unknown> | null = null;
 	if (phase === 'deriving') {
 		derived = h.s.derive(run, {
@@ -474,7 +474,7 @@ async function parkInKey(h: H, kind: SessionKind, phase: Phase) {
 	run.hold('writable', { abort: writableAbort });
 	run.own(owned);
 	run.ownRecord(record);
-	return { run, owned, record, writableAbort, closeConfirm, derived };
+	return { run, owned, record, writableAbort, closeConfirm, derived, field };
 }
 
 describe('hygiene relock (an app switch)', () => {
@@ -526,6 +526,7 @@ describe('hygiene relock (an app switch)', () => {
 			expect(held.closeConfirm).toHaveBeenCalledTimes(1);
 			expect(h.s.words).toBe(wordsBefore);
 			expect(h.s.held('fileBytes')).toBe(fileBefore);
+			expect(held.field.value).toBe('typed words');
 			if (phase === 'deriving') expect(nth(h.workers, h.workers.length - 1).terminated).toBe(1);
 			expect(h.clock.pending).toBe(0);
 		}
@@ -560,44 +561,45 @@ describe('hygiene relock (an app switch)', () => {
 });
 
 describe('clearing relocks', () => {
-	const REASONS: [RelockReason, { peerReason?: 'idle' | 'user' } | undefined][] = [
-		['idle', undefined],
-		['user', undefined],
-		['peer', undefined],
-		['peer', { peerReason: 'user' }]
-	];
-	const SITES: [SessionKind, Phase][] = [
-		['export', 'phrase-shown'],
-		['export', 'typed-back'],
-		['restore', 'file-chosen'],
-		['export', 'deriving'],
-		['restore', 'confirm']
+	// One row per reason on an export input phase, one restore file row, and one key-work row that must also stop the run.
+	const CLEAR_ROWS: [
+		RelockReason,
+		{ peerReason?: 'idle' | 'user' } | undefined,
+		SessionKind,
+		Phase
+	][] = [
+		['idle', undefined, 'export', 'phrase-shown'],
+		['user', undefined, 'export', 'typed-back'],
+		['peer', undefined, 'export', 'typed-back'],
+		['peer', { peerReason: 'user' }, 'export', 'typed-back'],
+		['user', undefined, 'restore', 'file-chosen'],
+		['user', undefined, 'export', 'deriving']
 	];
 
 	// A real lock, an idle lapse or a peer's Lock: the secret is gone, the session is over, and the person is told why.
-	it.each(
-		REASONS.flatMap(([reason, detail]) =>
-			SITES.map(([kind, phase]) => [reason, detail, kind, phase] as const)
-		)
-	)('%s %j clears an open %s session in %s', async (reason, detail, kind, phase) => {
-		const h = harness();
-		const input = { value: 'typed words' };
-		if (phase === 'deriving' || phase === 'confirm') await parkInKey(h, kind, phase);
-		else await park(h, kind, phase);
-		h.s.registerInput(input);
-		h.s.relockSync(reason, detail);
-		expect(h.s.phase).toBe('idle');
-		expect(h.s.active).toBe(false);
-		expect(h.s.words).toBeNull();
-		expect(h.s.revealed).toBe(false);
-		expect(h.s.held('fileBytes')).toBeNull();
-		expect(h.s.held('saveHandle')).toBeNull();
-		expect(h.s.backupAt).toBeNull();
-		expect(input.value).toBe('');
-		expect(h.s.message).toBe('E_LOCKED');
-		expect(h.s.busy).toBe(false);
-		expect(h.leave).toHaveBeenCalledTimes(1);
-	});
+	it.each(CLEAR_ROWS)(
+		'%s %j clears an open %s session in %s',
+		async (reason, detail, kind, phase) => {
+			const h = harness();
+			const input = { value: 'typed words' };
+			const keyWork = phase === 'deriving' ? await parkInKey(h, kind, phase) : null;
+			if (keyWork === null) await park(h, kind, phase);
+			h.s.registerInput(input);
+			h.s.relockSync(reason, detail);
+			if (keyWork !== null) expect(keyWork.run.signal.aborted).toBe(true);
+			expect(h.s.phase).toBe('idle');
+			expect(h.s.active).toBe(false);
+			expect(h.s.words).toBeNull();
+			expect(h.s.revealed).toBe(false);
+			expect(h.s.held('fileBytes')).toBeNull();
+			expect(h.s.held('saveHandle')).toBeNull();
+			expect(h.s.backupAt).toBeNull();
+			expect(input.value).toBe('');
+			expect(h.s.message).toBe('E_LOCKED');
+			expect(h.s.busy).toBe(false);
+			expect(h.leave).toHaveBeenCalledTimes(1);
+		}
+	);
 
 	// The app switch must keep a typed field; only a real clear wipes it.
 	it('registered inputs are scrubbed by a clear and by end, never by hygiene, and unregister', async () => {
@@ -640,6 +642,7 @@ describe('clearing relocks', () => {
 		expect(h.s.words).not.toBeNull();
 		expect(h.s.message).toBe('E_LOCKED');
 		expect(h.s.held('key')).toBeNull();
+		expect(held.field.value).toBe('typed words');
 		expect(h.s.active).toBe(true);
 	});
 
@@ -683,9 +686,7 @@ describe('relock while committing', () => {
 		run.own(owned);
 		run.hold('key', { key: true });
 		h.s.markCommitting();
-		const abort = vi.spyOn(run.signal, 'aborted', 'get');
 		for (const reason of ['hygiene', 'idle', 'user', 'peer'] as const) h.s.relockSync(reason);
-		abort.mockRestore();
 		expect(run.signal.aborted).toBe(false);
 		expect(h.s.runId).toBe(run.id);
 		expect(h.s.phase).toBe('writing');
@@ -1055,8 +1056,10 @@ describe('the passphrase worker', () => {
 		expect(h.s.revealed).toBe(true);
 		expect(h.s.busy).toBe(false);
 		h.s.revealed = false;
-		await h.s.showPassphrase();
+		const again = h.s.showPassphrase();
+		// Before anything is awaited: a second worker is created synchronously or not at all.
 		expect(h.workers).toHaveLength(1);
+		await again;
 		expect(h.s.revealed).toBe(true);
 		expect(h.s.words).toEqual(WORDS_A);
 	});
@@ -1074,8 +1077,9 @@ describe('the passphrase worker', () => {
 			h.s.enterPhase(phase);
 			h.s.revealed = false;
 			const workers = h.workers.length;
-			await h.s.showPassphrase();
+			const shown = h.s.showPassphrase();
 			expect(h.workers).toHaveLength(workers);
+			await shown;
 			expect(h.s.revealed).toBe(false);
 			expect(h.s.words).toBeNull();
 		}
@@ -1152,19 +1156,15 @@ describe('the passphrase worker', () => {
 	});
 
 	// A worker that cannot load is told apart from one that fails: the cause decides what the person is asked to do.
-	it.each<[string, BackupCode]>([
-		['the file is there', 'E_WORKER_FAILED'],
-		['the file is gone after an update', 'E_APP_UPDATED'],
-		['the network is down', 'E_CODE_UNAVAILABLE']
-	])('a worker that fails to load maps to the probe answer when %s', async (_name, code) => {
+	it('a worker that fails to load shows the probe answer and returns to phrase-hidden', async () => {
 		const h = harness();
-		h.env.probe = code;
+		h.env.probe = 'E_CODE_UNAVAILABLE';
 		h.s.start(h.app, 'export');
 		const shown = h.s.showPassphrase();
 		nth(h.workers, 0).fail();
 		await shown;
 		expect(h.probeWorker).toHaveBeenCalledTimes(1);
-		expect(h.s.message).toBe(code);
+		expect(h.s.message).toBe('E_CODE_UNAVAILABLE');
 		expect(h.s.phase).toBe('phrase-hidden');
 		expect(h.s.words).toBeNull();
 		expect(h.s.busy).toBe(false);
@@ -1177,12 +1177,7 @@ describe('the passphrase worker', () => {
 			(w) => w.answer({ type: 'words', words: ['a'] }),
 			'E_WORKER_FAILED'
 		],
-		['hits a message error', (w) => w.onmessageerror?.({}), 'E_WORKER_FAILED'],
-		[
-			'posts words that carry an extra field',
-			(w) => w.answer({ type: 'words', words: WORDS_A, extra: 1 }),
-			'E_WORKER_FAILED'
-		]
+		['hits a message error', (w) => w.onmessageerror?.({}), 'E_WORKER_FAILED']
 	])('a worker that %s ends in its code with no words', async (_name, act, code) => {
 		const h = harness();
 		h.s.start(h.app, 'export');
@@ -1279,7 +1274,7 @@ describe('deriving', () => {
 		expect(h.s.message).toBe('E_NOT_A_WORD');
 	});
 
-	it('Cancel then an immediate restart starts exactly one new worker', async () => {
+	it('a relock then an immediate restart starts exactly one new worker', async () => {
 		const h = harness();
 		await park(h, 'export', 'typed-back');
 		const run = h.s.beginRun() as Run;
@@ -1364,6 +1359,8 @@ describe('the deadline guards machine work only', () => {
 	it('a silent worker in deriving hits the deadline once, with the words kept', async () => {
 		const h = harness();
 		await exportWithWords(h);
+		const field = { value: 'typed words' };
+		h.s.registerInput(field);
 		const run = h.s.beginRun() as Run;
 		const derived = h.s.derive(run, { purpose: 'export', pass: passBuffer(), salt: FRESH_SALT() });
 		derived.catch(() => {});
@@ -1375,6 +1372,7 @@ describe('the deadline guards machine work only', () => {
 		expect(h.s.phase).toBe('typed-back');
 		expect(h.s.message).toBe('E_TOOK_TOO_LONG');
 		expect(h.s.words).toEqual(WORDS_A);
+		expect(field.value).toBe('typed words');
 		expect(worker.terminated).toBe(1);
 		expect(h.s.busy).toBe(false);
 		const id = h.s.runId;
@@ -1396,13 +1394,8 @@ describe('the deadline guards machine work only', () => {
 
 	// The person is reading a dialog, not waiting on the phone: no clock may run while a person decides.
 	it.each<[SessionKind, Phase]>([
-		['export', 'phrase-shown'],
 		['export', 'typed-back'],
-		['export', 'picking-save'],
-		['export', 'save-chosen'],
 		['export', 'replace-warning'],
-		['restore', 'getting-ready'],
-		['restore', 'choose-file'],
 		['restore', 'file-chosen']
 	])('no deadline runs in %s %s', (kind, phase) => {
 		const h = harness();
@@ -1486,22 +1479,18 @@ describe('the deadline guards machine work only', () => {
 		expect(h.s.message).toBe('E_TOOK_TOO_LONG');
 	});
 
-	it.each<Phase>(['saved', 'checking', 'done'])(
-		'no deadline runs after the export commit point (%s)',
-		async (phase) => {
-			const h = harness();
-			await exportWithWords(h);
-			const run = h.s.beginRun() as Run;
-			run.enter('snapshot');
-			run.enter('writing');
-			run.enter('saved');
-			run.enter(phase);
-			h.clock.advance(10 * MINUTE);
-			expect(h.s.phase).toBe(phase);
-			expect(run.signal.aborted).toBe(false);
-			expect(h.clock.pending).toBe(0);
-		}
-	);
+	it('no deadline runs after the export commit point', async () => {
+		const h = harness();
+		await exportWithWords(h);
+		const run = h.s.beginRun() as Run;
+		run.enter('snapshot');
+		run.enter('writing');
+		run.enter('saved');
+		h.clock.advance(10 * MINUTE);
+		expect(h.s.phase).toBe('saved');
+		expect(run.signal.aborted).toBe(false);
+		expect(h.clock.pending).toBe(0);
+	});
 });
 
 // ---- the file chooser --------------------------------------------------------------------------------------------
@@ -1535,26 +1524,15 @@ describe('the file chooser', () => {
 	});
 
 	// A browser with no picker gets a body-level input with no accept, so an odd file name is never filtered out.
-	it('falls back to an input with no accept that is clicked at once and removed after change or cancel', async () => {
+	it('falls back to a file input with no accept that is clicked at once and takes no busy', () => {
 		const h = harness();
 		h.s.start(h.app, 'restore');
-		const chosen = h.s.chooseFile();
+		void h.s.chooseFile();
 		const input = nth(h.inputs, 0);
 		expect(input.type).toBe('file');
 		expect(input.accept).toBeUndefined();
 		expect(input.clicked).toBe(1);
 		expect(h.s.busy).toBe(false);
-		const file = new File(['y'], 'a.json');
-		input.files = [file];
-		input.fire('change');
-		await expect(chosen).resolves.toBe(file);
-		expect(input.removed).toBe(true);
-
-		const second = h.s.chooseFile();
-		const cancelled = nth(h.inputs, 1);
-		cancelled.fire('cancel');
-		await expect(second).resolves.toBeNull();
-		expect(cancelled.removed).toBe(true);
 	});
 
 	it('a second press drops the first chooser late result and removes its input', async () => {

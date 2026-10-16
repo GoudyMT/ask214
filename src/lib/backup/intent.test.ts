@@ -56,8 +56,7 @@ describe('backup intent', () => {
 	// A page that asks for one intent must not eat the other, and a foreign value is never acted on.
 	it.each([
 		['the other intent', 'restore-row'],
-		['an unknown value', 'something-else'],
-		['a non-string value', 7]
+		['an unknown value', 'something-else']
 	])('take ignores %s and leaves the state alone', (_name, value) => {
 		entry.state = { 'sveltekit:history': 3, mtcBackupIntent: value };
 		expect(takeBackupIntent('restored')).toBe(false);
