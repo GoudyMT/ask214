@@ -882,6 +882,128 @@ describe('the backup and what the person is told', () => {
 	});
 });
 
+// ---- Send a copy ------------------------------------------------------------------------------------------------------------
+
+const shareUndo: (() => void)[] = [];
+
+/** Stands in for the browser's share seam on this page: a missing function is `undefined`. */
+function stubShare(o: {
+	canShare: ((data: ShareData) => boolean) | undefined;
+	share?: (data: ShareData) => Promise<void>;
+}): void {
+	for (const [name, value] of [
+		['canShare', o.canShare],
+		['share', o.share]
+	] as const) {
+		Object.defineProperty(navigator, name, { configurable: true, value });
+		shareUndo.push(() => void Reflect.deleteProperty(navigator, name));
+	}
+}
+
+afterEach(() => {
+	for (const undo of shareUndo.splice(0)) undo();
+});
+
+describe('sending a copy', () => {
+	const SEND = CARD_LABELS.send;
+
+	// The offer is for a file that is known to be good, and only where the browser would accept that very file.
+	it.each<[string, Mount, string]>([
+		['the read-back matches', {}, 'my-backup.json'],
+		['the file was downloaded', { picker: null }, '']
+	])('shares the saved file itself when %s', async (_name, opts, savedName) => {
+		const share = vi.fn<(data: ShareData) => Promise<void>>(() => Promise.resolve());
+		stubShare({ canShare: () => true, share });
+		const file = fakeFile({ name: 'my-backup.json' });
+		const card = await mount({ file, ...opts });
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.element(button(CARD_LABELS.checkNow)).toBeVisible();
+		await userEvent.click(button(SEND));
+
+		expect(share).toHaveBeenCalledOnce();
+		const files = need(share.mock.calls[0])[0].files ?? [];
+		expect(files).toHaveLength(1);
+		const sent = need(files[0]);
+		const expectedText = savedName === '' ? need(card.download.mock.calls[0])[1] : file.content;
+		expect(await sent.text()).toBe(expectedText);
+		expect(sent.name).toBe(savedName === '' ? need(card.download.mock.calls[0])[0] : savedName);
+		expect(sent.type).toBe('application/json');
+		// The file the browser was asked about is the one it was given.
+		expect(sent.size).toBe(new TextEncoder().encode(expectedText).length);
+	});
+
+	it.each<[string, ((data: ShareData) => boolean) | undefined]>([
+		['the browser has no canShare', undefined],
+		['the browser would refuse the file', () => false]
+	])('is not offered when %s', async (_name, canShare) => {
+		stubShare({ canShare, share: () => Promise.resolve() });
+		const card = await mount();
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.element(button(CARD_LABELS.checkNow)).toBeVisible();
+		expect(button(SEND).query()).toBeNull();
+	});
+
+	// A file that did not read back, or was not checked, is not one to pass on.
+	it.each<['mismatch' | 'not-checked']>([['mismatch'], ['not-checked']])(
+		'is not offered on the %s line',
+		async (kind) => {
+			stubShare({ canShare: () => true, share: () => Promise.resolve() });
+			const file = fakeFile();
+			if (kind === 'mismatch') file.mangle = true;
+			else file.readBack = 'reject';
+			const card = await mount({ file });
+			await typedBack(card);
+			await userEvent.click(submitOf(CARD_LABELS.make));
+			await expect.element(text('Keep the newest. Delete older files.')).toBeVisible();
+			expect(button(SEND).query()).toBeNull();
+		}
+	);
+
+	it('a share the person backs out of says nothing', async () => {
+		const unhandled: unknown[] = [];
+		const onUnhandled = (e: PromiseRejectionEvent) => unhandled.push(e.reason);
+		window.addEventListener('unhandledrejection', onUnhandled);
+		try {
+			stubShare({
+				canShare: () => true,
+				share: () => Promise.reject(new DOMException('Share canceled', 'AbortError'))
+			});
+			const card = await mount();
+			await typedBack(card);
+			await userEvent.click(submitOf(CARD_LABELS.make));
+			await userEvent.click(button(SEND));
+			await pause(50);
+			expect(page.getByRole('alert').query()).toBeNull();
+			await expect.element(button(SEND)).toBeVisible();
+			expect(unhandled).toEqual([]);
+		} finally {
+			window.removeEventListener('unhandledrejection', onUnhandled);
+		}
+	});
+
+	// The sealed text is kept only while the result line is on screen.
+	it.each(['the row is closed', 'a Check is started from the result'])(
+		'the offer and the text are gone when %s',
+		async (how) => {
+			const share = vi.fn<(data: ShareData) => Promise<void>>(() => Promise.resolve());
+			stubShare({ canShare: () => true, share });
+			const card = await mount();
+			await typedBack(card);
+			await userEvent.click(submitOf(CARD_LABELS.make));
+			await expect.element(button(SEND)).toBeVisible();
+
+			if (how === 'the row is closed') await userEvent.click(toggle(CARD_LABELS.make, true));
+			else await userEvent.click(button(CARD_LABELS.checkNow));
+
+			expect(button(SEND).query()).toBeNull();
+			expect(share).not.toHaveBeenCalled();
+			expect(card.session.kind).toBe(how === 'the row is closed' ? null : 'check');
+		}
+	);
+});
+
 // ---- Restore and Check ------------------------------------------------------------------------------------------------------
 
 describe('getting ready', () => {

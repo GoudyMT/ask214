@@ -103,6 +103,8 @@
 				kind: 'saved';
 				fileName: string;
 				readBack: 'matches' | 'mismatch' | 'not-checked' | 'download';
+				/** The sealed file, ciphertext only; held just while the result line is on screen. */
+				text: string;
 		  }
 		| { kind: 'line'; text: string };
 
@@ -329,7 +331,12 @@
 				break;
 			}
 			case 'saved':
-				exportOutcome = { kind: 'saved', fileName: result.fileName, readBack: result.readBack };
+				exportOutcome = {
+					kind: 'saved',
+					fileName: result.fileName,
+					readBack: result.readBack,
+					text: result.text
+				};
 				void refreshMark();
 				break;
 		}
@@ -391,6 +398,32 @@
 				return notCheckedLine(o.fileName);
 			case 'mismatch':
 				return mismatchLine(o.fileName);
+		}
+	}
+
+	// "Send a copy": offered only on the two lines that vouch for the file (read back, or handed to the downloads), and
+	// only where the browser says it would accept this very file. Asked once per result, not on every render.
+	const shareFile = $derived.by(() => {
+		const outcome = exportOutcome;
+		if (outcome?.kind !== 'saved') return null;
+		if (outcome.readBack !== 'matches' && outcome.readBack !== 'download') return null;
+		const file = new File([outcome.text], outcome.fileName, { type: 'application/json' });
+		try {
+			return navigator.canShare?.({ files: [file] }) === true ? file : null;
+		} catch {
+			return null;
+		}
+	});
+
+	// Called straight from the tap, so the browser still counts the tap as the person's own act. A back-out (an
+	// AbortError) and any other refusal leave the saved file where it is and say nothing.
+	async function sendCopy(): Promise<void> {
+		const file = shareFile;
+		if (file === null) return;
+		try {
+			await navigator.share({ files: [file] });
+		} catch {
+			/* the file is saved either way */
 		}
 	}
 
@@ -686,6 +719,16 @@
 					</p>
 					<p class="backup-hint">{KEEP_NEWEST_LINE}</p>
 					<div class="backup-actions">
+						{#if shareFile !== null}
+							<button
+								class="backup-primary"
+								type="button"
+								onclick={() => void sendCopy()}
+								onkeydown={guardEnter}
+							>
+								{CARD_LABELS.send}
+							</button>
+						{/if}
 						{#if exportOutcome.readBack === 'mismatch'}
 							<button
 								class="backup-primary"

@@ -464,6 +464,7 @@ describe('backupMessage wording', () => {
 			chooseAnother: 'Choose another place',
 			replaceIt: 'Replace it',
 			makeAgain: 'Make a new backup',
+			send: 'Send a copy',
 			cancel: 'Cancel',
 			replace: 'Replace',
 			reload: 'Reload',
