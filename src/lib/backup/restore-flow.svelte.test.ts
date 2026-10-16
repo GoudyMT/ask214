@@ -785,25 +785,47 @@ describe('the confirm', () => {
 		expect(need(two.flow.confirm).warning).toBe(warns);
 	});
 
-	// A backup stamped before the app existed has no believable date, so the phone's changes cannot be shown to be older.
-	it('a backup with an unknown date warns when the device has changes', async () => {
-		const phone = await newPhone();
-		const source = await finishedDevice(await newDb());
-		const file = await exportFrom(source, { createdAt: BACKUP_RELEASE_DATE - 1000 });
-		const crafted: DeviceState = {
-			gens: { profile: 1, timeline: 0, calendar: 0 },
-			ts: { profile: BACKUP_RELEASE_DATE - 5000, timeline: null, calendar: null },
-			mark: null,
-			lastSeenAt: null
-		};
-		const r = restoreRig(phone, {
-			readDevice: async () => ({ state: crafted, installUuid: new Uint8Array(16) })
-		});
-		await toConfirm(r, file);
-		const confirm = need(r.flow.confirm);
-		expect(confirm.deviceLine).toBe('This device was last changed date unknown.');
-		expect(confirm.warning).toBe(true);
-	});
+	// The warning turns on the NEWEST write on the phone against the backup's date. A backup stamped before the app
+	// existed has no believable date, so the phone's changes cannot be shown to be older.
+	it.each<[string, () => number, number, number | null, boolean]>([
+		['a backup with an unknown date', () => BACKUP_RELEASE_DATE - 1000, -4000, null, true],
+		[
+			'the oldest write predates the backup and the newest postdates it',
+			() => Date.now() - MINUTE,
+			-1000,
+			1000,
+			true
+		],
+		['every write predates the backup', () => Date.now() - MINUTE, -5000, -1000, false]
+	])(
+		'warns by the newest write: %s',
+		async (_name, madeAt, profileOffset, timelineOffset, warns) => {
+			const phone = await newPhone();
+			const source = await finishedDevice(await newDb());
+			const createdAt = madeAt();
+			const file = await exportFrom(source, { createdAt });
+			const crafted: DeviceState = {
+				gens: { profile: 1, timeline: timelineOffset === null ? 0 : 1, calendar: 0 },
+				ts: {
+					profile: createdAt + profileOffset,
+					timeline: timelineOffset === null ? null : createdAt + timelineOffset,
+					calendar: null
+				},
+				mark: null,
+				lastSeenAt: null
+			};
+			const r = restoreRig(phone, {
+				readDevice: async () => ({ state: crafted, installUuid: new Uint8Array(16) })
+			});
+			await toConfirm(r, file);
+			const confirm = need(r.flow.confirm);
+			const newest = createdAt + Math.max(profileOffset, timelineOffset ?? profileOffset);
+			expect(confirm.deviceLine).toBe(
+				'This device was last changed ' + formatBackupDate(newest) + '.'
+			);
+			expect(confirm.warning).toBe(warns);
+		}
+	);
 
 	it('lists what no backup carries, with the API key said as kept on this device', () => {
 		expect(NOT_IN_BACKUPS).toEqual([
