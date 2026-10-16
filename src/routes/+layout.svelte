@@ -13,9 +13,11 @@
 		provisionStore,
 		subscribeBus,
 		installLifecycle,
+		createJoinRelock,
 		createRelockEcho,
 		relockAll,
 		relockEachSync,
+		reloadOnSignalWhenShown,
 		reloadWhenShown,
 		superviseStartup,
 		type Relockable
@@ -131,7 +133,23 @@
 				// erase before it clears anything else.
 				if (result.status === 'damaged') {
 					safeLog({ code: 'E_INIT_FAILED' });
-					teardownRuntime = reloadWhenShown(bus, document, () => location.reload());
+					// Nothing is decrypted here, so the list starts empty: only a backup Check joins it, and the Erase's
+					// first step relocks it. The lifecycle and its idle timer end that Check like any other session.
+					const relockables: Relockable[] = [];
+					const offLifecycle = installLifecycle(relockables, {
+						win: window,
+						doc: document,
+						isHidden,
+						createIdleTimer,
+						idleThresholdMs: IDLE_THRESHOLD_MS
+					});
+					app.relockAll = () => relockAll(relockables, 'user');
+					app.joinRelock = createJoinRelock(relockables);
+					const offReload = reloadWhenShown(bus, document, () => location.reload());
+					teardownRuntime = () => {
+						offReload();
+						offLifecycle();
+					};
 					app.wipeAll = async () => {
 						const check = createProfileStore(result.db);
 						const damaged = await stillDamaged(async () => {
@@ -163,6 +181,8 @@
 				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
 				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
 				app.relockAll = () => relockAll(relockables, 'user');
+				app.joinRelock = createJoinRelock(relockables);
+				app.publish = (s) => echo.publish(s);
 				// refresh, not load: a peer's change is not the user asking to unlock, so each store
 				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
@@ -172,8 +192,28 @@
 						),
 					'profile-updated': () => result.store.refresh(),
 					'timeline-updated': () => app.timeline?.refresh(),
-					'calendar-updated': () => app.calendar?.refresh()
+					'calendar-updated': () => app.calendar?.refresh(),
+					// A restore in another tab replaced the data: drop what this tab decrypted first (no broadcast; a
+					// locked store stays locked), then reload as the wiring below decides.
+					'data-replaced': () => relockEachSync(relockables, 'hygiene')
 				});
+				// A locked tab never reloads itself, because a reload decrypts. A returning user's tab reloads on its Unlock; a
+				// first-run tab has no Unlock, so it offers a Reload line. Off the setup form: it would save over the
+				// restored date.
+				const offReplaced = reloadOnSignalWhenShown(
+					bus,
+					'data-replaced',
+					document,
+					() => result.store.lockState === 'locked',
+					() => {
+						if (result.store.locked) app.reloadOnUnlock = true;
+						else app.replacedNotice = true;
+					},
+					() =>
+						location.pathname === resolve('/wizard')
+							? location.replace(resolve('/timeline'))
+							: location.reload()
+				);
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,
 					doc: document,
@@ -183,6 +223,7 @@
 				});
 				teardownRuntime = () => {
 					offBus();
+					offReplaced();
 					offLifecycle();
 				};
 
@@ -329,6 +370,17 @@
 	{/if}
 
 	<main id="main-content" style:--shell-width={shellWidth}>
+		<!-- The status element is always present: a live region that arrives with its text is often not announced. -->
+		<div role="status">
+			{#if app.replacedNotice}
+				<p>
+					Data on this device was replaced from a backup in another tab. Reload to see it.
+					<button type="button" onclick={() => location.replace(resolve('/timeline'))}
+						>Reload</button
+					>
+				</p>
+			{/if}
+		</div>
 		{@render children()}
 	</main>
 
@@ -424,6 +476,19 @@
 		margin: 0 auto;
 		padding: var(--space-l);
 		min-height: calc(100vh - 160px);
+	}
+
+	/* The Reload button of the replaced-data line: the banner's text-link look and its 44px touch target. */
+	[role='status'] button {
+		min-height: 44px;
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 
 	/* Two-line footer content (attribution disclaimer + About/Source links). */
