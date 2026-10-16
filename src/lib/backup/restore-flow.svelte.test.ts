@@ -662,12 +662,52 @@ describe('the confirm', () => {
 		expect(confirm.summary).toEqual({
 			madeOn: formatBackupDate(FILE_CREATED_AT),
 			label: OUR_LABEL,
+			separationDate: true,
+			skillbridgeStart: false,
+			terminalLeaveStart: false,
 			tasks: 2,
 			notes: 1,
-			calendarExclusions: 2
+			calendarExclusions: 2,
+			calendarCard: false
 		});
 		// The confirm holds the key and the file, not the person's records.
 		expect(JSON.stringify(confirm)).not.toContain('TAP office');
+	});
+
+	// The person is told which kinds of thing the backup holds so they can tell it is theirs, never the values.
+	it('the summary names which dates and settings the backup holds and carries none of their values', async () => {
+		const source = await finishedDevice(await newDb());
+		const start = encodeEaos(parseEaosAtRead('2027-03-22'));
+		const leave = encodeEaos(parseEaosAtRead('2027-04-26'));
+		try {
+			await source.profile.save({ skillbridgeStart: start, terminalLeaveStart: leave });
+		} finally {
+			start.fill(0);
+			leave.fill(0);
+		}
+		await source.calendar.dismissCard(Date.now());
+		const createdAt = Date.now() - MINUTE;
+		const file = await exportFrom(source, { createdAt });
+		const phone = await newPhone();
+		const r = restoreRig(phone);
+		await toConfirm(r, file);
+
+		const { summary } = need(r.flow.confirm);
+		expect(summary).toEqual({
+			madeOn: formatBackupDate(createdAt),
+			label: OUR_LABEL,
+			separationDate: true,
+			skillbridgeStart: true,
+			terminalLeaveStart: true,
+			tasks: 2,
+			notes: 1,
+			calendarExclusions: 2,
+			calendarCard: true
+		});
+		const text = JSON.stringify(summary);
+		for (const value of ['2028-02-01', '2027-03-22', '2027-04-26', 'TAP office']) {
+			expect(text).not.toContain(value);
+		}
 	});
 
 	// Without the generations there is nothing to compare the device with, so Replace must not write on a guess.

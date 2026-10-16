@@ -51,13 +51,21 @@ import { validateInner, type ValidInner } from './validate';
  * its position only.
  */
 
-/** What the file holds, said as numbers and a date, never as content. */
+/**
+ * What the file holds, said as which kinds of thing it has and how many, plus the backup's own date. Never a value:
+ * no date the person set, no note text.
+ */
 export type BackupSummary = {
 	madeOn: string;
 	label: string | null;
+	/** Always true for a file that passed the check: a backup comes from a finished setup. */
+	separationDate: boolean;
+	skillbridgeStart: boolean;
+	terminalLeaveStart: boolean;
 	tasks: number;
 	notes: number;
 	calendarExclusions: number;
+	calendarCard: boolean;
 };
 
 /** What the confirm was built from. It holds no key, no plaintext and no record: Replace opens the file again. */
@@ -144,14 +152,19 @@ function deviceReadCode(e: unknown): BackupCode {
 function summarize(inner: ValidInner, label: string | null): BackupSummary {
 	const tasks = Object.values(inner.stores['timeline-state']?.tasks ?? {});
 	const calendar = inner.stores['calendar-sync'];
+	const profile = inner.stores.profile;
 	return {
 		madeOn: formatBackupDate(inner.createdAt),
 		label,
+		separationDate: true,
+		skillbridgeStart: profile.skillbridgeStart !== undefined,
+		terminalLeaveStart: profile.terminalLeaveStart !== undefined,
 		tasks: tasks.length,
 		notes: tasks.filter((task) => task.notes !== undefined).length,
 		calendarExclusions: calendar
 			? calendar.exclusions.taskIds.length + calendar.exclusions.categories.length
-			: 0
+			: 0,
+		calendarCard: calendar?.card !== undefined
 	};
 }
 
