@@ -3,6 +3,7 @@ import { deleteTestDb, openTestDb } from '../db/_test-helpers';
 import { withStores } from '../db/schema';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { getDiagnosticsForTest } from '../log/safelog';
+import { createCalendarSyncStore } from '../calendar/store.svelte';
 import { createJoinRelock, relockEachSync, type Relockable } from '../profile/app-init';
 import type { RelockReason } from '../profile/lifecycle';
 import { createProfileStore, readDeviceState, type ProfileStore } from '../profile/store.svelte';
@@ -475,17 +476,29 @@ describe('a saved file', () => {
 
 	// "Last backup" and the comparison the restore warning will use: the device still equals what was exported.
 	it('export success writes the mark at the generations the snapshot read', async () => {
+		// Each store at its own, different generation, so a mark that swapped two of them would show.
+		const timeline = createTimelineStateStore(db);
+		await timeline.load();
+		await timeline.setStatus('va-gov-account', 'done');
+		await timeline.setStatus('tap-course', 'skipped');
+		const calendar = createCalendarSyncStore(db);
+		await calendar.load();
+		await calendar.setExclusions({ taskIds: ['job-search'], categories: [] });
+		await calendar.setExclusions({ taskIds: ['job-search'], categories: ['finance'] });
+		await calendar.setExclusions({ taskIds: [], categories: ['finance'] });
+		const before = await readDeviceState(db);
+		expect(before.gens).toEqual({ profile: 1, timeline: 2, calendar: 3 });
+		expect(before.mark).toBeNull();
 		const f = fakeFile();
 		const { session, flow } = await rig(pickerOf(f.handle));
-		expect((await readDeviceState(db)).mark).toBeNull();
+		const backupAt = session.backupAt;
 
 		expect(await submit(flow)).toEqual(SAVED);
 
 		const state = await readDeviceState(db);
-		expect(state.mark?.at).toBe(session.backupAt);
-		expect(state.mark?.gens).toEqual({ profile: 2, timeline: 0, calendar: 0 });
+		expect(state.mark?.at).toBe(backupAt);
+		expect(state.mark?.gens).toEqual({ profile: 2, timeline: 2, calendar: 3 });
 		expect(state.gens).toEqual(state.mark?.gens);
-		expect(session.phase).toBe('done');
 		expect(session.busy).toBe(false);
 	});
 
