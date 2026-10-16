@@ -25,10 +25,12 @@ import {
 	NOT_IN_BACKUPS,
 	NOT_IN_BACKUPS_LEAD,
 	notCheckedLine,
+	notInBackupsLine,
 	ONLY_RESTORE_YOURS_LINE,
 	PHRASE_NOTE,
 	RESTORED_RELOAD_LINE,
 	RESTORED_UNLOCK_LINE,
+	restoredLine,
 	savedLine,
 	STOPPING_LINE,
 	summaryLines,
@@ -369,6 +371,7 @@ function allStrings(): string[] {
 	out.push(deviceMatchesLine('Oct 15, 2026'), deviceChangedLine('date unknown'));
 	out.push(checkOpensLine('Oct 15, 2026'), ...NOT_IN_BACKUPS);
 	out.push(lastBackupLine('Oct 15, 2026'), madeOnLine('Oct 15, 2026'));
+	out.push(restoredLine('Oct 15, 2026'), notInBackupsLine(true), notInBackupsLine(false));
 	out.push(savedLine('a.json'), downloadedLine('a.json'), notCheckedLine('a.json'));
 	out.push(
 		...summaryLines(FULL_SUMMARY),
@@ -425,6 +428,21 @@ describe('backupMessage wording', () => {
 			'saved documents',
 			"this device's settings (theme, Ask mode)"
 		]);
+	});
+
+	// The Timeline's lines after a restore; the list is the static one without the API key's aside, and with the key only
+	// when none is stored.
+	it('the lines after a restore are exact', () => {
+		expect(restoredLine('Oct 15, 2026')).toBe('Backup restored (made Oct 15, 2026).');
+		expect(notInBackupsLine(true)).toBe(
+			"Not in backups: your API key, Ask's offline library, saved documents, this device's settings (theme, Ask mode). Set them up again in Settings."
+		);
+		expect(notInBackupsLine(false)).toBe(
+			"Not in backups: Ask's offline library, saved documents, this device's settings (theme, Ask mode). Set them up again in Settings."
+		);
+		for (const item of NOT_IN_BACKUPS.slice(1)) {
+			expect(notInBackupsLine(false)).toContain(item);
+		}
 	});
 
 	it('the card lines are exact', () => {

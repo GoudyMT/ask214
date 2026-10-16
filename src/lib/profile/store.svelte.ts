@@ -267,6 +267,14 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			return derivePersona(_profile);
 		},
 
+		/**
+		 * When the backup this device last made or restored was made (ms), or null with none, or while the profile is
+		 * locked or not loaded. Reactive like `persona`. A screen shows it to the person whose device it is.
+		 */
+		get lastBackupAt(): number | null {
+			return _profile?.lastBackupAt ?? null;
+		},
+
 		/** Synchronous relock for the pagehide/freeze handlers (wired at app-init) - no await. */
 		relockSync(reason: RelockReason): void {
 			relockNow(reason);

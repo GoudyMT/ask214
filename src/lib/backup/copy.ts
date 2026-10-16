@@ -45,13 +45,31 @@ export const deviceChangedLine = (date: string): string =>
 	'This device was last changed ' + date + '.';
 export const checkOpensLine = (date: string): string => 'This backup opens. Made on ' + date + '.';
 
-/** What no backup carries. Static: the confirm shows every item whatever this device holds. */
-export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
-	'your API key (kept on this device if one is saved)',
+const API_KEY_ITEM = 'your API key';
+/** What no backup carries, apart from the API key: the same on every device. */
+const ALWAYS_NOT_IN_BACKUPS: readonly string[] = [
 	"Ask's offline library",
 	'saved documents',
 	"this device's settings (theme, Ask mode)"
+];
+
+/** What no backup carries. Static: the confirm shows every item whatever this device holds. */
+export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
+	API_KEY_ITEM + ' (kept on this device if one is saved)',
+	...ALWAYS_NOT_IN_BACKUPS
 ]);
+
+/**
+ * What the Timeline says right after a restore. The date is the app's own formatted text, passed in by the caller.
+ * The API key is listed only when this device holds none (a restore on the same device keeps it), so the person is
+ * not told to set up what is already there.
+ */
+export const restoredLine = (date: string): string => 'Backup restored (made ' + date + ').';
+export const notInBackupsLine = (apiKeyMissing: boolean): string =>
+	NOT_IN_BACKUPS_LEAD +
+	': ' +
+	(apiKeyMissing ? [API_KEY_ITEM, ...ALWAYS_NOT_IN_BACKUPS] : ALWAYS_NOT_IN_BACKUPS).join(', ') +
+	'. Set them up again in Settings.';
 
 /**
  * What the Backup card says around the flows: its own lines, and the words on its buttons and fields. DRAFT, for the

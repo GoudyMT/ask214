@@ -25,6 +25,9 @@
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
 	import { waitForControl } from '$lib/ask/when-controlled';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
+	import { takeBackupIntent } from '$lib/backup/intent';
+	import { formatBackupDate } from '$lib/backup/dates';
+	import { notInBackupsLine, restoredLine } from '$lib/backup/copy';
 
 	const app = getProfileApp();
 	// Everything derived from today reads this clock, which turns at local midnight; an act at a tap reads the clock at the tap.
@@ -44,6 +47,23 @@
 		unlockError = null;
 	});
 	let headingEl: HTMLElement | undefined;
+
+	// A restore reloads onto this page with a note in the history entry. It is taken here, once, as the page starts: the
+	// take removes it, so a second visit or a reload says nothing, and a later re-render cannot say it twice.
+	const restored = takeBackupIntent('restored');
+	const restoredAt = $derived(app.store?.lastBackupAt ?? null);
+	// Whether this device holds no API key (a backup never carries it). Unknown until read; the line waits for the answer
+	// so it appears once, whole.
+	let apiKeyMissing = $state<boolean | null>(null);
+	$effect(() => {
+		const byok = app.byok;
+		if (!restored || !byok || lockedView) return;
+		byok.readApiKey().then(
+			(key) => (apiKeyMissing = key === null),
+			// A key that cannot be read is not known to be there, so the person is told to check.
+			() => (apiKeyMissing = true)
+		);
+	});
 
 	// Until the timeline-state store loads (async, after the profile store), the view is built from an empty state. The
 	// list and the calendar card render only once the store is `ready`, so nothing shows a task as not started that the
@@ -153,6 +173,12 @@
 	}
 
 	async function unlock(): Promise<void> {
+		// This device's data was replaced from a backup while the page was locked: reading it again would open stale
+		// data, so the page starts over on the restored data.
+		if (app.reloadOnUnlock) {
+			location.reload();
+			return;
+		}
 		const store = app.store;
 		if (!store) return;
 		unlockError = null;
@@ -277,6 +303,12 @@
 				Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 			</p>
 			<LeavingLine {leaving} />
+			{#if restoredAt !== null && apiKeyMissing !== null}
+				<div class="timeline-restored" role="status">
+					<p>{restoredLine(formatBackupDate(restoredAt))}</p>
+					<p>{notInBackupsLine(apiKeyMissing)}</p>
+				</div>
+			{/if}
 			<!-- The list waits for the saved progress: drawn without it, every task shows as not started. A load that failed
 		     says so in its place, where a list would read as lost progress and its buttons would do nothing. -->
 			{#if view && app.timeline?.failed}
@@ -348,6 +380,15 @@
 	.timeline-subline {
 		margin: 0 0 var(--space-xs);
 		color: var(--color-fg-muted);
+	}
+
+	/* The one line a restore adds, under the subline. */
+	.timeline-restored {
+		margin: 0 0 var(--space-xs);
+	}
+
+	.timeline-restored p {
+		margin: 0;
 	}
 
 	/* The start-up banner's look (InitErrorBanner), inside the page: surface, a 3 px danger edge. */
