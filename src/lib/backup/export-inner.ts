@@ -111,7 +111,8 @@ export function buildExportInner(snap: Snapshot, createdAt: number): ExportInner
 		return { ok: false, code: 'E_EXPORT_SELF_INVALID', store };
 	}
 
-	const bytes = new TextEncoder().encode(JSON.stringify(inner));
+	// The record the check returned, so the bytes are exactly what passed it.
+	const bytes = new TextEncoder().encode(JSON.stringify(checked.inner));
 	if (bytes.length > MAX_PADDED_PLAINTEXT_BYTES) {
 		bytes.fill(0);
 		return { ok: false, code: 'E_CONTENT_TOO_LARGE', taskId: largestNoteTask(snap) };
