@@ -68,8 +68,8 @@ export type ProfileApp = {
 	 */
 	publish: ((s: BusSignal) => void) | null;
 	/**
-	 * Set when another tab replaced this device's data while this tab was locked: the next Unlock reloads the page
-	 * instead of re-reading. False until then.
+	 * Set when this device's data was replaced from a backup, in this tab or another, while this tab was locked: the
+	 * next Unlock reloads the page instead of re-reading. False until then.
 	 */
 	reloadOnUnlock: boolean;
 	/**
