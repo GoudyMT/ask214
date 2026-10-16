@@ -328,10 +328,14 @@ function verifyComposed(
 	staged.push(profileBytes);
 	const decodedProfile = decodeProfile(profileBytes);
 	records.push(decodedProfile);
+	// Held in variables so they are wiped with the rest: they hold every note and setting as text.
+	const timelineBytes = encodeTimelineState(timeline);
+	const calendarBytes = encodeCalendarSyncState(calendar);
+	staged.push(timelineBytes, calendarBytes);
 	const sound =
 		sameRecord(decodedProfile, profile) &&
-		sameRecord(decodeTimelineState(encodeTimelineState(timeline)), timeline) &&
-		sameRecord(decodeCalendarSyncState(encodeCalendarSyncState(calendar)), calendar);
+		sameRecord(decodeTimelineState(timelineBytes), timeline) &&
+		sameRecord(decodeCalendarSyncState(calendarBytes), calendar);
 
 	// The profile is compared as the file holds it (text), written back by the shipped encoder.
 	const content: ProfileV1 = { ...profile, generation: 0, lastSeenAt: 0 };

@@ -12,6 +12,7 @@ import { encodeProfile } from '../profile/codec';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import type { CalendarSyncState, DesiredEvent } from '../calendar/types';
+import type { TimelineState } from '../timeline/types';
 import {
 	restoreBackup,
 	type RestoreExpected,
@@ -26,12 +27,14 @@ import { validateInner, type ValidInner } from './validate';
 // - decodeProfile can add a field to the profile it decodes from the FILE (a composer that invents content);
 // - encodeCalendarSyncState can drop the card (a codec that does not round-trip what it was given);
 // - signSidecar reports each finished signature, so a test can act in the last wait before the transaction;
-// - zeroizeRecord keeps every record it wipes, so a test can look at what the writer left behind.
+// - zeroizeRecord keeps every record it wipes, so a test can look at what the writer left behind;
+// - the timeline and calendar encoders keep every buffer they hand out, so a test can see which were wiped.
 const seams = vi.hoisted(() => ({
 	inventOnGeneration: -1,
 	dropCard: false,
 	onSigned: null as (() => void) | null,
-	zeroized: [] as Record<string, unknown>[]
+	zeroized: [] as Record<string, unknown>[],
+	encoded: [] as Uint8Array[]
 }));
 
 vi.mock('$lib/profile/codec', async (importOriginal) => {
@@ -50,14 +53,29 @@ vi.mock('$lib/calendar/codec', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../calendar/codec')>();
 	return {
 		...real,
-		encodeCalendarSyncState: (state: CalendarSyncState) =>
-			real.encodeCalendarSyncState(
+		encodeCalendarSyncState: (state: CalendarSyncState) => {
+			const out = real.encodeCalendarSyncState(
 				seams.dropCard
 					? (Object.fromEntries(
 							Object.entries(state).filter(([key]) => key !== 'card')
 						) as CalendarSyncState)
 					: state
-			)
+			);
+			seams.encoded.push(out);
+			return out;
+		}
+	};
+});
+
+vi.mock('$lib/timeline/state-codec', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../timeline/state-codec')>();
+	return {
+		...real,
+		encodeTimelineState: (state: TimelineState) => {
+			const out = real.encodeTimelineState(state);
+			seams.encoded.push(out);
+			return out;
+		}
 	};
 });
 
@@ -741,14 +759,23 @@ describe('restoreBackup', () => {
 				});
 			}
 		]
-	])('the restore wipes the profile records it staged when it %s', async (_name, arm) => {
+	])('the restore wipes what it staged when it %s', async (_name, arm) => {
 		await buildDevice();
 		const expected = await confirmNow();
 		const inner = fileInner();
 		seams.zeroized.length = 0;
+		seams.encoded.length = 0;
 		arm();
 
 		await restoreBackup(db, inner, expected, session().options);
+
+		// Every timeline and calendar buffer made for the restore (the writer's own check and the boundaries' copies)
+		// holds the person's notes and settings as text, so none may be left readable.
+		expect(seams.encoded.length).toBeGreaterThanOrEqual(4);
+		for (const bytes of seams.encoded) {
+			expect(bytes.length).toBeGreaterThan(0);
+			expect(bytes.every((byte) => byte === 0)).toBe(true);
+		}
 
 		// Generation 41 is the profile decoded from the file; 4 is the composed record (the device was at 3).
 		for (const generation of [FILE_GENERATION, DEVICE.profile + 1]) {
