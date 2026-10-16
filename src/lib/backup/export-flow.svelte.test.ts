@@ -156,6 +156,7 @@ function fakeFile(over: { existing?: string; name?: string } = {}) {
 		closes: 0,
 		aborts: 0,
 		reads: 0,
+		createGate: null as Deferred<void> | null,
 		writeGate: null as Deferred<void> | null,
 		closeGate: null as Deferred<void> | null,
 		onClose: null as (() => void | Promise<void>) | null,
@@ -192,9 +193,10 @@ function fakeFile(over: { existing?: string; name?: string } = {}) {
 			if (f.reads > 1 && f.readBack === 'hang') return new Promise(() => {});
 			return Promise.resolve(new File([f.content], f.name));
 		},
-		createWritable: () => {
+		createWritable: async () => {
 			f.created += 1;
-			return Promise.resolve(writable);
+			await f.createGate?.promise;
+			return writable;
 		}
 	};
 	return f;
@@ -208,6 +210,10 @@ function pickerOf(...answers: (SaveHandle | Error)[]) {
 		return next instanceof Error ? Promise.reject(next) : Promise.resolve(next);
 	});
 }
+
+/** What the promise gives, or 'hung' when it has not settled in time: a hang then fails an assertion, not the suite's clock. */
+const within = <T>(work: Promise<T>, ms = 500) =>
+	Promise.race([work, new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), ms))]);
 
 const cancelled = () => new DOMException('The user aborted a request.', 'AbortError');
 
@@ -652,6 +658,25 @@ describe('the commit point', () => {
 		expect(session.phase).toBe('typed-back');
 		expect(session.words).not.toBeNull();
 		expect((await readDeviceState(db)).mark).toBeNull();
+	});
+
+	// A provider that never answers createWritable must not strand Cancel in "stopping"; a stream that arrives late is
+	// still aborted, so no swap file is left behind.
+	it('a Cancel while createWritable never settles ends with the cancelled line and aborts the late stream', async () => {
+		const f = fakeFile();
+		f.createGate = deferred();
+		const { session, flow } = await rig(pickerOf(f.handle));
+
+		const pending = submit(flow);
+		await vi.waitFor(() => expect(f.created).toBe(1));
+		expect(session.cancel()).toBe(true);
+
+		expect(await within(pending)).toEqual({ kind: 'stopped' });
+		expect(session.stopping).toBe(false);
+		expect(session.message).toBe('E_EXPORT_CANCELLED');
+		f.createGate.resolve();
+		await vi.waitFor(() => expect(f.aborts).toBe(1));
+		expect(f.writes).toBe(0);
 	});
 
 	// Cancel during the read: the decoded profile is wiped when the read finishes, and no file is touched.

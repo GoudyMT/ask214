@@ -418,8 +418,16 @@ export class ExportFlow {
 
 	async #writeFile(run: Run, handle: SaveHandle, prepared: Prepared): Promise<ExportResult> {
 		if (!run.enter('writing')) return STOPPED;
-		// Awaited to the end: a stream opened after the run was stopped still has to be aborted.
-		const writable = await handle.createWritable();
+		// Raced, because a provider may never answer and a Cancel must not wait for it; a stream that arrives after the
+		// run stopped is still aborted, so no half-made file is left behind.
+		const creating = handle.createWritable();
+		let writable: SaveWritable;
+		try {
+			writable = await untilAborted(creating, run.signal);
+		} catch (error) {
+			creating.then(abortQuietly, () => {});
+			throw error;
+		}
 		if (!run.hold('writable', writable)) {
 			abortQuietly(writable);
 			return STOPPED;
