@@ -9,13 +9,30 @@
  */
 
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { build } from 'esbuild';
 
 export const KDF_FOLDER = 'static/backup-kdf';
 export const KDF_FILE = 'backup-kdf.worker.mjs';
 
 const ENTRY = 'src/lib/backup/worker/entry.ts';
+const NOBLE_LICENSE = 'node_modules/@noble/hashes/LICENSE';
 const HASH_LENGTH = 16;
+
+/**
+ * The MIT notice of the bundled `@noble/hashes`, as a leading `/*!` comment. MIT asks that the notice travel with
+ * copies of the code, and esbuild keeps no notice for modules that carry none of their own. The text is read from
+ * the installed package, so the build and the gate read the same file, and goes in unchanged.
+ * @param {string} root
+ * @returns {string}
+ */
+function nobleNotice(root) {
+	const license = readFileSync(join(root, NOBLE_LICENSE), 'utf8');
+	// A comment ends at its first closing mark, so a licence holding one could not be carried whole.
+	if (license.includes('*/')) throw new Error('E_KDF_LICENSE_COMMENT_END');
+	return `/*! @noble/hashes\n${license}\n*/\n`;
+}
 
 /**
  * Bundle the worker entry in memory.
@@ -32,8 +49,9 @@ export async function buildWorkerBytes(root) {
 		target: 'es2022',
 		minify: true,
 		sourcemap: false,
-		// Keeps the notices of the bundled MIT code in the shipped file.
+		// Keeps any notice a bundled module carries itself in the shipped file.
 		legalComments: 'eof',
+		banner: { js: nobleNotice(root) },
 		write: false,
 		logLevel: 'silent'
 	});

@@ -231,3 +231,17 @@ describe('backup vendor gate', () => {
 		GATE_TIMEOUT
 	);
 });
+
+// MIT asks that its notice travel with copies of the code. The gate only compares the committed file with the
+// recipe, so a recipe edit that drops the notice would still pass it; this reads the shipped file itself.
+describe('the shipped backup key worker', () => {
+	it('carries the noble MIT notice', () => {
+		const license = readFileSync('node_modules/@noble/hashes/LICENSE', 'utf8');
+		const copyright = license.split(/\r?\n/).find((line) => line.startsWith('Copyright'));
+		const shipped = readFileSync(join('static/backup-kdf', HASH, FILE), 'utf8');
+		expect(copyright).toContain('Paul Miller');
+		expect(shipped.startsWith('/*!')).toBe(true);
+		expect(shipped).toContain(copyright ?? '');
+		expect(shipped).toContain('Permission is hereby granted');
+	});
+});

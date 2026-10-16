@@ -51,7 +51,8 @@ Bundled / vendored runtime components
    Copyright (c) 2022 Paul Miller (https://paulmillr.com)
    License: MIT
    https://github.com/paulmillr/noble-hashes
-   Bundled into the backup key worker in static/backup-kdf/.
+   Bundled into the backup key worker in static/backup-kdf/; its full notice
+   also ships inside that worker file.
 
 ================================================================================
 Reference content (the offline corpus)
