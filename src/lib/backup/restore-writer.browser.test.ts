@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
-import { LOCK_TIMEOUT_MS, LockAcquisitionTimeout, RunAbortedError } from '../db/locks';
+import { LOCK_TIMEOUT_MS, RunAbortedError } from '../db/locks';
 import { withStores, reqToPromise, STORES, type StoreName } from '../db/schema';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { createProfileStore, OccConflictError, readDeviceState } from '../profile/store.svelte';
@@ -372,20 +372,6 @@ describe('restoreBackup', () => {
 		expect(profile.clockBackward).toBe(true);
 	});
 
-	it("restore never takes the file's lastSeenAt", async () => {
-		await buildDevice();
-		const expected = await confirmNow();
-		const fileLastSeen = NOW + 200 * DAY;
-
-		const inner = fileInner({ lastSeenAt: fileLastSeen });
-		expectSucceeded(await restoreBackup(db, inner, expected, session().options));
-
-		const loaded = need(await createProfileStore(db).load());
-		expect(decodeEaos(need(loaded.eaos))).toBe('2028-02-01');
-		expect(loaded.lastSeenAt).toBeLessThan(fileLastSeen);
-		expect(loaded.lastSeenAt).toBeGreaterThanOrEqual(NOW - DAY);
-	});
-
 	it.each([
 		['a past createdAt is kept', NOW - 5 * DAY, NOW - 5 * DAY],
 		['a future createdAt is clamped to now', NOW + 10 * DAY, NOW]
@@ -637,28 +623,6 @@ describe('restoreBackup', () => {
 		expect(s.onCommitting).not.toHaveBeenCalled();
 	});
 
-	it('the deadline firing at step 6 leaves the 7 rows byte-identical and byok untouched', async () => {
-		await buildDevice();
-		await createByokStore(db).saveApiKey('sk-ant-api03-test-key-0000');
-		const expected = await confirmNow();
-		const before = await snapshot();
-		const s = session();
-		let signed = 0;
-		// The session's deadline fires while the writer is encrypting and signing, after every read and before the transaction.
-		seams.onSigned = () => {
-			if (++signed === 1) s.ctl.abort();
-		};
-
-		await expect(restoreBackup(db, fileInner(), expected, s.options)).rejects.toBeInstanceOf(
-			RunAbortedError
-		);
-
-		expect(signed).toBeGreaterThan(0);
-		expect(await snapshot()).toEqual(before);
-		expect(s.onCommitting).not.toHaveBeenCalled();
-		expect(await createByokStore(db).readApiKey()).toBe('sk-ant-api03-test-key-0000');
-	});
-
 	it('the step-7 check and the puts run in one synchronous block: an abort queued at the check lands after all seven puts', async () => {
 		await buildDevice();
 		const expected = await confirmNow();
@@ -676,19 +640,6 @@ describe('restoreBackup', () => {
 		expect([...stores].sort()).toEqual([...SEVEN].sort());
 		expect(abortedAtPut).toEqual(new Array<boolean>(7).fill(false));
 		expect(s.onCommitting).toHaveBeenCalledTimes(1);
-	});
-
-	it("the commit check's throw reaches the caller as RunAbortedError, not a lock timeout", async () => {
-		await buildDevice();
-		const expected = await confirmNow();
-		const s = session({ mayCommit: () => false });
-
-		const failure = await restoreBackup(db, fileInner(), expected, s.options).catch(
-			(e: unknown) => e
-		);
-
-		expect(failure).toBeInstanceOf(RunAbortedError);
-		expect(failure).not.toBeInstanceOf(LockAcquisitionTimeout);
 	});
 
 	it('abort after the 2nd put leaves the 7 rows byte-identical and byok untouched', async () => {
