@@ -9,10 +9,13 @@ import { fileURLToPath } from 'node:url';
 const SRC = fileURLToPath(new URL('../../', import.meta.url));
 const ENTRY = join(SRC, 'lib/backup/worker/entry.ts');
 const WORDS = join(SRC, 'lib/backup/words-v1.ts');
-const IMPORT = /(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g;
+// The same shapes the personal-data import scan reads (src/lib/ci/pii-policy.ts): a static import or re-export, a
+// side-effect import, `import(...)` with any quote including a template literal, and `import.meta.glob(...)`.
+const IMPORT =
+	/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\.meta\.glob(?:Eager)?\s*\(\s*\[?\s*|\bimport\s+)(['"`])([^'"`\r\n]+)\1/g;
 
 function importsOf(source: string): string[] {
-	return [...source.matchAll(IMPORT)].map((match) => match[1] ?? '');
+	return [...source.matchAll(IMPORT)].map((match) => match[2] ?? '');
 }
 
 function isTestFile(path: string): boolean {
@@ -34,8 +37,10 @@ function localFile(specifier: string, from: string): string | null {
 	if (specifier.startsWith('.')) base = resolve(dirname(from), specifier);
 	else if (specifier.startsWith('$lib/')) base = join(SRC, 'lib', specifier.slice('$lib/'.length));
 	else return null;
+	// A `.js` specifier names the `.ts` file beside it, the way the bundler resolves it.
+	const stem = base.endsWith('.js') ? base.slice(0, -'.js'.length) : base;
 	return (
-		[base, `${base}.ts`, join(base, 'index.ts')].find(
+		[base, `${base}.ts`, `${stem}.ts`, join(base, 'index.ts')].find(
 			(path) => /\.(?:ts|svelte)$/.test(path) && existsSync(path)
 		) ?? null
 	);
