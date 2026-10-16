@@ -145,7 +145,6 @@ export class ExportFlow {
 		const names = session.names;
 		const words = session.words;
 		if (
-			session.kind !== 'export' ||
 			session.concealed ||
 			words === null ||
 			names === null ||

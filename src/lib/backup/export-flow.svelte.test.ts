@@ -343,7 +343,8 @@ describe('the save picker and the type-back', () => {
 		const { session, flow, relock } = await rig(picker);
 		away(session, relock);
 
-		expect(await submit(flow)).toEqual({ kind: 'ignored' });
+		// Wrapped so that a submit which throws on the cleared session fails here, as an assertion.
+		await expect((async () => submit(flow))()).resolves.toEqual({ kind: 'ignored' });
 		expect(picker).not.toHaveBeenCalled();
 	});
 
@@ -729,7 +730,7 @@ describe('checking the file after it is saved', () => {
 			f.readBack = how;
 			const { session, flow } = await rig(pickerOf(f.handle), { readBackMs: 30 });
 
-			expect(await submit(flow)).toEqual({ ...SAVED, readBack: 'not-checked' });
+			expect(await within(submit(flow))).toEqual({ ...SAVED, readBack: 'not-checked' });
 
 			expect(session.phase).toBe('done');
 			expect((await readDeviceState(db)).mark).not.toBeNull();
