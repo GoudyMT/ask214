@@ -1427,6 +1427,25 @@ describe('cancel', () => {
 		h.s.cardGone();
 		expect(h.s.active).toBe(!cancelled);
 	});
+
+	// A peer tab idling locks this tab's profile and takes the card off the page, but the person is still here: only that
+	// kind of lock can leave a live session behind (every other lock has already cleared it), and Unlock brings it back.
+	it.each<[string, { locked?: boolean } | undefined, boolean]>([
+		['the profile went locked', { locked: true }, true],
+		['the profile did not lock', { locked: false }, false],
+		['nothing is said', undefined, false]
+	])(
+		'cardGone, when %s, leaves the session kept or ended as it should',
+		async (_name, opts, kept) => {
+			const h = harness();
+			await exportWithWords(h);
+			h.env.visible = true;
+			if (opts === undefined) h.s.cardGone();
+			else h.s.cardGone(opts);
+			expect(h.s.active).toBe(kept);
+			expect(h.s.words === null).toBe(!kept);
+		}
+	);
 });
 
 // ---- the deadline ------------------------------------------------------------------------------------------------

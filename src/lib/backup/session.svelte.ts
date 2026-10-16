@@ -818,10 +818,13 @@ export class BackupSession {
 
 	/**
 	 * The card is leaving the page. Cancels only when the person actually moved to another route: a card swapped out
-	 * by an app switch is concealed or the page is hidden, and must keep its session.
+	 * by an app switch is concealed or the page is hidden, and must keep its session. So is a card taken off the page
+	 * because the profile went `locked` (`opts.locked`): every lock that clears a session has already done so, which
+	 * leaves only another tab's idle lock, and the person is still here to unlock and carry on.
 	 */
-	cardGone(): void {
+	cardGone(opts?: { locked?: boolean }): void {
 		if (this.phase === 'idle' || this.concealed || !this.#deps.isVisible()) return;
+		if (opts?.locked === true) return;
 		// A write that has begun runs on; the export read-back learns the person left and stops with its own line.
 		if (this.#isCommit()) this.#record('navigated');
 		else this.cancel('navigated');

@@ -228,7 +228,7 @@
 	onMount(() => void refreshMark());
 
 	// Leaving the page ends the session; an app switch that only swaps the card out leaves it (the session knows).
-	onDestroy(() => session.cardGone());
+	onDestroy(() => session.cardGone({ locked: app.store?.lockState === 'locked' }));
 
 	// ---- rows -----------------------------------------------------------------------------------------------------
 

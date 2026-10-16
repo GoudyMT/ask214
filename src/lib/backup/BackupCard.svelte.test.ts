@@ -652,13 +652,16 @@ describe('leaving the app with the words on screen', () => {
 	});
 
 	// Leaving the page ends the session; an app switch that swaps the card out keeps it.
-	it.each([
-		['a real move to another page', 'idle', false],
-		['the card swapped out while the app is hidden', 'phrase-shown', true]
-	])('unmounting for %s leaves the session in %s', async (_name, phase, hidden) => {
+	it.each<[string, string, 'none' | 'hidden' | 'locked']>([
+		['a real move to another page', 'idle', 'none'],
+		['the card swapped out while the app is hidden', 'phrase-shown', 'hidden'],
+		// Another tab idling locks this profile and takes the card off the page; the person is still here to unlock.
+		['the card taken off behind a lock that left the session alone', 'phrase-shown', 'locked']
+	])('unmounting for %s leaves the session in %s', async (_name, phase, how) => {
 		const card = await mount();
 		await typedBack(card);
-		if (hidden) card.relock('hygiene');
+		if (how === 'hidden') card.relock('hygiene');
+		if (how === 'locked') profile.relockSync('peer');
 		await card.unmount();
 		expect(card.session.phase).toBe(phase);
 	});
