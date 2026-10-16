@@ -969,35 +969,57 @@ describe('Replace', () => {
 	});
 
 	// A phone that runs out of room at the last moment keeps everything it had, and the person can try again.
-	it('a write that fails part-way leaves every row as it was and lets the person try again', async () => {
-		const device = await finishedDevice(await newDb(), '2027-01-01');
-		const r = restoreRig({ db: device.db, store: device.profile });
-		await toConfirm(r, backupFile());
-		const before = await sevenRows(device.db);
-		const put = IDBObjectStore.prototype.put;
-		const spy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
-			this: IDBObjectStore,
-			value: unknown,
-			key?: IDBValidKey
-		) {
-			if (this.name === 'timeline-state') throw new DOMException('full', 'QuotaExceededError');
-			return put.call(this, value, key);
-		});
-		await r.flow.replace();
-		spy.mockRestore();
+	it.each<[string, ((r: Rig) => void) | null, string, string | null]>([
+		['nothing else happens', null, 'file-chosen', 'E_WRITE_FAILED'],
+		[
+			'the person switches apps meanwhile',
+			(r) => r.session.relockSync('hygiene'),
+			'file-chosen',
+			'E_LEFT_APP'
+		],
+		[
+			'the page leaves meanwhile',
+			(r) => r.win.dispatchEvent(new Event('pagehide')),
+			'idle',
+			'E_LOCKED'
+		]
+	])(
+		'a write that fails part-way leaves every row as it was when %s',
+		async (_name, act, phase, message) => {
+			const device = await finishedDevice(await newDb(), '2027-01-01');
+			const r = restoreRig({ db: device.db, store: device.profile });
+			await toConfirm(r, backupFile());
+			const before = await sevenRows(device.db);
+			if (act) duringCommit(r, () => act(r));
+			const put = IDBObjectStore.prototype.put;
+			const spy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+				this: IDBObjectStore,
+				value: unknown,
+				key?: IDBValidKey
+			) {
+				if (this.name === 'timeline-state') throw new DOMException('full', 'QuotaExceededError');
+				return put.call(this, value, key);
+			});
+			await r.flow.replace();
+			spy.mockRestore();
 
-		expect(await sevenRows(device.db)).toStrictEqual(before);
-		expect(r.session.message).toBe('E_WRITE_FAILED');
-		expect(r.flow.view.line).toContain('Nothing on this device was changed');
-		expect(r.session.committing).toBe(false);
-		expect(r.session.phase).toBe('file-chosen');
-		expect(r.session.busy).toBe(false);
-		expect(r.published).toEqual([]);
+			expect(await sevenRows(device.db)).toStrictEqual(before);
+			expect(r.session.message).toBe(message);
+			expect(r.flow.view.line).toContain('Nothing on this device was changed');
+			expect(r.session.committing).toBe(false);
+			expect(r.session.phase).toBe(phase);
+			expect(r.session.busy).toBe(false);
+			expect(r.published).toEqual([]);
+			// The typed words stay for a try again, unless the page left.
+			expect(r.field.value).toBe(phase === 'idle' ? '' : PHRASE);
 
-		await r.flow.submit(PHRASE);
-		await r.flow.replace();
-		expect(r.session.phase).toBe('committed');
-	});
+			if (phase === 'file-chosen') {
+				await r.flow.submit(PHRASE);
+				await r.flow.replace();
+				expect(r.session.phase).toBe('committed');
+			}
+		}
+	);
 
 	// Cancel pressed while Replace is queued behind another save: the request is withdrawn, nothing is written, no tab is
 	// told, and the person reads the stopped line.

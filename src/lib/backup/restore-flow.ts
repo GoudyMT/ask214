@@ -517,28 +517,12 @@ export class RestoreFlow {
 				await this.#confirmFrom(run, inner, label, 'E_RESTORE_DEVICE_MOVED');
 				return;
 			case 'E_WRITE_FAILED':
-				this.#afterFailedWrite(run);
+				// One transaction: a failure means nothing was written. The session applies what the person did during the
+				// commit window (a lock, an app switch, the page leaving); otherwise they are back at the file step.
+				if (this.#session.abortCommit()) run.toPre('E_WRITE_FAILED');
 				return;
 			default:
 				this.#failDevice(run, code);
-		}
-	}
-
-	/**
-	 * The writer marks the session committing just before its first put. If the transaction then fails, nothing was
-	 * written (it is one transaction), so the session is no longer committing: whatever the person did meanwhile is
-	 * applied now, and otherwise they are back at the file step.
-	 */
-	#afterFailedWrite(run: Run): void {
-		const session = this.#session;
-		const mover = session.epochMovedBy;
-		if (session.committing) session.committing = false;
-		if (mover === 'idle' || mover === 'user' || mover === 'peer') {
-			session.relockSync(mover);
-		} else if (mover === 'navigated') {
-			session.cancel('navigated');
-		} else {
-			run.toPre('E_WRITE_FAILED');
 		}
 	}
 

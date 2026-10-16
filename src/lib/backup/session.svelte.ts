@@ -510,6 +510,23 @@ export class BackupSession {
 		this.#disarm();
 	};
 
+	/**
+	 * The restore writer's transaction failed after `markCommitting`, so nothing was written and the session is no
+	 * longer committing. What the person did during that window was only recorded; it is applied now, once, as it
+	 * would have been without the commit, and the record is cleared so it never follows them into a retry. Returns
+	 * true when nothing stopped the session and the caller returns to the file step itself.
+	 */
+	abortCommit(): boolean {
+		const mover = this.epochMovedBy;
+		this.committing = false;
+		this.epochMovedBy = null;
+		if (mover === null) return true;
+		if (mover === 'pagehide') this.#clear('pagehide', 'E_LOCKED');
+		else if (mover === 'navigated') this.cancel('navigated');
+		else this.#relock(mover);
+		return false;
+	}
+
 	/** What a flow handed the session to hold, or null. */
 	held(slot: HoldSlot): unknown {
 		return this.#holds[slot];

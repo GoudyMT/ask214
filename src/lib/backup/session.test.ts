@@ -853,6 +853,68 @@ describe('relock while committing', () => {
 	);
 });
 
+describe('a write that failed after it was marked committing', () => {
+	// The writer marks the session just before its first put; if the one transaction then fails, nothing was written and
+	// the session must stop being committing. Whatever the person did during that window is applied now, once.
+	it.each<[string, ((h: H) => void) | null, boolean, Phase, BackupCode | null]>([
+		['nothing happened', null, true, 'writing', null],
+		['an app switch', (h) => h.s.relockSync('hygiene'), false, 'file-chosen', 'E_LEFT_APP'],
+		['an idle lock', (h) => h.s.relockSync('idle'), false, 'idle', 'E_LOCKED'],
+		['the person locking', (h) => h.s.relockSync('user'), false, 'idle', 'E_LOCKED'],
+		['another tab locking', (h) => h.s.relockSync('peer'), false, 'idle', 'E_LOCKED'],
+		['the card leaving', (h) => h.s.cardGone(), false, 'idle', null],
+		[
+			'the page leaving',
+			(h) => h.win.dispatchEvent(new Event('pagehide')),
+			false,
+			'idle',
+			'E_LOCKED'
+		]
+	])(
+		'%s during the write is applied when the write fails',
+		(_name, act, noStop, phase, message) => {
+			const h = harness();
+			startRestore(h);
+			const input = { value: 'words' };
+			h.s.registerInput(input);
+			const run = h.s.beginRun() as Run;
+			run.enter('writing');
+			h.s.markCommitting();
+			act?.(h);
+
+			expect(h.s.abortCommit()).toBe(noStop);
+			expect(h.s.committing).toBe(false);
+			expect(h.s.epochMovedBy).toBeNull();
+			expect(h.s.phase).toBe(phase);
+			expect(h.s.message).toBe(message);
+			expect(input.value).toBe(phase === 'idle' ? '' : 'words');
+			expect(h.s.concealed).toBe(phase === 'file-chosen');
+			if (noStop) {
+				// The caller returns to the file step itself; the session is still the same writing run.
+				expect(run.isCurrent()).toBe(true);
+				expect(run.toPre('E_WRITE_FAILED')).toBe(true);
+				expect(h.s.phase).toBe('file-chosen');
+			}
+		}
+	);
+
+	// What was recorded for the failed attempt must not follow the person into the next one.
+	it('the retry after an app switch records its own lock, not the earlier one', () => {
+		const h = harness();
+		startRestore(h);
+		(h.s.beginRun() as Run).enter('writing');
+		h.s.markCommitting();
+		h.s.relockSync('hygiene');
+		h.s.abortCommit();
+		const retry = h.s.beginRun() as Run;
+		retry.enter('writing');
+		h.s.markCommitting();
+		expect(h.s.epochMovedBy).toBeNull();
+		h.s.relockSync('user');
+		expect(h.s.epochMovedBy).toBe('user');
+	});
+});
+
 // ---- walk totality -----------------------------------------------------------------------------------------------
 
 describe('relock walk totality', () => {
