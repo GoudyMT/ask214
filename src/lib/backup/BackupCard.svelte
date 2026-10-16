@@ -217,6 +217,12 @@
 		return row === 'export' ? makeOpen : kind === row;
 	}
 
+	// Not `disabled`: a disabled button that holds focus drops it. The tap is guarded in `toggleRow` and `openRow`, and
+	// a screen reader is told the row is off.
+	function isInert(row: SessionKind): boolean {
+		return !isOpen(row) && (!allowed(row) || session.active);
+	}
+
 	// ---- keeping the card in step ---------------------------------------------------------------------------------
 
 	$effect(() => {
@@ -493,9 +499,10 @@
 		<button
 			id="backup-toggle-{row}"
 			class="backup-toggle"
-			class:backup-toggle--off={!isOpen(row) && (!allowed(row) || session.active)}
+			class:backup-toggle--off={isInert(row)}
 			type="button"
 			aria-expanded={isOpen(row)}
+			aria-disabled={isInert(row)}
 			aria-controls={controls}
 			onclick={() => toggleRow(row)}
 			onkeydown={guardEnter}

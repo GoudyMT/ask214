@@ -433,6 +433,7 @@ describe('the card at rest', () => {
 		await expect.element(text(CARD_INTRO_LINE)).toBeVisible();
 		for (const name of [CARD_LABELS.make, CARD_LABELS.restore, CARD_LABELS.check]) {
 			await expect.element(toggle(name, false)).toBeVisible();
+			expect(toggle(name, false).element().getAttribute('aria-disabled')).toBe('false');
 		}
 		await expect.element(text(NOT_IN_BACKUPS_LEAD)).toBeVisible();
 		for (const item of NOT_IN_BACKUPS) await expect.element(text(item)).toBeVisible();
@@ -468,13 +469,15 @@ describe('the card at rest', () => {
 		['the saved data is damaged', { status: 'damaged' }, CARD_LABELS.make]
 	])('a row stays closed when %s', async (_why, opts, row) => {
 		const card = await mount(opts);
-		await userEvent.click(toggle(row, false));
+		// A plain click: the browser's own click helper waits for an enabled control, and this one says it is not.
+		(toggle(row, false).element() as HTMLElement).click();
 		await pause(50);
 		expect(card.session.phase).toBe('idle');
 		await expect.element(toggle(row, false)).toBeVisible();
 		expect(text(GETTING_READY_LINE).query()).toBeNull();
-		// Inert, not broken: the tap starts nothing and raises no error line.
+		// Inert, not broken: the tap starts nothing and raises no error line, and a screen reader is told it is off.
 		expect(page.getByRole('status').query()).toBeNull();
+		expect(toggle(row, false).element().getAttribute('aria-disabled')).toBe('true');
 	});
 
 	// A start the app refuses is not an unfinished setup: the line must not blame the person's setup for it.
@@ -487,6 +490,7 @@ describe('the card at rest', () => {
 			configurable: true,
 			get: () => (reads++ === 0 ? real : null)
 		});
+		reads = 0;
 		await userEvent.click(toggle(CARD_LABELS.make, false));
 		await expect
 			.element(text(need(backupMessage('E_WORKER_FAILED', { path: 'export' }))))
