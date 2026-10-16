@@ -203,8 +203,9 @@ describe('takeSnapshot: what a backup reads', () => {
 		zeroizeRecord(snap.profile as unknown as Record<string, unknown>);
 	});
 
-	// A writer that skips the locks (an older tab) must still land wholly before or after the cut. The peer's rows are
-	// staged first, put back, and written again the moment the snapshot opens its transaction.
+	// The cut must hold by itself and not lean on the locks, so the peer here writes without them and only the single
+	// transaction keeps the read whole. The peer's rows are staged first, put back, and written again the moment the
+	// snapshot opens its transaction.
 	it('a peer write lands wholly before or after the cut', async () => {
 		const profile = await finishedDevice();
 		const timeline = await loadedTimeline();
