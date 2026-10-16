@@ -53,6 +53,81 @@ export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
 	"this device's settings (theme, Ask mode)"
 ]);
 
+/**
+ * What the Backup card says around the flows: its own lines, and the words on its buttons and fields. DRAFT, for the
+ * owner's review, like the rest of this module. The two lines that tell the person to delete a file live in the card
+ * itself, because this module's test refuses that word in any string it exports.
+ */
+export const CARD_INTRO_LINE =
+	'This file is yours. Erase does not remove it. Keep it off this phone, and keep the passphrase somewhere else.';
+export const lastBackupLine = (date: string): string => 'Last backup: ' + date;
+export const NO_BACKUP_YET_LINE = 'No backup yet.';
+export const GETTING_READY_LINE = 'Getting ready...';
+export const FINISH_SETUP_LINE = 'Finish setup first, then make a backup.';
+export const PHRASE_NOTE =
+	'Write these words down, or type them below so your password manager saves them. Do not copy or screenshot them.';
+export const HIDDEN_WHILE_AWAY_LINE = 'Hidden while you were away.';
+export const TYPE_BACK_LINE =
+	'Type the 6 words below. This checks for typing mistakes, and lets your password manager save them.';
+export const STOPPING_LINE = 'Stopping...';
+export const ONLY_RESTORE_YOURS_LINE = 'Only restore a backup you made.';
+export const NOT_IN_BACKUPS_LEAD = 'Not in backups';
+export const madeOnLine = (date: string): string => 'Made on ' + date + '.';
+export const savedLine = (fileName: string): string =>
+	'Backup saved as ' + fileName + '. It was read back and matches.';
+export const downloadedLine = (fileName: string): string =>
+	'Backup downloaded as ' + fileName + ', usually to your Downloads folder.';
+export const notCheckedLine = (fileName: string): string =>
+	'Saved as ' + fileName + ', but not checked. Use Check a backup.';
+
+export const CARD_LABELS = Object.freeze({
+	heading: 'Backup',
+	make: 'Make a backup',
+	restore: 'Restore from a backup',
+	check: 'Check a backup',
+	show: 'Show my passphrase',
+	hide: 'Hide words',
+	chooseFile: 'Choose file',
+	checkNow: 'Check this backup now',
+	chooseAnother: 'Choose another place',
+	replaceIt: 'Replace it',
+	makeAgain: 'Make a new backup',
+	cancel: 'Cancel',
+	replace: 'Replace',
+	reload: 'Reload',
+	restoreSubmit: 'Restore',
+	checkSubmit: 'Check',
+	passphrase: 'Passphrase',
+	backupName: 'Backup name'
+});
+
+function counted(n: number, one: string, many: string): string {
+	return n + ' ' + (n === 1 ? one : many);
+}
+
+/** What a backup holds, as kinds and counts. Never a date the person set or a word of a note. */
+export function summaryLines(s: {
+	separationDate: boolean;
+	skillbridgeStart: boolean;
+	terminalLeaveStart: boolean;
+	tasks: number;
+	notes: number;
+	calendarExclusions: number;
+	calendarCard: boolean;
+}): string[] {
+	const lines: string[] = [];
+	if (s.separationDate) lines.push('separation date set');
+	if (s.skillbridgeStart) lines.push('SkillBridge start date set');
+	if (s.terminalLeaveStart) lines.push('terminal leave start date set');
+	lines.push(counted(s.tasks, 'task with a status', 'tasks with a status'));
+	lines.push(counted(s.notes, 'note', 'notes'));
+	if (s.calendarExclusions > 0) {
+		lines.push(counted(s.calendarExclusions, 'calendar exclusion', 'calendar exclusions'));
+	}
+	if (s.calendarCard) lines.push('calendar card dismissed');
+	return lines;
+}
+
 type TextPath = 'export' | 'restore';
 
 /**

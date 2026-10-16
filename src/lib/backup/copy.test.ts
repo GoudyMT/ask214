@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { BACKUP_CODES, type BackupCode } from './codes';
 import {
 	backupMessage,
+	CARD_INTRO_LINE,
+	CARD_LABELS,
 	CHECK_NEW_BACKUP_OFFER,
 	checkOpensLine,
 	COPY_OWED,
@@ -9,12 +11,27 @@ import {
 	DEVICE_NO_DATA_LINE,
 	deviceChangedLine,
 	deviceMatchesLine,
+	downloadedLine,
 	ERASE_DEVICE_BUTTON,
+	FINISH_SETUP_LINE,
+	GETTING_READY_LINE,
+	HIDDEN_WHILE_AWAY_LINE,
+	lastBackupLine,
 	LOCKED_AFTER_RESTORE_LINE,
+	madeOnLine,
 	MAKE_NEW_BACKUP_BUTTON,
+	NO_BACKUP_YET_LINE,
 	NOT_IN_BACKUPS,
+	NOT_IN_BACKUPS_LEAD,
+	notCheckedLine,
+	ONLY_RESTORE_YOURS_LINE,
+	PHRASE_NOTE,
 	RESTORED_RELOAD_LINE,
 	RESTORED_UNLOCK_LINE,
+	savedLine,
+	STOPPING_LINE,
+	summaryLines,
+	TYPE_BACK_LINE,
 	type MessageContext
 } from './copy';
 import * as copyModule from './copy';
@@ -291,6 +308,25 @@ function reachable(code: BackupCode): ('export' | 'restore')[] {
 	return ['export', 'restore'];
 }
 
+const FULL_SUMMARY = {
+	separationDate: true,
+	skillbridgeStart: true,
+	terminalLeaveStart: true,
+	tasks: 12,
+	notes: 3,
+	calendarExclusions: 4,
+	calendarCard: true
+};
+const ONE_SUMMARY = {
+	separationDate: true,
+	skillbridgeStart: false,
+	terminalLeaveStart: false,
+	tasks: 1,
+	notes: 1,
+	calendarExclusions: 1,
+	calendarCard: false
+};
+
 const FULL: Params = {
 	position: 3,
 	numbers: false,
@@ -330,6 +366,13 @@ function allStrings(): string[] {
 	// The line builders and the list take the app's own date text, so one sample of each stands for them.
 	out.push(deviceMatchesLine('Oct 15, 2026'), deviceChangedLine('date unknown'));
 	out.push(checkOpensLine('Oct 15, 2026'), ...NOT_IN_BACKUPS);
+	out.push(lastBackupLine('Oct 15, 2026'), madeOnLine('Oct 15, 2026'));
+	out.push(savedLine('a.json'), downloadedLine('a.json'), notCheckedLine('a.json'));
+	out.push(
+		...summaryLines(FULL_SUMMARY),
+		...summaryLines(ONE_SUMMARY),
+		...Object.values(CARD_LABELS)
+	);
 	return out;
 }
 
@@ -380,6 +423,81 @@ describe('backupMessage wording', () => {
 			'saved documents',
 			"this device's settings (theme, Ask mode)"
 		]);
+	});
+
+	it('the card lines are exact', () => {
+		expect(CARD_INTRO_LINE).toBe(
+			'This file is yours. Erase does not remove it. Keep it off this phone, and keep the passphrase somewhere else.'
+		);
+		expect(lastBackupLine('Oct 15, 2026')).toBe('Last backup: Oct 15, 2026');
+		expect(NO_BACKUP_YET_LINE).toBe('No backup yet.');
+		expect(GETTING_READY_LINE).toBe('Getting ready...');
+		expect(FINISH_SETUP_LINE).toBe('Finish setup first, then make a backup.');
+		expect(PHRASE_NOTE).toBe(
+			'Write these words down, or type them below so your password manager saves them. Do not copy or screenshot them.'
+		);
+		expect(HIDDEN_WHILE_AWAY_LINE).toBe('Hidden while you were away.');
+		expect(TYPE_BACK_LINE).toBe(
+			'Type the 6 words below. This checks for typing mistakes, and lets your password manager save them.'
+		);
+		expect(STOPPING_LINE).toBe('Stopping...');
+		expect(ONLY_RESTORE_YOURS_LINE).toBe('Only restore a backup you made.');
+		expect(NOT_IN_BACKUPS_LEAD).toBe('Not in backups');
+		expect(madeOnLine('Oct 15, 2026')).toBe('Made on Oct 15, 2026.');
+		expect(savedLine('a.json')).toBe('Backup saved as a.json. It was read back and matches.');
+		expect(downloadedLine('a.json')).toBe(
+			'Backup downloaded as a.json, usually to your Downloads folder.'
+		);
+		expect(notCheckedLine('a.json')).toBe('Saved as a.json, but not checked. Use Check a backup.');
+	});
+
+	it('the button and label words are exact', () => {
+		expect(CARD_LABELS).toEqual({
+			heading: 'Backup',
+			make: 'Make a backup',
+			restore: 'Restore from a backup',
+			check: 'Check a backup',
+			show: 'Show my passphrase',
+			hide: 'Hide words',
+			chooseFile: 'Choose file',
+			checkNow: 'Check this backup now',
+			chooseAnother: 'Choose another place',
+			replaceIt: 'Replace it',
+			makeAgain: 'Make a new backup',
+			cancel: 'Cancel',
+			replace: 'Replace',
+			reload: 'Reload',
+			restoreSubmit: 'Restore',
+			checkSubmit: 'Check',
+			passphrase: 'Passphrase',
+			backupName: 'Backup name'
+		});
+	});
+
+	// What a backup holds, said as kinds and counts, never a value.
+	it.each([
+		[
+			FULL_SUMMARY,
+			[
+				'separation date set',
+				'SkillBridge start date set',
+				'terminal leave start date set',
+				'12 tasks with a status',
+				'3 notes',
+				'4 calendar exclusions',
+				'calendar card dismissed'
+			]
+		],
+		[
+			ONE_SUMMARY,
+			['separation date set', '1 task with a status', '1 note', '1 calendar exclusion']
+		],
+		[
+			{ ...ONE_SUMMARY, tasks: 0, notes: 0, calendarExclusions: 0 },
+			['separation date set', '0 tasks with a status', '0 notes']
+		]
+	])('the summary lines for %j', (summary, expected) => {
+		expect(summaryLines(summary)).toEqual(expected);
 	});
 
 	it('the sentence that says nothing was changed ships only in a text the table pins', () => {
