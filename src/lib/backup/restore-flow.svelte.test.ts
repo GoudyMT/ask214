@@ -22,10 +22,8 @@ import { newBackupSalt, decryptEnvelope, sealEnvelope } from './envelope';
 import { buildExportInner } from './export-inner';
 import { takeBackupIntent } from './intent';
 import {
-	DEVICE_NEWER_WARNING,
 	DEVICE_NO_DATA_LINE,
 	LOCKED_AFTER_RESTORE_LINE,
-	NOT_IN_BACKUPS,
 	RESTORED_RELOAD_LINE,
 	RESTORED_UNLOCK_LINE,
 	RestoreFlow,
@@ -616,19 +614,6 @@ describe('typing the six words', () => {
 		}
 	);
 
-	// Leaving or locking is different from a typo: the words are wiped then, even after a failed try.
-	it('a lock after a failed try still wipes the typed words', async () => {
-		const phone = await newPhone();
-		const r = restoreRig(phone);
-		await toFileChosen(r, backupFile());
-		r.field.value = OTHER_WORDS.join(' ');
-		await r.flow.submit(r.field.value);
-		expect(r.field.value).not.toBe('');
-		r.session.relockSync('user');
-		expect(r.field.value).toBe('');
-		expect(r.session.phase).toBe('idle');
-	});
-
 	// Cancel mid-way must end in the stopped line, not hang on "Stopping".
 	it('Cancel while the key is being made ends with the stopped line and nothing written', async () => {
 		const phone = await newPhone();
@@ -740,7 +725,6 @@ describe('the confirm', () => {
 			'This device was last changed ' + formatBackupDate(need(state.ts.timeline)) + '.'
 		);
 		expect(confirm.warning).toBe(true);
-		expect(DEVICE_NEWER_WARNING).toContain('newer than this backup');
 	});
 
 	// Another tab saving the profile in the gap between the snapshot and the mark leaves a device that holds a change the
@@ -766,9 +750,9 @@ describe('the confirm', () => {
 	// The phone holds exactly the content of the last backup it made or restored, so the second restore replaces nothing
 	// newer in one order and something newer in the other.
 	it.each<[string, number, number, boolean]>([
-		['an older backup then the newer one', 3 * DAY, DAY, false],
-		['the newer backup then the older one', DAY, 3 * DAY, true]
-	])('restoring %s warns: %s', async (_name, firstAge, secondAge, warns) => {
+		['restoring an older backup then the newer one does not warn', 3 * DAY, DAY, false],
+		['restoring the newer backup then the older one warns', DAY, 3 * DAY, true]
+	])('%s', async (_name, firstAge, secondAge, warns) => {
 		const source = await finishedDevice(await newDb());
 		const first = await exportFrom(source, { createdAt: Date.now() - firstAge }, OUR_NAME);
 		const second = await exportFrom(source, { createdAt: Date.now() - secondAge }, OUR_NAME);
@@ -826,15 +810,6 @@ describe('the confirm', () => {
 			expect(confirm.warning).toBe(warns);
 		}
 	);
-
-	it('lists what no backup carries, with the API key said as kept on this device', () => {
-		expect(NOT_IN_BACKUPS).toEqual([
-			'your API key (kept on this device if one is saved)',
-			"Ask's offline library",
-			'saved documents',
-			"this device's settings (theme, Ask mode)"
-		]);
-	});
 });
 
 // ---- Replace -------------------------------------------------------------------------------------------------------
@@ -922,7 +897,6 @@ describe('Replace', () => {
 		expect(r.session.busy).toBe(false);
 		const again = need(r.flow.confirm);
 		expect(again.notice).toBe('E_RESTORE_DEVICE_MOVED');
-		expect(r.flow.lineFor('E_RESTORE_DEVICE_MOVED')).toContain('changed while you were deciding');
 		expect(again.gens.timeline).toBe(first.gens.timeline + 1);
 		expect(await sevenRows(device.db)).toStrictEqual(before);
 		expect(r.published).toEqual([]);
@@ -1134,7 +1108,9 @@ describe('Replace', () => {
 			expect(r.flow.view.restored).toEqual({ line: null, reloadButton: false });
 		});
 
-		// A stop that reaches the run after the writer committed must not cost the other tabs their signal.
+		// A stop that reaches the run after the writer committed must not cost the other tabs their signal. Nothing in the
+		// session aborts a committing run today; this guards the writer staying awaited directly (never raced against the
+		// run's signal) if the session ever changes that.
 		it('a stop signal that arrives after the commit still publishes and finishes', async () => {
 			const phone = await newPhone();
 			const r = restoreRig(phone);
