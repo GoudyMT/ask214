@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 // The root layout loads on every page, and app-init is the code it runs at start-up. The backup code (the session,
 // the flows, the word list loader) is for the Settings and wizard pages alone: one import from either entry, however
-// deep, would ship it to every page, and the layout is already over its size budget.
+// deep, would ship it to every page.
 const SRC = fileURLToPath(new URL('../../', import.meta.url));
 const ENTRIES = [join(SRC, 'routes/+layout.svelte'), join(SRC, 'lib/profile/app-init.ts')];
 const BACKUP = join(SRC, 'lib/backup') + sep;
@@ -17,7 +17,10 @@ const SHARED_LEAF = join(SRC, 'lib/backup/note-cap.ts');
 const IMPORT =
 	/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\.meta\.glob(?:Eager)?\s*\(\s*\[?\s*|\bimport\s+)(['"`])([^'"`\r\n]+)\1/g;
 
-function localFile(specifier: string, from: string): string | null {
+function localFile(rawSpecifier: string, from: string): string | null {
+	// A Vite suffix (`?raw`, `?worker`, `?url`) names the same file; left on, the file would not be found and a backup
+	// import written that way would pass the scan.
+	const specifier = rawSpecifier.split('?')[0] ?? rawSpecifier;
 	let base: string;
 	if (specifier.startsWith('.')) base = resolve(dirname(from), specifier);
 	else if (specifier.startsWith('$lib/')) base = join(SRC, 'lib', specifier.slice('$lib/'.length));
