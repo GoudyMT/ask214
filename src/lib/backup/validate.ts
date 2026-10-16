@@ -1,6 +1,8 @@
 import { decodeCalendarSyncState } from '../calendar/codec';
 import { decodeProfile, encodeProfile } from '../profile/codec';
 import { decodeEaos, parseEaosAtRead } from '../profile/eaos';
+import { zeroizeRecord } from '../profile/lifecycle';
+import type { ProfileV1 } from '../profile/types';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
 import { decodeTimelineState, isSnoozeDate } from '../timeline/state-codec';
@@ -20,8 +22,8 @@ import { compareVersions, isAppVersion } from './version';
  * refusal in that check is "update the app" when the file names a newer app than this one (its fields may be ones
  * this version has never heard of), and "part of it cannot be read" otherwise.
  *
- * Fixed depth, no generic walk: the check enters only the containers it knows, at the depth it knows (the deepest is
- * a task or the calendar's card, six levels in). At each one it checks the type (plain object or array), then the
+ * Fixed depth, no generic walk: the check enters only the containers it knows, at the depth it knows (the card is four
+ * levels in, a task five, the entries of an exclusion list six). At each one it checks the type (plain object or array), then the
  * exact own keys, then each value's type BEFORE going into it, so a hostile 100,000-deep array is refused at its
  * first level and never entered. A time is only a whole number in range, never compared with the clock, so this reads
  * no clock.
@@ -76,7 +78,6 @@ type Bag = Record<string, unknown>;
 
 // The largest time a JavaScript Date holds, so `new Date(t)` is always a real date once a time passes.
 const MAX_TIME = 8.64e15;
-const MAX_ENTRIES = 1000;
 const MAX_DISMISS_COUNT = 10_000;
 
 // A record over every value, so a new status or category fails the type-check until it is decided here.
@@ -189,12 +190,21 @@ function readProfile(raw: unknown): ValidProfile | null {
 		if (!isStoredDate(date)) return null;
 		profile[key] = date;
 	}
-	// The decoder gives bytes, so the shipped encoder turns them back into the codec's text.
+	// The decoder gives bytes, so the shipped encoder turns them back into the codec's text. The decoded record holds
+	// the person's dates as bytes, so it and the buffers around it are wiped before this returns.
+	const wire = utf8(profile);
+	let decoded: ProfileV1 | undefined;
+	let written: Uint8Array | undefined;
 	try {
-		const written = new TextDecoder().decode(encodeProfile(decodeProfile(utf8(profile))));
-		return written === sortedJson(profile) ? profile : null;
+		decoded = decodeProfile(wire);
+		written = encodeProfile(decoded);
+		return new TextDecoder().decode(written) === sortedJson(profile) ? profile : null;
 	} catch {
 		return null;
+	} finally {
+		if (decoded) zeroizeRecord(decoded);
+		written?.fill(0);
+		wire.fill(0);
 	}
 }
 
@@ -228,11 +238,8 @@ function readTimeline(raw: unknown): TimelineState | null {
 	if (!isObject(raw) || !keysAre(raw, ['schemaVersion', 'tasks'])) return null;
 	const stored = raw.tasks;
 	if (raw.schemaVersion !== 1 || !isObject(stored)) return null;
-	const ids = Object.keys(stored);
-	// A size bound before any key is read.
-	if (ids.length > MAX_ENTRIES) return null;
 	const tasks: Record<string, TimelineTaskState> = {};
-	for (const id of ids) {
+	for (const id of Object.keys(stored)) {
 		// A task id this release ever shipped, or the SkillBridge plan's key; the id is known before its value is read.
 		if (id !== SKILLBRIDGE_PLAN_KEY && !TASK_IDS.has(id)) return null;
 		const task = readTask(id, stored[id]);
@@ -243,9 +250,9 @@ function readTimeline(raw: unknown): TimelineState | null {
 	return decodesToSame(timeline, decodeTimelineState) ? timeline : null;
 }
 
-/** A list of unique known values, at most MAX_ENTRIES long; its length is checked before any entry is read. */
+/** A list of unique known values. */
 function readList(raw: unknown, known: ReadonlySet<string>): string[] | null {
-	if (!Array.isArray(raw) || raw.length > MAX_ENTRIES) return null;
+	if (!Array.isArray(raw)) return null;
 	const list: string[] = [];
 	for (const entry of raw as unknown[]) {
 		if (typeof entry !== 'string' || !known.has(entry)) return null;

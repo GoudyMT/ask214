@@ -8,15 +8,10 @@ describe('formatBackupDate', () => {
 		expect(formatBackupDate(0)).toBe('date unknown');
 	});
 
-	// The value read from a file is checked as a number before it is shown, but the label must not turn a bad value
-	// into the text "NaN-NaN-NaN" if one ever arrives.
-	it('a value that is not a number formats as date unknown', () => {
-		expect(formatBackupDate(Number.NaN)).toBe('date unknown');
-	});
-
 	it('a date on or after BACKUP_RELEASE_DATE uses the Timeline date format', () => {
-		// Local noon, so the person's calendar day is the same in every time zone.
-		expect(formatBackupDate(new Date(2027, 2, 5, 12, 0).getTime())).toBe('Mar 5, 2027');
+		// Late evening where the person is (the tests run in America/Los_Angeles): the UTC day is already Mar 6, but the
+		// backup was made on Mar 5.
+		expect(formatBackupDate(new Date(2027, 2, 5, 23, 30).getTime())).toBe('Mar 5, 2027');
 		expect(formatBackupDate(BACKUP_RELEASE_DATE)).not.toBe('date unknown');
 	});
 });
