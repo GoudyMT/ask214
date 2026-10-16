@@ -282,9 +282,8 @@ describe('the save picker and the type-back', () => {
 
 		const pending = flow.submit(event, TYPED);
 		expect(picker).toHaveBeenCalledTimes(1);
-		expect(picker).toHaveBeenCalledWith(
-			expect.objectContaining({ suggestedName: session.names?.fileName })
-		);
+		// Only the name: the browser's own dialog text is the browser's.
+		expect(picker).toHaveBeenCalledWith({ suggestedName: session.names?.fileName });
 		expect(event.preventDefault).toHaveBeenCalledTimes(1);
 		expect(session.phase).toBe('picking-save');
 		expect(session.busy).toBe(true);

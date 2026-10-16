@@ -37,10 +37,7 @@ export type SaveHandle = {
 	createWritable: () => Promise<SaveWritable>;
 };
 
-export type SavePicker = (options: {
-	suggestedName: string;
-	types: { description: string; accept: Record<string, string[]> }[];
-}) => Promise<SaveHandle>;
+export type SavePicker = (options: { suggestedName: string }) => Promise<SaveHandle>;
 
 export type ExportDeps = {
 	session: BackupSession;
@@ -88,8 +85,6 @@ type Prepared = { text: string; gens: Gens; backupAt: number; fileName: string }
 type Pending = { run: Run; pass: Uint8Array<ArrayBuffer>; handle: SaveHandle };
 
 const STOPPED: ExportResult = { kind: 'stopped' };
-
-const PICKER_TYPES = [{ description: 'Ask 214 backup', accept: { 'application/json': ['.json'] } }];
 
 function defaultSavePicker(): SavePicker | null {
 	const picker = (window as { showSaveFilePicker?: SavePicker }).showSaveFilePicker;
@@ -262,7 +257,7 @@ export class ExportFlow {
 		const picker = (this.#deps.getSavePicker ?? defaultSavePicker)();
 		if (picker === null) return null;
 		try {
-			return picker({ suggestedName, types: PICKER_TYPES });
+			return picker({ suggestedName });
 		} catch (error) {
 			return Promise.reject(error);
 		}
