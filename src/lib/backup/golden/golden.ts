@@ -16,7 +16,7 @@
  *
  * `GOLDEN_ARGON2_HEX` is Argon2id (version 0x13, t 4, m 131072, p 2, 32 bytes) of the password's UTF-8 bytes and the
  * salt, computed by hash-wasm 4.12.0 and confirmed by @noble/hashes 2.4.0. The unit test stands in for the slow key
- * step with this value; the browser test that runs the real worker proves the same key.
+ * step with this value.
  *
  * This module imports nothing, so no change to app code can move a pinned value.
  */
@@ -33,14 +33,11 @@ export const GOLDEN_SALT: Uint8Array<ArrayBuffer> = Uint8Array.from(
 export const GOLDEN_ARGON2_HEX = '7bc54241a22e08156776840ffbde06b7bd17fe4bc5e09e443c79b3341af54f5e';
 
 /** SHA-256 of the committed file's bytes. */
-export const GOLDEN_SHA256 = 'b6f973c49f2b5b5ff0e8ff1ae65db4fae4ef4758f46bf62bf8f7a6daaf44f893';
-
-/** The inner's `createdAt` (2026-10-16T12:00:00Z) and `appVersion`. */
-export const GOLDEN_CREATED_AT = 1792152000000;
-export const GOLDEN_APP_VERSION = '1.8.0';
+export const GOLDEN_SHA256 = '6ad12ccf8980b383785778fd2db8da304a67286f90693078f401b7114593f573';
 
 // Emoji (a surrogate pair), Hebrew and Arabic text, a right-to-left override, a quote and a backslash: everything a
 // note's JSON text has to escape or keep apart. Built from code units so this file stays ASCII.
+const LINE_BREAK = String.fromCharCode(10);
 const MIXED_NOTE = [
 	'call ',
 	String.fromCharCode(0xd83d, 0xde00),
@@ -76,13 +73,15 @@ export const GOLDEN_EXPECTED = {
 			'login-gov-account': { status: 'done', notes: 'Used the second email address' },
 			'update-sgli': { status: 'skipped' },
 			'tap-course': { status: 'snoozed', snoozeUntil: '2027-01-15', notes: MIXED_NOTE },
-			'job-search': { notes: 'Ask the career office about the resume workshop' },
+			// Two lines, the commonest thing a note box saves.
+			'job-search': {
+				notes: ['Ask the career office', 'about the resume workshop'].join(LINE_BREAK)
+			},
 			'will-poa': { status: 'snoozed' },
 			'skillbridge-plan': { status: 'snoozed', snoozeUntil: '2027-02-01' }
 		}
 	},
 	calendar: {
-		schemaVersion: 1,
 		exclusions: { taskIds: ['will-poa', 'job-search'], categories: ['finance', 'career'] },
 		card: { dismissedAt: 1791892800000, dismissCount: 2 }
 	}

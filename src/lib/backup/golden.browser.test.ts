@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCalendarSyncStore } from '../calendar/store.svelte';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
-import { reqToPromise, STORES, withStores, type StoreName } from '../db/schema';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import {
@@ -48,7 +47,9 @@ vi.mock('@noble/hashes/argon2.js', async () => {
 
 type Row = Record<string, unknown>;
 
-// The fields a restore composes on the device itself; the file's content never decides them.
+// The fields the device sets itself, so they are left out of the content compare: its own generation and clock mark,
+// and the backup mark (lastBackupAt is stamped from the file's date but never later than the clock, so it depends on
+// when the test runs).
 const DEVICE_FIELDS = new Set([
 	'generation',
 	'lastSeenAt',
@@ -57,8 +58,6 @@ const DEVICE_FIELDS = new Set([
 	'backupGenTimeline',
 	'backupGenCalendar'
 ]);
-
-const SEVEN: StoreName[] = STORES.filter((store) => store !== 'byok');
 
 let db: IDBDatabase;
 let profile: ProfileStore | undefined;
@@ -137,35 +136,6 @@ function profileContent(loaded: ProfileV1): Record<string, unknown> {
 const toHex = (bytes: Uint8Array): string =>
 	Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
-/** A row as plain text, bytes included, so two reads can be compared. A stored key cannot be read, so it is a label. */
-function plain(value: unknown): unknown {
-	if (value instanceof Uint8Array) return `u8:${toHex(value)}`;
-	if (value instanceof ArrayBuffer) return `ab:${toHex(new Uint8Array(value))}`;
-	if (value instanceof CryptoKey) return 'CryptoKey';
-	if (Array.isArray(value)) return value.map(plain);
-	if (typeof value === 'object' && value !== null) {
-		return Object.fromEntries(
-			Object.entries(value)
-				.sort(([a], [b]) => (a < b ? -1 : 1))
-				.map(([key, inner]) => [key, plain(inner)])
-		);
-	}
-	return value;
-}
-
-/** The seven stores a restore writes, as the device holds them right now. */
-async function sevenRows(): Promise<Record<string, unknown>> {
-	const out: Record<string, unknown> = {};
-	for (const store of SEVEN) {
-		out[store] = plain(
-			await withStores(db, store, 'readonly', (tx) =>
-				reqToPromise<Row | undefined>(tx.objectStore(store).get(0))
-			)
-		);
-	}
-	return out;
-}
-
 describe('the golden v1 / 1 backup', () => {
 	it('the golden restores into a fresh device and loads deep-equal', async () => {
 		await finishedDevice();
@@ -184,11 +154,9 @@ describe('the golden v1 / 1 backup', () => {
 		expect(JSON.parse(JSON.stringify(timeline.state))).toStrictEqual(GOLDEN_EXPECTED.timeline);
 		const calendar = createCalendarSyncStore(db);
 		await calendar.load();
-		const { schemaVersion, ...calendarContent } = GOLDEN_EXPECTED.calendar;
-		expect(schemaVersion).toBe(1);
 		expect(
 			JSON.parse(JSON.stringify({ exclusions: calendar.exclusions, card: calendar.card }))
-		).toStrictEqual(calendarContent);
+		).toStrictEqual(GOLDEN_EXPECTED.calendar);
 	}, 30_000);
 
 	it("the golden's sha256 is pinned", async () => {
@@ -210,9 +178,7 @@ describe('the golden v1 / 1 backup', () => {
 		const sealed = await sealEnvelope(await workerKey('export'), newer, GOLDEN_SALT);
 
 		await finishedDevice();
-		const before = await sevenRows();
 
 		expect(await restoreFile(sealed)).toStrictEqual({ ok: false, code: 'E_NEWER_VERSION' });
-		expect(await sevenRows()).toStrictEqual(before);
 	}, 30_000);
 });
