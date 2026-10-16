@@ -1203,11 +1203,17 @@ describe('restoring', () => {
 		await field().fill(TYPED);
 		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
 		await expect.element(page.getByRole('dialog')).toBeVisible();
+		// The confirm holds the opened key and the details it was built from.
+		expect(card.session.held('key')).toBeInstanceOf(CryptoKey);
+		expect(card.session.held('confirm')).not.toBeNull();
 
 		await userEvent.click(button(CARD_LABELS.cancel));
 
 		expect(page.getByRole('dialog').query()).toBeNull();
 		expect(card.session.phase).toBe('file-chosen');
+		// Going back drops both: Restore opens the file with the words again.
+		expect(card.session.held('key')).toBeNull();
+		expect(card.session.held('confirm')).toBeNull();
 		expect(fieldEl().value).toBe(TYPED);
 		await expect.poll(() => document.activeElement).toBe(fieldEl());
 		expect(card.reload).not.toHaveBeenCalled();
