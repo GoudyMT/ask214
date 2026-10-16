@@ -65,7 +65,7 @@ const STAGE_CODE = {
  * The code to show for anything that was thrown. A BackupError gives its own code; every other throw gives the code of
  * the stage that caught it. It never reads `e.message`, because an error's text can hold a passphrase word or a byte of
  * the file, and it never returns E_NO_MEMORY: only the key worker's own catch around Argon2id proves low memory, and
- * it throws a BackupError for it. A RangeError on the main thread is not proof, and a plain Error whose message
+ * it posts E_NO_MEMORY itself. A RangeError on the main thread is not proof, and a plain Error whose message
  * happens to be a code is not trusted either.
  */
 export function toBackupCode(e: unknown, stage: 'worker' | 'crypto' | 'content'): BackupCode {
