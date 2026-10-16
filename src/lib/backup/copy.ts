@@ -37,7 +37,6 @@ type TextPath = 'export' | 'restore';
 export const COPY_OWED: readonly Readonly<{ code: BackupCode; path: TextPath }>[] = Object.freeze([
 	Object.freeze({ code: 'E_CRYPTO_FAILED', path: 'export' } as const),
 	Object.freeze({ code: 'E_RESTORE_DEVICE_CHANGED', path: 'restore' } as const),
-	Object.freeze({ code: 'E_RESTORE_CANCELLED', path: 'restore' } as const),
 	Object.freeze({ code: 'E_BACKUP_UNAVAILABLE', path: 'export' } as const),
 	Object.freeze({ code: 'E_BACKUP_UNAVAILABLE', path: 'restore' } as const)
 ]);
@@ -195,8 +194,15 @@ export function backupMessage(code: BackupCode, ctx: MessageContext): string | n
 				path,
 				"Some data saved on this device is damaged, so this backup cannot be restored over it. Nothing on this device was changed. Erase this device's data, then restore."
 			);
-		case 'E_RESTORE_DEVICE_CHANGED':
+		case 'E_LOCKED_ELSEWHERE':
+			return path === 'restore'
+				? 'Ask 214 locked in another tab, so the backup stopped. Nothing on this device was changed. Your passphrase is still here. Unlock, then try again.'
+				: 'Ask 214 locked in another tab, so the backup stopped. Your passphrase is still here. Unlock, then try again.';
 		case 'E_RESTORE_CANCELLED':
+			return onRestore(path, 'Stopped. Nothing on this device was changed.');
+		case 'E_EXPORT_CANCELLED':
+			return onExport(path, 'Stopped. No backup was saved.');
+		case 'E_RESTORE_DEVICE_CHANGED':
 		case 'E_BACKUP_UNAVAILABLE':
 			return null;
 		default:

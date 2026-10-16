@@ -32,7 +32,9 @@ export const BACKUP_CODES = Object.freeze([
 	'E_RESTORE_DEVICE_MOVED',
 	'E_RESTORE_DEVICE_CHANGED',
 	'E_RESTORE_DEVICE_DAMAGED',
-	'E_RESTORE_CANCELLED'
+	'E_RESTORE_CANCELLED',
+	'E_LOCKED_ELSEWHERE',
+	'E_EXPORT_CANCELLED'
 ] as const);
 
 export type BackupCode = (typeof BACKUP_CODES)[number];

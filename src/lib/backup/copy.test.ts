@@ -237,7 +237,21 @@ const ROWS: Row[] = [
 		restore:
 			"Some data saved on this device is damaged, so this backup cannot be restored over it. Nothing on this device was changed. Erase this device's data, then restore."
 	},
-	{ code: 'E_RESTORE_CANCELLED', params: {}, export: null, restore: null }
+	{
+		code: 'E_RESTORE_CANCELLED',
+		params: {},
+		export: null,
+		restore: 'Stopped. Nothing on this device was changed.'
+	},
+	{
+		code: 'E_LOCKED_ELSEWHERE',
+		params: {},
+		export:
+			'Ask 214 locked in another tab, so the backup stopped. Your passphrase is still here. Unlock, then try again.',
+		restore:
+			'Ask 214 locked in another tab, so the backup stopped. Nothing on this device was changed. Your passphrase is still here. Unlock, then try again.'
+	},
+	{ code: 'E_EXPORT_CANCELLED', params: {}, export: 'Stopped. No backup was saved.', restore: null }
 ];
 
 // Which paths a code can reach in the flows. The input messages show on every path.
@@ -258,7 +272,8 @@ const EXPORT_ONLY: BackupCode[] = [
 	'E_SNAPSHOT_FAILED',
 	'E_SAVE_FAILED',
 	'E_CONTENT_TOO_LARGE',
-	'E_EXPORT_SELF_INVALID'
+	'E_EXPORT_SELF_INVALID',
+	'E_EXPORT_CANCELLED'
 ];
 
 function reachable(code: BackupCode): ('export' | 'restore')[] {
@@ -365,7 +380,6 @@ describe('backupMessage coverage', () => {
 		expect(COPY_OWED.map(key)).toEqual([
 			'E_CRYPTO_FAILED/export',
 			'E_RESTORE_DEVICE_CHANGED/restore',
-			'E_RESTORE_CANCELLED/restore',
 			'E_BACKUP_UNAVAILABLE/export',
 			'E_BACKUP_UNAVAILABLE/restore'
 		]);

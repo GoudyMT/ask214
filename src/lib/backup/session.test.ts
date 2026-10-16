@@ -640,7 +640,7 @@ describe('clearing relocks', () => {
 		expect(h.s.phase).toBe('typed-back');
 		expect(h.s.words).toBe(words);
 		expect(h.s.words).not.toBeNull();
-		expect(h.s.message).toBe('E_LOCKED');
+		expect(h.s.message).toBe('E_LOCKED_ELSEWHERE');
 		expect(h.s.held('key')).toBeNull();
 		expect(held.field.value).toBe('typed words');
 		expect(h.s.active).toBe(true);
@@ -1310,8 +1310,22 @@ describe('cancel', () => {
 		await expect(derived).rejects.toBeInstanceOf(RunAbortedError);
 		run.release();
 		expect(h.s.stopping).toBe(false);
-		expect(h.s.message).toBe('E_RESTORE_CANCELLED');
+		expect(h.s.message).toBe('E_EXPORT_CANCELLED');
 	});
+
+	// The outcome line names what was not changed, so it follows the path that was stopped.
+	it.each<['restore' | 'check']>([['restore'], ['check']])(
+		'a stopped %s reports the restore wording',
+		(kind) => {
+			const h = harness();
+			startRestore(h, kind);
+			const run = h.s.beginRun() as Run;
+			run.enter('decrypting');
+			h.s.cancel();
+			run.release();
+			expect(h.s.message).toBe('E_RESTORE_CANCELLED');
+		}
+	);
 
 	// A settle from the run Cancel stopped must not paint a message over the session the person started next.
 	it('a late settle after a new session started reports nothing', async () => {

@@ -321,6 +321,7 @@ export class BackupSession {
 	#stopRunId = -1;
 	#sessionToken = 0;
 	#stopToken = -1;
+	#stopOutcome: BackupCode = 'E_RESTORE_CANCELLED';
 	#relockable: Relockable = {
 		relockSync: (reason, detail) => this.relockSync(reason, detail),
 		refresh: () => this.refresh()
@@ -485,7 +486,7 @@ export class BackupSession {
 				if (id === this.#stopRunId && this.#stopToken === this.#sessionToken) {
 					this.#stopRunId = -1;
 					this.stopping = false;
-					this.message = 'E_RESTORE_CANCELLED';
+					this.message = this.#stopOutcome;
 				}
 			}
 		};
@@ -785,8 +786,12 @@ export class BackupSession {
 		const inFlight =
 			PHASE_CLASS[this.phase as Exclude<Phase, 'idle'>] === 'KEY' && this.#ctl !== null;
 		const stopId = this.runId;
+		// The line names what was not changed, so it follows the path being stopped; the clear forgets which that was.
+		const outcome: BackupCode =
+			this.kind === 'export' ? 'E_EXPORT_CANCELLED' : 'E_RESTORE_CANCELLED';
 		this.#clear(reason, null);
 		if (inFlight && reason === 'user-cancel') {
+			this.#stopOutcome = outcome;
 			this.#stopRunId = stopId;
 			this.#stopToken = this.#sessionToken;
 			this.stopping = true;
@@ -850,7 +855,7 @@ export class BackupSession {
 		}
 		if (reason === 'peer' && detail?.peerReason === 'idle') {
 			// Another tab idling is not this person leaving: the words stay and nothing is hidden.
-			if (isKey) this.#abortToPre('peer-idle', 'E_LOCKED');
+			if (isKey) this.#abortToPre('peer-idle', 'E_LOCKED_ELSEWHERE');
 			return;
 		}
 		this.#clear(reason, 'E_LOCKED');
