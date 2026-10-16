@@ -1,11 +1,7 @@
 import { serializeEnvelope } from './envelope-json';
 import { SALT_BYTES, IV_BYTES, CHECK_BYTES } from './kdf-params';
 
-/**
- * The longest task note, in UTF-16 code units (`String.length`). That is the unit an HTML `maxlength` counts, so the
- * note field, the timeline store and a backup file's validator all agree on exactly which notes are allowed.
- */
-export const MAX_NOTE_UNITS = 100_000;
+export { MAX_NOTE_UNITS } from './note-cap';
 
 /**
  * The most plaintext one backup holds after padding. A multiple of the pad block, so a plaintext at or under this

@@ -9,7 +9,7 @@
 		afterLinkForTask,
 		linkNoteForTask
 	} from '$lib/resources';
-	import { MAX_NOTE_UNITS } from '$lib/backup/caps';
+	import { MAX_NOTE_UNITS } from '$lib/backup/note-cap';
 	import { closedOnDate, isFirmWarning, type FitReason } from '$lib/timeline/generate';
 
 	let {
