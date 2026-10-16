@@ -45,6 +45,11 @@ export type ProfileApp = {
 	byok: ByokStore | null;
 	cause: CapabilityCause | null;
 	/**
+	 * The open database: the same connection the stores use, and the only one in the tab. A page that needs the database
+	 * (the backup card) uses this one and never opens or closes its own. Null until app-init resolves ready or damaged.
+	 */
+	db: IDBDatabase | null;
+	/**
 	 * Erase every store on the device. An app-level act, not a store-level one: it must clear stores
 	 * by registry name, because a store that failed to provision is exactly the one whose rows would
 	 * outlive the wipe and then block their own recovery. Null until app-init resolves.

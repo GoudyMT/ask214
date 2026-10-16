@@ -6,8 +6,9 @@
 	// What outlives one card. The flows hold the person's place (a wrong passphrase's offer, a replace warning waiting
 	// for its answer), and the session survives the card being taken off the page behind a lock, so the card that
 	// comes back on Unlock must find the same flows. Keyed by session, so a test's own session starts clean.
-	// The flows work on one database connection, so they are kept only for the connection they were built on: a page
-	// that opens a new connection (the setup screen, on each visit) starts them fresh.
+	// The flows work on one database connection, so they are kept only for the connection they were built on: a card
+	// given another connection (a test, or a host that opens its own) starts them fresh. The app has one, so a page does
+	// not meet this.
 	type Kept = {
 		db: IDBDatabase | null;
 		restore: RestoreFlow | null;
@@ -73,10 +74,12 @@
 		exportDeps?: Omit<ExportDeps, 'session' | 'db' | 'profile'>;
 		restoreDeps?: Omit<FlowDeps, 'session' | 'app' | 'db'>;
 		/**
-		 * The setup screen's form of the card: only the restore row, under this label and without the card's own frame.
-		 * With `open` set, the row opens by itself, once, as soon as it can start.
+		 * The form of the card for a host that offers one row: that row alone, with no heading, intro or list, under
+		 * `label` (the row's own name when none is given). The restore row is drawn without the card's own frame, for the
+		 * setup screen, which has one; the Check row keeps it. With `open` set, the row opens by itself, once, as soon as
+		 * it can start.
 		 */
-		restoreOnly?: { label: string; open: boolean };
+		only?: { row: 'restore' | 'check'; label?: string; open?: boolean };
 	};
 	const props: Props = $props();
 
@@ -310,14 +313,15 @@
 		openRow(row);
 	}
 
-	// The setup screen can ask for the restore row to be open. It opens once, as soon as the row can start (the app may
+	// A host that shows one row can ask for it to be open. It opens once, as soon as the row can start (the app may
 	// still be starting when the card mounts), and never again: a row the person closed stays closed.
 	let autoOpened = false;
 	$effect(() => {
-		if (props.restoreOnly?.open !== true || autoOpened || !allowed('restore')) return;
+		const only = props.only;
+		if (only?.open !== true || autoOpened || !allowed(only.row)) return;
 		autoOpened = true;
 		untrack(() => {
-			if (!session.active) openRow('restore');
+			if (!session.active) openRow(only.row);
 		});
 	});
 
@@ -512,12 +516,14 @@
 
 <section
 	class="backup-card"
-	class:backup-card--bare={props.restoreOnly !== undefined}
+	class:backup-card--bare={props.only?.row === 'restore'}
 	translate="no"
-	aria-labelledby={props.restoreOnly === undefined ? 'backup-heading' : undefined}
-	aria-label={props.restoreOnly?.label}
+	aria-labelledby={props.only === undefined ? 'backup-heading' : undefined}
+	aria-label={props.only === undefined
+		? undefined
+		: (props.only.label ?? (props.only.row === 'check' ? CARD_LABELS.check : CARD_LABELS.restore))}
 >
-	{#if props.restoreOnly === undefined}
+	{#if props.only === undefined}
 		<h2 id="backup-heading" class="backup-card__heading">{CARD_LABELS.heading}</h2>
 		<p class="backup-hint">{CARD_INTRO_LINE}</p>
 		{#if lastBackup !== undefined}
@@ -686,7 +692,7 @@
 	{/snippet}
 
 	<!-- Make a backup -->
-	{#if props.restoreOnly === undefined}
+	{#if props.only === undefined}
 		<div class="backup-row">
 			{@render toggleRowButton('export', CARD_LABELS.make, 'backup-make')}
 			{#if makeOpen}
@@ -826,30 +832,34 @@
 	{/if}
 
 	<!-- Restore from a backup -->
-	<div class="backup-row">
-		{@render toggleRowButton(
-			'restore',
-			props.restoreOnly?.label ?? CARD_LABELS.restore,
-			'backup-restore'
-		)}
-		{#if kind === 'restore'}
-			<div id="backup-restore" class="backup-body">
-				{@render fileBody('restore')}
-			</div>
-		{/if}
-	</div>
-
-	{#if props.restoreOnly === undefined}
-		<!-- Check a backup -->
+	{#if props.only === undefined || props.only.row === 'restore'}
 		<div class="backup-row">
-			{@render toggleRowButton('check', CARD_LABELS.check, 'backup-check')}
+			{@render toggleRowButton(
+				'restore',
+				props.only?.label ?? CARD_LABELS.restore,
+				'backup-restore'
+			)}
+			{#if kind === 'restore'}
+				<div id="backup-restore" class="backup-body">
+					{@render fileBody('restore')}
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- Check a backup -->
+	{#if props.only === undefined || props.only.row === 'check'}
+		<div class="backup-row">
+			{@render toggleRowButton('check', props.only?.label ?? CARD_LABELS.check, 'backup-check')}
 			{#if kind === 'check'}
 				<div id="backup-check" class="backup-body">
 					{@render fileBody('check')}
 				</div>
 			{/if}
 		</div>
+	{/if}
 
+	{#if props.only === undefined}
 		<p class="backup-hint backup-lead">{NOT_IN_BACKUPS_LEAD}</p>
 		<ul class="backup-not-in">
 			{#each NOT_IN_BACKUPS as item (item)}

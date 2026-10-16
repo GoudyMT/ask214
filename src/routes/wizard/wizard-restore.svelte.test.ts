@@ -37,15 +37,6 @@ vi.mock('$lib/profile/context', async (importOriginal) => ({
 }));
 vi.mock('$app/navigation', () => ({ goto: rig.goto }));
 vi.mock('$lib/ask/when-controlled', () => ({ waitForControl: () => Promise.resolve(true) }));
-// The page opens the shared database with no name; a test's own database answers that call and no other.
-vi.mock('$lib/db/schema', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('$lib/db/schema')>();
-	return {
-		...actual,
-		openMtcDb: (...args: Parameters<typeof actual.openMtcDb>) =>
-			args[0] === undefined && rig.db !== null ? Promise.resolve(rig.db) : actual.openMtcDb(...args)
-	};
-});
 vi.mock('$lib/backup/session.svelte', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/backup/session.svelte')>();
 	return {
@@ -179,11 +170,13 @@ afterAll(() => {
 
 type AppOver = { status?: ProfileApp['status']; ready?: boolean };
 
+// The layout hands over its one connection when start-up resolves, so an app still starting has none.
 function makeApp(over: AppOver = {}) {
 	const ready = over.ready ?? true;
 	const app = $state({
 		status: over.status ?? 'ready',
 		store: null as ProfileApp['store'],
+		db: ready ? rig.db : null,
 		joinRelock: ready ? createJoinRelock([]) : null,
 		publish: ready ? (): void => {} : null,
 		reloadOnUnlock: false,
@@ -253,8 +246,7 @@ describe('Wizard, the way to restore a backup', () => {
 		expect(dialog.element().textContent).toContain('Ask 214 backup 2026-10-15 K7Q2');
 	});
 
-	// The page closes its connection when the person leaves and opens a new one on return; the restore must run on the
-	// new one, not on the closed one the first visit left behind.
+	// The app's one connection stays open when the person leaves, so a return visit restores on it as the first did.
 	it('still restores after the person left the setup screen and came back', async () => {
 		makeApp();
 		const first = await render(WizardPage);
@@ -263,9 +255,6 @@ describe('Wizard, the way to restore a backup', () => {
 		await first.unmount();
 		backupSession.relockSync('user');
 
-		await deleteTestDb(db);
-		db = await freshDevice();
-		rig.db = db;
 		await render(WizardPage);
 		await userEvent.click(entry());
 		await restoreFromRow();
@@ -273,12 +262,30 @@ describe('Wizard, the way to restore a backup', () => {
 		await expect.element(page.getByRole('dialog')).toBeVisible();
 	});
 
-	it('is inert until the app is ready, and then opens on a tap', async () => {
+	// The app has no connection to give until start-up resolves, so there is nothing for a row to run on.
+	it('is not drawn while the app is starting, and opens on a tap once it is ready', async () => {
 		const app = makeApp({ status: 'loading', ready: false });
+		await render(WizardPage);
+		await expect.element(page.getByRole('heading', { name: 'Set up your profile' })).toBeVisible();
+		expect(entry().query()).toBeNull();
+
+		app.db = db;
+		app.joinRelock = createJoinRelock([]);
+		app.publish = () => {};
+		app.status = 'ready';
+		await expect.element(entry()).toBeVisible();
+		await userEvent.click(entry());
+		await expect.element(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
+	});
+
+	// A device whose saved data is damaged has the connection but cannot take a restore: the entry is guarded, not merely
+	// switched off, so a tap does nothing and a screen reader hears it is off.
+	it('is inert on a device whose saved data is damaged', async () => {
+		const app = makeApp({ status: 'damaged' });
+		app.publish = null;
 		await render(WizardPage);
 		await expect.element(entry()).toBeVisible();
 
-		// A tap on the entry while the app is starting does nothing: guarded, not merely switched off.
 		const el = entry().element() as HTMLButtonElement;
 		expect(el.disabled).toBe(false);
 		expect(el.getAttribute('aria-disabled')).toBe('true');
@@ -286,13 +293,6 @@ describe('Wizard, the way to restore a backup', () => {
 		await pause(100);
 		expect(el.getAttribute('aria-expanded')).toBe('false');
 		expect(page.getByRole('button', { name: 'Choose file' }).query()).toBeNull();
-
-		app.joinRelock = createJoinRelock([]);
-		app.publish = () => {};
-		app.status = 'ready';
-		await expect.poll(() => el.getAttribute('aria-disabled')).toBe('false');
-		await userEvent.click(entry());
-		await expect.element(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
 	});
 });
 
@@ -328,11 +328,12 @@ describe('Wizard, after an Erase from the damaged view', () => {
 		const app = makeApp({ status: 'loading', ready: false });
 		leaveRestoreNote();
 		await render(WizardPage);
-		await expect.element(entry()).toBeVisible();
+		await expect.element(page.getByRole('heading', { name: 'Set up your profile' })).toBeVisible();
 
 		expect(intentOnEntry()).toBeUndefined();
-		expect(entry().element().getAttribute('aria-expanded')).toBe('false');
+		expect(entry().query()).toBeNull();
 
+		app.db = db;
 		app.joinRelock = createJoinRelock([]);
 		app.publish = () => {};
 		app.status = 'ready';

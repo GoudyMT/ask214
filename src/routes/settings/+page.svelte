@@ -11,8 +11,6 @@
 	import { LOCKED_AFTER_RESTORE_LINE, RESTORED_UNLOCK_LINE } from '$lib/backup/copy';
 	import { markBackupIntent } from '$lib/backup/intent';
 	import { backupSession } from '$lib/backup/session.svelte';
-	import { closeMtcDb, openMtcDb } from '$lib/db/schema';
-	import { safeLog } from '$lib/log/safelog';
 	import { eraseEverything } from '$lib/profile/erase';
 	import { eraseCaches } from '$lib/profile/erase-caches';
 	import { OccConflictError, type ProfilePatch } from '$lib/profile/store.svelte';
@@ -124,32 +122,6 @@
 	let clockError = $state<string | null>(null);
 	let eraseError = $state<string | null>(null);
 
-	// A backup works on the database through a connection of its own: the layout keeps its connection to itself. Opened
-	// once there is something to back up, closed when the page goes.
-	let backupDb = $state<IDBDatabase | null>(null);
-	$effect(() => {
-		if (app.status !== 'ready' || app.store === null || app.joinRelock === null) return;
-		let gone = false;
-		let opened: IDBDatabase | null = null;
-		void openMtcDb().then(
-			(db) => {
-				if (gone) {
-					closeMtcDb(db);
-					return;
-				}
-				opened = db;
-				backupDb = db;
-			},
-			() => safeLog({ code: 'E_INIT_FAILED' })
-		);
-		return () => {
-			gone = true;
-			if (opened === null) return;
-			closeMtcDb(opened);
-			backupDb = null;
-		};
-	});
-
 	// The Backup card outlives an app switch: that evicts the profile (it reads as locked), and a card taken off the page
 	// there would lose a running backup. So an evicted profile keeps the card while a session runs, and shows none
 	// otherwise (nothing new may start behind the Unlock panel). A profile locked for real (a Lock, idle, another tab)
@@ -161,7 +133,7 @@
 			app.store.lockState !== 'locked' &&
 			(!lockedView || backupSession.active)
 	);
-	const backupCardUp = $derived(showBackupCard && backupDb !== null);
+	const backupCardUp = $derived(showBackupCard && app.db !== null);
 	// A restore that finished while the profile was locked: the card that would say so is off the page, so the page does,
 	// above the Unlock panel.
 	const restoredLine = $derived(
@@ -646,7 +618,7 @@
 		<!-- Between the two halves of the lock gate, so it keeps its place after Privacy and security and is not torn down
 		     with the sections around it when an app switch evicts the profile. -->
 		{#if backupCardUp}
-			<BackupCard onEraseRequest={openEraseFromBackup} db={backupDb} />
+			<BackupCard onEraseRequest={openEraseFromBackup} db={app.db} />
 		{/if}
 
 		{#if !lockedView}
@@ -720,7 +692,7 @@
 			</p>
 		</section>
 		{#if app.joinRelock !== null}
-			<BackupCard onEraseRequest={openEraseFromBackup} db={null} />
+			<BackupCard onEraseRequest={openEraseFromBackup} db={app.db} only={{ row: 'check' }} />
 		{/if}
 		{@render eraseDialog()}
 	{/if}

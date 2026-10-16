@@ -106,6 +106,15 @@ afterEach(async () => {
 });
 
 describe('the root layout, when the saved data cannot be read', () => {
+	// The backup Check and the Erase work on this connection; a page opening one of its own is what this replaces.
+	it("hands the app the connection the start-up opened, the one the Erase's check reads", async () => {
+		await render(Layout, { children });
+		await vi.waitFor(() => expect(appNow().joinRelock).not.toBeNull());
+
+		expect(appNow().status).toBe('damaged');
+		expect(appNow().db).toBe(db);
+	});
+
 	// Check (a backup row) joins this list; Erase's first step and the idle timer must reach it before anything is wiped.
 	it('installs a lifecycle with an idle timer, so a joined session is relocked like any other', async () => {
 		await render(Layout, { children });

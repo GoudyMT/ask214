@@ -54,6 +54,7 @@ async function device() {
 		calendar: null,
 		byok,
 		cause: null,
+		db,
 		wipeAll: null,
 		relockAll: null,
 		joinRelock: null,

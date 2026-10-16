@@ -62,6 +62,7 @@
 		calendar: null,
 		byok: null,
 		cause: null,
+		db: null,
 		wipeAll: null,
 		relockAll: null,
 		joinRelock: null,
@@ -149,6 +150,7 @@
 						offReload();
 						offLifecycle();
 					};
+					app.db = result.db;
 					app.wipeAll = async () => {
 						const check = createProfileStore(result.db);
 						const damaged = await stillDamaged(async () => {
@@ -167,6 +169,7 @@
 				app.store = result.store;
 				// Registry-driven, so the erase covers stores that never provisioned - they are the ones
 				// whose orphaned rows would otherwise block their own recovery.
+				app.db = result.db;
 				app.wipeAll = () => wipeAllStores(result.db);
 				// The BYO-key store rides on the same db; it reads on demand and caches nothing, so it needs
 				// no relock join and no async load - just make it available once the keystore is usable.

@@ -16,9 +16,11 @@ import {
 import type { ProfileApp } from '$lib/profile/context';
 import { createProfileStore, type ProfileStore } from '$lib/profile/store.svelte';
 import {
+	CARD_INTRO_LINE,
 	CARD_LABELS,
 	ERASE_DEVICE_BUTTON,
 	LOCKED_AFTER_RESTORE_LINE,
+	NOT_IN_BACKUPS_LEAD,
 	RESTORED_UNLOCK_LINE
 } from '$lib/backup/copy';
 import goldenText from '$lib/backup/golden/v1-1.ask214backup?raw';
@@ -33,10 +35,7 @@ import SettingsPage from './+page.svelte';
 // The page runs on a real device: a test database with the real profile store, the real relock walk, the tab's real
 // backup session and flows and the real card. Only what a person cannot touch is faked: the app container the layout
 // would set, the slow key step (the pinned output, as the golden test does), the system file chooser, and the reload.
-const harness = vi.hoisted(() => ({
-	app: null as ProfileApp | null,
-	db: null as IDBDatabase | null
-}));
+const harness = vi.hoisted(() => ({ app: null as ProfileApp | null }));
 
 vi.mock('$lib/profile/context', async (importOriginal) => {
 	const real = await importOriginal<typeof import('$lib/profile/context')>();
@@ -52,20 +51,6 @@ vi.mock('$lib/install/context', () => ({
 	}),
 	setInstallApp: () => {}
 }));
-// The page opens the default database (no name) and closes it with the page. The card keeps its restore flow, and with
-// it the connection it was first given, for as long as the tab's session lives, which here is the whole file. So the
-// page is handed one test database for the file, and the close leaves it open; each test empties it instead.
-vi.mock('$lib/db/schema', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/db/schema')>();
-	return {
-		...real,
-		openMtcDb: (...args: Parameters<typeof real.openMtcDb>) =>
-			args[0] === undefined && harness.db !== null
-				? Promise.resolve(harness.db)
-				: real.openMtcDb(...args),
-		closeMtcDb: () => {}
-	};
-});
 // No service worker controls the test page, and the wait for one is ten seconds.
 vi.mock('$lib/ask/when-controlled', async (importOriginal) => {
 	const real = await importOriginal<typeof import('$lib/ask/when-controlled')>();
@@ -125,6 +110,7 @@ const app = $state<ProfileApp>({
 	calendar: null,
 	byok: null,
 	cause: null,
+	db: null,
 	wipeAll: null,
 	relockAll: null,
 	joinRelock: null,
@@ -159,6 +145,8 @@ async function device({ profile, status = 'ready' }: Device): Promise<ProfileSto
 	relockables = status === 'ready' ? [made] : [];
 	app.status = status;
 	app.store = status === 'ready' ? made : null;
+	// The layout's one connection, ready or damaged.
+	app.db = db;
 	app.wipeAll = wipeAll;
 	app.relockAll = () => relockAll(relockables, 'user');
 	app.joinRelock = createJoinRelock(relockables);
@@ -198,11 +186,9 @@ function setPicker(picker: OpenPicker | undefined): void {
 
 beforeAll(async () => {
 	db = await openTestDb();
-	harness.db = db;
 });
 
 afterAll(async () => {
-	harness.db = null;
 	await deleteTestDb(db);
 });
 
@@ -216,6 +202,7 @@ beforeEach(() => {
 	vi.stubGlobal('Worker', HandlerWorker);
 	app.status = 'ready';
 	app.store = null;
+	app.db = null;
 	app.relockAll = null;
 	app.joinRelock = null;
 	app.publish = null;
@@ -567,5 +554,22 @@ describe('Settings, when the saved data cannot be read', () => {
 		await eraseFromButton();
 
 		expect(activeAtWipe).toBe(false);
+	});
+
+	// Nothing can be made or restored over damaged data, so the rows that could not start are not drawn, nor is the card's
+	// intro or its list of what a backup leaves out.
+	it('shows the Check row alone', async () => {
+		await device({ profile: false, status: 'damaged' });
+		await render(SettingsPage);
+
+		await expect.element(toggle(CARD_LABELS.check, false)).toBeVisible();
+		expect(button(CARD_LABELS.make).query()).toBeNull();
+		expect(button(CARD_LABELS.restore).query()).toBeNull();
+		expect(backupHeading().query()).toBeNull();
+		expect(document.body.textContent).not.toContain(CARD_INTRO_LINE);
+		expect(document.body.textContent).not.toContain(NOT_IN_BACKUPS_LEAD);
+		// The row still works: it opens to the chooser.
+		await userEvent.click(toggle(CARD_LABELS.check, false));
+		await expect.element(button(CARD_LABELS.chooseFile)).toBeVisible();
 	});
 });
