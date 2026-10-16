@@ -601,18 +601,21 @@ describe('the commit point', () => {
 		const f = fakeFile();
 		const seen: Record<string, unknown> = {};
 		const { session, flow } = await rig(pickerOf(f.handle));
+		// The card's type-back field, registered the way the card will: the session wipes it at the commit.
+		const field = { value: TYPED };
+		session.registerInput(field);
 		f.onClose = () => {
+			seen.field = field.value;
 			seen.words = session.words;
 			seen.key = session.held('key');
 			seen.sealed = seams.sealed[0]?.length ? seams.sealed[0].every((byte) => byte === 0) : null;
 			const eaos = seams.snapEaos;
 			seen.profile = eaos?.length ? eaos.every((byte) => byte === 0) : null;
-			seen.field = seams.typed[0]?.length;
 		};
 
 		await submit(flow);
 
-		expect(seen).toEqual({ words: null, key: null, sealed: true, profile: true, field: 0 });
+		expect(seen).toEqual({ field: '', words: null, key: null, sealed: true, profile: true });
 	});
 
 	// The honest line when the browser cannot finish the file: nothing on the device, and the person told so.
