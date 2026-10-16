@@ -45,7 +45,7 @@ export type SavePicker = (options: {
 export type ExportDeps = {
 	session: BackupSession;
 	db: IDBDatabase;
-	profile: Pick<ProfileStore, 'save'>;
+	profile: Pick<ProfileStore, 'save' | 'lockState'>;
 	/** The browser's save picker, or null where there is none (the file is then downloaded). */
 	getSavePicker?: () => SavePicker | null;
 	download?: (fileName: string, text: string) => void;
@@ -461,7 +461,9 @@ export class ExportFlow {
 	 * older date.
 	 */
 	async #markBackup(run: Run, prepared: Prepared): Promise<void> {
-		if (!run.isCurrent()) return;
+		// A store that a hide or a lock evicted would refuse the save as a conflict that never was one, and loading it
+		// again is not this flow's to do: the older date stays and the restore warning falls back to its time rule.
+		if (!run.isCurrent() || this.#deps.profile.lockState !== 'unlocked') return;
 		const { gens, backupAt } = prepared;
 		try {
 			await this.#deps.profile.save({

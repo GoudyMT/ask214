@@ -3,6 +3,8 @@ import { deleteTestDb, openTestDb } from '../db/_test-helpers';
 import { withStores } from '../db/schema';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { getDiagnosticsForTest } from '../log/safelog';
+import { createJoinRelock, relockEachSync, type Relockable } from '../profile/app-init';
+import type { RelockReason } from '../profile/lifecycle';
 import { createProfileStore, readDeviceState, type ProfileStore } from '../profile/store.svelte';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { decryptEnvelope, readBackupFile } from './envelope';
@@ -218,6 +220,14 @@ afterEach(async () => {
 /** An export session at the type-back form, and a flow over it. */
 async function rig(picker: SavePicker | null, extra: Partial<ExportDeps> = {}) {
 	const workers: FakeKeyWorker[] = [];
+	// One relock list, as the layout builds it: the profile store sits in it and the session joins through the same
+	// seam, so a hide reaches both the way it does in the app.
+	const relockables: Relockable[] = [];
+	const joinRelock = createJoinRelock(relockables);
+	joinRelock({
+		relockSync: (reason) => profile.relockSync(reason),
+		refresh: () => Promise.resolve()
+	});
 	const session = new BackupSession({
 		isVisible: () => true,
 		hasFocus: () => true,
@@ -228,11 +238,12 @@ async function rig(picker: SavePicker | null, extra: Partial<ExportDeps> = {}) {
 		}
 	});
 	sessions.push(session);
-	session.start(APP, 'export');
+	session.start({ ...APP, joinRelock }, 'export');
 	await session.showPassphrase();
 	session.enterPhase('typed-back');
 	const flow = new ExportFlow({ session, db, profile, getSavePicker: () => picker, ...extra });
-	return { session, workers, flow };
+	const relock = (reason: RelockReason) => relockEachSync(relockables, reason);
+	return { session, workers, flow, relock };
 }
 
 const submit = (flow: ExportFlow, typed = TYPED) => flow.submit({ preventDefault: vi.fn() }, typed);
@@ -313,11 +324,14 @@ describe('the save picker and the type-back', () => {
 	// A stray submit (autofill, a held key) after the form is gone must not open a dialog for a session that ended.
 	it.each([
 		['after Cancel cleared the session', (s: BackupSession) => s.cancel()],
-		['while the app is hidden', (s: BackupSession) => s.relockSync('hygiene')]
+		[
+			'while the app is hidden',
+			(_s: BackupSession, relock: (r: RelockReason) => void) => relock('hygiene')
+		]
 	])('a submit %s does nothing', async (_name, away) => {
 		const picker = pickerOf(fakeFile().handle);
-		const { session, flow } = await rig(picker);
-		away(session);
+		const { session, flow, relock } = await rig(picker);
+		away(session, relock);
 
 		expect(await submit(flow)).toEqual({ kind: 'ignored' });
 		expect(picker).not.toHaveBeenCalled();
@@ -481,7 +495,8 @@ describe('a saved file', () => {
 		const download = vi.fn<(fileName: string, text: string) => void>();
 		let phaseAtMark = '';
 		let wordsAtMark: readonly string[] | null = WORDS;
-		const marking: Pick<ProfileStore, 'save'> = {
+		const marking: Pick<ProfileStore, 'save' | 'lockState'> = {
+			lockState: 'unlocked',
 			save: (patch) => {
 				phaseAtMark = session.phase;
 				wordsAtMark = session.words;
@@ -515,24 +530,27 @@ describe('a saved file', () => {
 });
 
 describe('the commit point', () => {
-	// The tap on Save is final the moment close() is called: a hide after that must not turn "saved" into "you left".
-	it('a hide after close() was called shows the saved line, not LEFT_APP', async () => {
+	// The tap on Save is final the moment close() is called: a hide after that must not turn "saved" into "you left". The
+	// hide also evicts the profile, so "Last backup" keeps its older date: skipped quietly, since nothing conflicted.
+	it('a hide after close() was called shows the saved line, not LEFT_APP, and leaves the mark alone', async () => {
 		const f = fakeFile();
 		f.closeGate = deferred();
-		const { session, flow } = await rig(pickerOf(f.handle));
+		const { session, flow, relock } = await rig(pickerOf(f.handle));
+		const logged = getDiagnosticsForTest().length;
 
 		const pending = submit(flow);
 		await vi.waitFor(() => expect(f.closes).toBe(1));
 		expect(session.phase).toBe('saved');
 		expect(session.canCancel).toBe(false);
 		expect(session.cancel()).toBe(false);
-		session.relockSync('hygiene');
+		relock('hygiene');
 		f.closeGate.resolve();
 
 		expect(await pending).toEqual(SAVED);
 		expect(session.message).toBeNull();
 		expect(f.aborts).toBe(0);
-		expect((await readDeviceState(db)).mark).not.toBeNull();
+		expect((await readDeviceState(db)).mark).toBeNull();
+		expect(getDiagnosticsForTest().length).toBe(logged);
 	});
 
 	// close() is what makes the file exist; a signal that fires while it runs must not turn a written file into "stopped".
@@ -588,11 +606,11 @@ describe('the commit point', () => {
 	it('an abort during write() calls writable.abort() and says nothing was saved', async () => {
 		const f = fakeFile({ existing: '' });
 		f.writeGate = deferred();
-		const { session, flow } = await rig(pickerOf(f.handle));
+		const { session, flow, relock } = await rig(pickerOf(f.handle));
 
 		const pending = submit(flow);
 		await vi.waitFor(() => expect(f.writes).toBe(1));
-		session.relockSync('hygiene');
+		relock('hygiene');
 		expect(f.aborts).toBe(1);
 		f.writeGate.resolve();
 
@@ -631,20 +649,30 @@ describe('the commit point', () => {
 
 describe('checking the file after it is saved', () => {
 	// The page left right after the save: the file is there and the "Last backup" date is kept, but nobody read it back.
+	// Navigating away leaves the profile unlocked, so the date is recorded; a page that is hidden for good is relocked by
+	// the lifecycle first (hygiene, then the session's own pagehide), so the date keeps its older value.
 	it.each([
-		['the person navigates away', (s: BackupSession) => s.cardGone()],
-		['the page is hidden for good', () => window.dispatchEvent(new Event('pagehide'))]
+		['the person navigates away', (s: BackupSession) => s.cardGone(), true],
+		[
+			'the page is hidden for good',
+			(_s: BackupSession, relock: (reason: RelockReason) => void) => {
+				relock('hygiene');
+				window.dispatchEvent(new Event('pagehide'));
+			},
+			false
+		]
 	])(
-		'an abort injected between close and getFile reports Saved, but not checked, and still records the last-backup write: %s',
-		async (_name, leave) => {
+		'an abort injected between close and getFile reports Saved, but not checked: %s',
+		async (_name, leave, markWritten) => {
 			const f = fakeFile();
-			const { session, flow } = await rig(pickerOf(f.handle));
-			f.onClose = () => leave(session);
+			const { session, flow, relock } = await rig(pickerOf(f.handle));
+			const backupAt = session.backupAt;
+			f.onClose = () => leave(session, relock);
 
 			expect(await submit(flow)).toEqual({ ...SAVED, readBack: 'not-checked' });
 
 			expect(f.reads).toBe(1);
-			expect((await readDeviceState(db)).mark?.at).toBe(session.backupAt);
+			expect((await readDeviceState(db)).mark?.at).toBe(markWritten ? backupAt : undefined);
 		}
 	);
 
