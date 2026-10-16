@@ -10,7 +10,7 @@
  * The worker ships as one file in a folder named for its own hash, and the app reads that URL from
  * `src/lib/backup/kdf-paths.ts`. The gate refuses a stray folder or an unchecked file beside it, because the
  * service worker keeps every shipped `/backup-kdf/` path for every visitor, so an unchecked file there would be
- * served and cached with no byte check at all. It reads the app's URL as text and never imports app code.
+ * served and cached with no byte check at all. It compares that file whole, as text, with what the build writes, and never imports app code.
  *
  * Run: pnpm check:backup-vendor
  */
@@ -23,6 +23,7 @@ import {
 	KDF_FOLDER,
 	buildWorkerBytes,
 	expectedWorkerSrc,
+	pathsModule,
 	workerHash
 } from './backup-kdf-build-core.mjs';
 import {
@@ -160,12 +161,14 @@ async function main() {
 	}
 
 	// 6. The app loads the file it will find.
-	const loaded = quotedConstant(
-		readRequired('The worker URL module', PATHS_FILE).toString('utf-8'),
-		'KDF_WORKER_SRC'
-	);
-	if (loaded !== expectedWorkerSrc(hash)) {
-		fail(`${PATHS_FILE} loads ${loaded}; it must load ${expectedWorkerSrc(hash)}.`);
+	// The whole file is compared, not searched: a good export in a comment above a real export of another file would
+	// satisfy a search, and the app would load the other file.
+	const src = expectedWorkerSrc(hash);
+	if (readRequired('The worker URL module', PATHS_FILE).toString('utf-8') !== pathsModule(src)) {
+		fail(
+			`${PATHS_FILE} is not the file the build writes; it must load ${src} and hold nothing else. ` +
+				'Run `pnpm build:backup-kdf`.'
+		);
 	}
 
 	console.log(`[check:backup-vendor] OK: worker ${hash} and the word list match their sources`);

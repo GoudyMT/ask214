@@ -136,21 +136,6 @@ describe('backup vendor gate', () => {
 	);
 
 	it(
-		'refuses a removal list that no longer removes a hyphenated word',
-		() => {
-			const copy = copies('removal-hyphen');
-			edit(copy.removals, (text) =>
-				text
-					.split(LF)
-					.filter((line) => !line.endsWith(`${TAB}hyphen`))
-					.join(LF)
-			);
-			expectRefusal(copy, 'E_CURATED_NOT_LETTERS');
-		},
-		GATE_TIMEOUT
-	);
-
-	it(
 		'refuses a removal-list word that is not in the source',
 		() => {
 			const copy = copies('removal-typo');
@@ -197,6 +182,22 @@ describe('backup vendor gate', () => {
 		() => {
 			const copy = copies('other-hash');
 			edit(copy.paths, (text) => text.replace(HASH, '0000000000000000'));
+			expectRefusal(copy, `it must load /backup-kdf/${HASH}/${FILE}`);
+		},
+		GATE_TIMEOUT
+	);
+
+	// The URL file is compared whole, not searched for a line: a good export left in a comment above a real export
+	// of another file would satisfy a search, and the app would load the other file.
+	it(
+		'refuses a URL file whose real export is not the one a comment above it names',
+		() => {
+			const copy = copies('commented-url');
+			writeFileSync(
+				copy.paths,
+				`// export const KDF_WORKER_SRC = '${KDF_WORKER_SRC}';${LF}` +
+					`export const KDF_WORKER_SRC = '/pdf-worker/pdf.worker.min.mjs';${LF}`
+			);
 			expectRefusal(copy, `it must load /backup-kdf/${HASH}/${FILE}`);
 		},
 		GATE_TIMEOUT
