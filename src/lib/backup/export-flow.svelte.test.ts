@@ -27,7 +27,7 @@ import type { FromWorker, WorkerRequest } from './worker/protocol';
 const seams = vi.hoisted(() => ({
 	typed: [] as Uint8Array[],
 	sealed: [] as Uint8Array[],
-	corruptSeal: false,
+	seal: 'ok' as 'ok' | 'flip' | 'otherKey' | 'otherBytes',
 	snapEaos: null as Uint8Array | null,
 	afterSnapshot: null as (() => Promise<void>) | null
 }));
@@ -49,9 +49,24 @@ vi.mock('$lib/backup/envelope', async (importOriginal) => {
 	return {
 		...real,
 		sealEnvelope: async (...args: Parameters<typeof real.sealEnvelope>) => {
-			seams.sealed.push(args[1]);
+			const [key, inner, salt] = args;
+			seams.sealed.push(inner);
+			if (seams.seal === 'otherKey') {
+				// A file that parses and checks out but whose key is not the one the person's words make.
+				const other = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+					'encrypt',
+					'decrypt'
+				]);
+				return real.sealEnvelope(other, inner, salt);
+			}
+			if (seams.seal === 'otherBytes') {
+				// A file that opens with the right key and holds a valid backup, but not the one that was made.
+				const changed = JSON.parse(new TextDecoder().decode(inner)) as { createdAt: number };
+				changed.createdAt += 1;
+				return real.sealEnvelope(key, new TextEncoder().encode(JSON.stringify(changed)), salt);
+			}
 			const text = await real.sealEnvelope(...args);
-			if (!seams.corruptSeal) return text;
+			if (seams.seal !== 'flip') return text;
 			// One flipped character of the ciphertext: the file's own check no longer matches.
 			const file = JSON.parse(text) as { data: string };
 			file.data = (file.data.startsWith('A') ? 'B' : 'A') + file.data.slice(1);
@@ -206,7 +221,7 @@ beforeEach(async () => {
 	await profile.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
 	seams.typed.length = 0;
 	seams.sealed.length = 0;
-	seams.corruptSeal = false;
+	seams.seal = 'ok';
 	seams.snapEaos = null;
 	seams.afterSnapshot = null;
 	kdf.reply = null;
@@ -704,8 +719,12 @@ describe('checking the file after it is saved', () => {
 
 describe('what stops a backup before anything is written', () => {
 	// A seal that does not open again must never reach the file: the person would find out only at restore time.
-	it('a seal that does not open is not written', async () => {
-		seams.corruptSeal = true;
+	it.each([
+		['a damaged seal', 'flip'],
+		['a seal under another key', 'otherKey'],
+		['a seal of bytes that are not the snapshot', 'otherBytes']
+	] as const)('a seal that does not open is not written: %s', async (_name, how) => {
+		seams.seal = how;
 		const f = fakeFile();
 		const { session, flow } = await rig(pickerOf(f.handle));
 
@@ -751,7 +770,7 @@ describe('what stops a backup before anything is written', () => {
 
 	// No message, result or log line may carry a word of the passphrase.
 	it('no word of the passphrase reaches a result or a log line', async () => {
-		seams.corruptSeal = true;
+		seams.seal = 'flip';
 		const { flow } = await rig(pickerOf(fakeFile().handle));
 		const results = [
 			await submit(flow, 'bamboo copper harvest lantern oxygen thimbl'),
