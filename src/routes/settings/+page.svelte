@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import SettingsDateRow from '$lib/components/SettingsDateRow.svelte';
 	import SkillBridgePlanRow from '$lib/components/SkillBridgePlanRow.svelte';
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
@@ -7,6 +7,12 @@
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
+	import BackupCard from '$lib/backup/BackupCard.svelte';
+	import { LOCKED_AFTER_RESTORE_LINE, RESTORED_UNLOCK_LINE } from '$lib/backup/copy';
+	import { markBackupIntent } from '$lib/backup/intent';
+	import { backupSession } from '$lib/backup/session.svelte';
+	import { closeMtcDb, openMtcDb } from '$lib/db/schema';
+	import { safeLog } from '$lib/log/safelog';
 	import { eraseEverything } from '$lib/profile/erase';
 	import { eraseCaches } from '$lib/profile/erase-caches';
 	import { OccConflictError, type ProfilePatch } from '$lib/profile/store.svelte';
@@ -100,6 +106,9 @@
 	const hasTimeline = $derived((app.store?.persona.completeness ?? 'none') !== 'none');
 
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
+	// Above the Erase button of a damaged device, beside the backup card's Check row.
+	const DAMAGED_BACKUP_LINE =
+		'Have a backup? Check it first, then erase and restore it on the setup screen.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
 	const lockedView = $derived(!!app.store?.locked);
@@ -114,6 +123,72 @@
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
 	let clockError = $state<string | null>(null);
 	let eraseError = $state<string | null>(null);
+
+	// A backup works on the database through a connection of its own: the layout keeps its connection to itself. Opened
+	// once there is something to back up, closed when the page goes.
+	let backupDb = $state<IDBDatabase | null>(null);
+	$effect(() => {
+		if (app.status !== 'ready' || app.store === null || app.joinRelock === null) return;
+		let gone = false;
+		let opened: IDBDatabase | null = null;
+		void openMtcDb().then(
+			(db) => {
+				if (gone) {
+					closeMtcDb(db);
+					return;
+				}
+				opened = db;
+				backupDb = db;
+			},
+			() => safeLog({ code: 'E_INIT_FAILED' })
+		);
+		return () => {
+			gone = true;
+			if (opened === null) return;
+			closeMtcDb(opened);
+			backupDb = null;
+		};
+	});
+
+	// The Backup card outlives an app switch: that evicts the profile (it reads as locked), and a card taken off the page
+	// there would lose a running backup. So an evicted profile keeps the card while a session runs, and shows none
+	// otherwise (nothing new may start behind the Unlock panel). A profile locked for real (a Lock, idle, another tab)
+	// takes the card away: those locks have already cleared the session, or left it for the Unlock to find again. A
+	// card with no way to relock its session has nothing it may start.
+	const showBackupCard = $derived(
+		app.joinRelock !== null &&
+			app.store !== null &&
+			app.store.lockState !== 'locked' &&
+			(!lockedView || backupSession.active)
+	);
+	const backupCardUp = $derived(showBackupCard && backupDb !== null);
+	// A restore that finished while the profile was locked: the card that would say so is off the page, so the page does,
+	// above the Unlock panel.
+	const restoredLine = $derived(
+		lockedView && !backupCardUp && backupSession.phase === 'committed'
+			? backupSession.lockedAfterRestore
+				? LOCKED_AFTER_RESTORE_LINE
+				: RESTORED_UNLOCK_LINE
+			: null
+	);
+
+	// Where the Erase dialog was opened from. An Erase of a damaged device, and one opened from the backup card's
+	// damaged-device line or from the setup screen's message, ends on the setup screen with the restore row open.
+	let eraseOpenedFromBackup = false;
+	function openEraseFromBackup(): void {
+		eraseOpenedFromBackup = true;
+		wipeDialog?.showModal();
+	}
+	function cancelErase(): void {
+		eraseOpenedFromBackup = false;
+		wipeDialog?.close();
+	}
+	// The setup screen sends the person here when it has no Erase dialog of its own. The request is taken once, and only
+	// when this page has the dialog to open.
+	$effect(() => {
+		if (wipeDialog === null || app.status !== 'ready') return;
+		if (untrack(() => backupSession.takeEraseRequest())) openEraseFromBackup();
+	});
 
 	// PII-free, user-facing copy per validation cause (matches the wizard).
 	const ERROR_COPY: Record<EaosCause, string> = {
@@ -284,6 +359,12 @@
 	}
 
 	async function unlock(): Promise<void> {
+		// A restore replaced this device's data while the page was locked. A read now would open the old data; the reload
+		// decrypts the new, which is the unlock the person asked for.
+		if (app.reloadOnUnlock) {
+			window.location.reload();
+			return;
+		}
 		const store = app.store;
 		if (!store) return;
 		unlockError = null;
@@ -336,6 +417,8 @@
 
 	async function confirmErase(): Promise<void> {
 		eraseError = null;
+		// Read before the dialog closes, and kept for the reload at the end.
+		const thenRestore = app.status === 'damaged' || eraseOpenedFromBackup;
 		wipeDialog?.close();
 		// Where the closing dialog left focus: its opener, which stays on a damaged page and goes with the page when the
 		// erase locks it.
@@ -356,7 +439,16 @@
 					await eraseCaches(window.caches);
 				},
 				// Reload -> app-init bootstraps a fresh keystore -> clean first-run state.
-				reload: () => window.location.reload()
+				reload: () => {
+					if (thenRestore) {
+						try {
+							markBackupIntent('restore-row', resolve('/wizard'));
+						} catch {
+							// The data is already gone, so the reload goes on and the setup screen opens at its start.
+						}
+					}
+					window.location.reload();
+				}
 			});
 		} catch (e) {
 			// Damaged data that reads again is not erased: the page is already reloading onto it, and nothing failed. The
@@ -409,6 +501,10 @@
 	     unmounted before the user ever saw it. -->
 		{#if eraseError}
 			<p class="erase-error" role="alert" tabindex="-1">{eraseError}</p>
+		{/if}
+		<!-- Above the lock gate for the same reason: the Backup card that would say it is off the page while locked. -->
+		{#if restoredLine}
+			<p class="restored-line" role="status">{restoredLine}</p>
 		{/if}
 		<!-- Above the lock gate on purpose: the theme is a non-PII device preference, so an idle-locked
 	     user can still switch light/dark without unlocking. -->
@@ -545,7 +641,15 @@
 					</div>
 				</section>
 			{/if}
+		{/if}
 
+		<!-- Between the two halves of the lock gate, so it keeps its place after Privacy and security and is not torn down
+		     with the sections around it when an app switch evicts the profile. -->
+		{#if backupCardUp}
+			<BackupCard onEraseRequest={openEraseFromBackup} db={backupDb} />
+		{/if}
+
+		{#if !lockedView}
 			{#if hasTimeline}
 				<CalendarPanel
 					items={calendarItems}
@@ -604,6 +708,10 @@
 		{/if}
 		<section class="settings-section" aria-labelledby="privacy-heading">
 			<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
+			<!-- The Check below needs the relock set the layout wires under damage; without it nothing could start. -->
+			{#if app.joinRelock !== null}
+				<p class="damaged-line">{DAMAGED_BACKUP_LINE}</p>
+			{/if}
 			<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
 				Erase all data on this device
 			</button>
@@ -611,6 +719,9 @@
 				Erasing removes everything saved on this device, so the app can start again.
 			</p>
 		</section>
+		{#if app.joinRelock !== null}
+			<BackupCard onEraseRequest={openEraseFromBackup} db={null} />
+		{/if}
 		{@render eraseDialog()}
 	{/if}
 
@@ -620,16 +731,17 @@
 			class="wipe-dialog"
 			aria-labelledby="wipe-dialog-heading"
 			aria-describedby="wipe-dialog-body"
+			oncancel={() => (eraseOpenedFromBackup = false)}
 		>
 			<h2 id="wipe-dialog-heading" class="wipe-dialog__heading">Erase all data on this device?</h2>
 			<p id="wipe-dialog-body" class="wipe-dialog__body">
 				This permanently erases everything stored on this device - your separation date and any
-				profile details. It can't be undone.
+				profile details. It can't be undone. Backup files you saved, and backup passphrases saved in
+				a password manager or on paper, are not erased. Delete them yourself if you no longer want
+				them.
 			</p>
 			<div class="wipe-dialog__actions">
-				<button class="wipe-dialog__cancel" type="button" onclick={() => wipeDialog?.close()}>
-					Cancel
-				</button>
+				<button class="wipe-dialog__cancel" type="button" onclick={cancelErase}>Cancel</button>
 				<button class="wipe-dialog__erase" type="button" onclick={() => void confirmErase()}>
 					Erase everything
 				</button>
@@ -719,6 +831,16 @@
 
 	.settings-hint {
 		margin: var(--space-s) 0 0;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.restored-line {
+		margin: 0 0 var(--space-l);
+	}
+
+	.damaged-line {
+		margin: 0 0 var(--space-m);
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
 	}
