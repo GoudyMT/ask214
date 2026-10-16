@@ -539,6 +539,13 @@ describe('restoreBackup', () => {
 				});
 				return { ...expected, gens: { ...expected.gens, profile: 0 } };
 			}
+		],
+		[
+			'a tampered keystore row',
+			async (expected: RestoreExpected) => {
+				await putRaw('keystore', { ...need(await readRaw('keystore')), epoch: 1 });
+				return expected;
+			}
 		]
 	])('%s returns DEVICE_DAMAGED and writes nothing', async (_name, damage) => {
 		await buildDevice();
