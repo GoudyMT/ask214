@@ -6,13 +6,20 @@
 	// What outlives one card. The flows hold the person's place (a wrong passphrase's offer, a replace warning waiting
 	// for its answer), and the session survives the card being taken off the page behind a lock, so the card that
 	// comes back on Unlock must find the same flows. Keyed by session, so a test's own session starts clean.
-	type Kept = { restore: RestoreFlow | null; exporter: ExportFlow | null; warningName: string };
+	// The flows work on one database connection, so they are kept only for the connection they were built on: a page
+	// that opens a new connection (the setup screen, on each visit) starts them fresh.
+	type Kept = {
+		db: IDBDatabase | null;
+		restore: RestoreFlow | null;
+		exporter: ExportFlow | null;
+		warningName: string;
+	};
 	const kept = new WeakMap<BackupSession, Kept>();
 
 	function keptFor(session: BackupSession): Kept {
 		let found = kept.get(session);
 		if (found === undefined) {
-			found = { restore: null, exporter: null, warningName: '' };
+			found = { db: null, restore: null, exporter: null, warningName: '' };
 			kept.set(session, found);
 		}
 		return found;
@@ -65,6 +72,11 @@
 		/** The seams a test stands in for (the save picker, the download, the read-back time). */
 		exportDeps?: Omit<ExportDeps, 'session' | 'db' | 'profile'>;
 		restoreDeps?: Omit<FlowDeps, 'session' | 'app' | 'db'>;
+		/**
+		 * The setup screen's form of the card: only the restore row, under this label and without the card's own frame.
+		 * With `open` set, the row opens by itself, once, as soon as it can start.
+		 */
+		restoreOnly?: { label: string; open: boolean };
 	};
 	const props: Props = $props();
 
@@ -73,9 +85,15 @@
 	const session = untrack(() => props.session ?? backupSession);
 	const app = untrack(() => props.app ?? getProfileApp());
 	const memo = keptFor(session);
-	const restore = (memo.restore ??= untrack(
-		() => new RestoreFlow({ session, app, db: props.db, ...props.restoreDeps })
-	));
+	const startDb = untrack(() => props.db);
+	if (memo.restore === null || memo.db !== startDb) {
+		memo.db = startDb;
+		memo.exporter = null;
+		memo.restore = untrack(
+			() => new RestoreFlow({ session, app, db: props.db, ...props.restoreDeps })
+		);
+	}
+	const restore: RestoreFlow = memo.restore;
 
 	// ---- what the card shows --------------------------------------------------------------------------------------
 
@@ -292,6 +310,17 @@
 		openRow(row);
 	}
 
+	// The setup screen can ask for the restore row to be open. It opens once, as soon as the row can start (the app may
+	// still be starting when the card mounts), and never again: a row the person closed stays closed.
+	let autoOpened = false;
+	$effect(() => {
+		if (props.restoreOnly?.open !== true || autoOpened || !allowed('restore')) return;
+		autoOpened = true;
+		untrack(() => {
+			if (!session.active) openRow('restore');
+		});
+	});
+
 	const guardEnter = (e: KeyboardEvent): void => {
 		if (e.repeat && e.key === 'Enter') e.preventDefault();
 	};
@@ -481,13 +510,21 @@
 	}
 </script>
 
-<section class="backup-card" translate="no" aria-labelledby="backup-heading">
-	<h2 id="backup-heading" class="backup-card__heading">{CARD_LABELS.heading}</h2>
-	<p class="backup-hint">{CARD_INTRO_LINE}</p>
-	{#if lastBackup !== undefined}
-		<p class="backup-hint backup-last">
-			{lastBackup === null ? NO_BACKUP_YET_LINE : lastBackupLine(formatBackupDate(lastBackup))}
-		</p>
+<section
+	class="backup-card"
+	class:backup-card--bare={props.restoreOnly !== undefined}
+	translate="no"
+	aria-labelledby={props.restoreOnly === undefined ? 'backup-heading' : undefined}
+	aria-label={props.restoreOnly?.label}
+>
+	{#if props.restoreOnly === undefined}
+		<h2 id="backup-heading" class="backup-card__heading">{CARD_LABELS.heading}</h2>
+		<p class="backup-hint">{CARD_INTRO_LINE}</p>
+		{#if lastBackup !== undefined}
+			<p class="backup-hint backup-last">
+				{lastBackup === null ? NO_BACKUP_YET_LINE : lastBackupLine(formatBackupDate(lastBackup))}
+			</p>
+		{/if}
 	{/if}
 	{#if session.stopping}
 		<p class="backup-hint" role="status">{STOPPING_LINE}</p>
@@ -649,146 +686,152 @@
 	{/snippet}
 
 	<!-- Make a backup -->
-	<div class="backup-row">
-		{@render toggleRowButton('export', CARD_LABELS.make, 'backup-make')}
-		{#if makeOpen}
-			<div id="backup-make" class="backup-body">
-				{@render hiddenLine()}
-				{#if showShow}
-					<p class="backup-hint" hidden={concealed}>{KEEP_WORDS_LINE}</p>
-					<button
-						bind:this={showEl}
-						class="backup-primary"
-						type="button"
-						hidden={concealed}
-						aria-busy={phase === 'generating'}
-						onclick={() => void show()}
-						onkeydown={guardEnter}
-					>
-						{CARD_LABELS.show}
-					</button>
-				{/if}
-				{#if showingWords && session.words !== null}
-					<PhraseBlock bind:this={phraseRef} words={session.words} onhide={() => void hide()} />
-				{/if}
-				{#if exportForm}
-					<!-- A held Enter repeats, and each repeat would ask for the save place again once the last try ended: only
+	{#if props.restoreOnly === undefined}
+		<div class="backup-row">
+			{@render toggleRowButton('export', CARD_LABELS.make, 'backup-make')}
+			{#if makeOpen}
+				<div id="backup-make" class="backup-body">
+					{@render hiddenLine()}
+					{#if showShow}
+						<p class="backup-hint" hidden={concealed}>{KEEP_WORDS_LINE}</p>
+						<button
+							bind:this={showEl}
+							class="backup-primary"
+							type="button"
+							hidden={concealed}
+							aria-busy={phase === 'generating'}
+							onclick={() => void show()}
+							onkeydown={guardEnter}
+						>
+							{CARD_LABELS.show}
+						</button>
+					{/if}
+					{#if showingWords && session.words !== null}
+						<PhraseBlock bind:this={phraseRef} words={session.words} onhide={() => void hide()} />
+					{/if}
+					{#if exportForm}
+						<!-- A held Enter repeats, and each repeat would ask for the save place again once the last try ended: only
 					     a new press submits. The form only filters its controls' keys; it is not a control itself. -->
-					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-					<form
-						class="backup-form"
-						aria-label={CARD_LABELS.make}
-						hidden={concealed}
-						onsubmit={submitExport}
-						onkeydown={guardEnter}
-					>
-						<p class="backup-hint">{TYPE_BACK_LINE}</p>
-						<label class="backup-field">
-							<span>{CARD_LABELS.backupName}</span>
-							<input
-								type="text"
-								readonly
-								autocomplete="username"
-								spellcheck="false"
-								value={session.names?.label ?? ''}
-							/>
-						</label>
-						<label class="backup-field">
-							<span>{CARD_LABELS.passphrase}</span>
-							<input
-								bind:this={exportPassEl}
-								type="password"
-								autocomplete="new-password"
-								autocapitalize="none"
-								autocorrect="off"
-								spellcheck="false"
-								enterkeyhint="done"
-								aria-invalid={inputError !== null}
-								aria-describedby={inputError !== null ? 'backup-make-error' : undefined}
-							/>
-						</label>
-						{#if inputError !== null}
-							<p id="backup-make-error" class="backup-error" role="alert">{inputError}</p>
-						{/if}
-						<div class="backup-actions">
-							<button class="backup-primary" type="submit" aria-busy={session.busy}>
-								{CARD_LABELS.make}
-							</button>
+						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+						<form
+							class="backup-form"
+							aria-label={CARD_LABELS.make}
+							hidden={concealed}
+							onsubmit={submitExport}
+							onkeydown={guardEnter}
+						>
+							<p class="backup-hint">{TYPE_BACK_LINE}</p>
+							<label class="backup-field">
+								<span>{CARD_LABELS.backupName}</span>
+								<input
+									type="text"
+									readonly
+									autocomplete="username"
+									spellcheck="false"
+									value={session.names?.label ?? ''}
+								/>
+							</label>
+							<label class="backup-field">
+								<span>{CARD_LABELS.passphrase}</span>
+								<input
+									bind:this={exportPassEl}
+									type="password"
+									autocomplete="new-password"
+									autocapitalize="none"
+									autocorrect="off"
+									spellcheck="false"
+									enterkeyhint="done"
+									aria-invalid={inputError !== null}
+									aria-describedby={inputError !== null ? 'backup-make-error' : undefined}
+								/>
+							</label>
+							{#if inputError !== null}
+								<p id="backup-make-error" class="backup-error" role="alert">{inputError}</p>
+							{/if}
+							<div class="backup-actions">
+								<button class="backup-primary" type="submit" aria-busy={session.busy}>
+									{CARD_LABELS.make}
+								</button>
+							</div>
+						</form>
+					{/if}
+					{#if phase === 'replace-warning'}
+						<div class="backup-warning" role="alert" tabindex="-1" bind:this={warningEl}>
+							<p>{replaceWarningLine(warningName)}</p>
+							<div class="backup-actions">
+								<button
+									class="backup-primary"
+									type="button"
+									onclick={chooseAnother}
+									onkeydown={guardEnter}
+								>
+									{CARD_LABELS.chooseAnother}
+								</button>
+								<button
+									class="backup-quiet-danger"
+									type="button"
+									onclick={replaceIt}
+									onkeydown={guardEnter}
+								>
+									{CARD_LABELS.replaceIt}
+								</button>
+							</div>
 						</div>
-					</form>
-				{/if}
-				{#if phase === 'replace-warning'}
-					<div class="backup-warning" role="alert" tabindex="-1" bind:this={warningEl}>
-						<p>{replaceWarningLine(warningName)}</p>
+					{/if}
+					{@render progressBar()}
+					{#if exportLine !== null}
+						<p class="backup-error" role="alert" tabindex="-1" bind:this={resultEl}>{exportLine}</p>
+					{/if}
+					{#if exportOutcome?.kind === 'saved'}
+						<p class="backup-result" role="status" tabindex="-1" bind:this={resultEl}>
+							{savedText(exportOutcome)}
+						</p>
+						<p class="backup-hint">{KEEP_NEWEST_LINE}</p>
 						<div class="backup-actions">
-							<button
-								class="backup-primary"
-								type="button"
-								onclick={chooseAnother}
-								onkeydown={guardEnter}
-							>
-								{CARD_LABELS.chooseAnother}
-							</button>
-							<button
-								class="backup-quiet-danger"
-								type="button"
-								onclick={replaceIt}
-								onkeydown={guardEnter}
-							>
-								{CARD_LABELS.replaceIt}
-							</button>
+							{#if shareFile !== null}
+								<button
+									class="backup-primary"
+									type="button"
+									onclick={() => void sendCopy()}
+									onkeydown={guardEnter}
+								>
+									{CARD_LABELS.send}
+								</button>
+							{/if}
+							{#if exportOutcome.readBack === 'mismatch'}
+								<button
+									class="backup-primary"
+									type="button"
+									onclick={makeAgain}
+									onkeydown={guardEnter}
+								>
+									{CARD_LABELS.makeAgain}
+								</button>
+							{:else}
+								<button
+									class="backup-primary"
+									type="button"
+									onclick={checkNow}
+									onkeydown={guardEnter}
+								>
+									{CARD_LABELS.checkNow}
+								</button>
+							{/if}
 						</div>
-					</div>
-				{/if}
-				{@render progressBar()}
-				{#if exportLine !== null}
-					<p class="backup-error" role="alert" tabindex="-1" bind:this={resultEl}>{exportLine}</p>
-				{/if}
-				{#if exportOutcome?.kind === 'saved'}
-					<p class="backup-result" role="status" tabindex="-1" bind:this={resultEl}>
-						{savedText(exportOutcome)}
-					</p>
-					<p class="backup-hint">{KEEP_NEWEST_LINE}</p>
-					<div class="backup-actions">
-						{#if shareFile !== null}
-							<button
-								class="backup-primary"
-								type="button"
-								onclick={() => void sendCopy()}
-								onkeydown={guardEnter}
-							>
-								{CARD_LABELS.send}
-							</button>
-						{/if}
-						{#if exportOutcome.readBack === 'mismatch'}
-							<button
-								class="backup-primary"
-								type="button"
-								onclick={makeAgain}
-								onkeydown={guardEnter}
-							>
-								{CARD_LABELS.makeAgain}
-							</button>
-						{:else}
-							<button
-								class="backup-primary"
-								type="button"
-								onclick={checkNow}
-								onkeydown={guardEnter}
-							>
-								{CARD_LABELS.checkNow}
-							</button>
-						{/if}
-					</div>
-				{/if}
-				{@render cancelButton()}
-			</div>
-		{/if}
-	</div>
+					{/if}
+					{@render cancelButton()}
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Restore from a backup -->
 	<div class="backup-row">
-		{@render toggleRowButton('restore', CARD_LABELS.restore, 'backup-restore')}
+		{@render toggleRowButton(
+			'restore',
+			props.restoreOnly?.label ?? CARD_LABELS.restore,
+			'backup-restore'
+		)}
 		{#if kind === 'restore'}
 			<div id="backup-restore" class="backup-body">
 				{@render fileBody('restore')}
@@ -796,22 +839,24 @@
 		{/if}
 	</div>
 
-	<!-- Check a backup -->
-	<div class="backup-row">
-		{@render toggleRowButton('check', CARD_LABELS.check, 'backup-check')}
-		{#if kind === 'check'}
-			<div id="backup-check" class="backup-body">
-				{@render fileBody('check')}
-			</div>
-		{/if}
-	</div>
+	{#if props.restoreOnly === undefined}
+		<!-- Check a backup -->
+		<div class="backup-row">
+			{@render toggleRowButton('check', CARD_LABELS.check, 'backup-check')}
+			{#if kind === 'check'}
+				<div id="backup-check" class="backup-body">
+					{@render fileBody('check')}
+				</div>
+			{/if}
+		</div>
 
-	<p class="backup-hint backup-lead">{NOT_IN_BACKUPS_LEAD}</p>
-	<ul class="backup-not-in">
-		{#each NOT_IN_BACKUPS as item (item)}
-			<li>{item}</li>
-		{/each}
-	</ul>
+		<p class="backup-hint backup-lead">{NOT_IN_BACKUPS_LEAD}</p>
+		<ul class="backup-not-in">
+			{#each NOT_IN_BACKUPS as item (item)}
+				<li>{item}</li>
+			{/each}
+		</ul>
+	{/if}
 </section>
 
 <style>
@@ -821,6 +866,14 @@
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-l);
 		padding: var(--space-l);
+	}
+	/* On the setup screen the card sits inside the screen's own frame, so it takes none of its own. */
+	.backup-card--bare {
+		margin-top: 0;
+		padding: 0;
+		background: none;
+		border: none;
+		border-radius: 0;
 	}
 	/* A class on a form, button or paragraph that sets `display` beats the browser's own rule for the hidden
 	   attribute, and a hidden form would then still show. Scoped to the card, never the whole app. */

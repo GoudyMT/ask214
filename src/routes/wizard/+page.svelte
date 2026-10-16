@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
+	import BackupCard from '$lib/backup/BackupCard.svelte';
+	import { takeBackupIntent } from '$lib/backup/intent';
+	import { backupSession } from '$lib/backup/session.svelte';
 	import EaosInput from '$lib/components/EaosInput.svelte';
+	import { openMtcDb } from '$lib/db/schema';
+	import { safeLog } from '$lib/log/safelog';
 	import { getProfileApp } from '$lib/profile/context';
 	import { OccConflictError } from '$lib/profile/store.svelte';
 	import {
@@ -85,6 +91,37 @@
 	async function skip(): Promise<void> {
 		await goto(resolve('/'));
 	}
+
+	const RESTORE_ENTRY = 'Moving to a new phone? Restore from a backup';
+
+	// The note an Erase from the damaged view leaves in the history entry. It is taken as the page starts, whatever the
+	// app is doing: a note left until the app is ready would still be there after a reload and open the row on a later
+	// visit. The card opens the row once the row can start.
+	const openRestoreRow = takeBackupIntent('restore-row');
+
+	// The card works on the database, and the app does not hand its own connection out, so the page holds one of its
+	// own for as long as it is shown. The row stays inert until the app is ready, whatever the connection is doing.
+	let db = $state<IDBDatabase | null>(null);
+	onMount(() => {
+		let gone = false;
+		openMtcDb()
+			.then((opened) => {
+				if (gone) opened.close();
+				else db = opened;
+			})
+			.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
+		return () => {
+			gone = true;
+			db?.close();
+		};
+	});
+
+	// A backup that cannot be restored over this device's damaged data: the Erase lives in Settings, which takes the
+	// request from the session (in memory, never in the address) when the page opens.
+	function eraseFromBackup(): void {
+		backupSession.requestErase();
+		void goto(resolve('/settings'));
+	}
 </script>
 
 <svelte:head>
@@ -95,7 +132,8 @@
 	<h1 id="wizard-heading">Set up your profile</h1>
 	<p class="wizard__lead">
 		Add your separation date and we'll build a transition timeline around it. Everything stays
-		encrypted on this device - it never leaves.
+		encrypted on this device. It leaves only if you make a backup, which is locked with your
+		passphrase.
 	</p>
 
 	{#if app.status === 'ready'}
@@ -124,6 +162,14 @@
 				>
 			</div>
 		</form>
+	{/if}
+
+	{#if db !== null}
+		<BackupCard
+			{db}
+			onEraseRequest={eraseFromBackup}
+			restoreOnly={{ label: RESTORE_ENTRY, open: openRestoreRow }}
+		/>
 	{/if}
 </section>
 
