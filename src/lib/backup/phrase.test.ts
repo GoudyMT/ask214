@@ -12,6 +12,7 @@ const PLAIN = 'apple harbor cable dog echo fox';
 const SHOWN = ['apple', 'harbor', 'cable', 'dog', 'echo', 'fox'] as const;
 
 function bytesOf(result: ReturnType<typeof canonicalizePhrase>): Uint8Array {
+	expect(result.ok).toBe(true);
 	if (!result.ok) throw new Error('phrase was not accepted');
 	return result.bytes;
 }
@@ -187,6 +188,10 @@ describe('parseCanonicalBytes', () => {
 		{ name: 'a non-ASCII letter', bytes: encode('apple harbor cable dog echo f' + KELVIN + 'x') },
 		{ name: 'no bytes', bytes: new Uint8Array(0) },
 		{
+			name: 'a leading byte-order mark',
+			bytes: new Uint8Array([0xef, 0xbb, 0xbf, ...encode(PLAIN)])
+		},
+		{
 			name: 'a non-UTF-8 byte',
 			bytes: new Uint8Array([...encode(PLAIN), 0xff])
 		}
@@ -199,6 +204,7 @@ describe('compareTypedBack', () => {
 	it('accepts the same words in another case and spacing, with the typed bytes', () => {
 		const typed = '  APPLE' + TAB + 'Harbor  cable' + LF + 'dog' + NBSP + 'echo FOX  ';
 		const result = compareTypedBack(typed, SHOWN);
+		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error('typed text did not match');
 		expect(textOf(result.bytes)).toBe(PLAIN);
 		expect(Array.from(result.bytes)).toEqual(Array.from(bytesOf(canonicalizePhrase(typed))));

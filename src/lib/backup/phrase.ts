@@ -76,7 +76,9 @@ export function canonicalizePhrase(input: string): CanonicalResult {
 export function parseCanonicalBytes(bytes: Uint8Array): readonly string[] | null {
 	let text: string;
 	try {
-		text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+		// ignoreBOM keeps a leading byte-order mark in the text, so it fails the letter check instead of being
+		// dropped silently (the bytes would not be the canonical ones).
+		text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
 	} catch {
 		return null;
 	}
