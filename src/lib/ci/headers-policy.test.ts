@@ -62,10 +62,18 @@ describe('_headers policy (P1b)', () => {
 		expect(headers.get('/pdf-worker/*')?.['Content-Security-Policy']).toBe("default-src 'none'");
 	});
 
+	// The backup key worker takes its policy from its own response too. It derives a key from words the page hands
+	// it and fetches, imports and evaluates nothing, so it gets nothing; a worker that could reach the network
+	// could send a passphrase out.
+	it("/backup-kdf/* has default-src 'none'", () => {
+		expect(headers.get('/backup-kdf/*')?.['Content-Security-Policy']).toBe("default-src 'none'");
+	});
+
 	// Every vendored or served static folder is named in NOTICE, with its license or its public-domain basis.
-	it('NOTICE names the page reader and the served documents', () => {
+	it('NOTICE names the page reader, the served documents and the backup key worker', () => {
 		const notice = readFileSync(join(process.cwd(), 'NOTICE'), 'utf8');
 		expect(notice).toContain('static/pdf-worker/');
 		expect(notice).toContain('static/docs/');
+		expect(notice).toContain('static/backup-kdf/');
 	});
 });

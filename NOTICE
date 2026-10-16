@@ -47,6 +47,12 @@ Bundled / vendored runtime components
    The library and its worker in static/pdf-worker/ are redistributed from
    this project, byte-for-byte; they draw the pages of the served documents.
 
+6. @noble/hashes
+   Copyright (c) 2022 Paul Miller (https://paulmillr.com)
+   License: MIT
+   https://github.com/paulmillr/noble-hashes
+   Bundled into the backup key worker in static/backup-kdf/.
+
 ================================================================================
 Reference content (the offline corpus)
 ================================================================================
@@ -67,6 +73,17 @@ or sponsored by the U.S. Department of Veterans Affairs, the U.S. Department of
 Defense, or any U.S. Government agency.
 
 ================================================================================
+Word list
+================================================================================
+
+The backup passphrase words are a curated copy of the EFF Large Wordlist for
+Passphrases (Electronic Frontier Foundation, https://www.eff.org/dice).
+License: Creative Commons Attribution 4.0 International (CC BY 4.0), per
+https://www.eff.org/copyright. Changed: 147 words removed (hyphenated words,
+alternate spellings, brand, drug, proper and offensive words); the list of
+removals is in content-ops/backup-words-removed.txt.
+
+================================================================================
 Apache License 2.0
 ================================================================================
 
@@ -85,12 +102,13 @@ MIT License
 ================================================================================
 
 The MIT-licensed components above (ONNX Runtime Web - onnxruntime-web and
-onnxruntime-common - and Svelte / SvelteKit) are distributed under the MIT
-License. Its permission notice is reproduced below and applies to each MIT
-component with its respective copyright holder as named above:
+onnxruntime-common - Svelte / SvelteKit and @noble/hashes) are distributed under
+the MIT License. Its permission notice is reproduced below and applies to each
+MIT component with its respective copyright holder as named above:
 
     Copyright (c) Microsoft Corporation (ONNX Runtime Web)
     Copyright (c) the Svelte contributors (Svelte and SvelteKit)
+    Copyright (c) 2022 Paul Miller (https://paulmillr.com) (@noble/hashes)
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal

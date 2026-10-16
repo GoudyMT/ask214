@@ -50,6 +50,14 @@ describe('classifyAsset', () => {
 		expect(classifyAsset('/favicon.png')).toBe('precache');
 	});
 
+	// A backup must work with no connection, even right after "Erase all data", so the key worker is kept at install
+	// for every visitor, like the app shell, and never fetched on first use.
+	it('precaches the backup key worker like the app shell', () => {
+		const worker = '/backup-kdf/e7d2d6aa88ea0e01/backup-kdf.worker.mjs';
+		expect(classifyAsset(worker)).toBe('precache');
+		expect(classifyAsset(worker)).toBe(classifyAsset('/_app/immutable/entry/start.js'));
+	});
+
 	// The install writes its precache entries as one batch, so every megabyte admitted here is both a
 	// download for someone who may never need it AND another chance for the whole install to fail on a
 	// flaky connection. Measured before this guard existed: the documents and the worker together put
