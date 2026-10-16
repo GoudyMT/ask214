@@ -249,7 +249,8 @@ const ROWS: Row[] = [
 		restore:
 			'You left Ask 214, so the backup stopped. Nothing on this device was changed. Your passphrase is still here - try again.'
 	},
-	{ code: 'E_BACKUP_UNAVAILABLE', params: {}, export: null, restore: null },
+	// Export only: a snapshot that finds the setup unfinished. A start the app refuses has no text of its own.
+	{ code: 'E_BACKUP_UNAVAILABLE', params: {}, export: FINISH_SETUP_LINE, restore: null },
 	{
 		code: 'E_RESTORE_DEVICE_MOVED',
 		params: {},
@@ -538,7 +539,6 @@ describe('backupMessage coverage', () => {
 		expect(COPY_OWED.map(key)).toEqual([
 			'E_CRYPTO_FAILED/export',
 			'E_RESTORE_DEVICE_CHANGED/restore',
-			'E_BACKUP_UNAVAILABLE/export',
 			'E_BACKUP_UNAVAILABLE/restore'
 		]);
 	});

@@ -477,6 +477,23 @@ describe('the card at rest', () => {
 		expect(page.getByRole('status').query()).toBeNull();
 	});
 
+	// A start the app refuses is not an unfinished setup: the line must not blame the person's setup for it.
+	it('a start the session refuses says that the step stopped, not that setup is unfinished', async () => {
+		const card = await mount();
+		const real = card.app.joinRelock;
+		let reads = 0;
+		// Open to the card's own check, gone by the time the session looks.
+		Object.defineProperty(card.app, 'joinRelock', {
+			configurable: true,
+			get: () => (reads++ === 0 ? real : null)
+		});
+		await userEvent.click(toggle(CARD_LABELS.make, false));
+		await expect
+			.element(text(need(backupMessage('E_WORKER_FAILED', { path: 'export' }))))
+			.toBeVisible();
+		expect(text(FINISH_SETUP_LINE).query()).toBeNull();
+	});
+
 	it('Check still opens when the saved data is damaged', async () => {
 		const card = await mount({ status: 'damaged' });
 		await userEvent.click(toggle(CARD_LABELS.check, false));

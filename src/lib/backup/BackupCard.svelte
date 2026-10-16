@@ -32,7 +32,6 @@
 		CHECK_NEW_BACKUP_OFFER,
 		downloadedLine,
 		ERASE_DEVICE_BUTTON,
-		FINISH_SETUP_LINE,
 		GETTING_READY_LINE,
 		HIDDEN_WHILE_AWAY_LINE,
 		KEEP_WORDS_LINE,
@@ -173,7 +172,6 @@
 		} catch {
 			/* a detail the flow could not give is the flow's fault; the person still gets a line */
 		}
-		if (code === 'E_BACKUP_UNAVAILABLE' && ctx.path === 'export') return FINISH_SETUP_LINE;
 		// A code with no text of its own yet says that the step stopped and nothing was changed.
 		return backupMessage('E_WORKER_FAILED', { path: ctx.path }) ?? '';
 	}
@@ -262,10 +260,11 @@
 			if (row === 'export') session.start(app, 'export');
 			else
 				void restore.open(row).catch(() => {
-					startLine = lineFor('E_BACKUP_UNAVAILABLE', { path: 'restore' });
+					startLine = lineFor('E_WORKER_FAILED', { path: 'restore' });
 				});
 		} catch {
-			startLine = lineFor('E_BACKUP_UNAVAILABLE', { path: 'export' });
+			// A refused start says the step stopped; "finish setup" is only for a snapshot that found the setup unfinished.
+			startLine = lineFor('E_WORKER_FAILED', { path: 'export' });
 		}
 	}
 

@@ -141,7 +141,6 @@ type TextPath = 'export' | 'restore';
 export const COPY_OWED: readonly Readonly<{ code: BackupCode; path: TextPath }>[] = Object.freeze([
 	Object.freeze({ code: 'E_CRYPTO_FAILED', path: 'export' } as const),
 	Object.freeze({ code: 'E_RESTORE_DEVICE_CHANGED', path: 'restore' } as const),
-	Object.freeze({ code: 'E_BACKUP_UNAVAILABLE', path: 'export' } as const),
 	Object.freeze({ code: 'E_BACKUP_UNAVAILABLE', path: 'restore' } as const)
 ]);
 
@@ -306,8 +305,10 @@ export function backupMessage(code: BackupCode, ctx: MessageContext): string | n
 			return onRestore(path, 'Stopped. Nothing on this device was changed.');
 		case 'E_EXPORT_CANCELLED':
 			return onExport(path, 'Stopped. No backup was saved.');
-		case 'E_RESTORE_DEVICE_CHANGED':
 		case 'E_BACKUP_UNAVAILABLE':
+			// A snapshot that finds the setup unfinished. A restore or Check the app refuses to start has no text yet.
+			return onExport(path, FINISH_SETUP_LINE);
+		case 'E_RESTORE_DEVICE_CHANGED':
 			return null;
 		default:
 			return bad();
