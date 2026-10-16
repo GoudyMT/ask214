@@ -27,6 +27,7 @@ import {
 	FINISH_SETUP_LINE,
 	GETTING_READY_LINE,
 	HIDDEN_WHILE_AWAY_LINE,
+	KEEP_WORDS_LINE,
 	lastBackupLine,
 	MAKE_NEW_BACKUP_BUTTON,
 	NO_BACKUP_YET_LINE,
@@ -495,6 +496,8 @@ describe('the words', () => {
 		expect(card.workers).toHaveLength(0);
 		expect(card.session.words).toBeNull();
 		for (const word of WORDS) expect(document.body.textContent).not.toContain(word);
+		// Said before the words appear: where to keep them, and that a forgotten passphrase cannot be recovered.
+		await expect.element(text(KEEP_WORDS_LINE)).toBeVisible();
 
 		await showWords();
 		expect(card.workers).toHaveLength(1);

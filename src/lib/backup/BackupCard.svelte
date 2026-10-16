@@ -14,6 +14,7 @@
 		FINISH_SETUP_LINE,
 		GETTING_READY_LINE,
 		HIDDEN_WHILE_AWAY_LINE,
+		KEEP_WORDS_LINE,
 		lastBackupLine,
 		MAKE_NEW_BACKUP_BUTTON,
 		NO_BACKUP_YET_LINE,
@@ -625,6 +626,7 @@
 			<div id="backup-make" class="backup-body">
 				{@render hiddenLine()}
 				{#if showShow}
+					<p class="backup-hint" hidden={concealed}>{KEEP_WORDS_LINE}</p>
 					<button
 						bind:this={showEl}
 						class="backup-primary"

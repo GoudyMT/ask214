@@ -16,6 +16,7 @@ import {
 	FINISH_SETUP_LINE,
 	GETTING_READY_LINE,
 	HIDDEN_WHILE_AWAY_LINE,
+	KEEP_WORDS_LINE,
 	lastBackupLine,
 	LOCKED_AFTER_RESTORE_LINE,
 	madeOnLine,
@@ -435,6 +436,9 @@ describe('backupMessage wording', () => {
 		expect(FINISH_SETUP_LINE).toBe('Finish setup first, then make a backup.');
 		expect(PHRASE_NOTE).toBe(
 			'Write these words down, or type them below so your password manager saves them. Do not copy or screenshot them.'
+		);
+		expect(KEEP_WORDS_LINE).toBe(
+			'Keep these words in a password manager or on paper, never with the backup file. If you forget them, no one can open this backup, not even Ask 214.'
 		);
 		expect(HIDDEN_WHILE_AWAY_LINE).toBe('Hidden while you were away.');
 		expect(TYPE_BACK_LINE).toBe(

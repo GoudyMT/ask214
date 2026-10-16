@@ -66,6 +66,8 @@ export const GETTING_READY_LINE = 'Getting ready...';
 export const FINISH_SETUP_LINE = 'Finish setup first, then make a backup.';
 export const PHRASE_NOTE =
 	'Write these words down, or type them below so your password manager saves them. Do not copy or screenshot them.';
+export const KEEP_WORDS_LINE =
+	'Keep these words in a password manager or on paper, never with the backup file. If you forget them, no one can open this backup, not even Ask 214.';
 export const HIDDEN_WHILE_AWAY_LINE = 'Hidden while you were away.';
 export const TYPE_BACK_LINE =
 	'Type the 6 words below. This checks for typing mistakes, and lets your password manager save them.';
