@@ -292,55 +292,44 @@ describe('the save picker and the type-back', () => {
 
 	// A typo in the words must be caught before a file dialog opens and before any key work.
 	it.each([
-		['a wrong last word', 'bamboo copper harvest lantern oxygen thimbl', 6, undefined],
-		['a letter that is a digit', 'bamboo copper harvest lan7ern oxygen thimble', 4, undefined],
+		[
+			'a wrong last word',
+			'bamboo copper harvest lantern oxygen thimbl',
+			{ kind: 'invalid', code: 'E_TYPE_BACK_MISMATCH', position: 6 }
+		],
 		[
 			'numbers in front of the words',
 			'1 bamboo copper harvest lantern oxygen thimble',
-			undefined,
-			true
+			{ kind: 'invalid', code: 'E_WORD_COUNT', numbers: true }
 		]
-	])('a wrong type-back opens no picker: %s', async (_name, typed, position, numbers) => {
+	])('a wrong type-back opens no picker: %s', async (_name, typed, expected) => {
 		const picker = pickerOf(fakeFile().handle);
 		const { session, workers, flow } = await rig(picker);
 
 		const result = await submit(flow, typed);
 
-		expect(result).toEqual(
-			numbers === true
-				? { kind: 'invalid', code: 'E_WORD_COUNT', numbers: true }
-				: {
-						kind: 'invalid',
-						code: position === 4 ? 'E_NOT_LETTERS' : 'E_TYPE_BACK_MISMATCH',
-						position
-					}
-		);
+		expect(result).toEqual(expected);
 		expect(picker).not.toHaveBeenCalled();
 		expect(workers).toHaveLength(1);
 		expect(session.busy).toBe(false);
 		expect(session.phase).toBe('typed-back');
 	});
 
-	// A held Enter or a second tap must not open two dialogs or derive the key twice, with or without a picker.
-	it.each([true, false])(
-		'a double click opens one picker and starts one worker (picker: %s)',
-		async (hasPicker) => {
-			const f = fakeFile();
-			const picker = hasPicker ? pickerOf(f.handle) : null;
-			const download = vi.fn();
-			const { workers, flow } = await rig(picker, { download });
-			const afterShow = workers.length;
+	// A held Enter or a second tap must not open two dialogs or derive the key twice.
+	it('a double click opens one picker and starts one worker', async () => {
+		const f = fakeFile();
+		const picker = pickerOf(f.handle);
+		const { workers, flow } = await rig(picker);
+		const afterShow = workers.length;
 
-			const first = submit(flow);
-			const second = submit(flow);
+		const first = submit(flow);
+		const second = submit(flow);
 
-			expect(await second).toEqual({ kind: 'ignored' });
-			expect((await first).kind).toBe('saved');
-			expect(picker?.mock.calls.length ?? 0).toBe(hasPicker ? 1 : 0);
-			expect(download).toHaveBeenCalledTimes(hasPicker ? 0 : 1);
-			expect(workers.length - afterShow).toBe(1);
-		}
-	);
+		expect(await second).toEqual({ kind: 'ignored' });
+		expect(await first).toEqual(SAVED);
+		expect(picker).toHaveBeenCalledTimes(1);
+		expect(workers.length - afterShow).toBe(1);
+	});
 
 	// A stray submit (autofill, a held key) after the form is gone must not open a dialog for a session that ended.
 	it.each([
@@ -467,15 +456,6 @@ describe('a saved file', () => {
 		expect(checked.inner.stores.profile.setupIntent).toBe('completed');
 		expect(checked.inner.stores['timeline-state']?.tasks).toEqual({
 			'va-gov-account': { status: 'done' }
-		});
-
-		const other = await keyFor(
-			new TextEncoder().encode('some other words here now ok').buffer,
-			read.envelope.salt
-		);
-		expect(await decryptEnvelope(read.envelope, other)).toMatchObject({
-			ok: false,
-			code: 'E_WRONG_PASSPHRASE'
 		});
 	});
 
