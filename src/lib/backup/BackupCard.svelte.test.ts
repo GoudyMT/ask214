@@ -498,6 +498,22 @@ describe('the card at rest', () => {
 		expect(text(FINISH_SETUP_LINE).query()).toBeNull();
 	});
 
+	// The toggle keeps focus through the press, so a repeat of the held key lands on it again and would close the row it
+	// just opened, then open it again.
+	it.each(TIMINGS)(
+		'a held Enter on a row toggle opens the row once (the wait takes %i ms)',
+		async (ms) => {
+			const wait = vi.fn(() => pause(ms).then(() => true));
+			const card = await mount({ wait });
+			(toggle(CARD_LABELS.restore, false).element() as HTMLElement).focus();
+			await holdEnter();
+			await pause(100);
+			expect(wait).toHaveBeenCalledTimes(1);
+			await expect.element(toggle(CARD_LABELS.restore, true)).toBeVisible();
+			expect(card.session.kind).toBe('restore');
+		}
+	);
+
 	it('Check still opens when the saved data is damaged', async () => {
 		const card = await mount({ status: 'damaged' });
 		await userEvent.click(toggle(CARD_LABELS.check, false));
