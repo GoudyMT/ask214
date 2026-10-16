@@ -63,14 +63,16 @@ function argonCalls(): number {
 	return mocks.argon2id.mock.calls.length + mocks.argon2idAsync.mock.calls.length;
 }
 
+function fakeArgon(_pass: Uint8Array, _salt: Uint8Array, opts: ArgonOptions): Uint8Array {
+	opts.onProgress?.(0.5);
+	opts.onProgress?.(1);
+	return Uint8Array.from(FAKE_OUTPUT);
+}
+
 beforeEach(() => {
 	mocks.argon2id.mockReset();
 	mocks.argon2idAsync.mockReset();
-	mocks.argon2id.mockImplementation((_pass: Uint8Array, _salt: Uint8Array, opts: ArgonOptions) => {
-		opts.onProgress?.(0.5);
-		opts.onProgress?.(1);
-		return Uint8Array.from(FAKE_OUTPUT);
-	});
+	mocks.argon2id.mockImplementation(fakeArgon);
 });
 
 describe('derive: the word check comes first', () => {
@@ -129,12 +131,19 @@ describe('derive: the passphrase bytes are wiped on every path', () => {
 	});
 
 	it('the passphrase bytes are zeroed when the key step fails', async () => {
+		let output: Uint8Array | undefined;
+		mocks.argon2id.mockImplementation(() => {
+			output = Uint8Array.from(FAKE_OUTPUT);
+			return output;
+		});
 		const import_ = vi.spyOn(crypto.subtle, 'importKey').mockRejectedValue(new Error('no'));
 		try {
 			const { pass, posts } = await runDerive(PHRASE_TEXT);
 			expect(posts.at(-1)).toEqual({ type: 'error', code: 'E_CRYPTO_FAILED' });
 			expect(posts.some((msg) => msg.type === 'key')).toBe(false);
 			expect(isZero(pass)).toBe(true);
+			expect(output).toBeDefined();
+			expect(output?.every((byte) => byte === 0)).toBe(true);
 		} finally {
 			import_.mockRestore();
 		}
@@ -257,6 +266,19 @@ async function referenceKey(
 	);
 }
 
+// A wrong key makes AES-GCM throw; turning that into null lets the test fail on a comparison, not on a crash.
+async function openOrNull(
+	key: CryptoKey,
+	iv: Uint8Array<ArrayBuffer>,
+	sealed: ArrayBuffer
+): Promise<number[] | null> {
+	try {
+		return [...new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, sealed))];
+	} catch {
+		return null;
+	}
+}
+
 function keyOf(posts: FromWorker[]): CryptoKey {
 	const last = posts.at(-1);
 	if (last?.type !== 'key') throw new Error('no key was posted');
@@ -291,8 +313,7 @@ describe('derive: the key', () => {
 			'ask214-backup-v1/aes-gcm-256'
 		);
 		const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, exportKey, block);
-		const opened = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, reference, sealed);
-		expect([...new Uint8Array(opened)]).toEqual([...block]);
+		expect(await openOrNull(reference, iv, sealed)).toEqual([...block]);
 
 		const restoreKey = keyOf((await runDerive(PHRASE_TEXT, 'restore', salt)).posts);
 		const sealedByReference = await crypto.subtle.encrypt(
@@ -300,12 +321,7 @@ describe('derive: the key', () => {
 			reference,
 			block
 		);
-		const openedByRestore = await crypto.subtle.decrypt(
-			{ name: 'AES-GCM', iv },
-			restoreKey,
-			sealedByReference
-		);
-		expect([...new Uint8Array(openedByRestore)]).toEqual([...block]);
+		expect(await openOrNull(restoreKey, iv, sealedByReference)).toEqual([...block]);
 	});
 
 	it('a key from another salt, another info or another output does not open it', async () => {
@@ -433,33 +449,157 @@ describe('generate and malformed requests', () => {
 });
 
 describe('privacy of what is posted', () => {
-	it('nothing posted ever holds a passphrase token', async () => {
-		const throwing = (thrown: unknown) => () => {
+	// Each answer has exactly these own keys and no others, so a stray field (an echoed phrase, an error's text) fails.
+	const SHAPES: Record<string, { required: string[]; optional: string[] }> = {
+		error: { required: ['type', 'code'], optional: ['position'] },
+		progress: { required: ['type', 'percent'], optional: [] },
+		key: { required: ['type', 'key'], optional: [] },
+		words: { required: ['type', 'words'], optional: [] }
+	};
+
+	function expectExactShape(msg: FromWorker): void {
+		const shape = SHAPES[msg.type];
+		expect(shape).toBeDefined();
+		if (shape === undefined) return;
+		const keys = Object.keys(msg);
+		const allowed = [...shape.required, ...shape.optional];
+		for (const key of shape.required) expect(keys).toContain(key);
+		for (const key of keys) expect(allowed).toContain(key);
+	}
+
+	// Everything except the type and code literals, as text: a token anywhere inside (a field, a nested value, an
+	// array) shows up here. A CryptoKey serialises to {}.
+	function expectNoToken(msg: FromWorker, tokens: readonly string[]): void {
+		const text = JSON.stringify(msg, (name, value: unknown) =>
+			name === 'type' || name === 'code' ? undefined : value
+		).toLowerCase();
+		for (const token of tokens) expect(text).not.toContain(token.toLowerCase());
+	}
+
+	type Scenario = [name: string, run: () => Promise<FromWorker[]>, tokens: string[]];
+
+	async function viaHandle(message: unknown): Promise<FromWorker[]> {
+		const posts: FromWorker[] = [];
+		const { handle } = createHandler(WORDS_V1, (msg) => posts.push(msg));
+		await handle(message);
+		return posts;
+	}
+
+	function deriving(
+		text: string,
+		arrange: () => void = () => undefined
+	): () => Promise<FromWorker[]> {
+		return async () => {
+			mocks.argon2id.mockImplementation(fakeArgon);
+			arrange();
+			return (await runDerive(text)).posts;
+		};
+	}
+
+	function argonThrows(thrown: unknown): () => void {
+		return () => {
 			mocks.argon2id.mockImplementation(() => {
 				throw thrown;
 			});
 		};
-		const scenarios: [string, () => void][] = [
-			[swapWord(3, NOT_A_WORD), () => undefined],
-			[PHRASE_TEXT, () => undefined],
-			[PHRASE_TEXT, throwing(new RangeError(PHRASE_TEXT))],
-			[PHRASE_TEXT, throwing(new Error(PHRASE_TEXT))],
-			[PHRASE_TEXT.toUpperCase(), () => undefined],
-			[`${PHRASE_TEXT} ${PHRASE_TEXT}`, () => undefined]
-		];
-		const strings: string[] = [];
-		for (const [text, arrange] of scenarios) {
-			arrange();
-			const { posts } = await runDerive(text);
+	}
+
+	function withSpy<T>(restore: () => void, run: () => Promise<T>): Promise<T> {
+		return run().finally(restore);
+	}
+
+	const PHRASE_TOKENS = [...PHRASE, NOT_A_WORD];
+	const SCENARIOS: Scenario[] = [
+		['an unknown word', deriving(swapWord(3, NOT_A_WORD)), PHRASE_TOKENS],
+		['a success', deriving(PHRASE_TEXT), PHRASE_TOKENS],
+		['upper case input', deriving(PHRASE_TEXT.toUpperCase()), PHRASE_TOKENS],
+		['twelve words', deriving(`${PHRASE_TEXT} ${PHRASE_TEXT}`), PHRASE_TOKENS],
+		['a double space', deriving(PHRASE_TEXT.replace(' ', '  ')), PHRASE_TOKENS],
+		[
+			'a RangeError carrying the phrase',
+			deriving(PHRASE_TEXT, argonThrows(new RangeError(PHRASE_TEXT))),
+			PHRASE_TOKENS
+		],
+		[
+			'an Error carrying the phrase',
+			deriving(PHRASE_TEXT, argonThrows(new Error(PHRASE_TEXT))),
+			PHRASE_TOKENS
+		],
+		[
+			'a string thrown carrying the phrase',
+			deriving(PHRASE_TEXT, argonThrows(PHRASE_TEXT)),
+			PHRASE_TOKENS
+		],
+		[
+			'an importKey failure carrying the phrase',
+			() => {
+				const spy = vi.spyOn(crypto.subtle, 'importKey').mockRejectedValue(new Error(PHRASE_TEXT));
+				return withSpy(() => spy.mockRestore(), deriving(PHRASE_TEXT));
+			},
+			PHRASE_TOKENS
+		],
+		[
+			'a deriveKey failure carrying the phrase',
+			() => {
+				const spy = vi.spyOn(crypto.subtle, 'deriveKey').mockRejectedValue(new Error(PHRASE_TEXT));
+				return withSpy(() => spy.mockRestore(), deriving(PHRASE_TEXT));
+			},
+			PHRASE_TOKENS
+		],
+		[
+			'a derive request with an extra key',
+			() =>
+				viaHandle({
+					op: 'derive',
+					purpose: 'restore',
+					pass: bufferOf(PHRASE_TEXT),
+					salt: saltOf(),
+					extra: PHRASE_TEXT
+				}),
+			PHRASE_TOKENS
+		],
+		[
+			'a request whose op is the phrase',
+			() => viaHandle({ op: PHRASE_TEXT, pass: bufferOf(PHRASE_TEXT) }),
+			PHRASE_TOKENS
+		],
+		['a request that is the phrase', () => viaHandle(PHRASE_TEXT), PHRASE_TOKENS],
+		[
+			'a request with a short salt',
+			() =>
+				viaHandle({
+					op: 'derive',
+					purpose: 'export',
+					pass: bufferOf(PHRASE_TEXT),
+					salt: saltOf(3)
+				}),
+			PHRASE_TOKENS
+		],
+		['generate', () => viaHandle({ op: 'generate' }), []]
+	];
+
+	it.each(SCENARIOS)(
+		'every post has exactly its own keys and holds no passphrase token (%s)',
+		async (_name, run, tokens) => {
+			const posts = await run();
+			expect(posts.length).toBeGreaterThan(0);
 			for (const msg of posts) {
-				for (const value of Object.values(msg)) if (typeof value === 'string') strings.push(value);
+				expectExactShape(msg);
+				if (msg.type !== 'words') expectNoToken(msg, tokens);
 			}
-			mocks.argon2id.mockReset();
-			mocks.argon2id.mockImplementation(() => Uint8Array.from(FAKE_OUTPUT));
 		}
-		expect(strings.length).toBeGreaterThan(0);
-		const tokens = new Set([...PHRASE, NOT_A_WORD, ...PHRASE_TEXT.toUpperCase().split(' ')]);
-		for (const text of strings) expect(tokens.has(text)).toBe(false);
-		for (const text of strings) expect(text).not.toContain(NOT_A_WORD);
+	);
+
+	it('the scenarios cover every answer type', async () => {
+		const seen = new Set<string>();
+		for (const [, run] of SCENARIOS) for (const msg of await run()) seen.add(msg.type);
+		expect([...seen].sort()).toEqual(['error', 'key', 'progress', 'words']);
+	});
+
+	it('a words post is only ever the generate answer', async () => {
+		for (const [name, run] of SCENARIOS) {
+			if (name === 'generate') continue;
+			for (const msg of await run()) expect(msg.type).not.toBe('words');
+		}
 	});
 });
