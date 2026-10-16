@@ -55,8 +55,9 @@ export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
 
 /**
  * What the Backup card says around the flows: its own lines, and the words on its buttons and fields. DRAFT, for the
- * owner's review, like the rest of this module. The two lines that tell the person to delete a file live in the card
- * itself, because this module's test refuses that word in any string it exports.
+ * owner's review, like the rest of this module. The three lines that tell the person to delete a file (keep the
+ * newest, the replace warning, the read-back mismatch) live in the card itself, because this module's test refuses
+ * that word in any string it exports.
  */
 export const CARD_INTRO_LINE =
 	'This file is yours. Erase does not remove it. Keep it off this phone, and keep the passphrase somewhere else.';
