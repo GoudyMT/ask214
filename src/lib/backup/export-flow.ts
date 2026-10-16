@@ -20,8 +20,9 @@ import { validateInner, type RefusedStore } from './validate';
  *     memory before anything is written, so a file that would not open is never written;
  *   - entering `saved` is the commit: it happens in the same synchronous block as the `close()` call (or the download
  *     click), and from there the session has already dropped the words, the key and every plaintext buffer.
- * Nothing here holds a word, a field value, a byte of the file or a record in a message, a log or a result: a failure
- * is a code, and the card looks up its words in copy.ts.
+ * Nothing here holds a word, a field value or a record in a message, a log or a result: a failure is a code, and the
+ * card looks up its words in copy.ts. The one thing a result does carry is the sealed file's text on a save, which is
+ * ciphertext, so the card can offer to send a copy.
  */
 
 /** What the browser's file-saving API gives the flow; only the parts it uses. */
@@ -76,6 +77,11 @@ export type ExportResult =
 			kind: 'saved';
 			fileName: string;
 			readBack: 'matches' | 'mismatch' | 'not-checked' | 'download';
+			/**
+			 * The sealed file exactly as it was saved. It is ciphertext and holds no word or key, so the card may keep it
+			 * for as long as it offers to send a copy.
+			 */
+			text: string;
 	  };
 
 type Gens = { profile: number; timeline: number; calendar: number };
@@ -407,7 +413,12 @@ export class ExportFlow {
 		run.enter('saved');
 		await this.#markBackup(run, prepared);
 		this.#finish(run);
-		return { kind: 'saved', fileName: prepared.fileName, readBack: 'download' };
+		return {
+			kind: 'saved',
+			fileName: prepared.fileName,
+			readBack: 'download',
+			text: prepared.text
+		};
 	}
 
 	async #writeFile(run: Run, handle: SaveHandle, prepared: Prepared): Promise<ExportResult> {
@@ -454,7 +465,7 @@ export class ExportFlow {
 		run.enter('checking');
 		const readBack = await this.#readBack(handle, prepared.text);
 		this.#finish(run);
-		return { kind: 'saved', fileName, readBack };
+		return { kind: 'saved', fileName, readBack, text: prepared.text };
 	}
 
 	/**

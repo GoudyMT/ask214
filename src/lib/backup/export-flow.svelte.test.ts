@@ -12,7 +12,6 @@ import { decryptEnvelope, readBackupFile } from './envelope';
 import {
 	ExportFlow,
 	type ExportDeps,
-	type ExportResult,
 	type SaveHandle,
 	type SavePicker,
 	type SaveWritable
@@ -270,7 +269,13 @@ async function rig(picker: SavePicker | null, extra: Partial<ExportDeps> = {}) {
 
 const submit = (flow: ExportFlow, typed = TYPED) => flow.submit({ preventDefault: vi.fn() }, typed);
 
-const SAVED: ExportResult = { kind: 'saved', fileName: 'picked.json', readBack: 'matches' };
+// The sealed text rides along on a save so the card can offer to share the very bytes that were saved.
+const SAVED = {
+	kind: 'saved',
+	fileName: 'picked.json',
+	readBack: 'matches',
+	text: expect.any(String)
+} as const;
 
 describe('the save picker and the type-back', () => {
 	// The browser lets a page open its picker only right after the tap, so a single await before the call loses it.
@@ -407,7 +412,7 @@ describe('replacing a file that already holds something', () => {
 
 		const third = flow.chooseAnother();
 		expect(picker).toHaveBeenCalledTimes(3);
-		expect(await third).toEqual({ kind: 'saved', fileName: 'fresh.json', readBack: 'matches' });
+		expect(await third).toEqual({ ...SAVED, fileName: 'fresh.json' });
 		expect(fresh.content).not.toBe('');
 		expect(old.content).toBe('an older backup');
 		expect(old.created).toBe(0);
@@ -499,7 +504,10 @@ describe('a saved file', () => {
 		};
 		const { flow } = await rig(pickerOf(f.handle));
 
-		expect(await submit(flow)).toEqual(SAVED);
+		const result = await submit(flow);
+		expect(result).toEqual(SAVED);
+		// The text on the result is the file's content, byte for byte: a share sends what was saved.
+		expect(result.kind === 'saved' && result.text).toBe(f.content);
 
 		expect(f.content).not.toBe('');
 		expect((await readDeviceState(db)).mark).toBeNull();
@@ -529,7 +537,13 @@ describe('a saved file', () => {
 
 		const result = await submit(flow);
 
-		expect(result).toEqual({ kind: 'saved', fileName, readBack: 'download' });
+		// The result carries the very text that was handed to the download.
+		expect(result).toEqual({
+			kind: 'saved',
+			fileName,
+			readBack: 'download',
+			text: download.mock.calls[0]?.[1]
+		});
 		expect(download).toHaveBeenCalledTimes(1);
 		expect(download.mock.calls[0]?.[0]).toBe(fileName);
 		expect(await readBackupFile(new File([download.mock.calls[0]?.[1] ?? ''], 'x'))).toMatchObject({
