@@ -36,7 +36,7 @@ import { compareVersions, isAppVersion } from './version';
  * Rules that keep a backup readable forever. Within `backupSchema` 1 this check may only be WIDENED. Anything that
  * tightens it, a store `schemaVersion` change, or a field that starts or stops being written bumps `backupSchema` in
  * the same change, with the migration for the old files. A new public setter on a store joins the writer-corpus test,
- * which writes every record the setters can make and validates it.
+ * which writes every record the setters can make and validates it, and fails review unless it is added there.
  */
 
 export type RefusedStore = 'profile' | 'timeline' | 'calendar';
