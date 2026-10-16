@@ -1,3 +1,24 @@
+<script module lang="ts">
+	import { ExportFlow } from './export-flow';
+	import { RestoreFlow } from './restore-flow';
+	import type { BackupSession } from './session.svelte';
+
+	// What outlives one card. The flows hold the person's place (a wrong passphrase's offer, a replace warning waiting
+	// for its answer), and the session survives the card being taken off the page behind a lock, so the card that
+	// comes back on Unlock must find the same flows. Keyed by session, so a test's own session starts clean.
+	type Kept = { restore: RestoreFlow | null; exporter: ExportFlow | null; warningName: string };
+	const kept = new WeakMap<BackupSession, Kept>();
+
+	function keptFor(session: BackupSession): Kept {
+		let found = kept.get(session);
+		if (found === undefined) {
+			found = { restore: null, exporter: null, warningName: '' };
+			kept.set(session, found);
+		}
+		return found;
+	}
+</script>
+
 <script lang="ts">
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { getProfileApp } from '../profile/context';
@@ -27,16 +48,11 @@
 		type MessageContext
 	} from './copy';
 	import { formatBackupDate } from './dates';
-	import { ExportFlow, type ExportDeps, type ExportResult } from './export-flow';
+	import type { ExportDeps, ExportResult } from './export-flow';
 	import PhraseBlock from './PhraseBlock.svelte';
-	import { RestoreFlow, type FlowDeps } from './restore-flow';
+	import type { FlowDeps } from './restore-flow';
 	import RestoreConfirm from './RestoreConfirm.svelte';
-	import {
-		backupSession,
-		type BackupSession,
-		type Phase,
-		type SessionKind
-	} from './session.svelte';
+	import { backupSession, type Phase, type SessionKind } from './session.svelte';
 
 	type Props = {
 		/** Opens the host's Erase dialog: the damaged-device line offers it. */
@@ -57,9 +73,10 @@
 	// them, because the flow holds the person's place in a restore.
 	const session = untrack(() => props.session ?? backupSession);
 	const app = untrack(() => props.app ?? getProfileApp());
-	const restore = untrack(
+	const memo = keptFor(session);
+	const restore = (memo.restore ??= untrack(
 		() => new RestoreFlow({ session, app, db: props.db, ...props.restoreDeps })
-	);
+	));
 
 	// ---- what the card shows --------------------------------------------------------------------------------------
 
@@ -112,7 +129,11 @@
 	let exportOutcome = $state<ExportOutcome | null>(null);
 	// A word that did not match, said beside the field; the session keeps nothing about it.
 	let inputError = $state<string | null>(null);
-	let warningName = $state('');
+	// Mirrored into `memo` so a card brought back over the same session still names the file.
+	let warningName = $state(memo.warningName);
+	$effect(() => {
+		memo.warningName = warningName;
+	});
 	let startLine = $state<string | null>(null);
 	// Undefined until the mark has been read; null when the device has none.
 	let lastBackup = $state<number | null | undefined>(undefined);
@@ -272,17 +293,16 @@
 
 	// ---- Make a backup --------------------------------------------------------------------------------------------
 
-	let exportFlow: ExportFlow | null = null;
 	function exportFlowFor(): ExportFlow | null {
-		if (exportFlow !== null) return exportFlow;
+		if (memo.exporter !== null) return memo.exporter;
 		if (props.db === null || app.store === null) return null;
-		exportFlow = new ExportFlow({
+		memo.exporter = new ExportFlow({
 			session,
 			db: props.db,
 			profile: app.store,
 			...props.exportDeps
 		});
-		return exportFlow;
+		return memo.exporter;
 	}
 
 	async function show(): Promise<void> {

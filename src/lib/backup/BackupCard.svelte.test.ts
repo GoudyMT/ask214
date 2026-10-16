@@ -302,30 +302,31 @@ async function mount(o: Mount = {}) {
 	const reload = vi.fn<() => void>();
 	const replace = vi.fn<(path: string) => void>();
 	const onEraseRequest = vi.fn<() => void>();
-	const rendered = await render(BackupCard, {
-		props: {
-			app,
-			db,
-			session,
-			onEraseRequest,
-			exportDeps: { getSavePicker, download, readBackMs: o.readBackMs ?? 500 },
-			restoreDeps: {
-				waitForControl: o.wait ?? (() => Promise.resolve(true)),
-				readDevice:
-					o.readDevice ??
-					(async (database: IDBDatabase) => {
-						await pause(timing.ms);
-						return realRead(database);
-					}),
-				reload,
-				replace,
-				isVisible: () => visible.value,
-				onceVisible: () => () => {}
-			}
+	const props = {
+		app,
+		db,
+		session,
+		onEraseRequest,
+		exportDeps: { getSavePicker, download, readBackMs: o.readBackMs ?? 500 },
+		restoreDeps: {
+			waitForControl: o.wait ?? (() => Promise.resolve(true)),
+			readDevice:
+				o.readDevice ??
+				(async (database: IDBDatabase) => {
+					await pause(timing.ms);
+					return realRead(database);
+				}),
+			reload,
+			replace,
+			isVisible: () => visible.value,
+			onceVisible: () => () => {}
 		}
-	});
+	};
+	const rendered = await render(BackupCard, { props });
 	return {
 		...rendered,
+		/** Mounts the card again over the same session, as Settings does when it brings the card back after an Unlock. */
+		remount: () => render(BackupCard, { props }),
 		session,
 		app,
 		workers,
@@ -885,6 +886,50 @@ describe('the backup and what the person is told', () => {
 		await userEvent.click(submitOf(CARD_LABELS.make));
 		await expect.element(text(FINISH_SETUP_LINE)).toBeVisible();
 		expect(card.session.phase).toBe('typed-back');
+	});
+});
+
+// ---- a card brought back over a session that kept running ------------------------------------------------------------------
+
+// Another tab idling locks this profile and takes the card off the page; the session is kept, and Unlock brings the card
+// back. The new card must pick up where the old one was, not start from a blank flow.
+describe('a card brought back after the profile locked behind it', () => {
+	it('shows the same wrong-passphrase state, with its offer, and starts nothing', async () => {
+		const card = await mount();
+		await fileChosen(card, 'check');
+		await field().fill(WRONG);
+		await userEvent.click(submitOf(CARD_LABELS.check, CARD_LABELS.checkSubmit));
+		await expect.element(button(MAKE_NEW_BACKUP_BUTTON)).toBeVisible();
+		const before = card.workers.length;
+
+		profile.relockSync('peer');
+		await card.unmount();
+		expect(card.session.kind).toBe('check');
+		await card.remount();
+
+		await expect.element(toggle(CARD_LABELS.check, true)).toBeVisible();
+		await expect.element(text(wrongLine())).toBeVisible();
+		await expect.element(button(MAKE_NEW_BACKUP_BUTTON)).toBeVisible();
+		await expect.element(field()).toBeVisible();
+		expect(card.workers.length).toBe(before);
+	});
+
+	it('still holds the replace warning the old card was showing', async () => {
+		const file = fakeFile({ existing: 'an older backup', name: 'old.json' });
+		const card = await mount({ file });
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.element(button(CARD_LABELS.replaceIt)).toBeVisible();
+
+		profile.relockSync('peer');
+		await card.unmount();
+		await card.remount();
+
+		await expect.element(button(CARD_LABELS.replaceIt)).toBeVisible();
+		expect(document.body.textContent).toContain('old.json');
+		await userEvent.click(button(CARD_LABELS.replaceIt));
+		await expect.element(text(savedLine('old.json'))).toBeVisible();
+		expect(file.closes).toBe(1);
 	});
 });
 
