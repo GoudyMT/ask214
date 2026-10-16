@@ -17,18 +17,17 @@ import {
 } from '../profile/store.svelte';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { MAX_FILE_BYTES } from './caps';
-import { BACKUP_RELEASE_DATE, formatBackupDate } from './dates';
-import { newBackupSalt, decryptEnvelope, sealEnvelope } from './envelope';
-import { buildExportInner } from './export-inner';
-import { takeBackupIntent } from './intent';
 import {
 	DEVICE_NO_DATA_LINE,
 	LOCKED_AFTER_RESTORE_LINE,
 	RESTORED_RELOAD_LINE,
-	RESTORED_UNLOCK_LINE,
-	RestoreFlow,
-	type FlowDeps
-} from './restore-flow';
+	RESTORED_UNLOCK_LINE
+} from './copy';
+import { BACKUP_RELEASE_DATE, formatBackupDate } from './dates';
+import { newBackupSalt, decryptEnvelope, sealEnvelope } from './envelope';
+import { buildExportInner } from './export-inner';
+import { takeBackupIntent } from './intent';
+import { RestoreFlow, type FlowDeps } from './restore-flow';
 import { restoreBackup } from './restore-writer';
 import { BackupSession, type OpenPicker, type WorkerLike } from './session.svelte';
 import { takeSnapshot } from './snapshot';

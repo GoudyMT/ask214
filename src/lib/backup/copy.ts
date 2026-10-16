@@ -28,6 +28,31 @@ export const MAKE_NEW_BACKUP_BUTTON = 'Make a new backup now';
 /** The button beside the "device is damaged" restore message. */
 export const ERASE_DEVICE_BUTTON = "Erase this device's data";
 
+/**
+ * What the restore confirm and the result lines say about the device and the outcome. The dates are the app's own
+ * formatted text, passed in by the caller.
+ */
+export const DEVICE_NO_DATA_LINE = 'This device has no saved data yet.';
+export const DEVICE_NEWER_WARNING =
+	'This device has changes newer than this backup. Restoring replaces them.';
+export const RESTORED_UNLOCK_LINE = 'Backup restored. Unlock to see it.';
+export const RESTORED_RELOAD_LINE = 'Backup restored. Reload to see it.';
+export const LOCKED_AFTER_RESTORE_LINE =
+	'This device was locked after the restore. Unlock to check it.';
+export const deviceMatchesLine = (date: string): string =>
+	'This device was last changed when its backup of ' + date + ' was made.';
+export const deviceChangedLine = (date: string): string =>
+	'This device was last changed ' + date + '.';
+export const checkOpensLine = (date: string): string => 'This backup opens. Made on ' + date + '.';
+
+/** What no backup carries. Static: the confirm shows every item whatever this device holds. */
+export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
+	'your API key (kept on this device if one is saved)',
+	"Ask's offline library",
+	'saved documents',
+	"this device's settings (theme, Ask mode)"
+]);
+
 type TextPath = 'export' | 'restore';
 
 /**

@@ -11,7 +11,17 @@ import {
 	type DeviceState
 } from '../profile/store.svelte';
 import { BackupError, toBackupCode, type BackupCode } from './codes';
-import { backupMessage, type MessageContext } from './copy';
+import {
+	backupMessage,
+	checkOpensLine,
+	DEVICE_NO_DATA_LINE,
+	deviceChangedLine,
+	deviceMatchesLine,
+	LOCKED_AFTER_RESTORE_LINE,
+	RESTORED_RELOAD_LINE,
+	RESTORED_UNLOCK_LINE,
+	type MessageContext
+} from './copy';
 import { BACKUP_RELEASE_DATE, formatBackupDate } from './dates';
 import { decryptEnvelope, readBackupFile, type ParsedEnvelope } from './envelope';
 import { markBackupIntent } from './intent';
@@ -40,27 +50,6 @@ import { validateInner, type ValidInner } from './validate';
  * posted, and no message, error or code carries a word, a byte of the file or a record. A line that names a word names
  * its position only.
  */
-
-/** The wording the confirm and the result lines use. Draft copy for the owner's review. */
-export const DEVICE_NO_DATA_LINE = 'This device has no saved data yet.';
-export const DEVICE_NEWER_WARNING =
-	'This device has changes newer than this backup. Restoring replaces them.';
-export const RESTORED_UNLOCK_LINE = 'Backup restored. Unlock to see it.';
-export const RESTORED_RELOAD_LINE = 'Backup restored. Reload to see it.';
-export const LOCKED_AFTER_RESTORE_LINE =
-	'This device was locked after the restore. Unlock to check it.';
-const deviceMatchesLine = (date: string): string =>
-	'This device was last changed when its backup of ' + date + ' was made.';
-const deviceChangedLine = (date: string): string => 'This device was last changed ' + date + '.';
-const checkOpensLine = (date: string): string => 'This backup opens. Made on ' + date + '.';
-
-/** What no backup carries. Static: the confirm shows every item whatever this device holds. */
-export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
-	'your API key (kept on this device if one is saved)',
-	"Ask's offline library",
-	'saved documents',
-	"this device's settings (theme, Ask mode)"
-]);
 
 /** What the file holds, said as numbers and a date, never as content. */
 export type BackupSummary = {

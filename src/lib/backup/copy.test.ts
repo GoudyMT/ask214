@@ -3,9 +3,18 @@ import { BACKUP_CODES, type BackupCode } from './codes';
 import {
 	backupMessage,
 	CHECK_NEW_BACKUP_OFFER,
+	checkOpensLine,
 	COPY_OWED,
+	DEVICE_NEWER_WARNING,
+	DEVICE_NO_DATA_LINE,
+	deviceChangedLine,
+	deviceMatchesLine,
 	ERASE_DEVICE_BUTTON,
+	LOCKED_AFTER_RESTORE_LINE,
 	MAKE_NEW_BACKUP_BUTTON,
+	NOT_IN_BACKUPS,
+	RESTORED_RELOAD_LINE,
+	RESTORED_UNLOCK_LINE,
 	type MessageContext
 } from './copy';
 import * as copyModule from './copy';
@@ -318,6 +327,9 @@ function allStrings(): string[] {
 	for (const value of Object.values(copyModule)) {
 		if (typeof value === 'string') out.push(value);
 	}
+	// The line builders and the list take the app's own date text, so one sample of each stands for them.
+	out.push(deviceMatchesLine('Oct 15, 2026'), deviceChangedLine('date unknown'));
+	out.push(checkOpensLine('Oct 15, 2026'), ...NOT_IN_BACKUPS);
 	return out;
 }
 
@@ -345,6 +357,29 @@ describe('backupMessage wording', () => {
 		);
 		expect(MAKE_NEW_BACKUP_BUTTON).toBe('Make a new backup now');
 		expect(ERASE_DEVICE_BUTTON).toBe("Erase this device's data");
+	});
+
+	it('the confirm and result lines are exact', () => {
+		expect(DEVICE_NO_DATA_LINE).toBe('This device has no saved data yet.');
+		expect(DEVICE_NEWER_WARNING).toBe(
+			'This device has changes newer than this backup. Restoring replaces them.'
+		);
+		expect(deviceMatchesLine('Oct 15, 2026')).toBe(
+			'This device was last changed when its backup of Oct 15, 2026 was made.'
+		);
+		expect(deviceChangedLine('Oct 15, 2026')).toBe('This device was last changed Oct 15, 2026.');
+		expect(checkOpensLine('Oct 15, 2026')).toBe('This backup opens. Made on Oct 15, 2026.');
+		expect(RESTORED_UNLOCK_LINE).toBe('Backup restored. Unlock to see it.');
+		expect(RESTORED_RELOAD_LINE).toBe('Backup restored. Reload to see it.');
+		expect(LOCKED_AFTER_RESTORE_LINE).toBe(
+			'This device was locked after the restore. Unlock to check it.'
+		);
+		expect(NOT_IN_BACKUPS).toEqual([
+			'your API key (kept on this device if one is saved)',
+			"Ask's offline library",
+			'saved documents',
+			"this device's settings (theme, Ask mode)"
+		]);
 	});
 
 	it('the sentence that says nothing was changed ships only in a text the table pins', () => {
