@@ -2,11 +2,10 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { buildBackupAad } from '../../src/lib/backup/aad';
 import { readBackupFile } from '../../src/lib/backup/envelope';
-import { GOLDEN_EXPECTED, GOLDEN_PASSWORD } from '../../src/lib/backup/golden/golden';
+import { GOLDEN_PASSWORD } from '../../src/lib/backup/golden/golden';
 import { HKDF_INFO_V1 } from '../../src/lib/backup/kdf-params';
 import { KDF_WORKER_SRC } from '../../src/lib/backup/kdf-paths';
 import { KAT_ARGON2_HEX, KAT_PASSWORD, KAT_SALT } from '../../src/lib/backup/kdf-kat';
-import { validateInner } from '../../src/lib/backup/validate';
 
 // The only place the real Argon2id runs at the production tuple (128 MiB, 4 passes, 2 lanes), inside the built and
 // served key worker. Every unit test replaces that step, so without this spec a change to the worker, the noble
@@ -150,23 +149,6 @@ test('the v1 golden opens through the real worker', async ({ page, browserName }
 	expect(opened).toEqual(expect.objectContaining({ ok: true }));
 	if (!opened.ok) return;
 	recordDeriveTime(browserName, opened.deriveMs);
-
-	const checked = validateInner(
-		JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(opened.plain)))
-	);
-	expect(checked).toEqual(expect.objectContaining({ ok: true }));
-	if (!checked.ok) return;
-
-	// The pinned record, in the form the file holds it: the profile's dates are base64 text of the ISO day.
-	const { profile, 'timeline-state': timeline, 'calendar-sync': calendar } = checked.inner.stores;
-	const day = (b64: string | undefined): string | undefined =>
-		b64 === undefined ? undefined : Buffer.from(b64, 'base64').toString('utf8');
-	expect(profile.setupIntent).toBe(GOLDEN_EXPECTED.profile.setupIntent);
-	expect(profile.setupIntentChangedAt).toBe(GOLDEN_EXPECTED.profile.setupIntentChangedAt);
-	expect(day(profile.eaos)).toBe(GOLDEN_EXPECTED.profile.eaos);
-	expect(day(profile.skillbridgeStart)).toBe(GOLDEN_EXPECTED.profile.skillbridgeStart);
-	expect(day(profile.terminalLeaveStart)).toBe(GOLDEN_EXPECTED.profile.terminalLeaveStart);
-	expect(timeline).toEqual(GOLDEN_EXPECTED.timeline);
-	expect(calendar?.exclusions).toEqual(GOLDEN_EXPECTED.calendar.exclusions);
-	expect(calendar?.card).toEqual(GOLDEN_EXPECTED.calendar.card);
+	// The decrypt is the proof: the reader pinned the bytes and AES-GCM authenticates the plaintext, so what opens here is
+	// exactly what golden.browser.test.ts validates and restores deep-equal.
 });
