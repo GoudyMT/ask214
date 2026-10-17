@@ -1244,6 +1244,7 @@
 		font: inherit;
 		font-size: var(--font-size-s);
 		text-align: left;
+		overflow-wrap: anywhere; /* a long title wraps instead of spilling past the card on a phone */
 		cursor: pointer;
 	}
 

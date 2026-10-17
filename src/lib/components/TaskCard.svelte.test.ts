@@ -9,6 +9,18 @@ import { TASK_DEFS } from '$lib/timeline';
 import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
+// A guide's title is the shipped document's own, so a case that needs an unbroken one sets it here; the rest read
+// the real titles.
+const guideTitle = vi.hoisted(() => ({ override: undefined as string | undefined }));
+vi.mock('$lib/resources', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/resources')>();
+	return {
+		...real,
+		guidesForTask: (taskId: string) =>
+			real.guidesForTask(taskId).map((g) => ({ ...g, title: guideTitle.override ?? g.title }))
+	};
+});
+
 // TaskCard renders one generated TimelineItem as an open status card: status-color left
 // edge + text status label (never color-only) + a status-specific date line + category chip +
 // why. The action row: Mark done / Skip + Snooze.
@@ -1174,6 +1186,33 @@ describe('TaskCard (layout by width)', () => {
 		const { container } = await renderCard(makeItem({ def: firm, status: 'start-now', note }));
 		const shown = container.querySelector('.task-card__note-shown') as HTMLElement;
 		expect(shown.scrollWidth).toBeLessThanOrEqual(shown.clientWidth);
+	});
+
+	it('on a 320 px phone a long unbroken guide title wraps inside its button and the card', async () => {
+		await page.viewport(320, 800);
+		const tsp = TASK_DEFS.find((t) => t.id === 'tsp-decision');
+		if (!tsp) throw new Error('E_TEST_TASK_MISSING');
+		guideTitle.override = 'A'.repeat(60);
+		try {
+			const { container } = await render(TaskCard, {
+				props: {
+					item: makeItem({ def: tsp }),
+					onSetStatus: noop,
+					onSetSnooze: noop,
+					onOpenGuide: noop
+				}
+			});
+			await page.getByRole('button', { name: /^Related resources/ }).click();
+			const guide = container.querySelector('.task-card__guide') as HTMLElement;
+			expect(guide.textContent).toContain('A'.repeat(60));
+			expect(guide.scrollWidth).toBeLessThanOrEqual(guide.clientWidth);
+			expect(guide.getBoundingClientRect().right).toBeLessThanOrEqual(
+				box(container, 'article').right
+			);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+		} finally {
+			guideTitle.override = undefined;
+		}
 	});
 });
 
