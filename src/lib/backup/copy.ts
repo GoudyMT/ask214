@@ -1,4 +1,11 @@
 import type { BackupCode } from './codes';
+import {
+	ALWAYS_NOT_IN_BACKUPS,
+	API_KEY_ITEM,
+	notInBackupsLine,
+	NOT_IN_BACKUPS_LEAD,
+	restoredLine
+} from './restored-note';
 
 /**
  * Every message the backup flows can show, in this one module, so the wording is reviewed in one place. The wording
@@ -45,31 +52,14 @@ export const deviceChangedLine = (date: string): string =>
 	'This device was last changed ' + date + '.';
 export const checkOpensLine = (date: string): string => 'This backup opens. Made on ' + date + '.';
 
-const API_KEY_ITEM = 'your API key';
-/** What no backup carries, apart from the API key: the same on every device. */
-const ALWAYS_NOT_IN_BACKUPS: readonly string[] = [
-	"Ask's offline library",
-	'saved documents',
-	"this device's settings (theme, Ask mode)"
-];
-
 /** What no backup carries. Static: the confirm shows every item whatever this device holds. */
 export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
 	API_KEY_ITEM + ' (kept on this device if one is saved)',
 	...ALWAYS_NOT_IN_BACKUPS
 ]);
 
-/**
- * What the Timeline says right after a restore. The date is the app's own formatted text, passed in by the caller.
- * The API key is listed only when this device holds none (a restore on the same device keeps it), so the person is
- * not told to set up what is already there.
- */
-export const restoredLine = (date: string): string => 'Backup restored (made ' + date + ').';
-export const notInBackupsLine = (apiKeyMissing: boolean): string =>
-	NOT_IN_BACKUPS_LEAD +
-	': ' +
-	(apiKeyMissing ? [API_KEY_ITEM, ...ALWAYS_NOT_IN_BACKUPS] : ALWAYS_NOT_IN_BACKUPS).join(', ') +
-	'. Set them up again in Settings.';
+// What the Timeline says after a restore lives in its own module (see there); it is listed here with the rest.
+export { notInBackupsLine, NOT_IN_BACKUPS_LEAD, restoredLine };
 
 /**
  * What the Backup card says around the flows: its own lines, and the words on its buttons and fields. DRAFT, for the
@@ -92,7 +82,6 @@ export const TYPE_BACK_LINE =
 	'Type the 6 words below. This checks for typing mistakes, and lets your password manager save them.';
 export const STOPPING_LINE = 'Stopping...';
 export const ONLY_RESTORE_YOURS_LINE = 'Only restore a backup you made.';
-export const NOT_IN_BACKUPS_LEAD = 'Not in backups';
 export const madeOnLine = (date: string): string => 'Made on ' + date + '.';
 export const savedLine = (fileName: string): string =>
 	'Backup saved as ' + fileName + '. It was read back and matches.';

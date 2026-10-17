@@ -27,7 +27,7 @@
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
 	import { takeBackupIntent } from '$lib/backup/intent';
 	import { formatBackupDate } from '$lib/backup/dates';
-	import { notInBackupsLine, restoredLine } from '$lib/backup/copy';
+	import { notInBackupsLine, restoredLine } from '$lib/backup/restored-note';
 
 	const app = getProfileApp();
 	// Everything derived from today reads this clock, which turns at local midnight; an act at a tap reads the clock at the tap.
