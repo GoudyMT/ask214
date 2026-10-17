@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { markBackupIntent, takeBackupIntent } from './intent';
+import { captureBackupIntent, markBackupIntent, takeBackupIntent } from './intent';
 
 // A history entry that records every replaceState the way the browser applies it.
 type Entry = { state: Record<string, unknown> | null; url: string };
@@ -51,6 +51,33 @@ describe('backup intent', () => {
 		expect(entry.state).toEqual({ 'sveltekit:history': 3 });
 		expect(takeBackupIntent('restored')).toBe(false);
 		expect(entry.state).toEqual({ 'sveltekit:history': 3 });
+	});
+
+	// A page that is not prerendered starts with SvelteKit writing its own entry over this one, with only its index keys,
+	// before any page runs. A note read only at the page would already be gone: the person was never told the restore
+	// landed. Reading it at start-up, ahead of that write, is what keeps it.
+	it('a note captured at start-up outlives SvelteKit rewriting the entry without it', () => {
+		entry.state = { 'sveltekit:history': 3, mtcBackupIntent: 'restored' };
+		captureBackupIntent();
+		entry.state = { 'sveltekit:history': 3, 'sveltekit:navigation': 3, 'sveltekit:states': {} };
+		expect(takeBackupIntent('restored')).toBe(true);
+		expect(takeBackupIntent('restored')).toBe(false);
+	});
+
+	// The note is for one load: once captured it is out of the entry, so a reload of the landed page carries none.
+	it('capture takes the note out of the entry and keeps SvelteKit keys', () => {
+		entry.state = { 'sveltekit:history': 3, mtcBackupIntent: 'restore-row' };
+		captureBackupIntent();
+		expect(entry.state).toEqual({ 'sveltekit:history': 3 });
+		// Taken here so the held note does not reach the next test.
+		expect(takeBackupIntent('restore-row')).toBe(true);
+	});
+
+	// A page opened fresh, or one that is not a backup landing, must start without a history write or a throw.
+	it('capture on an entry with no note writes nothing', () => {
+		entry.state = { 'sveltekit:history': 3 };
+		captureBackupIntent();
+		expect(replaceState).not.toHaveBeenCalled();
 	});
 
 	// A page that asks for one intent must not eat the other, and a foreign value is never acted on.

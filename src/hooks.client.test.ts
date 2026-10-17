@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { HandleClientError } from '@sveltejs/kit';
 import { handleError, init } from './hooks.client';
 import { getDiagnosticsForTest } from '$lib/log/safelog';
+import { takeBackupIntent } from '$lib/backup/intent';
 
 // The start-up hook installs the catcher on the window. This project runs in Node, so the window is a real event
 // target standing in for it; the catcher's own behaviour in a browser is tested beside it in src/lib/log.
@@ -17,6 +18,24 @@ describe('init', () => {
 		const ev = new Event('error', { cancelable: true });
 		target.dispatchEvent(ev);
 		expect(ev.defaultPrevented).toBe(true);
+	});
+
+	// SvelteKit calls this hook before it rewrites the history entry, so this is the one place that still sees the note a
+	// restore or a damaged Erase left for the page it reloads onto.
+	it('keeps the backup note for the page, though SvelteKit then rewrites the entry', async () => {
+		let state: Record<string, unknown> | null = { mtcBackupIntent: 'restored' };
+		vi.stubGlobal('window', new EventTarget());
+		vi.stubGlobal('history', {
+			get state() {
+				return state;
+			},
+			replaceState: (next: Record<string, unknown> | null) => {
+				state = next;
+			}
+		});
+		await init();
+		state = { 'sveltekit:history': 1, 'sveltekit:navigation': 1 };
+		expect(takeBackupIntent('restored')).toBe(true);
 	});
 });
 
