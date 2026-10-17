@@ -1162,7 +1162,8 @@ describe('choosing the file', () => {
 		}
 	);
 
-	// One question at a time: pick the file first, then say the words. The box must not sit beside "Choose file".
+	// Pick the file first, then say the words: the box is not there until a file is chosen. After that "Choose file"
+	// stays, because the file may be the wrong one.
 	it.each<['restore' | 'check', string, string]>([
 		['restore', CARD_LABELS.restore, CARD_LABELS.restoreSubmit],
 		['check', CARD_LABELS.check, CARD_LABELS.checkSubmit]
@@ -1183,13 +1184,38 @@ describe('choosing the file', () => {
 
 			await expect.element(field()).toBeVisible();
 			await expect.element(submitOf(name, submit)).toBeVisible();
-			expect(button(CARD_LABELS.chooseFile).query()).toBeNull();
-			// The button that was pressed is gone: the cursor goes to the box that took its place.
+			await expect.element(button(CARD_LABELS.chooseFile)).toBeVisible();
+			// The cursor goes to the box that just appeared.
 			await expect.poll(() => document.activeElement).toBe(fieldEl());
 		}
 	);
 
-	it('backing out of the restore confirm leaves the file chosen: the box stays, Choose file does not return', async () => {
+	// The first pick may be the wrong file: choosing again must leave the second file in force, not the first.
+	it('choosing another file replaces the first', async () => {
+		const card = await mount();
+		const nameField = () =>
+			page.getByLabelText(CARD_LABELS.backupName, { exact: true }).element() as HTMLInputElement;
+		card.choose(backupFile());
+		await userEvent.click(toggle(CARD_LABELS.restore, false));
+		await userEvent.click(button(CARD_LABELS.chooseFile));
+		await expect.element(field()).toBeVisible();
+		expect(nameField().value).toBe('Ask 214 backup 2026-10-15 K7Q2');
+
+		card.choose(backupFile('ask214-backup-2026-10-14-ABCD.json'));
+		await userEvent.click(button(CARD_LABELS.chooseFile));
+		await expect.poll(() => nameField().value).toBe('Ask 214 backup 2026-10-14 ABCD');
+		expect(card.session.phase).toBe('file-chosen');
+		await expect.poll(() => document.activeElement).toBe(fieldEl());
+
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog).toBeVisible();
+		expect(dialog.element().textContent).toContain('Ask 214 backup 2026-10-14 ABCD');
+		expect(dialog.element().textContent).not.toContain('K7Q2');
+	});
+
+	it('backing out of the restore confirm leaves the file chosen: the box and Choose file both stay', async () => {
 		const card = await mount();
 		await fileChosen(card, 'restore');
 		await field().fill(TYPED);
@@ -1201,7 +1227,7 @@ describe('choosing the file', () => {
 		await expect.poll(() => card.session.phase).toBe('file-chosen');
 		await expect.element(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit)).toBeVisible();
 		expect(fieldEl().value).toBe(TYPED);
-		expect(button(CARD_LABELS.chooseFile).query()).toBeNull();
+		await expect.element(button(CARD_LABELS.chooseFile)).toBeVisible();
 	});
 });
 

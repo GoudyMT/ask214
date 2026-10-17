@@ -126,6 +126,8 @@
 		'confirm',
 		'writing'
 	];
+	// Choose file stays after a choice, so a wrong file can be swapped for another.
+	const CHOOSE_PHASES: readonly Phase[] = ['choose-file', 'file-chosen'];
 	const WORKING_PHASES: readonly Phase[] = [
 		'deriving',
 		'snapshot',
@@ -180,9 +182,7 @@
 	const exportForm = $derived(kind === 'export' && EXPORT_FORM_PHASES.includes(phase));
 	const fileKind = $derived(kind === 'restore' || kind === 'check');
 	const fileForm = $derived(fileKind && FILE_FORM_PHASES.includes(phase));
-	// Choose file is the whole row until a file is chosen; then the passphrase box takes its place (a different file
-	// means closing the row and opening it again).
-	const chooser = $derived(fileKind && phase === 'choose-file');
+	const chooser = $derived(fileKind && CHOOSE_PHASES.includes(phase));
 	const working = $derived(session.busy && WORKING_PHASES.includes(phase));
 	// Not behind the confirm (it has its own Cancel) and not on a finished Check (the row's toggle closes it).
 	const cancellable = $derived(session.canCancel && phase !== 'done' && phase !== 'confirm');
@@ -504,8 +504,8 @@
 		checkedEl?.focus();
 	}
 
-	// The Choose file button is gone once a file is chosen, so focus goes to the box that replaces it. Not while the page
-	// is hidden (the form is not shown then), and not when the pick ended without a file.
+	// Once a file is chosen the next thing to do is type the words, so focus goes to the box. Not while the page is
+	// hidden (the form is not shown then), and not when the pick ended in the choose step (a cancelled or unreadable file).
 	async function chooseFile(): Promise<void> {
 		await restore.chooseFile();
 		await tick();
