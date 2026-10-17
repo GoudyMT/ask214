@@ -1161,6 +1161,48 @@ describe('choosing the file', () => {
 			expect(card.session.phase).toBe('file-chosen');
 		}
 	);
+
+	// One question at a time: pick the file first, then say the words. The box must not sit beside "Choose file".
+	it.each<['restore' | 'check', string, string]>([
+		['restore', CARD_LABELS.restore, CARD_LABELS.restoreSubmit],
+		['check', CARD_LABELS.check, CARD_LABELS.checkSubmit]
+	])(
+		'the %s row asks for the passphrase only after a file is chosen',
+		async (_row, name, submit) => {
+			const card = await mount();
+			card.choose(backupFile());
+			await userEvent.click(toggle(name, false));
+
+			await expect.element(button(CARD_LABELS.chooseFile)).toBeVisible();
+			await expect.element(button(CARD_LABELS.cancel)).toBeVisible();
+			expect(field().query()).toBeNull();
+			expect(formOf(name).query()).toBeNull();
+			expect(button(submit).query()).toBeNull();
+
+			await userEvent.click(button(CARD_LABELS.chooseFile));
+
+			await expect.element(field()).toBeVisible();
+			await expect.element(submitOf(name, submit)).toBeVisible();
+			expect(button(CARD_LABELS.chooseFile).query()).toBeNull();
+			// The button that was pressed is gone: the cursor goes to the box that took its place.
+			await expect.poll(() => document.activeElement).toBe(fieldEl());
+		}
+	);
+
+	it('backing out of the restore confirm leaves the file chosen: the box stays, Choose file does not return', async () => {
+		const card = await mount();
+		await fileChosen(card, 'restore');
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		await expect.element(page.getByRole('dialog')).toBeVisible();
+
+		await userEvent.click(button(CARD_LABELS.cancel));
+
+		await expect.poll(() => card.session.phase).toBe('file-chosen');
+		await expect.element(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit)).toBeVisible();
+		expect(fieldEl().value).toBe(TYPED);
+		expect(button(CARD_LABELS.chooseFile).query()).toBeNull();
+	});
 });
 
 describe('restoring', () => {
