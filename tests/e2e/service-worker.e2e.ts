@@ -25,6 +25,113 @@ test('service worker registers and activates on home page', async ({ page }) => 
 	expect(state).toBe('activated');
 });
 
+// The page registers the worker once. A second registration of the same file with another script type counts as an
+// update, so each page load would install the worker again - re-adding the precache list - and leave a copy waiting
+// behind the one in charge. Counted from inside the page: every register call is recorded, and every install the
+// registration announces (updatefound) is counted once the calls have settled.
+test('a first visit and two page loads leave no waiting service worker', async ({ page }) => {
+	await page.addInitScript(() => {
+		const w = window as unknown as { __sw: { calls: Promise<unknown>[]; installs: number } };
+		w.__sw = { calls: [], installs: 0 };
+		const container = navigator.serviceWorker;
+		const register = container.register.bind(container);
+		// Every call answers with the same registration object, so it is listened to once.
+		const listened = new WeakSet<ServiceWorkerRegistration>();
+		container.register = (...args: Parameters<ServiceWorkerContainer['register']>) => {
+			const call = register(...args);
+			void call.then((registration) => {
+				if (listened.has(registration)) return;
+				listened.add(registration);
+				registration.addEventListener('updatefound', () => w.__sw.installs++);
+			});
+			w.__sw.calls.push(call);
+			return call;
+		};
+	});
+
+	// The load's registrations, once they have all answered and no worker is still installing; then what the
+	// registration holds and how many installs the load started.
+	async function settled(): Promise<{ installs: number; waiting: boolean; active: boolean }> {
+		await page.waitForFunction(
+			() => (window as unknown as { __sw: { calls: unknown[] } }).__sw.calls.length > 0
+		);
+		return page.evaluate(async () => {
+			const w = window as unknown as { __sw: { calls: Promise<unknown>[]; installs: number } };
+			await Promise.all(w.__sw.calls);
+			const registration = await navigator.serviceWorker.getRegistration();
+			while (registration?.installing) await new Promise((r) => setTimeout(r, 50));
+			return {
+				installs: w.__sw.installs,
+				waiting: registration?.waiting != null,
+				active: registration?.active != null
+			};
+		});
+	}
+
+	await page.goto('/');
+	expect(await settled(), 'the first visit installs the worker once').toEqual({
+		installs: 1,
+		waiting: false,
+		active: true
+	});
+	for (const load of [1, 2]) {
+		await page.reload();
+		expect(await settled(), `load ${load} of the same build installs nothing`).toEqual({
+			installs: 0,
+			waiting: false,
+			active: true
+		});
+	}
+});
+
+// A hard reload (Ctrl+Shift+R) is served without the worker, so the page is not controlled. The setup's wait for a
+// worker ends at once when the registration has nothing left pending; a worker left waiting by a second registration
+// would make the first download sit out the whole limit (CONTROL_WAIT_MS, 10 s) for nothing. It only waits while
+// another tab still uses the worker in charge: with no such tab the waiting worker activates and claims the
+// hard-reloaded page, which hides the wait.
+//
+// Chromium only: Playwright offers no hard reload on WebKit, and the page there cannot be made uncontrolled.
+test('a hard-reloaded page starts an Ask setup without waiting out the worker limit', async ({
+	page,
+	context,
+	browserName
+}) => {
+	test.skip(browserName === 'webkit', 'no hard reload on Playwright WebKit');
+	// Nothing in this row downloads the model or asks the answer service: the requests are refused, the start is
+	// seen as the embed worker the page creates.
+	await context.route(/\/(api|models|wasm|corpus)\//, (route) => route.abort());
+	const workers: string[] = [];
+	page.on('worker', (worker) => workers.push(worker.url()));
+
+	// A second tab on the app, in the worker's charge, is what keeps a worker installed by the hard-reloaded page
+	// waiting: a worker activates at once only when no page is using the one in charge.
+	const other = await context.newPage();
+	await other.goto('/');
+	await other.evaluate(() => navigator.serviceWorker.ready);
+	await other.reload();
+	expect(await other.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+
+	await page.goto('/');
+	await page.evaluate(() => navigator.serviceWorker.ready);
+	await page.reload();
+	expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+
+	const session = await context.newCDPSession(page);
+	const loaded = page.waitForEvent('load');
+	await session.send('Page.reload', { ignoreCache: true });
+	await loaded;
+	expect(await page.evaluate(() => navigator.serviceWorker.controller), 'a hard reload').toBeNull();
+
+	const input = page.getByLabel('Ask a question');
+	await expect(input).toBeEnabled({ timeout: 30_000 });
+	await page.getByRole('button', { name: /^on device$/i }).click();
+	await input.fill('what is SkillBridge and how long does it last?');
+	await page.getByRole('button', { name: 'Search' }).click();
+	await page.getByRole('button', { name: /set up.+answer/i }).click();
+	// Well inside the 10 s limit.
+	await expect.poll(() => workers.length, { timeout: 5_000 }).toBe(1);
+});
+
 test('built assets are served from the service worker cache after first visit', async ({
 	page
 }) => {
