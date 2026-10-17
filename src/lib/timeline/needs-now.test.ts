@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { selectNeedsNow } from './needs-now';
+import { afterYouLeaveWord, selectNeedsNow } from './needs-now';
 import { generateTimeline, type TimelineItem, type DisplayStatus } from './generate';
+import { TASK_DEFS } from './task-defs';
 import { addDays, localTodayIso } from './day-math';
 import type { EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
@@ -141,5 +142,44 @@ describe('selectNeedsNow', () => {
 		);
 		expect(ids(g.afterYouLeave)).toEqual(['firm']);
 		expect([...g.late, ...g.closingSoon, ...g.justClosed, ...g.justOpened]).toEqual([]);
+	});
+
+	// Home names the first task of this group and the Timeline draws the group in this order, so a task whose leaving
+	// day has not come leads: the word on top is then the same on both.
+	it('puts the tasks whose leaving day has not come before the ones that have left', () => {
+		const g = selectNeedsNow(
+			[
+				item('left-1', 'after-you-leave', { leftCommand: { opened: true } }),
+				item('ahead-1', 'after-you-leave'),
+				item('left-2', 'after-you-leave', { leftCommand: { opened: false } }),
+				item('ahead-2', 'after-you-leave')
+			],
+			TODAY
+		);
+		expect(ids(g.afterYouLeave)).toEqual(['ahead-1', 'ahead-2', 'left-1', 'left-2']);
+	});
+});
+
+describe('afterYouLeaveWord', () => {
+	const SEP = '2027-04-30' as EaosString;
+	const persona: PersonaFilters = {
+		completeness: 'eaos-only',
+		eaos: SEP,
+		daysUntilSeparation: 208,
+		leaving: { terminalLeaveStart: '2026-11-15' as EaosString }
+	};
+	const shaOn = (day: Date) =>
+		generateTimeline(persona, [...TASK_DEFS], { schemaVersion: 1, tasks: {} }, day)
+			.phases.flatMap((p) => p.items)
+			.find((i) => i.def.id === 'sha-complete')!;
+
+	// The person meets the word through a real profile: the day before the leaving day it is still ahead of them.
+	it('reads "After you leave" the day before the leaving day and "Since you left" from it', () => {
+		const before = shaOn(new Date(2026, 10, 14, 12));
+		expect(before.status).toBe('after-you-leave');
+		expect(afterYouLeaveWord(before)).toBe('After you leave');
+		const left = shaOn(new Date(2026, 10, 16, 12));
+		expect(left.status).toBe('after-you-leave');
+		expect(afterYouLeaveWord(left)).toBe('Since you left');
 	});
 });

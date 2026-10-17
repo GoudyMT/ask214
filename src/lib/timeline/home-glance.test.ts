@@ -66,6 +66,39 @@ describe('timelineRow', () => {
 		expect(timelineRow(ready([opened])).status).toEqual({ word: 'Start now', hot: false });
 	});
 
+	// Once the leaving day has come the card, "Needs you now" and this row all say "Since you left"; a task whose
+	// leaving day is still ahead keeps "After you leave" and is named first when both are there.
+	it('words an after-you-leave task "Since you left" once the user has left the command', () => {
+		const left = item('left', 'after-you-leave', { leftCommand: { opened: true } });
+		const ahead = item('ahead', 'after-you-leave');
+		expect(timelineRow(ready([left])).status).toEqual({ word: 'Since you left', hot: false });
+		const both = timelineRow(ready([left, ahead]));
+		expect(both.status).toEqual({ word: 'After you leave', hot: false });
+		expect(both.detail).toBe('Title of ahead');
+		expect(both.count).toBe('2 need you now');
+	});
+
+	it('gives the word the card gives, before and after the leaving day, on a real profile', () => {
+		const persona: PersonaFilters = {
+			completeness: 'eaos-only',
+			eaos: '2027-04-30' as EaosString,
+			daysUntilSeparation: 208,
+			leaving: { terminalLeaveStart: '2026-11-15' as EaosString }
+		};
+		// One task alone, so nothing more urgent outranks it on the row.
+		const sha = TASK_DEFS.filter((d) => d.id === 'sha-complete');
+		const rowOn = (day: Date) => {
+			const view = generateTimeline(persona, sha, { schemaVersion: 1, tasks: {} }, day);
+			return timelineRow({
+				kind: 'ready',
+				items: view.phases.flatMap((p) => p.items),
+				todayIso: view.todayDate!
+			});
+		};
+		expect(rowOn(new Date(2026, 10, 14, 12)).status?.word).toBe('After you leave');
+		expect(rowOn(new Date(2026, 10, 16, 12)).status?.word).toBe('Since you left');
+	});
+
 	it('words a two-edge task whose final day is near as Changed', () => {
 		expect(timelineRow(ready([item('vgli', 'changed', { daysLeft: 12 })])).status).toEqual({
 			word: 'Changed',

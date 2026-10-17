@@ -1816,6 +1816,19 @@ describe('leaving your command', () => {
 		await expect.element(page.getByText('Opens Dec 1, 2026')).toBeVisible();
 	});
 
+	it('once the user has left the command, the status word is "Since you left"', async () => {
+		await renderCard(
+			makeItem({
+				def: firmDef,
+				status: 'after-you-leave',
+				windowStartDate: '2026-12-01',
+				leftCommand: { opened: false }
+			})
+		);
+		await expect.element(page.getByText('Since you left', { exact: true })).toBeVisible();
+		expect(page.getByText('After you leave', { exact: true }).query()).toBeNull();
+	});
+
 	it('once the user has left and the window has opened, shows no past opening date', async () => {
 		const { container } = await renderCard(
 			makeItem({

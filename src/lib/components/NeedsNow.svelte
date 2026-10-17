@@ -2,7 +2,7 @@
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { closedOnDate } from '$lib/timeline/generate';
 	import type { TimelineItem } from '$lib/timeline';
-	import type { NeedsNowGroups } from '$lib/timeline/needs-now';
+	import { afterYouLeaveWord, type NeedsNowGroups } from '$lib/timeline/needs-now';
 
 	let { groups }: { groups: NeedsNowGroups } = $props();
 
@@ -11,7 +11,16 @@
 		[
 			{ label: 'Late', items: groups.late },
 			{ label: 'Closing soon', items: groups.closingSoon },
-			{ label: 'After you leave', items: groups.afterYouLeave },
+			// One group in the selection; the heading follows the card's word, so a task that has left the command is
+			// listed apart from one still ahead.
+			{
+				label: 'After you leave',
+				items: groups.afterYouLeave.filter((i) => afterYouLeaveWord(i) === 'After you leave')
+			},
+			{
+				label: 'Since you left',
+				items: groups.afterYouLeave.filter((i) => afterYouLeaveWord(i) === 'Since you left')
+			},
 			{ label: 'Just closed', items: groups.justClosed },
 			{ label: 'Just opened', items: groups.justOpened }
 		].filter((s) => s.items.length > 0)

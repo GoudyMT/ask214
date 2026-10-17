@@ -257,6 +257,47 @@ describe('NeedsNow', () => {
 		expect(text).toContain('by your separation date');
 		expect(text).not.toContain('ask your command');
 	});
+
+	// The group heading follows the same rule as the card's status word: "Since you left" once the leaving day has come.
+	it('heads the group "Since you left" once the user has left, and keeps "After you leave" for a task still ahead', async () => {
+		const { container } = await render(NeedsNow, {
+			props: {
+				groups: {
+					...empty,
+					afterYouLeave: [
+						item('ahead', 'Task ahead', { status: 'after-you-leave' }),
+						item('left', 'Task left', {
+							status: 'after-you-leave',
+							leftCommand: { opened: true }
+						})
+					]
+				}
+			}
+		});
+		const headings = [...container.querySelectorAll('.needs-now__group')].map((h) => h.textContent);
+		expect(headings).toEqual(['After you leave', 'Since you left']);
+		const rows = [...container.querySelectorAll('.needs-now__group + .needs-now__list')].map((l) =>
+			textOf(l)
+		);
+		expect(rows[0]).toContain('Task ahead');
+		expect(rows[1]).toContain('Task left');
+		expect(container.querySelector('.needs-now__count')?.textContent).toBe('2');
+	});
+
+	it('has no "After you leave" heading when every task there has left the command', async () => {
+		const { container } = await render(NeedsNow, {
+			props: {
+				groups: {
+					...empty,
+					afterYouLeave: [
+						item('left', 'Task left', { status: 'after-you-leave', leftCommand: { opened: false } })
+					]
+				}
+			}
+		});
+		expect(textOf(container)).not.toContain('After you leave');
+		await expect.element(page.getByText('Since you left', { exact: true })).toBeVisible();
+	});
 });
 
 // On a phone a long title and the date do not fit side by side, so the date drops under the title instead of

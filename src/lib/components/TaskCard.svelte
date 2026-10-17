@@ -11,6 +11,7 @@
 	} from '$lib/resources';
 	import { MAX_NOTE_UNITS } from '$lib/backup/note-cap';
 	import { closedOnDate, isFirmWarning, type FitReason } from '$lib/timeline/generate';
+	import { afterYouLeaveWord } from '$lib/timeline/needs-now';
 
 	let {
 		item,
@@ -229,6 +230,11 @@
 		'after-you-leave': 'After you leave'
 	};
 
+	// "After you leave" turns to "Since you left" once the leaving day has come, as it does in Needs you now and on Home.
+	const statusLabel = $derived(
+		item.status === 'after-you-leave' ? afterYouLeaveWord(item) : STATUS_LABEL[item.status]
+	);
+
 	const CATEGORY_LABEL: Record<TaskCategory, string> = {
 		medical: 'Medical',
 		admin: 'Admin',
@@ -356,7 +362,7 @@
 		{#if item.note}
 			<span class="task-line__note-dot" title="Has a note" aria-label="Has a note"></span>
 		{/if}
-		<span class="task-line__status">{STATUS_LABEL[item.status]}</span>
+		<span class="task-line__status">{statusLabel}</span>
 		{#if item.status === 'snoozed' && item.snoozeUntil}
 			<span class="task-line__date">to {formatTimelineDate(item.snoozeUntil)}</span>
 		{/if}
@@ -377,7 +383,7 @@
 			onclick={(e) => toggleResolved(false, e)}
 		>
 			<span class="task-card__header-title">{item.def.title}</span>
-			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
+			<span class="task-card__status">{statusLabel}</span>
 			{#if item.status === 'snoozed' && item.snoozeUntil}
 				<span class="task-card__date">to {formatTimelineDate(item.snoozeUntil)}</span>
 			{/if}
@@ -524,7 +530,7 @@
 			{/if}
 		</div>
 		<div class="task-card__meta">
-			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
+			<span class="task-card__status">{statusLabel}</span>
 			<!-- A countdown only runs beside a date, so a card with no date line has nothing here. -->
 			{#if dateLine.text}
 				<span class="task-card__when"

@@ -109,6 +109,35 @@ describe('Home, the timeline row', () => {
 		expect(row()!.getAttribute('href')).toBe('/timeline');
 	});
 
+	// A person whose leaving day has passed sees the card's word on Home. Only the SHA task is kept, so nothing late
+	// outranks it on the row, whatever day the test runs.
+	it('words a task that opens after the leaving day "After you leave", and "Since you left" once it has passed', async () => {
+		const real = await glance.real();
+		glance.load.mockImplementation(async () => ({
+			...real,
+			readyGlance: (...args: Parameters<typeof real.readyGlance>) => {
+				const g = real.readyGlance(...args);
+				return g?.kind === 'ready'
+					? { ...g, items: g.items.filter((i) => i.def.id === 'sha-complete') }
+					: g;
+			}
+		}));
+		const status = () => row()?.querySelector('.glance__status')?.textContent;
+		const leavingOn = (terminalLeaveStart: string): PersonaFilters => ({
+			completeness: 'eaos-only',
+			eaos: addDays(today, 300) as EaosString,
+			daysUntilSeparation: 300,
+			leaving: { terminalLeaveStart: terminalLeaveStart as EaosString }
+		});
+		app.store = { locked: false, persona: leavingOn(addDays(today, 10)) };
+		const first = await render(HomePage);
+		await expect.poll(() => status()).toBe('After you leave');
+		await first.unmount();
+		app.store = { locked: false, persona: leavingOn(addDays(today, -1)) };
+		await render(HomePage);
+		await expect.poll(() => status()).toBe('Since you left');
+	});
+
 	it('sits in a section headed for screen readers, after Ask', async () => {
 		await render(HomePage);
 		await expect.poll(() => row()).not.toBeNull();
