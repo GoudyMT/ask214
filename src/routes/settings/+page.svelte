@@ -81,6 +81,9 @@
 			cancelled = true;
 		};
 	});
+	// Any copy of a document the device holds, current or older, is data the Erase clears, so it earns the Erase a
+	// device with no profile would not otherwise have.
+	const holdsDocuments = $derived(Object.values(states).some((held) => held.state !== 'unsaved'));
 	const savedMb = $derived(
 		`${(savedDocuments.reduce((total, id) => total + (LOCAL_DOCUMENT_BYTES[id] ?? 0), 0) / 1e6).toFixed(1)} MB`
 	);
@@ -598,13 +601,16 @@
 				</section>
 			{/if}
 
-			{#if hasTimeline}
+			{#if hasTimeline || holdsDocuments}
 				<section class="settings-section" aria-labelledby="privacy-heading">
 					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
-					<button class="settings-lock" type="button" onclick={lock}>Lock</button>
-					<p class="settings-hint">
-						Clears your profile from this screen. Use Unlock to view it again.
-					</p>
+					<!-- Only a profile can be locked; a device that holds saved documents alone still has the Erase. -->
+					{#if hasTimeline}
+						<button class="settings-lock" type="button" onclick={lock}>Lock</button>
+						<p class="settings-hint">
+							Clears your profile from this screen. Use Unlock to view it again.
+						</p>
+					{/if}
 
 					<div class="danger-zone">
 						<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
