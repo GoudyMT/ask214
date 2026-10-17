@@ -517,6 +517,9 @@ describe('Settings, Erase', () => {
 		expect(wipeAll).toHaveBeenCalledOnce();
 		expect(seen[0]?.type).toBe('reload');
 		expect(location.pathname).toBe(resolve('/wizard'));
+		// Nothing about a backup is in the address bar: the note lives in the history entry's state.
+		expect(location.search).toBe('');
+		expect(location.hash).toBe('');
 		expect(takeBackupIntent('restore-row')).toBe(true);
 	});
 
@@ -547,6 +550,8 @@ describe('Settings, Erase', () => {
 		await vi.waitFor(() => expect(seen).toHaveLength(1));
 		expect(wipeAll).toHaveBeenCalledOnce();
 		expect(location.pathname).toBe(resolve('/wizard'));
+		expect(location.search).toBe('');
+		expect(location.hash).toBe('');
 		expect(takeBackupIntent('restore-row')).toBe(true);
 	});
 

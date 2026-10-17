@@ -379,25 +379,6 @@ describe('Wizard, a device the restore finds damaged', () => {
 		expect(backupSession.takeEraseRequest()).toBe(true);
 		expect(backupSession.takeEraseRequest()).toBe(false);
 	});
-
-	it('the URL never carries backup state', async () => {
-		makeApp();
-		await damagedDevice();
-		leaveRestoreNote();
-		const before = { path: location.pathname, search: location.search, hash: location.hash };
-		await render(WizardPage);
-		await expect.poll(() => entry().element().getAttribute('aria-expanded')).toBe('true');
-		await restoreFromRow();
-		await userEvent.click(page.getByRole('button', { name: ERASE_DEVICE_BUTTON, exact: true }));
-
-		// The move to Settings names a bare path, and the address bar is exactly as it was.
-		expect(goto.mock.calls).toEqual([['/settings']]);
-		expect({ path: location.pathname, search: location.search, hash: location.hash }).toEqual(
-			before
-		);
-		expect(location.href).toBe(START_URL);
-		expect(intentOnEntry()).toBeUndefined();
-	});
 });
 
 describe('Wizard, what it says about where the data goes', () => {
