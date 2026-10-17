@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
+import { page } from 'vitest/browser';
 import AskAnswer from './AskAnswer.svelte';
 import type { AnswerView } from '$lib/ask/answer/answer-view';
 
@@ -273,6 +274,48 @@ describe('AskAnswer', () => {
 		const { container } = await render(AskAnswer, { props: { view: extractiveView } });
 		const el = container.querySelector('.ask-answer__text') as HTMLElement;
 		expect(['anywhere', 'break-word']).toContain(getComputedStyle(el).overflowWrap);
+	});
+
+	// A source title is a printed name and can carry one long unbroken word; on a 320 px phone it must wrap inside
+	// the block, in the "From" line and in a summary's citation link alike.
+	describe('on a 320 px phone a long unbroken source title', () => {
+		const LONG = 'T'.repeat(60);
+		const size = { width: 0, height: 0 };
+		beforeEach(async () => {
+			size.width = window.innerWidth;
+			size.height = window.innerHeight;
+			await page.viewport(320, 800);
+		});
+		afterEach(async () => {
+			await page.viewport(size.width, size.height);
+		});
+
+		it('wraps inside the block in the "From" line of an extractive answer', async () => {
+			const view: AnswerView = {
+				kind: 'extractive',
+				answer: { ...extractiveView.answer, sourceTitle: LONG }
+			};
+			const { container } = await render(AskAnswer, { props: { view } });
+			const block = container.querySelector('.ask-answer') as HTMLElement;
+			expect(block.clientWidth).toBeGreaterThan(0);
+			expect(block.scrollWidth).toBeLessThanOrEqual(block.clientWidth);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+		});
+
+		it('wraps inside the block in a summary citation link', async () => {
+			const view: AnswerView = {
+				kind: 'synthesized',
+				answer: {
+					...synthesizedView.answer,
+					citations: [{ id: 'va_ebenefits:3f9c1a7d2e05', url: 'https://www.va.gov/', title: LONG }]
+				}
+			};
+			const { container } = await render(AskAnswer, { props: { view } });
+			const block = container.querySelector('.ask-answer') as HTMLElement;
+			expect(block.clientWidth).toBeGreaterThan(0);
+			expect(block.scrollWidth).toBeLessThanOrEqual(block.clientWidth);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+		});
 	});
 
 	it('eligibility: shows the impersonal-info note and the accredited-VSO / va.gov outbound', async () => {

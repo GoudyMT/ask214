@@ -494,6 +494,8 @@
 		font: inherit;
 		color: var(--color-fg);
 		text-align: left;
+		/* A title with one long unbroken word breaks inside the row instead of widening it past a phone. */
+		overflow-wrap: anywhere;
 		cursor: pointer;
 		text-decoration: underline;
 		text-decoration-color: var(--color-border);

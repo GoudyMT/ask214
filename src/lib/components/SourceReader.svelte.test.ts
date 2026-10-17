@@ -38,6 +38,25 @@ describe('SourceReader', () => {
 		expect(passages[1]?.textContent).toContain('effective date');
 	});
 
+	// A source title is a printed name and can carry one long unbroken word; on a 320 px phone it must wrap inside
+	// the reader's title bar, not run past the screen's edge.
+	it('on a 320 px phone a long unbroken title wraps inside the title bar', async () => {
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		await page.viewport(320, 800);
+		try {
+			const { container } = await render(SourceReader, {
+				props: { source: source({ title: 'T'.repeat(60) }), onClose: () => {} }
+			});
+			flushSync();
+			const title = container.querySelector('.reader__title') as HTMLElement;
+			expect(title.clientWidth).toBeGreaterThan(0);
+			expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth);
+			expect(title.getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth);
+		} finally {
+			await page.viewport(size.width, size.height);
+		}
+	});
+
 	it('links to the official site safely (new tab, noopener noreferrer)', async () => {
 		const { container } = await render(SourceReader, {
 			props: { source: source(), onClose: () => {} }

@@ -1,5 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import DocumentsList from './DocumentsList.svelte';
 import type { DocumentRow, SaveProgress } from './DocumentsList.svelte';
 
@@ -72,6 +73,28 @@ const row = (container: Element, title: string) =>
 	[...container.querySelectorAll('li')].find((li) => li.textContent?.includes(title));
 
 describe('DocumentsList', () => {
+	// A document title is a printed name and can carry one long unbroken word; on a 320 px phone it must wrap
+	// inside its row, not push the list and the page sideways.
+	it('on a 320 px phone a long unbroken title wraps inside its row and the page does not scroll sideways', async () => {
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		await page.viewport(320, 800);
+		try {
+			const [first, ...rest] = ROWS;
+			const long = { ...(first as DocumentRow), title: 'T'.repeat(60) };
+			const { container } = await render(DocumentsList, {
+				props: props({ rows: [long, ...rest] })
+			});
+			const title = container.querySelector('.doc-row__title') as HTMLElement;
+			expect(title.clientWidth).toBeGreaterThan(0);
+			expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth);
+			const li = title.closest('li') as HTMLElement;
+			expect(li.scrollWidth).toBeLessThanOrEqual(li.clientWidth);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+		} finally {
+			await page.viewport(size.width, size.height);
+		}
+	});
+
 	it('sums what is saved, and offers the rest with its count and size', async () => {
 		const { container } = await render(DocumentsList, { props: props() });
 		expect(text(container)).toContain('2 of 4 saved on this device - 0.6 MB');

@@ -235,6 +235,8 @@
 		font-size: var(--font-size-s);
 		color: var(--color-fg-muted);
 		margin: 0 0 var(--space-s);
+		/* The source title in this line can be one long unbroken word; it breaks inside the block. */
+		overflow-wrap: anywhere;
 	}
 	.ask-answer__actions {
 		display: flex;
@@ -254,6 +256,8 @@
 	.ask-answer__sources {
 		margin: 0 0 var(--space-m);
 		padding-left: var(--space-l);
+		/* A citation's title can be one long unbroken word; it breaks inside the block. */
+		overflow-wrap: anywhere;
 	}
 	.ask-answer__disclaimer {
 		font-size: var(--font-size-s);
