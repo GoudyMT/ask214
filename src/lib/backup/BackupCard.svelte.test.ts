@@ -1188,7 +1188,7 @@ describe('restoring', () => {
 		expect(body).toContain('Made on ' + formatBackupDate(FILE_MADE_AT));
 		expect(body).toContain('Ask 214 backup 2026-10-15 K7Q2');
 		expect(body).toContain('separation date set');
-		expect(body).toContain('tasks with a status');
+		expect(body).toContain('tasks with progress or a note');
 		// This device has saved changes made after the backup was taken.
 		expect(body).toContain('This device was last changed');
 		expect(body).toContain(DEVICE_NEWER_WARNING);

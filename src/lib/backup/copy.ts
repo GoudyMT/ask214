@@ -130,7 +130,7 @@ export function summaryLines(s: {
 	if (s.separationDate) lines.push('separation date set');
 	if (s.skillbridgeStart) lines.push('SkillBridge start date set');
 	if (s.terminalLeaveStart) lines.push('terminal leave start date set');
-	lines.push(counted(s.tasks, 'task with a status', 'tasks with a status'));
+	lines.push(counted(s.tasks, 'task with progress or a note', 'tasks with progress or a note'));
 	lines.push(counted(s.notes, 'note', 'notes'));
 	if (s.calendarExclusions > 0) {
 		lines.push(counted(s.calendarExclusions, 'calendar exclusion', 'calendar exclusions'));

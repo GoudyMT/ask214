@@ -506,7 +506,7 @@ describe('backupMessage wording', () => {
 				'separation date set',
 				'SkillBridge start date set',
 				'terminal leave start date set',
-				'12 tasks with a status',
+				'12 tasks with progress or a note',
 				'3 notes',
 				'4 calendar exclusions',
 				'calendar card dismissed'
@@ -514,11 +514,11 @@ describe('backupMessage wording', () => {
 		],
 		[
 			ONE_SUMMARY,
-			['separation date set', '1 task with a status', '1 note', '1 calendar exclusion']
+			['separation date set', '1 task with progress or a note', '1 note', '1 calendar exclusion']
 		],
 		[
 			{ ...ONE_SUMMARY, tasks: 0, notes: 0, calendarExclusions: 0 },
-			['separation date set', '0 tasks with a status', '0 notes']
+			['separation date set', '0 tasks with progress or a note', '0 notes']
 		]
 	])('the summary lines for %j', (summary, expected) => {
 		expect(summaryLines(summary)).toEqual(expected);
