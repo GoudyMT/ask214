@@ -333,6 +333,19 @@ const STATIC = 'static';
 //     a build of v1.6.0: Ask +322 B, Settings +128 B, Timeline +151 B. Two builds measured page 64,193 B, precache
 //     156,590-156,594 B and route nodes 50,045-50,049 B, at least 41 B of room above the highest. Trim pass: the new
 //     code is one function or one string per feature in the build; nothing found to cut short of the approved copy.
+//     Page 64,240 -> 89,280, onDemand 8,090 -> 8,189, precache 156,640 -> 217,500, precache files 62 -> 68, root
+//     layout 7,100 -> 7,330 and route nodes 50,090 -> 51,880 (package.json's size-limit) (owner's call, 2026-10-17):
+//     the encrypted backup. About 23 KB of the page row is the backup itself (the card, the session that guards it,
+//     the two flows, the file check, the restore writer, the wording) in one chunk Settings and the setup screen load;
+//     about 1 KB is lock and profile wiring. Of the precache growth, 32.7 KB is the key worker (most of it the word
+//     list) and about 25 KB the page code, cached so a backup works offline; the six new files are the worker,
+//     BackupCard.css and four chunks. The root layout carries the relock and reload wiring; the route nodes the
+//     Settings and setup-screen wiring and the carry-overs. Three builds measured page 89,226-89,236 B, precache
+//     217,448-217,460 B, layout 7,287 B, route nodes 51,838 B, on demand 8,149 B, at least 40 B of room above the
+//     highest. Trim pass: the owed-copy list dropped from the build and the Timeline's restored note split from the
+//     backup wording (-375 B page, -383 B precache), kept; loading the key worker on demand (-32.7 KB precache) breaks
+//     an offline first backup, a tighter word list (-7.3 KB) is on the roadmap, and a lazy card defers bytes without
+//     saving them - none kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -342,10 +355,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 64_240,
-	onDemand: 8_090,
-	precacheFiles: 62,
-	precacheBytes: 156_640,
+	page: 89_280,
+	onDemand: 8_189,
+	precacheFiles: 68,
+	precacheBytes: 217_500,
 	workerScripts: 147_200
 };
 
