@@ -203,8 +203,8 @@ describe('synthesize', () => {
 		}
 	});
 
-	// The corpus prints "Transfer of Entitlement [TOE]" and "[DOS]". An answer quoting them is the source's own
-	// words, not a citation to an id nobody retrieved, so it is shown with the acronym kept.
+	// The corpus prints "Transfer of Entitlement [TOE]" and "[DOS]". A bracket of capital letters only is read as
+	// an acronym, not as a citation to an id nobody retrieved, so the answer is shown with the acronym kept.
 	it('shows an answer that quotes a bracketed acronym from its source instead of refusing it', async () => {
 		const impl = stubFetch(
 			`SkillBridge is open to members whose Transfer of Entitlement [TOE] is on file [${SKILLBRIDGE_ID}].`
@@ -215,6 +215,19 @@ describe('synthesize', () => {
 			expect(result.answer.text).toContain('Transfer of Entitlement [TOE] is on file.');
 			expect(result.answer.citations.map((c) => c.id)).toEqual([SKILLBRIDGE_ID]);
 		}
+	});
+
+	// Only a bracket of capital letters alone is an acronym. Any other marker the model writes parses and must be
+	// a retrieved id, whatever its case - a made-up source beside a real citation must never reach the reader.
+	it.each([
+		['an upper-cased id', `[${SKILLBRIDGE_ID}] [DOD_SKILLBRIDGE:ABCDEFABCDEF].`],
+		['a bare upper-case source name', `[${SKILLBRIDGE_ID}] [VA_BENEFITS_GUIDE].`],
+		['a mixed-case id', `[${SKILLBRIDGE_ID}] [Va_guide:abcdefabcdef].`]
+	])('refuses %s written next to a real citation', async (_name, markers) => {
+		const impl = stubFetch(`SkillBridge lets you train with a civilian employer ${markers}`);
+		const result = await synthesize('What is SkillBridge?', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('refusal');
+		if (result.kind === 'refusal') expect(result.reason).toBe('invalid_citation');
 	});
 
 	it('accepts a citation to a real corpus id carrying a collision suffix', async () => {

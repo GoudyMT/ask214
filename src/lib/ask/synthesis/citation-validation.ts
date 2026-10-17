@@ -19,11 +19,16 @@
  * shape the class cannot read at all (`[idA, idB]`, `[Source: idA]`) yields no citations, which is
  * indistinguishable from a model that cited nothing.
  *
- * Lowercase only, as every chunk id is and as `validateCitations` compares them. The corpus prints bracketed
- * acronyms of its own ("Transfer of Entitlement [TOE]"); read as a citation, one names no retrieved id and an
- * answer that merely quoted its source was refused.
+ * Case-insensitive, so a made-up marker in any case (`[DOD_SKILLBRIDGE:ABCDEFABCDEF]`) still parses and
+ * fails `validateCitations`, which compares ids exactly. The one exemption is `ACRONYM`: the corpus prints
+ * bracketed acronyms of its own ("Transfer of Entitlement [TOE]"), and read as a citation one names no
+ * retrieved id and an answer that merely quoted its source was refused.
  */
-export const CITATION = /\[([a-z0-9_.:-]+)\]/g;
+export const CITATION = /\[([a-z0-9_.:-]+)\]/gi;
+
+// A bracket of capital letters only is read as an acronym, not as a citation. Anything else that parses
+// must be a retrieved id.
+const ACRONYM = /^[A-Z]+$/;
 
 /**
  * Extract the chunk ids the model cited.
@@ -38,7 +43,7 @@ export function parseCitedIds(text: string): string[] {
 	const ids = new Set<string>();
 	for (const match of text.matchAll(CITATION)) {
 		const id = match[1];
-		if (id) ids.add(id);
+		if (id && !ACRONYM.test(id)) ids.add(id);
 	}
 	return [...ids];
 }
@@ -59,7 +64,7 @@ export function parseCitedIds(text: string): string[] {
  */
 export function stripCitations(text: string): string {
 	return text
-		.replace(CITATION, '')
+		.replace(CITATION, (marker, id: string) => (ACRONYM.test(id) ? marker : ''))
 		.replace(/[ \t]{2,}/g, ' ')
 		.replace(/[ \t]+([.,;:!?])/g, '$1')
 		.trim();
