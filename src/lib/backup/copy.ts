@@ -154,13 +154,15 @@ type TextPath = 'export' | 'restore';
 
 /**
  * The pairs that return null for a path the code can reach: no text is written for them yet. Listed in one place so
- * the wording review finds them.
+ * the wording review finds them. Only a test reads it, so every freeze is marked pure: the build then drops the list
+ * from the page instead of keeping calls whose result nothing uses.
  */
-export const COPY_OWED: readonly Readonly<{ code: BackupCode; path: TextPath }>[] = Object.freeze([
-	Object.freeze({ code: 'E_CRYPTO_FAILED', path: 'export' } as const),
-	Object.freeze({ code: 'E_RESTORE_DEVICE_CHANGED', path: 'restore' } as const),
-	Object.freeze({ code: 'E_BACKUP_UNAVAILABLE', path: 'restore' } as const)
-]);
+export const COPY_OWED: readonly Readonly<{ code: BackupCode; path: TextPath }>[] =
+	/* @__PURE__ */ Object.freeze([
+		/* @__PURE__ */ Object.freeze({ code: 'E_CRYPTO_FAILED', path: 'export' } as const),
+		/* @__PURE__ */ Object.freeze({ code: 'E_RESTORE_DEVICE_CHANGED', path: 'restore' } as const),
+		/* @__PURE__ */ Object.freeze({ code: 'E_BACKUP_UNAVAILABLE', path: 'restore' } as const)
+	]);
 
 // The shape of the label the app gives a backup: a date and four base32 characters (A-Z and 2-7). Anything else
 // could be a pasted passphrase, so it is never printed.
