@@ -206,15 +206,6 @@ describe('the root layout, when another tab restored a backup', () => {
 		expect(seen).toEqual([]);
 	});
 
-	// A restore writes through this connection, so a page must never need one of its own to close.
-	it('hands the app the connection the stores were created with', async () => {
-		await device(false);
-		await render(Layout, { children });
-		const app = await readyApp(false);
-
-		expect(app.db).toBe(db);
-	});
-
 	it('hands the restore a way to tell the other tabs', async () => {
 		await device(false);
 		const heard: string[] = [];

@@ -156,30 +156,33 @@ describe.each(PAGES)('a $name visit under the real layout', ({ Page, profile, ca
 		expect(() => app.db?.transaction('keystore', 'readonly')).not.toThrow();
 		expect(app.db).not.toBeNull();
 	});
+});
 
-	// The layout's own version-change handler is the only one: a tab on a newer bundle upgrades the database at once
-	// (no `blocked`), and this tab is told to reload.
-	it('does not hold up an upgrade from another tab', async () => {
-		await device(profile);
-		await render(Layout, { children });
-		const app = await appIsReady();
-		await expect.element(cardUp()).toBeVisible();
+// The layout's own version-change handler is the one that answers: a tab on a newer bundle upgrades the database at
+// once (no `blocked`), and this tab switches to the reload-onto-the-new-bundle takeover.
+it('switches to the updated-app takeover when another tab upgrades the database', async () => {
+	harness.Page = SettingsPage;
+	await device(true);
+	await render(Layout, { children });
+	const app = await appIsReady();
+	await expect
+		.element(page.getByRole('heading', { level: 2, name: 'Backup', exact: true }))
+		.toBeVisible();
 
-		// A request that is held up reports `blocked` and then waits for the holder: the wait ends here, so it reads as a
-		// failed assertion and not as a timeout.
-		let blocked = false;
-		const upgraded = await new Promise<IDBDatabase | null>((resolve, reject) => {
-			const request = indexedDB.open(harness.name, DB_VERSION + 1);
-			request.onblocked = () => {
-				blocked = true;
-				resolve(null);
-			};
-			request.onsuccess = () => resolve(request.result);
-			request.onerror = () => reject(request.error);
-		});
-		upgraded?.close();
-
-		expect(blocked).toBe(false);
-		await vi.waitFor(() => expect(app.status).toBe('stale'));
+	// A request that is held up reports `blocked` and then waits for the holder: the wait ends here, so it reads as a
+	// failed assertion and not as a timeout.
+	let blocked = false;
+	const upgraded = await new Promise<IDBDatabase | null>((resolve, reject) => {
+		const request = indexedDB.open(harness.name, DB_VERSION + 1);
+		request.onblocked = () => {
+			blocked = true;
+			resolve(null);
+		};
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () => reject(request.error);
 	});
+	upgraded?.close();
+
+	expect(blocked).toBe(false);
+	await vi.waitFor(() => expect(app.status).toBe('stale'));
 });

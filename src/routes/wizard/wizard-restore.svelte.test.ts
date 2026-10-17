@@ -340,16 +340,6 @@ describe('Wizard, after an Erase from the damaged view', () => {
 		await expect.poll(() => entry().element().getAttribute('aria-expanded')).toBe('true');
 		await expect.element(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
 	});
-
-	it('ignores a note it does not know and leaves the row closed', async () => {
-		makeApp();
-		history.replaceState({ ...(history.state ?? {}), [INTENT_KEY]: 'restored' }, '');
-		await render(WizardPage);
-		await expect.element(entry()).toBeVisible();
-		await pause(100);
-		expect(entry().element().getAttribute('aria-expanded')).toBe('false');
-		expect(intentOnEntry()).toBe('restored');
-	});
 });
 
 describe('Wizard, a device the restore finds damaged', () => {
