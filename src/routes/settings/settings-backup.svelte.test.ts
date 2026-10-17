@@ -24,7 +24,7 @@ import {
 } from '$lib/backup/copy';
 import goldenText from '$lib/backup/golden/v1-1.ask214backup?raw';
 import { GOLDEN_PASSWORD } from '$lib/backup/golden/golden';
-import { takeBackupIntent } from '$lib/backup/intent';
+import { captureBackupIntent, takeBackupIntent } from '$lib/backup/intent';
 import { backupSession, type OpenPicker, type WorkerLike } from '$lib/backup/session.svelte';
 import { createHandler } from '$lib/backup/worker/handler';
 import type { WorkerRequest } from '$lib/backup/worker/protocol';
@@ -506,6 +506,7 @@ describe('Settings, Erase', () => {
 		expect(wipeAll).toHaveBeenCalledOnce();
 		expect(seen[0]?.type).toBe('reload');
 		expect(location.pathname).not.toBe(resolve('/wizard'));
+		captureBackupIntent();
 		expect(takeBackupIntent('restore-row')).toBe(false);
 	});
 
@@ -520,6 +521,7 @@ describe('Settings, Erase', () => {
 		// Nothing about a backup is in the address bar: the note lives in the history entry's state.
 		expect(location.search).toBe('');
 		expect(location.hash).toBe('');
+		captureBackupIntent();
 		expect(takeBackupIntent('restore-row')).toBe(true);
 	});
 
@@ -552,6 +554,7 @@ describe('Settings, Erase', () => {
 		expect(location.pathname).toBe(resolve('/wizard'));
 		expect(location.search).toBe('');
 		expect(location.hash).toBe('');
+		captureBackupIntent();
 		expect(takeBackupIntent('restore-row')).toBe(true);
 	});
 
@@ -568,6 +571,7 @@ describe('Settings, Erase', () => {
 
 			await eraseFromButton();
 
+			captureBackupIntent();
 			expect(takeBackupIntent('restore-row')).toBe(false);
 			expect(location.pathname).not.toBe(resolve('/wizard'));
 		}
@@ -607,6 +611,7 @@ describe('Settings, Erase', () => {
 		await userEvent.click(dialogButton('Erase everything'));
 		await vi.waitFor(() => expect(seen).toHaveLength(1));
 		expect(wipeAll).toHaveBeenCalledOnce();
+		captureBackupIntent();
 		expect(takeBackupIntent('restore-row')).toBe(true);
 	}, 30_000);
 });

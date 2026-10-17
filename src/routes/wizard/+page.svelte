@@ -91,9 +91,9 @@
 
 	const RESTORE_ENTRY = 'Moving to a new phone? Restore from a backup';
 
-	// The note an Erase from the damaged view leaves in the history entry. It is taken as the page starts, whatever the
-	// app is doing: a note left until the app is ready would still be there after a reload and open the row on a later
-	// visit. The card opens the row once the row can start.
+	// The note an Erase from the damaged view leaves in the history entry; the app's start-up has already moved it out of
+	// the entry, so a reload of this page finds none. It is taken as the page starts, whatever the app is doing, so it is
+	// spent once. The card opens the row once the row can start.
 	const openRestoreRow = takeBackupIntent('restore-row');
 
 	// A backup that cannot be restored over this device's damaged data: the Erase lives in Settings, which takes the

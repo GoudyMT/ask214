@@ -26,7 +26,7 @@ import {
 import { BACKUP_RELEASE_DATE, formatBackupDate } from './dates';
 import { newBackupSalt, decryptEnvelope, sealEnvelope } from './envelope';
 import { buildExportInner } from './export-inner';
-import { takeBackupIntent } from './intent';
+import { captureBackupIntent, takeBackupIntent } from './intent';
 import { RestoreFlow, type FlowDeps } from './restore-flow';
 import { restoreBackup } from './restore-writer';
 import { BackupSession, type OpenPicker, type WorkerLike } from './session.svelte';
@@ -894,6 +894,8 @@ describe('Replace', () => {
 		expect(r.reload).toHaveBeenCalledTimes(1);
 		expect(r.replace).not.toHaveBeenCalled();
 		expect(new URL(location.href).pathname).toBe(resolve('/timeline'));
+		// The reload is stood in for by the app's start-up reading the entry.
+		captureBackupIntent();
 		expect(takeBackupIntent('restored')).toBe(true);
 		expect(takeBackupIntent('restored')).toBe(false);
 		expect(r.app.reloadOnUnlock).toBe(false);
@@ -1128,6 +1130,7 @@ describe('Replace', () => {
 
 			r.flow.reloadNow();
 			expect(r.reload).toHaveBeenCalledTimes(1);
+			captureBackupIntent();
 			expect(takeBackupIntent('restored')).toBe(true);
 		});
 

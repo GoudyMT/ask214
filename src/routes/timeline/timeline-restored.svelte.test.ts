@@ -7,7 +7,7 @@ import { createTimelineStateStore } from '$lib/timeline/state.svelte';
 import { createByokStore } from '$lib/ask/byok/store';
 import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
-import { markBackupIntent, takeBackupIntent } from '$lib/backup/intent';
+import { captureBackupIntent, markBackupIntent, takeBackupIntent } from '$lib/backup/intent';
 import { formatBackupDate } from '$lib/backup/dates';
 import TimelinePage from './+page.svelte';
 
@@ -66,9 +66,10 @@ async function device() {
 	return { app, store, timeline, byok };
 }
 
-/** What a restore leaves in the history entry before it reloads onto the Timeline. */
+/** What a restore leaves in the history entry before it reloads onto the Timeline, and the app's start-up then reads. */
 function restoredHere(): void {
 	markBackupIntent('restored', location.pathname + location.search);
+	captureBackupIntent();
 }
 
 /** Holds every navigation the page starts, recording its kind. */
@@ -119,7 +120,8 @@ describe('the Timeline right after a restore', () => {
 		expect(status.elements()).toHaveLength(1);
 		expect(first.container.textContent?.split(RESTORED).length).toBe(2);
 
-		// A reload keeps the history entry's state, so a page that left the note in it would say this again.
+		// Start-up took the note out of the entry, so a reload finds none; this second render stands for that reload,
+		// and a page that had not spent the note would say this again.
 		await first.unmount();
 		await render(TimelinePage);
 		await expectNoStatusLine();

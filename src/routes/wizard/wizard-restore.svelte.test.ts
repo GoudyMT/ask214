@@ -9,7 +9,7 @@ import {
 	type SavePicker,
 	type SaveWritable
 } from '$lib/backup/export-flow';
-import { markBackupIntent } from '$lib/backup/intent';
+import { captureBackupIntent, markBackupIntent, takeBackupIntent } from '$lib/backup/intent';
 import { backupSession, BackupSession, type WorkerLike } from '$lib/backup/session.svelte';
 import type { FromWorker, WorkerRequest } from '$lib/backup/worker/protocol';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
@@ -57,7 +57,6 @@ const WORDS = ['bamboo', 'copper', 'harvest', 'lantern', 'oxygen', 'thimble'];
 const TYPED = WORDS.join(' ');
 const START_URL = location.href;
 const START_STATE: unknown = history.state;
-const INTENT_KEY = 'mtcBackupIntent';
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -205,12 +204,14 @@ afterEach(async () => {
 
 const entry = () => page.getByRole('button', { name: ENTRY, exact: true });
 const field = () => page.getByLabelText('Passphrase', { exact: true });
-const intentOnEntry = (): unknown =>
-	(history.state as Record<string, unknown> | null)?.[INTENT_KEY];
 
-/** What the Erase from the damaged view leaves behind for this page: the note, with the address kept as it is. */
+/**
+ * What the Erase from the damaged view leaves behind for this page, with the address kept as it is, and what the app's
+ * start-up then reads from it.
+ */
 function leaveRestoreNote(): void {
 	markBackupIntent('restore-row', location.pathname + location.search + location.hash);
+	captureBackupIntent();
 }
 
 /** Choose the backup file, type the words and press Restore. */
@@ -300,13 +301,12 @@ describe('Wizard, after an Erase from the damaged view', () => {
 	it('opens the restore row from the note and clears it, so a reload or a return finds it closed', async () => {
 		makeApp();
 		leaveRestoreNote();
-		expect(intentOnEntry()).toBe('restore-row');
 
 		const first = await render(WizardPage);
 		await expect.element(entry()).toBeVisible();
 		await expect.poll(() => entry().element().getAttribute('aria-expanded')).toBe('true');
 		await expect.element(page.getByRole('button', { name: 'Choose file' })).toBeVisible();
-		expect(intentOnEntry()).toBeUndefined();
+		expect(takeBackupIntent('restore-row')).toBe(false);
 
 		// Closed by the person, it stays closed; the note is not read again.
 		await userEvent.click(entry());
@@ -330,7 +330,7 @@ describe('Wizard, after an Erase from the damaged view', () => {
 		await render(WizardPage);
 		await expect.element(page.getByRole('heading', { name: 'Set up your profile' })).toBeVisible();
 
-		expect(intentOnEntry()).toBeUndefined();
+		expect(takeBackupIntent('restore-row')).toBe(false);
 		expect(entry().query()).toBeNull();
 
 		app.db = db;

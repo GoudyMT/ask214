@@ -3,15 +3,21 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// The root layout loads on every page, and app-init is the code it runs at start-up. The backup code (the session,
-// the flows, the word list loader) is for the Settings and wizard pages alone: one import from either entry, however
-// deep, would ship it to every page.
+// The root layout loads on every page, app-init is the code it runs at start-up, and the client hooks file runs before
+// the app starts. The backup code (the session, the flows, the word list loader) is for the Settings and wizard pages
+// alone: one import from any of these entries, however deep, would ship it to every page.
 const SRC = fileURLToPath(new URL('../../', import.meta.url));
-const ENTRIES = [join(SRC, 'routes/+layout.svelte'), join(SRC, 'lib/profile/app-init.ts')];
+const ENTRIES = [
+	join(SRC, 'routes/+layout.svelte'),
+	join(SRC, 'lib/profile/app-init.ts'),
+	join(SRC, 'hooks.client.ts')
+];
 const BACKUP = join(SRC, 'lib/backup') + sep;
-// The one backup file the shared chunk already carries: a single constant that imports nothing, kept in its own file
-// so the note field and the timeline store can share it without the rest of the backup code.
-const SHARED_LEAF = join(SRC, 'lib/backup/note-cap.ts');
+// The backup files the shared chunk already carries, each a small leaf that imports nothing of the backup code:
+// note-cap.ts is a single constant, kept in its own file so the note field and the timeline store can share it;
+// intent.ts is the history note, which every page pays about 250 B gzip for, because the capture must run in the
+// client init hook, before SvelteKit's start-up rewrites the history entry the note rides in.
+const SHARED_LEAVES = [join(SRC, 'lib/backup/note-cap.ts'), join(SRC, 'lib/backup/intent.ts')];
 // The shapes the other import scans read (src/lib/ci/pii-policy.ts): a static import or re-export, a side-effect
 // import, `import(...)` with any quote including a template literal, and `import.meta.glob(...)`.
 const IMPORT =
@@ -48,11 +54,11 @@ function reachable(entries: string[]): Set<string> {
 	return seen;
 }
 
-describe('the root layout and app-init', () => {
-	// Guards a real cost: the layout node is on every page; a backup import there is paid by every visit.
+describe('the root layout, app-init and the client hooks', () => {
+	// Guards a real cost: these load on every page; a backup import there is paid by every visit.
 	it('reach no file under src/lib/backup', () => {
 		const reached = [...reachable(ENTRIES)]
-			.filter((path) => path.startsWith(BACKUP) && path !== SHARED_LEAF)
+			.filter((path) => path.startsWith(BACKUP) && !SHARED_LEAVES.includes(path))
 			.map((path) => relative(SRC, path).split(sep).join('/'));
 		expect(reached).toEqual([]);
 	});

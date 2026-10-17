@@ -123,7 +123,7 @@ test('a tab on damaged data reloads when another tab saves new data', async ({ c
 	await first.getByRole('button', { name: /erase all data on this device/i }).click();
 	await first.getByRole('button', { name: /^erase everything$/i }).click();
 	await expect(first.getByText("can't be read")).toBeHidden({ timeout: 15_000 });
-	// A damaged Erase reloads onto the setup screen with the restore row open (W5 J.4): wait for that ready first run
+	// A damaged Erase reloads onto the setup screen with the restore row open: wait for that ready first run
 	// before reading the database.
 	await expect(first).toHaveURL(/\/wizard$/, { timeout: 15_000 });
 	await expect(first.getByRole('button', { name: 'Choose file' })).toBeVisible({ timeout: 15_000 });
@@ -152,7 +152,7 @@ test('a second erase on data another tab already erased checks first and wipes n
 	await first.getByRole('button', { name: /erase all data on this device/i }).click();
 	await first.getByRole('button', { name: /^erase everything$/i }).click();
 	await expect(first.getByText("can't be read")).toBeHidden({ timeout: 15_000 });
-	// A damaged Erase reloads onto the setup screen with the restore row open (W5 J.4): wait for that ready first run
+	// A damaged Erase reloads onto the setup screen with the restore row open: wait for that ready first run
 	// before reading the database.
 	await expect(first).toHaveURL(/\/wizard$/, { timeout: 15_000 });
 	await expect(first.getByRole('button', { name: 'Choose file' })).toBeVisible({ timeout: 15_000 });
