@@ -1202,6 +1202,113 @@ describe('TaskCard (for keyboard and screen reader)', () => {
 		expect(document.activeElement).toBe(card);
 	});
 
+	describe('the Snooze picker', () => {
+		const ESCAPE = {
+			key: 'Escape',
+			code: 'Escape',
+			windowsVirtualKeyCode: 27
+		};
+		const snoozeButton = (container: Element) =>
+			[...container.querySelectorAll<HTMLButtonElement>('.task-card__actions button')].find(
+				(b) => b.textContent?.trim() === 'Snooze'
+			) as HTMLButtonElement;
+		const pickerOpen = (container: Element) =>
+			container.querySelector('.task-card__snooze') !== null;
+
+		it('tells a screen reader whether the picker is open', async () => {
+			const { container } = await renderCard(makeItem({ status: 'start-now' }));
+			const snooze = snoozeButton(container);
+			expect(snooze.getAttribute('aria-expanded')).toBe('false');
+			snooze.click();
+			await expect.poll(() => snooze.getAttribute('aria-expanded')).toBe('true');
+			(buttonByText(container, 'Cancel') as HTMLButtonElement).click();
+			await expect.poll(() => snooze.getAttribute('aria-expanded')).toBe('false');
+		});
+
+		it('closes on Escape from the Snooze button, and focus stays on it', async () => {
+			const { container } = await renderCard(makeItem({ status: 'start-now' }));
+			const snooze = snoozeButton(container);
+			snooze.focus();
+			snooze.click();
+			await expect.poll(() => pickerOpen(container)).toBe(true);
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await expect.poll(() => pickerOpen(container)).toBe(false);
+			expect(snooze.getAttribute('aria-expanded')).toBe('false');
+			expect(document.activeElement).toBe(snooze);
+		});
+
+		it('closes on Escape from inside the picker and returns focus to the Snooze button', async () => {
+			const onSetSnooze = vi.fn();
+			const { container } = await renderCard(makeItem({ status: 'start-now' }), { onSetSnooze });
+			const snooze = snoozeButton(container);
+			snooze.click();
+			await expect.poll(() => pickerOpen(container)).toBe(true);
+			(buttonByText(container, 'Customize') as HTMLButtonElement).click();
+			const field = await vi.waitFor(() => {
+				const input = container.querySelector<HTMLInputElement>('input[type="date"]');
+				if (!input) throw new Error('E_NO_FIELD');
+				return input;
+			});
+			field.focus();
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await expect.poll(() => pickerOpen(container)).toBe(false);
+			await expect.poll(() => document.activeElement).toBe(snooze);
+			expect(onSetSnooze).not.toHaveBeenCalled();
+		});
+
+		// A held key repeats about every 40 ms: the press that closed the picker is the only one that acts, so a
+		// repeat of it does not close a picker the person opened again.
+		it('a held Escape closes the picker once and its repeats do nothing more', async () => {
+			const { container } = await renderCard(makeItem({ status: 'start-now' }));
+			const snooze = snoozeButton(container);
+			snooze.focus();
+			snooze.click();
+			await expect.poll(() => pickerOpen(container)).toBe(true);
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await expect.poll(() => pickerOpen(container)).toBe(false);
+			snooze.click();
+			await expect.poll(() => pickerOpen(container)).toBe(true);
+			for (let i = 0; i < 10; i++) {
+				await new Promise((resolve) => setTimeout(resolve, 40));
+				await session.send('Input.dispatchKeyEvent', {
+					type: 'keyDown',
+					autoRepeat: true,
+					...ESCAPE
+				});
+			}
+			expect(pickerOpen(container)).toBe(true);
+			expect(snooze.getAttribute('aria-expanded')).toBe('true');
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await expect.poll(() => pickerOpen(container)).toBe(false);
+		});
+
+		// Escape belongs to the picker only while it is open and holds the key: the note editor's own text field is not it.
+		it('leaves an open note editor alone when Escape is pressed in it', async () => {
+			const { container } = await renderCard(makeItem({ status: 'start-now' }));
+			snoozeButton(container).click();
+			(buttonByText(container, 'Add note') as HTMLButtonElement).click();
+			const field = await vi.waitFor(() => {
+				const area = container.querySelector<HTMLTextAreaElement>('textarea');
+				if (!area) throw new Error('E_NO_FIELD');
+				return area;
+			});
+			field.focus();
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			expect(pickerOpen(container)).toBe(true);
+			expect(container.querySelector('textarea')).not.toBeNull();
+		});
+	});
+
 	it('separates the tags from the text with spaces, so they are not read as one word', async () => {
 		const def = { ...DEF, kind: 'closes' as const, afterNote: 'n' };
 		const open = (await renderCard(makeItem({ def, status: 'start-now' }))).container;

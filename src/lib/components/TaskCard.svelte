@@ -125,6 +125,16 @@
 		void returnFocus(snoozeOpener);
 	}
 
+	// Escape closes an open picker from the Snooze button or from inside it, and the button takes focus back. A held
+	// key's repeats are one press, so only its first event closes: a repeat of the press that closed it must not close
+	// the picker the person opens again.
+	function snoozeKeydown(e: KeyboardEvent): void {
+		if (e.key !== 'Escape' || !snoozeOpen) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (!e.repeat) cancelSnooze();
+	}
+
 	// The change this card made moves focus once it lands. A write that did not land changes nothing here, so the mark
 	// goes, or the next change from elsewhere would take focus.
 	async function markApplied(write: Promise<boolean> | void): Promise<void> {
@@ -449,12 +459,20 @@
 				     offered where it would change nothing; nor from the last day at the command on a task moved to fit
 				     before leaving. -->
 				{#if item.status !== 'upcoming' && !item.snoozeClosed && !isFirmWarning(item.status, item.def.kind)}
-					<button type="button" onclick={toggleSnooze}>Snooze</button>
+					<button
+						type="button"
+						aria-expanded={snoozeOpen}
+						onclick={toggleSnooze}
+						onkeydown={snoozeKeydown}>Snooze</button
+					>
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
 			{#if snoozeOpen && !item.snoozeClosed}
-				<div class="task-card__snooze" bind:this={snoozeEl}>
+				<!-- The picker only filters Escape for its controls; it is not a control itself, so the compiler's rule against
+				     key listeners on a static element does not fit. -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="task-card__snooze" bind:this={snoozeEl} onkeydown={snoozeKeydown}>
 					<span class="task-card__snooze-label">Snooze until</span>
 					<div class="task-card__presets">
 						{#each SNOOZE_PRESETS as preset (preset.days)}
