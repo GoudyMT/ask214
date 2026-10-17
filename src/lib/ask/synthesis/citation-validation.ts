@@ -18,8 +18,12 @@
  * a retrieved id fails loudly through `validateCitations`. Note this still has a SILENT-ZERO mode - a
  * shape the class cannot read at all (`[idA, idB]`, `[Source: idA]`) yields no citations, which is
  * indistinguishable from a model that cited nothing.
+ *
+ * Lowercase only, as every chunk id is and as `validateCitations` compares them. The corpus prints bracketed
+ * acronyms of its own ("Transfer of Entitlement [TOE]"); read as a citation, one names no retrieved id and an
+ * answer that merely quoted its source was refused.
  */
-export const CITATION = /\[([a-z0-9_.:-]+)\]/gi;
+export const CITATION = /\[([a-z0-9_.:-]+)\]/g;
 
 /**
  * Extract the chunk ids the model cited.

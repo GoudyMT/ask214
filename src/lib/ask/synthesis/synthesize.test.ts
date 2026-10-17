@@ -203,6 +203,20 @@ describe('synthesize', () => {
 		}
 	});
 
+	// The corpus prints "Transfer of Entitlement [TOE]" and "[DOS]". An answer quoting them is the source's own
+	// words, not a citation to an id nobody retrieved, so it is shown with the acronym kept.
+	it('shows an answer that quotes a bracketed acronym from its source instead of refusing it', async () => {
+		const impl = stubFetch(
+			`SkillBridge is open to members whose Transfer of Entitlement [TOE] is on file [${SKILLBRIDGE_ID}].`
+		);
+		const result = await synthesize('What is SkillBridge?', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.text).toContain('Transfer of Entitlement [TOE] is on file.');
+			expect(result.answer.citations.map((c) => c.id)).toEqual([SKILLBRIDGE_ID]);
+		}
+	});
+
 	it('accepts a citation to a real corpus id carrying a collision suffix', async () => {
 		const suffixed = await collisionId('tap_dol_efct', REAL_ID_CHUNKS[1]!.text, 1);
 		const chunks = [{ ...REAL_ID_CHUNKS[1]!, id: suffixed }];
