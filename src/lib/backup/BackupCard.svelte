@@ -273,8 +273,13 @@
 	}
 	onMount(() => void refreshMark());
 
-	// Leaving the page ends the session; an app switch that only swaps the card out leaves it (the session knows).
-	onDestroy(() => session.cardGone({ locked: app.store?.lockState === 'locked' }));
+	// Leaving the page ends the session; an app switch that only swaps the card out leaves it (the session knows). Read
+	// in a microtask: this teardown runs inside the batch that took the card off the page, where a state read still
+	// returns the value from before the batch. So a card taken off by a lock would read an unlocked profile, and
+	// would write "the page was left" over the lock that took it.
+	onDestroy(() =>
+		queueMicrotask(() => session.cardGone({ locked: app.store?.lockState === 'locked' }))
+	);
 
 	// ---- rows -----------------------------------------------------------------------------------------------------
 

@@ -1,4 +1,3 @@
-import { tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
@@ -36,6 +35,19 @@ import SettingsPage from './+page.svelte';
 // backup session and flows and the real card. Only what a person cannot touch is faked: the app container the layout
 // would set, the slow key step (the pinned output, as the golden test does), the system file chooser, and the reload.
 const harness = vi.hoisted(() => ({ app: null as ProfileApp | null }));
+// The write itself, held after it has committed: the one moment a person can press Lock "during the write".
+const writer = vi.hoisted(() => ({ hold: null as Promise<void> | null }));
+vi.mock('$lib/backup/restore-writer', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/backup/restore-writer')>();
+	return {
+		...real,
+		restoreBackup: async (...args: Parameters<typeof real.restoreBackup>) => {
+			const result = await real.restoreBackup(...args);
+			await writer.hold;
+			return result;
+		}
+	};
+});
 
 vi.mock('$lib/profile/context', async (importOriginal) => {
 	const real = await importOriginal<typeof import('$lib/profile/context')>();
@@ -208,6 +220,7 @@ beforeEach(() => {
 	app.publish = null;
 	app.reloadOnUnlock = false;
 	wipeAll.mockClear();
+	writer.hold = null;
 	// The erase also clears the device's settings and caches; the page under test shares both with other test files.
 	vi.spyOn(Storage.prototype, 'clear').mockImplementation(() => {});
 	vi.spyOn(CacheStorage.prototype, 'keys').mockResolvedValue([]);
@@ -258,6 +271,29 @@ async function openChooser(): Promise<void> {
 	await userEvent.click(toggle(CARD_LABELS.restore, false));
 	await expect.poll(() => session().phase).toBe('choose-file');
 	await userEvent.click(button(CARD_LABELS.chooseFile));
+}
+
+const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Opens the Restore row and picks the golden backup, leaving the card at the passphrase. */
+async function chooseGoldenFile(): Promise<void> {
+	setPicker(async () => [{ getFile: async () => goldenFile() }]);
+	await userEvent.click(toggle(CARD_LABELS.restore, false));
+	await userEvent.click(button(CARD_LABELS.chooseFile));
+	await expect.element(page.getByLabelText(CARD_LABELS.passphrase, { exact: true })).toBeVisible();
+}
+
+/** The whole way to the confirm a person sees before pressing Replace. */
+async function restoreToConfirm(): Promise<void> {
+	await chooseGoldenFile();
+	await page.getByLabelText(CARD_LABELS.passphrase, { exact: true }).fill(GOLDEN_PASSWORD);
+	await userEvent.click(
+		page.getByRole('form', { name: CARD_LABELS.restore }).getByRole('button', {
+			name: CARD_LABELS.restoreSubmit,
+			exact: true
+		})
+	);
+	await expect.element(page.getByRole('dialog')).toBeVisible();
 }
 
 const eraseCta = () => page.getByRole('button', { name: 'Erase all data on this device' });
@@ -358,7 +394,6 @@ describe('Settings, the Backup card', () => {
 		// event than the commit, as it is for a person.
 		session().committing = true;
 		session().enterPhase('committed');
-		await tick();
 		relockAll(relockables, 'user');
 
 		await expect.element(button('Unlock')).toBeVisible();
@@ -371,22 +406,64 @@ describe('Settings, the Backup card', () => {
 		).toBeTruthy();
 	});
 
-	it('says the backup was restored when the Lock came during the write', async () => {
+	// A Lock is a later event than the write that began: the restore finishes, the tab stays locked and says so, and no
+	// reload decrypts the page the person just locked.
+	it('says the backup was restored, and does not reload, when the Lock came during the write', async () => {
+		await device({ profile: true });
+		const written = deferred<void>();
+		writer.hold = written.promise;
+		const seen = holdNavigation();
+		await render(SettingsPage);
+		await expect.element(backupHeading()).toBeVisible();
+		await restoreToConfirm();
+		await userEvent.click(button(CARD_LABELS.replace));
+		await expect.poll(() => session().committing).toBe(true);
+
+		await userEvent.click(button('Lock'));
+		await expect.element(button('Unlock')).toBeVisible();
+		written.resolve();
+		await expect.poll(() => session().phase).toBe('committed');
+
+		await expect.element(page.getByText(RESTORED_UNLOCK_LINE)).toBeVisible();
+		expect(page.getByText(LOCKED_AFTER_RESTORE_LINE).query()).toBeNull();
+		expect(app.reloadOnUnlock).toBe(true);
+		await pause(100);
+		expect(seen).toEqual([]);
+	});
+
+	// Another tab idling locks this profile and takes the card off the page; the person is still here, mid-restore.
+	it('keeps a restore that has not begun writing when another tab idles, and finds it again on Unlock', async () => {
 		await device({ profile: true });
 		await render(SettingsPage);
+		await expect.element(backupHeading()).toBeVisible();
+		await chooseGoldenFile();
+		await expect.poll(() => session().phase).toBe('file-chosen');
+
+		relockEachSync(relockables, 'peer', { peerReason: 'idle' });
+
+		await expect.element(button('Unlock')).toBeVisible();
+		expect(backupHeading().query()).toBeNull();
+		await pause(100);
+		expect(session().phase).toBe('file-chosen');
+
+		await userEvent.click(button('Unlock'));
+		await expect.element(toggle(CARD_LABELS.restore, true)).toBeVisible();
+		await expect
+			.element(page.getByLabelText(CARD_LABELS.passphrase, { exact: true }))
+			.toBeVisible();
+	});
+
+	// The deferred read of the lock must not turn a real move to another page into a kept session.
+	it('ends a restore that has not begun writing when the person leaves the page', async () => {
+		await device({ profile: true });
+		const shown = await render(SettingsPage);
 		await expect.element(backupHeading()).toBeVisible();
 		await userEvent.click(toggle(CARD_LABELS.restore, false));
 		await expect.poll(() => session().phase).toBe('choose-file');
 
-		session().committing = true;
-		session().enterPhase('writing');
-		await tick();
-		relockAll(relockables, 'user');
-		await expect.element(button('Unlock')).toBeVisible();
-		session().enterPhase('committed');
+		await shown.unmount();
 
-		await expect.element(page.getByText(RESTORED_UNLOCK_LINE)).toBeVisible();
-		expect(page.getByText(LOCKED_AFTER_RESTORE_LINE).query()).toBeNull();
+		await expect.poll(() => session().active).toBe(false);
 	});
 
 	it('reloads on Unlock instead of reading, when a restore happened while locked', async () => {
