@@ -1,6 +1,17 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { SET_UP_FILES } from '../../src/lib/ask/asset-cache';
 import { KDF_WORKER_SRC } from '../../src/lib/backup/kdf-paths';
+import {
+	CONTROL_PATH,
+	damageProfileMark,
+	feedFile,
+	makeBackup,
+	restoreOpenRow,
+	sealApi,
+	setUpTimeline,
+	useInMemoryFiles,
+	workerInCharge
+} from './helpers/backup';
 
 // The backup features on the paths only the BUILT app, served, with its service worker in charge, can show: no
 // connection at all, a device whose saved data is damaged, and a page left open across a release. Each restore runs
@@ -13,142 +24,6 @@ test.skip(
 	({ browserName }) => browserName === 'webkit',
 	'Playwright WebKit offline fails a worker-controlled request before the worker can answer it'
 );
-
-const CONTROL_PATH = '/api/e2e-control';
-
-type Sealed = { reached: string[] };
-
-// Nothing in these flows talks to the server; anything that tried would be a bug and must not reach a live endpoint
-// (the mail key in the dev setup is real). The route is proven first by a request to a path no server answers, which
-// has to be refused here; `reached` then lists every /api/ request that got as far as the route.
-async function sealApi(context: BrowserContext, page: Page): Promise<Sealed> {
-	const reached: string[] = [];
-	await context.route('**/api/**', (route) => {
-		reached.push(new URL(route.request().url()).pathname);
-		return route.abort();
-	});
-	await page.goto('/');
-	const outcome = await page.evaluate(
-		(path) =>
-			fetch(path).then(
-				() => 'reached the network',
-				() => 'refused'
-			),
-		CONTROL_PATH
-	);
-	expect(outcome).toBe('refused');
-	expect(reached).toEqual([CONTROL_PATH]);
-	return { reached };
-}
-
-// The save and open pickers do not exist in every engine and cannot be driven. The save is kept in memory instead; the
-// open picker is removed so the card falls back to its file input, which a test can feed.
-async function useInMemoryFiles(context: BrowserContext): Promise<void> {
-	await context.addInitScript(() => {
-		const w = window as unknown as {
-			showOpenFilePicker?: unknown;
-			showSaveFilePicker?: unknown;
-			__saved?: { name: string; text: string };
-		};
-		delete w.showOpenFilePicker;
-		w.showSaveFilePicker = async (opts?: { suggestedName?: string }) => {
-			const name = opts?.suggestedName ?? 'backup.ask214backup';
-			let text = '';
-			return {
-				name,
-				kind: 'file',
-				createWritable: async () => {
-					let buffered = '';
-					return {
-						write: async (d: unknown) => {
-							buffered += typeof d === 'string' ? d : await new Blob([d as BlobPart]).text();
-						},
-						close: async () => {
-							text = buffered;
-							w.__saved = { name, text };
-						},
-						abort: async () => {}
-					};
-				},
-				// The card reads the file back to prove what was saved.
-				getFile: async () => new File([text], name, { type: 'application/json' })
-			};
-		};
-	});
-}
-
-async function workerInCharge(page: Page): Promise<void> {
-	await page.evaluate(async () => {
-		await navigator.serviceWorker.ready;
-		if (!navigator.serviceWorker.controller)
-			await new Promise<void>((resolve) =>
-				navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), {
-					once: true
-				})
-			);
-	});
-}
-
-async function setUpTimeline(page: Page): Promise<void> {
-	await page.goto('/wizard');
-	await page.getByLabel(/separation date/i).fill('2027-04-15');
-	await page.getByRole('button', { name: /save and continue/i }).click();
-	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
-}
-
-type Backup = { name: string; text: string; words: string };
-
-// Settings -> Make a backup, to the in-memory save. Returns the file and the six words that open it.
-async function makeBackup(page: Page): Promise<Backup> {
-	await page.getByRole('button', { name: 'Make a backup' }).click();
-	await page.getByRole('button', { name: 'Show my passphrase' }).click();
-	const card = page.locator('.backup-card');
-	await expect(card).toContainText('Write these words down');
-	const lines = (await card.innerText())
-		.split('\n')
-		.map((s) => s.trim())
-		.filter(Boolean);
-	const at = lines.findIndex((s) => s.startsWith('Write these words down'));
-	const words = lines.slice(at + 1, at + 7).join(' ');
-	expect(words.split(' ')).toHaveLength(6);
-	const make = page.locator('form[aria-label="Make a backup"]');
-	await make.locator('input[type=password]').fill(words);
-	await make.getByRole('button', { name: 'Make a backup' }).click();
-	await expect(page.locator('.backup-result')).toBeVisible({ timeout: 60_000 });
-	const saved = await page.evaluate(
-		() => (window as unknown as { __saved?: { name: string; text: string } }).__saved
-	);
-	if (!saved) throw new Error('E_TEST_NO_BACKUP');
-	return { ...saved, words };
-}
-
-async function feedFile(page: Page, backup: Backup): Promise<void> {
-	const chooser = page.waitForEvent('filechooser');
-	await page.getByRole('button', { name: 'Choose file' }).click();
-	await (
-		await chooser
-	).setFiles({
-		name: backup.name,
-		mimeType: 'application/json',
-		buffer: Buffer.from(backup.text)
-	});
-}
-
-// The open row's file, the words and Replace; the page reloads onto the Timeline with the restored line.
-async function restoreOpenRow(page: Page, backup: Backup): Promise<void> {
-	await feedFile(page, backup);
-	const restore = page.locator('form[aria-label="Restore from a backup"]');
-	await restore.locator('input[type=password]').fill(backup.words);
-	await restore.getByRole('button', { name: 'Restore' }).click();
-	// The key is derived first, offline, by the worker the app kept: the confirm only opens once it has.
-	const confirm = page.locator('dialog[open]');
-	await expect(confirm).toBeVisible({ timeout: 30_000 });
-	await confirm.getByRole('button', { name: 'Replace' }).click();
-	await expect(page).toHaveURL(/\/timeline$/, { timeout: 30_000 });
-	await expect(page.getByText(/^Backup restored \(made /)).toHaveCount(1, { timeout: 15_000 });
-	// The restored profile's date is what the Timeline is anchored to.
-	await expect(page.getByText(/^Anchored to Apr 15, 2027/)).toBeVisible();
-}
 
 // What the page asked the network for, by path, so a test can say what a flow did NOT fetch.
 function recordRequests(page: Page): string[] {
@@ -195,36 +70,6 @@ test('a backup made and restored offline needs no Ask setup', async ({ page, con
 	for (const file of SET_UP_FILES) expect(requested).not.toContain(file);
 	expect(reached).toEqual([CONTROL_PATH]);
 });
-
-// The key record is fine and the profile's mark fails its own check, as damage on disk would: the app starts on the
-// damaged view.
-async function damageProfileMark(page: Page): Promise<void> {
-	await page.evaluate(
-		() =>
-			new Promise<void>((resolve, reject) => {
-				const req = indexedDB.open('mtc');
-				req.onerror = () => reject(new Error('E_TEST_OPEN'));
-				req.onsuccess = () => {
-					const db = req.result;
-					const tx = db.transaction('profile-hwm', 'readwrite');
-					const store = tx.objectStore('profile-hwm');
-					const get = store.get(0);
-					get.onsuccess = () => {
-						const row = get.result;
-						const mac = new Uint8Array(row.mac.slice(0));
-						mac[0] = (mac[0] ?? 0) ^ 0xff;
-						row.mac = mac.buffer;
-						store.put(row);
-					};
-					tx.oncomplete = () => {
-						db.close();
-						resolve();
-					};
-					tx.onerror = () => reject(new Error('E_TEST_WRITE'));
-				};
-			})
-	);
-}
 
 test('an Erase made offline, then a restore on the first-run screen', async ({ page, context }) => {
 	test.slow();
