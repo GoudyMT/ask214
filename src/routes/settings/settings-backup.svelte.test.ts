@@ -595,7 +595,7 @@ describe('Settings, Erase', () => {
 
 		const body = document.querySelector('#wipe-dialog-body');
 		expect(body?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-			"This permanently erases everything stored on this device - your separation date and any profile details. It can't be undone. Backup files you saved, and backup passphrases saved in a password manager or on paper, are not erased. Delete them yourself if you no longer want them."
+			"This permanently erases everything stored on this device - your separation date and any profile details. It can't be undone. The app itself stays, so it still opens offline. Backup files you saved, and backup passphrases saved in a password manager or on paper, are not erased. Delete them yourself if you no longer want them."
 		);
 	});
 

@@ -716,9 +716,9 @@
 			<h2 id="wipe-dialog-heading" class="wipe-dialog__heading">Erase all data on this device?</h2>
 			<p id="wipe-dialog-body" class="wipe-dialog__body">
 				This permanently erases everything stored on this device - your separation date and any
-				profile details. It can't be undone. Backup files you saved, and backup passphrases saved in
-				a password manager or on paper, are not erased. Delete them yourself if you no longer want
-				them.
+				profile details. It can't be undone. The app itself stays, so it still opens offline. Backup
+				files you saved, and backup passphrases saved in a password manager or on paper, are not
+				erased. Delete them yourself if you no longer want them.
 			</p>
 			<div class="wipe-dialog__actions">
 				<button class="wipe-dialog__cancel" type="button" onclick={cancelErase}>Cancel</button>
