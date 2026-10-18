@@ -421,6 +421,24 @@ describe('Settings, the Backup card', () => {
 		await expect.element(toggle(CARD_LABELS.restore, false)).toBeVisible();
 	});
 
+	// A device with no profile has nothing to unlock: the locked panel never comes, so a card taken away by the lock would
+	// not come back until the page is reloaded. Its session still ends on the lock.
+	it('stays on a device with no profile after an idle lock, and the lock ends its session', async () => {
+		await device({ profile: false });
+		await render(SettingsPage);
+		await expect.element(backupHeading()).toBeVisible();
+		await userEvent.click(toggle(CARD_LABELS.restore, false));
+		await expect.poll(() => session().active).toBe(true);
+
+		relockEachSync(relockables, 'idle');
+
+		await expect.poll(() => session().active).toBe(false);
+		expect(store?.lockState).toBe('locked');
+		expect(button('Unlock').query()).toBeNull();
+		await expect.element(backupHeading()).toBeVisible();
+		await expect.element(toggle(CARD_LABELS.restore, false)).toBeVisible();
+	});
+
 	it('is not drawn for an evicted profile when no backup is running', async () => {
 		await device({ profile: true });
 		await render(SettingsPage);

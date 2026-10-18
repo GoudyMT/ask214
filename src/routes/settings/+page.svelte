@@ -129,11 +129,12 @@
 	// there would lose a running backup. So an evicted profile keeps the card while a session runs, and shows none
 	// otherwise (nothing new may start behind the Unlock panel). A profile locked for real (a Lock, idle, another tab)
 	// takes the card away: those locks have already cleared the session, or left it for the Unlock to find again. A
-	// card with no way to relock its session has nothing it may start.
+	// device with no profile has nothing to unlock, so its lock takes nothing away: the card would not come back until a
+	// reload. A card with no way to relock its session has nothing it may start.
 	const showBackupCard = $derived(
 		app.joinRelock !== null &&
 			app.store !== null &&
-			app.store.lockState !== 'locked' &&
+			(app.store.lockState !== 'locked' || !app.store.locked) &&
 			(!lockedView || backupSession.active)
 	);
 	const backupCardUp = $derived(showBackupCard && app.db !== null);
