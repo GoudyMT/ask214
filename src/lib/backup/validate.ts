@@ -127,10 +127,12 @@ const isTimeOrNull = (v: unknown): v is number | null => v === null || isTime(v)
 // Strict base64: whole four-character groups, the standard alphabet, padding where it belongs, no spaces or line
 // breaks (atob would skip them). A last group with spare bits set still fits this shape, but it is a second spelling of
 // the same bytes: the profile's round trip below refuses it, because the shipped encoder writes the other spelling.
-const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+// The length rule and this flat character loop together mean exactly that shape; a repeated four-character group would
+// overflow the regex engine's stack on a multi-megabyte date.
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 function fromBase64(s: string): Uint8Array | null {
-	if (!BASE64.test(s)) return null;
+	if (s.length % 4 !== 0 || !BASE64.test(s)) return null;
 	return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 }
 

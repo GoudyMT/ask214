@@ -306,6 +306,8 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 		['eaos without padding', (p) => (p.profile.eaos = 'MjAyNy0wNi0zMA'), 'profile'],
 		['eaos with a space in it', (p) => (p.profile.eaos = 'MjAy Ny0wNi0zMA=='), 'profile'],
 		['eaos in the URL-safe alphabet', (p) => (p.profile.eaos = '-jAyNy0wNi0zMA=='), 'profile'],
+		// A grouped regex overflows the engine's stack on a date this long; the refusal must still be a returned answer.
+		['eaos of 4.5 million characters', (p) => (p.profile.eaos = 'A'.repeat(4_500_000)), 'profile'],
 		// The shipped decoder reads this as the same date as 'MA==' but writes it back as 'MA==': the round trip refuses it.
 		[
 			'eaos with spare bits set in its last group',
