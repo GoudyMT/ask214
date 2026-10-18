@@ -38,6 +38,9 @@ the transition it is designed to help with.
   after an update.
 - **Timeline.** A persona-aware, separation-date-anchored checklist of transition tasks. Mark done,
   skip, snooze, or add private notes; add your upcoming deadlines to your calendar as an `.ics` file.
+- **Backup.** Save your profile, timeline, and notes as one encrypted file, and restore it on a new phone.
+  The file opens only with a six-word passphrase that the app makes for you. There is no account, and
+  nothing is uploaded.
 - **Resources.** A curated hub of official outbound links (VA, DoD, DOL, TSP, SkillBridge). We link to
   the real government tools with context; we never recreate or replace them.
 - **Reference library.** TAP curriculum, VA guides, and agency pages, all public U.S. Government work.
@@ -49,8 +52,9 @@ the transition it is designed to help with.
 Privacy is the architecture, not a setting.
 
 - **Your data stays on your device.** Personal information is stored locally in IndexedDB, encrypted
-  with AES-GCM via the Web Crypto API. Your profile, timeline, and notes are never sent anywhere; an
-  online question carries only the question text.
+  with AES-GCM via the Web Crypto API. Your profile, timeline, and notes are never sent anywhere. They
+  leave the device only in a file you choose to save, an encrypted backup or a calendar file. An online
+  question carries only the question text.
 - **No trackers. No ads, ever.**
 - **Everything the app runs comes from its own site.** Its code, the libraries it uses, and the on-device
   model are served from ask214.com under a strict Content Security Policy. The only other address it may
@@ -74,6 +78,8 @@ Privacy is the architecture, not a setting.
   (`all-MiniLM-L6-v2`, quantized) on **ONNX Runtime Web** (WebAssembly), served from the app's own
   origin.
 - **[PDF.js](https://github.com/mozilla/pdf.js)** draws the official documents in the reader.
+- **[@noble/hashes](https://github.com/paulmillr/noble-hashes)** turns the backup passphrase into a key
+  (Argon2id), in a background worker.
 - **Installable PWA:** a service worker, offline after the first visit, add-to-home-screen.
 - **Content pipeline:** Node scripts build and check the reference library from the official sources;
   two Python scripts prepare the served copies of the PDFs.

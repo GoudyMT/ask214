@@ -4,9 +4,9 @@
 
 The profile, the timeline built from it, the user's task notes, their calendar choices and an optional API key
 stay on the device, encrypted in IndexedDB. There is no account and no server copy. This document covers how
-that data is stored, encrypted, locked, shared between tabs, kept and erased, and the two ways any of it
-leaves: a calendar file the user saves, and the API key, sent only to its own provider with each summary
-request. Each decision's full reasoning is kept in private working notes.
+that data is stored, encrypted, locked, shared between tabs, kept, erased and backed up, and the ways any of it
+leaves: a calendar file or an encrypted backup file the user saves, and the API key, sent only to its own
+provider with each summary request. Each decision's full reasoning is kept in private working notes.
 
 ## Stack at a Glance
 
@@ -19,6 +19,8 @@ request. Each decision's full reasoning is kept in private working notes.
 | Ordering   | Web Locks API               | spec     | Orders writes; erase goes last          |
 | Tabs       | BroadcastChannel            | spec     | Tells other tabs to read again          |
 | Export     | iCalendar file              | RFC 5545 | Deadlines into the user's own calendar  |
+| Backup key | `@noble/hashes`, Argon2id   | 2.4.0    | Passphrase into a key, in a worker      |
+| Backup     | Web Crypto, HKDF, AES-GCM   | spec     | Encrypts the backup file                |
 
 ## Decisions and Reasoning
 
@@ -34,7 +36,8 @@ file names a profile field.
 
 **Why this project uses it.** With no server copy, there is nothing to breach, sell or hand over.
 
-**Tradeoffs accepted.** No sync between devices and no backup. Clearing the site's data loses it all.
+**Tradeoffs accepted.** No sync between devices. Clearing the site's data loses it all, unless the user saved
+a backup file first.
 
 ---
 
@@ -51,7 +54,8 @@ decrypt. A project lint rule forbids writing to an encrypted store anywhere else
 transaction. Signed high-water marks beside the profile, timeline and calendar records refuse an older copy, and
 errors carry opaque codes, never decrypted text.
 
-**What it does not protect.** There is no passphrase yet, so the key sits on the same device as the data.
+**What it does not protect.** There is no passphrase on the stored data yet (a backup file has its own, see
+Backup), so the key sits on the same device as the data.
 Non-extractable keys and authenticated encryption stop the key being exported and the records being altered or
 swapped, but not someone using the unlocked browser. A passphrase is planned for a later version.
 
@@ -134,11 +138,41 @@ Settings lists the ones to delete until the user marks them deleted.
 **Tradeoffs accepted.** Export is one way, so a change means exporting again. Each calendar app decides whether
 to keep the alerts. Google Calendar sync is designed but not built.
 
+---
+
+### Backup
+
+**What it is.** The user can save the profile, the timeline's task state and notes, and the calendar record as
+one encrypted file, and restore it on a new phone or after the site's data was cleared. The app makes a
+six-word passphrase from a list of 7,629 words, about 77 bits, and keeps it only while the backup is made. A key comes from it in two
+steps: Argon2id (128 MiB of memory, 4 passes, 2 lanes, from `@noble/hashes` 2.4.0) runs in a worker so the page
+stays responsive, then HKDF-SHA-256 turns its output into an AES-256-GCM key. Those numbers are fixed for the
+format: a file written under others is refused unread, and a change ships only as a new format version.
+
+**The file.** It is JSON that names the format, its version and the key settings, then holds a random salt, a
+random IV, a check value and the ciphertext. No personal data is in it in clear. The plaintext is padded to
+whole 4 KiB blocks so its length says little, and the additional authenticated data binds the key settings to
+the ciphertext. The check is a plain SHA-256 that only tells a damaged file from a wrong passphrase; it is not
+a security control. The reader refuses a file that is too large, not ours, from a newer version or damaged
+before it does any key work, with an opaque code.
+
+**Restore.** The user picks a file and types the passphrase. The restore replaces this device's profile, timeline
+and calendar record in one IndexedDB transaction, under the key lock alone, and signs fresh rollback marks
+for them. If anything fails, nothing was written.
+
+**What a backup does not carry.** The API key, Ask's offline library, saved documents and this device's
+settings (theme, Ask mode). The key store stays on the device. The user sets these up again in Settings.
+
+**Tradeoffs accepted.** A lost passphrase cannot be recovered: there is no server copy and no reset. Erase does
+not remove a file the user already saved, so the file and its passphrase need their own safekeeping. Deriving
+the key takes a moment and a lot of memory on purpose.
+
 ## How These Pieces Fit Together
 
 Every personal record goes through one encryption function into IndexedDB, bound to its place and write. Locks
 order writes across tabs, the idle lock clears memory, persistence resists eviction, and erase leaves no row
-behind. Only a calendar file the user saves and the API key, sent to its own provider, ever leave.
+behind. A backup restores it in one transaction. Only a calendar file or a backup file the user saves, and the
+API key, sent to its own provider, ever leave.
 
 ## Standards Adopted in This Section
 
