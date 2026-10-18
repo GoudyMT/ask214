@@ -7,7 +7,7 @@ import {
 	MAX_FILE_BYTES,
 	PAD_BLOCK_BYTES
 } from './caps';
-import { serializeEnvelope } from './envelope-json';
+import { ENVELOPE_OPENING, serializeEnvelope } from './envelope-json';
 import { KDF_V1, SALT_BYTES, IV_BYTES, CHECK_BYTES } from './kdf-params';
 
 /** What a good backup file holds once read: the bytes the key step and the decrypt step need. */
@@ -136,8 +136,8 @@ const refuse = <C extends Extract<ParseResult, { ok: false }>['code']>(code: C) 
 
 /**
  * Reads a backup file and refuses anything that is not exactly our shape, with the reason, before any key work. Each
- * refusal is a returned code that holds no part of the file. The steps run in a fixed order: size, bytes, text, JSON,
- * format, version (so a newer file with new keys says "update"), exact keys, key-derivation numbers, base64 and
+ * refusal is a returned code that holds no part of the file. The steps run in a fixed order: size, bytes, text, JSON
+ * (text that opens like a backup but does not parse is damaged), format, version (so a newer file with new keys says "update"), exact keys, key-derivation numbers, base64 and
  * lengths, the ciphertext bound, then the check.
  */
 export async function readBackupFile(file: File): Promise<ParseResult> {
@@ -146,11 +146,18 @@ export async function readBackupFile(file: File): Promise<ParseResult> {
 	const buf = await file.slice(0, MAX_FILE_BYTES + 1).arrayBuffer();
 	if (buf.byteLength > MAX_FILE_BYTES) return refuse('E_FILE_TOO_LARGE');
 
-	let parsed: unknown;
+	let text: string;
 	try {
-		parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(buf));
+		text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
 	} catch {
 		return refuse('E_NOT_BACKUP');
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		// Our own opening on text that does not parse is a backup that was cut short (a half-synced copy).
+		return refuse(text.startsWith(ENVELOPE_OPENING) ? 'E_DAMAGED' : 'E_NOT_BACKUP');
 	}
 	if (!isPlainObject(parsed)) return refuse('E_NOT_BACKUP');
 	if (!Object.hasOwn(parsed, 'format') || parsed['format'] !== 'ask214-backup') {

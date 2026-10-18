@@ -3,6 +3,9 @@ import { KDF_V1 } from './kdf-params';
 /** The four base64 strings that vary between backups; everything else in the envelope is fixed by format v1. */
 export type EnvelopeFields = { salt: string; iv: string; check: string; data: string };
 
+/** How every backup file begins; the reader uses it to tell a cut-short backup from some other kind of file. */
+export const ENVELOPE_OPENING = '{"format":"ask214-backup"';
+
 /**
  * The backup file text: one JSON object with its keys in a fixed order and no spaces, so the same fields always give
  * the same bytes. It imports nothing from `caps.ts`, because `caps.ts` measures this text to size its file limit.

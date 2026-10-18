@@ -407,6 +407,8 @@ describe('not a backup', () => {
 	const notUtf8 = Uint8Array.from([0xff, 0xfe, 0x00, 0x41]);
 	const rows: [string, BlobPart][] = [
 		['not JSON', 'this is not json {'],
+		['an opening brace alone', '{'],
+		['a calendar file', 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n'],
 		['empty', ''],
 		['not UTF-8', notUtf8],
 		['an array', '[]'],
@@ -421,6 +423,19 @@ describe('not a backup', () => {
 	it.each(rows)('%s -> NOT_BACKUP', async (_name, part) => {
 		const r = await readBackupFile(new File([part], 'x.json'));
 		expect(r).toEqual({ ok: false, code: 'E_NOT_BACKUP' });
+	});
+});
+
+// A half-synced or half-copied backup is ours and damaged, not some other kind of file.
+describe('a backup cut short is DAMAGED', () => {
+	// `good` exists only after beforeAll, so each cut is worked out inside the row.
+	it.each([
+		['at 100 bytes', () => 100],
+		['at half', (n: number) => Math.floor(n / 2)],
+		['one character short', (n: number) => n - 1]
+	])('%s', async (_name, cutOf) => {
+		const r = await readBackupFile(fileOf(good.slice(0, cutOf(good.length))));
+		expect(r).toEqual({ ok: false, code: 'E_DAMAGED' });
 	});
 });
 
