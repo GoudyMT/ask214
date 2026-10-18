@@ -59,7 +59,10 @@ test('a first visit and two page loads leave no waiting service worker', async (
 			const w = window as unknown as { __sw: { calls: Promise<unknown>[]; installs: number } };
 			await Promise.all(w.__sw.calls);
 			const registration = await navigator.serviceWorker.getRegistration();
-			while (registration?.installing) await new Promise((r) => setTimeout(r, 50));
+			// A first install passes through waiting on its way to active, with nothing in charge yet; only a worker
+			// waiting behind an active one is left there.
+			while (registration?.installing || (registration?.waiting && !registration.active))
+				await new Promise((r) => setTimeout(r, 50));
 			return {
 				installs: w.__sw.installs,
 				waiting: registration?.waiting != null,
