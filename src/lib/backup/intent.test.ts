@@ -99,6 +99,31 @@ describe('backup intent', () => {
 		expect(replaceState).not.toHaveBeenCalled();
 	});
 
+	// A browser that refuses to rewrite the entry (a locked-down webview, a sandboxed frame) must not stop the app from
+	// starting, and the note read just before the write is still the person's: the page takes it once.
+	it('capture does not throw when the entry cannot be rewritten, and the note is still taken once', () => {
+		entry.state = { 'sveltekit:history': 3, mtcBackupIntent: 'restored' };
+		replaceState.mockImplementation(() => {
+			throw new Error('SecurityError');
+		});
+		expect(() => captureBackupIntent()).not.toThrow();
+		expect(takeBackupIntent('restored')).toBe(true);
+		expect(takeBackupIntent('restored')).toBe(false);
+	});
+
+	// A browser that refuses the history read cannot give a note, and must not stop the app from starting either.
+	it('capture does not throw when the history state cannot be read, and take finds nothing', () => {
+		vi.stubGlobal('history', {
+			get state(): never {
+				throw new Error('SecurityError');
+			},
+			replaceState
+		});
+		expect(() => captureBackupIntent()).not.toThrow();
+		expect(takeBackupIntent('restore-row')).toBe(false);
+		expect(takeBackupIntent('restored')).toBe(false);
+	});
+
 	// The note is for the page it was left for. A client navigation to another page in the same document carries no new
 	// load, so a note never taken on its own page must not open a row on the next one.
 	it('a note left for one page is not taken on another', () => {
