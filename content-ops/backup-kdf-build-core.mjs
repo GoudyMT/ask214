@@ -35,6 +35,15 @@ function nobleNotice(root) {
 }
 
 /**
+ * The credit CC BY 4.0 asks for with copies of the bundled word list: the creator, the licence and a note that the
+ * list was changed. The removed-word count is the line count of `backup-words-removed.txt`, and NOTICE states the
+ * same count.
+ */
+const WORD_LIST_CREDIT =
+	'/*! EFF Large Wordlist for Passphrases, Electronic Frontier Foundation, https://www.eff.org/dice, ' +
+	'CC BY 4.0 https://creativecommons.org/licenses/by/4.0/, changed: 147 words removed */\n';
+
+/**
  * Bundle the worker entry in memory.
  * @param {string} root the repository folder the entry path is resolved from
  * @returns {Promise<Uint8Array>} the bytes of the single output file
@@ -51,7 +60,7 @@ export async function buildWorkerBytes(root) {
 		sourcemap: false,
 		// Keeps any notice a bundled module carries itself in the shipped file.
 		legalComments: 'eof',
-		banner: { js: nobleNotice(root) },
+		banner: { js: nobleNotice(root) + WORD_LIST_CREDIT },
 		write: false,
 		logLevel: 'silent'
 	});

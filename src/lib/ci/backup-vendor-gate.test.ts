@@ -244,4 +244,15 @@ describe('the shipped backup key worker', () => {
 		expect(shipped).toContain(copyright ?? '');
 		expect(shipped).toContain('Permission is hereby granted');
 	});
+
+	// CC BY 4.0 asks for the creator, the licence and a note of the changes with copies of the list. The shipped
+	// worker holds the words, so it carries that credit itself, ahead of the code.
+	it('carries the EFF word list credit with its licence and the changes', () => {
+		const shipped = readFileSync(join('static/backup-kdf', HASH, FILE), 'utf8');
+		const head = /^(?:\/\*![\s\S]*?\*\/\n)+/.exec(shipped)?.[0] ?? '';
+		expect(head).toContain('Electronic Frontier Foundation');
+		expect(head).toContain('https://www.eff.org/dice');
+		expect(head).toContain('https://creativecommons.org/licenses/by/4.0/');
+		expect(head).toContain('147 words removed');
+	});
 });

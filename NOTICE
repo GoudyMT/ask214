@@ -79,7 +79,8 @@ Word list
 
 The backup passphrase words are a curated copy of the EFF Large Wordlist for
 Passphrases (Electronic Frontier Foundation, https://www.eff.org/dice).
-License: Creative Commons Attribution 4.0 International (CC BY 4.0), per
+License: Creative Commons Attribution 4.0 International (CC BY 4.0,
+https://creativecommons.org/licenses/by/4.0/), per
 https://www.eff.org/copyright. Changed: 147 words removed (hyphenated words,
 alternate spellings, brand, drug, proper and offensive words); the list of
 removals is in content-ops/backup-words-removed.txt.

@@ -1,5 +1,3 @@
-import type { ErrorCode } from '../log/safelog';
-
 /**
  * Every way a backup can stop, as an opaque code. The shipped store codes (E_NOTE_TOO_LONG, E_NOTE_KEY, E_KEY_SHAPE)
  * keep their own homes and messages and are not listed here.
@@ -74,15 +72,3 @@ export function toBackupCode(e: unknown, stage: 'worker' | 'crypto' | 'content')
 	if (e instanceof BackupError) return e.code;
 	return STAGE_CODE[stage];
 }
-
-/**
- * Only a code that is logged joins safelog's union; every other backup code is shown to the person and never logged.
- * A later unit that logs another code moves it from the display-only list to this one in its own commit.
- */
-export const LOGGED_BACKUP_CODES = [
-	'E_EXPORT_SELF_INVALID'
-] as const satisfies readonly ErrorCode[];
-
-export const DISPLAY_ONLY_BACKUP_CODES: readonly BackupCode[] = BACKUP_CODES.filter(
-	(code) => !(LOGGED_BACKUP_CODES as readonly string[]).includes(code)
-);
