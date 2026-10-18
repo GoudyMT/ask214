@@ -416,7 +416,9 @@ describe('backupMessage wording', () => {
 			'This device was last changed when its backup of Oct 15, 2026 was made.'
 		);
 		expect(deviceChangedLine('Oct 15, 2026')).toBe('This device was last changed Oct 15, 2026.');
-		expect(checkOpensLine('Oct 15, 2026')).toBe('This backup opens. Made on Oct 15, 2026.');
+		expect(checkOpensLine('Oct 15, 2026')).toBe(
+			"This backup opens. Made on Oct 15, 2026 (this phone's time)."
+		);
 		expect(RESTORED_UNLOCK_LINE).toBe('Backup restored. Unlock to see it.');
 		expect(RESTORED_RELOAD_LINE).toBe('Backup restored. Reload to see it.');
 		expect(LOCKED_AFTER_RESTORE_LINE).toBe(
@@ -466,7 +468,7 @@ describe('backupMessage wording', () => {
 		expect(STOPPING_LINE).toBe('Stopping...');
 		expect(ONLY_RESTORE_YOURS_LINE).toBe('Only restore a backup you made.');
 		expect(NOT_IN_BACKUPS_LEAD).toBe('Not in backups');
-		expect(madeOnLine('Oct 15, 2026')).toBe('Made on Oct 15, 2026.');
+		expect(madeOnLine('Oct 15, 2026')).toBe("Made on Oct 15, 2026 (this phone's time).");
 		expect(savedLine('a.json')).toBe('Backup saved as a.json. It was read back and matches.');
 		expect(downloadedLine('a.json')).toBe(
 			'Backup downloaded as a.json, usually to your Downloads folder.'

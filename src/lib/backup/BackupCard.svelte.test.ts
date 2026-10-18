@@ -1483,7 +1483,7 @@ describe('restoring', () => {
 		const dialog = page.getByRole('dialog');
 		await expect.element(dialog).toBeVisible();
 		const body = dialog.element().textContent ?? '';
-		expect(body).toContain('Made on ' + formatBackupDate(FILE_MADE_AT));
+		expect(body).toContain('Made on ' + formatBackupDate(FILE_MADE_AT) + " (this phone's time).");
 		expect(body).toContain('Ask 214 backup 2026-10-15 K7Q2');
 		expect(body).toContain('separation date set');
 		expect(body).toContain('tasks with progress or a note');

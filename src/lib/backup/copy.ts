@@ -54,7 +54,7 @@ export const deviceMatchesLine = (date: string): string =>
 	'This device was last changed when its backup of ' + date + ' was made.';
 export const deviceChangedLine = (date: string): string =>
 	'This device was last changed ' + date + '.';
-export const checkOpensLine = (date: string): string => 'This backup opens. Made on ' + date + '.';
+export const checkOpensLine = (date: string): string => 'This backup opens. ' + madeOnLine(date);
 
 /** What no backup carries. Static: the confirm shows every item whatever this device holds. */
 export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
@@ -85,7 +85,8 @@ export const TYPE_BACK_LINE =
 	'Type the 6 words below. This checks for typing mistakes, and lets your password manager save them.';
 export const STOPPING_LINE = 'Stopping...';
 export const ONLY_RESTORE_YOURS_LINE = 'Only restore a backup you made.';
-export const madeOnLine = (date: string): string => 'Made on ' + date + '.';
+/** The date is shown in the time zone of the phone reading it, which can differ from where the backup was made. */
+export const madeOnLine = (date: string): string => 'Made on ' + date + " (this phone's time).";
 export const savedLine = (fileName: string): string =>
 	'Backup saved as ' + fileName + '. It was read back and matches.';
 export const downloadedLine = (fileName: string): string =>

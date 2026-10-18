@@ -1240,7 +1240,7 @@ describe('Check', () => {
 		expect(r.session.phase).toBe('done');
 		const checked = need(r.flow.view.checked);
 		expect(checked.line).toBe(
-			'This backup opens. Made on ' + formatBackupDate(FILE_CREATED_AT) + '.'
+			'This backup opens. Made on ' + formatBackupDate(FILE_CREATED_AT) + " (this phone's time)."
 		);
 		expect(checked.summary).toMatchObject({ tasks: 2, notes: 1, calendarExclusions: 2 });
 		expect(read).not.toHaveBeenCalled();
