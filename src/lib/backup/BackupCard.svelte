@@ -87,6 +87,7 @@
 		NOT_IN_BACKUPS_LEAD,
 		notCheckedLine,
 		savedLine,
+		SAVING_LINE,
 		SEND_REFUSED_DOWNLOADS_LINE,
 		SEND_REFUSED_FOLDER_LINE,
 		STOPPING_LINE,
@@ -168,6 +169,18 @@
 	];
 	// Choose file stays after a choice, so a wrong file can be swapped for another.
 	const CHOOSE_PHASES: readonly Phase[] = ['choose-file', 'file-chosen'];
+	// From the save place being chosen to the result: the row has nothing else to show while the file is made and closed,
+	// and a provider can hold the close for a long while.
+	const SAVING_PHASES: readonly Phase[] = [
+		'save-chosen',
+		'deriving',
+		'snapshot',
+		'encrypting',
+		'verifying',
+		'writing',
+		'saved',
+		'checking'
+	];
 	const WORKING_PHASES: readonly Phase[] = [
 		'deriving',
 		'snapshot',
@@ -233,7 +246,10 @@
 	const fileForm = $derived(fileKind && FILE_FORM_PHASES.includes(phase));
 	const chooser = $derived(fileKind && CHOOSE_PHASES.includes(phase));
 	const working = $derived(session.busy && WORKING_PHASES.includes(phase));
-	// Not behind the confirm (it has its own Cancel) and not on a finished Check (the row's toggle closes it).
+	const saving = $derived(kind === 'export' && SAVING_PHASES.includes(phase));
+	// A finished Check, or one that did not open: its Done button closes the row like its toggle does.
+	const checkDone = $derived(kind === 'check' && (view.checked !== null || view.offerNewBackup));
+	// Not behind the confirm (it has its own Cancel) and not on a finished Check (its Done button closes it).
 	const cancellable = $derived(session.canCancel && phase !== 'done' && phase !== 'confirm');
 
 	function lineFor(code: BackupCode, ctx: MessageContext): string {
@@ -759,6 +775,11 @@
 				{view.checked.line}
 			</p>
 		{/if}
+		{#if checkDone}
+			<button class="backup-primary" type="button" onclick={closeRow} onkeydown={guardEnter}>
+				{CARD_LABELS.done}
+			</button>
+		{/if}
 		{#if view.restored !== null}
 			{#if view.restored.line !== null}
 				<p class="backup-result" role="status">{view.restored.line}</p>
@@ -878,6 +899,9 @@
 								</button>
 							</div>
 						</div>
+					{/if}
+					{#if saving}
+						<p class="backup-hint" role="status">{SAVING_LINE}</p>
 					{/if}
 					{@render progressBar()}
 					{#if exportLine !== null}

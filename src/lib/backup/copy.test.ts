@@ -31,6 +31,7 @@ import {
 	RESTORED_RELOAD_LINE,
 	RESTORED_UNLOCK_LINE,
 	restoredLine,
+	SAVING_LINE,
 	savedLine,
 	STOPPING_LINE,
 	summaryLines,
@@ -466,6 +467,7 @@ describe('backupMessage wording', () => {
 			'Type the 6 words below. This checks for typing mistakes, and lets your password manager save them.'
 		);
 		expect(STOPPING_LINE).toBe('Stopping...');
+		expect(SAVING_LINE).toBe('Saving your backup...');
 		expect(ONLY_RESTORE_YOURS_LINE).toBe('Only restore a backup you made.');
 		expect(NOT_IN_BACKUPS_LEAD).toBe('Not in backups');
 		expect(madeOnLine('Oct 15, 2026')).toBe("Made on Oct 15, 2026 (this phone's time).");
@@ -491,6 +493,7 @@ describe('backupMessage wording', () => {
 			makeAgain: 'Make a new backup',
 			send: 'Send a copy',
 			cancel: 'Cancel',
+			done: 'Done',
 			replace: 'Replace',
 			reload: 'Reload',
 			restoreSubmit: 'Restore',

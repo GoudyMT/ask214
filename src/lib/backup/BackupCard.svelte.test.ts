@@ -36,6 +36,7 @@ import {
 	ONLY_RESTORE_YOURS_LINE,
 	PHRASE_NOTE,
 	RESTORED_UNLOCK_LINE,
+	SAVING_LINE,
 	savedLine,
 	STOPPING_LINE,
 	TYPE_BACK_LINE
@@ -972,6 +973,25 @@ describe('the backup and what the person is told', () => {
 		await expect.element(text(savedLine('picked.json'))).toBeVisible();
 	});
 
+	// A slow provider can hold close() for a long while: the open row must not sit empty, and the status goes when the
+	// saved line comes.
+	it('says it is saving while the file is being written, and the saved line replaces it', async () => {
+		const file = fakeFile();
+		file.closeGate = deferred<void>();
+		const card = await mount({ file });
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.poll(() => file.closes).toBe(1);
+
+		await expect.element(text(SAVING_LINE)).toBeVisible();
+		expect(text(SAVING_LINE).element().getAttribute('role')).toBe('status');
+		expect(text(savedLine('picked.json')).query()).toBeNull();
+
+		file.closeGate.resolve();
+		await expect.element(text(savedLine('picked.json'))).toBeVisible();
+		expect(text(SAVING_LINE).query()).toBeNull();
+	});
+
 	it('a device whose setup is not finished is told to finish it', async () => {
 		await profile.save({ setupIntent: 'pending' });
 		const card = await mount();
@@ -1846,6 +1866,36 @@ describe('checking', () => {
 			expect(card.workers.length - before).toBe(1);
 			expect(fieldEl().value).toBe(WRONG);
 			await expect.element(text(CHECK_NEW_BACKUP_OFFER)).toBeVisible();
+		}
+	);
+
+	// A finished Check leaves the other rows off until its own row is closed; a person who is done must not have to
+	// find the row's toggle to get them back.
+	it.each<['opens' | 'wrong words', string, () => string]>([
+		['opens', TYPED, () => checkOpensLine(formatBackupDate(FILE_MADE_AT))],
+		['wrong words', WRONG, wrongLine]
+	])(
+		'Done after a Check that %s closes the row, frees the others and puts focus on its toggle',
+		async (_result, typed, line) => {
+			const card = await mount();
+			await fileChosen(card, 'check');
+			expect(button(CARD_LABELS.done).query()).toBeNull();
+			await field().fill(typed);
+			await userEvent.click(submitOf(CARD_LABELS.check, CARD_LABELS.checkSubmit));
+			await expect.element(text(line())).toBeVisible();
+			expect(toggle(CARD_LABELS.make, false).element().getAttribute('aria-disabled')).toBe('true');
+			expect(heightOf(button(CARD_LABELS.done).element())).toBeGreaterThanOrEqual(44);
+
+			await userEvent.click(button(CARD_LABELS.done));
+
+			await expect.element(toggle(CARD_LABELS.check, false)).toBeVisible();
+			expect(card.session.kind).toBeNull();
+			for (const name of [CARD_LABELS.make, CARD_LABELS.restore]) {
+				expect(toggle(name, false).element().getAttribute('aria-disabled')).toBe('false');
+			}
+			await expect
+				.poll(() => document.activeElement)
+				.toBe(toggle(CARD_LABELS.check, false).element());
 		}
 	);
 

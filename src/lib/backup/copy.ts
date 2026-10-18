@@ -84,6 +84,8 @@ export const HIDDEN_WHILE_AWAY_LINE = 'Hidden while you were away.';
 export const TYPE_BACK_LINE =
 	'Type the 6 words below. This checks for typing mistakes, and lets your password manager save them.';
 export const STOPPING_LINE = 'Stopping...';
+/** While a backup is being sealed and written: the save place was chosen and no result is in yet. */
+export const SAVING_LINE = 'Saving your backup...';
 export const ONLY_RESTORE_YOURS_LINE = 'Only restore a backup you made.';
 /** The date is shown in the time zone of the phone reading it, which can differ from where the backup was made. */
 export const madeOnLine = (date: string): string => 'Made on ' + date + " (this phone's time).";
@@ -113,6 +115,7 @@ export const CARD_LABELS = Object.freeze({
 	makeAgain: 'Make a new backup',
 	send: 'Send a copy',
 	cancel: 'Cancel',
+	done: 'Done',
 	replace: 'Replace',
 	reload: 'Reload',
 	restoreSubmit: 'Restore',
