@@ -490,7 +490,10 @@
 		void exportFlowFor()?.replace().then(applyExport);
 	}
 
-	function chooseAnother(): void {
+	// The second tap of a double tap (`detail` 2) may land after a back-out brought this warning back, and would open
+	// the picker again.
+	function chooseAnother(event: MouseEvent): void {
+		if (event.detail > 1) return;
 		void exportFlowFor()?.chooseAnother().then(applyExport);
 	}
 

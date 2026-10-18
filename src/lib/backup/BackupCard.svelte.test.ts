@@ -901,6 +901,25 @@ describe('the backup and what the person is told', () => {
 		expect(second.closes).toBe(1);
 	});
 
+	// The second tap of a double tap can land after the first picker already answered with a back-out, when the same
+	// warning is on the page again; it must not open another picker. (While the first picker is still open the flow
+	// itself ignores the tap.)
+	it('a double tap on Choose another place opens one picker', async () => {
+		const first = fakeFile({ existing: 'an older backup', name: 'old.json' });
+		const picker = vi.fn<SavePicker>();
+		picker.mockResolvedValueOnce(first.handle);
+		picker.mockImplementation(() => Promise.reject(userCancel()));
+		const card = await mount({ file: first, picker });
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.element(button(CARD_LABELS.chooseAnother)).toBeVisible();
+
+		await userEvent.dblClick(button(CARD_LABELS.chooseAnother));
+		await pause(100);
+		expect(picker).toHaveBeenCalledTimes(2);
+		await expect.element(button(CARD_LABELS.chooseAnother)).toBeVisible();
+	});
+
 	it.each<['mismatch' | 'not-checked', (name: string) => string]>([
 		[
 			'mismatch',
