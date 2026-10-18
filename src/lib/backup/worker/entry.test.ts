@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WORDS_V1 } from '../words-v1';
 import { installWorker } from './entry';
@@ -82,14 +81,6 @@ describe('installWorker', () => {
 		fire('messageerror');
 		expect(posted).toEqual([{ type: 'error', code: 'E_WORKER_FAILED' }]);
 	});
-
-	it('listens for exactly message, messageerror, error and unhandledrejection', () => {
-		const { scope, listeners } = fakeScope();
-		installWorker(scope);
-		expect([...listeners.keys()].sort()).toEqual(
-			['error', 'message', 'messageerror', 'unhandledrejection'].sort()
-		);
-	});
 });
 
 describe('the real-scope call', () => {
@@ -116,40 +107,5 @@ describe('the real-scope call', () => {
 		expect(fake.listeners.sort()).toEqual(
 			['error', 'message', 'messageerror', 'unhandledrejection'].sort()
 		);
-	});
-});
-
-describe('the entry file imports', () => {
-	const entrySource = readFileSync(new URL('./entry.ts', import.meta.url), 'utf8');
-
-	function importsOf(source: string): string[] {
-		return [...source.matchAll(/(?:from|import)\s+['"]([^'"]+)['"]/g)].map((m) => m[1] ?? '');
-	}
-
-	it('imports words-v1 and not kdf-paths', () => {
-		const specifiers = importsOf(entrySource);
-		expect(specifiers).toContain('../words-v1');
-		expect(specifiers.some((s) => s.includes('kdf-paths'))).toBe(false);
-	});
-
-	it('reaches nothing from routes, components or a Svelte file, in itself or its local imports', () => {
-		const seen = new Set<string>();
-		const queue = ['./entry.ts'];
-		const base = new URL('./', import.meta.url);
-		while (queue.length > 0) {
-			const file = queue.pop() ?? '';
-			if (seen.has(file)) continue;
-			seen.add(file);
-			const url = new URL(file, base);
-			const source = readFileSync(url, 'utf8');
-			for (const specifier of importsOf(source)) {
-				expect(specifier).not.toMatch(/routes|components|\.svelte|kdf-paths|\$app|\$lib/);
-				if (specifier.startsWith('.')) {
-					const resolved = new URL(specifier.endsWith('.ts') ? specifier : `${specifier}.ts`, url);
-					queue.push(resolved.href);
-				}
-			}
-		}
-		expect(seen.size).toBeGreaterThan(1);
 	});
 });

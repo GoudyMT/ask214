@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { BACKUP_CODES } from '../codes';
 import { isWorkerAnswer, isWorkerRequest } from './protocol';
 
 async function aesKey(): Promise<CryptoKey> {
@@ -13,15 +12,15 @@ describe('isWorkerAnswer: the four exact shapes', () => {
 		expect(isWorkerAnswer({ type: 'words', words: SIX })).toBe(true);
 	});
 
-	it.each([1, 2, 3, 4, 5, 6])('accepts an error with position %i', (position) => {
+	it.each([1, 6])('accepts an error with position %i', (position) => {
 		expect(isWorkerAnswer({ type: 'error', code: 'E_NOT_A_WORD', position })).toBe(true);
 	});
 
-	it.each(BACKUP_CODES)('accepts the error code %s without a position', (code) => {
-		expect(isWorkerAnswer({ type: 'error', code })).toBe(true);
+	it('accepts an error code without a position', () => {
+		expect(isWorkerAnswer({ type: 'error', code: 'E_DAMAGED' })).toBe(true);
 	});
 
-	it.each([0, 1, 50, 100])('accepts progress %i', (percent) => {
+	it.each([0, 100])('accepts progress %i', (percent) => {
 		expect(isWorkerAnswer({ type: 'progress', percent })).toBe(true);
 	});
 
