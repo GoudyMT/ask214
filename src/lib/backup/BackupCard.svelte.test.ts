@@ -1084,6 +1084,32 @@ describe('the card for people who tap or see it differently', () => {
 			expect(height, label).toBeGreaterThanOrEqual(44);
 		}
 	});
+
+	// Forced colors (Windows high contrast) repaint every colour from a small system palette and keep only borders and
+	// text: a filled button with no border becomes unmarked text, and a row that is off reads like a live one.
+	it('under forced colors a filled button keeps an outline and an off row reads differently from a live one', async () => {
+		await mount();
+		await userEvent.click(toggle(CARD_LABELS.make, false));
+		const primary = button(CARD_LABELS.show).element();
+		// Make is open, so Check is off too; the open row is the live one.
+		const off = toggle(CARD_LABELS.restore, false).element();
+		const live = toggle(CARD_LABELS.make, true).element();
+		const media = cdp();
+		await media.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'forced-colors', value: 'active' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			const outline = getComputedStyle(primary);
+			expect(outline.borderTopWidth).toBe('1px');
+			expect(outline.borderTopStyle).toBe('solid');
+			expect(getComputedStyle(off).color).not.toBe(getComputedStyle(live).color);
+		} finally {
+			await media.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+		}
+	});
 });
 
 // ---- Send a copy ------------------------------------------------------------------------------------------------------------

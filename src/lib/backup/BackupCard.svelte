@@ -984,6 +984,12 @@
 		color: var(--color-fg-muted);
 		cursor: default;
 	}
+	/* Forced colors paint the muted grey as ordinary text, so a row that is off would read like a live one. */
+	@media (forced-colors: active) {
+		.backup-toggle--off {
+			color: GrayText;
+		}
+	}
 	.backup-chevron {
 		width: 0;
 		height: 0;
@@ -1031,12 +1037,14 @@
 		gap: var(--space-m);
 	}
 
+	/* The border is clear and takes a pixel of the padding, so the button is the size it was: forced colors repaint a clear
+	   border in a system colour, which keeps a filled button's edge when its fill is taken away. */
 	.backup-primary {
 		min-height: 44px;
-		padding: var(--space-s) var(--space-l);
+		padding: calc(var(--space-s) - 1px) calc(var(--space-l) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-m);
 		font: inherit;
 		font-weight: 600;
