@@ -954,6 +954,33 @@ describe('a write that failed after it was marked committing', () => {
 		expect(h.s.message).toBe('E_LOCKED');
 	});
 
+	// The app switch is still going on when the write fails, so the card must be hidden, and the clock of the absence must
+	// run, even though another tab's idle was written down first and is what the replay applies.
+	it('an app switch after another tab idled hides the card when the write fails, and a long absence clears it', async () => {
+		const h = harness();
+		startRestore(h);
+		const input = { value: 'words' };
+		h.s.registerInput(input);
+		(h.s.beginRun() as Run).enter('writing');
+		h.s.markCommitting();
+		h.s.relockSync('peer', { peerReason: 'idle' });
+		h.env.visible = false;
+		h.s.relockSync('hygiene');
+
+		expect(h.s.abortCommit()).toBe(false);
+		expect(h.s.phase).toBe('file-chosen');
+		expect(h.s.message).toBe('E_LOCKED_ELSEWHERE');
+		expect(h.s.concealed).toBe(true);
+		expect(input.value).toBe('words');
+
+		h.clock.advance(IDLE_THRESHOLD_MS);
+		h.env.visible = true;
+		await h.s.refresh();
+		expect(h.s.phase).toBe('idle');
+		expect(h.s.message).toBe('E_LOCKED');
+		expect(input.value).toBe('');
+	});
+
 	// What was recorded for the failed attempt must not follow the person into the next one.
 	it('the retry after an app switch records its own lock, not the earlier one', () => {
 		const h = harness();

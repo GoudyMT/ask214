@@ -532,6 +532,9 @@ export class BackupSession {
 		if (mover === 'pagehide') this.#clear('pagehide', 'E_LOCKED');
 		else if (mover === 'navigated') this.cancel('navigated');
 		else this.#relock(mover, detail);
+		// An app switch that is still going on may have been written down behind a stronger stop, whose replay hides
+		// nothing: the card is hidden here, and the clock of the absence starts.
+		if (this.phase !== 'idle' && !this.#deps.isVisible()) this.#conceal();
 		// An app switch that ended while the write ran was replayed late: the page is visible again, and no later
 		// visibility event would un-hide it.
 		void this.refresh();
@@ -957,16 +960,19 @@ export class BackupSession {
 	}
 
 	/**
-	 * A stop that cannot touch a committing session is only written down. An app switch and a navigation are weak:
-	 * the first real lock or page leave outranks them, and nothing outranks that. Another tab idling is no lock of this
-	 * tab either, so it is weak too, and it is written down as itself so the late application knows it.
+	 * A stop that cannot touch a committing session is only written down, and a later stop replaces it only by
+	 * outranking it. An app switch and a navigation rank lowest. Another tab idling is no lock of this tab, so it ranks
+	 * above them (the tab is still locked, and the choice after the write must say so) and below every real lock or
+	 * page leave; it is written down as itself so the late application knows it.
 	 */
 	#record(mover: EpochMover, detail?: { peerReason?: 'idle' | 'user' }): void {
-		const weak = (m: EpochMover, d: typeof detail): boolean =>
-			m === 'hygiene' || m === 'navigated' || d?.peerReason === 'idle';
+		const rank = (m: EpochMover, d: typeof detail): number => {
+			if (m === 'hygiene' || m === 'navigated') return 0;
+			return d?.peerReason === 'idle' ? 1 : 2;
+		};
 		if (
 			this.epochMovedBy === null ||
-			(weak(this.epochMovedBy, this.#movedDetail) && !weak(mover, detail))
+			rank(mover, detail) > rank(this.epochMovedBy, this.#movedDetail)
 		) {
 			this.epochMovedBy = mover;
 			this.#movedDetail = detail;

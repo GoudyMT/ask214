@@ -1221,6 +1221,35 @@ describe('Replace', () => {
 			expect(r.app.reloadOnUnlock).toBe(true);
 			expect(r.flow.view.restored?.line).toBe(LOCKED_AFTER_RESTORE_LINE);
 		});
+
+		// Another tab idling really locks this tab's profile. A reload would decrypt it behind the lock, so the app switch
+		// that came first must not hide the lock from the choice made after the write.
+		it.each<[string, boolean]>([
+			['the person is looking at the page', true],
+			['the page was hidden through the write', false]
+		])(
+			'an app switch and then another tab idling during the write do not reload a locked tab (%s)',
+			async (_name, visible) => {
+				const device = await finishedDevice(await newDb(), '2027-01-01');
+				const file = await exportFrom(device, { createdAt: Date.now() - MINUTE });
+				const r = restoreRig({ db: device.db, store: device.profile });
+				await toConfirm(r, file);
+				r.visible.value = visible;
+				duringCommit(r, () => {
+					device.profile.relockSync('hygiene');
+					r.session.relockSync('hygiene');
+					device.profile.relockSync('peer');
+					r.session.relockSync('peer', { peerReason: 'idle' });
+				});
+				await r.flow.replace();
+				r.visible.value = true;
+				r.waiting.fn?.();
+
+				expect(r.reload).not.toHaveBeenCalled();
+				expect(r.app.reloadOnUnlock).toBe(true);
+				expect(r.flow.view.restored).toEqual({ line: RESTORED_UNLOCK_LINE, reloadButton: false });
+			}
+		);
 	});
 });
 
