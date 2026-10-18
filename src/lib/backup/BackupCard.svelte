@@ -203,6 +203,9 @@
 	let startLine = $state<string | null>(null);
 	// Undefined until the mark has been read; null when the device has none.
 	let lastBackup = $state<number | null | undefined>(undefined);
+	// The device has no saved profile (a fresh one, or one just erased), so a snapshot would refuse: the Make row stays
+	// off rather than show six words first. Read with the mark; false until it has been read.
+	let neverSetUp = $state(false);
 	// Which path an idle session's last message belongs to: a cleared session forgets its kind.
 	let lastKind = $state<SessionKind | null>(null);
 
@@ -287,7 +290,7 @@
 	// Not `disabled`: a disabled button that holds focus drops it. The tap is guarded in `toggleRow` and `openRow`, and
 	// a screen reader is told the row is off.
 	function isInert(row: SessionKind): boolean {
-		return !isOpen(row) && (!allowed(row) || session.active);
+		return !isOpen(row) && (!allowed(row) || session.active || (row === 'export' && neverSetUp));
 	}
 
 	// ---- keeping the card in step ---------------------------------------------------------------------------------
@@ -312,9 +315,12 @@
 	async function refreshMark(): Promise<void> {
 		if (props.db === null) return;
 		try {
-			lastBackup = (await readDeviceState(props.db)).mark?.at ?? null;
+			const state = await readDeviceState(props.db);
+			lastBackup = state.mark?.at ?? null;
+			neverSetUp = state.gens.profile === 0;
 		} catch {
 			lastBackup = undefined;
+			neverSetUp = false;
 		}
 	}
 	onMount(() => void refreshMark());
@@ -340,6 +346,10 @@
 	function openRow(row: SessionKind): void {
 		startLine = null;
 		if (!allowed(row)) return;
+		if (row === 'export' && neverSetUp) {
+			startLine = lineFor('E_BACKUP_UNAVAILABLE', { path: 'export' });
+			return;
+		}
 		setOutcome(null);
 		inputError = null;
 		try {

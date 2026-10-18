@@ -980,6 +980,24 @@ describe('the backup and what the person is told', () => {
 		await expect.element(text(FINISH_SETUP_LINE)).toBeVisible();
 		expect(card.session.phase).toBe('typed-back');
 	});
+
+	// A fresh device, or one just erased, has nothing to back up: it must not show six words and refuse at the save.
+	it('a device with no profile keeps Make a backup off and says to finish setup', async () => {
+		await deleteTestDb(db);
+		db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		profile = createProfileStore(db);
+		const card = await mount();
+		await expect.element(text(NO_BACKUP_YET_LINE)).toBeVisible();
+
+		// A plain click: the browser's own click helper waits for an enabled control, and this one says it is off.
+		(toggle(CARD_LABELS.make, false).element() as HTMLElement).click();
+		await expect.element(text(FINISH_SETUP_LINE)).toBeVisible();
+		expect(toggle(CARD_LABELS.make, false).element().getAttribute('aria-disabled')).toBe('true');
+		expect(card.session.phase).toBe('idle');
+		expect(button(CARD_LABELS.show).query()).toBeNull();
+		expect(phrase().query()).toBeNull();
+	});
 });
 
 // ---- a card brought back over a session that kept running ------------------------------------------------------------------
