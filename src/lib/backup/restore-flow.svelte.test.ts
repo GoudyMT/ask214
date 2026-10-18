@@ -15,6 +15,7 @@ import {
 	type DeviceState,
 	type ProfileStore
 } from '../profile/store.svelte';
+import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { MAX_FILE_BYTES } from './caps';
 import {
@@ -686,6 +687,8 @@ describe('the confirm', () => {
 			leave.fill(0);
 		}
 		await source.calendar.dismissCard(Date.now());
+		// The SkillBridge plan's answer sits among the tasks in the file but is not a task on the person's list.
+		await source.timeline.setStatus(SKILLBRIDGE_PLAN_KEY, 'done');
 		const createdAt = Date.now() - MINUTE;
 		const file = await exportFrom(source, { createdAt });
 		const phone = await newPhone();

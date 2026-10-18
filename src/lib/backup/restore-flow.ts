@@ -10,6 +10,7 @@ import {
 	readKeystoreRow,
 	type DeviceState
 } from '../profile/store.svelte';
+import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
 import { BackupError, toBackupCode, type BackupCode } from './codes';
 import {
 	backupMessage,
@@ -150,7 +151,10 @@ function deviceReadCode(e: unknown): BackupCode {
 }
 
 function summarize(inner: ValidInner, label: string | null): BackupSummary {
-	const tasks = Object.values(inner.stores['timeline-state']?.tasks ?? {});
+	// The SkillBridge plan's answer is stored beside the tasks but is not one on the person's list.
+	const tasks = Object.entries(inner.stores['timeline-state']?.tasks ?? {})
+		.filter(([id]) => id !== SKILLBRIDGE_PLAN_KEY)
+		.map(([, task]) => task);
 	const calendar = inner.stores['calendar-sync'];
 	const profile = inner.stores.profile;
 	return {
