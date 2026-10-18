@@ -32,6 +32,11 @@ export type MessageContext = {
 export const CHECK_NEW_BACKUP_OFFER =
 	"If you no longer have this backup's passphrase, make a new backup now, while this phone still has your data.";
 export const MAKE_NEW_BACKUP_BUTTON = 'Make a new backup now';
+/** On the setup screen: the one backup row a new phone is offered. */
+export const RESTORE_ENTRY = 'Moving to a new phone? Restore from a backup';
+/** Above the Erase button of a device whose saved data is damaged, beside the card's Check row. */
+export const DAMAGED_BACKUP_LINE =
+	'Have a backup? Check it first, then erase and restore it on the setup screen.';
 /** The button beside the "device is damaged" restore message. */
 export const ERASE_DEVICE_BUTTON = "Erase this device's data";
 

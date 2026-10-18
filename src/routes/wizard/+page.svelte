@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import BackupCard from '$lib/backup/BackupCard.svelte';
+	import { RESTORE_ENTRY } from '$lib/backup/copy';
 	import { takeBackupIntent } from '$lib/backup/intent';
 	import { backupSession } from '$lib/backup/session.svelte';
 	import EaosInput from '$lib/components/EaosInput.svelte';
@@ -88,8 +89,6 @@
 	async function skip(): Promise<void> {
 		await goto(resolve('/'));
 	}
-
-	const RESTORE_ENTRY = 'Moving to a new phone? Restore from a backup';
 
 	// The note an Erase from the damaged view leaves in the history entry; the app's start-up has already moved it out of
 	// the entry, so a reload of this page finds none. It is taken as the page starts, whatever the app is doing, so it is

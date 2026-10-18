@@ -8,7 +8,11 @@
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import BackupCard from '$lib/backup/BackupCard.svelte';
-	import { LOCKED_AFTER_RESTORE_LINE, RESTORED_UNLOCK_LINE } from '$lib/backup/copy';
+	import {
+		DAMAGED_BACKUP_LINE,
+		LOCKED_AFTER_RESTORE_LINE,
+		RESTORED_UNLOCK_LINE
+	} from '$lib/backup/copy';
 	import { markBackupIntent } from '$lib/backup/intent';
 	import { backupSession } from '$lib/backup/session.svelte';
 	import { eraseEverything } from '$lib/profile/erase';
@@ -107,9 +111,6 @@
 	const hasTimeline = $derived((app.store?.persona.completeness ?? 'none') !== 'none');
 
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
-	// Above the Erase button of a damaged device, beside the backup card's Check row.
-	const DAMAGED_BACKUP_LINE =
-		'Have a backup? Check it first, then erase and restore it on the setup screen.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
 	const lockedView = $derived(!!app.store?.locked);
