@@ -327,6 +327,21 @@
 		warningName = '';
 	}
 
+	// A pressed button that leaves the page drops focus to the top of the page. Focus goes to the row's own toggle instead,
+	// unless the person (or the step that followed) already put it somewhere.
+	async function handFocusToRow(row: SessionKind): Promise<void> {
+		await tick();
+		if (document.activeElement === document.body) {
+			document.getElementById(`backup-toggle-${row}`)?.focus();
+		}
+	}
+
+	function cancelRow(): void {
+		const row = kind;
+		closeRow();
+		if (row !== null) void handFocusToRow(row);
+	}
+
 	function toggleRow(row: SessionKind): void {
 		if (isOpen(row)) {
 			closeRow();
@@ -449,11 +464,13 @@
 	function checkNow(): void {
 		setOutcome(null);
 		openRow('check');
+		void handFocusToRow('check');
 	}
 
 	function makeAgain(): void {
 		setOutcome(null);
 		openRow('export');
+		void handFocusToRow('export');
 	}
 
 	// The three lines that tell the person to delete a file live here, not in copy.ts: that module's test refuses the
@@ -542,6 +559,7 @@
 	function makeNewBackup(): void {
 		restore.close();
 		openRow('export');
+		void handFocusToRow('export');
 	}
 </script>
 
@@ -602,7 +620,7 @@
 
 	{#snippet cancelButton()}
 		{#if cancellable}
-			<button class="backup-cancel" type="button" onclick={closeRow} onkeydown={guardEnter}>
+			<button class="backup-cancel" type="button" onclick={cancelRow} onkeydown={guardEnter}>
 				{CARD_LABELS.cancel}
 			</button>
 		{/if}

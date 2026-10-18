@@ -1001,6 +1001,54 @@ describe('a card brought back after the person left the page', () => {
 	});
 });
 
+// ---- where the cursor goes when the pressed button goes away ---------------------------------------------------------------------
+
+// A button that is pressed and then leaves the page drops focus to the top of the page: a keyboard or screen-reader
+// person would start again from the page's first control. It goes to the row's own toggle instead.
+describe('focus when the pressed button leaves the page', () => {
+	it.each<[string]>([[CARD_LABELS.make], [CARD_LABELS.restore], [CARD_LABELS.check]])(
+		'Cancel on the %s row puts focus on that row (closed)',
+		async (name) => {
+			await mount();
+			await userEvent.click(toggle(name, false));
+			await userEvent.click(button(CARD_LABELS.cancel));
+
+			await expect.element(toggle(name, false)).toBeVisible();
+			await expect.poll(() => document.activeElement).toBe(toggle(name, false).element());
+		}
+	);
+
+	it('Check this backup now puts focus on the Check row', async () => {
+		const card = await mount();
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await userEvent.click(button(CARD_LABELS.checkNow));
+
+		await expect.poll(() => document.activeElement).toBe(toggle(CARD_LABELS.check, true).element());
+	});
+
+	it('Make a new backup (after a file that does not match) puts focus on the Make row', async () => {
+		const file = fakeFile();
+		file.mangle = true;
+		const card = await mount({ file });
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await userEvent.click(button(CARD_LABELS.makeAgain));
+
+		await expect.poll(() => document.activeElement).toBe(toggle(CARD_LABELS.make, true).element());
+	});
+
+	it('Make a new backup now (after a wrong passphrase on Check) puts focus on the Make row', async () => {
+		const card = await mount();
+		await fileChosen(card, 'check');
+		await field().fill(WRONG);
+		await userEvent.click(submitOf(CARD_LABELS.check, CARD_LABELS.checkSubmit));
+		await userEvent.click(button(MAKE_NEW_BACKUP_BUTTON));
+
+		await expect.poll(() => document.activeElement).toBe(toggle(CARD_LABELS.make, true).element());
+	});
+});
+
 // ---- Send a copy ------------------------------------------------------------------------------------------------------------
 
 const shareUndo: (() => void)[] = [];
