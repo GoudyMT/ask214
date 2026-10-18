@@ -474,10 +474,10 @@
 	}
 
 	// The three lines that tell the person to delete a file live here, not in copy.ts: that module's test refuses the
-	// word in anything it exports. They go to the owner's Copy review with the rest. Where each comes from:
-	//   - KEEP_NEWEST_LINE: the passphrase-lifetime decision (design D23), shown under every saved line;
-	//   - replaceWarningLine: the warning before saving over a file that holds something (design W5 H.2);
-	//   - mismatchLine: the read-back mismatch result (design W5 H.1).
+	// word in anything it exports. What each says:
+	//   - KEEP_NEWEST_LINE: shown under every saved line, so an older file does not linger beside a newer one;
+	//   - replaceWarningLine: the warning before saving over a file that already holds something;
+	//   - mismatchLine: the result when the saved file does not read back as what was written.
 	const KEEP_NEWEST_LINE = 'Keep the newest. Delete older files.';
 	const replaceWarningLine = (name: string): string =>
 		'There is already a file named ' +

@@ -8,8 +8,7 @@ import {
 } from './restored-note';
 
 /**
- * Every message the backup flows can show, in this one module, so the wording is reviewed in one place. The wording
- * is DRAFT, written for the owner's review.
+ * Every message the backup flows can show, in this one module, so the wording is reviewed in one place.
  *
  * A message never repeats a word of the passphrase or a byte of the file, and an error's own text is never shown. The
  * only variable parts are the parameters of MessageContext, each checked or looked up here: a position is an integer
@@ -67,10 +66,9 @@ export const NOT_IN_BACKUPS: readonly string[] = Object.freeze([
 export { notInBackupsLine, NOT_IN_BACKUPS_LEAD, restoredLine };
 
 /**
- * What the Backup card says around the flows: its own lines, and the words on its buttons and fields. DRAFT, for the
- * owner's review, like the rest of this module. The three lines that tell the person to delete a file (keep the
- * newest, the replace warning, the read-back mismatch) live in the card itself, because this module's test refuses
- * that word in any string it exports.
+ * What the Backup card says around the flows: its own lines, and the words on its buttons and fields. The three lines
+ * that tell the person to delete a file (keep the newest, the replace warning, the read-back mismatch) live in the
+ * card itself, because this module's test refuses that word in any string it exports.
  */
 export const CARD_INTRO_LINE =
 	'This file is yours. Erase does not remove it. Keep it off this phone, and keep the passphrase somewhere else.';
