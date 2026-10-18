@@ -1,8 +1,6 @@
 import { serializeEnvelope } from './envelope-json';
 import { SALT_BYTES, IV_BYTES, CHECK_BYTES } from './kdf-params';
 
-export { MAX_NOTE_UNITS } from './note-cap';
-
 /**
  * The most plaintext one backup holds after padding. A multiple of the pad block, so a plaintext at or under this
  * number stays at or under it once padded, and the export can check the unpadded length.

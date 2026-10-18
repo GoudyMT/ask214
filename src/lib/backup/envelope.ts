@@ -244,8 +244,3 @@ export async function decryptEnvelope(env: ParsedEnvelope, key: CryptoKey): Prom
 		plain?.fill(0);
 	}
 }
-
-/** The only Blob this module makes; it holds the envelope text and nothing else. */
-export function envelopeBlob(text: string): Blob {
-	return new Blob([text], { type: 'application/json' });
-}

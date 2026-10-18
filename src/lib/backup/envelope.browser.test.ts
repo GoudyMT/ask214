@@ -14,7 +14,6 @@ import {
 	sealEnvelope,
 	readBackupFile,
 	decryptEnvelope,
-	envelopeBlob,
 	type ParsedEnvelope
 } from './envelope';
 
@@ -629,23 +628,6 @@ describe('padding and wiping', () => {
 
 	it('a salt of the wrong length throws E_INTERNAL', async () => {
 		await expect(sealEnvelope(keyA, enc.encode('{}'), counting(15))).rejects.toThrow('E_INTERNAL');
-	});
-
-	it('a Blob spy sees only the envelope', async () => {
-		const made: [BlobPart[] | undefined, BlobPropertyBag | undefined][] = [];
-		class SpyBlob extends Blob {
-			constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
-				super(parts, options);
-				made.push([parts, options]);
-			}
-		}
-		vi.stubGlobal('Blob', SpyBlob);
-		const text = await sealEnvelope(keyA, enc.encode('{"a":1}'), SALT);
-		const blob = envelopeBlob(text);
-		expect(made).toHaveLength(1);
-		expect(made[0]?.[0]).toEqual([text]);
-		expect(blob.type).toBe('application/json');
-		expect(await blob.text()).toBe(text);
 	});
 });
 

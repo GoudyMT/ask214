@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-	MAX_NOTE_UNITS,
 	MAX_PADDED_PLAINTEXT_BYTES,
 	MAX_CIPHERTEXT_BYTES,
 	MAX_DATA_B64_CHARS,
@@ -11,6 +10,7 @@ import {
 } from './caps';
 import { serializeEnvelope } from './envelope-json';
 import { KDF_V1 } from './kdf-params';
+import { MAX_NOTE_UNITS } from './note-cap';
 
 function b64OfZeros(bytes: number): string {
 	return btoa(String.fromCharCode(...new Uint8Array(bytes)));
