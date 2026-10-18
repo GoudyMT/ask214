@@ -1315,6 +1315,41 @@ describe('the passphrase worker', () => {
 		expect(h.probeWorker).not.toHaveBeenCalled();
 	});
 
+	// The service worker answers GET only, so a HEAD always goes to the network: a page it controls would make a request
+	// for a file the device already holds, and offline that request fails and blames the connection for a worker that
+	// is stored and simply failed to start.
+	it('mapWorkerLoadFailure reads the cache first and asks the network only when the worker is not held', async () => {
+		const held = { match: vi.fn(async () => new Response('x')) } as unknown as CacheStorage;
+		const offline = vi.fn(async () => {
+			throw new TypeError('network');
+		});
+		await expect(mapWorkerLoadFailure(offline, held)).resolves.toBe('E_WORKER_FAILED');
+		expect(held.match).toHaveBeenCalledWith(KDF_WORKER_SRC);
+		expect(offline).not.toHaveBeenCalled();
+
+		const missing = { match: vi.fn(async () => undefined) } as unknown as CacheStorage;
+		await expect(
+			mapWorkerLoadFailure(
+				vi.fn(async () => new Response(null, { status: 404 })),
+				missing
+			)
+		).resolves.toBe('E_APP_UPDATED');
+		await expect(mapWorkerLoadFailure(offline, missing)).resolves.toBe('E_CODE_UNAVAILABLE');
+
+		// A cache the browser will not read says nothing either way, so the network is asked as before.
+		const unreadable = {
+			match: vi.fn(async () => {
+				throw new Error('storage');
+			})
+		} as unknown as CacheStorage;
+		await expect(
+			mapWorkerLoadFailure(
+				vi.fn(async () => new Response(null, { status: 404 })),
+				unreadable
+			)
+		).resolves.toBe('E_APP_UPDATED');
+	});
+
 	it('mapWorkerLoadFailure probes the worker file with a HEAD and nothing else', async () => {
 		const fetchImpl = vi.fn(async () => new Response(null, { status: 200 }));
 		await expect(mapWorkerLoadFailure(fetchImpl)).resolves.toBe('E_WORKER_FAILED');

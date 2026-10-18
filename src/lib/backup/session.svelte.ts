@@ -221,11 +221,21 @@ export function untilAborted<T>(p: Promise<T>, signal: AbortSignal): Promise<T> 
 }
 
 /**
- * Why the key worker's script did not load, found by asking for the file: it is there (the worker itself failed), it
- * is gone (the app was updated under this page), or the network is down (the code was never downloaded). This is the
- * only request the session makes, and it carries nothing.
+ * Why the key worker's script did not load: this device holds it (the worker itself failed), it is gone (the app was
+ * updated under this page), or the network is down (the code was never downloaded). The cache is read first, because
+ * the service worker answers GET only: a HEAD goes to the network even from a page it controls, and offline it would
+ * blame the connection for a script that is stored. This is the only request the session makes, and it carries nothing.
  */
-export async function mapWorkerLoadFailure(fetchImpl: typeof fetch = fetch): Promise<BackupCode> {
+export async function mapWorkerLoadFailure(
+	fetchImpl: typeof fetch = fetch,
+	// eslint-disable-next-line no-restricted-properties -- a read-only lookup of whether the device holds a public script
+	cachesApi: CacheStorage | undefined = globalThis.caches
+): Promise<BackupCode> {
+	try {
+		if ((await cachesApi?.match(KDF_WORKER_SRC)) !== undefined) return 'E_WORKER_FAILED';
+	} catch {
+		/* a cache the browser will not read says nothing; the network is asked as before */
+	}
 	try {
 		const response = await fetchImpl(KDF_WORKER_SRC, { method: 'HEAD' });
 		return response.status === 404 ? 'E_APP_UPDATED' : 'E_WORKER_FAILED';
