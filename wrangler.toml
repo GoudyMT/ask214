@@ -7,6 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 # follow this flag) would otherwise serve the same app under a second host whose security.txt Canonical
 # points at a different origin (RFC 9116 mismatch), and split a privacy-first app across two origins.
 workers_dev = false
+preview_urls = true
 
 [assets]
 binding = "ASSETS"
