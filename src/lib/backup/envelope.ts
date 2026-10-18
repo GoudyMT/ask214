@@ -7,7 +7,7 @@ import {
 	MAX_FILE_BYTES,
 	PAD_BLOCK_BYTES
 } from './caps';
-import { ENVELOPE_OPENING, serializeEnvelope } from './envelope-json';
+import { serializeEnvelope } from './envelope-json';
 import { KDF_V1, SALT_BYTES, IV_BYTES, CHECK_BYTES } from './kdf-params';
 
 /** What a good backup file holds once read: the bytes the key step and the decrypt step need. */
@@ -146,18 +146,15 @@ export async function readBackupFile(file: File): Promise<ParseResult> {
 	const buf = await file.slice(0, MAX_FILE_BYTES + 1).arrayBuffer();
 	if (buf.byteLength > MAX_FILE_BYTES) return refuse('E_FILE_TOO_LARGE');
 
-	let text: string;
-	try {
-		text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
-	} catch {
-		return refuse('E_NOT_BACKUP');
-	}
+	// Empty until the bytes are read as text: a file that is not text starts with nothing.
+	let text = '';
 	let parsed: unknown;
 	try {
+		text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
 		parsed = JSON.parse(text);
 	} catch {
-		// Our own opening on text that does not parse is a backup that was cut short (a half-synced copy).
-		return refuse(text.startsWith(ENVELOPE_OPENING) ? 'E_DAMAGED' : 'E_NOT_BACKUP');
+		// The writer's fixed opening on text that does not parse is a backup that was cut short (a half-synced copy).
+		return refuse(text.startsWith('{"format":"ask214-') ? 'E_DAMAGED' : 'E_NOT_BACKUP');
 	}
 	if (!isPlainObject(parsed)) return refuse('E_NOT_BACKUP');
 	if (!Object.hasOwn(parsed, 'format') || parsed['format'] !== 'ask214-backup') {

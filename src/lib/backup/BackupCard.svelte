@@ -76,6 +76,7 @@
 		CHECK_NEW_BACKUP_OFFER,
 		downloadedLine,
 		ERASE_DEVICE_BUTTON,
+		FINISH_SETUP_LINE,
 		GETTING_READY_LINE,
 		HIDDEN_WHILE_AWAY_LINE,
 		KEEP_WORDS_LINE,
@@ -204,7 +205,7 @@
 	// Undefined until the mark has been read; null when the device has none.
 	let lastBackup = $state<number | null | undefined>(undefined);
 	// The device has no saved profile (a fresh one, or one just erased), so a snapshot would refuse: the Make row stays
-	// off rather than show six words first. Read with the mark; false until it has been read.
+	// off rather than show six words first. Read with the mark; false until it has been read, and when the read fails.
 	let neverSetUp = $state(false);
 	// Which path an idle session's last message belongs to: a cleared session forgets its kind.
 	let lastKind = $state<SessionKind | null>(null);
@@ -280,7 +281,7 @@
 		if (row === 'check') return app.status === 'ready' || app.status === 'damaged';
 		if (app.status !== 'ready' || props.db === null) return false;
 		if (row === 'restore') return app.publish !== null;
-		return app.store !== null;
+		return app.store !== null && !neverSetUp;
 	}
 
 	function isOpen(row: SessionKind): boolean {
@@ -290,7 +291,7 @@
 	// Not `disabled`: a disabled button that holds focus drops it. The tap is guarded in `toggleRow` and `openRow`, and
 	// a screen reader is told the row is off.
 	function isInert(row: SessionKind): boolean {
-		return !isOpen(row) && (!allowed(row) || session.active || (row === 'export' && neverSetUp));
+		return !isOpen(row) && (!allowed(row) || session.active);
 	}
 
 	// ---- keeping the card in step ---------------------------------------------------------------------------------
@@ -320,7 +321,6 @@
 			neverSetUp = state.gens.profile === 0;
 		} catch {
 			lastBackup = undefined;
-			neverSetUp = false;
 		}
 	}
 	onMount(() => void refreshMark());
@@ -344,12 +344,9 @@
 	// ---- rows -----------------------------------------------------------------------------------------------------
 
 	function openRow(row: SessionKind): void {
-		startLine = null;
+		// The Make row is off on a device with nothing to back up (see `allowed`), and a tap on it says so.
+		startLine = row === 'export' && neverSetUp ? FINISH_SETUP_LINE : null;
 		if (!allowed(row)) return;
-		if (row === 'export' && neverSetUp) {
-			startLine = lineFor('E_BACKUP_UNAVAILABLE', { path: 'export' });
-			return;
-		}
 		setOutcome(null);
 		inputError = null;
 		try {
