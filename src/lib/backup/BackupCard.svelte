@@ -681,6 +681,8 @@
 						autocorrect="off"
 						spellcheck="false"
 						enterkeyhint="done"
+						aria-invalid={fileLine !== null}
+						aria-describedby={fileLine !== null ? `backup-${row}-error` : undefined}
 					/>
 				</label>
 				<div class="backup-actions">
@@ -692,7 +694,7 @@
 		{/if}
 		{@render progressBar()}
 		{#if fileLine !== null}
-			<p class="backup-error" role="alert">{fileLine}</p>
+			<p id="backup-{row}-error" class="backup-error" role="alert">{fileLine}</p>
 		{/if}
 		{#if view.offerNewBackup}
 			<p class="backup-hint">{CHECK_NEW_BACKUP_OFFER}</p>

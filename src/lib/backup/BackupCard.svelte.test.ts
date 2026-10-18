@@ -1298,6 +1298,27 @@ describe('choosing the file', () => {
 	});
 });
 
+describe('a wrong passphrase on a file', () => {
+	// A screen-reader person on the field must hear why it is wrong, as they do on the type-back field.
+	it.each<['restore' | 'check', string, string]>([
+		['restore', CARD_LABELS.restore, CARD_LABELS.restoreSubmit],
+		['check', CARD_LABELS.check, CARD_LABELS.checkSubmit]
+	])('is tied to the %s field as its error', async (row, name, submit) => {
+		const card = await mount();
+		await fileChosen(card, row);
+		expect(fieldEl().getAttribute('aria-invalid')).toBe('false');
+		expect(fieldEl().hasAttribute('aria-describedby')).toBe(false);
+
+		await field().fill(WRONG);
+		await userEvent.click(submitOf(name, submit));
+		await expect.element(text(wrongLine())).toBeVisible();
+
+		expect(fieldEl().getAttribute('aria-invalid')).toBe('true');
+		const described = document.getElementById(fieldEl().getAttribute('aria-describedby') ?? '');
+		expect(described?.textContent).toBe(wrongLine());
+	});
+});
+
 describe('restoring', () => {
 	it('opens the confirm with Cancel focused, in a dialog the translator leaves alone', async () => {
 		const card = await mount();
