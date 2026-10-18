@@ -7,6 +7,7 @@ import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
 import { decodeTimelineState, isSnoozeDate } from '../timeline/state-codec';
 import type { TaskCategory, TaskStatus, TimelineState, TimelineTaskState } from '../timeline/types';
+import { b64DecodeStrict } from './envelope';
 import { CARRIED_STORES } from './manifest';
 import { MAX_NOTE_UNITS } from './note-cap';
 import { compareVersions, isAppVersion } from './version';
@@ -124,22 +125,14 @@ function isInteger(v: unknown, min: number, max: number): v is number {
 const isTime = (v: unknown): v is number => isInteger(v, 0, MAX_TIME);
 const isTimeOrNull = (v: unknown): v is number | null => v === null || isTime(v);
 
-// Strict base64: whole four-character groups, the standard alphabet, padding where it belongs, no spaces or line
-// breaks (atob would skip them). A last group with spare bits set still fits this shape, but it is a second spelling of
-// the same bytes: the profile's round trip below refuses it, because the shipped encoder writes the other spelling.
-// The length rule and this flat character loop together mean exactly that shape; a repeated four-character group would
-// overflow the regex engine's stack on a multi-megabyte date.
-const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
-
-function fromBase64(s: string): Uint8Array | null {
-	if (s.length % 4 !== 0 || !BASE64.test(s)) return null;
-	return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-}
-
-/** A date as the profile stores it: base64 of an ISO day the Settings read check (parseEaosAtRead) accepts. */
+/**
+ * A date as the profile stores it: base64 of an ISO day the Settings read check (parseEaosAtRead) accepts. The base64
+ * is the envelope's strict kind (the one reader that also survives a multi-megabyte value), which refuses a last
+ * group with spare bits set: a second spelling of the same bytes that the shipped encoder never writes.
+ */
 function isStoredDate(v: unknown): v is string {
 	if (typeof v !== 'string') return false;
-	const bytes = fromBase64(v);
+	const bytes = b64DecodeStrict(v);
 	if (bytes === null) return false;
 	try {
 		parseEaosAtRead(decodeEaos(bytes));

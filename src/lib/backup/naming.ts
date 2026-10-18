@@ -1,5 +1,4 @@
-import { isDay } from '../timeline/day-check';
-import { localTodayIso } from '../timeline/day-math';
+import { addDays, localTodayIso } from '../timeline/day-math';
 
 /**
  * The file name and the on-screen "Backup name" of a backup.
@@ -42,6 +41,7 @@ export function makeBackupNames(now: Date, id: string): { fileName: string; labe
  */
 export function parseBackupLabel(fileName: string): string | null {
 	const match = FILE_NAME_SHAPE.exec(fileName);
-	if (match === null || !isDay(match[1])) return null;
+	// A date that names no day comes back as another one (2026-02-30 is March 2), so it is not the app's own name.
+	if (match === null || addDays(match[1]!, 0) !== match[1]) return null;
 	return 'Ask 214 backup ' + match[1] + ' ' + match[2];
 }

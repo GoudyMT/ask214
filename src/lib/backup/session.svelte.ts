@@ -227,16 +227,10 @@ export function untilAborted<T>(p: Promise<T>, signal: AbortSignal): Promise<T> 
  * blame the connection for a script that is stored. Apart from the browser's own load of that script, the HEAD is the
  * only request the session makes, and it is made only for a script the device does not hold; it carries nothing.
  */
-export async function mapWorkerLoadFailure(
-	fetchImpl: typeof fetch = fetch,
+export async function mapWorkerLoadFailure(fetchImpl: typeof fetch = fetch): Promise<BackupCode> {
+	// A cache the browser will not read says nothing, and the network is asked as before.
 	// eslint-disable-next-line no-restricted-properties -- a read-only lookup of whether the device holds a public script
-	cachesApi: CacheStorage | undefined = globalThis.caches
-): Promise<BackupCode> {
-	try {
-		if ((await cachesApi?.match(KDF_WORKER_SRC)) !== undefined) return 'E_WORKER_FAILED';
-	} catch {
-		/* a cache the browser will not read says nothing; the network is asked as before */
-	}
+	if (await globalThis.caches?.match(KDF_WORKER_SRC).catch(() => null)) return 'E_WORKER_FAILED';
 	try {
 		const response = await fetchImpl(KDF_WORKER_SRC, { method: 'HEAD' });
 		return response.status === 404 ? 'E_APP_UPDATED' : 'E_WORKER_FAILED';
@@ -333,8 +327,8 @@ export class BackupSession {
 	#sessionToken = 0;
 	#stopToken = -1;
 	#stopOutcome: BackupCode = 'E_RESTORE_CANCELLED';
-	/** True when `epochMovedBy` is another tab's idle lock, which a plain 'peer' cannot say. */
-	#movedByPeerIdle = false;
+	/** What came with `epochMovedBy`, read only while that is set: another tab's idle lock is told from its Lock by this. */
+	#movedDetail: { peerReason?: 'idle' | 'user' } | undefined;
 	#relockable: Relockable = {
 		relockSync: (reason, detail) => this.relockSync(reason, detail),
 		refresh: () => this.refresh()
@@ -402,7 +396,6 @@ export class BackupSession {
 		this.stopping = false;
 		this.message = null;
 		this.epochMovedBy = null;
-		this.#movedByPeerIdle = false;
 		this.lockedAfterRestore = false;
 		this.committing = false;
 		this.kind = kind;
@@ -532,14 +525,16 @@ export class BackupSession {
 	 */
 	abortCommit(): boolean {
 		const mover = this.epochMovedBy;
-		const peerIdle = this.#movedByPeerIdle;
+		const detail = this.#movedDetail;
 		this.committing = false;
 		this.epochMovedBy = null;
-		this.#movedByPeerIdle = false;
 		if (mover === null) return true;
 		if (mover === 'pagehide') this.#clear('pagehide', 'E_LOCKED');
 		else if (mover === 'navigated') this.cancel('navigated');
-		else this.#relock(mover, peerIdle ? { peerReason: 'idle' } : undefined, true);
+		else this.#relock(mover, detail);
+		// An app switch that ended while the write ran was replayed late: the page is visible again, and no later
+		// visibility event would un-hide it.
+		void this.refresh();
 		return false;
 	}
 
@@ -868,11 +863,10 @@ export class BackupSession {
 		}
 	}
 
-	/** `replay` is a stop recorded during a write that failed: it is applied late, so the page may no longer be hidden. */
-	#relock(reason: RelockReason, detail?: { peerReason?: 'idle' | 'user' }, replay = false): void {
+	#relock(reason: RelockReason, detail?: { peerReason?: 'idle' | 'user' }): void {
 		if (this.phase === 'idle') return;
 		if (this.#isCommit()) {
-			this.#record(reason, reason === 'peer' && detail?.peerReason === 'idle');
+			this.#record(reason, detail);
 			if (this.phase === 'committed' && reason !== 'hygiene') this.lockedAfterRestore = true;
 			return;
 		}
@@ -887,8 +881,7 @@ export class BackupSession {
 		if (reason === 'hygiene') {
 			if (isKey) this.#abortToPre('hygiene', 'E_LEFT_APP');
 			else if (this.phase === 'generating') this.#abortToPre('hygiene', null);
-			// A replayed app switch that ended while the write ran has nothing to hide, and nothing would un-hide it.
-			if (!replay || !this.#deps.isVisible()) this.#conceal();
+			this.#conceal();
 			return;
 		}
 		if (reason === 'peer' && detail?.peerReason === 'idle') {
@@ -968,15 +961,15 @@ export class BackupSession {
 	 * the first real lock or page leave outranks them, and nothing outranks that. Another tab idling is no lock of this
 	 * tab either, so it is weak too, and it is written down as itself so the late application knows it.
 	 */
-	#record(mover: EpochMover, peerIdle = false): void {
-		const weak = (m: EpochMover, idle: boolean): boolean =>
-			m === 'hygiene' || m === 'navigated' || (m === 'peer' && idle);
+	#record(mover: EpochMover, detail?: { peerReason?: 'idle' | 'user' }): void {
+		const weak = (m: EpochMover, d: typeof detail): boolean =>
+			m === 'hygiene' || m === 'navigated' || d?.peerReason === 'idle';
 		if (
 			this.epochMovedBy === null ||
-			(weak(this.epochMovedBy, this.#movedByPeerIdle) && !weak(mover, peerIdle))
+			(weak(this.epochMovedBy, this.#movedDetail) && !weak(mover, detail))
 		) {
 			this.epochMovedBy = mover;
-			this.#movedByPeerIdle = peerIdle;
+			this.#movedDetail = detail;
 		}
 	}
 

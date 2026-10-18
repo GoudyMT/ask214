@@ -48,7 +48,7 @@ function b64Encode(bytes: Uint8Array): string {
 }
 
 /** Strict decode: null unless the text is canonical base64, i.e. re-encoding the decoded bytes gives the same text. */
-function b64DecodeStrict(text: string): Uint8Array<ArrayBuffer> | null {
+export function b64DecodeStrict(text: string): Uint8Array<ArrayBuffer> | null {
 	if (text.length % 4 !== 0 || !B64_PATTERN.test(text)) return null;
 	let bin: string;
 	try {
