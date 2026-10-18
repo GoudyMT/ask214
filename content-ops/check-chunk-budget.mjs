@@ -360,6 +360,12 @@ const STATIC = 'static';
 //     session ends when its card leaves, a refused Send a copy and the newer saved line survive a remount. Three builds
 //     measured page 89,682-89,688 B, precache 218,144-218,159 B, route nodes 51,879-51,885 B, at least 41 B of room
 //     above the highest. Trim pass: the three kept values share one effect, kept.
+//     Page 89,730 -> 89,930 and precache 218,200 -> 218,440 (owner's call, 2026-10-18): the Pre-Push Op-Test's fixes
+//     and the owner's two answers - a fresh device keeps Make a backup off, the backup name fits at 320 px, a backup
+//     cut short reads as damaged, a double tap opens the save picker once, "Saving your backup..." while the file is
+//     written, and a Done button after a Check. Three builds measured page 89,881-89,884 B, precache 218,387-218,394 B,
+//     at least 46 B of room above the highest. Trim pass: the Op-Test fixes were trimmed once (kept); reusing the
+//     working-phase list for the saving line grew the page (+8 B), not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -369,10 +375,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 89_730,
+	page: 89_930,
 	onDemand: 8_189,
 	precacheFiles: 68,
-	precacheBytes: 218_200,
+	precacheBytes: 218_440,
 	workerScripts: 147_200
 };
 
