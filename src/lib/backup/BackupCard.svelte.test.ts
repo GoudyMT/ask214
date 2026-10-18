@@ -823,6 +823,32 @@ describe('the backup and what the person is told', () => {
 		await expect.poll(() => document.activeElement?.textContent).toBe(savedLine('my-backup.json'));
 	});
 
+	// A lock during the write leaves the date unrecorded: the older date beside this backup's own line would say the backup
+	// that was just made was not.
+	it('does not show an older Last backup beside the saved line of a newer backup the date missed', async () => {
+		const older = Date.now() - 3 * 24 * 60 * 60 * 1000;
+		await profile.save({
+			lastBackupAt: older,
+			backupGenProfile: 2,
+			backupGenTimeline: 0,
+			backupGenCalendar: 0
+		});
+		const file = fakeFile();
+		file.closeGate = deferred<void>();
+		const card = await mount({ file });
+		await expect.element(text(lastBackupLine(formatBackupDate(older)))).toBeVisible();
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.poll(() => file.closes).toBe(1);
+
+		profile.relockSync('hygiene');
+		file.closeGate.resolve();
+
+		await expect.element(text(savedLine('picked.json'))).toBeVisible();
+		await pause(100);
+		expect(text(lastBackupLine(formatBackupDate(older))).query()).toBeNull();
+	});
+
 	it('on a browser with no save picker, says the file was downloaded', async () => {
 		const card = await mount({ picker: null });
 		await typedBack(card);
@@ -1265,6 +1291,27 @@ describe('sending a copy', () => {
 		await userEvent.click(submitOf(CARD_LABELS.make));
 		await expect.element(button(SEND)).toBeVisible();
 		expect(text(DOWNLOADS_LINE).query()).toBeNull();
+	});
+
+	// The card taken off behind a lock comes back to the same result, so it must come back to the same refusal: a Send a
+	// copy that returns after the browser said it would not send only fails again.
+	it('a refusal stays with its result when the card is taken off behind a lock and brought back', async () => {
+		stubShare({
+			canShare: () => true,
+			share: () => Promise.reject(new DOMException('Not allowed', 'NotAllowedError'))
+		});
+		const card = await mount({ picker: null });
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await userEvent.click(button(SEND));
+		await expect.element(text(DOWNLOADS_LINE)).toBeVisible();
+
+		profile.relockSync('peer');
+		await card.unmount();
+		await card.remount();
+
+		await expect.element(text(DOWNLOADS_LINE)).toBeVisible();
+		expect(button(SEND).query()).toBeNull();
 	});
 
 	// The sealed text is kept only while the result line is on screen.

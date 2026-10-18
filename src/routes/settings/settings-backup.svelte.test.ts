@@ -484,6 +484,56 @@ describe('Settings, the Backup card', () => {
 		expect(page.getByText(NO_BACKUP_YET_LINE).query()).toBeNull();
 	});
 
+	// The card was taken off behind the Lock, so it kept the result for the person's return; the person then went to another
+	// page and unlocked there. Coming back to Settings is a new visit, not the return the result was kept for.
+	it('does not bring a kept saved line back after the person left Settings while locked', async () => {
+		await device({ profile: true });
+		kdf.standIn = true;
+		const place = savePlace('kept.json');
+		const shown = await render(SettingsPage);
+		await expect.element(backupHeading()).toBeVisible();
+		await userEvent.click(toggle(CARD_LABELS.make, false));
+		await userEvent.click(button(CARD_LABELS.show));
+		const group = page.getByRole('group', { name: PHRASE_NOTE, exact: true });
+		await expect.element(group).toBeVisible();
+		const words = [...group.element().querySelectorAll('li')].map((li) => li.textContent).join(' ');
+		await page.getByLabelText(CARD_LABELS.passphrase, { exact: true }).fill(words);
+		await userEvent.click(
+			page.getByRole('form', { name: CARD_LABELS.make }).getByRole('button', {
+				name: CARD_LABELS.make,
+				exact: true
+			})
+		);
+		place.release();
+		await expect.element(page.getByText(savedLine('kept.json'))).toBeVisible();
+
+		await userEvent.click(button('Lock'));
+		await expect.element(button('Unlock')).toBeVisible();
+		await shown.unmount();
+		await store?.load();
+		await render(SettingsPage);
+
+		await expect.element(backupHeading()).toBeVisible();
+		expect(page.getByText(savedLine('kept.json')).query()).toBeNull();
+	});
+
+	// A device with nothing to unlock reads 'locked' after another tab idles, and the person is still elsewhere once they
+	// leave: the open step must not wait on a page they are no longer on.
+	it('ends a restore on a device with no profile when the person leaves Settings after a peer lock', async () => {
+		await device({ profile: false });
+		const shown = await render(SettingsPage);
+		await expect.element(backupHeading()).toBeVisible();
+		await userEvent.click(toggle(CARD_LABELS.restore, false));
+		await expect.poll(() => session().phase).toBe('choose-file');
+		relockEachSync(relockables, 'peer', { peerReason: 'idle' });
+		expect(store?.lockState).toBe('locked');
+		expect(session().active).toBe(true);
+
+		await shown.unmount();
+
+		await expect.poll(() => session().active).toBe(false);
+	});
+
 	it('says the restore finished and the device is locked, above the Unlock panel', async () => {
 		await device({ profile: true });
 		await render(SettingsPage);

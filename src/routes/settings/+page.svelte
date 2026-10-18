@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { onDestroy, tick, untrack } from 'svelte';
 	import SettingsDateRow from '$lib/components/SettingsDateRow.svelte';
 	import SkillBridgePlanRow from '$lib/components/SkillBridgePlanRow.svelte';
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
@@ -7,7 +7,7 @@
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
-	import BackupCard from '$lib/backup/BackupCard.svelte';
+	import BackupCard, { forgetResult } from '$lib/backup/BackupCard.svelte';
 	import {
 		DAMAGED_BACKUP_LINE,
 		LOCKED_AFTER_RESTORE_LINE,
@@ -139,6 +139,9 @@
 			(!lockedView || backupSession.active)
 	);
 	const backupCardUp = $derived(showBackupCard && app.db !== null);
+	// This page stays up across a Lock and an Unlock, and only a move to another page ends the visit: a result the card kept
+	// for its return behind a lock is not for the next visit.
+	onDestroy(() => forgetResult(backupSession));
 	// A restore that finished while the profile was locked: the card that would say so is off the page, so the page does,
 	// above the Unlock panel.
 	const restoredLine = $derived(

@@ -17,7 +17,12 @@
 				kind: 'saved';
 				fileName: string;
 				readBack: 'matches' | 'mismatch' | 'not-checked' | 'download';
-				/** The sealed file, ciphertext only; held just while the result line is on screen. */
+				/** When the words appeared: the date the backup carries, and the one its Last backup mark would show. */
+				at: number;
+				/**
+				 * The sealed file, ciphertext only. Held while the result is on screen, and while a lock has only taken the card
+				 * off the page; the page that shows the card drops it with `forgetResult` when the person leaves.
+				 */
 				text: string;
 		  }
 		| { kind: 'line'; text: string };
@@ -28,16 +33,33 @@
 		exporter: ExportFlow | null;
 		warningName: string;
 		outcome: ExportOutcome | null;
+		/** The browser refused to send the file of `outcome`; it goes with that one result. */
+		refused: boolean;
 	};
 	const kept = new WeakMap<BackupSession, Kept>();
 
 	function keptFor(session: BackupSession): Kept {
 		let found = kept.get(session);
 		if (found === undefined) {
-			found = { db: null, restore: null, exporter: null, warningName: '', outcome: null };
+			found = {
+				db: null,
+				restore: null,
+				exporter: null,
+				warningName: '',
+				outcome: null,
+				refused: false
+			};
 			kept.set(session, found);
 		}
 		return found;
+	}
+
+	/**
+	 * The person has left the page that shows the card: a result kept for the card's return is theirs to come back to only
+	 * within the visit, and a lock taken in the middle of it ends no visit, so the card cannot tell the two apart itself.
+	 */
+	export function forgetResult(session: BackupSession): void {
+		keptFor(session).outcome = null;
 	}
 </script>
 
@@ -159,7 +181,7 @@
 	// card to come back to, and the sealed text must not wait in memory for one.
 	let leftForGood = false;
 	// The browser refused to send this result's file. It belongs to one result, so every new result clears it.
-	let sendRefused = $state(false);
+	let sendRefused = $state(memo.refused);
 	let refusedEl = $state<HTMLElement | null>(null);
 	function setOutcome(next: ExportOutcome | null): void {
 		if (!leftForGood) memo.outcome = next;
@@ -168,10 +190,15 @@
 	}
 	// A word that did not match, said beside the field; the session keeps nothing about it.
 	let inputError = $state<string | null>(null);
-	// Mirrored into `memo` so a card brought back over the same session still names the file.
 	let warningName = $state(memo.warningName);
+	// The time the words appeared, held from then: the session forgets it when the backup ends, before the result arrives.
+	let madeAt = 0;
+	// The name and the refusal are mirrored into `memo` so a card brought back over the same session still names the file
+	// and still knows the browser would not send it.
 	$effect(() => {
 		memo.warningName = warningName;
+		memo.refused = sendRefused;
+		madeAt = session.backupAt ?? madeAt;
 	});
 	let startLine = $state<string | null>(null);
 	// Undefined until the mark has been read; null when the device has none.
@@ -299,9 +326,12 @@
 	onDestroy(() =>
 		queueMicrotask(() => {
 			// A card taken off behind a lock or an app switch comes back; one taken off with the profile open went with the page.
-			leftForGood = app.store === null || app.store.lockState === 'unlocked';
+			// "Locked" is a profile that exists and is not open: a first-run device reads 'locked' after another tab idles, with
+			// nothing to unlock and no card to come back to.
+			const locked = !!app.store?.locked;
+			leftForGood = !locked;
 			if (leftForGood) memo.outcome = null;
-			session.cardGone({ locked: app.store?.lockState === 'locked' });
+			session.cardGone({ locked });
 		})
 	);
 
@@ -434,6 +464,7 @@
 					kind: 'saved',
 					fileName: result.fileName,
 					readBack: result.readBack,
+					at: madeAt,
 					text: result.text
 				});
 				void refreshMark();
@@ -576,9 +607,9 @@
 	{#if props.only === undefined}
 		<h2 id="backup-heading" class="backup-card__heading">{CARD_LABELS.heading}</h2>
 		<p class="backup-hint">{CARD_INTRO_LINE}</p>
-		<!-- A save made while the page was hidden could not record its date, and "No backup yet." beside its own saved line
-		     would deny it. -->
-		{#if lastBackup !== undefined && !(lastBackup === null && exportOutcome?.kind === 'saved')}
+		<!-- A save made while the page was hidden could not record its date, and an older date (or "No backup yet.") beside
+		     its own saved line would deny it. -->
+		{#if lastBackup !== undefined && !(exportOutcome?.kind === 'saved' && (lastBackup ?? 0) < exportOutcome.at)}
 			<p class="backup-hint backup-last">
 				{lastBackup === null ? NO_BACKUP_YET_LINE : lastBackupLine(formatBackupDate(lastBackup))}
 			</p>

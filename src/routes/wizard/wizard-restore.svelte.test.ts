@@ -263,6 +263,25 @@ describe('Wizard, the way to restore a backup', () => {
 		await expect.element(page.getByRole('dialog')).toBeVisible();
 	});
 
+	// A first-run device reads 'locked' after another tab idles though there is nothing to unlock; leaving the screen must
+	// still end the step the person was in.
+	it('ends a restore in progress when the person leaves after another tab idled', async () => {
+		const app = makeApp();
+		profile = createProfileStore(db);
+		app.store = profile;
+		const shown = await render(WizardPage);
+		await userEvent.click(entry());
+		await expect.poll(() => backupSession.phase).toBe('choose-file');
+		profile.relockSync('peer');
+		backupSession.relockSync('peer', { peerReason: 'idle' });
+		expect(profile.lockState).toBe('locked');
+		expect(backupSession.active).toBe(true);
+
+		await shown.unmount();
+
+		await expect.poll(() => backupSession.active).toBe(false);
+	});
+
 	// The app has no connection to give until start-up resolves, so there is nothing for a row to run on.
 	it('is not drawn while the app is starting, and opens on a tap once it is ready', async () => {
 		const app = makeApp({ status: 'loading', ready: false });
