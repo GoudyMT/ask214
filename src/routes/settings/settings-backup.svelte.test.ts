@@ -19,9 +19,13 @@ import {
 	CARD_LABELS,
 	ERASE_DEVICE_BUTTON,
 	LOCKED_AFTER_RESTORE_LINE,
+	NO_BACKUP_YET_LINE,
 	NOT_IN_BACKUPS_LEAD,
-	RESTORED_UNLOCK_LINE
+	PHRASE_NOTE,
+	RESTORED_UNLOCK_LINE,
+	savedLine
 } from '$lib/backup/copy';
+import type { SaveHandle } from '$lib/backup/export-flow';
 import goldenText from '$lib/backup/golden/v1-1.ask214backup?raw';
 import { GOLDEN_PASSWORD } from '$lib/backup/golden/golden';
 import { captureBackupIntent, takeBackupIntent } from '$lib/backup/intent';
@@ -68,6 +72,9 @@ vi.mock('$lib/ask/when-controlled', async (importOriginal) => {
 	const real = await importOriginal<typeof import('$lib/ask/when-controlled')>();
 	return { ...real, waitForControl: () => Promise.resolve(true) };
 });
+// A backup made here has words of its own, which the pinned output cannot answer: while this is set, the key step is a
+// cheap function of the password and the salt, so the same words open the file and others do not.
+const kdf = vi.hoisted(() => ({ standIn: false }));
 // The slow key step answers with the pinned output for exactly the pinned password, salt and settings.
 vi.mock('@noble/hashes/argon2.js', async () => {
 	const golden = await import('$lib/backup/golden/golden');
@@ -75,6 +82,12 @@ vi.mock('@noble/hashes/argon2.js', async () => {
 		a.length === b.length && a.every((x, i) => x === b[i]);
 	return {
 		argon2id: (pass: Uint8Array, salt: Uint8Array, opts: Record<string, unknown>) => {
+			if (kdf.standIn) {
+				return Uint8Array.from(
+					{ length: 32 },
+					(_, i) => (pass[i % pass.length] ?? 0) ^ (salt[i % salt.length] ?? 0) ^ i
+				);
+			}
 			const asked =
 				same(pass, new TextEncoder().encode(golden.GOLDEN_PASSWORD)) &&
 				same(salt, golden.GOLDEN_SALT) &&
@@ -196,6 +209,39 @@ function setPicker(picker: OpenPicker | undefined): void {
 	});
 }
 
+const realSavePicker = Object.getOwnPropertyDescriptor(window, 'showSaveFilePicker');
+
+/**
+ * The place the person picks for a backup, whose close() is held until `release`: the one moment a page can be hidden
+ * after the save is final and before its answer is back.
+ */
+function savePlace(name: string) {
+	const gate = deferred<void>();
+	const place = { closes: 0, release: () => gate.resolve(), content: '' };
+	let staged = '';
+	const handle: SaveHandle = {
+		name,
+		getFile: async () => new File([place.content], name),
+		createWritable: async () => ({
+			write: async (data) => {
+				staged = data;
+			},
+			close: async () => {
+				place.closes += 1;
+				await gate.promise;
+				place.content = staged;
+			},
+			abort: async () => {}
+		})
+	};
+	Object.defineProperty(window, 'showSaveFilePicker', {
+		configurable: true,
+		writable: true,
+		value: () => Promise.resolve(handle)
+	});
+	return place;
+}
+
 beforeAll(async () => {
 	db = await openTestDb();
 });
@@ -206,6 +252,7 @@ afterAll(async () => {
 
 beforeEach(() => {
 	harness.app = app;
+	kdf.standIn = false;
 	setPicker(undefined);
 	// The headless browser dismisses a real file dialog at once, which would fire the input's cancel.
 	vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
@@ -239,6 +286,8 @@ afterEach(async () => {
 	for (const input of document.body.querySelectorAll('input[type="file"]')) input.remove();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
+	if (realSavePicker) Object.defineProperty(window, 'showSaveFilePicker', realSavePicker);
+	else Reflect.deleteProperty(window, 'showSaveFilePicker');
 	store?.relockSync('hygiene');
 	store = null;
 	app.store = null;
@@ -381,6 +430,40 @@ describe('Settings, the Backup card', () => {
 
 		await expect.element(button('Unlock')).toBeVisible();
 		expect(backupHeading().query()).toBeNull();
+	});
+
+	// The person puts the phone down just after pressing Save: the page is hidden before the file's answer is back, and the
+	// card is gone when it arrives. The result is theirs to read when they come back.
+	it('shows the saved line when the card comes back after the page was hidden during the save', async () => {
+		await device({ profile: true });
+		kdf.standIn = true;
+		const place = savePlace('kept.json');
+		await render(SettingsPage);
+		await expect.element(backupHeading()).toBeVisible();
+		await userEvent.click(toggle(CARD_LABELS.make, false));
+		await userEvent.click(button(CARD_LABELS.show));
+		const group = page.getByRole('group', { name: PHRASE_NOTE, exact: true });
+		await expect.element(group).toBeVisible();
+		const words = [...group.element().querySelectorAll('li')].map((li) => li.textContent).join(' ');
+		await page.getByLabelText(CARD_LABELS.passphrase, { exact: true }).fill(words);
+		await userEvent.click(
+			page.getByRole('form', { name: CARD_LABELS.make }).getByRole('button', {
+				name: CARD_LABELS.make,
+				exact: true
+			})
+		);
+		await expect.poll(() => place.closes).toBe(1);
+
+		relockEachSync(relockables, 'hygiene');
+		place.release();
+
+		await expect.element(button('Unlock')).toBeVisible();
+		await expect.poll(() => session().active).toBe(false);
+		await expect.poll(() => backupHeading().query()).toBeNull();
+
+		await userEvent.click(button('Unlock'));
+		await expect.element(page.getByText(savedLine('kept.json'))).toBeVisible();
+		expect(page.getByText(NO_BACKUP_YET_LINE).query()).toBeNull();
 	});
 
 	it('says the restore finished and the device is locked, above the Unlock panel', async () => {

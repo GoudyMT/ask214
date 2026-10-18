@@ -9,18 +9,32 @@
 	// The flows work on one database connection, so they are kept only for the connection they were built on: a card
 	// given another connection (a test, or a host that opens its own) starts them fresh. The app has one, so a page does
 	// not meet this.
+	// The result of a backup is kept too: the person may put the phone down just after pressing Save, and the card is gone
+	// when the file's answer arrives. It is written here by the code that receives the answer, not by anything that
+	// mirrors the card's own state, because that card may no longer exist.
+	type ExportOutcome =
+		| {
+				kind: 'saved';
+				fileName: string;
+				readBack: 'matches' | 'mismatch' | 'not-checked' | 'download';
+				/** The sealed file, ciphertext only; held just while the result line is on screen. */
+				text: string;
+		  }
+		| { kind: 'line'; text: string };
+
 	type Kept = {
 		db: IDBDatabase | null;
 		restore: RestoreFlow | null;
 		exporter: ExportFlow | null;
 		warningName: string;
+		outcome: ExportOutcome | null;
 	};
 	const kept = new WeakMap<BackupSession, Kept>();
 
 	function keptFor(session: BackupSession): Kept {
 		let found = kept.get(session);
 		if (found === undefined) {
-			found = { db: null, restore: null, exporter: null, warningName: '' };
+			found = { db: null, restore: null, exporter: null, warningName: '', outcome: null };
 			kept.set(session, found);
 		}
 		return found;
@@ -92,6 +106,7 @@
 	if (memo.restore === null || memo.db !== startDb) {
 		memo.db = startDb;
 		memo.exporter = null;
+		memo.outcome = null;
 		memo.restore = untrack(
 			() => new RestoreFlow({ session, app, db: props.db, ...props.restoreDeps })
 		);
@@ -137,17 +152,14 @@
 		'writing'
 	];
 
-	type ExportOutcome =
-		| {
-				kind: 'saved';
-				fileName: string;
-				readBack: 'matches' | 'mismatch' | 'not-checked' | 'download';
-				/** The sealed file, ciphertext only; held just while the result line is on screen. */
-				text: string;
-		  }
-		| { kind: 'line'; text: string };
-
-	let exportOutcome = $state<ExportOutcome | null>(null);
+	let exportOutcome = $state<ExportOutcome | null>(memo.outcome);
+	// Set once the card has gone for good (the person moved to another page): a result that arrives after that has no
+	// card to come back to, and the sealed text must not wait in memory for one.
+	let leftForGood = false;
+	function setOutcome(next: ExportOutcome | null): void {
+		if (!leftForGood) memo.outcome = next;
+		exportOutcome = next;
+	}
 	// A word that did not match, said beside the field; the session keeps nothing about it.
 	let inputError = $state<string | null>(null);
 	// Mirrored into `memo` so a card brought back over the same session still names the file.
@@ -279,7 +291,12 @@
 	// returns the value from before the batch. So a card taken off by a lock would read an unlocked profile, and
 	// would write "the page was left" over the lock that took it.
 	onDestroy(() =>
-		queueMicrotask(() => session.cardGone({ locked: app.store?.lockState === 'locked' }))
+		queueMicrotask(() => {
+			// A card taken off behind a lock or an app switch comes back; one taken off with the profile open went with the page.
+			leftForGood = app.store === null || app.store.lockState === 'unlocked';
+			if (leftForGood) memo.outcome = null;
+			session.cardGone({ locked: app.store?.lockState === 'locked' });
+		})
 	);
 
 	// ---- rows -----------------------------------------------------------------------------------------------------
@@ -287,7 +304,7 @@
 	function openRow(row: SessionKind): void {
 		startLine = null;
 		if (!allowed(row)) return;
-		exportOutcome = null;
+		setOutcome(null);
 		inputError = null;
 		try {
 			if (row === 'export') session.start(app, 'export');
@@ -305,7 +322,7 @@
 		if (session.stopping) return;
 		if (session.canCancel) session.cancel('user-cancel');
 		else restore.close();
-		exportOutcome = null;
+		setOutcome(null);
 		inputError = null;
 		warningName = '';
 	}
@@ -392,16 +409,16 @@
 					const title = taskTitle(result.taskId);
 					if (title !== undefined) ctx.taskTitle = title;
 				}
-				exportOutcome = { kind: 'line', text: lineFor(result.code, ctx) };
+				setOutcome({ kind: 'line', text: lineFor(result.code, ctx) });
 				break;
 			}
 			case 'saved':
-				exportOutcome = {
+				setOutcome({
 					kind: 'saved',
 					fileName: result.fileName,
 					readBack: result.readBack,
 					text: result.text
-				};
+				});
 				void refreshMark();
 				break;
 		}
@@ -416,7 +433,7 @@
 			return;
 		}
 		inputError = null;
-		if (exportOutcome?.kind === 'line') exportOutcome = null;
+		if (exportOutcome?.kind === 'line') setOutcome(null);
 		// Everything up to the save picker is synchronous inside the flow: the browser opens it only for this tap.
 		void flow.submit(event, exportPassEl?.value ?? '').then(applyExport);
 	}
@@ -430,12 +447,12 @@
 	}
 
 	function checkNow(): void {
-		exportOutcome = null;
+		setOutcome(null);
 		openRow('check');
 	}
 
 	function makeAgain(): void {
-		exportOutcome = null;
+		setOutcome(null);
 		openRow('export');
 	}
 
@@ -540,7 +557,9 @@
 	{#if props.only === undefined}
 		<h2 id="backup-heading" class="backup-card__heading">{CARD_LABELS.heading}</h2>
 		<p class="backup-hint">{CARD_INTRO_LINE}</p>
-		{#if lastBackup !== undefined}
+		<!-- A save made while the page was hidden could not record its date, and "No backup yet." beside its own saved line
+		     would deny it. -->
+		{#if lastBackup !== undefined && !(lastBackup === null && exportOutcome?.kind === 'saved')}
 			<p class="backup-hint backup-last">
 				{lastBackup === null ? NO_BACKUP_YET_LINE : lastBackupLine(formatBackupDate(lastBackup))}
 			</p>

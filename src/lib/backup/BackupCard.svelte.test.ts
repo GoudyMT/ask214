@@ -982,6 +982,25 @@ describe('a card brought back after the profile locked behind it', () => {
 	});
 });
 
+describe('a card brought back after the person left the page', () => {
+	// The saved line is for a card that was only taken off behind a lock. A person who went to another page and came back
+	// starts from a closed row, and the sealed text is not held for a card that is no longer there.
+	it('does not show the last result, nor offer to send the file', async () => {
+		stubShare({ canShare: () => true, share: () => Promise.resolve() });
+		const card = await mount();
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.element(text(savedLine('picked.json'))).toBeVisible();
+
+		await card.unmount();
+		await card.remount();
+
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		expect(text(savedLine('picked.json')).query()).toBeNull();
+		expect(button(CARD_LABELS.send).query()).toBeNull();
+	});
+});
+
 // ---- Send a copy ------------------------------------------------------------------------------------------------------------
 
 const shareUndo: (() => void)[] = [];
