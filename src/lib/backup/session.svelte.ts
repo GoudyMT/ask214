@@ -322,6 +322,8 @@ export class BackupSession {
 	#sessionToken = 0;
 	#stopToken = -1;
 	#stopOutcome: BackupCode = 'E_RESTORE_CANCELLED';
+	/** True when `epochMovedBy` is another tab's idle lock, which a plain 'peer' cannot say. */
+	#movedByPeerIdle = false;
 	#relockable: Relockable = {
 		relockSync: (reason, detail) => this.relockSync(reason, detail),
 		refresh: () => this.refresh()
@@ -389,6 +391,7 @@ export class BackupSession {
 		this.stopping = false;
 		this.message = null;
 		this.epochMovedBy = null;
+		this.#movedByPeerIdle = false;
 		this.lockedAfterRestore = false;
 		this.committing = false;
 		this.kind = kind;
@@ -518,12 +521,14 @@ export class BackupSession {
 	 */
 	abortCommit(): boolean {
 		const mover = this.epochMovedBy;
+		const peerIdle = this.#movedByPeerIdle;
 		this.committing = false;
 		this.epochMovedBy = null;
+		this.#movedByPeerIdle = false;
 		if (mover === null) return true;
 		if (mover === 'pagehide') this.#clear('pagehide', 'E_LOCKED');
 		else if (mover === 'navigated') this.cancel('navigated');
-		else this.#relock(mover);
+		else this.#relock(mover, peerIdle ? { peerReason: 'idle' } : undefined, true);
 		return false;
 	}
 
@@ -852,10 +857,11 @@ export class BackupSession {
 		}
 	}
 
-	#relock(reason: RelockReason, detail?: { peerReason?: 'idle' | 'user' }): void {
+	/** `replay` is a stop recorded during a write that failed: it is applied late, so the page may no longer be hidden. */
+	#relock(reason: RelockReason, detail?: { peerReason?: 'idle' | 'user' }, replay = false): void {
 		if (this.phase === 'idle') return;
 		if (this.#isCommit()) {
-			this.#record(reason);
+			this.#record(reason, reason === 'peer' && detail?.peerReason === 'idle');
 			if (this.phase === 'committed' && reason !== 'hygiene') this.lockedAfterRestore = true;
 			return;
 		}
@@ -870,7 +876,8 @@ export class BackupSession {
 		if (reason === 'hygiene') {
 			if (isKey) this.#abortToPre('hygiene', 'E_LEFT_APP');
 			else if (this.phase === 'generating') this.#abortToPre('hygiene', null);
-			this.#conceal();
+			// A replayed app switch that ended while the write ran has nothing to hide, and nothing would un-hide it.
+			if (!replay || !this.#deps.isVisible()) this.#conceal();
 			return;
 		}
 		if (reason === 'peer' && detail?.peerReason === 'idle') {
@@ -947,12 +954,18 @@ export class BackupSession {
 
 	/**
 	 * A stop that cannot touch a committing session is only written down. An app switch and a navigation are weak:
-	 * the first real lock or page leave outranks them, and nothing outranks that.
+	 * the first real lock or page leave outranks them, and nothing outranks that. Another tab idling is no lock of this
+	 * tab either, so it is weak too, and it is written down as itself so the late application knows it.
 	 */
-	#record(mover: EpochMover): void {
-		const weak = (m: EpochMover): boolean => m === 'hygiene' || m === 'navigated';
-		if (this.epochMovedBy === null || (weak(this.epochMovedBy) && !weak(mover))) {
+	#record(mover: EpochMover, peerIdle = false): void {
+		const weak = (m: EpochMover, idle: boolean): boolean =>
+			m === 'hygiene' || m === 'navigated' || (m === 'peer' && idle);
+		if (
+			this.epochMovedBy === null ||
+			(weak(this.epochMovedBy, this.#movedByPeerIdle) && !weak(mover, peerIdle))
+		) {
 			this.epochMovedBy = mover;
+			this.#movedByPeerIdle = peerIdle;
 		}
 	}
 

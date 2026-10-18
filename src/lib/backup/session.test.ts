@@ -858,7 +858,16 @@ describe('a write that failed after it was marked committing', () => {
 	// the session must stop being committing. Whatever the person did during that window is applied now, once.
 	it.each<[string, ((h: H) => void) | null, boolean, Phase, BackupCode | null]>([
 		['nothing happened', null, true, 'writing', null],
-		['an app switch', (h) => h.s.relockSync('hygiene'), false, 'file-chosen', 'E_LEFT_APP'],
+		[
+			'an app switch that is still going on',
+			(h) => {
+				h.env.visible = false;
+				h.s.relockSync('hygiene');
+			},
+			false,
+			'file-chosen',
+			'E_LEFT_APP'
+		],
 		['an idle lock', (h) => h.s.relockSync('idle'), false, 'idle', 'E_LOCKED'],
 		['the person locking', (h) => h.s.relockSync('user'), false, 'idle', 'E_LOCKED'],
 		['another tab locking', (h) => h.s.relockSync('peer'), false, 'idle', 'E_LOCKED'],
@@ -897,6 +906,61 @@ describe('a write that failed after it was marked committing', () => {
 			}
 		}
 	);
+
+	// The person came back before the write failed, so there is nothing left to hide: a concealed card would stay blank
+	// until some later visibility event, with their typed words behind it.
+	it('an app switch that ended during the write does not hide the card when the write fails', async () => {
+		const h = harness();
+		startRestore(h);
+		const input = { value: 'words' };
+		h.s.registerInput(input);
+		(h.s.beginRun() as Run).enter('writing');
+		h.s.markCommitting();
+		h.env.visible = false;
+		h.s.relockSync('hygiene');
+		h.env.visible = true;
+		await h.s.refresh();
+
+		expect(h.s.abortCommit()).toBe(false);
+		expect(h.s.phase).toBe('file-chosen');
+		expect(h.s.message).toBe('E_LEFT_APP');
+		expect(h.s.concealed).toBe(false);
+		expect(input.value).toBe('words');
+	});
+
+	// Another tab idling is not a lock of this tab, in the write window as anywhere else: the file and the words stay.
+	it('another tab idling during the write is still only that when the write fails', () => {
+		const h = harness();
+		startRestore(h);
+		const input = { value: 'words' };
+		h.s.registerInput(input);
+		const run = h.s.beginRun() as Run;
+		run.enter('writing');
+		run.hold('fileBytes', new Uint8Array([1]));
+		h.s.markCommitting();
+		h.s.relockSync('peer', { peerReason: 'idle' });
+
+		expect(h.s.abortCommit()).toBe(false);
+		expect(h.s.active).toBe(true);
+		expect(h.s.phase).toBe('file-chosen');
+		expect(h.s.message).toBe('E_LOCKED_ELSEWHERE');
+		expect(h.s.held('fileBytes')).not.toBeNull();
+		expect(input.value).toBe('words');
+		expect(h.s.concealed).toBe(false);
+	});
+
+	it('a real lock after another tab idled during the write still ends the session when it fails', () => {
+		const h = harness();
+		startRestore(h);
+		(h.s.beginRun() as Run).enter('writing');
+		h.s.markCommitting();
+		h.s.relockSync('peer', { peerReason: 'idle' });
+		h.s.relockSync('user');
+
+		expect(h.s.abortCommit()).toBe(false);
+		expect(h.s.phase).toBe('idle');
+		expect(h.s.message).toBe('E_LOCKED');
+	});
 
 	// What was recorded for the failed attempt must not follow the person into the next one.
 	it('the retry after an app switch records its own lock, not the earlier one', () => {
