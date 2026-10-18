@@ -64,6 +64,8 @@
 		NOT_IN_BACKUPS_LEAD,
 		notCheckedLine,
 		savedLine,
+		SEND_REFUSED_DOWNLOADS_LINE,
+		SEND_REFUSED_FOLDER_LINE,
 		STOPPING_LINE,
 		TYPE_BACK_LINE,
 		type MessageContext
@@ -156,8 +158,12 @@
 	// Set once the card has gone for good (the person moved to another page): a result that arrives after that has no
 	// card to come back to, and the sealed text must not wait in memory for one.
 	let leftForGood = false;
+	// The browser refused to send this result's file. It belongs to one result, so every new result clears it.
+	let sendRefused = $state(false);
+	let refusedEl = $state<HTMLElement | null>(null);
 	function setOutcome(next: ExportOutcome | null): void {
 		if (!leftForGood) memo.outcome = next;
+		sendRefused = false;
 		exportOutcome = next;
 	}
 	// A word that did not match, said beside the field; the session keeps nothing about it.
@@ -509,14 +515,19 @@
 	});
 
 	// Called straight from the tap, so the browser still counts the tap as the person's own act. A back-out (an
-	// AbortError) and any other refusal leave the saved file where it is and say nothing.
+	// AbortError) says nothing and leaves the button. Any other refusal means the button would only fail again, so it
+	// goes and the line says where to find the file; the file is saved either way. The button had focus, so the line
+	// takes it.
 	async function sendCopy(): Promise<void> {
 		const file = shareFile;
 		if (file === null) return;
 		try {
 			await navigator.share({ files: [file] });
-		} catch {
-			/* the file is saved either way */
+		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') return;
+			sendRefused = true;
+			await tick();
+			refusedEl?.focus();
 		}
 	}
 
@@ -836,8 +847,15 @@
 							{savedText(exportOutcome)}
 						</p>
 						<p class="backup-hint">{KEEP_NEWEST_LINE}</p>
+						{#if sendRefused}
+							<p class="backup-hint" role="status" tabindex="-1" bind:this={refusedEl}>
+								{exportOutcome.readBack === 'download'
+									? SEND_REFUSED_DOWNLOADS_LINE
+									: SEND_REFUSED_FOLDER_LINE}
+							</p>
+						{/if}
 						<div class="backup-actions">
-							{#if shareFile !== null}
+							{#if shareFile !== null && !sendRefused}
 								<button
 									class="backup-primary"
 									type="button"

@@ -1213,6 +1213,61 @@ describe('sending a copy', () => {
 		}
 	});
 
+	// A browser that will not send the file (a blocked share, or any other refusal) leaves the person on a button that
+	// only fails again: it goes, and the line says where the file is, which differs between a saved and a downloaded file.
+	const DOWNLOADS_LINE =
+		"Your browser can't send this file. Open your Downloads and share it from there.";
+	const FOLDER_LINE =
+		"Your browser can't send this file. Open the folder you saved it to and share it from there.";
+	it.each<[string, Mount, Error, string]>([
+		[
+			'a blocked share of a downloaded file',
+			{ picker: null },
+			new DOMException('Not allowed', 'NotAllowedError'),
+			DOWNLOADS_LINE
+		],
+		[
+			'a blocked share of a file saved to a chosen place',
+			{},
+			new DOMException('Not allowed', 'NotAllowedError'),
+			FOLDER_LINE
+		],
+		['any other failure of the share', { picker: null }, new TypeError('E_X'), DOWNLOADS_LINE]
+	])('%s hides Send a copy and says where the file is', async (_name, opts, refusal, line) => {
+		stubShare({ canShare: () => true, share: () => Promise.reject(refusal) });
+		const card = await mount(opts);
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await userEvent.click(button(SEND));
+
+		await expect.element(text(line)).toBeVisible();
+		expect(button(SEND).query()).toBeNull();
+		// The button that had focus is gone, so the line takes it.
+		await expect.poll(() => document.activeElement?.textContent?.trim()).toBe(line);
+		// The saved line and the way on stay.
+		await expect.element(button(CARD_LABELS.checkNow)).toBeVisible();
+	});
+
+	// The refusal belongs to one result: the next backup on this card is offered Send a copy again.
+	it('a refused share does not hide Send a copy on the next backup', async () => {
+		stubShare({
+			canShare: () => true,
+			share: () => Promise.reject(new DOMException('Not allowed', 'NotAllowedError'))
+		});
+		const card = await mount({ picker: null });
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await userEvent.click(button(SEND));
+		await expect.element(text(DOWNLOADS_LINE)).toBeVisible();
+
+		await userEvent.click(toggle(CARD_LABELS.make, true));
+		expect(text(DOWNLOADS_LINE).query()).toBeNull();
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.element(button(SEND)).toBeVisible();
+		expect(text(DOWNLOADS_LINE).query()).toBeNull();
+	});
+
 	// The sealed text is kept only while the result line is on screen.
 	it.each(['the row is closed', 'a Check is started from the result'])(
 		'the offer and the text are gone when %s',

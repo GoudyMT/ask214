@@ -92,6 +92,11 @@ export const downloadedLine = (fileName: string): string =>
 	'Backup downloaded as ' + fileName + ', usually to your Downloads folder.';
 export const notCheckedLine = (fileName: string): string =>
 	'Saved as ' + fileName + ', but not checked. Use Check a backup.';
+/** After the browser refuses to send the file: where it is, by how it was saved. */
+export const SEND_REFUSED_DOWNLOADS_LINE =
+	"Your browser can't send this file. Open your Downloads and share it from there.";
+export const SEND_REFUSED_FOLDER_LINE =
+	"Your browser can't send this file. Open the folder you saved it to and share it from there.";
 
 export const CARD_LABELS = Object.freeze({
 	heading: 'Backup',
