@@ -1147,6 +1147,51 @@ describe('the card for people who tap or see it differently', () => {
 		}
 	});
 
+	// The Backup name tells one backup from another by its last characters, and a read-only field cannot be scrolled to
+	// them. Component tests run without app.css, so the case sets the tokens the field uses and gives the card the width
+	// it gets in the Settings section on a 320 px phone (the page's 24 px padding either side). Arial's letter widths
+	// stand in for a phone's system font: at 14 px the name needs about 229 px there, and the field has 220.
+	it('on a 320 px phone the whole Backup name shows in its field', async () => {
+		const TOKENS: Record<string, string> = {
+			'--space-xs': '4px',
+			'--space-s': '8px',
+			'--space-m': '16px',
+			'--space-l': '24px',
+			'--font-size-s': '14px',
+			'--radius-m': '8px',
+			'--color-border': '#888888'
+		};
+		const root = document.documentElement;
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		const bodyFont = document.body.style.fontFamily;
+		const reset = document.createElement('style');
+		reset.textContent = '* { box-sizing: border-box; } body { margin: 0; }';
+		document.head.append(reset);
+		for (const [name, value] of Object.entries(TOKENS)) root.style.setProperty(name, value);
+		document.body.style.fontFamily = 'Arial, Helvetica, sans-serif';
+		try {
+			await page.viewport(320, 800);
+			const card = await mount();
+			card.container.style.width = '272px';
+			await userEvent.click(toggle(CARD_LABELS.make, false));
+			await showWords();
+			await field().fill(TYPED);
+			const name = page.getByLabelText(CARD_LABELS.backupName, { exact: true }).element();
+			const input = name as HTMLInputElement;
+			expect(input.value).toBe(need(card.session.names).label);
+			expect(input.clientWidth).toBeGreaterThan(0);
+			expect(input.scrollWidth).toBeLessThanOrEqual(input.clientWidth);
+			// The four-letter id is random: the widest letters must fit too.
+			input.value = 'Ask 214 backup 2026-10-28 WWWW';
+			expect(input.scrollWidth).toBeLessThanOrEqual(input.clientWidth);
+		} finally {
+			for (const name of Object.keys(TOKENS)) root.style.removeProperty(name);
+			document.body.style.fontFamily = bodyFont;
+			reset.remove();
+			await page.viewport(size.width, size.height);
+		}
+	});
+
 	// Forced colors (Windows high contrast) repaint every colour from a small system palette and keep only borders and
 	// text: a filled button with no border becomes unmarked text, and a row that is off reads like a live one.
 	it('under forced colors a filled button keeps an outline and an off row reads differently from a live one', async () => {

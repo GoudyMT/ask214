@@ -1082,6 +1082,14 @@
 		border-radius: var(--radius-m);
 		font: inherit;
 	}
+	/* The name is read-only, so it cannot be scrolled to its last characters, and those tell one backup from another. On
+	   a 320 px phone the field is 220 px wide and the name at 14 px needs about 225 (more with a wide id), so it is set a
+	   little smaller there. */
+	@media (max-width: 340px) {
+		.backup-field input[readonly] {
+			font-size: 12px;
+		}
+	}
 	.backup-actions {
 		display: flex;
 		flex-wrap: wrap;
