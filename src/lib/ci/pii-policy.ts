@@ -121,7 +121,7 @@ export function scanForPiiTokens(
  * not caught.
  */
 export const FORBIDDEN_IMPORT_PATTERN =
-	/(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar)(?:\/|$)/;
+	/(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar|backup)(?:\/|$)/;
 
 // Any quote, including a template literal, and any whitespace - line breaks too - between `import(` or `from` and the
 // specifier, so the scan runs over the whole file rather than one line at a time. The specifier itself stops at a

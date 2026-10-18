@@ -265,6 +265,7 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		'$lib/calendar/store.svelte',
 		'$lib/db/schema',
 		'$lib/crypto/aes-gcm',
+		'$lib/backup/session.svelte',
 		'../../../src/lib/profile/types'
 	])('flags an import of %s', (specifier) => {
 		const violations = scan(`import { a } from '${specifier}';`);
