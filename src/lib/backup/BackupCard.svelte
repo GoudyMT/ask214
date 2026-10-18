@@ -1032,6 +1032,7 @@
 	}
 
 	.backup-primary {
+		min-height: 44px;
 		padding: var(--space-s) var(--space-l);
 		background: var(--color-accent);
 		color: var(--color-bg);
@@ -1050,6 +1051,7 @@
 		cursor: default;
 	}
 	.backup-cancel {
+		min-height: 44px;
 		padding: var(--space-s);
 		background: none;
 		border: none;
@@ -1059,6 +1061,7 @@
 		cursor: pointer;
 	}
 	.backup-quiet-danger {
+		min-height: 44px;
 		padding: var(--space-s);
 		background: none;
 		border: none;

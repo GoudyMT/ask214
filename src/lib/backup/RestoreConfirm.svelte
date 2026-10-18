@@ -137,6 +137,7 @@
 	/* Cancel is the prominent, focused default (filled primary) so the safe choice is the obvious one - the same
 	   pattern as the Erase dialog. */
 	.confirm__cancel {
+		min-height: 44px;
 		padding: var(--space-s) var(--space-l);
 		background: var(--color-accent);
 		color: var(--color-bg);
@@ -151,6 +152,7 @@
 	}
 	/* The destructive choice is quiet danger text: available, but it takes deliberate aim. */
 	.confirm__replace {
+		min-height: 44px;
 		padding: var(--space-s);
 		background: none;
 		border: none;

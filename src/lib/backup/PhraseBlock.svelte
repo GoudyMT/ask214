@@ -68,6 +68,7 @@
 		line-height: 1.8;
 	}
 	.phrase__hide {
+		min-height: 44px;
 		padding: var(--space-s) 0;
 		background: none;
 		border: none;

@@ -1049,6 +1049,43 @@ describe('focus when the pressed button leaves the page', () => {
 	});
 });
 
+// ---- how the buttons look to the people who need them to ------------------------------------------------------------------------
+
+const heightOf = (el: Element) => el.getBoundingClientRect().height;
+
+describe('the card for people who tap or see it differently', () => {
+	// A thumb needs 44 px; the toggles already have it, so the buttons under them must too.
+	it('every kind of button on the card is at least 44 px tall', async () => {
+		const file = fakeFile({ existing: 'an older backup', name: 'old.json' });
+		const card = await mount({ file });
+		await userEvent.click(toggle(CARD_LABELS.make, false));
+		const seen: Record<string, number> = {};
+		const measure = (label: string, el: Element) => (seen[label] = heightOf(el));
+
+		measure('primary (Show)', button(CARD_LABELS.show).element());
+		measure('cancel', button(CARD_LABELS.cancel).element());
+		await showWords();
+		measure('hide', button(CARD_LABELS.hide).element());
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.element(button(CARD_LABELS.replaceIt)).toBeVisible();
+		measure('quiet danger (Replace it)', button(CARD_LABELS.replaceIt).element());
+
+		await userEvent.click(toggle(CARD_LABELS.make, true));
+		await fileChosen(card, 'restore');
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		await expect.element(page.getByRole('dialog')).toBeVisible();
+		measure('confirm Cancel', button(CARD_LABELS.cancel).element());
+		measure('confirm Replace', button(CARD_LABELS.replace).element());
+
+		expect(Object.keys(seen)).toHaveLength(6);
+		for (const [label, height] of Object.entries(seen)) {
+			expect(height, label).toBeGreaterThanOrEqual(44);
+		}
+	});
+});
+
 // ---- Send a copy ------------------------------------------------------------------------------------------------------------
 
 const shareUndo: (() => void)[] = [];
