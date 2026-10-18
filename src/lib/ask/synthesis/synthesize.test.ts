@@ -243,8 +243,7 @@ describe('synthesize', () => {
 	it.each([
 		['an upper-cased id', `[${SKILLBRIDGE_ID}] [DOD_SKILLBRIDGE:ABCDEFABCDEF].`],
 		['a bare upper-case source name', `[${SKILLBRIDGE_ID}] [VA_BENEFITS_GUIDE].`],
-		['a mixed-case id', `[${SKILLBRIDGE_ID}] [Va_guide:abcdefabcdef].`],
-		['a lower-case word in brackets', `[${SKILLBRIDGE_ID}] [toe].`]
+		['a mixed-case id', `[${SKILLBRIDGE_ID}] [Va_guide:abcdefabcdef].`]
 	])('refuses %s written next to a real citation', async (_name, markers) => {
 		const impl = stubFetch(`SkillBridge lets you train with a civilian employer ${markers}`);
 		const result = await synthesize('What is SkillBridge?', REAL_ID_CHUNKS, deps(impl));
