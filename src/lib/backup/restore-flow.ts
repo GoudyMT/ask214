@@ -10,6 +10,8 @@ import {
 	readKeystoreRow,
 	type DeviceState
 } from '../profile/store.svelte';
+import { localTodayIso } from '../timeline/day-math';
+import { formatTimelineDate } from '../timeline/format-date';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
 import { BackupError, toBackupCode, type BackupCode } from './codes';
 import {
@@ -199,7 +201,9 @@ function describeDevice(state: DeviceState, createdAt: number): { line: string; 
 	if (written.length === 0) return { line: DEVICE_NO_DATA_LINE, warning: false };
 	const newest = Math.max(...written);
 	return {
-		line: deviceChangedLine(formatBackupDate(newest)),
+		// The cutoff of formatBackupDate is for a backup's stamp. The phone's own write times come from its own clock and
+		// are real however old, so a phone last saved before the release still names its day.
+		line: deviceChangedLine(formatTimelineDate(localTodayIso(new Date(newest)))),
 		warning: newest > createdAt || createdAt < BACKUP_RELEASE_DATE
 	};
 }

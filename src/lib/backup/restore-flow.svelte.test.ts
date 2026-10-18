@@ -15,6 +15,8 @@ import {
 	type DeviceState,
 	type ProfileStore
 } from '../profile/store.svelte';
+import { localTodayIso } from '../timeline/day-math';
+import { formatTimelineDate } from '../timeline/format-date';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { MAX_FILE_BYTES } from './caps';
@@ -86,6 +88,9 @@ const MINUTE = 60_000;
 const DAY = 86_400_000;
 const START_URL = location.href;
 const START_STATE: unknown = history.state;
+
+// A time the phone wrote, as the confirm shows it: always a date, whatever the day.
+const deviceDate = (ms: number): string => formatTimelineDate(localTodayIso(new Date(ms)));
 
 function need<T>(value: T | null | undefined): T {
 	if (value === null || value === undefined) throw new Error('test setup: value missing');
@@ -764,7 +769,7 @@ describe('the confirm', () => {
 		await toConfirm(r, file);
 		const confirm = need(r.flow.confirm);
 		expect(confirm.deviceLine).toBe(
-			'This device was last changed ' + formatBackupDate(need(state.ts.timeline)) + '.'
+			'This device was last changed ' + deviceDate(need(state.ts.timeline)) + '.'
 		);
 		expect(confirm.warning).toBe(true);
 	});
@@ -846,12 +851,33 @@ describe('the confirm', () => {
 			await toConfirm(r, file);
 			const confirm = need(r.flow.confirm);
 			const newest = createdAt + Math.max(profileOffset, timelineOffset ?? profileOffset);
-			expect(confirm.deviceLine).toBe(
-				'This device was last changed ' + formatBackupDate(newest) + '.'
-			);
+			expect(confirm.deviceLine).toBe('This device was last changed ' + deviceDate(newest) + '.');
 			expect(confirm.warning).toBe(warns);
 		}
 	);
+
+	// "Date unknown" is for a backup whose own stamp cannot be believed. A phone last saved before the release day
+	// (any install from before backups existed) still knows when it was last saved, and the person is told.
+	it('a phone last saved before the release day still dates its last change', async () => {
+		const phone = await newPhone();
+		const source = await finishedDevice(await newDb());
+		const file = await exportFrom(source, { createdAt: Date.now() - MINUTE });
+		const savedAt = new Date(2026, 8, 15, 12).getTime();
+		expect(savedAt).toBeLessThan(BACKUP_RELEASE_DATE);
+		const crafted: DeviceState = {
+			gens: { profile: 1, timeline: 0, calendar: 0 },
+			ts: { profile: savedAt, timeline: null, calendar: null },
+			mark: null,
+			lastSeenAt: null
+		};
+		const r = restoreRig(phone, {
+			readDevice: async () => ({ state: crafted, installUuid: new Uint8Array(16) })
+		});
+		await toConfirm(r, file);
+		const confirm = need(r.flow.confirm);
+		expect(confirm.deviceLine).toBe('This device was last changed Sep 15, 2026.');
+		expect(confirm.warning).toBe(false);
+	});
 });
 
 // ---- Replace -------------------------------------------------------------------------------------------------------
