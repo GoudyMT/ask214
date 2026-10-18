@@ -20,30 +20,56 @@
  * indistinguishable from a model that cited nothing.
  *
  * Case-insensitive, so a made-up marker in any case (`[DOD_SKILLBRIDGE:ABCDEFABCDEF]`) still parses and
- * fails `validateCitations`, which compares ids exactly. The one exemption is `ACRONYM`: the corpus prints
- * bracketed acronyms of its own ("Transfer of Entitlement [TOE]"), and read as a citation one names no
- * retrieved id and an answer that merely quoted its source was refused.
+ * fails `validateCitations`, which compares ids exactly. The one exemption is a bracket the sources print
+ * themselves ("Transfer of Entitlement [TOE]"): read as a citation it names no retrieved id, and an answer
+ * that merely quoted its source was refused. See `printedAcronyms`.
  */
 export const CITATION = /\[([a-z0-9_.:-]+)\]/gi;
 
-// A bracket of capital letters only is read as an acronym, not as a citation. Anything else that parses
-// must be a retrieved id.
+// The shape of a bracket that may be an acronym: capital letters only, in exactly that case.
 const ACRONYM = /^[A-Z]+$/;
+
+/**
+ * Collect the acronym brackets the retrieved sources print.
+ *
+ * Only a bracket the sources themselves print is exempt from being read as a citation. A capital-letters
+ * bracket that no source prints (`[DOD]`, `[VABENEFITSGUIDE]`) is a made-up source and stays a citation, so
+ * it fails `validateCitations`. Pass the result to `parseCitedIds`, `stripCitations` and `toCitedAnswer`
+ * alike, so the gate and the text the reader sees agree on which brackets are acronyms.
+ *
+ * Args:
+ *     texts: The cleaned text of every retrieved chunk.
+ *
+ * Returns:
+ *     The contents of each capital-letters bracket printed in any of the texts, brackets excluded.
+ */
+export function printedAcronyms(texts: readonly string[]): Set<string> {
+	const printed = new Set<string>();
+	for (const text of texts) {
+		for (const match of text.matchAll(CITATION)) {
+			const id = match[1];
+			if (id && ACRONYM.test(id)) printed.add(id);
+		}
+	}
+	return printed;
+}
 
 /**
  * Extract the chunk ids the model cited.
  *
  * Args:
  *     text: The model's raw answer text.
+ *     printed: The acronym brackets the sources print (`printedAcronyms`); none by default, so every
+ *         bracket is read as a citation.
  *
  * Returns:
  *     The unique cited ids, in first-seen order.
  */
-export function parseCitedIds(text: string): string[] {
+export function parseCitedIds(text: string, printed: ReadonlySet<string> = new Set()): string[] {
 	const ids = new Set<string>();
 	for (const match of text.matchAll(CITATION)) {
 		const id = match[1];
-		if (id && !ACRONYM.test(id)) ids.add(id);
+		if (id && !printed.has(id)) ids.add(id);
 	}
 	return [...ids];
 }
@@ -58,13 +84,14 @@ export function parseCitedIds(text: string): string[] {
  *
  * Args:
  *     text: The model's raw answer text.
+ *     printed: The acronym brackets the sources print (`printedAcronyms`); these stay in the text.
  *
  * Returns:
  *     The text with every citation marker removed and surrounding whitespace tidied.
  */
-export function stripCitations(text: string): string {
+export function stripCitations(text: string, printed: ReadonlySet<string> = new Set()): string {
 	return text
-		.replace(CITATION, (marker, id: string) => (ACRONYM.test(id) ? marker : ''))
+		.replace(CITATION, (marker, id: string) => (printed.has(id) ? marker : ''))
 		.replace(/[ \t]{2,}/g, ' ')
 		.replace(/[ \t]+([.,;:!?])/g, '$1')
 		.trim();

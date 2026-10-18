@@ -52,12 +52,14 @@ function detectInert(text: string): string[] {
  * @param modelText The synthesized answer prose.
  * @param citedIds The chunk ids the model cited.
  * @param retrieved The chunks actually retrieved - the only source of clickable citations.
+ * @param printed The acronym brackets the sources print, kept in the text; the same set the grounding gate used.
  * @returns The answer text, its verified citations, inert prose tokens, and the disclaimer.
  */
 export function toCitedAnswer(
 	modelText: string,
 	citedIds: string[],
-	retrieved: Citation[]
+	retrieved: Citation[],
+	printed: ReadonlySet<string> = new Set()
 ): CitedAnswer {
 	const cited = new Set(citedIds);
 	const citations = retrieved
@@ -71,6 +73,6 @@ export function toCitedAnswer(
 	// The prompt tells the model to END with the disclaimer, and this function attaches it unconditionally
 	// so it survives a model that forgets. Both firing prints the sentence to the reader twice, back to
 	// back. The attached copy is the one that is guaranteed, so the model's trailing copy is dropped.
-	const prose = stripCitations(modelText).replace(TRAILING_DISCLAIMER_RE, '').trim();
+	const prose = stripCitations(modelText, printed).replace(TRAILING_DISCLAIMER_RE, '').trim();
 	return { text: prose, citations, inert: detectInert(prose), disclaimer: DISCLAIMER };
 }

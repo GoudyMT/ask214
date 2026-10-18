@@ -29,6 +29,18 @@ describe('toCitedAnswer', () => {
 		expect(ans.inert).not.toContain('71686373');
 	});
 
+	// A source that prints "Transfer of Entitlement [TOE]" is quoted with the bracket intact; the printed set is
+	// the only thing that keeps it, so a marker of the same shape that no source prints is still removed.
+	it('keeps a bracket the sources print and removes every other marker', () => {
+		const ans = toCitedAnswer(
+			'The Transfer of Entitlement [TOE] is on file [a], per [DOD].',
+			['a'],
+			RETRIEVED,
+			new Set(['TOE'])
+		);
+		expect(ans.text).toBe('The Transfer of Entitlement [TOE] is on file, per.');
+	});
+
 	it('never turns a URL or phone the model wrote into a citation (anti-phishing)', () => {
 		const text = 'Call 800-555-1212 or visit http://scam.example to claim, also @scammer.';
 		const ans = toCitedAnswer(text, ['a'], RETRIEVED);

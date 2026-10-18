@@ -1,6 +1,11 @@
 import { detectEligibilityIntent } from './eligibility-gate';
 import { buildMessages } from './system-prompt';
-import { validateCitations, parseCitedIds, stripCitations } from './citation-validation';
+import {
+	validateCitations,
+	parseCitedIds,
+	stripCitations,
+	printedAcronyms
+} from './citation-validation';
 import { checkNumericGrounding } from './grounding';
 import { mentionsCrisisLine, mentionsOfficialFallback } from '../crisis/contacts';
 import { toCitedAnswer, type Citation, type CitedAnswer } from './cited-answer';
@@ -182,7 +187,10 @@ export async function synthesize(
 	// answer to be UNCITED is what keeps the classification precise: 28 of the 1992 shipped chunks
 	// legitimately mention the crisis line, so keying on the number alone would replace a real, useful
 	// answer about mental-health resources with a crisis card.
-	const citedIds = parseCitedIds(modelText);
+	// A capital-letters bracket is an acronym only when a retrieved chunk prints it. Parsing, grounding and the
+	// rendered answer all take this one set, so they agree on what a citation is.
+	const printed = printedAcronyms(cleanedChunks.map((c) => c.text));
+	const citedIds = parseCitedIds(modelText, printed);
 	const retrievedIds = new Set(chunks.map((c) => c.id));
 	// Classified out ahead of ALL THREE gates, on the count of VALID citations rather than of parsed ones.
 	// Ordering this after validateCitations left the crisis reply behind the invalid_citation gate: the
@@ -218,7 +226,7 @@ export async function synthesize(
 	// characters, so the marker itself carries digits that are metadata, not claims the source must
 	// support. `stripCitations` is the SAME transform the rendered answer uses, so the gate can never
 	// check text the reader does not see. See its contract for why removal, not substitution.
-	const prose = stripCitations(modelText);
+	const prose = stripCitations(modelText, printed);
 	if (!checkNumericGrounding(prose, citedText).grounded) {
 		return { kind: 'refusal', reason: 'ungrounded_number' };
 	}
@@ -244,5 +252,5 @@ export async function synthesize(
 		if (c === undefined || citations.some((x) => x.id === c.id)) continue;
 		citations.push({ id: c.id, url: documentUrl(c.sourceId, c.page) ?? c.url, title: c.title });
 	}
-	return { kind: 'answer', answer: toCitedAnswer(modelText, citedIds, citations) };
+	return { kind: 'answer', answer: toCitedAnswer(modelText, citedIds, citations, printed) };
 }
