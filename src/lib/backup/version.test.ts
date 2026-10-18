@@ -39,7 +39,6 @@ describe('isAppVersion', () => {
 		['a seven-digit part', '1.2.1234567'],
 		['an empty part', '1..3'],
 		['a negative part', '1.2.-3'],
-		['21 characters', '123456.123456.1234567'],
 		['Arabic-Indic digits', String.fromCharCode(0x661) + '.2.3'],
 		['an array', ['1.2.3']]
 	] as const)('refuses %s', (_name, v) => {

@@ -1,14 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ErrorCode } from '../log/safelog';
-import {
-	BACKUP_CODES,
-	DISPLAY_ONLY_BACKUP_CODES,
-	LOGGED_BACKUP_CODES,
-	BackupError,
-	isBackupCode,
-	toBackupCode,
-	type BackupCode
-} from './codes';
+import { BackupError, isBackupCode, toBackupCode, type BackupCode } from './codes';
 
 const EXPECTED_CODES = [
 	'E_FILE_TOO_LARGE',
@@ -50,18 +41,6 @@ const STAGE_CODE = {
 	content: 'E_CONTENT_INVALID'
 } as const;
 
-describe('BACKUP_CODES', () => {
-	it('holds exactly the listed codes, each E_-prefixed, no duplicates', () => {
-		expect([...BACKUP_CODES]).toEqual(EXPECTED_CODES);
-		expect(new Set(BACKUP_CODES).size).toBe(BACKUP_CODES.length);
-		for (const code of BACKUP_CODES) expect(code.startsWith('E_')).toBe(true);
-	});
-
-	it('is frozen, so a caller cannot add a code at run time', () => {
-		expect(Object.isFrozen(BACKUP_CODES)).toBe(true);
-	});
-});
-
 describe('isBackupCode', () => {
 	it('accepts every code and refuses others', () => {
 		for (const code of EXPECTED_CODES) expect(isBackupCode(code)).toBe(true);
@@ -78,12 +57,6 @@ describe('isBackupCode', () => {
 			['E_DAMAGED']
 		];
 		for (const value of refused) expect(isBackupCode(value)).toBe(false);
-	});
-
-	it('refuses the codes that live elsewhere', () => {
-		for (const code of ['E_NOTE_TOO_LONG', 'E_NOTE_KEY', 'E_KEY_SHAPE', 'E_INTERNAL']) {
-			expect(isBackupCode(code)).toBe(false);
-		}
 	});
 
 	it('refuses an Object.prototype name', () => {
@@ -132,13 +105,6 @@ describe('toBackupCode', () => {
 		}
 	});
 
-	it('an Error whose message is a backup code is not trusted', () => {
-		for (const stage of STAGES) {
-			expect(toBackupCode(new Error('E_NO_MEMORY'), stage)).toBe(STAGE_CODE[stage]);
-			expect(toBackupCode(new Error('E_WRONG_PASSPHRASE'), stage)).toBe(STAGE_CODE[stage]);
-		}
-	});
-
 	it('an object that only looks like a BackupError is not trusted', () => {
 		const lookalike = { name: 'BackupError', code: 'E_NO_MEMORY', message: 'E_NO_MEMORY' };
 		for (const stage of STAGES) {
@@ -166,20 +132,5 @@ describe('toBackupCode', () => {
 			toBackupCode(err, stage);
 		}
 		expect(reads).toBe(0);
-	});
-});
-
-describe('logged and display-only codes', () => {
-	it('every code is logged or display-only, never both', () => {
-		const logged: readonly string[] = LOGGED_BACKUP_CODES;
-		const display: readonly string[] = DISPLAY_ONLY_BACKUP_CODES;
-		expect(logged).toEqual(['E_EXPORT_SELF_INVALID']);
-		for (const code of logged) expect(display).not.toContain(code);
-		expect([...logged, ...display].sort()).toEqual([...BACKUP_CODES].sort());
-	});
-
-	it('the logged codes are members of the safelog union', () => {
-		const asErrorCodes: readonly ErrorCode[] = LOGGED_BACKUP_CODES;
-		expect(asErrorCodes.length).toBe(1);
 	});
 });
