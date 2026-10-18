@@ -318,28 +318,24 @@
 		}
 	}
 
-	function closeRow(): void {
-		if (session.stopping) return;
-		if (session.canCancel) session.cancel('user-cancel');
-		else restore.close();
-		setOutcome(null);
-		inputError = null;
-		warningName = '';
-	}
-
 	// A pressed button that leaves the page drops focus to the top of the page. Focus goes to the row's own toggle instead,
 	// unless the person (or the step that followed) already put it somewhere.
-	async function handFocusToRow(row: SessionKind): Promise<void> {
+	async function handFocusToRow(row: SessionKind | null): Promise<void> {
 		await tick();
 		if (document.activeElement === document.body) {
 			document.getElementById(`backup-toggle-${row}`)?.focus();
 		}
 	}
 
-	function cancelRow(): void {
+	function closeRow(): void {
+		if (session.stopping) return;
 		const row = kind;
-		closeRow();
-		if (row !== null) void handFocusToRow(row);
+		if (session.canCancel) session.cancel('user-cancel');
+		else restore.close();
+		setOutcome(null);
+		inputError = null;
+		warningName = '';
+		void handFocusToRow(row);
 	}
 
 	function toggleRow(row: SessionKind): void {
@@ -461,16 +457,11 @@
 		void exportFlowFor()?.chooseAnother().then(applyExport);
 	}
 
-	function checkNow(): void {
+	// The result's own buttons: the one that was pressed goes with the result, so focus goes to the row it opened.
+	function offer(row: SessionKind): void {
 		setOutcome(null);
-		openRow('check');
-		void handFocusToRow('check');
-	}
-
-	function makeAgain(): void {
-		setOutcome(null);
-		openRow('export');
-		void handFocusToRow('export');
+		openRow(row);
+		void handFocusToRow(row);
 	}
 
 	// The three lines that tell the person to delete a file live here, not in copy.ts: that module's test refuses the
@@ -558,8 +549,7 @@
 
 	function makeNewBackup(): void {
 		restore.close();
-		openRow('export');
-		void handFocusToRow('export');
+		offer('export');
 	}
 </script>
 
@@ -620,7 +610,7 @@
 
 	{#snippet cancelButton()}
 		{#if cancellable}
-			<button class="backup-cancel" type="button" onclick={cancelRow} onkeydown={guardEnter}>
+			<button class="backup-cancel" type="button" onclick={closeRow} onkeydown={guardEnter}>
 				{CARD_LABELS.cancel}
 			</button>
 		{/if}
@@ -682,7 +672,7 @@
 						spellcheck="false"
 						enterkeyhint="done"
 						aria-invalid={fileLine !== null}
-						aria-describedby={fileLine !== null ? `backup-${row}-error` : undefined}
+						aria-describedby={fileLine !== null ? 'backup-file-error' : undefined}
 					/>
 				</label>
 				<div class="backup-actions">
@@ -694,7 +684,7 @@
 		{/if}
 		{@render progressBar()}
 		{#if fileLine !== null}
-			<p id="backup-{row}-error" class="backup-error" role="alert">{fileLine}</p>
+			<p id="backup-file-error" class="backup-error" role="alert">{fileLine}</p>
 		{/if}
 		{#if view.offerNewBackup}
 			<p class="backup-hint">{CHECK_NEW_BACKUP_OFFER}</p>
@@ -861,7 +851,7 @@
 								<button
 									class="backup-primary"
 									type="button"
-									onclick={makeAgain}
+									onclick={() => offer('export')}
 									onkeydown={guardEnter}
 								>
 									{CARD_LABELS.makeAgain}
@@ -870,7 +860,7 @@
 								<button
 									class="backup-primary"
 									type="button"
-									onclick={checkNow}
+									onclick={() => offer('check')}
 									onkeydown={guardEnter}
 								>
 									{CARD_LABELS.checkNow}

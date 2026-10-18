@@ -1405,20 +1405,18 @@ describe('restoring', () => {
 		const dialog = page.getByRole('dialog');
 		await expect.element(dialog).toBeVisible();
 
-		const ids = (dialog.element().getAttribute('aria-describedby') ?? '').split(' ');
-		const described = ids.map((id) => document.getElementById(id)?.textContent ?? null);
-		expect(described).toHaveLength(2);
-		expect(described[0]).toContain('This device was last changed');
-		expect(described[1]).toBe(DEVICE_NEWER_WARNING);
+		const description = () =>
+			document.getElementById(dialog.element().getAttribute('aria-describedby') ?? '')?.textContent;
+		expect(description()).toContain('This device was last changed');
+		expect(description()).toContain(DEVICE_NEWER_WARNING);
+		expect(description()).not.toContain(ONLY_RESTORE_YOURS_LINE);
 
 		// The device moves while the person decides: Replace reads the details again, and says why, in the dialog.
 		await profile.save({ skillbridgeStart: new TextEncoder().encode('2027-01-10') });
 		await userEvent.click(button(CARD_LABELS.replace));
 		const why = need(backupMessage('E_RESTORE_DEVICE_MOVED', { path: 'restore' }));
 		await expect.element(dialog.getByText(why, { exact: true })).toBeVisible();
-		const after = (dialog.element().getAttribute('aria-describedby') ?? '').split(' ');
-		expect(after).toHaveLength(3);
-		expect(document.getElementById(need(after[2]))?.textContent).toBe(why);
+		expect(description()).toContain(why);
 	});
 
 	it('the confirm says what the backup holds, what the device holds, and what no backup carries', async () => {
