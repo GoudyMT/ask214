@@ -52,7 +52,7 @@ vi.mock('$lib/backup/session.svelte', async (importOriginal) => {
 
 const ENTRY = 'Moving to a new phone? Restore from a backup';
 const NEW_LEAD =
-	'Everything stays encrypted on this device. It leaves only if you make a backup, which is locked with your passphrase.';
+	'Everything stays encrypted on this device. It leaves only in a file you choose to save: a backup, locked with its passphrase, or a calendar file of your deadlines.';
 const WORDS = ['bamboo', 'copper', 'harvest', 'lantern', 'oxygen', 'thimble'];
 const TYPED = WORDS.join(' ');
 const START_URL = location.href;

@@ -111,8 +111,8 @@
 	<h1 id="wizard-heading">Set up your profile</h1>
 	<p class="wizard__lead">
 		Add your separation date and we'll build a transition timeline around it. Everything stays
-		encrypted on this device. It leaves only if you make a backup, which is locked with your
-		passphrase.
+		encrypted on this device. It leaves only in a file you choose to save: a backup, locked with its
+		passphrase, or a calendar file of your deadlines.
 	</p>
 
 	{#if app.status === 'ready'}
