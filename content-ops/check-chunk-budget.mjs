@@ -355,6 +355,11 @@ const STATIC = 'static';
 //     850 B less on Home, About, Documents, Feedback, Resources and Ask. Three builds measured page 89,638-89,641 B,
 //     precache 218,083-218,092 B, route nodes 51,858-51,865 B, at least 45 B of room above the highest. Trim pass: the
 //     sweep fixes were trimmed once each (focus helper, confirm description, the flow checks; about -150 B), kept.
+//     Page 89,690 -> 89,730, precache 218,140 -> 218,200 and route nodes 51,910 -> 51,930 (owner's call, 2026-10-18):
+//     the re-sweep's fixes - a kept backup result is dropped when the person leaves Settings, a first-run device's
+//     session ends when its card leaves, a refused Send a copy and the newer saved line survive a remount. Three builds
+//     measured page 89,682-89,688 B, precache 218,144-218,159 B, route nodes 51,879-51,885 B, at least 41 B of room
+//     above the highest. Trim pass: the three kept values share one effect, kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -364,10 +369,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 89_690,
+	page: 89_730,
 	onDemand: 8_189,
 	precacheFiles: 68,
-	precacheBytes: 218_140,
+	precacheBytes: 218_200,
 	workerScripts: 147_200
 };
 
