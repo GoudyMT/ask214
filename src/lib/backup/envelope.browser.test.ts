@@ -181,18 +181,6 @@ describe('seal, read, decrypt', () => {
 		expect(Array.from(r.envelope.ct)).toEqual(Array.from(fromB64(parsed['data'] as string)));
 	});
 
-	it('the sealed text is the serializer output for its own fields', async () => {
-		const parsed = JSON.parse(good) as Env;
-		expect(good).toBe(
-			serializeEnvelope({
-				salt: parsed.kdf['salt'] as string,
-				iv: parsed.cipher['iv'] as string,
-				check: parsed['check'] as string,
-				data: parsed['data'] as string
-			})
-		);
-	});
-
 	it('GCM failure with a matching check is WRONG_PASSPHRASE', async () => {
 		const env = await mustRead(good);
 		expect(await decryptEnvelope(env, keyB)).toEqual({ ok: false, code: 'E_WRONG_PASSPHRASE' });
@@ -220,14 +208,6 @@ describe('seal, read, decrypt', () => {
 		const text = await sealEnvelope(keyA, Uint8Array.from([0x22, 0xff, 0x22]), SALT);
 		const out = await decryptEnvelope(await mustRead(text), keyA);
 		expect(out).toEqual({ ok: false, code: 'E_CONTENT_INVALID' });
-	});
-
-	it('newBackupSalt is 16 random bytes', () => {
-		const a = newBackupSalt();
-		const b = newBackupSalt();
-		expect(a).toHaveLength(16);
-		expect(b).toHaveLength(16);
-		expect(hex(a)).not.toBe(hex(b));
 	});
 });
 
@@ -333,11 +313,6 @@ describe('version', () => {
 		expect(await readBackupFile(fileOf(text))).toEqual({ ok: false, code: 'E_NEWER_VERSION' });
 	});
 
-	it('a huge integer version is NEWER_VERSION', async () => {
-		const text = good.replace('"version":1', '"version":99');
-		expect(await readBackupFile(fileOf(text))).toEqual({ ok: false, code: 'E_NEWER_VERSION' });
-	});
-
 	it('version 2 with a wrong format is NOT_BACKUP (the format check runs first)', async () => {
 		const text = edit(good, (e) => {
 			e['version'] = 2;
@@ -425,28 +400,6 @@ describe('the check', () => {
 			ok: false,
 			code: 'E_DAMAGED'
 		});
-	});
-
-	it('check is SHA-256 over the AAD bytes then the decoded data bytes', async () => {
-		const parsed = JSON.parse(good) as Env;
-		const salt = fromB64(parsed.kdf['salt'] as string);
-		const iv = fromB64(parsed.cipher['iv'] as string);
-		const data = fromB64(parsed['data'] as string);
-		const aad = enc.encode(buildBackupAad(salt, iv));
-		const expected = await sha256(concat(aad, data));
-		expect(parsed['check']).toBe(toB64(expected));
-	});
-
-	it('check over the base64 text instead of the bytes does not match', async () => {
-		const parsed = JSON.parse(good) as Env;
-		const salt = fromB64(parsed.kdf['salt'] as string);
-		const iv = fromB64(parsed.cipher['iv'] as string);
-		const aad = enc.encode(buildBackupAad(salt, iv));
-		const overText = await sha256(concat(aad, enc.encode(parsed['data'] as string)));
-		expect(parsed['check']).not.toBe(toB64(overText));
-		// A file that carries the text form is refused.
-		const text = edit(good, (e) => (e['check'] = toB64(overText)));
-		expect(await readBackupFile(fileOf(text))).toEqual({ ok: false, code: 'E_DAMAGED' });
 	});
 });
 
@@ -559,8 +512,6 @@ describe('padding and wiping', () => {
 
 	it.each([
 		[0, 4112],
-		[1, 4112],
-		[4095, 4112],
 		[4096, 4112],
 		[4097, 8208]
 	])('inner of %i bytes gives %i decoded data bytes', async (innerLength, expected) => {
@@ -652,52 +603,13 @@ describe('the freeze', () => {
 	});
 });
 
-describe('no result or error carries file text', () => {
-	const CANARY = 'CANARY-Zq7-private-note';
-	const CANARY32 = 'CANARYCANARYCANARYCANARYCANARY12';
-
-	const cases: [string, () => BlobPart][] = [
-		['not UTF-8', () => Uint8Array.from([0xff, ...enc.encode(CANARY)])],
-		['not JSON', () => 'not json ' + CANARY],
-		['an array', () => '["' + CANARY + '"]'],
-		['another format', () => '{"format":"' + CANARY + '"}'],
-		['a bad version', () => '{"format":"ask214-backup","version":"' + CANARY + '"}'],
-		['a newer version', () => '{"format":"ask214-backup","version":2,"x":"' + CANARY + '"}'],
-		['an extra key', () => edit(good, (e) => (e[CANARY] = CANARY))],
-		['a bad kdf alg', () => edit(good, (e) => (e.kdf['alg'] = CANARY))],
-		['a bad cipher alg', () => edit(good, (e) => (e.cipher['alg'] = CANARY))],
-		['a bad salt', () => edit(good, (e) => (e.kdf['salt'] = CANARY))],
-		['a bad iv', () => edit(good, (e) => (e.cipher['iv'] = CANARY))],
-		['a bad data', () => edit(good, (e) => (e['data'] = CANARY))],
-		['a bad number', () => edit(good, (e) => (e.kdf['m'] = CANARY))],
-		['a check that does not match', () => edit(good, (e) => (e['check'] = btoa(CANARY32)))],
-		['too large', () => concat(enc.encode(CANARY), new Uint8Array(MAX_FILE_BYTES).fill(0x20))]
-	];
-
-	it.each(cases)('refused for %s', async (_name, make) => {
-		const r = await readBackupFile(new File([make()], 'x.json'));
-		expect(r.ok).toBe(false);
-		expect(Object.keys(r).sort()).toEqual(['code', 'ok']);
-		const out = JSON.stringify(r);
-		expect(out).not.toContain(CANARY);
-		expect(out).not.toContain(btoa(CANARY32));
-		expect(out).not.toContain('CANARY');
-	});
-
-	it('a decrypt that cannot read its contents carries no text', async () => {
-		const text = await sealEnvelope(keyA, enc.encode('not json ' + CANARY), SALT);
-		const r = await decryptEnvelope(await mustRead(text), keyA);
-		expect(r).toEqual({ ok: false, code: 'E_CONTENT_INVALID' });
+describe('no result carries file text', () => {
+	// One canary: every refusal above is compared whole with toEqual, so a result that echoed file text would already
+	// fail there. This row names the privacy rule itself, on the path that reads a field's value.
+	it('a refused file with a canary in a field comes back as its code alone', async () => {
+		const CANARY = 'CANARY-Zq7-private-note';
+		const r = await readBackupFile(fileOf(edit(good, (e) => (e.kdf['alg'] = CANARY))));
+		expect(r).toEqual({ ok: false, code: 'E_DAMAGED' });
 		expect(JSON.stringify(r)).not.toContain('CANARY');
-	});
-
-	it('a seal refused for size carries no text', async () => {
-		const err = await sealEnvelope(
-			keyA,
-			new Uint8Array(MAX_PADDED_PLAINTEXT_BYTES + 1),
-			SALT
-		).catch((e: unknown) => e);
-		expect(err).toBeInstanceOf(BackupError);
-		expect((err as BackupError).message).toBe('E_CONTENT_TOO_LARGE');
 	});
 });

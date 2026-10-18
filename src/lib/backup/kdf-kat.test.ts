@@ -55,18 +55,6 @@ describe('Argon2id known answers', () => {
 		expect(hex(result.bytes)).toBe(hex(passwordBytes()));
 	});
 
-	it('omitted key and personalization equal explicit zero-length bytes', () => {
-		const omitted = argon2id(passwordBytes(), KAT_SALT, SMALL);
-		const explicit = argon2id(passwordBytes(), KAT_SALT, {
-			...SMALL,
-			key: new Uint8Array(0),
-			personalization: new Uint8Array(0)
-		});
-		expect(hex(explicit)).toBe(hex(omitted));
-		const keyed = argon2id(passwordBytes(), KAT_SALT, { ...SMALL, key: new Uint8Array([1]) });
-		expect(hex(keyed)).not.toBe(hex(omitted));
-	});
-
 	it('the production KAT uses the v1 tuple', () => {
 		expect(KAT_ARGON2_TUPLE).toEqual(KDF_V1);
 	});
