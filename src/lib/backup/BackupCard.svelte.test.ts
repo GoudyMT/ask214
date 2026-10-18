@@ -1332,6 +1332,32 @@ describe('restoring', () => {
 		await expect.poll(() => document.activeElement).toBe(button(CARD_LABELS.cancel).element());
 	});
 
+	// A screen reader announces a dialog with its name and its description: what the device holds, and the warning that
+	// restoring replaces newer changes, are what the person must hear before Replace.
+	it('the confirm is described by the device line, the newer-changes warning and the reason it was read again', async () => {
+		const card = await mount();
+		await fileChosen(card, 'restore');
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog).toBeVisible();
+
+		const ids = (dialog.element().getAttribute('aria-describedby') ?? '').split(' ');
+		const described = ids.map((id) => document.getElementById(id)?.textContent ?? null);
+		expect(described).toHaveLength(2);
+		expect(described[0]).toContain('This device was last changed');
+		expect(described[1]).toBe(DEVICE_NEWER_WARNING);
+
+		// The device moves while the person decides: Replace reads the details again, and says why, in the dialog.
+		await profile.save({ skillbridgeStart: new TextEncoder().encode('2027-01-10') });
+		await userEvent.click(button(CARD_LABELS.replace));
+		const why = need(backupMessage('E_RESTORE_DEVICE_MOVED', { path: 'restore' }));
+		await expect.element(dialog.getByText(why, { exact: true })).toBeVisible();
+		const after = (dialog.element().getAttribute('aria-describedby') ?? '').split(' ');
+		expect(after).toHaveLength(3);
+		expect(document.getElementById(need(after[2]))?.textContent).toBe(why);
+	});
+
 	it('the confirm says what the backup holds, what the device holds, and what no backup carries', async () => {
 		const card = await mount();
 		await fileChosen(card, 'restore');

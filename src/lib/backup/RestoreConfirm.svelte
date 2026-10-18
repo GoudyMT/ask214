@@ -26,6 +26,18 @@
 	let dialog = $state<HTMLDialogElement | null>(null);
 	let cancelEl = $state<HTMLButtonElement | null>(null);
 
+	// What a screen reader reads after the name: what this device holds, the warning that its changes are newer, and the
+	// reason the details were read again. Only the lines that are on the page.
+	const describedBy = $derived(
+		[
+			'backup-confirm-device',
+			confirm.warning ? 'backup-confirm-warning' : null,
+			notice !== null ? 'backup-confirm-notice' : null
+		]
+			.filter((id) => id !== null)
+			.join(' ')
+	);
+
 	onMount(() => {
 		dialog?.showModal();
 		// Cancel is the safe choice and the default: Enter on a dialog that just opened must not replace anything.
@@ -42,6 +54,7 @@
 	class="confirm"
 	translate="no"
 	aria-labelledby="backup-confirm-heading"
+	aria-describedby={describedBy}
 	onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 	oncancel={(e) => {
 		e.preventDefault();
@@ -58,12 +71,14 @@
 			<li>{line}</li>
 		{/each}
 	</ul>
-	<p class="confirm__line">{confirm.deviceLine}</p>
+	<p id="backup-confirm-device" class="confirm__line">{confirm.deviceLine}</p>
 	{#if confirm.warning}
-		<p class="confirm__line confirm__line--warning">{DEVICE_NEWER_WARNING}</p>
+		<p id="backup-confirm-warning" class="confirm__line confirm__line--warning">
+			{DEVICE_NEWER_WARNING}
+		</p>
 	{/if}
 	{#if notice !== null}
-		<p class="confirm__line" role="alert">{notice}</p>
+		<p id="backup-confirm-notice" class="confirm__line" role="alert">{notice}</p>
 	{/if}
 	<p class="confirm__line">{ONLY_RESTORE_YOURS_LINE}</p>
 	<p class="confirm__line confirm__line--lead">{NOT_IN_BACKUPS_LEAD}</p>
