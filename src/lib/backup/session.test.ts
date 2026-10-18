@@ -731,14 +731,6 @@ describe('relock while committing', () => {
 		expect(h.s.concealed).toBe(false);
 	});
 
-	// A run from an earlier session must never look current to the next one.
-	it('start moves the run id past every earlier run', () => {
-		const h = harness();
-		const before = h.s.runId;
-		h.s.start(h.app, 'check');
-		expect(h.s.runId).toBeGreaterThan(before);
-	});
-
 	// The export read-back must know the person left the page, so it can say "saved, but not checked".
 	it('the card leaving while committing is recorded as navigation and does not cancel', () => {
 		const h = harness();

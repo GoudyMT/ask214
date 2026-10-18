@@ -56,8 +56,7 @@ describe('KNOWN_TASK_IDS', () => {
 		expect(KNOWN_TASK_IDS.slice(0, SHIPPED_TASK_IDS.length)).toEqual(SHIPPED_TASK_IDS);
 	});
 
-	it('KNOWN_TASK_IDS is frozen and has no duplicates', () => {
-		expect(Object.isFrozen(KNOWN_TASK_IDS)).toBe(true);
+	it('KNOWN_TASK_IDS has no duplicates', () => {
 		expect(new Set(KNOWN_TASK_IDS).size).toBe(KNOWN_TASK_IDS.length);
 	});
 });

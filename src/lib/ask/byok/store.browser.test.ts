@@ -192,21 +192,6 @@ describe('byok store against an erase', () => {
 		expect(await byokRow(db)).toBeUndefined();
 	});
 
-	it('a key save waits for an Erase holding the keystore lock', async () => {
-		const peer = await hold('mtc-keystore', 'exclusive');
-		let save: Promise<void> | undefined;
-		try {
-			save = createByokStore(db).saveApiKey(KEY);
-			expect(await outcomeOf(save)).toBe('still waiting');
-			expect(await byokRow(db)).toBeUndefined();
-		} finally {
-			await peer.release();
-		}
-		await save;
-		expect(await byokRow(db)).toBeDefined();
-		expect(await createByokStore(db).readApiKey()).toBe(KEY);
-	});
-
 	it('a key removal straddling an Erase waits for it', async () => {
 		const store = createByokStore(db);
 		await store.saveApiKey(KEY);

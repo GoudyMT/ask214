@@ -154,7 +154,7 @@ describe.each(PAGES)('a $name visit under the real layout', ({ Page, profile, ca
 
 		leavePage();
 		expect(() => app.db?.transaction('keystore', 'readonly')).not.toThrow();
-		expect(app.db).not.toBeNull();
+		expect(app.db).toBe(await harness.opened[0]);
 	});
 });
 
