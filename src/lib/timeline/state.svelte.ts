@@ -1,6 +1,6 @@
 import type { TimelineState, TaskStatus, TimelineTaskState } from './types';
 import { isSnoozeDate } from './state-codec';
-import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
+import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-key';
 import { MAX_NOTE_UNITS } from '../backup/note-cap';
 import { encryptTimelineRecord, decryptTimelineRecord } from './crypto-boundary';
 import type { KeystoreRecordV1 } from '../keystore/record';

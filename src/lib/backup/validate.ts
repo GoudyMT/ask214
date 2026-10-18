@@ -4,7 +4,7 @@ import { decodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
 import type { ProfileV1 } from '../profile/types';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
-import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
+import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-key';
 import { decodeTimelineState, isSnoozeDate } from '../timeline/state-codec';
 import type { TaskCategory, TaskStatus, TimelineState, TimelineTaskState } from '../timeline/types';
 import { b64DecodeStrict } from './envelope';

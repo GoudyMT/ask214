@@ -6,7 +6,8 @@ import { getDiagnosticsForTest } from '../log/safelog';
 import { createCalendarSyncStore } from '../calendar/store.svelte';
 import { createJoinRelock, relockEachSync, type Relockable } from '../profile/app-init';
 import type { RelockReason } from '../profile/lifecycle';
-import { createProfileStore, readDeviceState, type ProfileStore } from '../profile/store.svelte';
+import { readDeviceState } from '../profile/device-state';
+import { createProfileStore, type ProfileStore } from '../profile/store.svelte';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { decryptEnvelope, readBackupFile } from './envelope';
 import {

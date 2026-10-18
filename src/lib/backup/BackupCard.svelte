@@ -44,7 +44,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { getProfileApp } from '../profile/context';
-	import { readDeviceState } from '../profile/store.svelte';
+	import { readDeviceState } from '../profile/device-state';
 	import { TASK_DEFS } from '../timeline/task-defs';
 	import type { BackupCode } from './codes';
 	import {

@@ -8,13 +8,13 @@ import { computeRecordHmac } from '../keystore/record';
 import { updateLastSeen } from '../profile/clock';
 import { decodeProfile, encodeProfile } from '../profile/codec';
 import { encryptProfileRecord } from '../profile/crypto-boundary';
+import { readDeviceState } from '../profile/device-state';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { signSidecar } from '../profile/sidecars';
 import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
 	getRow,
-	readDeviceState,
 	readKeystoreRow
 } from '../profile/store.svelte';
 import type { ProfileV1 } from '../profile/types';

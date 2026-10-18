@@ -3,16 +3,15 @@ import { createSubscriber } from 'svelte/reactivity';
 import { waitForControl } from '../ask/when-controlled';
 import { RunAbortedError } from '../db/locks';
 import type { ProfileApp } from '../profile/context';
+import { readDeviceState, type DeviceState } from '../profile/device-state';
 import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
-	readDeviceState,
-	readKeystoreRow,
-	type DeviceState
+	readKeystoreRow
 } from '../profile/store.svelte';
 import { localTodayIso } from '../timeline/day-math';
 import { formatTimelineDate } from '../timeline/format-date';
-import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
+import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-key';
 import { BackupError, toBackupCode, type BackupCode } from './codes';
 import {
 	backupMessage,

@@ -7,12 +7,11 @@ import { reqToPromise, STORES, withStores, type StoreName } from '../db/schema';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
+import { readDeviceState, type DeviceState } from '../profile/device-state';
 import {
 	createProfileStore,
 	OccConflictError,
-	readDeviceState,
 	readKeystoreRow,
-	type DeviceState,
 	type ProfileStore
 } from '../profile/store.svelte';
 import { localTodayIso } from '../timeline/day-math';

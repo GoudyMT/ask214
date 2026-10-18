@@ -1,7 +1,7 @@
 import { getContext, setContext } from 'svelte';
 import type { CapabilityCause } from '../crypto/capability';
 import type { ProfileStore } from './store.svelte';
-import type { TimelineStateStore } from '../timeline';
+import type { TimelineStateStore } from '../timeline/state.svelte';
 import type { CalendarSyncStore } from '../calendar/store.svelte';
 import type { ByokStore } from '../ask/byok/store';
 import type { Relockable } from './app-init';

@@ -23,7 +23,7 @@
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
-	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline';
+	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline/state.svelte';
 	import { createCalendarSyncStore, type CalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus } from '$lib/broadcast/bus';

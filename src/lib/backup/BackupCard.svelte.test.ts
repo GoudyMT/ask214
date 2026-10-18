@@ -6,12 +6,11 @@ import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { createJoinRelock, relockEachSync, type Relockable } from '../profile/app-init';
 import type { ProfileApp } from '../profile/context';
 import type { RelockReason } from '../profile/lifecycle';
+import { readDeviceState, type DeviceState } from '../profile/device-state';
 import {
 	createProfileStore,
 	KeystoreNotInitializedError,
-	readDeviceState,
 	readKeystoreRow,
-	type DeviceState,
 	type ProfileStore
 } from '../profile/store.svelte';
 import BackupCard from './BackupCard.svelte';

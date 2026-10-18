@@ -62,4 +62,18 @@ describe('the root layout, app-init and the client hooks', () => {
 			.map((path) => relative(SRC, path).split(sep).join('/'));
 		expect(reached).toEqual([]);
 	});
+
+	// Guards a real cost: the SkillBridge plan's code (the answer reader, the write rules, the day math) is for the
+	// Timeline and Settings routes, and the restore-only device reader is for the backup flows; the timeline store the
+	// layout loads needs only the plan's key, which has a leaf file of its own. An import of either file from the layout's
+	// graph would ship about 860 B gzip to Home, About, Documents, Feedback and Resources.
+	it('reach neither the SkillBridge plan nor the device-state reader', () => {
+		const reached = [...reachable(ENTRIES)]
+			.map((path) => relative(SRC, path).split(sep).join('/'))
+			.filter(
+				(path) =>
+					path === 'lib/timeline/skillbridge-plan.ts' || path === 'lib/profile/device-state.ts'
+			);
+		expect(reached).toEqual([]);
+	});
 });
