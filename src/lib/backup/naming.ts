@@ -1,3 +1,4 @@
+import { isDay } from '../timeline/day-check';
 import { localTodayIso } from '../timeline/day-math';
 
 /**
@@ -41,6 +42,6 @@ export function makeBackupNames(now: Date, id: string): { fileName: string; labe
  */
 export function parseBackupLabel(fileName: string): string | null {
 	const match = FILE_NAME_SHAPE.exec(fileName);
-	if (match === null) return null;
+	if (match === null || !isDay(match[1])) return null;
 	return 'Ask 214 backup ' + match[1] + ' ' + match[2];
 }

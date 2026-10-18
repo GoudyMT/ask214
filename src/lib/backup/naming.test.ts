@@ -172,6 +172,9 @@ describe('parseBackupLabel', () => {
 		['ask214-backup-2026-10-15-14-32-K7Q2.json', null],
 		['ask214-backup-26-10-15-K7Q2.json', null],
 		['ask214-backup-2026-1O-15-K7Q2.json', null],
+		// Shaped like a date but naming no day: a hand-made name must not become a label.
+		['ask214-backup-2026-13-45-K7Q2.json', null],
+		['ask214-backup-2026-02-30-K7Q2.json', null],
 		['ask214-backup-abcd-ef-gh-K7Q2.json', null],
 		['my ask214-backup-2026-10-15-K7Q2.json', null],
 		['downloads/ask214-backup-2026-10-15-K7Q2.json', null],
