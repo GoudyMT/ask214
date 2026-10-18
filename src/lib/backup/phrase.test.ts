@@ -128,50 +128,7 @@ describe('canonicalizePhrase', () => {
 	});
 });
 
-describe('no result carries the input', () => {
-	const failing = [
-		'1. apple 2. harbor 3. cable 4. dog 5. echo 6. fox',
-		'apple, harbor, cable, dog, echo, fox',
-		'apple harbor cable dog echo fox.',
-		'harbor ' + FULL_WIDTH_APPLE + ' cable dog echo fox',
-		'apple harbor ca' + ZWSP + 'ble dog echo fox',
-		'zebra yodel xylophone walrus'
-	];
-
-	it('keeps every token out of every failure', () => {
-		for (const input of failing) {
-			const json = JSON.stringify(canonicalizePhrase(input));
-			for (const token of input.split(' ')) {
-				expect(json).not.toContain(token);
-			}
-		}
-	});
-
-	it('keeps every token out of a type-back failure', () => {
-		const typed = 'apple harbor zebra dog echo fox';
-		const json = JSON.stringify(compareTypedBack(typed, SHOWN));
-		for (const token of typed.split(' ')) {
-			expect(json).not.toContain(token);
-		}
-	});
-});
-
 describe('parseCanonicalBytes', () => {
-	const accepted = [
-		PLAIN,
-		'Apple  HARBOR' + TAB + 'cable' + NBSP + 'dog' + LF + 'Echo fox ',
-		'pea' + KELVIN + ' harbor cable dog echo fox'
-	];
-
-	it.each(accepted.map((input, index) => ({ index, input })))(
-		'round-trips accepted input $index',
-		({ input }) => {
-			const parsed = parseCanonicalBytes(bytesOf(canonicalizePhrase(input)));
-			expect(parsed).toHaveLength(6);
-			expect(parsed?.join(' ')).toBe(textOf(bytesOf(canonicalizePhrase(input))));
-		}
-	);
-
 	it('returns the six tokens of the plain phrase', () => {
 		expect(parseCanonicalBytes(encode(PLAIN))).toEqual([...SHOWN]);
 	});

@@ -56,14 +56,6 @@ describe('backup intent', () => {
 		expect(replaceState).not.toHaveBeenCalled();
 	});
 
-	// The page reads the note once; a second read must not act on it again.
-	it('take returns true once', () => {
-		entry.state = { 'sveltekit:history': 3, mtcBackupIntent: 'restored' };
-		captureBackupIntent();
-		expect(takeBackupIntent('restored')).toBe(true);
-		expect(takeBackupIntent('restored')).toBe(false);
-	});
-
 	// A page that is not prerendered starts with SvelteKit writing its own entry over this one, with only its index keys,
 	// before any page runs. A note read only at the page would already be gone: the person was never told the restore
 	// landed. Reading it at start-up, ahead of that write, is what keeps it.

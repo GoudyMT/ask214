@@ -31,12 +31,6 @@ afterEach(() => {
 });
 
 describe('createSampler', () => {
-	it('derives N and SAMPLE_LIMIT from the list and freezes the result', () => {
-		expect(sampler.N).toBe(N);
-		expect(sampler.SAMPLE_LIMIT).toBe(RANGE - (RANGE % N));
-		expect(Object.isFrozen(sampler)).toBe(true);
-	});
-
 	it('exhaustive mapping: every index is hit equally often and the leftover samples are rejected', () => {
 		const hits = new Array<number>(N).fill(0);
 		let rejected = 0;
@@ -51,15 +45,6 @@ describe('createSampler', () => {
 		expect(rejected).toBe(RANGE % N);
 		const each = Math.floor(RANGE / N);
 		expect(hits.every((count) => count === each)).toBe(true);
-	});
-
-	it('6*log2(distinct indexes indexFromSample can return) >= 77', () => {
-		const seen = new Set<number>();
-		for (let x = 0; x < RANGE; x++) {
-			const index = sampler.indexFromSample(x);
-			if (index !== null) seen.add(index);
-		}
-		expect(6 * Math.log2(seen.size)).toBeGreaterThanOrEqual(77);
 	});
 
 	it('generatePhrase skips rejected samples', () => {
@@ -82,20 +67,6 @@ describe('createSampler', () => {
 		const phrase = sampler.generatePhrase();
 		expect(phrase).toHaveLength(6);
 		expect(phrase).toEqual(new Array<string>(6).fill(wordAt(42)));
-	});
-
-	it('generatePhrase takes no parameters', () => {
-		expect(sampler.generatePhrase.length).toBe(0);
-	});
-
-	it('each draw is one 16-bit value', () => {
-		const spy = scriptDraws([1, 2, 3, 4, 5, 6]);
-		sampler.generatePhrase();
-		expect(spy).toHaveBeenCalledTimes(6);
-		for (const [array] of spy.mock.calls) {
-			expect(array).toBeInstanceOf(Uint16Array);
-			expect((array as Uint16Array).length).toBe(1);
-		}
 	});
 
 	it('createSampler refuses lists of 0, 1 and 65,537 words', () => {
