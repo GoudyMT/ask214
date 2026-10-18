@@ -38,8 +38,8 @@ export function whenControlled(
 	});
 }
 
-// How long the first download waits for the service worker on a first visit. Its install downloads ~133 KB,
-// about 4-5 s on a slow 0.25 Mbps link; past this the download goes ahead and is not kept.
+// How long the first download waits for the service worker on a first visit. Its install downloads ~217.5 KB,
+// about 7 s on a slow 0.25 Mbps link; past this the download goes ahead and is not kept.
 export const CONTROL_WAIT_MS = 10_000;
 // Module scope, so the wait happens at most once per visit, not once per return to a page: once a worker
 // is in charge the check is immediate, and a worker that has not come within the time is not waited for again.
