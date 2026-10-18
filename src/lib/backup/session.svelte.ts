@@ -224,7 +224,8 @@ export function untilAborted<T>(p: Promise<T>, signal: AbortSignal): Promise<T> 
  * Why the key worker's script did not load: this device holds it (the worker itself failed), it is gone (the app was
  * updated under this page), or the network is down (the code was never downloaded). The cache is read first, because
  * the service worker answers GET only: a HEAD goes to the network even from a page it controls, and offline it would
- * blame the connection for a script that is stored. This is the only request the session makes, and it carries nothing.
+ * blame the connection for a script that is stored. Apart from the browser's own load of that script, the HEAD is the
+ * only request the session makes, and it is made only for a script the device does not hold; it carries nothing.
  */
 export async function mapWorkerLoadFailure(
 	fetchImpl: typeof fetch = fetch,
