@@ -747,6 +747,75 @@ describe('leaving the app with the words on screen', () => {
 	});
 });
 
+// A typo in six hidden words can only be fixed blind; the person asks to see what they typed instead of retyping all six.
+describe('showing what was typed', () => {
+	const shown = () => page.getByRole('list').filter({ hasText: 'thimbl' });
+	const typedWords = () =>
+		[...document.querySelectorAll('#backup-typed li')].map((li) => li.textContent);
+
+	it('lists the typed words by number on request, follows the typing, and hides again, with the field still a password field', async () => {
+		const card = await mount();
+		await typedBack(card, WRONG);
+		await userEvent.click(button(CARD_LABELS.hide));
+		expect(document.querySelector('#backup-typed')).toBeNull();
+
+		await userEvent.click(button(CARD_LABELS.showTyped));
+		expect(typedWords()).toEqual(WRONG.split(' '));
+		await expect.element(button(CARD_LABELS.hideTyped)).toHaveAttribute('aria-expanded', 'true');
+		expect(fieldEl().type).toBe('password');
+
+		await field().fill(TYPED);
+		await expect.poll(typedWords).toEqual(WORDS);
+
+		await userEvent.click(button(CARD_LABELS.hideTyped));
+		expect(document.querySelector('#backup-typed')).toBeNull();
+		await expect.element(button(CARD_LABELS.showTyped)).toHaveAttribute('aria-expanded', 'false');
+	});
+
+	it.each<['restore' | 'check']>([['restore'], ['check']])(
+		'the %s field shows what was typed too',
+		async (row) => {
+			const card = await mount();
+			await fileChosen(card, row);
+			await field().fill(WRONG);
+			await userEvent.click(button(CARD_LABELS.showTyped));
+			expect(typedWords()).toEqual(WRONG.split(' '));
+		}
+	);
+
+	it.each<[string, RelockReason]>([
+		['leaving the app', 'hygiene'],
+		['a Lock', 'user']
+	])(
+		'%s takes the typed words off the page, and they stay off until asked for again',
+		async (_name, reason) => {
+			const card = await mount();
+			await typedBack(card, WRONG);
+			await userEvent.click(button(CARD_LABELS.hide));
+			await userEvent.click(button(CARD_LABELS.showTyped));
+			await expect.element(shown()).toBeVisible();
+
+			card.relock(reason);
+			await expect.poll(() => document.querySelector('#backup-typed')).toBeNull();
+			expect(document.body.textContent).not.toContain('thimbl');
+			if (reason === 'hygiene') {
+				await card.session.refresh();
+				await expect.element(button(CARD_LABELS.showTyped)).toBeVisible();
+				expect(document.querySelector('#backup-typed')).toBeNull();
+			}
+		}
+	);
+
+	it.each(['copy', 'cut'])('refuses a %s of the typed words', async (kind) => {
+		const card = await mount();
+		await typedBack(card, WRONG);
+		await userEvent.click(button(CARD_LABELS.showTyped));
+		const event = new ClipboardEvent(kind, { bubbles: true, cancelable: true });
+		need(document.querySelector('#backup-typed li')).dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(true);
+	});
+});
+
 function lockedLine(): string {
 	return need(backupMessage('E_LOCKED', { path: 'export' }));
 }

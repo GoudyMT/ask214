@@ -108,6 +108,8 @@ export const CARD_LABELS = Object.freeze({
 	check: 'Check a backup',
 	show: 'Show my passphrase',
 	hide: 'Hide words',
+	showTyped: 'Show what I typed',
+	hideTyped: 'Hide what I typed',
 	chooseFile: 'Choose file',
 	checkNow: 'Check this backup now',
 	chooseAnother: 'Choose another place',

@@ -97,6 +97,7 @@
 	import { formatBackupDate } from './dates';
 	import type { ExportDeps, ExportResult } from './export-flow';
 	import PhraseBlock from './PhraseBlock.svelte';
+	import TypedWords from './TypedWords.svelte';
 	import type { FlowDeps } from './restore-flow';
 	import RestoreConfirm from './RestoreConfirm.svelte';
 	import { backupSession, type Phase, type SessionKind } from './session.svelte';
@@ -319,6 +320,24 @@
 	// The session wipes these on a real stop (a Lock, a Cancel, leaving the page) and never on an app switch.
 	$effect(() => (exportPassEl === null ? undefined : session.registerInput(exportPassEl)));
 	$effect(() => (filePassEl === null ? undefined : session.registerInput(filePassEl)));
+
+	// What the person typed, shown on request so a typo can be found without retyping all six words blind. It goes,
+	// with its copy of the text, whenever the field does or the page is hidden, the same as the words.
+	let typedShown = $state(false);
+	let typedText = $state('');
+	$effect(() => {
+		if (concealed || !(exportForm || fileForm)) {
+			typedShown = false;
+			typedText = '';
+		}
+	});
+	function toggleTyped(el: HTMLInputElement | null): void {
+		typedShown = !typedShown;
+		typedText = typedShown ? (el?.value ?? '') : '';
+	}
+	function typed(e: Event & { currentTarget: HTMLInputElement }): void {
+		if (typedShown) typedText = e.currentTarget.value;
+	}
 
 	// A wrong passphrase puts the cursor back in the field with its text kept.
 	let focusSeen = untrack(() => restore.view.focusField);
@@ -741,8 +760,10 @@
 						enterkeyhint="done"
 						aria-invalid={fileLine !== null}
 						aria-describedby={fileLine !== null ? 'backup-file-error' : undefined}
+						oninput={typed}
 					/>
 				</label>
+				{@render typedView(filePassEl)}
 				<div class="backup-actions">
 					<button class="backup-primary" type="submit" aria-busy={session.busy}>
 						{row === 'restore' ? CARD_LABELS.restoreSubmit : CARD_LABELS.checkSubmit}
@@ -807,6 +828,21 @@
 		{/if}
 	{/snippet}
 
+	{#snippet typedView(el: HTMLInputElement | null)}
+		<button
+			class="backup-cancel backup-typed"
+			type="button"
+			aria-expanded={typedShown}
+			aria-controls="backup-typed"
+			onclick={() => toggleTyped(el)}
+		>
+			{typedShown ? CARD_LABELS.hideTyped : CARD_LABELS.showTyped}
+		</button>
+		{#if typedShown}
+			<TypedWords text={typedText} />
+		{/if}
+	{/snippet}
+
 	<!-- Make a backup -->
 	{#if props.only === undefined}
 		<div class="backup-row">
@@ -865,8 +901,10 @@
 									enterkeyhint="done"
 									aria-invalid={inputError !== null}
 									aria-describedby={inputError !== null ? 'backup-make-error' : undefined}
+									oninput={typed}
 								/>
 							</label>
+							{@render typedView(exportPassEl)}
 							{#if inputError !== null}
 								<p id="backup-make-error" class="backup-error" role="alert">{inputError}</p>
 							{/if}
@@ -1148,6 +1186,10 @@
 		font: inherit;
 		text-decoration: underline;
 		cursor: pointer;
+	}
+	.backup-typed {
+		align-self: flex-start;
+		padding-inline: 0;
 	}
 	.backup-quiet-danger {
 		min-height: 44px;
