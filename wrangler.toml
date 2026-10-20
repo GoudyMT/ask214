@@ -3,11 +3,12 @@ main = ".svelte-kit/cloudflare/_worker.js"
 compatibility_date = "2026-05-22"
 compatibility_flags = ["nodejs_compat"]
 
-# Serve only on the ask214.com custom domain. The default *.workers.dev origin (and preview URLs, which
-# follow this flag) would otherwise serve the same app under a second host whose security.txt Canonical
-# points at a different origin (RFC 9116 mismatch), and split a privacy-first app across two origins.
+# Serve only on the ask214.com custom domain. The default *.workers.dev origin would otherwise serve the
+# same app under a second host whose security.txt Canonical points at a different origin (RFC 9116
+# mismatch), and split a privacy-first app across two origins.
 workers_dev = false
-preview_urls = false
+# Preview links (Version URLs) are switched in the dashboard, for testing a branch before merge. No
+# preview_urls line here: a branch build applies one, so it would flip that switch on every push.
 
 [assets]
 binding = "ASSETS"
