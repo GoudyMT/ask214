@@ -105,6 +105,17 @@ describe('pii-policy: server source must not reference ProfileV1 PII fields', ()
 		expect(violations[0]?.token).toBe(`\\.${field}\\b`);
 	});
 
+	it.each(['lastBackupAt', 'backupGenProfile', 'backupGenTimeline', 'backupGenCalendar'])(
+		'flags the backup mark %s',
+		(field) => {
+			const violations = scanForPiiTokens([
+				{ path: 'src/routes/x/+server.ts', content: `const v = profile.${field};` }
+			]);
+			expect(violations).toHaveLength(1);
+			expect(violations[0]?.token).toBe(`\\.${field}\\b`);
+		}
+	);
+
 	it('does not flag clean server code', () => {
 		const violations = scanForPiiTokens([
 			{ path: 'src/routes/x/+server.ts', content: 'export const GET = () => new Response("ok");' }
@@ -254,6 +265,7 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		'$lib/calendar/store.svelte',
 		'$lib/db/schema',
 		'$lib/crypto/aes-gcm',
+		'$lib/backup/session.svelte',
 		'../../../src/lib/profile/types'
 	])('flags an import of %s', (specifier) => {
 		const violations = scan(`import { a } from '${specifier}';`);

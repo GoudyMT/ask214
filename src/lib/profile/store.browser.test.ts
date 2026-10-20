@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { flushSync } from 'svelte';
+import { toStore } from 'svelte/store';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import {
 	createProfileStore,
 	KeystoreNotInitializedError,
 	KeystoreHmacMismatchError,
-	OccConflictError
+	OccConflictError,
+	type BroadcastEvent
 } from './store.svelte';
 import { withStores, reqToPromise } from '../db/schema';
 import { encryptProfileRecord } from './crypto-boundary';
@@ -14,16 +17,18 @@ import { registerSecureInput } from './lifecycle';
 import { IV_HARD_STOP, IvCounterExhaustedError } from '../keystore/iv-counter';
 import type { ProfileV1 } from './types';
 
-type Store = 'keystore' | 'profile-hwm' | 'profile';
+type Store = 'keystore' | 'profile-hwm' | 'profile' | 'timeline-state-hwm' | 'calendar-sync-hwm';
 type Row = Record<string, unknown>;
 
 // Seams over three modules, each a passthrough until a test arms it:
 // - cloneField records every byte array the save stages, so a test can look at the copies the store
 //   made and the caller never sees;
+// - zeroizeRecord records every record the store discards, so a test can show which one was wiped;
 // - decryptProfileRecord counts decrypts, so a refresh that must not read can be shown not to;
 // - computeRecordHmac can be made to throw, which reaches the step right after the staged copies exist.
 const seams = vi.hoisted(() => ({
 	cloned: [] as Uint8Array[],
+	zeroized: [] as Record<string, unknown>[],
 	decrypts: 0,
 	failHmac: false
 }));
@@ -34,6 +39,10 @@ vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./lifecycle')>();
 	return {
 		...real,
+		zeroizeRecord: (rec: Record<string, unknown>): void => {
+			seams.zeroized.push(rec);
+			real.zeroizeRecord(rec);
+		},
 		cloneField: (v: unknown): unknown => {
 			const out = real.cloneField(v);
 			if (out instanceof Uint8Array) seams.cloned.push(out);
@@ -72,6 +81,7 @@ let db: IDBDatabase;
 beforeEach(async () => {
 	db = await openTestDb();
 	seams.cloned.length = 0;
+	seams.zeroized.length = 0;
 	seams.decrypts = 0;
 	seams.failHmac = false;
 });
@@ -315,6 +325,23 @@ describe('ProfileStore.relockSync', () => {
 		expect(events).not.toContain('relocked');
 	});
 
+	it('a non-hygiene relock broadcasts its reason', () => {
+		const events: BroadcastEvent[] = [];
+		const store = createProfileStore(db, { onBroadcast: (e) => events.push(e) });
+
+		store.relockSync('idle');
+		store.relockSync('user');
+		store.relockSync('peer');
+		store.relockSync('hygiene');
+
+		expect(events).toEqual([
+			{ type: 'relocked', reason: 'idle' },
+			{ type: 'relocked', reason: 'user' },
+			{ type: 'relocked' }
+		]);
+		expect('reason' in (events[2] ?? { reason: 1 })).toBe(false);
+	});
+
 	// A save puts the profile back in memory just as surely as a load does. If it does not say so,
 	// the store sits holding plaintext while refusing every automatic re-read - so a peer's change
 	// never lands in a tab that is plainly open.
@@ -552,6 +579,24 @@ describe('ProfileStore.locked', () => {
 		expect(store.locked).toBe(true);
 		await store.load();
 		expect(store.locked).toBe(false);
+	});
+
+	// A first-run tab has no profile in storage, so `locked` stays false when it relocks: only lockState tells the UI.
+	it('lockState is reactive, and moves for a first-run tab that relocks', async () => {
+		const store = createProfileStore(db);
+		await store.load();
+		const seen: unknown[] = [];
+		// toStore runs the getter inside an effect, which is how a component would read it; this file is not
+		// compiled for runes, so $effect itself is not available here.
+		const stop = toStore(() => store.lockState).subscribe((v) => seen.push(v));
+		flushSync();
+		expect(seen).toEqual(['unlocked']);
+
+		store.relockSync('user');
+		flushSync();
+		expect(seen).toEqual(['unlocked', 'locked']);
+		expect(store.locked).toBe(false);
+		stop();
 	});
 });
 

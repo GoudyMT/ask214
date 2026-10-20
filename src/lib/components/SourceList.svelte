@@ -92,6 +92,8 @@
 	.src-row__title {
 		font-weight: 500;
 		text-decoration: none;
+		/* A title with one long unbroken word breaks inside the row instead of widening it past a phone. */
+		overflow-wrap: anywhere;
 	}
 
 	.src-row__title:hover {
@@ -132,6 +134,8 @@
 		border-bottom: 1px solid var(--color-border);
 		color: var(--color-fg);
 		font-size: var(--font-size-s);
+		/* As on the agency rows: one long unbroken word breaks inside the row. */
+		overflow-wrap: anywhere;
 	}
 
 	.visually-hidden {

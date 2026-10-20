@@ -142,4 +142,19 @@ describe('selectNeedsNow', () => {
 		expect(ids(g.afterYouLeave)).toEqual(['firm']);
 		expect([...g.late, ...g.closingSoon, ...g.justClosed, ...g.justOpened]).toEqual([]);
 	});
+
+	// Home names the first task of this group and the Timeline draws the group in this order, so a task whose leaving
+	// day has not come leads: the word on top is then the same on both.
+	it('puts the tasks whose leaving day has not come before the ones that have left', () => {
+		const g = selectNeedsNow(
+			[
+				item('left-1', 'after-you-leave', { leftCommand: { opened: true } }),
+				item('ahead-1', 'after-you-leave'),
+				item('left-2', 'after-you-leave', { leftCommand: { opened: false } }),
+				item('ahead-2', 'after-you-leave')
+			],
+			TODAY
+		);
+		expect(ids(g.afterYouLeave)).toEqual(['ahead-1', 'ahead-2', 'left-1', 'left-2']);
+	});
 });

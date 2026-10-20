@@ -1,6 +1,8 @@
 import type { TimelineState, TaskStatus, TimelineTaskState } from './types';
-import { encodeTimelineState, decodeTimelineState, isSnoozeDate } from './state-codec';
-import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
+import { isSnoozeDate } from './state-codec';
+import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-key';
+import { MAX_NOTE_UNITS } from '../backup/note-cap';
+import { encryptTimelineRecord, decryptTimelineRecord } from './crypto-boundary';
 import type { KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
@@ -44,8 +46,6 @@ export class TimelineRelockedError extends Error {
 	}
 }
 
-const TIMELINE_CTX: RecordCtx = { storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 };
-
 /** Default returned before load / when relocked. Frozen so a consumer cannot mutate the shared default. */
 const EMPTY_STATE: TimelineState = Object.freeze({ schemaVersion: 1, tasks: Object.freeze({}) });
 
@@ -72,7 +72,10 @@ function cleanTaskState(s: TimelineTaskState): TimelineTaskState {
 	return out as TimelineTaskState;
 }
 
-export type TimelineBroadcastEvent = { type: 'timeline-updated' | 'relocked' };
+export type TimelineBroadcastEvent = {
+	type: 'timeline-updated' | 'relocked';
+	reason?: 'idle' | 'user';
+};
 export type TimelineStoreOptions = { onBroadcast?: (e: TimelineBroadcastEvent) => void };
 
 export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOptions = {}) {
@@ -92,7 +95,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		relockEpoch++;
 		lockState = nextLockState(lockState, reason);
 		// Only an intentional relock is other tabs' business - see the profile store's relockNow.
-		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
+		if (reason === 'idle' || reason === 'user') opts.onBroadcast?.({ type: 'relocked', reason });
+		else if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	const readVerifiedKeystore = () => readKeystoreRow(db);
@@ -127,12 +131,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 
 				const next = mutate(_state);
 				const nextGen = currentGen + 1;
-				const blob = await encryptRecord(
-					TIMELINE_CTX,
-					new Uint8Array(encodeTimelineState(next)),
-					keystore,
-					nextGen
-				);
+				const blob = await encryptTimelineRecord(next, keystore, nextGen);
 				const newHwm = await signSidecar<TimelineHwmPayload>(
 					'timeline-state-hwm',
 					{
@@ -174,12 +173,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	}
 
 	const api = {
-		/** Reactive timeline state; EMPTY before load / when relocked. */
+		/** Reactive timeline state; EMPTY before load / when relocked / after a load that failed. */
 		get state(): TimelineState {
 			return _state ?? EMPTY_STATE;
 		},
 
-		/** Whether the record is loaded. FALSE before the first load and after a relock: the stored statuses are
+		/** Whether the record is loaded. FALSE before the first load, after a relock and after a load that failed: the stored statuses are
 		 *  then UNKNOWN, and an add built from the empty defaults would put done tasks back in the calendar. */
 		get ready(): boolean {
 			return _state !== null;
@@ -234,9 +233,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 						}
 						const row = await getRow<StateRow>(db, 'timeline-state');
 						if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
-						const decoded = decodeTimelineState(
-							await decryptRecord(TIMELINE_CTX, row.rec, keystore, gen)
-						);
+						const decoded = await decryptTimelineRecord(row.rec, keystore, gen);
 						_generation = gen;
 						if (relockEpoch === relockAtStart) {
 							_state = decoded;
@@ -245,6 +242,10 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					}
 				);
 			} catch (e) {
+				// A failed read must not leave the statuses from an older read on screen as if they were current, and
+				// `ready` must read false so an add built from them cannot run. lockState stays as it was, so the next
+				// automatic re-read still tries.
+				_state = null;
 				_failed = true;
 				throw e;
 			}
@@ -282,8 +283,15 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 			return update(taskId, { status: 'snoozed', snoozeUntil: untilIso });
 		},
 
-		/** Set or clear a free-text note (empty string clears it). */
+		/**
+		 * Set or clear a free-text note (empty string clears it). Refuses the SkillBridge plan's record, which the Timeline
+		 * never shows a note for, and a note over the cap, which a backup file could not hold.
+		 */
 		setNote(taskId: string, note: string | undefined): Promise<void> {
+			if (taskId === SKILLBRIDGE_PLAN_KEY) return Promise.reject(new Error('E_NOTE_KEY'));
+			if (typeof note === 'string' && note.length > MAX_NOTE_UNITS) {
+				return Promise.reject(new Error('E_NOTE_TOO_LONG'));
+			}
 			return update(taskId, { notes: note ? note : undefined });
 		},
 

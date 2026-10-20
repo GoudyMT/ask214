@@ -15,7 +15,14 @@ const { store, goto } = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/profile/context', () => ({
-	getProfileApp: () => ({ status: 'ready', store }),
+	getProfileApp: () => ({
+		status: 'ready',
+		store,
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
+	}),
 	setProfileApp: () => {}
 }));
 vi.mock('$app/navigation', () => ({ goto }));
@@ -23,13 +30,16 @@ vi.mock('$app/navigation', () => ({ goto }));
 const FAILED = 'Could not update right now - please try again.';
 const OCC = 'This was changed in another tab. We reloaded it - please review and save again.';
 
-// A date a few months out, inside the range the page accepts, built from the real clock.
-const TYPED = (() => {
+// A date this many days from today, built from the real clock.
+const daysFromToday = (days: number): string => {
 	const d = new Date();
-	d.setDate(d.getDate() + 120);
+	d.setDate(d.getDate() + days);
 	const pad = (n: number) => String(n).padStart(2, '0');
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-})();
+};
+
+// A date a few months out, inside the range the page accepts.
+const TYPED = daysFromToday(120);
 
 const unhandled: unknown[] = [];
 const onUnhandled = (e: PromiseRejectionEvent) => unhandled.push(e.reason);
@@ -68,6 +78,22 @@ function pendingSave() {
 	});
 	return { seen, settle };
 }
+
+// The range runs back 5 years as well as forward 15, so the line names both ends: a year typo in either direction was
+// told only one of them. Settings and the E2E suite pin the same words.
+describe('Wizard, a date outside the range', () => {
+	it('names both ends of the range when the date is too far back, and saves nothing', async () => {
+		await render(WizardPage);
+		await page.getByLabelText('Separation date').fill(daysFromToday(-6 * 365));
+		await page.getByRole('button', { name: 'Save and continue' }).click();
+
+		await expect
+			.element(page.getByText('Enter a date from 5 years ago to 15 years from now.'))
+			.toBeVisible();
+		expect(store.save).not.toHaveBeenCalled();
+		expect(goto).not.toHaveBeenCalled();
+	});
+});
 
 describe('Wizard, a save that fails', () => {
 	it('says so, keeps the typed date, and leaves no unhandled rejection', async () => {

@@ -16,8 +16,12 @@ const { app, store } = vi.hoisted(() => ({
 		calendar: null as object | null,
 		byok: null as object | null,
 		cause: null,
-		wipeAll: null,
-		relockAll: null
+		wipeAll: null as (() => Promise<void>) | null,
+		relockAll: null,
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
 	},
 	store: {
 		locked: false,
@@ -61,6 +65,7 @@ afterEach(() => {
 	app.timeline = null;
 	app.calendar = null;
 	app.byok = null;
+	app.wipeAll = null;
 });
 
 // Integration: the Documents row reads the real Cache API, as the Documents page does.
@@ -85,6 +90,51 @@ describe('Settings, the Documents row', () => {
 		await vi.waitFor(() =>
 			expect(summary()).toBe(`0 of ${SERVED} saved on this device - 0.0 MB, plus 1 older copy`)
 		);
+	});
+});
+
+// A person who saved a guide to read offline and never set up a profile still has data on the device, so the
+// Erase must reach them. The erase refuses here, as the damaged-data suite's does: a real erase ends in a page
+// reload, which this page test cannot survive.
+describe('Settings, a device with no profile', () => {
+	const eraseButton = () => page.getByRole('button', { name: 'Erase all data on this device' });
+	const [servedPath = ''] = Object.values(LOCAL_DOCUMENTS);
+
+	it('offers the erase when a saved document is all there is, and sends it to the wipe', async () => {
+		const wipeAll = vi.fn(async () => {
+			throw new Error('E_TEST_WIPE');
+		});
+		app.wipeAll = wipeAll;
+		const cache = await caches.open(ASK_ASSET_CACHE);
+		await cache.put(servedPath, new Response(new Uint8Array(1_000)));
+		await render(SettingsPage);
+
+		await expect.element(eraseButton()).toBeVisible();
+		await eraseButton().click();
+		await page.getByRole('button', { name: 'Erase everything' }).click();
+		expect(wipeAll).toHaveBeenCalledOnce();
+		// Nothing to lock without a profile.
+		expect(page.getByRole('button', { name: /^lock$/i }).elements()).toHaveLength(0);
+	});
+
+	// A document the build has since replaced leaves its older copy on the device, and that is data too.
+	it('offers the erase when only an older copy of a document is held', async () => {
+		const cache = await caches.open(ASK_ASSET_CACHE);
+		await cache.put('/docs/tap_vet_centers.0badc0de.pdf', new Response(new Uint8Array(1_000)));
+		await render(SettingsPage);
+
+		await expect.element(eraseButton()).toBeVisible();
+	});
+
+	it('shows no erase on a device with nothing saved', async () => {
+		await render(SettingsPage);
+		await expect
+			.element(page.getByText(`0 of ${SERVED} saved on this device - 0.0 MB`))
+			.toBeVisible();
+		// Past the page's read of the asset cache, so an erase that read would draw is on the page.
+		await new Promise((r) => setTimeout(r, 100));
+		expect(eraseButton().elements()).toHaveLength(0);
+		expect(page.getByRole('heading', { name: 'Privacy and security' }).elements()).toHaveLength(0);
 	});
 });
 

@@ -63,7 +63,11 @@ vi.mock('$lib/profile/context', () => ({
 		// As the layout's is: the profile reads as locked at once.
 		relockAll: () => {
 			if (ctl.relocks) profile.locked = true;
-		}
+		},
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
 	}),
 	setProfileApp: () => {}
 }));

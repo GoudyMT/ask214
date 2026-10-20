@@ -22,6 +22,7 @@ import {
 	APP_SHELL,
 	offlineResponse
 } from './asset-cache';
+import { KDF_WORKER_SRC } from '../backup/kdf-paths';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
 // model + ORT WASM (~45MB) and the ~3.5MB corpus are LAZY (cached on first use, never eagerly precached at
@@ -48,6 +49,14 @@ describe('classifyAsset', () => {
 	it('marks the app shell + icons as precache', () => {
 		expect(classifyAsset('/_app/immutable/entry/start.js')).toBe('precache');
 		expect(classifyAsset('/favicon.png')).toBe('precache');
+	});
+
+	// A backup must work with no connection, even right after "Erase all data", so the key worker is kept at install
+	// for every visitor, like the app shell, and never fetched on first use.
+	it('precaches the backup key worker like the app shell', () => {
+		// The URL the app loads, not a copy of it, so a rebuilt worker is still guarded.
+		expect(classifyAsset(KDF_WORKER_SRC)).toBe('precache');
+		expect(classifyAsset(KDF_WORKER_SRC)).toBe(classifyAsset('/_app/immutable/entry/start.js'));
 	});
 
 	// The install writes its precache entries as one batch, so every megabyte admitted here is both a

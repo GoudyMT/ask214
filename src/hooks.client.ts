@@ -1,10 +1,13 @@
 import type { ClientInit, HandleClientError } from '@sveltejs/kit';
 import { installGlobalErrorSanitizer } from '$lib/log/global-errors';
 import { safeLog } from '$lib/log/safelog';
+import { captureBackupIntent } from '$lib/backup/intent';
 
 /** Installed before the app starts, so an error thrown while it starts is caught too. */
 export const init: ClientInit = () => {
 	installGlobalErrorSanitizer(window);
+	// SvelteKit rewrites the history entry right after this hook, dropping any note a reload was meant to carry.
+	captureBackupIntent();
 };
 
 /**

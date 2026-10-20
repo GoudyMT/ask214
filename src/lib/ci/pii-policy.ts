@@ -28,7 +28,11 @@ export const PII_FIELD_NAMES: readonly string[] = [
 	'geographicDestination',
 	'specialSituations',
 	'skillbridgeStart',
-	'terminalLeaveStart'
+	'terminalLeaveStart',
+	'lastBackupAt',
+	'backupGenProfile',
+	'backupGenTimeline',
+	'backupGenCalendar'
 ];
 
 /**
@@ -48,6 +52,10 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\.specialSituations\b/,
 	/\.skillbridgeStart\b/,
 	/\.terminalLeaveStart\b/,
+	/\.lastBackupAt\b/,
+	/\.backupGenProfile\b/,
+	/\.backupGenTimeline\b/,
+	/\.backupGenCalendar\b/,
 	/\b_profileBytes\b/,
 	/\binstallUuid\b/,
 	// The same fields read without a dot, which the patterns above cannot see: by bracket (`profile['eaos']`), as a key
@@ -56,9 +64,9 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	// of prose can start with one. A name scan cannot see a value under a new name at all; the online request test
 	// (tests/e2e/egress-canary.e2e.ts) checks the values that leave the device - but no screen sets rate or rank yet, so
 	// it covers them only once one does and the test seeds them.
-	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)['"`]\s*\]/,
-	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\b[^}]*\}/,
-	/^\s*(?:eaos|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart)\s*(?=[,:=]|$)/
+	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar)['"`]\s*\]/,
+	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar)\b[^}]*\}/,
+	/^\s*(?:eaos|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar)\s*(?=[,:=]|$)/
 ];
 
 /**
@@ -113,7 +121,7 @@ export function scanForPiiTokens(
  * not caught.
  */
 export const FORBIDDEN_IMPORT_PATTERN =
-	/(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar)(?:\/|$)/;
+	/(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar|backup)(?:\/|$)/;
 
 // Any quote, including a template literal, and any whitespace - line breaks too - between `import(` or `from` and the
 // specifier, so the scan runs over the whole file rather than one line at a time. The specifier itself stops at a

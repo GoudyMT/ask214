@@ -11,6 +11,10 @@ const config = {
 	},
 	kit: {
 		adapter: adapter(),
+		// Off: the layout registers /service-worker.js itself, as a module worker. SvelteKit's own call registers
+		// the same file as a classic one, and a second registration of a different type counts as an update, so
+		// every page load would install the worker again and leave a copy waiting behind the one in charge.
+		serviceWorker: { register: false },
 		csp: {
 			// Hash mode generates SHA hashes for SvelteKit's inline hydration scripts and
 			// injects them into script-src - avoids 'unsafe-inline' on scripts. Style-src

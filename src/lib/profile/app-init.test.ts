@@ -5,11 +5,17 @@ import {
 	provisionStore,
 	createRelockEcho,
 	relockAll,
+	relockEachSync,
+	createJoinRelock,
 	reloadWhenShown,
+	reloadOnSignalWhenShown,
+	subscribeBus,
 	superviseStartup,
 	START_TIMEOUT_MS,
-	type AppInitResult
+	type AppInitResult,
+	type Relockable
 } from './app-init';
+import { IDLE_THRESHOLD_MS } from './idle-threshold';
 import { KeystoreAlreadyExistsError } from '../keystore/bootstrap';
 import { KeystoreHmacMismatchError } from './store.svelte';
 import { LockAcquisitionTimeout } from '../db/locks';
@@ -85,6 +91,219 @@ describe('relockAll', () => {
 		// A store failing to relock must not strand PII in every store after it in the list.
 		expect(() => relockAll([boom, after], 'user')).not.toThrow();
 		expect(after.relockSync).toHaveBeenCalledOnce();
+	});
+});
+
+describe('walking the relock list', () => {
+	const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+	const fake = () => ({ relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) });
+	const throwing = () => ({
+		relockSync: vi.fn(() => {
+			throw new Error('relock blew up');
+		}),
+		refresh: vi.fn().mockResolvedValue(null)
+	});
+
+	function install(relockables: Relockable[]) {
+		const win = new EventTarget();
+		const doc = new EventTarget();
+		installLifecycle(relockables, {
+			win,
+			doc,
+			isHidden: () => false,
+			createIdleTimer: () => timer,
+			idleThresholdMs: 900_000
+		});
+		return { win, doc };
+	}
+
+	it('relockEachSync relocks every store when one throws', () => {
+		const a = fake();
+		const boom = throwing();
+		const c = fake();
+		expect(() => relockEachSync([a, boom, c], 'peer')).not.toThrow();
+		expect(a.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
+		expect(boom.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
+		expect(c.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
+	});
+
+	it('relockEachSync passes the detail to every relockable', () => {
+		const a = fake();
+		const boom = throwing();
+		const c = fake();
+		relockEachSync([a, boom, c], 'peer', { peerReason: 'user' });
+		expect(a.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'user' });
+		expect(boom.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'user' });
+		expect(c.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'user' });
+	});
+
+	it('onHide relocks every store when one throws', () => {
+		const a = fake();
+		const boom = throwing();
+		const c = fake();
+		const { win } = install([a, boom, c]);
+		win.dispatchEvent(new Event('pagehide'));
+		expect(c.relockSync).toHaveBeenCalledExactlyOnceWith('hygiene');
+	});
+
+	// A store that leaves the shared list during its own relock shifts every later index by one, so a walk
+	// over the live array skips the store right after it.
+	const walkers: [string, (list: Relockable[]) => void][] = [
+		['relockAll', (list) => relockAll(list, 'user')],
+		['relockEachSync', (list) => relockEachSync(list, 'peer')],
+		['onHide', (list) => install(list).win.dispatchEvent(new Event('pagehide'))]
+	];
+	it.each(walkers)(
+		'%s: a relockable that leaves during the walk does not make the walk skip the next one',
+		(_name, walk) => {
+			const list: Relockable[] = [];
+			const a = {
+				relockSync: vi.fn(() => void list.splice(list.indexOf(a), 1)),
+				refresh: vi.fn().mockResolvedValue(null)
+			};
+			const b = fake();
+			list.push(a, b);
+			walk(list);
+			expect(a.relockSync).toHaveBeenCalledOnce();
+			expect(b.relockSync).toHaveBeenCalledOnce();
+		}
+	);
+
+	it('restore re-reads every store when one refresh throws synchronously', () => {
+		const a = fake();
+		const boom = {
+			relockSync: vi.fn(),
+			refresh: vi.fn(() => {
+				throw new Error('refresh blew up');
+			})
+		};
+		const c = fake();
+		const { doc } = install([a, boom, c]);
+		doc.dispatchEvent(new Event('resume'));
+		expect(a.refresh).toHaveBeenCalledOnce();
+		expect(boom.refresh).toHaveBeenCalledOnce();
+		expect(c.refresh).toHaveBeenCalledOnce();
+	});
+});
+
+describe('createJoinRelock', () => {
+	const fake = () => ({ relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) });
+
+	it('a joined relockable is relocked by the walk over the list', () => {
+		const list: Relockable[] = [];
+		const joiner = fake();
+		createJoinRelock(list)(joiner);
+		relockEachSync(list, 'peer');
+		expect(joiner.relockSync).toHaveBeenCalledExactlyOnceWith('peer');
+	});
+
+	// A joiner must receive every argument after the reason, so a detail a walk passes reaches it.
+	it('forwards every argument after the reason to the joiner', () => {
+		const list: Relockable[] = [];
+		const joiner = fake();
+		createJoinRelock(list)(joiner);
+		const entry = list[0];
+		if (!entry) throw new Error('test setup: no entry joined');
+		entry.relockSync('peer', { peerReason: 'idle' });
+		expect(joiner.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'idle' });
+	});
+
+	it('a joined relockable receives the detail', () => {
+		const list: Relockable[] = [];
+		const joiner = fake();
+		createJoinRelock(list)(joiner);
+		relockEachSync(list, 'peer', { peerReason: 'idle' });
+		expect(joiner.relockSync).toHaveBeenCalledExactlyOnceWith('peer', { peerReason: 'idle' });
+	});
+
+	it('a joiner that throws does not stop the walk', () => {
+		const first = fake();
+		const last = fake();
+		const boom = {
+			relockSync: vi.fn(() => {
+				throw new Error('relock blew up');
+			}),
+			refresh: vi.fn().mockResolvedValue(null)
+		};
+		const list: Relockable[] = [first];
+		createJoinRelock(list)(boom);
+		list.push(last);
+		// The wrapper swallows the throw itself, so even a walk that has no isolation of its own gets through.
+		expect(() => {
+			for (const r of list) r.relockSync('user');
+		}).not.toThrow();
+		expect(boom.relockSync).toHaveBeenCalledOnce();
+		expect(first.relockSync).toHaveBeenCalledOnce();
+		expect(last.relockSync).toHaveBeenCalledOnce();
+	});
+
+	// A lifecycle restore must reach the joiner's own refresh: the backup session un-conceals there.
+	it('the joined entry forwards its refresh to the joiner', async () => {
+		const list: Relockable[] = [];
+		const joiner = fake();
+		createJoinRelock(list)(joiner);
+		expect(list).toHaveLength(1);
+		await list[0]?.refresh();
+		expect(joiner.refresh).toHaveBeenCalledOnce();
+	});
+
+	// restore() walks every store; a joiner whose refresh throws or rejects must not stop the walk or surface.
+	it.each([
+		[
+			'throws synchronously',
+			() => {
+				throw new Error('refresh blew up');
+			}
+		],
+		['rejects', () => Promise.reject(new Error('refresh rejected'))]
+	])('a joiner whose refresh %s settles quietly', async (_name, refresh) => {
+		const list: Relockable[] = [];
+		createJoinRelock(list)({ relockSync: vi.fn(), refresh });
+		await expect(list[0]?.refresh()).resolves.toBeUndefined();
+	});
+
+	it.each([
+		['first in, first out', 0, 1],
+		['last in, first out', 1, 0]
+	])('leave() removes exactly that entry (%s)', (_name, firstLeaver, secondLeaver) => {
+		const list: Relockable[] = [];
+		const join = createJoinRelock(list);
+		const a = fake();
+		const b = fake();
+		const leaves = [join(a), join(b)];
+		expect(list).toHaveLength(2);
+
+		leaves[firstLeaver]?.();
+		expect(list).toHaveLength(1);
+		relockEachSync(list, 'user');
+		const stayer = firstLeaver === 0 ? b : a;
+		const gone = firstLeaver === 0 ? a : b;
+		expect(stayer.relockSync).toHaveBeenCalledOnce();
+		expect(gone.relockSync).not.toHaveBeenCalled();
+
+		leaves[secondLeaver]?.();
+		expect(list).toHaveLength(0);
+	});
+
+	it('leave() twice removes nothing more', () => {
+		const list: Relockable[] = [];
+		const join = createJoinRelock(list);
+		const a = fake();
+		const b = fake();
+		const leaveA = join(a);
+		join(b);
+		leaveA();
+		leaveA();
+		expect(list).toHaveLength(1);
+		relockEachSync(list, 'user');
+		expect(b.relockSync).toHaveBeenCalledOnce();
+		expect(a.relockSync).not.toHaveBeenCalled();
+	});
+});
+
+describe('IDLE_THRESHOLD_MS', () => {
+	it('is 15 minutes', () => {
+		expect(IDLE_THRESHOLD_MS).toBe(15 * 60 * 1000);
 	});
 });
 
@@ -306,6 +525,25 @@ describe('installLifecycle when the page is already hidden', () => {
 	});
 });
 
+describe('subscribeBus', () => {
+	it('passes the signal to its handler', () => {
+		let deliver: ((s: BusSignal) => void) | undefined;
+		const bus: ProfileBus = {
+			publish: () => {},
+			subscribe: (h) => {
+				deliver = h;
+				return () => {};
+			},
+			close: () => {}
+		};
+		const onRelocked = vi.fn();
+		subscribeBus(bus, { relocked: onRelocked });
+		const signal: BusSignal = { type: 'relocked', reason: 'idle' };
+		deliver?.(signal);
+		expect(onRelocked).toHaveBeenCalledExactlyOnceWith(signal);
+	});
+});
+
 describe('reloadWhenShown', () => {
 	function setup(hidden: boolean) {
 		let handler: ((s: BusSignal) => void) | undefined;
@@ -367,6 +605,132 @@ describe('reloadWhenShown', () => {
 		t.show();
 		t.signal();
 		expect(t.reload).not.toHaveBeenCalled();
+	});
+});
+
+describe('reloadOnSignalWhenShown', () => {
+	const ALL_TYPES: BusSignal['type'][] = [
+		'profile-updated',
+		'relocked',
+		'timeline-updated',
+		'calendar-updated',
+		'data-replaced'
+	];
+
+	function setup(opts: { hidden: boolean; locked?: boolean; type?: BusSignal['type'] }) {
+		let handler: ((s: BusSignal) => void) | undefined;
+		const unsubscribe = vi.fn(() => void (handler = undefined));
+		const bus: ProfileBus = {
+			publish: () => {},
+			subscribe: (h) => {
+				handler = h;
+				return unsubscribe;
+			},
+			close: () => {}
+		};
+		const doc = Object.assign(new EventTarget(), { hidden: opts.hidden });
+		const state = { locked: opts.locked ?? false };
+		const reload = vi.fn();
+		const onLocked = vi.fn();
+		const stop = reloadOnSignalWhenShown(
+			bus,
+			opts.type ?? 'data-replaced',
+			doc,
+			() => state.locked,
+			onLocked,
+			reload
+		);
+		return {
+			reload,
+			onLocked,
+			stop,
+			state,
+			signal: (type: BusSignal['type'] = 'data-replaced') => handler?.({ type }),
+			show: () => {
+				doc.hidden = false;
+				doc.dispatchEvent(new Event('visibilitychange'));
+			}
+		};
+	}
+
+	// Only a replaced-data signal means this tab's view is stale; every other signal has its own handler.
+	it('ignores every other signal type', () => {
+		const t = setup({ hidden: false });
+		for (const type of ALL_TYPES.filter((x) => x !== 'data-replaced')) t.signal(type);
+		expect(t.reload).not.toHaveBeenCalled();
+		expect(t.onLocked).not.toHaveBeenCalled();
+	});
+
+	it('reloads at once when shown and unlocked', () => {
+		const t = setup({ hidden: false });
+		t.signal();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+		expect(t.onLocked).not.toHaveBeenCalled();
+	});
+
+	// A reload runs the start-up again, which decrypts; a hidden tab must not hold that plaintext.
+	it('holds the reload while hidden, then reloads once when shown', () => {
+		const t = setup({ hidden: true });
+		t.signal();
+		t.signal();
+		expect(t.reload).not.toHaveBeenCalled();
+		t.show();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+		t.show();
+		expect(t.reload).toHaveBeenCalledTimes(1);
+	});
+
+	// A locked tab must not open itself: it only remembers to reload when the user unlocks.
+	it('marks reload-on-unlock and does not reload when locked', () => {
+		const t = setup({ hidden: false, locked: true });
+		t.signal();
+		expect(t.onLocked).toHaveBeenCalledTimes(1);
+		expect(t.reload).not.toHaveBeenCalled();
+	});
+
+	// A tab that is both hidden and locked must record the pending reload at the signal, not only when it is
+	// later shown: it may never be shown before the user unlocks.
+	it('marks reload-on-unlock at the signal when the tab is hidden and locked', () => {
+		const t = setup({ hidden: true, locked: true });
+		t.signal();
+		expect(t.onLocked).toHaveBeenCalledTimes(1);
+		expect(t.reload).not.toHaveBeenCalled();
+		t.show();
+		expect(t.onLocked).toHaveBeenCalledTimes(1);
+		expect(t.reload).not.toHaveBeenCalled();
+	});
+
+	// The type is a parameter, not a constant: a helper built for another type reacts to that one only.
+	it('reacts to the type it was given and ignores data-replaced otherwise', () => {
+		const t = setup({ hidden: false, type: 'relocked' });
+		t.signal('data-replaced');
+		expect(t.reload).not.toHaveBeenCalled();
+		t.signal('relocked');
+		expect(t.reload).toHaveBeenCalledTimes(1);
+	});
+
+	it('marks reload-on-unlock when the tab locked while it waited hidden', () => {
+		const t = setup({ hidden: true });
+		t.signal();
+		t.state.locked = true;
+		t.show();
+		expect(t.onLocked).toHaveBeenCalledTimes(1);
+		expect(t.reload).not.toHaveBeenCalled();
+	});
+
+	it('does nothing after teardown, whether the reload was waiting or not', () => {
+		const idle = setup({ hidden: false });
+		idle.stop();
+		idle.signal();
+		expect(idle.reload).not.toHaveBeenCalled();
+		expect(idle.onLocked).not.toHaveBeenCalled();
+
+		const waiting = setup({ hidden: true });
+		waiting.signal();
+		waiting.stop();
+		waiting.show();
+		expect(waiting.reload).not.toHaveBeenCalled();
+		expect(waiting.onLocked).not.toHaveBeenCalled();
 	});
 });
 

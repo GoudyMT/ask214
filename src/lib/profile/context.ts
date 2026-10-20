@@ -1,9 +1,11 @@
 import { getContext, setContext } from 'svelte';
 import type { CapabilityCause } from '../crypto/capability';
 import type { ProfileStore } from './store.svelte';
-import type { TimelineStateStore } from '../timeline';
+import type { TimelineStateStore } from '../timeline/state.svelte';
 import type { CalendarSyncStore } from '../calendar/store.svelte';
 import type { ByokStore } from '../ask/byok/store';
+import type { Relockable } from './app-init';
+import type { BusSignal } from '../broadcast/bus';
 
 // `damaged`: the saved data failed its own checks at start-up, so only the erase is offered (see `isDamagedRecord`).
 export type AppStatus = 'loading' | 'ready' | 'unsupported' | 'stale' | 'error' | 'damaged';
@@ -43,6 +45,11 @@ export type ProfileApp = {
 	byok: ByokStore | null;
 	cause: CapabilityCause | null;
 	/**
+	 * The open database: the same connection the stores use, and the only one in the tab. A page that needs the database
+	 * (the backup card) uses this one and never opens or closes its own. Null until app-init resolves ready or damaged.
+	 */
+	db: IDBDatabase | null;
+	/**
 	 * Erase every store on the device. An app-level act, not a store-level one: it must clear stores
 	 * by registry name, because a store that failed to provision is exactly the one whose rows would
 	 * outlive the wipe and then block their own recovery. Null until app-init resolves.
@@ -51,10 +58,30 @@ export type ProfileApp = {
 	/**
 	 * Relock every provisioned store. Use this for ANY "lock" or "erase" - never relock stores
 	 * one by one at a call site: a per-site list drifts, and decrypted PII is left behind silently.
-	 * Null until app-init resolves ready, and under `damaged`, where nothing stays decrypted (the erase's check relocks
-	 * its own store).
+	 * Null until app-init resolves ready or damaged; under `damaged` it relocks only a running backup Check (nothing
+	 * else is decrypted there; the erase's check relocks its own store).
 	 */
 	relockAll: (() => void) | null;
+	/**
+	 * Joins a relockable to the app's relock list for as long as it lives; the function it returns leaves the list.
+	 * Null until app-init resolves ready or damaged.
+	 */
+	joinRelock: ((r: Relockable) => () => void) | null;
+	/**
+	 * Broadcasts a signal to the other tabs through the relock echo, so a relock it causes stays local to the peer.
+	 * Null until app-init resolves ready, and under `damaged`.
+	 */
+	publish: ((s: BusSignal) => void) | null;
+	/**
+	 * Set when this device's data was replaced from a backup, in this tab or another, while this tab was locked: the
+	 * next Unlock reloads the page instead of re-reading. False until then.
+	 */
+	reloadOnUnlock: boolean;
+	/**
+	 * Set when a first-run tab that is locked learns its data was replaced by another tab; the layout then shows a
+	 * Reload line. False until then.
+	 */
+	replacedNotice: boolean;
 };
 
 const KEY = Symbol('mtc-profile-app');

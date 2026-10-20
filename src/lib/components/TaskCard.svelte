@@ -9,7 +9,9 @@
 		afterLinkForTask,
 		linkNoteForTask
 	} from '$lib/resources';
+	import { MAX_NOTE_UNITS } from '$lib/backup/note-cap';
 	import { closedOnDate, isFirmWarning, type FitReason } from '$lib/timeline/generate';
+	import { afterYouLeaveWord } from '$lib/timeline/needs-now';
 
 	let {
 		item,
@@ -123,6 +125,16 @@
 		void returnFocus(snoozeOpener);
 	}
 
+	// Escape closes an open picker from the Snooze button or from inside it, and the button takes focus back. A held
+	// key's repeats are one press, so only its first event closes: a repeat of the press that closed it must not close
+	// the picker the person opens again.
+	function snoozeKeydown(e: KeyboardEvent): void {
+		if (e.key !== 'Escape' || !snoozeOpen) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (!e.repeat) cancelSnooze();
+	}
+
 	// The change this card made moves focus once it lands. A write that did not land changes nothing here, so the mark
 	// goes, or the next change from elsewhere would take focus.
 	async function markApplied(write: Promise<boolean> | void): Promise<void> {
@@ -171,11 +183,13 @@
 
 	let noteFailed = $state(false);
 	let noteSaving = $state(false);
+	let noteTooLong = $state(false);
 
 	function openNote(event: MouseEvent): void {
 		noteOpener = event.currentTarget as HTMLElement;
 		noteValue = item.note ?? '';
 		noteFailed = false;
+		noteTooLong = false;
 		noteOpen = true;
 	}
 
@@ -184,6 +198,10 @@
 	// button that holds focus can drop it).
 	async function saveNote(): Promise<void> {
 		if (noteSaving) return;
+		// The page turns every refusal into one generic failure, so a note over the cap is caught here, where it can be
+		// named. The field's maxlength stops typing past the cap, but not a note already longer when the editor opened.
+		noteTooLong = noteValue.length > MAX_NOTE_UNITS;
+		if (noteTooLong) return;
 		noteSaving = true;
 		noteFailed = false;
 		try {
@@ -197,6 +215,7 @@
 
 	function closeNote(): void {
 		noteOpen = false;
+		noteTooLong = false;
 		noteValue = '';
 		void returnFocus(noteOpener);
 	}
@@ -220,6 +239,11 @@
 		snoozed: 'Snoozed',
 		'after-you-leave': 'After you leave'
 	};
+
+	// "After you leave" turns to "Since you left" once the leaving day has come, as it does in Needs you now and on Home.
+	const statusLabel = $derived(
+		item.status === 'after-you-leave' ? afterYouLeaveWord(item) : STATUS_LABEL[item.status]
+	);
 
 	const CATEGORY_LABEL: Record<TaskCategory, string> = {
 		medical: 'Medical',
@@ -298,8 +322,13 @@
 				bind:value={noteValue}
 				spellcheck="false"
 				aria-label="Note"
+				maxlength={MAX_NOTE_UNITS}
 				placeholder="Add a note..."></textarea>
-			{#if noteFailed}
+			{#if noteTooLong}
+				<p class="task-card__note-error" role="alert">
+					This note is over 100,000 characters. Shorten it to save.
+				</p>
+			{:else if noteFailed}
 				<p class="task-card__note-error" role="alert">
 					Could not update right now - please try again.
 				</p>
@@ -343,7 +372,7 @@
 		{#if item.note}
 			<span class="task-line__note-dot" title="Has a note" aria-label="Has a note"></span>
 		{/if}
-		<span class="task-line__status">{STATUS_LABEL[item.status]}</span>
+		<span class="task-line__status">{statusLabel}</span>
 		{#if item.status === 'snoozed' && item.snoozeUntil}
 			<span class="task-line__date">to {formatTimelineDate(item.snoozeUntil)}</span>
 		{/if}
@@ -364,7 +393,7 @@
 			onclick={(e) => toggleResolved(false, e)}
 		>
 			<span class="task-card__header-title">{item.def.title}</span>
-			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
+			<span class="task-card__status">{statusLabel}</span>
 			{#if item.status === 'snoozed' && item.snoozeUntil}
 				<span class="task-card__date">to {formatTimelineDate(item.snoozeUntil)}</span>
 			{/if}
@@ -430,12 +459,20 @@
 				     offered where it would change nothing; nor from the last day at the command on a task moved to fit
 				     before leaving. -->
 				{#if item.status !== 'upcoming' && !item.snoozeClosed && !isFirmWarning(item.status, item.def.kind)}
-					<button type="button" onclick={toggleSnooze}>Snooze</button>
+					<button
+						type="button"
+						aria-expanded={snoozeOpen}
+						onclick={toggleSnooze}
+						onkeydown={snoozeKeydown}>Snooze</button
+					>
 				{/if}
 				<button type="button" onclick={openNote}>{item.note ? 'Edit note' : 'Add note'}</button>
 			</div>
 			{#if snoozeOpen && !item.snoozeClosed}
-				<div class="task-card__snooze" bind:this={snoozeEl}>
+				<!-- The picker only filters Escape for its controls; it is not a control itself, so the compiler's rule against
+				     key listeners on a static element does not fit. -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="task-card__snooze" bind:this={snoozeEl} onkeydown={snoozeKeydown}>
 					<span class="task-card__snooze-label">Snooze until</span>
 					<div class="task-card__presets">
 						{#each SNOOZE_PRESETS as preset (preset.days)}
@@ -511,7 +548,7 @@
 			{/if}
 		</div>
 		<div class="task-card__meta">
-			<span class="task-card__status">{STATUS_LABEL[item.status]}</span>
+			<span class="task-card__status">{statusLabel}</span>
 			<!-- A countdown only runs beside a date, so a card with no date line has nothing here. -->
 			{#if dateLine.text}
 				<span class="task-card__when"
@@ -1207,6 +1244,7 @@
 		font: inherit;
 		font-size: var(--font-size-s);
 		text-align: left;
+		overflow-wrap: anywhere; /* a long title wraps instead of spilling past the card on a phone */
 		cursor: pointer;
 	}
 

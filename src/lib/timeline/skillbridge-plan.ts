@@ -1,15 +1,17 @@
 import { addDays } from './day-math';
 import { isDay } from './day-check';
+import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-key';
 import type { TimelineState, TimelineTaskState } from './types';
 
 /**
  * The SkillBridge question's answer and what it means for the Timeline. It is kept in the timeline state under a key
- * no task uses, in the shapes the store already writes: Yes = { status: 'done' }; No = { status: 'skipped' }; Not
+ * no task uses (SKILLBRIDGE_PLAN_KEY, re-exported here for this file's callers), in the shapes the store already
+ * writes: Yes = { status: 'done' }; No = { status: 'skipped' }; Not
  * sure before the second ask = { status: 'snoozed', snoozeUntil }; Not sure from the second ask on = { status:
  * 'snoozed' } with no date, which shows the steps. Any other field on the key (the user's own note, one a newer release
  * added) is ignored. Any other combination of status and date reads as no answer, so a damaged record asks again and never shows steps nobody chose.
  */
-export const SKILLBRIDGE_PLAN_KEY = 'skillbridge-plan';
+export { SKILLBRIDGE_PLAN_KEY };
 
 /** About 15 months before separation: a month before the search for a program should start. */
 export const ASK_AGAIN_DAYS = 456;

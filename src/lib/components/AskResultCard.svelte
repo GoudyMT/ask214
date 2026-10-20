@@ -106,6 +106,8 @@
 	.ask-card__title {
 		font-weight: 600;
 		font-size: var(--font-size-base);
+		/* A title with one long unbroken word breaks inside the card instead of widening it past a phone. */
+		overflow-wrap: anywhere;
 	}
 	.ask-card--lead .ask-card__title {
 		font-size: var(--font-size-l);

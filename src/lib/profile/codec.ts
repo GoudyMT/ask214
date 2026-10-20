@@ -51,6 +51,10 @@ type WireProfile = {
 	specialSituations?: string[];
 	skillbridgeStart?: string;
 	terminalLeaveStart?: string;
+	lastBackupAt?: number;
+	backupGenProfile?: number;
+	backupGenTimeline?: number;
+	backupGenCalendar?: number;
 };
 
 export function encodeProfile(p: ProfileV1): Uint8Array {
@@ -76,7 +80,11 @@ export function encodeProfile(p: ProfileV1): Uint8Array {
 			specialSituations: p.specialSituations.map(b64encode)
 		}),
 		...(p.skillbridgeStart && { skillbridgeStart: b64encode(p.skillbridgeStart) }),
-		...(p.terminalLeaveStart && { terminalLeaveStart: b64encode(p.terminalLeaveStart) })
+		...(p.terminalLeaveStart && { terminalLeaveStart: b64encode(p.terminalLeaveStart) }),
+		...(p.lastBackupAt !== undefined && { lastBackupAt: p.lastBackupAt }),
+		...(p.backupGenProfile !== undefined && { backupGenProfile: p.backupGenProfile }),
+		...(p.backupGenTimeline !== undefined && { backupGenTimeline: p.backupGenTimeline }),
+		...(p.backupGenCalendar !== undefined && { backupGenCalendar: p.backupGenCalendar })
 	};
 	const sortedKeys = Object.keys(wire).sort();
 	const canon: Record<string, unknown> = {};
@@ -112,7 +120,11 @@ const WIRE_TYPES: Record<string, (v: unknown) => boolean> = {
 	geographicDestination: isText,
 	specialSituations: (v) => Array.isArray(v) && v.every(isText),
 	skillbridgeStart: isText,
-	terminalLeaveStart: isText
+	terminalLeaveStart: isText,
+	lastBackupAt: isNumber,
+	backupGenProfile: isNumber,
+	backupGenTimeline: isNumber,
+	backupGenCalendar: isNumber
 };
 
 export function decodeProfile(bytes: Uint8Array): ProfileV1 {
@@ -153,6 +165,10 @@ export function decodeProfile(bytes: Uint8Array): ProfileV1 {
 			specialSituations: wire.specialSituations.map(b64decode)
 		}),
 		...(wire.skillbridgeStart && { skillbridgeStart: b64decode(wire.skillbridgeStart) }),
-		...(wire.terminalLeaveStart && { terminalLeaveStart: b64decode(wire.terminalLeaveStart) })
+		...(wire.terminalLeaveStart && { terminalLeaveStart: b64decode(wire.terminalLeaveStart) }),
+		...(wire.lastBackupAt !== undefined && { lastBackupAt: wire.lastBackupAt }),
+		...(wire.backupGenProfile !== undefined && { backupGenProfile: wire.backupGenProfile }),
+		...(wire.backupGenTimeline !== undefined && { backupGenTimeline: wire.backupGenTimeline }),
+		...(wire.backupGenCalendar !== undefined && { backupGenCalendar: wire.backupGenCalendar })
 	};
 }

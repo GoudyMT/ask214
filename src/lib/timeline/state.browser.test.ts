@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
-import { createTimelineStateStore, TimelineRelockedError } from './state.svelte';
+import {
+	createTimelineStateStore,
+	TimelineRelockedError,
+	type TimelineBroadcastEvent
+} from './state.svelte';
 import { readPlan, SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import type { TimelineTaskState } from './types';
 import { OccConflictError } from '../profile/store.svelte';
@@ -93,6 +97,49 @@ describe('timeline-state store', () => {
 		const b = createTimelineStateStore(db);
 		await b.load();
 		expect(b.state.tasks['skillbridge']?.notes).toBe('reached out to 3 hosts');
+		await deleteTestDb(db);
+	});
+
+	it('setNote rejects 100,001 units and writes nothing', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setNote('skillbridge', 'an earlier short note');
+		await expect(a.setNote('skillbridge', 'a'.repeat(100_001))).rejects.toThrow('E_NOTE_TOO_LONG');
+
+		const b = await reload(db);
+		expect(b.state.tasks['skillbridge']?.notes).toBe('an earlier short note');
+		await deleteTestDb(db);
+	});
+
+	it('50,000 surrogate pairs = 100,000 units is accepted', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const pairs = String.fromCharCode(0xd83d, 0xde00).repeat(50_000);
+		expect(pairs.length).toBe(100_000);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setNote('skillbridge', pairs);
+
+		const b = await reload(db);
+		expect(b.state.tasks['skillbridge']?.notes).toBe(pairs);
+		await deleteTestDb(db);
+	});
+
+	it('setNote rejects the plan key and writes nothing', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setNote('y', 'kept');
+		await expect(a.setNote(SKILLBRIDGE_PLAN_KEY, 'x')).rejects.toThrow('E_NOTE_KEY');
+
+		const b = await reload(db);
+		expect(b.state.tasks).toEqual({ y: { notes: 'kept' } });
 		await deleteTestDb(db);
 	});
 
@@ -609,6 +656,48 @@ describe('timeline-state store', () => {
 		await b.load();
 		expect(b.failed).toBe(false);
 		expect(b.state.tasks['dd214-review']?.status).toBe('done');
+		await deleteTestDb(db);
+	});
+
+	// The tasks held from the last good read are not known to be current once a read fails: they must not stay on
+	// screen as if they were, and an add built from them must not run.
+	it('a failed load reads not-ready', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('dd214-review', 'done');
+		expect(a.ready).toBe(true);
+		expect(a.state.tasks['dd214-review']?.status).toBe('done');
+
+		await withStores(db, 'timeline-state', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state').delete(0);
+		});
+		await expect(a.load()).rejects.toThrow('E_TIMELINE_BODY_MISSING');
+
+		expect(a.ready).toBe(false);
+		expect(a.state).toEqual({ schemaVersion: 1, tasks: {} });
+		expect(a.failed).toBe(true);
+		await deleteTestDb(db);
+	});
+
+	it('a non-hygiene relock broadcasts its reason', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const events: TimelineBroadcastEvent[] = [];
+		const store = createTimelineStateStore(db, { onBroadcast: (e) => events.push(e) });
+
+		store.relockSync('idle');
+		store.relockSync('user');
+		store.relockSync('peer');
+		store.relockSync('hygiene');
+
+		expect(events).toEqual([
+			{ type: 'relocked', reason: 'idle' },
+			{ type: 'relocked', reason: 'user' },
+			{ type: 'relocked' }
+		]);
+		expect('reason' in (events[2] ?? { reason: 1 })).toBe(false);
 		await deleteTestDb(db);
 	});
 

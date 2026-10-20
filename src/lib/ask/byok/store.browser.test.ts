@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createByokStore } from './store';
 import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 import { KeystoreNotInitializedError } from '$lib/profile/store.svelte';
-import { withStores, reqToPromise } from '$lib/db/schema';
+import { withStores, reqToPromise, STORES } from '$lib/db/schema';
 import { openTestDb, deleteTestDb } from '$lib/db/_test-helpers';
 
 // Real Chromium (SubtleCrypto + IndexedDB). The byok store persists the user's BYO API key as a single
@@ -103,6 +103,109 @@ describe('byok store', () => {
 		await expect(store.saveApiKey(KEY)).rejects.toThrow(KeystoreNotInitializedError);
 		await expect(store.readApiKey()).rejects.toThrow(KeystoreNotInitializedError);
 		await deleteTestDb(db);
+	});
+
+	// Run on a database with no keystore: a refusal that comes first throws its own code, one that reads the
+	// keystore first would throw KeystoreNotInitializedError instead.
+	it('saveApiKey refuses a bad shape and writes nothing', async () => {
+		const db = await openTestDb();
+
+		await expect(createByokStore(db).saveApiKey('apple harbor cable dog echo fox')).rejects.toThrow(
+			'E_KEY_SHAPE'
+		);
+		expect(seen.cipherInput).toHaveLength(0);
+
+		await bootstrapLocalKeystore(db);
+		await expect(createByokStore(db).saveApiKey('sk-test-key')).rejects.toThrow('E_KEY_SHAPE');
+		const row = await withStores(db, 'byok', 'readonly', (tx) =>
+			reqToPromise<unknown>(tx.objectStore('byok').get(0))
+		);
+		expect(row).toBeUndefined();
+		expect(seen.cipherInput).toHaveLength(0);
+		await deleteTestDb(db);
+	});
+});
+
+// A peer holding a lock: `hold(...)` resolves once the peer holds it, and `release` frees it and waits for it to go.
+async function hold(name: string, mode: LockMode): Promise<{ release: () => Promise<void> }> {
+	let release: () => void = () => {};
+	let holding: Promise<void> = Promise.resolve();
+	const granted = new Promise<void>((resolve) => {
+		holding = navigator.locks.request(name, { mode }, async () => {
+			await new Promise<void>((r) => {
+				release = r;
+				resolve();
+			});
+		});
+	});
+	await granted;
+	return {
+		release: async () => {
+			release();
+			await holding;
+		}
+	};
+}
+
+/** What a promise did, without hanging the test when it does nothing. */
+async function outcomeOf(p: Promise<unknown>): Promise<unknown> {
+	const settled = p.then(
+		() => 'resolved' as const,
+		(err: unknown) => err
+	);
+	const pending = new Promise<'still waiting'>((r) => setTimeout(() => r('still waiting'), 300));
+	return Promise.race([settled, pending]);
+}
+
+const byokRow = (db: IDBDatabase) =>
+	withStores(db, 'byok', 'readonly', (tx) => reqToPromise<unknown>(tx.objectStore('byok').get(0)));
+
+// The device erase takes the keystore lock exclusive. A save or a remove that ran without the lock could land after
+// the erase and write the key back into the emptied database; under the lock it runs wholly before or after it.
+describe('byok store against an erase', () => {
+	let db: IDBDatabase;
+
+	beforeEach(async () => {
+		db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+	});
+
+	afterEach(async () => {
+		await deleteTestDb(db);
+	});
+
+	// The erase's own effect, made while the peer holds the lock: every store cleared in one transaction, the
+	// keystore with them. A save that read the keystore before the erase would still hold it and write after.
+	it('a key save straddling an Erase writes nothing', async () => {
+		const peer = await hold('mtc-keystore', 'exclusive');
+		let save: Promise<void> | undefined;
+		try {
+			save = createByokStore(db).saveApiKey(KEY);
+			expect(await outcomeOf(save)).toBe('still waiting');
+			await withStores(db, [...STORES], 'readwrite', (tx) => {
+				for (const store of STORES) tx.objectStore(store).clear();
+			});
+		} finally {
+			await peer.release();
+		}
+		await expect(save).rejects.toThrow(KeystoreNotInitializedError);
+		expect(await byokRow(db)).toBeUndefined();
+	});
+
+	it('a key removal straddling an Erase waits for it', async () => {
+		const store = createByokStore(db);
+		await store.saveApiKey(KEY);
+		const peer = await hold('mtc-keystore', 'exclusive');
+		let clear: Promise<void> | undefined;
+		try {
+			clear = store.clearApiKey();
+			expect(await outcomeOf(clear)).toBe('still waiting');
+			expect(await byokRow(db)).toBeDefined();
+		} finally {
+			await peer.release();
+		}
+		await clear;
+		expect(await byokRow(db)).toBeUndefined();
 	});
 });
 

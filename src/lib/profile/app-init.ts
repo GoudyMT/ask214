@@ -176,12 +176,12 @@ export function createRelockEcho(bus: ProfileBus): {
  */
 export function subscribeBus(
 	bus: ProfileBus,
-	handlers: Partial<Record<BusSignal['type'], () => unknown>>
+	handlers: Partial<Record<BusSignal['type'], (s: BusSignal) => unknown>>
 ): () => void {
 	return bus.subscribe((signal) => {
 		// A handler may hand back a re-read. It is not rethrown into the page as an unhandled rejection: the timeline
 		// and calendar show a failed re-read in their own state; the profile has no failed state, so it keeps what it held.
-		void Promise.resolve(handlers[signal.type]?.()).catch(() => {});
+		void Promise.resolve(handlers[signal.type]?.(signal)).catch(() => {});
 	});
 }
 
@@ -211,6 +211,43 @@ export function reloadWhenShown(
 	};
 }
 
+/**
+ * Reload when a peer says one particular thing, and only in a tab that is both shown and unlocked. A
+ * reload runs the start-up again, which decrypts: a hidden tab must not hold that plaintext, and a
+ * locked tab must not open itself. A locked tab calls `onLocked` instead, so the caller can remember
+ * to reload when the user unlocks. The lock is checked again when a hidden tab is shown, because it
+ * may have locked while it waited. Returns the teardown (bus and any pending wait).
+ */
+export function reloadOnSignalWhenShown(
+	bus: ProfileBus,
+	type: BusSignal['type'],
+	doc: EventTarget & { hidden: boolean },
+	isLocked: () => boolean,
+	onLocked: () => void,
+	reload: () => void
+): () => void {
+	// The same function added twice is one listener, so a burst of signals while hidden still reloads once.
+	const onShow = (): void => {
+		if (doc.hidden) return;
+		doc.removeEventListener('visibilitychange', onShow);
+		if (isLocked()) onLocked();
+		else reload();
+	};
+	const off = bus.subscribe((signal) => {
+		if (signal.type !== type) return;
+		if (isLocked()) {
+			onLocked();
+			return;
+		}
+		doc.addEventListener('visibilitychange', onShow);
+		onShow();
+	});
+	return () => {
+		off();
+		doc.removeEventListener('visibilitychange', onShow);
+	};
+}
+
 /** User-input events that reset the idle countdown. Passive listeners (no scroll-jank). */
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'touchstart'] as const;
 
@@ -227,9 +264,12 @@ const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'pointermove', 'scroll', 'tou
  * `refresh`, not `load`: everything reached through this type is AUTOMATIC (a lifecycle event, a
  * peer's signal), never the user asking to unlock. load() is deliberately absent so this seam
  * cannot decrypt on its own say-so; the store's own gate is what actually enforces it.
+ *
+ * `detail` is the extra a peer relock can carry: why the other tab locked. The shipped stores ignore it; a
+ * later joiner may use it.
  */
 export type Relockable = {
-	relockSync: (reason: RelockReason) => void;
+	relockSync: (reason: RelockReason, detail?: { peerReason?: 'idle' | 'user' }) => void;
 	refresh: () => Promise<unknown>;
 	lock?: (reason: RelockReason) => Promise<void>;
 };
@@ -247,10 +287,11 @@ export type Relockable = {
  * in every store after it in the list.
  *
  * NOT for the cross-tab bus handler - that path must stay fully synchronous inside the relock echo's
- * answer() frame, so it calls relockSync directly.
+ * answer() frame, so it uses relockEachSync, which never defers through lock().
  */
 export function relockAll(relockables: Relockable[], reason: RelockReason): void {
-	for (const r of relockables) {
+	// A copy, so a store leaving the list during its own relock cannot make the walk skip the next one.
+	for (const r of [...relockables]) {
 		try {
 			if (r.lock) void r.lock(reason);
 			else r.relockSync(reason);
@@ -258,6 +299,64 @@ export function relockAll(relockables: Relockable[], reason: RelockReason): void
 			/* isolated: the next store's PII still gets zeroized */
 		}
 	}
+}
+
+/**
+ * Relock every store synchronously, one throw never stopping the rest. The page-hide and peer-relock
+ * paths cannot defer through lock(), and a store that throws must not leave the plaintext of the
+ * stores after it in memory. The walk reads a copy so a store leaving the shared list during its own
+ * relock cannot shift the index and make the walk skip the next one.
+ */
+export function relockEachSync(
+	relockables: Relockable[],
+	reason: RelockReason,
+	detail?: { peerReason?: 'idle' | 'user' }
+): void {
+	for (const r of [...relockables]) {
+		try {
+			// Spread, not `detail` itself: an undefined would still be a second argument, and a walk with no detail must
+			// call each store with the reason alone.
+			r.relockSync(reason, ...(detail ? [detail] : []));
+		} catch {
+			/* isolated: the next store's PII still gets zeroized */
+		}
+	}
+}
+
+/**
+ * The seam a later feature joins the relock list through. The joiner is wrapped, never stored: a throw from it
+ * cannot break a walk the shipped stores depend on. Its `refresh` is forwarded, and a throw or a rejection from it
+ * is swallowed for the same reason. A joiner's refresh must never decrypt: for the backup session it is the check
+ * that decides whether the screen may show again after the person was away. `leave()` removes that wrapper by
+ * identity (a stored index goes stale as soon as another entry leaves) and is safe to call twice.
+ */
+export function createJoinRelock(relockables: Relockable[]): (r: Relockable) => () => void {
+	return (r) => {
+		const entry: Relockable = {
+			relockSync: (reason, ...rest) => {
+				try {
+					r.relockSync(reason, ...rest);
+				} catch {
+					/* isolated: a joiner can never stop the stores after it from relocking */
+				}
+			},
+			refresh: () => {
+				try {
+					return r.refresh().then(
+						() => undefined,
+						() => undefined
+					);
+				} catch {
+					return Promise.resolve();
+				}
+			}
+		};
+		relockables.push(entry);
+		return () => {
+			const i = relockables.indexOf(entry);
+			if (i !== -1) relockables.splice(i, 1);
+		};
+	};
 }
 
 /** Injected so the whole path is unit-testable; +layout supplies window, document, the real
@@ -298,15 +397,20 @@ export function installLifecycle(
 	// The page is going away, so its plaintext goes with it. That is hygiene, not a decision the
 	// user made, so it stays undoable - pagehide and freeze both land here and their order is not
 	// consistent across browsers, which the state ladder absorbs.
-	const onHide = (): void => {
-		for (const r of relockables) r.relockSync('hygiene');
-	};
+	const onHide = (): void => relockEachSync(relockables, 'hygiene');
 	// The page came back. Ask every store to re-read; each answers from how its own plaintext went
 	// away, so an evicted store restores and a locked one stays shut. No policy belongs here.
 	const restore = (): void => {
 		// A failed re-read is not left as an unhandled rejection: the timeline and calendar show it in their own
 		// state; the profile has no failed state, so it keeps what it held.
-		for (const r of relockables) r.refresh().catch(() => {});
+		// A synchronous throw is not covered by that catch, so each store is also isolated by its own try.
+		for (const r of [...relockables]) {
+			try {
+				r.refresh().catch(() => {});
+			} catch {
+				/* isolated: the next store still re-reads */
+			}
+		}
 	};
 	// Two ways back in, deliberately routed through the same branch rather than paired by arrival
 	// order: which of these fires, and in what sequence, is not consistent across browsers.

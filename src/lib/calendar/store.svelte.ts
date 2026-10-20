@@ -1,8 +1,7 @@
 import type { CalendarSyncState, DesiredEvent, HandedOverEvent, TaskExclusions } from './types';
 import type { CardDismissal } from './card-visibility';
-import { encodeCalendarSyncState, decodeCalendarSyncState } from './codec';
+import { encryptCalendarRecord, decryptCalendarRecord } from './crypto-boundary';
 import { mergeHandedOver, acknowledge } from './handed-over';
-import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import type { KeystoreRecordV1 } from '../keystore/record';
 import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
@@ -43,8 +42,6 @@ export class CalendarRelockedError extends Error {
 	}
 }
 
-const CALENDAR_CTX: RecordCtx = { storeName: 'calendar-sync', recordId: 'self', schemaVersion: 1 };
-
 type CalendarHwmPayload = {
 	generation: number;
 	keystoreGeneration: number;
@@ -55,7 +52,10 @@ type CalendarHwmPayload = {
 type KeystoreRow = KeystoreRecordV1 & { id: number };
 type StateRow = { id: number; rec: Uint8Array };
 
-export type CalendarBroadcastEvent = { type: 'calendar-updated' | 'relocked' };
+export type CalendarBroadcastEvent = {
+	type: 'calendar-updated' | 'relocked';
+	reason?: 'idle' | 'user';
+};
 export type CalendarStoreOptions = { onBroadcast?: (e: CalendarBroadcastEvent) => void };
 
 export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOptions = {}) {
@@ -77,7 +77,8 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		relockEpoch++;
 		lockState = nextLockState(lockState, reason);
 		// Only an intentional relock is other tabs' business - see the profile store's relockNow.
-		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
+		if (reason === 'idle' || reason === 'user') opts.onBroadcast?.({ type: 'relocked', reason });
+		else if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	const readVerifiedKeystore = () => readKeystoreRow(db);
@@ -111,12 +112,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 
 				const next = mutate(_state);
 				const nextGen = currentGen + 1;
-				const blob = await encryptRecord(
-					CALENDAR_CTX,
-					new Uint8Array(encodeCalendarSyncState(next)),
-					keystore,
-					nextGen
-				);
+				const blob = await encryptCalendarRecord(next, keystore, nextGen);
 				const newHwm = await signSidecar<CalendarHwmPayload>(
 					'calendar-sync-hwm',
 					{
@@ -220,9 +216,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 						}
 						const row = await getRow<StateRow>(db, 'calendar-sync');
 						if (!row) throw new Error('E_CALENDAR_BODY_MISSING');
-						const decoded = decodeCalendarSyncState(
-							await decryptRecord(CALENDAR_CTX, row.rec, keystore, gen)
-						);
+						const decoded = await decryptCalendarRecord(row.rec, keystore, gen);
 						_generation = gen;
 						if (relockEpoch === relockAtStart) {
 							_state = decoded;

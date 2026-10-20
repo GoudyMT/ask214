@@ -333,6 +333,43 @@ const STATIC = 'static';
 //     a build of v1.6.0: Ask +322 B, Settings +128 B, Timeline +151 B. Two builds measured page 64,193 B, precache
 //     156,590-156,594 B and route nodes 50,045-50,049 B, at least 41 B of room above the highest. Trim pass: the new
 //     code is one function or one string per feature in the build; nothing found to cut short of the approved copy.
+//     Page 64,240 -> 89,280, onDemand 8,090 -> 8,189, precache 156,640 -> 217,500, precache files 62 -> 68, root
+//     layout 7,100 -> 7,330 and route nodes 50,090 -> 51,880 (package.json's size-limit) (owner's call, 2026-10-17):
+//     the encrypted backup. About 23 KB of the page row is the backup itself (the card, the session that guards it,
+//     the two flows, the file check, the restore writer, the wording) in one chunk Settings and the setup screen load;
+//     about 1.8 KB is lock and profile wiring. Of the precache growth, 32.7 KB is the key worker (most of it the word
+//     list) and about 28 KB the page code, route nodes and CSS, cached so a backup works offline; the six new files are
+//     the worker and five chunks (BackupCard.css replaces EaosInput.css and carries its rules). The root layout carries the relock and reload wiring; the route nodes the
+//     Settings and setup-screen wiring and the carry-overs. Three builds measured page 89,226-89,236 B, precache
+//     217,448-217,460 B, layout 7,287 B, route nodes 51,838 B, on demand 8,149 B, at least 40 B of room above the
+//     highest. Trim pass: the owed-copy list dropped from the build and the Timeline's restored note split from the
+//     backup wording (-375 B page, -383 B precache), kept; loading the key worker on demand (-32.7 KB precache) breaks
+//     an offline first backup, a tighter word list (-7.3 KB) is on the roadmap, and a lazy card defers bytes without
+//     saving them - none kept.
+//     Page 89,280 -> 89,690, precache 217,500 -> 218,140 and route nodes 51,880 -> 51,910 (owner's call, 2026-10-18):
+//     the Pre-PR sweep's fixes and the owner's copy answers - the card keeps a saved result across a remount, keeps
+//     focus on its row, ties errors to fields, describes the restore confirm, 44 px buttons and a forced-colours outline;
+//     a refused Send a copy names where the file is; "Made on" names this phone's time; the key worker carries the
+//     word list's CC BY 4.0 credit (+109 B); a made-up citation refused unless a retrieved source prints it. The same
+//     change moved the SkillBridge plan code and the restore-only device reader off the code every page loads: about
+//     850 B less on Home, About, Documents, Feedback, Resources and Ask. Three builds measured page 89,638-89,641 B,
+//     precache 218,083-218,092 B, route nodes 51,858-51,865 B, at least 45 B of room above the highest. Trim pass: the
+//     sweep fixes were trimmed once each (focus helper, confirm description, the flow checks; about -150 B), kept.
+//     Page 89,690 -> 89,730, precache 218,140 -> 218,200 and route nodes 51,910 -> 51,930 (owner's call, 2026-10-18):
+//     the re-sweep's fixes - a kept backup result is dropped when the person leaves Settings, a first-run device's
+//     session ends when its card leaves, a refused Send a copy and the newer saved line survive a remount. Three builds
+//     measured page 89,682-89,688 B, precache 218,144-218,159 B, route nodes 51,879-51,885 B, at least 41 B of room
+//     above the highest. Trim pass: the three kept values share one effect, kept.
+//     Page 89,730 -> 89,930 and precache 218,200 -> 218,440 (owner's call, 2026-10-18): the Pre-Push Op-Test's fixes
+//     and the owner's two answers - a fresh device keeps Make a backup off, the backup name fits at 320 px, a backup
+//     cut short reads as damaged, a double tap opens the save picker once, "Saving your backup..." while the file is
+//     written, and a Done button after a Check. Three builds measured page 89,881-89,884 B, precache 218,387-218,394 B,
+//     at least 46 B of room above the highest. Trim pass: the Op-Test fixes were trimmed once (kept); reusing the
+//     working-phase list for the saving line grew the page (+8 B), not kept.
+//     Page 89,930 -> 90,300 and precache 218,440 -> 218,860 (owner's call, 2026-10-19): "Show what I typed" under
+//     each passphrase field, so a typo is found by its number instead of retyping six hidden words (its own list
+//     component and styles). Three builds measured page 90,246-90,250 B, precache 218,795-218,808 B, at least 50 B
+//     of room above the highest.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -342,10 +379,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 64_240,
-	onDemand: 8_090,
-	precacheFiles: 62,
-	precacheBytes: 156_640,
+	page: 90_300,
+	onDemand: 8_189,
+	precacheFiles: 68,
+	precacheBytes: 218_860,
 	workerScripts: 147_200
 };
 

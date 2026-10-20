@@ -123,10 +123,10 @@ test('a tab on damaged data reloads when another tab saves new data', async ({ c
 	await first.getByRole('button', { name: /erase all data on this device/i }).click();
 	await first.getByRole('button', { name: /^erase everything$/i }).click();
 	await expect(first.getByText("can't be read")).toBeHidden({ timeout: 15_000 });
-	// The erase ends in a reload: wait for it to land on a ready first run before reading the database.
-	await expect(first.getByRole('heading', { level: 2, name: 'Appearance' })).toBeVisible({
-		timeout: 15_000
-	});
+	// A damaged Erase reloads onto the setup screen with the restore row open: wait for that ready first run
+	// before reading the database.
+	await expect(first).toHaveURL(/\/wizard$/, { timeout: 15_000 });
+	await expect(first.getByRole('button', { name: 'Choose file' })).toBeVisible({ timeout: 15_000 });
 	await seedProfile(first);
 
 	// The second tab heard the save and read the data again: no erase offered, the new date shown.
@@ -152,16 +152,17 @@ test('a second erase on data another tab already erased checks first and wipes n
 	await first.getByRole('button', { name: /erase all data on this device/i }).click();
 	await first.getByRole('button', { name: /^erase everything$/i }).click();
 	await expect(first.getByText("can't be read")).toBeHidden({ timeout: 15_000 });
-	// The erase ends in a reload: wait for it to land on a ready first run before reading the database.
-	await expect(first.getByRole('heading', { level: 2, name: 'Appearance' })).toBeVisible({
-		timeout: 15_000
-	});
+	// A damaged Erase reloads onto the setup screen with the restore row open: wait for that ready first run
+	// before reading the database.
+	await expect(first).toHaveURL(/\/wizard$/, { timeout: 15_000 });
+	await expect(first.getByRole('button', { name: 'Choose file' })).toBeVisible({ timeout: 15_000 });
 	const fresh = await installId(first);
 
 	await second.getByRole('button', { name: /erase all data on this device/i }).click();
 	await second.getByRole('button', { name: /^erase everything$/i }).click();
 	await expect(second.getByText("can't be read")).toBeHidden({ timeout: 15_000 });
-	// The erase ends in a reload: wait for it to land on a ready first run before reading the database.
+	// The data no longer reads as damaged, so this erase wipes nothing and reloads in place, on Settings: wait for that
+	// ready first run before reading the database.
 	await expect(second.getByRole('heading', { level: 2, name: 'Appearance' })).toBeVisible({
 		timeout: 15_000
 	});

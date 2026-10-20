@@ -53,12 +53,12 @@ export type ProfilePatch = Partial<
 	Omit<ProfileV1, 'schemaVersion' | 'generation' | 'lastSeenAt' | 'setupIntentChangedAt'>
 >;
 
-export type BroadcastEvent = { type: 'profile-updated' | 'relocked' };
+export type BroadcastEvent = { type: 'profile-updated' | 'relocked'; reason?: 'idle' | 'user' };
 export type ProfileStoreOptions = { onBroadcast?: (e: BroadcastEvent) => void };
 
-type KeystoreRow = KeystoreRecordV1 & { id: number };
-type HwmRow = SignedSidecar<ProfileHwmPayload> & { id: number };
-type ProfileRow = { id: number; rec: Uint8Array };
+export type KeystoreRow = KeystoreRecordV1 & { id: number };
+export type HwmRow = SignedSidecar<ProfileHwmPayload> & { id: number };
+export type ProfileRow = { id: number; rec: Uint8Array };
 
 /** A store's single self-row (id 0), shared by every encrypted store. */
 export function getRow<T>(db: IDBDatabase, store: StoreName): Promise<T | undefined> {
@@ -106,7 +106,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	// back. `locked` cannot answer that: it is derived state (hasProfile && _profile === null), so it
 	// reads FALSE for a first-run tab that has relocked, and it says nothing about WHY the profile is
 	// absent. See refresh().
-	let lockState: LockState = 'unlocked';
+	let lockState = $state<LockState>('unlocked');
 	// True once a profile body exists in storage (generation >= 1). Retained across relock
 	// (the encrypted record still exists), so `locked` can distinguish relocked from never-set-up.
 	// $state so `locked` recomputes reactively when it flips without a coincident `_profile` write
@@ -133,7 +133,9 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		// The relocked signal means "the user locked - you should too". Page hygiene is not that: THIS
 		// page is going away and the others are not, so telling them turns switching tabs into locking
 		// every other tab, and a peer relock is not one a page restore may undo.
-		if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
+		// The reason rides along only for an idle or user relock, so a tab can tell a timeout from the user's Lock.
+		if (reason === 'idle' || reason === 'user') opts.onBroadcast?.({ type: 'relocked', reason });
+		else if (reason !== 'hygiene') opts.onBroadcast?.({ type: 'relocked' });
 	}
 
 	const api = {
@@ -145,6 +147,14 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		/** Reactive persona derived from current profile state (re-runs when load/save mutates it). */
 		get persona(): PersonaFilters {
 			return derivePersona(_profile);
+		},
+
+		/**
+		 * When the backup this device last made or restored was made (ms), or null with none, or while the profile is
+		 * locked or not loaded. Reactive like `persona`. A screen shows it to the person whose device it is.
+		 */
+		get lastBackupAt(): number | null {
+			return _profile?.lastBackupAt ?? null;
 		},
 
 		/** Synchronous relock for the pagehide/freeze handlers (wired at app-init) - no await. */
@@ -180,6 +190,11 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 */
 		get locked(): boolean {
 			return hasProfile && _profile === null;
+		},
+
+		/** Reactive lock state; unlike `locked` it tells a first-run tab that relocked from one that never loaded. */
+		get lockState(): LockState {
+			return lockState;
 		},
 
 		/**

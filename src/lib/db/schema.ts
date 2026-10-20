@@ -21,7 +21,8 @@ export const DB_NAME = 'mtc';
 // newer database: a v1.2.0 bundle stays on its loading screen; later ones show the start-up banner with Reload.
 // Raise it too whenever a change alters how saved data is checked (the key record's HMAC input, the AAD, a sidecar's
 // signed bytes, a record's format): an older app then stops at the version, with Reload, instead of reading the
-// newer data as damaged and offering to erase it.
+// newer data as damaged and offering to erase it. An added optional key that an older codec ignores (profile
+// codec.ts: 'a key not listed is ignored') is not a format change and needs no raise.
 export const DB_VERSION = 6; // 5 -> 6: no new store; retires a tab on an older bundle (onversionchange -> 'stale'), whose out-of-date calendar list would mark the SkillBridge steps' events for deletion
 export const STORES = [
 	'profile',

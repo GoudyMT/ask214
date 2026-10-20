@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import BackupCard from '$lib/backup/BackupCard.svelte';
+	import { RESTORE_ENTRY } from '$lib/backup/copy';
+	import { takeBackupIntent } from '$lib/backup/intent';
+	import { backupSession } from '$lib/backup/session.svelte';
 	import EaosInput from '$lib/components/EaosInput.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import { OccConflictError } from '$lib/profile/store.svelte';
@@ -85,6 +89,18 @@
 	async function skip(): Promise<void> {
 		await goto(resolve('/'));
 	}
+
+	// The note an Erase from the damaged view leaves in the history entry; the app's start-up has already moved it out of
+	// the entry, so a reload of this page finds none. It is taken as the page starts, whatever the app is doing, so it is
+	// spent once. The card opens the row once the row can start.
+	const openRestoreRow = takeBackupIntent('restore-row');
+
+	// A backup that cannot be restored over this device's damaged data: the Erase lives in Settings, which takes the
+	// request from the session (in memory, never in the address) when the page opens.
+	function eraseFromBackup(): void {
+		backupSession.requestErase();
+		void goto(resolve('/settings'));
+	}
 </script>
 
 <svelte:head>
@@ -95,7 +111,8 @@
 	<h1 id="wizard-heading">Set up your profile</h1>
 	<p class="wizard__lead">
 		Add your separation date and we'll build a transition timeline around it. Everything stays
-		encrypted on this device - it never leaves.
+		encrypted on this device. It leaves only in a file you choose to save: a backup, locked with its
+		passphrase, or a calendar file of your deadlines.
 	</p>
 
 	{#if app.status === 'ready'}
@@ -124,6 +141,15 @@
 				>
 			</div>
 		</form>
+	{/if}
+
+	<!-- The app's one connection: there is nothing to restore onto before start-up has opened it. -->
+	{#if app.db}
+		<BackupCard
+			db={app.db}
+			onEraseRequest={eraseFromBackup}
+			only={{ row: 'restore', label: RESTORE_ENTRY, open: openRestoreRow }}
+		/>
 	{/if}
 </section>
 

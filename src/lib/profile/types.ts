@@ -24,4 +24,8 @@ export type ProfileV1 = {
 	specialSituations?: Uint8Array[];
 	skillbridgeStart?: Uint8Array; // ISO date bytes (like eaos), so zeroizeField reaches it on relock
 	terminalLeaveStart?: Uint8Array; // ISO date bytes
+	lastBackupAt?: number; // ms epoch of the backup this device last made or restored
+	backupGenProfile?: number; // profile generation that backup matched
+	backupGenTimeline?: number; // timeline-state generation that backup matched
+	backupGenCalendar?: number; // calendar-sync generation that backup matched
 };

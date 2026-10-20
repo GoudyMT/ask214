@@ -1,5 +1,5 @@
 import { formatTimelineDate } from './format-date';
-import { selectNeedsNow } from './needs-now';
+import { afterYouLeaveWord, selectNeedsNow } from './needs-now';
 import { generateTimeline, type DisplayStatus, type TimelineItem } from './generate';
 import { TASK_DEFS } from './task-defs';
 import type { TimelineState } from './types';
@@ -23,12 +23,12 @@ export type TimelineGlance =
 
 const NAME = 'Your timeline';
 
-// The task card's own status words, for the statuses "Needs you now" can hold.
+// The task card's own status words, for the statuses "Needs you now" can hold; After you leave / Since you left turns
+// on the task, so it is worded by `afterYouLeaveWord`.
 const STATUS_WORD: Partial<Record<DisplayStatus, string>> = {
 	late: 'Late',
 	'closing-soon': 'Closing soon',
 	changed: 'Changed',
-	'after-you-leave': 'After you leave',
 	closed: 'Closed',
 	'start-now': 'Start now'
 };
@@ -98,7 +98,10 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 			name: NAME,
 			count: `${n} ${n === 1 ? 'needs' : 'need'} you now`,
 			status: {
-				word: STATUS_WORD[first.status] ?? first.status,
+				word:
+					first.status === 'after-you-leave'
+						? afterYouLeaveWord(first)
+						: (STATUS_WORD[first.status] ?? first.status),
 				hot: first.status !== 'start-now' && first.status !== 'after-you-leave'
 			},
 			detail: first.def.title

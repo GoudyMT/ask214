@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect } from 'vitest';
+import { page } from 'vitest/browser';
 import AskResultCard from './AskResultCard.svelte';
 import type { ResultCard } from '$lib/corpus';
 
@@ -95,6 +96,24 @@ describe('AskResultCard', () => {
 		const para = container.querySelector('.ask-card__excerpt') as HTMLElement;
 		expect(para.clientWidth).toBeGreaterThan(0);
 		expect(para.scrollWidth).toBeLessThanOrEqual(para.clientWidth);
+	});
+
+	// A source title is a printed name and can carry one long unbroken word; on a 320 px phone it must wrap inside
+	// the card, not push the card and the page sideways.
+	it('on a 320 px phone a long unbroken title wraps inside the card and the page does not scroll sideways', async () => {
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		await page.viewport(320, 800);
+		try {
+			const { container } = await render(AskResultCard, {
+				props: { card: fullCard({ sourceTitle: 'T'.repeat(60) }), variant: 'lead' }
+			});
+			const card = container.querySelector('.ask-card') as HTMLElement;
+			expect(card.clientWidth).toBeGreaterThan(0);
+			expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+		} finally {
+			await page.viewport(size.width, size.height);
+		}
 	});
 
 	it('renders no excerpt paragraph when the chunk cleans to nothing', async () => {

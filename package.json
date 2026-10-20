@@ -1,7 +1,7 @@
 {
 	"name": "ask214",
 	"private": true,
-	"version": "1.7.2",
+	"version": "1.8.0",
 	"license": "AGPL-3.0-or-later",
 	"type": "module",
 	"packageManager": "pnpm@11.2.2",
@@ -23,6 +23,9 @@
 		"build:sources-index": "tsx content-ops/build-sources-index.mjs",
 		"check:sources-index": "tsx content-ops/check-sources-index.mjs",
 		"check:pdf-worker": "tsx content-ops/check-pdf-worker.mjs",
+		"check:backup-vendor": "tsx content-ops/check-backup-vendor.mjs",
+		"curate:backup-words": "tsx content-ops/curate-backup-words.mjs",
+		"build:backup-kdf": "tsx content-ops/build-backup-kdf.mjs",
 		"check:served-history": "node content-ops/check-served-history.mjs",
 		"check:chunks": "tsx content-ops/check-chunk-budget.mjs",
 		"check:commit-msg": "tsx content-ops/check-commit-message.mjs",
@@ -70,13 +73,13 @@
 		{
 			"name": "Root layout node (loaded on every page)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/0.*.js",
-			"limit": "7100 B",
+			"limit": "7330 B",
 			"gzip": true
 		},
 		{
 			"name": "Lazy route nodes (sum; no single page loads all of them)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
-			"limit": "50090 B",
+			"limit": "51930 B",
 			"gzip": true
 		}
 	],
@@ -92,6 +95,7 @@
 		"@types/node": "^26",
 		"@vitejs/plugin-basic-ssl": "^2.3.0",
 		"@vitest/browser-playwright": "5.0.3",
+		"esbuild": "0.28.2",
 		"eslint": "^10.12.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.23.0",
@@ -116,6 +120,7 @@
 	},
 	"dependencies": {
 		"@huggingface/transformers": "^4.2.0",
+		"@noble/hashes": "2.4.0",
 		"pdfjs-dist": "^6.3.289"
 	}
 }

@@ -630,6 +630,8 @@
 		margin: 0;
 		font-size: var(--font-size-l);
 		line-height: 1.25;
+		/* A title with one long unbroken word breaks inside the bar instead of running past a phone's edge. */
+		overflow-wrap: anywhere;
 	}
 	.reader__close {
 		grid-area: close;

@@ -203,6 +203,54 @@ describe('synthesize', () => {
 		}
 	});
 
+	// The corpus prints "Transfer of Entitlement [TOE]". A bracket of capital letters is kept as an acronym only
+	// when a retrieved chunk prints that exact bracket; the answer is then shown with it, not refused.
+	const TOE_CHUNKS: RetrievedChunk[] = [
+		{
+			...REAL_ID_CHUNKS[0]!,
+			text: `${REAL_ID_CHUNKS[0]!.text} Members need a Transfer of Entitlement [TOE] on file.`
+		}
+	];
+	it('shows an answer that quotes a bracketed acronym a retrieved chunk prints', async () => {
+		const impl = stubFetch(
+			`SkillBridge is open to members whose Transfer of Entitlement [TOE] is on file [${SKILLBRIDGE_ID}].`
+		);
+		const result = await synthesize('What is SkillBridge?', TOE_CHUNKS, deps(impl));
+		expect(result.kind).toBe('answer');
+		if (result.kind === 'answer') {
+			expect(result.answer.text).toContain('Transfer of Entitlement [TOE] is on file.');
+			expect(result.answer.citations.map((c) => c.id)).toEqual([SKILLBRIDGE_ID]);
+		}
+	});
+
+	// A source name written in capitals is not an acronym any source prints: it is a made-up citation, and it
+	// must not reach the reader beside a real one. The printed [TOE] does not vouch for another bracket, nor
+	// for the same letters in lower case.
+	it.each([
+		['an acronym no chunk prints', `[${SKILLBRIDGE_ID}] [DOD].`],
+		['a source name in capitals', `[${SKILLBRIDGE_ID}] [VABENEFITSGUIDE].`],
+		['a printed acronym beside one that is not printed', `[TOE] [${SKILLBRIDGE_ID}] [DOD].`],
+		['a printed acronym in lower case', `[${SKILLBRIDGE_ID}] [toe].`]
+	])('refuses %s written next to a real citation', async (_name, markers) => {
+		const impl = stubFetch(`SkillBridge lets you train with a civilian employer ${markers}`);
+		const result = await synthesize('What is SkillBridge?', TOE_CHUNKS, deps(impl));
+		expect(result.kind).toBe('refusal');
+		if (result.kind === 'refusal') expect(result.reason).toBe('invalid_citation');
+	});
+
+	// Any other marker the model writes parses and must be a retrieved id, whatever its case - a made-up source
+	// beside a real citation must never reach the reader.
+	it.each([
+		['an upper-cased id', `[${SKILLBRIDGE_ID}] [DOD_SKILLBRIDGE:ABCDEFABCDEF].`],
+		['a bare upper-case source name', `[${SKILLBRIDGE_ID}] [VA_BENEFITS_GUIDE].`],
+		['a mixed-case id', `[${SKILLBRIDGE_ID}] [Va_guide:abcdefabcdef].`]
+	])('refuses %s written next to a real citation', async (_name, markers) => {
+		const impl = stubFetch(`SkillBridge lets you train with a civilian employer ${markers}`);
+		const result = await synthesize('What is SkillBridge?', REAL_ID_CHUNKS, deps(impl));
+		expect(result.kind).toBe('refusal');
+		if (result.kind === 'refusal') expect(result.reason).toBe('invalid_citation');
+	});
+
 	it('accepts a citation to a real corpus id carrying a collision suffix', async () => {
 		const suffixed = await collisionId('tap_dol_efct', REAL_ID_CHUNKS[1]!.text, 1);
 		const chunks = [{ ...REAL_ID_CHUNKS[1]!, id: suffixed }];

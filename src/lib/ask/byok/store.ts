@@ -1,6 +1,9 @@
 import { encryptRecord, decryptRecord, type RecordCtx } from '$lib/crypto/record-crypto';
-import { readKeystoreRow } from '$lib/profile/store.svelte';
+import type { KeystoreRecordV1 } from '$lib/keystore/record';
+import { readKeystoreRow, KeystoreNotInitializedError } from '$lib/profile/store.svelte';
 import { withStores, reqToPromise } from '$lib/db/schema';
+import { withWriteLocks } from '$lib/db/locks';
+import { isAnthropicKeyShape } from './key-shape';
 
 /**
  * byok store - persists the user's BYO API key as ONE encrypted self-row through the shared
@@ -23,19 +26,33 @@ export function createByokStore(db: IDBDatabase) {
 	return {
 		/** Encrypt + persist the API key as the single byok self-row. */
 		async saveApiKey(key: string): Promise<void> {
-			const keystore = await readVerifiedKeystore();
-			const plaintext = new TextEncoder().encode(key);
-			let blob: Uint8Array;
-			try {
-				// Awaited inside the try: the wipe must wait for the cipher to finish with the buffer.
-				blob = await encryptRecord(BYOK_CTX, plaintext, keystore, BYOK_GENERATION);
-			} finally {
-				plaintext.fill(0);
-			}
-			await withStores(db, 'byok', 'readwrite', (tx) => {
-				// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord.
-				tx.objectStore('byok').put({ id: 0, rec: blob });
-			});
+			// First, before the keystore is read: no caller may store text that is not a key.
+			if (!isAnthropicKeyShape(key)) throw new Error('E_KEY_SHAPE');
+			// The keystore read, the encrypt and the write all sit inside the shared keystore lock: a device erase
+			// holds it exclusive, so it runs wholly before or after this save and cannot be undone by its write.
+			let ks: KeystoreRecordV1 | undefined;
+			await withWriteLocks(
+				async () => {
+					ks = await readVerifiedKeystore();
+					return ks.keystoreGeneration;
+				},
+				async () => {
+					if (!ks) throw new KeystoreNotInitializedError();
+					const keystore = ks;
+					const plaintext = new TextEncoder().encode(key);
+					let blob: Uint8Array;
+					try {
+						// Awaited inside the try: the wipe must wait for the cipher to finish with the buffer.
+						blob = await encryptRecord(BYOK_CTX, plaintext, keystore, BYOK_GENERATION);
+					} finally {
+						plaintext.fill(0);
+					}
+					await withStores(db, 'byok', 'readwrite', (tx) => {
+						// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord, under withWriteLocks.
+						tx.objectStore('byok').put({ id: 0, rec: blob });
+					});
+				}
+			);
 		},
 
 		/** Decrypt + return the stored key, or null if none is set. Reads on demand; never cached. */
@@ -55,9 +72,16 @@ export function createByokStore(db: IDBDatabase) {
 
 		/** Remove the stored key. */
 		async clearApiKey(): Promise<void> {
-			await withStores(db, 'byok', 'readwrite', (tx) => {
-				tx.objectStore('byok').clear();
-			});
+			// Under the same locks as the save, so it orders against an erase. It reads no keystore: removing
+			// a key needs none, and a damaged keystore must not stop the user from removing their key.
+			await withWriteLocks(
+				async () => 0,
+				async () => {
+					await withStores(db, 'byok', 'readwrite', (tx) => {
+						tx.objectStore('byok').clear();
+					});
+				}
+			);
 		}
 	};
 }

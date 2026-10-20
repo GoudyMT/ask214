@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { registerSecureInput } from '../profile/lifecycle';
+	import { isAnthropicKeyShape } from '../ask/byok/key-shape';
 
 	type Props = {
 		defaultMode: 'device' | 'online';
@@ -42,8 +43,14 @@
 	async function save(): Promise<void> {
 		const key = keyDraft.trim();
 		if (key === '') return;
-		keyError = null;
 		keyDraft = '';
+		// Text that is not a key (a backup passphrase pasted into the wrong field) is dropped, never stored or sent,
+		// and the line never repeats it.
+		if (!isAnthropicKeyShape(key)) {
+			keyError = 'That is not an Anthropic API key. Keys start with sk-ant-. Nothing was saved.';
+			return;
+		}
+		keyError = null;
 		try {
 			await onSaveKey(key);
 		} catch {

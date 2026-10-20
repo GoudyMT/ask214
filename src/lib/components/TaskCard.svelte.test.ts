@@ -9,6 +9,18 @@ import { TASK_DEFS } from '$lib/timeline';
 import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
 import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
 
+// A guide's title is the shipped document's own, so a case that needs an unbroken one sets it here; the rest read
+// the real titles.
+const guideTitle = vi.hoisted(() => ({ override: undefined as string | undefined }));
+vi.mock('$lib/resources', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/resources')>();
+	return {
+		...real,
+		guidesForTask: (taskId: string) =>
+			real.guidesForTask(taskId).map((g) => ({ ...g, title: guideTitle.override ?? g.title }))
+	};
+});
+
 // TaskCard renders one generated TimelineItem as an open status card: status-color left
 // edge + text status label (never color-only) + a status-specific date line + category chip +
 // why. The action row: Mark done / Skip + Snooze.
@@ -640,6 +652,93 @@ describe('TaskCard (open states)', () => {
 		await expect.poll(() => cancel.disabled).toBe(false);
 		expect(buttonByText(container, 'Cancel')).toBe(cancel);
 	});
+
+	// A note is capped at 100,000 UTF-16 units. The page wraps every store refusal into one generic failure, so the card
+	// checks the length itself and says why.
+	const TOO_LONG = 'This note is over 100,000 characters. Shorten it to save.';
+
+	async function openTooLong(
+		onSetNote: (taskId: string, note: string | undefined) => Promise<void>
+	) {
+		const { container } = await renderCard(makeItem({ note: 'a'.repeat(100_001) }), { onSetNote });
+		buttonByText(container, 'Edit note')?.click();
+		flushSync();
+		return container;
+	}
+
+	it('the note field has maxlength 100000', async () => {
+		const { container } = await renderCard(makeItem());
+		buttonByText(container, 'Add note')?.click();
+		flushSync();
+		expect(container.querySelector('textarea')?.getAttribute('maxlength')).toBe('100000');
+	});
+
+	it('a pre-filled 100,001-unit note shows the too-long line on Save and calls no onSetNote', async () => {
+		const onSetNote = vi.fn(async () => {});
+		const container = await openTooLong(onSetNote);
+		buttonByText(container, 'Save')?.click();
+		flushSync();
+		expect(onSetNote).not.toHaveBeenCalled();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(TOO_LONG);
+		expect(container.querySelector('.task-card__note [role="alert"]')).not.toBeNull();
+		expect(container.querySelector('textarea')).not.toBeNull();
+	});
+
+	it('the generic line is not shown for a too-long note, even right after a failed save', async () => {
+		const onSetNote = vi.fn(async () => {
+			throw new Error('E_NOTE_SAVE');
+		});
+		const container = await openTooLong(onSetNote);
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+		textarea.value = 'short';
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		buttonByText(container, 'Save')?.click();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(SAVE_FAILED);
+
+		textarea.value = 'a'.repeat(100_001);
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		buttonByText(container, 'Save')?.click();
+		await expect.element(page.getByRole('alert')).toHaveTextContent(TOO_LONG);
+		expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1);
+		expect(container.textContent).not.toContain(SAVE_FAILED);
+		expect(onSetNote).toHaveBeenCalledTimes(1);
+	});
+
+	it('shortening it to 100,000 saves, and the line goes when that Save starts', async () => {
+		let release: () => void = () => {};
+		const onSetNote = vi.fn(() => new Promise<void>((resolve) => (release = resolve)));
+		const container = await openTooLong(onSetNote);
+		buttonByText(container, 'Save')?.click();
+		flushSync();
+		expect(container.querySelector('[role="alert"]')).not.toBeNull();
+
+		const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+		textarea.value = 'a'.repeat(100_000);
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		buttonByText(container, 'Save')?.click();
+		await expect.poll(() => onSetNote.mock.calls.length).toBe(1);
+		expect(onSetNote).toHaveBeenCalledWith('skillbridge-hosts', 'a'.repeat(100_000));
+		await expect.poll(() => container.querySelector('[role="alert"]')).toBeNull();
+		release();
+		await expect.poll(() => container.querySelector('textarea')).toBeNull();
+	});
+
+	it('Cancel drops the too-long line, and the next edit starts without it', async () => {
+		const onSetNote = vi.fn(async () => {});
+		const container = await openTooLong(onSetNote);
+		buttonByText(container, 'Save')?.click();
+		flushSync();
+		expect(container.querySelector('[role="alert"]')).not.toBeNull();
+		buttonByText(container, 'Cancel')?.click();
+		flushSync();
+		buttonByText(container, 'Edit note')?.click();
+		flushSync();
+		expect(container.querySelector('textarea')).not.toBeNull();
+		expect(container.querySelector('[role="alert"]')).toBeNull();
+	});
 });
 
 // A snooze is live only while its date is after today, so the custom picker offers tomorrow at the earliest, and
@@ -1088,6 +1187,33 @@ describe('TaskCard (layout by width)', () => {
 		const shown = container.querySelector('.task-card__note-shown') as HTMLElement;
 		expect(shown.scrollWidth).toBeLessThanOrEqual(shown.clientWidth);
 	});
+
+	it('on a 320 px phone a long unbroken guide title wraps inside its button and the card', async () => {
+		await page.viewport(320, 800);
+		const tsp = TASK_DEFS.find((t) => t.id === 'tsp-decision');
+		if (!tsp) throw new Error('E_TEST_TASK_MISSING');
+		guideTitle.override = 'A'.repeat(60);
+		try {
+			const { container } = await render(TaskCard, {
+				props: {
+					item: makeItem({ def: tsp }),
+					onSetStatus: noop,
+					onSetSnooze: noop,
+					onOpenGuide: noop
+				}
+			});
+			await page.getByRole('button', { name: /^Related resources/ }).click();
+			const guide = container.querySelector('.task-card__guide') as HTMLElement;
+			expect(guide.textContent).toContain('A'.repeat(60));
+			expect(guide.scrollWidth).toBeLessThanOrEqual(guide.clientWidth);
+			expect(guide.getBoundingClientRect().right).toBeLessThanOrEqual(
+				box(container, 'article').right
+			);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+		} finally {
+			guideTitle.override = undefined;
+		}
+	});
 });
 
 // What a keyboard or screen-reader user meets: the link's place, the jump's landing, and words kept apart.
@@ -1113,6 +1239,113 @@ describe('TaskCard (for keyboard and screen reader)', () => {
 		) as HTMLElement;
 		card.focus();
 		expect(document.activeElement).toBe(card);
+	});
+
+	describe('the Snooze picker', () => {
+		const ESCAPE = {
+			key: 'Escape',
+			code: 'Escape',
+			windowsVirtualKeyCode: 27
+		};
+		const snoozeButton = (container: Element) =>
+			[...container.querySelectorAll<HTMLButtonElement>('.task-card__actions button')].find(
+				(b) => b.textContent?.trim() === 'Snooze'
+			) as HTMLButtonElement;
+		const pickerOpen = (container: Element) =>
+			container.querySelector('.task-card__snooze') !== null;
+
+		it('tells a screen reader whether the picker is open', async () => {
+			const { container } = await renderCard(makeItem({ status: 'start-now' }));
+			const snooze = snoozeButton(container);
+			expect(snooze.getAttribute('aria-expanded')).toBe('false');
+			snooze.click();
+			await expect.poll(() => snooze.getAttribute('aria-expanded')).toBe('true');
+			(buttonByText(container, 'Cancel') as HTMLButtonElement).click();
+			await expect.poll(() => snooze.getAttribute('aria-expanded')).toBe('false');
+		});
+
+		it('closes on Escape from the Snooze button, and focus stays on it', async () => {
+			const { container } = await renderCard(makeItem({ status: 'start-now' }));
+			const snooze = snoozeButton(container);
+			snooze.focus();
+			snooze.click();
+			await expect.poll(() => pickerOpen(container)).toBe(true);
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await expect.poll(() => pickerOpen(container)).toBe(false);
+			expect(snooze.getAttribute('aria-expanded')).toBe('false');
+			expect(document.activeElement).toBe(snooze);
+		});
+
+		it('closes on Escape from inside the picker and returns focus to the Snooze button', async () => {
+			const onSetSnooze = vi.fn();
+			const { container } = await renderCard(makeItem({ status: 'start-now' }), { onSetSnooze });
+			const snooze = snoozeButton(container);
+			snooze.click();
+			await expect.poll(() => pickerOpen(container)).toBe(true);
+			(buttonByText(container, 'Customize') as HTMLButtonElement).click();
+			const field = await vi.waitFor(() => {
+				const input = container.querySelector<HTMLInputElement>('input[type="date"]');
+				if (!input) throw new Error('E_NO_FIELD');
+				return input;
+			});
+			field.focus();
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await expect.poll(() => pickerOpen(container)).toBe(false);
+			await expect.poll(() => document.activeElement).toBe(snooze);
+			expect(onSetSnooze).not.toHaveBeenCalled();
+		});
+
+		// A held key repeats about every 40 ms: the press that closed the picker is the only one that acts, so a
+		// repeat of it does not close a picker the person opened again.
+		it('a held Escape closes the picker once and its repeats do nothing more', async () => {
+			const { container } = await renderCard(makeItem({ status: 'start-now' }));
+			const snooze = snoozeButton(container);
+			snooze.focus();
+			snooze.click();
+			await expect.poll(() => pickerOpen(container)).toBe(true);
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await expect.poll(() => pickerOpen(container)).toBe(false);
+			snooze.click();
+			await expect.poll(() => pickerOpen(container)).toBe(true);
+			for (let i = 0; i < 10; i++) {
+				await new Promise((resolve) => setTimeout(resolve, 40));
+				await session.send('Input.dispatchKeyEvent', {
+					type: 'keyDown',
+					autoRepeat: true,
+					...ESCAPE
+				});
+			}
+			expect(pickerOpen(container)).toBe(true);
+			expect(snooze.getAttribute('aria-expanded')).toBe('true');
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await expect.poll(() => pickerOpen(container)).toBe(false);
+		});
+
+		// Escape belongs to the picker only while it is open and holds the key: the note editor's own text field is not it.
+		it('leaves an open note editor alone when Escape is pressed in it', async () => {
+			const { container } = await renderCard(makeItem({ status: 'start-now' }));
+			snoozeButton(container).click();
+			(buttonByText(container, 'Add note') as HTMLButtonElement).click();
+			const field = await vi.waitFor(() => {
+				const area = container.querySelector<HTMLTextAreaElement>('textarea');
+				if (!area) throw new Error('E_NO_FIELD');
+				return area;
+			});
+			field.focus();
+			const session = cdp();
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ESCAPE });
+			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ESCAPE });
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			expect(pickerOpen(container)).toBe(true);
+			expect(container.querySelector('textarea')).not.toBeNull();
+		});
 	});
 
 	it('separates the tags from the text with spaces, so they are not read as one word', async () => {
@@ -1727,6 +1960,19 @@ describe('leaving your command', () => {
 		);
 		expect(box).not.toContain('Ask your command');
 		await expect.element(page.getByText('Opens Dec 1, 2026')).toBeVisible();
+	});
+
+	it('once the user has left the command, the status word is "Since you left"', async () => {
+		await renderCard(
+			makeItem({
+				def: firmDef,
+				status: 'after-you-leave',
+				windowStartDate: '2026-12-01',
+				leftCommand: { opened: false }
+			})
+		);
+		await expect.element(page.getByText('Since you left', { exact: true })).toBeVisible();
+		expect(page.getByText('After you leave', { exact: true }).query()).toBeNull();
 	});
 
 	it('once the user has left and the window has opened, shows no past opening date', async () => {

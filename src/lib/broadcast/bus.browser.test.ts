@@ -88,4 +88,43 @@ describe('createProfileBus', () => {
 		raw.close();
 		expect(received).toBe(0);
 	});
+
+	it('data-replaced is a bus signal', async () => {
+		const name = uniqueName();
+		const tabA = makeBus(name);
+		const tabB = makeBus(name);
+		const received = new Promise<BusSignal | null>((resolve) => {
+			tabB.subscribe((s) => resolve(s));
+			setTimeout(() => resolve(null), 1000);
+		});
+		tabA.publish({ type: 'data-replaced' });
+		expect(await received).toEqual({ type: 'data-replaced' });
+	});
+
+	it('toBusSignal keeps reason idle and user and drops any other value', async () => {
+		const name = uniqueName();
+		const tabB = makeBus(name);
+		const seen: BusSignal[] = [];
+		tabB.subscribe((s) => seen.push(s));
+		// A same-origin script can post any shape: only the checked fields may reach a handler.
+		const raw = new BroadcastChannel(name);
+		raw.postMessage({ type: 'relocked', reason: 'idle' });
+		raw.postMessage({ type: 'relocked', reason: 'user' });
+		raw.postMessage({ type: 'relocked', reason: 'peer' });
+		raw.postMessage({ type: 'relocked', reason: 42 });
+		raw.postMessage({ type: 'relocked', evil: 1 });
+		raw.postMessage({ type: 'relocked', reason: 'user', evil: 1 });
+		await delay(200);
+		raw.close();
+		expect(seen).toEqual([
+			{ type: 'relocked', reason: 'idle' },
+			{ type: 'relocked', reason: 'user' },
+			{ type: 'relocked' },
+			{ type: 'relocked' },
+			{ type: 'relocked' },
+			{ type: 'relocked', reason: 'user' }
+		]);
+		for (const s of seen) expect('evil' in s).toBe(false);
+		expect('reason' in (seen[2] ?? {})).toBe(false);
+	});
 });

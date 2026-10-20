@@ -79,6 +79,11 @@ jobs:
       - name: Check vendored pdf worker (drift gate vs the installed package)
         run: pnpm run check:pdf-worker
 
+      # The backup key worker and the word list are rebuilt from source and must match what is committed; a
+      # changed list could refuse the words of an old backup, so a difference here is never a quiet refresh.
+      - name: Check the vendored backup key worker and word list
+        run: pnpm run check:backup-vendor
+
       # The answer quality gate, on the on-device path. Self-contained by construction: the committed
       # corpus, the vendored MiniLM weights, no network and no credentials. Placed with the other
       # content gates so it fails before the Playwright install rather than after it.

@@ -40,7 +40,15 @@ vi.mock('$lib/ask', async (importOriginal) => ({
 vi.mock('$lib/ask/embed-worker?worker', () => ({ default: class {} }));
 vi.mock('$lib/ask/device-files', () => ({ deviceFilesKept: () => gate.held }));
 vi.mock('$lib/profile/context', () => ({
-	getProfileApp: () => ({ status: 'loading', store: null, byok: null }),
+	getProfileApp: () => ({
+		status: 'loading',
+		store: null,
+		byok: null,
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
+	}),
 	setProfileApp: () => {}
 }));
 vi.mock('$lib/install/context', () => ({

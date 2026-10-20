@@ -13,18 +13,22 @@
 		provisionStore,
 		subscribeBus,
 		installLifecycle,
+		createJoinRelock,
 		createRelockEcho,
 		relockAll,
+		relockEachSync,
+		reloadOnSignalWhenShown,
 		reloadWhenShown,
 		superviseStartup,
 		type Relockable
 	} from '$lib/profile/app-init';
 	import { createProfileStore } from '$lib/profile/store.svelte';
-	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline';
+	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline/state.svelte';
 	import { createCalendarSyncStore, type CalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus } from '$lib/broadcast/bus';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
+	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
 	import { wipeAllStores } from '$lib/db/wipe';
@@ -42,16 +46,11 @@
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 	import { stashRoute } from '$lib/feedback/context';
-
 	let { children } = $props();
 
 	// Shell content width: one width for every route (shell-width.ts), set on nav, main and footer through
 	// the --shell-width CSS var. The 720px in the styles below is only the fallback for a missing var.
 	const shellWidth = $derived(shellWidthFor());
-
-	// Auto-lock the in-memory profile after 15 minutes of no user input (memory hygiene;
-	// unlock is a transparent local-key re-decrypt in v1.0).
-	const IDLE_THRESHOLD_MS = 15 * 60 * 1000;
 
 	// App-wide profile container, set synchronously (setContext must run during component
 	// init). Populated by the client-only app-init in onMount below. The shell renders for
@@ -63,8 +62,13 @@
 		calendar: null,
 		byok: null,
 		cause: null,
+		db: null,
 		wipeAll: null,
-		relockAll: null
+		relockAll: null,
+		joinRelock: null,
+		publish: null,
+		reloadOnUnlock: false,
+		replacedNotice: false
 	});
 	setProfileApp(app);
 
@@ -129,7 +133,24 @@
 				// erase before it clears anything else.
 				if (result.status === 'damaged') {
 					safeLog({ code: 'E_INIT_FAILED' });
-					teardownRuntime = reloadWhenShown(bus, document, () => location.reload());
+					// Nothing is decrypted here, so the list starts empty: only a backup Check joins it, and the Erase's
+					// first step relocks it. The lifecycle and its idle timer end that Check like any other session.
+					const relockables: Relockable[] = [];
+					const offLifecycle = installLifecycle(relockables, {
+						win: window,
+						doc: document,
+						isHidden,
+						createIdleTimer,
+						idleThresholdMs: IDLE_THRESHOLD_MS
+					});
+					app.relockAll = () => relockAll(relockables, 'user');
+					app.joinRelock = createJoinRelock(relockables);
+					const offReload = reloadWhenShown(bus, document, () => location.reload());
+					teardownRuntime = () => {
+						offReload();
+						offLifecycle();
+					};
+					app.db = result.db;
 					app.wipeAll = async () => {
 						const check = createProfileStore(result.db);
 						const damaged = await stillDamaged(async () => {
@@ -148,6 +169,7 @@
 				app.store = result.store;
 				// Registry-driven, so the erase covers stores that never provisioned - they are the ones
 				// whose orphaned rows would otherwise block their own recovery.
+				app.db = result.db;
 				app.wipeAll = () => wipeAllStores(result.db);
 				// The BYO-key store rides on the same db; it reads on demand and caches nothing, so it needs
 				// no relock join and no async load - just make it available once the keystore is usable.
@@ -161,14 +183,39 @@
 				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
 				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
 				app.relockAll = () => relockAll(relockables, 'user');
+				app.joinRelock = createJoinRelock(relockables);
+				app.publish = (s) => echo.publish(s);
 				// refresh, not load: a peer's change is not the user asking to unlock, so each store
 				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
-					relocked: () => echo.answer(() => relockables.forEach((r) => r.relockSync('peer'))),
+					relocked: (s) =>
+						echo.answer(() =>
+							relockEachSync(relockables, 'peer', s.reason ? { peerReason: s.reason } : undefined)
+						),
 					'profile-updated': () => result.store.refresh(),
 					'timeline-updated': () => app.timeline?.refresh(),
-					'calendar-updated': () => app.calendar?.refresh()
+					'calendar-updated': () => app.calendar?.refresh(),
+					// A restore in another tab replaced the data: drop what this tab decrypted first (no broadcast; a
+					// locked store stays locked), then reload as the wiring below decides.
+					'data-replaced': () => relockEachSync(relockables, 'hygiene')
 				});
+				// A locked tab never reloads itself, because a reload decrypts. A returning user's tab reloads on its Unlock; a
+				// first-run tab has no Unlock, so it offers a Reload line. Off the setup form: it would save over the
+				// restored date.
+				const offReplaced = reloadOnSignalWhenShown(
+					bus,
+					'data-replaced',
+					document,
+					() => result.store.lockState === 'locked',
+					() => {
+						if (result.store.locked) app.reloadOnUnlock = true;
+						else app.replacedNotice = true;
+					},
+					() =>
+						location.pathname === resolve('/wizard')
+							? location.replace(resolve('/timeline'))
+							: location.reload()
+				);
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,
 					doc: document,
@@ -178,6 +225,7 @@
 				});
 				teardownRuntime = () => {
 					offBus();
+					offReplaced();
 					offLifecycle();
 				};
 
@@ -324,6 +372,12 @@
 	{/if}
 
 	<main id="main-content" style:--shell-width={shellWidth}>
+		{#if app.replacedNotice}
+			<p role="status">
+				Data on this device was replaced from a backup in another tab. Reload to see it.
+				<button type="button" onclick={() => location.replace(resolve('/timeline'))}>Reload</button>
+			</p>
+		{/if}
 		{@render children()}
 	</main>
 
@@ -419,6 +473,19 @@
 		margin: 0 auto;
 		padding: var(--space-l);
 		min-height: calc(100vh - 160px);
+	}
+
+	/* The Reload button of the replaced-data line: the banner's text-link look and its 44px touch target. */
+	[role='status'] button {
+		min-height: 44px;
+		padding: 0;
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 
 	/* Two-line footer content (attribution disclaimer + About/Source links). */
