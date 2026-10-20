@@ -366,6 +366,10 @@ const STATIC = 'static';
 //     written, and a Done button after a Check. Three builds measured page 89,881-89,884 B, precache 218,387-218,394 B,
 //     at least 46 B of room above the highest. Trim pass: the Op-Test fixes were trimmed once (kept); reusing the
 //     working-phase list for the saving line grew the page (+8 B), not kept.
+//     Page 89,930 -> 90,300 and precache 218,440 -> 218,860 (owner's call, 2026-10-19): "Show what I typed" under
+//     each passphrase field, so a typo is found by its number instead of retyping six hidden words (its own list
+//     component and styles). Three builds measured page 90,246-90,250 B, precache 218,795-218,808 B, at least 50 B
+//     of room above the highest.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -375,10 +379,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 89_930,
+	page: 90_300,
 	onDemand: 8_189,
 	precacheFiles: 68,
-	precacheBytes: 218_440,
+	precacheBytes: 218_860,
 	workerScripts: 147_200
 };
 
