@@ -1,3 +1,4 @@
+import { flushSync } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
@@ -750,6 +751,7 @@ describe('leaving the app with the words on screen', () => {
 // A typo in six hidden words can only be fixed blind; the person asks to see what they typed instead of retyping all six.
 describe('showing what was typed', () => {
 	const shown = () => page.getByRole('list').filter({ hasText: 'thimbl' });
+	const listEl = () => document.querySelector('#backup-typed');
 	const typedWords = () =>
 		[...document.querySelectorAll('#backup-typed li')].map((li) => li.textContent);
 
@@ -757,10 +759,11 @@ describe('showing what was typed', () => {
 		const card = await mount();
 		await typedBack(card, WRONG);
 		await userEvent.click(button(CARD_LABELS.hide));
-		expect(document.querySelector('#backup-typed')).toBeNull();
+		expect(listEl()).toBeNull();
 
 		await userEvent.click(button(CARD_LABELS.showTyped));
 		expect(typedWords()).toEqual(WRONG.split(' '));
+		expect(need(listEl()).tagName).toBe('OL');
 		await expect.element(button(CARD_LABELS.hideTyped)).toHaveAttribute('aria-expanded', 'true');
 		expect(fieldEl().type).toBe('password');
 
@@ -768,51 +771,109 @@ describe('showing what was typed', () => {
 		await expect.poll(typedWords).toEqual(WORDS);
 
 		await userEvent.click(button(CARD_LABELS.hideTyped));
-		expect(document.querySelector('#backup-typed')).toBeNull();
+		expect(listEl()).toBeNull();
 		await expect.element(button(CARD_LABELS.showTyped)).toHaveAttribute('aria-expanded', 'false');
 	});
 
 	it.each<['restore' | 'check']>([['restore'], ['check']])(
-		'the %s field shows what was typed too',
+		'the %s field shows what was typed and follows the typing',
 		async (row) => {
 			const card = await mount();
 			await fileChosen(card, row);
-			await field().fill(WRONG);
+			await field().fill('bamboo');
 			await userEvent.click(button(CARD_LABELS.showTyped));
-			expect(typedWords()).toEqual(WRONG.split(' '));
+			await field().fill(WRONG);
+			await expect.poll(typedWords).toEqual(WRONG.split(' '));
 		}
 	);
+
+	// The case it exists for: a try failed, the line names a word, and the list beside it shows that word.
+	it('stays beside the line after a try that failed', async () => {
+		const card = await mount();
+		await fileChosen(card, 'restore');
+		await field().fill(WRONG);
+		await userEvent.click(button(CARD_LABELS.showTyped));
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		await expect.element(text(wrongLine())).toBeVisible();
+		expect(typedWords()).toEqual(WRONG.split(' '));
+	});
+
+	// A paste brings stray spaces, a tab, a line break or a non-breaking space; the numbers must still match the words.
+	it('numbers the words the same through stray spaces, a tab, a line break and a non-breaking space', async () => {
+		const card = await mount();
+		await typedBack(card, '  bamboo\tcopper harvest\n lantern   oxygen thimble ');
+		await userEvent.click(button(CARD_LABELS.showTyped));
+		expect(typedWords()).toEqual(WORDS);
+	});
 
 	it.each<[string, RelockReason]>([
 		['leaving the app', 'hygiene'],
 		['a Lock', 'user']
-	])(
-		'%s takes the typed words off the page, and they stay off until asked for again',
-		async (_name, reason) => {
-			const card = await mount();
-			await typedBack(card, WRONG);
-			await userEvent.click(button(CARD_LABELS.hide));
-			await userEvent.click(button(CARD_LABELS.showTyped));
-			await expect.element(shown()).toBeVisible();
+	])('%s takes the typed words off the page', async (_name, reason) => {
+		const card = await mount();
+		await typedBack(card, WRONG);
+		await userEvent.click(button(CARD_LABELS.hide));
+		await userEvent.click(button(CARD_LABELS.showTyped));
+		await expect.element(shown()).toBeVisible();
 
-			card.relock(reason);
-			await expect.poll(() => document.querySelector('#backup-typed')).toBeNull();
-			expect(document.body.textContent).not.toContain('thimbl');
-			if (reason === 'hygiene') {
-				await card.session.refresh();
-				await expect.element(button(CARD_LABELS.showTyped)).toBeVisible();
-				expect(document.querySelector('#backup-typed')).toBeNull();
-			}
+		card.relock(reason);
+		await expect.poll(listEl).toBeNull();
+		expect(document.body.textContent).not.toContain('thimbl');
+		if (reason === 'hygiene') {
+			await card.session.refresh();
+			await expect.element(button(CARD_LABELS.showTyped)).toBeVisible();
+			expect(listEl()).toBeNull();
 		}
-	);
+	});
 
-	it.each(['copy', 'cut'])('refuses a %s of the typed words', async (kind) => {
+	// Once the write begins, a hide or a Lock is only recorded and the card is not hidden: the list must go anyway.
+	it.each<[string, RelockReason]>([
+		['an app switch', 'hygiene'],
+		['a Lock', 'user']
+	])('%s while a restore writes leaves no typed words on screen', async (_name, reason) => {
+		const card = await mount();
+		await fileChosen(card, 'restore');
+		await field().fill(TYPED);
+		await userEvent.click(button(CARD_LABELS.showTyped));
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		let onScreen: boolean | null = null;
+		const original = card.session.markCommitting;
+		card.session.markCommitting = () => {
+			original();
+			card.relock(reason);
+			flushSync();
+			onScreen = listEl() !== null;
+		};
+		await userEvent.click(button(CARD_LABELS.replace));
+		await expect.poll(() => onScreen).toBe(false);
+	});
+
+	it.each<[string, () => Promise<void>]>([
+		['Cancel', () => userEvent.click(button(CARD_LABELS.cancel))],
+		['closing the row', () => userEvent.click(toggle(CARD_LABELS.make, true))]
+	])('after %s, a new backup starts with the typed words hidden', async (_name, leave) => {
 		const card = await mount();
 		await typedBack(card, WRONG);
 		await userEvent.click(button(CARD_LABELS.showTyped));
-		const event = new ClipboardEvent(kind, { bubbles: true, cancelable: true });
-		need(document.querySelector('#backup-typed li')).dispatchEvent(event);
-		expect(event.defaultPrevented).toBe(true);
+		await leave();
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		await userEvent.click(toggle(CARD_LABELS.make, false));
+		await showWords();
+		await expect.element(button(CARD_LABELS.showTyped)).toBeVisible();
+		expect(listEl()).toBeNull();
+		expect(card.session.phase).not.toBe('idle');
+	});
+
+	it('cannot be selected, and refuses a copy or a cut', async () => {
+		const card = await mount();
+		await typedBack(card, WRONG);
+		await userEvent.click(button(CARD_LABELS.showTyped));
+		expect(getComputedStyle(need(listEl())).userSelect).toBe('none');
+		for (const kind of ['copy', 'cut']) {
+			const event = new ClipboardEvent(kind, { bubbles: true, cancelable: true });
+			need(document.querySelector('#backup-typed li')).dispatchEvent(event);
+			expect(event.defaultPrevented).toBe(true);
+		}
 	});
 });
 

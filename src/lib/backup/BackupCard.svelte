@@ -322,11 +322,12 @@
 	$effect(() => (filePassEl === null ? undefined : session.registerInput(filePassEl)));
 
 	// What the person typed, shown on request so a typo can be found without retyping all six words blind. It goes,
-	// with its copy of the text, whenever the field does or the page is hidden, the same as the words.
+	// with its copy of the text, whenever the field does or the page is hidden, the same as the words. A write that
+	// has begun only records a hide or a Lock without hiding the card, and by then the words have opened the file.
 	let typedShown = $state(false);
 	let typedText = $state('');
 	$effect(() => {
-		if (concealed || !(exportForm || fileForm)) {
+		if (concealed || session.committing || !(exportForm || fileForm)) {
 			typedShown = false;
 			typedText = '';
 		}
