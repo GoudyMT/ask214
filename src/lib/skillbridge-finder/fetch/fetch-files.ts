@@ -5,8 +5,15 @@
  * dropped, never trusted or kept.
  */
 
-import type { ChangesFile, IdsFile, IndexFile, RegionFile } from '../contract/listing';
 import {
+	MAX_FILE_BYTES,
+	type ChangesFile,
+	type IdsFile,
+	type IndexFile,
+	type RegionFile
+} from '../contract/listing';
+import {
+	REGION_FILE_NAMES,
 	dataPath,
 	type DataFile,
 	type RegionFileName,
@@ -44,10 +51,14 @@ const REQUEST_INIT: RequestInit = {
 const defaultFetch: FetchFn = (input, init) => globalThis.fetch(input, init);
 
 /** The one place a request is made: the URL comes from dataPath alone, and the body is capped, decoded, parsed. */
-async function getJson(file: DataFile, fetchFn: FetchFn): Promise<unknown> {
+async function getJson(
+	file: DataFile,
+	fetchFn: FetchFn,
+	maxBytes: number = MAX_FILE_BYTES
+): Promise<unknown> {
 	const response = await fetchFn(dataPath(file), REQUEST_INIT);
 	if (!response.ok) throw new Error('E_SBF_HTTP');
-	const bytes = await readCapped(response);
+	const bytes = await readCapped(response, maxBytes);
 
 	let text: string;
 	try {
@@ -84,16 +95,21 @@ export async function fetchIndex(
 }
 
 /**
- * The listed region files among `names`. A name the index does not list is not requested. A file that cannot be
- * fetched or read, fails the contract, is from another pull than the index, or names another file is dropped.
+ * The listed region files among `names`, requested in the fixed file order whatever order `names` has. A name the
+ * index does not list is not requested. A file that cannot be fetched or read, fails the contract, is from another
+ * pull than the index, names another file, or is larger than the index says it is, is dropped.
  */
 export async function fetchRegionFiles(
 	index: IndexFile,
 	names: readonly RegionFileName[],
 	fetchFn: FetchFn = defaultFetch
 ): Promise<{ files: Map<RegionFileName, RegionFile>; dropped: RegionFileName[] }> {
-	const listed = new Set<string>(index.files.map((f) => f.name));
-	const wanted = [...new Set(names)].filter((name) => listed.has(name));
+	const declared = new Map<string, number>(index.files.map((f) => [f.name, f.bytes]));
+	const fixedOrder: readonly string[] = REGION_FILE_NAMES;
+	// A name off the fixed list sorts first, so the check below still throws before the first request.
+	const wanted = [...new Set(names)]
+		.filter((name) => declared.has(name))
+		.sort((a, b) => fixedOrder.indexOf(a) - fixedOrder.indexOf(b));
 	const fileOf = (name: RegionFileName): DataFile => ({
 		kind: 'region',
 		pullDate: index.pullDate,
@@ -108,7 +124,9 @@ export async function fetchRegionFiles(
 		while (next < wanted.length) {
 			const name = wanted[next++] as RegionFileName;
 			try {
-				const raw = await getJson(fileOf(name), fetchFn);
+				// Also bounds the whole download to what the index declares, not the global cap per file.
+				const limit = Math.min(MAX_FILE_BYTES, declared.get(name) ?? 0);
+				const raw = await getJson(fileOf(name), fetchFn, limit);
 				const file = raw as RegionFile;
 				const ok =
 					validateRegionFile(raw).valid && file.pullDate === index.pullDate && file.file === name;
@@ -120,7 +138,7 @@ export async function fetchRegionFiles(
 	};
 	await Promise.all(Array.from({ length: Math.min(MAX_IN_FLIGHT, wanted.length) }, worker));
 
-	// Reported in the order asked for, whichever request finished first.
+	// Reported in the fixed file order, whichever request finished first.
 	const files = new Map<RegionFileName, RegionFile>();
 	const dropped: RegionFileName[] = [];
 	for (const name of wanted) {
@@ -131,43 +149,44 @@ export async function fetchRegionFiles(
 	return { files, dropped };
 }
 
-type OtherFile = Extract<DataFile, { kind: 'ids' | 'changes' | 'table' }>;
+/**
+ * The ids or changes file of the index's own week. The date in the request is the index's, so no caller (and no
+ * date held on the device) can choose it.
+ */
+export async function fetchWeekFile<K extends 'ids' | 'changes'>(
+	index: IndexFile,
+	kind: K,
+	fetchFn: FetchFn = defaultFetch
+): Promise<K extends 'ids' ? IdsFile : ChangesFile> {
+	type Value = K extends 'ids' ? IdsFile : ChangesFile;
+	const raw = await getJson({ kind, pullDate: index.pullDate }, fetchFn);
+	if (kind === 'ids') {
+		const ids = checked<IdsFile>(raw, validateIds(raw));
+		// A copy from another pull, served at this pull's path, would pass as current.
+		if (ids.pullDate !== index.pullDate) throw new Error('E_SBF_INVALID');
+		return ids as Value;
+	}
+	const changes = checked<ChangesFile>(raw, validateChanges(raw));
+	// The newest week it describes is the pull it was published for.
+	if (changes.weeks[0]?.pullDate !== index.pullDate) throw new Error('E_SBF_INVALID');
+	return changes as Value;
+}
+
+type TableFile = Extract<DataFile, { kind: 'table' }>;
 type TableValues = { zips: ZipsTable; crosswalk: CrosswalkTable };
-type ValueOf<F extends OtherFile> = F extends { kind: 'ids' }
-	? IdsFile
-	: F extends { kind: 'changes' }
-		? ChangesFile
-		: F extends { kind: 'table'; name: infer N extends TableFileName }
-			? TableValues[N]
-			: never;
 
 const TABLE_VALIDATORS: Record<TableFileName, (raw: unknown) => ContractResult> = {
 	zips: validateZips,
 	crosswalk: validateCrosswalk
 };
 
-/** An ids, changes or table file, returned only when it passes its own validator. */
-export async function fetchDataFile<F extends OtherFile>(
+/** A supporting table, returned only when it passes its own validator. */
+export async function fetchDataFile<F extends TableFile>(
 	file: F,
 	fetchFn: FetchFn = defaultFetch
-): Promise<ValueOf<F>> {
+): Promise<TableValues[F['name']]> {
+	// Ids and changes files go through fetchWeekFile; refused before any request, even through a cast.
+	if (file.kind !== 'table') throw new Error('E_SBF_BAD_PATH');
 	const raw = await getJson(file, fetchFn);
-	switch (file.kind) {
-		case 'ids': {
-			const ids = checked<IdsFile>(raw, validateIds(raw));
-			// A copy from another pull, served at this pull's path, would pass as current.
-			if (ids.pullDate !== file.pullDate) throw new Error('E_SBF_INVALID');
-			return ids as ValueOf<F>;
-		}
-		case 'changes': {
-			const changes = checked<ChangesFile>(raw, validateChanges(raw));
-			// The newest week it describes is the pull it was published for.
-			if (changes.weeks[0]?.pullDate !== file.pullDate) throw new Error('E_SBF_INVALID');
-			return changes as ValueOf<F>;
-		}
-		case 'table':
-			return checked(raw, TABLE_VALIDATORS[file.name](raw));
-		default:
-			throw new Error('E_SBF_BAD_PATH');
-	}
+	return checked(raw, TABLE_VALIDATORS[file.name](raw));
 }
