@@ -275,6 +275,21 @@ describe('the root layout navigation', () => {
 			.toBe(true);
 	});
 
+	// With the header slid away, Shift+Tab from the bar's first tab reaches the brand: the browser would scroll the page
+	// up to an off-screen brand, so the header that holds focus must be in place before it looks, and the page stays.
+	it('keeps the page still when Shift+Tab reaches the brand in the hidden header at 320x640', async () => {
+		await openAt(320, 640);
+		window.scrollTo(0, 600);
+		const header = document.querySelector('header') as HTMLElement;
+		await expect.poll(() => header.hasAttribute('data-hidden')).toBe(true);
+		(document.querySelector('.bottom-bar a') as HTMLElement).focus({ preventScroll: true });
+		await userEvent.tab({ shift: true });
+		expect(document.activeElement).toBe(header.querySelector('a.brand'));
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+		expect(window.scrollY).toBe(600);
+		expect(header.hasAttribute('data-hidden')).toBe(false);
+	});
+
 	// The bar's own links always sit "under the bar": focusing one must not push the page.
 	it('leaves the page where it is when focus enters the bar itself at 320 px', async () => {
 		await openAt(320, 568);

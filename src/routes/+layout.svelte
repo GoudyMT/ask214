@@ -505,8 +505,12 @@
 
 	/* Hidden on a phone while the page scrolls down. Transform only, so the header keeps its box in the layout and
 	   the text below does not jump. The attribute is set from the script, so the compiler cannot see it in the markup. */
-	header:global([data-hidden]) {
+	header:global([data-hidden]):not(:focus-within) {
 		transform: translateY(-100%);
+	}
+	/* A header that holds focus is in place at once: the browser scrolls to an off-screen brand before the script shows it. */
+	header:focus-within {
+		transition: none;
 	}
 	@media (prefers-reduced-motion: reduce) {
 		header {
