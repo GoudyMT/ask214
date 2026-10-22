@@ -396,6 +396,12 @@ const STATIC = 'static';
 //     clear of the bar when the move hides the header. Three builds measured page 90,304-90,307 B, precache
 //     222,268-222,282 B and route nodes 53,239-53,245 B; the highest precache build was 2 B over. The raise restores
 //     about 40 B of room above the highest; no trim was left that kept every fix.
+//     Precache 222,320 -> 222,500 and root layout 8,460 -> 8,610 (package.json's size-limit) (owner's call, 2026-10-22):
+//     the Pre-Push Op-Test's fixes - a control focused from script re-checked after WebKit's late focus scroll and moved
+//     by whole pixels, the room for the bar following its real height at a large text size, a header that holds focus
+//     kept on screen and unflagged, and a header menu that wraps instead of scrolling sideways. Three builds measured
+//     root layout 8,568-8,569 B and precache 222,440-222,456 B, about 40 B of room above the highest. Trim pass first:
+//     the focused control measured in one place and the bar looked up once (about -20 B), kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -408,7 +414,7 @@ const LIMIT = {
 	page: 90_350,
 	onDemand: 8_189,
 	precacheFiles: 71,
-	precacheBytes: 222_320,
+	precacheBytes: 222_500,
 	workerScripts: 147_200
 };
 

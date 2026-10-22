@@ -146,9 +146,9 @@ live site sends.
 ### Budgets and Lighthouse
 
 **What they are.** `size-limit` caps the gzipped JavaScript: the SvelteKit entry at 10 KB, the root layout
-loaded on every page at 8,460 bytes, and the code of all pages together at 53,290 bytes. `pnpm check:chunks` caps what
+loaded on every page at 8,610 bytes, and the code of all pages together at 53,290 bytes. `pnpm check:chunks` caps what
 one page downloads (90,350 bytes), the code loaded on demand (8,189 bytes) and the service worker's install set
-(71 files, 222,320 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
+(71 files, 222,500 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
 production build: accessibility below 0.95 or performance below 0.9 fails the build, and best practices or SEO
 below 0.9 warns. Reports stay in a CI artifact.
 
