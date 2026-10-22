@@ -547,12 +547,28 @@ describe('contacts', () => {
 		'https://forms.example.com./apply',
 		'HTTP://forms.example.com/apply',
 		'https://',
-		'https://forms.example.com/' + 'a'.repeat(300)
+		'https://forms.example.com/' + 'a'.repeat(300),
+		// A form on a raw address or an internal name is not a company's page a person should be sent to.
+		'https://192.0.2.7/apply',
+		'https://2130706433/apply',
+		'https://[2001:db8::1]/apply',
+		'https://intranet/apply',
+		'https://localhost/apply'
 	])('drops the link %j', (employerPocEmail) => {
 		const out = clean([rawListing({ employerPocEmail })]);
 		expect(out.listings[0]).not.toHaveProperty('e');
 		expect(out.listings[0]).not.toHaveProperty('u');
 		expect(out.dropped).toEqual({ D_EMAIL: 1 });
+	});
+
+	it('publishes the link in its normalized form, an international host as punycode', () => {
+		expect(only({ employerPocEmail: 'HTTPS://Forms.Example.COM/Apply' }).u).toBe(
+			'https://forms.example.com/Apply'
+		);
+		const host = 'm' + String.fromCharCode(0xfc) + 'nchen.example.com';
+		expect(only({ employerPocEmail: 'https://' + host + '/form' }).u).toBe(
+			'https://xn--mnchen-3ya.example.com/form'
+		);
 	});
 
 	it('keeps no contact for a field that holds neither address nor link', () => {

@@ -334,17 +334,26 @@ function cleanCodes(value: unknown, drops: string[]): string[] | 'all' | undefin
 	return undefined;
 }
 
+const IPV4_HOST_RE = /^\d+(?:\.\d+){3}$/;
+
+/** The page address in its normalized form (lower-case host, punycode for an international one), or undefined. */
 function httpsLink(piece: string): string | undefined {
 	if (piece.length > CAPS.url || !isSafeText(piece)) return undefined;
 	try {
 		const url = new URL(piece);
+		const { hostname } = url;
 		const ok =
 			url.protocol === 'https:' &&
 			url.username === '' &&
 			url.password === '' &&
 			// A trailing dot names the same host but slips past a suffix check.
-			!url.hostname.endsWith('.');
-		return ok ? piece : undefined;
+			!hostname.endsWith('.') &&
+			// An address or an internal name (no dot) is not a company's page. The URL parser has already
+			// rewritten short and hexadecimal IPv4 forms to dotted decimal.
+			hostname.includes('.') &&
+			!hostname.startsWith('[') &&
+			!IPV4_HOST_RE.test(hostname);
+		return ok && url.href.length <= CAPS.url && isSafeText(url.href) ? url.href : undefined;
 	} catch {
 		return undefined;
 	}
