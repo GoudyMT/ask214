@@ -69,6 +69,7 @@ import { queryWikidata } from './wikidata.ts';
  *   linkDeps: LinkDeps,
  *   today(): string,
  *   repoRoot: string,
+ *   env?: Record<string, string | undefined>,
  *   print?: (line: string) => void
  * }} RunDeps
  */
@@ -247,6 +248,10 @@ export async function runPipeline(options, deps) {
 		return /** @type {const} */ ({ exitCode: 3, report: null });
 	};
 
+	// Node's fetch skips certificate checks when the shell asks it to, so the pull and the Wikidata lookup could be
+	// fed by anyone on the network; the run does not start.
+	if ((deps.env ?? process.env).NODE_TLS_REJECT_UNAUTHORIZED === '0')
+		return refuse('E_TLS_UNVERIFIED');
 	// The state holds raw rows with contact names and addresses, so it must live outside the repo.
 	if (isInsideFolder(deps.repoRoot, stateDir)) return refuse('E_STATE_INSIDE_REPO');
 	const pullDate = deps.today();

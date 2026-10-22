@@ -187,7 +187,8 @@ async function go(
 	world: World,
 	today: string,
 	over: Partial<Options> = {},
-	spy = linkSpy()
+	spy = linkSpy(),
+	env: Record<string, string | undefined> = {}
 ) {
 	if (!existsSync(join(where.stateDir, 'tables'))) writeTables(where);
 	const server = fakeHttp(world);
@@ -198,6 +199,7 @@ async function go(
 		linkDeps: spy.deps,
 		today: () => today,
 		repoRoot: where.repoRoot,
+		env,
 		print: (line) => {
 			printed.push(line);
 		}
@@ -594,6 +596,34 @@ describe('bad arguments and bad files', () => {
 		expect(urls).toEqual([]);
 		expect(existsSync(where.deployDir)).toBe(false);
 		expect(existsSync(join(where.stateDir, 'runs'))).toBe(false);
+	});
+
+	// Node's fetch skips certificate checks when the shell says so, which would let anyone on the network feed the
+	// pull and the Wikidata lookup.
+	it('refuses to start with certificate checks switched off, before any request or write', async () => {
+		const where = folders();
+		const { result, urls, spy, printed } = await go(
+			where,
+			makeWorld(),
+			FIRST,
+			{ baseline: true },
+			linkSpy(),
+			{ NODE_TLS_REJECT_UNAUTHORIZED: '0' }
+		);
+		expect(result.exitCode).toBe(1);
+		expect(printed).toEqual(['E_TLS_UNVERIFIED']);
+		expect(urls).toEqual([]);
+		expect(spy.calls).toEqual([]);
+		expect(existsSync(where.deployDir)).toBe(false);
+		expect(existsSync(join(where.stateDir, 'runs'))).toBe(false);
+		expect(existsSync(join(where.stateDir, 'state.json'))).toBe(false);
+	});
+
+	it('runs when the variable is set to anything else', async () => {
+		const { result } = await go(folders(), makeWorld(), FIRST, { baseline: true }, linkSpy(), {
+			NODE_TLS_REJECT_UNAUTHORIZED: '1'
+		});
+		expect(result.exitCode).toBe(0);
 	});
 
 	it('refuses a pull date that is not a date, which would build folder names', async () => {
