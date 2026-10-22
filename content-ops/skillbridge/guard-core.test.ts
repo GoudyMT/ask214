@@ -397,6 +397,26 @@ describe('checkTree and guardAndDeploy: what may be deployed', () => {
 			`E_INVALID:skillbridge-data/w/${WEEK_OLD}/remote.json`
 		],
 		[
+			'a listing file that names a different region than its file name',
+			(t) =>
+				put(
+					t,
+					`skillbridge-data/w/${WEEK_OLD}/remote.json`,
+					JSON.stringify({ v: 1, pullDate: WEEK_OLD, file: 'territories', listings: [] })
+				),
+			`E_INVALID:skillbridge-data/w/${WEEK_OLD}/remote.json`
+		],
+		[
+			'an ids file filed under another date',
+			(t) =>
+				put(
+					t,
+					`skillbridge-data/w/${WEEK_OLD}/ids.json`,
+					JSON.stringify({ v: 1, pullDate: WEEK_NEW, ids: [[1001, WEEK_OLD]], aliases: [] })
+				),
+			`E_INVALID:skillbridge-data/w/${WEEK_OLD}/ids.json`
+		],
+		[
 			'a table that fails the contract',
 			(t) =>
 				put(
