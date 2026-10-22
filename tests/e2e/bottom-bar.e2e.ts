@@ -124,7 +124,7 @@ test('a person on a desktop reaches every page from the top menu', async ({ page
 		await expectPage(page, item.path, item.heading);
 	}
 
-	// Resources moved nowhere: its address still answers.
+	// /resources keeps its address and still answers.
 	const response = await page.goto('/resources');
 	expect(response?.status()).toBe(200);
 	await expect(page.getByRole('heading', { level: 1, name: 'Resources' })).toBeVisible();

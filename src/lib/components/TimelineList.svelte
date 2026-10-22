@@ -204,7 +204,7 @@
 		min-width: 0;
 		font-size: var(--font-size-s);
 		font-weight: 600;
-		/* The stronger accent shade: the plain accent on this tint read 4.33:1 in the light theme, under the
+		/* The stronger accent shade: the plain accent reads 4.33:1 on this tint in the light theme, under the
 		   4.5:1 that small text needs. */
 		color: var(--color-accent-muted);
 		text-align: center;
