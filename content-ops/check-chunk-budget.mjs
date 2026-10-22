@@ -374,12 +374,22 @@ const STATIC = 'static';
 //     route nodes 51,930 -> 53,260 (package.json's size-limit) (owner's call, 2026-10-22): the phone bottom bar (four
 //     tabs with their own icons, the current-tab mark, a focused control kept clear of the bar), the header that hides
 //     on scroll down at phone width, the grouped More page and the SkillBridge placeholder page. The three new files
-//     are the two new pages' route nodes and the More page's styles. Three builds measured page 90,288-90,290 B,
-//     precache 222,013-222,023 B, layout 8,356-8,357 B, route nodes 53,213-53,219 B, at least 40 B of room above the
-//     highest. Trim pass: the placeholder's one style inline (-1 file, -84 B precache), the header step decided with
+//     are the two new pages' route nodes and the More page's styles. Three builds before the Timeline "today" pill's
+//     colour fix measured page 90,288-90,290 B, precache 222,013-222,023 B, layout 8,356-8,357 B, route nodes
+//     53,213-53,219 B, at least 40 B of room above the highest; with the pill fix, page and route nodes had 38 B.
+//     Trim pass: the placeholder's one style inline (-1 file, -84 B precache), the header step decided with
 //     one comparison less, the hiding attribute set on the header with no state of its own, and each tab named by its
 //     route alone (together about -75 B precache and -60 B root layout), kept; the More page's styles inline (-1 file,
 //     -133 B precache) grew the route nodes by 160 B, not kept.
+//     Precache 222,065 -> 222,280 and root layout 8,400 -> 8,460 (package.json's size-limit) (owner's call,
+//     2026-10-22): the Pre-PR review's fixes to the bottom bar - the page held still under a dialog and moved only for
+//     a control that starts in view, the feedback page kept through More, the bar first in the Tab order, labels that
+//     wrap at a large text size, a focus ring drawn inside each tab - and four older marks fixed with them (the
+//     reader's view toggle and cited label, Ask's answer mode and the Timeline's phase chips in forced colours or on
+//     their tint). Three builds measured precache 222,223-222,236 B and root layout 8,413-8,417 B, about 40 B of room
+//     above the highest; route nodes 53,226-53,229 B and page 90,285-90,290 B stay under their limits. Trim pass
+//     first: one focus listener for the header and the bar, and a literal padding (-20 B root layout, -45 B
+//     precache), kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -392,7 +402,7 @@ const LIMIT = {
 	page: 90_330,
 	onDemand: 8_189,
 	precacheFiles: 71,
-	precacheBytes: 222_065,
+	precacheBytes: 222_280,
 	workerScripts: 147_200
 };
 
