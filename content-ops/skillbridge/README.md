@@ -5,10 +5,17 @@ The SkillBridge finder in the app reads static files served by a separate Cloudf
 from the public listings at `api.skillbridge.mil`, and deployed with Max's own Cloudflare login. Nothing in this
 folder runs in the app or in CI except the tests.
 
-What it keeps and why: facts only, never the providers' descriptions or contact names. The listings' contact
-emails are published as DoD lists them; the built files and the pipeline's state hold real addresses, so neither is
-ever committed: the deploy folder is git-ignored, and the state folder must lie outside the repo (the command refuses
-one inside it).
+What it publishes and why: facts only, never the providers' descriptions or contact names. The listings' contact
+emails are published as DoD lists them. The last two raw pulls (which still hold the providers' text and contact
+names, so a clean-step fix never needs a new 5.5-hour pull) stay in the state folder on this PC only and are never
+deployed. The built files and the pipeline's state hold real addresses, so neither is ever committed: the deploy
+folder is git-ignored, and the state folder must lie outside the repo (the command refuses one inside it).
+
+## Before the first deploy (a precondition)
+
+0. Do not deploy until the app's About page and the finder footer credit the O*NET Military Crosswalk ("Crosswalk
+   Files by U.S. Department of Labor, Employment and Training Administration", CC BY 4.0): the deploy publishes
+   `tables/crosswalk.json`, and its licence asks for that credit wherever it is used.
 
 ## Before the first run (once)
 
@@ -26,6 +33,18 @@ one inside it).
    ```
 
    It stops with `E_ZIP_NO_STATE` if any ZIP cannot be given a state; report that rather than edit the files.
+
+   The files as downloaded on 2026-10-22 (bytes, SHA-256), so a later download can be compared:
+   - `2026_Gaz_zcta_national.zip` (www2.census.gov, 2026_Gazetteer): 952,131,
+     `f1e9046b91f6e60686a99343cb2752834c02b0764939403b331c78c017e2c54c`
+   - `2026_Gaz_counties_national.zip` (same folder): 139,190,
+     `6a99ca00efbc0be5112e225d4102704c51d5ce3b16e3afd6e4159460595fd12a`
+   - `tab20_zcta520_county20_natl.txt` (www2.census.gov, geo/docs/maps-data/data/rel2020/zcta520): 6,821,287,
+     `3ed41278d637dc249e0323306f68be8a6c234e3090f4de88ef328dee71aeaaaf`
+   - `military_crosswalk.zip` (onetcenter.org, dl_files/2019): 4,826,815,
+     `ee7381411644fd39adaf93e7f3a8814773b28f4e8a5b2c00c7ad6b775b01d747`
+
+   That build gave 33,791 ZIP rows in 56 states and territories and 12,916 crosswalk rows.
 
 4. Log in to Cloudflare once, storing the token in Windows' credential store:
 
