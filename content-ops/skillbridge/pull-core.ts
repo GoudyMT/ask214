@@ -344,6 +344,8 @@ async function pullAll(
 	const queried = new Set<string>();
 
 	async function queryProvider(name: string): Promise<void> {
+		// A lone surrogate is valid in JSON but cannot be percent-encoded into a query; stop rather than crash.
+		if (!name.isWellFormed()) stopRun('E_BAD_PROVIDER_NAME');
 		queried.add(name);
 		const ids = new Set<number>();
 		let cappedQueries = 0;

@@ -644,6 +644,20 @@ describe('runPull: the name goes out as it came in', () => {
 		expect(run.providers.map((p) => p.total)).toEqual([2, 2, 2, 2, 2]);
 	});
 
+	// A lone surrogate is valid in JSON but cannot be percent-encoded; it must end the run with a code, not crash it.
+	it('stops with a code, before any request for it, on a provider name that cannot be encoded', async () => {
+		const bad = 'Acme' + String.fromCharCode(0xdc00);
+		const w = makeWorld({
+			providers: [
+				['Good Co', rowsOf(1, 2)],
+				[bad, rowsOf(10, 2)]
+			]
+		});
+		const { outcome, urls } = await pull(w);
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_BAD_PROVIDER_NAME' });
+		expect(urls()).toEqual([ROBOTS_URL, FILTERS_URL, ALL_URL, providerUrl('Good Co')]);
+	});
+
 	it('only ever asks https://api.skillbridge.mil, whatever the names hold', async () => {
 		const w = makeWorld({ providers: names.map((n, i) => [n, rowsOf(100 + i * 10, 2)]) });
 		const { urls } = await pull(w);

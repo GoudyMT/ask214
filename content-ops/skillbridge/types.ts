@@ -43,6 +43,7 @@ export type StopCode =
 	| 'E_HTML_BODY'
 	| 'E_NOT_JSON'
 	| 'E_BAD_ENVELOPE'
+	| 'E_BAD_PROVIDER_NAME'
 	| 'E_ERRORS_IN_A_ROW';
 
 /** What the pull learned about one provider this run. */
