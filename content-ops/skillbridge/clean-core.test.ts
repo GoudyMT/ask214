@@ -796,6 +796,9 @@ describe('contact data in published text', () => {
 		['a phone in brackets', 'Welder, (410) 555.0100', 'Recruiting Team'],
 		['a bare phone', 'Welder, 4105550100', 'Recruiting Team'],
 		['a phone with no area code', 'Welder, Call 555 0100', 'Recruiting Team'],
+		['a phone after "Contact"', 'Welder, Contact 555 0100', 'Recruiting Team'],
+		['a phone after "Ph"', 'Welder, Ph 555 0100', 'Recruiting Team'],
+		['a phone after "Mobile"', 'Welder, Mobile 555.0100', 'Recruiting Team'],
 		['"ask for" with no contact on the row', 'Welder, Ask for Pat Smith', ''],
 		['the contact written surname first', 'Jordan Smith, Recruiter', 'Smith, Jordan']
 	])('drops the roles when they hold %s', (_what, jobDescription, employerPoc) => {
@@ -809,6 +812,7 @@ describe('contact data in published text', () => {
 
 	it.each([
 		['an address', 'Widget Internship, pat.smith@example.com'],
+		['an address with a space before its "@"', 'Widget Internship, pat.smith @example.com'],
 		['a ten-digit phone', 'Widget Internship 410-555-0100'],
 		['a ten-digit phone in brackets', 'Widget Internship (410) 555 0100'],
 		['"ask for" and a name', 'Ask for Jordan Smith about the Widget Internship'],
@@ -823,6 +827,7 @@ describe('contact data in published text', () => {
 	it.each([
 		['the contact after "contact"', 'Contact Jordan Smith at Norfolk Naval Station'],
 		['an address', 'Norfolk Naval Station, pat.smith@example.com'],
+		['an address with spaces around its "@"', 'Norfolk Naval Station, pat.smith @ example.com'],
 		['a phone', 'Norfolk Naval Station 410 555 0100']
 	])('drops an installation that holds %s but keeps the row', (_what, installation) => {
 		const out = clean([rawListing({ installation, employerPoc: POC })]);
@@ -918,6 +923,24 @@ describe('contact data in published text', () => {
 			expect(out.dropped).toEqual({});
 		}
 	);
+
+	// A person's surname can be an office word ("Camp", "Staff", "Fort"); the name is still the contact's.
+	it.each([
+		['Jordan Camp', 'Widget Internship POC Jordan Camp'],
+		['Lee Staff', 'Widget Internship with Lee Staff']
+	])('holds back a row whose program names the contact %j', (employerPoc, program) => {
+		const out = clean([rawListing({ program, employerPoc })]);
+		expect(out.listings).toEqual([]);
+		expect(out.quarantine).toEqual([{ id: 1001, code: 'E_Q_PROGRAM_CONTACT' }]);
+	});
+
+	it('drops an installation that names a contact whose surname is an office word', () => {
+		const out = clean([
+			rawListing({ installation: 'Norfolk Office of Pat Fort', employerPoc: 'Pat Fort' })
+		]);
+		expect(out.listings[0]).not.toHaveProperty('inst');
+		expect(out.dropped).toEqual({ D_INSTALLATION_CONTACT: 1 });
+	});
 
 	it.each([
 		['SkillBridge @ Acme', 'Camp @ Lejeune'],

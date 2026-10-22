@@ -377,8 +377,9 @@ function pairsOf(words: readonly string[]): string[] {
 
 /**
  * The words and word pairs a text must hold to be read as the contact's name. With `organization` given (for a
- * program or place name), a pair that holds an office word or also stands in the organization's name is left out:
- * that contact is an office or the company's own desk, and the title shares its words with the listing.
+ * program or place name), a pair made only of office words, or one that also stands in the organization's name, is
+ * left out: that contact is an office or the company's own desk, and the title shares its words with the listing. A
+ * pair with one office word stays, as a surname can be one ("Jordan Camp").
  */
 function contactName(contact: unknown, organization?: string): ContactName {
 	const words = nameWordsOf(scrub(contact));
@@ -389,7 +390,7 @@ function contactName(contact: unknown, organization?: string): ContactName {
 		.slice(1)
 		.flatMap((word, at) => {
 			const before = words[at] ?? '';
-			return OFFICE_WORDS.has(before) || OFFICE_WORDS.has(word) ? [] : pairsOf([before, word]);
+			return OFFICE_WORDS.has(before) && OFFICE_WORDS.has(word) ? [] : pairsOf([before, word]);
 		})
 		.filter((pair) => !own.has(pair));
 	return { words: new Set(person), pairs: new Set(pairs) };
@@ -419,9 +420,10 @@ function namesContact(text: string, name: ContactName): boolean {
 // its groups; a number of seven digits is a phone number only right after a word that says so, as "Part 121 1500
 // Hour" and "Course 101 2026" are titles.
 const PHONE_RE =
-	/(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)[\s.-]?|\d{3}[\s.-]?)\d{3}[\s.-]?\d{4}(?!\d)|\b(?:call|phone|tel|text|fax|cell)\b[\s:.#-]*\d{3}[\s.-]?\d{4}(?!\d)/i;
-// A local part, an "@" and a domain with a dot; a program or a place name may hold a bare "@" ("SkillBridge @ Acme").
-const ADDRESS_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+	/(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)[\s.-]?|\d{3}[\s.-]?)\d{3}[\s.-]?\d{4}(?!\d)|\b(?:call|contact|phone|telephone|tel|ph|text|fax|cell|mobile)\b[\s:.#-]*\d{3}[\s.-]?\d{4}(?!\d)/i;
+// A local part, an "@" and a domain with a dot, a space allowed on either side of the "@"; a program or a place name
+// may hold a bare "@" ("SkillBridge @ Acme").
+const ADDRESS_RE = /[^\s@]+\s?@\s?[^\s@]+\.[^\s@]+/;
 
 /** True when published text would carry an address, a phone number or the contact's name. */
 function leaksContact(text: string, name: ContactName, anyAt: boolean): boolean {
