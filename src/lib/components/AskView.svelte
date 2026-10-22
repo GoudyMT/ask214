@@ -465,7 +465,7 @@
 	@media (forced-colors: active) {
 		.ask-mode__opt[aria-pressed='true'] {
 			border: 3px solid Highlight;
-			padding: calc(var(--space-xs) - 2px) calc(var(--space-m) - 2px);
+			padding: 2px 14px;
 		}
 	}
 	/* Frozen while a query is in flight (a mid-flight switch would mislabel the completing result). */

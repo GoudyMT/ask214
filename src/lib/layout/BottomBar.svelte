@@ -112,7 +112,6 @@
 		text-decoration: none;
 	}
 	/* The bar touches the screen edges, so the ring is drawn inside the tab, as More's rows do. */
-	/* The bar touches the screen edges, so the ring is drawn inside the tab, as More's rows do. */
 	a:focus-visible {
 		outline-offset: -2px;
 	}

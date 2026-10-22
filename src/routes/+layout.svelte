@@ -354,19 +354,20 @@
 			state = nextHeaderState(state, window.scrollY);
 			setHidden(state.hidden);
 		};
-		const onFocusIn = () => {
-			state = startHeaderState(window.scrollY);
-			setHidden(false);
-		};
+		// Focus entering the header brings it back, and the hide distance counts from there.
 		// The bar never moves, so a control focused under it has to. Chromium does that from scroll-padding-bottom, but
 		// WebKit leaves a control that is already inside the window where it is, partly under the bar. A control that starts
 		// in the window and runs under the bar is moved up, but never past its first line; one below the window is left.
-		const onPageFocus = (event: FocusEvent) => {
+		// The bar's own links stay put, and so does the page behind a modal dialog, which sits above the bar.
+		const onFocusIn = ({ target }: FocusEvent) => {
+			if (!(target instanceof Element)) return;
+			if (el.contains(target)) {
+				state = startHeaderState(window.scrollY);
+				return setHidden(false);
+			}
 			const bar = document.querySelector('.bottom-bar');
-			if (!bar || !(event.target instanceof Element) || bar.contains(event.target)) return;
-			// A modal dialog sits above the bar, and the page behind it must hold still.
-			if (event.target.closest('dialog[open]')) return;
-			const { top, bottom } = event.target.getBoundingClientRect();
+			if (!bar || target.closest('.bottom-bar,dialog[open]')) return;
+			const { top, bottom } = target.getBoundingClientRect();
 			const shift = Math.min(
 				bottom - bar.getBoundingClientRect().top,
 				top - el.getBoundingClientRect().bottom
@@ -375,8 +376,7 @@
 		};
 		const stop = () => {
 			window.removeEventListener('scroll', onScroll);
-			el.removeEventListener('focusin', onFocusIn);
-			document.removeEventListener('focusin', onPageFocus);
+			document.removeEventListener('focusin', onFocusIn);
 			setHidden(false);
 		};
 		// Crossing 600px in either direction starts over: a header hidden on a phone must not stay hidden on a desktop.
@@ -384,9 +384,8 @@
 			stop();
 			if (!phone.matches) return;
 			state = startHeaderState(window.scrollY);
-			window.addEventListener('scroll', onScroll, { passive: true });
-			el.addEventListener('focusin', onFocusIn);
-			document.addEventListener('focusin', onPageFocus);
+			window.addEventListener('scroll', onScroll);
+			document.addEventListener('focusin', onFocusIn);
 		};
 		sync();
 		phone.addEventListener('change', sync);
