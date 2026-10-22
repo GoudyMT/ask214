@@ -256,12 +256,19 @@ describe('the root layout navigation', () => {
 		window.scrollTo(0, 300);
 		await expect.poll(() => window.scrollY).toBe(300);
 		const dialog = document.createElement('dialog');
+		// The passage starts inside the window and runs under the bar, so only the dialog check keeps the page still.
+		dialog.style.cssText =
+			'position: fixed; inset: 0; margin: 0; padding: 0; border: 0; max-height: none; max-width: none';
 		dialog.innerHTML =
-			'<div style="max-height: 60vh; overflow-y: auto"><div style="height: 1500px"></div><p tabindex="-1">cited</p></div>';
+			'<div style="height: 700px"></div><p tabindex="-1" style="height: 150px; margin: 0">cited</p>';
 		document.body.appendChild(dialog);
 		try {
 			dialog.showModal();
-			(dialog.querySelector('p') as HTMLElement).focus({ preventScroll: true });
+			const cited = dialog.querySelector('p') as HTMLElement;
+			const bar = document.querySelector('.bottom-bar') as HTMLElement;
+			expect(cited.getBoundingClientRect().top).toBeLessThan(window.innerHeight);
+			expect(cited.getBoundingClientRect().bottom).toBeGreaterThan(bar.getBoundingClientRect().top);
+			cited.focus({ preventScroll: true });
 			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
 			expect(window.scrollY).toBe(300);
 		} finally {
