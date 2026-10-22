@@ -16,13 +16,16 @@ one inside it).
    `.svelte-kit/tsconfig.json` exists (the scripts' `$lib` imports need it).
 2. Pick a state folder outside the repo, for example `C:/Users/Max/skillbridge-state`. It keeps last week's records,
    the provider list, pinned company sites, the removal-request list, the last two raw pulls and every report.
-3. Build the supporting tables into it (public data: the Census ZCTA gazetteer and the O*NET Military Crosswalk,
-   "Crosswalk Files by U.S. Department of Labor, Employment and Training Administration", CC BY 4.0 - credited in the
-   app's About page and the finder footer):
+3. Build the supporting tables into it (public data: the Census ZCTA gazetteer for each ZIP's point, the Census 2020
+   ZCTA-to-county relationship file and counties gazetteer for each ZIP's state - a ZIP spanning states gets the one
+   holding most of its land - and the O*NET Military Crosswalk, "Crosswalk Files by U.S. Department of Labor,
+   Employment and Training Administration", CC BY 4.0 - credited in the app's About page and the finder footer):
 
    ```
-   node --import tsx content-ops/skillbridge/tables.mjs --zcta <path>/2026_Gaz_zcta_national.txt --crosswalk <path>/milx0724.csv --out C:/Users/Max/skillbridge-state/tables
+   node --import tsx content-ops/skillbridge/tables.mjs --zcta <path>/2026_Gaz_zcta_national.txt --zcta-county <path>/tab20_zcta520_county20_natl.txt --counties <path>/2026_Gaz_counties_national.txt --crosswalk <path>/milx0724.csv --out C:/Users/Max/skillbridge-state/tables
    ```
+
+   It stops with `E_ZIP_NO_STATE` if any ZIP cannot be given a state; report that rather than edit the files.
 
 4. Log in to Cloudflare once, storing the token in Windows' credential store:
 
@@ -59,8 +62,8 @@ Run from the repo root (each command is one line):
 2. Read the report it prints (also saved as `runs/<date>/report.txt` in the state folder): the listing count beside
    the site's own total, how many providers were not proven complete, capped queries, rows held back and why,
    additions and removals, listings not seen this week, any provider whose count fell sharply, and the company
-   website and LinkedIn link counts beside last week's (a sharp drop means a link source failed this week; run again
-   later rather than deploy it).
+   website and LinkedIn link counts beside last week's (a sharp drop means a link source failed this week; skip the
+   deploy and run again on a later day - a second run on the same day is refused with `E_PULL_DATE_ORDER`).
 
 3. If the report is right, deploy. From the data Worker's own folder, `workers/skillbridge-data`:
 
@@ -69,7 +72,8 @@ Run from the repo root (each command is one line):
    ```
 
    The guard checks the config (static files only, the one route, no code, no bindings), refuses to run from the repo
-   root, with any `CLOUDFLARE_*`, `CF_*` or `WRANGLER_*` variable set in the shell, or beside a `.env` /
+   root, with any `CLOUDFLARE_*`, `CF_*` or `WRANGLER_*` variable set in the shell (except `WRANGLER_SEND_METRICS` and
+   `WRANGLER_LOG`), with `NODE_TLS_REJECT_UNAUTHORIZED=0` or any `NODE_OPTIONS` set, or beside a `.env` /
    `.env.local` file, checks that the deploy tree holds exactly the files the app may fetch (the zip and crosswalk
    tables included) and that each one is valid, and only then runs `wrangler deploy` with the data Worker's own
    config. Deploy every week you build: the deploy folder keeps this week and last week only.
@@ -79,8 +83,8 @@ Run from the repo root (each command is one line):
 The pull stops at once, and nothing is published, on a robots.txt rule that disallows a request, a 403 or 429, a
 CAPTCHA or other web page instead of data (whatever its status), a reply that is not the expected JSON, three errors
 in a row, or a provider name that cannot be sent (`E_BAD_PROVIDER_NAME`: report it, it needs a code change). The app
-keeps showing the last deployed week. Read the stop code in the report. Do not re-run the same night after a 403,
-429 or robots stop; if the SkillBridge office objects to the pull in any way, stop running it and tell the office it
+keeps showing the last deployed week. Read the stop code in the report. A stopped run saves no state, so it may be
+run again the same day - but never the same night after a 403, 429 or robots stop; if the SkillBridge office objects to the pull in any way, stop running it and tell the office it
 has stopped.
 
 ## When a week is blocked (exit 3)
@@ -117,11 +121,13 @@ data files with the version: NOT YET MEASURED (to be read on the first rollback 
 When someone asks for their contact address to be removed (through Feedback), add the address to the `suppression`
 list in `state.json` in the state folder (case and spacing do not matter), then run and deploy as usual: the address
 is dropped from every listing, this week's and any kept from earlier weeks, roles and titles never carry an address,
-and that week's deploy holds only the new week, so last week's files with the address are no longer served.
+and when the deployed last week still holds it, that week's deploy holds only the new week, so those files are no
+longer served.
 
 ## Refreshing the tables
 
 The Census gazetteer and the O*NET crosswalk change about once a year. Download the new files (each is a decision for
-Max), run step 3 of "Before the first run" again, and run the week. The state boxes the clean step uses
+Max), run step 3 of "Before the first run" again, and run the week. A run that stops with `E_TABLE_INVALID` has
+tables in an older shape (for example a ZIP table without its state column): rebuild them with step 3. The state boxes the clean step uses
 (`src/lib/skillbridge-finder/contract/state-extents.ts`) are generated by the same script with `--counties <file>
 --extents <that path>`; that file is committed, so a refresh of it is a normal change with its own pull request.
