@@ -197,13 +197,12 @@ const SEPARATOR = /[\\/]/;
 const TEMPORARY_SUFFIX = '.tmp';
 
 /**
- * Removal is only of a dated folder, or its temporary twin, sitting directly in the weeks folder; anything else
- * is a bug, not a prune.
+ * A prune removes only a dated folder sitting directly in the weeks folder; a temporary twin, a stray name or a
+ * path that climbs out is a bug, not a prune.
  */
-function assertDirectChild(weeksDir: string, path: string): void {
+export function assertDirectChild(weeksDir: string, path: string): void {
 	const name = path.startsWith(`${weeksDir}/`) ? path.slice(weeksDir.length + 1) : '';
-	const stem = name.endsWith(TEMPORARY_SUFFIX) ? name.slice(0, -TEMPORARY_SUFFIX.length) : name;
-	if (!isIsoDate(stem) || SEPARATOR.test(name)) throw new Error('E_UNSAFE_PRUNE');
+	if (!isIsoDate(name) || SEPARATOR.test(name)) throw new Error('E_UNSAFE_PRUNE');
 }
 
 /**
@@ -227,10 +226,11 @@ export function writeDeployTree(
 	const weeksDir = at(`${DEPLOY_DATA_DIR}/w`);
 	const datedPrefix = `${DEPLOY_DATA_DIR}/w/${pullDate}/`;
 	const indexPath = `${DEPLOY_DATA_DIR}/index.json`;
-	const tmpDir = `${weeksDir}/${pullDate}${TEMPORARY_SUFFIX}`;
 	const finalDir = `${weeksDir}/${pullDate}`;
-	assertDirectChild(weeksDir, tmpDir);
+	// The dated folder is checked as the prune checks it; its temporary twin is that path plus a fixed suffix,
+	// so it sits beside it by construction.
 	assertDirectChild(weeksDir, finalDir);
+	const tmpDir = `${finalDir}${TEMPORARY_SUFFIX}`;
 
 	fs.mkdir(root);
 	for (const file of week.files.filter((f) => f.path === '_headers'))

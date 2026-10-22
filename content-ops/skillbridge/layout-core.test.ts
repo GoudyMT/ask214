@@ -2,7 +2,13 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, mkdirSync, existsSync }
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildWeek, nodeTreeFs, placeListing, writeDeployTree } from './layout-core.ts';
+import {
+	assertDirectChild,
+	buildWeek,
+	nodeTreeFs,
+	placeListing,
+	writeDeployTree
+} from './layout-core.ts';
 import type { BuiltWeek, TreeFs } from './layout-core.ts';
 import { DATA_HEADERS_FILE } from './config.ts';
 import type { Listing } from '../../src/lib/skillbridge-finder/contract/listing.ts';
@@ -420,7 +426,7 @@ describe('writeDeployTree', () => {
 	});
 
 	// The pull date builds the folder paths that get removed, so a value that is not a date (a hand-built or
-	// damaged week) must never reach them: one such value once pointed the removal at the whole data folder.
+	// damaged week) must never reach them: such a value points the removal at the whole data folder.
 	it.each([['..'], ['2026-10-21/..'], ['../../x']])(
 		'refuses a pull date of %s before touching anything',
 		(bad) => {
@@ -498,6 +504,24 @@ describe('writeDeployTree', () => {
 		const out = writeDeployTree(ROOT, weekFor('2026-10-07'), mem.fs);
 		expect(mem.fs.listDir(W)).toContain('2026-10-07');
 		expect(out.pruned).toEqual(['2026-10-14']);
+	});
+});
+
+describe('assertDirectChild: what the prune may remove', () => {
+	it('accepts a dated folder directly in the weeks folder', () => {
+		expect(() => assertDirectChild(W, `${W}/2026-10-07`)).not.toThrow();
+	});
+
+	// A prune that reached a temporary twin would take a half-written week with it; only a date passes.
+	it.each([
+		['a temporary folder', `${W}/2026-10-07.tmp`],
+		['a name that is not a date', `${W}/notes`],
+		['a nested path', `${W}/2026-10-07/ids.json`],
+		['the weeks folder itself', W],
+		['a path climbing out', `${W}/../2026-10-07`],
+		['a folder elsewhere', `${ROOT}/2026-10-07`]
+	])('refuses %s', (_name, path) => {
+		expect(() => assertDirectChild(W, path)).toThrow('E_UNSAFE_PRUNE');
 	});
 });
 
