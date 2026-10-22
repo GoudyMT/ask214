@@ -218,9 +218,16 @@ describe('buildExportInner: what a person exports', () => {
 	it.each([
 		['nothing at all', {}],
 		['a setup that was emptied', { finderSetup: {} }],
-		['filters that were emptied', { finderFilters: {} }]
+		['filters that were emptied', { finderFilters: {} }],
+		// The store keeps a key a newer release added, in any shape; the file never carries it, so it is no data here.
+		['only a filter a newer release added', { finderFilters: { regions: null } }]
 	])('a finder record that holds %s exports no finder key', (_name, extra) => {
-		const empty: FinderRecord = { schemaVersion: 1, finderSaved: [], finderCompare: [], ...extra };
+		const empty = {
+			schemaVersion: 1,
+			finderSaved: [],
+			finderCompare: [],
+			...extra
+		} as FinderRecord;
 		const stores = storesOf(
 			exported(
 				snapshot({ finder: empty, gens: { profile: 4, timeline: 0, calendar: 0, finder: 5 } })

@@ -110,11 +110,13 @@ function fileFilters(filters: FinderFilters): FinderFilters {
 	};
 }
 
+// Judged on what the file would carry: the store also keeps keys a newer release added, in any shape, and the file
+// never writes them.
 export const holdsData = (finder: FinderRecord): boolean =>
 	finder.finderSaved.length > 0 ||
 	finder.finderCompare.length > 0 ||
-	Object.keys(finder.finderSetup ?? {}).length > 0 ||
-	Object.values(finder.finderFilters ?? {}).some((list) => list.length > 0);
+	Object.keys(fileSetup(finder.finderSetup ?? {})).length > 0 ||
+	Object.values(fileFilters(finder.finderFilters ?? {})).some((list) => list.length > 0);
 
 /**
  * Built field by field, never as a copy of the stored record: the store keeps any key a newer release added so an older
