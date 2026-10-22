@@ -722,6 +722,83 @@ describe('contacts', () => {
 	});
 });
 
+// A provider can type an address, a phone number or the contact's name into any free-text field; none of them may
+// be published (the contact's address is kept only in `e`, and only when it is a plain one).
+describe('contact data in published text', () => {
+	const POC = 'Jordan Smith';
+
+	it.each([
+		['an address', 'Welder, pat.smith@example.com', 'Recruiting Team'],
+		['a phone after "Call"', 'Welder, Call 410 555 0100', 'Recruiting Team'],
+		['a phone in brackets', 'Welder, (410) 555.0100', 'Recruiting Team'],
+		['a bare phone', 'Welder, 4105550100', 'Recruiting Team'],
+		['a phone with no area code', 'Welder, Call 555 0100', 'Recruiting Team'],
+		['"ask for" with no contact on the row', 'Welder, Ask for Pat Smith', ''],
+		['the contact written surname first', 'Jordan Smith, Recruiter', 'Smith, Jordan']
+	])('drops the roles when they hold %s', (_what, jobDescription, employerPoc) => {
+		const out = clean([rawListing({ jobDescription, employerPoc })], {
+			suppression: ['pat.smith@example.com']
+		});
+		expect(out.listings[0]).not.toHaveProperty('r');
+		expect(out.dropped).toEqual({ D_ROLES_CONTACT: 1 });
+		expect(JSON.stringify(out)).not.toMatch(/Smith|555|0100/);
+	});
+
+	it.each([
+		['an address', 'Widget Internship, pat.smith@example.com'],
+		['a ten-digit phone', 'Widget Internship 410-555-0100'],
+		['a ten-digit phone in brackets', 'Widget Internship (410) 555 0100'],
+		['"ask for" and a name', 'Ask for Jordan Smith about the Widget Internship'],
+		['the contact written surname first', 'Widget Internship, Smith Jordan']
+	])('holds back a row whose program holds %s', (_what, program) => {
+		const out = clean([rawListing({ program, employerPoc: POC })]);
+		expect(out.listings).toEqual([]);
+		expect(out.quarantine).toEqual([{ id: 1001, code: 'E_Q_PROGRAM_CONTACT' }]);
+		expect(JSON.stringify(out)).not.toMatch(/Smith|555|0100/);
+	});
+
+	it.each([
+		['the contact after "contact"', 'Contact Jordan Smith at Norfolk Naval Station'],
+		['an address', 'Norfolk Naval Station, pat.smith@example.com'],
+		['a phone', 'Norfolk Naval Station 410 555 0100']
+	])('drops an installation that holds %s but keeps the row', (_what, installation) => {
+		const out = clean([rawListing({ installation, employerPoc: POC })]);
+		expect(out.quarantine).toEqual([]);
+		expect(out.listings).toHaveLength(1);
+		expect(out.listings[0]).not.toHaveProperty('inst');
+		expect(out.dropped).toEqual({ D_INSTALLATION_CONTACT: 1 });
+		expect(JSON.stringify(out)).not.toMatch(/Smith|555|0100/);
+	});
+
+	// Digits, role words and place names that look a little like contact data are what real listings hold.
+	it('keeps the ordinary roles, program and installation that only look like contact data', () => {
+		const roles = [
+			'Part 107 drone pilot',
+			'IT Specialist 2210',
+			'ISO 27001 Lead Auditor',
+			'ISO 9001 14001 Auditor',
+			'Boeing 737 787 Mechanic',
+			'Contact Center Agent',
+			'Call Center Representative'
+		];
+		const out = clean([
+			rawListing({
+				jobDescription: roles.join(', '),
+				employerPoc: POC,
+				program: 'Course 101 2026 Class 100-2000',
+				installation: 'Joint Base Lewis-McChord'
+			})
+		]);
+		expect(out.quarantine).toEqual([]);
+		expect(out.listings[0]).toMatchObject({
+			r: roles,
+			p: 'Course 101 2026 Class 100-2000',
+			inst: 'Joint Base Lewis-McChord'
+		});
+		expect(out.dropped).toEqual({});
+	});
+});
+
 describe('duplicates and order', () => {
 	it('keeps the lowest id of listings that clean to the same facts, even when it comes last', () => {
 		const out = clean([RAW_CASES.duplicateContent, RAW_CASES.paddedName, rawListing({ id: 1001 })]);
