@@ -28,13 +28,18 @@ vi.mock('../profile/lifecycle', async (importOriginal) => {
 
 // The finder's record decoder, a passthrough until a test arms it. The validator checks every rule itself and then asks
 // this decoder to read its answer back as a net; a lenient decoder (it hands back whatever it was given) shows each
-// rule of the validator refuses on its own, and one that throws shows the net is really cast.
-const finderCodec = vi.hoisted(() => ({ mode: 'real' as 'real' | 'lenient' | 'throws' }));
+// rule of the validator refuses on its own, and one that throws shows the net is really cast. It keeps each buffer it
+// was handed, so a test can look at them once the validator has returned.
+const finderCodec = vi.hoisted(() => ({
+	mode: 'real' as 'real' | 'lenient' | 'throws',
+	seen: [] as Uint8Array[]
+}));
 vi.mock('../skillbridge-finder/state/codec', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../skillbridge-finder/state/codec')>();
 	return {
 		...real,
 		decodeFinderRecord: (bytes: Uint8Array) => {
+			finderCodec.seen.push(bytes);
 			if (finderCodec.mode === 'throws') throw new Error('E_TEST_CODEC_THROWS');
 			if (finderCodec.mode === 'lenient')
 				return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
@@ -731,6 +736,35 @@ describe('validateInner: the finder refusals hold on the validator alone', () =>
 	it('a record the codec cannot read back is refused', () => {
 		finderCodec.mode = 'throws';
 		expect(validateInner(make(withFinder()))).toEqual(refusal('finder'));
+	});
+});
+
+// The bytes handed to a shipped decoder hold the person's plaintext record, so the check wipes them whether the decoder
+// reads them back, disagrees or throws (the profile's own buffers are wiped the same way).
+describe('validateInner: the bytes a check decodes are wiped', () => {
+	beforeEach(() => {
+		finderCodec.seen = [];
+	});
+	afterEach(() => {
+		finderCodec.mode = 'real';
+	});
+
+	const expectWiped = () => {
+		expect(finderCodec.seen).toHaveLength(1);
+		const bytes = finderCodec.seen[0] as Uint8Array;
+		expect(bytes.length).toBeGreaterThan(0);
+		expect(bytes.every((b) => b === 0)).toBe(true);
+	};
+
+	it('after a decode that reads the record back', () => {
+		expect(validateInner(make(withFinder())).ok).toBe(true);
+		expectWiped();
+	});
+
+	it('after a decoder that throws', () => {
+		finderCodec.mode = 'throws';
+		expect(validateInner(make(withFinder()))).toEqual(refusal('finder'));
+		expectWiped();
 	});
 });
 

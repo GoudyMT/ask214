@@ -183,10 +183,14 @@ const utf8 = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.strin
 
 /** The shipped decoder reads the validated record's exact bytes and gets the same record back. */
 function decodesToSame(validated: unknown, decode: (bytes: Uint8Array) => unknown): boolean {
+	// The bytes are the person's plaintext record: wiped whether the decode agrees, differs or throws.
+	const bytes = utf8(validated);
 	try {
-		return sortedJson(decode(utf8(validated))) === sortedJson(validated);
+		return sortedJson(decode(bytes)) === sortedJson(validated);
 	} catch {
 		return false;
+	} finally {
+		bytes.fill(0);
 	}
 }
 
