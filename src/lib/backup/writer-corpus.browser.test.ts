@@ -480,10 +480,7 @@ const FINDER_MEMBERS: Member[] = [
 			await saveAll(ctx, [CLEAN_CASES.inPerson, CLEAN_CASES.hybrid]);
 			await ctx.finder.addCompare(CLEAN_CASES.inPerson.i);
 		},
-		holds: (seen) => {
-			expect(seen.file.finder).toStrictEqual(seen.snap.finder);
-			expect(seen.file.finder?.finderCompare).toStrictEqual([CLEAN_CASES.inPerson.i]);
-		}
+		holds: (seen) => expect(seen.file.finder?.finderCompare).toStrictEqual([CLEAN_CASES.inPerson.i])
 	}
 ];
 

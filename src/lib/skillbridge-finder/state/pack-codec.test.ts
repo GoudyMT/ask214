@@ -57,9 +57,8 @@ describe('seen row codec', () => {
 			['an id past the safe integers', { finderSeen: [Number.MAX_SAFE_INTEGER + 2] }],
 			['the same id twice', { finderSeen: [4, 4] }],
 			['more than the cap', { finderSeen: Array.from({ length: MAX_SEEN + 1 }, (_, n) => n + 1) }],
-			['a date that is not a day', { finderSeen: [], finderLastSeenPull: '2026-02-30' }],
-			['a date in another form', { finderSeen: [], finderLastSeenPull: '10/21/2026' }],
-			['a date that is not text', { finderSeen: [], finderLastSeenPull: 20261021 }]
+			// One bad date: what makes a date good is the contract's rule, tested there; this proves the call is made.
+			['a date that is not a day', { finderSeen: [], finderLastSeenPull: '2026-02-30' }]
 		];
 		it.each(bad)('%s', (_name, value) => {
 			expectRefused(value === undefined ? new Uint8Array([0xff, 0xfe]) : bytesOf(value));

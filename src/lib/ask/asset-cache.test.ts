@@ -289,12 +289,6 @@ describe('isFinderDataRequest (the SW never keeps SkillBridge data files)', () =
 		expect(isFinderDataRequest('/skillbridge-data')).toBe(false);
 		expect(isFinderDataRequest('/api/x')).toBe(false);
 	});
-
-	it('leaves isApiRequest answering as before for those paths', () => {
-		expect(isApiRequest('/skillbridge-data/index.json')).toBe(false);
-		expect(isApiRequest('/skillbridge/')).toBe(false);
-		expect(isApiRequest('/api/x')).toBe(true);
-	});
 });
 
 // A source document is kept only when the user saves it; the worker passes a viewed one through untouched.

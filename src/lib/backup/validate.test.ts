@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decodeCalendarSyncState } from '../calendar/codec';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { decodeProfile, encodeProfile } from '../profile/codec';
@@ -22,6 +22,23 @@ vi.mock('../profile/lifecycle', async (importOriginal) => {
 		zeroizeRecord: (record: Record<string, unknown>) => {
 			wiped.records.push(record);
 			real.zeroizeRecord(record);
+		}
+	};
+});
+
+// The finder's record decoder, a passthrough until a test arms it. The validator checks every rule itself and then asks
+// this decoder to read its answer back as a net; a lenient decoder (it hands back whatever it was given) shows each
+// rule of the validator refuses on its own, and one that throws shows the net is really cast.
+const finderCodec = vi.hoisted(() => ({ mode: 'real' as 'real' | 'lenient' | 'throws' }));
+vi.mock('../skillbridge-finder/state/codec', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../skillbridge-finder/state/codec')>();
+	return {
+		...real,
+		decodeFinderRecord: (bytes: Uint8Array) => {
+			if (finderCodec.mode === 'throws') throw new Error('E_TEST_CODEC_THROWS');
+			if (finderCodec.mode === 'lenient')
+				return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+			return real.decodeFinderRecord(bytes);
 		}
 	};
 });
@@ -458,17 +475,11 @@ function finderCases(): [string, (p: Parts) => void, Store][] {
 		['a saved item with no facts', (f) => delete first(f).facts],
 		['a saved id of 0', (f) => ((first(f).id = 0), (facts(f).i = 0))],
 		['a saved id as text', (f) => (first(f).id = '1001')],
+		// One bad date and one bad listing: the rules for each are the contract's, tested there; this proves the call is made.
 		['a saved date that is no day', (f) => (first(f).savedOn = '2026-02-30')],
-		['a saved date in another form', (f) => (first(f).savedOn = '10/21/2026')],
 		['facts of another id', (f) => (facts(f).i = 1002)],
 		['facts as null', (f) => (first(f).facts = null)],
 		['facts with a key the contract does not list', (f) => (facts(f).summary = 'Great program')],
-		['facts with a ZIP of four digits', (f) => (facts(f).z = '2104')],
-		['facts with markup in the program name', (f) => (facts(f).p = '<b>Program</b>')],
-		[
-			'facts with an email and a form link',
-			(f) => (facts(f).u = 'https://forms.example.com/apply')
-		],
 		['the same program saved twice', (f) => saved(f).push(structuredClone(first(f)))],
 		[
 			'201 programs saved',
@@ -692,6 +703,34 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 
 	it('a file that is null is CONTENT_INVALID', () => {
 		expect(validateInner(null)).toEqual(refusal());
+	});
+});
+
+// The finder's refusals again, with a codec that reads back whatever it is given. The check above passes whether the
+// validator's own lines or the codec refuse, so a rule that only the codec enforced would go unnoticed; here the
+// validator alone must refuse every case. The last case is the net itself: a record the validator accepts is still
+// refused when the codec cannot read it back.
+describe('validateInner: the finder refusals hold on the validator alone', () => {
+	beforeEach(() => {
+		finderCodec.mode = 'lenient';
+	});
+	afterEach(() => {
+		finderCodec.mode = 'real';
+	});
+
+	const cases: [string, (p: Parts) => void][] = [
+		['a finder record of null', (p) => (p.stores['skillbridge-finder'] = null)],
+		['a finder record that is a list', (p) => (p.stores['skillbridge-finder'] = [])],
+		...finderCases().map(([name, edit]): [string, (p: Parts) => void] => [name, edit])
+	];
+
+	it.each(cases)('%s', (_name, edit) => {
+		expect(validateInner(make(edit))).toEqual(refusal('finder'));
+	});
+
+	it('a record the codec cannot read back is refused', () => {
+		finderCodec.mode = 'throws';
+		expect(validateInner(make(withFinder()))).toEqual(refusal('finder'));
 	});
 });
 

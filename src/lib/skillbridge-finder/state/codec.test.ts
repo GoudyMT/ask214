@@ -130,13 +130,9 @@ describe('finder record codec', () => {
 		const badSaved: [string, unknown][] = [
 			['more than the cap', manySaved],
 			['the same id twice', dupSaved],
+			// One bad date and one bad listing: the rules for each are the contract's, tested there; this proves the call is made.
 			['a date that is not a day', [saved(386, { savedOn: '2026-02-30' })]],
-			['a date in another form', [saved(386, { savedOn: '10/21/2026' })]],
 			['facts the contract refuses', [saved(386, { facts: listing(386, { z: '2104' }) })]],
-			[
-				'facts with a field the contract does not name',
-				[saved(386, { facts: { ...listing(386), summary: 'x' } as Listing })]
-			],
 			['facts of another listing than its id', [saved(386, { facts: listing(387) })]],
 			['an id that is not a positive integer', [saved(0, { facts: listing(0) })]],
 			['not a list', { 386: saved(386) }]
