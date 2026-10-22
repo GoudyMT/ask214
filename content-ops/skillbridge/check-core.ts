@@ -93,6 +93,21 @@ export function runCheck(input: {
 
 	const seenIds = new Set(clean.listings.map((l) => l.i));
 	const mergedIds = new Set(clean.aliases.map(([merged]) => merged));
+	const overseasIds = new Set(clean.overseas);
+	const suppressed = new Set(state.suppression);
+	// An id some provider returned this week is alive, even when the clean step set its row aside.
+	const returnedIds = new Set(pull.providers.flatMap((p) => p.ids));
+	const filtersNames = new Set(pull.filtersProviders);
+	const everyProviderComplete = pull.providers.every((p) => p.complete);
+
+	// A baseline replaces the earlier records, so it must not silently drop live listings.
+	if (
+		baseline &&
+		Object.keys(state.records).length > 0 &&
+		(!pull.sumGate || !everyProviderComplete) &&
+		!acceptDrift
+	)
+		block('E_BASELINE_UNPROVEN');
 	const orgLinks = new Map(links.byOrg);
 	const knownOrgs = new Set(state.knownOrgs);
 
@@ -128,7 +143,8 @@ export function runCheck(input: {
 		records[key] = {
 			listing,
 			provider: providerOf.get(row.i) ?? prior?.provider ?? '',
-			misses: 0
+			misses: 0,
+			...(overseasIds.has(row.i) ? { overseas: true } : {})
 		};
 	}
 
@@ -136,16 +152,29 @@ export function runCheck(input: {
 		for (const [key, rec] of Object.entries(state.records)) {
 			const id = rec.listing.i;
 			if (seenIds.has(id) || mergedIds.has(id)) continue;
-			// Gone only when the pull's totals add up and the provider that last returned it was fully read
-			// without it: a provider not queried this week proves nothing.
-			if (pull.sumGate && providerByName.get(rec.provider)?.complete === true) {
+			// Gone only when the pull's totals add up, no provider returned it, and the provider that last
+			// returned it was fully read without it. A provider not queried proves nothing, and a name missing
+			// from Filters proves nothing while another provider is unread: the listing may have moved to it.
+			if (
+				pull.sumGate &&
+				!returnedIds.has(id) &&
+				providerByName.get(rec.provider)?.complete === true &&
+				(filtersNames.has(rec.provider) || everyProviderComplete)
+			) {
 				removed.push(id);
 				continue;
 			}
 			const kept = structuredClone(rec.listing);
+			// A kept copy is published again, so a contact removed on request since it was recorded goes now.
+			if (kept.e !== undefined && suppressed.has(kept.e.toLowerCase())) delete kept.e;
 			notSeen.push(id);
 			published.push(kept);
-			records[key] = { listing: kept, provider: rec.provider, misses: rec.misses + 1 };
+			records[key] = {
+				listing: kept,
+				provider: rec.provider,
+				misses: rec.misses + 1,
+				...(rec.overseas === true ? { overseas: true } : {})
+			};
 		}
 	}
 

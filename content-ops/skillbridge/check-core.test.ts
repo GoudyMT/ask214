@@ -294,6 +294,142 @@ describe('runCheck: removal is proven, never guessed', () => {
 		expect(out.published.some((l) => l.i === 2)).toBe(false);
 		expect(out.nextState.records['2']).toBeUndefined();
 	});
+
+	// A provider renamed on the server shows up as an old name that is "complete" with nothing, beside a new
+	// name that is still being read: its listings are not gone, they are not yet counted.
+	it('keeps listings of a vanished provider name while the name they moved to is incomplete', () => {
+		const all = range(20);
+		const out = run({
+			state: stateOf(all.map((i) => record(i, 'Example Old Name'))),
+			pull: pullOf(
+				[
+					provider('Example Old Name', [], true),
+					{ ...provider('Example New Name', range(14), false), total: 20 }
+				],
+				{ filtersProviders: ['Example New Name'] }
+			),
+			clean: cleaned(range(14).map((i) => cleanRow(i)))
+		});
+		expect(out.removed).toEqual([]);
+		expect(out.notSeen).toEqual(range(6, 15));
+	});
+
+	it('removes it when its provider is still in Filters, though another provider is incomplete', () => {
+		const out = run({
+			...base,
+			pull: pullOf([provider(PROVIDER, seen, true), provider(OTHER_PROVIDER, [], false)])
+		});
+		expect(out.removed).toEqual([1]);
+	});
+
+	it('removes it when its provider left Filters and every queried provider is complete', () => {
+		const out = run({
+			state: stateOf(ids.map((i) => record(i, i === 1 ? 'Example Gone Co' : PROVIDER))),
+			pull: pullOf([provider('Example Gone Co', [], true), provider(PROVIDER, seen, true)], {
+				filtersProviders: [PROVIDER]
+			}),
+			clean: cleaned(seen.map((i) => cleanRow(i)))
+		});
+		expect(out.removed).toEqual([1]);
+	});
+
+	it('keeps a listing its complete provider returned but the clean step set aside', () => {
+		const out = run({
+			...base,
+			pull: pullOf([provider(PROVIDER, ids, true)])
+		});
+		expect(out.removed).toEqual([]);
+		expect(out.week.removed).toEqual([]);
+		expect(out.notSeen).toEqual([1]);
+		expect(out.published.map((l) => l.i)).toContain(1);
+		expect(out.nextState.records['1']?.misses).toBe(1);
+	});
+
+	it('credits an id to the first provider in order that returned it', () => {
+		const out = run({
+			state: stateOf([]),
+			pull: pullOf([provider('Example First', [1]), provider('Example Second', [1])]),
+			clean: cleaned([cleanRow(1)])
+		});
+		expect(out.nextState.records['1']?.provider).toBe('Example First');
+	});
+});
+
+describe('runCheck: a kept listing still honours the suppression list', () => {
+	it('publishes a not-seen listing without a suppressed contact, and stores it stripped', () => {
+		const out = run({
+			state: stateOf(
+				[
+					record(1, PROVIDER, 0, published(1, { e: 'Gone@Example.com' })),
+					record(2, PROVIDER, 0, published(2, { e: 'keep@example.com' }))
+				],
+				{ suppression: ['gone@example.com'] }
+			),
+			pull: pullOf([provider(PROVIDER, [], false)]),
+			clean: cleaned([])
+		});
+		const byId = (i: number) => out.published.find((l) => l.i === i);
+		expect(out.notSeen).toEqual([1, 2]);
+		expect('e' in (byId(1) ?? {})).toBe(false);
+		expect(byId(2)?.e).toBe('keep@example.com');
+		expect('e' in (out.nextState.records['1']?.listing ?? {})).toBe(false);
+	});
+});
+
+describe('runCheck: a baseline that would drop earlier listings must be proven', () => {
+	const earlier = stateOf(range(10).map((i) => record(i)));
+	const baselineRun = (pull: PullRun, over: Partial<Input> = {}) =>
+		run({
+			state: earlier,
+			baseline: true,
+			pull,
+			clean: cleaned(range(10).map((i) => cleanRow(i))),
+			...over
+		});
+
+	it.each([
+		['the sum gate failed', pullOf([provider(PROVIDER, range(10))], { sumGate: false })],
+		['a queried provider is incomplete', pullOf([provider(PROVIDER, range(10), false)])]
+	])('is held when %s', (_name, pull) => {
+		expect(baselineRun(pull).blockers).toEqual(['E_BASELINE_UNPROVEN']);
+	});
+
+	it('goes ahead when Max accepts it', () => {
+		const pull = pullOf([provider(PROVIDER, range(10))], { sumGate: false });
+		expect(baselineRun(pull, { acceptDrift: true }).blockers).toEqual([]);
+	});
+
+	it('goes ahead when every provider is complete and the sum gate passed', () => {
+		expect(baselineRun(pullOf([provider(PROVIDER, range(10))])).blockers).toEqual([]);
+	});
+
+	it('is not held for the very first baseline, which has nothing to drop', () => {
+		const out = run({
+			state: emptyState(),
+			baseline: true,
+			pull: pullOf([provider(PROVIDER, range(10), false)], { sumGate: false }),
+			clean: cleaned(range(10).map((i) => cleanRow(i)))
+		});
+		expect(out.blockers).toEqual([]);
+	});
+});
+
+describe('runCheck: overseas listings', () => {
+	it('remembers the flag on seen and on kept records, and adds no key otherwise', () => {
+		const ids = range(10);
+		const seen = range(8, 3);
+		const out = run({
+			state: stateOf([...ids.map((i) => (i === 1 ? { ...record(i), overseas: true } : record(i)))]),
+			pull: pullOf([provider(PROVIDER, seen, false)]),
+			clean: { ...cleaned(seen.map((i) => cleanRow(i))), overseas: [4] }
+		});
+		const records = out.nextState.records;
+		expect(out.notSeen).toEqual([1, 2]);
+		expect(records['1']?.overseas).toBe(true);
+		expect('overseas' in (records['2'] ?? {})).toBe(false);
+		expect(records['4']?.overseas).toBe(true);
+		expect('overseas' in (records['3'] ?? {})).toBe(false);
+	});
 });
 
 describe('runCheck: what counts as New', () => {
@@ -463,7 +599,7 @@ describe('runCheck: the state kept for next week', () => {
 				provider(PROVIDER, [11, 10, 9, 8, 7, 6, 5, 4, 3], true),
 				provider(OTHER_PROVIDER, [], false)
 			],
-			{ nextMode: 'full', filtersProviders: ['Example Filter A', 'Example Filter B'] }
+			{ nextMode: 'full', filtersProviders: ['Example Filter A', PROVIDER] }
 		),
 		clean: cleaned(
 			[11, 10, 9, 8, 7, 6, 5, 4, 3].map((i) => cleanRow(i, i === 11 ? { o: 500 } : {}))
@@ -492,7 +628,7 @@ describe('runCheck: the state kept for next week', () => {
 	it('carries the providers, counts, pinned sites, orgs, week, dates and mode forward', () => {
 		const next = out.nextState;
 		expect(next.v).toBe(1);
-		expect(next.knownProviders).toEqual(['Example Filter A', 'Example Filter B']);
+		expect(next.knownProviders).toEqual(['Example Filter A', PROVIDER]);
 		expect(next.providerCounts).toEqual([
 			[PROVIDER, 9],
 			[OTHER_PROVIDER, 0]
