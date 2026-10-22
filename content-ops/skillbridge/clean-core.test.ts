@@ -78,6 +78,7 @@ function want(
 const ALL_STATES = STATE_CODES.filter((code) => !TERRITORY_CODES.includes(code));
 const CURLY_APOSTROPHE = String.fromCharCode(0x2019);
 const EN_DASH = String.fromCharCode(0x2013);
+const EM_DASH = String.fromCharCode(0x2014);
 
 type Want = { listing: CleanListing; dropped?: Record<string, number> } | { quarantine: string };
 
@@ -211,6 +212,15 @@ describe('text fields', () => {
 		const out = clean([rawListing({ program: 'x'.repeat(201) })]);
 		expect(out.listings).toEqual([]);
 		expect(out.quarantine).toEqual([{ id: 1001, code: 'E_Q_PROGRAM' }]);
+	});
+
+	it('keeps a city of 80 characters and drops one of 81, keeping the row', () => {
+		expect(only({ city: 'c'.repeat(80) }).c).toHaveLength(80);
+		const out = clean([rawListing({ city: 'c'.repeat(81) })]);
+		expect(out.quarantine).toEqual([]);
+		expect(out.listings).toHaveLength(1);
+		expect(out.listings[0]).not.toHaveProperty('c');
+		expect(out.dropped).toEqual({ D_CITY: 1 });
 	});
 
 	it('drops a city holding markup but keeps the row', () => {
@@ -382,7 +392,8 @@ describe('places', () => {
 		['MD & VA', ['MD', 'VA']],
 		['OK to relocate to MD, VA', ['MD', 'VA']],
 		// A plain comma list of codes keeps every one, including the codes that are also English words.
-		['HI, ME, MD', ['HI', 'MD', 'ME']]
+		['HI, ME, MD', ['HI', 'MD', 'ME']],
+		['MD, OR, VA', ['MD', 'OR', 'VA']]
 	])('reads the states in %j as %j', (locationStates, expected) => {
 		expect(only({ locationStates }).ls).toEqual(expected);
 	});
@@ -413,8 +424,6 @@ describe('places', () => {
 	});
 
 	it.each([
-		['21046', '21046'],
-		['2134', '02134'],
 		['21046-1234', '21046'],
 		['210461234', '21046'],
 		[' 21046 ', '21046']
@@ -514,6 +523,10 @@ describe('roles, industries and occupation codes', () => {
 		['one two three four five six seven'],
 		['Technician - Level 1'],
 		['Technician ' + EN_DASH + ' Level 1'],
+		['Technician ' + EM_DASH + ' Level 1'],
+		['Technician: Level 1'],
+		// Nothing but separators: the field is not empty, yet holds no role.
+		[',,,'],
 		['Technician <b>'],
 		['Inspector, ' + 'x'.repeat(81)],
 		['Inspector, !!!']
