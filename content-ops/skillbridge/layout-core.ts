@@ -21,18 +21,15 @@ import { DELIVERY } from '../../src/lib/skillbridge-finder/contract/listing.ts';
 import {
 	DIVISION_OF_STATE,
 	REGION_FILE_NAMES,
-	TABLE_FILE_NAMES,
 	TERRITORY_CODES,
 	dataPath,
 	isIsoDate
 } from '../../src/lib/skillbridge-finder/contract/places.ts';
 import type {
 	RegionFileName,
-	StateCode,
-	TableFileName
+	StateCode
 } from '../../src/lib/skillbridge-finder/contract/places.ts';
 import {
-	validateBases,
 	validateCrosswalk,
 	validateZips
 } from '../../src/lib/skillbridge-finder/contract/tables.ts';
@@ -48,9 +45,12 @@ import { DATA_HEADERS_FILE, DEPLOY_DATA_DIR, DEPLOY_WEEKS_KEPT } from './config.
 /** A listing naming this many states or more is in `multi-state` only: it fits no one division. */
 const MULTI_STATE_MIN = 10;
 
-const TABLE_VALIDATORS: Record<TableFileName, (raw: unknown) => ContractResult> = {
+/** The supporting tables this pipeline publishes; distance is by ZIP, so there is no table of bases. */
+const PUBLISHED_TABLES = ['zips', 'crosswalk'] as const;
+type PublishedTable = (typeof PUBLISHED_TABLES)[number];
+
+const TABLE_VALIDATORS: Record<PublishedTable, (raw: unknown) => ContractResult> = {
 	zips: validateZips,
-	bases: validateBases,
 	crosswalk: validateCrosswalk
 };
 
@@ -90,7 +90,7 @@ export function buildWeek(input: {
 	/** This week's change week, then last week's when there is one. */
 	weeks: ChangesFile['weeks'];
 	/** Parsed tables to publish whole; each is validated. */
-	tables: Partial<Record<TableFileName, unknown>>;
+	tables: Partial<Record<PublishedTable, unknown>>;
 }): BuiltWeek {
 	const { pullDate, baseline, baselineDate, published, overseas, aliases, weeks, tables } = input;
 	const index: IndexFile = { v: 1, pullDate, baseline, baselineDate, files: [] };
@@ -139,7 +139,7 @@ export function buildWeek(input: {
 	note(dataPath({ kind: 'changes', pullDate }).slice(1), JSON.stringify(changes));
 	if (!validateChanges(changes).valid) errors.add('E_INVALID_CHANGES');
 
-	for (const name of TABLE_FILE_NAMES) {
+	for (const name of PUBLISHED_TABLES) {
 		const table = tables[name];
 		if (table === undefined) continue;
 		note(dataPath({ kind: 'table', name }).slice(1), JSON.stringify(table));

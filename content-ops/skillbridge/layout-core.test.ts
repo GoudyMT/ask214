@@ -30,7 +30,6 @@ import {
 	validateRegionFile
 } from '../../src/lib/skillbridge-finder/contract/validate.ts';
 import {
-	validateBases,
 	validateCrosswalk,
 	validateZips
 } from '../../src/lib/skillbridge-finder/contract/tables.ts';
@@ -106,7 +105,6 @@ describe('placeListing: every listing goes to its files and nowhere else', () =>
 
 const TABLES = {
 	zips: { v: 1, rows: [['21046', 39.2, -76.86]] },
-	bases: { v: 1, rows: [['Example Base', 'MD', 39.1, -76.7]] },
 	crosswalk: { v: 1, rows: [['91B', 'Army', '49-3023.00', 'Automotive Service Technicians']] }
 };
 
@@ -156,7 +154,6 @@ describe('buildWeek', () => {
 				`skillbridge-data/w/${PULL_DATE}/ids.json`,
 				`skillbridge-data/w/${PULL_DATE}/changes.json`,
 				'skillbridge-data/tables/zips.json',
-				'skillbridge-data/tables/bases.json',
 				'skillbridge-data/tables/crosswalk.json',
 				...regions
 			].sort()
@@ -172,13 +169,23 @@ describe('buildWeek', () => {
 						? validateChanges(parsed)
 						: path.endsWith('/zips.json')
 							? validateZips(parsed)
-							: path.endsWith('/bases.json')
-								? validateBases(parsed)
-								: path.endsWith('/crosswalk.json')
-									? validateCrosswalk(parsed)
-									: validateRegionFile(parsed);
+							: path.endsWith('/crosswalk.json')
+								? validateCrosswalk(parsed)
+								: validateRegionFile(parsed);
 			expect(result.errors, path).toEqual([]);
 		}
+	});
+
+	// Distance is by ZIP only, so no table of bases is published even when a caller hands one in.
+	it('never writes a bases table', () => {
+		const tables: Record<string, unknown> = {
+			...TABLES,
+			bases: { v: 1, rows: [['Example Base', 'MD', 39.1, -76.7]] }
+		};
+		const week = buildWeek(input({ tables }));
+		expect(week.errors).toEqual([]);
+		expect(week.files.filter((f) => f.path.includes('bases'))).toEqual([]);
+		expect(week.files.some((f) => f.path.endsWith('/zips.json'))).toBe(true);
 	});
 
 	it('files each listing under every region it belongs to and no other, sorted by id', () => {
