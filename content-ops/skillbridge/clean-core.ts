@@ -191,6 +191,7 @@ function cleanPoint(
 ): readonly [number, number] | undefined {
 	const { lat, lon } = row;
 	const given = typeof lat === 'number' && typeof lon === 'number';
+	const box = state === undefined ? undefined : places.stateBox(state);
 	if (
 		given &&
 		Number.isFinite(lat) &&
@@ -198,13 +199,14 @@ function cleanPoint(
 		!(lat === 0 && lon === 0) &&
 		Math.abs(lat) <= 90 &&
 		Math.abs(lon) <= 180 &&
-		state !== undefined
-	) {
-		const box = places.stateBox(state);
-		if (box !== undefined && insideBox(lat, lon, box)) return [lat, lon];
-	}
+		box !== undefined &&
+		insideBox(lat, lon, box)
+	)
+		return [lat, lon];
 	const centroid = zip === undefined ? undefined : places.zipPoint(zip);
-	if (centroid !== undefined) {
+	// A mistyped ZIP is as wrong as a mistyped coordinate. With no box to test it against (a territory, or no
+	// usable state) the table's own centroid stands in, as it always has.
+	if (centroid !== undefined && (box === undefined || insideBox(centroid[0], centroid[1], box))) {
 		drops.push('P_ZIP_CENTROID');
 		return centroid;
 	}

@@ -390,7 +390,8 @@ describe('required fields', () => {
 
 	it('holds back a row the validator would refuse, such as one given a corrupt ZIP centroid', () => {
 		const corrupt: PlaceLookups = { ...PLACES, zipPoint: () => [95, 0] };
-		const out = clean([rawListing({ lon: 76.86 })], { places: corrupt });
+		// TX has no box here, so the centroid is not tested against one and reaches the validator.
+		const out = clean([rawListing({ state: 'TX' })], { places: corrupt });
 		expect(out.listings).toEqual([]);
 		expect(out.quarantine).toEqual([{ id: 1001, code: 'E_Q_INVALID' }]);
 	});
@@ -483,6 +484,36 @@ describe('places', () => {
 		expect(out.listings[0]).not.toHaveProperty('la');
 		expect(out.listings[0]).not.toHaveProperty('lo');
 		expect(out.dropped).toEqual({ D_POINT: 1 });
+	});
+
+	// A mistyped ZIP must not move a listing to another state: the centroid is held to the state's box too.
+	describe('a ZIP centre that lies outside the listing state', () => {
+		const places: PlaceLookups = {
+			...PLACES,
+			zipPoint: (zip) => (zip === '90210' ? [34.09, -118.41] : ZIP_POINTS[zip])
+		};
+		const noPoint = { lat: null as unknown as number, lon: null as unknown as number };
+
+		it('gives the listing no point', () => {
+			const out = clean([rawListing({ state: 'MD', zip: '90210', ...noPoint })], { places });
+			expect(out.listings[0]).not.toHaveProperty('la');
+			expect(out.listings[0]).not.toHaveProperty('lo');
+			expect(out.dropped).toEqual({});
+		});
+
+		it('counts the dropped point when the listing gave one that was outside too', () => {
+			const out = clean([rawListing({ state: 'MD', zip: '90210', lat: 13.47, lon: 144.75 })], {
+				places
+			});
+			expect(out.listings[0]).not.toHaveProperty('la');
+			expect(out.dropped).toEqual({ D_POINT: 1 });
+		});
+
+		it('still uses the centre of a ZIP that lies in the state', () => {
+			const out = clean([rawListing({ state: 'MD', zip: '21046', ...noPoint })], { places });
+			expect(out.listings[0]).toMatchObject(CENTROID);
+			expect(out.dropped).toEqual({ P_ZIP_CENTROID: 1 });
+		});
 	});
 
 	it('does not trust a point past the range of the globe even if a box would hold it', () => {
