@@ -1,0 +1,16 @@
+{
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	// Serves the weekly SkillBridge listing files as static assets and nothing else. With no `main`, no
+	// bindings and no `run_worker_first`, no Worker code ever runs, so the files cost nothing to serve and
+	// nothing on this route can log, store or bill. `src/lib/ci/skillbridge-data-config-policy.ts` holds
+	// these rules and a test reads this file against them; the pre-deploy guard runs the same check.
+	"name": "ask214-skillbridge-data",
+	"compatibility_date": "2026-07-01",
+	"observability": { "enabled": false },
+	// The deploy folder mirrors the request path: deploy/skillbridge-data/index.json is served at
+	// /skillbridge-data/index.json. It is built on Max's machine each week and never committed.
+	"assets": { "directory": "./deploy" },
+	"routes": [{ "pattern": "ask214.com/skillbridge-data/*", "zone_name": "ask214.com" }],
+	"workers_dev": false,
+	"preview_urls": false
+}
