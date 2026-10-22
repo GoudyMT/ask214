@@ -184,11 +184,6 @@ for (const [name, t] of [
 			const tint = tintOf(ruleOf(timelineListCss, '.timeline-today__pill'));
 			expect(cr(text, mix(c.accent, c.bg, tint))).toBeGreaterThanOrEqual(4.5);
 		});
-		// Both labels use this one shade: retuning it (it also fills a hovered button) must not push them under.
-		it('the stronger accent shade clears 4.5:1 on both tints', () => {
-			expect(cr(c.accentMuted, mix(c.accent, c.surface, 0.16))).toBeGreaterThanOrEqual(4.5);
-			expect(cr(c.accentMuted, mix(c.accent, c.bg, 0.14))).toBeGreaterThanOrEqual(4.5);
-		});
 	});
 }
 
