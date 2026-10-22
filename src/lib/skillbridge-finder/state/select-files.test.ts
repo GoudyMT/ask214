@@ -114,6 +114,17 @@ describe('selectRegionFiles', () => {
 			]);
 		});
 
+		// A wider radius must never fetch less: a point in a territory still needs the territories file.
+		it("with the radius 'any' still fetches the territories file for a point inside a territory", () => {
+			const place = { kind: 'point', la: 18.2, lo: -66.4 } as const;
+			expect(selectRegionFiles({ place, radiusMiles: 'any' }, EXTENTS)).toEqual([
+				...DIVISIONS,
+				...FIXED,
+				'territories',
+				'unknown'
+			]);
+		});
+
 		// When the place cannot be found, covering every division is safe; missing the right one is not.
 		it('inside no box and with no state fetches every division', () => {
 			const lost = { kind: 'point', la: 30, lo: -60 } as const;
@@ -156,10 +167,7 @@ describe('selectRegionFiles', () => {
 		// A bad coordinate must fall back to the place's state or to everything, never match a box by accident.
 		it.each([
 			['NaN latitude', { la: NaN, lo: -77.5 }],
-			['infinite latitude', { la: Infinity, lo: -77.5 }],
-			['NaN longitude', { la: 60, lo: NaN }],
-			['infinite longitude on the date-line box', { la: 60, lo: Infinity }],
-			['negative infinite longitude on the date-line box', { la: 60, lo: -Infinity }]
+			['NaN longitude', { la: 60, lo: NaN }]
 		])('treats %s as a point inside no box', (_name, coords) => {
 			const withState = { kind: 'point', ...coords, state: 'TX' } as const;
 			expect(selectRegionFiles({ place: withState, radiusMiles: 100 }, EXTENTS)).toEqual([

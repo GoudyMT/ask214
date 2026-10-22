@@ -238,4 +238,23 @@ describe('fetchDataFile', () => {
 		const bad = serve({ [url]: json(c.wrong) });
 		await expect(fetchDataFile(c.file, bad.fetchFn)).rejects.toThrow('E_SBF_INVALID');
 	});
+
+	// A stale copy served at this week's path would show last week's listings as current.
+	it('refuses an ids file from another pull than the one requested', async () => {
+		const file = { kind: 'ids', pullDate: PULL } as const;
+		const stale = serve({ [dataPath(file)]: json({ ...ids, pullDate: '2026-10-14' }) });
+		await expect(fetchDataFile(file, stale.fetchFn)).rejects.toThrow('E_SBF_INVALID');
+	});
+
+	// The changes file lists this week and last; the folder's week is the newest one it describes.
+	it('refuses a changes file whose newest week is not the requested pull', async () => {
+		const file = { kind: 'changes', pullDate: PULL } as const;
+		const older = { pullDate: '2026-10-14', added: [], removed: [], newOrgs: [] };
+		const stale = serve({ [dataPath(file)]: json({ v: 1, weeks: [older] }) });
+		await expect(fetchDataFile(file, stale.fetchFn)).rejects.toThrow('E_SBF_INVALID');
+
+		const twoWeeks = { v: 1, weeks: [changes.weeks[0], older] };
+		const ok = serve({ [dataPath(file)]: json(twoWeeks) });
+		expect(await fetchDataFile(file, ok.fetchFn)).toEqual(twoWeeks);
+	});
 });

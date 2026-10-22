@@ -71,16 +71,16 @@ export function selectRegionFiles(input: SelectInput, extents: StateExtents): Re
 		if (place.kind === 'state') addState(place.state);
 		else {
 			if (place.state) addState(place.state);
+			const { la, lo } = place;
+			// 'any' covers every division and also keeps what the point's own box selects (a territory has
+			// no division), so a wider radius never fetches less than a narrower one.
+			const miles = input.radiusMiles === 'any' ? 0 : (input.radiusMiles ?? 0);
+			const hits = (Object.entries(extents) as [StateCode, Extent][]).filter(([, box]) =>
+				inBox(la, lo, box, miles)
+			);
+			for (const [state] of hits) addState(state);
 			if (input.radiusMiles === 'any') addEveryDivision();
-			else {
-				const { la, lo } = place;
-				const miles = input.radiusMiles ?? 0;
-				const hits = (Object.entries(extents) as [StateCode, Extent][]).filter(([, box]) =>
-					inBox(la, lo, box, miles)
-				);
-				for (const [state] of hits) addState(state);
-				if (hits.length === 0 && place.state === undefined) addEveryDivision();
-			}
+			else if (hits.length === 0 && place.state === undefined) addEveryDivision();
 		}
 	}
 

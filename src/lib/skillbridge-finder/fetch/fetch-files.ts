@@ -145,10 +145,18 @@ export async function fetchDataFile<F extends OtherFile>(
 ): Promise<ValueOf<F>> {
 	const raw = await getJson(file, fetchFn);
 	switch (file.kind) {
-		case 'ids':
-			return checked(raw, validateIds(raw));
-		case 'changes':
-			return checked(raw, validateChanges(raw));
+		case 'ids': {
+			const ids = checked<IdsFile>(raw, validateIds(raw));
+			// A copy from another pull, served at this pull's path, would pass as current.
+			if (ids.pullDate !== file.pullDate) throw new Error('E_SBF_INVALID');
+			return ids as ValueOf<F>;
+		}
+		case 'changes': {
+			const changes = checked<ChangesFile>(raw, validateChanges(raw));
+			// The newest week it describes is the pull it was published for.
+			if (changes.weeks[0]?.pullDate !== file.pullDate) throw new Error('E_SBF_INVALID');
+			return changes as ValueOf<F>;
+		}
 		case 'table':
 			return checked(raw, TABLE_VALIDATORS[file.name](raw));
 		default:
