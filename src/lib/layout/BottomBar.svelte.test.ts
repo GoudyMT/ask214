@@ -72,6 +72,33 @@ describe('BottomBar on a 320 px phone', () => {
 		expect(new Set(iconTops).size).toBe(1);
 	});
 
+	// A person who raised their text size (Android font size, text-only zoom) still reads every label: a long one wraps
+	// inside its own column instead of running over the next tab or off the screen.
+	it('keeps every label inside its own column at a large text size', async () => {
+		const root = document.documentElement;
+		const before = root.style.getPropertyValue('--font-size-s');
+		root.style.setProperty('--font-size-s', '28px');
+		try {
+			const { container } = await render(BottomBar);
+			const bar = (container.querySelector('nav') as HTMLElement).getBoundingClientRect();
+			const labels = links(container).map((a) =>
+				(a.querySelector('span') as HTMLElement).getBoundingClientRect()
+			);
+			expect(labels).toHaveLength(4);
+			for (const label of labels) {
+				expect(label.left).toBeGreaterThanOrEqual(bar.left);
+				expect(label.right).toBeLessThanOrEqual(bar.right);
+			}
+			for (const [i, label] of labels.entries()) {
+				const next = labels[i + 1];
+				if (next) expect(label.right).toBeLessThanOrEqual(next.left);
+			}
+		} finally {
+			if (before) root.style.setProperty('--font-size-s', before);
+			else root.style.removeProperty('--font-size-s');
+		}
+	});
+
 	// The wizard owns no tab; Settings, Resources, Documents, Feedback and About are under More. A screen reader says
 	// "current page" only for the tab whose page is open; for More behind it, it is the current section.
 	it.each([

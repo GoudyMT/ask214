@@ -92,7 +92,8 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(4, 1fr);
+		/* minmax(0, ...) lets a column be narrower than its label, which then wraps (below) instead of widening the bar. */
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 	}
 
 	a {
@@ -109,6 +110,11 @@
 		font-size: var(--font-size-s);
 		line-height: 1.2;
 		text-decoration: none;
+	}
+	/* At a large text size a long label breaks inside its own column, centred like the single line. */
+	span {
+		overflow-wrap: anywhere;
+		text-align: center;
 	}
 	a[aria-current] {
 		padding-top: 0;
