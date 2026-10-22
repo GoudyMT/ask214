@@ -96,7 +96,7 @@ export function validateZips(raw: unknown): ContractResult {
 export function validateCrosswalk(raw: unknown): ContractResult {
 	const errors: ContractError[] = [];
 	const rows = readTable(raw, MAX_CROSSWALK_ROWS, errors);
-	const perCode = new Map<string, number>();
+	const perCode = new Map<string, Set<string>>();
 	const pairs = new Set<string>();
 	for (const r of rows ?? []) {
 		const row = rowOf(r, 4, errors);
@@ -110,13 +110,14 @@ export function validateCrosswalk(raw: unknown): ContractResult {
 		)
 			errors.push({ code: 'E_SBF_BAD_CODES', field: 'rows' });
 		else {
-			// Search walks every row of a code it is given, so a code with thousands of rows, or one row repeated, is
-			// cost with no meaning. The excess is reported once per code.
-			const count = (perCode.get(code) ?? 0) + 1;
-			perCode.set(code, count);
-			if (count === MAX_ROWS_PER_CODE + 1)
+			// Search walks every occupation of a code it is given, so a code with thousands of them, or one row repeated,
+			// is cost with no meaning. A code shared by two branches (Navy and Coast Guard ratings) folds into one set of
+			// occupations, so the cap counts distinct occupations. The excess is reported once per code.
+			const onets = perCode.get(code) ?? new Set<string>();
+			perCode.set(code, onets);
+			if (!onets.has(onetCode) && onets.add(onetCode).size === MAX_ROWS_PER_CODE + 1)
 				errors.push({ code: 'E_SBF_TOO_MANY_ROWS', field: 'rows' });
-			const pair = `${code} ${onetCode}`;
+			const pair = `${code} ${String(branch)} ${onetCode}`;
 			if (pairs.has(pair)) errors.push({ code: 'E_SBF_DUP_ID', field: 'rows' });
 			pairs.add(pair);
 		}

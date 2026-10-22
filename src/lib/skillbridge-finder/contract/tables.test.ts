@@ -106,11 +106,29 @@ describe('validateCrosswalk', () => {
 		]);
 	});
 
-	it('refuses the same military code and O*NET code listed twice', () => {
+	// Navy and Coast Guard ratings share codes, so the published table lists a code once per branch. Search folds a
+	// code's rows into its set of occupations, so the second branch costs nothing and must not count toward the cap.
+	it('keeps a code whose 50 occupations are listed under two branches', () => {
+		const rows = ['Navy', 'Coast Guard'].flatMap((branch) =>
+			Array.from({ length: MAX_ROWS_PER_CODE }, (_, k) => [
+				'BM',
+				branch,
+				`53-${5000 + k}.00`,
+				'Sailors'
+			])
+		);
+		expect(validateCrosswalk(crosswalk(rows))).toEqual({ valid: true, errors: [] });
+	});
+
+	it('refuses the same military code, branch and O*NET code listed twice', () => {
 		const row = ['91B', 'Army', '49-3023.00', 'Automotive Service Technicians'];
 		expect(codes(validateCrosswalk(crosswalk([row, [...row]])))).toEqual(['E_SBF_DUP_ID']);
 		expect(
 			validateCrosswalk(crosswalk([row, ['91B', 'Army', '49-3031.00', 'Bus Mechanics']])).valid
+		).toBe(true);
+		const navy = ['BM', 'Navy', '53-5011.00', 'Sailors and Marine Oilers'];
+		expect(
+			validateCrosswalk(crosswalk([navy, ['BM', 'Coast Guard', ...navy.slice(2)]])).valid
 		).toBe(true);
 	});
 });
