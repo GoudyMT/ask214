@@ -3,8 +3,6 @@ import { encodeFinderRecord, decodeFinderRecord, FinderSchemaError } from './cod
 import { MAX_COMPARE, MAX_SAVED, type FinderRecord, type FinderSavedItem } from './types';
 import type { Listing } from '../contract/listing';
 
-const ZERO_WIDTH = String.fromCharCode(0x200b);
-
 function listing(i: number, overrides: Partial<Listing> = {}): Listing {
 	return {
 		i,
@@ -36,7 +34,7 @@ const saved = (id: number, overrides: Partial<FinderSavedItem> = {}): FinderSave
 const full: FinderRecord = {
 	schemaVersion: 1,
 	finderSetup: {
-		place: { kind: 'base', name: 'Fort Meade', state: 'MD' },
+		place: { kind: 'zip', zip: '21046' },
 		radius: 50,
 		territories: false,
 		overseas: true
@@ -99,21 +97,12 @@ describe('finder record codec', () => {
 		const badSetup: [string, unknown][] = [
 			['a ZIP of four digits', { place: { kind: 'zip', zip: '2104' } }],
 			['a ZIP with text after the digits', { place: { kind: 'zip', zip: '21046\n' } }],
-			['a base name with markup', { place: { kind: 'base', name: 'Fort <b>', state: 'MD' } }],
-			[
-				'a base name with an invisible character',
-				{ place: { kind: 'base', name: `Fort${ZERO_WIDTH}Meade`, state: 'MD' } }
-			],
-			[
-				'a base name over 150 characters',
-				{ place: { kind: 'base', name: 'a'.repeat(151), state: 'MD' } }
-			],
 			['a state that is not a state code', { place: { kind: 'state', state: 'ZZ' } }],
-			[
-				'a base state that is not a state code',
-				{ place: { kind: 'base', name: 'Fort', state: 'md' } }
-			],
 			['a place kind it does not know', { place: { kind: 'city', name: 'Columbia' } }],
+			[
+				'an installation, which the finder no longer takes as a place',
+				{ place: { kind: 'base', name: 'Fort Meade', state: 'MD' } }
+			],
 			['a radius off the four values', { radius: 75 }],
 			['a radius given as text', { radius: '50' }],
 			['an overseas flag that is not a boolean', { overseas: 'yes' }]

@@ -14,9 +14,7 @@ import {
 } from '../contract/places';
 import {
 	validateZips,
-	validateBases,
 	validateCrosswalk,
-	type BasesTable,
 	type CrosswalkTable,
 	type ZipsTable
 } from '../contract/tables';
@@ -123,7 +121,7 @@ export async function fetchRegionFiles(
 }
 
 type OtherFile = Extract<DataFile, { kind: 'ids' | 'changes' | 'table' }>;
-type TableValues = { zips: ZipsTable; bases: BasesTable; crosswalk: CrosswalkTable };
+type TableValues = { zips: ZipsTable; crosswalk: CrosswalkTable };
 type ValueOf<F extends OtherFile> = F extends { kind: 'ids' }
 	? IdsFile
 	: F extends { kind: 'changes' }
@@ -134,7 +132,6 @@ type ValueOf<F extends OtherFile> = F extends { kind: 'ids' }
 
 const TABLE_VALIDATORS: Record<TableFileName, (raw: unknown) => ContractResult> = {
 	zips: validateZips,
-	bases: validateBases,
 	crosswalk: validateCrosswalk
 };
 

@@ -334,7 +334,7 @@ describe('finder pack store', () => {
 				store.putTable('zips', { v: 1, rows: [['2104', 1, 1]] } as ZipsTable)
 			).rejects.toThrow('E_FINDER_PACK_BAD_INPUT');
 			expect(await store.readTable('zips')).toEqual(zips);
-			expect(await store.readTable('bases')).toBeUndefined();
+			expect(await store.readTable('crosswalk')).toBeUndefined();
 		});
 	});
 
@@ -501,7 +501,7 @@ describe('finder pack store', () => {
 				() => store.markOpened([2]),
 				() => store.setSeen([2]),
 				() => store.advanceLastSeen(WEEK_2),
-				() => store.putTable('bases', { v: 1, rows: [] }),
+				() => store.putTable('crosswalk', { v: 1, rows: [] }),
 				() => store.swap(week(WEEK_2, ['mountain']))
 			];
 			for (const write of writes) await expect(write()).rejects.toThrow('E_FINDER_PACK_RELOCKED');

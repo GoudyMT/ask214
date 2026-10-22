@@ -1,6 +1,5 @@
 import {
 	BRANCHES,
-	CAPS,
 	DELIVERY,
 	DURATIONS,
 	INDUSTRIES,
@@ -8,7 +7,7 @@ import {
 	type Listing
 } from '../contract/listing';
 import { STATE_CODES, isIsoDate } from '../contract/places';
-import { isSafeText, validateListing } from '../contract/validate';
+import { validateListing } from '../contract/validate';
 import { MAX_COMPARE, MAX_SAVED, type FinderRecord } from './types';
 
 const SCHEMA_VERSION = 1;
@@ -35,14 +34,6 @@ function checkPlace(place: unknown): void {
 	if (!isObject(place)) throw new FinderSchemaError('E_FINDER_BAD_SETUP');
 	if (place.kind === 'zip') {
 		if (typeof place.zip !== 'string' || !ZIP_RE.test(place.zip)) {
-			throw new FinderSchemaError('E_FINDER_BAD_SETUP');
-		}
-	} else if (place.kind === 'base') {
-		if (
-			!isSafeText(place.name) ||
-			place.name.length > CAPS.installation ||
-			!STATE_SET.has(place.state)
-		) {
 			throw new FinderSchemaError('E_FINDER_BAD_SETUP');
 		}
 	} else if (place.kind === 'state') {

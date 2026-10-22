@@ -8,10 +8,8 @@ import {
 	type TableFileName
 } from '../contract/places';
 import {
-	validateBases,
 	validateCrosswalk,
 	validateZips,
-	type BasesTable,
 	type CrosswalkTable,
 	type ZipsTable
 } from '../contract/tables';
@@ -54,7 +52,7 @@ const PACK_STORE = 'skillbridge-finder-pack';
 const LOCK_NAME = 'skillbridge-finder-pack';
 const GENERATION = 0;
 
-type PackTable = ZipsTable | BasesTable | CrosswalkTable;
+type PackTable = ZipsTable | CrosswalkTable;
 type RowKey = 'index' | 'ids' | 'changes' | 'seen' | RegionFileName | `table:${TableFileName}`;
 type Row = { id: string; rec: Uint8Array };
 
@@ -63,7 +61,6 @@ const WEEK_KEYS: readonly string[] = [...REGION_FILE_NAMES, 'ids', 'changes', 'i
 
 const TABLE_VALIDATORS: Record<TableFileName, (raw: unknown) => ContractResult> = {
 	zips: validateZips,
-	bases: validateBases,
 	crosswalk: validateCrosswalk
 };
 

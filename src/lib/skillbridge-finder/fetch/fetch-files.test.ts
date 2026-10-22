@@ -215,7 +215,6 @@ describe('fetchDataFile', () => {
 		weeks: [{ pullDate: PULL, added: [1], removed: [], newOrgs: [] }]
 	};
 	const zips = { v: 1, rows: [['21046', 39.2, -76.86]] };
-	const bases = { v: 1, rows: [['Fort Meade', 'MD', 39.1, -76.7]] };
 	const crosswalk = {
 		v: 1,
 		rows: [['91B', 'Army', '49-3023.00', 'Automotive Service Technicians and Mechanics']]
@@ -225,8 +224,7 @@ describe('fetchDataFile', () => {
 	const cases = [
 		{ file: { kind: 'ids', pullDate: PULL }, good: ids, wrong: changes },
 		{ file: { kind: 'changes', pullDate: PULL }, good: changes, wrong: zips },
-		{ file: { kind: 'table', name: 'zips' }, good: zips, wrong: bases },
-		{ file: { kind: 'table', name: 'bases' }, good: bases, wrong: crosswalk },
+		{ file: { kind: 'table', name: 'zips' }, good: zips, wrong: crosswalk },
 		{ file: { kind: 'table', name: 'crosswalk' }, good: crosswalk, wrong: ids }
 	] as const;
 

@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	MAX_BASE_ROWS,
-	MAX_CROSSWALK_ROWS,
-	MAX_ZIP_ROWS,
-	validateBases,
-	validateCrosswalk,
-	validateZips
-} from './tables';
+import { MAX_CROSSWALK_ROWS, MAX_ZIP_ROWS, validateCrosswalk, validateZips } from './tables';
 
 const codes = (r: { errors: { code: string }[] }) => r.errors.map((e) => e.code);
 
@@ -62,32 +55,6 @@ describe('validateZips', () => {
 	it('refuses an unknown key and a future version', () => {
 		expect(codes(validateZips({ v: 1, rows: [], note: 'x' }))).toEqual(['E_SBF_UNKNOWN_FIELD']);
 		expect(codes(validateZips({ v: 2, rows: [] }))).toEqual(['E_SBF_BAD_VERSION']);
-	});
-});
-
-describe('validateBases', () => {
-	const bases = (rows: unknown[]) => ({ v: 1, rows });
-
-	it('accepts a named installation with its state and point', () => {
-		expect(validateBases(bases([['Fort Example', 'TX', 31.13, -97.78]]))).toEqual({
-			valid: true,
-			errors: []
-		});
-	});
-
-	it.each([
-		[['Fort <b>Example</b>', 'TX', 31.13, -97.78], 'E_SBF_BAD_TEXT'],
-		[['a'.repeat(151), 'TX', 31.13, -97.78], 'E_SBF_TOO_LONG'],
-		[['Fort Example', 'Texas', 31.13, -97.78], 'E_SBF_BAD_ENUM'],
-		[['Fort Example', 'TX', 31.13, 181], 'E_SBF_BAD_POINT']
-	])('refuses the row %j', (row, code) => {
-		expect(codes(validateBases(bases([row])))).toEqual([code]);
-	});
-
-	it('refuses more rows than the cap without walking them', () => {
-		expect(codes(validateBases(bases(new Array<unknown>(MAX_BASE_ROWS + 1).fill(null))))).toEqual([
-			'E_SBF_TOO_MANY_ROWS'
-		]);
 	});
 });
 

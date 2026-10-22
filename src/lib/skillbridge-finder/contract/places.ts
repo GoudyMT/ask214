@@ -114,7 +114,7 @@ export const REGION_FILE_NAMES = [
 export type RegionFileName = (typeof REGION_FILE_NAMES)[number];
 
 /** The supporting tables, served whole (never split by prefix, which would name a ZIP range). */
-export const TABLE_FILE_NAMES = ['zips', 'bases', 'crosswalk'] as const;
+export const TABLE_FILE_NAMES = ['zips', 'crosswalk'] as const;
 export type TableFileName = (typeof TABLE_FILE_NAMES)[number];
 
 const REGION_SET: ReadonlySet<string> = new Set(REGION_FILE_NAMES);

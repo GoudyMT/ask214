@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { BasesTable, ZipsTable } from '../contract/tables';
+import type { ZipsTable } from '../contract/tables';
 import { CLEAN_CASES, cleanListing } from '../fixtures/clean';
 import { milesBetween, placePoint, placement } from './distance';
 
@@ -28,45 +28,21 @@ describe('placePoint', () => {
 			['00901', 18.46, -66.1]
 		]
 	};
-	const bases: BasesTable = {
-		v: 1,
-		rows: [
-			['Fort Meade', 'MD', 39.1, -76.74],
-			['Fort Meade', 'FL', 27.75, -81.8],
-			['Naval Station Norfolk', 'VA', 36.95, -76.3]
-		]
-	};
-
 	it('gives a ZIP the point of its own row', () => {
-		expect(placePoint({ kind: 'zip', zip: '21046' }, zips, bases)).toEqual({
+		expect(placePoint({ kind: 'zip', zip: '21046' }, zips)).toEqual({
 			la: 39.2,
 			lo: -76.86
 		});
 	});
 
-	// Two installations can share a name across states; matching on the name alone would put the person in Florida.
-	it('finds an installation by its name and its state together', () => {
-		expect(placePoint({ kind: 'base', name: 'Fort Meade', state: 'FL' }, zips, bases)).toEqual({
-			la: 27.75,
-			lo: -81.8
-		});
-		expect(placePoint({ kind: 'base', name: 'Fort Meade', state: 'MD' }, zips, bases)).toEqual({
-			la: 39.1,
-			lo: -76.74
-		});
-		expect(placePoint({ kind: 'base', name: 'Fort Meade', state: 'VA' }, zips, bases)).toBeNull();
-	});
-
 	// A state has no centre, so a state alone never gets a distance (it would be a guess presented as a measure).
 	it('gives a whole state no point', () => {
-		expect(placePoint({ kind: 'state', state: 'MD' }, zips, bases)).toBeNull();
+		expect(placePoint({ kind: 'state', state: 'MD' }, zips)).toBeNull();
 	});
 
 	it('gives no point when the table or the row is missing', () => {
 		expect(placePoint({ kind: 'zip', zip: '21046' })).toBeNull();
-		expect(placePoint({ kind: 'zip', zip: '99999' }, zips, bases)).toBeNull();
-		expect(placePoint({ kind: 'base', name: 'Fort Meade', state: 'MD' }, zips)).toBeNull();
-		expect(placePoint({ kind: 'base', name: 'Nowhere', state: 'MD' }, zips, bases)).toBeNull();
+		expect(placePoint({ kind: 'zip', zip: '99999' }, zips)).toBeNull();
 	});
 });
 

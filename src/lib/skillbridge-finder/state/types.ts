@@ -8,10 +8,7 @@ import type { StateCode } from '../contract/places';
  * "saved" or "compare" would trip it in unrelated code.
  */
 
-export type FinderPlace =
-	| { kind: 'zip'; zip: string }
-	| { kind: 'base'; name: string; state: StateCode }
-	| { kind: 'state'; state: StateCode };
+export type FinderPlace = { kind: 'zip'; zip: string } | { kind: 'state'; state: StateCode };
 
 export type FinderRadius = 25 | 50 | 100 | 'any';
 
