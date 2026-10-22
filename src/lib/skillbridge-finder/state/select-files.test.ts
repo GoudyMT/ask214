@@ -66,6 +66,30 @@ describe('selectRegionFiles', () => {
 			]);
 		});
 
+		// Real state boxes overlap along borders. The request set must not tell which of two divisions a person is in:
+		// a ZIP that knows its state fetches that state's division alone, and only a point with no state falls back
+		// to the boxes. These boxes overlap on purpose between latitudes 39.7 and 39.9.
+		it("with a state and no radius fetches only that state's division, though two boxes hold the point", () => {
+			const overlapping: StateExtents = { MD: [38, -80, 39.9, -75], PA: [39.7, -80, 42, -75] };
+			const inBoth = { kind: 'point', la: 39.8, lo: -77.5 } as const;
+			expect(selectRegionFiles({ place: { ...inBoth, state: 'MD' } }, overlapping)).toEqual([
+				'south-atlantic',
+				...FIXED,
+				'unknown'
+			]);
+			expect(selectRegionFiles({ place: { ...inBoth, state: 'PA' } }, overlapping)).toEqual([
+				'middle-atlantic',
+				...FIXED,
+				'unknown'
+			]);
+			expect(selectRegionFiles({ place: inBoth }, overlapping)).toEqual([
+				'middle-atlantic',
+				'south-atlantic',
+				...FIXED,
+				'unknown'
+			]);
+		});
+
 		// 30 miles from the line: a 25 mile search stays in its division, a 50 mile search reaches over the line.
 		it('adds the division across a border only when the radius reaches it', () => {
 			expect(selectRegionFiles({ place: point, radiusMiles: 25 }, EXTENTS)).toEqual([
@@ -141,10 +165,11 @@ describe('selectRegionFiles', () => {
 		});
 
 		// Alaska's box wraps the date line: west 172, east -130 means "from 172 east to 130 west".
+		// A radius is given because a state with no radius skips the boxes altogether.
 		it('finds a point on either side of the 180th meridian in a box that crosses it', () => {
 			for (const lo of [175, -175, 180, -135]) {
 				const place = { kind: 'point', la: 60, lo, state: 'TX' } as const;
-				expect(selectRegionFiles({ place }, EXTENTS)).toEqual([
+				expect(selectRegionFiles({ place, radiusMiles: 25 }, EXTENTS)).toEqual([
 					'west-south-central',
 					'pacific',
 					...FIXED,
@@ -156,7 +181,7 @@ describe('selectRegionFiles', () => {
 		it('does not put a point outside a box that crosses the 180th meridian inside it', () => {
 			for (const lo of [0, -120, 100, 170]) {
 				const place = { kind: 'point', la: 60, lo, state: 'TX' } as const;
-				expect(selectRegionFiles({ place }, EXTENTS)).toEqual([
+				expect(selectRegionFiles({ place, radiusMiles: 25 }, EXTENTS)).toEqual([
 					'west-south-central',
 					...FIXED,
 					'unknown'

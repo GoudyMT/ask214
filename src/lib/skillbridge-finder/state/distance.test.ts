@@ -18,14 +18,21 @@ describe('placePoint', () => {
 	const zips: ZipsTable = {
 		v: 1,
 		rows: [
-			['21046', 39.2, -76.86],
-			['00901', 18.46, -66.1]
+			['21046', 'MD', 39.2, -76.86],
+			['00901', 'PR', 18.46, -66.1]
 		]
 	};
-	it('gives a ZIP the point of its own row', () => {
+	// The state rides with the point so the file choice can place the person by their ZIP's own state.
+	it('gives a ZIP the state and point of its own row', () => {
 		expect(placePoint({ kind: 'zip', zip: '21046' }, zips)).toEqual({
+			state: 'MD',
 			la: 39.2,
 			lo: -76.86
+		});
+		expect(placePoint({ kind: 'zip', zip: '00901' }, zips)).toEqual({
+			state: 'PR',
+			la: 18.46,
+			lo: -66.1
 		});
 	});
 

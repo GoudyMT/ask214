@@ -31,12 +31,12 @@ export function milesBetween(a: Point, b: Point): number {
 
 /**
  * The point a place stands for, or null when it has none: a state alone has no centre, and a table or row that
- * is missing gives nothing to measure from.
+ * is missing gives nothing to measure from. A ZIP's point carries its state, which places the person exactly.
  */
-export function placePoint(place: Place, zips?: ZipsTable): Point | null {
+export function placePoint(place: Place, zips?: ZipsTable): (Point & { state: StateCode }) | null {
 	if (place.kind === 'zip') {
 		const row = zips?.rows.find((r) => r[0] === place.zip);
-		return row === undefined ? null : { la: row[1], lo: row[2] };
+		return row === undefined ? null : { state: row[1], la: row[2], lo: row[3] };
 	}
 	return null;
 }

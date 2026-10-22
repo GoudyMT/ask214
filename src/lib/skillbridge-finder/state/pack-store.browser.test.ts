@@ -65,7 +65,7 @@ const changesFile = (pull: string): ChangesFile => ({
 	weeks: [{ pullDate: pull, added: [1001], removed: [], newOrgs: [] }]
 });
 
-const zips: ZipsTable = { v: 1, rows: [['21046', 39.2, -76.86]] };
+const zips: ZipsTable = { v: 1, rows: [['21046', 'MD', 39.2, -76.86]] };
 
 /** A complete swap for one week: a region file per name, in the order given, with ids and changes. */
 function week(pull: string, names: RegionFileName[], withExtras = true) {
@@ -415,7 +415,7 @@ describe('finder pack store', () => {
 			expect(await store.readTable('zips')).toEqual(zips);
 
 			await expect(
-				store.putTable('zips', { v: 1, rows: [['2104', 1, 1]] } as ZipsTable)
+				store.putTable('zips', { v: 1, rows: [['2104', 'MD', 1, 1]] } as ZipsTable)
 			).rejects.toThrow('E_FINDER_PACK_BAD_INPUT');
 			expect(await store.readTable('zips')).toEqual(zips);
 			expect(await store.readTable('crosswalk')).toBeUndefined();

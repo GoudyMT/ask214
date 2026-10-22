@@ -268,7 +268,7 @@ async function fillPack() {
 		])
 	});
 	await pack.markOpened([1001]);
-	await pack.putTable('zips', { v: 1, rows: [['21046', 39.2, -76.86]] });
+	await pack.putTable('zips', { v: 1, rows: [['21046', 'MD', 39.2, -76.86]] });
 }
 
 const packRows = () =>

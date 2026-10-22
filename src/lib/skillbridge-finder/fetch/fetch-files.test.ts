@@ -284,7 +284,7 @@ describe('fetchRegionFiles', () => {
 
 describe('fetchDataFile', () => {
 	const ids = { v: 1, pullDate: PULL, ids: [[1001, '2026-10-14']], aliases: [] };
-	const zips = { v: 1, rows: [['21046', 39.2, -76.86]] };
+	const zips = { v: 1, rows: [['21046', 'MD', 39.2, -76.86]] };
 	const crosswalk = {
 		v: 1,
 		rows: [['91B', 'Army', '49-3023.00', 'Automotive Service Technicians and Mechanics']]
@@ -325,7 +325,7 @@ describe('fetchWeekFile', () => {
 		v: 1,
 		weeks: [{ pullDate: PULL, added: [1], removed: [], newOrgs: [] }]
 	};
-	const zips = { v: 1, rows: [['21046', 39.2, -76.86]] };
+	const zips = { v: 1, rows: [['21046', 'MD', 39.2, -76.86]] };
 	const index = indexOf(['pacific']);
 	const idsPath = `/skillbridge-data/w/${PULL}/ids.json`;
 	const changesPath = `/skillbridge-data/w/${PULL}/changes.json`;

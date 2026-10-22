@@ -69,7 +69,11 @@ export function selectRegionFiles(input: SelectInput, extents: StateExtents): Re
 	} else {
 		chosen.add('unknown');
 		if (place.kind === 'state') addState(place.state);
-		else {
+		else if (place.state !== undefined && input.radiusMiles === undefined) {
+			// A ZIP's own state places it exactly. Box overlap with no radius could add divisions the person is
+			// not in, and the set of files requested would then narrow their place more than one division does.
+			addState(place.state);
+		} else {
 			if (place.state) addState(place.state);
 			const { la, lo } = place;
 			// 'any' covers every division and also keeps what the point's own box selects (a territory has

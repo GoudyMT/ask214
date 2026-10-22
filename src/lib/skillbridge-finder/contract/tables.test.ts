@@ -12,12 +12,13 @@ const codes = (r: { errors: { code: string }[] }) => r.errors.map((e) => e.code)
 describe('validateZips', () => {
 	const zips = (rows: unknown[]) => ({ v: 1, rows });
 
-	it('accepts five-digit ZIPs with a state and a point, including a leading zero', () => {
+	it('accepts five-digit ZIPs with a state and a point, including a leading zero and a territory', () => {
 		expect(
 			validateZips(
 				zips([
 					['21046', 'MD', 39.2, -76.86],
-					['02134', 'MA', 42.35, -71.13]
+					['02134', 'MA', 42.35, -71.13],
+					['00901', 'PR', 18.46, -66.1]
 				])
 			)
 		).toEqual({ valid: true, errors: [] });
@@ -34,7 +35,8 @@ describe('validateZips', () => {
 		[['21046', 'MD', 39.2], 'E_SBF_BAD_ROW'],
 		[['21046', 'ZZ', 39.2, -76.86], 'E_SBF_BAD_ENUM'],
 		[['21046', 'OS', 39.2, -76.86], 'E_SBF_BAD_ENUM'],
-		[['21046', 'Maryland', 39.2, -76.86], 'E_SBF_BAD_ENUM']
+		[['21046', 'Maryland', 39.2, -76.86], 'E_SBF_BAD_ENUM'],
+		[['21046', 'XX', 39.2, -76.86], 'E_SBF_BAD_ENUM']
 	])('refuses the row %j', (row, code) => {
 		expect(codes(validateZips(zips([row])))).toEqual([code]);
 	});
