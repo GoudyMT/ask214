@@ -419,6 +419,22 @@ describe('writeDeployTree', () => {
 		expect(firstRemoveOfOldWeek).toBeGreaterThan(swap);
 	});
 
+	// The pull date builds the folder paths that get removed, so a value that is not a date (a hand-built or
+	// damaged week) must never reach them: one such value once pointed the removal at the whole data folder.
+	it.each([['..'], ['2026-10-21/..'], ['../../x']])(
+		'refuses a pull date of %s before touching anything',
+		(bad) => {
+			const mem = memoryFs();
+			writeDeployTree(ROOT, weekFor(PULL_DATE), mem.fs);
+			mem.calls.length = 0;
+			const good = weekFor(PULL_DATE);
+			const forged: BuiltWeek = { ...good, index: { ...good.index, pullDate: bad } };
+			expect(() => writeDeployTree(ROOT, forged, mem.fs)).toThrow('E_BAD_DATE');
+			expect(mem.calls).toEqual([]);
+			expect(mem.fs.exists(`${W}/${PULL_DATE}`)).toBe(true);
+		}
+	);
+
 	it('writes nothing when the week has errors', () => {
 		const mem = memoryFs();
 		const bad = buildWeek(input({ published: [listing(1, { n: 'Example <b>Markup</b>' })] }));

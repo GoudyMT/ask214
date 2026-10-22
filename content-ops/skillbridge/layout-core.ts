@@ -194,10 +194,16 @@ export const nodeTreeFs: TreeFs = {
 const TRAILING_SEPARATORS = /[\\/]+$/;
 const SEPARATOR = /[\\/]/;
 
-/** Removal is by a name that is a date and sits directly in the weeks folder; anything else is a bug, not a prune. */
+const TEMPORARY_SUFFIX = '.tmp';
+
+/**
+ * Removal is only of a dated folder, or its temporary twin, sitting directly in the weeks folder; anything else
+ * is a bug, not a prune.
+ */
 function assertDirectChild(weeksDir: string, path: string): void {
 	const name = path.startsWith(`${weeksDir}/`) ? path.slice(weeksDir.length + 1) : '';
-	if (!isIsoDate(name) || SEPARATOR.test(name)) throw new Error('E_UNSAFE_PRUNE');
+	const stem = name.endsWith(TEMPORARY_SUFFIX) ? name.slice(0, -TEMPORARY_SUFFIX.length) : name;
+	if (!isIsoDate(stem) || SEPARATOR.test(name)) throw new Error('E_UNSAFE_PRUNE');
 }
 
 /**
@@ -211,22 +217,26 @@ export function writeDeployTree(
 	fs: TreeFs
 ): { pruned: string[]; kept: string[]; ignored: string[] } {
 	if (week.errors.length > 0) throw new Error('E_WEEK_HAS_ERRORS');
+	// The pull date names folders that are removed below, so it is checked before anything is written.
+	const pullDate = week.index.pullDate;
+	if (!isIsoDate(pullDate)) throw new Error('E_BAD_DATE');
 
 	const root = deployRoot.replace(TRAILING_SEPARATORS, '');
 	const at = (relative: string) => `${root}/${relative}`;
 	const parentOf = (path: string) => path.slice(0, path.lastIndexOf('/'));
-	const pullDate = week.index.pullDate;
 	const weeksDir = at(`${DEPLOY_DATA_DIR}/w`);
 	const datedPrefix = `${DEPLOY_DATA_DIR}/w/${pullDate}/`;
 	const indexPath = `${DEPLOY_DATA_DIR}/index.json`;
+	const tmpDir = `${weeksDir}/${pullDate}${TEMPORARY_SUFFIX}`;
+	const finalDir = `${weeksDir}/${pullDate}`;
+	assertDirectChild(weeksDir, tmpDir);
+	assertDirectChild(weeksDir, finalDir);
 
 	fs.mkdir(root);
 	for (const file of week.files.filter((f) => f.path === '_headers'))
 		fs.writeFile(at(file.path), file.body);
 
 	// A leftover temporary folder of this very date is a run that died part-way: start it afresh.
-	const tmpDir = `${weeksDir}/${pullDate}.tmp`;
-	const finalDir = `${weeksDir}/${pullDate}`;
 	if (fs.exists(tmpDir)) fs.removeDir(tmpDir);
 	fs.mkdir(tmpDir);
 	for (const file of week.files.filter((f) => f.path.startsWith(datedPrefix)))
