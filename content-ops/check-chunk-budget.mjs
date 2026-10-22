@@ -402,6 +402,12 @@ const STATIC = 'static';
 //     kept on screen and unflagged, and a header menu that wraps instead of scrolling sideways. Three builds measured
 //     root layout 8,568-8,569 B and precache 222,440-222,456 B, about 40 B of room above the highest. Trim pass first:
 //     the focused control measured in one place and the bar looked up once (about -20 B), kept.
+//     Page 90,300 -> 94,820, precache 218,860 -> 223,360 and precache files 68 -> 69 (owner's call, 2026-10-22): the
+//     SkillBridge finder's record in the encrypted backup. The backup chunk grew 24,489 -> 28,789 B gzip: the finder
+//     record's field-by-field check and the listing validator it reuses for each saved program. The extra file is the
+//     timeline store, which the bundler now splits into a chunk of its own (1,256 B). Three builds measured page
+//     94,763-94,771 B, precache 223,291-223,317 B, 69 files, at least 43 B of room above the highest. Trim pass:
+//     the growth is validation code, which a trim does not touch.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
