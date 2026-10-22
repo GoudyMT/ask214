@@ -131,6 +131,20 @@ describe('the root layout navigation', () => {
 			.toBe(true);
 	});
 
+	// A phone on its side is 481 to 599 px wide: the narrow-phone footer rule does not apply there, so the room the
+	// footer keeps for the bar has to come from the rule for every phone width.
+	it('keeps the last footer link above the bar at the bottom of the page at 568x320', async () => {
+		await openAt(568, 320);
+		const last = [...document.querySelectorAll<HTMLAnchorElement>('footer a')].at(
+			-1
+		) as HTMLElement;
+		const bar = document.querySelector('.bottom-bar') as HTMLElement;
+		window.scrollTo(0, document.documentElement.scrollHeight);
+		await expect
+			.poll(() => last.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top)
+			.toBe(true);
+	});
+
 	// WebKit leaves a focused control that is already inside the window where it is, even with part of it under the
 	// bar (the question field on a short screen). A focus that does not scroll stands in for that engine here.
 	it('moves a focused control clear of the bar when the browser does not scroll to it at 320 px', async () => {

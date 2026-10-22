@@ -118,6 +118,17 @@ describe('the phone header while the page scrolls', () => {
 		expect(flagOnRoot()).toBe(false);
 	});
 
+	// The bar is gone from 600 px, and the header's menu is the only menu: the header hides only where the bar shows, so
+	// at exactly 600 px it stays however far the page is scrolled.
+	it('does not hide at exactly 600 px, where the bar is gone', async () => {
+		await openAt(600, 800);
+		window.scrollTo(0, 200);
+		await expect.poll(() => window.scrollY).toBe(200);
+		await frames();
+		expect(isHidden()).toBe(false);
+		expect(flagOnRoot()).toBe(false);
+	});
+
 	// Someone who asked their device for less motion gets the header gone and back with no slide.
 	it('slides in 200 ms, and not at all when reduced motion is on', async () => {
 		await openAt(320, 568);
