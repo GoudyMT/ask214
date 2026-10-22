@@ -27,8 +27,9 @@ describe('nextHeaderState', () => {
 	});
 
 	// Whatever state it was in, the top of the page (or the pull past it that phones allow) has the header in place; the
-	// 4 px up rule alone would leave it hidden when the last move to the top is shorter than that.
-	it.each([0, -8])('shows the header when the page reaches %s', (y) => {
+	// 4 px up rule alone would leave it hidden when the last move to the top is shorter than that. From 2 px, the moves
+	// to 0 and to -1 are 2 px and 3 px up: only the top-of-page rule can show the header.
+	it.each([0, -1])('shows the header when the page reaches %s', (y) => {
 		const hiddenNearTop = { hidden: true, lastY: 2, anchorY: 2, dir: 1 as const };
 		expect(nextHeaderState(hiddenNearTop, y).hidden).toBe(false);
 	});
