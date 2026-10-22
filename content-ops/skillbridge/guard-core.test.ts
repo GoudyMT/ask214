@@ -228,6 +228,34 @@ describe('checkConfig', () => {
 	])('refuses %s as unparseable', (_name, config) => {
 		expect(checkConfig(CONFIG, makeDeps({ config }).deps)).toEqual(['E_CONFIG_PARSE']);
 	});
+
+	// The shared comment stripper ends a // comment only at a line feed, but wrangler's own parser ends it at a
+	// carriage return too, so text after a lone CR is a comment to the guard and live config to wrangler.
+	const CR = String.fromCharCode(13);
+	const hidden = (): string =>
+		committedConfig
+			.replaceAll('\r\n', '\n')
+			.replace(
+				'"preview_urls": false',
+				`"preview_urls": false, // weekly data${CR}  "main": "src/x.js", ` +
+					'"routes": [{ "pattern": "ask214.com/*", "zone_name": "ask214.com" }], ' +
+					'"kv_namespaces": [{ "binding": "KV", "id": "x" }]'
+			);
+
+	it('refuses a config that hides keys after a lone carriage return in a comment', () => {
+		expect(hidden()).toContain('"main"');
+		expect(checkConfig(CONFIG, makeDeps({ config: hidden() }).deps)).toEqual(['E_CONFIG_PARSE']);
+	});
+
+	it('refuses a lone carriage return anywhere, even outside a comment', () => {
+		const config = committedConfig.replaceAll('\r\n', '\n').replace('"name"', `${CR}"name"`);
+		expect(checkConfig(CONFIG, makeDeps({ config }).deps)).toEqual(['E_CONFIG_PARSE']);
+	});
+
+	it('still accepts the committed config with Windows line ends', () => {
+		const config = committedConfig.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n');
+		expect(checkConfig(CONFIG, makeDeps({ config }).deps)).toEqual([]);
+	});
 });
 
 describe('guardAndDeploy: where it runs', () => {
