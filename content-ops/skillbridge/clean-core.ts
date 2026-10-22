@@ -287,6 +287,17 @@ function isRole(item: string): boolean {
 
 const WORD_RE = /\p{L}+/gu;
 
+// Line feed, carriage return, and the Unicode line and paragraph separators.
+const LINE_BREAKS: ReadonlySet<string> = new Set(
+	[0x0a, 0x0d, 0x2028, 0x2029].map((code) => String.fromCharCode(code))
+);
+
+function lineBreaksToCommas(text: string): string {
+	let out = '';
+	for (const char of text) out += LINE_BREAKS.has(char) ? ',' : char;
+	return out;
+}
+
 /** What a role needs in common with the contact's name to be read as the name; tested only, never published. */
 type ContactName = { words: ReadonlySet<string>; pairs: ReadonlySet<string> };
 
@@ -321,7 +332,7 @@ function namesContact(item: string, name: ContactName): boolean {
 
 function cleanRoles(value: unknown, contact: unknown, drops: string[]): string[] | undefined {
 	// A line break separates roles as a comma does; scrub would otherwise run the lines together.
-	const whole = scrub(typeof value === 'string' ? value.replace(/[\r\n]+/g, ',') : value);
+	const whole = scrub(typeof value === 'string' ? lineBreaksToCommas(value) : value);
 	if (whole === '') return undefined;
 	const split = splitOutsideParentheses(whole);
 	const items = (split ?? []).map(scrub).filter((item) => item !== '');
@@ -416,6 +427,8 @@ function cleanCodes(value: unknown, drops: string[]): string[] | 'all' | undefin
 }
 
 const IPV4_HOST_RE = /^\d+(?:\.\d+){3}$/;
+// Names that only resolve inside a private network.
+const PRIVATE_SUFFIXES = ['.local', '.lan', '.internal', '.home', '.localdomain', '.home.arpa'];
 
 /** The page address in its normalized form (lower-case host, punycode for an international one), or undefined. */
 function httpsLink(piece: string): string | undefined {
@@ -433,7 +446,8 @@ function httpsLink(piece: string): string | undefined {
 			// rewritten short and hexadecimal IPv4 forms to dotted decimal.
 			hostname.includes('.') &&
 			!hostname.startsWith('[') &&
-			!IPV4_HOST_RE.test(hostname);
+			!IPV4_HOST_RE.test(hostname) &&
+			!PRIVATE_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
 		return ok && url.href.length <= CAPS.url && isSafeText(url.href) ? url.href : undefined;
 	} catch {
 		return undefined;

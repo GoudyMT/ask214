@@ -555,6 +555,15 @@ describe('roles, industries and occupation codes', () => {
 	});
 
 	// A provider sometimes types "Ask for <contact>" where the roles go; the contact's name must not be published.
+	it('reads the Unicode line and paragraph separators between roles as line breaks', () => {
+		const separators = String.fromCharCode(0x2028) + 'Inspector' + String.fromCharCode(0x2029);
+		expect(only({ jobDescription: 'Field Technician' + separators + 'Welder' }).r).toEqual([
+			'Field Technician',
+			'Inspector',
+			'Welder'
+		]);
+	});
+
 	// The name is dropped when two of its words stand together, or one stands right after "ask for", "contact",
 	// "call" or "email".
 	it.each([
@@ -682,7 +691,13 @@ describe('contacts', () => {
 		'https://2130706433/apply',
 		'https://[2001:db8::1]/apply',
 		'https://intranet/apply',
-		'https://localhost/apply'
+		'https://localhost/apply',
+		'https://printer.local/apply',
+		'https://forms.corp.lan/apply',
+		'https://hr.internal/apply',
+		'https://forms.home/apply',
+		'https://hr.localdomain/apply',
+		'https://forms.home.arpa/apply'
 	])('drops the link %j', (employerPocEmail) => {
 		const out = clean([rawListing({ employerPocEmail })]);
 		expect(out.listings[0]).not.toHaveProperty('e');
