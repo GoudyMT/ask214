@@ -52,6 +52,7 @@
 					type="button"
 					class="phase-chips__chip"
 					class:phase-chips__chip--active={activeId === chip.id}
+					aria-current={activeId === chip.id ? 'true' : undefined}
 					onclick={() => jumpTo(chip.id)}
 				>
 					{chip.label} <span class="phase-chips__count">{chip.count}</span>

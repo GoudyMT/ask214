@@ -125,6 +125,23 @@ describe('PhaseChips', () => {
 		}
 	});
 
+	// The look of the in-view phase is not heard by a screen reader: the chip also says it is the current item of the set.
+	it('marks only the in-view phase chip as current, for a screen reader', async () => {
+		const section = document.createElement('section');
+		section.id = 'phase-final-90';
+		section.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100vh';
+		document.body.appendChild(section);
+		try {
+			const { container } = await render(PhaseChips, { props: { view: VIEW } });
+			const chips = [...container.querySelectorAll<HTMLElement>('button.phase-chips__chip')];
+			await expect
+				.poll(() => chips.map((c) => c.getAttribute('aria-current')))
+				.toEqual([null, 'true']);
+		} finally {
+			section.remove();
+		}
+	});
+
 	// Forced colors drop the fill and the border colour that mark the in-view phase, so there a 3 px border in the system
 	// highlight colour marks it, and no chip changes size; the normal look has no such ring. Component tests run without
 	// app.css, so the border colour token is set here (the chips then have their 1 px border) and removed.
