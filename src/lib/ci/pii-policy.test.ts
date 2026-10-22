@@ -116,18 +116,22 @@ describe('pii-policy: server source must not reference ProfileV1 PII fields', ()
 		}
 	);
 
-	// The finder keeps where a person is looking, their saved programs and their filters; none of it may be named in
-	// code that can send a request off the device.
-	it.each(['finderSetup', 'finderFilters', 'finderSaved', 'finderCompare'])(
-		'flags the SkillBridge finder record %s in an online-path file',
-		(field) => {
-			const violations = scanForPiiTokens([
-				{ path: 'src/lib/ask/online/x.ts', content: `const v = finder.${field};` }
-			]);
-			expect(violations).toHaveLength(1);
-			expect(violations[0]?.token).toBe(`\\.${field}\\b`);
-		}
-	);
+	// The finder keeps where a person is looking, their saved programs, their filters and which listings they have
+	// opened; none of it may be named in code that can send a request off the device.
+	it.each([
+		'finderSetup',
+		'finderFilters',
+		'finderSaved',
+		'finderCompare',
+		'finderSeen',
+		'finderLastSeenPull'
+	])('flags the SkillBridge finder record %s in an online-path file', (field) => {
+		const violations = scanForPiiTokens([
+			{ path: 'src/lib/ask/online/x.ts', content: `const v = finder.${field};` }
+		]);
+		expect(violations).toHaveLength(1);
+		expect(violations[0]?.token).toBe(`\\.${field}\\b`);
+	});
 
 	it('does not flag clean server code', () => {
 		const violations = scanForPiiTokens([
