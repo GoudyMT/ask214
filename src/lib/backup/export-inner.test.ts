@@ -214,8 +214,13 @@ describe('buildExportInner: what a person exports', () => {
 
 	// A restore of an older file, or a person who took every pick away, leaves an empty record at a high generation. The
 	// file made from it must be the one an older app opens, as for a device that never used the finder.
-	it('a finder record that holds nothing exports no finder key', () => {
-		const empty: FinderRecord = { schemaVersion: 1, finderSaved: [], finderCompare: [] };
+	// A place or a filter set that was set and then cleared stays in the store as an empty object, which is no data either.
+	it.each([
+		['nothing at all', {}],
+		['a setup that was emptied', { finderSetup: {} }],
+		['filters that were emptied', { finderFilters: {} }]
+	])('a finder record that holds %s exports no finder key', (_name, extra) => {
+		const empty: FinderRecord = { schemaVersion: 1, finderSaved: [], finderCompare: [], ...extra };
 		const stores = storesOf(
 			exported(
 				snapshot({ finder: empty, gens: { profile: 4, timeline: 0, calendar: 0, finder: 5 } })

@@ -28,7 +28,7 @@ import { createTimelineStateStore, type TimelineStateStore } from '../timeline/s
 import { decodeTimelineState } from '../timeline/state-codec';
 import { TASK_DEFS } from '../timeline/task-defs';
 import type { TimelineState } from '../timeline/types';
-import { buildExportInner } from './export-inner';
+import { buildExportInner, holdsData } from './export-inner';
 import { MAX_NOTE_UNITS } from './note-cap';
 import { takeSnapshot, type Snapshot } from './snapshot';
 import { validateInner } from './validate';
@@ -684,8 +684,8 @@ async function exportAndReadBack(db: IDBDatabase, ctx: Ctx, member: Member) {
 		expect(profile).toStrictEqual(withoutBackupMark(snap.profile));
 		expect(timeline).toStrictEqual(snap.timeline);
 		expect(calendar).toStrictEqual(snap.calendar && withoutDeviceOnly(snap.calendar));
-		// A store with no record exports no key, so a member that never touched the finder reads back null.
-		expect(finder).toStrictEqual(snap.finder);
+		// A store with no record, or one whose answers were all cleared, exports no key and reads back null.
+		expect(finder).toStrictEqual(snap.finder && holdsData(snap.finder) ? snap.finder : null);
 		member.holds?.({ snap, file: { profile, timeline, calendar, finder }, ctx });
 	} finally {
 		for (const record of toWipe) zeroizeRecord(record);

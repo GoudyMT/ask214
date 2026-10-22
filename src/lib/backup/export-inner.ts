@@ -110,11 +110,11 @@ function fileFilters(filters: FinderFilters): FinderFilters {
 	};
 }
 
-const holdsData = (finder: FinderRecord): boolean =>
+export const holdsData = (finder: FinderRecord): boolean =>
 	finder.finderSaved.length > 0 ||
 	finder.finderCompare.length > 0 ||
-	finder.finderSetup !== undefined ||
-	finder.finderFilters !== undefined;
+	Object.keys(finder.finderSetup ?? {}).length > 0 ||
+	Object.values(finder.finderFilters ?? {}).some((list) => list.length > 0);
 
 /**
  * Built field by field, never as a copy of the stored record: the store keeps any key a newer release added so an older
