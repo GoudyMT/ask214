@@ -106,6 +106,16 @@ describe('the root layout navigation', () => {
 		);
 	});
 
+	// Below 600 px the bar is the only menu: a keyboard user (400% zoom) reaches it right after the brand, as the desktop
+	// menu comes first in the header, instead of tabbing through the whole page.
+	it('reaches the bar right after the brand link with the Tab key at 320 px', async () => {
+		await openAt(320, 568);
+		(document.querySelector('header a.brand') as HTMLElement).focus({ preventScroll: true });
+		await userEvent.tab();
+		expect(document.activeElement).toBe(document.querySelector('.bottom-bar a'));
+		expect(document.activeElement?.textContent?.trim()).toBe('Home');
+	});
+
 	// WCAG 2.4.11: a focused control must not sit under the fixed bar. The footer is the last thing on every page.
 	it('keeps the last footer link above the bar when keyboard focus reaches it at 320 px', async () => {
 		await openAt(320, 568);

@@ -179,9 +179,10 @@ for (const route of ['/', '/more']) {
 			// key cannot reach the link there; focusing it scrolls it into view the same way.
 			await last.focus();
 		} else {
-			// The bar follows the footer in the page, so one step back from its first link is the footer's last link.
-			await page.locator(`${BAR} a`).first().focus();
-			await page.keyboard.press('Shift+Tab');
+			// The footer's last link is the last stop in the page: Tab from the one before it.
+			const footerLinks = page.getByRole('contentinfo').getByRole('link');
+			await footerLinks.nth((await footerLinks.count()) - 2).focus();
+			await page.keyboard.press('Tab');
 		}
 		await expect(last).toBeFocused();
 		await expectClearOfBar(page, last);

@@ -424,6 +424,10 @@
 		</div>
 	</header>
 
+	<!-- Fixed on screen, so its place in the page is free to be here: below 600px it is the only menu, so a keyboard user
+	     reaches it right after the brand (the desktop menu is in the header too), and "Skip to content" skips it. -->
+	<BottomBar />
+
 	{#if app.status === 'ready' && app.store?.clockBackward}
 		<ClockBackwardBanner onfix={() => void goto(resolve('/settings'))} />
 	{:else if app.status === 'error' || app.status === 'damaged'}
@@ -463,8 +467,6 @@
 			>
 		</p>
 	</footer>
-
-	<BottomBar />
 </AppGate>
 
 <style>
