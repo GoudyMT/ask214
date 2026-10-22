@@ -503,6 +503,16 @@ describe('runCheck: what counts as New', () => {
 		expect(out.week.added).toEqual([201, 203, 204]);
 	});
 
+	// The site's clock and ours can disagree; the app refuses a listing created after its own pull date.
+	it('publishes a creation date later than the pull as the pull date, and still as New', () => {
+		const out = crowd([cleanRow(204, { dc: '2026-10-25' })]);
+		expect(out.published.find((l) => l.i === 204)?.dc).toBe(PULL_DATE);
+		expect(out.week.added).toEqual([204]);
+		expect(Object.values(out.nextState.records).find((r) => r.listing.i === 204)?.listing.dc).toBe(
+			PULL_DATE
+		);
+	});
+
 	it('keeps the first-listed date of a listing already recorded, however recent its creation date', () => {
 		const ids = range(100);
 		const out = run({

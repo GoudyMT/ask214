@@ -133,7 +133,8 @@ export function runCheck(input: {
 			} else fl = state.baselineDate ?? pullDate;
 		}
 
-		const listing: Listing = { ...row, fl };
+		// The site's clock can run ahead of ours; a creation date after the pull would be refused by the app.
+		const listing: Listing = { ...row, dc: row.dc > pullDate ? pullDate : row.dc, fl };
 		const found = orgLinks.get(row.o);
 		if (found?.w !== undefined) listing.w = found.w;
 		if (found?.li !== undefined) listing.li = found.li;
