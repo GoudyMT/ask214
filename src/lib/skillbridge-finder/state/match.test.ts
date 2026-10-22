@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import type { Listing } from '../contract/listing';
+import type { Listing, RegionFile } from '../contract/listing';
 import { CLEAN_CASES, cleanListing } from '../fixtures/clean';
 import { milesBetween } from './distance';
-import { countInState, matchListings } from './match';
+import { countInState, matchListings, mergeRegionListings } from './match';
 
 const ORIGIN = { la: 0, lo: 0 };
 /** The latitude that is this many miles due north of the origin. */
@@ -186,6 +186,51 @@ describe('countInState', () => {
 		expect(countInState(rows, 'MD')).toBe(4);
 		expect(countInState(rows, 'VA')).toBe(2);
 		expect(countInState(rows, 'AK')).toBe(0);
+	});
+
+	// The list shows an online program in the remote tier whatever place it names, so a state's count cannot include it.
+	it('leaves out an online program even when it names the state', () => {
+		const online = cleanListing({ m: 2, s: 'MD', ls: ['MD'] });
+		expect(countInState([online], 'MD')).toBe(0);
+		expect(countInState([online, cleanListing({ i: 2, s: 'MD', ls: ['MD'] })], 'MD')).toBe(1);
+	});
+});
+
+describe('mergeRegionListings', () => {
+	const fileOf = (name: RegionFile['file'], listings: Listing[]): RegionFile => ({
+		v: 1,
+		pullDate: '2026-10-21',
+		file: name,
+		listings
+	});
+
+	// A program that names several states is written into every division it names, under one id.
+	it('keeps one copy of a listing that sits in several division files', () => {
+		const seven = near(7, 10, { ls: ['MD', 'PA'] });
+		const merged = mergeRegionListings([
+			fileOf('south-atlantic', [seven]),
+			fileOf('middle-atlantic', [{ ...seven }])
+		]);
+		expect(merged.map((l) => l.i)).toEqual([7]);
+	});
+
+	// Two different listings under one id mean a broken or hostile file; showing either would be a guess.
+	it('drops a listing whose copies differ, however many files agree with one of them', () => {
+		const seven = near(7, 10);
+		const merged = mergeRegionListings([
+			fileOf('south-atlantic', [seven, near(8, 10)]),
+			fileOf('middle-atlantic', [{ ...seven, n: 'Another Name' }]),
+			fileOf('pacific', [{ ...seven }])
+		]);
+		expect(merged.map((l) => l.i)).toEqual([8]);
+	});
+
+	it('keeps the order of first appearance across the files', () => {
+		const merged = mergeRegionListings([
+			fileOf('pacific', [near(3, 10), near(1, 10)]),
+			fileOf('mountain', [near(1, 10), near(2, 10)])
+		]);
+		expect(merged.map((l) => l.i)).toEqual([3, 1, 2]);
 	});
 });
 

@@ -1,4 +1,13 @@
-import type { Branch, Delivery, Duration, Industry, Kind, Listing } from '../contract/listing';
+import {
+	DELIVERY,
+	type Branch,
+	type Delivery,
+	type Duration,
+	type Industry,
+	type Kind,
+	type Listing,
+	type RegionFile
+} from '../contract/listing';
 import type { StateCode } from '../contract/places';
 import { milesBetween, placement, type Placement, type Point } from './distance';
 
@@ -81,8 +90,32 @@ export function matchListings(
 	return rows;
 }
 
-/** Listings whose own state is `state` or whose named states include it. */
+/**
+ * Every listing of the given region files once. Ids are unique only within one file, and a listing that names
+ * several states sits in every division it names, so the same id turns up more than once. Equal copies are one
+ * listing. Copies that differ mean a broken or hostile file: both are dropped, so the person loses one listing
+ * rather than see one that cannot be trusted. The order is that of first appearance.
+ */
+export function mergeRegionListings(files: Iterable<RegionFile>): Listing[] {
+	const first = new Map<number, { listing: Listing; text: string }>();
+	const conflicted = new Set<number>();
+	for (const file of files) {
+		for (const listing of file.listings) {
+			const text = JSON.stringify(listing);
+			const held = first.get(listing.i);
+			if (held === undefined) first.set(listing.i, { listing, text });
+			else if (held.text !== text) conflicted.add(listing.i);
+		}
+	}
+	return [...first.values()]
+		.filter(({ listing }) => !conflicted.has(listing.i))
+		.map((e) => e.listing);
+}
+
+/** Placed listings whose own state is `state` or whose named states include it; an online one has no place. */
 export function countInState(listings: readonly Listing[], state: StateCode): number {
-	return listings.filter((listing) => listing.s === state || listing.ls?.includes(state) === true)
-		.length;
+	return listings.filter(
+		(listing) =>
+			listing.m !== DELIVERY.remote && (listing.s === state || listing.ls?.includes(state) === true)
+	).length;
 }
