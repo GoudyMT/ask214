@@ -125,6 +125,45 @@ describe('PhaseChips', () => {
 		}
 	});
 
+	// Forced colors drop the fill and the border colour that mark the in-view phase, so there a 3 px border in the system
+	// highlight colour marks it, and no chip changes size; the normal look has no such ring. Component tests run without
+	// app.css, so the border colour token is set here (the chips then have their 1 px border) and removed.
+	it('marks the in-view phase by a 3 px border in forced colors only, with no chip changing size', async () => {
+		document.documentElement.style.setProperty('--color-border', '#2a313a');
+		// The phase's section is in the page behind the chips, across the band the scroll-spy watches.
+		const section = document.createElement('section');
+		section.id = 'phase-18-12';
+		section.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100vh';
+		document.body.appendChild(section);
+		const session = cdp();
+		try {
+			const { container } = await render(PhaseChips, { props: { view: VIEW } });
+			const chips = [...container.querySelectorAll<HTMLElement>('button.phase-chips__chip')];
+			await expect
+				.poll(() => chips.map((c) => c.classList.contains('phase-chips__chip--active')))
+				.toEqual([true, false]);
+			const borders = () => chips.map((c) => getComputedStyle(c).borderTopWidth);
+			const sizes = () =>
+				chips.map((c) => [c.getBoundingClientRect().width, c.getBoundingClientRect().height]);
+			expect(borders()).toEqual(['1px', '1px']);
+			const before = sizes();
+
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'active' }]
+			});
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			expect(borders()).toEqual(['3px', '1px']);
+			expect(sizes()).toEqual(before);
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+			section.remove();
+			document.documentElement.style.removeProperty('--color-border');
+		}
+		await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(false);
+	});
+
 	it('smooth-scrolls to a phase section when its chip is clicked', async () => {
 		// The <section id> lives in TimelineList (a sibling in the page); PhaseChips reaches it by id.
 		const section = document.createElement('section');

@@ -569,6 +569,43 @@ describe('SourceReader with a served document', () => {
 		expect(container.querySelector('.reader__text')?.hasAttribute('hidden')).toBe(true);
 	});
 
+	// Forced colors drop the accent fill that marks the chosen view, so there a 3 px border in the system highlight colour
+	// marks it, and neither button changes size; the normal look has no such ring.
+	it('marks the chosen view by a 3 px border in forced colors only, with no button changing size', async () => {
+		const session = cdp();
+		try {
+			const { container } = await render(SourceReader, {
+				props: { source: served(), highlightId: 's2', onClose: () => {}, pdfLoader: pendingLoader }
+			});
+			await vi.waitFor(() =>
+				expect(seg(container, 'Page')?.getAttribute('aria-pressed')).toBe('true')
+			);
+			const buttons = ['Page', 'Text'].map((label) => seg(container, label) as HTMLButtonElement);
+			const rings = () =>
+				buttons.map((b) =>
+					getComputedStyle(b).borderTopStyle === 'none'
+						? 'none'
+						: getComputedStyle(b).borderTopWidth
+				);
+			const sizes = () =>
+				buttons.map((b) => [b.getBoundingClientRect().width, b.getBoundingClientRect().height]);
+			expect(rings()).toEqual(['none', 'none']);
+			const before = sizes();
+
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'active' }]
+			});
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			expect(rings()).toEqual(['3px', 'none']);
+			expect(sizes()).toEqual(before);
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+		}
+		await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(false);
+	});
+
 	it('shows the text, with the cited passage focused, when the switch picks Text', async () => {
 		const { container } = await render(SourceReader, {
 			props: { source: served(), highlightId: 's2', onClose: () => {} }

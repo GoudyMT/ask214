@@ -130,6 +130,14 @@
 		color: var(--color-fg);
 		border-color: var(--color-accent);
 	}
+	/* Forced colors replace the fill and the border colour that mark the in-view phase, so there a 3px border in the
+	   system highlight colour marks it; the padding gives up the 2px the border grows by, so no chip changes size. */
+	@media (forced-colors: active) {
+		.phase-chips__chip--active {
+			border: 3px solid Highlight;
+			padding: 2px 9px;
+		}
+	}
 	.phase-chips__count {
 		margin-left: 2px;
 	}

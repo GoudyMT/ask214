@@ -460,6 +460,14 @@
 		color: var(--color-bg);
 		border-color: var(--color-accent);
 	}
+	/* As on the theme pills: forced colors drop the fill, so a 3px Highlight border marks the chosen mode, with the
+	   padding giving up the 2px the border grows by so the option keeps its size. */
+	@media (forced-colors: active) {
+		.ask-mode__opt[aria-pressed='true'] {
+			border: 3px solid Highlight;
+			padding: calc(var(--space-xs) - 2px) calc(var(--space-m) - 2px);
+		}
+	}
 	/* Frozen while a query is in flight (a mid-flight switch would mislabel the completing result). */
 	.ask-mode__opt:disabled,
 	.ask-reminder__set:disabled {

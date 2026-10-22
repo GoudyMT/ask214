@@ -754,6 +754,16 @@
 		background: var(--color-accent);
 		color: var(--color-bg);
 	}
+	/* As on the theme pills: forced colors drop the fill, so a 3px Highlight border marks the chosen view. The padding
+	   gives up those 3px so the button keeps its size, and the border is rounded like the pill so its ends are not
+	   clipped. */
+	@media (forced-colors: active) {
+		.seg button[aria-pressed='true'] {
+			border: 3px solid Highlight;
+			padding: 3px 12px;
+			border-radius: 999px;
+		}
+	}
 	.seg button:disabled {
 		opacity: 0.45;
 		cursor: default;
