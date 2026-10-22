@@ -1,7 +1,7 @@
 import '../../app.css';
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cdp, page } from 'vitest/browser';
+import { cdp, page, userEvent } from 'vitest/browser';
 import BottomBar from './BottomBar.svelte';
 
 // The bar reads the open page's path from the router; a test sets the path it wants before it renders.
@@ -97,6 +97,22 @@ describe('BottomBar on a 320 px phone', () => {
 			if (before) root.style.setProperty('--font-size-s', before);
 			else root.style.removeProperty('--font-size-s');
 		}
+	});
+
+	// The bar touches the left, right and bottom edges of the screen, so a focus ring drawn outside the tab would be cut
+	// off there: a keyboard user must see the whole ring.
+	it('draws the focus ring of the first tab inside the screen', async () => {
+		const { container } = await render(BottomBar);
+		await userEvent.tab();
+		const home = links(container)[0] as HTMLElement;
+		expect(document.activeElement).toBe(home);
+		expect(home.matches(':focus-visible')).toBe(true);
+		const rect = home.getBoundingClientRect();
+		const style = getComputedStyle(home);
+		const offset = parseFloat(style.outlineOffset);
+		const width = parseFloat(style.outlineWidth);
+		expect(rect.left - offset - width).toBeGreaterThanOrEqual(0);
+		expect(rect.bottom + offset + width).toBeLessThanOrEqual(window.innerHeight);
 	});
 
 	// The wizard owns no tab; Settings, Resources, Documents, Feedback and About are under More. A screen reader says

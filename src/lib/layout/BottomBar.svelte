@@ -111,6 +111,11 @@
 		line-height: 1.2;
 		text-decoration: none;
 	}
+	/* The bar touches the screen edges, so the ring is drawn inside the tab, as More's rows do. */
+	/* The bar touches the screen edges, so the ring is drawn inside the tab, as More's rows do. */
+	a:focus-visible {
+		outline-offset: -2px;
+	}
 	/* At a large text size a long label breaks inside its own column, centred like the single line. */
 	span {
 		overflow-wrap: anywhere;
