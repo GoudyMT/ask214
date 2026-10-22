@@ -34,6 +34,12 @@ describe('isInStateExtent', () => {
 		expect(isInStateExtent('AK', 13.47, 144.75)).toBe(false);
 	});
 
+	// Alaska reaches past 180 degrees west, but its box must not reach east across Asia and Europe.
+	it('finds an Alaska point with a flipped longitude outside Alaska', () => {
+		expect(isInStateExtent('AK', 61.2, 149.9)).toBe(false);
+		expect(isInStateExtent('AK', 61.2, -149.9)).toBe(true);
+	});
+
 	// A flipped longitude and the 0,0 default are the two wrong coordinates the listings really carry.
 	it('finds the flipped longitude and 0,0 in no state', () => {
 		for (const code of STATE_CODES) {

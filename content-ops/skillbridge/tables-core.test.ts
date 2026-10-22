@@ -375,6 +375,22 @@ describe('stateExtentsFromCounties', () => {
 		expect(stateExtentsFromCounties(signed)).toEqual(stateExtentsFromCounties(plain));
 	});
 
+	// Every area lies west of Greenwich except the western Aleutians, whose interior point is past 180 degrees
+	// west and so is written as a positive longitude. Read as written, it would stretch Alaska's box east across
+	// Asia and Europe; read as the same place west of Greenwich, the box stays over North America.
+	it('does not let a county written east of Greenwich stretch a box across the world', () => {
+		const extents = stateExtentsFromCounties(
+			file(
+				county('AK', '300000000', '0', '61.2', '-149.9'),
+				county('AK', '300000000', '0', '51.9', '+179.6')
+			)
+		);
+		const alaska = extents.AK as StateExtent;
+		expect(alaska[1]).toBe(-180);
+		expect(alaska[3]).toBeLessThan(-140);
+		expect(alaska[3]).toBeGreaterThan(-149.9);
+	});
+
 	it('clamps a box to the globe', () => {
 		const extents = stateExtentsFromCounties(
 			file(

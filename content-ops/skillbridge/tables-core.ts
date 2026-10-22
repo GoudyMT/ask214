@@ -256,7 +256,11 @@ export function stateExtentsFromCounties(text: string): Partial<Record<StateCode
 		const area =
 			toNumber(fields[index.ALAND] ?? '', line) + toNumber(fields[index.AWATER] ?? '', line);
 		const lat = toNumber(fields[index.INTPTLAT] ?? '', line);
-		const lon = toNumber(fields[index.INTPTLONG] ?? '', line);
+		const written = toNumber(fields[index.INTPTLONG] ?? '', line);
+		// Every area lies west of Greenwich; only the western Aleutians cross 180 degrees, and the file then
+		// writes their longitude as east. Read as the same place west of Greenwich, so a state's box does not
+		// run east across Asia and Europe to reach it.
+		const lon = written > 0 ? written - 360 : written;
 		const radiusKm = Math.sqrt(area / Math.PI) / 1000;
 		const padLat = (2 * radiusKm) / KM_PER_DEGREE;
 		const padLon = (2 * radiusKm) / (KM_PER_DEGREE * Math.cos((lat * Math.PI) / 180));

@@ -12,7 +12,7 @@ import type { StateCode } from './places';
 export type StateExtent = readonly [south: number, west: number, north: number, east: number];
 
 export const STATE_EXTENTS: Readonly<Partial<Record<StateCode, StateExtent>>> = {
-	AK: [49.91, -170.73, 74.58, 180],
+	AK: [49.91, -180, 74.58, -128.68],
 	AL: [29.82, -89.07, 35.45, -84.59],
 	AR: [32.53, -94.96, 36.93, -89.33],
 	AZ: [30.45, -116.19, 38.16, -107.27],
