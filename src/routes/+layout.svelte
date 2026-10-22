@@ -363,6 +363,8 @@
 		const onPageFocus = (event: FocusEvent) => {
 			const bar = document.querySelector('.bottom-bar');
 			if (!bar || !(event.target instanceof Element) || bar.contains(event.target)) return;
+			// A modal dialog sits above the bar, and the page behind it must hold still.
+			if (event.target.closest('dialog[open]')) return;
 			const overlap = event.target.getBoundingClientRect().bottom - bar.getBoundingClientRect().top;
 			if (overlap > 0) window.scrollBy(0, overlap);
 		};

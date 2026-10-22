@@ -141,4 +141,25 @@ describe('the root layout navigation', () => {
 		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
 		expect(window.scrollY).toBe(300);
 	});
+
+	// The source reader is a modal dialog above the bar and focuses its cited passage on open: the page behind the
+	// backdrop must hold still, or it scrolls and the header hides under the reader.
+	it('leaves the page where it is when focus moves inside an open dialog at 390 px', async () => {
+		await openAt(390, 844);
+		window.scrollTo(0, 300);
+		await expect.poll(() => window.scrollY).toBe(300);
+		const dialog = document.createElement('dialog');
+		dialog.innerHTML =
+			'<div style="max-height: 60vh; overflow-y: auto"><div style="height: 1500px"></div><p tabindex="-1">cited</p></div>';
+		document.body.appendChild(dialog);
+		try {
+			dialog.showModal();
+			(dialog.querySelector('p') as HTMLElement).focus({ preventScroll: true });
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			expect(window.scrollY).toBe(300);
+		} finally {
+			dialog.close();
+			dialog.remove();
+		}
+	});
 });
