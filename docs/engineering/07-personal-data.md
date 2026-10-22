@@ -12,7 +12,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 
 | Layer      | Tool                        | Version  | Purpose                                 |
 | ---------- | --------------------------- | -------- | --------------------------------------- |
-| Storage    | IndexedDB, raw API          | spec     | Eight single-row stores                 |
+| Storage    | IndexedDB, raw API          | spec     | Eleven stores                           |
 | Encryption | Web Crypto, AES-GCM 256     | spec     | Every personal record                   |
 | Integrity  | Web Crypto, HMAC-SHA-256    | spec     | Signs the key record and rollback marks |
 | Keys       | Non-extractable `CryptoKey` | spec     | Made on the device, never exportable    |
@@ -29,9 +29,11 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 **What it is.** The profile holds the separation date (EAOS) and, optionally, rate, rank, years of service,
 anticipated disability rating, family status, intended path, destination, special situations, and SkillBridge
 and terminal leave start dates. Beside it are the timeline's task statuses, snooze dates and notes, among them
-the answer to the SkillBridge question, the calendar choices, and the optional API key. Each lives as
-ciphertext in its own single-row IndexedDB store; three more stores hold signed rollback marks and one holds the
-keys, eight in all. Pages that show personal data render only in the browser, and a CI test fails if any server
+the answer to the SkillBridge question, the calendar choices, the SkillBridge finder's answers (a ZIP or a state,
+filters), saved programs and compare picks, and the optional API key. Each lives as ciphertext in its own
+single-row IndexedDB store; four more stores hold signed rollback marks and one holds the keys. The finder's
+downloaded listings, its seen programs and its last-seen week sit in one more store, encrypted one row per file
+and kept on this device only: eleven stores in all. Pages that show personal data render only in the browser, and a CI test fails if any server
 file names a profile field.
 
 **Why this project uses it.** With no server copy, there is nothing to breach, sell or hand over.
@@ -73,7 +75,8 @@ through one sink that refuses error objects and keeps 64 entries in memory only;
 error.
 
 **Tradeoffs accepted.** Without a passphrase, Unlock is one tap: the lock clears the screen, it is not access
-control. Timeline notes and the calendar record are not overwritten in memory like the profile.
+control. Timeline notes, the calendar record and the finder's place and saved programs are not overwritten in
+memory like the profile: plain strings cannot be zeroized, so a lock drops the reference.
 
 ---
 

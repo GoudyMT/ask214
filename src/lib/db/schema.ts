@@ -19,7 +19,7 @@
  *                         (the files are public and re-downloadable)
  *
  * Raw IndexedDB (no Dexie) honors the v2 audit "0 new prod deps" lock; the schema
- * is trivial (single-row stores, no indexes/queries) so a library adds no value.
+ * is trivial (single-row stores and one keyed by file name, no indexes/queries) so a library adds no value.
  */
 export const DB_NAME = 'mtc';
 // Fix forward only: never roll the deployed app back past a version that raised this. An older bundle cannot open the
