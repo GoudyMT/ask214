@@ -544,6 +544,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		/* At a large text size the brand and the menu wrap onto lines of their own instead of scrolling the page sideways. */
+		flex-wrap: wrap;
+		row-gap: var(--space-xs);
 		max-width: var(--shell-width, 720px);
 		margin: 0 auto;
 	}
@@ -556,6 +559,7 @@
 		padding: 0;
 		margin: 0;
 		display: flex;
+		flex-wrap: wrap;
 		gap: var(--space-m);
 	}
 

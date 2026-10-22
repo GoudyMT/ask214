@@ -296,6 +296,31 @@ describe('the root layout navigation', () => {
 		}
 	});
 
+	// From 600 px the header carries the menu: at 200 % text the brand and the four links no longer fit one line, so the
+	// row must wrap instead of pushing the page sideways.
+	it('does not scroll sideways at 600 px with text at 200 %', async () => {
+		const root = document.documentElement;
+		root.style.setProperty('--font-size-base', '32px');
+		try {
+			await openAt(600, 600);
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+		} finally {
+			root.style.removeProperty('--font-size-base');
+		}
+	});
+
+	// Wrapping is only for when the line is full: at normal text the header is one line, 57 px tall, as before.
+	it.each([600, 1280])(
+		'keeps the header one line, 57 px tall at %i px and normal text',
+		async (width) => {
+			await openAt(width, 800);
+			expect((document.querySelector('header') as HTMLElement).getBoundingClientRect().height).toBe(
+				57
+			);
+		}
+	);
+
 	// With the header slid away, Shift+Tab from the bar's first tab reaches the brand: the browser would scroll the page
 	// up to an off-screen brand, so the header that holds focus must be in place before it looks, and the page stays.
 	it('keeps the page still when Shift+Tab reaches the brand in the hidden header at 320x640', async () => {
