@@ -130,6 +130,11 @@ export type StateRecord = {
 	provider: string;
 	/** Runs in a row it was not seen while its provider was not proven complete. */
 	misses: number;
+	/**
+	 * Its raw state named an overseas location. A published listing cannot carry this (the overseas hint is not a
+	 * state), so a week that keeps it without seeing it still needs it to file the listing under `overseas`.
+	 */
+	overseas?: boolean;
 };
 
 /** Everything the pipeline keeps between weeks, in a folder outside the repo. */
