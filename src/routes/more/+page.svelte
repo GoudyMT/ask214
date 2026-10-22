@@ -1,0 +1,116 @@
+<script lang="ts">
+	import { afterNavigate } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { stashRoute } from '$lib/feedback/context';
+	import { getProfileApp } from '$lib/profile/context';
+
+	const app = getProfileApp();
+	// The header's rule: Settings is offered when the app is ready, and when damaged (its erase is the way back).
+	const showSettings = $derived(app.status === 'ready' || app.status === 'damaged');
+
+	// Feedback is sent with the page the person was on. Passing through More must not replace that with "More",
+	// which is not a page feedback can name, so the page they came from is remembered here.
+	let cameFrom: string | undefined;
+	afterNavigate(({ from }) => {
+		cameFrom = from?.url.pathname;
+	});
+	// With no earlier page, "/more" is not a known route: stashing it clears any stale page name.
+	const stashContext = () => stashRoute(cameFrom ?? '/more');
+</script>
+
+<svelte:head>
+	<title>More - Ask 214</title>
+</svelte:head>
+
+<h1>More</h1>
+
+{#if showSettings}
+	<ul class="group">
+		<li>
+			<a class="row" href={resolve('/settings')}>
+				<span class="row__title">Settings</span>
+				<span class="row__text">Your dates, backup, theme, online answers</span>
+			</a>
+		</li>
+	</ul>
+{/if}
+
+<ul class="group">
+	<li>
+		<a class="row" href={resolve('/resources')}>
+			<span class="row__title">Resources</span>
+			<span class="row__text">Official links for benefits, jobs and school</span>
+		</a>
+	</li>
+	<li>
+		<a class="row" href={resolve('/documents')}>
+			<span class="row__title">Documents</span>
+			<span class="row__text">Guides saved for offline</span>
+		</a>
+	</li>
+</ul>
+
+<ul class="group">
+	<li>
+		<a class="row" href={resolve('/feedback')} onclick={stashContext}>
+			<span class="row__title">Feedback</span>
+			<span class="row__text">Tell us what to fix or add</span>
+		</a>
+	</li>
+	<li>
+		<a class="row" href={resolve('/about')}>
+			<span class="row__title">About</span>
+			<span class="row__text">Sources, privacy, how Ask 214 works</span>
+		</a>
+	</li>
+	<li>
+		<a class="row" href="https://github.com/GoudyMT/ask214" rel="external">
+			<span class="row__title">Source code</span>
+			<span class="row__text">On GitHub</span>
+		</a>
+	</li>
+</ul>
+
+<p class="more-note">
+	New tools land here first. A tool moves to the bottom bar only once people use it a lot.
+</p>
+
+<style>
+	.group {
+		list-style: none;
+		margin: 0 0 var(--space-m);
+		padding: 0;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-l);
+		overflow: hidden;
+	}
+	.group li + li {
+		border-top: 1px solid var(--color-border);
+	}
+
+	.row {
+		display: block;
+		padding: var(--space-m);
+		text-decoration: none;
+	}
+	/* Inside the clipped box, so the focus ring is drawn inward instead of being cut off. */
+	.row:focus-visible {
+		outline-offset: -2px;
+	}
+	.row__title {
+		display: block;
+		color: var(--color-fg);
+		font-weight: 600;
+	}
+	.row__text {
+		display: block;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.more-note {
+		margin: var(--space-l) 0 0;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+</style>
