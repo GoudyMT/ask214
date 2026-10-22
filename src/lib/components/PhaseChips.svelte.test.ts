@@ -90,6 +90,21 @@ describe('PhaseChips', () => {
 		);
 	});
 
+	// On a phone the header slides off the top while the page scrolls down; the chips that stuck under it must then stick
+	// to the top edge, or a gap the height of the header shows between the screen edge and the chips.
+	it('sticks under the header, and to the top edge while the header is hidden', async () => {
+		const { container } = await render(PhaseChips, { props: { view: VIEW } });
+		const chips = container.querySelector('.phase-chips') as HTMLElement;
+		expect(getComputedStyle(chips).top).toBe('56px');
+		document.documentElement.setAttribute('data-header-hidden', '');
+		try {
+			await expect.poll(() => getComputedStyle(chips).top).toBe('0px');
+		} finally {
+			document.documentElement.removeAttribute('data-header-hidden');
+		}
+		await expect.poll(() => getComputedStyle(chips).top).toBe('56px');
+	});
+
 	it('smooth-scrolls to a phase section when its chip is clicked', async () => {
 		// The <section id> lives in TimelineList (a sibling in the page); PhaseChips reaches it by id.
 		const section = document.createElement('section');

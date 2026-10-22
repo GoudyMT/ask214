@@ -44,6 +44,7 @@
 	} from '$lib/install/install-prompt';
 	import { isInstalled, isIOS } from '$lib/install/install-state';
 	import BottomBar from '$lib/layout/BottomBar.svelte';
+	import { nextHeaderState, PHONE_QUERY, startHeaderState } from '$lib/layout/header-scroll';
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 	import { stashRoute } from '$lib/feedback/context';
@@ -335,6 +336,49 @@
 		void refreshPersistence();
 		return controller.destroy;
 	});
+
+	// Header hiding, on a phone only (rules in header-scroll.ts): it slides away on a scroll down and returns on a scroll
+	// up or when focus enters it. The flag is also set on <html> so the Timeline's sticky chips can take its place.
+	let headerEl = $state<HTMLElement | null>(null);
+	let headerHidden = $state(false);
+	$effect(() => {
+		const el = headerEl;
+		if (!el) return;
+		const phone = window.matchMedia(PHONE_QUERY);
+		const root = document.documentElement;
+		let state = startHeaderState(window.scrollY);
+		const setHidden = (hidden: boolean) => {
+			headerHidden = hidden;
+			root.toggleAttribute('data-header-hidden', hidden);
+		};
+		const onScroll = () => {
+			state = nextHeaderState(state, window.scrollY);
+			setHidden(state.hidden);
+		};
+		const onFocusIn = () => {
+			state = { ...state, hidden: false };
+			setHidden(false);
+		};
+		const stop = () => {
+			window.removeEventListener('scroll', onScroll);
+			el.removeEventListener('focusin', onFocusIn);
+			setHidden(false);
+		};
+		// Crossing 600px in either direction starts over: a header hidden on a phone must not stay hidden on a desktop.
+		const sync = () => {
+			stop();
+			if (!phone.matches) return;
+			state = startHeaderState(window.scrollY);
+			window.addEventListener('scroll', onScroll, { passive: true });
+			el.addEventListener('focusin', onFocusIn);
+		};
+		sync();
+		phone.addEventListener('change', sync);
+		return () => {
+			phone.removeEventListener('change', sync);
+			stop();
+		};
+	});
 </script>
 
 <svelte:head>
@@ -350,7 +394,7 @@
 <AppGate {app}>
 	<a class="skip-link" href="#main-content">Skip to content</a>
 
-	<header>
+	<header bind:this={headerEl} data-hidden={headerHidden ? '' : undefined}>
 		<div class="header-row" style:--shell-width={shellWidth}>
 			<a href={resolve('/')} class="brand">Ask 214</a>
 			<nav aria-label="Primary">
@@ -407,7 +451,7 @@
 </AppGate>
 
 <style>
-	/* Sticky header (pure CSS, no JS). Background + z-index prevent */
+	/* Sticky header. Background + z-index prevent */
 	/* underlying content from showing through on scroll. */
 	header {
 		position: sticky;
@@ -416,6 +460,18 @@
 		background: var(--color-bg);
 		border-bottom: 1px solid var(--color-border);
 		padding: var(--space-m) var(--space-l);
+		transition: transform 200ms ease;
+	}
+
+	/* Hidden on a phone while the page scrolls down. Transform only, so the header keeps its box in the layout and
+	   the text below does not jump. */
+	header[data-hidden] {
+		transform: translateY(-100%);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		header {
+			transition: none;
+		}
 	}
 
 	/* Tighter side padding on a phone: header, content, and footer share a 16px gutter so the nav is not
@@ -509,14 +565,18 @@
 		margin: var(--space-s) 0;
 	}
 
-	/* Below 600px (the value BottomBar.svelte repeats; a media query cannot read a variable) the bar replaces the
-	   header menu. The page keeps room for it: the footer's last line and a focused control scrolled into view
-	   stay clear of the fixed bar. --bottom-bar-height is the bar's 56px links plus its 1px top border. */
+	/* Below 600px (the value header-scroll.ts and BottomBar.svelte repeat; a media query cannot read a variable) the
+	   bar replaces the header menu. The page keeps room for both fixed edges: the footer's last line and a focused
+	   control or anchor target scrolled into view stay clear of the bar below and of the header above.
+	   --bottom-bar-height is the bar's 56px links plus its 1px top border; --header-height is the header's one line
+	   (two 16px paddings, one 24px line, 1px border). */
 	@media (max-width: 599.98px) {
 		:global(:root) {
 			--bottom-bar-height: 57px;
+			--header-height: 57px;
 		}
 		:global(html) {
+			scroll-padding-top: var(--header-height);
 			scroll-padding-bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
 		}
 		header nav {

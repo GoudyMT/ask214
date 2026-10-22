@@ -72,6 +72,18 @@
 		padding: var(--space-s) 0;
 		background: var(--color-bg);
 		border-bottom: 1px solid var(--color-border);
+		transition: top 200ms ease;
+	}
+
+	/* The phone header slides away while the page scrolls down (the root layout sets the flag); the chips take its
+	   place at the top edge, moving with the same timing. */
+	:global(html[data-header-hidden]) .phase-chips {
+		top: 0;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.phase-chips {
+			transition: none;
+		}
 	}
 
 	/* On mobile the chips become one horizontally-scrolling row (no wrap, no wasted width). */
