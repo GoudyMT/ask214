@@ -33,7 +33,9 @@ export function stripJsoncComments(raw: string): string {
 		const ch = raw.charAt(i);
 		const next = raw.charAt(i + 1);
 		if (inLine) {
-			if (ch === '\n') {
+			// Wrangler's reader ends a line comment at either line break; ending it only at '\n' would hide the keys
+			// after a lone '\r' from the policy while wrangler still deploys them.
+			if (ch === '\n' || ch === '\r') {
 				inLine = false;
 				out += ch;
 			}
