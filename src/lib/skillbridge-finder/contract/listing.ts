@@ -34,7 +34,8 @@ export type Duration = (typeof DURATIONS)[number];
 
 /**
  * The site's delivery method ids. Measured on the 1,435-listing sample: every one of the 323 listings filed
- * under "Virtual" carries 2; 1 and 3 always carry a place.
+ * under "Virtual" carries 2; 1 and 3 always carry a place. Which of 1 and 3 is hybrid is inferred, not yet read
+ * from the site.
  */
 export const DELIVERY = { inPerson: 1, remote: 2, hybrid: 3 } as const;
 export type Delivery = (typeof DELIVERY)[keyof typeof DELIVERY];
