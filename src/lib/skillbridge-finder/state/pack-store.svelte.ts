@@ -89,10 +89,17 @@ function isValidFile(key: RowKey, value: unknown): boolean {
 	return validateRegionFile(value).valid && isObject(value) && value.file === key;
 }
 
-/** The weekly files carry the week they belong to; it must be the index's. */
+/**
+ * The weekly files carry the week they belong to; it must be the index's. A changes file lists its weeks newest first,
+ * so its first week is the one it was cut for; one with no weeks says nothing about any week and is refused.
+ */
 function isOfWeek(key: RowKey, value: unknown, pull: string): boolean {
-	if (key === 'changes' || key === 'seen' || key === 'index' || key.startsWith('table:'))
-		return true;
+	if (key === 'seen' || key === 'index' || key.startsWith('table:')) return true;
+	if (key === 'changes') {
+		if (!isObject(value) || !Array.isArray(value.weeks)) return false;
+		const newest: unknown = value.weeks[0];
+		return isObject(newest) && newest.pullDate === pull;
+	}
 	return isObject(value) && value.pullDate === pull;
 }
 
@@ -426,7 +433,9 @@ export function createFinderPackStore(db: IDBDatabase) {
 				});
 			});
 			if (epoch !== epochAtStart) return;
-			if (newer) clearMemo();
+			// "Newer" is judged against the disk, but the memo belongs to the week this tab holds: a peer tab may have moved the
+			// disk on already, and then an older week's files are still here even though this swap only adds to the disk's week.
+			if (newer || _index?.pullDate !== pull) clearMemo();
 			else for (const [key] of files) memo.delete(key);
 			_index = index;
 		},
@@ -494,6 +503,8 @@ export function createFinderPackStore(db: IDBDatabase) {
 
 		/** Clear every row of the pack and everything in memory (a restore replaced the data, or the person removed it). */
 		async drop(): Promise<void> {
+			// Readiness is left as it was: a relock that landed before or during the wait stands, and a locked or failed
+			// store needs a load() before it decrypts anything again.
 			await withKeystoreShared(() =>
 				withPackLock(() =>
 					withStores(db, PACK_STORE, 'readwrite', (tx) => {
@@ -503,9 +514,6 @@ export function createFinderPackStore(db: IDBDatabase) {
 			);
 			epoch++;
 			clearHeld();
-			// Empty is a state the pack can be filled from again.
-			_ready = true;
-			_failed = false;
 			notifyDropped();
 		}
 	};

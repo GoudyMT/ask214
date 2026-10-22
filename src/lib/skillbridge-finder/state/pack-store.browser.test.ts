@@ -5,7 +5,7 @@ import { bootstrapLocalKeystore } from '../../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../../db/_test-helpers';
 import { withStores, reqToPromise } from '../../db/schema';
 import { rotateOrUpgrade } from '../../db/locks';
-import { encryptRecord } from '../../crypto/record-crypto';
+import { encryptRecord, decryptRecord } from '../../crypto/record-crypto';
 import { readKeystoreRow } from '../../profile/store.svelte';
 import { cleanListing } from '../fixtures/clean';
 import type { ChangesFile, IdsFile, IndexFile, RegionFile } from '../contract/listing';
@@ -158,8 +158,7 @@ describe('finder pack store', () => {
 			expect(await fresh.readRegion('pacific')).toBeDefined();
 		});
 
-		// The changes file carries no pull date of its own that a read could compare, so only the row's binding to its week
-		// stops last week's copy from being read as this week's.
+		// The row's binding to its week stops a row kept from last week, whatever its content.
 		it.each([
 			[
 				'a region file',
@@ -203,17 +202,19 @@ describe('finder pack store', () => {
 			await expect((await opened()).readRegion('pacific')).rejects.toThrow('E_FINDER_PACK_BAD_ROW');
 		});
 
-		it('an index row copied from another key fails the load, and the store says so', async () => {
+		// The row authenticates under its own key and week, so only the file's own content can show it is another week's.
+		it('a changes file of another week planted under this week is refused on read', async () => {
 			const store = await opened();
-			await store.swap(week(WEEK_1, ['pacific']));
-			const ids = await getRaw('ids');
-			await putRaw({ id: 'index', rec: ids?.rec ?? new Uint8Array() });
+			await store.swap(week(WEEK_2, ['pacific']));
+			const rec = await encryptRecord(
+				{ storeName: 'skillbridge-finder-pack', recordId: `changes@${WEEK_2}`, schemaVersion: 1 },
+				new TextEncoder().encode(JSON.stringify(changesFile(WEEK_1))),
+				await readKeystoreRow(db),
+				0
+			);
+			await putRaw({ id: 'changes', rec });
 
-			const fresh = createFinderPackStore(db);
-			await expect(fresh.load()).rejects.toThrow('E_FINDER_PACK_BAD_ROW');
-			expect(fresh.ready).toBe(false);
-			expect(fresh.failed).toBe(true);
-			expect(fresh.pullDate).toBeUndefined();
+			await expect((await opened()).readChanges()).rejects.toThrow('E_FINDER_PACK_BAD_ROW');
 		});
 	});
 
@@ -258,7 +259,10 @@ describe('finder pack store', () => {
 					index: { ...indexFile(WEEK_1, ['pacific']), baseline: 'yes' }
 				},
 				{ ...week(WEEK_1, ['pacific']), ids: { ...idsFile(WEEK_1), pullDate: WEEK_0 } },
-				{ ...week(WEEK_1, ['pacific']), changes: { v: 1, weeks: [{ pullDate: 'soon' }] } }
+				{ ...week(WEEK_1, ['pacific']), changes: { v: 1, weeks: [{ pullDate: 'soon' }] } },
+				// A valid changes file that is not this week's, or says nothing about any week, is not this week's changes.
+				{ ...week(WEEK_2, ['pacific']), changes: changesFile(WEEK_1) },
+				{ ...week(WEEK_2, ['pacific']), changes: { v: 1, weeks: [] } }
 			];
 			for (const input of bad) {
 				await expect(
@@ -304,6 +308,21 @@ describe('finder pack store', () => {
 			expect(await fresh.readIds()).toEqual(idsFile(WEEK_1));
 		});
 
+		// A swap is "equal" against the disk, but newer than what this tab holds when a peer tab already moved the disk on.
+		// The tab must not go on showing the older week's file it read before.
+		it('a swap that is equal on disk but newer than the held week drops the older week from memory', async () => {
+			const a = await opened();
+			await a.swap(week(WEEK_1, ['pacific', 'mountain']));
+			expect((await a.readRegion('pacific'))?.pullDate).toBe(WEEK_1);
+
+			const b = await opened();
+			await b.swap(week(WEEK_2, ['pacific']));
+			await a.swap(week(WEEK_2, ['mountain']));
+
+			expect(a.pullDate).toBe(WEEK_2);
+			expect((await a.readRegion('pacific'))?.pullDate).toBe(WEEK_2);
+		});
+
 		it('a newer pull date removes every old-week file row and keeps seen and tables', async () => {
 			const store = await opened();
 			await store.swap(week(WEEK_1, ['pacific', 'mountain']));
@@ -346,6 +365,28 @@ describe('finder pack store', () => {
 
 			const fresh = await opened();
 			expect([...fresh.seen].sort()).toEqual([1, 2]);
+		});
+
+		// An older tab saving must not erase a key a newer release added to the row.
+		it('marking an id keeps a key this release does not know', async () => {
+			const keystore = await readKeystoreRow(db);
+			const aad = { storeName: 'skillbridge-finder-pack', recordId: 'seen', schemaVersion: 1 };
+			const rec = await encryptRecord(
+				aad,
+				new TextEncoder().encode(JSON.stringify({ finderSeen: [1], future: 'kept' })),
+				keystore,
+				0
+			);
+			await putRaw({ id: 'seen', rec });
+
+			await (await opened()).markOpened([2]);
+
+			const row = await getRaw('seen');
+			const plain = await decryptRecord(aad, row?.rec ?? new Uint8Array(), keystore, 0);
+			expect(JSON.parse(new TextDecoder().decode(plain))).toEqual({
+				finderSeen: [1, 2],
+				future: 'kept'
+			});
 		});
 
 		it('setSeen replaces the list with the pruned one, keeping the last-seen pull', async () => {
@@ -561,6 +602,21 @@ describe('finder pack store', () => {
 			expect(fresh.ready).toBe(false);
 			expect(fresh.pullDate).toBeUndefined();
 		});
+	});
+
+	// A drop waits for its locks; a relock that lands meanwhile (or came before) must not be undone by it, or a locked
+	// device would decrypt again without a load.
+	it('drop does not reopen a store that was relocked', async () => {
+		const store = await opened();
+		await store.swap(week(WEEK_1, ['pacific']));
+		await store.putTable('zips', zips);
+		store.relockSync('user');
+
+		await store.drop();
+
+		expect(store.ready).toBe(false);
+		await expect(store.markOpened([7])).rejects.toThrow('E_FINDER_PACK_RELOCKED');
+		await expect(store.readTable('zips')).rejects.toThrow('E_FINDER_PACK_RELOCKED');
 	});
 
 	it('drop empties the store and memory, and tells the listeners', async () => {

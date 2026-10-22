@@ -30,9 +30,14 @@ function checkSeen(row: unknown): FinderSeenRow {
 	) {
 		throw new FinderPackError('E_FINDER_PACK_BAD_SEEN');
 	}
-	if (finderLastSeenPull === undefined) return { finderSeen: finderSeen as number[] };
-	if (!isIsoDate(finderLastSeenPull)) throw new FinderPackError('E_FINDER_PACK_BAD_SEEN');
-	return { finderSeen: finderSeen as number[], finderLastSeenPull };
+	if (finderLastSeenPull !== undefined && !isIsoDate(finderLastSeenPull)) {
+		throw new FinderPackError('E_FINDER_PACK_BAD_SEEN');
+	}
+	// A key a newer release added is kept, so an older tab's mark does not erase it.
+	return {
+		...(row as Record<string, unknown>),
+		finderSeen: finderSeen as number[]
+	} as FinderSeenRow;
 }
 
 /** Encoding holds the line decoding does: a row written that cannot be read back would lose the person's marks. */
@@ -40,7 +45,7 @@ export function encodeSeen(row: FinderSeenRow): Uint8Array {
 	return new TextEncoder().encode(JSON.stringify(checkSeen(row)));
 }
 
-/** Reads the two fields it knows; a key a newer release added is ignored. */
+/** Checks the two fields it knows; a key a newer release added is carried forward, not read. */
 export function decodeSeen(bytes: Uint8Array): FinderSeenRow {
 	let parsed: unknown;
 	try {

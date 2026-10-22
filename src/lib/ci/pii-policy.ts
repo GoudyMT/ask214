@@ -62,8 +62,10 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\.backupGenProfile\b/,
 	/\.backupGenTimeline\b/,
 	/\.backupGenCalendar\b/,
-	// The SkillBridge finder's record (src/lib/skillbridge-finder/state/types.ts): where a person is looking, what they
-	// saved and compare, and their filters. The `finder` prefix keeps these names out of ordinary words.
+	// The SkillBridge finder's own data. finderSetup, finderFilters, finderSaved and finderCompare are the record
+	// (src/lib/skillbridge-finder/state/types.ts): where a person is looking, what they saved and compare, and their
+	// filters. finderSeen and finderLastSeenPull are the pack's seen row (src/lib/skillbridge-finder/state/pack-codec.ts):
+	// what they opened and the newest pull they had seen. The `finder` prefix keeps these names out of ordinary words.
 	/\.finderSetup\b/,
 	/\.finderFilters\b/,
 	/\.finderSaved\b/,

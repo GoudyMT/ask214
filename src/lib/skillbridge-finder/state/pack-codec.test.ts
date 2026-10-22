@@ -36,9 +36,13 @@ describe('seen row codec', () => {
 		expect(decodeSeen(bytesOf({ finderSeen: ids })).finderSeen).toHaveLength(MAX_SEEN);
 	});
 
-	// A newer release may add a key; this one reads the two it knows and ignores the rest.
-	it('ignores a key it does not know', () => {
-		expect(decodeSeen(bytesOf({ finderSeen: [7], future: 1 }))).toEqual({ finderSeen: [7] });
+	// A newer release may add a key; this one validates the two it knows and carries the rest forward unchanged.
+	it('carries a key it does not know through a decode and an encode', () => {
+		const row = decodeSeen(bytesOf({ finderSeen: [7], future: 1 }));
+		expect(JSON.parse(new TextDecoder().decode(encodeSeen(row)))).toEqual({
+			finderSeen: [7],
+			future: 1
+		});
 	});
 
 	describe('refuses what it cannot trust, with a static code', () => {
