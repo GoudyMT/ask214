@@ -51,7 +51,7 @@ decrypt. A project lint rule forbids writing to an encrypted store anywhere else
 
 **Keys.** On first run the browser generates an AES-GCM 256 key and an HMAC-SHA-256 key as non-extractable
 `CryptoKey` objects, which no script can export, and stores them with the signed key record in one
-transaction. Signed high-water marks beside the profile, timeline and calendar records refuse an older copy, and
+transaction. Signed high-water marks beside the profile, timeline, calendar and finder records refuse an older copy, and
 errors carry opaque codes, never decrypted text.
 
 **What it does not protect.** There is no passphrase on the stored data yet (a backup file has its own, see
@@ -156,9 +156,11 @@ the ciphertext. The check is a plain SHA-256 that only tells a damaged file from
 a security control. The reader refuses a file that is too large, not ours, from a newer version or damaged
 before it does any key work, with an opaque code.
 
-**Restore.** The user picks a file and types the passphrase. The restore replaces this device's profile, timeline
-and calendar record in one IndexedDB transaction, under the key lock alone, and signs fresh rollback marks
-for them. If anything fails, nothing was written.
+**Restore.** The user picks a file and types the passphrase. The restore replaces this device's profile, timeline,
+calendar and SkillBridge finder records in one IndexedDB transaction, under the key lock alone, and signs fresh
+rollback marks for them; a file from before the finder existed leaves the finder empty. If anything fails,
+nothing was written. Once it lands, the downloaded SkillBridge listings are dropped, since they belonged to the
+data the restore replaced.
 
 **What a backup does not carry.** The API key, Ask's offline library, saved documents, downloaded SkillBridge
 listings and this device's settings (theme, Ask mode). The key store stays on the device. The user sets these up
