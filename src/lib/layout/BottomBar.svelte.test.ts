@@ -29,10 +29,11 @@ afterEach(async () => {
 const links = (container: Element) => [
 	...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Primary"] a')
 ];
-const currentLabels = (container: Element) =>
+// Every tab marked as current, with how it is marked.
+const marked = (container: Element) =>
 	links(container)
-		.filter((a) => a.getAttribute('aria-current') === 'page')
-		.map((a) => a.textContent?.trim());
+		.filter((a) => a.hasAttribute('aria-current'))
+		.map((a) => [a.textContent?.trim(), a.getAttribute('aria-current')]);
 
 describe('BottomBar on a 320 px phone', () => {
 	// A person on a phone sees every place by name, so they never have to guess an icon.
@@ -71,21 +72,33 @@ describe('BottomBar on a 320 px phone', () => {
 		expect(new Set(iconTops).size).toBe(1);
 	});
 
-	// The wizard owns no tab; Settings, Resources, Documents, Feedback and About are under More.
+	// The wizard owns no tab; Settings, Resources, Documents, Feedback and About are under More. A screen reader says
+	// "current page" only for the tab whose page is open; for More behind it, it is the current section.
 	it.each([
-		['/', 'Home'],
-		['/skillbridge', 'SkillBridge'],
-		['/settings', 'More']
-	])('marks only %s as the current page: %s', async (pathname, label) => {
+		['/', 'Home', 'page'],
+		['/skillbridge', 'SkillBridge', 'page'],
+		['/more', 'More', 'page'],
+		['/settings', 'More', 'true']
+	])('marks only %s as the current tab: %s, %s', async (pathname, label, how) => {
 		route.pathname = pathname;
 		const { container } = await render(BottomBar);
-		expect(currentLabels(container)).toEqual([label]);
+		expect(marked(container)).toEqual([[label, how]]);
 	});
 
 	it('marks no tab on a page no tab owns', async () => {
 		route.pathname = '/wizard';
 		const { container } = await render(BottomBar);
-		expect(currentLabels(container)).toEqual([]);
+		expect(marked(container)).toEqual([]);
+	});
+
+	// Marked as the section only for the screen reader: the look of the current tab holds on every page behind More.
+	it('draws the 3 px top bar on More while a page behind it is open', async () => {
+		route.pathname = '/settings';
+		const { container } = await render(BottomBar);
+		const more = links(container).at(-1) as HTMLElement;
+		expect(more.textContent?.trim()).toBe('More');
+		expect(getComputedStyle(more).borderTopWidth).toBe('3px');
+		expect(getComputedStyle(more).borderTopStyle).toBe('solid');
 	});
 
 	// Forced colours drop the accent text colour, so the marked tab would look like the rest; its 3 px top bar is what

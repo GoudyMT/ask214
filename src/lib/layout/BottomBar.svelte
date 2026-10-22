@@ -29,6 +29,8 @@
 		}
 	];
 
+	// The tab that owns the open page is marked as the current section; "page" is only for the tab whose own page is
+	// open, so a screen reader does not call More the current page on Settings.
 	const current = $derived(tabForPath(page.url.pathname));
 </script>
 
@@ -38,7 +40,11 @@
 			<li>
 				<a
 					href={resolve(t.route)}
-					aria-current={current === tabForPath(t.route) ? 'page' : undefined}
+					aria-current={current === tabForPath(t.route)
+						? page.url.pathname === t.route
+							? 'page'
+							: 'true'
+						: undefined}
 				>
 					<svg
 						viewBox="0 0 24 24"
@@ -104,7 +110,7 @@
 		line-height: 1.2;
 		text-decoration: none;
 	}
-	a[aria-current='page'] {
+	a[aria-current] {
 		padding-top: 0;
 		border-top: 3px solid var(--color-accent);
 		color: var(--color-accent);

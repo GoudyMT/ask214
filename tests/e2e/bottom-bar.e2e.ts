@@ -100,11 +100,12 @@ test('a person on a phone reaches every page from the bottom bar, and More keeps
 		await expectPage(page, '/more', 'More');
 		await page.getByRole('main').getByRole('link', { name: row.name }).click();
 		await expectPage(page, row.path, row.heading);
-		// These pages live under More, so the tab stays current while a person is on one.
-		await expect(bar.locator('a[aria-current="page"]')).toHaveCount(1);
+		// These pages live under More, so the tab stays marked as the current section (not the current page) while a
+		// person is on one.
+		await expect(bar.locator('a[aria-current]')).toHaveCount(1);
 		await expect(bar.getByRole('link', { name: 'More', exact: true })).toHaveAttribute(
 			'aria-current',
-			'page'
+			'true'
 		);
 	}
 });
