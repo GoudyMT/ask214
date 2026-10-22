@@ -215,7 +215,15 @@ describe('checkConfig', () => {
 	it.each([
 		['another folder', '../retrieve/deploy'],
 		['the data folder itself', '.'],
-		['an absolute folder', '/etc']
+		['an absolute folder', '/etc'],
+		['the deploy folder in another case', './Deploy'],
+		['the deploy folder without the leading dot', 'deploy'],
+		['the deploy folder with a trailing slash', './deploy/'],
+		// U+212A lowercases to k in JavaScript, but Windows keeps it a different letter from k.
+		[
+			'a folder whose name holds a Kelvin sign',
+			`../s${String.fromCharCode(0x212a)}illbridge-data/deploy`
+		]
 	])('refuses assets served from %s', (_name, directory) => {
 		const config = JSON.stringify({ ...configObject(), assets: { directory } });
 		expect(checkConfig(CONFIG, makeDeps({ config }).deps)).toContain('E_ASSETS_DIR');

@@ -53,6 +53,8 @@ export type GuardDeps = {
 };
 
 const DATA_WORKER_DIR = 'workers/skillbridge-data';
+/** The assets directory the committed data config names, relative to the config's folder. */
+const ASSETS_DIRECTORY = './deploy';
 const DATA_WEEK_ROOT = `${DEPLOY_DATA_DIR}/w`;
 
 /** Forward slashes and no trailing slash, so paths from `fileURLToPath` and from a test read the same. */
@@ -61,8 +63,10 @@ function slashed(p: string): string {
 }
 
 /**
- * A path with `.` and `..` folded away and the case dropped, for comparing two spellings of one place. Windows
- * paths are case-insensitive; folding case everywhere only ever makes the guard refuse more, never less.
+ * A path with `.` and `..` folded away and the case dropped, for comparing two spellings of one place. Folding
+ * case can also equate two places Windows keeps apart (U+212A lowercases to k), so it is used only where a false
+ * match is harmless: the config is always read by its own canonical spelling, and a match on the shell's folder
+ * only refuses. Nothing here decides which folder wrangler uploads.
  */
 function sameKey(p: string): string {
 	const parts: string[] = [];
@@ -72,10 +76,6 @@ function sameKey(p: string): string {
 		else parts.push(part.toLowerCase());
 	}
 	return (p.replaceAll('\\', '/').startsWith('/') ? '/' : '') + parts.join('/');
-}
-
-function isAbsolute(p: string): boolean {
-	return p.startsWith('/') || p.startsWith('\\') || /^[A-Za-z]:/.test(p);
 }
 
 function workerFolder(repoRoot: string): string {
@@ -108,15 +108,10 @@ export function checkConfig(configPath: string, deps: GuardDeps): string[] {
 	const problems = findDataWorkerConfigViolations(config as Record<string, unknown>).map(
 		(violation) => `E_CONFIG_POLICY:${violation}`
 	);
+	// Exactly the committed spelling, compared as plain text: wrangler resolves the folder on the real disk, and any
+	// other spelling (another case, a Unicode look-alike) could name a folder the tree check never looked at.
 	const directory = (config as { assets?: { directory?: unknown } }).assets?.directory;
-	const served =
-		typeof directory === 'string'
-			? isAbsolute(directory)
-				? directory
-				: `${workerFolder(deps.repoRoot)}/${directory}`
-			: null;
-	if (served === null || sameKey(served) !== sameKey(`${workerFolder(deps.repoRoot)}/deploy`))
-		problems.push('E_ASSETS_DIR');
+	if (directory !== ASSETS_DIRECTORY) problems.push('E_ASSETS_DIR');
 	return problems;
 }
 
