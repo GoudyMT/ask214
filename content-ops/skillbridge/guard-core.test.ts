@@ -568,7 +568,15 @@ describe('guardAndDeploy: the environment wrangler would inherit', () => {
 		'CLOUDFLARE_API_TOKEN',
 		'CF_API_TOKEN',
 		'CLOUDFLARE_API_KEY',
-		'CF_API_KEY'
+		'CF_API_KEY',
+		'WRANGLER_CI_OVERRIDE_NAME',
+		'CLOUDFLARE_API_BASE_URL',
+		'CF_API_BASE_URL',
+		'CLOUDFLARE_ACCOUNT_ID',
+		'CF_ACCOUNT_ID',
+		'WRANGLER_AUTH_DOMAIN',
+		'WRANGLER_AUTH_URL',
+		'WRANGLER_TOKEN_URL'
 	])(
 		'refuses when %s is set, names it without its value, and never runs wrangler',
 		async (name) => {

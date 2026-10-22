@@ -50,16 +50,28 @@ export type GuardDeps = {
 };
 
 /**
- * Variables wrangler reads from the environment that change what a deploy does: CLOUDFLARE_ENV deploys a Worker
- * named `<name>-<env>`, and an API token or key replaces the keyring login, which is meant to be the one stored
- * credential. Only the names are ever reported, never a value.
+ * Environment variables that make a deploy do something other than what the committed config and the keyring login
+ * say. This is the set known to matter, not everything wrangler reads. What the listed ones do:
+ * - CLOUDFLARE_ENV deploys a Worker named `<name>-<env>`, and WRANGLER_CI_OVERRIDE_NAME renames the Worker;
+ * - an API token or key replaces the keyring login, which is meant to be the one stored credential;
+ * - an account id points the deploy at another account;
+ * - an API base URL, or the OAuth domain and endpoints, send every call (the keyring token included) to another host.
+ * Only the names are ever reported, never a value.
  */
 const FORBIDDEN_ENV = [
 	'CLOUDFLARE_ENV',
+	'WRANGLER_CI_OVERRIDE_NAME',
 	'CLOUDFLARE_API_TOKEN',
 	'CF_API_TOKEN',
 	'CLOUDFLARE_API_KEY',
-	'CF_API_KEY'
+	'CF_API_KEY',
+	'CLOUDFLARE_ACCOUNT_ID',
+	'CF_ACCOUNT_ID',
+	'CLOUDFLARE_API_BASE_URL',
+	'CF_API_BASE_URL',
+	'WRANGLER_AUTH_DOMAIN',
+	'WRANGLER_AUTH_URL',
+	'WRANGLER_TOKEN_URL'
 ] as const;
 
 const DATA_WORKER_DIR = 'workers/skillbridge-data';
