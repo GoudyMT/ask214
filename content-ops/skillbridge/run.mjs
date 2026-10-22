@@ -368,8 +368,10 @@ export async function runPipeline(options, deps) {
 	/** @type {Map<string, readonly [number, number]>} */
 	const zipPoints = new Map();
 	const zipRows =
-		/** @type {{ rows: [string, number, number][] } | undefined} */ (tables.zips)?.rows ?? [];
-	for (const [zip, la, lo] of zipRows) zipPoints.set(zip, [la, lo]);
+		/** @type {{ rows: [string, string, number, number][] } | undefined} */ (tables.zips)?.rows ??
+		[];
+	// The clean step needs only the point; the ZIP's state is for the app.
+	for (const [zip, , la, lo] of zipRows) zipPoints.set(zip, [la, lo]);
 	const clean = cleanListings(pull.rows, {
 		suppression: new Set(state.suppression),
 		places: {

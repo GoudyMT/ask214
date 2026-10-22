@@ -154,7 +154,7 @@ function folders(name = 'run') {
 type Where = ReturnType<typeof folders>;
 
 const TABLES = {
-	zips: { v: 1, rows: [['21046', 39.2, -76.86]] },
+	zips: { v: 1, rows: [['21046', 'MD', 39.2, -76.86]] },
 	crosswalk: { v: 1, rows: [['91B', 'Army', '49-3023.00', 'Example Technicians']] }
 };
 
@@ -278,6 +278,30 @@ describe('the first full run', () => {
 		expect(result.report).toMatchObject({ published: 8, added: 0, removed: 0, baseline: true });
 		expect(existsSync(join(where.stateDir, 'runs', FIRST, 'raw.json'))).toBe(true);
 		expect(existsSync(join(where.stateDir, 'runs', FIRST, 'report.txt'))).toBe(true);
+	});
+});
+
+describe('the ZIP table in a run', () => {
+	// The table rows are [zip, state, lat, lon]; reading the point from the wrong columns would publish a state
+	// code as a coordinate or drop the point.
+	it('places a listing whose own point is unusable at the point of its ZIP', async () => {
+		const where = folders();
+		const dir = join(where.stateDir, 'tables');
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(
+			join(dir, 'zips.json'),
+			JSON.stringify({ v: 1, rows: [['21046', 'MD', 39.25, -76.81]] })
+		);
+		writeFileSync(join(dir, 'crosswalk.json'), JSON.stringify(TABLES.crosswalk));
+		const world = makeWorld({ providers: [[ONE, rowsOf([1], { lat: 0, lon: 0 })]] });
+		const { result } = await go(where, world, FIRST, { baseline: true });
+
+		expect(result.exitCode).toBe(0);
+		const published = readdirSync(weekDir(where, FIRST))
+			.filter((name) => name !== 'ids.json' && name !== 'changes.json')
+			.map((name) => readFileSync(join(weekDir(where, FIRST), name), 'utf8'))
+			.join('\n');
+		expect(published).toContain('"la":39.25,"lo":-76.81');
 	});
 });
 
@@ -618,7 +642,7 @@ describe('bad arguments and bad files', () => {
 		mkdirSync(join(where.stateDir, 'tables'), { recursive: true });
 		writeFileSync(
 			join(where.stateDir, 'tables', 'zips.json'),
-			JSON.stringify({ v: 1, rows: [['2104', 39.2, -76.86]] })
+			JSON.stringify({ v: 1, rows: [['2104', 'MD', 39.2, -76.86]] })
 		);
 		const { result } = await go(where, makeWorld(), FIRST, { baseline: true });
 		expect(result.exitCode).toBe(1);

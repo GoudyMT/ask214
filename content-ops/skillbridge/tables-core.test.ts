@@ -35,56 +35,326 @@ describe('zipsFromGazetteer', () => {
 		`${geoid}|860Z200US${geoid}|1|2|3|4|${lat}|${lon}`;
 	const file = (...lines: string[]) => [HEADER, ...lines].join('\n') + '\n';
 
-	it('gives one rounded row per ZIP, sorted, in a table the app accepts', () => {
+	// The Census ZCTA-to-county relationship file, in its published column order; one row per ZCTA and county.
+	const REL_HEADER = [
+		'OID_ZCTA5_20',
+		'GEOID_ZCTA5_20',
+		'NAMELSAD_ZCTA5_20',
+		'AREALAND_ZCTA5_20',
+		'AREAWATER_ZCTA5_20',
+		'MTFCC_ZCTA5_20',
+		'CLASSFP_ZCTA5_20',
+		'FUNCSTAT_ZCTA5_20',
+		'OID_COUNTY_20',
+		'GEOID_COUNTY_20',
+		'NAMELSAD_COUNTY_20',
+		'AREALAND_COUNTY_20',
+		'AREAWATER_COUNTY_20',
+		'MTFCC_COUNTY_20',
+		'CLASSFP_COUNTY_20',
+		'FUNCSTAT_COUNTY_20',
+		'AREALAND_PART',
+		'AREAWATER_PART'
+	].join('|');
+	const part = (zip: string, county: string, land: string, water = '0') =>
+		[
+			'1',
+			zip,
+			zip === '' ? '' : `ZCTA5 ${zip}`,
+			'9',
+			'9',
+			zip === '' ? '' : 'G6350',
+			zip === '' ? '' : 'B5',
+			zip === '' ? '' : 'S',
+			'2',
+			county,
+			'Example County',
+			'9',
+			'9',
+			'G4020',
+			'H1',
+			'A',
+			land,
+			water
+		].join('|');
+	const rel = (...lines: string[]) => [REL_HEADER, ...lines].join('\n') + '\n';
+
+	// The counties gazetteer: only USPS and GEOID (the state FIPS is the GEOID's first two digits) are read.
+	const COUNTIES_HEADER =
+		'USPS|GEOID|GEOIDFQ|ANSICODE|NAME|ALAND|AWATER|ALAND_SQMI|AWATER_SQMI|INTPTLAT|INTPTLONG';
+	const county = (usps: string, geoid: string) =>
+		`${usps}|${geoid}|0500000US${geoid}|0|Example County|1|1|0|0|39.0|-77.0`;
+	const counties = (...lines: string[]) => [COUNTIES_HEADER, ...lines].join('\n') + '\n';
+	const COUNTIES = counties(
+		county('MD', '24001'),
+		county('MD', '24510'),
+		county('VA', '51059'),
+		county('DC', '11001'),
+		county('MA', '25025'),
+		county('PR', '72001')
+	);
+
+	const reversed = (text: string) =>
+		text
+			.split('\n')
+			.map((l) => l.split('|').reverse().join('|'))
+			.join('\n');
+
+	const BASIC_ZCTA = file(line('21046', '39.18921', '-76.86012'));
+	const BASIC_REL = rel(part('21046', '24001', '500'));
+
+	it('gives one rounded row per ZIP with its state, sorted, in a table the app accepts', () => {
 		const table = zipsFromGazetteer(
 			file(
 				line('21046', '39.18921', '-76.86012'),
 				line('00601', '18.180621', '-66.749931'),
 				line('02134', '42.3551', '-71.1304')
-			)
+			),
+			rel(
+				part('21046', '24001', '500'),
+				part('00601', '72001', '70'),
+				part('02134', '25025', '30')
+			),
+			COUNTIES
 		);
 		expect(table).toEqual({
 			v: 1,
 			rows: [
-				['00601', 18.181, -66.75],
-				['02134', 42.355, -71.13],
-				['21046', 39.189, -76.86]
+				['00601', 'PR', 18.181, -66.75],
+				['02134', 'MA', 42.355, -71.13],
+				['21046', 'MD', 39.189, -76.86]
 			]
 		});
 		expect(validateZips(table)).toEqual({ valid: true, errors: [] });
 	});
 
 	it('reads Windows line ends the same as Unix ones', () => {
-		const unix = file(line('21046', '39.18921', '-76.86012'), line('00601', '18.18', '-66.75'));
-		expect(zipsFromGazetteer(unix.replaceAll('\n', '\r\n'))).toEqual(zipsFromGazetteer(unix));
+		const crlf = (text: string) => text.replaceAll('\n', '\r\n');
+		expect(zipsFromGazetteer(crlf(BASIC_ZCTA), crlf(BASIC_REL), crlf(COUNTIES))).toEqual(
+			zipsFromGazetteer(BASIC_ZCTA, BASIC_REL, COUNTIES)
+		);
 	});
 
-	it('finds columns by name, whatever their order', () => {
+	it('finds columns by name in all three files, whatever their order', () => {
 		const shuffled = 'INTPTLONG|X|GEOID|INTPTLAT\n-76.86012|a|21046|39.18921\n';
-		expect(zipsFromGazetteer(shuffled).rows).toEqual([['21046', 39.189, -76.86]]);
+		expect(zipsFromGazetteer(shuffled, reversed(BASIC_REL), reversed(COUNTIES)).rows).toEqual([
+			['21046', 'MD', 39.189, -76.86]
+		]);
+	});
+
+	describe('the state of a ZIP', () => {
+		const stateOf = (...lines: string[]) =>
+			zipsFromGazetteer(BASIC_ZCTA, rel(...lines), COUNTIES).rows[0]?.[1];
+
+		it('is the state of its county, for a ZIP in more than one county of that state', () => {
+			expect(stateOf(part('21046', '24001', '300'), part('21046', '24510', '200'))).toBe('MD');
+		});
+
+		// A rule that took the largest single part would pick DC here; the state is the one holding the most land.
+		it('is the state holding the most land, summed over its counties', () => {
+			expect(
+				stateOf(
+					part('21046', '11001', '100'),
+					part('21046', '24001', '90'),
+					part('21046', '24510', '30')
+				)
+			).toBe('MD');
+		});
+
+		it('breaks a land tie by the larger water, whatever the order of the rows', () => {
+			expect(stateOf(part('21046', '24001', '100', '5'), part('21046', '51059', '100', '7'))).toBe(
+				'VA'
+			);
+			expect(stateOf(part('21046', '51059', '100', '7'), part('21046', '24001', '100', '5'))).toBe(
+				'VA'
+			);
+		});
+
+		it('breaks a land and water tie by the lower state code, whatever the order of the rows', () => {
+			expect(stateOf(part('21046', '51059', '100', '5'), part('21046', '24001', '100', '5'))).toBe(
+				'MD'
+			);
+			expect(stateOf(part('21046', '24001', '100', '5'), part('21046', '51059', '100', '5'))).toBe(
+				'MD'
+			);
+		});
+
+		it('ignores rows of ZCTAs that are not in the gazetteer, and counties with no ZCTA', () => {
+			const table = zipsFromGazetteer(
+				BASIC_ZCTA,
+				rel(
+					part('', '24510', '1'),
+					part('21046', '24001', '500'),
+					part('90210', '99001', '500'),
+					part('', '', '0')
+				),
+				COUNTIES
+			);
+			expect(table.rows).toEqual([['21046', 'MD', 39.189, -76.86]]);
+		});
 	});
 
 	it.each([
-		['a 4-digit GEOID', file(line('1046', '39.1', '-76.8')), 'E_TABLE_LINE'],
-		['a letter in a GEOID', file(line('2104a', '39.1', '-76.8')), 'E_TABLE_LINE'],
-		['a line with 7 fields', file('21046|860Z200US21046|1|2|3|39.1|-76.8'), 'E_TABLE_LINE'],
-		['a latitude that is not a number', file(line('21046', 'north', '-76.8')), 'E_TABLE_LINE'],
-		['an empty longitude', file(line('21046', '39.1', '')), 'E_TABLE_LINE'],
+		[
+			'a ZIP with no row in the relationship file',
+			BASIC_ZCTA,
+			rel(part('21047', '24001', '500')),
+			COUNTIES
+		],
+		[
+			'a ZIP whose county state FIPS is not in the counties file',
+			BASIC_ZCTA,
+			rel(part('21046', '99001', '500')),
+			COUNTIES
+		],
+		[
+			'a ZIP whose state is not one of the contract states',
+			BASIC_ZCTA,
+			BASIC_REL,
+			counties(county('ZZ', '24001'))
+		],
+		[
+			'a ZIP with one county in a state the counties file does not know, beside a larger known one',
+			BASIC_ZCTA,
+			rel(part('21046', '24001', '500'), part('21046', '99001', '1')),
+			COUNTIES
+		]
+	])('fails the build for %s rather than guessing a state', (_name, zcta, relationship, list) => {
+		expect(failure(() => zipsFromGazetteer(zcta, relationship, list))).toBe('E_ZIP_NO_STATE');
+	});
+
+	it.each([
+		['a 4-digit GEOID', file(line('1046', '39.1', '-76.8')), BASIC_REL, COUNTIES, 'E_TABLE_LINE'],
+		[
+			'a letter in a GEOID',
+			file(line('2104a', '39.1', '-76.8')),
+			BASIC_REL,
+			COUNTIES,
+			'E_TABLE_LINE'
+		],
+		[
+			'a line with 7 fields',
+			file('21046|860Z200US21046|1|2|3|39.1|-76.8'),
+			BASIC_REL,
+			COUNTIES,
+			'E_TABLE_LINE'
+		],
+		[
+			'a latitude that is not a number',
+			file(line('21046', 'north', '-76.8')),
+			BASIC_REL,
+			COUNTIES,
+			'E_TABLE_LINE'
+		],
+		['an empty longitude', file(line('21046', '39.1', '')), BASIC_REL, COUNTIES, 'E_TABLE_LINE'],
 		[
 			'a repeated GEOID',
 			file(line('21046', '39.1', '-76.8'), line('21046', '39.2', '-76.9')),
+			BASIC_REL,
+			COUNTIES,
 			'E_TABLE_LINE'
 		],
 		[
 			'a blank line between rows',
 			file(line('21046', '39.1', '-76.8'), '', line('21047', '39.1', '-76.8')),
+			BASIC_REL,
+			COUNTIES,
 			'E_TABLE_LINE'
 		],
-		['a latitude past the poles', file(line('21046', '95.1', '-76.8')), 'E_TABLE_INVALID'],
-		['a header without INTPTLONG', HEADER.replace('INTPTLONG', 'LONG') + '\n', 'E_TABLE_HEADER'],
-		['no header at all', '', 'E_TABLE_HEADER']
-	])('refuses %s', (_name, text, code) => {
-		expect(failure(() => zipsFromGazetteer(text))).toBe(code);
+		[
+			'a latitude past the poles',
+			file(line('21046', '95.1', '-76.8')),
+			BASIC_REL,
+			COUNTIES,
+			'E_TABLE_INVALID'
+		],
+		[
+			'a header without INTPTLONG',
+			HEADER.replace('INTPTLONG', 'LONG') + '\n',
+			BASIC_REL,
+			COUNTIES,
+			'E_TABLE_HEADER'
+		],
+		['no header at all', '', BASIC_REL, COUNTIES, 'E_TABLE_HEADER'],
+		[
+			'a relationship header without AREALAND_PART',
+			BASIC_ZCTA,
+			BASIC_REL.replace('AREALAND_PART', 'AREALAND'),
+			COUNTIES,
+			'E_TABLE_HEADER'
+		],
+		[
+			'a relationship file with commas for delimiters',
+			BASIC_ZCTA,
+			BASIC_REL.replaceAll('|', ','),
+			COUNTIES,
+			'E_TABLE_HEADER'
+		],
+		[
+			'a relationship row with an empty county GEOID',
+			BASIC_ZCTA,
+			rel(part('21046', '', '500')),
+			COUNTIES,
+			'E_TABLE_LINE'
+		],
+		[
+			'a relationship row with a 4-digit county GEOID',
+			BASIC_ZCTA,
+			rel(part('21046', '2400', '500')),
+			COUNTIES,
+			'E_TABLE_LINE'
+		],
+		[
+			'a relationship row with a 4-digit ZCTA',
+			BASIC_ZCTA,
+			rel(part('2104', '24001', '500')),
+			COUNTIES,
+			'E_TABLE_LINE'
+		],
+		[
+			'a relationship land area that is not a number',
+			BASIC_ZCTA,
+			rel(part('21046', '24001', 'lots')),
+			COUNTIES,
+			'E_TABLE_LINE'
+		],
+		[
+			'a relationship line with a field missing',
+			BASIC_ZCTA,
+			rel(part('21046', '24001', '500').split('|').slice(1).join('|')),
+			COUNTIES,
+			'E_TABLE_LINE'
+		],
+		[
+			'a counties header without GEOID',
+			BASIC_ZCTA,
+			BASIC_REL,
+			COUNTIES.replace('|GEOID|', '|FIPS|'),
+			'E_TABLE_HEADER'
+		],
+		[
+			'a counties file with commas for delimiters',
+			BASIC_ZCTA,
+			BASIC_REL,
+			COUNTIES.replaceAll('|', ','),
+			'E_TABLE_HEADER'
+		],
+		[
+			'a county GEOID that is not 5 digits',
+			BASIC_ZCTA,
+			BASIC_REL,
+			counties(county('MD', '2400')),
+			'E_TABLE_LINE'
+		],
+		[
+			'two state codes for one state FIPS',
+			BASIC_ZCTA,
+			BASIC_REL,
+			counties(county('MD', '24001'), county('VA', '24510')),
+			'E_TABLE_LINE'
+		]
+	])('refuses %s', (_name, zcta, relationship, list, code) => {
+		expect(failure(() => zipsFromGazetteer(zcta, relationship, list))).toBe(code);
 	});
 });
 

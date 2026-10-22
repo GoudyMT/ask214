@@ -1,7 +1,8 @@
 /**
- * Builds the SkillBridge finder's supporting tables from three public datasets: the Census ZIP code tabulation
- * area gazetteer (ZIP points), the Census counties gazetteer (the state boxes) and the O*NET Military Crosswalk
- * (military job codes to civilian occupations). Each reader refuses a line it does not understand by throwing a
+ * Builds the SkillBridge finder's supporting tables from four public datasets: the Census ZIP code tabulation
+ * area gazetteer (ZIP points), the Census ZCTA-to-county relationship file (each ZIP's state), the Census counties
+ * gazetteer (the state boxes and the state of each county) and the O*NET Military Crosswalk (military job codes
+ * to civilian occupations). Each reader refuses a line it does not understand by throwing a
  * static code, because a table built on a guess would quietly serve wrong distances or wrong job matches.
  * Pure: the text is passed in, so no test touches the disk or the network.
  */
@@ -74,17 +75,99 @@ function readPipeTable<Name extends string>(
 const round3 = (value: number) => Math.round(value * 1000) / 1000 + 0;
 
 const GEOID_RE = /^\d{5}$/;
+const STATE_SET: ReadonlySet<string> = new Set(STATE_CODES);
 
-export function zipsFromGazetteer(text: string): ZipsTable {
-	const { index, rows } = readPipeTable(text, ['GEOID', 'INTPTLAT', 'INTPTLONG'] as const);
+/**
+ * The USPS code of each state FIPS, read from the counties gazetteer: a county GEOID is its state's two FIPS digits
+ * then three of its own. Read from the file rather than written out, so no code here can drift from the Census.
+ */
+function stateOfFips(countiesText: string): Map<string, string> {
+	const { index, rows } = readPipeTable(countiesText, ['USPS', 'GEOID'] as const);
+	const states = new Map<string, string>();
+	for (const { fields, line } of rows) {
+		const usps = fields[index.USPS] ?? '';
+		const geoid = fields[index.GEOID] ?? '';
+		if (usps === '' || !GEOID_RE.test(geoid)) fail('E_TABLE_LINE', line);
+		const fips = geoid.slice(0, 2);
+		const known = states.get(fips);
+		if (known !== undefined && known !== usps) fail('E_TABLE_LINE', line);
+		states.set(fips, usps);
+	}
+	return states;
+}
+
+type LandWater = { land: number; water: number };
+
+/** Land and water of each ZCTA by state FIPS, summed over its counties. Rows with no ZCTA are counties without one. */
+function areaByFips(relationshipText: string): Map<string, Map<string, LandWater>> {
+	const { index, rows } = readPipeTable(relationshipText, [
+		'GEOID_ZCTA5_20',
+		'GEOID_COUNTY_20',
+		'AREALAND_PART',
+		'AREAWATER_PART'
+	] as const);
+	const byZcta = new Map<string, Map<string, LandWater>>();
+	for (const { fields, line } of rows) {
+		const zcta = fields[index.GEOID_ZCTA5_20] ?? '';
+		if (zcta === '') continue;
+		const countyGeoid = fields[index.GEOID_COUNTY_20] ?? '';
+		if (!GEOID_RE.test(zcta) || !GEOID_RE.test(countyGeoid)) fail('E_TABLE_LINE', line);
+		const land = toNumber(fields[index.AREALAND_PART] ?? '', line);
+		const water = toNumber(fields[index.AREAWATER_PART] ?? '', line);
+		const fips = countyGeoid.slice(0, 2);
+		const parts = byZcta.get(zcta) ?? new Map<string, LandWater>();
+		const sum = parts.get(fips) ?? { land: 0, water: 0 };
+		parts.set(fips, { land: sum.land + land, water: sum.water + water });
+		byZcta.set(zcta, parts);
+	}
+	return byZcta;
+}
+
+/**
+ * The state holding most of a ZCTA's land; a tie goes to the larger water, then to the lower state code, so the
+ * answer never depends on the order of the file.
+ */
+function stateOfZcta(
+	parts: ReadonlyMap<string, LandWater> | undefined,
+	states: ReadonlyMap<string, string>
+): StateCode {
+	if (parts === undefined) fail('E_ZIP_NO_STATE');
+	let best: { state: string; area: LandWater } | undefined;
+	for (const [fips, area] of parts) {
+		const state = states.get(fips);
+		if (state === undefined || !STATE_SET.has(state)) fail('E_ZIP_NO_STATE');
+		const wins =
+			best === undefined ||
+			area.land > best.area.land ||
+			(area.land === best.area.land &&
+				(area.water > best.area.water || (area.water === best.area.water && state < best.state)));
+		if (wins) best = { state, area };
+	}
+	if (best === undefined) fail('E_ZIP_NO_STATE');
+	return best.state as StateCode;
+}
+
+/**
+ * One row per ZCTA: `[zip, state, lat, lon]`, the point from the ZCTA gazetteer and the state from the Census
+ * ZCTA-to-county relationship file, whose county GEOIDs are turned into states with the counties gazetteer.
+ */
+export function zipsFromGazetteer(
+	zctaText: string,
+	relationshipText: string,
+	countiesText: string
+): ZipsTable {
+	const { index, rows } = readPipeTable(zctaText, ['GEOID', 'INTPTLAT', 'INTPTLONG'] as const);
+	const states = stateOfFips(countiesText);
+	const areas = areaByFips(relationshipText);
 	const seen = new Set<string>();
-	const out: [string, number, number][] = [];
+	const out: [string, StateCode, number, number][] = [];
 	for (const { fields, line } of rows) {
 		const geoid = fields[index.GEOID] ?? '';
 		if (!GEOID_RE.test(geoid) || seen.has(geoid)) fail('E_TABLE_LINE', line);
 		seen.add(geoid);
 		out.push([
 			geoid,
+			stateOfZcta(areas.get(geoid), states),
 			round3(toNumber(fields[index.INTPTLAT] ?? '', line)),
 			round3(toNumber(fields[index.INTPTLONG] ?? '', line))
 		]);
@@ -228,7 +311,6 @@ export function crosswalkFromCsv(text: string): {
 	return { table, skipped };
 }
 
-const STATE_SET: ReadonlySet<string> = new Set(STATE_CODES);
 const KM_PER_DEGREE = 111.32;
 const MARGIN_DEGREES = 0.1;
 

@@ -75,7 +75,7 @@ function goodTree(): Tree {
 	put(
 		tree,
 		'skillbridge-data/tables/zips.json',
-		JSON.stringify({ v: 1, rows: [['21046', 39.2, -76.86]] })
+		JSON.stringify({ v: 1, rows: [['21046', 'MD', 39.2, -76.86]] })
 	);
 	put(
 		tree,
@@ -427,7 +427,7 @@ describe('checkTree and guardAndDeploy: what may be deployed', () => {
 				put(
 					t,
 					'skillbridge-data/tables/zips.json',
-					JSON.stringify({ v: 1, rows: [['abc', 1, 2]] })
+					JSON.stringify({ v: 1, rows: [['abc', 'MD', 1, 2]] })
 				),
 			'E_INVALID:skillbridge-data/tables/zips.json'
 		],

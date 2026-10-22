@@ -13,24 +13,29 @@ const codes = (r: { errors: { code: string }[] }) => r.errors.map((e) => e.code)
 describe('validateZips', () => {
 	const zips = (rows: unknown[]) => ({ v: 1, rows });
 
-	it('accepts five-digit ZIPs with a point, including a leading zero', () => {
+	it('accepts five-digit ZIPs with a state and a point, including a leading zero', () => {
 		expect(
 			validateZips(
 				zips([
-					['21046', 39.2, -76.86],
-					['02134', 42.35, -71.13]
+					['21046', 'MD', 39.2, -76.86],
+					['02134', 'MA', 42.35, -71.13]
 				])
 			)
 		).toEqual({ valid: true, errors: [] });
 	});
 
 	// A ZIP is matched against what a person types; a malformed one would never match, or match the wrong place.
+	// The state picks which division file the app fetches, so a state outside the contract would fetch nothing.
 	it.each([
-		[['2134', 42.35, -71.13], 'E_SBF_BAD_ZIP'],
-		[['21046-1234', 39.2, -76.86], 'E_SBF_BAD_ZIP'],
-		[['21046', 91, -76.86], 'E_SBF_BAD_POINT'],
-		[['21046', 39.2, 'west'], 'E_SBF_BAD_POINT'],
-		[['21046', 39.2], 'E_SBF_BAD_ROW']
+		[['2134', 'MA', 42.35, -71.13], 'E_SBF_BAD_ZIP'],
+		[['21046-1234', 'MD', 39.2, -76.86], 'E_SBF_BAD_ZIP'],
+		[['21046', 'MD', 91, -76.86], 'E_SBF_BAD_POINT'],
+		[['21046', 'MD', 39.2, 'west'], 'E_SBF_BAD_POINT'],
+		[['21046', 39.2, -76.86], 'E_SBF_BAD_ROW'],
+		[['21046', 'MD', 39.2], 'E_SBF_BAD_ROW'],
+		[['21046', 'ZZ', 39.2, -76.86], 'E_SBF_BAD_ENUM'],
+		[['21046', 'OS', 39.2, -76.86], 'E_SBF_BAD_ENUM'],
+		[['21046', 'Maryland', 39.2, -76.86], 'E_SBF_BAD_ENUM']
 	])('refuses the row %j', (row, code) => {
 		expect(codes(validateZips(zips([row])))).toEqual([code]);
 	});
@@ -40,8 +45,8 @@ describe('validateZips', () => {
 			codes(
 				validateZips(
 					zips([
-						['21046', 39.2, -76.86],
-						['21046', 39.3, -76.8]
+						['21046', 'MD', 39.2, -76.86],
+						['21046', 'MD', 39.3, -76.8]
 					])
 				)
 			)

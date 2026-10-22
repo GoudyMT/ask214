@@ -1,8 +1,12 @@
 /**
  * Builds the SkillBridge finder's supporting tables from public datasets Max downloads by hand.
  *
- * Run: node --import tsx content-ops/skillbridge/tables.mjs --zcta <file> --crosswalk <file> --out <folder>
+ * Run: node --import tsx content-ops/skillbridge/tables.mjs --zcta <file> --zcta-county <file> --counties <file>
+ *        --crosswalk <file> --out <folder>
  *        writes <folder>/zips.json and <folder>/crosswalk.json (compact JSON) and prints their row counts.
+ *        --zcta is the Census ZCTA gazetteer (the points), --zcta-county the Census ZCTA-to-county
+ *        relationship file (tab20_zcta520_county20_natl.txt, the state of each ZIP) and --counties the Census
+ *        counties gazetteer (the state of each county).
  *      node --import tsx content-ops/skillbridge/tables.mjs --counties <file> --extents <path>
  *        writes the app's state-extents.ts source (format it with prettier afterwards).
  *
@@ -46,22 +50,39 @@ function main() {
 	const { values } = parseArgs({
 		options: {
 			zcta: { type: 'string' },
+			'zcta-county': { type: 'string' },
 			crosswalk: { type: 'string' },
 			out: { type: 'string' },
 			counties: { type: 'string' },
 			extents: { type: 'string' }
 		}
 	});
+	// --counties serves both modes, so only --extents picks the extents mode.
 	const tables =
-		values.zcta !== undefined || values.crosswalk !== undefined || values.out !== undefined;
-	const extents = values.counties !== undefined || values.extents !== undefined;
+		values.zcta !== undefined ||
+		values['zcta-county'] !== undefined ||
+		values.crosswalk !== undefined ||
+		values.out !== undefined;
+	const extents = values.extents !== undefined;
 	if (!tables && !extents) stop('E_USAGE');
 
 	if (tables) {
-		const { zcta, crosswalk, out } = values;
-		if (zcta === undefined || crosswalk === undefined || out === undefined) stop('E_USAGE');
+		const { zcta, crosswalk, out, counties } = values;
+		const zctaCounty = values['zcta-county'];
+		if (
+			zcta === undefined ||
+			zctaCounty === undefined ||
+			counties === undefined ||
+			crosswalk === undefined ||
+			out === undefined
+		)
+			stop('E_USAGE');
 		if (isInsideFolder(REPO_ROOT, out)) stop('E_OUT_INSIDE_REPO');
-		const zips = zipsFromGazetteer(readFileSync(zcta, 'utf8'));
+		const zips = zipsFromGazetteer(
+			readFileSync(zcta, 'utf8'),
+			readFileSync(zctaCounty, 'utf8'),
+			readFileSync(counties, 'utf8')
+		);
 		const built = crosswalkFromCsv(readFileSync(crosswalk, 'utf8'));
 		mkdirSync(out, { recursive: true });
 		writeJson(join(out, 'zips.json'), zips);

@@ -104,7 +104,7 @@ describe('placeListing: every listing goes to its files and nowhere else', () =>
 });
 
 const TABLES = {
-	zips: { v: 1, rows: [['21046', 39.2, -76.86]] },
+	zips: { v: 1, rows: [['21046', 'MD', 39.2, -76.86]] },
 	crosswalk: { v: 1, rows: [['91B', 'Army', '49-3023.00', 'Automotive Service Technicians']] }
 };
 
@@ -309,7 +309,9 @@ describe('buildWeek', () => {
 	});
 
 	it('refuses a table that breaks the contract', () => {
-		const week = buildWeek(input({ tables: { zips: { v: 1, rows: [['2104', 39.2, -76.86]] } } }));
+		const week = buildWeek(
+			input({ tables: { zips: { v: 1, rows: [['2104', 'MD', 39.2, -76.86]] } } })
+		);
 		expect(week.errors).toEqual(['E_INVALID_TABLE']);
 	});
 

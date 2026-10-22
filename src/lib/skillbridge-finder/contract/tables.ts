@@ -6,7 +6,7 @@
  */
 
 import { BRANCHES, CONTRACT_VERSION } from './listing';
-import { STATE_CODES } from './places';
+import { STATE_CODES, type StateCode } from './places';
 import { isSafeText, type ContractError, type ContractResult } from './validate';
 
 export const MAX_ZIP_ROWS = 40_000;
@@ -14,8 +14,11 @@ export const MAX_BASE_ROWS = 2_000;
 export const MAX_CROSSWALK_ROWS = 100_000;
 const MAX_NAME = 150;
 
-/** `[zip, lat, lon]`: one row per five-digit ZIP code tabulation area. */
-export type ZipsTable = { v: 1; rows: [string, number, number][] };
+/**
+ * `[zip, state, lat, lon]`: one row per five-digit ZIP code tabulation area. The state is the ZIP's own, so the app
+ * fetches only that state's division file.
+ */
+export type ZipsTable = { v: 1; rows: [string, StateCode, number, number][] };
 /** `[name, state, lat, lon]`: one row per installation. */
 export type BasesTable = { v: 1; rows: [string, string, number, number][] };
 /**
@@ -76,13 +79,14 @@ export function validateZips(raw: unknown): ContractResult {
 	const rows = readTable(raw, MAX_ZIP_ROWS, errors);
 	const seen = new Set<string>();
 	for (const r of rows ?? []) {
-		const row = rowOf(r, 3, errors);
+		const row = rowOf(r, 4, errors);
 		if (row === null) continue;
-		const [zip, la, lo] = row;
+		const [zip, state, la, lo] = row;
 		if (typeof zip !== 'string' || !ZIP_RE.test(zip)) {
 			errors.push({ code: 'E_SBF_BAD_ZIP', field: 'rows' });
 			continue;
 		}
+		if (!STATE_SET.has(state)) errors.push({ code: 'E_SBF_BAD_ENUM', field: 'rows' });
 		if (!isPoint(la, lo)) errors.push({ code: 'E_SBF_BAD_POINT', field: 'rows' });
 		if (seen.has(zip)) errors.push({ code: 'E_SBF_DUP_ID', field: 'rows' });
 		seen.add(zip);
