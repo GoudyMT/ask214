@@ -93,6 +93,8 @@ type Setup = {
 	exitCode?: number;
 	runnerFails?: boolean;
 	env?: Record<string, string | undefined>;
+	/** Names of files present in the data Worker folder, beside the config. */
+	present?: string[];
 };
 
 function makeDeps(setup: Setup = {}) {
@@ -130,7 +132,8 @@ function makeDeps(setup: Setup = {}) {
 		wranglerJs: WRANGLER_JS,
 		nodePath: NODE,
 		cwd: setup.cwd ?? FOLDER,
-		env: setup.env ?? {}
+		env: setup.env ?? {},
+		exists: (path) => (setup.present ?? []).some((name) => path === `${FOLDER}/${name}`)
 	};
 	return { deps, reads, runs };
 }
@@ -599,6 +602,31 @@ describe('guardAndDeploy: the environment wrangler would inherit', () => {
 		const { outcome, runs } = await guard({ env });
 		expect(outcome).toEqual({ ok: true, problems: [], exitCode: 0 });
 		expect(runs).toHaveLength(1);
+	});
+});
+
+// Wrangler loads `.env` and `.env.local` from its working folder and fills in any name the shell does not set, so
+// a token in one of them would replace the keyring login while the environment check passes. The guard only asks
+// whether such a file exists; it never opens one.
+describe('guardAndDeploy: env files beside the data Worker config', () => {
+	it.each(['.env', '.env.local'])(
+		'refuses when %s exists, without reading it, and never runs wrangler',
+		async (name) => {
+			const { outcome, runs, reads } = await guard({ present: [name] });
+			expect(outcome).toEqual({ ok: false, problems: [`E_DOTENV:${name}`] });
+			expect(runs).toEqual([]);
+			expect(reads.filter((p) => p.includes('.env'))).toEqual([]);
+		}
+	);
+
+	it('names both when both exist', async () => {
+		const { outcome } = await guard({ present: ['.env.local', '.env'] });
+		expect(outcome.problems).toEqual(['E_DOTENV:.env', 'E_DOTENV:.env.local']);
+	});
+
+	it('does not mind other files in the folder', async () => {
+		const { outcome } = await guard({ present: ['wrangler.jsonc', '.gitignore', 'notes.env'] });
+		expect(outcome).toEqual({ ok: true, problems: [], exitCode: 0 });
 	});
 });
 

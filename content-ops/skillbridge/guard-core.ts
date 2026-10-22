@@ -47,7 +47,12 @@ export type GuardDeps = {
 	cwd: string;
 	/** The environment wrangler would inherit. */
 	env: Record<string, string | undefined>;
+	/** Whether a file or folder exists at `path`. Existence only: the guard never opens an env file. */
+	exists(path: string): boolean;
 };
+
+/** Files wrangler loads from its working folder to fill in any variable the shell does not set. */
+const DOTENV_FILES = ['.env', '.env.local'] as const;
 
 /**
  * Environment variables that make a deploy do something other than what the committed config and the keyring login
@@ -313,6 +318,9 @@ export async function guardAndDeploy(
 	for (const name of FORBIDDEN_ENV) {
 		const value = deps.env[name];
 		if (value !== undefined && value !== '') problems.push(`E_ENV:${name}`);
+	}
+	for (const name of DOTENV_FILES) {
+		if (deps.exists(`${workerFolder(deps.repoRoot)}/${name}`)) problems.push(`E_DOTENV:${name}`);
 	}
 	problems.push(...checkConfig(options.configPath, deps));
 	problems.push(...checkTree(`${workerFolder(deps.repoRoot)}/deploy`, deps));

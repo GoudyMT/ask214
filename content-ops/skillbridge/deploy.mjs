@@ -10,7 +10,7 @@
 // with narrowed scopes); no token is read or stored here.
 
 import { spawn } from 'node:child_process';
-import { lstatSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,6 +79,7 @@ const outcome = await guardAndDeploy(
 		repoRoot,
 		cwd: process.cwd(),
 		env: process.env,
+		exists: existsSync,
 		readText: (path) => readFileSync(path, 'utf8'),
 		listTree,
 		runner,
