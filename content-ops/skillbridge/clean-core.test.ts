@@ -287,6 +287,38 @@ describe('text fields', () => {
 	});
 });
 
+describe('very long values', () => {
+	// Some of the cleaning is quadratic in the length of a value (nested parentheses are peeled one layer at a
+	// time), and a provider can send as much text as it likes.
+	const padded = (length: number) => 'Inspector' + ','.repeat(length - 'Inspector'.length);
+
+	it('keeps roles from a value of 10,000 characters and refuses one of 10,001', () => {
+		expect(only({ jobDescription: padded(10_000) }).r).toEqual(['Inspector']);
+		const out = clean([rawListing({ jobDescription: padded(10_001) })]);
+		expect(out.listings[0]).not.toHaveProperty('r');
+		expect(out.dropped).toEqual({ D_ROLES: 1 });
+	});
+
+	it('refuses a 50,000-character value quickly', () => {
+		const started = performance.now();
+		const out = clean([
+			rawListing({
+				jobDescription: padded(50_000),
+				targetMOCs: '('.repeat(25_000) + ')'.repeat(25_000)
+			})
+		]);
+		expect(performance.now() - started).toBeLessThan(200);
+		expect(out.listings[0]).not.toHaveProperty('r');
+		expect(out.listings[0]).not.toHaveProperty('oc');
+		expect(out.dropped).toEqual({ D_ROLES: 1, D_CODES: 1 });
+	});
+
+	it('holds back a row whose required name is that long', () => {
+		const out = clean([rawListing({ organization: 'x'.repeat(10_001) })]);
+		expect(out.quarantine).toEqual([{ id: 1001, code: 'E_Q_NAME' }]);
+	});
+});
+
 describe('required fields', () => {
 	it('holds back a delivery method outside 1, 2 and 3', () => {
 		const out = clean([rawListing({ deliveryMethodId: 4 })]);

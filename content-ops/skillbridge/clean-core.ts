@@ -457,12 +457,27 @@ function hold(row: unknown, code: string): Held {
 	return { held: true, id: isId(id) ? id : 0, code };
 }
 
+// No real value is this long, and some of the cleaning below is quadratic in the length of its input.
+const MAX_RAW_LENGTH = 10_000;
+// What an over-long text becomes: a non-empty value that no field accepts, so each field drops it the way it
+// drops any unusable value, and a required one holds the row back.
+const UNUSABLE_TEXT = '?';
+
+function withoutOverlongText(row: Raw): Raw {
+	return Object.fromEntries(
+		Object.entries(row).map(([key, value]) => [
+			key,
+			typeof value === 'string' && value.length > MAX_RAW_LENGTH ? UNUSABLE_TEXT : value
+		])
+	);
+}
+
 function cleanRow(
 	input: unknown,
 	options: { suppression: ReadonlySet<string>; places: PlaceLookups }
 ): Cleaned | Held {
 	if (typeof input !== 'object' || input === null) return hold(input, 'E_Q_ID');
-	const row = input as Raw;
+	const row = withoutOverlongText(input as Raw);
 	const drops: string[] = [];
 
 	const { id, organizationId } = row;
