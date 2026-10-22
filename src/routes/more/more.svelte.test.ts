@@ -9,16 +9,21 @@ import MorePage from './+page.svelte';
 const ctx = vi.hoisted(() => ({
 	app: { status: 'ready' },
 	cameFrom: null as string | null,
-	arrive: (() => {}) as (from: string | null) => void
+	arrive: (() => {}) as (from: string | null) => void,
+	leave: (() => {}) as (to: string) => void
 }));
 
 vi.mock('$lib/profile/context', () => ({ getProfileApp: () => ctx.app, setProfileApp: () => {} }));
-// SvelteKit reports the previous page to afterNavigate; here the test says what it was.
+// SvelteKit reports the previous page to afterNavigate and the next one to beforeNavigate; here the test says what
+// they are.
 vi.mock('$app/navigation', () => ({
 	afterNavigate: (callback: (navigation: { from: { url: URL } | null }) => void) => {
 		ctx.arrive = (from) =>
 			callback({ from: from === null ? null : { url: new URL(from, window.location.origin) } });
 		ctx.arrive(ctx.cameFrom);
+	},
+	beforeNavigate: (callback: (navigation: { to: { url: URL } | null }) => void) => {
+		ctx.leave = (to) => callback({ to: { url: new URL(to, window.location.origin) } });
 	}
 }));
 
@@ -150,9 +155,31 @@ describe('the More page', () => {
 		await render(MorePage);
 		expect(readStashedRoute()).toBe('/timeline');
 
+		ctx.leave('/feedback');
 		ctx.cameFrom = '/feedback';
 		await render(MorePage);
 
 		expect(readStashedRoute()).toBe('/timeline');
+	});
+
+	// The remembered page belongs to one visit: once the person leaves More for any page but Feedback, a later trip
+	// to Feedback must not name a page from before.
+	it('forgets the page when the person leaves for another page, so a later Feedback names nothing', async () => {
+		ctx.cameFrom = '/';
+		await render(MorePage);
+
+		ctx.leave('/timeline');
+		ctx.arrive('/feedback');
+
+		expect(readStashedRoute()).toBeNull();
+	});
+
+	it('leaves nothing remembered when the person goes on from More to another page', async () => {
+		ctx.cameFrom = '/timeline';
+		await render(MorePage);
+
+		ctx.leave('/');
+
+		expect(readStashedRoute()).toBeNull();
 	});
 });

@@ -5,7 +5,7 @@
 </script>
 
 <script lang="ts">
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, beforeNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { stashRoute } from '$lib/feedback/context';
 	import { getProfileApp } from '$lib/profile/context';
@@ -21,6 +21,10 @@
 		const path = from?.url.pathname;
 		if (path !== '/more' && path !== '/feedback') cameFrom = path ?? '/more';
 		stashRoute(cameFrom);
+	});
+	// The remembered page belongs to one visit: leaving for anything but Feedback forgets it.
+	beforeNavigate(({ to }) => {
+		if (to?.url.pathname !== '/feedback') stashRoute((cameFrom = '/more'));
 	});
 </script>
 
