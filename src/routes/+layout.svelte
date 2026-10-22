@@ -31,6 +31,7 @@
 	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
+	import { startReload, stopReloadForLock } from '$lib/profile/pending-reload';
 	import { wipeAllStores } from '$lib/db/wipe';
 	import { stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
@@ -189,16 +190,29 @@
 				const relockables: Relockable[] = [result.store];
 				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
 				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
-				app.relockAll = () => relockAll(relockables, 'user');
+				// A lock (here or from another tab) that lands while a reload of the app's own waits out its grace cancels
+				// it, as the reload would decrypt again (pending-reload.ts). The tab then goes on as one locked before the
+				// signal (below).
+				const lockStopsReload = () => {
+					if (!stopReloadForLock()) return;
+					if (result.store.locked) app.reloadOnUnlock = true;
+					else app.replacedNotice = true;
+				};
+				app.relockAll = () => {
+					relockAll(relockables, 'user');
+					lockStopsReload();
+				};
 				app.joinRelock = createJoinRelock(relockables);
 				app.publish = (s) => echo.publish(s);
 				// refresh, not load: a peer's change is not the user asking to unlock, so each store
 				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
-					relocked: (s) =>
+					relocked: (s) => {
 						echo.answer(() =>
 							relockEachSync(relockables, 'peer', s.reason ? { peerReason: s.reason } : undefined)
-						),
+						);
+						lockStopsReload();
+					},
 					'profile-updated': () => result.store.refresh(),
 					'timeline-updated': () => app.timeline?.refresh(),
 					'calendar-updated': () => app.calendar?.refresh(),
@@ -219,9 +233,11 @@
 						else app.replacedNotice = true;
 					},
 					() =>
-						location.pathname === resolve('/wizard')
-							? location.replace(resolve('/timeline'))
-							: location.reload()
+						startReload(() =>
+							location.pathname === resolve('/wizard')
+								? location.replace(resolve('/timeline'))
+								: location.reload()
+						)
 				);
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,

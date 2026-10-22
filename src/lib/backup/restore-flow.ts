@@ -32,6 +32,7 @@ import { canonicalizePhrase, type PhrasePosition } from './phrase';
 import { restoreBackup, type RestoreFailureCode, type RestoreGens } from './restore-writer';
 import { untilAborted, type BackupSession, type Run, type SessionKind } from './session.svelte';
 import { validateInner, type ValidInner } from './validate';
+import { startReload } from '../profile/pending-reload';
 
 /**
  * The restore and Check flow: everything a person does between "Restore" (or "Check a backup") and the result, driven
@@ -246,8 +247,10 @@ export class RestoreFlow {
 		this.#db = deps.db;
 		this.#waitForControl = deps.waitForControl ?? waitForControl;
 		this.#readDevice = deps.readDevice ?? readDeviceNow;
-		this.#reload = deps.reload ?? ((): void => location.reload());
-		this.#replace = deps.replace ?? ((path: string): void => location.replace(path));
+		// Through startReload, so a lock landing before the page unloads stops the reload (pending-reload.ts).
+		this.#reload = deps.reload ?? ((): void => startReload(() => location.reload()));
+		this.#replace =
+			deps.replace ?? ((path: string): void => startReload(() => location.replace(path)));
 		this.#isVisible = deps.isVisible ?? ((): boolean => document.visibilityState === 'visible');
 		this.#onceVisible = deps.onceVisible ?? onceVisibleNow;
 		this.#timelinePath = deps.timelinePath ?? ((): string => resolve('/timeline'));
