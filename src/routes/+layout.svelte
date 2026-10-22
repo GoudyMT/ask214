@@ -361,43 +361,46 @@
 		};
 		// Focus entering the header brings it back, and the hide distance counts from there.
 		// The bar never moves, so a control focused under it has to. Chromium does that from scroll-padding-bottom, but
-		// WebKit leaves a control that is already inside the window where it is, partly under the bar. A control that starts
-		// in the window and runs under the bar is moved up, but never past its first line (the header's bottom while a move
-		// that short keeps it shown, the top of the window when the move hides it); one below the window is left, and
-		// looked at again for half a second, as WebKit scrolls to a control only after focusin, to under the bar.
+		// WebKit leaves a control that is already inside the window where it is, and scrolls to one below the window only
+		// after focusin, to under the bar - so a control below the window is looked at again for up to half a second. A
+		// control that starts in the window and runs under the bar is moved up, but never past its first line (the
+		// header's bottom while a move that short keeps it shown, the top of the window when the move hides it).
 		// The bar's own links stay put, and so does the page behind a modal dialog, which sits above the bar.
-		const clearBar = (target: Element, bar: Element) => {
-			const { top, bottom } = target.getBoundingClientRect();
-			const room = bottom - bar.getBoundingClientRect().top;
-			const shift = Math.min(
-				room,
-				room > HIDE_AFTER_PX ? top : top - el.getBoundingClientRect().bottom
-			);
-			if (top < window.innerHeight && shift > 0) window.scrollBy(0, shift);
-			return top < window.innerHeight;
-		};
+		const bar = document.querySelector('.bottom-bar');
 		const onFocusIn = ({ target }: FocusEvent) => {
 			if (!(target instanceof Element)) return;
 			if (el.contains(target)) {
 				state = startHeaderState(window.scrollY);
 				return setHidden(false);
 			}
-			const bar = document.querySelector('.bottom-bar');
-			if (!bar || target.closest('.bottom-bar,dialog[open]') || clearBar(target, bar)) return;
+			if (!bar || target.closest('.bottom-bar,dialog[open]')) return;
 			let frames = 30;
-			const again = () => {
-				if (document.activeElement === target && !clearBar(target, bar) && --frames > 0)
-					requestAnimationFrame(again);
+			const check = () => {
+				if (document.activeElement !== target) return;
+				const { top, bottom } = target.getBoundingClientRect();
+				if (top >= window.innerHeight) {
+					if (--frames) requestAnimationFrame(check);
+					return;
+				}
+				const room = bottom - bar.getBoundingClientRect().top;
+				const shift = Math.min(
+					room,
+					room > HIDE_AFTER_PX ? top : top - el.getBoundingClientRect().bottom
+				);
+				if (shift > 0) window.scrollBy(0, shift);
 			};
-			requestAnimationFrame(again);
+			check();
 		};
-		// At a large text size the bar's labels wrap and it grows: the room the page keeps for it follows its real height.
-		let barWatch: ResizeObserver | undefined;
+		// At a large text size the labels wrap and the bar grows, so the room the page keeps for it follows its real
+		// height: its links and its top border (the safe-area inset is added where the room is used).
+		const sizer = new ResizeObserver((entries) => {
+			for (const e of entries)
+				root.style.setProperty('--bottom-bar-height', `${e.contentRect.height + 1}px`);
+		});
 		const stop = () => {
 			window.removeEventListener('scroll', onScroll);
 			document.removeEventListener('focusin', onFocusIn);
-			barWatch?.disconnect();
-			root.style.removeProperty('--bottom-bar-height');
+			sizer.disconnect();
 			setHidden(false);
 		};
 		// Crossing 600px in either direction starts over: a header hidden on a phone must not stay hidden on a desktop.
@@ -407,12 +410,7 @@
 			state = startHeaderState(window.scrollY);
 			window.addEventListener('scroll', onScroll);
 			document.addEventListener('focusin', onFocusIn);
-			const bar = document.querySelector<HTMLElement>('.bottom-bar');
-			if (!bar) return;
-			barWatch = new ResizeObserver(() =>
-				root.style.setProperty('--bottom-bar-height', `${bar.offsetHeight}px`)
-			);
-			barWatch.observe(bar);
+			if (bar) sizer.observe(bar);
 		};
 		sync();
 		phone.addEventListener('change', sync);
