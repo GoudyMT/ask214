@@ -27,10 +27,10 @@ import { withStores } from '../../db/schema';
  * store has no wipe of its own, since one that cleared without the lock and reset the generation to 0 would let a
  * stale tab's write pass the conflict check later. State lives in the factory closure (`_state`); never exported.
  *
- * load() is fail-closed: verify the keystore-record HMAC, then the signed HWM, BEFORE any decrypt. A missing
- * skillbridge-finder-hwm = "nothing saved yet" (generation 0, empty record) - legitimate for a first visit; the HWM is
- * created on first save. An HWM with no body is a deleted record and fails the load. Relock drops the in-memory
- * reference; the on-disk record stays encrypted.
+ * load() is fail-closed: verify the keystore-record HMAC, then the signed HWM, BEFORE any decrypt. No skillbridge-finder
+ * body and no HWM = "nothing saved yet" (generation 0, empty record) - legitimate for a first visit; the HWM is created
+ * on first save. An HWM with no body is a deleted record, and a body with no HWM is a lost marker: both fail the load.
+ * Relock drops the in-memory reference; the on-disk record stays encrypted.
  */
 
 /** A write was attempted against unloaded/relocked state, where the current record is UNKNOWN. */
@@ -215,6 +215,11 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 						// would otherwise pair the newer generation with the older record, and a write from them would
 						// pass the conflict check and lay it over the peer's save.
 						if (gen === 0) {
+							// A body with no marker is damage, never a first visit: reading it as empty would let the next
+							// save write over it. The backup snapshot refuses the same state.
+							if (await getRow<StateRow>(db, 'skillbridge-finder')) {
+								throw new Error('E_FINDER_BODY_WITHOUT_MARK');
+							}
 							_generation = gen;
 							if (relockEpoch === relockAtStart) {
 								_state = EMPTY_RECORD();

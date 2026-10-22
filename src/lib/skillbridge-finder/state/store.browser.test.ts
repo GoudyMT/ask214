@@ -189,6 +189,22 @@ describe('finder store', () => {
 			expect(b.failed).toBe(true);
 		});
 
+		// A body whose marker is gone is damage, not a first visit: reading it as empty would let the next save write over
+		// the person's saved programs.
+		it('a body present but the marker missing: not ready, and the body is left alone', async () => {
+			const ks = await readKeystoreRow(db);
+			const rec = await encryptFinderRecord({ ...EMPTY_RECORD, finderCompare: [386] }, ks, 1);
+			await putRow('skillbridge-finder', { id: 0, rec });
+
+			const b = createFinderStore(db);
+			await expect(b.load()).rejects.toThrow('E_FINDER_BODY_WITHOUT_MARK');
+			expect(b.ready).toBe(false);
+			expect(b.failed).toBe(true);
+			await expect(b.addCompare(1)).rejects.toThrow(FinderRelockedError);
+			expect((await readRow<Row>('skillbridge-finder'))?.rec).toEqual(rec);
+			expect(await readRow('skillbridge-finder-hwm')).toBeUndefined();
+		});
+
 		it('a body that does not decrypt, and reads as ready again once it does', async () => {
 			const a = await loaded();
 			await a.setSetup({ radius: 25 });
