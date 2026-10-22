@@ -81,6 +81,13 @@ const STATE_SET: ReadonlySet<string> = new Set(STATE_CODES);
  * The USPS code of each state FIPS, read from the counties gazetteer: a county GEOID is its state's two FIPS digits
  * then three of its own. Read from the file rather than written out, so no code here can drift from the Census.
  */
+const ISLAND_AREA_FIPS: readonly (readonly [string, string])[] = [
+	['60', 'AS'],
+	['66', 'GU'],
+	['69', 'MP'],
+	['78', 'VI']
+];
+
 function stateOfFips(countiesText: string): Map<string, string> {
 	const { index, rows } = readPipeTable(countiesText, ['USPS', 'GEOID'] as const);
 	const states = new Map<string, string>();
@@ -93,6 +100,9 @@ function stateOfFips(countiesText: string): Map<string, string> {
 		if (known !== undefined && known !== usps) fail('E_TABLE_LINE', line);
 		states.set(fips, usps);
 	}
+	// The counties gazetteer covers the states, DC and Puerto Rico only, while the ZCTA files also hold ZIPs of the
+	// island areas; their state FIPS codes are the Census Bureau's outlying-area codes.
+	for (const [fips, usps] of ISLAND_AREA_FIPS) if (!states.has(fips)) states.set(fips, usps);
 	return states;
 }
 

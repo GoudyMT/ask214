@@ -223,6 +223,31 @@ describe('zipsFromGazetteer', () => {
 		expect(failure(() => zipsFromGazetteer(zcta, relationship, list))).toBe('E_ZIP_NO_STATE');
 	});
 
+	// The ZCTA gazetteer holds ZIPs of the island areas, but the counties gazetteer has no county there.
+	it('gives the ZIPs of the island areas their state, which the counties file never names', () => {
+		const table = zipsFromGazetteer(
+			file(
+				line('96799', '-14.3', '-170.7'),
+				line('96910', '13.47', '144.75'),
+				line('96950', '15.18', '145.75'),
+				line('00802', '18.34', '-64.93')
+			),
+			rel(
+				part('96799', '60050', '100'),
+				part('96910', '66010', '100'),
+				part('96950', '69110', '100'),
+				part('00802', '78030', '100')
+			),
+			COUNTIES
+		);
+		expect(table.rows.map(([zip, state]) => [zip, state])).toEqual([
+			['00802', 'VI'],
+			['96799', 'AS'],
+			['96910', 'GU'],
+			['96950', 'MP']
+		]);
+	});
+
 	it.each([
 		['a 4-digit GEOID', file(line('1046', '39.1', '-76.8')), BASIC_REL, COUNTIES, 'E_TABLE_LINE'],
 		[
