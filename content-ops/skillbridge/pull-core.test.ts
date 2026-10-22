@@ -287,6 +287,13 @@ describe('runPull: robots.txt first', () => {
 		expect(urls()).toEqual([ROBOTS_URL]);
 	});
 
+	it('stops when robots.txt is served as text/html even though its body reads like rules', async () => {
+		const robots = html('User-agent: *\nAllow: /');
+		const { outcome, urls } = await pull(makeWorld({ robots }));
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_ROBOTS_UNREADABLE' });
+		expect(urls()).toEqual([ROBOTS_URL]);
+	});
+
 	it('stops on a 403 for robots.txt like for any other request', async () => {
 		const { outcome, urls } = await pull(makeWorld({ robots: status(403) }));
 		expect(outcome).toMatchObject({ ok: false, stop: 'E_HTTP_403' });
