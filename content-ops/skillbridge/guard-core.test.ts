@@ -4,6 +4,7 @@ import { checkConfig, checkTree, dataConfigPath, guardAndDeploy } from './guard-
 import type { GuardDeps, TreeEntry } from './guard-core.ts';
 import { ASSET_MAX_FILES, ASSET_MAX_FILE_BYTES, DATA_HEADERS_FILE } from './config.ts';
 import { stripJsoncComments } from '../../src/lib/ci/worker-config-policy.ts';
+import { MAX_FILE_BYTES } from '../../src/lib/skillbridge-finder/contract/listing.ts';
 import { cleanListing } from '../../src/lib/skillbridge-finder/fixtures/clean.ts';
 
 // Max deploys the week's files from his own login, so the guard is the last thing between a slip and a public
@@ -437,6 +438,42 @@ describe('checkTree and guardAndDeploy: what may be deployed', () => {
 		const { outcome, runs } = await guard({ tree: null });
 		expect(outcome).toEqual({ ok: false, problems: ['E_NO_TREE'] });
 		expect(runs).toEqual([]);
+	});
+
+	// The app refuses a data file over MAX_FILE_BYTES while it streams in, so a larger one would deploy fine and
+	// then never load for anyone; Cloudflare's own 25 MiB limit still applies to every other file.
+	const resized = (bytes: number): Tree => {
+		const tree = goodTree();
+		const path = `skillbridge-data/w/${WEEK_NEW}/remote.json`;
+		tree.set(path, { ...tree.get(path)!, bytes });
+		const indexPath = 'skillbridge-data/index.json';
+		const index = JSON.parse(tree.get(indexPath)!.text!) as {
+			files: { name: string; bytes: number }[];
+		};
+		index.files.find((f) => f.name === 'remote')!.bytes = bytes;
+		put(tree, indexPath, JSON.stringify(index));
+		return tree;
+	};
+
+	it('refuses a data file one byte over what the app will read', async () => {
+		const { outcome, runs } = await guard({ tree: resized(MAX_FILE_BYTES + 1) });
+		expect(outcome.ok).toBe(false);
+		expect(outcome.problems).toEqual([`E_FILE_TOO_BIG:skillbridge-data/w/${WEEK_NEW}/remote.json`]);
+		expect(runs).toEqual([]);
+	});
+
+	it('allows a data file of exactly what the app will read', async () => {
+		const { outcome } = await guard({ tree: resized(MAX_FILE_BYTES) });
+		expect(outcome.problems).toEqual([]);
+	});
+
+	it('keeps Cloudflare 25 MiB limit for any other file', () => {
+		const tree = goodTree();
+		tree.set('notes.bin', { bytes: ASSET_MAX_FILE_BYTES + 1 });
+		tree.set('other.bin', { bytes: MAX_FILE_BYTES + 1 });
+		const problems = checkTree(DEPLOY, makeDeps({ tree }).deps);
+		expect(problems).toContain('E_FILE_TOO_BIG:notes.bin');
+		expect(problems).not.toContain('E_FILE_TOO_BIG:other.bin');
 	});
 
 	it('allows exactly the most files a Worker version may hold', () => {

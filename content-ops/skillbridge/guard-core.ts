@@ -24,6 +24,7 @@ import {
 	validateZips
 } from '../../src/lib/skillbridge-finder/contract/tables.ts';
 import type { ContractResult } from '../../src/lib/skillbridge-finder/contract/validate.ts';
+import { MAX_FILE_BYTES } from '../../src/lib/skillbridge-finder/contract/listing.ts';
 import type { IndexFile } from '../../src/lib/skillbridge-finder/contract/listing.ts';
 import {
 	ASSET_MAX_FILES,
@@ -188,6 +189,14 @@ export function checkTree(deployRoot: string, deps: GuardDeps): string[] {
 	}
 	if (dates.size > DEPLOY_WEEKS_KEPT) problems.push('E_TOO_MANY_WEEKS');
 
+	// The app refuses a data file past MAX_FILE_BYTES while it streams in, so a larger one would deploy and then
+	// never load; any other file only has Cloudflare's limit to meet.
+	for (const [path, entry] of files) {
+		const kind = placed.get(path)?.kind;
+		const limit = kind !== undefined && kind !== 'headers' ? MAX_FILE_BYTES : ASSET_MAX_FILE_BYTES;
+		if (entry.bytes > limit) problems.push(`E_FILE_TOO_BIG:${path}`);
+	}
+
 	const read = (path: string): string | null => {
 		try {
 			return deps.readText(`${root}/${path}`);
@@ -202,10 +211,8 @@ export function checkTree(deployRoot: string, deps: GuardDeps): string[] {
 	for (const [path, where] of placed) {
 		if (where.kind === 'headers') continue;
 		const entry = files.get(path)!;
-		if (entry.bytes > ASSET_MAX_FILE_BYTES) {
-			problems.push(`E_FILE_TOO_BIG:${path}`);
-			continue;
-		}
+		// Already reported as too big above; not read.
+		if (entry.bytes > MAX_FILE_BYTES) continue;
 		const text = read(path);
 		let json: unknown;
 		let valid = false;
