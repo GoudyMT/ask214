@@ -60,7 +60,7 @@
 
 	// After a database raise, this release's worker takes over at once (take-over.ts).
 	const takeOver = (raised?: boolean) => {
-		if (raised) markRaised();
+		if (raised) markRaised(version);
 		void takeOverIfRaised(navigator.serviceWorker, version);
 	};
 
