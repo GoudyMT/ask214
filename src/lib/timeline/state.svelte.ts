@@ -26,11 +26,12 @@ import { withStores } from '../db/schema';
  * the factory closure (`_state`); never exported.
  *
  * load() is fail-closed: verify the keystore-record HMAC, then the signed HWM,
- * BEFORE any decrypt. A missing `timeline-state-hwm` = "no timeline state yet"
- * (generation 0, empty) - legitimate for a returning user; the HWM is created on
- * first save. Relock drops the in-memory reference (note strings are immutable JS
- * strings; cannot be byte-zeroized - documented residual); the on-disk record stays
- * encrypted.
+ * BEFORE any decrypt. No `timeline-state` body and no `timeline-state-hwm` = "no
+ * timeline state yet" (generation 0, empty) - legitimate for a returning user; the
+ * HWM is created on first save. An HWM with no body is a deleted record, and a body
+ * with no HWM is a lost marker: both fail the load. Relock drops the in-memory
+ * reference (note strings are immutable JS strings; cannot be byte-zeroized -
+ * documented residual); the on-disk record stays encrypted.
  *
  * Deviation: reuses `withWriteLocks` (profile-write exclusive) rather than a
  * dedicated `timeline-write` lock - safe full-serialization for a single-user app,
@@ -224,6 +225,11 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 						// would otherwise pair the newer generation with the older statuses, and a write from them would
 						// pass the conflict check and lay them over the peer's save.
 						if (gen === 0) {
+							// A body with no marker is damage, never a first visit: reading it as empty would let the next
+							// save write over it. The backup snapshot refuses the same state.
+							if (await getRow<StateRow>(db, 'timeline-state')) {
+								throw new Error('E_TIMELINE_BODY_WITHOUT_MARK');
+							}
 							_generation = gen;
 							if (relockEpoch === relockAtStart) {
 								_state = { schemaVersion: 1, tasks: {} };

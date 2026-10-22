@@ -23,10 +23,11 @@ import { withStores } from '../db/schema';
  * lives in the factory closure (`_state`); never exported.
  *
  * load() is fail-closed: verify the keystore-record HMAC, then the signed HWM,
- * BEFORE any decrypt. A missing calendar-sync-hwm = "no calendar state yet"
- * (generation 0, empty exclusions) - legitimate for a returning user; the HWM is
- * created on first save. Relock drops the in-memory reference; the on-disk record
- * stays encrypted. Reuses withWriteLocks (profile-write exclusive) - safe
+ * BEFORE any decrypt. No calendar-sync body and no calendar-sync-hwm = "no calendar
+ * state yet" (generation 0, empty exclusions) - legitimate for a returning user; the
+ * HWM is created on first save. An HWM with no body is a deleted record, and a body
+ * with no HWM is a lost marker: both fail the load. Relock drops the in-memory
+ * reference; the on-disk record stays encrypted. Reuses withWriteLocks (profile-write exclusive) - safe
  * full-serialization for a single-user app; HWM domain-separation is via the
  * sidecar name ('calendar-sync-hwm').
  *
@@ -207,6 +208,11 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 						// peer's save would otherwise pair the newer generation with the older record, and a
 						// write from them would pass the conflict check and lay it over the peer's save.
 						if (gen === 0) {
+							// A body with no marker is damage, never a first visit: reading it as empty would let the next
+							// save write over it. The backup snapshot refuses the same state.
+							if (await getRow<StateRow>(db, 'calendar-sync')) {
+								throw new Error('E_CALENDAR_BODY_WITHOUT_MARK');
+							}
 							_generation = gen;
 							if (relockEpoch === relockAtStart) {
 								_state = { schemaVersion: 1, exclusions: { taskIds: [], categories: [] } };
