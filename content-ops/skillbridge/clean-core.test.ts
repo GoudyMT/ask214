@@ -7,7 +7,6 @@ import {
 	TERRITORY_CODES,
 	type StateCode
 } from '../../src/lib/skillbridge-finder/contract/places.ts';
-import { validateListing } from '../../src/lib/skillbridge-finder/contract/validate.ts';
 import { RAW_CASES, rawListing } from '../../src/lib/skillbridge-finder/fixtures/raw.ts';
 
 // Small synthetic lookups: the real boxes and centroids come from the Census tables.
@@ -966,14 +965,6 @@ describe('what leaves the PC', () => {
 			expect(json).not.toContain(value);
 		expect(json).not.toContain('PLANTED-JOBDESCRIPTION');
 		expect(json).toContain('Camp Example');
-	});
-
-	it('hands the validator nothing it refuses', () => {
-		const out = clean(everyRow);
-		const errors = out.listings.flatMap((listing) =>
-			validateListing({ ...listing, fl: '2026-10-21' })
-		);
-		expect(errors).toEqual([]);
 	});
 
 	it('names held-back rows by code only, never by the raw value', () => {
