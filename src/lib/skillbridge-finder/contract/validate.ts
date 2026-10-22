@@ -65,7 +65,7 @@ const PROSE_MARKS = [':', '-', String.fromCharCode(0x2013), String.fromCharCode(
  * Text that renders exactly as stored: not empty, no padding, already NFKC (no look-alike forms), nothing
  * invisible, and no `<` (a field holding markup is dropped by the pipeline, never escaped and shown).
  */
-function isSafeText(s: unknown): s is string {
+export function isSafeText(s: unknown): s is string {
 	return (
 		typeof s === 'string' &&
 		s.length > 0 &&
