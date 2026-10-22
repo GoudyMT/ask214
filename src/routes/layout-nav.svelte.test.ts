@@ -275,6 +275,22 @@ describe('the root layout navigation', () => {
 			.toBe(true);
 	});
 
+	// The late check gives up after about half a second: a control that keeps focus without being scrolled to (a focus that
+	// asked not to scroll, or the window coming back) must not pull the page when the person later scrolls by hand.
+	it('leaves a later hand scroll alone once the late check has given up at 320 px', async () => {
+		await openAt(320, 568);
+		const last = [...document.querySelectorAll<HTMLAnchorElement>('footer a')].at(
+			-1
+		) as HTMLElement;
+		const bar = document.querySelector('.bottom-bar') as HTMLElement;
+		last.focus({ preventScroll: true });
+		for (let i = 0; i < 40; i++) await new Promise((done) => requestAnimationFrame(done));
+		window.scrollBy(0, last.getBoundingClientRect().top - (bar.getBoundingClientRect().top - 11));
+		const handScroll = window.scrollY;
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+		expect(window.scrollY).toBe(handScroll);
+	});
+
 	// At a large text size the labels wrap and the bar is taller than its first-paint 57 px: the room the page keeps for it
 	// must follow, or the footer's last line ends under the bar at the end of every page.
 	it('keeps the last footer link above a taller bar at the bottom of the page at 320x640', async () => {
