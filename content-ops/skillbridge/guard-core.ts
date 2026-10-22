@@ -248,6 +248,12 @@ export function checkTree(deployRoot: string, deps: GuardDeps): string[] {
 		else problems.push(`E_INVALID:${path}`);
 	}
 
+	// The app's ZIP distance and crosswalk search read these; without them a week deploys and then fails on phones.
+	for (const name of TABLE_NAMES) {
+		const path = `${DEPLOY_DATA_DIR}/tables/${name}.json`;
+		if (!files.has(path)) problems.push(`E_MISSING_FILE:${path}`);
+	}
+
 	checkIndex(files, dates, parsed, placed, problems);
 	return problems;
 }

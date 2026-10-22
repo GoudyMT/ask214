@@ -272,6 +272,9 @@ export async function runPipeline(options, deps) {
 	// a run on it would date every listing again and mark the old ones New.
 	if (state.lastPullDate !== null && deployedPullDate(deployDir) > state.lastPullDate)
 		return blocked('E_STATE_BEHIND_DEPLOY');
+	// The app's ZIP distance and crosswalk search read these two tables, so a week without them is not published.
+	if (tables.zips === undefined || tables.crosswalk === undefined)
+		return blocked('E_TABLES_MISSING');
 
 	const runDir = join(stateDir, 'runs', pullDate);
 	/** @type {PullOutcome} */

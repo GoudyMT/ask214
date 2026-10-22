@@ -148,6 +148,18 @@ function folders(name = 'run') {
 }
 
 type Where = ReturnType<typeof folders>;
+
+const TABLES = {
+	zips: { v: 1, rows: [['21046', 39.2, -76.86]] },
+	crosswalk: { v: 1, rows: [['91B', 'Army', '49-3023.00', 'Example Technicians']] }
+};
+
+/** Puts the two supporting tables in the state folder, as Max keeps them there. */
+function writeTables(where: Where, names: (keyof typeof TABLES)[] = ['zips', 'crosswalk']) {
+	const dir = join(where.stateDir, 'tables');
+	mkdirSync(dir, { recursive: true });
+	for (const name of names) writeFileSync(join(dir, `${name}.json`), JSON.stringify(TABLES[name]));
+}
 type Options = Parameters<typeof runPipeline>[0];
 
 function options(where: Where, over: Partial<Options> = {}): Options {
@@ -163,7 +175,10 @@ function options(where: Where, over: Partial<Options> = {}): Options {
 	};
 }
 
-/** One run of the command against a world, on a given day. */
+/**
+ * One run of the command against a world, on a given day. The state folder gets the supporting tables first unless
+ * the test has set up a tables folder of its own.
+ */
 async function go(
 	where: Where,
 	world: World,
@@ -171,6 +186,7 @@ async function go(
 	over: Partial<Options> = {},
 	spy = linkSpy()
 ) {
+	if (!existsSync(join(where.stateDir, 'tables'))) writeTables(where);
 	const server = fakeHttp(world);
 	const printed: string[] = [];
 	const result = await runPipeline(options(where, over), {
@@ -560,6 +576,23 @@ describe('bad arguments and bad files', () => {
 		expect(existsSync(where.deployDir)).toBe(false);
 	});
 
+	// The app's ZIP distance and crosswalk search read these two files; a week without them would deploy and then
+	// fail on every phone.
+	it.each([
+		['both tables', [] as (keyof typeof TABLES)[]],
+		['the ZIP table', ['crosswalk'] as (keyof typeof TABLES)[]],
+		['the crosswalk table', ['zips'] as (keyof typeof TABLES)[]]
+	])('blocks the week before any request when the state folder lacks %s', async (_name, have) => {
+		const where = folders();
+		writeTables(where, have);
+		const { result, urls, printed } = await go(where, makeWorld(), FIRST, { baseline: true });
+		expect(result.exitCode).toBe(3);
+		expect(printed).toContain('E_TABLES_MISSING');
+		expect(urls).toEqual([]);
+		expect(existsSync(where.deployDir)).toBe(false);
+		expect(existsSync(join(where.stateDir, 'runs'))).toBe(false);
+	});
+
 	it('refuses a pull date that is not a date, which would build folder names', async () => {
 		const where = folders();
 		const { result } = await go(where, makeWorld(), '../escape', { baseline: true });
@@ -613,6 +646,7 @@ describe('the command line', () => {
 	it('deploys to the data Worker deploy folder of the repo unless told otherwise', async () => {
 		const where = folders();
 		const { deps } = cliDeps(where);
+		writeTables(where);
 		const code = await runCli(['--state', where.stateDir, '--baseline', '--no-links'], deps);
 		expect(code).toBe(0);
 		expect(
@@ -632,6 +666,7 @@ describe('the command line', () => {
 	it('uses the --deploy folder and the --mode it is given', async () => {
 		const where = folders();
 		const { deps } = cliDeps(where);
+		writeTables(where);
 		const code = await runCli(
 			['--state', where.stateDir, '--deploy', where.deployDir, '--mode', 'full', '--baseline'],
 			deps

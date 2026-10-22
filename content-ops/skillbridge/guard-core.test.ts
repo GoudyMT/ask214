@@ -458,6 +458,16 @@ describe('checkTree and guardAndDeploy: what may be deployed', () => {
 			(t) => t.set('skillbridge-data/w', { bytes: 0, kind: 'link' }),
 			'E_SYMLINK:skillbridge-data/w'
 		],
+		[
+			'no ZIP table, which the distance search needs',
+			(t) => t.delete('skillbridge-data/tables/zips.json'),
+			'E_MISSING_FILE:skillbridge-data/tables/zips.json'
+		],
+		[
+			'no crosswalk table, which the occupation search needs',
+			(t) => t.delete('skillbridge-data/tables/crosswalk.json'),
+			'E_MISSING_FILE:skillbridge-data/tables/crosswalk.json'
+		],
 		['no index', (t) => t.delete('skillbridge-data/index.json'), 'E_INDEX'],
 		[
 			'an index that fails the contract',
