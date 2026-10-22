@@ -15,6 +15,7 @@ import {
 	mkdirSync,
 	readFileSync,
 	readdirSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	writeFileSync
@@ -438,10 +439,25 @@ function localDate() {
 	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-if (
-	process.argv[1] !== undefined &&
-	import.meta.url === pathToFileURL(resolve(process.argv[1])).href
-) {
+/**
+ * Whether this file is the one being run. Node loads the main module by its real path while `argv[1]` stays as
+ * typed, so the typed path is resolved through any link before the two are compared; a start through a linked
+ * folder would otherwise do nothing and still exit 0.
+ * @param {string} moduleUrl
+ * @param {string | undefined} argv1
+ * @param {(path: string) => string} [realpath]
+ * @returns {boolean}
+ */
+export function isMain(moduleUrl, argv1, realpath = realpathSync) {
+	if (argv1 === undefined) return false;
+	try {
+		return moduleUrl === pathToFileURL(realpath(resolve(argv1))).href;
+	} catch {
+		return false;
+	}
+}
+
+if (isMain(import.meta.url, process.argv[1])) {
 	const sleep = (/** @type {number} */ ms) =>
 		new Promise((done) => {
 			setTimeout(done, ms);

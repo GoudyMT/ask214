@@ -6,13 +6,16 @@ import {
 	mkdtempSync,
 	readFileSync,
 	readdirSync,
+	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { runCli, runPipeline } from './run.mjs';
+import { isMain, runCli, runPipeline } from './run.mjs';
 import { API_ORIGIN, FILTERS_PATH, LOOKUP_PATH, ROBOTS_PATH } from './config.ts';
 import { checkTree } from './guard-core.ts';
 import type { GuardDeps, TreeEntry } from './guard-core.ts';
@@ -600,6 +603,45 @@ describe('bad arguments and bad files', () => {
 		expect(existsSync(join(where.stateDir, 'escape'))).toBe(false);
 		expect(existsSync(join(where.stateDir, 'runs'))).toBe(false);
 		expect(existsSync(where.deployDir)).toBe(false);
+	});
+});
+
+// Node loads the main module by its real path, while the path typed on the command line stays as typed. A run
+// started through a linked folder that did not match would print nothing and exit 0, which reads as "written".
+describe('isMain: is this file the one being run', () => {
+	const real = resolve('real-folder', 'run.mjs');
+	const linked = resolve('linked-folder', 'run.mjs');
+	const moduleUrl = pathToFileURL(real).href;
+
+	it('is true for the file itself and for a path that leads to it through a link', () => {
+		const realpath = (path: string) => (path === linked ? real : path);
+		expect(isMain(moduleUrl, real, realpath)).toBe(true);
+		expect(isMain(moduleUrl, linked, realpath)).toBe(true);
+	});
+
+	it('is false for another file, a missing argument or a path that cannot be resolved', () => {
+		const realpath = (path: string) => path;
+		expect(isMain(moduleUrl, resolve('real-folder', 'other.mjs'), realpath)).toBe(false);
+		expect(isMain(moduleUrl, undefined, realpath)).toBe(false);
+		expect(
+			isMain(moduleUrl, real, () => {
+				throw new Error('E_TEST_NO_SUCH_PATH');
+			})
+		).toBe(false);
+	});
+
+	it('follows a real link on disk with the default lookup', () => {
+		temp = mkdtempSync(join(tmpdir(), 'sbk-link-'));
+		const target = join(temp, 'target');
+		mkdirSync(target);
+		writeFileSync(join(target, 'run.mjs'), '');
+		symlinkSync(target, join(temp, 'link'), 'junction');
+		expect(
+			isMain(
+				pathToFileURL(realpathSync(join(target, 'run.mjs'))).href,
+				join(temp, 'link', 'run.mjs')
+			)
+		).toBe(true);
 	});
 });
 
