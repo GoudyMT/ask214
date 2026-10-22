@@ -54,6 +54,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
 	vi.restoreAllMocks();
+	// What the footer link stashes must not reach the next test.
+	sessionStorage.removeItem('mtc:feedback:route');
 	await page.viewport(restoreSize.width, restoreSize.height);
 	if (db) await deleteTestDb(db);
 	db = null;
@@ -68,6 +70,17 @@ async function openAt(width: number, height: number): Promise<void> {
 			[...document.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'Settings')
 		)
 		.toBe(true);
+}
+
+/** Presses the footer's Feedback link without leaving the test page. */
+async function clickFooterFeedback(): Promise<void> {
+	const stayHere = (event: Event) => event.preventDefault();
+	document.addEventListener('click', stayHere, true);
+	try {
+		await page.getByRole('link', { name: 'Feedback' }).click();
+	} finally {
+		document.removeEventListener('click', stayHere, true);
+	}
 }
 
 const primaryNavs = () =>
@@ -260,13 +273,15 @@ describe('the root layout navigation', () => {
 		route.pathname = '/more';
 		stashRoute('/timeline');
 		await openAt(320, 568);
-		const stayHere = (event: Event) => event.preventDefault();
-		document.addEventListener('click', stayHere, true);
-		try {
-			await page.getByRole('link', { name: 'Feedback' }).click();
-		} finally {
-			document.removeEventListener('click', stayHere, true);
-		}
+		await clickFooterFeedback();
+		expect(readStashedRoute()).toBe('/timeline');
+	});
+
+	// Anywhere else the page the link is used on is the page feedback names.
+	it('names the open page when the footer Feedback link is used on an ordinary page', async () => {
+		route.pathname = '/timeline';
+		await openAt(320, 568);
+		await clickFooterFeedback();
 		expect(readStashedRoute()).toBe('/timeline');
 	});
 
