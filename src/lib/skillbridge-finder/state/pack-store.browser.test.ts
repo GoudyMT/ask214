@@ -34,6 +34,9 @@ const WEEK_0 = '2026-10-07';
 const WEEK_1 = '2026-10-14';
 const WEEK_2 = '2026-10-21';
 const ORG = 'Example Wind Services';
+// The device clock, fixed late in the UTC day so the far-future bound is shown to count whole UTC days.
+const NOW = Date.UTC(2026, 9, 22, 23, 59);
+const makeStore = (database: IDBDatabase = db) => createFinderPackStore(database, () => NOW);
 
 const region = (name: RegionFileName, pull: string, ids: number[]): RegionFile => ({
 	v: 1,
@@ -98,7 +101,7 @@ const putRaw = (row: Row) =>
 const getRaw = async (id: string) => (await allRows()).find((r) => r.id === id);
 
 async function opened() {
-	const store = createFinderPackStore(db);
+	const store = makeStore();
 	await store.load();
 	return store;
 }
@@ -341,6 +344,50 @@ describe('finder pack store', () => {
 		});
 	});
 
+	// A pipeline year typo or a hostile deploy can publish an index dated far ahead; accepting it would make every real
+	// week after it look like a rollback, with nothing but dropping the pack to recover.
+	describe('a far-future index', () => {
+		it('is refused when more than 7 days ahead of the device day, and accepted at exactly 7', async () => {
+			const store = await opened();
+			// NOW is 2026-10-22 in UTC, so 7 days ahead is 2026-10-29.
+			for (const pull of ['2099-01-01', '2026-10-30']) {
+				await expect(store.swap(week(pull, ['pacific']))).rejects.toThrow(
+					'E_FINDER_PACK_BAD_INPUT'
+				);
+			}
+			expect(await allRows()).toEqual([]);
+			expect(store.pullDate).toBeUndefined();
+
+			await store.swap(week('2026-10-29', ['pacific']));
+			expect(store.pullDate).toBe('2026-10-29');
+		});
+
+		it('a held index dated far ahead does not make the real week a rollback', async () => {
+			const keystore = await readKeystoreRow(db);
+			const plant = async (id: string, recordId: string, value: unknown) =>
+				putRaw({
+					id,
+					rec: await encryptRecord(
+						{ storeName: 'skillbridge-finder-pack', recordId, schemaVersion: 1 },
+						new TextEncoder().encode(JSON.stringify(value)),
+						keystore,
+						0
+					)
+				});
+			await plant('index', 'index', indexFile('2099-01-01', ['pacific']));
+			await plant('pacific', 'pacific@2099-01-01', region('pacific', '2099-01-01', [1001]));
+
+			const store = await opened();
+			expect(store.pullDate).toBe('2099-01-01');
+			await store.swap(week(WEEK_2, ['mountain']));
+
+			expect(store.pullDate).toBe(WEEK_2);
+			// The hostile week's files are gone, not merged into the real week.
+			expect(await rowKeys()).toEqual(['changes', 'ids', 'index', 'mountain']);
+			expect((await opened()).pullDate).toBe(WEEK_2);
+		});
+	});
+
 	describe('tables', () => {
 		it('are kept encrypted across weeks and refused when they fail the contract', async () => {
 			const store = await opened();
@@ -458,7 +505,7 @@ describe('finder pack store', () => {
 		});
 		await acquired;
 		try {
-			const store = createFinderPackStore(db);
+			const store = makeStore();
 			await within(2000, store.load());
 			expect(await within(2000, store.readRegion('pacific'))).toBeDefined();
 			await within(2000, store.swap(week(WEEK_2, ['mountain'])));
@@ -500,7 +547,7 @@ describe('finder pack store', () => {
 				bad[20] = (bad[20] ?? 0) ^ 0xff;
 				await putRaw({ id: key, rec: bad });
 
-				const store = createFinderPackStore(db);
+				const store = makeStore();
 				await expect(store.load()).rejects.toThrow('E_FINDER_PACK_BAD_ROW');
 				expect(store.ready).toBe(false);
 				expect(store.failed).toBe(true);
@@ -595,7 +642,7 @@ describe('finder pack store', () => {
 		it('a load already in flight when the lock lands does not bring the index back', async () => {
 			const store = await opened();
 			await store.swap(week(WEEK_1, ['pacific']));
-			const fresh = createFinderPackStore(db);
+			const fresh = makeStore();
 			const loading = fresh.load();
 			fresh.relockSync('user');
 			await loading;

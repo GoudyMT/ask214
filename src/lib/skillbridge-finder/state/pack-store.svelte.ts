@@ -21,6 +21,7 @@ import {
 	type ContractResult
 } from '../contract/validate';
 import { decodeSeen, encodeSeen, FinderPackError, type FinderSeenRow } from './pack-codec';
+import { isRollback } from './new-rule';
 import { encryptRecord, decryptRecord } from '../../crypto/record-crypto';
 import { AesGcmAuthError } from '../../crypto/aes-gcm';
 import type { KeystoreRecordV1 } from '../../keystore/record';
@@ -51,6 +52,15 @@ import { safeLog } from '../../log/safelog';
 const PACK_STORE = 'skillbridge-finder-pack';
 const LOCK_NAME = 'skillbridge-finder-pack';
 const GENERATION = 0;
+
+/**
+ * How far past the device's UTC day an index may be dated. The weekly pull is cut on or just before it is published, so
+ * a week further ahead than a clock that is a little off is a pipeline typo or a hostile deploy; held, it would make
+ * every real week after it look like a rollback.
+ */
+const MAX_FUTURE_DAYS = 7;
+const MS_PER_DAY = 86_400_000;
+const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 type PackTable = ZipsTable | CrosswalkTable;
 type RowKey = 'index' | 'ids' | 'changes' | 'seen' | RegionFileName | `table:${TableFileName}`;
@@ -178,7 +188,16 @@ const getRow = (db: IDBDatabase, key: string) =>
 		reqToPromise<Row | undefined>(tx.objectStore(PACK_STORE).get(key))
 	);
 
-export function createFinderPackStore(db: IDBDatabase) {
+/** `now` is the device clock in ms; it is a parameter so the far-future bound can be tested without waiting for a date. */
+export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.now) {
+	/** Whether a week's date is more than MAX_FUTURE_DAYS after the device's UTC day. An unreadable date is not far ahead. */
+	function isFarFuture(pull: string): boolean {
+		const parts = DATE_RE.exec(pull);
+		if (parts === null) return false;
+		const pullDay = Date.UTC(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])) / MS_PER_DAY;
+		return pullDay - Math.floor(now() / MS_PER_DAY) > MAX_FUTURE_DAYS;
+	}
+
 	let _ready = $state(false);
 	let _failed = $state(false);
 	let _index = $state.raw<IndexFile | undefined>(undefined);
@@ -415,6 +434,9 @@ export function createFinderPackStore(db: IDBDatabase) {
 				}
 			}
 
+			// The same bound the held week is judged by: a week this far ahead is a typo or an attack, not the next pull.
+			if (isFarFuture(pull)) throw new FinderPackError('E_FINDER_PACK_BAD_INPUT');
+
 			const epochAtStart = epoch;
 			let newer = true;
 			await withKeystoreShared(async () => {
@@ -423,8 +445,11 @@ export function createFinderPackStore(db: IDBDatabase) {
 					files.map(([key, value]) => sealFile(keystore, key, pull, value))
 				);
 				await withPackLock(async () => {
-					const held = await readStoredIndex(keystore);
-					if (held && pull < held.pullDate) throw new FinderPackError('E_FINDER_PACK_ROLLBACK');
+					// A held week dated far ahead is not a week the data can have reached: it cannot outrank a real one, so it is
+					// treated as if nothing were held, and the real week replaces it.
+					const onDisk = await readStoredIndex(keystore);
+					const held = onDisk !== undefined && !isFarFuture(onDisk.pullDate) ? onDisk : undefined;
+					if (isRollback(held?.pullDate, pull)) throw new FinderPackError('E_FINDER_PACK_ROLLBACK');
 					newer = held === undefined || pull > held.pullDate;
 					await withStores(db, PACK_STORE, 'readwrite', (tx) => {
 						if (newer) for (const key of WEEK_KEYS) tx.objectStore(PACK_STORE).delete(key);
