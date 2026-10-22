@@ -408,6 +408,12 @@ const STATIC = 'static';
 //     timeline store, which the bundler now splits into a chunk of its own (1,256 B). Three builds measured page
 //     94,763-94,771 B, precache 223,291-223,317 B, 69 files, at least 43 B of room above the highest. Trim pass:
 //     the growth is validation code, which a trim does not touch.
+//     Page 94,820 -> 94,890, precache 223,360 -> 223,490 and the root layout node (size-limit, package.json) 7,330 ->
+//     7,370 (owner's call, 2026-10-22): the finder review's fixes - stricter listing, crosswalk and ZIP-table checks,
+//     a ZIP's own state - and two checks in the calendar and timeline stores, which load on every page, that refuse a
+//     record whose signed marker is missing instead of reading it as empty. Three builds measured page 94,866-94,875 B,
+//     precache 223,422-223,445 B, root layout 7,329-7,332 B, at least 15 B of room above the highest page and 38 B
+//     above the highest root layout. Trim pass: the growth is safety checks, which a trim does not touch.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
