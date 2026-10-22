@@ -254,6 +254,17 @@ describe('runCheck: removal is proven, never guessed', () => {
 		expect(out.notSeen).toEqual([1]);
 	});
 
+	// The unproven-baseline hold is only for a run that replaces the records; a normal week keeps what it cannot
+	// prove gone and carries on.
+	it('does not hold a normal week for an unproven baseline when the gate failed or a provider is unread', () => {
+		const out = run({
+			...base,
+			pull: pullOf([provider(PROVIDER, seen, false)], { sumGate: false })
+		});
+		expect(out.blockers).toEqual([]);
+		expect(out.notSeen).toEqual([1]);
+	});
+
 	it('keeps it as not seen when its provider was not queried at all', () => {
 		const out = run({ ...base, pull: pullOf([provider(OTHER_PROVIDER, [500], true)]) });
 		expect(out.removed).toEqual([]);
@@ -415,6 +426,16 @@ describe('runCheck: a baseline that would drop earlier listings must be proven',
 });
 
 describe('runCheck: overseas listings', () => {
+	// A listing's place can be corrected on the server: this week's raw state is the truth, not last week's flag.
+	it('drops the flag from a seen listing that is no longer overseas', () => {
+		const out = run({
+			state: stateOf([{ ...record(1), overseas: true }]),
+			pull: pullOf([provider(PROVIDER, [1])]),
+			clean: { ...cleaned([cleanRow(1)]), overseas: [] }
+		});
+		expect('overseas' in (out.nextState.records['1'] ?? {})).toBe(false);
+	});
+
 	it('remembers the flag on seen and on kept records, and adds no key otherwise', () => {
 		const ids = range(10);
 		const seen = range(8, 3);
