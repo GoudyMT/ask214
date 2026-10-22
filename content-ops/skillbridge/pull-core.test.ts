@@ -534,6 +534,44 @@ describe('runPull: stop on any sign of a "no"', () => {
 	});
 });
 
+// A block or CAPTCHA page often comes with an error status; asking again would be pushing against a "no".
+describe('runPull: a web page sent with an error status', () => {
+	const captcha = (code: number): HttpReply => ({
+		status: code,
+		contentType: 'text/html',
+		body: '<html>captcha: prove you are human</html>'
+	});
+
+	it('stops at once on a 503 CAPTCHA page for Filters, without asking again', async () => {
+		const w = makeWorld();
+		w.scripts.set(FILTERS_URL, [captcha(503)]);
+		const { outcome, urls } = await pull(w);
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_HTML_BODY', requests: 2 });
+		expect(urls()).toEqual([ROBOTS_URL, FILTERS_URL]);
+	});
+
+	it('stops at once on a 401 page sent as JSON, since the body is a web page', async () => {
+		const w = makeWorld();
+		w.scripts.set(ALL_URL, [
+			{ status: 401, contentType: 'application/json', body: ' <!DOCTYPE html><p>sign in</p>' }
+		]);
+		const { outcome, urls } = await pull(w);
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_HTML_BODY', requests: 3 });
+		expect(urls()).toEqual([ROBOTS_URL, FILTERS_URL, ALL_URL]);
+	});
+
+	it('stops with E_ROBOTS_UNREADABLE on a 503 web page for robots.txt', async () => {
+		const { outcome, urls } = await pull(makeWorld({ robots: captcha(503) }));
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_ROBOTS_UNREADABLE', requests: 1 });
+		expect(urls()).toEqual([ROBOTS_URL]);
+	});
+
+	it('still reads a 404 web page for robots.txt as "no rules"', async () => {
+		const { outcome } = await pull(makeWorld({ robots: captcha(404) }));
+		expect(outcome.ok).toBe(true);
+	});
+});
+
 describe('runPull: errors in a row', () => {
 	it('stops on the third error in a row, after exactly three tries, waiting longer each time', async () => {
 		const w = makeWorld();

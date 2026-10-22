@@ -260,6 +260,8 @@ function createSender(http: Http, clock: Clock) {
 					errorsInARow = 0;
 					return reply;
 				}
+				// A block or CAPTCHA page sent with an error status is a "no", not a hiccup: not asked again.
+				if (looksLikeHtml(reply)) stopRun(isRobots ? 'E_ROBOTS_UNREADABLE' : 'E_HTML_BODY');
 			}
 			errorsInARow++;
 			if (errorsInARow >= MAX_ERRORS_IN_A_ROW) stopRun('E_ERRORS_IN_A_ROW');
