@@ -359,9 +359,18 @@
 			state = { ...state, hidden: false };
 			setHidden(false);
 		};
+		// The bar never moves, so a control focused under it has to. Chromium does that from scroll-padding-bottom, but
+		// WebKit leaves a control that is already inside the window where it is, partly under the bar.
+		const onPageFocus = (event: FocusEvent) => {
+			const bar = document.querySelector('.bottom-bar');
+			if (!bar || !(event.target instanceof Element) || bar.contains(event.target)) return;
+			const overlap = event.target.getBoundingClientRect().bottom - bar.getBoundingClientRect().top;
+			if (overlap > 0) window.scrollBy(0, overlap);
+		};
 		const stop = () => {
 			window.removeEventListener('scroll', onScroll);
 			el.removeEventListener('focusin', onFocusIn);
+			document.removeEventListener('focusin', onPageFocus);
 			setHidden(false);
 		};
 		// Crossing 600px in either direction starts over: a header hidden on a phone must not stay hidden on a desktop.
@@ -371,6 +380,7 @@
 			state = startHeaderState(window.scrollY);
 			window.addEventListener('scroll', onScroll, { passive: true });
 			el.addEventListener('focusin', onFocusIn);
+			document.addEventListener('focusin', onPageFocus);
 		};
 		sync();
 		phone.addEventListener('change', sync);

@@ -115,4 +115,30 @@ describe('the root layout navigation', () => {
 			.poll(() => last.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top)
 			.toBe(true);
 	});
+
+	// WebKit leaves a focused control that is already inside the window where it is, even with part of it under the
+	// bar (the question field on a short screen). A focus that does not scroll stands in for that engine here.
+	it('moves a focused control clear of the bar when the browser does not scroll to it at 320 px', async () => {
+		await openAt(320, 568);
+		const last = [...document.querySelectorAll<HTMLAnchorElement>('footer a')].at(
+			-1
+		) as HTMLElement;
+		const bar = document.querySelector('.bottom-bar') as HTMLElement;
+		window.scrollBy(0, last.getBoundingClientRect().bottom - (window.innerHeight - 8));
+		expect(last.getBoundingClientRect().bottom).toBeGreaterThan(bar.getBoundingClientRect().top);
+		last.focus({ preventScroll: true });
+		await expect
+			.poll(() => last.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top)
+			.toBe(true);
+	});
+
+	// The bar's own links always sit "under the bar": focusing one must not push the page.
+	it('leaves the page where it is when focus enters the bar itself at 320 px', async () => {
+		await openAt(320, 568);
+		window.scrollTo(0, 300);
+		await expect.poll(() => window.scrollY).toBe(300);
+		(document.querySelector('.bottom-bar a') as HTMLElement).focus({ preventScroll: true });
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+		expect(window.scrollY).toBe(300);
+	});
 });
