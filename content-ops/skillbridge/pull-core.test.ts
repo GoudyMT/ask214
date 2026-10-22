@@ -686,7 +686,8 @@ describe('runPull: proving a provider was fully seen', () => {
 			providerUrl(name),
 			providerUrl(name, '&deliveryMethod=1'),
 			providerUrl(name, '&deliveryMethod=2'),
-			providerUrl(name, '&deliveryMethod=3')
+			providerUrl(name, '&deliveryMethod=3'),
+			providerUrl(name)
 		]);
 		const result = runOf(outcome).providers[0]!;
 		expect(result.ids).toHaveLength(200);
@@ -712,7 +713,8 @@ describe('runPull: proving a provider was fully seen', () => {
 			providerUrl(name, '&deliveryMethod=1&state=TX'),
 			providerUrl(name, '&deliveryMethod=1&state=CA'),
 			providerUrl(name, '&deliveryMethod=2'),
-			providerUrl(name, '&deliveryMethod=3')
+			providerUrl(name, '&deliveryMethod=3'),
+			providerUrl(name)
 		]);
 		const result = runOf(outcome).providers[0]!;
 		expect(result.ids).toHaveLength(200);
@@ -736,6 +738,46 @@ describe('runPull: proving a provider was fully seen', () => {
 			expect(result.ids).toHaveLength(complete ? 200 : 199);
 			expect(result.complete).toBe(complete);
 			expect(result.cappedQueries).toBe(1);
+		}
+	);
+
+	// The server is live while the split runs. A listing added to the provider then can bring the count up to the
+	// total read at the start while a listing the state queries cannot reach stays unseen, so the total is read
+	// again after the split and must not have moved.
+	it.each([
+		['every listing reachable and nothing changes', 'CA', false, true],
+		['one listing no state query reaches and nothing changes', 'NATIONWIDE', false, false],
+		[
+			'one listing no state query reaches and another is added during the split',
+			'NATIONWIDE',
+			true,
+			false
+		]
+	])(
+		'is complete only if the total held through the split: %s',
+		async (_name, lastState, add, complete) => {
+			const name = 'Big Example';
+			const rows = [
+				...rowsOf(1, 100, { deliveryMethodId: 1, state: 'CA' }),
+				...rowsOf(101, 50, { deliveryMethodId: 1, state: 'VA' }),
+				...rowsOf(151, 1, { deliveryMethodId: 1, state: lastState })
+			];
+			const w = makeWorld({ providers: [[name, rows]], states: ['CA', 'VA'] });
+			const server = fakeServer(w);
+			let added = false;
+			const http: Http = async (url) => {
+				const reply = await server.http(url);
+				if (add && !added && url === providerUrl(name)) {
+					added = true;
+					w.providers[0]![1].push(...rowsOf(152, 1, { deliveryMethodId: 1, state: 'VA' }));
+				}
+				return reply;
+			};
+			const outcome = await runPull(inputOf(), http, server.clock);
+			const result = runOf(outcome).providers[0]!;
+			expect(result.total).toBe(151);
+			expect(result.complete).toBe(complete);
+			expect(server.urls().filter((u) => u === providerUrl(name))).toHaveLength(2);
 		}
 	);
 
@@ -766,7 +808,8 @@ describe('runPull: proving a provider was fully seen', () => {
 			providerUrl(name),
 			providerUrl(name, '&deliveryMethod=1'),
 			providerUrl(name, '&deliveryMethod=1&state=MD'),
-			providerUrl(name, '&deliveryMethod=1&state=VA')
+			providerUrl(name, '&deliveryMethod=1&state=VA'),
+			providerUrl(name)
 		]);
 		expect(runOf(outcome).providers[0]).toMatchObject({ total: 160, complete: true });
 	});

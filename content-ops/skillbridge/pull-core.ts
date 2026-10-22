@@ -357,6 +357,7 @@ async function pullAll(
 
 		const national = take(await sender.getJson(lookupUrl({ provider: name }), parseLookup));
 		const total = national.recordsTotal;
+		let totalHeld = true;
 		if (!isLeafComplete(national)) {
 			for (const deliveryMethod of DELIVERY_SPLIT) {
 				if (ids.size >= total) break;
@@ -372,12 +373,16 @@ async function pullAll(
 					if (!isLeafComplete(byState)) cappedQueries++;
 				}
 			}
+			// The split takes many requests while the server stays live: a listing added meanwhile could make the
+			// count while a listing the split cannot reach is still unseen. Only an unmoved total proves the count.
+			const again = take(await sender.getJson(lookupUrl({ provider: name }), parseLookup));
+			totalHeld = again.recordsTotal === total;
 		}
 		results.push({
 			name,
 			total,
 			ids: [...ids].sort((a, b) => a - b),
-			complete: ids.size >= total,
+			complete: totalHeld && ids.size >= total,
 			cappedQueries
 		});
 	}
