@@ -4,9 +4,11 @@ import { encryptFinderRecord } from './crypto-boundary';
 import { MAX_COMPARE, MAX_SAVED, type FinderRecord } from './types';
 import {
 	KeystoreHmacMismatchError,
+	KeystoreNotInitializedError,
 	OccConflictError,
 	readKeystoreRow
 } from '../../profile/store.svelte';
+import { wipeAllStores } from '../../db/wipe';
 import { SidecarTamperError, signSidecar } from '../../profile/sidecars';
 import { bootstrapLocalKeystore } from '../../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../../db/_test-helpers';
@@ -34,7 +36,7 @@ vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
 });
 
 // Real Chromium (SubtleCrypto + IndexedDB + navigator.locks): the finder store keeps the person's place, saved programs,
-// compare picks and filters encrypted, on the same load / save / OCC / relock / wipe spine as the calendar settings.
+// compare picks and filters encrypted, on the same load / save / OCC / relock spine as the calendar settings.
 
 const TODAY = '2026-10-21';
 
@@ -445,18 +447,24 @@ describe('finder store', () => {
 			expect((await loaded()).setup).toEqual({ radius: 25 });
 		});
 
-		it('wipe clears the record and its marker, and a write after it is refused and writes nothing', async () => {
+		// Erase clears every store through wipeAllStores, never through this store. A second tab that loaded the record before
+		// it must not put the record back, while the device has no keys or once the person has set it up again.
+		it('after Erase the finder rows are gone, and a tab that loaded before it cannot write', async () => {
 			const a = await loaded();
 			await a.save(listing(386), TODAY);
-			await a.wipe();
 
-			await expect(a.setSetup({ radius: 25 })).rejects.toThrow(FinderRelockedError);
-			await expect(a.save(listing(2), TODAY)).rejects.toThrow(FinderRelockedError);
+			await wipeAllStores(db);
+
 			expect(await readRow('skillbridge-finder')).toBeUndefined();
 			expect(await readRow('skillbridge-finder-hwm')).toBeUndefined();
-
+			await expect(a.setSetup({ radius: 25 })).rejects.toThrow(KeystoreNotInitializedError);
+			await bootstrapLocalKeystore(db);
+			await expect(a.setSetup({ radius: 25 })).rejects.toThrow(OccConflictError);
+			expect(await readRow('skillbridge-finder')).toBeUndefined();
+			expect(await readRow('skillbridge-finder-hwm')).toBeUndefined();
 			const fresh = await loaded();
 			expect(fresh.saved).toEqual([]);
+			expect(fresh.setup).toEqual({});
 		});
 
 		// The idle lock and the user's Lock are the user's: an automatic re-read must not reverse them.

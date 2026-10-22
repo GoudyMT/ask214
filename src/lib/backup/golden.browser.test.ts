@@ -205,11 +205,11 @@ function plain(value: unknown): unknown {
 	return value;
 }
 
-// The stores a restore replaces or clears: every one the manifest does not mark 'never' (the API key and the finder's
-// cached listings).
+// The stores a restore replaces: every one the manifest does not mark 'never' (the API key and the finder's cached
+// listings).
 const RESTORE_TOUCHES: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
 
-/** The stores a restore replaces or clears, as the device holds them right now. */
+/** The stores a restore replaces, as the device holds them right now. */
 async function restoredRows(): Promise<Record<string, unknown>> {
 	const out: Record<string, unknown> = {};
 	for (const store of RESTORE_TOUCHES) {
@@ -247,7 +247,7 @@ describe('the golden v1 / 1 backup', () => {
 
 	// The golden was made before the finder existed: it must still restore, and it leaves the finder empty, not holding
 	// what this device saved since.
-	it('the golden has no finder record and restoring it clears the finder and its marker', async () => {
+	it('the golden has no finder record and restoring it leaves the finder empty, with a new marker', async () => {
 		await finishedDevice();
 		const before = await restoredRows();
 		expect(before['skillbridge-finder']).toBeDefined();
@@ -256,13 +256,16 @@ describe('the golden v1 / 1 backup', () => {
 		expect(await restoreFile(goldenText)).toStrictEqual({ ok: true });
 
 		const after = await restoredRows();
-		expect(after['skillbridge-finder']).toBeUndefined();
-		expect(after['skillbridge-finder-hwm']).toBeUndefined();
+		expect(after['skillbridge-finder']).toBeDefined();
+		expect(after['skillbridge-finder']).not.toStrictEqual(before['skillbridge-finder']);
+		expect(after['skillbridge-finder-hwm']).not.toStrictEqual(before['skillbridge-finder-hwm']);
 		const finder = createFinderStore(db);
 		await finder.load();
 		expect(finder.ready).toBe(true);
-		expect(finder.saved).toEqual([]);
 		expect(finder.setup).toEqual({});
+		expect(finder.filters).toEqual({});
+		expect(finder.saved).toEqual([]);
+		expect(finder.compare).toEqual([]);
 	}, 30_000);
 
 	it("the golden's sha256 is pinned", async () => {

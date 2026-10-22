@@ -110,6 +110,12 @@ function fileFilters(filters: FinderFilters): FinderFilters {
 	};
 }
 
+const holdsData = (finder: FinderRecord): boolean =>
+	finder.finderSaved.length > 0 ||
+	finder.finderCompare.length > 0 ||
+	finder.finderSetup !== undefined ||
+	finder.finderFilters !== undefined;
+
 /**
  * Built field by field, never as a copy of the stored record: the store keeps any key a newer release added so an older
  * tab's save does not drop it, but the check a restore runs refuses a key it does not know, so a file carrying one
@@ -147,11 +153,12 @@ export function buildExportInner(snap: Snapshot, createdAt: number): ExportInner
 		return { ok: false, code: 'E_EXPORT_SELF_INVALID', store };
 	};
 
-	// The key is written only for a store that holds a record: a device that never used the finder makes the same file as
-	// before the finder existed, which an older app opens.
+	// The key is written only for a record that holds something: a device that never used the finder, or whose finder was
+	// emptied (a restore of an older file leaves an empty record behind), makes the same file as before the finder
+	// existed, which an older app opens.
 	let finder: unknown;
 	try {
-		finder = snap.finder && fileFinder(snap.finder);
+		finder = snap.finder && holdsData(snap.finder) ? fileFinder(snap.finder) : undefined;
 	} catch {
 		// The encoder refuses a record the store itself would not read back: a fault in the app, not a failed read.
 		return selfInvalid('finder');
@@ -166,7 +173,7 @@ export function buildExportInner(snap: Snapshot, createdAt: number): ExportInner
 			profile: fileProfile(snap.profile),
 			'timeline-state': snap.timeline && asJson(encodeTimelineState(snap.timeline)),
 			'calendar-sync': snap.calendar && fileCalendar(snap.calendar),
-			...(snap.finder && { 'skillbridge-finder': finder })
+			...(finder !== undefined && { 'skillbridge-finder': finder })
 		}
 	};
 

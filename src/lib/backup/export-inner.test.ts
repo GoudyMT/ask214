@@ -212,6 +212,39 @@ describe('buildExportInner: what a person exports', () => {
 		expect(Object.keys(stores).sort()).toEqual(['calendar-sync', 'profile', 'timeline-state']);
 	});
 
+	// A restore of an older file, or a person who took every pick away, leaves an empty record at a high generation. The
+	// file made from it must be the one an older app opens, as for a device that never used the finder.
+	it('a finder record that holds nothing exports no finder key', () => {
+		const empty: FinderRecord = { schemaVersion: 1, finderSaved: [], finderCompare: [] };
+		const stores = storesOf(
+			exported(
+				snapshot({ finder: empty, gens: { profile: 4, timeline: 0, calendar: 0, finder: 5 } })
+			)
+		);
+		expect(stores).not.toHaveProperty('skillbridge-finder');
+		expect(Object.keys(stores).sort()).toEqual(['calendar-sync', 'profile', 'timeline-state']);
+	});
+
+	// Each kind of saved choice alone is data: a person who only saved a place, or only a pick, keeps it in the file.
+	it.each([
+		['a place and reach', { finderSetup: { radius: 25 } }],
+		['filters', { finderFilters: { kinds: ['internship'] } }],
+		[
+			'a saved program',
+			{ finderSaved: [{ id: 1001, savedOn: '2026-10-21', facts: cleanListing() }] }
+		],
+		['a compare pick', { finderCompare: [1001] }]
+	] as [string, Partial<FinderRecord>][])(
+		'a finder record holding only %s exports',
+		(_name, own) => {
+			const finder: FinderRecord = { schemaVersion: 1, finderSaved: [], finderCompare: [], ...own };
+			const stores = storesOf(
+				exported(snapshot({ finder, gens: { profile: 4, timeline: 0, calendar: 0, finder: 2 } }))
+			);
+			expect(stores['skillbridge-finder']).toEqual(finder);
+		}
+	);
+
 	it('a store with a finder record exports it, and it validates', () => {
 		const finder = deviceFinder();
 		const bytes = exported(

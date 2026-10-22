@@ -141,14 +141,9 @@ const DAY = 86_400_000;
 const FILE_GENERATION = 41;
 const INVENTED_GENERATION = 1234;
 const DEVICE: RestoreGens = { profile: 3, timeline: 4, calendar: 2, finder: 0 };
-const FINDER_STORES: StoreName[] = ['skillbridge-finder', 'skillbridge-finder-hwm'];
-// The stores a restore replaces or clears: every one the manifest does not mark 'never' (the API key and the finder's
-// cached listings, which a restore drops in a step of its own).
+// The stores a restore replaces: every one the manifest does not mark 'never' (the API key and the finder's cached
+// listings, which a restore drops in a step of its own).
 const RESTORE_TOUCHES: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
-// The stores a restore puts a row in when the file holds no finder record; the finder's two are cleared instead.
-const PUT_WITHOUT_FINDER: StoreName[] = RESTORE_TOUCHES.filter(
-	(store) => !FINDER_STORES.includes(store)
-);
 const PACK = 'skillbridge-finder-pack';
 const RADII = [25, 50, 100, 'any'] as const;
 
@@ -404,7 +399,7 @@ describe('restoreBackup', () => {
 		const { options } = session({ now: () => Date.now() });
 
 		const gens = expectSucceeded(await restoreBackup(db, inner, expected, options));
-		expect(gens).toEqual({ profile: 6, timeline: 10, calendar: 3, finder: 0 });
+		expect(gens).toEqual({ profile: 6, timeline: 10, calendar: 3, finder: 1 });
 
 		// A reload: new stores over the same database.
 		const profile = createProfileStore(db);
@@ -426,7 +421,7 @@ describe('restoreBackup', () => {
 			profile: 6,
 			timeline: 10,
 			calendar: 3,
-			finder: 0
+			finder: 1
 		});
 
 		// The person carries on: the next saves go through.
@@ -463,27 +458,52 @@ describe('restoreBackup', () => {
 	});
 
 	// An older backup is the person's data as it was before the finder: restoring it leaves the finder empty, not holding
-	// what this device saved since.
-	it('a file made before the finder existed leaves the finder record and its marker cleared', async () => {
+	// what this device saved since. The empty record is signed one step past the device like any other restore.
+	it('a file made before the finder existed leaves the finder empty, one step past the device', async () => {
 		const device = await buildDevice({ profile: 3, timeline: 4, calendar: 2, finder: 3 });
 		await device.finder.save(cleanListing(), '2026-10-21');
+		await device.finder.addCompare(cleanListing().i);
 		expect(need(await readRaw('skillbridge-finder'))).toBeDefined();
 		const expected = await confirmNow();
+		expect(expected.gens.finder).toBe(5);
 
 		const gens = expectSucceeded(await restoreBackup(db, fileInner(), expected, session().options));
 
-		expect(gens.finder).toBe(0);
-		expect(await readRaw('skillbridge-finder')).toBeUndefined();
-		expect(await readRaw('skillbridge-finder-hwm')).toBeUndefined();
+		expect(gens.finder).toBe(6);
 		const finder = createFinderStore(db);
 		await finder.load();
 		expect(finder.ready).toBe(true);
-		expect(finder.saved).toEqual([]);
 		expect(finder.setup).toEqual({});
+		expect(finder.filters).toEqual({});
+		expect(finder.saved).toEqual([]);
+		expect(finder.compare).toEqual([]);
 		const state = await readDeviceState(db);
-		expect(state.gens.finder).toBe(0);
-		expect(state.mark?.gens.finder).toBe(0);
+		expect(state.gens.finder).toBe(6);
+		expect(state.mark?.gens.finder).toBe(6);
 		await expect(device.finder.setSetup({ radius: 25 })).rejects.toBeInstanceOf(OccConflictError);
+	});
+
+	// The finder's generation must never come round again: a tab that read the record before the restore would otherwise
+	// pass its conflict check the day a fresh save reaches its number, and write the old record over the newer one.
+	it('after a file without a finder record, saves never bring the finder back to the number a stale tab holds', async () => {
+		const stale = await buildDevice({ profile: 3, timeline: 4, calendar: 2, finder: 1 });
+		await stale.finder.save(cleanListing({ i: 1001 }), '2026-10-21');
+		const expected = await confirmNow();
+		expect(expected.gens.finder).toBe(2);
+		expectSucceeded(await restoreBackup(db, fileInner(), expected, session().options));
+
+		const fresh = createFinderStore(db);
+		await fresh.load();
+		await fresh.setSetup({ radius: 25 });
+		await fresh.setSetup({ radius: 50 });
+
+		await expect(stale.finder.setFilters({ kinds: ['internship'] })).rejects.toBeInstanceOf(
+			OccConflictError
+		);
+		const reread = createFinderStore(db);
+		await reread.load();
+		expect(reread.saved).toEqual([]);
+		expect(reread.filters).toEqual({});
 	});
 
 	// The cached listings and the opened ids are public data kept for this device alone; a restore replaces the person's
@@ -570,7 +590,7 @@ describe('restoreBackup', () => {
 		['a past createdAt is kept', NOW - 5 * DAY, NOW - 5 * DAY],
 		['a future createdAt is clamped to now', NOW + 10 * DAY, NOW]
 	])(
-		'restore writes lastBackupAt = min(createdAt, now) and the three new generations: %s',
+		'restore writes lastBackupAt = min(createdAt, now) and the four new generations: %s',
 		async (_name, createdAt, lastBackupAt) => {
 			await buildDevice();
 			const expected = await confirmNow();
@@ -579,7 +599,7 @@ describe('restoreBackup', () => {
 
 			expect((await readDeviceState(db)).mark).toEqual({
 				at: lastBackupAt,
-				gens: { profile: 4, timeline: 5, calendar: 3, finder: 0 }
+				gens: { profile: 4, timeline: 5, calendar: 3, finder: 1 }
 			});
 		}
 	);
@@ -819,20 +839,20 @@ describe('restoreBackup', () => {
 		const s = session();
 		let signed = 0;
 		seams.onSigned = () => {
-			// The third signature is the last wait; the abort lands before the writer wakes up from it.
-			if (++signed === 3) queueMicrotask(() => s.ctl.abort());
+			// The fourth signature is the last wait; the abort lands before the writer wakes up from it.
+			if (++signed === 4) queueMicrotask(() => s.ctl.abort());
 		};
 
 		await expect(restoreBackup(db, fileInner(), expected, s.options)).rejects.toBeInstanceOf(
 			RunAbortedError
 		);
 
-		expect(signed).toBe(3);
+		expect(signed).toBe(4);
 		expect(await snapshot()).toEqual(before);
 		expect(s.onCommitting).not.toHaveBeenCalled();
 	});
 
-	it('the step-7 check and the puts run in one synchronous block: an abort queued at the check lands after all seven puts', async () => {
+	it('the step-7 check and the puts run in one synchronous block: an abort queued at the check lands after all nine puts', async () => {
 		await buildDevice();
 		const expected = await confirmNow();
 		const s = session();
@@ -846,30 +866,12 @@ describe('restoreBackup', () => {
 		const result = await restoreBackup(db, fileInner(), expected, s.options);
 
 		expect(result.ok).toBe(true);
-		expect([...stores].sort()).toEqual([...PUT_WITHOUT_FINDER].sort());
-		expect(abortedAtPut).toEqual(new Array<boolean>(7).fill(false));
+		expect([...stores].sort()).toEqual([...RESTORE_TOUCHES].sort());
+		expect(abortedAtPut).toEqual(new Array<boolean>(9).fill(false));
 		expect(s.onCommitting).toHaveBeenCalledTimes(1);
 	});
 
-	it('a file with a finder record puts nine rows in the same synchronous block', async () => {
-		await buildDevice();
-		const expected = await confirmNow();
-		const s = session();
-		s.mayCommit.mockImplementation(() => {
-			queueMicrotask(() => s.ctl.abort());
-			return true;
-		});
-		const abortedAtPut: boolean[] = [];
-		const stores = watchPuts(() => abortedAtPut.push(s.ctl.signal.aborted));
-
-		const result = await restoreBackup(db, fileInner({ finder: FILE_FINDER }), expected, s.options);
-
-		expect(result.ok).toBe(true);
-		expect([...stores].sort()).toEqual([...RESTORE_TOUCHES].sort());
-		expect(abortedAtPut).toEqual(new Array<boolean>(9).fill(false));
-	});
-
-	it('abort after the 2nd put leaves the 7 rows byte-identical and byok untouched', async () => {
+	it('abort after the 2nd put leaves the nine rows byte-identical and byok untouched', async () => {
 		await buildDevice();
 		await createByokStore(db).saveApiKey('sk-ant-api03-test-key-0000');
 		const expected = await confirmNow();

@@ -22,8 +22,10 @@ import { withStores } from '../../db/schema';
 /**
  * FinderStore - orchestration over keystore + the generic record-crypto boundary + IDB for the SkillBridge finder's
  * personal record: where the person is looking, the programs they saved, the ones they compare and their filters.
- * Same spine as the calendar-sync store (load / save / OCC / relock / wipe), and like it NEVER mutates the keystore
- * (a save writes only skillbridge-finder + its HWM). State lives in the factory closure (`_state`); never exported.
+ * Same spine as the calendar-sync store (load / save / OCC / relock), and like it NEVER mutates the keystore (a save
+ * writes only skillbridge-finder + its HWM). Erase goes through wipeAllStores under the exclusive keystore lock; this
+ * store has no wipe of its own, since one that cleared without the lock and reset the generation to 0 would let a
+ * stale tab's write pass the conflict check later. State lives in the factory closure (`_state`); never exported.
  *
  * load() is fail-closed: verify the keystore-record HMAC, then the signed HWM, BEFORE any decrypt. A missing
  * skillbridge-finder-hwm = "nothing saved yet" (generation 0, empty record) - legitimate for a first visit; the HWM is
@@ -322,16 +324,6 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 		/** Sync relock for the pagehide/freeze handlers - drop the reference. */
 		relockSync(reason: RelockReason): void {
 			relockNow(reason);
-		},
-
-		/** Clear the finder record + its HWM (the keystore is owned by the profile wipe). */
-		async wipe(): Promise<void> {
-			await withStores(db, ['skillbridge-finder', HWM_STORE], 'readwrite', (tx) => {
-				tx.objectStore('skillbridge-finder').clear();
-				tx.objectStore(HWM_STORE).clear();
-			});
-			_generation = 0;
-			relockNow('user');
 		}
 	};
 

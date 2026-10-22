@@ -33,9 +33,9 @@ import type { ValidInner } from './validate';
  * opens normally after a reload, or nothing changed at all. The device keeps its own bookkeeping: its install and keys
  * (so the stored API key still opens), its clock mark, and the calendar's list of events it handed to this phone.
  *
- * A file made before the finder existed holds no finder record, and restoring it clears the finder's record and
- * marker: the device then holds the person's data as that backup had it, not a finder saved since. A restore of the
- * finder's own record is signed with a fresh marker like the other stores.
+ * A file made before the finder existed holds no finder record, and restoring it writes an empty one: the device then
+ * holds the person's data as that backup had it, not a finder saved since. Either way the finder's record is signed
+ * with a fresh marker one step past this device, like the other stores, so its generation never comes round again.
  *
  * The file's content is all that is taken from it. Its generations, clock mark, sidecars and keystore never reach the
  * device: this device's own counters decide what the new generations are, which is what makes a reload accept the
@@ -76,7 +76,7 @@ export type RestoreFailureCode =
 export type RestoreResult =
 	{ ok: true; gens: RestoreGens } | { ok: false; code: RestoreFailureCode };
 
-/** The nine stores a restore writes or clears. The person's own API key (byok) is never among them. */
+/** The nine stores a restore writes. The person's own API key (byok) is never among them. */
 const WRITTEN_STORES: StoreName[] = [
 	'profile',
 	'profile-hwm',
@@ -97,6 +97,7 @@ const emptyCalendar = (): CalendarSyncState => ({
 	schemaVersion: 1,
 	exclusions: { taskIds: [], categories: [] }
 });
+const emptyFinder = (): FinderRecord => ({ schemaVersion: 1, finderSaved: [], finderCompare: [] });
 
 // The backup mark, which the device composes itself; the file never carries it.
 const MARK_FIELDS = [
@@ -217,15 +218,15 @@ async function replaceStores(
 			return fail('E_RESTORE_DEVICE_MOVED');
 		}
 
-		// 3. Each store moves one step past where this device is, so a peer's next save sees the change. The finder's
-		// record and marker are written only for a file that holds one; otherwise both are cleared and the finder is
-		// back at generation 0, which a tab that loaded the old record sees as a conflict on its next save.
-		const fileFinder = inner.stores['skillbridge-finder'];
+		// 3. Each store moves one step past where this device is, so a peer's next save sees the change. The finder does
+		// too when the file holds no finder record: it is then written empty, never cleared. A cleared finder would start
+		// again at generation 0, and later saves would climb back to the number a stale tab holds, which would then pass
+		// its conflict check and write its old record over the newer one.
 		const gens: RestoreGens = {
 			profile: state.gens.profile + 1,
 			timeline: state.gens.timeline + 1,
 			calendar: state.gens.calendar + 1,
-			finder: fileFinder ? state.gens.finder + 1 : 0
+			finder: state.gens.finder + 1
 		};
 		const at = (opts.now ?? Date.now)();
 
@@ -261,7 +262,9 @@ async function replaceStores(
 		const handedOver = await readDeviceLastAdd(db, keystore, state.gens.calendar);
 		if (handedOver !== undefined) calendar.lastAdd = handedOver;
 
-		const finder: FinderRecord | null = fileFinder ? structuredClone(fileFinder) : null;
+		const finder: FinderRecord = structuredClone(
+			inner.stores['skillbridge-finder'] ?? emptyFinder()
+		);
 
 		// The writer's own check of itself, before anything is encrypted: the codecs give back exactly what is about to
 		// be written, and that holds exactly the file's content and nothing else.
@@ -276,11 +279,8 @@ async function replaceStores(
 		const profileBlob = await encryptProfileRecord(profile, nextKeystore);
 		const timelineBlob = await encryptTimelineRecord(timeline, nextKeystore, gens.timeline);
 		const calendarBlob = await encryptCalendarRecord(calendar, nextKeystore, gens.calendar);
-		const finderBlob = finder
-			? await encryptFinderRecord(finder, nextKeystore, gens.finder)
-			: undefined;
-		staged.push(profileBlob, timelineBlob, calendarBlob);
-		if (finderBlob) staged.push(finderBlob);
+		const finderBlob = await encryptFinderRecord(finder, nextKeystore, gens.finder);
+		staged.push(profileBlob, timelineBlob, calendarBlob, finderBlob);
 		const sign = (name: string, generation: number) =>
 			signSidecar(
 				name,
@@ -296,7 +296,7 @@ async function replaceStores(
 			sign('profile-hwm', gens.profile),
 			sign('timeline-state-hwm', gens.timeline),
 			sign('calendar-sync-hwm', gens.calendar),
-			finder ? sign('skillbridge-finder-hwm', gens.finder) : undefined
+			sign('skillbridge-finder-hwm', gens.finder)
 		]);
 
 		// 7-8. The check and the writes, one transaction, one synchronous block. A throw before the first put aborts the
@@ -305,14 +305,9 @@ async function replaceStores(
 		await withStores(db, WRITTEN_STORES, 'readwrite', (tx) => {
 			if (opts.signal.aborted || !opts.mayCommit()) throw new RunAbortedError();
 			opts.onCommitting();
-			if (finderBlob && finderMark) {
-				// eslint-disable-next-line mtc/encrypted-store-registry -- the backup restore writer: ciphertext from encryptFinderRecord, one transaction with the other stores, under the exclusive keystore lock.
-				tx.objectStore('skillbridge-finder').put({ id: 0, rec: finderBlob });
-				tx.objectStore('skillbridge-finder-hwm').put({ id: 0, ...finderMark });
-			} else {
-				tx.objectStore('skillbridge-finder').clear();
-				tx.objectStore('skillbridge-finder-hwm').clear();
-			}
+			// eslint-disable-next-line mtc/encrypted-store-registry -- the backup restore writer: ciphertext from encryptFinderRecord, one transaction with the other stores, under the exclusive keystore lock.
+			tx.objectStore('skillbridge-finder').put({ id: 0, rec: finderBlob });
+			tx.objectStore('skillbridge-finder-hwm').put({ id: 0, ...finderMark });
 			// eslint-disable-next-line mtc/encrypted-store-registry -- the backup restore writer: ciphertext from encryptProfileRecord, one transaction with the other stores, under the exclusive keystore lock.
 			tx.objectStore('profile').put({ id: 0, rec: profileBlob });
 			tx.objectStore('profile-hwm').put({ id: 0, ...profileMark });
@@ -376,7 +371,7 @@ function verifyComposed(
 	profile: ProfileV1,
 	timeline: TimelineState,
 	calendar: CalendarSyncState,
-	finder: FinderRecord | null,
+	finder: FinderRecord,
 	records: ProfileV1[],
 	staged: Uint8Array[]
 ): void {
@@ -389,13 +384,13 @@ function verifyComposed(
 	const calendarBytes = encodeCalendarSyncState(calendar);
 	staged.push(timelineBytes, calendarBytes);
 	// The finder's saved programs are held as text too, so its bytes are wiped with the rest.
-	const finderBytes = finder ? encodeFinderRecord(finder) : null;
-	if (finderBytes) staged.push(finderBytes);
+	const finderBytes = encodeFinderRecord(finder);
+	staged.push(finderBytes);
 	const sound =
 		sameRecord(decodedProfile, profile) &&
 		sameRecord(decodeTimelineState(timelineBytes), timeline) &&
 		sameRecord(decodeCalendarSyncState(calendarBytes), calendar) &&
-		(finderBytes === null || sameRecord(decodeFinderRecord(finderBytes), finder));
+		sameRecord(decodeFinderRecord(finderBytes), finder);
 
 	// The profile is compared as the file holds it (text), written back by the shipped encoder.
 	const content: ProfileV1 = { ...profile, generation: 0, lastSeenAt: 0 };
@@ -413,7 +408,7 @@ function verifyComposed(
 		sortedJson(JSON.parse(new TextDecoder().decode(contentBytes))) === sortedJson(fileProfile) &&
 		sameRecord(timeline, inner.stores['timeline-state'] ?? emptyTimeline()) &&
 		sameRecord(calendarContent, inner.stores['calendar-sync'] ?? emptyCalendar()) &&
-		sameRecord(finder, inner.stores['skillbridge-finder'] ?? null);
+		sameRecord(finder, inner.stores['skillbridge-finder'] ?? emptyFinder());
 
 	if (!sound || !sameContent) throw new Error('E_WRITE_FAILED');
 }
