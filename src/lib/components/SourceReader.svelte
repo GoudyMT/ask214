@@ -790,7 +790,8 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		color: var(--color-accent);
+		/* The stronger accent shade: the plain accent on its own tint is under the 4.5:1 that small text needs. */
+		color: var(--color-accent-muted);
 	}
 	.reader__section {
 		margin: var(--space-l) 0 var(--space-s);
