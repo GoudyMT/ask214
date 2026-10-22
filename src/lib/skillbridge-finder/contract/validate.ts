@@ -51,8 +51,12 @@ const BRANCH_SET: ReadonlySet<unknown> = new Set(BRANCHES);
 const INDUSTRY_SET: ReadonlySet<unknown> = new Set(INDUSTRIES);
 const STATE_SET: ReadonlySet<unknown> = new Set(STATE_CODES);
 
-// Control, format (zero-width, bidi) and private-use characters: invisible, so they can hide or reorder text.
-const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}]/u;
+// Characters that render as nothing or are not text: control, format (zero-width, bidi), private-use and unassigned
+// code points; the ones Unicode marks default-ignorable (Hangul fillers, the grapheme joiner, variation selectors);
+// and line and paragraph separators, which break a line inside a name.
+const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Default_Ignorable_Code_Point}\p{Zl}\p{Zp}]/u;
+// A blank braille cell is neither default-ignorable nor a space, yet draws as empty.
+const BRAILLE_BLANK = String.fromCharCode(0x2800);
 const ZIP_RE = /^\d{5}$/;
 const CODE_RE = /^[0-9A-Z]{2,6}$/;
 // One plain address; no `?` so a mailto link built from it cannot carry a subject, body or second recipient.
@@ -71,7 +75,9 @@ export function isSafeText(s: unknown): s is string {
 		s.length > 0 &&
 		s === s.trim() &&
 		s === s.normalize('NFKC') &&
+		s.isWellFormed() &&
 		!INVISIBLE_RE.test(s) &&
+		!s.includes(BRAILLE_BLANK) &&
 		!s.includes('<')
 	);
 }

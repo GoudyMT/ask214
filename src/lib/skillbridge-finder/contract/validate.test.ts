@@ -138,6 +138,30 @@ describe('validateListing', () => {
 		expect(codes(listing({ [field]: value }))).toEqual(['E_SBF_BAD_TEXT']);
 	});
 
+	// Each class of character that renders as nothing, or breaks a line, or is not text at all: a name made of
+	// them reads as an empty one, and a line break inside a name splits a card.
+	it.each([
+		['a Hangul filler', 0x1160],
+		['a Hangul choseong filler', 0x115f],
+		['a combining grapheme joiner', 0x034f],
+		['a variation selector', 0xfe0f],
+		['a braille blank', 0x2800],
+		['a line separator', 0x2028],
+		['a paragraph separator', 0x2029],
+		['a lone surrogate', 0xd800],
+		['an unassigned code point', 0x0378]
+	])('refuses %s inside a name and a name made of it alone', (_class, code) => {
+		const mark = String.fromCharCode(code);
+		expect(codes(listing({ n: 'Acme' + mark + 'Corp' }))).toEqual(['E_SBF_BAD_TEXT']);
+		expect(codes(listing({ n: mark }))).toEqual(['E_SBF_BAD_TEXT']);
+	});
+
+	it('still accepts an accented name and an emoji', () => {
+		const n = String.fromCharCode(0xf1);
+		const grin = String.fromCodePoint(0x1f600);
+		expect(validateListing(listing({ c: `Ca${n}on City`, n: `Acme ${grin} Corp` }))).toEqual([]);
+	});
+
 	it.each([
 		[['one two three four five six seven']],
 		[['Role: Technician']],
