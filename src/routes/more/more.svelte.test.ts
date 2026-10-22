@@ -142,4 +142,17 @@ describe('the More page', () => {
 			expect(readStashedRoute()).toBe('/timeline');
 		}
 	);
+
+	// Feedback reads and clears what is remembered, and Back from it mounts More afresh: the page the person came from
+	// must still be there for the next trip to Feedback.
+	it('remembers the page across a trip to Feedback and back, which mounts More again', async () => {
+		ctx.cameFrom = '/timeline';
+		await render(MorePage);
+		expect(readStashedRoute()).toBe('/timeline');
+
+		ctx.cameFrom = '/feedback';
+		await render(MorePage);
+
+		expect(readStashedRoute()).toBe('/timeline');
+	});
 });

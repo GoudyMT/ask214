@@ -1,3 +1,9 @@
+<script module lang="ts">
+	// In the module, not the page: it must survive a trip to Feedback and back, which mounts this page again and finds
+	// the remembered page already read by Feedback.
+	let cameFrom = '/more';
+</script>
+
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -9,11 +15,12 @@
 	const showSettings = $derived(app.status === 'ready' || app.status === 'damaged');
 
 	// Feedback is sent with the page the person was on. More is not a page feedback can name, so arriving here
-	// remembers the page they came from. Arriving from More itself or from Feedback keeps what is remembered, and a
-	// direct open (no earlier page; "/more" is not a known route) clears a stale name.
+	// remembers the page they came from. Arriving from More itself or from Feedback keeps that page, and a direct open
+	// (no earlier page; "/more" is not a known route) clears a stale name.
 	afterNavigate(({ from }) => {
 		const path = from?.url.pathname;
-		if (path !== '/more' && path !== '/feedback') stashRoute(path ?? '/more');
+		if (path !== '/more' && path !== '/feedback') cameFrom = path ?? '/more';
+		stashRoute(cameFrom);
 	});
 </script>
 
