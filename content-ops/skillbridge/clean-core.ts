@@ -44,8 +44,10 @@ const INDUSTRY_ALIASES: readonly (readonly [string, Industry])[] = [
 	['Education, Training, and Library', 'Educational Instruction and Library']
 ];
 
-// Control, format (zero-width, bidi) and private-use characters: invisible, so they can hide or reorder text.
-const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}]/gu;
+// Control, format (zero-width, bidi), private-use, unassigned and surrogate code points, and the marks Unicode
+// says to ignore when drawing (variation selectors, the combining grapheme joiner): invisible or meaningless, so
+// they can hide text or make two names that look the same differ. Removed like the zero-width characters.
+const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}\p{Default_Ignorable_Code_Point}]/gu;
 const WHITESPACE_RE = /\s+/g;
 const CODE_RE = /^[0-9A-Z]{2,6}$/;
 // One plain address; no `?` so a mailto link built from it cannot carry a subject, body or second recipient.
@@ -91,9 +93,26 @@ const LETTER_OR_DIGIT_RE = /[\p{L}\p{N}]/u;
 // More than two combining marks in a row is stacked "zalgo" text that draws over the lines around it.
 const STACKED_MARKS_RE = /\p{M}{3,}/u;
 
-/** True for text worth publishing: shows a letter or digit, no markup, no stacked marks. */
+// A mark with nothing before it has no letter to attach to; it draws on whatever precedes the text.
+const LEADING_MARK_RE = /^\p{M}/u;
+
+/** True for text worth publishing: shows a letter or digit, no markup, no stacked marks, no leading mark. */
 function isPlainText(text: string): boolean {
-	return LETTER_OR_DIGIT_RE.test(text) && !text.includes('<') && !STACKED_MARKS_RE.test(text);
+	return (
+		LETTER_OR_DIGIT_RE.test(text) &&
+		!text.includes('<') &&
+		!STACKED_MARKS_RE.test(text) &&
+		!LEADING_MARK_RE.test(text)
+	);
+}
+
+/**
+ * True when a piece of text could have been published as it stands: scrubbing changes nothing (so no hidden
+ * characters, odd whitespace or look-alike forms), the validator accepts it, and it is plain text. The one gate
+ * for any free text the app shows, listing or table.
+ */
+export function isListingText(text: string): boolean {
+	return scrub(text) === text && isSafeText(text) && isPlainText(text);
 }
 
 /** Scrubbed text that may be published within its cap, or undefined (empty, markup, stacked marks, too long). */

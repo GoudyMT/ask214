@@ -249,6 +249,24 @@ describe('crosswalkFromCsv', () => {
 		expect(skipped).toEqual({ ONET_SHAPE: 3 });
 	});
 
+	// The listing text gate refuses all three; a title that skips it would reach the table the app reads.
+	it('skips a title with a line separator, only a combining mark, or stacked marks', () => {
+		const { table, skipped } = crosswalkFromCsv(
+			xwalk([
+				{
+					ONET2: '47-2061.00',
+					ONET2_TITLE: 'Welders' + String.fromCharCode(0x2028) + 'Cutters',
+					ONET3: '47-2062.00',
+					ONET3_TITLE: String.fromCharCode(0x301, 0x301),
+					ONET4: '47-2063.00',
+					ONET4_TITLE: 'Welders' + String.fromCharCode(0x489, 0x489, 0x489)
+				}
+			])
+		);
+		expect(table.rows).toEqual([['11B', 'Army', '33-3051.00', 'Police and Patrol Officers']]);
+		expect(skipped).toEqual({ ONET_SHAPE: 3 });
+	});
+
 	it('gives a row with four O*NET pairs four rows', () => {
 		const { table } = crosswalkFromCsv(
 			xwalk([

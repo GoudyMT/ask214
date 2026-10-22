@@ -255,6 +255,27 @@ describe('text fields', () => {
 		);
 	});
 
+	// Marks, variation selectors and unassigned code points draw nothing, so a name could hide them or use them to
+	// tell apart two names that look the same. Like the zero-width format characters they are removed.
+	it.each([
+		['U+034F, a combining mark that draws nothing', String.fromCodePoint(0x34f)],
+		['U+FE0F, a variation selector', String.fromCodePoint(0xfe0f)],
+		['U+17B4, a Khmer vowel that draws nothing', String.fromCodePoint(0x17b4)],
+		['U+E0100, a variation selector from the supplement', String.fromCodePoint(0xe0100)],
+		['U+2065, a code point no one assigned', String.fromCodePoint(0x2065)],
+		['U+FFFF, a noncharacter', String.fromCodePoint(0xffff)],
+		['U+D800, a lone surrogate', String.fromCharCode(0xd800)]
+	])('removes %s from inside a name', (_what, char) => {
+		expect(only({ organization: 'Ac' + char + 'me Widgets' }).n).toBe('Acme Widgets');
+	});
+
+	it('holds back a name that begins with a combining mark once it is normalised', () => {
+		// The acute accent folds to a space and a combining acute; the space is then trimmed away.
+		const out = clean([rawListing({ organization: String.fromCharCode(0xb4) + 'Acme' })]);
+		expect(out.listings).toEqual([]);
+		expect(out.quarantine).toEqual([{ id: 1001, code: 'E_Q_NAME' }]);
+	});
+
 	// A letter stacked with a pile of combining marks draws over the lines around it ("zalgo" text).
 	const marks = (n: number) => 'x' + String.fromCharCode(0x301, 0x302, 0x303, 0x304).slice(0, n);
 

@@ -15,7 +15,7 @@ import {
 	type CrosswalkTable,
 	type ZipsTable
 } from '../../src/lib/skillbridge-finder/contract/tables.ts';
-import { isSafeText } from '../../src/lib/skillbridge-finder/contract/validate.ts';
+import { isListingText } from './clean-core.ts';
 
 /** `[south, west, north, east]` in degrees. */
 export type StateExtent = readonly [south: number, west: number, north: number, east: number];
@@ -211,7 +211,7 @@ export function crosswalkFromCsv(text: string): {
 			const onet = at(`ONET${k}`);
 			if (onet === '') continue;
 			const title = at(`ONET${k}_TITLE`);
-			if (!ONET_RE.test(onet) || !isSafeText(title) || title.length > ONET_TITLE_MAX) {
+			if (!ONET_RE.test(onet) || !isListingText(title) || title.length > ONET_TITLE_MAX) {
 				skip('ONET_SHAPE');
 				continue;
 			}
