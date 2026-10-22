@@ -14,7 +14,12 @@ describe('tabForPath', () => {
 		['/documents', 'more'],
 		['/feedback', 'more'],
 		['/about', 'more'],
-		['/wizard', null]
+		['/more/', 'more'],
+		['/wizard', null],
+		// Every page is top level: a missing page under a tab's address belongs to no tab.
+		['/more/zzz', null],
+		['/documents/zzz', null],
+		['/skillbridge/x', null]
 	])('maps %s to %s', (pathname, tab) => {
 		expect(tabForPath(pathname)).toBe(tab);
 	});

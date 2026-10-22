@@ -5,7 +5,8 @@ const MORE_PAGES = ['more', 'settings', 'resources', 'documents', 'feedback', 'a
 
 /** The bottom-bar tab that holds the page at this path, or null for a page no tab owns (the first-run wizard). */
 export function tabForPath(pathname: string): Tab | null {
-	const first = pathname.split('/')[1] ?? '';
+	// Every page is top level, so the whole path is the page; a trailing slash still names it.
+	const first = pathname.replace(/\/+$/, '').slice(1);
 	if (first === '') return 'home';
 	if (first === 'timeline' || first === 'skillbridge') return first;
 	return MORE_PAGES.includes(first) ? 'more' : null;
