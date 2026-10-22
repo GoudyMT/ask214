@@ -53,6 +53,38 @@ export function lookupUrl(q: {
 	return url;
 }
 
+const UNRESERVED = /[A-Za-z0-9\-._~]/;
+const HEX_PAIR = /^[0-9A-Fa-f]{2}$/;
+
+/**
+ * The normal form robots.txt paths are compared in (RFC 9309 section 2.2.2): every non-ASCII character becomes
+ * the percent-encoding of its UTF-8 octets, and a %XX that stands for an unreserved character becomes that
+ * character. The hex of every other %xx is written upper case, since RFC 3986 treats the two cases as the same
+ * octet. Applied to both the rule and the request, so two spellings of one path meet.
+ */
+function normalizeRobotsPath(path: string): string {
+	let out = '';
+	for (let i = 0; i < path.length;) {
+		const char = String.fromCodePoint(path.codePointAt(i) ?? 0);
+		i += char.length;
+		if ((char.codePointAt(0) ?? 0) > 127) {
+			for (const octet of new TextEncoder().encode(char))
+				out += `%${octet.toString(16).toUpperCase().padStart(2, '0')}`;
+		} else if (char === '%' && HEX_PAIR.test(path.slice(i, i + 2))) {
+			const octet = parseInt(path.slice(i, i + 2), 16);
+			i += 2;
+			const decoded = String.fromCharCode(octet);
+			out +=
+				octet < 128 && UNRESERVED.test(decoded)
+					? decoded
+					: `%${octet.toString(16).toUpperCase().padStart(2, '0')}`;
+		} else {
+			out += char;
+		}
+	}
+	return out;
+}
+
 export type RobotsRule = { allow: boolean; path: string };
 type Group = { agents: string[]; rules: RobotsRule[] };
 
@@ -75,7 +107,7 @@ function parseRobots(text: string): Group[] {
 			}
 			current.agents.push(value.toLowerCase());
 		} else if (field === 'allow' || field === 'disallow') {
-			current?.rules.push({ allow: field === 'allow', path: value });
+			current?.rules.push({ allow: field === 'allow', path: normalizeRobotsPath(value) });
 		}
 	}
 	return groups;
@@ -132,7 +164,7 @@ export function robotsRules(robotsTxt: string): RobotsRule[] {
  * Disallow forbids nothing.
  */
 export function robotsAllows(rules: RobotsRule[], pathAndQuery: string): boolean {
-	return !pathDisallowed(rules, pathAndQuery);
+	return !pathDisallowed(rules, normalizeRobotsPath(pathAndQuery));
 }
 
 /** True when robots.txt forbids us either bare endpoint path; the pre-flight check before any query is built. */

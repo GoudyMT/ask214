@@ -385,6 +385,61 @@ describe('runPull: robots rules are tested against each request as sent', () => 
 	});
 });
 
+// RFC 9309 compares paths after normalising them: a non-ASCII character is the percent-encoding of its UTF-8
+// octets, a %XX that stands for an unreserved character (A-Z a-z 0-9 - . _ ~) is that character, and the hex of
+// every other %xx is upper case. A rule written in another spelling of the same path must still match.
+describe('runPull: robots rules are compared in normal form', () => {
+	const QUOTE = String.fromCharCode(0x2019);
+	const rules = (line: string): HttpReply => ({
+		status: 200,
+		contentType: 'text/plain',
+		body: `User-agent: *\n${line}`
+	});
+	const curly = `Curly${QUOTE}s Example`;
+	const curlyWorld = (line: string) =>
+		makeWorld({ robots: rules(line), providers: [[curly, rowsOf(1, 2)]] });
+
+	it.each([
+		['a raw U+2019', `Disallow: /*provider=Curly${QUOTE}s`],
+		['its percent-encoding in capitals', 'Disallow: /*provider=Curly%E2%80%99s'],
+		['its percent-encoding in lower case', 'Disallow: /*provider=Curly%e2%80%99s']
+	])(
+		'stops before the provider query when the rule spells the apostrophe as %s',
+		async (_name, line) => {
+			const { outcome, urls } = await pull(curlyWorld(line));
+			expect(outcome).toMatchObject({ ok: false, stop: 'E_ROBOTS_DISALLOW', requests: 3 });
+			expect(urls()).toEqual([ROBOTS_URL, FILTERS_URL, ALL_URL]);
+		}
+	);
+
+	it('stops when the rule spells a letter of the provider name as a percent escape', async () => {
+		const { outcome } = await pull(makeWorld({ robots: rules('Disallow: /*provider=%41cme') }));
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_ROBOTS_DISALLOW', requests: 3 });
+	});
+
+	it('stops before Filters when the rule spells a letter of the path as a percent escape', async () => {
+		const { outcome, urls } = await pull(
+			makeWorld({ robots: rules('Disallow: /%4Cocation/Lookup') })
+		);
+		expect(outcome).toEqual({ ok: false, stop: 'E_ROBOTS_DISALLOW', requests: 1, elapsedMs: 0 });
+		expect(urls()).toEqual([ROBOTS_URL]);
+	});
+
+	it('reads the lower-case hex of an escaped letter the same way', () => {
+		expect(robotsDisallows('User-agent: *\nDisallow: /%4cocation/Lookup')).toBe(true);
+	});
+
+	it('does not match a rule that differs in a real character', async () => {
+		const { outcome } = await pull(makeWorld({ robots: rules('Disallow: /*provider=%41cmx') }));
+		expect(outcome.ok).toBe(true);
+	});
+
+	it('keeps an escaped reserved character escaped, so it does not match the plain one', () => {
+		expect(robotsDisallows('User-agent: *\nDisallow: /Location%2FLookup')).toBe(false);
+		expect(robotsDisallows('User-agent: *\nDisallow: /Location%2flookup')).toBe(false);
+	});
+});
+
 describe('runPull: stop on any sign of a "no"', () => {
 	const cases: [string, HttpReply, string][] = [
 		['a 403', status(403), 'E_HTTP_403'],
