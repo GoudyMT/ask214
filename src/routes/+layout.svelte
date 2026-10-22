@@ -340,7 +340,6 @@
 	// Header hiding, on a phone only (rules in header-scroll.ts): it slides away on a scroll down and returns on a scroll
 	// up or when focus enters it. The flag is also set on <html> so the Timeline's sticky chips can take its place.
 	let headerEl = $state<HTMLElement | null>(null);
-	let headerHidden = $state(false);
 	$effect(() => {
 		const el = headerEl;
 		if (!el) return;
@@ -348,7 +347,7 @@
 		const root = document.documentElement;
 		let state = startHeaderState(window.scrollY);
 		const setHidden = (hidden: boolean) => {
-			headerHidden = hidden;
+			el.toggleAttribute('data-hidden', hidden);
 			root.toggleAttribute('data-header-hidden', hidden);
 		};
 		const onScroll = () => {
@@ -404,7 +403,7 @@
 <AppGate {app}>
 	<a class="skip-link" href="#main-content">Skip to content</a>
 
-	<header bind:this={headerEl} data-hidden={headerHidden ? '' : undefined}>
+	<header bind:this={headerEl}>
 		<div class="header-row" style:--shell-width={shellWidth}>
 			<a href={resolve('/')} class="brand">Ask 214</a>
 			<nav aria-label="Primary">
@@ -474,8 +473,8 @@
 	}
 
 	/* Hidden on a phone while the page scrolls down. Transform only, so the header keeps its box in the layout and
-	   the text below does not jump. */
-	header[data-hidden] {
+	   the text below does not jump. The attribute is set from the script, so the compiler cannot see it in the markup. */
+	header:global([data-hidden]) {
 		transform: translateY(-100%);
 	}
 	@media (prefers-reduced-motion: reduce) {
