@@ -172,15 +172,18 @@ async function go(
 	spy = linkSpy()
 ) {
 	const server = fakeHttp(world);
+	const printed: string[] = [];
 	const result = await runPipeline(options(where, over), {
 		http: server.http,
 		clock: fakeClock(),
 		linkDeps: spy.deps,
 		today: () => today,
 		repoRoot: where.repoRoot,
-		print: () => undefined
+		print: (line) => {
+			printed.push(line);
+		}
 	});
-	return { result, urls: server.urls, spy };
+	return { result, urls: server.urls, spy, printed };
 }
 
 function listFiles(dir: string, rel = ''): string[] {
@@ -375,6 +378,26 @@ describe('a run that cannot be trusted writes nothing to the deploy tree', () =>
 		expect(readFileSync(join(where.stateDir, 'runs', SECOND, 'report.txt'), 'utf8')).toContain(
 			'E_HTTP_429'
 		);
+	});
+
+	// The tree is written before the state is saved, so a save that failed leaves a week deployed that the state
+	// never heard of; a run on that state would date everything again and mark the old listings New.
+	it('refuses to run on a saved state that is older than the deploy tree, before any request', async () => {
+		const where = folders();
+		await go(where, makeWorld(), FIRST, { baseline: true });
+		const weekOneState = readFileSync(join(where.stateDir, 'state.json'), 'utf8');
+		await go(where, makeWorld(), SECOND);
+		writeFileSync(join(where.stateDir, 'state.json'), weekOneState);
+		const treeBefore = hashTree(where.deployDir);
+
+		const { result, urls, printed } = await go(where, makeWorld(), THIRD);
+
+		expect(result.exitCode).toBe(3);
+		expect(printed).toContain('E_STATE_BEHIND_DEPLOY');
+		expect(urls).toEqual([]);
+		expect(hashTree(where.deployDir)).toEqual(treeBefore);
+		expect(readFileSync(join(where.stateDir, 'state.json'), 'utf8')).toBe(weekOneState);
+		expect(existsSync(join(where.stateDir, 'runs', THIRD))).toBe(false);
 	});
 
 	it('is blocked by a drift past 20%, leaving the tree and the state as they were, until Max accepts it', async () => {

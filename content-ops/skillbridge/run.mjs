@@ -29,6 +29,7 @@ import {
 	validateZips
 } from '../../src/lib/skillbridge-finder/contract/tables.ts';
 import { emptyState, runCheck } from './check-core.ts';
+import { DEPLOY_DATA_DIR } from './config.ts';
 import { cleanListings } from './clean-core.ts';
 import { assertDirectChild, buildWeek, nodeTreeFs, writeDeployTree } from './layout-core.ts';
 import { runLinks } from './links-core.ts';
@@ -147,6 +148,23 @@ function loadState(stateDir) {
 }
 
 /**
+ * The pull date the deploy folder's `index.json` names, or an empty string when there is none or it cannot be read
+ * (the guard refuses such a tree before any deploy).
+ * @param {string} deployDir
+ * @returns {string}
+ */
+function deployedPullDate(deployDir) {
+	try {
+		const index = /** @type {{ pullDate?: unknown }} */ (
+			readJson(join(deployDir, DEPLOY_DATA_DIR, 'index.json'))
+		);
+		return typeof index.pullDate === 'string' && isIsoDate(index.pullDate) ? index.pullDate : '';
+	} catch {
+		return '';
+	}
+}
+
+/**
  * The supporting tables kept in the state folder, each checked against its contract.
  * @param {string} stateDir
  * @returns {{ zips?: unknown, crosswalk?: unknown }}
@@ -222,6 +240,11 @@ export async function runPipeline(options, deps) {
 		print(code);
 		return /** @type {const} */ ({ exitCode: 1, report: null });
 	};
+	/** @param {string} code */
+	const blocked = (code) => {
+		print(code);
+		return /** @type {const} */ ({ exitCode: 3, report: null });
+	};
 
 	// The state holds raw rows with contact names and addresses, so it must live outside the repo.
 	if (isInsideFolder(deps.repoRoot, stateDir)) return refuse('E_STATE_INSIDE_REPO');
@@ -241,6 +264,11 @@ export async function runPipeline(options, deps) {
 			error instanceof Error && error.message.startsWith('E_') ? error.message : 'E_STATE_READ'
 		);
 	}
+
+	// The tree is written before the state is saved. A deploy tree dated after the state means that save failed;
+	// a run on it would date every listing again and mark the old ones New.
+	if (state.lastPullDate !== null && deployedPullDate(deployDir) > state.lastPullDate)
+		return blocked('E_STATE_BEHIND_DEPLOY');
 
 	const runDir = join(stateDir, 'runs', pullDate);
 	/** @type {PullOutcome} */
