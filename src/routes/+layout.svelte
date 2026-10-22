@@ -359,14 +359,19 @@
 			setHidden(false);
 		};
 		// The bar never moves, so a control focused under it has to. Chromium does that from scroll-padding-bottom, but
-		// WebKit leaves a control that is already inside the window where it is, partly under the bar.
+		// WebKit leaves a control that is already inside the window where it is, partly under the bar. A control that starts
+		// in the window and runs under the bar is moved up, but never past its first line; one below the window is left.
 		const onPageFocus = (event: FocusEvent) => {
 			const bar = document.querySelector('.bottom-bar');
 			if (!bar || !(event.target instanceof Element) || bar.contains(event.target)) return;
 			// A modal dialog sits above the bar, and the page behind it must hold still.
 			if (event.target.closest('dialog[open]')) return;
-			const overlap = event.target.getBoundingClientRect().bottom - bar.getBoundingClientRect().top;
-			if (overlap > 0) window.scrollBy(0, overlap);
+			const { top, bottom } = event.target.getBoundingClientRect();
+			const shift = Math.min(
+				bottom - bar.getBoundingClientRect().top,
+				top - el.getBoundingClientRect().bottom
+			);
+			if (top < window.innerHeight && shift > 0) window.scrollBy(0, shift);
 		};
 		const stop = () => {
 			window.removeEventListener('scroll', onScroll);

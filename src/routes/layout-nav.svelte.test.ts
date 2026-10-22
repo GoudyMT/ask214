@@ -161,6 +161,46 @@ describe('the root layout navigation', () => {
 			.toBe(true);
 	});
 
+	// A passage taller than the strip between header and bar (Ask's "More detail") is moved up only until its first line
+	// is below the header: lining its bottom up with the bar would send its first lines off the top of the screen.
+	it('never moves the first line of a tall focused control above the header at 320 px', async () => {
+		await openAt(320, 568);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 300px"></div><p tabindex="-1" style="height: 800px; margin: 0">passage</p>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const tall = holder.querySelector('p') as HTMLElement;
+			expect(tall.getBoundingClientRect().top).toBeLessThan(
+				(document.querySelector('.bottom-bar') as HTMLElement).getBoundingClientRect().top
+			);
+			tall.focus({ preventScroll: true });
+			await expect
+				.poll(() => tall.getBoundingClientRect().top >= header.getBoundingClientRect().bottom)
+				.toBe(true);
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			expect(tall.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+				header.getBoundingClientRect().bottom
+			);
+		} finally {
+			holder.remove();
+		}
+	});
+
+	// Chromium sends focusin again to a control that kept focus when the window comes back, with no scroll asked for: a
+	// control far below the window must not pull the page down to it.
+	it('leaves the page at the top when a control far below the window takes focus at 320 px', async () => {
+		await openAt(320, 568);
+		const last = [...document.querySelectorAll<HTMLAnchorElement>('footer a')].at(
+			-1
+		) as HTMLElement;
+		expect(last.getBoundingClientRect().top).toBeGreaterThan(window.innerHeight);
+		last.focus({ preventScroll: true });
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+		expect(window.scrollY).toBe(0);
+	});
+
 	// The bar's own links always sit "under the bar": focusing one must not push the page.
 	it('leaves the page where it is when focus enters the bar itself at 320 px', async () => {
 		await openAt(320, 568);
