@@ -275,15 +275,41 @@ function isRole(item: string): boolean {
 	);
 }
 
-function cleanRoles(value: unknown, drops: string[]): string[] | undefined {
-	const whole = scrub(value);
+const WORD_RE = /\p{L}+/gu;
+
+/** The contact's name words of three letters or more, lower-cased; used only to test roles, never published. */
+function contactWords(contact: unknown): Set<string> {
+	const words = scrub(contact).toLowerCase().match(WORD_RE) ?? [];
+	return new Set(words.filter((word) => word.length >= 3));
+}
+
+/** True when a role holds, as a whole word and in any case, a word of the contact's name. */
+function namesContact(item: string, words: ReadonlySet<string>): boolean {
+	return (item.toLowerCase().match(WORD_RE) ?? []).some((word) => words.has(word));
+}
+
+function cleanRoles(value: unknown, contact: unknown, drops: string[]): string[] | undefined {
+	// A line break separates roles as a comma does; scrub would otherwise run the lines together.
+	const whole = scrub(typeof value === 'string' ? value.replace(/[\r\n]+/g, ',') : value);
 	if (whole === '') return undefined;
 	const split = splitOutsideParentheses(whole);
 	const items = (split ?? []).map(scrub).filter((item) => item !== '');
-	if (split !== undefined && items.length >= 1 && items.length <= CAPS.roles && items.every(isRole))
-		return items;
-	drops.push('D_ROLES');
-	return undefined;
+	if (
+		split === undefined ||
+		items.length < 1 ||
+		items.length > CAPS.roles ||
+		!items.every(isRole)
+	) {
+		drops.push('D_ROLES');
+		return undefined;
+	}
+	// Providers sometimes type "ask for <name>" where the roles go; the name must never be published.
+	const words = contactWords(contact);
+	if (items.some((item) => namesContact(item, words))) {
+		drops.push('D_ROLES_CONTACT');
+		return undefined;
+	}
+	return items;
 }
 
 const NAME_START = [' ', ','];
@@ -481,7 +507,7 @@ function cleanRow(
 	if (point !== undefined) [listing.la, listing.lo] = point;
 	const duration = cleanDuration(row.duration, drops);
 	if (duration !== undefined) listing.d = duration;
-	const roles = cleanRoles(row.jobDescription, drops);
+	const roles = cleanRoles(row.jobDescription, row.employerPoc, drops);
 	if (roles !== undefined) listing.r = roles;
 	const codes = cleanCodes(row.targetMOCs, drops);
 	if (codes !== undefined) listing.oc = codes;

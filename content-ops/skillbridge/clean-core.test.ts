@@ -491,6 +491,33 @@ describe('roles, industries and occupation codes', () => {
 		expect(out.dropped).toEqual({ D_ROLES: 1 });
 	});
 
+	it('reads a line break between roles as a separator', () => {
+		expect(
+			only({ jobDescription: 'Field Technician\nWind Turbine Technician\r\nInspector' }).r
+		).toEqual(['Field Technician', 'Wind Turbine Technician', 'Inspector']);
+	});
+
+	// A provider sometimes types "Ask for <contact>" where the roles go; the contact's name must not be published.
+	it.each([['Ask for Pat Example, Technician'], ['Technician, ask for PAT'], ['Call example']])(
+		'drops roles that name the contact: %j',
+		(jobDescription) => {
+			const out = clean([rawListing({ jobDescription, employerPoc: 'Pat Example' })]);
+			expect(out.listings[0]).not.toHaveProperty('r');
+			expect(out.dropped).toEqual({ D_ROLES_CONTACT: 1 });
+			expect(JSON.stringify(out)).not.toContain('Pat Example');
+		}
+	);
+
+	it('keeps roles that only share letters or a short word with the contact', () => {
+		const roles = (jobDescription: string, employerPoc: string) =>
+			only({ jobDescription, employerPoc }).r;
+		expect(roles('Patrol Officer, Examples Clerk', 'Pat Example')).toEqual([
+			'Patrol Officer',
+			'Examples Clerk'
+		]);
+		expect(roles('Li Inspector, Welder', 'Jo Li')).toEqual(['Li Inspector', 'Welder']);
+	});
+
 	it('keeps the four industry names that hold commas whole', () => {
 		const names = [
 			'Arts, Design, Entertainment, Sports, and Media',
