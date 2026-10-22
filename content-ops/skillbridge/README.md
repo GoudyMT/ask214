@@ -20,13 +20,21 @@ folder is git-ignored, and the state folder must lie outside the repo (the comma
 ## Before the first run (once)
 
 1. Node 22 and the repo's packages installed (`pnpm install --frozen-lockfile`), and `pnpm check` run once, so
-   `.svelte-kit/tsconfig.json` exists (the scripts' `$lib` imports need it).
+   `.svelte-kit/tsconfig.json` exists (the scripts' `$lib` imports need it). In every new PowerShell window, set Node
+   22 first (the run checks its Unicode version: 17.0, Node 22.22.3 when this was written):
+
+   ```
+   $env:COREPACK_ENABLE_DOWNLOAD_PROMPT='0'; fnm env | Out-String | Invoke-Expression; fnm use 22
+   ```
+
 2. Pick a state folder outside the repo, for example `C:/Users/Max/skillbridge-state`. It keeps last week's records,
    the provider list, pinned company sites, the removal-request list, the last two raw pulls and every report.
 3. Build the supporting tables into it (public data: the Census ZCTA gazetteer for each ZIP's point, the Census 2020
    ZCTA-to-county relationship file and counties gazetteer for each ZIP's state - a ZIP spanning states gets the one
    holding most of its land - and the O*NET Military Crosswalk, "Crosswalk Files by U.S. Department of Labor,
-   Employment and Training Administration", CC BY 4.0 - credited in the app's About page and the finder footer):
+   Employment and Training Administration", CC BY 4.0 - credited in the app's About page and the finder footer).
+   The two gazetteers and the crosswalk come as `.zip` files: extract each into a folder of its own and give the
+   command the `.txt` / `.csv` inside (the crosswalk's is `milx0724.csv`); the relationship file is a plain `.txt`.
 
    ```
    node --import tsx content-ops/skillbridge/tables.mjs --zcta <path>/2026_Gaz_zcta_national.txt --zcta-county <path>/tab20_zcta520_county20_natl.txt --counties <path>/2026_Gaz_counties_national.txt --crosswalk <path>/milx0724.csv --out C:/Users/Max/skillbridge-state/tables
@@ -55,8 +63,8 @@ folder is git-ignored, and the state folder must lie outside the repo (the comma
    then `pnpm exec wrangler whoami` shows the account and the scopes.
 
 5. The first full pull is a baseline: add `--baseline` to the weekly command below, once. It sets every listing's
-   first-listed date to that pull, so nothing is marked New, and it replaces any earlier records (the sample week
-   included). A state folder that never had a baseline blocks every other run with `E_NO_BASELINE`.
+   first-listed date to that pull, so nothing is marked New, and it replaces any earlier records (a week built from
+   a saved snapshot included). A state folder that never had a baseline blocks every other run with `E_NO_BASELINE`.
 
 ## Every week
 
@@ -86,11 +94,17 @@ Run from the repo root (each command is one line):
    website and LinkedIn link counts beside last week's (a sharp drop means a link source failed this week; skip the
    deploy and run again on a later day - a second run on the same day is refused with `E_PULL_DATE_ORDER`).
 
-3. If the report is right, deploy. From the data Worker's own folder, `workers/skillbridge-data`:
+3. If the report is right, deploy. Move into the data Worker's own folder (the guard refuses the repo root), deploy,
+   and move back:
 
    ```
+   Set-Location workers/skillbridge-data
    node --import tsx ../../content-ops/skillbridge/deploy.mjs
+   Set-Location ../..
    ```
+
+   It prints "guard: checking ...", then either "refused" with one code per problem (nothing was deployed; fix what
+   the code names, or report it) or wrangler's own deploy output.
 
    The guard checks the config (static files only, the one route, no code, no bindings), refuses to run from the repo
    root, with any `CLOUDFLARE_*`, `CF_*` or `WRANGLER_*` variable set in the shell (except `WRANGLER_SEND_METRICS` and
@@ -101,12 +115,14 @@ Run from the repo root (each command is one line):
 
 ## When the run stops
 
-The pull stops at once, and nothing is published, on a robots.txt rule that disallows a request, a 403 or 429, a
-CAPTCHA or other web page instead of data (whatever its status), a reply that is not the expected JSON, three errors
-in a row, or a provider name that cannot be sent (`E_BAD_PROVIDER_NAME`: report it, it needs a code change). The app
-keeps showing the last deployed week. Read the stop code in the report. A stopped run saves no state, so it may be
-run again the same day - but never the same night after a 403, 429 or robots stop; if the SkillBridge office objects to the pull in any way, stop running it and tell the office it
-has stopped.
+Exit 2, and the report ends "Publish: STOPPED (<code>)". The pull stops at once, and nothing is published, on:
+a robots.txt rule that disallows a request (`E_ROBOTS_DISALLOW`, or `E_ROBOTS_UNREADABLE` for a robots.txt that is a
+web page); a 403 or 429 (`E_HTTP_403`, `E_HTTP_429`); a CAPTCHA or other web page instead of data, whatever its status
+(`E_HTML_BODY`); a reply that is not the expected JSON (`E_NOT_JSON`, `E_BAD_ENVELOPE`); three errors in a row
+(`E_ERRORS_IN_A_ROW`); or a provider name that cannot be sent (`E_BAD_PROVIDER_NAME`: report it, it needs a code
+change). The app keeps showing the last deployed week. A stopped run saves no state, so it may be run again the same
+day - but never the same night after a 403, 429 or robots stop. If the SkillBridge office objects to the pull in any
+way, stop running it and tell the office it has stopped.
 
 ## When a week is blocked (exit 3)
 
@@ -140,7 +156,9 @@ data files with the version: NOT YET MEASURED (to be read on the first rollback 
 ## A removal request
 
 When someone asks for their contact address to be removed (through Feedback), add the address to the `suppression`
-list in `state.json` in the state folder (case and spacing do not matter), then run and deploy as usual: the address
+list in `state.json` in the state folder, for example `"suppression": ["name@example.com"]` (case and spacing do not
+matter; keep the file valid JSON - a broken file stops the run with `E_STATE_READ`), then run and deploy as usual:
+the address
 is dropped from every listing, this week's and any kept from earlier weeks, roles and titles never carry an address,
 and when the deployed last week still holds it, that week's deploy holds only the new week, so those files are no
 longer served.
@@ -149,6 +167,7 @@ longer served.
 
 The Census gazetteer and the O*NET crosswalk change about once a year. Download the new files (each is a decision for
 Max), run step 3 of "Before the first run" again, and run the week. A run that stops with `E_TABLE_INVALID` has
-tables in an older shape (for example a ZIP table without its state column): rebuild them with step 3. The state boxes the clean step uses
+tables in an older shape (for example a ZIP table without its state column): rebuild them with step 3. The state
+boxes the clean step uses
 (`src/lib/skillbridge-finder/contract/state-extents.ts`) are generated by the same script with `--counties <file>
 --extents <that path>`; that file is committed, so a refresh of it is a normal change with its own pull request.
