@@ -86,6 +86,9 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	let _failed = $state(false);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
+	// Saves still waiting for their turn, and the last record one of them wrote after a lock took `_state` away.
+	let inFlight = 0;
+	let savedAfterLock: TimelineState | null = null;
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
 	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
 	// Reactive: the Timeline offers Unlock while this stays `locked` after the profile has opened.
@@ -116,48 +119,64 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	 */
 	async function persist(mutate: (base: TimelineState) => TimelineState): Promise<void> {
 		const relockAtStart = relockEpoch;
+		// The record the tap was made on. A lock that lands while this save waits its turn takes `_state` away, but the
+		// tap came first, so the save still lands on the record as this tab held it (or on what a save queued before it
+		// wrote meanwhile), and only while the disk still holds the generation the tap was made on.
+		const tappedOn = _state;
+		const tappedAt = _generation;
+		inFlight++;
 		let ks: KeystoreRow | undefined;
-		await withWriteLocks(
-			async () => {
-				ks = await readVerifiedKeystore();
-				return ks.keystoreGeneration;
-			},
-			async () => {
-				if (!ks) throw new KeystoreNotInitializedError();
-				const keystore = ks;
+		try {
+			await withWriteLocks(
+				async () => {
+					ks = await readVerifiedKeystore();
+					return ks.keystoreGeneration;
+				},
+				async () => {
+					if (!ks) throw new KeystoreNotInitializedError();
+					const keystore = ks;
 
-				const currentGen = await readCurrentGeneration(keystore);
-				if (currentGen !== _generation) throw new OccConflictError();
-				if (_state === null) throw new TimelineRelockedError();
+					const currentGen = await readCurrentGeneration(keystore);
+					if (currentGen !== _generation) throw new OccConflictError();
+					const overtaken = relockEpoch !== relockAtStart;
+					const base =
+						_state ??
+						(overtaken ? (savedAfterLock ?? (currentGen === tappedAt ? tappedOn : null)) : null);
+					if (base === null) throw new TimelineRelockedError();
 
-				const next = mutate(_state);
-				const nextGen = currentGen + 1;
-				const blob = await encryptTimelineRecord(next, keystore, nextGen);
-				const newHwm = await signSidecar<TimelineHwmPayload>(
-					'timeline-state-hwm',
-					{
-						generation: nextGen,
-						keystoreGeneration: keystore.keystoreGeneration,
-						epoch: keystore.epoch,
-						ts: Date.now()
-					},
-					keystore.hmacKeyRef
-				);
+					const next = mutate(base);
+					const nextGen = currentGen + 1;
+					const blob = await encryptTimelineRecord(next, keystore, nextGen);
+					const newHwm = await signSidecar<TimelineHwmPayload>(
+						'timeline-state-hwm',
+						{
+							generation: nextGen,
+							keystoreGeneration: keystore.keystoreGeneration,
+							epoch: keystore.epoch,
+							ts: Date.now()
+						},
+						keystore.hmacKeyRef
+					);
 
-				await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
-					// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord, under withWriteLocks.
-					tx.objectStore('timeline-state').put({ id: 0, rec: blob });
-					tx.objectStore('timeline-state-hwm').put({ id: 0, ...newHwm });
-				});
+					await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
+						// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord, under withWriteLocks.
+						tx.objectStore('timeline-state').put({ id: 0, rec: blob });
+						tx.objectStore('timeline-state-hwm').put({ id: 0, ...newHwm });
+					});
 
-				_generation = nextGen;
-				// Residency guard: a relockSync() during this save must not be undone by
-				// re-populating decrypted state (the IDB write already persisted the edit).
-				// No lockState update belongs here: the relocked check above means a write only ever
-				// runs on a store load() already opened.
-				if (relockEpoch === relockAtStart) _state = next;
-			}
-		);
+					_generation = nextGen;
+					// Residency guard: a relockSync() during this save must not be undone by
+					// re-populating decrypted state (the IDB write already persisted the edit).
+					// No lockState update belongs here: the relocked check above means a write only ever
+					// runs on a store load() already opened.
+					if (relockEpoch === relockAtStart) _state = next;
+					else if (_state === null) savedAfterLock = next;
+				}
+			);
+		} finally {
+			// Plaintext kept past a lock lives only while a save the lock overtook still waits.
+			if (--inFlight === 0) savedAfterLock = null;
+		}
 		opts.onBroadcast?.({ type: 'timeline-updated' });
 	}
 

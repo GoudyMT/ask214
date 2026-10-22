@@ -208,6 +208,44 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	// The person's tap came first: another tab's Lock arriving while the save waits for its turn must not throw the
+	// change away (in WebKit the lock message reaches the tab before the save writes, and the tap was silently lost).
+	it('a tap made before a lock still lands, and the store stays locked', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+		const tap = a.setStatus('y', 'done');
+		a.relockSync('peer');
+		await tap;
+		expect(a.ready).toBe(false);
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({ x: { status: 'done' }, y: { status: 'done' } });
+		await deleteTestDb(db);
+	});
+
+	// Two taps queued before the lock: the second builds on what the first saved, so neither drops the other.
+	it('two taps queued before a lock both land', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		const first = a.setStatus('x', 'done');
+		const second = a.setNote('y', 'call the office');
+		a.relockSync('user');
+		await Promise.all([first, second]);
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({ x: { status: 'done' }, y: { notes: 'call the office' } });
+		await deleteTestDb(db);
+	});
+
 	it('merges concurrent actions against a fresh base - the second does not drop the first', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);
