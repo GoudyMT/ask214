@@ -71,7 +71,7 @@ describe('BottomBar on a 320 px phone', () => {
 		expect(new Set(iconTops).size).toBe(1);
 	});
 
-	// The wizard owns no tab; every page the old header or footer linked to is under More.
+	// The wizard owns no tab; Settings, Resources, Documents, Feedback and About are under More.
 	it.each([
 		['/', 'Home'],
 		['/skillbridge', 'SkillBridge'],

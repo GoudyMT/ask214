@@ -1,6 +1,6 @@
 export type Tab = 'home' | 'timeline' | 'skillbridge' | 'more';
 
-// The pages the old header and footer linked to now live behind the More tab, so it stays marked while one is open.
+// Settings, Resources, Documents, Feedback and About sit behind the More tab, so it stays marked while one is open.
 const MORE_PAGES = ['more', 'settings', 'resources', 'documents', 'feedback', 'about'];
 
 /** The bottom-bar tab that holds the page at this path, or null for a page no tab owns (the first-run wizard). */

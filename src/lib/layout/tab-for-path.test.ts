@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { tabForPath, type Tab } from './tab-for-path';
 
 // tabForPath names the bottom-bar tab that holds the page being read, so the bar can mark it current. The pages
-// the old header and footer linked to all sit behind the More tab; a page no tab owns marks none.
+// Settings, Resources, Documents, Feedback and About all sit behind the More tab; a page no tab owns marks none.
 describe('tabForPath', () => {
 	it.each<[string, Tab | null]>([
 		['/', 'home'],
