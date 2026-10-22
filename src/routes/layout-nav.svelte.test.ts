@@ -336,6 +336,17 @@ describe('the root layout navigation', () => {
 		expect(header.hasAttribute('data-hidden')).toBe(false);
 	});
 
+	// While focus is in the header it stays on screen, so the page must not be told it is hidden: the Timeline's sticky
+	// chips take the header's place when it is, and would slide under the header instead.
+	it('does not flag the header hidden while focus is in it and the page scrolls down at 320x640', async () => {
+		await openAt(320, 640);
+		(document.querySelector('header a.brand') as HTMLElement).focus();
+		window.scrollTo(0, 600);
+		await expect.poll(() => window.scrollY).toBe(600);
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+		expect(document.documentElement.hasAttribute('data-header-hidden')).toBe(false);
+	});
+
 	// The bar's own links always sit "under the bar": focusing one must not push the page.
 	it('leaves the page where it is when focus enters the bar itself at 320 px', async () => {
 		await openAt(320, 568);

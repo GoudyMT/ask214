@@ -357,7 +357,8 @@
 		};
 		const onScroll = () => {
 			state = nextHeaderState(state, window.scrollY);
-			setHidden(state.hidden);
+			// A header holding focus stays on screen, so the page is not told it is hidden.
+			setHidden(state.hidden && !el.contains(document.activeElement));
 		};
 		// Focus entering the header brings it back, and the hide distance counts from there.
 		// The bar never moves, so a control focused under it has to. Chromium does that from scroll-padding-bottom, but
