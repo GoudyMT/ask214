@@ -10,6 +10,8 @@ import { isSafeText, type ContractError, type ContractResult } from './validate'
 
 export const MAX_ZIP_ROWS = 40_000;
 export const MAX_CROSSWALK_ROWS = 100_000;
+/** One military code maps to a handful of O*NET jobs; more than this is a broken or hostile table. */
+export const MAX_ROWS_PER_CODE = 50;
 const MAX_NAME = 150;
 
 /** `[zip, lat, lon]`: one row per five-digit ZIP code tabulation area. */
@@ -88,6 +90,8 @@ export function validateZips(raw: unknown): ContractResult {
 export function validateCrosswalk(raw: unknown): ContractResult {
 	const errors: ContractError[] = [];
 	const rows = readTable(raw, MAX_CROSSWALK_ROWS, errors);
+	const perCode = new Map<string, number>();
+	const pairs = new Set<string>();
 	for (const r of rows ?? []) {
 		const row = rowOf(r, 4, errors);
 		if (row === null) continue;
@@ -99,6 +103,17 @@ export function validateCrosswalk(raw: unknown): ContractResult {
 			!ONET_CODE_RE.test(onetCode)
 		)
 			errors.push({ code: 'E_SBF_BAD_CODES', field: 'rows' });
+		else {
+			// Search walks every row of a code it is given, so a code with thousands of rows, or one row repeated, is
+			// cost with no meaning. The excess is reported once per code.
+			const count = (perCode.get(code) ?? 0) + 1;
+			perCode.set(code, count);
+			if (count === MAX_ROWS_PER_CODE + 1)
+				errors.push({ code: 'E_SBF_TOO_MANY_ROWS', field: 'rows' });
+			const pair = `${code} ${onetCode}`;
+			if (pairs.has(pair)) errors.push({ code: 'E_SBF_DUP_ID', field: 'rows' });
+			pairs.add(pair);
+		}
 		if (!BRANCH_SET.has(branch)) errors.push({ code: 'E_SBF_BAD_ENUM', field: 'rows' });
 		if (!isSafeText(title)) errors.push({ code: 'E_SBF_BAD_TEXT', field: 'rows' });
 		else if (title.length > MAX_NAME) errors.push({ code: 'E_SBF_TOO_LONG', field: 'rows' });

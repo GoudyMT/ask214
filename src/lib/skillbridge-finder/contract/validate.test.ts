@@ -154,6 +154,14 @@ describe('validateListing', () => {
 		expect(codes(listing({ oc: [...forty, 'B1'] }))).toEqual(['E_SBF_BAD_CODES']);
 	});
 
+	// A code repeated 40 times makes one listing cost 40 visits in every search that reaches it.
+	it('refuses an occupation code listed twice', () => {
+		expect(validateListing(listing({ oc: ['91B', '2A6X1'] }))).toEqual([]);
+		expect(validateListing(listing({ oc: ['91B', '2A6X1', '91B'] }))).toEqual([
+			{ code: 'E_SBF_BAD_CODES', id: 386, field: 'oc' }
+		]);
+	});
+
 	it.each([
 		[{ e: 'a@example.com, b@example.com' }],
 		[{ e: 'jobs@example.com?subject=hi' }],

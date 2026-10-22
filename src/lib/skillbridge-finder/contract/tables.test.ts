@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { MAX_CROSSWALK_ROWS, MAX_ZIP_ROWS, validateCrosswalk, validateZips } from './tables';
+import {
+	MAX_CROSSWALK_ROWS,
+	MAX_ROWS_PER_CODE,
+	MAX_ZIP_ROWS,
+	validateCrosswalk,
+	validateZips
+} from './tables';
 
 const codes = (r: { errors: { code: string }[] }) => r.errors.map((e) => e.code);
 
@@ -83,5 +89,26 @@ describe('validateCrosswalk', () => {
 		expect(
 			codes(validateCrosswalk(crosswalk(new Array<unknown>(MAX_CROSSWALK_ROWS + 1).fill(null))))
 		).toEqual(['E_SBF_TOO_MANY_ROWS']);
+	});
+
+	// One code with thousands of rows makes every search that touches it walk them all.
+	it('refuses a military code with more than 50 rows, and keeps one with exactly 50', () => {
+		const rowsFor = (n: number) =>
+			Array.from({ length: n }, (_, k) => ['11B', 'Army', `49-${1000 + k}.00`, 'Infantry']);
+		expect(validateCrosswalk(crosswalk(rowsFor(MAX_ROWS_PER_CODE)))).toEqual({
+			valid: true,
+			errors: []
+		});
+		expect(validateCrosswalk(crosswalk(rowsFor(MAX_ROWS_PER_CODE + 1))).errors).toEqual([
+			{ code: 'E_SBF_TOO_MANY_ROWS', field: 'rows' }
+		]);
+	});
+
+	it('refuses the same military code and O*NET code listed twice', () => {
+		const row = ['91B', 'Army', '49-3023.00', 'Automotive Service Technicians'];
+		expect(codes(validateCrosswalk(crosswalk([row, [...row]])))).toEqual(['E_SBF_DUP_ID']);
+		expect(
+			validateCrosswalk(crosswalk([row, ['91B', 'Army', '49-3031.00', 'Bus Mechanics']])).valid
+		).toBe(true);
 	});
 });

@@ -178,7 +178,8 @@ export function validateListing(raw: unknown): ContractError[] {
 			Array.isArray(oc) &&
 			oc.length > 0 &&
 			oc.length <= CAPS.codes &&
-			oc.every((c) => typeof c === 'string' && CODE_RE.test(c));
+			oc.every((c) => typeof c === 'string' && CODE_RE.test(c)) &&
+			new Set(oc).size === oc.length;
 		if (!ok) fail('E_SBF_BAD_CODES', 'oc');
 	}
 

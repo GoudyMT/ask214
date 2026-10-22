@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Industry, Listing } from '../contract/listing';
 import type { StateCode } from '../contract/places';
 import type { CrosswalkTable } from '../contract/tables';
@@ -180,7 +180,7 @@ describe('typing as you go and slips of the thumb', () => {
 		['an extra letter', 'tulsaa'],
 		['a missing letter', 'robotcs']
 	])('forgives one slip in a word of 5 or more letters: %s', (_slip, word) => {
-		expect(find(word)).toHaveLength(1);
+		expect(find(word)).toEqual([1]);
 	});
 
 	// Four-letter words are too short: one slip would turn "chef" into other real words.
@@ -211,10 +211,28 @@ describe('military job codes through the crosswalk', () => {
 		expect(find('11b', ALL, CROSSWALK)).toEqual([1]);
 	});
 
-	// "All occupations" says nothing about this person's job, so a code never finds it.
-	it('does not match a listing open to all occupations by a code', () => {
-		expect(find('92g', ALL, CROSSWALK)).not.toContain(3);
-		expect(find('11b')).not.toContain(3);
+	// "All occupations" is a marker, not a list: read as one it would hold the codes "a" and "l", and the listing
+	// would turn up for anyone typing those letters.
+	it.each(['a', 'l'])('does not read the all-occupations marker as the letter %s', (letter) => {
+		expect(find(letter, ALL, CROSSWALK)).toEqual([]);
+	});
+
+	// A civilian job shared by several codes must cost one visit per code, not one per shared job, or a code
+	// with many O*NET rows makes a single keystroke walk the same listings over and over.
+	it('visits the listings of each related code once, however many O*NET jobs link to it', () => {
+		const jobs = ['35-1011.00', '35-1012.00', '35-2014.00'];
+		const crosswalk: CrosswalkTable = {
+			v: 1,
+			rows: ['11B', '92G', 'MS'].flatMap((code) =>
+				jobs.map((job): [string, string, string, string] => [code, 'Army', job, 'Cooks'])
+			)
+		};
+		const index = buildSearchIndex(ALL, crosswalk);
+		const visits = vi.spyOn(index.listingsByCode, 'get');
+		expect(search(index, '11b')).toEqual([1, 2, 4]);
+		const perCode = new Map<string, number>();
+		for (const [code] of visits.mock.calls) perCode.set(code, (perCode.get(code) ?? 0) + 1);
+		expect(Object.fromEntries(perCode)).toEqual({ '11b': 1, '92g': 1, ms: 1 });
 	});
 
 	it('without a crosswalk, searches the same but a code finds only listings naming it', () => {

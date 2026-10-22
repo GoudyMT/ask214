@@ -104,10 +104,12 @@ function matchWord(index: SearchIndex, word: string): Set<number> {
 		}
 	}
 
-	// A military code also finds the same civilian job under any branch's code.
+	// A military code also finds the same civilian job under any branch's code. Codes shared by several of its
+	// O*NET jobs are gathered first, so the listings of each code are walked once.
+	const related = new Set<string>();
 	for (const onet of index.onetsByCode.get(word) ?? [])
-		for (const code of index.codesByOnet.get(onet) ?? [])
-			index.listingsByCode.get(code)?.forEach((id) => hits.add(id));
+		for (const code of index.codesByOnet.get(onet) ?? []) related.add(code);
+	for (const code of related) index.listingsByCode.get(code)?.forEach((id) => hits.add(id));
 	return hits;
 }
 
