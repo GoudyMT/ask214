@@ -137,6 +137,13 @@ export function scanForPiiTokens(
 export const FORBIDDEN_IMPORT_PATTERN =
 	/(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar|backup)(?:\/|$)/;
 
+/**
+ * The SkillBridge finder's own personal half: the person's place, saved programs and which listings they opened live
+ * in its `state` folder. Its fetch part asks the server for files, so it must receive file names only and never
+ * import that folder; the server would otherwise be one function call away from a place.
+ */
+export const FINDER_STATE_IMPORT_PATTERN = /(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?state(?:\/|$)/;
+
 // Any quote, including a template literal, and any whitespace - line breaks too - between `import(` or `from` and the
 // specifier, so the scan runs over the whole file rather than one line at a time. The specifier itself stops at a
 // line break: a quoted word ending in "from" in a string or comment would otherwise run on to the next quote and
@@ -149,18 +156,20 @@ const IMPORT_SPECIFIER =
  *
  * Args:
  *   files: array of { path, content } to scan.
+ *   pattern: the specifiers to refuse; the personal-data modules unless given.
  *
  * Returns:
  *   one PiiViolation per forbidden import, with the specifier as its token; empty array when clean.
  */
 export function scanForPiiImports(
-	files: ReadonlyArray<{ path: string; content: string }>
+	files: ReadonlyArray<{ path: string; content: string }>,
+	pattern: RegExp = FORBIDDEN_IMPORT_PATTERN
 ): PiiViolation[] {
 	const violations: PiiViolation[] = [];
 	for (const file of files) {
 		for (const match of file.content.matchAll(IMPORT_SPECIFIER)) {
 			const specifier = match[2] ?? '';
-			if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
+			if (pattern.test(specifier)) {
 				const line = file.content.slice(0, match.index).split('\n').length;
 				violations.push({ path: file.path, token: specifier, line });
 			}
