@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { version } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import AppGate from '$lib/components/AppGate.svelte';
@@ -32,6 +33,7 @@
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
 	import { startReload, stopReloadForLock } from '$lib/profile/pending-reload';
+	import { markRaised, takeOverIfRaised } from '$lib/sw/take-over';
 	import { wipeAllStores } from '$lib/db/wipe';
 	import { stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
@@ -55,6 +57,12 @@
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 	import { stashRoute } from '$lib/feedback/context';
 	let { children } = $props();
+
+	// After a database raise, this release's worker takes over at once (take-over.ts).
+	const takeOver = (raised?: boolean) => {
+		if (raised) markRaised();
+		void takeOverIfRaised(navigator.serviceWorker, version);
+	};
 
 	// Shell content width: one width for every route (shell-width.ts), set on nav, main and footer through
 	// the --shell-width CSS var. The 720px in the styles below is only the fallback for a missing var.
@@ -94,6 +102,7 @@
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/service-worker.js', { type: 'module' });
+			takeOver();
 		}
 
 		// Cross-tab bus: created up front so the store can publish change/relock signals via
@@ -122,7 +131,8 @@
 								// the takeover offers a reload onto the new bundle instead of a silent, data-less tab.
 								if (!destroyed) app.status = 'stale';
 							},
-							onBlocked
+							onBlocked,
+							() => takeOver(true)
 						),
 					bootstrap: bootstrapLocalKeystore,
 					createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })

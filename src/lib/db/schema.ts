@@ -47,11 +47,14 @@ export type StoreName = (typeof STORES)[number];
 export function openMtcDb(
 	name: string = DB_NAME,
 	onVersionChange?: () => void,
-	onBlocked?: () => void
+	onBlocked?: () => void,
+	// This open raised a database an older release made (not a fresh one): that release's pages cannot open it now.
+	onRaised?: () => void
 ): Promise<IDBDatabase> {
 	return new Promise<IDBDatabase>((resolve, reject) => {
 		const req = indexedDB.open(name, DB_VERSION);
-		req.onupgradeneeded = () => {
+		req.onupgradeneeded = (event) => {
+			if (event.oldVersion > 0) onRaised?.();
 			const db = req.result;
 			for (const store of STORES) {
 				if (!db.objectStoreNames.contains(store)) {

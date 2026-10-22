@@ -116,6 +116,24 @@ describe('openMtcDb schema (v7)', () => {
 		}
 	});
 
+	// The app asks this release's waiting worker to take over only after a raise: the older release's pages, which its
+	// worker serves offline, cannot open the raised database. A new database or one already raised is no such event.
+	it('says when it raised a database an older release made, and never otherwise', async () => {
+		const name = 'mtc-test-' + crypto.randomUUID();
+		(await openV6Db(name)).close();
+		const raised = vi.fn();
+		const upgraded = await openMtcDb(name, undefined, undefined, raised);
+		expect(raised).toHaveBeenCalledOnce();
+		upgraded.close();
+
+		const again = vi.fn();
+		opened.push(await openMtcDb(name, undefined, undefined, again));
+		const created = vi.fn();
+		opened.push(await openMtcDb('mtc-test-' + crypto.randomUUID(), undefined, undefined, created));
+		expect(again).not.toHaveBeenCalled();
+		expect(created).not.toHaveBeenCalled();
+	});
+
 	it('does NOT create the deferred journal/meta stores', async () => {
 		const db = await freshDb();
 		expect(db.objectStoreNames.contains('journal')).toBe(false);

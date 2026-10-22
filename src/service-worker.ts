@@ -21,6 +21,7 @@ import {
 	INSTALL_PAGES,
 	offlineResponse
 } from '$lib/ask/asset-cache';
+import { isTakeOver } from '$lib/sw/take-over-message';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -172,6 +173,12 @@ async function keepEmbedWorkerScript(cacheNames: string[]): Promise<void> {
 		// Intentionally ignored - see above.
 	}
 }
+
+// A page of this release that raised the database asks this worker to take over now (src/lib/sw/take-over.ts): the
+// older worker's cached pages cannot open the raised database offline.
+sw.addEventListener('message', (event) => {
+	if (isTakeOver(event.data, version)) void sw.skipWaiting();
+});
 
 sw.addEventListener('fetch', (event) => {
 	if (event.request.method !== 'GET') return;
