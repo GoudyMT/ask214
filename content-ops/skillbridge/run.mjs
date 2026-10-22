@@ -30,7 +30,7 @@ import {
 	validateZips
 } from '../../src/lib/skillbridge-finder/contract/tables.ts';
 import { emptyState, runCheck } from './check-core.ts';
-import { DEPLOY_DATA_DIR, DEPLOY_WEEKS_KEPT } from './config.ts';
+import { DEPLOY_DATA_DIR, DEPLOY_WEEKS_KEPT, UNICODE_VERSION } from './config.ts';
 import { cleanListings } from './clean-core.ts';
 import { assertDirectChild, buildWeek, nodeTreeFs, writeDeployTree } from './layout-core.ts';
 import { runLinks } from './links-core.ts';
@@ -70,6 +70,7 @@ import { queryWikidata } from './wikidata.ts';
  *   today(): string,
  *   repoRoot: string,
  *   env?: Record<string, string | undefined>,
+ *   unicode?: string,
  *   print?: (line: string) => void
  * }} RunDeps
  */
@@ -298,6 +299,9 @@ export async function runPipeline(options, deps) {
 	// fed by anyone on the network; the run does not start.
 	if ((deps.env ?? process.env).NODE_TLS_REJECT_UNAUTHORIZED === '0')
 		return refuse('E_TLS_UNVERIFIED');
+	// The clean step strips code points this Node's Unicode leaves unassigned; another version publishes differently.
+	if ((deps.unicode ?? process.versions.unicode) !== UNICODE_VERSION)
+		return refuse('E_UNICODE_VERSION');
 	// The state holds raw rows with contact names and addresses, so it must live outside the repo.
 	if (isInsideFolder(deps.repoRoot, stateDir)) return refuse('E_STATE_INSIDE_REPO');
 	const pullDate = deps.today();

@@ -52,6 +52,12 @@ export const WIKIDATA_PAUSE_MS = 1_500;
 export const DEPLOY_DATA_DIR = 'skillbridge-data';
 /** Dated folders kept in the deploy tree: this week's and last week's. */
 export const DEPLOY_WEEKS_KEPT = 2;
+/**
+ * The Unicode version of the Node that may run the weekly command (`process.versions.unicode`). The clean step strips
+ * code points unassigned in it; another version would change what is published, so the run refuses to start until
+ * this is updated in a reviewed change.
+ */
+export const UNICODE_VERSION = '17.0';
 /** Cloudflare's static-asset limits per Worker version. */
 export const ASSET_MAX_FILES = 20_000;
 export const ASSET_MAX_FILE_BYTES = 25 * 1024 * 1024;

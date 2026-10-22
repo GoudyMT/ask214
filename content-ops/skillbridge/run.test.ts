@@ -16,7 +16,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { isMain, runCli, runPipeline } from './run.mjs';
-import { API_ORIGIN, FILTERS_PATH, LOOKUP_PATH, ROBOTS_PATH } from './config.ts';
+import { API_ORIGIN, FILTERS_PATH, LOOKUP_PATH, ROBOTS_PATH, UNICODE_VERSION } from './config.ts';
 import { emptyState } from './check-core.ts';
 import { checkTree } from './guard-core.ts';
 import type { GuardDeps, TreeEntry } from './guard-core.ts';
@@ -189,7 +189,8 @@ async function go(
 	today: string,
 	over: Partial<Options> = {},
 	spy = linkSpy(),
-	env: Record<string, string | undefined> = {}
+	env: Record<string, string | undefined> = {},
+	unicode = UNICODE_VERSION
 ) {
 	if (!existsSync(join(where.stateDir, 'tables'))) writeTables(where);
 	const server = fakeHttp(world);
@@ -201,6 +202,7 @@ async function go(
 		today: () => today,
 		repoRoot: where.repoRoot,
 		env,
+		unicode,
 		print: (line) => {
 			printed.push(line);
 		}
@@ -687,6 +689,25 @@ describe('bad arguments and bad files', () => {
 		expect(existsSync(join(where.stateDir, 'state.json'))).toBe(false);
 	});
 
+	// Which characters count as unassigned (and are stripped before publishing) depends on the Unicode version of the
+	// Node that runs; a different one would silently change what is published.
+	it('refuses to start on a Node whose Unicode version is not the pinned one, before any request', async () => {
+		const where = folders();
+		const { result, urls, printed } = await go(
+			where,
+			makeWorld(),
+			FIRST,
+			{ baseline: true },
+			linkSpy(),
+			{},
+			'16.0'
+		);
+		expect(result.exitCode).toBe(1);
+		expect(printed).toEqual(['E_UNICODE_VERSION']);
+		expect(urls).toEqual([]);
+		expect(existsSync(where.deployDir)).toBe(false);
+	});
+
 	it('runs when the variable is set to anything else', async () => {
 		const { result } = await go(folders(), makeWorld(), FIRST, { baseline: true }, linkSpy(), {
 			NODE_TLS_REJECT_UNAUTHORIZED: '1'
@@ -756,6 +777,7 @@ describe('the command line', () => {
 				linkDeps: linkSpy().deps,
 				today: () => FIRST,
 				repoRoot: where.repoRoot,
+				unicode: UNICODE_VERSION,
 				print: (line: string) => {
 					printed.push(line);
 				}
