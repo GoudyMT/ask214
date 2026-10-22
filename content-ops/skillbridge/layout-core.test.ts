@@ -464,6 +464,20 @@ describe('writeDeployTree', () => {
 		expect(last).toEqual({ pruned: ['2026-10-07'], kept: ['2026-10-14', PULL_DATE], ignored: [] });
 	});
 
+	it('keeps only the folder it just wrote when asked, and still leaves a name that is not a date', () => {
+		const mem = memoryFs();
+		writeDeployTree(ROOT, weekFor('2026-10-07'), mem.fs);
+		writeDeployTree(ROOT, weekFor('2026-10-14'), mem.fs);
+		mem.fs.mkdir(`${W}/notes`);
+		const out = writeDeployTree(ROOT, weekFor(PULL_DATE), mem.fs, { onlyThisWeek: true });
+		expect(out).toEqual({
+			pruned: ['2026-10-07', '2026-10-14'],
+			kept: [PULL_DATE],
+			ignored: ['notes']
+		});
+		expect(mem.fs.listDir(W).sort()).toEqual([PULL_DATE, 'notes']);
+	});
+
 	it('never removes an entry that is not a dated folder, and names it back', () => {
 		const mem = memoryFs();
 		writeDeployTree(ROOT, weekFor('2026-10-07'), mem.fs);

@@ -141,6 +141,8 @@ function loadState(stateDir) {
 		state.records === null
 	)
 		throw new Error('E_STATE_SHAPE');
+	// Addresses are compared in lower case and trimmed, so an entry typed by hand must be stored that way.
+	state.suppression = state.suppression.map((entry) => entry.trim().toLowerCase());
 	return state;
 }
 
@@ -322,7 +324,13 @@ export async function runPipeline(options, deps) {
 
 	if (check.blockers.length > 0 || week.errors.length > 0) return { exitCode: 3, report };
 
-	writeDeployTree(deployDir, week, nodeTreeFs);
+	// Last week's files stay deployed beside this week's, so an address removed on request that last week still
+	// published would stay up for another week; then only this week's folder is kept.
+	const suppressed = new Set(state.suppression);
+	const lastWeekHoldsRemoved = Object.values(state.records).some(
+		(record) => record.listing.e !== undefined && suppressed.has(record.listing.e.toLowerCase())
+	);
+	writeDeployTree(deployDir, week, nodeTreeFs, { onlyThisWeek: lastWeekHoldsRemoved });
 	// The state is replaced whole, so a run that dies half-way leaves last week's file.
 	writeJson(join(stateDir, 'state.json.tmp'), check.nextState);
 	renameSync(join(stateDir, 'state.json.tmp'), join(stateDir, 'state.json'));

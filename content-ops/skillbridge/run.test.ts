@@ -302,6 +302,59 @@ describe('a second week', () => {
 	});
 });
 
+describe('an address removed on request', () => {
+	const PAT = 'pat@example.com';
+	const withPat = () =>
+		makeWorld({
+			providers: [
+				[ONE, [row(1, { employerPocEmail: PAT }), ...rowsOf([2, 3, 4, 5])]],
+				[TWO, rowsOf([6, 7, 8])]
+			]
+		});
+
+	/** Every file under a folder whose text holds the address, ignoring case. */
+	function filesHolding(dir: string, address: string): string[] {
+		return listFiles(dir).filter((path) =>
+			readFileSync(join(dir, ...path.split('/')), 'utf8')
+				.toLowerCase()
+				.includes(address)
+		);
+	}
+
+	function suppress(where: Where, entries: string[]) {
+		const state = stateOf(where);
+		state.suppression = entries;
+		writeFileSync(join(where.stateDir, 'state.json'), JSON.stringify(state));
+	}
+
+	it('is gone from every file of the deploy folder the next week, last week included, whatever its case or spacing', async () => {
+		const where = folders();
+		await go(where, withPat(), FIRST, { baseline: true });
+		expect(filesHolding(where.deployDir, PAT).length).toBeGreaterThan(0);
+
+		suppress(where, ['  PAT@example.com ']);
+		const { result } = await go(where, withPat(), SECOND);
+
+		expect(result.exitCode).toBe(0);
+		expect(filesHolding(where.deployDir, PAT)).toEqual([]);
+		expect(readdirSync(join(where.deployDir, 'skillbridge-data', 'w'))).toEqual([SECOND]);
+		expect(checkTree(where.deployDir, guardDeps())).toEqual([]);
+	});
+
+	it('leaves last week deployed when the list holds only addresses nobody published', async () => {
+		const where = folders();
+		await go(where, withPat(), FIRST, { baseline: true });
+
+		suppress(where, ['nobody@example.com']);
+		await go(where, withPat(), SECOND);
+
+		expect(readdirSync(join(where.deployDir, 'skillbridge-data', 'w')).sort()).toEqual([
+			FIRST,
+			SECOND
+		]);
+	});
+});
+
 describe('a run that cannot be trusted writes nothing to the deploy tree', () => {
 	it('stops when the server says no, leaving the tree and the state exactly as they were', async () => {
 		const where = folders();

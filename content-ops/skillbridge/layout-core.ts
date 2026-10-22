@@ -209,11 +209,13 @@ export function assertDirectChild(weeksDir: string, path: string): void {
  * Writes the week into the deploy folder. The dated folder is written complete beside its final name and swapped
  * in, then `index.json` is swapped in last, so a phone reading `index.json` sees last week's complete set or this
  * week's, never a mix. Older dated folders are pruned only after that; a name that is not a date is left alone.
+ * With `onlyThisWeek`, last week's dated folder goes too: used when it holds something that must not stay up.
  */
 export function writeDeployTree(
 	deployRoot: string,
 	week: BuiltWeek,
-	fs: TreeFs
+	fs: TreeFs,
+	options: { onlyThisWeek: boolean } = { onlyThisWeek: false }
 ): { pruned: string[]; kept: string[]; ignored: string[] } {
 	if (week.errors.length > 0) throw new Error('E_WEEK_HAS_ERRORS');
 	// The pull date names folders that are removed below, so it is checked before anything is written.
@@ -270,7 +272,7 @@ export function writeDeployTree(
 		.filter((d) => d !== pullDate)
 		.sort()
 		.reverse()
-		.slice(0, DEPLOY_WEEKS_KEPT - 1);
+		.slice(0, options.onlyThisWeek ? 0 : DEPLOY_WEEKS_KEPT - 1);
 	const kept = [pullDate, ...newestOthers].sort();
 	const pruned = dated.filter((d) => !kept.includes(d)).sort();
 	for (const name of pruned) {
