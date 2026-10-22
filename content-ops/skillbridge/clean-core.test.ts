@@ -396,14 +396,23 @@ describe('places', () => {
 		['OK to relocate to MD, VA', ['MD', 'VA']],
 		// A plain comma list of codes keeps every one, including the codes that are also English words.
 		['HI, ME, MD', ['HI', 'MD', 'ME']],
-		['MD, OR, VA', ['MD', 'OR', 'VA']]
+		['MD, OR, VA', ['MD', 'OR', 'VA']],
+		['PA; MA', ['MA', 'PA']],
+		['AS, GU, LA', ['AS', 'GU', 'LA']],
+		// An OR that does not stand between commas is the English word, even next to a comma list.
+		['MD, VA OR DC', ['DC', 'MD', 'VA']],
+		['MD, VA, and DC', ['DC', 'MD', 'VA']]
 	])('reads the states in %j as %j', (locationStates, expected) => {
 		expect(only({ locationStates }).ls).toEqual(expected);
 	});
 
-	it('falls back to the listing state for a sentence whose only codes are English words', () => {
-		expect(only({ locationStates: 'REMOTE OR IN PERSON' }).ls).toEqual(['MD']);
-	});
+	// Codes that are also English words (OR, IN, ME, OK, HI, AS, LA, PA) are words in anything but a plain list.
+	it.each(['REMOTE OR IN PERSON', 'AS NEEDED', 'LA AREA', 'PA RESIDENTS ONLY'])(
+		'falls back to the listing state for the sentence %j',
+		(locationStates) => {
+			expect(only({ locationStates }).ls).toEqual(['MD']);
+		}
+	);
 
 	it('reads ALL, in any case and with padding, as the 50 states and DC', () => {
 		expect(ALL_STATES).toHaveLength(51);
@@ -619,19 +628,26 @@ describe('roles, industries and occupation codes', () => {
 		['', undefined],
 		// "all" opens a sentence about one kind of job, which is not "open to all".
 		['All-source analysts (35F)', undefined],
+		['ALL;', 'all'],
+		['ALL, 11B', 'all'],
+		['All. MOCs', 'all'],
 		// Words in capitals that fit the code shape are not codes.
 		['ANY', undefined],
 		['NONE', undefined],
-		['MOS 11B', undefined],
-		['11B OR 12B', undefined],
-		['11B AND 12B', undefined],
 		['OPEN', undefined],
 		['TBD', undefined],
-		['NA', undefined]
+		['NA', undefined],
+		['11B, NONE', undefined],
+		// Connecting words between codes are skipped; a value of nothing else has no codes.
+		['11B AND 12B', ['11B', '12B']],
+		['11B OR 12B', ['11B', '12B']],
+		['MOS 11B, 12B', ['11B', '12B']],
+		['MOCs: none', undefined],
+		['MOS', undefined]
 	])('reads the target MOCs %j', (targetMOCs, expected) => {
 		const listing = only({ targetMOCs });
 		if (expected === undefined) expect(listing).not.toHaveProperty('oc');
-		else expect(listing.oc).toBe(expected);
+		else expect(listing.oc).toEqual(expected);
 	});
 
 	it('keeps 40 codes, drops 41, and drops repeats', () => {

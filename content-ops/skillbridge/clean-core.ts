@@ -113,24 +113,34 @@ function cleanState(value: unknown, drops: string[]): { state?: StateCode; overs
 	return { overseas: false };
 }
 
-const CONNECTORS: ReadonlySet<string> = new Set(['and', 'AND', '&']);
 // State codes that are also common English words.
-const ENGLISH_WORD_CODES: ReadonlySet<string> = new Set(['OR', 'IN', 'ME', 'OK', 'HI']);
+const ENGLISH_WORD_CODES: ReadonlySet<string> = new Set([
+	'OR',
+	'IN',
+	'ME',
+	'OK',
+	'HI',
+	'AS',
+	'LA',
+	'PA'
+]);
 
 function cleanStates(value: unknown, state: StateCode | undefined): StateCode[] | undefined {
 	const text = typeof value === 'string' ? value : '';
 	if (text.trim().toUpperCase() === 'ALL') return [...ALL_STATES];
-	const tokens = text.split(/[,;\s]+/).filter((token) => token !== '' && !CONNECTORS.has(token));
-	// Without commas, an OR between two other words is the English word ("MD OR VA"), not Oregon.
-	const words = /[,;]/.test(text)
-		? tokens
-		: tokens.filter((token, at) => !(token === 'OR' && at > 0 && at < tokens.length - 1));
-	// A list made only of codes is a list of states, even when a code is also an English word ("HI, ME").
-	// In anything else those words are far more likely prose ("REMOTE OR IN PERSON").
-	const onlyCodes = words.length > 0 && words.every((token) => STATE_SET.has(token));
+	// A list of codes with only commas or semicolons between them is a list of states, even when a code is also
+	// an English word ("HI, ME, OR"). Anything else, such as "MD OR VA", "MD, VA OR DC" or "AS NEEDED", is a
+	// sentence, and in a sentence those words are words.
+	const parts = text
+		.split(/[,;]/)
+		.map((part) => part.trim())
+		.filter((part) => part !== '');
+	const plainList = parts.length > 0 && parts.every((part) => STATE_SET.has(part));
 	// Whole, exactly-cased tokens only: prose such as "in Maryland or Virginia" holds words that spell codes.
 	const named = new Set(
-		words.filter((token) => STATE_SET.has(token) && (onlyCodes || !ENGLISH_WORD_CODES.has(token)))
+		text
+			.split(/[,;\s]+/)
+			.filter((token) => STATE_SET.has(token) && (plainList || !ENGLISH_WORD_CODES.has(token)))
 	);
 	const states = STATE_CODES.filter((code) => named.has(code));
 	if (states.length > 0) return states;
@@ -376,24 +386,15 @@ function cleanIndustries(value: unknown, drops: string[]): Industry[] {
 }
 
 // Capital words that fit the code shape but are prose; a value holding one is a sentence, not a code list.
-const NOT_CODES: ReadonlySet<string> = new Set([
-	'ANY',
-	'NONE',
-	'MOS',
-	'MOC',
-	'MOCS',
-	'AND',
-	'OR',
-	'OPEN',
-	'TBD',
-	'NA'
-]);
+const NOT_CODES: ReadonlySet<string> = new Set(['ANY', 'NONE', 'OPEN', 'TBD', 'NA']);
+// Capital words that only join or introduce codes ("11B AND 12B", "MOS 11B"); skipped.
+const CODE_CONNECTORS: ReadonlySet<string> = new Set(['AND', 'OR', 'MOS', 'MOC', 'MOCS']);
 
 function cleanCodes(value: unknown, drops: string[]): string[] | 'all' | undefined {
 	const text = scrub(value);
 	if (text === '') return undefined;
-	// "All MOCs" is open to all; "All-source analysts (35F)" is one kind of job.
-	if (/^all(?:\s|$)/i.test(text)) return 'all';
+	// "All MOCs" and "ALL, 11B" are open to all; "All-source analysts (35F)" is one kind of job.
+	if (/^all(?:[\s,;.]|$)/i.test(text)) return 'all';
 	let stripped = text;
 	for (let before = ''; before !== stripped;) {
 		before = stripped;
@@ -402,7 +403,7 @@ function cleanCodes(value: unknown, drops: string[]): string[] | 'all' | undefin
 	const pieces = stripped
 		.split(/[,;]/)
 		.flatMap((item) => item.split(/\s+/))
-		.filter((p) => p !== '');
+		.filter((p) => p !== '' && !CODE_CONNECTORS.has(p));
 	const codes = [...new Set(pieces)];
 	if (
 		codes.length > 0 &&
