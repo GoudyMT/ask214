@@ -97,6 +97,7 @@ type Setup = {
 	repoRoot?: string;
 	exitCode?: number;
 	runnerFails?: boolean;
+	env?: Record<string, string | undefined>;
 };
 
 function makeDeps(setup: Setup = {}) {
@@ -133,7 +134,8 @@ function makeDeps(setup: Setup = {}) {
 		},
 		wranglerJs: WRANGLER_JS,
 		nodePath: NODE,
-		cwd: setup.cwd ?? FOLDER
+		cwd: setup.cwd ?? FOLDER,
+		env: setup.env ?? {}
 	};
 	return { deps, reads, runs };
 }
@@ -553,6 +555,42 @@ describe('checkTree and guardAndDeploy: what may be deployed', () => {
 		put(tree, 'skillbridge-data/w/2026-10-19/ids.json', 'SECRET-CONTENT-123');
 		const { deps } = makeDeps({ tree });
 		expect(checkTree(DEPLOY, deps).join('\n')).not.toContain('SECRET');
+	});
+});
+
+// Wrangler inherits the whole environment: CLOUDFLARE_ENV would deploy a differently named Worker, and an API
+// token would replace the keyring login, which is meant to be the one stored credential.
+describe('guardAndDeploy: the environment wrangler would inherit', () => {
+	const VALUE = 'not-a-real-value-123';
+
+	it.each([
+		'CLOUDFLARE_ENV',
+		'CLOUDFLARE_API_TOKEN',
+		'CF_API_TOKEN',
+		'CLOUDFLARE_API_KEY',
+		'CF_API_KEY'
+	])(
+		'refuses when %s is set, names it without its value, and never runs wrangler',
+		async (name) => {
+			const { outcome, runs } = await guard({ env: { [name]: VALUE } });
+			expect(outcome.ok).toBe(false);
+			expect(outcome.problems).toEqual([`E_ENV:${name}`]);
+			expect(JSON.stringify(outcome)).not.toContain(VALUE);
+			expect(runs).toEqual([]);
+		}
+	);
+
+	it('names every such variable that is set', async () => {
+		const env = { CF_API_TOKEN: VALUE, CLOUDFLARE_ENV: VALUE };
+		const { outcome } = await guard({ env });
+		expect(outcome.problems).toEqual(['E_ENV:CLOUDFLARE_ENV', 'E_ENV:CF_API_TOKEN']);
+	});
+
+	it('ignores variables that are empty, unset, or unrelated', async () => {
+		const env = { CLOUDFLARE_API_TOKEN: '', CF_API_KEY: undefined, PATH: VALUE, HOME: VALUE };
+		const { outcome, runs } = await guard({ env });
+		expect(outcome).toEqual({ ok: true, problems: [], exitCode: 0 });
+		expect(runs).toHaveLength(1);
 	});
 });
 

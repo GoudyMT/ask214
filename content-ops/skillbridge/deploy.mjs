@@ -78,6 +78,7 @@ const outcome = await guardAndDeploy(
 	{
 		repoRoot,
 		cwd: process.cwd(),
+		env: process.env,
 		readText: (path) => readFileSync(path, 'utf8'),
 		listTree,
 		runner,

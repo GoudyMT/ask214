@@ -50,7 +50,22 @@ export type GuardDeps = {
 	nodePath: string;
 	/** The shell's folder when Max ran the command. */
 	cwd: string;
+	/** The environment wrangler would inherit. */
+	env: Record<string, string | undefined>;
 };
+
+/**
+ * Variables wrangler reads from the environment that change what a deploy does: CLOUDFLARE_ENV deploys a Worker
+ * named `<name>-<env>`, and an API token or key replaces the keyring login, which is meant to be the one stored
+ * credential. Only the names are ever reported, never a value.
+ */
+const FORBIDDEN_ENV = [
+	'CLOUDFLARE_ENV',
+	'CLOUDFLARE_API_TOKEN',
+	'CF_API_TOKEN',
+	'CLOUDFLARE_API_KEY',
+	'CF_API_KEY'
+] as const;
 
 const DATA_WORKER_DIR = 'workers/skillbridge-data';
 /** The assets directory the committed data config names, relative to the config's folder. */
@@ -288,6 +303,10 @@ export async function guardAndDeploy(
 ): Promise<{ ok: boolean; problems: string[]; exitCode?: number }> {
 	const problems: string[] = [];
 	if (sameKey(deps.cwd) === sameKey(deps.repoRoot)) problems.push('E_APP_ROOT');
+	for (const name of FORBIDDEN_ENV) {
+		const value = deps.env[name];
+		if (value !== undefined && value !== '') problems.push(`E_ENV:${name}`);
+	}
 	problems.push(...checkConfig(options.configPath, deps));
 	problems.push(...checkTree(`${workerFolder(deps.repoRoot)}/deploy`, deps));
 	if (problems.length > 0) return { ok: false, problems };
