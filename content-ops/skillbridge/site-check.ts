@@ -104,14 +104,21 @@ function parseIPv6(address: string): number[] | null {
 }
 
 function isPublicIPv6(g: readonly number[]): boolean {
-	const [g0 = 0, , , , , g5 = 0, g6 = 0, g7 = 0] = g;
+	const [g0 = 0, g1 = 0, , , , g5 = 0, g6 = 0, g7 = 0] = g;
 	// IPv4-mapped (::ffff:a.b.c.d) and IPv4-compatible (::a.b.c.d, which also covers :: and ::1) carry an IPv4
 	// address in the last 32 bits: that address decides.
 	if (g.slice(0, 5).every((group) => group === 0) && (g5 === 0xffff || g5 === 0))
 		return isPublicIPv4([g6 >> 8, g6 & 0xff, g7 >> 8, g7 & 0xff]);
-	if ((g0 & 0xfe00) === 0xfc00) return false;
-	if ((g0 & 0xffc0) === 0xfe80) return false;
-	return (g0 & 0xff00) !== 0xff00;
+	// Everything else must be global unicast (2000::/3). That alone leaves out the NAT64 prefixes (64:ff9b::/96 and
+	// 64:ff9b:1::/48), SIIT (::ffff:0:0/96), site-local (fec0::/10), unique-local, link-local and multicast, all of
+	// which can reach a private IPv4 address or never name a public site.
+	if ((g0 & 0xe000) !== 0x2000) return false;
+	// 6to4 (2002::/16) embeds an IPv4 address that a relay delivers to.
+	if (g0 === 0x2002) return false;
+	// 2001::/23 is for protocol assignments, Teredo (2001::/32) among them; 2001:db8::/32 is for documentation.
+	if (g0 === 0x2001 && (g1 < 0x200 || g1 === 0xdb8)) return false;
+	// 3fff::/20 is for documentation.
+	return !(g0 === 0x3fff && g1 < 0x1000);
 }
 
 /** True only for an IP address that is globally routable: not private, loopback, link-local, reserved or multicast. */

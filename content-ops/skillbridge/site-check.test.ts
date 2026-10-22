@@ -135,6 +135,55 @@ describe('isPublicAddress', () => {
 	});
 });
 
+// A DNS answer in these forms makes a gateway (or the OS) deliver the request to the IPv4 address inside it, or
+// belongs to space that is never a public site: only global unicast outside them may be connected to.
+describe('isPublicAddress: IPv6 forms that translate to private or reserved space', () => {
+	test('refuses NAT64, local NAT64, 6to4, SIIT, site-local, Teredo, documentation and non-global space', () => {
+		const refused = [
+			'64:ff9b::7f00:1',
+			'64:ff9b::a00:1',
+			'64:ff9b::',
+			'64:ff9b::ffff:ffff',
+			'64:ff9b:1::a00:1',
+			'64:ff9b:1:ffff:ffff:ffff:ffff:ffff',
+			'2002:c0a8:101::1',
+			'2002::',
+			'2002:ffff:ffff:ffff:ffff:ffff:ffff:ffff',
+			'::ffff:0:7f00:1',
+			'::ffff:0:a00:1',
+			'0:0:0:0:ffff:0:c0a8:1',
+			'fec0::1',
+			'feff:ffff::1',
+			'2001::1',
+			'2001:0:4136:e378:8000:63bf:3fff:fdd2',
+			'2001:1ff:ffff::1',
+			'2001:db8::1',
+			'2001:db8:ffff:ffff::1',
+			'3fff::1',
+			'3fff:fff:ffff::1',
+			'1fff:ffff::1',
+			'4000::1'
+		];
+		expect(refused.filter((address) => isPublicAddress(address))).toEqual([]);
+	});
+
+	test('passes global unicast addresses just outside each of those ranges', () => {
+		const allowed = [
+			'2606:4700::1',
+			'2000::1',
+			'2001:200::1',
+			'2001:db7:ffff::1',
+			'2001:db9::1',
+			'2001:ffff::1',
+			'2003::1',
+			'3fff:1000::1',
+			'2a00:1450::1',
+			'2400:cb00::1'
+		];
+		expect(allowed.filter((address) => !isPublicAddress(address))).toEqual([]);
+	});
+});
+
 describe('checkSite', () => {
 	test('a live HTML home page passes, on the address lookup returned, after one lookup', async () => {
 		const { deps, lookups, gets, limits } = makeDeps({ 'site.test/': HOME });
