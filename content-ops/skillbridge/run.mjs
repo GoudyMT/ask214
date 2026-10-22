@@ -357,7 +357,15 @@ export async function runPipeline(options, deps) {
 		tables
 	});
 
-	const report = buildReport({ pull: outcome, clean, check, week, baseline, pullDate });
+	const report = buildReport({
+		pull: outcome,
+		clean,
+		check,
+		week,
+		lastRecords: state.records,
+		baseline,
+		pullDate
+	});
 	writeJson(join(runDir, 'report.json'), report);
 	writeFileSync(join(runDir, 'report.txt'), reportText(report));
 	print(reportText(report));

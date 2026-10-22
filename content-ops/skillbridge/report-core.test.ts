@@ -140,11 +140,49 @@ describe('buildReport', () => {
 			driftAbort: true,
 			blockers: ['E_DRIFT'],
 			floorWarnings: [{ provider: 'Example Provider Two', last: 10, now: 4 }],
+			links: { website: 0, linkedin: 0, lastWebsite: 0, lastLinkedin: 0 },
 			files: [
 				{ name: 'south-atlantic', count: 2, bytes: 700 },
 				{ name: 'remote', count: 1, bytes: 300 }
 			]
 		});
+	});
+
+	// A Wikidata outage leaves a week with no LinkedIn links and no error anywhere; the drop has to show here.
+	it('shows how many listings carry a website and a LinkedIn link beside last week', () => {
+		const lastOf = (i: number, over: Partial<Listing>) => ({
+			listing: listing(i, over),
+			provider: 'Example Provider One',
+			misses: 0
+		});
+		const lastWeek = Object.fromEntries(
+			[
+				lastOf(1, { w: 'https://example.com/', li: 'https://www.linkedin.com/company/a' }),
+				lastOf(2, { w: 'https://example.org/', li: 'https://www.linkedin.com/company/b' }),
+				lastOf(3, { li: 'https://www.linkedin.com/company/c' }),
+				lastOf(4, {})
+			].map((r) => [String(r.listing.i), r])
+		);
+		const report = buildReport({
+			pull: ok(runOf()),
+			clean: CLEAN,
+			check: checkOf({
+				published: [
+					listing(1, { w: 'https://example.com/' }),
+					listing(2, { w: 'https://example.org/' }),
+					listing(3),
+					listing(4)
+				]
+			}),
+			week: weekOf(),
+			lastRecords: lastWeek,
+			baseline: false,
+			pullDate: PULL_DATE
+		});
+		expect(report.links).toEqual({ website: 2, linkedin: 0, lastWebsite: 2, lastLinkedin: 3 });
+		expect(reportText(report)).toContain(
+			'Company links: website 2 (last week 2), LinkedIn 0 (last week 3)'
+		);
 	});
 
 	// The two totals differ only when some listing is unaccounted for: the case Max most needs to see.

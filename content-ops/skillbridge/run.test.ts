@@ -498,6 +498,15 @@ describe('company links', () => {
 		expect(region.listings.length).toBeGreaterThan(0);
 		expect(region.listings.every((l) => l.w === 'https://example.com/')).toBe(true);
 
+		// The next report sets this week's link counts beside the ones just published.
+		const next = await go(where, makeWorld(), SECOND, { noLinks: true });
+		expect(next.result.report?.links).toEqual({
+			website: 8,
+			linkedin: 0,
+			lastWebsite: 8,
+			lastLinkedin: 0
+		});
+
 		// The spy is live: the same run with links on does ask.
 		const other = folders('other');
 		const loud = await go(other, makeWorld(), FIRST, { baseline: true });

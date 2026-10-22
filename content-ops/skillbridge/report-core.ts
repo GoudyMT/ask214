@@ -5,7 +5,15 @@
  */
 
 import type { BuiltWeek } from './layout-core.ts';
-import type { CheckOutput, CleanOutput, PullMode, PullOutcome, StopCode } from './types.ts';
+import type { Listing } from '../../src/lib/skillbridge-finder/contract/listing.ts';
+import type {
+	CheckOutput,
+	CleanOutput,
+	PipelineState,
+	PullMode,
+	PullOutcome,
+	StopCode
+} from './types.ts';
 
 export type RunReport = {
 	pullDate: string;
@@ -35,6 +43,11 @@ export type RunReport = {
 	driftAbort: boolean;
 	blockers: string[];
 	floorWarnings: { provider: string; last: number; now: number }[];
+	/**
+	 * Published listings carrying a company website and a LinkedIn link, this week and last. A link source that
+	 * failed leaves no error behind, only fewer links, so a drop is read here.
+	 */
+	links: { website: number; linkedin: number; lastWebsite: number; lastLinkedin: number };
 	files: { name: string; count: number; bytes: number }[];
 };
 
@@ -49,10 +62,16 @@ export function buildReport(input: {
 	clean?: CleanOutput;
 	check?: CheckOutput;
 	week?: BuiltWeek;
+	/** The records saved by the last run, which the link counts are set beside. */
+	lastRecords?: PipelineState['records'];
 	baseline: boolean;
 	pullDate: string;
 }): RunReport {
-	const { pull, clean, check, week, baseline, pullDate } = input;
+	const { pull, clean, check, week, lastRecords, baseline, pullDate } = input;
+	const lastListings = Object.values(lastRecords ?? {}).map((r) => r.listing);
+	const thisListings = check?.published ?? [];
+	const count = (listings: readonly Listing[], key: 'w' | 'li') =>
+		listings.filter((l) => l[key] !== undefined).length;
 	// Nothing the pull never learned is invented: a stopped run reports zeros, and its stop code.
 	const run = pull.ok ? pull.run : undefined;
 	const providers = run?.providers ?? [];
@@ -83,6 +102,12 @@ export function buildReport(input: {
 		driftAbort: check?.driftAbort ?? false,
 		blockers: [...new Set([...(check?.blockers ?? []), ...(week?.errors ?? [])])],
 		floorWarnings: (check?.floorWarnings ?? []).map((w) => ({ ...w })),
+		links: {
+			website: count(thisListings, 'w'),
+			linkedin: count(thisListings, 'li'),
+			lastWebsite: count(lastListings, 'w'),
+			lastLinkedin: count(lastListings, 'li')
+		},
 		files: (week?.index.files ?? []).map((f) => ({ ...f }))
 	};
 }
@@ -118,7 +143,10 @@ export function reportText(report: RunReport): string {
 	for (const w of report.floorWarnings)
 		lines.push(`Floor: ${safe(w.provider)} fell from ${w.last} to ${w.now}`);
 	if (report.driftAbort) lines.push('Drift: additions or removals passed the limit.');
-	lines.push('Files:');
+	lines.push(
+		`Company links: website ${report.links.website} (last week ${report.links.lastWebsite}), LinkedIn ${report.links.linkedin} (last week ${report.links.lastLinkedin})`,
+		'Files:'
+	);
 	for (const f of report.files)
 		lines.push(`  ${safe(f.name)}: ${f.count} listings, ${f.bytes} bytes`);
 	lines.push(
