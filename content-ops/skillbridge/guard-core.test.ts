@@ -591,10 +591,42 @@ describe('guardAndDeploy: the environment wrangler would inherit', () => {
 		}
 	);
 
+	// Wrangler reads far more than the named set (CLOUDFLARE_AUTH_USE_KEYRING=false would let an old file-stored
+	// login deploy), so any variable in its three name families is refused, in any letter case (Windows names are
+	// case-insensitive, so a lower-case name reaches wrangler too).
+	it.each([
+		'CLOUDFLARE_AUTH_USE_KEYRING',
+		'WRANGLER_API_ENVIRONMENT',
+		'CF_PAGES_TOKEN',
+		'wrangler_api_environment',
+		'Cloudflare_Api_Token',
+		'cf_account_id'
+	])('refuses %s, names it without its value, and never runs wrangler', async (name) => {
+		const { outcome, runs } = await guard({ env: { [name]: VALUE } });
+		expect(outcome.ok).toBe(false);
+		expect(outcome.problems).toEqual([`E_ENV:${name}`]);
+		expect(JSON.stringify(outcome)).not.toContain(VALUE);
+		expect(runs).toEqual([]);
+	});
+
+	it('lets a variable through that only resembles those families', async () => {
+		const env = {
+			CFLAGS: VALUE,
+			CF: VALUE,
+			WRANGLER: VALUE,
+			MY_CLOUDFLARE_NOTE: VALUE,
+			CLOUDFLARED_HOME: VALUE,
+			PATH: VALUE
+		};
+		const { outcome, runs } = await guard({ env });
+		expect(outcome).toEqual({ ok: true, problems: [], exitCode: 0 });
+		expect(runs).toHaveLength(1);
+	});
+
 	it('names every such variable that is set', async () => {
 		const env = { CF_API_TOKEN: VALUE, CLOUDFLARE_ENV: VALUE };
 		const { outcome } = await guard({ env });
-		expect(outcome.problems).toEqual(['E_ENV:CLOUDFLARE_ENV', 'E_ENV:CF_API_TOKEN']);
+		expect(outcome.problems).toEqual(['E_ENV:CF_API_TOKEN', 'E_ENV:CLOUDFLARE_ENV']);
 	});
 
 	it('ignores variables that are empty, unset, or unrelated', async () => {

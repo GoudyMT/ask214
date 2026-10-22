@@ -56,28 +56,16 @@ const DOTENV_FILES = ['.env', '.env.local'] as const;
 
 /**
  * Environment variables that make a deploy do something other than what the committed config and the keyring login
- * say. This is the set known to matter, not everything wrangler reads. What the listed ones do:
+ * say. Wrangler reads many (a list of the known ones would miss the next), so every variable whose name starts with
+ * one of these prefixes is refused, in any letter case since Windows names are case-insensitive. Among them:
  * - CLOUDFLARE_ENV deploys a Worker named `<name>-<env>`, and WRANGLER_CI_OVERRIDE_NAME renames the Worker;
- * - an API token or key replaces the keyring login, which is meant to be the one stored credential;
+ * - an API token or key replaces the keyring login, which is meant to be the one stored credential, and
+ *   CLOUDFLARE_AUTH_USE_KEYRING=false lets an old file-stored login take its place;
  * - an account id points the deploy at another account;
  * - an API base URL, or the OAuth domain and endpoints, send every call (the keyring token included) to another host.
  * Only the names are ever reported, never a value.
  */
-const FORBIDDEN_ENV = [
-	'CLOUDFLARE_ENV',
-	'WRANGLER_CI_OVERRIDE_NAME',
-	'CLOUDFLARE_API_TOKEN',
-	'CF_API_TOKEN',
-	'CLOUDFLARE_API_KEY',
-	'CF_API_KEY',
-	'CLOUDFLARE_ACCOUNT_ID',
-	'CF_ACCOUNT_ID',
-	'CLOUDFLARE_API_BASE_URL',
-	'CF_API_BASE_URL',
-	'WRANGLER_AUTH_DOMAIN',
-	'WRANGLER_AUTH_URL',
-	'WRANGLER_TOKEN_URL'
-] as const;
+const FORBIDDEN_ENV_PREFIXES = ['CLOUDFLARE_', 'CF_', 'WRANGLER_'] as const;
 
 const DATA_WORKER_DIR = 'workers/skillbridge-data';
 /** The assets directory the committed data config names, relative to the config's folder. */
@@ -315,10 +303,14 @@ export async function guardAndDeploy(
 ): Promise<{ ok: boolean; problems: string[]; exitCode?: number }> {
 	const problems: string[] = [];
 	if (sameKey(deps.cwd) === sameKey(deps.repoRoot)) problems.push('E_APP_ROOT');
-	for (const name of FORBIDDEN_ENV) {
+	const setNames = Object.keys(deps.env).filter((name) => {
 		const value = deps.env[name];
-		if (value !== undefined && value !== '') problems.push(`E_ENV:${name}`);
-	}
+		const upper = name.toUpperCase();
+		return (
+			value !== undefined && value !== '' && FORBIDDEN_ENV_PREFIXES.some((p) => upper.startsWith(p))
+		);
+	});
+	for (const name of setNames.sort()) problems.push(`E_ENV:${name}`);
 	for (const name of DOTENV_FILES) {
 		if (deps.exists(`${workerFolder(deps.repoRoot)}/${name}`)) problems.push(`E_DOTENV:${name}`);
 	}
