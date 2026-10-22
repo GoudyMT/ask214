@@ -79,11 +79,6 @@ function goodTree(): Tree {
 	);
 	put(
 		tree,
-		'skillbridge-data/tables/bases.json',
-		JSON.stringify({ v: 1, rows: [['Example Base', 'MD', 39.1, -76.7]] })
-	);
-	put(
-		tree,
 		'skillbridge-data/tables/crosswalk.json',
 		JSON.stringify({ v: 1, rows: [['91B', 'Army', '49-3023.00', 'Example Technicians']] })
 	);
@@ -324,6 +319,11 @@ describe('checkTree and guardAndDeploy: what may be deployed', () => {
 			'a table off the list',
 			stray('skillbridge-data/tables/secrets.json'),
 			'E_STRAY:skillbridge-data/tables/secrets.json'
+		],
+		[
+			'a bases table, which is no longer published now that distance is by ZIP only',
+			(t) => put(t, 'skillbridge-data/tables/bases.json', JSON.stringify({ v: 1, rows: [] })),
+			'E_STRAY:skillbridge-data/tables/bases.json'
 		],
 		[
 			'a file next to the index',

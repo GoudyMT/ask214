@@ -7,11 +7,7 @@
 
 import { findDataWorkerConfigViolations } from '../../src/lib/ci/skillbridge-data-config-policy.ts';
 import { stripJsoncComments } from '../../src/lib/ci/worker-config-policy.ts';
-import {
-	isIsoDate,
-	REGION_FILE_NAMES,
-	TABLE_FILE_NAMES
-} from '../../src/lib/skillbridge-finder/contract/places.ts';
+import { isIsoDate, REGION_FILE_NAMES } from '../../src/lib/skillbridge-finder/contract/places.ts';
 import {
 	validateChanges,
 	validateIds,
@@ -19,7 +15,6 @@ import {
 	validateRegionFile
 } from '../../src/lib/skillbridge-finder/contract/validate.ts';
 import {
-	validateBases,
 	validateCrosswalk,
 	validateZips
 } from '../../src/lib/skillbridge-finder/contract/tables.ts';
@@ -130,11 +125,12 @@ export function checkConfig(configPath: string, deps: GuardDeps): string[] {
 	return problems;
 }
 
-type Kind = 'headers' | 'index' | 'region' | 'ids' | 'changes' | 'zips' | 'bases' | 'crosswalk';
+type Kind = 'headers' | 'index' | 'region' | 'ids' | 'changes' | 'zips' | 'crosswalk';
 type Placed = { kind: Kind; date?: string; name?: string };
 
 const REGION_NAMES: ReadonlySet<string> = new Set(REGION_FILE_NAMES);
-const TABLE_NAMES: ReadonlySet<string> = new Set(TABLE_FILE_NAMES);
+/** The supporting tables the app fetches: distance is by ZIP only, so there is no installation list. */
+const TABLE_NAMES: ReadonlySet<string> = new Set(['zips', 'crosswalk']);
 
 /** Where a file path sits in the layout the app may fetch, or null for a file that has no place in it. */
 function place(rel: string): Placed | null {
@@ -162,7 +158,6 @@ const VALIDATORS: Record<Exclude<Kind, 'headers'>, (raw: unknown) => ContractRes
 	ids: validateIds,
 	changes: validateChanges,
 	zips: validateZips,
-	bases: validateBases,
 	crosswalk: validateCrosswalk
 };
 
