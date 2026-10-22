@@ -134,6 +134,24 @@ describe('the phone header while the page scrolls', () => {
 		expect(new DOMMatrixReadOnly(getComputedStyle(header()).transform).m42).toBe(-before.height);
 	});
 
+	// A phone turned to landscape (or any window grown past 600 px) while the header is hidden has no bottom bar any more:
+	// the top menu is the only way around, so it must be back, and must behave as on a wide screen from then on.
+	it('shows the header again when the width crosses 600 px, and stops hiding it', async () => {
+		await openAt(320, 568);
+		window.scrollTo(0, 200);
+		await expect.poll(isHidden).toBe(true);
+
+		await page.viewport(1280, 800);
+		await expect.poll(isHidden).toBe(false);
+		expect(flagOnRoot()).toBe(false);
+
+		window.scrollTo(0, 600);
+		await expect.poll(() => window.scrollY).toBe(600);
+		await frames();
+		expect(isHidden()).toBe(false);
+		expect(flagOnRoot()).toBe(false);
+	});
+
 	// "Skip to content" lands the main region at the top of the screen: it must clear the header that sits there.
 	it('puts the main region below the header after "Skip to content" at 320 px', async () => {
 		await openAt(320, 568);
