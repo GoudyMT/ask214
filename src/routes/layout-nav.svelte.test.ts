@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProfileStore } from '$lib/profile/store.svelte';
 import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
+import { readStashedRoute, stashRoute } from '$lib/feedback/context';
 import Layout from './+layout.svelte';
 
 // The real layout starts up on a test database with a saved profile (status ready); only the database it opens is
@@ -19,6 +20,16 @@ vi.mock('$lib/db/schema', async (importOriginal) => {
 	};
 });
 
+// The layout reads the open page's path from the router; a test sets the path it wants before it renders.
+const route = vi.hoisted(() => ({ pathname: '/' }));
+vi.mock('$app/state', () => ({
+	page: {
+		get url() {
+			return new URL(route.pathname, 'https://ask214.test');
+		}
+	}
+}));
+
 // A page tall enough to scroll, with one link at its top.
 const children = createRawSnippet(() => ({
 	render: () => '<div style="height: 2000px"><a href="#top-of-page">first</a></div>'
@@ -28,6 +39,7 @@ let db: IDBDatabase | null = null;
 let restoreSize = { width: 0, height: 0 };
 
 beforeEach(async () => {
+	route.pathname = '/';
 	restoreSize = { width: window.innerWidth, height: window.innerHeight };
 	db = await openTestDb();
 	harness.name = db.name;
@@ -140,6 +152,22 @@ describe('the root layout navigation', () => {
 		(document.querySelector('.bottom-bar a') as HTMLElement).focus({ preventScroll: true });
 		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
 		expect(window.scrollY).toBe(300);
+	});
+
+	// More is not a page feedback can name, and More itself remembers the page the person came from: the footer's
+	// Feedback link on More must not overwrite that with "More".
+	it('keeps the remembered page when the footer Feedback link is used on More', async () => {
+		route.pathname = '/more';
+		stashRoute('/timeline');
+		await openAt(320, 568);
+		const stayHere = (event: Event) => event.preventDefault();
+		document.addEventListener('click', stayHere, true);
+		try {
+			await page.getByRole('link', { name: 'Feedback' }).click();
+		} finally {
+			document.removeEventListener('click', stayHere, true);
+		}
+		expect(readStashedRoute()).toBe('/timeline');
 	});
 
 	// The source reader is a modal dialog above the bar and focuses its cited passage on open: the page behind the

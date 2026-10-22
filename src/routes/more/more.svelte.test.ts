@@ -1,21 +1,25 @@
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { readStashedRoute } from '$lib/feedback/context';
 import MorePage from './+page.svelte';
 
-// The profile app the page reads and the page the person came from, both set per test.
+// The profile app the page reads and the page the person came from, both set per test. `arrive` reports a later
+// arrival to the page, as SvelteKit does when the person navigates while More stays mounted.
 const ctx = vi.hoisted(() => ({
 	app: { status: 'ready' },
-	cameFrom: null as string | null
+	cameFrom: null as string | null,
+	arrive: (() => {}) as (from: string | null) => void
 }));
 
 vi.mock('$lib/profile/context', () => ({ getProfileApp: () => ctx.app, setProfileApp: () => {} }));
 // SvelteKit reports the previous page to afterNavigate; here the test says what it was.
 vi.mock('$app/navigation', () => ({
-	afterNavigate: (callback: (navigation: { from: { url: URL } | null }) => void) =>
-		callback({
-			from: ctx.cameFrom === null ? null : { url: new URL(ctx.cameFrom, window.location.origin) }
-		})
+	afterNavigate: (callback: (navigation: { from: { url: URL } | null }) => void) => {
+		ctx.arrive = (from) =>
+			callback({ from: from === null ? null : { url: new URL(from, window.location.origin) } });
+		ctx.arrive(ctx.cameFrom);
+	}
 }));
 
 const STASH_KEY = 'mtc:feedback:route';
@@ -64,19 +68,13 @@ const LISTED = [
 	]
 ];
 
-// Stops the browser leaving the test page when a row is clicked; the row's own handler still runs, because
-// preventDefault does not stop other listeners.
-const keepPageStill = (event: Event) => event.preventDefault();
-
 beforeEach(() => {
 	ctx.app.status = 'ready';
 	ctx.cameFrom = null;
 	sessionStorage.removeItem(STASH_KEY);
-	document.addEventListener('click', keepPageStill, true);
 });
 
 afterEach(() => {
-	document.removeEventListener('click', keepPageStill, true);
 	sessionStorage.removeItem(STASH_KEY);
 });
 
@@ -116,13 +114,11 @@ describe('the More page', () => {
 	);
 
 	// Feedback is reported with the page it came from; reaching it through More must not lose that.
-	it('keeps the page the person came from when they open Feedback', async () => {
+	it('remembers the page the person came from on arrival, for Feedback', async () => {
 		ctx.cameFrom = '/timeline';
 		await render(MorePage);
 
-		await page.getByRole('link', { name: 'Feedback' }).click();
-
-		expect(sessionStorage.getItem(STASH_KEY)).toBe('/timeline');
+		expect(readStashedRoute()).toBe('/timeline');
 	});
 
 	// More opened directly has no earlier page; a stale page name from before must not ride along.
@@ -130,8 +126,20 @@ describe('the More page', () => {
 		sessionStorage.setItem(STASH_KEY, '/resources');
 		await render(MorePage);
 
-		await page.getByRole('link', { name: 'Feedback' }).click();
-
-		expect(sessionStorage.getItem(STASH_KEY)).toBeNull();
+		expect(readStashedRoute()).toBeNull();
 	});
+
+	// Tapping the More tab on More, or coming back from Feedback, arrives from a page feedback cannot name: the page the
+	// person really came from stays.
+	it.each(['/more', '/feedback'])(
+		'keeps the remembered page when it is arrived at again from %s',
+		async (again) => {
+			ctx.cameFrom = '/timeline';
+			await render(MorePage);
+
+			ctx.arrive(again);
+
+			expect(readStashedRoute()).toBe('/timeline');
+		}
+	);
 });

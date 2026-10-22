@@ -8,14 +8,13 @@
 	// The header's rule: Settings is offered when the app is ready, and when damaged (its erase is the way back).
 	const showSettings = $derived(app.status === 'ready' || app.status === 'damaged');
 
-	// Feedback is sent with the page the person was on. Passing through More must not replace that with "More",
-	// which is not a page feedback can name, so the page they came from is remembered here.
-	let cameFrom: string | undefined;
+	// Feedback is sent with the page the person was on. More is not a page feedback can name, so arriving here
+	// remembers the page they came from. Arriving from More itself or from Feedback keeps what is remembered, and a
+	// direct open (no earlier page; "/more" is not a known route) clears a stale name.
 	afterNavigate(({ from }) => {
-		cameFrom = from?.url.pathname;
+		const path = from?.url.pathname;
+		if (path !== '/more' && path !== '/feedback') stashRoute(path ?? '/more');
 	});
-	// With no earlier page, "/more" is not a known route: stashing it clears any stale page name.
-	const stashContext = () => stashRoute(cameFrom ?? '/more');
 </script>
 
 <svelte:head>
@@ -52,7 +51,7 @@
 
 <ul class="group">
 	<li>
-		<a class="row" href={resolve('/feedback')} onclick={stashContext}>
+		<a class="row" href={resolve('/feedback')}>
 			<span class="row__title">Feedback</span>
 			<span class="row__text">Tell us what to fix or add</span>
 		</a>
