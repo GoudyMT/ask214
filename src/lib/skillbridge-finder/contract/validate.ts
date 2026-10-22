@@ -51,12 +51,12 @@ const BRANCH_SET: ReadonlySet<unknown> = new Set(BRANCHES);
 const INDUSTRY_SET: ReadonlySet<unknown> = new Set(INDUSTRIES);
 const STATE_SET: ReadonlySet<unknown> = new Set(STATE_CODES);
 
-// Characters that render as nothing or are not text: control, format (zero-width, bidi), private-use, unassigned and
-// lone surrogate code points (with the u flag a surrogate outside a pair is its own code point); the ones Unicode marks
+// Characters that render as nothing or are not text: control, format (zero-width, bidi), private-use and lone
+// surrogate code points (with the u flag a surrogate outside a pair is its own code point); the ones Unicode marks
 // default-ignorable (Hangul fillers, the grapheme joiner, variation selectors); and line and paragraph separators,
-// which break a line inside a name.
-const INVISIBLE_RE =
-	/[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}\p{Default_Ignorable_Code_Point}\p{Zl}\p{Zp}]/u;
+// which break a line inside a name. Unassigned code points are not refused: which ones are unassigned depends on the
+// browser's Unicode version, so a character a newer Unicode added would drop a whole file on an older phone.
+const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Default_Ignorable_Code_Point}\p{Zl}\p{Zp}]/u;
 // A blank braille cell is neither default-ignorable nor a space, yet draws as empty.
 const BRAILLE_BLANK = String.fromCharCode(0x2800);
 const ZIP_RE = /^\d{5}$/;

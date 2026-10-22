@@ -148,12 +148,18 @@ describe('validateListing', () => {
 		['a braille blank', 0x2800],
 		['a line separator', 0x2028],
 		['a paragraph separator', 0x2029],
-		['a lone surrogate', 0xd800],
-		['an unassigned code point', 0x0378]
+		['a lone surrogate', 0xd800]
 	])('refuses %s inside a name and a name made of it alone', (_class, code) => {
 		const mark = String.fromCharCode(code);
 		expect(codes(listing({ n: 'Acme' + mark + 'Corp' }))).toEqual(['E_SBF_BAD_TEXT']);
 		expect(codes(listing({ n: mark }))).toEqual(['E_SBF_BAD_TEXT']);
+	});
+
+	// The data is checked where it is built, on a newer Unicode than many phones run: a character that version added
+	// reads as unassigned on an older phone, and refusing it there would drop the whole file the listing sits in.
+	it('accepts a code point this device may not know yet', () => {
+		const unknown = String.fromCharCode(0x0378);
+		expect(validateListing(listing({ n: `Acme ${unknown} Corp` }))).toEqual([]);
 	});
 
 	it('still accepts an accented name and an emoji', () => {
