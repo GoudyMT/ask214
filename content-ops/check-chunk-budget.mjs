@@ -390,6 +390,12 @@ const STATIC = 'static';
 //     above the highest; route nodes 53,226-53,229 B and page 90,285-90,290 B stay under their limits. Trim pass
 //     first: one focus listener for the header and the bar, and a literal padding (-20 B root layout, -45 B
 //     precache), kept.
+//     Page 90,330 -> 90,350, precache 222,280 -> 222,320 and route nodes 53,260 -> 53,290 (package.json's
+//     size-limit) (owner's call, 2026-10-22): the review's last fixes - the More page forgetting the page a person
+//     came from once they leave it for anything but Feedback (the More route node), and a focused control moved fully
+//     clear of the bar when the move hides the header. Three builds measured page 90,304-90,307 B, precache
+//     222,268-222,282 B and route nodes 53,239-53,245 B; the highest precache build was 2 B over. The raise restores
+//     about 40 B of room above the highest; no trim was left that kept every fix.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -399,10 +405,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 90_330,
+	page: 90_350,
 	onDemand: 8_189,
 	precacheFiles: 71,
-	precacheBytes: 222_280,
+	precacheBytes: 222_320,
 	workerScripts: 147_200
 };
 
