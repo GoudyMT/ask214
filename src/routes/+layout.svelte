@@ -355,7 +355,7 @@
 			setHidden(state.hidden);
 		};
 		const onFocusIn = () => {
-			state = { ...state, hidden: false };
+			state = startHeaderState(window.scrollY);
 			setHidden(false);
 		};
 		// The bar never moves, so a control focused under it has to. Chromium does that from scroll-padding-bottom, but

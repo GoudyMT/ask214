@@ -95,6 +95,20 @@ describe('the phone header while the page scrolls', () => {
 		expect(scrolls).not.toHaveBeenCalled();
 	});
 
+	// The header focus brought back counts its 12 px from where the person is now, as a freshly shown header does: a
+	// tiny scroll down right after must not slide it away again.
+	it('stays after focus brought it back and the page moves down 5 px at 320 px', async () => {
+		await openAt(320, 568);
+		window.scrollTo(0, 200);
+		await expect.poll(isHidden).toBe(true);
+		(header().querySelector('a.brand') as HTMLAnchorElement).focus({ preventScroll: true });
+		await expect.poll(isHidden).toBe(false);
+		window.scrollBy(0, 5);
+		await expect.poll(() => window.scrollY).toBe(205);
+		await frames();
+		expect(isHidden()).toBe(false);
+	});
+
 	it('does not hide on a wide screen, however far the page is scrolled', async () => {
 		await openAt(1280, 800);
 		window.scrollTo(0, 200);
