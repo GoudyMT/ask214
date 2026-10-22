@@ -113,11 +113,25 @@ function cleanState(value: unknown, drops: string[]): { state?: StateCode; overs
 	return { overseas: false };
 }
 
+const CONNECTORS: ReadonlySet<string> = new Set(['and', 'AND', '&']);
+// State codes that are also common English words.
+const ENGLISH_WORD_CODES: ReadonlySet<string> = new Set(['OR', 'IN', 'ME', 'OK', 'HI']);
+
 function cleanStates(value: unknown, state: StateCode | undefined): StateCode[] | undefined {
 	const text = typeof value === 'string' ? value : '';
 	if (text.trim().toUpperCase() === 'ALL') return [...ALL_STATES];
+	const tokens = text.split(/[,;\s]+/).filter((token) => token !== '' && !CONNECTORS.has(token));
+	// Without commas, an OR between two other words is the English word ("MD OR VA"), not Oregon.
+	const words = /[,;]/.test(text)
+		? tokens
+		: tokens.filter((token, at) => !(token === 'OR' && at > 0 && at < tokens.length - 1));
+	// A list made only of codes is a list of states, even when a code is also an English word ("HI, ME").
+	// In anything else those words are far more likely prose ("REMOTE OR IN PERSON").
+	const onlyCodes = words.length > 0 && words.every((token) => STATE_SET.has(token));
 	// Whole, exactly-cased tokens only: prose such as "in Maryland or Virginia" holds words that spell codes.
-	const named = new Set(text.split(/[,;\s]+/).filter((token) => STATE_SET.has(token)));
+	const named = new Set(
+		words.filter((token) => STATE_SET.has(token) && (onlyCodes || !ENGLISH_WORD_CODES.has(token)))
+	);
 	const states = STATE_CODES.filter((code) => named.has(code));
 	if (states.length > 0) return states;
 	return state === undefined ? undefined : [state];
@@ -314,10 +328,25 @@ function cleanIndustries(value: unknown, drops: string[]): Industry[] {
 	return INDUSTRIES.filter((name) => found.has(name));
 }
 
+// Capital words that fit the code shape but are prose; a value holding one is a sentence, not a code list.
+const NOT_CODES: ReadonlySet<string> = new Set([
+	'ANY',
+	'NONE',
+	'MOS',
+	'MOC',
+	'MOCS',
+	'AND',
+	'OR',
+	'OPEN',
+	'TBD',
+	'NA'
+]);
+
 function cleanCodes(value: unknown, drops: string[]): string[] | 'all' | undefined {
 	const text = scrub(value);
 	if (text === '') return undefined;
-	if (/^all\b/i.test(text)) return 'all';
+	// "All MOCs" is open to all; "All-source analysts (35F)" is one kind of job.
+	if (/^all(?:\s|$)/i.test(text)) return 'all';
 	let stripped = text;
 	for (let before = ''; before !== stripped;) {
 		before = stripped;
@@ -328,7 +357,11 @@ function cleanCodes(value: unknown, drops: string[]): string[] | 'all' | undefin
 		.flatMap((item) => item.split(/\s+/))
 		.filter((p) => p !== '');
 	const codes = [...new Set(pieces)];
-	if (codes.length > 0 && codes.length <= CAPS.codes && pieces.every((p) => CODE_RE.test(p)))
+	if (
+		codes.length > 0 &&
+		codes.length <= CAPS.codes &&
+		pieces.every((p) => CODE_RE.test(p) && !NOT_CODES.has(p))
+	)
 		return codes;
 	drops.push('D_CODES');
 	return undefined;

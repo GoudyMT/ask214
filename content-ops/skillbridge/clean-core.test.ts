@@ -343,6 +343,22 @@ describe('places', () => {
 		}
 	);
 
+	it.each([
+		['MD OR VA', ['MD', 'VA']],
+		['MD and VA', ['MD', 'VA']],
+		['MD AND VA', ['MD', 'VA']],
+		['MD & VA', ['MD', 'VA']],
+		['OK to relocate to MD, VA', ['MD', 'VA']],
+		// A plain comma list of codes keeps every one, including the codes that are also English words.
+		['HI, ME, MD', ['HI', 'MD', 'ME']]
+	])('reads the states in %j as %j', (locationStates, expected) => {
+		expect(only({ locationStates }).ls).toEqual(expected);
+	});
+
+	it('falls back to the listing state for a sentence whose only codes are English words', () => {
+		expect(only({ locationStates: 'REMOTE OR IN PERSON' }).ls).toEqual(['MD']);
+	});
+
 	it('reads ALL, in any case and with padding, as the 50 states and DC', () => {
 		expect(ALL_STATES).toHaveLength(51);
 		expect(only({ locationStates: ' all ' }).ls).toEqual(ALL_STATES);
@@ -514,7 +530,18 @@ describe('roles, industries and occupation codes', () => {
 		['ALL', 'all'],
 		['All MOCs', 'all'],
 		['Allied Health', undefined],
-		['', undefined]
+		['', undefined],
+		// "all" opens a sentence about one kind of job, which is not "open to all".
+		['All-source analysts (35F)', undefined],
+		// Words in capitals that fit the code shape are not codes.
+		['ANY', undefined],
+		['NONE', undefined],
+		['MOS 11B', undefined],
+		['11B OR 12B', undefined],
+		['11B AND 12B', undefined],
+		['OPEN', undefined],
+		['TBD', undefined],
+		['NA', undefined]
 	])('reads the target MOCs %j', (targetMOCs, expected) => {
 		const listing = only({ targetMOCs });
 		if (expected === undefined) expect(listing).not.toHaveProperty('oc');
