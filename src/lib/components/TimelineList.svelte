@@ -204,7 +204,9 @@
 		min-width: 0;
 		font-size: var(--font-size-s);
 		font-weight: 600;
-		color: var(--color-accent);
+		/* The stronger accent shade: the plain accent on this tint read 4.33:1 in the light theme, under the
+		   4.5:1 that small text needs. */
+		color: var(--color-accent-muted);
 		text-align: center;
 		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
 		border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
