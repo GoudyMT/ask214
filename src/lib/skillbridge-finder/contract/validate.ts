@@ -51,10 +51,12 @@ const BRANCH_SET: ReadonlySet<unknown> = new Set(BRANCHES);
 const INDUSTRY_SET: ReadonlySet<unknown> = new Set(INDUSTRIES);
 const STATE_SET: ReadonlySet<unknown> = new Set(STATE_CODES);
 
-// Characters that render as nothing or are not text: control, format (zero-width, bidi), private-use and unassigned
-// code points; the ones Unicode marks default-ignorable (Hangul fillers, the grapheme joiner, variation selectors);
-// and line and paragraph separators, which break a line inside a name.
-const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Default_Ignorable_Code_Point}\p{Zl}\p{Zp}]/u;
+// Characters that render as nothing or are not text: control, format (zero-width, bidi), private-use, unassigned and
+// lone surrogate code points (with the u flag a surrogate outside a pair is its own code point); the ones Unicode marks
+// default-ignorable (Hangul fillers, the grapheme joiner, variation selectors); and line and paragraph separators,
+// which break a line inside a name.
+const INVISIBLE_RE =
+	/[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}\p{Default_Ignorable_Code_Point}\p{Zl}\p{Zp}]/u;
 // A blank braille cell is neither default-ignorable nor a space, yet draws as empty.
 const BRAILLE_BLANK = String.fromCharCode(0x2800);
 const ZIP_RE = /^\d{5}$/;
@@ -75,7 +77,6 @@ export function isSafeText(s: unknown): s is string {
 		s.length > 0 &&
 		s === s.trim() &&
 		s === s.normalize('NFKC') &&
-		s.isWellFormed() &&
 		!INVISIBLE_RE.test(s) &&
 		!s.includes(BRAILLE_BLANK) &&
 		!s.includes('<')
