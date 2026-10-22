@@ -36,6 +36,17 @@ describe('stripJsoncComments', () => {
 	it('does not strip a comma inside a string value', () => {
 		expect(JSON.parse(stripJsoncComments('{ "a": "x," }')).a).toBe('x,');
 	});
+
+	// Wrangler's own JSONC reader ends a line comment at a carriage return as well as a line feed. Ending it only
+	// at a line feed would hide every key after a lone carriage return from the policy check while wrangler still
+	// deploys them: a script, a binding, a route over the whole domain.
+	it('ends a // line comment at a lone carriage return, as wrangler does', () => {
+		const CR = String.fromCharCode(13);
+		const raw = `{ "a": 1, // note${CR}  "main": "src/x.js" }`;
+		const stripped = stripJsoncComments(raw);
+		expect(stripped).toBe(`{ "a": 1, ${CR}  "main": "src/x.js" }`);
+		expect(JSON.parse(stripped)).toEqual({ a: 1, main: 'src/x.js' });
+	});
 });
 
 describe('findWorkerConfigViolations', () => {

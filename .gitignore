@@ -144,6 +144,10 @@ workers/retrieve/worker-configuration.d.ts
 #      wrangler.jsonc keeps a placeholder). Copy wrangler.jsonc -> wrangler.local.jsonc, set the real id. ----
 wrangler.local.jsonc
 
+# ---- The weekly SkillBridge files, built and deployed from Max's machine. They hold the contact emails DoD
+#      lists publicly; they are served, never committed. ----
+workers/skillbridge-data/deploy/
+
 # ---- Misc local-only ----
 TODO.private
 NOTES.private
