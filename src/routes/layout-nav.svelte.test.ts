@@ -201,6 +201,28 @@ describe('the root layout navigation', () => {
 		expect(window.scrollY).toBe(0);
 	});
 
+	// From 600 px the bar is gone (its box has no place on screen), so nothing is under it: focus must never move the page
+	// for it. Only the phone-width gate on the listener keeps a desktop page still.
+	it('leaves the page where it is when a control in view takes focus at 1280 px', async () => {
+		await openAt(1280, 800);
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 40px; margin: 0">control</p>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			window.scrollTo(0, 300);
+			await expect.poll(() => window.scrollY).toBe(300);
+			const control = holder.querySelector('p') as HTMLElement;
+			expect(control.getBoundingClientRect().top).toBeGreaterThan(0);
+			expect(control.getBoundingClientRect().top).toBeLessThan(window.innerHeight);
+			control.focus({ preventScroll: true });
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			expect(window.scrollY).toBe(300);
+		} finally {
+			holder.remove();
+		}
+	});
+
 	// The bar's own links always sit "under the bar": focusing one must not push the page.
 	it('leaves the page where it is when focus enters the bar itself at 320 px', async () => {
 		await openAt(320, 568);
