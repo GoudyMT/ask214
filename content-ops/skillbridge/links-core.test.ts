@@ -168,6 +168,33 @@ describe('runLinks website', () => {
 		expect(out).toEqual({ byOrg: [], pinned: [], requests: 1 });
 	});
 
+	// Never scrape LinkedIn, Facebook, Reddit or private platforms: an organization whose contact address sits on
+	// one of them (or a short-link or subdomain of it) must make no request, even though its name matches the domain.
+	test('makes no request to a social platform, a short link of one, or a government site', async () => {
+		const blocked: [string, string][] = [
+			['Lnkd', 'lnkd.in'],
+			['LinkedIn', 'linkedin.com'],
+			['Facebook', 'facebook.com'],
+			['Fb', 'fb.com'],
+			['Reddit', 'reddit.com'],
+			['Redd', 'redd.it'],
+			['Facebook', 'pages.facebook.com'],
+			['Veterans Affairs', 'va.gov']
+		];
+		const live = blocked.map(([, domain]) => 'https://' + domain + '/');
+		const { deps, siteCalls } = makeDeps({}, [...live, SITE]);
+		const out = await runLinks(
+			[
+				...blocked.map(([name, domain], i) => listing(10 + i, 400 + i, name, 'jobs@' + domain)),
+				listing(50, 301, 'Example Wind Services', 'jobs@examplewindservices.test')
+			],
+			[],
+			deps
+		);
+		expect(siteCalls).toEqual([SITE]);
+		expect(out.byOrg).toEqual([[301, { w: SITE }]]);
+	});
+
 	test('a name that does not match the domain makes no request', async () => {
 		const { deps, siteCalls } = makeDeps({}, ['https://unrelated.test/']);
 		const out = await runLinks(

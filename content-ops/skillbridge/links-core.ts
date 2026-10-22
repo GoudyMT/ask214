@@ -17,8 +17,9 @@ export type LinkDeps = {
 };
 
 /**
- * Free and ISP mail: an address there says nothing about the sender's company. linkedin.com is listed too, though
- * it is no mail host: this pipeline must never make a request to it, and a domain here is never requested.
+ * Free and ISP mail: an address there says nothing about the sender's company. The social platforms (LinkedIn and
+ * its lnkd.in short links, Facebook, Reddit) are listed too, though they are no mail hosts: this pipeline must
+ * never make a request to them, and a domain here (or a subdomain of it) is never requested.
  */
 const BLOCKED_DOMAINS: readonly string[] = [
 	'gmail.com',
@@ -57,7 +58,12 @@ const BLOCKED_DOMAINS: readonly string[] = [
 	'rr.com',
 	'roadrunner.com',
 	'spectrum.net',
-	'linkedin.com'
+	'linkedin.com',
+	'lnkd.in',
+	'facebook.com',
+	'fb.com',
+	'reddit.com',
+	'redd.it'
 ];
 
 /** Words dropped from the end of a name before it is compared with a domain, once their dots and commas are gone. */
