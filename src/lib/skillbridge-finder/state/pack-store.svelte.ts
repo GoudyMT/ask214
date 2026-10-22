@@ -36,7 +36,8 @@ import { safeLog } from '../../log/safelog';
  * works offline. Every file is ONE encrypted row (`{ id: <row key>, rec }`), and each row's AAD binds it to its key and,
  * for the weekly files, to the pull date, so a row copied to another key or kept from another week fails to decrypt.
  * There is no high-water-mark sidecar: the files are public and can be fetched again, and the week only moves forward
- * because a swap compares the new index with the one on disk.
+ * because a swap compares the new index with the one on disk - except a held index dated more than a week ahead, which
+ * counts as nothing held, so a broken date can never block every real week after it.
  *
  * Nothing here takes the `profile-write` lock, which times out at 10 s and would stall every profile save behind
  * multi-MB files. A write holds the keystore lock SHARED (so an erase, which holds it exclusive, is the last writer and
