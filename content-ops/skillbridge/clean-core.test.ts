@@ -726,6 +726,16 @@ describe('contacts', () => {
 		expect(out.dropped).toEqual({ D_EMAIL: 1 });
 	});
 
+	// A mail client decodes %2C and %0A in a mailto link, so these would send to a second recipient or add a header.
+	it.each(['real%40good.com%2Cspy@example.com', 'x%0Abcc%3Aspy@example.com'])(
+		'drops the address %j, which hides a second recipient behind percent signs',
+		(employerPocEmail) => {
+			const out = clean([rawListing({ employerPocEmail })]);
+			expect(out.listings[0]).not.toHaveProperty('e');
+			expect(out.dropped).toEqual({ D_EMAIL: 1 });
+		}
+	);
+
 	it('publishes the link in its normalized form, an international host as punycode', () => {
 		expect(only({ employerPocEmail: 'HTTPS://Forms.Example.COM/Apply' }).u).toBe(
 			'https://forms.example.com/Apply'

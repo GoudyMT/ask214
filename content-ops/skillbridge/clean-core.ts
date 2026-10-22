@@ -50,8 +50,9 @@ const INDUSTRY_ALIASES: readonly (readonly [string, Industry])[] = [
 const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}\p{Default_Ignorable_Code_Point}]/gu;
 const WHITESPACE_RE = /\s+/g;
 const CODE_RE = /^[0-9A-Z]{2,6}$/;
-// One plain address; no `?` so a mailto link built from it cannot carry a subject, body or second recipient.
-const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+// One plain address; no `?` or `%` so a mailto link built from it cannot carry a subject, body or second
+// recipient (a mail client decodes %2C and %0A).
+const EMAIL_RE = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
 // A role with a colon or a dash is a sentence fragment, not a role name.
 const PROSE_MARKS = [':', '-', String.fromCharCode(0x2013), String.fromCharCode(0x2014)];
 
