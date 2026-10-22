@@ -277,15 +277,36 @@ function isRole(item: string): boolean {
 
 const WORD_RE = /\p{L}+/gu;
 
-/** The contact's name words of three letters or more, lower-cased; used only to test roles, never published. */
-function contactWords(contact: unknown): Set<string> {
-	const words = scrub(contact).toLowerCase().match(WORD_RE) ?? [];
-	return new Set(words.filter((word) => word.length >= 3));
+/** What a role needs in common with the contact's name to be read as the name; tested only, never published. */
+type ContactName = { words: ReadonlySet<string>; pairs: ReadonlySet<string> };
+
+const wordsOf = (text: string) => text.toLowerCase().match(WORD_RE) ?? [];
+
+function contactName(contact: unknown): ContactName {
+	const words = wordsOf(scrub(contact)).filter((word) => word.length >= 2);
+	const pairs = new Set(words.slice(1).map((word, at) => `${words[at]} ${word}`));
+	return { words: new Set(words), pairs };
 }
 
-/** True when a role holds, as a whole word and in any case, a word of the contact's name. */
-function namesContact(item: string, words: ReadonlySet<string>): boolean {
-	return (item.toLowerCase().match(WORD_RE) ?? []).some((word) => words.has(word));
+/**
+ * True when a role holds two of the contact's words in a row, in their order in the name, or one of them right
+ * after "ask for", "contact", "call" or "email". One shared word alone is not enough: "Project Manager" is a role
+ * even when the contact is a "Program Manager".
+ */
+function namesContact(item: string, name: ContactName): boolean {
+	if (name.words.size === 0) return false;
+	const words = wordsOf(item);
+	return words.some((word, at) => {
+		const next = words[at + 1];
+		if (next !== undefined && name.pairs.has(`${word} ${next}`)) return true;
+		const named =
+			word === 'ask' && next === 'for'
+				? words[at + 2]
+				: word === 'contact' || word === 'call' || word === 'email'
+					? next
+					: undefined;
+		return named !== undefined && name.words.has(named);
+	});
 }
 
 function cleanRoles(value: unknown, contact: unknown, drops: string[]): string[] | undefined {
@@ -304,8 +325,8 @@ function cleanRoles(value: unknown, contact: unknown, drops: string[]): string[]
 		return undefined;
 	}
 	// Providers sometimes type "ask for <name>" where the roles go; the name must never be published.
-	const words = contactWords(contact);
-	if (items.some((item) => namesContact(item, words))) {
+	const name = contactName(contact);
+	if (items.some((item) => namesContact(item, name))) {
 		drops.push('D_ROLES_CONTACT');
 		return undefined;
 	}

@@ -546,24 +546,35 @@ describe('roles, industries and occupation codes', () => {
 	});
 
 	// A provider sometimes types "Ask for <contact>" where the roles go; the contact's name must not be published.
-	it.each([['Ask for Pat Example, Technician'], ['Technician, ask for PAT'], ['Call example']])(
-		'drops roles that name the contact: %j',
-		(jobDescription) => {
-			const out = clean([rawListing({ jobDescription, employerPoc: 'Pat Example' })]);
-			expect(out.listings[0]).not.toHaveProperty('r');
-			expect(out.dropped).toEqual({ D_ROLES_CONTACT: 1 });
-			expect(JSON.stringify(out)).not.toContain('Pat Example');
-		}
-	);
+	// The name is dropped when two of its words stand together, or one stands right after "ask for", "contact",
+	// "call" or "email".
+	it.each([
+		['Ask for Pat Example, Technician'],
+		['Technician, ask for PAT'],
+		['Call example'],
+		['Contact Pat, Welder'],
+		['Welder, EMAIL pat'],
+		['Welder, Pat Example']
+	])('drops roles that name the contact: %j', (jobDescription) => {
+		const out = clean([rawListing({ jobDescription, employerPoc: 'Pat Example' })]);
+		expect(out.listings[0]).not.toHaveProperty('r');
+		expect(out.dropped).toEqual({ D_ROLES_CONTACT: 1 });
+		expect(JSON.stringify(out)).not.toContain('Pat Example');
+	});
 
-	it('keeps roles that only share letters or a short word with the contact', () => {
-		const roles = (jobDescription: string, employerPoc: string) =>
-			only({ jobDescription, employerPoc }).r;
-		expect(roles('Patrol Officer, Examples Clerk', 'Pat Example')).toEqual([
-			'Patrol Officer',
-			'Examples Clerk'
-		]);
-		expect(roles('Li Inspector, Welder', 'Jo Li')).toEqual(['Li Inspector', 'Welder']);
+	// Ordinary roles that share one common word with the contact's name or title are still roles.
+	it.each([
+		['Program Manager', 'Project Manager, Welder'],
+		['John Carpenter', 'Carpenter, Electrician'],
+		['Recruiting and Hiring Team', 'Heating and Cooling Technician'],
+		['Art Smith', 'Art Director'],
+		['SkillBridge Coordinator', 'Program Coordinator'],
+		['Mason Lee', 'Mason, Laborer'],
+		['Pat Example', 'Patrol Officer, Examples Clerk'],
+		['Jo Li', 'Li Inspector, Welder']
+	])('keeps the roles of a listing whose contact is %j: %j', (employerPoc, jobDescription) => {
+		const roles = only({ jobDescription, employerPoc }).r;
+		expect(roles).toEqual(jobDescription.split(', '));
 	});
 
 	it('keeps the four industry names that hold commas whole', () => {
