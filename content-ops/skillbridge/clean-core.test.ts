@@ -359,16 +359,24 @@ describe('durations, kinds and branches', () => {
 		['OJT', 'job-training'],
 		['Skills Training Program', 'skills-training'],
 		['Internship and Apprenticeship', 'internship'],
-		['Apprenticeship that leads to an internship', 'apprenticeship']
+		['Apprenticeship that leads to an internship', 'apprenticeship'],
+		['Paid Interns Program', 'internship'],
+		['Fellows Program', 'fellowship'],
+		// "intern" opens many other words; only the whole words count as the kind.
+		['International Skills Training', 'skills-training'],
+		['Internet Skills Program', 'skills-training']
 	])('reads the program type %j as %j', (programType, expected) => {
 		expect(only({ programType }).k).toBe(expected);
 	});
 
-	it('does not read ojt inside another word as a kind', () => {
-		const out = clean([rawListing({ programType: 'ojtx pilot' })]);
-		expect(out.listings[0]).not.toHaveProperty('k');
-		expect(out.dropped).toEqual({ D_KIND: 1 });
-	});
+	it.each(['ojtx pilot', 'Internal Training Program', 'Fellowshipping 101'])(
+		'does not read a kind into %j',
+		(programType) => {
+			const out = clean([rawListing({ programType })]);
+			expect(out.listings[0]).not.toHaveProperty('k');
+			expect(out.dropped).toEqual({ D_KIND: 1 });
+		}
+	);
 
 	it('lists branches in the contract order, once each, and ignores the rest', () => {
 		expect(only({ branches: ['Space Force', 'Army', 'Army', 'Air Force', 'Pirates'] }).b).toEqual([

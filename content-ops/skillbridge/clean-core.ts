@@ -168,9 +168,10 @@ function cleanBranches(value: unknown, drops: string[]): Branch[] {
 
 // Each family with how to find its earliest mention; the earliest in the text wins.
 const KIND_FAMILIES: readonly (readonly [Kind, (text: string) => number])[] = [
-	['internship', (t) => t.indexOf('intern')],
-	['apprenticeship', (t) => t.indexOf('apprentic')],
-	['fellowship', (t) => t.indexOf('fellow')],
+	// Whole words: "intern" opens "international" and "internet", "fellow" opens "fellowship" only as a word.
+	['internship', (t) => t.search(/\bintern(?:s|ship|ships)?\b/)],
+	['apprenticeship', (t) => t.search(/\bapprentic/)],
+	['fellowship', (t) => t.search(/\bfellow(?:s|ship|ships)?\b/)],
 	[
 		'job-training',
 		(t) =>
