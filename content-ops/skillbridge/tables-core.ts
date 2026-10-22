@@ -6,7 +6,8 @@
  * Pure: the text is passed in, so no test touches the disk or the network.
  */
 
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import type { Branch } from '../../src/lib/skillbridge-finder/contract/listing.ts';
 import { STATE_CODES, type StateCode } from '../../src/lib/skillbridge-finder/contract/places.ts';
 import {
@@ -322,9 +323,63 @@ export function isInStateExtent(code: StateCode, la: number, lo: number): boolea
 `;
 }
 
-/** True when `target` is `folder` or lies inside it, comparing resolved paths. */
-export function isInsideFolder(folder: string, target: string): boolean {
-	const path = relative(resolve(folder), resolve(target));
+/** The operating system's own path resolution: follows links and junctions, expands short names, fixes case. */
+export const DEFAULT_REALPATH: (path: string) => string = realpathSync.native;
+
+const WINDOWS = process.platform === 'win32';
+// "\\?\C:\x" names the same folder as "C:\x" with the path checks of Windows switched off.
+const VERBATIM_DRIVE_RE = /^[\\/]{2}\?[\\/](?=[A-Za-z]:)/;
+const NETWORK_RE = /^[\\/]{2}/;
+// Windows opens "name." and "name " as "name".
+const TRAILING_DOTS_AND_SPACES_RE = /[. ]+$/;
+
+/** The path without a verbatim prefix; undefined for a network or device path, which cannot be compared. */
+function plainPath(path: string): string | undefined {
+	if (!WINDOWS) return path;
+	const plain = path.replace(VERBATIM_DRIVE_RE, '');
+	return NETWORK_RE.test(plain) ? undefined : plain;
+}
+
+/**
+ * Where a path really lies: the deepest folder of it that exists is resolved by the operating system (so a link
+ * or junction is followed), and the part that does not exist yet is kept as written, minus the dots and spaces
+ * Windows ignores at the end of a name. Undefined when the path is one that cannot be compared.
+ */
+function realLocation(path: string, realpath: (path: string) => string): string | undefined {
+	const plain = plainPath(path);
+	if (plain === undefined) return undefined;
+	const absolute = resolve(plain);
+	const { root } = parse(absolute);
+	const names = absolute
+		.slice(root.length)
+		.split(sep)
+		.map((name) => (WINDOWS ? name.replace(TRAILING_DOTS_AND_SPACES_RE, '') : name))
+		.filter((name) => name !== '');
+	for (let kept = names.length; kept >= 0; kept--) {
+		try {
+			const head = realpath(join(root, ...names.slice(0, kept)));
+			return join(plainPath(head) ?? head, ...names.slice(kept));
+		} catch {
+			// This folder does not exist yet; look one folder up.
+		}
+	}
+	return join(root, ...names);
+}
+
+/**
+ * True when `target` is `folder` or lies inside it, comparing where each really is, so a link, a junction, a
+ * short name or a Windows spelling of the folder cannot read as outside it. A network or device path cannot be
+ * checked, so it counts as inside.
+ */
+export function isInsideFolder(
+	folder: string,
+	target: string,
+	realpath: (path: string) => string = DEFAULT_REALPATH
+): boolean {
+	const from = realLocation(folder, realpath);
+	const to = realLocation(target, realpath);
+	if (from === undefined || to === undefined) return true;
+	const path = relative(from, to);
 	if (path === '') return true;
 	return path !== '..' && !path.startsWith('..' + sep) && !isAbsolute(path);
 }

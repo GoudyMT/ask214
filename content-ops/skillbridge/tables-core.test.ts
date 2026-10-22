@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -7,6 +7,7 @@ import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
 	crosswalkFromCsv,
+	DEFAULT_REALPATH,
 	isInsideFolder,
 	stateExtentsFromCounties,
 	stateExtentsSource,
@@ -510,5 +511,93 @@ describe('isInsideFolder', () => {
 		expect(isInsideFolder(root, join(tmpdir(), 'repo-root-copy', 'out'))).toBe(false);
 		expect(isInsideFolder(root, tmpdir())).toBe(false);
 		expect(isInsideFolder(root, join(root, '..', 'elsewhere'))).toBe(false);
+	});
+
+	it('resolves real paths with the operating system call by default', () => {
+		expect(DEFAULT_REALPATH).toBe(realpathSync.native);
+	});
+
+	// The skillbridge state holds raw rows with contact names, so it must never land in the repo; a string compare
+	// of two paths misses every spelling below, which the file system opens as the same folder.
+	const BACKSLASH = String.fromCharCode(92);
+	const folders: string[] = [];
+	afterEach(() => {
+		for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
+	});
+
+	/** A temp folder holding a `repo` folder; the folder is removed after the test. */
+	function repoInTemp(): { temp: string; repo: string } {
+		const temp = mkdtempSync(join(tmpdir(), 'inside-'));
+		folders.push(temp);
+		const repo = join(temp, 'repo');
+		mkdirSync(repo);
+		return { temp, repo };
+	}
+
+	it('follows a link into the folder, and tells a sibling folder from the folder', () => {
+		const { temp, repo } = repoInTemp();
+		symlinkSync(repo, join(temp, 'link'), 'junction');
+		expect(isInsideFolder(repo, join(temp, 'link', 'state'))).toBe(true);
+		expect(isInsideFolder(repo, join(temp, 'link'))).toBe(true);
+		mkdirSync(join(temp, 'sibling'));
+		expect(isInsideFolder(repo, join(temp, 'sibling', 'state'))).toBe(false);
+		expect(isInsideFolder(repo, join(temp, 'repo-two', 'state'))).toBe(false);
+	});
+
+	it('asks the injected resolver about the deepest folder that exists and keeps the rest as written', () => {
+		const root = join(tmpdir(), 'repo-root');
+		const real = new Map([
+			[join(tmpdir(), 'linked'), root],
+			[tmpdir(), tmpdir()]
+		]);
+		const resolver = (path: string) => {
+			const found = real.get(path);
+			if (found === undefined) throw new Error('E_TEST_MISSING');
+			return found;
+		};
+		expect(isInsideFolder(root, join(tmpdir(), 'linked', 'a', 'state'), resolver)).toBe(true);
+		expect(isInsideFolder(root, join(tmpdir(), 'other', 'state'), resolver)).toBe(false);
+	});
+
+	// These spellings are Windows ones; elsewhere a backslash is an ordinary letter of a file name.
+	describe.runIf(process.platform === 'win32')('Windows spellings of a folder in the repo', () => {
+		it.each([
+			['the verbatim form', (repo: string) => BACKSLASH.repeat(2) + '?' + BACKSLASH + repo],
+			['a folder name ending in a dot', (repo: string) => repo + '.'],
+			['a folder name ending in a space', (repo: string) => repo + ' '],
+			['another case', (repo: string) => repo.toUpperCase()],
+			[
+				'the administrative share of the same drive',
+				(repo: string) =>
+					BACKSLASH.repeat(2) + 'localhost' + BACKSLASH + repo.slice(0, 1) + '$' + repo.slice(2)
+			]
+		])('refuses %s', (_what, spell) => {
+			const { temp, repo } = repoInTemp();
+			// The spelled folder does not exist as written, so only a real path comparison can see it is the repo.
+			mkdirSync(join(temp, 'repo', 'state'));
+			const target = spell(repo) + BACKSLASH + 'state';
+			expect(isInsideFolder(repo, target)).toBe(true);
+		});
+
+		it.each([
+			[
+				'a network path',
+				BACKSLASH.repeat(2) + 'server' + BACKSLASH + 'share' + BACKSLASH + 'state'
+			],
+			['a device path', BACKSLASH.repeat(2) + '.' + BACKSLASH + 'C:' + BACKSLASH + 'state'],
+			['a network path with slashes', '//server/share/state']
+		])('refuses %s, which cannot be checked', (_what, target) => {
+			const { repo } = repoInTemp();
+			expect(isInsideFolder(repo, target)).toBe(true);
+		});
+
+		it('does not take a folder that only starts like the repo for the repo', () => {
+			const { temp, repo } = repoInTemp();
+			mkdirSync(join(temp, 'repo.two'));
+			expect(isInsideFolder(repo, join(temp, 'repo.two', 'state'))).toBe(false);
+			expect(
+				isInsideFolder(repo, BACKSLASH.repeat(2) + '?' + BACKSLASH + join(temp, 'repo.two'))
+			).toBe(false);
+		});
 	});
 });
