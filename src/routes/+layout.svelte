@@ -567,7 +567,9 @@
 
 	/* Below 600px (the value header-scroll.ts and BottomBar.svelte repeat; a media query cannot read a variable) the
 	   bar replaces the header menu. The page keeps room for both fixed edges: the footer's last line and a focused
-	   control or anchor target scrolled into view stay clear of the bar below and of the header above.
+	   control scrolled into view stay clear of the bar below, and "Skip to content" lands main below the header. The
+	   room above is main's own scroll margin, not the page's scroll padding: the cards and the Timeline set a
+	   scroll-margin-top of their own for the chips, and padding would be added on top of it.
 	   --bottom-bar-height is the bar's 56px links plus its 1px top border; --header-height is the header's one line
 	   (two 16px paddings, one 24px line, 1px border). */
 	@media (max-width: 599.98px) {
@@ -576,8 +578,10 @@
 			--header-height: 57px;
 		}
 		:global(html) {
-			scroll-padding-top: var(--header-height);
 			scroll-padding-bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
+		}
+		main {
+			scroll-margin-top: var(--header-height);
 		}
 		header nav {
 			display: none;

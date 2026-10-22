@@ -152,6 +152,24 @@ describe('the phone header while the page scrolls', () => {
 		expect(flagOnRoot()).toBe(false);
 	});
 
+	// The Timeline, the task cards and the SkillBridge status line tune their own scroll-margin-top (6.5rem) so a jump
+	// lands just under the sticky chips; the room kept for the phone header must not be added on top of it.
+	it('leaves an element with scroll-margin-top 6.5rem at 104 px when scrolled to at 320 px', async () => {
+		await openAt(320, 568);
+		const target = document.createElement('div');
+		target.style.cssText =
+			'position: absolute; top: 1500px; height: 40px; scroll-margin-top: 6.5rem';
+		document.body.appendChild(target);
+		try {
+			target.scrollIntoView({ block: 'start' });
+			await expect
+				.poll(() => Math.abs(target.getBoundingClientRect().top - 104))
+				.toBeLessThanOrEqual(1);
+		} finally {
+			target.remove();
+		}
+	});
+
 	// "Skip to content" lands the main region at the top of the screen: it must clear the header that sits there.
 	it('puts the main region below the header after "Skip to content" at 320 px', async () => {
 		await openAt(320, 568);
