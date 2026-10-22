@@ -325,13 +325,74 @@ type ContactName = { words: ReadonlySet<string>; pairs: ReadonlySet<string> };
 
 const wordsOf = (text: string) => text.toLowerCase().match(WORD_RE) ?? [];
 
-function contactName(contact: unknown): ContactName {
-	const words = wordsOf(scrub(contact)).filter((word) => word.length >= 2);
-	// A name is written "Jordan Smith" or "Smith, Jordan"; a role or title may use either order.
-	const pairs = new Set(
-		words.slice(1).flatMap((word, at) => [`${words[at]} ${word}`, `${word} ${words[at]}`])
-	);
-	return { words: new Set(words), pairs };
+// A name is split into words at every mark, so "Jordan A. Smith" and "Pat O'Brien" hold one-letter words; the
+// name and the text under test are both read without them, or an initial would break the pair.
+const nameWordsOf = (text: string) => wordsOf(text).filter((word) => word.length >= 2);
+
+// A contact field often holds an office or a job title, not a person; these words mark such a title, so a title
+// that shares them with a program or a place name is not read as the name of someone.
+const OFFICE_WORDS: ReadonlySet<string> = new Set([
+	'program',
+	'manager',
+	'team',
+	'office',
+	'recruiting',
+	'recruiter',
+	'coordinator',
+	'director',
+	'department',
+	'hr',
+	'human',
+	'resources',
+	'transition',
+	'talent',
+	'acquisition',
+	'military',
+	'skillbridge',
+	'career',
+	'careers',
+	'hiring',
+	'staff',
+	'services',
+	'naval',
+	'station',
+	'base',
+	'fort',
+	'camp',
+	'joint',
+	'air',
+	'force',
+	'army',
+	'navy',
+	'marine',
+	'corps',
+	'guard',
+	'space'
+]);
+
+/** Each adjacent pair of words, in both orders: a name is written "Jordan Smith" or "Smith, Jordan". */
+function pairsOf(words: readonly string[]): string[] {
+	return words.slice(1).flatMap((word, at) => [`${words[at]} ${word}`, `${word} ${words[at]}`]);
+}
+
+/**
+ * The words and word pairs a text must hold to be read as the contact's name. With `organization` given (for a
+ * program or place name), a pair that holds an office word or also stands in the organization's name is left out:
+ * that contact is an office or the company's own desk, and the title shares its words with the listing.
+ */
+function contactName(contact: unknown, organization?: string): ContactName {
+	const words = nameWordsOf(scrub(contact));
+	if (organization === undefined) return { words: new Set(words), pairs: new Set(pairsOf(words)) };
+	const own = new Set(pairsOf(nameWordsOf(organization)));
+	const person = words.filter((word) => !OFFICE_WORDS.has(word));
+	const pairs = words
+		.slice(1)
+		.flatMap((word, at) => {
+			const before = words[at] ?? '';
+			return OFFICE_WORDS.has(before) || OFFICE_WORDS.has(word) ? [] : pairsOf([before, word]);
+		})
+		.filter((pair) => !own.has(pair));
+	return { words: new Set(person), pairs: new Set(pairs) };
 }
 
 /**
@@ -341,27 +402,31 @@ function contactName(contact: unknown): ContactName {
  * "Program Manager", and "Contact Center Agent" is a role.
  */
 function namesContact(text: string, name: ContactName): boolean {
-	const words = wordsOf(text);
+	const raw = wordsOf(text);
+	if (raw.some((word, at) => word === 'ask' && raw[at + 1] === 'for' && raw[at + 2] !== undefined))
+		return true;
+	if (name.words.size === 0) return false;
+	const words = raw.filter((word) => word.length >= 2);
 	return words.some((word, at) => {
 		const next = words[at + 1];
-		if (word === 'ask' && next === 'for') return words[at + 2] !== undefined;
-		if (name.words.size === 0) return false;
 		if (next !== undefined && name.pairs.has(`${word} ${next}`)) return true;
 		const named = word === 'contact' || word === 'call' || word === 'email' ? next : undefined;
 		return named !== undefined && name.words.has(named);
 	});
 }
 
-// A phone number with or without its area code, as a role item can hold one ("Call 410 555 0100", "555-0100").
-const ANY_PHONE_RE =
-	/(?<!\d)(?:\(\d{3}\)\s?|\d{3}[\s.-]?)?\d{3}[\s.-]\d{4}(?!\d)|(?<!\d)\d{10}(?!\d)/;
-// The same with the area code required, for a title or a place name, where "Course 101 2026" is no phone number.
-const FULL_PHONE_RE =
-	/(?<!\d)(?:\(\d{3}\)\s?|\d{3}[\s.-]?)\d{3}[\s.-]\d{4}(?!\d)|(?<!\d)\d{10}(?!\d)/;
+// A ten-digit phone number, with or without a country prefix, an area code in brackets or any separators between
+// its groups; a number of seven digits is a phone number only right after a word that says so, as "Part 121 1500
+// Hour" and "Course 101 2026" are titles.
+const PHONE_RE =
+	/(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)[\s.-]?|\d{3}[\s.-]?)\d{3}[\s.-]?\d{4}(?!\d)|\b(?:call|phone|tel|text|fax|cell)\b[\s:.#-]*\d{3}[\s.-]?\d{4}(?!\d)/i;
+// A local part, an "@" and a domain with a dot; a program or a place name may hold a bare "@" ("SkillBridge @ Acme").
+const ADDRESS_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 
 /** True when published text would carry an address, a phone number or the contact's name. */
-function leaksContact(text: string, name: ContactName, phone: RegExp): boolean {
-	return text.includes('@') || phone.test(text) || namesContact(text, name);
+function leaksContact(text: string, name: ContactName, anyAt: boolean): boolean {
+	const address = anyAt ? text.includes('@') : ADDRESS_RE.test(text);
+	return address || PHONE_RE.test(text) || namesContact(text, name);
 }
 
 function cleanRoles(value: unknown, name: ContactName, drops: string[]): string[] | undefined {
@@ -380,7 +445,8 @@ function cleanRoles(value: unknown, name: ContactName, drops: string[]): string[
 		return undefined;
 	}
 	// Providers sometimes type "ask for <name>", an address or a phone number where the roles go; none may be published.
-	if (items.some((item) => leaksContact(item, name, ANY_PHONE_RE))) {
+	// The whole text is read as well: "Smith, Jordan" is split at its comma into two roles that each look harmless.
+	if (items.some((item) => leaksContact(item, name, true)) || namesContact(whole, name)) {
 		drops.push('D_ROLES_CONTACT');
 		return undefined;
 	}
@@ -562,9 +628,10 @@ function cleanRow(
 	const n = capped(scrub(row.organization), CAPS.organization);
 	if (n === undefined) return hold(row, 'E_Q_NAME');
 	const name = contactName(row.employerPoc);
+	const titleName = contactName(row.employerPoc, n);
 	const p = capped(scrub(row.program), CAPS.program);
 	if (p === undefined) return hold(row, 'E_Q_PROGRAM');
-	if (leaksContact(p, name, FULL_PHONE_RE)) return hold(row, 'E_Q_PROGRAM_CONTACT');
+	if (leaksContact(p, titleName, false)) return hold(row, 'E_Q_PROGRAM_CONTACT');
 	const m = row.deliveryMethodId;
 	if (m !== 1 && m !== 2 && m !== 3) return hold(row, 'E_Q_DELIVERY');
 	const created = typeof row.dateCreated === 'string' ? row.dateCreated.slice(0, 10) : '';
@@ -612,7 +679,7 @@ function cleanRow(
 	if (installation !== '') {
 		const kept = capped(installation, CAPS.installation);
 		if (kept === undefined) drops.push('D_INSTALLATION');
-		else if (leaksContact(kept, name, FULL_PHONE_RE)) drops.push('D_INSTALLATION_CONTACT');
+		else if (leaksContact(kept, titleName, false)) drops.push('D_INSTALLATION_CONTACT');
 		else listing.inst = kept;
 	}
 

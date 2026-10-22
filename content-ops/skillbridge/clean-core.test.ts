@@ -833,6 +833,107 @@ describe('contact data in published text', () => {
 		expect(JSON.stringify(out)).not.toMatch(/Smith|555|0100/);
 	});
 
+	// A name with an initial or an apostrophe is split into short words; the short ones must not hide the name.
+	it.each([
+		[
+			'an initial',
+			'Jordan A. Smith',
+			'Welder, Jordan A. Smith',
+			'Widget Internship with Jordan A Smith'
+		],
+		['an apostrophe', "Pat O'Brien", "Welder, Pat O'Brien", "Widget Internship with Pat O'Brien"]
+	])(
+		'finds a contact with %s in the roles and the program',
+		(_what, employerPoc, jobDescription, program) => {
+			const roles = clean([rawListing({ employerPoc, jobDescription })]);
+			expect(roles.listings[0]).not.toHaveProperty('r');
+			expect(roles.dropped).toEqual({ D_ROLES_CONTACT: 1 });
+			const held = clean([rawListing({ employerPoc, program })]);
+			expect(held.listings).toEqual([]);
+			expect(held.quarantine).toEqual([{ id: 1001, code: 'E_Q_PROGRAM_CONTACT' }]);
+		}
+	);
+
+	it('finds the contact written "Last, First" in the roles, where the comma splits the name', () => {
+		const out = clean([rawListing({ jobDescription: 'Welder, Smith, Jordan', employerPoc: POC })]);
+		expect(out.listings[0]).not.toHaveProperty('r');
+		expect(out.dropped).toEqual({ D_ROLES_CONTACT: 1 });
+		expect(JSON.stringify(out)).not.toMatch(/Smith|Jordan/);
+	});
+
+	// A phone number is written with a country prefix, with no separators, or with a bracketed area code.
+	const PHONES = ['+14105550100', '+1 410 555 0100', '1-410-555-0100', '(410)5550100'];
+
+	// A hyphen in a role already drops it as prose, so a hyphenated phone never reaches the contact rule there.
+	it.each(PHONES.filter((phone) => !phone.includes('-')))(
+		'drops the roles that hold %s',
+		(phone) => {
+			const out = clean([rawListing({ jobDescription: `Welder, ${phone}`, employerPoc: POC })]);
+			expect(out.listings[0]).not.toHaveProperty('r');
+			expect(out.dropped).toEqual({ D_ROLES_CONTACT: 1 });
+		}
+	);
+
+	it.each(PHONES)('drops the installation and holds the program that hold %s', (phone) => {
+		const installation = clean([
+			rawListing({ installation: `Norfolk ${phone}`, employerPoc: POC })
+		]);
+		expect(installation.listings[0]).not.toHaveProperty('inst');
+		expect(installation.dropped).toEqual({ D_INSTALLATION_CONTACT: 1 });
+		const program = clean([
+			rawListing({ program: `Widget Internship ${phone}`, employerPoc: POC })
+		]);
+		expect(program.quarantine).toEqual([{ id: 1001, code: 'E_Q_PROGRAM_CONTACT' }]);
+	});
+
+	it('drops roles that hold a seven-digit number written after "Call"', () => {
+		const out = clean([rawListing({ jobDescription: 'Welder, Call 5550100', employerPoc: POC })]);
+		expect(out.listings[0]).not.toHaveProperty('r');
+		expect(out.dropped).toEqual({ D_ROLES_CONTACT: 1 });
+	});
+
+	// A contact field that holds an office or a job title is no person; the title shares words with real listings.
+	it.each([
+		['Acme SkillBridge Program', 'SkillBridge Program Manager', 'Acme', 'Naval Station Norfolk'],
+		['Program Manager Fellowship', 'Program Manager', 'Acme', 'Naval Station Norfolk'],
+		['Military Recruiting Fellowship', 'Military Recruiting Team', 'Acme', 'Naval Station Norfolk'],
+		[
+			'Widget Internship',
+			'Norfolk Naval Station Transition Office',
+			'Acme',
+			'Naval Station Norfolk'
+		],
+		[
+			'Example Wind Services Internship',
+			'Example Wind Services HR',
+			'Example Wind Services',
+			'Example Wind Services Yard'
+		]
+	])(
+		'keeps program %j and its installation when the contact is the office %j',
+		(program, employerPoc, organization, installation) => {
+			const out = clean([rawListing({ program, employerPoc, organization, installation })]);
+			expect(out.quarantine).toEqual([]);
+			expect(out.listings[0]).toMatchObject({ p: program, inst: installation });
+			expect(out.dropped).toEqual({});
+		}
+	);
+
+	it.each([
+		['SkillBridge @ Acme', 'Camp @ Lejeune'],
+		['Vets@Work Fellowship', 'Fort@Bragg']
+	])('keeps program %j and installation %j, whose "@" is no address', (program, installation) => {
+		const out = clean([rawListing({ program, installation, employerPoc: POC })]);
+		expect(out.quarantine).toEqual([]);
+		expect(out.listings[0]).toMatchObject({ p: program, inst: installation });
+		expect(out.dropped).toEqual({});
+	});
+
+	it('keeps the roles that hold two numbers of four digits', () => {
+		const roles = ['Part 121 1500 Hour Pilot', 'API 653 1169 Inspector'];
+		expect(only({ jobDescription: roles.join(', '), employerPoc: POC }).r).toEqual(roles);
+	});
+
 	// Digits, role words and place names that look a little like contact data are what real listings hold.
 	it('keeps the ordinary roles, program and installation that only look like contact data', () => {
 		const roles = [
@@ -842,7 +943,9 @@ describe('contact data in published text', () => {
 			'ISO 9001 14001 Auditor',
 			'Boeing 737 787 Mechanic',
 			'Contact Center Agent',
-			'Call Center Representative'
+			'Call Center Representative',
+			'Part 121 1500 Hour Pilot',
+			'API 653 1169 Inspector'
 		];
 		const out = clean([
 			rawListing({
