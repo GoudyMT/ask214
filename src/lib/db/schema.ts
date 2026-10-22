@@ -1,6 +1,6 @@
 /**
  * MTC v1 IndexedDB schema + the thin promise/transaction layer that is the ONLY
- * place raw IndexedDB request/transaction plumbing lives. v1.0 ships 8 stores
+ * place raw IndexedDB request/transaction plumbing lives. 11 stores
  * (journal + meta deferred to v1.1 with key rotation):
  *
  *   - profile             ciphertext, single self-row (id = 0)
@@ -12,6 +12,11 @@
  *   - calendar-sync-hwm   signed HWM sidecar for calendar-sync (id = 0)
  *   - byok                ciphertext (BYO API key), single self-row (id = 0); no HWM -
  *                         a re-enterable key needs no OCC/anti-rollback generation
+ *   - skillbridge-finder  ciphertext (the finder's place, saved programs, compare picks and
+ *                         filters), single self-row (id = 0)
+ *   - skillbridge-finder-hwm  signed HWM sidecar for skillbridge-finder (id = 0)
+ *   - skillbridge-finder-pack ciphertext, one row per downloaded data file; device only, no HWM
+ *                         (the files are public and re-downloadable)
  *
  * Raw IndexedDB (no Dexie) honors the v2 audit "0 new prod deps" lock; the schema
  * is trivial (single-row stores, no indexes/queries) so a library adds no value.
@@ -23,7 +28,7 @@ export const DB_NAME = 'mtc';
 // signed bytes, a record's format): an older app then stops at the version, with Reload, instead of reading the
 // newer data as damaged and offering to erase it. An added optional key that an older codec ignores (profile
 // codec.ts: 'a key not listed is ignored') is not a format change and needs no raise.
-export const DB_VERSION = 6; // 5 -> 6: no new store; retires a tab on an older bundle (onversionchange -> 'stale'), whose out-of-date calendar list would mark the SkillBridge steps' events for deletion
+export const DB_VERSION = 7; // 6 -> 7 adds the SkillBridge finder stores; a tab on an older bundle retires (onversionchange -> 'stale')
 export const STORES = [
 	'profile',
 	'profile-hwm',
@@ -32,7 +37,10 @@ export const STORES = [
 	'timeline-state-hwm',
 	'calendar-sync',
 	'calendar-sync-hwm',
-	'byok'
+	'byok',
+	'skillbridge-finder',
+	'skillbridge-finder-hwm',
+	'skillbridge-finder-pack'
 ] as const;
 export type StoreName = (typeof STORES)[number];
 

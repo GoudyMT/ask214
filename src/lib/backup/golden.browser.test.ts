@@ -8,6 +8,7 @@ import { createProfileStore, type ProfileStore } from '../profile/store.svelte';
 import type { ProfileV1 } from '../profile/types';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { decryptEnvelope, readBackupFile, sealEnvelope } from './envelope';
+import { BACKUP_MANIFEST } from './manifest';
 import goldenText from './golden/v1-1.ask214backup?raw';
 import { GOLDEN_EXPECTED, GOLDEN_PASSWORD, GOLDEN_SALT, GOLDEN_SHA256 } from './golden/golden';
 import { RestoreFlow } from './restore-flow';
@@ -197,7 +198,8 @@ function plain(value: unknown): unknown {
 	return value;
 }
 
-const SEVEN: StoreName[] = STORES.filter((store) => store !== 'byok');
+// The stores a restore touches: every one the manifest does not mark 'never' (the API key, the finder's data).
+const SEVEN: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
 
 /** The seven stores a restore writes, as the device holds them right now. */
 async function sevenRows(): Promise<Record<string, unknown>> {

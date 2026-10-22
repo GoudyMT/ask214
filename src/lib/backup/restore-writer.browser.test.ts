@@ -14,6 +14,7 @@ import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import type { CalendarSyncState, DesiredEvent } from '../calendar/types';
 import type { TimelineState } from '../timeline/types';
+import { BACKUP_MANIFEST } from './manifest';
 import {
 	restoreBackup,
 	type RestoreExpected,
@@ -112,7 +113,8 @@ const DAY = 86_400_000;
 const FILE_GENERATION = 41;
 const INVENTED_GENERATION = 1234;
 const DEVICE: RestoreGens = { profile: 3, timeline: 4, calendar: 2 };
-const SEVEN: StoreName[] = STORES.filter((store) => store !== 'byok');
+// The stores a restore touches: every one the manifest does not mark 'never' (the API key, the finder's data).
+const SEVEN: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
 
 let db: IDBDatabase;
 

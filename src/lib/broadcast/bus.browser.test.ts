@@ -101,6 +101,25 @@ describe('createProfileBus', () => {
 		expect(await received).toEqual({ type: 'data-replaced' });
 	});
 
+	it('delivers a skillbridge-finder-updated signal to another tab, and rebuilds a spoofed one bare', async () => {
+		const name = uniqueName();
+		const tabA = makeBus(name);
+		const tabB = makeBus(name);
+		const seen: BusSignal[] = [];
+		tabB.subscribe((s) => seen.push(s));
+		tabA.publish({ type: 'skillbridge-finder-updated' });
+		// A same-origin script can add fields to the same type: only the checked ones may reach a handler.
+		const raw = new BroadcastChannel(name);
+		raw.postMessage({ type: 'skillbridge-finder-updated', evil: 1 });
+		await delay(200);
+		raw.close();
+		expect(seen).toEqual([
+			{ type: 'skillbridge-finder-updated' },
+			{ type: 'skillbridge-finder-updated' }
+		]);
+		for (const s of seen) expect('evil' in s).toBe(false);
+	});
+
 	it('toBusSignal keeps reason idle and user and drops any other value', async () => {
 		const name = uniqueName();
 		const tabB = makeBus(name);

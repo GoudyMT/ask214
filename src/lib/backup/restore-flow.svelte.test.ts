@@ -27,6 +27,7 @@ import {
 } from './copy';
 import { BACKUP_RELEASE_DATE, formatBackupDate } from './dates';
 import { newBackupSalt, decryptEnvelope, sealEnvelope } from './envelope';
+import { BACKUP_MANIFEST } from './manifest';
 import { buildExportInner } from './export-inner';
 import { captureBackupIntent, takeBackupIntent } from './intent';
 import { RestoreFlow, type FlowDeps } from './restore-flow';
@@ -244,7 +245,8 @@ async function exportFrom(device: Device, o: ExportOptions, name = OUR_NAME): Pr
 // ---- rows ----------------------------------------------------------------------------------------------------------
 
 type Row = Record<string, unknown>;
-const SEVEN: StoreName[] = STORES.filter((store) => store !== 'byok');
+// The stores a restore touches: every one the manifest does not mark 'never' (the API key, the finder's data).
+const SEVEN: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
 const hex = (bytes: Uint8Array): string =>
 	Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 

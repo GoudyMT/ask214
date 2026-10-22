@@ -15,7 +15,13 @@
  * best-effort), so its absence degrades to a no-op bus rather than blocking core use.
  */
 export type BusSignal = {
-	type: 'profile-updated' | 'relocked' | 'timeline-updated' | 'calendar-updated' | 'data-replaced';
+	type:
+		| 'profile-updated'
+		| 'relocked'
+		| 'timeline-updated'
+		| 'calendar-updated'
+		| 'skillbridge-finder-updated'
+		| 'data-replaced';
 	reason?: 'idle' | 'user';
 };
 
@@ -39,6 +45,7 @@ function toBusSignal(value: unknown): BusSignal | null {
 		type !== 'relocked' &&
 		type !== 'timeline-updated' &&
 		type !== 'calendar-updated' &&
+		type !== 'skillbridge-finder-updated' &&
 		type !== 'data-replaced'
 	) {
 		return null;

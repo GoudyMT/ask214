@@ -614,6 +614,7 @@ describe('reloadOnSignalWhenShown', () => {
 		'relocked',
 		'timeline-updated',
 		'calendar-updated',
+		'skillbridge-finder-updated',
 		'data-replaced'
 	];
 

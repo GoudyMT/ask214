@@ -14,7 +14,9 @@ export const ENCRYPTED_STORES = Object.freeze([
 	'profile',
 	'timeline-state',
 	'calendar-sync',
-	'byok'
+	'byok',
+	'skillbridge-finder',
+	'skillbridge-finder-pack'
 ] as const);
 
 export type EncryptedStoreName = (typeof ENCRYPTED_STORES)[number];
