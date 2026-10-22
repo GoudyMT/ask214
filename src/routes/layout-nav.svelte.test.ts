@@ -257,6 +257,24 @@ describe('the root layout navigation', () => {
 		}
 	});
 
+	// WebKit scrolls a control focused from script to the window's bottom edge after focusin, without the scroll padding,
+	// so it lands partly under the bar. A scroll after the focus stands in for that engine here.
+	it('clears a control of the bar after the browser scrolls it into the window late at 320 px', async () => {
+		await openAt(320, 568);
+		const last = [...document.querySelectorAll<HTMLAnchorElement>('footer a')].at(
+			-1
+		) as HTMLElement;
+		const bar = document.querySelector('.bottom-bar') as HTMLElement;
+		expect(last.getBoundingClientRect().top).toBeGreaterThan(window.innerHeight);
+		last.focus({ preventScroll: true });
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+		window.scrollBy(0, last.getBoundingClientRect().top - (bar.getBoundingClientRect().top - 11));
+		expect(last.getBoundingClientRect().bottom).toBeGreaterThan(bar.getBoundingClientRect().top);
+		await expect
+			.poll(() => last.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top)
+			.toBe(true);
+	});
+
 	// The bar's own links always sit "under the bar": focusing one must not push the page.
 	it('leaves the page where it is when focus enters the bar itself at 320 px', async () => {
 		await openAt(320, 568);

@@ -363,16 +363,10 @@
 		// The bar never moves, so a control focused under it has to. Chromium does that from scroll-padding-bottom, but
 		// WebKit leaves a control that is already inside the window where it is, partly under the bar. A control that starts
 		// in the window and runs under the bar is moved up, but never past its first line (the header's bottom while a move
-		// that short keeps it shown, the top of the window when the move hides it); one below the window is left.
+		// that short keeps it shown, the top of the window when the move hides it); one below the window is left, and
+		// looked at again for half a second, as WebKit scrolls to a control only after focusin, to under the bar.
 		// The bar's own links stay put, and so does the page behind a modal dialog, which sits above the bar.
-		const onFocusIn = ({ target }: FocusEvent) => {
-			if (!(target instanceof Element)) return;
-			if (el.contains(target)) {
-				state = startHeaderState(window.scrollY);
-				return setHidden(false);
-			}
-			const bar = document.querySelector('.bottom-bar');
-			if (!bar || target.closest('.bottom-bar,dialog[open]')) return;
+		const clearBar = (target: Element, bar: Element) => {
 			const { top, bottom } = target.getBoundingClientRect();
 			const room = bottom - bar.getBoundingClientRect().top;
 			const shift = Math.min(
@@ -380,6 +374,22 @@
 				room > HIDE_AFTER_PX ? top : top - el.getBoundingClientRect().bottom
 			);
 			if (top < window.innerHeight && shift > 0) window.scrollBy(0, shift);
+			return top < window.innerHeight;
+		};
+		const onFocusIn = ({ target }: FocusEvent) => {
+			if (!(target instanceof Element)) return;
+			if (el.contains(target)) {
+				state = startHeaderState(window.scrollY);
+				return setHidden(false);
+			}
+			const bar = document.querySelector('.bottom-bar');
+			if (!bar || target.closest('.bottom-bar,dialog[open]') || clearBar(target, bar)) return;
+			let frames = 30;
+			const again = () => {
+				if (document.activeElement === target && !clearBar(target, bar) && --frames > 0)
+					requestAnimationFrame(again);
+			};
+			requestAnimationFrame(again);
 		};
 		const stop = () => {
 			window.removeEventListener('scroll', onScroll);
