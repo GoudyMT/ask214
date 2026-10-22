@@ -6,6 +6,8 @@ import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { createProfileStore, type ProfileStore } from '../profile/store.svelte';
 import type { ProfileV1 } from '../profile/types';
+import { cleanListing } from '../skillbridge-finder/fixtures/clean';
+import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { decryptEnvelope, readBackupFile, sealEnvelope } from './envelope';
 import { BACKUP_MANIFEST } from './manifest';
@@ -53,7 +55,8 @@ const DEVICE_FIELDS = new Set([
 	'lastBackupAt',
 	'backupGenProfile',
 	'backupGenTimeline',
-	'backupGenCalendar'
+	'backupGenCalendar',
+	'backupGenFinder'
 ]);
 
 let db: IDBDatabase;
@@ -103,6 +106,10 @@ async function finishedDevice() {
 	const calendar = createCalendarSyncStore(db);
 	await calendar.load();
 	await calendar.setExclusions({ taskIds: ['sha-schedule'], categories: [] });
+	const finder = createFinderStore(db);
+	await finder.load();
+	await finder.setSetup({ radius: 25 });
+	await finder.save(cleanListing(), '2026-10-21');
 }
 
 /** The key worker with the real handler behind it, answering later and with the passphrase buffer detached. */
@@ -198,13 +205,14 @@ function plain(value: unknown): unknown {
 	return value;
 }
 
-// The stores a restore touches: every one the manifest does not mark 'never' (the API key, the finder's data).
-const SEVEN: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
+// The stores a restore replaces or clears: every one the manifest does not mark 'never' (the API key and the finder's
+// cached listings).
+const RESTORE_TOUCHES: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
 
-/** The seven stores a restore writes, as the device holds them right now. */
-async function sevenRows(): Promise<Record<string, unknown>> {
+/** The stores a restore replaces or clears, as the device holds them right now. */
+async function restoredRows(): Promise<Record<string, unknown>> {
 	const out: Record<string, unknown> = {};
-	for (const store of SEVEN) {
+	for (const store of RESTORE_TOUCHES) {
 		out[store] = plain(
 			await withStores(db, store, 'readonly', (tx) =>
 				reqToPromise<Row | undefined>(tx.objectStore(store).get(0))
@@ -237,6 +245,26 @@ describe('the golden v1 / 1 backup', () => {
 		).toStrictEqual(GOLDEN_EXPECTED.calendar);
 	}, 30_000);
 
+	// The golden was made before the finder existed: it must still restore, and it leaves the finder empty, not holding
+	// what this device saved since.
+	it('the golden has no finder record and restoring it clears the finder and its marker', async () => {
+		await finishedDevice();
+		const before = await restoredRows();
+		expect(before['skillbridge-finder']).toBeDefined();
+		expect(before['skillbridge-finder-hwm']).toBeDefined();
+
+		expect(await restoreFile(goldenText)).toStrictEqual({ ok: true });
+
+		const after = await restoredRows();
+		expect(after['skillbridge-finder']).toBeUndefined();
+		expect(after['skillbridge-finder-hwm']).toBeUndefined();
+		const finder = createFinderStore(db);
+		await finder.load();
+		expect(finder.ready).toBe(true);
+		expect(finder.saved).toEqual([]);
+		expect(finder.setup).toEqual({});
+	}, 30_000);
+
 	it("the golden's sha256 is pinned", async () => {
 		const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(goldenText));
 		expect(toHex(new Uint8Array(digest))).toBe(GOLDEN_SHA256);
@@ -256,9 +284,9 @@ describe('the golden v1 / 1 backup', () => {
 		const sealed = await sealEnvelope(await workerKey('export'), newer, GOLDEN_SALT);
 
 		await finishedDevice();
-		const before = await sevenRows();
+		const before = await restoredRows();
 
 		expect(await restoreFile(sealed)).toStrictEqual({ ok: false, code: 'E_NEWER_VERSION' });
-		expect(await sevenRows()).toStrictEqual(before);
+		expect(await restoredRows()).toStrictEqual(before);
 	}, 30_000);
 });

@@ -160,8 +160,9 @@ before it does any key work, with an opaque code.
 and calendar record in one IndexedDB transaction, under the key lock alone, and signs fresh rollback marks
 for them. If anything fails, nothing was written.
 
-**What a backup does not carry.** The API key, Ask's offline library, saved documents and this device's
-settings (theme, Ask mode). The key store stays on the device. The user sets these up again in Settings.
+**What a backup does not carry.** The API key, Ask's offline library, saved documents, downloaded SkillBridge
+listings and this device's settings (theme, Ask mode). The key store stays on the device. The user sets these up
+again in Settings.
 
 **Tradeoffs accepted.** A lost passphrase cannot be recovered: there is no server copy and no reset. Erase does
 not remove a file the user already saved, so the file and its passphrase need their own safekeeping. Deriving

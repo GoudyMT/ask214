@@ -3,6 +3,8 @@ import type { CalendarSyncState } from '../calendar/types';
 import { getDiagnosticsForTest } from '../log/safelog';
 import { encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import type { ProfileV1 } from '../profile/types';
+import { cleanListing } from '../skillbridge-finder/fixtures/clean';
+import type { FinderRecord } from '../skillbridge-finder/state/types';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
 import type { TimelineState, TimelineTaskState } from '../timeline/types';
@@ -67,6 +69,15 @@ vi.mock('../calendar/codec', async (importOriginal) => {
 	};
 });
 
+vi.mock('../skillbridge-finder/state/codec', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../skillbridge-finder/state/codec')>();
+	return {
+		...real,
+		encodeFinderRecord: (...args: Parameters<typeof real.encodeFinderRecord>) =>
+			keepBuffer('finder', real.encodeFinderRecord(...args))
+	};
+});
+
 type Bag = Record<string, unknown>;
 
 const NOW = 1_760_000_000_000;
@@ -92,6 +103,7 @@ function deviceProfile(extra: Partial<ProfileV1> = {}): ProfileV1 {
 		backupGenProfile: 3,
 		backupGenTimeline: 1,
 		backupGenCalendar: 1,
+		backupGenFinder: 2,
 		...extra
 	};
 }
@@ -102,7 +114,20 @@ function snapshot(over: Partial<Omit<Snapshot, 'ok'>> = {}): Snapshot {
 		profile: deviceProfile(),
 		timeline: null,
 		calendar: null,
-		gens: { profile: 4, timeline: 0, calendar: 0 },
+		finder: null,
+		gens: { profile: 4, timeline: 0, calendar: 0, finder: 0 },
+		...over
+	};
+}
+
+/** A finder record as the store holds it after a person has used the finder. */
+function deviceFinder(over: Partial<FinderRecord> = {}): FinderRecord {
+	return {
+		schemaVersion: 1,
+		finderSetup: { place: { kind: 'zip', zip: '21046' }, radius: 50, territories: true },
+		finderFilters: { branches: ['Army'], delivery: [1] },
+		finderSaved: [{ id: 1001, savedOn: '2026-10-21', facts: cleanListing() }],
+		finderCompare: [1001],
 		...over
 	};
 }
@@ -180,6 +205,54 @@ describe('buildExportInner: what a person exports', () => {
 		});
 	});
 
+	// A device that never used the finder must make the same file as before, so an older app can still open it.
+	it('a store with no finder record exports no finder key', () => {
+		const stores = storesOf(exported(snapshot()));
+		expect(stores).not.toHaveProperty('skillbridge-finder');
+		expect(Object.keys(stores).sort()).toEqual(['calendar-sync', 'profile', 'timeline-state']);
+	});
+
+	it('a store with a finder record exports it, and it validates', () => {
+		const finder = deviceFinder();
+		const bytes = exported(
+			snapshot({ finder, gens: { profile: 4, timeline: 0, calendar: 0, finder: 3 } })
+		);
+
+		expect(storesOf(bytes)['skillbridge-finder']).toEqual(finder);
+		const result = validateInner(parse(bytes));
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.inner.stores['skillbridge-finder']).toEqual(finder);
+	});
+
+	// The store keeps a key a newer release added, so an older tab's save does not drop it; the strict check on a restore
+	// would refuse a file that carried it, so the file is built from the known fields only.
+	it('export builds the finder record from its known fields and copies no key the store kept', () => {
+		const kept = {
+			...deviceFinder(),
+			future: 'x',
+			finderSetup: {
+				place: { kind: 'zip', zip: '21046', future: 'x' },
+				radius: 50,
+				future: 'x'
+			},
+			finderFilters: { branches: ['Army'], future: ['x'] },
+			finderSaved: [{ id: 1001, savedOn: '2026-10-21', facts: cleanListing(), future: 'x' }]
+		} as unknown as FinderRecord;
+
+		const bytes = exported(
+			snapshot({ finder: kept, gens: { profile: 4, timeline: 0, calendar: 0, finder: 1 } })
+		);
+
+		expect(storesOf(bytes)['skillbridge-finder']).toEqual({
+			schemaVersion: 1,
+			finderSetup: { place: { kind: 'zip', zip: '21046' }, radius: 50 },
+			finderFilters: { branches: ['Army'] },
+			finderSaved: [{ id: 1001, savedOn: '2026-10-21', facts: cleanListing() }],
+			finderCompare: [1001]
+		});
+		expect(validateInner(parse(bytes)).ok).toBe(true);
+	});
+
 	// The mark says which saved state this device last backed up; it describes the device, not the data.
 	it('export omits the backup mark', () => {
 		const profile = storesOf(exported(snapshot())).profile as Bag;
@@ -187,7 +260,8 @@ describe('buildExportInner: what a person exports', () => {
 			'lastBackupAt',
 			'backupGenProfile',
 			'backupGenTimeline',
-			'backupGenCalendar'
+			'backupGenCalendar',
+			'backupGenFinder'
 		]) {
 			expect(profile).not.toHaveProperty(key);
 		}
@@ -214,7 +288,7 @@ describe('buildExportInner: what a person exports', () => {
 
 	// The encoders hand back the person's dates and notes as bytes; once the export has read them they have no use, so
 	// none may linger in memory after the export.
-	it('an export leaves no profile, timeline or calendar plaintext behind in the encoder buffers', () => {
+	it('an export leaves no profile, timeline, calendar or finder plaintext behind in the encoder buffers', () => {
 		const timeline: TimelineState = {
 			schemaVersion: 1,
 			tasks: { 'tap-course': { notes: 'Call the TAP office' } }
@@ -223,9 +297,14 @@ describe('buildExportInner: what a person exports', () => {
 			schemaVersion: 1,
 			exclusions: { taskIds: ['job-search'], categories: ['finance'] }
 		};
-		exported(snapshot({ timeline, calendar }));
+		exported(snapshot({ timeline, calendar, finder: deviceFinder() }));
 
-		expect(encoded.kept.map((k) => k.name).sort()).toEqual(['calendar', 'profile', 'timeline']);
+		expect(encoded.kept.map((k) => k.name).sort()).toEqual([
+			'calendar',
+			'finder',
+			'profile',
+			'timeline'
+		]);
 		for (const { buffer, copy } of encoded.kept) {
 			expect(copy.some((byte) => byte !== 0)).toBe(true);
 			expect(buffer.every((byte) => byte === 0)).toBe(true);
@@ -278,6 +357,16 @@ describe('buildExportInner: refusals', () => {
 					schemaVersion: 1,
 					exclusions: { taskIds: ['not-a-task'], categories: [] }
 				} as CalendarSyncState
+			}
+		},
+		{
+			store: 'finder',
+			index: 3,
+			over: {
+				// A saved program whose facts name another id: the store would refuse to read it back, and so would a restore.
+				finder: deviceFinder({
+					finderSaved: [{ id: 1002, savedOn: '2026-10-21', facts: cleanListing() }]
+				})
 			}
 		}
 	])(

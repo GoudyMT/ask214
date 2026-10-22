@@ -28,4 +28,7 @@ export type ProfileV1 = {
 	backupGenProfile?: number; // profile generation that backup matched
 	backupGenTimeline?: number; // timeline-state generation that backup matched
 	backupGenCalendar?: number; // calendar-sync generation that backup matched
+	// finder generation that backup matched. Optional on a valid mark: a mark made before the finder existed has the four
+	// fields above alone, and a missing one reads as 0 (the finder was empty then).
+	backupGenFinder?: number;
 };

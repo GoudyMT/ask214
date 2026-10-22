@@ -9,6 +9,17 @@ import { encodeEaos, validateEaosAtInput } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { createProfileStore, type ProfilePatch, type ProfileStore } from '../profile/store.svelte';
 import type { ProfileV1 } from '../profile/types';
+import {
+	BRANCHES,
+	DURATIONS,
+	INDUSTRIES,
+	KINDS,
+	type Listing
+} from '../skillbridge-finder/contract/listing';
+import { CLEAN_CASES, cleanListing } from '../skillbridge-finder/fixtures/clean';
+import { decodeFinderRecord } from '../skillbridge-finder/state/codec';
+import { createFinderStore, type FinderStore } from '../skillbridge-finder/state/store.svelte';
+import { MAX_COMPARE, MAX_SAVED, type FinderRecord } from '../skillbridge-finder/state/types';
 import { SNOOZE_DATE_MAX } from '../timeline/day-check';
 import { addDays, localTodayIso } from '../timeline/day-math';
 import { SKILLBRIDGE_PLAN_KEY, type PlanAnswer } from '../timeline/skillbridge-plan';
@@ -24,7 +35,7 @@ import { validateInner } from './validate';
 
 // Every member below is something a screen can really do, driven through the same public setter the screen calls, on a
 // real IndexedDB. A person who makes a backup must never be told that a record the app itself wrote is not fit to
-// export, and a restore must never refuse one. A new public setter on any of the three stores belongs here too.
+// export, and a restore must never refuse one. A new public setter on any of the four stores belongs here too.
 // What keeps refused records out of the corpus is state.browser.test.ts: its two setNote tests prove the setter rejects
 // the plan key and a 100,001-unit note and leaves the saved record untouched.
 
@@ -34,6 +45,7 @@ type Ctx = {
 	profile: ProfileStore;
 	timeline: TimelineStateStore;
 	calendar: CalendarSyncStore;
+	finder: FinderStore;
 	/** The separation date the first-run screen saved. */
 	eaos: string;
 	/** The local day on the clock the member runs under. */
@@ -47,6 +59,7 @@ type Seen = {
 		profile: ProfileV1;
 		timeline: TimelineState | null;
 		calendar: CalendarSyncState | null;
+		finder: FinderRecord | null;
 	};
 	ctx: Ctx;
 };
@@ -366,6 +379,114 @@ const CALENDAR_MEMBERS: Member[] = [
 	}
 ];
 
+// ---- Finder ------------------------------------------------------------------------------------------------------
+
+/** Saves a listing as the Saved tab does: whole, with the day it was kept. */
+const saveAll = async (ctx: Ctx, listings: Listing[]) => {
+	for (const listing of listings) await ctx.finder.save(listing, ctx.today);
+};
+
+const FINDER_MEMBERS: Member[] = [
+	{
+		name: 'finder: a ZIP, then every reach, with territories and overseas on',
+		run: async (ctx) => {
+			await ctx.finder.setSetup({
+				place: { kind: 'zip', zip: '21046' },
+				radius: 25,
+				territories: true,
+				overseas: true
+			});
+			for (const radius of [50, 100, 'any'] as const) {
+				await ctx.finder.setSetup((current) => ({ ...current, radius }));
+			}
+		},
+		holds: (seen) =>
+			expect(seen.snap.finder?.finderSetup).toStrictEqual({
+				place: { kind: 'zip', zip: '21046' },
+				radius: 'any',
+				territories: true,
+				overseas: true
+			})
+	},
+	{
+		name: 'finder: a territory as the place, then the setup emptied',
+		run: async (ctx) => {
+			await ctx.finder.setSetup({ place: { kind: 'state', state: 'PR' } });
+			await ctx.finder.setSetup({});
+		},
+		holds: (seen) => expect(seen.snap.finder?.finderSetup).toStrictEqual({})
+	},
+	{
+		name: 'finder: filters with every industry, branch, duration, kind and delivery',
+		run: async (ctx) => {
+			await ctx.finder.setFilters({
+				industries: [...INDUSTRIES],
+				branches: [...BRANCHES],
+				durations: [...DURATIONS],
+				kinds: [...KINDS],
+				delivery: [1, 2, 3]
+			});
+		},
+		holds: (seen) =>
+			expect(seen.snap.finder?.finderFilters?.industries).toStrictEqual([...INDUSTRIES])
+	},
+	{
+		name: 'finder: filters changed from the saved set, then emptied',
+		run: async (ctx) => {
+			await ctx.finder.setFilters({ branches: ['Army'] });
+			await ctx.finder.setFilters((current) => ({ ...current, branches: ['Army', 'Navy'] }));
+			await ctx.finder.setFilters({});
+		},
+		holds: (seen) => expect(seen.snap.finder?.finderFilters).toStrictEqual({})
+	},
+	{
+		name: 'finder: every kind of listing saved, then one removed',
+		run: async (ctx) => {
+			await saveAll(ctx, Object.values(CLEAN_CASES));
+			await ctx.finder.unsave(CLEAN_CASES.remote.i);
+		},
+		holds: (seen) =>
+			expect(seen.snap.finder?.finderSaved.map((item) => item.id)).toStrictEqual(
+				Object.values(CLEAN_CASES)
+					.map((listing) => listing.i)
+					.filter((id) => id !== CLEAN_CASES.remote.i)
+			)
+	},
+	{
+		name: 'finder: the most programs that can be saved',
+		run: (ctx) =>
+			saveAll(
+				ctx,
+				Array.from({ length: MAX_SAVED }, (_, n) => cleanListing({ i: n + 1 }))
+			),
+		holds: (seen) => expect(seen.snap.finder?.finderSaved).toHaveLength(MAX_SAVED)
+	},
+	{
+		name: 'finder: compare filled, one removed, one added back, then cleared and refilled',
+		run: async (ctx) => {
+			for (let n = 1; n <= MAX_COMPARE; n++) await ctx.finder.addCompare(n);
+			await ctx.finder.removeCompare(2);
+			await ctx.finder.addCompare(9);
+			await ctx.finder.clearCompare();
+			await ctx.finder.addCompare(5);
+		},
+		holds: (seen) => expect(seen.snap.finder?.finderCompare).toStrictEqual([5])
+	},
+	{
+		name: 'finder: answers, filters, saved programs and compare picks together',
+		run: async (ctx) => {
+			await ctx.finder.setSetup({ place: { kind: 'state', state: 'TX' }, radius: 100 });
+			await ctx.finder.setFilters({ kinds: ['internship'], delivery: [1, 3] });
+			await saveAll(ctx, [CLEAN_CASES.inPerson, CLEAN_CASES.hybrid]);
+			await ctx.finder.addCompare(CLEAN_CASES.inPerson.i);
+		},
+		holds: (seen) => {
+			expect(seen.file.finder).toStrictEqual(seen.snap.finder);
+			expect(seen.file.finder?.finderCompare).toStrictEqual([CLEAN_CASES.inPerson.i]);
+		}
+	}
+];
+
 // ---- Profile -----------------------------------------------------------------------------------------------------
 
 const PROFILE_MEMBERS: Member[] = [
@@ -441,6 +562,7 @@ const MEMBERS: Member[] = [
 	...TIMELINE_MEMBERS,
 	...PLAN_MEMBERS,
 	...CALENDAR_MEMBERS,
+	...FINDER_MEMBERS,
 	...PROFILE_MEMBERS
 ];
 
@@ -492,8 +614,17 @@ async function finishedDevice(db: IDBDatabase, clock: Clock) {
 	await timeline.load();
 	const calendar = createCalendarSyncStore(db);
 	await calendar.load();
+	const finder = createFinderStore(db);
+	await finder.load();
 	if (clock.memberAt) setClock(clock.memberAt(Date.now()));
-	return { profile, timeline, calendar, eaos, today: localTodayIso(new Date()) } satisfies Ctx;
+	return {
+		profile,
+		timeline,
+		calendar,
+		finder,
+		eaos,
+		today: localTodayIso(new Date())
+	} satisfies Ctx;
 }
 
 const wire = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
@@ -505,6 +636,7 @@ function withoutBackupMark(profile: ProfileV1): ProfileV1 {
 	delete copy.backupGenProfile;
 	delete copy.backupGenTimeline;
 	delete copy.backupGenCalendar;
+	delete copy.backupGenFinder;
 	return copy;
 }
 
@@ -548,11 +680,16 @@ async function exportAndReadBack(db: IDBDatabase, ctx: Ctx, member: Member) {
 		const calendar = stores['calendar-sync']
 			? decodeCalendarSyncState(wire(stores['calendar-sync']))
 			: null;
+		const finder = stores['skillbridge-finder']
+			? decodeFinderRecord(wire(stores['skillbridge-finder']))
+			: null;
 
 		expect(profile).toStrictEqual(withoutBackupMark(snap.profile));
 		expect(timeline).toStrictEqual(snap.timeline);
 		expect(calendar).toStrictEqual(snap.calendar && withoutDeviceOnly(snap.calendar));
-		member.holds?.({ snap, file: { profile, timeline, calendar }, ctx });
+		// A store with no record exports no key, so a member that never touched the finder reads back null.
+		expect(finder).toStrictEqual(snap.finder);
+		member.holds?.({ snap, file: { profile, timeline, calendar, finder }, ctx });
 	} finally {
 		for (const record of toWipe) zeroizeRecord(record);
 	}

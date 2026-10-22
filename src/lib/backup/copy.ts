@@ -12,7 +12,7 @@ import {
  *
  * A message never repeats a word of the passphrase or a byte of the file, and an error's own text is never shown. The
  * only variable parts are the parameters of MessageContext, each checked or looked up here: a position is an integer
- * from 1 to 6, a store is one of three app words, the task title is app text the caller looks up, and a label is used
+ * from 1 to 6, a store is one of four app words, the task title is app text the caller looks up, and a label is used
  * only when it has the shape the app itself gives a backup.
  *
  * The sentence "Nothing on this device was changed" ships only where a test proves the stored rows byte-identical
@@ -22,7 +22,7 @@ export type MessageContext = {
 	path: 'export' | 'restore' | 'check';
 	position?: number;
 	numbers?: boolean;
-	store?: 'profile' | 'timeline' | 'calendar';
+	store?: 'profile' | 'timeline' | 'calendar' | 'finder';
 	taskTitle?: string;
 	label?: string;
 };
@@ -190,6 +190,8 @@ function storeWords(store: MessageContext['store']): string {
 			return 'timeline';
 		case 'calendar':
 			return 'calendar settings';
+		case 'finder':
+			return 'SkillBridge finder';
 		default:
 			return bad();
 	}

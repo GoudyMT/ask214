@@ -6,6 +6,8 @@ import { reqToPromise, withStores, type StoreName } from '../db/schema';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { createProfileStore } from '../profile/store.svelte';
+import { cleanListing } from '../skillbridge-finder/fixtures/clean';
+import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { takeSnapshot, type SnapshotResult } from './snapshot';
 
@@ -141,15 +143,18 @@ async function snapshotOf(signal?: AbortSignal): Promise<SnapshotResult> {
 	return snap;
 }
 
-const failedAt = (store: 'profile' | 'timeline' | 'calendar') =>
+const failedAt = (store: 'profile' | 'timeline' | 'calendar' | 'finder') =>
 	({ ok: false, code: 'E_SNAPSHOT_FAILED', store }) as const;
 
-const SEVEN_STORES = [
+// The stores a backup reads: never the API key, and never the finder's cached listings.
+const SNAPSHOT_STORES = [
 	'calendar-sync',
 	'calendar-sync-hwm',
 	'keystore',
 	'profile',
 	'profile-hwm',
+	'skillbridge-finder',
+	'skillbridge-finder-hwm',
 	'timeline-state',
 	'timeline-state-hwm'
 ];
@@ -157,8 +162,15 @@ const SEVEN_STORES = [
 const STORE_ROWS = [
 	{ store: 'profile', body: 'profile', mark: 'profile-hwm' },
 	{ store: 'timeline', body: 'timeline-state', mark: 'timeline-state-hwm' },
-	{ store: 'calendar', body: 'calendar-sync', mark: 'calendar-sync-hwm' }
+	{ store: 'calendar', body: 'calendar-sync', mark: 'calendar-sync-hwm' },
+	{ store: 'finder', body: 'skillbridge-finder', mark: 'skillbridge-finder-hwm' }
 ] as const;
+
+async function loadedFinder() {
+	const finder = createFinderStore(db);
+	await finder.load();
+	return finder;
+}
 
 async function fullDevice() {
 	const profile = await finishedDevice();
@@ -166,7 +178,10 @@ async function fullDevice() {
 	await timeline.setStatus('va-gov-account', 'done');
 	const calendar = await loadedCalendar();
 	await calendar.setExclusions({ taskIds: ['job-search'], categories: ['finance'] });
-	return { profile, timeline, calendar };
+	const finder = await loadedFinder();
+	await finder.setSetup({ place: { kind: 'state', state: 'TX' } });
+	await finder.save(cleanListing(), '2026-10-21');
+	return { profile, timeline, calendar, finder };
 }
 
 describe('takeSnapshot: what a backup reads', () => {
@@ -177,9 +192,31 @@ describe('takeSnapshot: what a backup reads', () => {
 		if (!snap.ok) return;
 		expect(snap.timeline).toBeNull();
 		expect(snap.calendar).toBeNull();
-		expect(snap.gens).toEqual({ profile: 1, timeline: 0, calendar: 0 });
+		expect(snap.finder).toBeNull();
+		expect(snap.gens).toEqual({ profile: 1, timeline: 0, calendar: 0, finder: 0 });
 		expect(snap.profile.setupIntent).toBe('completed');
 		expect(new TextDecoder().decode(snap.profile.eaos ?? new Uint8Array())).toBe('2027-04-15');
+		zeroizeRecord(snap.profile as unknown as Record<string, unknown>);
+	});
+
+	it("a finder record is read from the device with its generation, and a locked screen doesn't hide it", async () => {
+		await finishedDevice();
+		const finder = await loadedFinder();
+		await finder.setSetup({ radius: 25 });
+		await finder.save(cleanListing(), '2026-10-21');
+		finder.relockSync('hygiene');
+		expect(finder.ready).toBe(false);
+
+		const snap = await takeSnapshot(db);
+		expect(snap.ok).toBe(true);
+		if (!snap.ok) return;
+		expect(snap.finder).toEqual({
+			schemaVersion: 1,
+			finderSetup: { radius: 25 },
+			finderSaved: [{ id: 1001, savedOn: '2026-10-21', facts: cleanListing() }],
+			finderCompare: []
+		});
+		expect(snap.gens.finder).toBe(2);
 		zeroizeRecord(snap.profile as unknown as Record<string, unknown>);
 	});
 
@@ -329,13 +366,13 @@ describe('takeSnapshot: what it refuses', () => {
 });
 
 describe('takeSnapshot: how it reads', () => {
-	it('one readonly transaction over exactly the seven stores, never byok', async () => {
+	it('one readonly transaction over exactly the nine stores, never byok or the finder pack', async () => {
 		await fullDevice();
 		const spy = vi.spyOn(db, 'transaction');
 		await snapshotOf();
 		expect(spy).toHaveBeenCalledTimes(1);
 		const [stores, mode] = spy.mock.calls[0] ?? [];
-		expect([...(stores as string[])].sort()).toEqual(SEVEN_STORES);
+		expect([...(stores as string[])].sort()).toEqual(SNAPSHOT_STORES);
 		expect(mode).toBe('readonly');
 	});
 

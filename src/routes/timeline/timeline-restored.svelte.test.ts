@@ -26,7 +26,8 @@ const KEY = 'sk-ant-api03-' + 'a'.repeat(40);
 const START_URL = location.href;
 // The date is the app's own formatting of the stored time, never a hand-built year (the zone decides the day).
 const RESTORED = `Backup restored (made ${formatBackupDate(BACKUP_AT)}).`;
-const KEPT = "Ask's offline library, saved documents, this device's settings (theme, Ask mode)";
+const KEPT =
+	"Ask's offline library, saved documents, downloaded SkillBridge listings, this device's settings (theme, Ask mode)";
 const NOT_IN_BACKUPS_NO_KEY = `Not in backups: your API key, ${KEPT}. Set them up again in Settings.`;
 const NOT_IN_BACKUPS_WITH_KEY = `Not in backups: ${KEPT}. Set them up again in Settings.`;
 

@@ -55,6 +55,7 @@ type WireProfile = {
 	backupGenProfile?: number;
 	backupGenTimeline?: number;
 	backupGenCalendar?: number;
+	backupGenFinder?: number;
 };
 
 export function encodeProfile(p: ProfileV1): Uint8Array {
@@ -84,7 +85,8 @@ export function encodeProfile(p: ProfileV1): Uint8Array {
 		...(p.lastBackupAt !== undefined && { lastBackupAt: p.lastBackupAt }),
 		...(p.backupGenProfile !== undefined && { backupGenProfile: p.backupGenProfile }),
 		...(p.backupGenTimeline !== undefined && { backupGenTimeline: p.backupGenTimeline }),
-		...(p.backupGenCalendar !== undefined && { backupGenCalendar: p.backupGenCalendar })
+		...(p.backupGenCalendar !== undefined && { backupGenCalendar: p.backupGenCalendar }),
+		...(p.backupGenFinder !== undefined && { backupGenFinder: p.backupGenFinder })
 	};
 	const sortedKeys = Object.keys(wire).sort();
 	const canon: Record<string, unknown> = {};
@@ -124,7 +126,8 @@ const WIRE_TYPES: Record<string, (v: unknown) => boolean> = {
 	lastBackupAt: isNumber,
 	backupGenProfile: isNumber,
 	backupGenTimeline: isNumber,
-	backupGenCalendar: isNumber
+	backupGenCalendar: isNumber,
+	backupGenFinder: isNumber
 };
 
 export function decodeProfile(bytes: Uint8Array): ProfileV1 {
@@ -169,6 +172,7 @@ export function decodeProfile(bytes: Uint8Array): ProfileV1 {
 		...(wire.lastBackupAt !== undefined && { lastBackupAt: wire.lastBackupAt }),
 		...(wire.backupGenProfile !== undefined && { backupGenProfile: wire.backupGenProfile }),
 		...(wire.backupGenTimeline !== undefined && { backupGenTimeline: wire.backupGenTimeline }),
-		...(wire.backupGenCalendar !== undefined && { backupGenCalendar: wire.backupGenCalendar })
+		...(wire.backupGenCalendar !== undefined && { backupGenCalendar: wire.backupGenCalendar }),
+		...(wire.backupGenFinder !== undefined && { backupGenFinder: wire.backupGenFinder })
 	};
 }
