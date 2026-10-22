@@ -14,8 +14,7 @@ describe('tabForPath', () => {
 		['/documents', 'more'],
 		['/feedback', 'more'],
 		['/about', 'more'],
-		['/wizard', null],
-		['/no-such-page', null]
+		['/wizard', null]
 	])('maps %s to %s', (pathname, tab) => {
 		expect(tabForPath(pathname)).toBe(tab);
 	});

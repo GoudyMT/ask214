@@ -101,6 +101,23 @@ describe('BottomBar on a 320 px phone', () => {
 		expect(getComputedStyle(more).borderTopStyle).toBe('solid');
 	});
 
+	// In normal colours the current tab is told apart by its accent colour and bold label (and its top bar, below).
+	it('shows the current tab in the accent colour with a 600 weight label, and the others plain', async () => {
+		route.pathname = '/timeline';
+		const { container } = await render(BottomBar);
+		// The accent is a theme token, so read what it resolves to rather than a colour written here.
+		const probe = document.createElement('div');
+		probe.style.color = 'var(--color-accent)';
+		container.appendChild(probe);
+		const accent = getComputedStyle(probe).color;
+		probe.remove();
+		const [home, timeline] = links(container).map((a) => getComputedStyle(a));
+		expect(timeline?.color).toBe(accent);
+		expect(timeline?.fontWeight).toBe('600');
+		expect(home?.color).not.toBe(accent);
+		expect(home?.fontWeight).not.toBe('600');
+	});
+
 	// Forced colours drop the accent text colour, so the marked tab would look like the rest; its 3 px top bar is what
 	// still tells it apart. The other tabs draw no border at all, which forced colours would colour in as well.
 	it('keeps a 3 px top bar on the current tab alone when forced colours are on', async () => {

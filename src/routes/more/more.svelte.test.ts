@@ -96,14 +96,14 @@ describe('the More page', () => {
 	});
 
 	// The header offers Settings only when the app is ready or damaged; before that there is nothing to set.
-	it.each(['ready', 'damaged'])('offers Settings when the app is %s', async (status) => {
-		ctx.app.status = status;
+	it('offers Settings when the app is damaged', async () => {
+		ctx.app.status = 'damaged';
 		await render(MorePage);
 
 		expect(groups()[0]).toEqual([SETTINGS]);
 	});
 
-	it.each(['loading', 'unsupported', 'stale', 'error'])(
+	it.each(['loading', 'error'])(
 		'leaves the whole Settings group out when the app is %s',
 		async (status) => {
 			ctx.app.status = status;

@@ -43,8 +43,9 @@ describe('nextHeaderState', () => {
 		expect(hiddenAfter(100, [120, 200, 300, 298, 300, 297, 300])).toBe(true);
 	});
 
-	it('changes nothing when the page has not moved', () => {
-		const hidden = play(100, [120, 200, 300]);
-		expect(nextHeaderState(hidden, 300)).toEqual(hidden);
+	// A scroll event can repeat the position it already reported (a settling fling): that is not a turn, so the 13 px
+	// still counts from where the page started down.
+	it('does not reset the count when the same position is reported again', () => {
+		expect(hiddenAfter(100, [104, 104, 113])).toBe(true);
 	});
 });

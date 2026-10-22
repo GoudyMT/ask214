@@ -116,23 +116,16 @@ describe('the root layout navigation', () => {
 		expect(document.activeElement?.textContent?.trim()).toBe('Home');
 	});
 
-	// WCAG 2.4.11: a focused control must not sit under the fixed bar. The footer is the last thing on every page.
-	it('keeps the last footer link above the bar when keyboard focus reaches it at 320 px', async () => {
+	// WCAG 2.4.11: a scroll that brings an element into view with no focus (find in page, an anchor, a script) must stop
+	// short of the fixed bar; the page's scroll padding is what says where the bar starts. The footer is the last thing
+	// on every page.
+	it('keeps the last footer link above the bar when it is scrolled into view at 320 px', async () => {
 		await openAt(320, 568);
-		const footerLinks = [...document.querySelectorAll<HTMLAnchorElement>('footer a')];
-		const last = footerLinks.at(-1) as HTMLAnchorElement;
-		const before = footerLinks.at(-2) as HTMLAnchorElement;
-		const bar = [...document.querySelectorAll('nav[aria-label="Primary"]')].find(
-			(n) => !n.closest('header')
-		) as HTMLElement;
-		// The browser leaves a control that is already fully on screen where it is, so park the page with the link
-		// in view but inside the strip the bar covers: only the scroll padding then tells it to move the page.
-		window.scrollBy(0, last.getBoundingClientRect().bottom - (window.innerHeight - 8));
-		expect(last.getBoundingClientRect().bottom).toBeGreaterThan(bar.getBoundingClientRect().top);
-		before.focus({ preventScroll: true });
-		await userEvent.tab();
-		expect(document.activeElement).toBe(last);
-		// The scroll that brings the link into view settles after the key press.
+		const last = [...document.querySelectorAll<HTMLAnchorElement>('footer a')].at(
+			-1
+		) as HTMLAnchorElement;
+		const bar = document.querySelector('.bottom-bar') as HTMLElement;
+		last.scrollIntoView({ block: 'end' });
 		await expect
 			.poll(() => last.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top)
 			.toBe(true);
