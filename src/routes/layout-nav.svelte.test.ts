@@ -188,6 +188,27 @@ describe('the root layout navigation', () => {
 		}
 	});
 
+	// A control a little taller than the strip between header and bar: the move that brings it clear of the bar also hides
+	// the header, so the header's room is not needed above it and the control must end fully above the bar.
+	it('moves a control a little taller than the strip fully above the bar at 320x180', async () => {
+		await openAt(320, 180);
+		const header = document.querySelector('header') as HTMLElement;
+		const bar = document.querySelector('.bottom-bar') as HTMLElement;
+		const strip = bar.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+		const tall = document.createElement('p');
+		tall.tabIndex = -1;
+		tall.style.cssText = `height: ${strip + 34}px; margin: 0`;
+		(document.querySelector('main') as HTMLElement).prepend(tall);
+		try {
+			tall.focus({ preventScroll: true });
+			await expect
+				.poll(() => tall.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top)
+				.toBe(true);
+		} finally {
+			tall.remove();
+		}
+	});
+
 	// Chromium sends focusin again to a control that kept focus when the window comes back, with no scroll asked for: a
 	// control far below the window must not pull the page down to it.
 	it('leaves the page at the top when a control far below the window takes focus at 320 px', async () => {
