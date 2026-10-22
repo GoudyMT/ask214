@@ -5,12 +5,14 @@ import { describe, it, expect } from 'vitest';
 
 /*
  * The SkillBridge listings carry real people's work emails. The finder's tests are built on synthetic copies, and
- * this guard keeps it that way: any email address in src/ or tests/ must use a reserved example domain or one
- * of the few synthetic or own domains listed here, so a real contact pasted into a fixture fails the suite.
+ * this guard keeps it that way: any email address in src/, tests/ or the weekly pipeline's folder must use a
+ * reserved example domain or one of the few synthetic or own domains listed here, so a real contact pasted into a
+ * fixture fails the suite. The rest of content-ops is left out: its git-ignored capture folders hold real
+ * government addresses from the published sources.
  */
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const SCANNED = ['src', 'tests'];
+const SCANNED = ['src', 'tests', 'content-ops/skillbridge'];
 const TEXT_FILE_RE = /\.(ts|js|mjs|cjs|svelte|json|html|txt|md|csv)$/;
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g;
 
@@ -44,7 +46,7 @@ function* walk(dir: string): Generator<string> {
 }
 
 describe('no real contact addresses in the repo', () => {
-	it('every email address in src/ and tests/ uses an example or known synthetic domain', () => {
+	it('every email address in src/, tests/ and content-ops/skillbridge/ uses an example or known synthetic domain', () => {
 		const found: string[] = [];
 		for (const top of SCANNED)
 			for (const file of walk(join(ROOT, top)))
