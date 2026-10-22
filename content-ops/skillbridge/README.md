@@ -57,7 +57,9 @@ Run from the repo root (each command is one line):
    Exit codes: 0 - the week is written to `workers/skillbridge-data/deploy`; 2 - the pull stopped (see below);
    3 - the week was blocked by a check and nothing was written; 1 - a wrong argument or an unsafe setup (for
    example `E_STATE_INSIDE_REPO`, or `E_TLS_UNVERIFIED`: `NODE_TLS_REJECT_UNAUTHORIZED=0` is set in the shell, which
-   would switch off certificate checks - remove it and run again).
+   would switch off certificate checks - remove it and run again; or `E_UNICODE_VERSION`: this Node's Unicode version
+   is not the one `UNICODE_VERSION` in `config.ts` names, which decides which characters count as unassigned and are
+   stripped - use the pinned Node, or update that constant in a reviewed change).
 
 2. Read the report it prints (also saved as `runs/<date>/report.txt` in the state folder): the listing count beside
    the site's own total, how many providers were not proven complete, capped queries, rows held back and why,
