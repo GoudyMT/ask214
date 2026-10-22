@@ -1,4 +1,5 @@
 import { render } from 'vitest-browser-svelte';
+import { cdp } from 'vitest/browser';
 import { describe, it, expect, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import PhaseChips from './PhaseChips.svelte';
@@ -103,6 +104,25 @@ describe('PhaseChips', () => {
 			document.documentElement.removeAttribute('data-header-hidden');
 		}
 		await expect.poll(() => getComputedStyle(chips).top).toBe('56px');
+	});
+
+	// The chips move with the header, in 200 ms; someone who asked their device for less motion gets them there with no slide.
+	it('slides to the top edge in 200 ms, and not at all when reduced motion is on', async () => {
+		const { container } = await render(PhaseChips, { props: { view: VIEW } });
+		const chips = container.querySelector('.phase-chips') as HTMLElement;
+		expect(getComputedStyle(chips).transitionDuration).toBe('0.2s');
+		const session = cdp();
+		await session.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'prefers-reduced-motion', value: 'reduce' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(true);
+			expect(getComputedStyle(chips).transitionDuration).toBe('0s');
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }]
+			});
+		}
 	});
 
 	it('smooth-scrolls to a phase section when its chip is clicked', async () => {
