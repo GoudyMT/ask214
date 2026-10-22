@@ -344,6 +344,41 @@ describe('runCheck: removal is proven, never guessed', () => {
 		expect(out.removed).toEqual([1]);
 	});
 
+	// A listing saved from a snapshot has no provider, so no named provider can ever prove it gone; a full pull that
+	// accounted for every listing can, whatever provider the record carries.
+	describe('a listing recorded under no provider', () => {
+		const orphaned = stateOf(ids.map((i) => record(i, i === 7 ? '' : PROVIDER)));
+		const seenAll = ids.filter((i) => i !== 7);
+		const afterPull = (pull: PullRun) =>
+			run({ state: orphaned, clean: cleaned(seenAll.map((i) => cleanRow(i))), pull });
+
+		it('is removed by a full pull that every provider read completely, sum gate passed', () => {
+			const out = afterPull(pullOf([provider(PROVIDER, seenAll, true)], { mode: 'full' }));
+			expect(out.removed).toEqual([7]);
+			expect(out.notSeen).toEqual([]);
+			expect(out.nextState.records['7']).toBeUndefined();
+		});
+
+		it.each([
+			['a weekly pull', pullOf([provider(PROVIDER, seenAll, true)], { mode: 'weekly' })],
+			[
+				'a full pull whose sum gate failed',
+				pullOf([provider(PROVIDER, seenAll, true)], { mode: 'full', sumGate: false })
+			],
+			[
+				'a full pull with a provider not read completely',
+				pullOf([provider(PROVIDER, seenAll, true), provider(OTHER_PROVIDER, [], false)], {
+					mode: 'full'
+				})
+			],
+			['a full pull that read no provider', pullOf([], { mode: 'full' })]
+		])('is kept as not seen after %s', (_name, pull) => {
+			const out = afterPull(pull);
+			expect(out.removed).toEqual([]);
+			expect(out.notSeen).toContain(7);
+		});
+	});
+
 	it('keeps a listing its complete provider returned but the clean step set aside', () => {
 		const out = run({
 			...base,

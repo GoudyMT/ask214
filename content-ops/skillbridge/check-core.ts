@@ -155,11 +155,17 @@ export function runCheck(input: {
 			// Gone only when the pull's totals add up, no provider returned it, and the provider that last
 			// returned it was fully read without it. A provider not queried proves nothing, and a name missing
 			// from Filters proves nothing while another provider is unread: the listing may have moved to it.
+			// A full pull in which every provider was read to the end and the totals add up accounted for all the
+			// listings there are, so an id none of them returned is gone whatever provider it was recorded under
+			// (a listing saved from a snapshot has none).
+			const fullPullAccountedForAll =
+				pull.mode === 'full' && pull.providers.length > 0 && everyProviderComplete;
 			if (
 				pull.sumGate &&
 				!returnedIds.has(id) &&
-				providerByName.get(rec.provider)?.complete === true &&
-				(filtersNames.has(rec.provider) || everyProviderComplete)
+				(fullPullAccountedForAll ||
+					(providerByName.get(rec.provider)?.complete === true &&
+						(filtersNames.has(rec.provider) || everyProviderComplete)))
 			) {
 				removed.push(id);
 				continue;
