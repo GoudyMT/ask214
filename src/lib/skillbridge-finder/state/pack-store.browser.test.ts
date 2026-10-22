@@ -42,7 +42,7 @@ const region = (name: RegionFileName, pull: string, ids: number[]): RegionFile =
 	v: 1,
 	pullDate: pull,
 	file: name,
-	listings: ids.map((i) => cleanListing({ i }))
+	listings: ids.map((i) => cleanListing({ i, fl: pull }))
 });
 
 const indexFile = (pull: string, names: RegionFileName[]): IndexFile => ({

@@ -98,6 +98,19 @@ describe('fetchIndex', () => {
 		expect(calls).toHaveLength(1);
 	});
 
+	// An index dated far ahead would pin the person to a pull no later week could replace.
+	it('refuses an index dated more than 7 UTC days after the device day, and keeps one exactly 7 ahead', async () => {
+		const afternoon = Date.UTC(2026, 9, 22, 15, 30);
+		const ahead = (pullDate: string) =>
+			fetchIndex(
+				serve({ [INDEX_PATH]: json(indexOf(['pacific'], pullDate)) }).fetchFn,
+				() => afternoon
+			);
+		expect((await ahead('2026-10-29')).pullDate).toBe('2026-10-29');
+		await expect(ahead('2026-10-30')).rejects.toThrow('E_SBF_INVALID');
+		await expect(ahead('9999-12-31')).rejects.toThrow('E_SBF_INVALID');
+	});
+
 	it.each([
 		['a non-OK status', new Response('x', { status: 500 }), 'E_SBF_HTTP'],
 		['a body that is not UTF-8', new Uint8Array([0xff, 0xfe, 0x7b]), 'E_SBF_BAD_ENCODING'],

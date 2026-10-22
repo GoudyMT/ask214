@@ -237,6 +237,23 @@ describe('validateRegionFile', () => {
 			{ code: 'E_SBF_TOO_MANY_ROWS', field: 'listings' }
 		]);
 	});
+
+	// A first-seen date after the pull would sort first in "newest first" for everyone, and a creation date after
+	// first sight would read as New: neither can be true of a file published on its pull date.
+	it('refuses a first-seen date after the pull, and keeps one on the pull date', () => {
+		const dated = (fl: string) => validateRegionFile(file({ listings: [listing({ fl })] }));
+		expect(dated('2026-10-21')).toEqual({ valid: true, errors: [] });
+		expect(dated('2026-10-22').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'fl' }]);
+		expect(dated('9999-12-31').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'fl' }]);
+	});
+
+	it('refuses a creation date after first-seen, and keeps one on the same day', () => {
+		const dated = (dc: string) =>
+			validateRegionFile(file({ listings: [listing({ fl: '2026-10-14', dc })] }));
+		expect(dated('2026-10-14')).toEqual({ valid: true, errors: [] });
+		expect(dated('2026-10-15').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'dc' }]);
+		expect(dated('2099-01-01').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'dc' }]);
+	});
 });
 
 describe('validateIndex', () => {

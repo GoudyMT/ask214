@@ -249,10 +249,23 @@ export function validateRegionFile(raw: unknown): ContractResult {
 	if (listings.length > MAX_LISTINGS_PER_FILE)
 		return result([...errors, { code: 'E_SBF_TOO_MANY_ROWS', field: 'listings' }]);
 
+	const pullDate = isIsoDate(raw.pullDate) ? raw.pullDate : undefined;
 	const seen = new Set<number>();
 	for (const listing of listings) {
 		errors.push(...validateListing(listing));
 		const id = isObject(listing) && isPositiveInt(listing.i) ? listing.i : undefined;
+		if (isObject(listing)) {
+			// A listing cannot be first seen after the file was pulled, nor created after it was first seen.
+			const { fl, dc } = listing;
+			const late = (field: 'fl' | 'dc') =>
+				errors.push(
+					id === undefined
+						? { code: 'E_SBF_BAD_DATE', field }
+						: { code: 'E_SBF_BAD_DATE', id, field }
+				);
+			if (pullDate !== undefined && isIsoDate(fl) && fl > pullDate) late('fl');
+			if (isIsoDate(fl) && isIsoDate(dc) && dc > fl) late('dc');
+		}
 		if (id === undefined) continue;
 		if (seen.has(id)) errors.push({ code: 'E_SBF_DUP_ID', id, field: 'i' });
 		seen.add(id);
