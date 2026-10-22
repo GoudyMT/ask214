@@ -43,9 +43,10 @@ meets WCAG AA contrast (4.5:1, and 3:1 for interface edges) in both themes.
 (Timeline, SkillBridge, Resources and Settings), a `main` region, and a footer with the not-affiliated statement,
 links to About, Source and Feedback, and the release version. Below 600 px the top menu gives way to a bottom bar
 fixed to the screen edge with four tabs, Home, Timeline, SkillBridge and More, each an icon above a visible label
-(`src/lib/layout/BottomBar.svelte`). The current tab is marked by `aria-current="page"`, the accent colour and a 3 px
-bar on its top edge, so forced-colours mode still shows it; Settings, Resources, Documents, Feedback and About count as
-More. Only one "Primary" navigation is ever displayed, and the page reserves room for the bar (footer padding and
+(`src/lib/layout/BottomBar.svelte`). The current tab is marked by the accent colour and a 3 px bar on its top edge, so
+forced-colours mode still shows it, and by `aria-current="page"` on the tab whose own page is open; More carries
+`aria-current="true"` (the current section) while Settings, Resources, Documents, Feedback or About is open. Only one
+"Primary" navigation is ever displayed, and the page reserves room for the bar (footer padding and
 `scroll-padding-bottom`, plus the device's safe-area inset) so the footer and a focused control are never hidden
 behind it. On a phone only, the header slides away after more than 12 px of scrolling down and comes back on 4 px of
 scrolling up, at the top of the page, and when keyboard focus enters it; with reduced motion it moves with no slide.
