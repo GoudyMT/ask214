@@ -10,7 +10,7 @@ import {
 import { validateListing } from '../../src/lib/skillbridge-finder/contract/validate.ts';
 import { RAW_CASES, rawListing } from '../../src/lib/skillbridge-finder/fixtures/raw.ts';
 
-// Small synthetic lookups: the real boxes and centroids come from the Census tables, in another unit.
+// Small synthetic lookups: the real boxes and centroids come from the Census tables.
 const BOXES: Partial<Record<StateCode, Box>> = {
 	MD: [37.8, -79.6, 39.8, -75.0],
 	MA: [41.2, -73.6, 42.9, -69.9],
