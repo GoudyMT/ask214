@@ -105,7 +105,6 @@
 		align-items: center;
 		justify-content: center;
 		gap: 2px;
-		box-sizing: border-box;
 		min-height: 56px;
 		/* The 3px every tab but the current one takes as padding is where the current tab's top bar sits, so no tab
 		   moves when the mark changes. A transparent border would do the same, but forced colours draw it. */
