@@ -142,8 +142,8 @@ to keep the alerts. Google Calendar sync is designed but not built.
 
 ### Backup
 
-**What it is.** The user can save the profile, the timeline's task state and notes, and the calendar record as
-one encrypted file, and restore it on a new phone or after the site's data was cleared. The app makes a
+**What it is.** The user can save the profile, the timeline's task state and notes, the calendar record and the
+SkillBridge finder's answers, saved programs and compare picks as one encrypted file, and restore it on a new phone or after the site's data was cleared. The app makes a
 six-word passphrase from a list of 7,629 words, about 77 bits, and keeps it only while the backup is made. A key comes from it in two
 steps: Argon2id (128 MiB of memory, 4 passes, 2 lanes, from `@noble/hashes` 2.4.0) runs in a worker so the page
 stays responsive, then HKDF-SHA-256 turns its output into an AES-256-GCM key. Those numbers are fixed for the

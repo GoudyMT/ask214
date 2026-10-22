@@ -332,7 +332,7 @@ export function createFinderPackStore(db: IDBDatabase) {
 			return _ready;
 		},
 
-		/** Whether the last load failed, so the pack could not be read; the caller may drop() and fetch again. */
+		/** Whether the last load failed, so the pack could not be read; the caller may drop(), load() and fetch again. */
 		get failed(): boolean {
 			return _failed;
 		},

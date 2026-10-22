@@ -676,7 +676,8 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 	});
 
 	it.each([
-		['the finder record', '"finderSetup":{', '"finderSetup":{"__proto__":{},'],
+		['the finder record', '"skillbridge-finder":{', '"skillbridge-finder":{"__proto__":{},'],
+		['the finder setup', '"finderSetup":{', '"finderSetup":{"__proto__":{},'],
 		['a finder place', '"place":{', '"place":{"__proto__":{},'],
 		['the finder filters', '"finderFilters":{', '"finderFilters":{"__proto__":[],'],
 		['a saved program', '"finderSaved":[{', '"finderSaved":[{"__proto__":{},'],
