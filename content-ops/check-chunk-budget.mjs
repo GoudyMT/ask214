@@ -370,6 +370,16 @@ const STATIC = 'static';
 //     each passphrase field, so a typo is found by its number instead of retyping six hidden words (its own list
 //     component and styles). Three builds measured page 90,246-90,250 B, precache 218,795-218,808 B, at least 50 B
 //     of room above the highest.
+//     Page 90,300 -> 90,330, precache 218,860 -> 222,065, precache files 68 -> 71, root layout 7,330 -> 8,400 and
+//     route nodes 51,930 -> 53,260 (package.json's size-limit) (owner's call, 2026-10-22): the phone bottom bar (four
+//     tabs with their own icons, the current-tab mark, a focused control kept clear of the bar), the header that hides
+//     on scroll down at phone width, the grouped More page and the SkillBridge placeholder page. The three new files
+//     are the two new pages' route nodes and the More page's styles. Three builds measured page 90,288-90,290 B,
+//     precache 222,013-222,023 B, layout 8,356-8,357 B, route nodes 53,213-53,219 B, at least 40 B of room above the
+//     highest. Trim pass: the placeholder's one style inline (-1 file, -84 B precache), the header step decided with
+//     one comparison less, the hiding attribute set on the header with no state of its own, and each tab named by its
+//     route alone (together about -75 B precache and -60 B root layout), kept; the More page's styles inline (-1 file,
+//     -133 B precache) grew the route nodes by 160 B, not kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -379,10 +389,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 90_300,
+	page: 90_330,
 	onDemand: 8_189,
-	precacheFiles: 68,
-	precacheBytes: 218_860,
+	precacheFiles: 71,
+	precacheBytes: 222_065,
 	workerScripts: 147_200
 };
 
