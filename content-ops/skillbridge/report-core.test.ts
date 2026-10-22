@@ -44,7 +44,7 @@ function runOf(over: Partial<PullRun> = {}): PullRun {
 		providers: [
 			provider('Example Provider One'),
 			provider('Example Provider Two', { complete: false, cappedQueries: 2 }),
-			provider('Example Provider Three', { complete: false, cappedQueries: 1 })
+			provider('Example Provider Three', { complete: false, cappedQueries: 2 })
 		],
 		sumOfTotals: 12,
 		sumGate: true,
@@ -71,9 +71,9 @@ const CLEAN: CleanOutput = {
 function checkOf(over: Partial<CheckOutput> = {}): CheckOutput {
 	return {
 		published: [listing(1, { e: PLANTED_EMAIL }), listing(2), listing(3), listing(4), listing(5)],
-		week: { pullDate: PULL_DATE, added: [1, 2, 3], removed: [7, 8], newOrgs: [5] },
-		notSeen: [9],
-		removed: [7, 8],
+		week: { pullDate: PULL_DATE, added: [1, 2, 3], removed: [7, 8, 11, 12], newOrgs: [5] },
+		notSeen: [9, 10],
+		removed: [7, 8, 11, 12],
 		floorWarnings: [{ provider: 'Example Provider Two', last: 10, now: 4 }],
 		driftAbort: true,
 		blockers: ['E_DRIFT'],
@@ -128,14 +128,14 @@ describe('buildReport', () => {
 			uniqueIds: 11,
 			providersQueried: 3,
 			providersIncomplete: 2,
-			cappedQueries: 3,
+			cappedQueries: 4,
 			dormantSwept: true,
 			quarantine: { E_BAD_STATE: 2, E_NO_ORG: 1 },
 			dropped: { E_DROP_MARKUP: 4 },
 			published: 5,
 			added: 3,
-			removed: 2,
-			notSeen: 1,
+			removed: 4,
+			notSeen: 2,
 			newOrgs: 1,
 			driftAbort: true,
 			blockers: ['E_DRIFT'],
@@ -145,6 +145,21 @@ describe('buildReport', () => {
 				{ name: 'remote', count: 1, bytes: 300 }
 			]
 		});
+	});
+
+	// The two totals differ only when some listing is unaccounted for: the case Max most needs to see.
+	it('reports a failed sum gate with both totals, in the data and in the text', () => {
+		const report = buildReport({
+			pull: ok(runOf({ totalN: 12, sumOfTotals: 10, sumGate: false })),
+			clean: CLEAN,
+			check: checkOf(),
+			week: weekOf(),
+			baseline: false,
+			pullDate: PULL_DATE
+		});
+		expect(report).toMatchObject({ totalN: 12, sumOfTotals: 10, sumGate: false });
+		expect(reportText(report)).toContain('N 12; sum of provider totals 10 (sum gate FAILED)');
+		expect(reportText(fullReport())).toContain('sum gate passed');
 	});
 
 	it('names the stop code of a stopped pull and reports nothing it never learned', () => {
