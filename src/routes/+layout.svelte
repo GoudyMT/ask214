@@ -43,6 +43,7 @@
 		type InstallController
 	} from '$lib/install/install-prompt';
 	import { isInstalled, isIOS } from '$lib/install/install-state';
+	import BottomBar from '$lib/layout/BottomBar.svelte';
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 	import { stashRoute } from '$lib/feedback/context';
@@ -350,19 +351,22 @@
 	<a class="skip-link" href="#main-content">Skip to content</a>
 
 	<header>
-		<nav aria-label="Primary" style:--shell-width={shellWidth}>
+		<div class="header-row" style:--shell-width={shellWidth}>
 			<a href={resolve('/')} class="brand">Ask 214</a>
-			<ul>
-				<li><a href={resolve('/timeline')}>Timeline</a></li>
-				<li><a href={resolve('/resources')}>Resources</a></li>
-				<!-- Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable,
-				     so even a fresh no-timeline user has something to set there (the timeline sections hide inside
-				     Settings). And when the saved data is damaged, where its erase is the only way back. -->
-				{#if app.status === 'ready' || app.status === 'damaged'}
-					<li><a href={resolve('/settings')}>Settings</a></li>
-				{/if}
-			</ul>
-		</nav>
+			<nav aria-label="Primary">
+				<ul>
+					<li><a href={resolve('/timeline')}>Timeline</a></li>
+					<li><a href={resolve('/skillbridge')}>SkillBridge</a></li>
+					<li><a href={resolve('/resources')}>Resources</a></li>
+					<!-- Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable,
+					     so even a fresh no-timeline user has something to set there (the timeline sections hide inside
+					     Settings). And when the saved data is damaged, where its erase is the only way back. -->
+					{#if app.status === 'ready' || app.status === 'damaged'}
+						<li><a href={resolve('/settings')}>Settings</a></li>
+					{/if}
+				</ul>
+			</nav>
+		</div>
 	</header>
 
 	{#if app.status === 'ready' && app.store?.clockBackward}
@@ -398,6 +402,8 @@
 			>
 		</p>
 	</footer>
+
+	<BottomBar />
 </AppGate>
 
 <style>
@@ -422,9 +428,9 @@
 		}
 	}
 
-	/* Right-aligned nav (brand left, nav right) via flex space-between. */
+	/* Brand left, menu right via flex space-between. */
 	/* Content width from --shell-width, one value for every route; 720px is only the fallback. */
-	nav {
+	.header-row {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -432,9 +438,9 @@
 		margin: 0 auto;
 	}
 
-	/* Inline horizontal nav (brand + Timeline/Resources/Settings; Settings appears only once a
-	   separation date is set; About lives in the footer). Migrate to a bottom-tab-bar when the nav grows
-	   to 4+ items (e.g. a future Tools section). */
+	/* From 600px up the header carries the menu (Timeline, SkillBridge, Resources, Settings; Settings appears
+	   only when the app is ready or damaged). Below 600px the header is the brand alone and the bottom bar
+	   (BottomBar.svelte) is the Primary navigation; About and Feedback live in More and the footer. */
 	nav ul {
 		list-style: none;
 		padding: 0;
@@ -501,5 +507,28 @@
 	}
 	footer p {
 		margin: var(--space-s) 0;
+	}
+
+	/* Below 600px (the value BottomBar.svelte repeats; a media query cannot read a variable) the bar replaces the
+	   header menu. The page keeps room for it: the footer's last line and a focused control scrolled into view
+	   stay clear of the fixed bar. --bottom-bar-height is the bar's 56px links plus its 1px top border. */
+	@media (max-width: 599.98px) {
+		:global(:root) {
+			--bottom-bar-height: 57px;
+		}
+		:global(html) {
+			scroll-padding-bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
+		}
+		header nav {
+			display: none;
+		}
+		footer {
+			padding-bottom: calc(var(--space-l) + var(--bottom-bar-height) + env(safe-area-inset-bottom));
+		}
+	}
+	@media (max-width: 480px) {
+		footer {
+			padding-bottom: calc(var(--space-m) + var(--bottom-bar-height) + env(safe-area-inset-bottom));
+		}
 	}
 </style>
