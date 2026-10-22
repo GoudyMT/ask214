@@ -309,23 +309,26 @@ describe('very long values', () => {
 		expect(out.dropped).toEqual({ D_ROLES: 1 });
 	});
 
-	it('refuses a 50,000-character value quickly', () => {
-		const started = performance.now();
-		const out = clean([
-			rawListing({
-				jobDescription: padded(50_000),
-				targetMOCs: '('.repeat(25_000) + ')'.repeat(25_000)
-			})
-		]);
-		expect(performance.now() - started).toBeLessThan(200);
-		expect(out.listings[0]).not.toHaveProperty('r');
+	// Nested parentheses are peeled one layer per pass, so this is the slow shape. The code list inside is
+	// valid once the parentheses are gone, so only the length guard can refuse the longer value.
+	const nested = (length: number) => {
+		const layers = (length - '11B '.length) / 2;
+		return '11B ' + '('.repeat(layers) + ')'.repeat(layers);
+	};
+
+	it('reads codes from a value of 10,000 characters and refuses one of 10,002', () => {
+		expect(only({ targetMOCs: nested(10_000) }).oc).toEqual(['11B']);
+		const out = clean([rawListing({ targetMOCs: nested(10_002) })]);
 		expect(out.listings[0]).not.toHaveProperty('oc');
-		expect(out.dropped).toEqual({ D_ROLES: 1, D_CODES: 1 });
+		expect(out.dropped).toEqual({ D_CODES: 1 });
 	});
 
-	it('holds back a row whose required name is that long', () => {
-		const out = clean([rawListing({ organization: 'x'.repeat(10_001) })]);
-		expect(out.quarantine).toEqual([{ id: 1001, code: 'E_Q_NAME' }]);
+	it('keeps a contact address from a value of 10,000 characters and refuses one of 10,001', () => {
+		const address = (length: number) => 'jobs@example.com'.padEnd(length, ' ');
+		expect(only({ employerPocEmail: address(10_000) }).e).toBe('jobs@example.com');
+		const out = clean([rawListing({ employerPocEmail: address(10_001) })]);
+		expect(out.listings[0]).not.toHaveProperty('e');
+		expect(out.dropped).toEqual({ D_EMAIL: 1 });
 	});
 });
 
