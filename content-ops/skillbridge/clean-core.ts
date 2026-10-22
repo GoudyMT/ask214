@@ -88,12 +88,17 @@ function scrub(value: unknown): string {
 }
 
 const LETTER_OR_DIGIT_RE = /[\p{L}\p{N}]/u;
+// More than two combining marks in a row is stacked "zalgo" text that draws over the lines around it.
+const STACKED_MARKS_RE = /\p{M}{3,}/u;
 
-/** Scrubbed text that may be published within its cap, or undefined (empty, markup, too long). */
+/** True for text worth publishing: shows a letter or digit, no markup, no stacked marks. */
+function isPlainText(text: string): boolean {
+	return LETTER_OR_DIGIT_RE.test(text) && !text.includes('<') && !STACKED_MARKS_RE.test(text);
+}
+
+/** Scrubbed text that may be published within its cap, or undefined (empty, markup, stacked marks, too long). */
 function capped(text: string, cap: number): string | undefined {
-	return LETTER_OR_DIGIT_RE.test(text) && !text.includes('<') && text.length <= cap
-		? text
-		: undefined;
+	return isPlainText(text) && text.length <= cap ? text : undefined;
 }
 
 const isId = (value: unknown): value is number =>
@@ -249,7 +254,7 @@ function splitOutsideParentheses(text: string): string[] | undefined {
 function isRole(item: string): boolean {
 	return (
 		isSafeText(item) &&
-		LETTER_OR_DIGIT_RE.test(item) &&
+		isPlainText(item) &&
 		item.length <= CAPS.roleItem &&
 		item.split(' ').length <= CAPS.roleWords &&
 		!PROSE_MARKS.some((mark) => item.includes(mark))

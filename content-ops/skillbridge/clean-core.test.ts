@@ -245,6 +245,35 @@ describe('text fields', () => {
 		);
 	});
 
+	// A letter stacked with a pile of combining marks draws over the lines around it ("zalgo" text).
+	const marks = (n: number) => 'x' + String.fromCharCode(0x301, 0x302, 0x303, 0x304).slice(0, n);
+
+	it('holds back a name or program with a run of more than two combining marks', () => {
+		const name = clean([rawListing({ organization: 'Example ' + marks(3) })]);
+		expect(name.quarantine).toEqual([{ id: 1001, code: 'E_Q_NAME' }]);
+		const program = clean([rawListing({ program: 'Intern ' + marks(4) })]);
+		expect(program.quarantine).toEqual([{ id: 1001, code: 'E_Q_PROGRAM' }]);
+	});
+
+	it('drops a city, an installation and a role holding stacked marks but keeps the row', () => {
+		const out = clean([
+			rawListing({
+				city: 'Col' + marks(3),
+				installation: 'Camp ' + marks(3),
+				jobDescription: 'Inspector, Tech' + marks(3)
+			})
+		]);
+		const [listing] = out.listings;
+		expect(listing).not.toHaveProperty('c');
+		expect(listing).not.toHaveProperty('inst');
+		expect(listing).not.toHaveProperty('r');
+		expect(out.dropped).toEqual({ D_CITY: 1, D_INSTALLATION: 1, D_ROLES: 1 });
+	});
+
+	it('keeps a letter with two combining marks, as real names have', () => {
+		expect(only({ organization: 'Example ' + marks(2) }).n).toBe('Example ' + marks(2));
+	});
+
 	it('holds back a name or program with no letter or digit and drops such a city', () => {
 		expect(clean([rawListing({ organization: '. . .' })]).quarantine).toEqual([
 			{ id: 1001, code: 'E_Q_NAME' }
