@@ -32,6 +32,10 @@ one inside it).
 
    then `pnpm exec wrangler whoami` shows the account and the scopes.
 
+5. The first full pull is a baseline: add `--baseline` to the weekly command below, once. It sets every listing's
+   first-listed date to that pull, so nothing is marked New, and it replaces any earlier records (the sample week
+   included). A state folder that never had a baseline blocks every other run with `E_NO_BASELINE`.
+
 ## Every week
 
 Run from the repo root (each command is one line):
@@ -48,11 +52,15 @@ Run from the repo root (each command is one line):
    it overnight; a weekly run asks only last week's providers and new ones unless the totals disagree).
 
    Exit codes: 0 - the week is written to `workers/skillbridge-data/deploy`; 2 - the pull stopped (see below);
-   3 - the week was blocked by a check and nothing was written; 1 - a wrong argument.
+   3 - the week was blocked by a check and nothing was written; 1 - a wrong argument or an unsafe setup (for
+   example `E_STATE_INSIDE_REPO`, or `E_TLS_UNVERIFIED`: `NODE_TLS_REJECT_UNAUTHORIZED=0` is set in the shell, which
+   would switch off certificate checks - remove it and run again).
 
 2. Read the report it prints (also saved as `runs/<date>/report.txt` in the state folder): the listing count beside
-   the site's own total, providers not proven complete, capped queries, rows held back and why, additions and
-   removals, listings not seen this week, and any provider whose count fell sharply.
+   the site's own total, how many providers were not proven complete, capped queries, rows held back and why,
+   additions and removals, listings not seen this week, any provider whose count fell sharply, and the company
+   website and LinkedIn link counts beside last week's (a sharp drop means a link source failed this week; run again
+   later rather than deploy it).
 
 3. If the report is right, deploy. From the data Worker's own folder, `workers/skillbridge-data`:
 
@@ -61,25 +69,34 @@ Run from the repo root (each command is one line):
    ```
 
    The guard checks the config (static files only, the one route, no code, no bindings), refuses to run from the repo
-   root or with a Cloudflare token or environment name set in the shell, checks that the deploy tree holds exactly the
-   files the app may fetch and that each one is valid, and only then runs `wrangler deploy` with the data Worker's
-   own config. Deploy every week you build: the deploy folder keeps this week and last week only.
+   root, with any `CLOUDFLARE_*`, `CF_*` or `WRANGLER_*` variable set in the shell, or beside a `.env` /
+   `.env.local` file, checks that the deploy tree holds exactly the files the app may fetch (the zip and crosswalk
+   tables included) and that each one is valid, and only then runs `wrangler deploy` with the data Worker's own
+   config. Deploy every week you build: the deploy folder keeps this week and last week only.
 
 ## When the run stops
 
 The pull stops at once, and nothing is published, on a robots.txt rule that disallows a request, a 403 or 429, a
-CAPTCHA or other web page instead of data, a reply that is not the expected JSON, or three errors in a row. The app
+CAPTCHA or other web page instead of data (whatever its status), a reply that is not the expected JSON, three errors
+in a row, or a provider name that cannot be sent (`E_BAD_PROVIDER_NAME`: report it, it needs a code change). The app
 keeps showing the last deployed week. Read the stop code in the report. Do not re-run the same night after a 403,
 429 or robots stop; if the SkillBridge office objects to the pull in any way, stop running it and tell the office it
 has stopped.
 
 ## When a week is blocked (exit 3)
 
-- `E_DRIFT`: more than 20% of the listings were added or removed. Read the report; if the change is real (for
-  example the first full pull after the sample), run again with `--accept-drift`.
+- `E_DRIFT`: more than 20% of the listings were added or removed. Read the report; if the change is real, run again
+  with `--accept-drift`.
 - `E_INVALID_LISTING` or a file error: a listing or file failed the contract the app uses. Do not deploy; report it.
 - `E_BASELINE_UNPROVEN`: a re-baseline when not every listing was accounted for. Run again later, or accept with
-  `--accept-drift` after reading which providers were incomplete.
+  `--accept-drift` after reading the report's count of providers not proven complete.
+- `E_NO_BASELINE`: this state folder has never had a baseline; run with `--baseline` (step 5 above).
+- `E_PULL_DATE_ORDER`: a run already happened today or later; nothing was asked. Run on a later day.
+- `E_TABLES_MISSING`: `tables/zips.json` or `tables/crosswalk.json` is missing from the state folder; build them
+  (step 3 above).
+- `E_STATE_BEHIND_DEPLOY`: the deploy folder holds a later week than the saved state (the state save failed after
+  the files were written). Do not deploy that folder; put back the state folder's copy from that week if you have
+  one, or delete `workers/skillbridge-data/deploy` and run again.
 
 ## Missed weeks
 
@@ -93,13 +110,14 @@ Cloudflare keeps the 100 most recent versions. Dashboard: "Workers & Pages" > `a
 "Deployments" > the three-dot menu on the version to restore > "Rollback". Or from `workers/skillbridge-data`:
 `pnpm exec wrangler versions list --config wrangler.jsonc`, then
 `pnpm exec wrangler rollback <version id> --config wrangler.jsonc --message "<why>"`. Whether a rollback restores the
-data files with the version: MEASURED AT BUILD (gate c).
+data files with the version: NOT YET MEASURED (to be read on the first rollback test).
 
 ## A removal request
 
-When someone asks for their contact address to be removed (through Feedback), add the address, lowercased, to the
-`suppression` list in `state.json` in the state folder, then run and deploy as usual: the address is dropped from
-every listing, this week's and any kept from earlier weeks, and never published again.
+When someone asks for their contact address to be removed (through Feedback), add the address to the `suppression`
+list in `state.json` in the state folder (case and spacing do not matter), then run and deploy as usual: the address
+is dropped from every listing, this week's and any kept from earlier weeks, roles and titles never carry an address,
+and that week's deploy holds only the new week, so last week's files with the address are no longer served.
 
 ## Refreshing the tables
 
