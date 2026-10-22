@@ -17,6 +17,7 @@ import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { isMain, runCli, runPipeline } from './run.mjs';
 import { API_ORIGIN, FILTERS_PATH, LOOKUP_PATH, ROBOTS_PATH } from './config.ts';
+import { emptyState } from './check-core.ts';
 import { checkTree } from './guard-core.ts';
 import type { GuardDeps, TreeEntry } from './guard-core.ts';
 import type { LinkDeps } from './links-core.ts';
@@ -364,6 +365,39 @@ describe('an address removed on request', () => {
 		expect(filesHolding(where.deployDir, PAT)).toEqual([]);
 		expect(readdirSync(join(where.deployDir, 'skillbridge-data', 'w'))).toEqual([SECOND]);
 		expect(checkTree(where.deployDir, guardDeps())).toEqual([]);
+	});
+
+	// The folder that is re-deployed is the one in the deploy tree, whichever state folder built it: a first run from
+	// a new state folder knows nothing of what the earlier week published.
+	it('is gone from last week as well when that week was built from another state folder', async () => {
+		const where = folders();
+		await go(where, withPat(), FIRST, { baseline: true });
+		expect(filesHolding(where.deployDir, PAT).length).toBeGreaterThan(0);
+
+		const fresh = { ...where, stateDir: join(where.stateDir, '..', 'state-fresh') };
+		mkdirSync(fresh.stateDir, { recursive: true });
+		writeFileSync(
+			join(fresh.stateDir, 'state.json'),
+			JSON.stringify({ ...emptyState(), suppression: [PAT] })
+		);
+		const { result } = await go(fresh, withPat(), SECOND, { baseline: true });
+
+		expect(result.exitCode).toBe(0);
+		expect(filesHolding(where.deployDir, PAT)).toEqual([]);
+		expect(readdirSync(join(where.deployDir, 'skillbridge-data', 'w'))).toEqual([SECOND]);
+	});
+
+	// A file that cannot be read cannot be shown clean, so the safe side is to serve only this week.
+	it('keeps only this week when a file of last week cannot be parsed and the list is not empty', async () => {
+		const where = folders();
+		await go(where, withPat(), FIRST, { baseline: true });
+		writeFileSync(join(weekDir(where, FIRST), 'south-atlantic.json'), '{ not json');
+
+		suppress(where, ['nobody@example.com']);
+		const { result } = await go(where, withPat(), SECOND);
+
+		expect(result.exitCode).toBe(0);
+		expect(readdirSync(join(where.deployDir, 'skillbridge-data', 'w'))).toEqual([SECOND]);
 	});
 
 	it('leaves last week deployed when the list holds only addresses nobody published', async () => {

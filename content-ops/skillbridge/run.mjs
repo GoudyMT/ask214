@@ -30,7 +30,7 @@ import {
 	validateZips
 } from '../../src/lib/skillbridge-finder/contract/tables.ts';
 import { emptyState, runCheck } from './check-core.ts';
-import { DEPLOY_DATA_DIR } from './config.ts';
+import { DEPLOY_DATA_DIR, DEPLOY_WEEKS_KEPT } from './config.ts';
 import { cleanListings } from './clean-core.ts';
 import { assertDirectChild, buildWeek, nodeTreeFs, writeDeployTree } from './layout-core.ts';
 import { runLinks } from './links-core.ts';
@@ -163,6 +163,52 @@ function deployedPullDate(deployDir) {
 		return typeof index.pullDate === 'string' && isIsoDate(index.pullDate) ? index.pullDate : '';
 	} catch {
 		return '';
+	}
+}
+
+/**
+ * Whether a dated folder the writer would keep beside this week still publishes an address on the removal list. Each
+ * file is parsed and every `e` value in it is compared, trimmed and in lower case; a file that cannot be read or
+ * parsed counts as holding one, since the folder is then kept only on a guess.
+ * @param {string} deployDir
+ * @param {string} pullDate
+ * @param {ReadonlySet<string>} suppressed
+ * @returns {boolean}
+ */
+function deployedWeeksHoldRemoved(deployDir, pullDate, suppressed) {
+	if (suppressed.size === 0) return false;
+	const weeksDir = join(deployDir, DEPLOY_DATA_DIR, 'w');
+	try {
+		if (!existsSync(weeksDir)) return false;
+		const kept = readdirSync(weeksDir)
+			.filter((name) => isIsoDate(name) && name !== pullDate)
+			.filter((name) => lstatSync(join(weeksDir, name)).isDirectory())
+			.sort()
+			.reverse()
+			.slice(0, DEPLOY_WEEKS_KEPT - 1);
+		for (const name of kept) {
+			for (const file of readdirSync(join(weeksDir, name))) {
+				const path = join(weeksDir, name, file);
+				if (!lstatSync(path).isFile()) return true;
+				/** @type {unknown[]} */
+				const pending = [readJson(path)];
+				for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+					if (typeof next !== 'object' || next === null) continue;
+					for (const [key, value] of Object.entries(next)) {
+						if (
+							key === 'e' &&
+							typeof value === 'string' &&
+							suppressed.has(value.trim().toLowerCase())
+						)
+							return true;
+						pending.push(value);
+					}
+				}
+			}
+		}
+		return false;
+	} catch {
+		return true;
 	}
 }
 
@@ -373,10 +419,12 @@ export async function runPipeline(options, deps) {
 	if (check.blockers.length > 0 || week.errors.length > 0) return { exitCode: 3, report };
 
 	// Last week's files stay deployed beside this week's, so an address removed on request that last week still
-	// published would stay up for another week; then only this week's folder is kept.
-	const suppressed = new Set(state.suppression);
-	const lastWeekHoldsRemoved = Object.values(state.records).some(
-		(record) => record.listing.e !== undefined && suppressed.has(record.listing.e.toLowerCase())
+	// published would stay up for another week; then only this week's folder is kept. The folder re-deployed is the one
+	// in the deploy tree, which a different state folder may have built, so the files themselves are read.
+	const lastWeekHoldsRemoved = deployedWeeksHoldRemoved(
+		deployDir,
+		pullDate,
+		new Set(state.suppression)
 	);
 	writeDeployTree(deployDir, week, nodeTreeFs, { onlyThisWeek: lastWeekHoldsRemoved });
 	// The state is replaced whole, so a run that dies half-way leaves last week's file.
