@@ -12,6 +12,12 @@ const STATE_FILES = ['match', 'distance', 'new-rule', 'saved-status', 'select-fi
 
 const isSource = (name: string) => /\.ts$/.test(name) && !/\.test\.ts$/.test(name);
 
+/** Every word starting with rate, rank or profile, or holding one in camel case, outside comments. */
+function profileWords(source: string): string[] {
+	const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+	return code.match(/\b(?:rate|rank|profile)\w*|\b\w*(?:Rate|Rank|Profile)\w*/g) ?? [];
+}
+
 function collect(): { path: string; content: string }[] {
 	const searchDir = join(process.cwd(), SEARCH_DIR);
 	const paths = [
@@ -26,6 +32,21 @@ function collect(): { path: string; content: string }[] {
 describe('the finder code that matches and orders listings', () => {
 	it('names no profile field', () => {
 		expect(scanForPiiTokens(collect())).toEqual([]);
+	});
+
+	// The field scan sees a profile field only as it is read off an object. A screen that hands the person's rank or rate
+	// in as a plain argument names no field at all, so these files may not use the words either.
+	it('uses no profile word, however it is written', () => {
+		expect(collect().flatMap((file) => profileWords(file.content))).toEqual([]);
+	});
+
+	it.each([
+		['a bare rank parameter', 'export function matchListings(rows, query, rank) {', ['rank']],
+		['a camel-case name', 'const userProfile = query.who;', ['userProfile']],
+		['a rate compared', 'return rows.filter((r) => r.minRate <= payRate);', ['minRate', 'payRate']]
+	])('flags %s, and not the same words in a comment', (_name, content, words) => {
+		expect(profileWords(content)).toEqual(words);
+		expect(profileWords(`// ${content}`)).toEqual([]);
 	});
 
 	it('imports none of the modules that hold personal data', () => {
