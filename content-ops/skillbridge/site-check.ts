@@ -29,7 +29,7 @@ export type SiteDeps = {
 };
 /** The part of `https.request` the transport uses; a test swaps in `http.request` aimed at a stub server. */
 export type RequestFn = (
-	options: http.RequestOptions & { servername?: string },
+	options: http.RequestOptions & { servername?: string; rejectUnauthorized?: boolean },
 	callback: (res: http.IncomingMessage) => void
 ) => http.ClientRequest;
 
@@ -235,6 +235,8 @@ export function createGet(
 					method: 'GET',
 					path: target.path,
 					servername: target.host,
+					// Explicit, so a NODE_TLS_REJECT_UNAUTHORIZED in the environment cannot switch checking off.
+					rejectUnauthorized: true,
 					headers: { Host: target.host, 'User-Agent': USER_AGENT, Accept: 'text/html' },
 					agent: false,
 					signal

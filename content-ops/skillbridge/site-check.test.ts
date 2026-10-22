@@ -495,9 +495,10 @@ describe('the production wiring', () => {
 			servername: 'site.test',
 			headers: { Host: 'site.test', 'User-Agent': USER_AGENT }
 		});
-		// A custom lookup would be a second DNS resolution, and false would switch certificate checks off.
+		// A custom lookup would be a second DNS resolution. Certificates are verified by an explicit option, since
+		// leaving it out lets NODE_TLS_REJECT_UNAUTHORIZED=0 in the shell switch verification off.
 		expect(options).not.toHaveProperty('lookup');
-		expect(options.rejectUnauthorized).not.toBe(false);
+		expect(options.rejectUnauthorized).toBe(true);
 	});
 
 	test('an http target is refused before any socket is opened', async () => {
