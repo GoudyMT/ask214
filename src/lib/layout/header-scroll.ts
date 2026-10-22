@@ -20,11 +20,12 @@ export function startHeaderState(y: number): HeaderState {
 /** The state after the page scrolls to `y`. At the top of the page (or pulled past it) the header is always shown. */
 export function nextHeaderState(state: HeaderState, y: number): HeaderState {
 	if (y <= 0) return startHeaderState(y);
-	const dir = y > state.lastY ? 1 : y < state.lastY ? -1 : 0;
-	if (dir === 0) return state;
+	if (y === state.lastY) return state;
+	const dir = y > state.lastY ? 1 : -1;
 	const anchorY = dir === state.dir ? state.anchorY : state.lastY;
-	let hidden = state.hidden;
-	if (dir === 1 && y - anchorY > HIDE_AFTER_PX) hidden = true;
-	else if (dir === -1 && anchorY - y >= SHOW_AFTER_PX) hidden = false;
+	const hidden =
+		dir === 1
+			? state.hidden || y - anchorY > HIDE_AFTER_PX
+			: state.hidden && anchorY - y < SHOW_AFTER_PX;
 	return { hidden, lastY: y, anchorY, dir };
 }
