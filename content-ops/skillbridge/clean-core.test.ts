@@ -220,6 +220,42 @@ describe('text fields', () => {
 		expect(out.listings[0]).not.toHaveProperty('c');
 		expect(out.dropped).toEqual({ D_CITY: 1 });
 	});
+
+	// These characters render as empty space but are not control or format characters, so a name made of
+	// them would pass as text while showing nothing.
+	const BLANK_LOOKING = [0x115f, 0x1160, 0x2800, 0x3164, 0xffa0].map((code) =>
+		String.fromCharCode(code)
+	);
+
+	it.each(BLANK_LOOKING.map((char) => [char.charCodeAt(0).toString(16), char]))(
+		'holds back a name and a program made only of the blank-looking character U+%s',
+		(_code, char) => {
+			const name = clean([rawListing({ organization: char.repeat(3) })]);
+			expect(name.listings).toEqual([]);
+			expect(name.quarantine).toEqual([{ id: 1001, code: 'E_Q_NAME' }]);
+			const program = clean([rawListing({ program: ' ' + char + ' ' })]);
+			expect(program.quarantine).toEqual([{ id: 1001, code: 'E_Q_PROGRAM' }]);
+		}
+	);
+
+	it('strips blank-looking characters from inside a name like any invisible one', () => {
+		const filler = BLANK_LOOKING.join('');
+		expect(only({ organization: 'Example' + filler + ' Wind Services' }).n).toBe(
+			'Example Wind Services'
+		);
+	});
+
+	it('holds back a name or program with no letter or digit and drops such a city', () => {
+		expect(clean([rawListing({ organization: '. . .' })]).quarantine).toEqual([
+			{ id: 1001, code: 'E_Q_NAME' }
+		]);
+		expect(clean([rawListing({ program: '---' })]).quarantine).toEqual([
+			{ id: 1001, code: 'E_Q_PROGRAM' }
+		]);
+		const out = clean([rawListing({ city: '???' })]);
+		expect(out.listings[0]).not.toHaveProperty('c');
+		expect(out.dropped).toEqual({ D_CITY: 1 });
+	});
 });
 
 describe('required fields', () => {
@@ -402,7 +438,8 @@ describe('roles, industries and occupation codes', () => {
 		['Technician - Level 1'],
 		['Technician ' + EN_DASH + ' Level 1'],
 		['Technician <b>'],
-		['Inspector, ' + 'x'.repeat(81)]
+		['Inspector, ' + 'x'.repeat(81)],
+		['Inspector, !!!']
 	])('drops the roles %j as prose', (jobDescription) => {
 		const out = clean([rawListing({ jobDescription })]);
 		expect(out.listings[0]).not.toHaveProperty('r');

@@ -60,6 +60,18 @@ type Raw = Readonly<Record<string, unknown>>;
 type Cleaned = { listing: CleanListing; overseas: boolean; drops: string[] };
 type Held = { held: true; id: number; code: string };
 
+// Hangul fillers and the braille blank are letters or symbols to Unicode but draw as empty space, so a name made
+// of them would pass as text while showing nothing.
+const BLANK_LOOKING = new Set(
+	[0x115f, 0x1160, 0x2800, 0x3164, 0xffa0].map((code) => String.fromCharCode(code))
+);
+
+function withoutBlankLooking(text: string): string {
+	let out = '';
+	for (const char of text) if (!BLANK_LOOKING.has(char)) out += char;
+	return out;
+}
+
 /**
  * NFKC, no invisible characters, whitespace runs as one space, trimmed; empty when nothing is left or the value
  * is not a string. Whitespace is collapsed before the strip too, because a tab or newline is a control
@@ -67,18 +79,21 @@ type Held = { held: true; id: number; code: string };
  */
 function scrub(value: unknown): string {
 	if (typeof value !== 'string') return '';
-	return value
-		.normalize('NFKC')
-		.replace(WHITESPACE_RE, ' ')
-		.replace(INVISIBLE_RE, '')
+	return withoutBlankLooking(
+		value.normalize('NFKC').replace(WHITESPACE_RE, ' ').replace(INVISIBLE_RE, '')
+	)
 		.replace(WHITESPACE_RE, ' ')
 		.trim()
 		.normalize('NFKC');
 }
 
+const LETTER_OR_DIGIT_RE = /[\p{L}\p{N}]/u;
+
 /** Scrubbed text that may be published within its cap, or undefined (empty, markup, too long). */
 function capped(text: string, cap: number): string | undefined {
-	return text !== '' && !text.includes('<') && text.length <= cap ? text : undefined;
+	return LETTER_OR_DIGIT_RE.test(text) && !text.includes('<') && text.length <= cap
+		? text
+		: undefined;
 }
 
 const isId = (value: unknown): value is number =>
@@ -234,6 +249,7 @@ function splitOutsideParentheses(text: string): string[] | undefined {
 function isRole(item: string): boolean {
 	return (
 		isSafeText(item) &&
+		LETTER_OR_DIGIT_RE.test(item) &&
 		item.length <= CAPS.roleItem &&
 		item.split(' ').length <= CAPS.roleWords &&
 		!PROSE_MARKS.some((mark) => item.includes(mark))
