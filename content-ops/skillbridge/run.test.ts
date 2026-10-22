@@ -400,6 +400,28 @@ describe('a run that cannot be trusted writes nothing to the deploy tree', () =>
 		expect(existsSync(join(where.stateDir, 'runs', THIRD))).toBe(false);
 	});
 
+	// The pull takes hours, and a saved run is overwritten or pruned after it, so the date is judged before it starts.
+	it.each([
+		['the same day as the last run', FIRST, FIRST],
+		['a day before the last run', SECOND, '2026-10-24']
+	])('refuses a run dated %s before any request, touching nothing', async (_name, last, today) => {
+		const where = folders();
+		await go(where, makeWorld(), FIRST, { baseline: true });
+		if (last !== FIRST) await go(where, makeWorld(), last);
+		const runsBefore = hashTree(join(where.stateDir, 'runs'));
+		const treeBefore = hashTree(where.deployDir);
+		const stateBefore = readFileSync(join(where.stateDir, 'state.json'), 'utf8');
+
+		const { result, urls, printed } = await go(where, makeWorld(), today);
+
+		expect(result.exitCode).toBe(3);
+		expect(printed).toContain('E_PULL_DATE_ORDER');
+		expect(urls).toEqual([]);
+		expect(hashTree(join(where.stateDir, 'runs'))).toEqual(runsBefore);
+		expect(hashTree(where.deployDir)).toEqual(treeBefore);
+		expect(readFileSync(join(where.stateDir, 'state.json'), 'utf8')).toBe(stateBefore);
+	});
+
 	it('is blocked by a drift past 20%, leaving the tree and the state as they were, until Max accepts it', async () => {
 		const where = folders();
 		await go(where, makeWorld(), FIRST, { baseline: true });

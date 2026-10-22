@@ -265,6 +265,9 @@ export async function runPipeline(options, deps) {
 		);
 	}
 
+	// A pull takes hours and then overwrites or prunes saved runs, so the date order is judged before it starts.
+	if (state.lastPullDate !== null && pullDate <= state.lastPullDate)
+		return blocked('E_PULL_DATE_ORDER');
 	// The tree is written before the state is saved. A deploy tree dated after the state means that save failed;
 	// a run on it would date every listing again and mark the old ones New.
 	if (state.lastPullDate !== null && deployedPullDate(deployDir) > state.lastPullDate)
