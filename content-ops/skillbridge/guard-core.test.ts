@@ -619,6 +619,44 @@ describe('guardAndDeploy: the environment wrangler would inherit', () => {
 		expect(runs).toEqual([]);
 	});
 
+	// Wrangler is started with this environment: with certificate checks off it would send the keyring login to
+	// anyone on the network, and NODE_OPTIONS can load code (--require, --import) into the process that holds it.
+	it.each([
+		['NODE_TLS_REJECT_UNAUTHORIZED', '0'],
+		['node_tls_reject_unauthorized', '0'],
+		['NODE_OPTIONS', '--require ./x.js'],
+		['Node_Options', '--max-old-space-size=100']
+	])('refuses %s=%s, names it without its value, and never runs wrangler', async (name, value) => {
+		const { outcome, runs } = await guard({ env: { [name]: value } });
+		expect(outcome.ok).toBe(false);
+		expect(outcome.problems).toEqual([`E_ENV:${name}`]);
+		expect(JSON.stringify(outcome)).not.toContain(value);
+		expect(runs).toEqual([]);
+	});
+
+	it('lets certificate checks stay on and an empty NODE_OPTIONS through', async () => {
+		const { outcome, runs } = await guard({
+			env: { NODE_TLS_REJECT_UNAUTHORIZED: '1', NODE_OPTIONS: '' }
+		});
+		expect(outcome).toEqual({ ok: true, problems: [], exitCode: 0 });
+		expect(runs).toHaveLength(1);
+	});
+
+	// Wrangler's own telemetry opt-out and log level change no deploy target and no login, so they are not a reason
+	// to stop a deploy; every other WRANGLER_ name still is.
+	it.each([
+		['WRANGLER_SEND_METRICS', 'false'],
+		['wrangler_log', 'debug']
+	])('lets %s through, and still refuses its neighbours', async (name, value) => {
+		const allowed = await guard({ env: { [name]: value } });
+		expect(allowed.outcome).toEqual({ ok: true, problems: [], exitCode: 0 });
+		expect(allowed.runs).toHaveLength(1);
+
+		const mixed = await guard({ env: { [name]: value, WRANGLER_API_ENVIRONMENT: 'x' } });
+		expect(mixed.outcome.problems).toEqual(['E_ENV:WRANGLER_API_ENVIRONMENT']);
+		expect(mixed.runs).toEqual([]);
+	});
+
 	it('lets a variable through that only resembles those families', async () => {
 		const env = {
 			CFLAGS: VALUE,

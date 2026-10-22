@@ -67,6 +67,25 @@ const DOTENV_FILES = ['.env', '.env.local'] as const;
  */
 const FORBIDDEN_ENV_PREFIXES = ['CLOUDFLARE_', 'CF_', 'WRANGLER_'] as const;
 
+/**
+ * Wrangler's telemetry opt-out and log level: they redirect neither a deploy nor a login, so they are exempt from the
+ * prefix rule (compared in upper case, like the prefixes).
+ */
+const ALLOWED_ENV_NAMES: ReadonlySet<string> = new Set(['WRANGLER_SEND_METRICS', 'WRANGLER_LOG']);
+
+/**
+ * Whether a variable of the shell would weaken the deploy. Wrangler runs on node with this environment, so node's
+ * own settings count too: certificate checks off would send the keyring login to anyone on the network, and
+ * NODE_OPTIONS can load code (--require, --import) into the process that holds the login.
+ */
+function weakensDeploy(upper: string, value: string): boolean {
+	if (value === '') return false;
+	if (upper === 'NODE_OPTIONS') return true;
+	if (upper === 'NODE_TLS_REJECT_UNAUTHORIZED') return value === '0';
+	if (ALLOWED_ENV_NAMES.has(upper)) return false;
+	return FORBIDDEN_ENV_PREFIXES.some((p) => upper.startsWith(p));
+}
+
 const DATA_WORKER_DIR = 'workers/skillbridge-data';
 /** The assets directory the committed data config names, relative to the config's folder. */
 const ASSETS_DIRECTORY = './deploy';
@@ -311,10 +330,7 @@ export async function guardAndDeploy(
 	if (sameKey(deps.cwd) === sameKey(deps.repoRoot)) problems.push('E_APP_ROOT');
 	const setNames = Object.keys(deps.env).filter((name) => {
 		const value = deps.env[name];
-		const upper = name.toUpperCase();
-		return (
-			value !== undefined && value !== '' && FORBIDDEN_ENV_PREFIXES.some((p) => upper.startsWith(p))
-		);
+		return value !== undefined && weakensDeploy(name.toUpperCase(), value);
 	});
 	for (const name of setNames.sort()) problems.push(`E_ENV:${name}`);
 	for (const name of DOTENV_FILES) {
