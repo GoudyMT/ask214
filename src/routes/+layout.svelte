@@ -388,7 +388,8 @@
 					room,
 					room > HIDE_AFTER_PX ? top : top - el.getBoundingClientRect().bottom
 				);
-				if (shift > 0) window.scrollBy(0, shift);
+				// Whole pixels: WebKit drops a fraction of a pixel, which would leave the control just under the bar.
+				if (shift > 0) window.scrollBy(0, Math.ceil(shift));
 			};
 			check();
 		};
