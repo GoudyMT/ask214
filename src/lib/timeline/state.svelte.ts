@@ -86,15 +86,18 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	let _failed = $state(false);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
-	// Saves still waiting for their turn, and the last record one of them wrote after a lock took `_state` away.
-	let inFlight = 0;
-	let savedAfterLock: TimelineState | null = null;
+	// Saves still waiting for their turn. The tap came before any lock that lands while its save waits, so the lock
+	// hands each the record as this tab holds it, and the save still lands; the record lives only in the saves that
+	// hold it.
+	type Waiting = { base: TimelineState | null };
+	const waiting: Waiting[] = [];
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
 	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
 	// Reactive: the Timeline offers Unlock while this stays `locked` after the profile has opened.
 	let lockState = $state<LockState>('unlocked');
 
 	function relockNow(reason: RelockReason): void {
+		if (_state !== null) for (const save of waiting) save.base = _state;
 		_state = null;
 		relockEpoch++;
 		lockState = nextLockState(lockState, reason);
@@ -119,12 +122,9 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	 */
 	async function persist(mutate: (base: TimelineState) => TimelineState): Promise<void> {
 		const relockAtStart = relockEpoch;
-		// The record the tap was made on. A lock that lands while this save waits its turn takes `_state` away, but the
-		// tap came first, so the save still lands on the record as this tab held it (or on what a save queued before it
-		// wrote meanwhile), and only while the disk still holds the generation the tap was made on.
-		const tappedOn = _state;
-		const tappedAt = _generation;
-		inFlight++;
+		// A save asked for on a locked store is handed nothing by a lock that already happened, so it stays refused.
+		const me: Waiting = { base: null };
+		waiting.push(me);
 		let ks: KeystoreRow | undefined;
 		try {
 			await withWriteLocks(
@@ -138,10 +138,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 
 					const currentGen = await readCurrentGeneration(keystore);
 					if (currentGen !== _generation) throw new OccConflictError();
-					const overtaken = relockEpoch !== relockAtStart;
-					const base =
-						_state ??
-						(overtaken ? (savedAfterLock ?? (currentGen === tappedAt ? tappedOn : null)) : null);
+					// The handed record is the one at `_generation`, which OCC just matched to the disk.
+					const base = _state ?? me.base;
 					if (base === null) throw new TimelineRelockedError();
 
 					const next = mutate(base);
@@ -170,12 +168,13 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 					// No lockState update belongs here: the relocked check above means a write only ever
 					// runs on a store load() already opened.
 					if (relockEpoch === relockAtStart) _state = next;
-					else if (_state === null) savedAfterLock = next;
+					// Still locked: the saves behind this one build on what it wrote, so none drops it.
+					else if (_state === null)
+						for (const save of waiting) if (save.base !== null) save.base = next;
 				}
 			);
 		} finally {
-			// Plaintext kept past a lock lives only while a save the lock overtook still waits.
-			if (--inFlight === 0) savedAfterLock = null;
+			waiting.splice(waiting.indexOf(me), 1);
 		}
 		opts.onBroadcast?.({ type: 'timeline-updated' });
 	}

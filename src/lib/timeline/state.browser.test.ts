@@ -246,6 +246,46 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	// The second tap was made before the first save landed and before the lock: it builds on what the first saved, never
+	// on the record as it was when tapped, which would write the first save away.
+	it('a tap queued behind a save that landed before the lock lands on top of it', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		const first = a.setStatus('x', 'done');
+		const second = a.setStatus('y', 'done');
+		await first;
+		a.relockSync('peer');
+		await second;
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({ x: { status: 'done' }, y: { status: 'done' } });
+		await deleteTestDb(db);
+	});
+
+	// A save asked for on a store that is already locked was never tapped on a record: it stays refused, even while a
+	// save from before the lock still waits and holds one.
+	it('a save asked for after the lock is refused while an earlier one still lands', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		const before = a.setStatus('x', 'done');
+		a.relockSync('user');
+		const after = a.setStatus('y', 'done');
+		await expect(after).rejects.toThrow(TimelineRelockedError);
+		await before;
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({ x: { status: 'done' } });
+		await deleteTestDb(db);
+	});
+
 	it('merges concurrent actions against a fresh base - the second does not drop the first', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);
