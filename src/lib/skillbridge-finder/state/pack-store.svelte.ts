@@ -21,11 +21,11 @@ import {
 	type ContractResult
 } from '../contract/validate';
 import { decodeSeen, encodeSeen, FinderPackError, type FinderSeenRow } from './pack-codec';
-import { isRollback } from './new-rule';
+import { isRollback, nextLastSeen } from './new-rule';
 import { encryptRecord, decryptRecord } from '../../crypto/record-crypto';
 import { AesGcmAuthError } from '../../crypto/aes-gcm';
 import type { KeystoreRecordV1 } from '../../keystore/record';
-import type { RelockReason } from '../../profile/lifecycle';
+import { nextLockState, type LockState, type RelockReason } from '../../profile/lifecycle';
 import { readKeystoreRow } from '../../profile/store.svelte';
 import { LOCK_TIMEOUT_MS, LockAcquisitionTimeout } from '../../db/locks';
 import { withStores, reqToPromise } from '../../db/schema';
@@ -208,6 +208,12 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 	const listeners = setOf<() => void>();
 	// Bumped by a relock or a drop: a read or load that began before it must not put anything back.
 	let epoch = 0;
+	// Bumped by drop(), inside the pack lock, as the rows are cleared: a write that began before it and only now has the
+	// lock would put the dropped week or the opened ids back on disk, where the next load reads them.
+	let dropEpoch = 0;
+	// How this store came to hold nothing decrypted. Only the person's own load() opens a `locked` store; an automatic
+	// re-read (refresh) may undo `evicted`, which is page hygiene on the way out.
+	let lockState = $state<LockState>('unlocked');
 	// Bumped whenever the memo is cleared for new data: a read that began before it must not memoize the old file.
 	let memoVersion = 0;
 
@@ -236,6 +242,11 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 
 	function requireReady(): void {
 		if (!_ready) throw new FinderPackError('E_FINDER_PACK_RELOCKED');
+	}
+
+	/** Called inside the pack lock, before a write's transaction: a drop that ran since the write began wins. */
+	function requireNotDropped(dropEpochAtStart: number): void {
+		if (dropEpoch !== dropEpochAtStart) throw new FinderPackError('E_FINDER_PACK_RELOCKED');
 	}
 
 	function putRows(tx: IDBTransaction, rows: Row[]): void {
@@ -294,6 +305,20 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 		return row ? ((await openFile(keystore, 'index', undefined, row.rec)) as IndexFile) : undefined;
 	}
 
+	/**
+	 * Whether the disk holds a different week than the one this tab holds (`pull`). A weekly row that fails its check
+	 * then means this tab is behind a peer's swap (or a peer's drop), not that the row is damaged. Only the index row is
+	 * read; if that one does not read either, the row is judged on its own and nothing is claimed about the week.
+	 */
+	async function weekMovedOnDisk(keystore: KeystoreRecordV1, pull: string): Promise<boolean> {
+		try {
+			const onDisk = await readStoredIndex(keystore);
+			return onDisk?.pullDate !== pull;
+		} catch {
+			return false;
+		}
+	}
+
 	/** One file, decrypted on demand and held until a relock. */
 	async function readFile<T>(key: RowKey): Promise<T | undefined> {
 		requireReady();
@@ -305,7 +330,22 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 		if (memo.has(key)) return memo.get(key) as T;
 		const row = await getRow(db, key);
 		if (!row) return undefined;
-		const value = await openFile(await readKeystoreRow(db), key, pull, row.rec);
+		const keystore = await readKeystoreRow(db);
+		let value: unknown;
+		try {
+			value = await openFile(keystore, key, pull, row.rec);
+		} catch (e) {
+			if (epoch !== epochAtStart) throw new FinderPackError('E_FINDER_PACK_RELOCKED');
+			if (
+				pull !== undefined &&
+				e instanceof FinderPackError &&
+				e.message === 'E_FINDER_PACK_BAD_ROW' &&
+				(await weekMovedOnDisk(keystore, pull))
+			) {
+				throw new FinderPackError('E_FINDER_PACK_STALE');
+			}
+			throw e;
+		}
 		// A lock that landed while this ran wins: the caller gets nothing and nothing is put back.
 		if (epoch !== epochAtStart) throw new FinderPackError('E_FINDER_PACK_RELOCKED');
 		if (memoVersion === versionAtStart) memo.set(key, value);
@@ -326,10 +366,12 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 	): Promise<void> {
 		requireReady();
 		const epochAtStart = epoch;
+		const dropAtStart = dropEpoch;
 		let result: FinderSeenRow | undefined;
 		await withKeystoreShared(async () => {
 			const keystore = await readKeystoreRow(db);
 			await withPackLock(async () => {
+				requireNotDropped(dropAtStart);
 				const row = await getRow(db, 'seen');
 				const current = row ? await openSeen(keystore, row.rec) : { finderSeen: [] };
 				const next = mutate(current);
@@ -354,6 +396,14 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 		/** Whether the last load failed, so the pack could not be read; the caller may drop(), load() and fetch again. */
 		get failed(): boolean {
 			return _failed;
+		},
+
+		/**
+		 * Whether the person's lock holds: only a load they ask for opens it, and page hygiene on top of it does not move
+		 * it. An automatic re-read (refresh) refuses a locked pack.
+		 */
+		get locked(): boolean {
+			return lockState === 'locked';
 		},
 
 		/** The held week's pull date, or undefined when nothing is held. */
@@ -395,6 +445,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 				holdSeen(seen);
 				_ready = true;
 				_failed = false;
+				lockState = 'unlocked';
 			} catch (e) {
 				if (epoch === epochAtStart) {
 					_ready = false;
@@ -403,6 +454,19 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 				}
 				throw e;
 			}
+		},
+
+		/**
+		 * AUTOMATIC re-read (a peer tab's change, a page restore). It decrypts, so it answers to how the plaintext went away:
+		 * a `locked` store (the person asked, or their presence lapsed) stays as it is, an `evicted` one (page hygiene)
+		 * is read again now the page is back, and a hidden page decrypts nothing because nobody can see the result.
+		 * load() is not gated: Unlock and start-up use it, and they are the person asking.
+		 */
+		refresh(): Promise<void> {
+			if (lockState === 'locked' || document.visibilityState === 'hidden') {
+				return Promise.resolve();
+			}
+			return api.load();
 		},
 
 		readRegion: (name: RegionFileName) => readFile<RegionFile>(name),
@@ -438,6 +502,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 			if (isFarFuture(pull)) throw new FinderPackError('E_FINDER_PACK_BAD_INPUT');
 
 			const epochAtStart = epoch;
+			const dropAtStart = dropEpoch;
 			let newer = true;
 			await withKeystoreShared(async () => {
 				const keystore = await readKeystoreRow(db);
@@ -445,6 +510,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 					files.map(([key, value]) => sealFile(keystore, key, pull, value))
 				);
 				await withPackLock(async () => {
+					requireNotDropped(dropAtStart);
 					// A held week dated far ahead is not a week the data can have reached: it cannot outrank a real one, so it is
 					// treated as if nothing were held, and the real week replaces it.
 					const onDisk = await readStoredIndex(keystore);
@@ -465,18 +531,20 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 			_index = index;
 		},
 
-		/** Keep a supporting table (ZIP points, installations, crosswalk); tables are kept across weeks. */
+		/** Keep a supporting table (ZIP points, crosswalk); tables are kept across weeks. */
 		async putTable(name: TableFileName, table: PackTable): Promise<void> {
 			requireReady();
 			if (!TABLE_FILE_NAMES.includes(name) || !TABLE_VALIDATORS[name](table).valid) {
 				throw new FinderPackError('E_FINDER_PACK_BAD_INPUT');
 			}
 			const key: RowKey = `table:${name}`;
+			const dropAtStart = dropEpoch;
 			await withKeystoreShared(async () => {
 				const row = await sealFile(await readKeystoreRow(db), key, undefined, table);
-				await withPackLock(() =>
-					withStores(db, PACK_STORE, 'readwrite', (tx) => putRows(tx, [row]))
-				);
+				await withPackLock(() => {
+					requireNotDropped(dropAtStart);
+					return withStores(db, PACK_STORE, 'readwrite', (tx) => putRows(tx, [row]));
+				});
 			});
 			memo.delete(key);
 		},
@@ -502,7 +570,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 			if (!isIsoDate(pullDate))
 				return Promise.reject(new FinderPackError('E_FINDER_PACK_BAD_INPUT'));
 			return updateSeen((current) =>
-				current.finderLastSeenPull !== undefined && current.finderLastSeenPull >= pullDate
+				nextLastSeen(current.finderLastSeenPull, pullDate) === current.finderLastSeenPull
 					? null
 					: { ...current, finderLastSeenPull: pullDate }
 			);
@@ -518,7 +586,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 
 		/** Sync relock for the pagehide/freeze handlers: drop every decrypted thing held. Never re-reads on its own. */
 		relockSync(reason: RelockReason): void {
-			void reason;
+			lockState = nextLockState(lockState, reason);
 			epoch++;
 			_ready = false;
 			_failed = false;
@@ -531,11 +599,12 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 			// Readiness is left as it was: a relock that landed before or during the wait stands, and a locked or failed
 			// store needs a load() before it decrypts anything again.
 			await withKeystoreShared(() =>
-				withPackLock(() =>
-					withStores(db, PACK_STORE, 'readwrite', (tx) => {
+				withPackLock(() => {
+					dropEpoch++;
+					return withStores(db, PACK_STORE, 'readwrite', (tx) => {
 						tx.objectStore(PACK_STORE).clear();
-					})
-				)
+					});
+				})
 			);
 			epoch++;
 			clearHeld();

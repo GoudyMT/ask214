@@ -388,6 +388,24 @@ describe('finder pack store', () => {
 		});
 	});
 
+	// A peer tab moving to a newer week makes this tab's unread files fail their week binding. That is a tab that is behind,
+	// not a damaged row, and a caller that answers a bad row by dropping the pack would wipe the person's opened ids.
+	describe('a peer tab swapped to a newer week', () => {
+		it('a read of a file not yet read says the week is stale, and a load catches up', async () => {
+			const a = await opened();
+			await a.swap(week(WEEK_1, ['pacific', 'mountain']));
+			const b = await opened();
+			await a.swap(week(WEEK_2, ['pacific', 'mountain']));
+
+			await expect(b.readRegion('pacific')).rejects.toThrow('E_FINDER_PACK_STALE');
+			await expect(b.readIds()).rejects.toThrow('E_FINDER_PACK_STALE');
+
+			await b.load();
+			expect(b.pullDate).toBe(WEEK_2);
+			expect((await b.readRegion('pacific'))?.pullDate).toBe(WEEK_2);
+		});
+	});
+
 	describe('tables', () => {
 		it('are kept encrypted across weeks and refused when they fail the contract', async () => {
 			const store = await opened();
@@ -639,6 +657,76 @@ describe('finder pack store', () => {
 			expect(seams.decrypts).toBe(1);
 		});
 
+		describe('an automatic re-read (refresh)', () => {
+			afterEach(() => {
+				vi.restoreAllMocks();
+			});
+
+			// Idle or Lock: the person's presence lapsed, and a re-read on the next page event would reverse that.
+			it('does not undo a lock the user or the idle timer asked for', async () => {
+				const store = await opened();
+				await store.markOpened([1]);
+				store.relockSync('idle');
+				expect(store.locked).toBe(true);
+				seams.decrypts = 0;
+
+				await store.refresh();
+
+				expect(store.ready).toBe(false);
+				expect(store.seen.size).toBe(0);
+				expect(seams.decrypts).toBe(0);
+
+				// Only the person's own load opens it again.
+				await store.load();
+				expect(store.locked).toBe(false);
+				expect(store.ready).toBe(true);
+				expect([...store.seen]).toEqual([1]);
+			});
+
+			// Page hygiene is the app tidying up on the way out; coming back owes the re-read, and a hide does not lock.
+			it('re-reads a store that only page hygiene evicted', async () => {
+				const store = await opened();
+				await store.swap(week(WEEK_1, ['pacific']));
+				await store.markOpened([1]);
+				store.relockSync('hygiene');
+				expect(store.locked).toBe(false);
+				seams.decrypts = 0;
+
+				await store.refresh();
+
+				expect(store.ready).toBe(true);
+				expect(store.pullDate).toBe(WEEK_1);
+				expect([...store.seen]).toEqual([1]);
+				expect(seams.decrypts).toBe(2);
+			});
+
+			it('a later hygiene relock does not turn a lock into an eviction', async () => {
+				const store = await opened();
+				store.relockSync('user');
+				store.relockSync('hygiene');
+				expect(store.locked).toBe(true);
+				await store.refresh();
+				expect(store.ready).toBe(false);
+			});
+
+			it('does not decrypt while the page is hidden, and reads again once it is visible', async () => {
+				const store = await opened();
+				await store.markOpened([1]);
+				store.relockSync('hygiene');
+				seams.decrypts = 0;
+
+				const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+				await store.refresh();
+				expect(seams.decrypts).toBe(0);
+				expect(store.ready).toBe(false);
+
+				visibility.mockReturnValue('visible');
+				await store.refresh();
+				expect(store.ready).toBe(true);
+				expect([...store.seen]).toEqual([1]);
+			});
+		});
+
 		it('a load already in flight when the lock lands does not bring the index back', async () => {
 			const store = await opened();
 			await store.swap(week(WEEK_1, ['pacific']));
@@ -664,6 +752,31 @@ describe('finder pack store', () => {
 		expect(store.ready).toBe(false);
 		await expect(store.markOpened([7])).rejects.toThrow('E_FINDER_PACK_RELOCKED');
 		await expect(store.readTable('zips')).rejects.toThrow('E_FINDER_PACK_RELOCKED');
+	});
+
+	// The person removed the pack and was told it was gone; a write that was already on its way must not put the week or
+	// the opened ids back for the next load to read.
+	it('a write that was under way when drop ran does not land after it', async () => {
+		const store = await opened();
+		await store.swap(week(WEEK_1, ['pacific']));
+		await store.markOpened([1001]);
+
+		const writes = [
+			store.swap(week(WEEK_2, ['mountain'])),
+			store.markOpened([1002]),
+			store.putTable('zips', zips)
+		];
+		await store.drop();
+		const settled = await Promise.allSettled(writes);
+
+		expect(await allRows()).toEqual([]);
+		// A write that won the race to the lock was cleared by the drop; one that lost it says so.
+		for (const result of settled) {
+			if (result.status === 'rejected') {
+				expect((result.reason as Error).message).toBe('E_FINDER_PACK_RELOCKED');
+			}
+		}
+		expect((await opened()).pullDate).toBeUndefined();
 	});
 
 	it('drop empties the store and memory, and tells the listeners', async () => {
