@@ -637,7 +637,8 @@ describe('runCheck: the state kept for next week', () => {
 				i,
 				i === 2 ? OTHER_PROVIDER : PROVIDER,
 				i === 3 ? 2 : 0,
-				published(i, { fl: '2026-03-02' })
+				// Listing 2 is kept as not seen with a contact that is now suppressed: the check strips it from a copy.
+				published(i, { fl: '2026-03-02', ...(i === 2 ? { e: 'removed@example.com' } : {}) })
 			)
 		),
 		{

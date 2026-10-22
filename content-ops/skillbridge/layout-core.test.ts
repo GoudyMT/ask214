@@ -497,6 +497,16 @@ describe('writeDeployTree', () => {
 		]);
 	});
 
+	// A file whose name looks like a date is not a week: counting it would keep it in place of last week's folder.
+	it('ignores a plain file named like a date, and still keeps the real last week', () => {
+		const mem = memoryFs();
+		writeDeployTree(ROOT, weekFor('2026-10-07'), mem.fs);
+		mem.fs.writeFile(`${W}/2026-10-12`, 'x');
+		const out = writeDeployTree(ROOT, weekFor(PULL_DATE), mem.fs);
+		expect(out).toEqual({ pruned: [], kept: ['2026-10-07', PULL_DATE], ignored: ['2026-10-12'] });
+		expect(mem.fs.listDir(W).sort()).toEqual(['2026-10-07', '2026-10-12', PULL_DATE]);
+	});
+
 	it('replaces a folder for the same pull date whole, leaving no stale file in it', () => {
 		const mem = memoryFs();
 		writeDeployTree(ROOT, weekFor(PULL_DATE, { overseas: new Set([5]) }), mem.fs);

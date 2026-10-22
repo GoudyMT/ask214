@@ -246,7 +246,8 @@ function guardDeps(): GuardDeps {
 		wranglerJs: '',
 		nodePath: '',
 		cwd: '',
-		env: {}
+		env: {},
+		exists: (path) => existsSync(path)
 	};
 }
 
@@ -746,13 +747,15 @@ describe('the command line', () => {
 
 	it('uses the --deploy folder and the --mode it is given', async () => {
 		const where = folders();
-		const { deps } = cliDeps(where);
+		const { deps, printed } = cliDeps(where);
 		writeTables(where);
+		// A fresh state would pull in full by itself, so a weekly pull in the report can only come from the flag.
 		const code = await runCli(
-			['--state', where.stateDir, '--deploy', where.deployDir, '--mode', 'full', '--baseline'],
+			['--state', where.stateDir, '--deploy', where.deployDir, '--mode', 'weekly', '--baseline'],
 			deps
 		);
 		expect(code).toBe(0);
+		expect(printed.join('\n')).toContain('(weekly pull, baseline)');
 		expect(existsSync(join(where.deployDir, 'skillbridge-data', 'index.json'))).toBe(true);
 	});
 });
