@@ -1,44 +1,31 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { tabForPath, type Tab } from './tab-for-path';
+	import { tabForPath } from './tab-for-path';
 
 	// Each icon is one hand-drawn path in a 24 px box, drawn with the text colour so the current tab's accent
-	// reaches it. More is three filled dots, so its path is filled as well as stroked.
+	// reaches it. More is three filled dots, so its path is filled as well as stroked. A tab is named by its route:
+	// tabForPath says which tab a route belongs to.
 	const TABS: {
-		tab: Tab;
 		route: '/' | '/timeline' | '/skillbridge' | '/more';
 		label: string;
 		d: string;
-		filled: boolean;
 	}[] = [
+		{ route: '/', label: 'Home', d: 'M3 10.5 12 3l9 7.5M5 9v11h5v-6h4v6h5V9' },
 		{
-			tab: 'home',
-			route: '/',
-			label: 'Home',
-			d: 'M3 10.5 12 3l9 7.5M5 9v11h5v-6h4v6h5V9',
-			filled: false
-		},
-		{
-			tab: 'timeline',
 			route: '/timeline',
 			label: 'Timeline',
-			d: 'M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM3 10h18M8 3v4M16 3v4',
-			filled: false
+			d: 'M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM3 10h18M8 3v4M16 3v4'
 		},
 		{
-			tab: 'skillbridge',
 			route: '/skillbridge',
 			label: 'SkillBridge',
-			d: 'M2 14h20M4 14a8 6 0 0 1 16 0M8 8.8V14M12 8v6M16 8.8V14M6 14v6M18 14v6',
-			filled: false
+			d: 'M2 14h20M4 14a8 6 0 0 1 16 0M8 8.8V14M12 8v6M16 8.8V14M6 14v6M18 14v6'
 		},
 		{
-			tab: 'more',
 			route: '/more',
 			label: 'More',
-			d: 'M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
-			filled: true
+			d: 'M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0'
 		}
 	];
 
@@ -47,9 +34,12 @@
 
 <nav class="bottom-bar" aria-label="Primary">
 	<ul>
-		{#each TABS as t (t.tab)}
+		{#each TABS as t (t.route)}
 			<li>
-				<a href={resolve(t.route)} aria-current={current === t.tab ? 'page' : undefined}>
+				<a
+					href={resolve(t.route)}
+					aria-current={current === tabForPath(t.route) ? 'page' : undefined}
+				>
 					<svg
 						viewBox="0 0 24 24"
 						width="24"
@@ -62,7 +52,7 @@
 						aria-hidden="true"
 						focusable="false"
 					>
-						<path d={t.d} fill={t.filled ? 'currentColor' : undefined} />
+						<path d={t.d} fill={t.route === '/more' ? 'currentColor' : undefined} />
 					</svg>
 					<span>{t.label}</span>
 				</a>
