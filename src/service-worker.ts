@@ -11,6 +11,7 @@ import {
 	keptOnActivate,
 	pruneSupersededEntries,
 	isApiRequest,
+	isFinderDataRequest,
 	keptOnFetch,
 	LIBRARY_RESTORE_DEADLINE_MS,
 	WORKER_SCRIPT_DEADLINE_MS,
@@ -184,6 +185,9 @@ sw.addEventListener('fetch', (event) => {
 	// so no query-derived response is ever stored. (A retrieve POST is already skipped by the GET guard
 	// above; this also excludes any same-origin GET under /api/.)
 	if (isApiRequest(url.pathname)) return;
+
+	// SkillBridge data files go straight to the network too: which ones a device fetched narrows where the person is.
+	if (isFinderDataRequest(url.pathname)) return;
 
 	event.respondWith(
 		(async () => {
