@@ -88,7 +88,9 @@ the next release deletes. Files loaded only on demand (the on-device model and i
 the PDF library, saved documents) go to a second cache, `ask-assets-v1`, whose name never changes, so updates do
 not download them again; each release prunes the old versions nothing will request again.
 
-**How it answers.** Same-origin GET requests only, and nothing under `/api/` is ever stored. Built files come
+**How it answers.** Same-origin GET requests only, and nothing under `/api/` or `/skillbridge-data/` is ever
+stored: the SkillBridge listing files are public, but which of them a device fetched narrows where the person
+is, so no copy is kept. Built files come
 from the cache first. Everything else comes from the network first and falls back to the stored copy; a page
 with no stored copy falls back to the home page, whose router draws the page asked for. Pages that show personal
 data render only in the browser (`ssr = false`, required by a unit test), so no stored page holds anything of

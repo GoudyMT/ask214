@@ -105,7 +105,7 @@ after seven days, and these exemptions are untested on a real iPhone.
 ### Erase
 
 **What it is.** Erase, in Settings after a confirmation, runs in one safe order: decrypted data leaves memory
-first; then all eight stores are cleared in one transaction while erase holds the key lock alone, so no save in
+first; then every store is cleared in one transaction while erase holds the key lock alone, so no save in
 progress can write a row back; then local storage and the caches, saved documents included, keeping only the
 app's code so it opens offline; then a reload into a fresh first run. It refuses to start unless it can
 clear every store, and if it stops, it says nothing was deleted.
