@@ -49,7 +49,7 @@
 	<ul>
 		{#each TABS as t (t.tab)}
 			<li>
-				<a href={resolve(t.route as '/')} aria-current={current === t.tab ? 'page' : undefined}>
+				<a href={resolve(t.route)} aria-current={current === t.tab ? 'page' : undefined}>
 					<svg
 						viewBox="0 0 24 24"
 						width="24"
