@@ -234,8 +234,8 @@ describe('checkConfig', () => {
 		expect(checkConfig(CONFIG, makeDeps({ config }).deps)).toEqual(['E_CONFIG_PARSE']);
 	});
 
-	// The shared comment stripper ends a // comment only at a line feed, but wrangler's own parser ends it at a
-	// carriage return too, so text after a lone CR is a comment to the guard and live config to wrangler.
+	// A lone carriage return is where JSONC readers disagree about where a // comment ends, so text after one could
+	// be a comment to the guard and live config to wrangler; refusing it keeps both reading the same keys.
 	const CR = String.fromCharCode(13);
 	const hidden = (): string =>
 		committedConfig

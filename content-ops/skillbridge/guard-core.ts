@@ -105,8 +105,8 @@ export function checkConfig(configPath: string, deps: GuardDeps): string[] {
 	let config: unknown;
 	try {
 		const text = deps.readText(expected);
-		// stripJsoncComments ends a // comment only at a line feed; wrangler's parser ends it at a carriage return
-		// too. A CR on its own would let text the guard drops as a comment be live config to wrangler.
+		// A carriage return on its own is where JSONC readers disagree about where a // comment ends. Refusing it
+		// keeps the guard and wrangler reading the same keys, whatever the shared comment stripper does.
 		if (/\r(?!\n)/.test(text)) return ['E_CONFIG_PARSE'];
 		config = JSON.parse(stripJsoncComments(text));
 	} catch {
