@@ -275,6 +275,27 @@ describe('the root layout navigation', () => {
 			.toBe(true);
 	});
 
+	// At a large text size the labels wrap and the bar is taller than its first-paint 57 px: the room the page keeps for it
+	// must follow, or the footer's last line ends under the bar at the end of every page.
+	it('keeps the last footer link above a taller bar at the bottom of the page at 320x640', async () => {
+		const root = document.documentElement;
+		root.style.setProperty('--font-size-s', '28px');
+		try {
+			await openAt(320, 640);
+			const last = [...document.querySelectorAll<HTMLAnchorElement>('footer a')].at(
+				-1
+			) as HTMLElement;
+			const bar = document.querySelector('.bottom-bar') as HTMLElement;
+			expect(bar.offsetHeight).toBeGreaterThan(57);
+			window.scrollTo(0, document.documentElement.scrollHeight);
+			await expect
+				.poll(() => last.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top)
+				.toBe(true);
+		} finally {
+			root.style.removeProperty('--font-size-s');
+		}
+	});
+
 	// With the header slid away, Shift+Tab from the bar's first tab reaches the brand: the browser would scroll the page
 	// up to an off-screen brand, so the header that holds focus must be in place before it looks, and the page stays.
 	it('keeps the page still when Shift+Tab reaches the brand in the hidden header at 320x640', async () => {

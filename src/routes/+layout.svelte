@@ -391,9 +391,13 @@
 			};
 			requestAnimationFrame(again);
 		};
+		// At a large text size the bar's labels wrap and it grows: the room the page keeps for it follows its real height.
+		let barWatch: ResizeObserver | undefined;
 		const stop = () => {
 			window.removeEventListener('scroll', onScroll);
 			document.removeEventListener('focusin', onFocusIn);
+			barWatch?.disconnect();
+			root.style.removeProperty('--bottom-bar-height');
 			setHidden(false);
 		};
 		// Crossing 600px in either direction starts over: a header hidden on a phone must not stay hidden on a desktop.
@@ -403,6 +407,12 @@
 			state = startHeaderState(window.scrollY);
 			window.addEventListener('scroll', onScroll);
 			document.addEventListener('focusin', onFocusIn);
+			const bar = document.querySelector<HTMLElement>('.bottom-bar');
+			if (!bar) return;
+			barWatch = new ResizeObserver(() =>
+				root.style.setProperty('--bottom-bar-height', `${bar.offsetHeight}px`)
+			);
+			barWatch.observe(bar);
 		};
 		sync();
 		phone.addEventListener('change', sync);
