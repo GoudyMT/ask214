@@ -92,6 +92,13 @@ export const CAPS = {
 } as const;
 
 export const MAX_LISTINGS_PER_FILE = 20_000;
+/** Every list of ids in `ids.json` and `changes.json`; the whole site lists about 12,000. */
+export const MAX_IDS = 200_000;
+/**
+ * The most bytes a client reads from any one data file, enforced while the body streams in, before it is
+ * parsed: the row caps above only bound work after a file has already been read whole.
+ */
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 /** Two weeks of changes are published: this week's and last week's. */
 export const MAX_CHANGE_WEEKS = 2;
 

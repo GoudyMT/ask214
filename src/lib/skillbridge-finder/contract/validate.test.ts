@@ -6,7 +6,7 @@ import {
 	validateListing,
 	validateRegionFile
 } from './validate';
-import { MAX_LISTINGS_PER_FILE } from './listing';
+import { MAX_IDS, MAX_LISTINGS_PER_FILE } from './listing';
 
 const ZERO_WIDTH = String.fromCharCode(0x200b);
 const EN_DASH = String.fromCharCode(0x2013);
@@ -165,6 +165,7 @@ describe('validateListing', () => {
 		[{ w: 'https://example.com/careers' }],
 		[{ w: 'https://recruiting.army.mil/' }],
 		[{ w: 'https://www.va.gov/' }],
+		[{ w: 'https://recruiting.army.mil./' }],
 		[{ li: 'https://www.linkedin.com.example.com/company/x' }],
 		[{ li: 'https://www.linkedin.com/in/a-person' }]
 	])('refuses the contact or link %j', (overrides) => {
@@ -277,6 +278,13 @@ describe('validateIndex', () => {
 	])('refuses %j with %s', (overrides, code) => {
 		expect(validateIndex(index(overrides)).errors.map((e) => e.code)).toContain(code);
 	});
+
+	it('refuses a file list longer than the fixed names without walking it', () => {
+		const files = new Array<unknown>(15).fill({ name: 'remote', count: 1, bytes: 1 });
+		expect(validateIndex(index({ files })).errors).toEqual([
+			{ code: 'E_SBF_TOO_MANY_ROWS', field: 'files' }
+		]);
+	});
 });
 
 describe('validateIds', () => {
@@ -311,6 +319,13 @@ describe('validateIds', () => {
 		[{ aliases: [[386, 386]] }, 'E_SBF_BAD_ALIAS']
 	])('refuses %j with %s', (overrides, code) => {
 		expect(validateIds(ids(overrides)).errors.map((e) => e.code)).toContain(code);
+	});
+
+	it.each(['ids', 'aliases'])('refuses an oversized %s list without walking it', (field) => {
+		const rows = new Array<unknown>(MAX_IDS + 1).fill(null);
+		expect(validateIds(ids({ [field]: rows })).errors).toEqual([
+			{ code: 'E_SBF_TOO_MANY_ROWS', field: 'ids' }
+		]);
 	});
 });
 
@@ -355,5 +370,14 @@ describe('validateChanges', () => {
 		]
 	])('refuses %j with %s', (overrides, code) => {
 		expect(validateChanges(changes(overrides)).errors.map((e) => e.code)).toContain(code);
+	});
+
+	it('refuses a week whose id list is past the cap', () => {
+		const added = new Array<number>(MAX_IDS + 1).fill(1);
+		expect(
+			validateChanges(
+				changes({ weeks: [{ pullDate: '2026-10-21', added, removed: [], newOrgs: [] }] })
+			).errors
+		).toEqual([{ code: 'E_SBF_BAD_ID', field: 'weeks' }]);
 	});
 });

@@ -16,9 +16,10 @@ import {
 	INDUSTRIES,
 	KINDS,
 	MAX_CHANGE_WEEKS,
+	MAX_IDS,
 	MAX_LISTINGS_PER_FILE
 } from './listing';
-import { STATE_CODES, isIsoDate, isRegionFileName } from './places';
+import { REGION_FILE_NAMES, STATE_CODES, isIsoDate, isRegionFileName } from './places';
 
 export type ContractError = { code: string; id?: number; field?: string };
 export type ContractResult = { valid: boolean; errors: ContractError[] };
@@ -93,7 +94,13 @@ function parseHttps(s: unknown): URL | null {
 	if (typeof s !== 'string' || s.length > CAPS.url || !isSafeText(s)) return null;
 	try {
 		const url = new URL(s);
-		return url.protocol === 'https:' && url.username === '' && url.password === '' ? url : null;
+		// A trailing dot names the same host ("army.mil.") but slips past a suffix check such as ".mil".
+		return url.protocol === 'https:' &&
+			url.username === '' &&
+			url.password === '' &&
+			!url.hostname.endsWith('.')
+			? url
+			: null;
 	} catch {
 		return null;
 	}
@@ -276,6 +283,8 @@ export function validateIndex(raw: unknown): ContractResult {
 		errors.push({ code: 'E_SBF_BAD_TYPE', field: 'files' });
 		return result(errors);
 	}
+	if (raw.files.length > REGION_FILE_NAMES.length)
+		return result([...errors, { code: 'E_SBF_TOO_MANY_ROWS', field: 'files' }]);
 	const names = new Set<string>();
 	for (const entry of raw.files) {
 		if (!isObject(entry) || !isRegionFileName(entry.name)) {
@@ -299,6 +308,8 @@ export function validateIds(raw: unknown): ContractResult {
 		errors.push({ code: 'E_SBF_BAD_TYPE', field: 'ids' });
 		return result(errors);
 	}
+	if (raw.ids.length > MAX_IDS || raw.aliases.length > MAX_IDS)
+		return result([...errors, { code: 'E_SBF_TOO_MANY_ROWS', field: 'ids' }]);
 	const pullDate = isIsoDate(raw.pullDate) ? raw.pullDate : undefined;
 
 	const current = new Set<number>();
@@ -352,7 +363,7 @@ export function validateChanges(raw: unknown): ContractResult {
 			errors.push({ code: 'E_SBF_BAD_ORDER', field: 'weeks' });
 		previous = week.pullDate;
 		for (const list of [week.added, week.removed, week.newOrgs])
-			if (!Array.isArray(list) || !list.every(isPositiveInt))
+			if (!Array.isArray(list) || list.length > MAX_IDS || !list.every(isPositiveInt))
 				errors.push({ code: 'E_SBF_BAD_ID', field: 'weeks' });
 	}
 	return result(errors);
