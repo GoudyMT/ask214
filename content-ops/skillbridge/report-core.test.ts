@@ -219,6 +219,24 @@ describe('buildReport', () => {
 		expect(reportText(report)).toContain('E_HTTP_429');
 	});
 
+	// A stop is not a failed check: the runbook's "When the run stops" section is the one Max must read, and zeros
+	// from a pull that never finished must not read as a sum gate that failed.
+	it('words a stopped pull as stopped, not as a blocked week or a failed sum gate', () => {
+		const text = reportText(
+			buildReport({
+				pull: { ok: false, stop: 'E_HTTP_429', requests: 2, elapsedMs: 3000 },
+				baseline: false,
+				pullDate: PULL_DATE
+			})
+		);
+		expect(text).toContain(
+			'Publish: STOPPED (E_HTTP_429). Do not deploy; see "When the run stops".'
+		);
+		expect(text).not.toContain('BLOCKED');
+		expect(text).not.toContain('sum gate');
+		expect(text).toContain('Pull: stopped after 2 requests, so there are no totals.');
+	});
+
 	it('also holds the week when the files could not be built, so Max sees why', () => {
 		const report = buildReport({
 			pull: ok(runOf()),

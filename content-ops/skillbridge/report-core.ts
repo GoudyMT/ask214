@@ -126,7 +126,7 @@ function tally(counts: Record<string, number>): string {
 
 /** Plain ASCII lines for Max to read. */
 export function reportText(report: RunReport): string {
-	const held = [...(report.stop === undefined ? [] : [report.stop]), ...report.blockers];
+	const held = report.blockers;
 	const lines = [
 		`SkillBridge weekly run, pull date ${safe(report.pullDate)} (${report.mode} pull${report.baseline ? ', baseline' : ''})`
 	];
@@ -134,7 +134,10 @@ export function reportText(report: RunReport): string {
 		lines.push(`STOPPED: ${safe(report.stop)}. Nothing from this run can be published.`);
 	lines.push(
 		`Requests: ${report.requests} in ${(report.elapsedMs / 1000).toFixed(1)} s`,
-		`Pull: N ${report.totalN}; sum of provider totals ${report.sumOfTotals} (sum gate ${report.sumGate ? 'passed' : 'FAILED'}); site total ${report.totalPositions}; unique ids ${report.uniqueIds}`,
+		// A pull that never finished has no totals; zeros beside "sum gate" would read as a check that failed.
+		report.stop !== undefined
+			? `Pull: stopped after ${report.requests} requests, so there are no totals.`
+			: `Pull: N ${report.totalN}; sum of provider totals ${report.sumOfTotals} (sum gate ${report.sumGate ? 'passed' : 'FAILED'}); site total ${report.totalPositions}; unique ids ${report.uniqueIds}`,
 		`Providers: ${report.providersQueried} queried, ${report.providersIncomplete} not proven complete, ${report.cappedQueries} queries still capped, dormant sweep ${report.dormantSwept ? 'yes' : 'no'}`,
 		`Quarantined rows: ${tally(report.quarantine)}`,
 		`Dropped values: ${tally(report.dropped)}`,
@@ -150,9 +153,11 @@ export function reportText(report: RunReport): string {
 	for (const f of report.files)
 		lines.push(`  ${safe(f.name)}: ${f.count} listings, ${f.bytes} bytes`);
 	lines.push(
-		held.length > 0
-			? `Publish: BLOCKED (${held.map(safe).join(', ')}). Do not deploy.`
-			: 'Publish: clear. Read the numbers above, then deploy.'
+		report.stop !== undefined
+			? `Publish: STOPPED (${safe(report.stop)}). Do not deploy; see "When the run stops".`
+			: held.length > 0
+				? `Publish: BLOCKED (${held.map(safe).join(', ')}). Do not deploy.`
+				: 'Publish: clear. Read the numbers above, then deploy.'
 	);
 	return lines.join('\n') + '\n';
 }
