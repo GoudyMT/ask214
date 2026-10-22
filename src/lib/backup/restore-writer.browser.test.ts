@@ -169,7 +169,7 @@ function plain(value: unknown): unknown {
 	return value;
 }
 
-/** All eight stores, byok included, as a person's device holds them right now. */
+/** Every store, byok included, as a person's device holds them right now. */
 async function snapshot(): Promise<Record<string, unknown>> {
 	const out: Record<string, unknown> = {};
 	for (const store of STORES) out[store] = plain(await readRaw(store));

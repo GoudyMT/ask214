@@ -87,7 +87,7 @@ describe('mtc/encrypted-store-registry', () => {
 	});
 
 	it('keeps a sanctioned write allowed by its inline disable, and that disable is used', () => {
-		// The four sanctioned writes carry this comment. With unused directives an error, a rule that stopped
+		// The sanctioned writes carry this comment. With unused directives an error, a rule that stopped
 		// matching the chain would fail here as well as in the repo lint.
 		expect(() =>
 			ruleTester.run('encrypted-store-registry', rule, {
