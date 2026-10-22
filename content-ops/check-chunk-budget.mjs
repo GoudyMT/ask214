@@ -414,6 +414,14 @@ const STATIC = 'static';
 //     record whose signed marker is missing instead of reading it as empty. Three builds measured page 94,866-94,875 B,
 //     precache 223,422-223,445 B, root layout 7,329-7,332 B, at least 15 B of room above the highest page and 38 B
 //     above the highest root layout. Trim pass: the growth is safety checks, which a trim does not touch.
+//     Page 94,890 -> 95,070, precache 223,490 -> 223,890 and the root layout node 7,370 -> 7,630 (owner's call,
+//     2026-10-22): three fixes the pre-push op-test found in shipped behaviour - a release that raises the database
+//     takes over its service worker at once (offline, the older worker's pages could not open the raised database),
+//     a lock that lands while the app reloads on its own holds (the reload waits a short grace), and a tap made
+//     before another tab locks still saves. Three builds measured page 95,021-95,028 B, precache 223,847-223,850 B,
+//     root layout 7,592 B (gzip-9). Trim pass: the take-over code first went in a lazy chunk of its own, which put
+//     on-demand chunks 320 B and precache files one over; it runs on every start anyway, so it moved into the
+//     layout and both fit again. The rest is the fixes themselves.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
