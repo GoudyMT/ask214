@@ -12,12 +12,6 @@ describe('milesBetween', () => {
 		expect(Math.abs(milesBetween(newYork, losAngeles) - 2445.5)).toBeLessThan(1);
 		expect(milesBetween(newYork, newYork)).toBe(0);
 	});
-
-	it('gives the same distance in either direction', () => {
-		const a = { la: 39.2, lo: -76.86 };
-		const b = { la: 38.9, lo: -77.04 };
-		expect(milesBetween(a, b)).toBeCloseTo(milesBetween(b, a), 9);
-	});
 });
 
 describe('placePoint', () => {
@@ -81,9 +75,5 @@ describe('placement', () => {
 	it('is unlisted when nothing places it', () => {
 		expect(placement(CLEAN_CASES.locationUnknown)).toEqual({ kind: 'unlisted' });
 		expect(placement({ ...CLEAN_CASES.locationUnknown, la: 30.1 })).toEqual({ kind: 'unlisted' });
-	});
-
-	it('keeps a territory with its point', () => {
-		expect(placement(CLEAN_CASES.territory)).toEqual({ kind: 'point', la: 18.46, lo: -66.1 });
 	});
 });

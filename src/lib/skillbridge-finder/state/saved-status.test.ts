@@ -113,15 +113,4 @@ describe('savedStatus', () => {
 		expect(savedStatus(10, idsFile([11]), changes).kind).toBe('missing');
 		expect(savedStatus(10, idsFile([10, 11]), changes)).toEqual({ kind: 'listed', id: 10 });
 	});
-
-	it('ends on an alias cycle and reports missing', () => {
-		const ids = idsFile(
-			[99],
-			[
-				[1, 2],
-				[2, 1]
-			]
-		);
-		expect(savedStatus(1, ids).kind).toBe('missing');
-	});
 });

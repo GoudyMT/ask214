@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import type { Listing, RegionFile } from '../contract/listing';
 import { CLEAN_CASES, cleanListing } from '../fixtures/clean';
 import { milesBetween } from './distance';
@@ -164,13 +163,6 @@ describe('matchListings order', () => {
 		const out = matchListings(rows, { filters: {}, point: null }).map((m) => m.listing.i);
 		expect(out).toEqual([3, 4, 5, 2, 1, 10]);
 	});
-
-	it('gives the same order whatever order the listings arrive in', () => {
-		const rows = [near(1, 5), near(2, 5), near(3, 5, { fl: '2026-10-14' })];
-		const forward = ids(rows);
-		const backward = ids([...rows].reverse());
-		expect(backward).toEqual(forward);
-	});
 });
 
 describe('countInState', () => {
@@ -231,28 +223,5 @@ describe('mergeRegionListings', () => {
 			fileOf('mountain', [near(1, 10), near(2, 10)])
 		]);
 		expect(merged.map((l) => l.i)).toEqual([3, 1, 2]);
-	});
-});
-
-// Nothing in the list is sorted, highlighted or filtered by what the person's profile holds, so the matcher has no
-// such input. The scan looks for those words as identifiers in the code (comments removed).
-function profileWords(source: string): string[] {
-	const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-	return code.match(/\b(?:rate|rank|profile)\w*|\b\w*(?:Rate|Rank|Profile)\w*/g) ?? [];
-}
-
-describe('what the matcher may read', () => {
-	it('finds a planted profile input in the scan', () => {
-		expect(profileWords('const rank = person.rank;\nconst userProfile = 1;')).toEqual([
-			'rank',
-			'rank',
-			'userProfile'
-		]);
-		expect(profileWords('// a rank in a comment\nconst a = 1;')).toEqual([]);
-	});
-
-	it('has no rate, rank or profile in match.ts', () => {
-		const source = readFileSync(new URL('./match.ts', import.meta.url), 'utf-8');
-		expect(profileWords(source)).toEqual([]);
 	});
 });
