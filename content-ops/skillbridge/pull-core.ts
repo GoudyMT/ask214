@@ -53,8 +53,8 @@ export function lookupUrl(q: {
 	return url;
 }
 
-type Rule = { allow: boolean; path: string };
-type Group = { agents: string[]; rules: Rule[] };
+export type RobotsRule = { allow: boolean; path: string };
+type Group = { agents: string[]; rules: RobotsRule[] };
 
 function parseRobots(text: string): Group[] {
 	const groups: Group[] = [];
@@ -103,8 +103,8 @@ function ruleMatches(rule: string, path: string): boolean {
 	return true;
 }
 
-function pathDisallowed(rules: Rule[], path: string): boolean {
-	let best: Rule | null = null;
+function pathDisallowed(rules: RobotsRule[], path: string): boolean {
+	let best: RobotsRule | null = null;
 	for (const rule of rules) {
 		if (rule.path === '' || !ruleMatches(rule.path, path)) continue;
 		const longer = best === null || rule.path.length > best.path.length;
@@ -116,15 +116,29 @@ function pathDisallowed(rules: Rule[], path: string): boolean {
 }
 
 /**
- * True when robots.txt (RFC 9309) forbids us either endpoint the pull uses. The groups naming our token apply;
- * with none, the `*` groups do. The longest matching rule wins, Allow wins a tie, an empty Disallow forbids nothing.
+ * The rules of robots.txt (RFC 9309) that apply to us: the groups naming our token, or with none the `*` groups.
+ * Parsed once; each request is then tested with `robotsAllows`.
  */
-export function robotsDisallows(robotsTxt: string): boolean {
+export function robotsRules(robotsTxt: string): RobotsRule[] {
 	const groups = parseRobots(robotsTxt);
 	const own = groups.filter((g) => g.agents.includes(ROBOTS_TOKEN));
 	const applicable = own.length > 0 ? own : groups.filter((g) => g.agents.includes('*'));
-	const rules = applicable.flatMap((g) => g.rules);
-	return pathDisallowed(rules, LOOKUP_PATH) || pathDisallowed(rules, FILTERS_PATH);
+	return applicable.flatMap((g) => g.rules);
+}
+
+/**
+ * Whether the rules let us request `pathAndQuery`, which is the path plus the query exactly as sent (RFC 9309
+ * matches the query too, and every Lookup carries one). The longest matching rule wins, Allow wins a tie, an empty
+ * Disallow forbids nothing.
+ */
+export function robotsAllows(rules: RobotsRule[], pathAndQuery: string): boolean {
+	return !pathDisallowed(rules, pathAndQuery);
+}
+
+/** True when robots.txt forbids us either bare endpoint path; the pre-flight check before any query is built. */
+export function robotsDisallows(robotsTxt: string): boolean {
+	const rules = robotsRules(robotsTxt);
+	return !robotsAllows(rules, LOOKUP_PATH) || !robotsAllows(rules, FILTERS_PATH);
 }
 
 /** Thrown inside the run to end it at once; `runPull` turns it into the outcome. */
@@ -184,8 +198,12 @@ function createSender(http: Http, clock: Clock) {
 	let lastStart: number | null = null;
 	let requests = 0;
 	let errorsInARow = 0;
+	let rules: RobotsRule[] = [];
 
 	async function send(url: string, isRobots: boolean): Promise<HttpReply> {
+		// Tested as sent, query included, and before the pacing wait: a forbidden request is never made.
+		const target = new URL(url);
+		if (!robotsAllows(rules, target.pathname + target.search)) stopRun('E_ROBOTS_DISALLOW');
 		for (;;) {
 			if (lastStart !== null) {
 				const wait = lastStart + PAUSE_MS - clock.now();
@@ -231,7 +249,15 @@ function createSender(http: Http, clock: Clock) {
 		return value;
 	}
 
-	return { send, getJson, requests: () => requests };
+	return {
+		send,
+		getJson,
+		requests: () => requests,
+		/** Called once, with the rules read from robots.txt; every later request is tested against them. */
+		obey: (parsed: RobotsRule[]) => {
+			rules = parsed;
+		}
+	};
 }
 
 /** A reply that returned every row it counts, under the cap: nothing more can be hiding behind it. */
@@ -273,6 +299,7 @@ async function pullAll(
 	if (robots.status === 200) {
 		if (looksLikeHtml(robots)) stopRun('E_ROBOTS_UNREADABLE');
 		if (robotsDisallows(robots.body)) stopRun('E_ROBOTS_DISALLOW');
+		sender.obey(robotsRules(robots.body));
 	}
 
 	const filters = await sender.getJson(API_ORIGIN + FILTERS_PATH, parseFilters);

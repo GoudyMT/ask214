@@ -309,6 +309,82 @@ describe('runPull: robots.txt first', () => {
 	});
 });
 
+// RFC 9309 matches a rule against the path WITH the query, and every Lookup we send carries one, so a rule that
+// forbids a query (`/*?`, `/*provider=`) must stop the pull even though the bare path is not forbidden.
+describe('runPull: robots rules are tested against each request as sent', () => {
+	const rules = (...lines: string[]): HttpReply => ({
+		status: 200,
+		contentType: 'text/plain',
+		body: ['User-agent: *', ...lines].join('\n')
+	});
+
+	it.each([
+		['any URL with a query', 'Disallow: /*?'],
+		['the Lookup path with a query', 'Disallow: /Location/Lookup?'],
+		['the Lookup path with the draw parameter', 'Disallow: /Location/Lookup?draw=1'],
+		['a URL ending in the paging length', 'Disallow: /*length=150$']
+	])(
+		'stops before the first Lookup when robots.txt forbids %s, but Filters (no query) may go',
+		async (_name, line) => {
+			const { outcome, urls } = await pull(makeWorld({ robots: rules(line) }));
+			expect(outcome).toEqual({
+				ok: false,
+				stop: 'E_ROBOTS_DISALLOW',
+				requests: 2,
+				elapsedMs: PAUSE_MS
+			});
+			expect(urls()).toEqual([ROBOTS_URL, FILTERS_URL]);
+		}
+	);
+
+	it('stops before the first provider query, after the unfiltered Lookup, when robots.txt forbids provider=', async () => {
+		const { outcome, urls } = await pull(makeWorld({ robots: rules('Disallow: /*provider=') }));
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_ROBOTS_DISALLOW', requests: 3 });
+		expect(urls()).toEqual([ROBOTS_URL, FILTERS_URL, ALL_URL]);
+	});
+
+	it('lets the longest matching rule decide: a longer Allow beats a shorter Disallow on the query', async () => {
+		// The provider URL matches "Allow /Location/Lookup?draw=1" (23 characters) and "Disallow /*provider=" (11).
+		const robots = rules('Allow: /Location/Lookup?draw=1', 'Disallow: /*provider=');
+		const { outcome, urls } = await pull(makeWorld({ robots }));
+		expect(outcome.ok).toBe(true);
+		expect(urls()).toContain(providerUrl('Acme Example'));
+	});
+
+	it('lets a longer Disallow on the query beat a shorter Allow on the path', async () => {
+		const robots = rules(
+			'Allow: /Location/Lookup',
+			'Disallow: /Location/Lookup?draw=1&start=0&length=150&provider='
+		);
+		const { outcome, urls } = await pull(makeWorld({ robots }));
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_ROBOTS_DISALLOW', requests: 3 });
+		expect(urls()).toEqual([ROBOTS_URL, FILTERS_URL, ALL_URL]);
+	});
+
+	it('still stops before Filters when robots.txt forbids the Filters path', async () => {
+		const { outcome, urls } = await pull(
+			makeWorld({ robots: rules('Disallow: /Location/Filters') })
+		);
+		expect(outcome).toEqual({ ok: false, stop: 'E_ROBOTS_DISALLOW', requests: 1, elapsedMs: 0 });
+		expect(urls()).toEqual([ROBOTS_URL]);
+	});
+
+	it('does not stop for a rule on a query we never send', async () => {
+		const { outcome } = await pull(makeWorld({ robots: rules('Disallow: /*?debug=') }));
+		expect(outcome.ok).toBe(true);
+	});
+
+	it('applies the group for our own token to the queries too', async () => {
+		const robots = {
+			status: 200,
+			contentType: 'text/plain',
+			body: 'User-agent: *\nAllow: /\n\nUser-agent: ask214-skillbridge-finder\nDisallow: /*provider='
+		};
+		const { outcome } = await pull(makeWorld({ robots }));
+		expect(outcome).toMatchObject({ ok: false, stop: 'E_ROBOTS_DISALLOW' });
+	});
+});
+
 describe('runPull: stop on any sign of a "no"', () => {
 	const cases: [string, HttpReply, string][] = [
 		['a 403', status(403), 'E_HTTP_403'],
