@@ -713,6 +713,8 @@ describe('contacts', () => {
 		'https://[2001:db8::1]/apply',
 		'https://intranet/apply',
 		'https://localhost/apply',
+		// Browsers resolve every name under .localhost to the loopback address.
+		'https://router.localhost/apply',
 		'https://printer.local/apply',
 		'https://forms.corp.lan/apply',
 		'https://hr.internal/apply',

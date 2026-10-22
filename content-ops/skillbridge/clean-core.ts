@@ -459,7 +459,15 @@ function cleanCodes(value: unknown, drops: string[]): string[] | 'all' | undefin
 
 const IPV4_HOST_RE = /^\d+(?:\.\d+){3}$/;
 // Names that only resolve inside a private network.
-const PRIVATE_SUFFIXES = ['.local', '.lan', '.internal', '.home', '.localdomain', '.home.arpa'];
+const PRIVATE_SUFFIXES = [
+	'.local',
+	'.localhost',
+	'.lan',
+	'.internal',
+	'.home',
+	'.localdomain',
+	'.home.arpa'
+];
 
 /** The page address in its normalized form (lower-case host, punycode for an international one), or undefined. */
 function httpsLink(piece: string): string | undefined {
