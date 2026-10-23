@@ -78,6 +78,7 @@
 		calendar: null,
 		finder: null,
 		finderPack: null,
+		finderFailed: false,
 		byok: null,
 		cause: null,
 		db: null,
@@ -351,7 +352,10 @@
 							if (!destroyed) app.finderPack = pack;
 						});
 					})
-					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
+					.catch(() => {
+						safeLog({ code: 'E_INIT_FAILED' });
+						if (!destroyed) app.finderFailed = true;
+					});
 			}
 		);
 

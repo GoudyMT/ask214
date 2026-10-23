@@ -55,6 +55,7 @@ async function device() {
 		calendar: null,
 		finder: null,
 		finderPack: null,
+		finderFailed: false,
 		byok,
 		cause: null,
 		db,

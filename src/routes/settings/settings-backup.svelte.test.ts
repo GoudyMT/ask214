@@ -135,6 +135,7 @@ const app = $state<ProfileApp>({
 	calendar: null,
 	finder: null,
 	finderPack: null,
+	finderFailed: false,
 	byok: null,
 	cause: null,
 	db: null,

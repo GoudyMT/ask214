@@ -48,6 +48,11 @@ export type ProfileApp = {
 	finder: FinderStore | null;
 	/** The finder's downloaded listing files and the ids the person has opened; device only, never backed up. */
 	finderPack: FinderPackStore | null;
+	/**
+	 * Set when the finder's code, which loads on demand, failed to load: its stores stay null for good, so the finder says
+	 * so instead of waiting. False until then.
+	 */
+	finderFailed: boolean;
 	byok: ByokStore | null;
 	cause: CapabilityCause | null;
 	/**
