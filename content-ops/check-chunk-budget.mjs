@@ -440,6 +440,8 @@ const STATIC = 'static';
 //     parser into the backup check had split two shared chunks (87 files), now one; the rest is fixes, not trimmable.
 //     The re-sweep's fixes (a week kept off the disk, the count alone announced, focus only after a saved removal)
 //     measured 264,180 B in the gate: 264,150 -> 264,250 (owner's call, 2026-10-23), about 70 B of room for CI drift.
+//     The setup asked one question a step (where, how, what field) measured 264,441 B after a trim pass that grew it (shared
+//     button styles compressed worse): 264,250 -> 264,500 (owner's call, 2026-10-23), 59 B of room.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -452,7 +454,7 @@ const LIMIT = {
 	page: 107_000,
 	onDemand: 14_200,
 	precacheFiles: 86,
-	precacheBytes: 264_250,
+	precacheBytes: 264_500,
 	workerScripts: 147_200
 };
 
