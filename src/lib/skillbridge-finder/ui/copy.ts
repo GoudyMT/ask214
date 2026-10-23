@@ -8,3 +8,6 @@ export const DIB_LINE =
 
 export const CREDIT_LINE =
 	'Job code matches use the O*NET Military Crosswalk from the US Department of Labor (CC BY 4.0). Some company links come from Wikidata (CC0).';
+
+/** Said when a place typed in setup or in Settings is neither a 5-digit ZIP nor a state. */
+export const PLACE_PROBLEM = 'Enter a 5-digit ZIP code or a state name.';

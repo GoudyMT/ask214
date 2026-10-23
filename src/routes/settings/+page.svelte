@@ -35,6 +35,7 @@
 	} from '$lib/profile/eaos';
 	import FinderSettings from '$lib/skillbridge-finder/ui/FinderSettings.svelte';
 	import { parsePlaceText, placeText } from '$lib/skillbridge-finder/ui/place-text';
+	import { PLACE_PROBLEM } from '$lib/skillbridge-finder/ui/copy';
 	import CalendarPanel from '$lib/components/CalendarPanel.svelte';
 	import OnlineAnswersPanel from '$lib/components/OnlineAnswersPanel.svelte';
 	import {
@@ -300,12 +301,11 @@
 
 	// The place is only checked as a ZIP's shape or a state's name: the ZIP table is the finder's to fetch, and this
 	// screen makes no request.
-	const PLACE_ERROR = 'Enter a 5-digit ZIP code or a state name.';
 	const destination = $derived(app.store?.destination ?? null);
 
 	async function savePlace(draft: string): Promise<string | null> {
 		const place = parsePlaceText(draft);
-		if (place === null) return PLACE_ERROR;
+		if (place === null) return PLACE_PROBLEM;
 		// Stored as the canonical text, so "maryland" and "Maryland" are one place.
 		const bytes = new TextEncoder().encode(placeText(place));
 		return savePatch({ geographicDestination: bytes }, bytes);

@@ -2,7 +2,7 @@
 	import { INDUSTRIES, type Delivery, type Industry } from '../contract/listing';
 	import type { ZipsTable } from '../contract/tables';
 	import type { FinderFilters, FinderPlace, FinderRadius, FinderSetup } from '../state/types';
-	import { NOT_AFFILIATED } from './copy';
+	import { NOT_AFFILIATED, PLACE_PROBLEM } from './copy';
 	import { FORMAT_LABELS, FORMAT_ORDER, toggled } from './list-model';
 	import { parsePlaceText, placeText, suggestPlaces, type PlaceSuggestion } from './place-text';
 
@@ -110,7 +110,7 @@
 	async function resolvePlace(): Promise<{ place?: FinderPlace } | { problem: string }> {
 		if (text.trim() === '') return {};
 		const place = parsePlaceText(text);
-		if (place === null) return { problem: 'Enter a 5-digit ZIP code or a state name.' };
+		if (place === null) return { problem: PLACE_PROBLEM };
 		if (place.kind === 'zip') {
 			zipsAsked = true;
 			zips ??= await loadZips().catch(() => undefined);
