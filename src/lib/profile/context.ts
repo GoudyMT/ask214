@@ -4,6 +4,8 @@ import type { ProfileStore } from './store.svelte';
 import type { TimelineStateStore } from '../timeline/state.svelte';
 import type { CalendarSyncStore } from '../calendar/store.svelte';
 import type { ByokStore } from '../ask/byok/store';
+import type { FinderStore } from '../skillbridge-finder/state/store.svelte';
+import type { FinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
 import type { Relockable } from './app-init';
 import type { BusSignal } from '../broadcast/bus';
 
@@ -42,6 +44,10 @@ export type ProfileApp = {
 	store: ProfileStore | null;
 	timeline: TimelineStateStore | null;
 	calendar: CalendarSyncStore | null;
+	/** The SkillBridge finder's own record: place, filters, saved programs, compare picks. */
+	finder: FinderStore | null;
+	/** The finder's downloaded listing files and the ids the person has opened; device only, never backed up. */
+	finderPack: FinderPackStore | null;
 	byok: ByokStore | null;
 	cause: CapabilityCause | null;
 	/**

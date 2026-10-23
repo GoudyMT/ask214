@@ -53,6 +53,8 @@ async function device() {
 		store,
 		timeline,
 		calendar: null,
+		finder: null,
+		finderPack: null,
 		byok,
 		cause: null,
 		db,

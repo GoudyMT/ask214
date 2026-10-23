@@ -355,7 +355,12 @@
 			// the profile's load; without this they stay unloaded behind an unlocked UI (see the
 			// timeline route for the full reasoning). allSettled so a secondary failure leaves that
 			// store not-ready rather than blocking the unlock.
-			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
+			await Promise.allSettled([
+				app.timeline?.load(),
+				app.calendar?.load(),
+				app.finder?.load(),
+				app.finderPack?.load()
+			]);
 		} catch {
 			// The button keeps focus (it is never turned off) and the panel says so.
 			unlockError = UNLOCK_FAILED;

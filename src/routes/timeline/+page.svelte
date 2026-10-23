@@ -190,7 +190,12 @@
 			// defaults read as real state. allSettled: a secondary failure must not block the unlock.
 			// Both then fail closed on `ready`, and a timeline load that fails says so in place of the list
 			// (the store's `failed`).
-			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
+			await Promise.allSettled([
+				app.timeline?.load(),
+				app.calendar?.load(),
+				app.finder?.load(),
+				app.finderPack?.load()
+			]);
 		} catch {
 			// The button keeps focus (it is never turned off) and the panel says so.
 			unlockError = UNLOCK_FAILED;

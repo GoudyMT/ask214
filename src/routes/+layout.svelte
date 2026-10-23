@@ -76,6 +76,8 @@
 		store: null,
 		timeline: null,
 		calendar: null,
+		finder: null,
+		finderPack: null,
 		byok: null,
 		cause: null,
 		db: null,
@@ -226,6 +228,7 @@
 					'profile-updated': () => result.store.refresh(),
 					'timeline-updated': () => app.timeline?.refresh(),
 					'calendar-updated': () => app.calendar?.refresh(),
+					'skillbridge-finder-updated': () => app.finder?.refresh(),
 					// A restore in another tab replaced the data: drop what this tab decrypted first (no broadcast; a
 					// locked store stays locked), then reload as the wiring below decides.
 					'data-replaced': () => relockEachSync(relockables, 'hygiene')
@@ -308,6 +311,45 @@
 						// settings could not be read instead of waiting on a store that never arrives.
 						if (!destroyed) app.calendar = calendarStore;
 					});
+
+				// The finder's record and its downloaded files load on demand, so the code every page loads stays small.
+				// Each joins the relock set before its first decrypt. A Lock that lands while the code is still on its way
+				// leaves the new store locked, not read: only an Unlock opens it. That relock stays in this tab, as the Lock
+				// itself already reached the others. A failure leaves the finder saying so and the rest of the app as it is.
+				const provisionFinder = <S extends Relockable & { load: () => Promise<void> }>(
+					store: S,
+					set: (s: S) => void
+				) => {
+					relockables.push(store);
+					if (result.store.locked) {
+						echo.answer(() => store.relockSync('peer'));
+						set(store);
+						return;
+					}
+					void provisionStore(result.db, () => store, undefined, isHidden)
+						.then(set)
+						.catch(() => {
+							safeLog({ code: 'E_INIT_FAILED' });
+							set(store);
+						});
+				};
+				void Promise.all([
+					import('$lib/skillbridge-finder/state/store.svelte'),
+					import('$lib/skillbridge-finder/state/pack-store.svelte')
+				])
+					.then(([{ createFinderStore }, { createFinderPackStore }]) => {
+						if (destroyed) return;
+						provisionFinder(
+							createFinderStore(result.db, { onBroadcast: (e) => echo.publish(e) }),
+							(finder) => {
+								if (!destroyed) app.finder = finder;
+							}
+						);
+						provisionFinder(createFinderPackStore(result.db), (pack) => {
+							if (!destroyed) app.finderPack = pack;
+						});
+					})
+					.catch(() => safeLog({ code: 'E_INIT_FAILED' }));
 			}
 		);
 

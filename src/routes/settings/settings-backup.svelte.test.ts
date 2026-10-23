@@ -133,6 +133,8 @@ const app = $state<ProfileApp>({
 	store: null,
 	timeline: null,
 	calendar: null,
+	finder: null,
+	finderPack: null,
 	byok: null,
 	cause: null,
 	db: null,
