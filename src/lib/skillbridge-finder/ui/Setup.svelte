@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { INDUSTRIES, type Delivery, type Industry } from '../contract/listing';
 	import type { ZipsTable } from '../contract/tables';
 	import type { FinderFilters, FinderPlace, FinderRadius, FinderSetup } from '../state/types';
@@ -52,7 +53,37 @@
 	let active = $state(-1);
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
-	let fieldEl: HTMLInputElement | undefined;
+	let fieldEl = $state<HTMLInputElement>();
+	// One question a screen: where, how, what field. The answers live in this form across the steps and are written
+	// only by Show programs (or Skip all).
+	const STEPS = 3;
+	let step = $state(1);
+	let headingEl = $state<HTMLElement>();
+
+	async function goTo(next: number): Promise<void> {
+		step = next;
+		await tick();
+		headingEl?.focus();
+	}
+
+	/** Step 1 moves on only with a place it can use, or none; a place it cannot read is said on that step. */
+	async function next(): Promise<void> {
+		if (busy) return;
+		if (step === 1) {
+			busy = true;
+			try {
+				const where = await resolvePlace();
+				if ('problem' in where) {
+					problem = where.problem;
+					fieldEl?.focus();
+					return;
+				}
+			} finally {
+				busy = false;
+			}
+		}
+		await goTo(step + 1);
+	}
 
 	const typed = $derived(parsePlaceText(text));
 	// A whole ZIP needs no list; left open, it would also sit over the reach pills that appear under the field.
@@ -92,8 +123,8 @@
 		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
 			if (suggestions.length === 0) return;
 			e.preventDefault();
-			const step = e.key === 'ArrowDown' ? 1 : -1;
-			active = (active + step + suggestions.length) % suggestions.length;
+			const move = e.key === 'ArrowDown' ? 1 : -1;
+			active = (active + move + suggestions.length) % suggestions.length;
 		} else if (e.key === 'Enter' && active >= 0) {
 			// The pick is the answer to Enter; the form is not submitted by it.
 			e.preventDefault();
@@ -170,123 +201,143 @@
 	novalidate
 	onsubmit={(e) => {
 		e.preventDefault();
-		void save(false);
+		void (step < STEPS ? next() : save(false));
 	}}
 >
 	<p class="setup__intro">
 		Find DoD SkillBridge programs near you or online. What you enter stays on this device.
 	</p>
 
-	<h2>Where?</h2>
-	<div class="setup__field">
-		<label for="finder-place">ZIP code or state</label>
-		<input
-			id="finder-place"
-			bind:this={fieldEl}
-			bind:value={text}
-			type="text"
-			role="combobox"
-			autocomplete="off"
-			autocapitalize="off"
-			spellcheck="false"
-			aria-expanded={suggestions.length > 0}
-			aria-controls="finder-place-list"
-			aria-autocomplete="list"
-			aria-activedescendant={active >= 0 ? `finder-place-${active}` : undefined}
-			aria-describedby={problem ? 'finder-setup-problem' : undefined}
-			aria-invalid={problem ? true : undefined}
-			oninput={onInput}
-			onkeydown={onKey}
-			onblur={() => {
-				open = false;
-				active = -1;
-			}}
-		/>
-		<ul id="finder-place-list" class="setup__list" role="listbox" hidden={suggestions.length === 0}>
-			{#each suggestions as suggestion, n (suggestion.label)}
-				<!-- A press must not move focus off the field, or the list closes before the press lands. The keys are
-				     the field's (combobox pattern: focus stays on the input), so the options take only the pointer. -->
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<li
-					id={`finder-place-${n}`}
-					role="option"
-					aria-selected={n === active}
-					onmousedown={(e) => e.preventDefault()}
-					onclick={() => choose(suggestion)}
-				>
-					{suggestion.label}
-				</li>
-			{/each}
-		</ul>
-		{#if problem}<p id="finder-setup-problem" class="setup__problem" role="alert">{problem}</p>{/if}
-	</div>
-
-	{#if destination}
-		<p class="setup__profile">
-			From your profile:
-			<button
-				type="button"
-				class="setup__pill"
-				onclick={() => choose({ label: placeText(destination), place: destination })}
-				>Use {placeText(destination)}</button
+	<p class="setup__step">Step {step} of {STEPS}</p>
+	{#if step === 1}
+		<h2 bind:this={headingEl} tabindex="-1">Where?</h2>
+		<div class="setup__field">
+			<label for="finder-place">ZIP code or state</label>
+			<input
+				id="finder-place"
+				bind:this={fieldEl}
+				bind:value={text}
+				type="text"
+				role="combobox"
+				autocomplete="off"
+				autocapitalize="off"
+				spellcheck="false"
+				aria-expanded={suggestions.length > 0}
+				aria-controls="finder-place-list"
+				aria-autocomplete="list"
+				aria-activedescendant={active >= 0 ? `finder-place-${active}` : undefined}
+				aria-describedby={problem ? 'finder-setup-problem' : undefined}
+				aria-invalid={problem ? true : undefined}
+				oninput={onInput}
+				onkeydown={onKey}
+				onblur={() => {
+					open = false;
+					active = -1;
+				}}
+			/>
+			<ul
+				id="finder-place-list"
+				class="setup__list"
+				role="listbox"
+				hidden={suggestions.length === 0}
 			>
-		</p>
-	{/if}
+				{#each suggestions as suggestion, n (suggestion.label)}
+					<!-- A press must not move focus off the field, or the list closes before the press lands. The keys are
+				     the field's (combobox pattern: focus stays on the input), so the options take only the pointer. -->
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<li
+						id={`finder-place-${n}`}
+						role="option"
+						aria-selected={n === active}
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => choose(suggestion)}
+					>
+						{suggestion.label}
+					</li>
+				{/each}
+			</ul>
+			{#if problem}<p id="finder-setup-problem" class="setup__problem" role="alert">
+					{problem}
+				</p>{/if}
+		</div>
 
-	{#if typed?.kind === 'zip'}
-		<div class="setup__pills">
-			{#each RADII as r (r.label)}
+		{#if destination}
+			<p class="setup__profile">
+				From your profile:
 				<button
 					type="button"
 					class="setup__pill"
-					aria-pressed={radius === r.value}
-					onclick={() => (radius = r.value)}>{r.label}</button
+					onclick={() => choose({ label: placeText(destination), place: destination })}
+					>Use {placeText(destination)}</button
+				>
+			</p>
+		{/if}
+
+		{#if typed?.kind === 'zip'}
+			<div class="setup__pills">
+				{#each RADII as r (r.label)}
+					<button
+						type="button"
+						class="setup__pill"
+						aria-pressed={radius === r.value}
+						onclick={() => (radius = r.value)}>{r.label}</button
+					>
+				{/each}
+			</div>
+		{/if}
+
+		<label class="setup__check"
+			><input type="checkbox" bind:checked={territories} /> Include US territories</label
+		>
+		<label class="setup__check"
+			><input type="checkbox" bind:checked={overseas} /> Include programs overseas</label
+		>
+	{:else if step === 2}
+		<h2 bind:this={headingEl} tabindex="-1">How?</h2>
+		<div class="setup__pills">
+			{#each FORMAT_ORDER as format (format)}
+				<button
+					type="button"
+					class="setup__pill"
+					aria-pressed={delivery.includes(format)}
+					onclick={() => (delivery = toggled(delivery, format) ?? [])}
+					>{FORMAT_LABELS[format]}</button
 				>
 			{/each}
 		</div>
+	{:else}
+		<h2 bind:this={headingEl} tabindex="-1">
+			What field? <span class="setup__optional">optional</span>
+		</h2>
+		<div class="setup__pills">
+			{#each fieldsShown as industry (industry)}
+				<button
+					type="button"
+					class="setup__pill"
+					aria-pressed={industries.includes(industry)}
+					onclick={() => (industries = toggled(industries, industry) ?? [])}>{industry}</button
+				>
+			{/each}
+		</div>
+		<button
+			type="button"
+			class="setup__link"
+			aria-expanded={showAllFields}
+			onclick={() => (showAllFields = !showAllFields)}
+			>{showAllFields ? 'Show fewer fields' : `Show all ${INDUSTRIES.length} fields`}</button
+		>
 	{/if}
-
-	<label class="setup__check"
-		><input type="checkbox" bind:checked={territories} /> Include US territories</label
-	>
-	<label class="setup__check"
-		><input type="checkbox" bind:checked={overseas} /> Include programs overseas</label
-	>
-
-	<h2>How?</h2>
-	<div class="setup__pills">
-		{#each FORMAT_ORDER as format (format)}
-			<button
-				type="button"
-				class="setup__pill"
-				aria-pressed={delivery.includes(format)}
-				onclick={() => (delivery = toggled(delivery, format) ?? [])}>{FORMAT_LABELS[format]}</button
-			>
-		{/each}
-	</div>
-
-	<h2>What field? <span class="setup__optional">optional</span></h2>
-	<div class="setup__pills">
-		{#each fieldsShown as industry (industry)}
-			<button
-				type="button"
-				class="setup__pill"
-				aria-pressed={industries.includes(industry)}
-				onclick={() => (industries = toggled(industries, industry) ?? [])}>{industry}</button
-			>
-		{/each}
-	</div>
-	<button
-		type="button"
-		class="setup__link"
-		aria-expanded={showAllFields}
-		onclick={() => (showAllFields = !showAllFields)}
-		>{showAllFields ? 'Show fewer fields' : `Show all ${INDUSTRIES.length} fields`}</button
-	>
 
 	{#if error}<p class="setup__problem" role="alert">{error}</p>{/if}
 	<div class="setup__actions">
-		<button type="submit" class="setup__primary" aria-busy={busy}>Show programs</button>
+		{#if step > 1}
+			<button type="button" class="setup__secondary" onclick={() => void goTo(step - 1)}
+				>Back</button
+			>
+		{/if}
+		<button type="submit" class="setup__primary" aria-busy={busy}
+			>{step < STEPS ? 'Next' : 'Show programs'}</button
+		>
 		<button type="button" class="setup__link" onclick={() => void save(true)}>Skip all</button>
 	</div>
 
@@ -298,9 +349,31 @@
 		margin: 0 0 var(--space-s);
 	}
 
+	.setup__step {
+		margin: var(--space-m) 0 0;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
 	.setup h2 {
 		font-size: var(--font-size-l);
-		margin: var(--space-l) 0 var(--space-s);
+		margin: var(--space-xs) 0 var(--space-s);
+	}
+
+	.setup h2:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.setup__secondary {
+		min-height: 44px;
+		padding: 0 var(--space-l);
+		background: none;
+		color: var(--color-accent);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-m);
+		font: inherit;
+		cursor: pointer;
 	}
 
 	.setup__optional {

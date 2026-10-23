@@ -91,7 +91,7 @@ test('a person on a phone reaches every page from the bottom bar, and More keeps
 	// A first visit to the finder opens on its setup, so the tab leads somewhere a person can act, not a dead end.
 	await bar.getByRole('link', { name: 'SkillBridge', exact: true }).click();
 	await expect(page.getByLabel('ZIP code or state')).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Show programs' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
 
 	for (const row of MORE_ROWS) {
 		await bar.getByRole('link', { name: 'More', exact: true }).click();

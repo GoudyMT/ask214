@@ -54,7 +54,10 @@ async function device(overrides: Partial<ProfileApp> = {}) {
 }
 
 const field = () => page.getByLabelText('ZIP code or state');
+const next = () => page.getByRole('button', { name: 'Next' });
 const show = () => page.getByRole('button', { name: 'Show programs' });
+// Every step says which it is; with the field shown on the first step only, this line is what says the setup is open.
+const stepLine = () => page.getByText(/^Step \d of 3$/);
 
 beforeEach(() => {
 	harness.app = null;
@@ -68,7 +71,7 @@ afterEach(async () => {
 });
 
 describe('the first visit', () => {
-	it('shows the heading and the one-screen setup with no profile at all', async () => {
+	it('shows the heading and the first setup step with no profile at all', async () => {
 		await device();
 		await render(SkillBridgePage);
 
@@ -86,11 +89,13 @@ describe('the first visit', () => {
 		vi.spyOn(finder, 'setFilters').mockRejectedValue(new Error('E_TEST_WRITE'));
 		await render(SkillBridgePage);
 		await field().fill('Maryland');
+		await next().click();
 		await page.getByRole('button', { name: 'Hybrid' }).click();
+		await next().click();
 		await show().click();
 
 		await expect.element(page.getByRole('alert')).toBeVisible();
-		await expect.element(field()).toBeVisible();
+		await expect.element(show()).toBeVisible();
 	});
 
 	it('Skip all keeps the choice and takes the setup away', async () => {
@@ -99,19 +104,21 @@ describe('the first visit', () => {
 		await page.getByRole('button', { name: 'Skip all' }).click();
 
 		await vi.waitFor(() => expect(finder.setup).toEqual({ territories: false, overseas: false }));
-		await expect.element(field()).not.toBeInTheDocument();
+		await expect.element(stepLine()).not.toBeInTheDocument();
 	});
 
 	it('saves a state, the formats and the fields into the record', async () => {
 		const { finder } = await device();
 		await render(SkillBridgePage);
 		await field().fill('Maryland');
+		await next().click();
 		await page.getByRole('button', { name: 'Hybrid' }).click();
+		await next().click();
 		await page.getByRole('button', { name: 'Management' }).click();
 		await show().click();
 
 		// The setup closes once both its writes have landed (the filters it owns, then the place).
-		await expect.element(field()).not.toBeInTheDocument();
+		await expect.element(stepLine()).not.toBeInTheDocument();
 		expect(finder.setup).toEqual({
 			place: { kind: 'state', state: 'MD' },
 			territories: false,
@@ -126,7 +133,9 @@ describe('the first visit', () => {
 		await render(SkillBridgePage);
 		await field().fill('Maryland');
 		await userEvent.keyboard('{Enter}');
-		await expect.element(field()).not.toBeInTheDocument();
+		await next().click();
+		await show().click();
+		await expect.element(stepLine()).not.toBeInTheDocument();
 
 		expect(location.href).toBe(START_URL);
 	});
@@ -186,15 +195,17 @@ describe('changing the setup', () => {
 
 		await expect.element(field()).toHaveValue('Texas');
 		await field().fill('Virginia');
+		await next().click();
 		// The saved format is shown chosen; turning it off drops it from the record.
 		await expect
 			.element(page.getByRole('button', { name: 'In person' }))
 			.toHaveAttribute('aria-pressed', 'true');
 		await page.getByRole('button', { name: 'In person' }).click();
+		await next().click();
 		await show().click();
 
 		// The setup closes once both its writes have landed (the filters it owns, then the place).
-		await expect.element(field()).not.toBeInTheDocument();
+		await expect.element(stepLine()).not.toBeInTheDocument();
 		expect(finder.setup.place).toEqual({ kind: 'state', state: 'VA' });
 		expect(finder.filters).toEqual({ branches: ['Navy'] });
 		// The address goes back to the plain page, so a reload does not open the setup again.

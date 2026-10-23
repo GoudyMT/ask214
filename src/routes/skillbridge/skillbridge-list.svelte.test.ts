@@ -71,6 +71,8 @@ describe('from setup to the list', () => {
 		await device();
 		await render(SkillBridgePage);
 		await page.getByLabelText('ZIP code or state').fill('Maryland');
+		await page.getByRole('button', { name: 'Next' }).click();
+		await page.getByRole('button', { name: 'Next' }).click();
 		await page.getByRole('button', { name: 'Show programs' }).click();
 
 		await expect.element(programs(6)).toBeVisible();
@@ -106,6 +108,8 @@ describe('from setup to the list', () => {
 		history.replaceState(history.state, '', `${location.pathname}${location.search}#setup`);
 		await render(SkillBridgePage);
 		await page.getByLabelText('ZIP code or state').fill('Virginia');
+		await page.getByRole('button', { name: 'Next' }).click();
+		await page.getByRole('button', { name: 'Next' }).click();
 		await page.getByRole('button', { name: 'Show programs' }).click();
 
 		await vi.waitFor(() => expect(finder.setup.place).toEqual({ kind: 'state', state: 'VA' }));

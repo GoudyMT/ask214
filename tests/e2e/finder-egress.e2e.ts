@@ -226,10 +226,14 @@ test('what a person types into the finder reaches no request, with the service w
 
 	// The seeded values, through the real screens: a ZIP, then a state, then a search.
 	await page.getByLabel('ZIP code or state').fill(ZIP);
+	await page.getByRole('button', { name: 'Next' }).click();
+	await page.getByRole('button', { name: 'Next' }).click();
 	await page.getByRole('button', { name: 'Show programs' }).click();
 	await expect(page.getByText(/^\d+ programs?$/)).toBeVisible();
 	await page.goto('/skillbridge#setup');
 	await page.getByLabel('ZIP code or state').fill(STATE_NAME);
+	await page.getByRole('button', { name: 'Next' }).click();
+	await page.getByRole('button', { name: 'Next' }).click();
 	await page.getByRole('button', { name: 'Show programs' }).click();
 	await expect(page.getByRole('button', { name: `Remove In ${STATE_NAME}` })).toBeVisible();
 	await page.getByLabel('Search programs').fill(SEARCH);
