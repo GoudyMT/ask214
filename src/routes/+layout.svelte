@@ -315,13 +315,15 @@
 				// The finder's record and its downloaded files load on demand, so the code every page loads stays small.
 				// Each joins the relock set before its first decrypt. A Lock that lands while the code is still on its way
 				// leaves the new store locked, not read: only an Unlock opens it. That relock stays in this tab, as the Lock
-				// itself already reached the others. A failure leaves the finder saying so and the rest of the app as it is.
+				// itself already reached the others. Gated on `lockState`, not `locked`: `locked` reads true for a tab that
+				// only went hidden and false for a first-run tab the person locked. A failure leaves the finder saying so and
+				// the rest of the app as it is.
 				const provisionFinder = <S extends Relockable & { load: () => Promise<void> }>(
 					store: S,
 					set: (s: S) => void
 				) => {
 					relockables.push(store);
-					if (result.store.locked) {
+					if (result.store.lockState === 'locked') {
 						echo.answer(() => store.relockSync('peer'));
 						set(store);
 						return;

@@ -5,6 +5,7 @@ import type { ProfileApp } from '$lib/profile/context';
 import { createProfileStore } from '$lib/profile/store.svelte';
 import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
+import { createProfileBus, type BusSignal } from '$lib/broadcast/bus';
 import Layout from './+layout.svelte';
 
 // A file of its own: the finder's code is held back on its first load, and a module loads once per file.
@@ -82,11 +83,18 @@ it('leaves the pack locked when a Lock lands before its code arrives', async () 
 	expect(app.finderPack).toBeNull();
 
 	app.relockAll?.();
+	// The Lock already reached the other tabs; the late store's own relock must not send them another.
+	const heard: BusSignal[] = [];
+	const other = createProfileBus();
+	other.subscribe((signal) => heard.push(signal));
 	harness.release();
 
 	await vi.waitFor(() => expect(app.finderPack).not.toBeNull());
 	// Long enough for a load the wiring wrongly started to land.
 	await new Promise((r) => setTimeout(r, 300));
+	other.close();
 	expect(app.finderPack?.locked).toBe(true);
 	expect(app.finderPack?.ready).toBe(false);
+	expect(app.finder?.locked).toBe(true);
+	expect(heard.filter((signal) => signal.type === 'relocked')).toEqual([]);
 });

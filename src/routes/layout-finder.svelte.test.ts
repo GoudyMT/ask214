@@ -75,6 +75,8 @@ beforeEach(() => {
 
 afterEach(async () => {
 	vi.restoreAllMocks();
+	delete (document as unknown as Record<string, unknown>).visibilityState;
+	delete (document as unknown as Record<string, unknown>).hidden;
 	if (db) await deleteTestDb(db);
 	db = null;
 });
@@ -107,6 +109,38 @@ it('shows this tab a finder change saved in another tab', async () => {
 	bus.close();
 
 	await vi.waitFor(() => expect(app.finder?.setup.place).toEqual({ kind: 'state', state: 'TX' }));
+});
+
+// A tab opened in the background drops what it read on the way, as page hygiene; that is not the person's Lock, so the
+// finder comes back with the rest of the app when the tab is shown.
+it('gives a tab opened in the background its finder back when it is shown', async () => {
+	const testDb = await device();
+	const seed = createFinderStore(testDb);
+	await seed.load();
+	await seed.setSetup({ place: { kind: 'state', state: 'TX' } });
+	let hidden = true;
+	Object.defineProperty(document, 'visibilityState', {
+		configurable: true,
+		get: () => (hidden ? 'hidden' : 'visible')
+	});
+	Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+
+	await render(Layout, { children });
+	await vi.waitFor(() => {
+		expect(harness.app?.status).toBe('ready');
+		expect(harness.app?.finder).not.toBeNull();
+		expect(harness.app?.finderPack).not.toBeNull();
+	});
+	const app = harness.app as ProfileApp;
+
+	hidden = false;
+	document.dispatchEvent(new Event('visibilitychange'));
+
+	await vi.waitFor(() => {
+		expect(app.finder?.setup.place).toEqual({ kind: 'state', state: 'TX' });
+		expect(app.finderPack?.ready).toBe(true);
+	});
+	expect(app.finder?.locked).toBe(false);
 });
 
 // The finder is one tool: a saved record that cannot be read must not take the profile, Timeline or Settings with it.
