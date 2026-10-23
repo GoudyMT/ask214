@@ -22,6 +22,7 @@ import {
 	offlineResponse
 } from '$lib/ask/asset-cache';
 import { isTakeOver } from '$lib/sw/take-over-message';
+import { answerFinderBypass } from '$lib/sw/finder-bypass-message';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -178,6 +179,8 @@ async function keepEmbedWorkerScript(cacheNames: string[]): Promise<void> {
 // older worker's cached pages cannot open the raised database offline.
 sw.addEventListener('message', (event) => {
 	if (isTakeOver(event.data, version)) void sw.skipWaiting();
+	// The finder asks before it downloads: a worker from before the bypass below stays silent (finder-bypass.ts).
+	answerFinderBypass(event);
 });
 
 sw.addEventListener('fetch', (event) => {
