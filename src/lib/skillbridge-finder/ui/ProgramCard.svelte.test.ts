@@ -146,6 +146,29 @@ describe('opening and closing', () => {
 		await expect.element(summary()).toHaveAttribute('aria-expanded', 'true');
 	});
 
+	// Dragging across the card's text ends in a click on the card; that is a person selecting words to copy, not asking
+	// to open it. The click is sent straight to the card so the selection stands, as it does after a real drag.
+	it('stays closed when a click ends a text selection, and opens when nothing is selected', async () => {
+		await mount();
+		const card = page.getByRole('article').element();
+		const org = card.querySelector('.card__org') as Element;
+		const selection = window.getSelection() as Selection;
+		const click = () => card.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+		try {
+			selection.selectAllChildren(org);
+			expect(selection.isCollapsed).toBe(false);
+			click();
+			await expect.element(summary()).toHaveAttribute('aria-expanded', 'false');
+
+			selection.removeAllRanges();
+			click();
+			await expect.element(summary()).toHaveAttribute('aria-expanded', 'true');
+		} finally {
+			selection.removeAllRanges();
+		}
+	});
+
 	// The cue is a picture of the control, not a second one: a tap on it must land on the card.
 	it('opens on a tap on the Details cue, which is not a control of its own', async () => {
 		await mount();
