@@ -1,10 +1,19 @@
 <script lang="ts">
 	type Props = { count: number; oncompare: () => void };
 	let { count, oncompare }: Props = $props();
+	let height = $state(0);
+
+	// The page keeps a focused control clear of the bottom bar only, and the tray stands above the bar: its own height
+	// is added to that room while it is shown, so a control reached by Tab is not left behind it.
+	$effect(() => {
+		const root = document.documentElement.style;
+		root.scrollPaddingBottom = `calc(var(--bottom-bar-height, 0px) + env(safe-area-inset-bottom) + ${height}px)`;
+		return () => root.removeProperty('scroll-padding-bottom');
+	});
 </script>
 
 <!-- Fixed above the bottom bar so the picks stay in reach while the list scrolls; the page shows it only with a pick. -->
-<div class="tray">
+<div class="tray" bind:offsetHeight={height}>
 	<span class="tray__count">{count} of 3 picked</span>
 	<button class="tray__compare" type="button" onclick={oncompare}>Compare</button>
 </div>
