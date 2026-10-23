@@ -506,15 +506,20 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			});
 			return running;
 		},
-		async searchAll(): Promise<void> {
+		/** False when the other regions could not be downloaded; a lock that cut it short is not a failure to report. */
+		async searchAll(): Promise<boolean> {
 			const at = epoch;
 			const index = week();
-			if (index === undefined) return;
+			if (index === undefined) return true;
 			try {
-				if ((await download(index, wantedFiles(true))) && !shownOnly) await readHeld();
+				if (await download(index, wantedFiles(true))) {
+					if (!shownOnly) await readHeld();
+					return true;
+				}
 			} catch {
 				if (at === epoch) _status = _blocked ? 'failed' : 'offline';
 			}
+			return at !== epoch;
 		},
 		ensureZips: zipsTable,
 		async markOpened(id: number): Promise<void> {

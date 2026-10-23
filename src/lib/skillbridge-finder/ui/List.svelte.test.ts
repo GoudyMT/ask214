@@ -320,6 +320,33 @@ describe('search', () => {
 });
 
 describe('searching every region with no place set', () => {
+	// The connection drops between the offer and the tap: the button must not go back to its offer as if nothing
+	// happened, with no word of why.
+	it('says so when the other regions could not be downloaded', async () => {
+		const dev = await device(db, { territories: false, overseas: false });
+		const net = network();
+		let down = false;
+		const session = await startedSession(
+			dev,
+			{
+				...net,
+				fetchFn: (url, init) =>
+					down ? Promise.reject(new TypeError('Failed to fetch')) : net.fetchFn(url, init)
+			},
+			NOW
+		);
+		await render(List, { session, finder: dev.finder, card });
+		await search().fill('delta');
+		await expect.element(page.getByText('Search every region?')).toBeVisible();
+
+		down = true;
+		await page.getByRole('button', { name: 'Search every region' }).click();
+
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent("Listings couldn't be downloaded right now.");
+	});
+
 	it('asks first, sized from the index, and downloads only after the button', async () => {
 		const { net } = await mount({ territories: false, overseas: false });
 		await expect.element(page.getByText('1 program', { exact: true })).toBeVisible();

@@ -28,6 +28,7 @@
 	// Past this many missed weekly updates, "new" no longer means this week's.
 	const MAX_MISSED_WEEKS = 4;
 	const SAVE_FAILED = 'Could not save that change. Try again.';
+	const DOWNLOAD_FAILED = "Listings couldn't be downloaded right now.";
 
 	let tab = $state<'programs' | 'saved'>('programs');
 	let shown = $state(PAGE_SIZE);
@@ -136,8 +137,9 @@
 
 	async function searchEveryRegion(): Promise<void> {
 		downloadingAll = true;
+		problem = null;
 		try {
-			await session.searchAll();
+			if (!(await session.searchAll())) problem = DOWNLOAD_FAILED;
 		} finally {
 			downloadingAll = false;
 		}
@@ -236,7 +238,7 @@
 			{:else if session.status === 'offline' && !online}
 				<p class="list__muted">You are offline and no listings are downloaded yet.</p>
 			{:else if session.status === 'failed' || session.status === 'offline'}
-				<p class="list__muted" role="alert">Listings couldn't be downloaded right now.</p>
+				<p class="list__muted" role="alert">{DOWNLOAD_FAILED}</p>
 				<button type="button" class="list__more" onclick={() => void session.start()}
 					>Try again</button
 				>
