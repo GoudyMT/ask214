@@ -24,6 +24,7 @@ import {
 	type FinderSavedItem,
 	type FinderSetup
 } from '../skillbridge-finder/state/types';
+import { parsePlaceText, placeText } from '../skillbridge-finder/ui/place-text';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-key';
 import { decodeTimelineState, isSnoozeDate } from '../timeline/state-codec';
@@ -75,6 +76,8 @@ export type ValidProfile = {
 	eaos: string;
 	skillbridgeStart?: string;
 	terminalLeaveStart?: string;
+	/** Where the person plans to live, as Settings saves it: base64 of a ZIP or a state's full name. */
+	geographicDestination?: string;
 };
 
 export type ValidCalendar = {
@@ -132,6 +135,7 @@ const PROFILE_REQUIRED = [
 	'setupIntentChangedAt'
 ] as const;
 const PROFILE_DATES = ['skillbridgeStart', 'terminalLeaveStart'] as const;
+const PROFILE_OPTIONAL = [...PROFILE_DATES, 'geographicDestination'] as const;
 const TASK_FIELDS = ['notes', 'snoozeUntil', 'status'] as const;
 // The Timeline never shows a note for the SkillBridge plan's record, and the store refuses to write one.
 const PLAN_FIELDS = ['snoozeUntil', 'status'] as const;
@@ -172,6 +176,26 @@ function isStoredDate(v: unknown): v is string {
 	}
 }
 
+/**
+ * A place as Settings stores it: base64 of text the finder's own parser reads as a place and spells the same way back
+ * (a ZIP, or a state's full name). Free text, a second spelling or anything the parser does not name is refused, so a
+ * crafted file cannot plant words the app would later show or use.
+ */
+function isStoredPlace(v: unknown): v is string {
+	if (typeof v !== 'string') return false;
+	const bytes = b64DecodeStrict(v);
+	if (bytes === null) return false;
+	try {
+		const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+		const place = parsePlaceText(text);
+		return place !== null && placeText(place) === text;
+	} catch {
+		return false;
+	} finally {
+		bytes.fill(0);
+	}
+}
+
 /** The JSON text of a value with every object's keys in sorted order, so two equal records give equal text. */
 function sortedJson(value: unknown): string {
 	return JSON.stringify(value, (_key, v: unknown) =>
@@ -196,7 +220,7 @@ function decodesToSame(validated: unknown, decode: (bytes: Uint8Array) => unknow
 
 /** Only the keys the codec writes for a finished setup; every field no screen writes, and the backup mark, refuses. */
 function readProfile(raw: unknown): ValidProfile | null {
-	if (!isObject(raw) || !keysAre(raw, PROFILE_REQUIRED, PROFILE_DATES)) return null;
+	if (!isObject(raw) || !keysAre(raw, PROFILE_REQUIRED, PROFILE_OPTIONAL)) return null;
 	const { schemaVersion, generation, lastSeenAt, setupIntent, setupIntentChangedAt, eaos } = raw;
 	if (schemaVersion !== 1 || setupIntent !== 'completed') return null;
 	// The writer replaces the generation, so only its shape is checked.
@@ -216,6 +240,11 @@ function readProfile(raw: unknown): ValidProfile | null {
 		const date = raw[key];
 		if (!isStoredDate(date)) return null;
 		profile[key] = date;
+	}
+	if (Object.hasOwn(raw, 'geographicDestination')) {
+		const place = raw.geographicDestination;
+		if (!isStoredPlace(place)) return null;
+		profile.geographicDestination = place;
 	}
 	// The decoder gives bytes, so the shipped encoder turns them back into the codec's text. The decoded record holds
 	// the person's dates as bytes, so it and the buffers around it are wiped before this returns.

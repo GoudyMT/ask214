@@ -395,6 +395,18 @@ describe('validateInner: acceptance corpus (shapes the app writes)', () => {
 			}
 		],
 		[
+			'a profile with a ZIP as where they plan to live',
+			(p) => {
+				p.profile.geographicDestination = btoa('21046');
+			}
+		],
+		[
+			'a profile with a state as where they plan to live',
+			(p) => {
+				p.profile.geographicDestination = btoa('Maryland');
+			}
+		],
+		[
 			'a profile with no change time yet',
 			(p) => {
 				p.profile.setupIntentChangedAt = null;
@@ -515,7 +527,6 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 		'anticipatedDisabilityRating',
 		'familyStatus',
 		'intendedPath',
-		'geographicDestination',
 		'specialSituations'
 	];
 	const BACKUP_MARK = [
@@ -569,6 +580,24 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 			(p) => (p.profile.eaos = b64('2027-02-30')),
 			'profile'
 		],
+		// Where you plan to live: only a place the finder's own parser names, in the spelling Settings saves.
+		[
+			'a destination of free text',
+			(p) => (p.profile.geographicDestination = b64('Atlantis')),
+			'profile'
+		],
+		[
+			'a destination in a second spelling',
+			(p) => (p.profile.geographicDestination = b64('maryland')),
+			'profile'
+		],
+		[
+			'a destination of four digits',
+			(p) => (p.profile.geographicDestination = b64('2104')),
+			'profile'
+		],
+		['a destination not base64', (p) => (p.profile.geographicDestination = '21046'), 'profile'],
+		['an empty destination', (p) => (p.profile.geographicDestination = ''), 'profile'],
 		['skillbridgeStart empty', (p) => (p.profile.skillbridgeStart = ''), 'profile'],
 		['skillbridgeStart not base64', (p) => (p.profile.skillbridgeStart = '2027-03-01'), 'profile'],
 		[

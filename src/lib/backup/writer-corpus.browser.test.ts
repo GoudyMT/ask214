@@ -546,6 +546,22 @@ const PROFILE_MEMBERS: Member[] = [
 			expect(seen.file.profile.terminalLeaveStart).toBeUndefined();
 		}
 	},
+	// Settings' "Where you plan to live" saves the place as the finder spells it: a ZIP, or a state's full name.
+	...['21046', 'Maryland'].map((place): Member => ({
+		name: `profile: ${place} saved as where you plan to live`,
+		run: async (ctx) => {
+			await ctx.profile.save({ geographicDestination: new TextEncoder().encode(place) });
+		},
+		holds: (seen) => expect(text(seen.file.profile.geographicDestination)).toBe(place)
+	})),
+	{
+		name: 'profile: where you plan to live saved, then removed',
+		run: async (ctx) => {
+			await ctx.profile.save({ geographicDestination: new TextEncoder().encode('21046') });
+			await ctx.profile.save({ geographicDestination: undefined });
+		},
+		holds: (seen) => expect(seen.file.profile.geographicDestination).toBeUndefined()
+	},
 	// Only a clock that moved back makes this do anything; under the other clocks it still has to leave a record that
 	// exports.
 	{
