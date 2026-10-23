@@ -68,7 +68,15 @@ describe('the finder copy and claim policy', () => {
 	// A folder read that matched nothing would let every scan pass on an empty list.
 	it('reads the route, the screens and the stores, and none of their tests', () => {
 		const names = collect().map((f) => basename(f.path));
-		expect(names).toEqual(expect.arrayContaining(['+page.svelte', 'store.svelte.ts', 'match.ts']));
+		expect(names).toEqual(
+			expect.arrayContaining([
+				'+page.svelte',
+				'store.svelte.ts',
+				'match.ts',
+				'CompareTable.svelte',
+				'home-row.ts'
+			])
+		);
 		expect(names.filter((name) => name.includes('.test.'))).toEqual([]);
 	});
 
