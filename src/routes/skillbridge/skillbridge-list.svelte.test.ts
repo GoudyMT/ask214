@@ -155,4 +155,87 @@ describe('across a Lock', () => {
 		await expect.element(programs(6)).toBeVisible();
 		await expect.element(page.getByText('Your data is locked')).not.toBeInTheDocument();
 	});
+
+	// The Lock cut the first download short; the Unlock comes before that download has wound down, so the visit it
+	// asks for is owed, not the cut-short one.
+	it('brings the list back after a Lock and an Unlock that land while the listings download', async () => {
+		const { store, finder, pack } = await device();
+		await finder.setSetup({
+			place: { kind: 'state', state: 'MD' },
+			territories: false,
+			overseas: false
+		});
+		let release!: () => void;
+		let arrive!: () => void;
+		const hold = new Promise<void>((resolve) => (release = resolve));
+		const reached = new Promise<void>((resolve) => (arrive = resolve));
+		vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+			const url = String(input);
+			if (url.endsWith('/remote.json')) {
+				arrive();
+				await hold;
+			}
+			return net.fetchFn(url, {});
+		});
+		await render(SkillBridgePage);
+		await reached;
+
+		store.relockSync('user');
+		finder.relockSync('user');
+		pack.relockSync('user');
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(page.getByText('Your data is locked')).not.toBeInTheDocument();
+		release();
+
+		await expect.element(programs(6)).toBeVisible();
+	});
+});
+
+describe('a setup changed in another tab', () => {
+	// The other tab's write reaches this one as a refresh of the record; the list must fetch what the new place needs,
+	// not count the new place against the old place's files.
+	it('fetches the files the new place needs', async () => {
+		const { finder } = await device();
+		await finder.setSetup({
+			place: { kind: 'state', state: 'MD' },
+			territories: false,
+			overseas: false
+		});
+		await render(SkillBridgePage);
+		await expect.element(programs(6)).toBeVisible();
+
+		const peer = createFinderStore(db as IDBDatabase);
+		await peer.load();
+		await peer.setSetup({
+			place: { kind: 'state', state: 'WA' },
+			territories: false,
+			overseas: false
+		});
+		await finder.refresh();
+
+		await expect.element(page.getByRole('button', { name: 'Remove In Washington' })).toBeVisible();
+		await vi.waitFor(() => expect(net.calls.some((c) => c.endsWith('/pacific.json'))).toBe(true));
+	});
+
+	// A refresh that leaves the setup as it was (another tab saved a program) must not start the list over.
+	it('starts no new visit when the setup did not change', async () => {
+		const { finder } = await device();
+		await finder.setSetup({
+			place: { kind: 'state', state: 'MD' },
+			territories: false,
+			overseas: false
+		});
+		await render(SkillBridgePage);
+		await expect.element(programs(6)).toBeVisible();
+		const indexCalls = () => net.calls.filter((c) => c.endsWith('/index.json')).length;
+		const before = indexCalls();
+
+		const peer = createFinderStore(db as IDBDatabase);
+		await peer.load();
+		await peer.addCompare(3001);
+		await finder.refresh();
+
+		await vi.waitFor(() => expect(finder.compare).toEqual([3001]));
+		expect(indexCalls()).toBe(before);
+	});
 });

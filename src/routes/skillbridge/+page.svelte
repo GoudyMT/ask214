@@ -128,8 +128,18 @@
 			isSetUp(finder.setup) &&
 			!changing
 	);
+	// A setup changed in another tab arrives as a refresh with the list still open, and needs the files its place needs.
+	// A plain variable, not state: it holds the setup, and a Lock closes the list, which clears it.
+	let startedFor: string | null = null;
 	$effect(() => {
-		if (listOpen) void session?.start();
+		if (!listOpen || !finder) {
+			startedFor = null;
+			return;
+		}
+		const key = JSON.stringify(finder.setup);
+		if (key === startedFor) return;
+		startedFor = key;
+		void session?.start();
 	});
 
 	onMount(() => {
