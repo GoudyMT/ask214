@@ -17,7 +17,7 @@ import type { FinderPackStore } from '../state/pack-store.svelte';
 import { savedStatus, type SavedStatus } from '../state/saved-status';
 import { selectRegionFiles, type SelectInput } from '../state/select-files';
 import type { FinderStore } from '../state/store.svelte';
-import type { FinderSetup } from '../state/types';
+import type { FinderFilters, FinderSetup } from '../state/types';
 import { safeLog } from '../../log/safelog';
 import { workerBypassesFinderData } from '../../sw/finder-bypass';
 
@@ -318,13 +318,10 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		return listing.s === state || listing.ls?.some((s) => s === state) === true;
 	}
 
-	function computeMatches(): Match[] {
+	/** The listings that pass `filters` and the person's place, in list order. */
+	function matchesFor(filters: FinderFilters): Match[] {
 		const s = setup();
-		const filters = finder.ready ? finder.filters : {};
 		const where = point();
-		const key = JSON.stringify([filters, s, where]);
-		if (matchMemo && matchMemo.key === key && matchMemo.listings === _listings)
-			return matchMemo.rows;
 		let rows = matchListings(_listings, {
 			filters,
 			point: where,
@@ -340,6 +337,15 @@ export function createFinderSession(opts: FinderSessionOptions) {
 					inState(r.listing, state)
 			);
 		}
+		return rows;
+	}
+
+	function computeMatches(): Match[] {
+		const filters = finder.ready ? finder.filters : {};
+		const key = JSON.stringify([filters, setup(), point()]);
+		if (matchMemo && matchMemo.key === key && matchMemo.listings === _listings)
+			return matchMemo.rows;
+		const rows = matchesFor(filters);
 		matchMemo = { key, listings: _listings, rows };
 		return rows;
 	}
@@ -371,6 +377,8 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		get matches(): Match[] {
 			return computeMatches();
 		},
+		/** What the list would hold under other filters, for the counts beside each filter value. Not kept. */
+		matchesWith: matchesFor,
 		get query(): string {
 			return _query;
 		},

@@ -2,13 +2,14 @@
 	import { onMount, tick } from 'svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
-	import { NOT_AFFILIATED } from '$lib/skillbridge-finder/ui/copy';
+	import List from '$lib/skillbridge-finder/ui/List.svelte';
 	import {
 		createFinderSession,
 		type FinderSession
 	} from '$lib/skillbridge-finder/ui/session.svelte';
 	import Setup from '$lib/skillbridge-finder/ui/Setup.svelte';
 	import { isSetUp, withSetupChoices } from '$lib/skillbridge-finder/ui/setup-state';
+	import type { Listing } from '$lib/skillbridge-finder/contract/listing';
 	import type { FinderFilters, FinderSetup } from '$lib/skillbridge-finder/state/types';
 
 	const app = getProfileApp();
@@ -48,6 +49,15 @@
 			made.destroy();
 			session = null;
 		};
+	});
+
+	// The week is opened and refreshed once the person is through setup and everything is open; a lock empties the
+	// session, and the Unlock that follows opens the stores again and lands here.
+	const listOpen = $derived(
+		!!session && !!finder?.ready && !!app.finderPack?.ready && isSetUp(finder.setup) && !changing
+	);
+	$effect(() => {
+		if (listOpen) void session?.start();
 	});
 
 	onMount(() => {
@@ -116,6 +126,10 @@
 	<title>SkillBridge - Ask 214</title>
 </svelte:head>
 
+{#snippet program(args: { listing: Listing })}
+	<article class="finder-program"><strong>{args.listing.n}</strong> {args.listing.p}</article>
+{/snippet}
+
 <!-- A browser's page translation sends this screen's text to a translation service, and the place is the person's own. -->
 <div translate="no">
 	<h1 bind:this={headingEl} tabindex="-1">SkillBridge</h1>
@@ -140,8 +154,8 @@
 				onsave={saveSetup}
 				error={saveError}
 			/>
-		{:else if finder.ready}
-			<p class="finder-line">{NOT_AFFILIATED}</p>
+		{:else if finder.ready && session}
+			<List {session} {finder} card={program} />
 		{/if}
 	{/if}
 </div>
@@ -156,10 +170,12 @@
 		outline-offset: 2px;
 	}
 
-	.finder-line {
-		margin: 0;
-		color: var(--color-fg-muted);
-		font-size: var(--font-size-s);
+	.finder-program {
+		margin-bottom: var(--space-s);
+		padding: var(--space-s) var(--space-m);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-m);
 	}
 
 	.finder-note {
