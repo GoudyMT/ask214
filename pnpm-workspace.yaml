@@ -86,6 +86,13 @@ overrides:
   # high; transitive build-only via vite>postcss, never in the client bundle). Targeted range pin, inside the
   # ^1.2.1 postcss asks for. Retire when the lockfile resolves >=1.2.2 without it.
   'source-map-js@<1.2.2': '1.2.2'
+  # Force patched zod (GHSA-mrhx-c7xc-m3w5, memory exhaustion validating oversized constrained collections, high, up to
+  # <4.6.6; transitive dev-only via @lhci/cli>lighthouse>puppeteer-core>chromium-bidi, its only consumer, never in the
+  # client bundle). The patch exists only in 4.x and chromium-bidi asks for 3.x, so this crosses a major, as the
+  # basic-ftp pin does. The accepted cost: chromium-bidi parses WebDriver BiDi messages with it, a protocol Lighthouse
+  # does not use (it drives Chrome over CDP); the Lighthouse gate proves the chain still loads. Retire when
+  # chromium-bidi asks for a patched zod (Dependabot will surface it).
+  'zod@<4.6.6': '4.6.6'
 
 # Accepted, unfixable, dev/CI-only advisories (never shipped in the client bundle): extract-zip
 # (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6; and GHSA-7pqw-9j4j-h8q3,

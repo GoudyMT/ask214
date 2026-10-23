@@ -19,6 +19,7 @@ overrides:
   proxy-addr@<2.0.8: 2.0.8
   compression@<1.8.2: 1.8.2
   source-map-js@<1.2.2: 1.2.2
+  zod@<4.6.6: 4.6.6
 
 importers:
 
@@ -3319,8 +3320,8 @@ packages:
   zimmerframe@1.1.5:
     resolution: {integrity: sha512-msJxIvYDYcoNL+PJsu+7qmpDWsYmAxTY+2TNYXXF0hzBzBk0BMecOqDOG/EckUoKCuKwObfbugIl8QpqHDXeFA==}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.6.6:
+    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
 
 snapshots:
 
@@ -4459,7 +4460,7 @@ snapshots:
     dependencies:
       devtools-protocol: 0.0.1608973
       mitt: 3.0.1
-      zod: 3.25.76
+      zod: 4.6.6
 
   cli-cursor@2.1.0:
     dependencies:
@@ -6386,4 +6387,4 @@ snapshots:
 
   zimmerframe@1.1.5: {}
 
-  zod@3.25.76: {}
+  zod@4.6.6: {}
