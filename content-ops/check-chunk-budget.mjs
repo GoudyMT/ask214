@@ -434,6 +434,10 @@ const STATIC = 'static';
 //     demand 13,379-13,380 B, 84 files, precache 261,865-261,871 B, root layout 9.23 kB, route nodes 67.98 kB. A trim
 //     pass took about 250 B (a shared helper out of the Home row's chunk, Setup's format pills from the list's table);
 //     what is left is the finder's own code, and these limits leave room for its review fixes, not for new features.
+//     The review fixes then took precache 263,500 -> 264,150 (owner's call, 2026-10-23): a backup check for the saved
+//     place (whose own chunk is the state-name table), focus and live-region fixes, the tray's room for focus, and
+//     the full-device week. Two builds measured 264,110-264,130 B with 86 files. Trim pass: an import of the finder's
+//     parser into the backup check had split two shared chunks (87 files), now one; the rest is fixes, not trimmable.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
