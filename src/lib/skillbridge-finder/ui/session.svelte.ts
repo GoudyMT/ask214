@@ -181,14 +181,18 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		_changes = changes;
 	}
 
-	/** Opens the pack when the caller has not; a locked pack stays shut, and unreadable rows are cleared and read again. */
+	/**
+	 * Opens the pack when the caller has not; a locked pack stays shut, and unreadable rows are cleared and read again.
+	 * A load that ends early because a lock landed meanwhile returns without error and leaves the pack shut, so the answer
+	 * is whether the pack is open now.
+	 */
 	async function openPack(): Promise<boolean> {
 		if (pack.ready) return true;
 		if (pack.locked) return false;
 		if (!pack.failed) {
 			try {
 				await pack.load();
-				return true;
+				return pack.ready;
 			} catch {
 				if (!pack.failed) return false;
 			}
@@ -196,7 +200,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		try {
 			await pack.drop();
 			await pack.load();
-			return true;
+			return pack.ready;
 		} catch {
 			return false;
 		}

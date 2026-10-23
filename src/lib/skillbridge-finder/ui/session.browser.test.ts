@@ -735,6 +735,47 @@ describe('Lock', () => {
 		expect(net.calls).toHaveLength(0);
 	});
 
+	// The person locks while the visit is still opening the pack: that open ends early with nothing held, and the visit
+	// must not go on to download for a pack that is shut.
+	it('requests nothing when a lock lands while the visit is opening the pack', async () => {
+		const dev = await device({}, false);
+		const pack = around(dev.pack, {
+			load: async () => {
+				const opening = dev.pack.load();
+				dev.pack.relockSync('user');
+				await opening;
+			}
+		});
+		const net = network();
+		const session = open({ finder: dev.finder, pack }, net);
+		await session.start();
+
+		expect(net.calls).toHaveLength(0);
+		expect(session.status).toBe('failed');
+		expect(dev.pack.ready).toBe(false);
+		expect(dev.pack.locked).toBe(true);
+	});
+
+	it('requests nothing when a lock lands while an unreadable pack is cleared and opened again', async () => {
+		const dev = await device({}, false);
+		await putPackRow({ id: 'index', rec: new Uint8Array(32) });
+		await expect(dev.pack.load()).rejects.toThrow();
+		const pack = around(dev.pack, {
+			load: async () => {
+				const opening = dev.pack.load();
+				dev.pack.relockSync('user');
+				await opening;
+			}
+		});
+		const net = network();
+		const session = open({ finder: dev.finder, pack }, net);
+		await session.start();
+
+		expect(net.calls).toHaveLength(0);
+		expect(session.status).toBe('failed');
+		expect(dev.pack.locked).toBe(true);
+	});
+
 	it('fails closed when the pack is not open, and requests nothing', async () => {
 		const dev = await device({});
 		dev.pack.relockSync('user');
