@@ -304,10 +304,11 @@
 		font-weight: 600;
 	}
 
+	/* The plain danger red is under 4.5:1 on its own tint in the light theme; a little of the text colour deepens it there. */
 	.card__tag--gone {
 		border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
 		background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-		color: var(--color-danger);
+		color: color-mix(in srgb, var(--color-danger) 80%, var(--color-fg));
 	}
 
 	.card__tag--format {
@@ -407,6 +408,15 @@
 		gap: var(--space-m);
 		margin: var(--space-s) 0 0;
 		font-size: var(--font-size-s);
+	}
+
+	/* A flex box would drop the space inside the arrow's span, so the gap puts it back. */
+	.card__links a,
+	.card__dl a {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25em;
+		min-height: 44px;
 	}
 
 	.card__copy {

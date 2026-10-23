@@ -9,6 +9,7 @@ import type { SavedStatus } from '../state/saved-status';
 import { createFinderSession } from './session.svelte';
 import { device } from './list-world';
 import { useAppCss } from './app-css';
+import { NOT_AFFILIATED } from './copy';
 import ProgramCard from './ProgramCard.svelte';
 
 // The card runs on the real finder record and pack over a test database; its session is not started, since a card
@@ -280,6 +281,21 @@ describe('the details', () => {
 		}
 	});
 
+	// The not-affiliated line is a legal line: the opened card must carry all of it, not a start.
+	it('says in full that Ask 214 is independent of the Department of Defense', async () => {
+		await mount();
+		await summary().click();
+
+		await shows(page.getByRole('article'), NOT_AFFILIATED);
+	});
+
+	// The list sends focus to the first button of a card when it adds one; that must be the summary toggle.
+	it('has the summary toggle as its first button', async () => {
+		await mount();
+
+		expect(page.getByRole('article').element().querySelector('button')).toBe(summary().element());
+	});
+
 	it('copies the organization name and opens skillbridge.mil in a new tab', async () => {
 		const copied = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
 		await mount();
@@ -442,6 +458,77 @@ it('keeps Save, Comparing and Details on one line at 320 px', async () => {
 		const cue = root.querySelector<HTMLElement>('.card__cue')!;
 		expect(cue.getBoundingClientRect().height, `${width} px`).toBeLessThan(30);
 	}
+});
+
+describe('the opened card, for a thumb', () => {
+	const FORM = { ...withoutEmail(WIND), u: 'https://forms.example.com/apply' };
+
+	// Every tap target is at least 44 px high; the text links in the details sat at 19 to 21 px.
+	it.each([
+		['the company, LinkedIn and email links', WIND, 3],
+		['the online form link', FORM, 3]
+	] as const)('makes %s at least 44 px high on a 320 px phone', async (_name, listing, count) => {
+		dropCss = useAppCss();
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		await page.viewport(320, 800);
+		onTestFinished(() => page.viewport(size.width, size.height));
+		await mount(listing);
+		const root = page.getByRole('article').element();
+		(root.parentElement as HTMLElement).style.width = `${320 - 32}px`;
+		await summary().click();
+
+		const links = [...root.querySelectorAll<HTMLElement>('.card__dl a, .card__links a')];
+		expect(links).toHaveLength(count);
+		for (const link of links) {
+			expect(link.getBoundingClientRect().height, link.textContent ?? '').toBeGreaterThanOrEqual(
+				44
+			);
+		}
+	});
+});
+
+// WCAG 1.4.3: 14 px normal text needs 4.5:1. The pair is read from what the browser paints, over the card behind it.
+describe('the "No longer listed" tag', () => {
+	const channels = (css: string): [number, number, number, number] => {
+		const n = (css.match(/[\d.]+(?:e-?\d+)?/g) ?? []).map(Number);
+		// color(srgb 0.76 0.25 0.05 / 0.12) is on a 0..1 scale, rgb(194, 65, 12) on 0..255.
+		const k = css.startsWith('color(') ? 255 : 1;
+		return [(n[0] ?? 0) * k, (n[1] ?? 0) * k, (n[2] ?? 0) * k, n[3] ?? 1];
+	};
+	const luminance = ([r, g, b]: [number, number, number]) => {
+		const lin = (c: number) => {
+			const s = c / 255;
+			return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+		};
+		return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+	};
+
+	it.each(['light', 'dark'])('reads at 4.5:1 or better in the %s theme', async (theme) => {
+		dropCss = useAppCss();
+		document.documentElement.dataset.theme = theme;
+		onTestFinished(() => {
+			delete document.documentElement.dataset.theme;
+		});
+		await mount(WIND, { status: { kind: 'missing' } });
+
+		const card = getComputedStyle(page.getByRole('article').element());
+		const tag = getComputedStyle(
+			page.getByRole('article').element().querySelector('.card__tag--gone') as Element
+		);
+		expect(tag.fontSize).toBe('14px');
+		const [fr, fg, fb] = channels(tag.color);
+		const [tr, tg, tb, ta] = channels(tag.backgroundColor);
+		const [cr, cg, cb] = channels(card.backgroundColor);
+		const text = luminance([fr, fg, fb]);
+		const fill = luminance([
+			tr * ta + cr * (1 - ta),
+			tg * ta + cg * (1 - ta),
+			tb * ta + cb * (1 - ta)
+		]);
+		const ratio = (Math.max(text, fill) + 0.05) / (Math.min(text, fill) + 0.05);
+
+		expect(ratio).toBeGreaterThanOrEqual(4.5);
+	});
 });
 
 describe('the tag line', () => {

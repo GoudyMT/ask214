@@ -179,7 +179,7 @@
 		border: 1px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
 		border-radius: var(--radius-s);
 		background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-		color: var(--color-danger);
+		color: color-mix(in srgb, var(--color-danger) 80%, var(--color-fg));
 		line-height: 1.4;
 		white-space: nowrap;
 	}
