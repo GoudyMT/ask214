@@ -263,7 +263,8 @@ export function validateRegionFile(raw: unknown): ContractResult {
 		errors.push(...validateListing(listing));
 		const id = isObject(listing) && isPositiveInt(listing.i) ? listing.i : undefined;
 		if (isObject(listing)) {
-			// A listing cannot be first seen after the file was pulled, nor created after it was first seen.
+			// A listing cannot be first seen or created after the file was pulled. It may be created after it was
+			// first seen: the pipeline dates an older listing it first sees after the baseline to the baseline.
 			const { fl, dc } = listing;
 			const late = (field: 'fl' | 'dc') =>
 				errors.push(
@@ -272,7 +273,7 @@ export function validateRegionFile(raw: unknown): ContractResult {
 						: { code: 'E_SBF_BAD_DATE', id, field }
 				);
 			if (pullDate !== undefined && isIsoDate(fl) && fl > pullDate) late('fl');
-			if (isIsoDate(fl) && isIsoDate(dc) && dc > fl) late('dc');
+			if (pullDate !== undefined && isIsoDate(dc) && dc > pullDate) late('dc');
 		}
 		if (id === undefined) continue;
 		if (seen.has(id)) errors.push({ code: 'E_SBF_DUP_ID', id, field: 'i' });

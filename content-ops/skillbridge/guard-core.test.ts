@@ -41,7 +41,7 @@ function goodTree(): Tree {
 	const names = ['remote', 'territories'] as const;
 	for (const week of [WEEK_OLD, WEEK_NEW]) {
 		names.forEach((file, n) => {
-			const listings = [cleanListing({ i: 1001 + n })];
+			const listings = [cleanListing({ i: 1001 + n, fl: WEEK_OLD })];
 			put(
 				tree,
 				`skillbridge-data/w/${week}/${file}.json`,

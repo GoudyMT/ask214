@@ -277,7 +277,7 @@ describe('validateRegionFile', () => {
 	});
 
 	// A first-seen date after the pull would sort first in "newest first" for everyone, and a creation date after
-	// first sight would read as New: neither can be true of a file published on its pull date.
+	// the pull would read as New: neither can be true of a file published on its pull date.
 	it('refuses a first-seen date after the pull, and keeps one on the pull date', () => {
 		const dated = (fl: string) => validateRegionFile(file({ listings: [listing({ fl })] }));
 		expect(dated('2026-10-21')).toEqual({ valid: true, errors: [] });
@@ -285,11 +285,15 @@ describe('validateRegionFile', () => {
 		expect(dated('9999-12-31').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'fl' }]);
 	});
 
-	it('refuses a creation date after first-seen, and keeps one on the same day', () => {
+	// The pipeline dates an older listing it first sees after the baseline to the baseline itself, so its creation
+	// date can fall after its first-seen date; refusing that would refuse the whole week's file.
+	it('keeps a creation date after first-seen up to the pull, and refuses one after the pull', () => {
 		const dated = (dc: string) =>
 			validateRegionFile(file({ listings: [listing({ fl: '2026-10-14', dc })] }));
 		expect(dated('2026-10-14')).toEqual({ valid: true, errors: [] });
-		expect(dated('2026-10-15').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'dc' }]);
+		expect(dated('2026-10-15')).toEqual({ valid: true, errors: [] });
+		expect(dated('2026-10-21')).toEqual({ valid: true, errors: [] });
+		expect(dated('2026-10-22').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'dc' }]);
 		expect(dated('2099-01-01').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'dc' }]);
 	});
 });
