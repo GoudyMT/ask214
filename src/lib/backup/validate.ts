@@ -189,7 +189,9 @@ function isStoredPlace(v: unknown): v is string {
 	const bytes = b64DecodeStrict(v);
 	if (bytes === null) return false;
 	try {
-		const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+		// ignoreBOM keeps a leading byte-order mark in the text, so the exact match below refuses it rather than the
+		// decoder dropping it unseen.
+		const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
 		return STORED_ZIP_RE.test(text) || Object.values(STATE_NAMES).includes(text);
 	} catch {
 		return false;

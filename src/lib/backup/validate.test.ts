@@ -596,6 +596,13 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 			(p) => (p.profile.geographicDestination = b64('2104')),
 			'profile'
 		],
+		// The bytes of a byte-order mark before the ZIP: a decoder that drops it would let a restore plant bytes Settings
+		// never writes, and every later backup would carry them on.
+		[
+			'a destination after a byte-order mark',
+			(p) => (p.profile.geographicDestination = b64('\xEF\xBB\xBF21046')),
+			'profile'
+		],
 		['a destination not base64', (p) => (p.profile.geographicDestination = '21046'), 'profile'],
 		['an empty destination', (p) => (p.profile.geographicDestination = ''), 'profile'],
 		['skillbridgeStart empty', (p) => (p.profile.skillbridgeStart = ''), 'profile'],
