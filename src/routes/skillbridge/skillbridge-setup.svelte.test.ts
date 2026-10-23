@@ -139,6 +139,9 @@ describe('the place the profile names', () => {
 		const { app, finder } = await device();
 		await app.store?.save({ geographicDestination: new TextEncoder().encode('21046') });
 		const before = { setup: finder.setup, filters: finder.filters };
+		// A write may land after the field fills, so the stored values alone cannot show that none was started.
+		const setSetup = vi.spyOn(finder, 'setSetup');
+		const setFilters = vi.spyOn(finder, 'setFilters');
 		await render(SkillBridgePage);
 
 		await expect.element(page.getByRole('button', { name: 'Use 21046' })).toBeVisible();
@@ -147,6 +150,8 @@ describe('the place the profile names', () => {
 
 		await expect.element(field()).toHaveValue('21046');
 		expect({ setup: finder.setup, filters: finder.filters }).toEqual(before);
+		expect(setSetup).not.toHaveBeenCalled();
+		expect(setFilters).not.toHaveBeenCalled();
 	});
 
 	it('offers nothing when the profile names no place', async () => {
