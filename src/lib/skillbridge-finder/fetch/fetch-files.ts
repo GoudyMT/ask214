@@ -7,6 +7,7 @@
 
 import {
 	MAX_FILE_BYTES,
+	MAX_PULL_DAYS_AHEAD,
 	type ChangesFile,
 	type IdsFile,
 	type IndexFile,
@@ -78,8 +79,6 @@ function checked<T>(raw: unknown, result: ContractResult): T {
 	return raw as T;
 }
 
-/** The furthest an index may be dated past the device's own UTC day: a pull a few days early, never a far-off one. */
-const MAX_DAYS_AHEAD = 7;
 const MS_PER_DAY = 86_400_000;
 
 /** `now` is the device clock in ms; it is only read to refuse a pull date that cannot be true. */
@@ -90,7 +89,8 @@ export async function fetchIndex(
 	const raw = await getJson({ kind: 'index' }, fetchFn);
 	const index = checked<IndexFile>(raw, validateIndex(raw));
 	const pullDay = Date.parse(`${index.pullDate}T00:00:00Z`) / MS_PER_DAY;
-	if (pullDay - Math.floor(now() / MS_PER_DAY) > MAX_DAYS_AHEAD) throw new Error('E_SBF_INVALID');
+	if (pullDay - Math.floor(now() / MS_PER_DAY) > MAX_PULL_DAYS_AHEAD)
+		throw new Error('E_SBF_INVALID');
 	return index;
 }
 

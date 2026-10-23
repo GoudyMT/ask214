@@ -100,6 +100,12 @@ export const MAX_IDS = 200_000;
  * parsed: the row caps above only bound work after a file has already been read whole.
  */
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+/**
+ * The furthest a pull date may be past the device's own UTC day: a pull cut a few days early, or a clock a little
+ * off, never a far-off date. The download refuses such an index, and the device's store drops one it holds, by this
+ * one number, so the two can never disagree about a week.
+ */
+export const MAX_PULL_DAYS_AHEAD = 7;
 /** Two weeks of changes are published: this week's and last week's. */
 export const MAX_CHANGE_WEEKS = 2;
 

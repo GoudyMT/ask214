@@ -1,4 +1,10 @@
-import type { ChangesFile, IdsFile, IndexFile, RegionFile } from '../contract/listing';
+import {
+	MAX_PULL_DAYS_AHEAD,
+	type ChangesFile,
+	type IdsFile,
+	type IndexFile,
+	type RegionFile
+} from '../contract/listing';
 import {
 	REGION_FILE_NAMES,
 	TABLE_FILE_NAMES,
@@ -54,12 +60,8 @@ const PACK_STORE = 'skillbridge-finder-pack';
 const LOCK_NAME = 'skillbridge-finder-pack';
 const GENERATION = 0;
 
-/**
- * How far past the device's UTC day an index may be dated. The weekly pull is cut on or just before it is published, so
- * a week further ahead than a clock that is a little off is a pipeline typo or a hostile deploy; held, it would make
- * every real week after it look like a rollback.
- */
-const MAX_FUTURE_DAYS = 7;
+// A held week dated further ahead than MAX_PULL_DAYS_AHEAD is a pipeline typo or a hostile deploy; kept, it would make
+// every real week after it look like a rollback.
 const MS_PER_DAY = 86_400_000;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -191,12 +193,12 @@ const getRow = (db: IDBDatabase, key: string) =>
 
 /** `now` is the device clock in ms; it is a parameter so the far-future bound can be tested without waiting for a date. */
 export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.now) {
-	/** Whether a week's date is more than MAX_FUTURE_DAYS after the device's UTC day. An unreadable date is not far ahead. */
+	/** Whether a week's date is more than MAX_PULL_DAYS_AHEAD after the device's UTC day. An unreadable date is not far ahead. */
 	function isFarFuture(pull: string): boolean {
 		const parts = DATE_RE.exec(pull);
 		if (parts === null) return false;
 		const pullDay = Date.UTC(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])) / MS_PER_DAY;
-		return pullDay - Math.floor(now() / MS_PER_DAY) > MAX_FUTURE_DAYS;
+		return pullDay - Math.floor(now() / MS_PER_DAY) > MAX_PULL_DAYS_AHEAD;
 	}
 
 	let _ready = $state(false);
