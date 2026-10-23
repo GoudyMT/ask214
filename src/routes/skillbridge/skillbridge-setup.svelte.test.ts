@@ -139,9 +139,10 @@ describe('changing the setup', () => {
 		await page.getByRole('button', { name: 'In person' }).click();
 		await show().click();
 
-		await vi.waitFor(() => expect(finder.setup.place).toEqual({ kind: 'state', state: 'VA' }));
-		expect(finder.filters).toEqual({ branches: ['Navy'] });
+		// The setup closes once both its writes have landed (the place, then the filters it owns).
 		await expect.element(field()).not.toBeInTheDocument();
+		expect(finder.setup.place).toEqual({ kind: 'state', state: 'VA' });
+		expect(finder.filters).toEqual({ branches: ['Navy'] });
 		// The address goes back to the plain page, so a reload does not open the setup again.
 		expect(location.hash).toBe('');
 	});
