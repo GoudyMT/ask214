@@ -90,34 +90,46 @@
 		query === '' ? chips : [...chips, { id: 'query', label: `"${query}"` }]
 	);
 
-	/** A write to the record; one that fails reads the record again and says so. */
-	async function write(run: () => Promise<void>): Promise<void> {
+	/** A write to the record; one that fails reads the record again and says so. True when it was saved. */
+	async function write(run: () => Promise<void>): Promise<boolean> {
 		problem = null;
 		try {
 			await run();
+			return true;
 		} catch {
 			await finder.refresh().catch(() => undefined);
 			problem = SAVE_FAILED;
+			return false;
 		}
 	}
 
-	function remove(id: string): void {
-		filtersButton?.focus();
+	// Focus moves on only once the pressed control is really gone: a save that failed leaves it, and focus with it.
+	async function remove(id: string): Promise<void> {
 		if (id === 'query') {
 			session.query = '';
-		} else if (id === 'place') {
-			void write(() => finder.setSetup((cur) => removeChip('place', cur, {}).setup));
-		} else {
-			void write(() => finder.setFilters((cur) => removeChip(id, {}, cur).filters));
+			filtersButton?.focus();
+		} else if (
+			await write(() =>
+				id === 'place'
+					? finder.setSetup((cur) => removeChip('place', cur, {}).setup)
+					: finder.setFilters((cur) => removeChip(id, {}, cur).filters)
+			)
+		) {
+			filtersButton?.focus();
 		}
 	}
 
-	function clearAll(): void {
-		filtersButton?.focus();
-		void write(async () => {
+	async function clearAll(): Promise<void> {
+		const saved = await write(async () => {
 			await finder.setSetup((cur) => clearAllChips(cur).setup);
 			await finder.setFilters({});
 		});
+		if (saved) filtersButton?.focus();
+	}
+
+	async function markAllSeen(): Promise<void> {
+		await session.markAllSeen();
+		if (newCount === 0) filtersButton?.focus();
 	}
 
 	// Once the last page is shown the button is gone; focus goes to the first program it added, not to the top of the page.
@@ -158,7 +170,7 @@
 		type="button"
 		class="list__chip"
 		aria-label="Remove {c.label}"
-		onclick={() => remove(c.id)}>{c.label} <span aria-hidden="true">x</span></button
+		onclick={() => void remove(c.id)}>{c.label} <span aria-hidden="true">x</span></button
 	>
 {/snippet}
 
@@ -222,7 +234,7 @@
 		<div class="list__chips">
 			{#each chips as c (c.id)}{@render chipButton(c)}{/each}
 			{#if chips.length >= 2}
-				<button type="button" class="list__link" onclick={clearAll}>Clear all</button>
+				<button type="button" class="list__link" onclick={() => void clearAll()}>Clear all</button>
 			{/if}
 			<button
 				type="button"
@@ -246,17 +258,13 @@
 				<p class="list__muted">No listings are available for this area right now.</p>
 			{/if}
 		{:else}
-			<p class="list__count" role="status">
-				<strong>{rows.length} {rows.length === 1 ? 'program' : 'programs'}</strong>
+			<!-- Only the count is announced: opening a card lowers the new count, which is not news to read aloud. -->
+			<p class="list__count">
+				<strong role="status">{rows.length} {rows.length === 1 ? 'program' : 'programs'}</strong>
 				{#if newCount > 0}
 					- {newCount} new
-					<button
-						type="button"
-						class="list__link"
-						onclick={() => {
-							filtersButton?.focus();
-							void session.markAllSeen();
-						}}>Mark all seen</button
+					<button type="button" class="list__link" onclick={() => void markAllSeen()}
+						>Mark all seen</button
 					>
 				{/if}
 			</p>

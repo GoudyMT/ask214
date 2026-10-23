@@ -226,6 +226,26 @@ describe('where focus goes when the control pressed goes away', () => {
 		await expect.element(filtersButton()).toHaveFocus();
 	});
 
+	// A save that failed leaves the chip on screen: focus stays on what the person pressed, beside the error.
+	it('stays on a chip whose removal could not be saved', async () => {
+		const { finder } = await mount(STATE, { filters: { delivery: [1, 3] } });
+		vi.spyOn(finder, 'setFilters').mockRejectedValue(new Error('E_TEST_WRITE'));
+		await chip('Hybrid').click();
+
+		await expect.element(page.getByText('Could not save that change. Try again.')).toBeVisible();
+		await expect.element(chip('Hybrid')).toHaveFocus();
+	});
+
+	// Opening a card lowers the new count; only the program count is read aloud, so that is not announced.
+	it('announces the program count alone, not the new count beside it', async () => {
+		await mount();
+		await expect.element(page.getByText(/- 4 new/)).toBeVisible();
+
+		await expect
+			.poll(() => page.getByRole('status').element().textContent?.trim())
+			.toBe('6 programs');
+	});
+
 	it('goes to the Filters button after Clear all', async () => {
 		await mount(STATE, { filters: { delivery: [1, 3] } });
 		await page.getByRole('button', { name: 'Clear all' }).click();
