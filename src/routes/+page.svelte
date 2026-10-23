@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount, tick, type Component } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { waitForControl } from '$lib/ask/when-controlled';
 	import AskView from '$lib/components/AskView.svelte';
@@ -22,6 +22,7 @@
 	import type { HomeRow } from '$lib/timeline/home-glance';
 	import { FAILED_ROW, loadHomeGlance } from '$lib/timeline/load-home-glance';
 	import GlanceRow from '$lib/components/GlanceRow.svelte';
+	import { loadFinderHomeRow } from '$lib/skillbridge-finder/ui/load-home-row';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
 	import InstallNudge from '$lib/components/InstallNudge.svelte';
@@ -75,6 +76,20 @@
 		if (!timeline.ready) return null;
 		const glance = code.readyGlance(persona, timeline.state, clock.now);
 		return glance && code.timelineRow(glance);
+	});
+
+	// SkillBridge's row sits under the Timeline's. It reads its own stores and is handed nothing from here; it only says
+	// whether it has a row. Its code loads for a returning user only, so a first visit downloads none of it. A load that
+	// fails leaves Home without the row: the row is an extra, and the Timeline row does not wait for it.
+	let FinderRow = $state.raw<Component<{ onpresent: (present: boolean) => void }> | null>(null);
+	let finderRowShown = $state(false);
+	$effect(() => {
+		if (returning && !FinderRow) {
+			loadFinderHomeRow().then(
+				(m) => (FinderRow = m.default),
+				() => undefined
+			);
+		}
 	});
 
 	// Ask store wiring: the store is created once the cache has been read (a lookup, no download - see onMount),
@@ -267,12 +282,22 @@
 			</p>
 			<a class="home-onramp__action" href={resolve('/wizard')}>Set up your timeline</a>
 		</section>
-	{:else if isIdle && row}
-		<hr class="home-divider" />
+	{:else if isIdle && (row || FinderRow)}
+		<!-- The finder's row is not known until its code has read its own stores, so both stay in the page, hidden, until a row exists. -->
+		<hr class="home-divider" hidden={!row && !finderRowShown} />
 		<!-- A plain region, not a live one: it is read when reached, never announced on load. -->
-		<section class="home-glance" aria-labelledby="home-glance-heading">
+		<section
+			class="home-glance"
+			aria-labelledby="home-glance-heading"
+			hidden={!row && !finderRowShown}
+		>
 			<h2 id="home-glance-heading" class="home-glance__heading">For you</h2>
-			<GlanceRow {row} to="/timeline" />
+			{#if row}
+				<GlanceRow {row} to="/timeline" />
+			{/if}
+			{#if FinderRow}
+				<FinderRow onpresent={(present) => (finderRowShown = present)} />
+			{/if}
 		</section>
 	{/if}
 </div>

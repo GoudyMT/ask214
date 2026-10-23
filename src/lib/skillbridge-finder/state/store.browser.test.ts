@@ -150,6 +150,28 @@ describe('finder store', () => {
 		]);
 	});
 
+	// Home shows a locked row only to a person who has a saved finder record, and it must know that without opening it.
+	describe('whether a record is saved', () => {
+		it('is false on a device that has saved nothing, and true once the person has saved their setup', async () => {
+			const store = await loaded();
+			expect(await store.hasRecord()).toBe(false);
+			await store.setSetup({ radius: 25 });
+			expect(await store.hasRecord()).toBe(true);
+		});
+
+		it('answers while the record is locked, without decrypting it', async () => {
+			const a = await loaded();
+			await a.setSetup({ radius: 25 });
+			const locked = createFinderStore(db);
+			seams.decrypts = 0;
+
+			expect(await locked.hasRecord()).toBe(true);
+
+			expect(locked.ready).toBe(false);
+			expect(seams.decrypts).toBe(0);
+		});
+	});
+
 	describe('fails closed on a store it cannot trust', () => {
 		it('a keystore whose record HMAC no longer verifies', async () => {
 			const ks = await readRow<Record<string, unknown>>('keystore');

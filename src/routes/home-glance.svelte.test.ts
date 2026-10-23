@@ -8,6 +8,7 @@ import { textOf } from '$lib/timeline/personal-claim';
 import type { EaosString } from '$lib/profile/eaos';
 import type { PersonaFilters } from '$lib/profile/persona';
 import HomePage from './+page.svelte';
+import { stub as finderRow } from './home-finder-stub.svelte';
 
 // The Ask store is replaced by one the test controls; the cache read that makes it lands at once.
 const fake = $state<{ state: AskState }>({ state: { kind: 'idle' } });
@@ -64,6 +65,14 @@ vi.mock('$lib/timeline/load-home-glance', async (importOriginal) => {
 	glance.real = real.loadHomeGlance;
 	return { ...real, loadHomeGlance: () => glance.load() };
 });
+// SkillBridge's row reads stores of its own and has its own tests; here a stand-in says whether it has a row.
+const finderCode = vi.hoisted(() => ({ loads: 0 }));
+vi.mock('$lib/skillbridge-finder/ui/load-home-row', () => ({
+	loadFinderHomeRow: () => {
+		finderCode.loads++;
+		return import('./home-finder-stub.svelte');
+	}
+}));
 vi.mock('$lib/install/context', () => ({
 	getInstallApp: () => ({ canPrompt: false, installed: true, ios: false, persisted: false }),
 	setInstallApp: () => {}
@@ -89,6 +98,9 @@ beforeEach(() => {
 	glance.load.mockReset();
 	glance.load.mockImplementation(() => glance.real());
 	fake.state = { kind: 'idle' };
+	finderRow.present = false;
+	finderRow.mounts = 0;
+	finderCode.loads = 0;
 	app.status = 'ready';
 	app.store = { locked: false, persona };
 	app.timeline = { locked: false, ready: true, failed: false, state: EMPTY };
@@ -194,6 +206,7 @@ describe('Home, the timeline row', () => {
 		await new Promise((r) => setTimeout(r, 50));
 		expect(row()).toBeNull();
 		expect(glance.load).not.toHaveBeenCalled();
+		expect(finderCode.loads).toBe(0);
 	});
 
 	it('says it could not load when the row code fails to arrive', async () => {
@@ -221,6 +234,43 @@ describe('Home, the timeline row', () => {
 		await expect
 			.poll(() => lines())
 			.toEqual(['Your timeline - locked', 'Unlock to see what is due']);
+	});
+
+	describe('with the SkillBridge row', () => {
+		const section = () => document.querySelector<HTMLElement>('.home-glance');
+		const links = () => [...document.querySelectorAll<HTMLAnchorElement>('a.glance')];
+
+		// Someone who set up the finder and whose Timeline has nothing to say still has a row under "For you".
+		it('shows it under "For you" when the Timeline has no row', async () => {
+			app.timeline = { locked: false, ready: false, failed: false, state: EMPTY };
+			finderRow.present = true;
+			await render(HomePage);
+
+			await expect.poll(() => links().map((a) => a.getAttribute('href'))).toEqual(['/skillbridge']);
+			expect(finderCode.loads).toBe(1);
+			expect(section()!.hidden).toBe(false);
+			expect(section()!.querySelector('h2')!.textContent).toBe('For you');
+		});
+
+		it('sits below the Timeline row in the same section', async () => {
+			finderRow.present = true;
+			await render(HomePage);
+
+			await expect
+				.poll(() => links().map((a) => a.getAttribute('href')))
+				.toEqual(['/timeline', '/skillbridge']);
+			expect(document.querySelectorAll('.home-glance')).toHaveLength(1);
+		});
+
+		it('leaves no empty "For you" or divider on the page when neither tool has a row', async () => {
+			app.timeline = { locked: false, ready: false, failed: false, state: EMPTY };
+			await render(HomePage);
+
+			await expect.poll(() => finderRow.mounts).toBe(1);
+			expect(links()).toEqual([]);
+			expect(section()!.checkVisibility()).toBe(false);
+			expect(document.querySelector<HTMLElement>('.home-divider')!.checkVisibility()).toBe(false);
+		});
 	});
 
 	it('steps aside while answers show', async () => {

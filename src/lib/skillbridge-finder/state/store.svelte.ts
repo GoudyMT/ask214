@@ -17,7 +17,7 @@ import {
 	readKeystoreRow
 } from '../../profile/store.svelte';
 import { withWriteLocks } from '../../db/locks';
-import { withStores } from '../../db/schema';
+import { reqToPromise, withStores } from '../../db/schema';
 
 /**
  * FinderStore - orchestration over keystore + the generic record-crypto boundary + IDB for the SkillBridge finder's
@@ -324,6 +324,17 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 			return persist((base) =>
 				base.finderCompare.length > 0 ? { ...base, finderCompare: [] } : base
 			);
+		},
+
+		/**
+		 * Whether a finder record is saved on this device. The record is encrypted, so this counts the stored rows and
+		 * opens nothing: it answers while the store is locked, which is what a locked screen needs to know.
+		 */
+		async hasRecord(): Promise<boolean> {
+			const rows = await withStores(db, 'skillbridge-finder', 'readonly', (tx) =>
+				reqToPromise(tx.objectStore('skillbridge-finder').count())
+			);
+			return rows > 0;
 		},
 
 		/** Sync relock for the pagehide/freeze handlers - drop the reference. */
