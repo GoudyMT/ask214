@@ -427,6 +427,13 @@ const STATIC = 'static';
 //     222,500 -> 227,560, precache files 71 -> 72 and the root layout node 8,610 -> 8,920. Three builds measured
 //     page 95,102-95,105 B, precache 227,510-227,517 B, 72 files, root layout 8,877-8,879 B, about 40 B of room above
 //     the highest. Trim pass: the growth is the two approved sets of raises together, nothing new.
+//     The SkillBridge finder's screens (setup, list, filters, search, card, Compare, Saved, the Home row and the Settings
+//     rows) with the session that loads, searches and marks listings (owner's call, 2026-10-23): page 95,150 -> 107,000,
+//     on demand 8,189 -> 14,200, precache files 72 -> 86, precache 227,560 -> 263,500, and in package.json the root
+//     layout node 8,920 -> 9,300 and the route nodes 53,290 -> 69,000. Two builds measured page 105,639-105,643 B, on
+//     demand 13,379-13,380 B, 84 files, precache 261,865-261,871 B, root layout 9.23 kB, route nodes 67.98 kB. A trim
+//     pass took about 250 B (a shared helper out of the Home row's chunk, Setup's format pills from the list's table);
+//     what is left is the finder's own code, and these limits leave room for its review fixes, not for new features.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -436,10 +443,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 95_150,
-	onDemand: 8_189,
-	precacheFiles: 72,
-	precacheBytes: 227_560,
+	page: 107_000,
+	onDemand: 14_200,
+	precacheFiles: 86,
+	precacheBytes: 263_500,
 	workerScripts: 147_200
 };
 
