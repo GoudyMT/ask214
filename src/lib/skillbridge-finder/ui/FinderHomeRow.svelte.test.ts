@@ -105,8 +105,22 @@ describe('the SkillBridge row on Home', () => {
 		await setUpDevice();
 		await render(FinderHomeRow);
 
-		await expect.poll(() => lines()).toEqual(['SkillBridge - 2 new', '5 near Maryland']);
+		await expect
+			.poll(() => lines())
+			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location']);
 		expect(row()!.getAttribute('href')).toBe('/skillbridge');
+	});
+
+	// "Near" must be true: an online program, or one offered across several states, is in the list but is not near.
+	it('counts only the programs placed near the person, leaving online ones out', async () => {
+		const dev = await setUpDevice();
+		await dev.finder.setFilters({});
+		await render(FinderHomeRow);
+
+		// All six programs are listed; Foxtrot is online, so five are near.
+		await expect
+			.poll(() => lines())
+			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location']);
 	});
 
 	// Last week is held on the device, so a count could be shown at once: it would be last week's, and read as nothing new.
@@ -225,7 +239,9 @@ describe('the SkillBridge row on Home while locked', () => {
 		await dev.pack.load();
 		flags.lockState = 'unlocked';
 
-		await expect.poll(() => lines()).toEqual(['SkillBridge - 2 new', '5 near Maryland']);
+		await expect
+			.poll(() => lines())
+			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location']);
 	});
 });
 

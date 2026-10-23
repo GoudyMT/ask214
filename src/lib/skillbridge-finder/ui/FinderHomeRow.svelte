@@ -127,7 +127,10 @@
 			setUp: true,
 			missedWeeks: made.missedWeeks,
 			newCount: found.filter((m) => made.isNewId(m.listing.i)).length,
-			nearCount: place ? found.length : 0,
+			// Near means a program with one place of its own: online and several-state programs are listed but are not near.
+			nearCount: place
+				? found.filter((m) => m.placement.kind === 'point' || m.placement.kind === 'state').length
+				: 0,
 			placeLabel: place ? placeText(place) : null
 		};
 	});
