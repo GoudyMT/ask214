@@ -79,6 +79,20 @@ describe('the first visit', () => {
 		expect(page.getByText('Timeline').elements()).toHaveLength(0);
 	});
 
+	// A first setup closes once the record says it is done, so the filters must land before that: otherwise a failed
+	// filters write would be said on a screen that is already gone, and the list would open without the chosen formats.
+	it('keeps the setup open and says so when the chosen formats cannot be saved', async () => {
+		const { finder } = await device();
+		vi.spyOn(finder, 'setFilters').mockRejectedValue(new Error('E_TEST_WRITE'));
+		await render(SkillBridgePage);
+		await field().fill('Maryland');
+		await page.getByRole('button', { name: 'Hybrid' }).click();
+		await show().click();
+
+		await expect.element(page.getByRole('alert')).toBeVisible();
+		await expect.element(field()).toBeVisible();
+	});
+
 	it('Skip all keeps the choice and takes the setup away', async () => {
 		const { finder } = await device();
 		await render(SkillBridgePage);
@@ -96,7 +110,7 @@ describe('the first visit', () => {
 		await page.getByRole('button', { name: 'Management' }).click();
 		await show().click();
 
-		// The setup closes once both its writes have landed (the place, then the filters it owns).
+		// The setup closes once both its writes have landed (the filters it owns, then the place).
 		await expect.element(field()).not.toBeInTheDocument();
 		expect(finder.setup).toEqual({
 			place: { kind: 'state', state: 'MD' },
@@ -139,7 +153,7 @@ describe('changing the setup', () => {
 		await page.getByRole('button', { name: 'In person' }).click();
 		await show().click();
 
-		// The setup closes once both its writes have landed (the place, then the filters it owns).
+		// The setup closes once both its writes have landed (the filters it owns, then the place).
 		await expect.element(field()).not.toBeInTheDocument();
 		expect(finder.setup.place).toEqual({ kind: 'state', state: 'VA' });
 		expect(finder.filters).toEqual({ branches: ['Navy'] });

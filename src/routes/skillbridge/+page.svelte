@@ -169,8 +169,10 @@
 		if (!store) return;
 		saveError = null;
 		try {
-			await store.setSetup(setup);
+			// Filters first: a first setup closes the moment the record says it is done, so anything written after that
+			// would land on a list already showing, and a failure would be said on a screen that is gone.
 			await store.setFilters((current) => withSetupChoices(current, choices));
+			await store.setSetup(setup);
 		} catch {
 			// The record is read again, so what shows is what is saved (another tab may have written meanwhile).
 			await store.refresh().catch(() => undefined);
