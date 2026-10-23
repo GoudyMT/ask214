@@ -39,11 +39,20 @@ meets WCAG AA contrast (4.5:1, and 3:1 for interface edges) in both themes.
 
 ### Layout and accessibility
 
-**What it is.** One layout wraps every page: a sticky header with the wordmark and navigation, a `main` region,
-and a footer with the not-affiliated statement, links to About, Source and Feedback, and the release version. The
-version comes from `package.json`, which each release's pull request bumps; a small Vite plugin writes it into the
-layout as plain text before Svelte compiles, and it links to that release's notes. A "Skip to content" link
-comes first in keyboard order. The landmarks are plain `header`, labelled `nav`, `main` and `footer` elements,
+**What it is.** One layout wraps every page: a sticky header with the wordmark and, from 600 px wide, the top menu
+(Timeline, SkillBridge, Resources and Settings), a `main` region, and a footer with the not-affiliated statement,
+links to About, Source and Feedback, and the release version. Below 600 px the top menu gives way to a bottom bar
+fixed to the screen edge with four tabs, Home, Timeline, SkillBridge and More, each an icon above a visible label
+(`src/lib/layout/BottomBar.svelte`). The current tab is marked by the accent colour and a 3 px bar on its top edge, so
+forced-colours mode still shows it, and by `aria-current="page"` on the tab whose own page is open; More carries
+`aria-current="true"` (the current section) while Settings, Resources, Documents, Feedback or About is open. Only one
+"Primary" navigation is ever displayed, and the page reserves room for the bar (footer padding and
+`scroll-padding-bottom`, plus the device's safe-area inset) so the footer and a focused control are never hidden
+behind it. On a phone only, the header slides away after more than 12 px of scrolling down and comes back on 4 px of
+scrolling up, at the top of the page, and when keyboard focus enters it; with reduced motion it moves with no slide.
+The version comes from `package.json`, which each release's pull request bumps; a small Vite plugin writes
+it into the layout as plain text before Svelte compiles, and it links to that release's notes. A "Skip to content"
+link comes first in keyboard order. The landmarks are plain `header`, labelled `nav`, `main` and `footer` elements,
 which carry their roles natively.
 
 **Why this project uses it.** Many users live with a disability, so keyboard and screen reader support is a
@@ -137,9 +146,9 @@ live site sends.
 ### Budgets and Lighthouse
 
 **What they are.** `size-limit` caps the gzipped JavaScript: the SvelteKit entry at 10 KB, the root layout
-loaded on every page at 7,330 bytes, and the code of all pages together at 51,930 bytes. `pnpm check:chunks` caps what
-one page downloads (90,300 bytes), the code loaded on demand (8,189 bytes) and the service worker's install set
-(68 files, 218,860 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
+loaded on every page at 8,610 bytes, and the code of all pages together at 53,290 bytes. `pnpm check:chunks` caps what
+one page downloads (90,350 bytes), the code loaded on demand (8,189 bytes) and the service worker's install set
+(71 files, 222,500 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
 production build: accessibility below 0.95 or performance below 0.9 fails the build, and best practices or SEO
 below 0.9 warns. Reports stay in a CI artifact.
 

@@ -1,0 +1,185 @@
+import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { readStashedRoute } from '$lib/feedback/context';
+import MorePage from './+page.svelte';
+
+// The profile app the page reads and the page the person came from, both set per test. `arrive` reports a later
+// arrival to the page, as SvelteKit does when the person navigates while More stays mounted.
+const ctx = vi.hoisted(() => ({
+	app: { status: 'ready' },
+	cameFrom: null as string | null,
+	arrive: (() => {}) as (from: string | null) => void,
+	leave: (() => {}) as (to: string) => void
+}));
+
+vi.mock('$lib/profile/context', () => ({ getProfileApp: () => ctx.app, setProfileApp: () => {} }));
+// SvelteKit reports the previous page to afterNavigate and the next one to beforeNavigate; here the test says what
+// they are.
+vi.mock('$app/navigation', () => ({
+	afterNavigate: (callback: (navigation: { from: { url: URL } | null }) => void) => {
+		ctx.arrive = (from) =>
+			callback({ from: from === null ? null : { url: new URL(from, window.location.origin) } });
+		ctx.arrive(ctx.cameFrom);
+	},
+	beforeNavigate: (callback: (navigation: { to: { url: URL } | null }) => void) => {
+		ctx.leave = (to) => callback({ to: { url: new URL(to, window.location.origin) } });
+	}
+}));
+
+const STASH_KEY = 'mtc:feedback:route';
+
+// Each group as the person sees it: a box of rows, every row one link with a title and a description.
+const groups = () =>
+	Array.from(document.querySelectorAll('ul')).map((list) =>
+		Array.from(list.querySelectorAll('a')).map((link) => ({
+			href: link.getAttribute('href'),
+			rel: link.getAttribute('rel'),
+			title: link.children[0]?.textContent,
+			text: link.children[1]?.textContent
+		}))
+	);
+
+const SETTINGS = {
+	href: '/settings',
+	rel: null,
+	title: 'Settings',
+	text: 'Your dates, backup, theme, online answers'
+};
+const LISTED = [
+	[
+		{
+			href: '/resources',
+			rel: null,
+			title: 'Resources',
+			text: 'Official links for benefits, jobs and school'
+		},
+		{ href: '/documents', rel: null, title: 'Documents', text: 'Guides saved for offline' }
+	],
+	[
+		{ href: '/feedback', rel: null, title: 'Feedback', text: 'Tell us what to fix or add' },
+		{
+			href: '/about',
+			rel: null,
+			title: 'About',
+			text: 'Sources, privacy, how Ask 214 works'
+		},
+		{
+			href: 'https://github.com/GoudyMT/ask214',
+			rel: 'external',
+			title: 'Source code',
+			text: 'On GitHub'
+		}
+	]
+];
+
+beforeEach(() => {
+	ctx.app.status = 'ready';
+	ctx.cameFrom = null;
+	sessionStorage.removeItem(STASH_KEY);
+});
+
+afterEach(() => {
+	sessionStorage.removeItem(STASH_KEY);
+});
+
+describe('the More page', () => {
+	// A phone user opens More to reach what the bottom bar does not hold.
+	it('lists the pages in their groups, each row one link with its title and description', async () => {
+		await render(MorePage);
+
+		await expect.element(page.getByRole('heading', { level: 1, name: 'More' })).toBeVisible();
+		expect(document.title).toBe('More - Ask 214');
+		expect(groups()).toEqual([[SETTINGS], ...LISTED]);
+		await expect
+			.element(
+				page.getByText(
+					'New tools land here first. A tool moves to the bottom bar only once people use it a lot.'
+				)
+			)
+			.toBeVisible();
+	});
+
+	// The header offers Settings only when the app is ready or damaged; before that there is nothing to set.
+	it('offers Settings when the app is damaged', async () => {
+		ctx.app.status = 'damaged';
+		await render(MorePage);
+
+		expect(groups()[0]).toEqual([SETTINGS]);
+	});
+
+	it.each(['loading', 'error'])(
+		'leaves the whole Settings group out when the app is %s',
+		async (status) => {
+			ctx.app.status = status;
+			await render(MorePage);
+
+			expect(groups()).toEqual(LISTED);
+		}
+	);
+
+	// Feedback is reported with the page it came from; reaching it through More must not lose that.
+	it('remembers the page the person came from on arrival, for Feedback', async () => {
+		ctx.cameFrom = '/timeline';
+		await render(MorePage);
+
+		expect(readStashedRoute()).toBe('/timeline');
+	});
+
+	// More opened directly has no earlier page; a stale page name from before must not ride along.
+	it('clears an old page name when More was opened directly', async () => {
+		sessionStorage.setItem(STASH_KEY, '/resources');
+		await render(MorePage);
+
+		expect(readStashedRoute()).toBeNull();
+	});
+
+	// Tapping the More tab on More, or coming back from Feedback, arrives from a page feedback cannot name: the page the
+	// person really came from stays.
+	it.each(['/more', '/feedback'])(
+		'keeps the remembered page when it is arrived at again from %s',
+		async (again) => {
+			ctx.cameFrom = '/timeline';
+			await render(MorePage);
+
+			ctx.arrive(again);
+
+			expect(readStashedRoute()).toBe('/timeline');
+		}
+	);
+
+	// Feedback reads and clears what is remembered, and Back from it mounts More afresh: the page the person came from
+	// must still be there for the next trip to Feedback.
+	it('remembers the page across a trip to Feedback and back, which mounts More again', async () => {
+		ctx.cameFrom = '/timeline';
+		await render(MorePage);
+		expect(readStashedRoute()).toBe('/timeline');
+
+		ctx.leave('/feedback');
+		ctx.cameFrom = '/feedback';
+		await render(MorePage);
+
+		expect(readStashedRoute()).toBe('/timeline');
+	});
+
+	// The remembered page belongs to one visit: once the person leaves More for any page but Feedback, a later trip
+	// to Feedback must not name a page from before.
+	it('forgets the page when the person leaves for another page, so a later Feedback names nothing', async () => {
+		ctx.cameFrom = '/';
+		await render(MorePage);
+
+		ctx.leave('/timeline');
+		ctx.arrive('/feedback');
+
+		expect(readStashedRoute()).toBeNull();
+	});
+
+	it('leaves nothing remembered when the person goes on from More to another page', async () => {
+		ctx.cameFrom = '/timeline';
+		await render(MorePage);
+
+		ctx.leave('/');
+
+		expect(readStashedRoute()).toBeNull();
+	});
+});

@@ -754,6 +754,16 @@
 		background: var(--color-accent);
 		color: var(--color-bg);
 	}
+	/* As on the theme pills: forced colors drop the fill, so a 3px Highlight border marks the chosen view. The padding
+	   gives up those 3px so the button keeps its size, and the border is rounded like the pill so its ends are not
+	   clipped. */
+	@media (forced-colors: active) {
+		.seg button[aria-pressed='true'] {
+			border: 3px solid Highlight;
+			padding: 3px 12px;
+			border-radius: 999px;
+		}
+	}
 	.seg button:disabled {
 		opacity: 0.45;
 		cursor: default;
@@ -790,7 +800,8 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		color: var(--color-accent);
+		/* The stronger accent shade: the plain accent on its own tint is under the 4.5:1 that small text needs. */
+		color: var(--color-accent-muted);
 	}
 	.reader__section {
 		margin: var(--space-l) 0 var(--space-s);

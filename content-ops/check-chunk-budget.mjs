@@ -370,6 +370,38 @@ const STATIC = 'static';
 //     each passphrase field, so a typo is found by its number instead of retyping six hidden words (its own list
 //     component and styles). Three builds measured page 90,246-90,250 B, precache 218,795-218,808 B, at least 50 B
 //     of room above the highest.
+//     Page 90,300 -> 90,330, precache 218,860 -> 222,065, precache files 68 -> 71, root layout 7,330 -> 8,400 and
+//     route nodes 51,930 -> 53,260 (package.json's size-limit) (owner's call, 2026-10-22): the phone bottom bar (four
+//     tabs with their own icons, the current-tab mark, a focused control kept clear of the bar), the header that hides
+//     on scroll down at phone width, the grouped More page and the SkillBridge placeholder page. The three new files
+//     are the two new pages' route nodes and the More page's styles. Three builds before the Timeline "today" pill's
+//     colour fix measured page 90,288-90,290 B, precache 222,013-222,023 B, layout 8,356-8,357 B, route nodes
+//     53,213-53,219 B, at least 40 B of room above the highest; with the pill fix, page and route nodes had 38 B.
+//     Trim pass: the placeholder's one style inline (-1 file, -84 B precache), the header step decided with
+//     one comparison less, the hiding attribute set on the header with no state of its own, and each tab named by its
+//     route alone (together about -75 B precache and -60 B root layout), kept; the More page's styles inline (-1 file,
+//     -133 B precache) grew the route nodes by 160 B, not kept.
+//     Precache 222,065 -> 222,280 and root layout 8,400 -> 8,460 (package.json's size-limit) (owner's call,
+//     2026-10-22): the Pre-PR review's fixes to the bottom bar - the page held still under a dialog and moved only for
+//     a control that starts in view, the feedback page kept through More, the bar first in the Tab order, labels that
+//     wrap at a large text size, a focus ring drawn inside each tab - and four older marks fixed with them (the
+//     reader's view toggle and cited label, Ask's answer mode and the Timeline's phase chips in forced colours or on
+//     their tint). Three builds measured precache 222,223-222,236 B and root layout 8,413-8,417 B, about 40 B of room
+//     above the highest; route nodes 53,226-53,229 B and page 90,285-90,290 B stay under their limits. Trim pass
+//     first: one focus listener for the header and the bar, and a literal padding (-20 B root layout, -45 B
+//     precache), kept.
+//     Page 90,330 -> 90,350, precache 222,280 -> 222,320 and route nodes 53,260 -> 53,290 (package.json's
+//     size-limit) (owner's call, 2026-10-22): the review's last fixes - the More page forgetting the page a person
+//     came from once they leave it for anything but Feedback (the More route node), and a focused control moved fully
+//     clear of the bar when the move hides the header. Three builds measured page 90,304-90,307 B, precache
+//     222,268-222,282 B and route nodes 53,239-53,245 B; the highest precache build was 2 B over. The raise restores
+//     about 40 B of room above the highest; no trim was left that kept every fix.
+//     Precache 222,320 -> 222,500 and root layout 8,460 -> 8,610 (package.json's size-limit) (owner's call, 2026-10-22):
+//     the Pre-Push Op-Test's fixes - a control focused from script re-checked after WebKit's late focus scroll and moved
+//     by whole pixels, the room for the bar following its real height at a large text size, a header that holds focus
+//     kept on screen and unflagged, and a header menu that wraps instead of scrolling sideways. Three builds measured
+//     root layout 8,568-8,569 B and precache 222,440-222,456 B, about 40 B of room above the highest. Trim pass first:
+//     the focused control measured in one place and the bar looked up once (about -20 B), kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -379,10 +411,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 90_300,
+	page: 90_350,
 	onDemand: 8_189,
-	precacheFiles: 68,
-	precacheBytes: 218_860,
+	precacheFiles: 71,
+	precacheBytes: 222_500,
 	workerScripts: 147_200
 };
 

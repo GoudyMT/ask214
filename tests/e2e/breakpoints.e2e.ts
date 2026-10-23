@@ -80,7 +80,16 @@ const WIDER = [
 // Public routes reachable without a provisioned profile. Home gets the full width range (the
 // primary surface); the rest are checked at mobile widths, where overflow bites. (/ask is a 308
 // redirect to Home -- the Ask UI lives on / , already covered -- so listing it would retest Home.)
-const ROUTES = ['/', '/resources', '/about', '/feedback', '/wizard', '/documents'];
+const ROUTES = [
+	'/',
+	'/resources',
+	'/about',
+	'/feedback',
+	'/wizard',
+	'/documents',
+	'/more',
+	'/skillbridge'
+];
 
 for (const route of ROUTES) {
 	const viewports = route === '/' ? [...MOBILE, ...WIDER] : MOBILE;

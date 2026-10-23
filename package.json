@@ -1,7 +1,7 @@
 {
 	"name": "ask214",
 	"private": true,
-	"version": "1.8.0",
+	"version": "1.9.0",
 	"license": "AGPL-3.0-or-later",
 	"type": "module",
 	"packageManager": "pnpm@11.2.2",
@@ -73,13 +73,13 @@
 		{
 			"name": "Root layout node (loaded on every page)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/0.*.js",
-			"limit": "7330 B",
+			"limit": "8610 B",
 			"gzip": true
 		},
 		{
 			"name": "Lazy route nodes (sum; no single page loads all of them)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
-			"limit": "51930 B",
+			"limit": "53290 B",
 			"gzip": true
 		}
 	],
@@ -95,6 +95,7 @@
 		"@types/node": "^26",
 		"@vitejs/plugin-basic-ssl": "^2.3.0",
 		"@vitest/browser-playwright": "5.0.4",
+		"axe-core": "4.11.4",
 		"esbuild": "0.28.2",
 		"eslint": "^10.12.0",
 		"eslint-config-prettier": "^10.1.8",

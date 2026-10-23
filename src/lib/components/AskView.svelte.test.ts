@@ -550,6 +550,45 @@ describe('AskView', () => {
 		expect(priv).not.toContain('only your question is sent'); // the online-only phrasing must be absent
 	});
 
+	// Forced colors drop the accent fill that marks the chosen mode, so there a 3 px border in the system highlight colour
+	// marks it, and no option changes size; the normal look has no such ring. The component tests run without app.css,
+	// so the tokens the options use (spacing, and a border colour so the options have their 1 px border) are set here, and
+	// removed.
+	it('marks the chosen answer mode by a 3 px border in forced colors only, with no option changing size', async () => {
+		const root = document.documentElement;
+		root.style.setProperty('--space-xs', '4px');
+		root.style.setProperty('--space-m', '16px');
+		root.style.setProperty('--color-border', '#2a313a');
+		const session = cdp();
+		try {
+			const { container } = await render(AskView, {
+				props: props({ kind: 'idle' }, { onlineCapable: true, mode: 'online' })
+			});
+			const opts = [...container.querySelectorAll<HTMLElement>('.ask-mode__opt')];
+			expect(opts.map((o) => o.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+			const borders = () => opts.map((o) => getComputedStyle(o).borderTopWidth);
+			const sizes = () =>
+				opts.map((o) => [o.getBoundingClientRect().width, o.getBoundingClientRect().height]);
+			expect(borders()).toEqual(['1px', '1px']);
+			const before = sizes();
+
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'active' }]
+			});
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			expect(borders()).toEqual(['3px', '1px']);
+			expect(sizes()).toEqual(before);
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+			root.style.removeProperty('--space-xs');
+			root.style.removeProperty('--space-m');
+			root.style.removeProperty('--color-border');
+		}
+		await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(false);
+	});
+
 	it('freezes the mode toggle and the nudge button while a query is in flight', async () => {
 		const { container } = await render(AskView, {
 			props: props({ kind: 'embedding' }, { onlineCapable: true, mode: 'online', showNudge: true })

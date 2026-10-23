@@ -7,8 +7,9 @@ compatibility_flags = ["nodejs_compat"]
 # same app under a second host whose security.txt Canonical points at a different origin (RFC 9116
 # mismatch), and split a privacy-first app across two origins.
 workers_dev = false
-# Preview links (Version URLs) are switched in the dashboard, for testing a branch before merge. No
-# preview_urls line here: a branch build applies one, so it would flip that switch on every push.
+# Preview links (Version URLs) are switched on in the dashboard, for testing a branch before merge, and
+# every deploy to main turns them off again. No preview_urls line here: a branch build applies one, so it
+# would flip that switch on every push.
 
 [assets]
 binding = "ASSETS"

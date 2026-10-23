@@ -52,6 +52,7 @@
 					type="button"
 					class="phase-chips__chip"
 					class:phase-chips__chip--active={activeId === chip.id}
+					aria-current={activeId === chip.id ? 'true' : undefined}
 					onclick={() => jumpTo(chip.id)}
 				>
 					{chip.label} <span class="phase-chips__count">{chip.count}</span>
@@ -72,6 +73,18 @@
 		padding: var(--space-s) 0;
 		background: var(--color-bg);
 		border-bottom: 1px solid var(--color-border);
+		transition: top 200ms ease;
+	}
+
+	/* The phone header slides away while the page scrolls down (the root layout sets the flag); the chips take its
+	   place at the top edge, moving with the same timing. */
+	:global(html[data-header-hidden]) .phase-chips {
+		top: 0;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.phase-chips {
+			transition: none;
+		}
 	}
 
 	/* On mobile the chips become one horizontally-scrolling row (no wrap, no wasted width). */
@@ -117,6 +130,14 @@
 		background: var(--color-surface);
 		color: var(--color-fg);
 		border-color: var(--color-accent);
+	}
+	/* Forced colors replace the fill and the border colour that mark the in-view phase, so there a 3px border in the
+	   system highlight colour marks it; the padding gives up the 2px the border grows by, so no chip changes size. */
+	@media (forced-colors: active) {
+		.phase-chips__chip--active {
+			border: 3px solid Highlight;
+			padding: 2px 9px;
+		}
 	}
 	.phase-chips__count {
 		margin-left: 2px;

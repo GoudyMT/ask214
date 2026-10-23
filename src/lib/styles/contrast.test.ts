@@ -134,6 +134,59 @@ function opacityOf(css: string, selector: string): number {
 	return value ? Number(value) : 1;
 }
 
+// Small accent-coloured text on a tint of the accent itself: the plain accent is under 4.5:1 there, so the text uses the
+// stronger shade. The colour token and the tint are read from each component's own CSS, so a change in either shows up
+// here as the ratio a person would see.
+const sourceReaderCss = readFileSync(
+	fileURLToPath(new URL('../components/SourceReader.svelte', import.meta.url)),
+	'utf8'
+);
+const timelineListCss = readFileSync(
+	fileURLToPath(new URL('../components/TimelineList.svelte', import.meta.url)),
+	'utf8'
+);
+
+// The declarations of the rule that starts at `selector {`.
+function ruleOf(css: string, selector: string): string {
+	const at = css.indexOf(`${selector} {`);
+	if (at === -1) throw new Error('E_RULE_NOT_FOUND');
+	return css.slice(at, css.indexOf('}', at));
+}
+// The colour token the rule's text uses, as the palette value.
+function textColorOf(rule: string, c: { accent: string; accentMuted: string }): string {
+	const name = /(?:^|[\s;])color:\s*var\(--color-([a-z-]+)\)/.exec(rule)?.[1];
+	if (name === 'accent') return c.accent;
+	if (name === 'accent-muted') return c.accentMuted;
+	throw new Error('E_TEXT_TOKEN_UNKNOWN');
+}
+// The accent tint of the rule's background, as a share between 0 and 1.
+function tintOf(rule: string): number {
+	const pct = /background:\s*color-mix\(in srgb, var\(--color-accent\) (\d+)%, transparent\)/.exec(
+		rule
+	)?.[1];
+	if (!pct) throw new Error('E_TINT_NOT_FOUND');
+	return Number(pct) / 100;
+}
+
+for (const [name, t] of [
+	['dark', tokens],
+	['light', tokensLight]
+] as const) {
+	describe(`WCAG AA accent text on its own tint - ${name} palette`, () => {
+		const c = t.color;
+		it('the "Cited passage" label in the source reader (over its tint on the surface) >= 4.5:1', () => {
+			const text = textColorOf(ruleOf(sourceReaderCss, '.reader__passage--cited::before'), c);
+			const tint = tintOf(ruleOf(sourceReaderCss, '.reader__passage--cited'));
+			expect(cr(text, mix(c.accent, c.surface, tint))).toBeGreaterThanOrEqual(4.5);
+		});
+		it('the Timeline "Today" pill text (over its tint on the page) >= 4.5:1', () => {
+			const text = textColorOf(ruleOf(timelineListCss, '.timeline-today__pill'), c);
+			const tint = tintOf(ruleOf(timelineListCss, '.timeline-today__pill'));
+			expect(cr(text, mix(c.accent, c.bg, tint))).toBeGreaterThanOrEqual(4.5);
+		});
+	});
+}
+
 for (const [name, t] of [
 	['dark', tokens],
 	['light', tokensLight]

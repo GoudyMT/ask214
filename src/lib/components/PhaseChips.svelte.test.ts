@@ -1,4 +1,5 @@
 import { render } from 'vitest-browser-svelte';
+import { cdp } from 'vitest/browser';
 import { describe, it, expect, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import PhaseChips from './PhaseChips.svelte';
@@ -88,6 +89,96 @@ describe('PhaseChips', () => {
 		expect(container.querySelector('button.phase-chips__chip')?.textContent).toContain(
 			'After separation'
 		);
+	});
+
+	// On a phone the header slides off the top while the page scrolls down; the chips that stuck under it must then stick
+	// to the top edge, or a gap the height of the header shows between the screen edge and the chips.
+	it('sticks under the header, and to the top edge while the header is hidden', async () => {
+		const { container } = await render(PhaseChips, { props: { view: VIEW } });
+		const chips = container.querySelector('.phase-chips') as HTMLElement;
+		expect(getComputedStyle(chips).top).toBe('56px');
+		document.documentElement.setAttribute('data-header-hidden', '');
+		try {
+			await expect.poll(() => getComputedStyle(chips).top).toBe('0px');
+		} finally {
+			document.documentElement.removeAttribute('data-header-hidden');
+		}
+		await expect.poll(() => getComputedStyle(chips).top).toBe('56px');
+	});
+
+	// The chips move with the header, in 200 ms; someone who asked their device for less motion gets them there with no slide.
+	it('slides to the top edge in 200 ms, and not at all when reduced motion is on', async () => {
+		const { container } = await render(PhaseChips, { props: { view: VIEW } });
+		const chips = container.querySelector('.phase-chips') as HTMLElement;
+		expect(getComputedStyle(chips).transitionDuration).toBe('0.2s');
+		const session = cdp();
+		await session.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'prefers-reduced-motion', value: 'reduce' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(true);
+			expect(getComputedStyle(chips).transitionDuration).toBe('0s');
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }]
+			});
+		}
+	});
+
+	// The look of the in-view phase is not heard by a screen reader: the chip also says it is the current item of the set.
+	it('marks only the in-view phase chip as current, for a screen reader', async () => {
+		const section = document.createElement('section');
+		section.id = 'phase-final-90';
+		section.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100vh';
+		document.body.appendChild(section);
+		try {
+			const { container } = await render(PhaseChips, { props: { view: VIEW } });
+			const chips = [...container.querySelectorAll<HTMLElement>('button.phase-chips__chip')];
+			await expect
+				.poll(() => chips.map((c) => c.getAttribute('aria-current')))
+				.toEqual([null, 'true']);
+		} finally {
+			section.remove();
+		}
+	});
+
+	// Forced colors drop the fill and the border colour that mark the in-view phase, so there a 3 px border in the system
+	// highlight colour marks it, and no chip changes size; the normal look has no such ring. Component tests run without
+	// app.css, so the border colour token is set here (the chips then have their 1 px border) and removed.
+	it('marks the in-view phase by a 3 px border in forced colors only, with no chip changing size', async () => {
+		document.documentElement.style.setProperty('--color-border', '#2a313a');
+		// The phase's section is in the page behind the chips, across the band the scroll-spy watches.
+		const section = document.createElement('section');
+		section.id = 'phase-18-12';
+		section.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100vh';
+		document.body.appendChild(section);
+		const session = cdp();
+		try {
+			const { container } = await render(PhaseChips, { props: { view: VIEW } });
+			const chips = [...container.querySelectorAll<HTMLElement>('button.phase-chips__chip')];
+			await expect
+				.poll(() => chips.map((c) => c.classList.contains('phase-chips__chip--active')))
+				.toEqual([true, false]);
+			const borders = () => chips.map((c) => getComputedStyle(c).borderTopWidth);
+			const sizes = () =>
+				chips.map((c) => [c.getBoundingClientRect().width, c.getBoundingClientRect().height]);
+			expect(borders()).toEqual(['1px', '1px']);
+			const before = sizes();
+
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'active' }]
+			});
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			expect(borders()).toEqual(['3px', '1px']);
+			expect(sizes()).toEqual(before);
+		} finally {
+			await session.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+			section.remove();
+			document.documentElement.style.removeProperty('--color-border');
+		}
+		await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(false);
 	});
 
 	it('smooth-scrolls to a phase section when its chip is clicked', async () => {

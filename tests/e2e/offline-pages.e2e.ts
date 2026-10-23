@@ -117,6 +117,7 @@ test('a page never opened while the worker was in charge opens offline, with its
 	const pages: [string, string | RegExp][] = [
 		['/documents', 'Documents'],
 		['/about', 'About'],
+		['/more', 'More'],
 		['/', /military transition/i]
 	];
 	for (const [path, heading] of pages) {

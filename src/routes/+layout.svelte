@@ -43,6 +43,13 @@
 		type InstallController
 	} from '$lib/install/install-prompt';
 	import { isInstalled, isIOS } from '$lib/install/install-state';
+	import BottomBar from '$lib/layout/BottomBar.svelte';
+	import {
+		HIDE_AFTER_PX,
+		nextHeaderState,
+		PHONE_QUERY,
+		startHeaderState
+	} from '$lib/layout/header-scroll';
 	import { shellWidthFor } from '$lib/layout/shell-width';
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 	import { stashRoute } from '$lib/feedback/context';
@@ -334,6 +341,86 @@
 		void refreshPersistence();
 		return controller.destroy;
 	});
+
+	// Header hiding, on a phone only (rules in header-scroll.ts): it slides away on a scroll down and returns on a scroll
+	// up or when focus enters it. The flag is also set on <html> so the Timeline's sticky chips can take its place.
+	let headerEl = $state<HTMLElement | null>(null);
+	$effect(() => {
+		const el = headerEl;
+		if (!el) return;
+		const phone = window.matchMedia(PHONE_QUERY);
+		const root = document.documentElement;
+		let state = startHeaderState(window.scrollY);
+		const setHidden = (hidden: boolean) => {
+			el.toggleAttribute('data-hidden', hidden);
+			root.toggleAttribute('data-header-hidden', hidden);
+		};
+		const onScroll = () => {
+			state = nextHeaderState(state, window.scrollY);
+			// A header holding focus stays on screen, so the page is not told it is hidden.
+			setHidden(state.hidden && !el.contains(document.activeElement));
+		};
+		// Focus entering the header brings it back, and the hide distance counts from there.
+		// The bar never moves, so a control focused under it has to. Chromium does that from scroll-padding-bottom, but
+		// WebKit leaves a control that is already inside the window where it is, and scrolls to one below the window only
+		// after focusin, to under the bar - so a control below the window is looked at again for up to half a second. A
+		// control that starts in the window and runs under the bar is moved up, but never past its first line (the
+		// header's bottom while a move that short keeps it shown, the top of the window when the move hides it).
+		// The bar's own links stay put, and so does the page behind a modal dialog, which sits above the bar.
+		const bar = document.querySelector('.bottom-bar');
+		const onFocusIn = ({ target }: FocusEvent) => {
+			if (!(target instanceof Element)) return;
+			if (el.contains(target)) {
+				state = startHeaderState(window.scrollY);
+				return setHidden(false);
+			}
+			if (!bar || target.closest('.bottom-bar,dialog[open]')) return;
+			let frames = 30;
+			const check = () => {
+				if (document.activeElement !== target) return;
+				const { top, bottom } = target.getBoundingClientRect();
+				if (top >= window.innerHeight) {
+					if (--frames) requestAnimationFrame(check);
+					return;
+				}
+				const room = bottom - bar.getBoundingClientRect().top;
+				const shift = Math.min(
+					room,
+					room > HIDE_AFTER_PX ? top : top - el.getBoundingClientRect().bottom
+				);
+				// Whole pixels: WebKit drops a fraction of a pixel, which would leave the control just under the bar.
+				if (shift > 0) window.scrollBy(0, Math.ceil(shift));
+			};
+			check();
+		};
+		// At a large text size the labels wrap and the bar grows, so the room the page keeps for it follows its real
+		// height: its links and its top border (the safe-area inset is added where the room is used).
+		const sizer = new ResizeObserver((entries) => {
+			for (const e of entries)
+				root.style.setProperty('--bottom-bar-height', `${e.contentRect.height + 1}px`);
+		});
+		const stop = () => {
+			window.removeEventListener('scroll', onScroll);
+			document.removeEventListener('focusin', onFocusIn);
+			sizer.disconnect();
+			setHidden(false);
+		};
+		// Crossing 600px in either direction starts over: a header hidden on a phone must not stay hidden on a desktop.
+		const sync = () => {
+			stop();
+			if (!phone.matches) return;
+			state = startHeaderState(window.scrollY);
+			window.addEventListener('scroll', onScroll);
+			document.addEventListener('focusin', onFocusIn);
+			if (bar) sizer.observe(bar);
+		};
+		sync();
+		phone.addEventListener('change', sync);
+		return () => {
+			phone.removeEventListener('change', sync);
+			stop();
+		};
+	});
 </script>
 
 <svelte:head>
@@ -349,21 +436,28 @@
 <AppGate {app}>
 	<a class="skip-link" href="#main-content">Skip to content</a>
 
-	<header>
-		<nav aria-label="Primary" style:--shell-width={shellWidth}>
+	<header bind:this={headerEl}>
+		<div class="header-row" style:--shell-width={shellWidth}>
 			<a href={resolve('/')} class="brand">Ask 214</a>
-			<ul>
-				<li><a href={resolve('/timeline')}>Timeline</a></li>
-				<li><a href={resolve('/resources')}>Resources</a></li>
-				<!-- Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable,
-				     so even a fresh no-timeline user has something to set there (the timeline sections hide inside
-				     Settings). And when the saved data is damaged, where its erase is the only way back. -->
-				{#if app.status === 'ready' || app.status === 'damaged'}
-					<li><a href={resolve('/settings')}>Settings</a></li>
-				{/if}
-			</ul>
-		</nav>
+			<nav aria-label="Primary">
+				<ul>
+					<li><a href={resolve('/timeline')}>Timeline</a></li>
+					<li><a href={resolve('/skillbridge')}>SkillBridge</a></li>
+					<li><a href={resolve('/resources')}>Resources</a></li>
+					<!-- Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable,
+					     so even a fresh no-timeline user has something to set there (the timeline sections hide inside
+					     Settings). And when the saved data is damaged, where its erase is the only way back. -->
+					{#if app.status === 'ready' || app.status === 'damaged'}
+						<li><a href={resolve('/settings')}>Settings</a></li>
+					{/if}
+				</ul>
+			</nav>
+		</div>
 	</header>
+
+	<!-- Fixed on screen, so its place in the page is free to be here: below 600px it is the only menu, so a keyboard user
+	     reaches it right after the brand (the desktop menu is in the header too), and "Skip to content" skips it. -->
+	<BottomBar />
 
 	{#if app.status === 'ready' && app.store?.clockBackward}
 		<ClockBackwardBanner onfix={() => void goto(resolve('/settings'))} />
@@ -391,7 +485,13 @@
 			<a href={resolve('/about')}>About</a> &middot;
 			<a href="https://github.com/GoudyMT/ask214" rel="external">Source</a>
 			&middot;
-			<a href={resolve('/feedback')} onclick={() => stashRoute(page.url.pathname)}>Feedback</a>
+			<!-- On More the page the person came from is already remembered, and "/more" would clear it. -->
+			<a
+				href={resolve('/feedback')}
+				onclick={() => {
+					if (page.url.pathname !== '/more') stashRoute(page.url.pathname);
+				}}>Feedback</a
+			>
 			&middot;
 			<a href="https://github.com/GoudyMT/ask214/releases/tag/v{__APP_VERSION__}" rel="external"
 				>v{__APP_VERSION__}</a
@@ -401,7 +501,7 @@
 </AppGate>
 
 <style>
-	/* Sticky header (pure CSS, no JS). Background + z-index prevent */
+	/* Sticky header. Background + z-index prevent */
 	/* underlying content from showing through on scroll. */
 	header {
 		position: sticky;
@@ -410,6 +510,22 @@
 		background: var(--color-bg);
 		border-bottom: 1px solid var(--color-border);
 		padding: var(--space-m) var(--space-l);
+		transition: transform 200ms ease;
+	}
+
+	/* Hidden on a phone while the page scrolls down. Transform only, so the header keeps its box in the layout and
+	   the text below does not jump. The attribute is set from the script, so the compiler cannot see it in the markup. */
+	header:global([data-hidden]):not(:focus-within) {
+		transform: translateY(-100%);
+	}
+	/* A header that holds focus is in place at once: the browser scrolls to an off-screen brand before the script shows it. */
+	header:focus-within {
+		transition: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		header {
+			transition: none;
+		}
 	}
 
 	/* Tighter side padding on a phone: header, content, and footer share a 16px gutter so the nav is not
@@ -422,24 +538,28 @@
 		}
 	}
 
-	/* Right-aligned nav (brand left, nav right) via flex space-between. */
+	/* Brand left, menu right via flex space-between. */
 	/* Content width from --shell-width, one value for every route; 720px is only the fallback. */
-	nav {
+	.header-row {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		/* At a large text size the brand and the menu wrap onto lines of their own instead of scrolling the page sideways. */
+		flex-wrap: wrap;
+		row-gap: var(--space-xs);
 		max-width: var(--shell-width, 720px);
 		margin: 0 auto;
 	}
 
-	/* Inline horizontal nav (brand + Timeline/Resources/Settings; Settings appears only once a
-	   separation date is set; About lives in the footer). Migrate to a bottom-tab-bar when the nav grows
-	   to 4+ items (e.g. a future Tools section). */
+	/* From 600px up the header carries the menu (Timeline, SkillBridge, Resources, Settings; Settings appears
+	   only when the app is ready or damaged). Below 600px the header is the brand alone and the bottom bar
+	   (BottomBar.svelte) is the Primary navigation; About and Feedback live in More and the footer. */
 	nav ul {
 		list-style: none;
 		padding: 0;
 		margin: 0;
 		display: flex;
+		flex-wrap: wrap;
 		gap: var(--space-m);
 	}
 
@@ -501,5 +621,36 @@
 	}
 	footer p {
 		margin: var(--space-s) 0;
+	}
+
+	/* Below 600px (the value header-scroll.ts and BottomBar.svelte repeat; a media query cannot read a variable) the
+	   bar replaces the header menu. The page keeps room for both fixed edges: the footer's last line and a focused
+	   control scrolled into view stay clear of the bar below, and "Skip to content" lands main below the header. The
+	   room above is main's own scroll margin, not the page's scroll padding: the cards and the Timeline set a
+	   scroll-margin-top of their own for the chips, and padding would be added on top of it.
+	   --bottom-bar-height is the bar's 56px links plus its 1px top border; --header-height is the header's one line
+	   (two 16px paddings, one 24px line, 1px border). */
+	@media (max-width: 599.98px) {
+		:global(:root) {
+			--bottom-bar-height: 57px;
+			--header-height: 57px;
+		}
+		:global(html) {
+			scroll-padding-bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
+		}
+		main {
+			scroll-margin-top: var(--header-height);
+		}
+		header nav {
+			display: none;
+		}
+		footer {
+			padding-bottom: calc(var(--space-l) + var(--bottom-bar-height) + env(safe-area-inset-bottom));
+		}
+	}
+	@media (max-width: 480px) {
+		footer {
+			padding-bottom: calc(var(--space-m) + var(--bottom-bar-height) + env(safe-area-inset-bottom));
+		}
 	}
 </style>
