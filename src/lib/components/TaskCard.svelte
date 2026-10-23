@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
+	import { resolve } from '$app/paths';
 	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
 	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
 	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
@@ -222,6 +223,8 @@
 
 	// Contextual outbound resources: the links curated for this specific task, collapsed by default.
 	const related = $derived(resourcesForTask(item.def.id));
+	// The one task the app itself can help with in place: finding a program opens the finder, in this tab.
+	const opensFinder = $derived(item.def.id === 'skillbridge-find');
 	const guides = $derived(onOpenGuide ? guidesForTask(item.def.id) : []);
 	const linkNote = $derived(linkNoteForTask(item.def.id));
 	let relatedOpen = $state(false);
@@ -432,6 +435,13 @@
 				{#if firm}<span class="task-card__firm">Firm deadline</span>{/if}
 				{item.def.why}
 			</p>
+			{#if opensFinder}
+				<p class="task-card__whatnow">
+					<a class="task-card__whatnow-link" href={resolve('/skillbridge')}
+						>Search programs in the SkillBridge finder</a
+					>
+				</p>
+			{/if}
 			{#if afterNote?.text}
 				<div class="task-card__whatnow">
 					<span class="task-card__whatnow-label">{afterNote.label}</span>

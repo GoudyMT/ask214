@@ -67,6 +67,26 @@ async function renderCard(
 	});
 }
 
+// The task that asks a person to find a program opens the app's own finder, in this tab, where the search happens.
+describe('TaskCard, the link into the SkillBridge finder', () => {
+	const FIND = TASK_DEFS.find((d) => d.id === 'skillbridge-find');
+
+	it('offers the finder on the find-a-program task', async () => {
+		if (!FIND) throw new Error('test setup: no skillbridge-find task');
+		await renderCard(makeItem({ def: FIND }));
+		const link = page.getByRole('link', { name: 'Search programs in the SkillBridge finder' });
+		await expect.element(link).toHaveAttribute('href', '/skillbridge');
+		expect(link.element().getAttribute('target')).toBeNull();
+	});
+
+	it('offers it on no other task', async () => {
+		await renderCard(makeItem());
+		expect(
+			page.getByRole('link', { name: 'Search programs in the SkillBridge finder' }).elements()
+		).toHaveLength(0);
+	});
+});
+
 function buttonByText(container: Element, text: string): HTMLButtonElement | undefined {
 	return [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
 }
