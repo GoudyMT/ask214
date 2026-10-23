@@ -10,6 +10,10 @@ describe('sanitizeRoute', () => {
 		expect(sanitizeRoute('/documents')).toBe('/documents');
 		expect(routeLabel('/documents')).toBe('Documents');
 	});
+	it('accepts the SkillBridge finder, so feedback sent from it keeps its page', () => {
+		expect(sanitizeRoute('/skillbridge')).toBe('/skillbridge');
+		expect(routeLabel('/skillbridge')).toBe('SkillBridge');
+	});
 	it('strips query and hash before matching', () => {
 		expect(sanitizeRoute('/ask?q=hi')).toBe('/ask');
 		expect(sanitizeRoute('/about#sources')).toBe('/about');

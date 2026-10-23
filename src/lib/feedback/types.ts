@@ -4,6 +4,7 @@ export const MAX_EMAIL_LEN = 254; // RFC 5321 practical max
 export const KNOWN_ROUTES = [
 	'/',
 	'/timeline',
+	'/skillbridge',
 	'/ask',
 	'/resources',
 	'/settings',
@@ -40,6 +41,7 @@ export function sanitizeRoute(path: string | null | undefined): KnownRoute | nul
 const ROUTE_LABELS: Record<KnownRoute, string> = {
 	'/': 'Home',
 	'/timeline': 'Timeline',
+	'/skillbridge': 'SkillBridge',
 	'/ask': 'Ask',
 	'/resources': 'Resources',
 	'/settings': 'Settings',
