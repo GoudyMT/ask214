@@ -198,6 +198,22 @@ const failingAt =
 	(url, init) =>
 		url === path ? Promise.resolve(new Response('no', { status: 500 })) : net.fetchFn(url, init);
 
+/** `net` with one path held back until `release()`: `reached` settles when that request has been made. */
+function heldAt(net: ReturnType<typeof network>, path: string) {
+	let release!: () => void;
+	let arrive!: () => void;
+	const hold = new Promise<void>((resolve) => (release = resolve));
+	const reached = new Promise<void>((resolve) => (arrive = resolve));
+	const fetchFn: FetchFn = async (url, init) => {
+		if (url === path) {
+			arrive();
+			await hold;
+		}
+		return net.fetchFn(url, init);
+	};
+	return { net: { ...net, fetchFn }, reached, release };
+}
+
 let db: IDBDatabase;
 let sessions: FinderSession[] = [];
 
@@ -367,6 +383,36 @@ describe('what the session asks the network for', () => {
 		await session.start();
 
 		expect(asked).toBe(1);
+	});
+
+	// A worker that cannot be asked may be an older one that keeps a copy: no answer is a no, not a yes.
+	it('requests nothing when asking the worker fails', async () => {
+		const net = network();
+		const session = open(await device({}), net, {
+			workerPassesData: () => Promise.reject(new Error('no worker'))
+		});
+		await session.start();
+
+		expect(net.calls).toHaveLength(0);
+		expect(session.status).toBe('failed');
+		expect(session.downloadBlocked).toBe(true);
+	});
+
+	// A worker can take charge between two visits: the answer of the first must not stand for the second.
+	it('asks the worker again on each start, and obeys the newer answer', async () => {
+		const answers = [true, false];
+		const session = open(await device({}), network(), {
+			workerPassesData: () => Promise.resolve(answers.shift() ?? false)
+		});
+		await session.start();
+		expect(session.downloadBlocked).toBe(false);
+		expect(answers).toEqual([false]);
+
+		await session.start();
+
+		expect(answers).toEqual([]);
+		expect(session.status).toBe('failed');
+		expect(session.downloadBlocked).toBe(true);
 	});
 
 	it('asks the worker nothing when the guard already refuses', async () => {
@@ -749,6 +795,49 @@ describe('Lock', () => {
 		expect(session.indexHeld).toBe(false);
 		expect(session.query).toBe('');
 		expect(session.pullDate).toBeUndefined();
+	});
+
+	it('leaves no ZIP table in the session when the pack relocks', async () => {
+		const dev = await device({ place: { kind: 'zip', zip: '21046' }, radius: 25 });
+		const session = open(dev, network());
+		await session.start();
+		expect(session.zips).toBeDefined();
+
+		dev.pack.relockSync('user');
+
+		expect(session.zips).toBeUndefined();
+	});
+
+	// A download that was still running when the person locked must not put its week into a pack they unlock later.
+	it('keeps a download that finishes after a lock and an unlock out of the pack', async () => {
+		const dev = await device({});
+		await open(dev, network(LAST_PULL)).start();
+		const gate = heldAt(network(PULL), pathOf.region('remote'));
+		const session = open(dev, gate.net);
+		const visit = session.start();
+		await gate.reached;
+
+		dev.pack.relockSync('user');
+		await dev.pack.load();
+		gate.release();
+		await visit;
+
+		expect(dev.pack.pullDate).toBe(LAST_PULL);
+	});
+
+	// The ZIP table is fetched on demand; one that arrives after a lock is not kept, nor handed to the caller.
+	it('keeps a ZIP table that arrives after a lock out of the session', async () => {
+		const dev = await device({ place: { kind: 'zip', zip: '21046' }, radius: 25 });
+		const gate = heldAt(network(), pathOf.zips);
+		const session = open(dev, gate.net);
+		const asked = session.ensureZips();
+		await gate.reached;
+
+		dev.pack.relockSync('user');
+		gate.release();
+
+		await expect(asked).resolves.toBeUndefined();
+		expect(session.zips).toBeUndefined();
 	});
 
 	// A read that finishes after the person locked must not put its listings back on a locked device.
