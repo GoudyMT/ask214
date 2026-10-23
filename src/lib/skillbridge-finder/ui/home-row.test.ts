@@ -17,7 +17,7 @@ describe('finderHomeRow', () => {
 		expect(row({})).toStrictEqual({
 			name: 'SkillBridge',
 			count: '4 new',
-			detail: '4 opportunities near your selected location'
+			detail: '4 opportunities near your selected location (21046)'
 		});
 	});
 
@@ -74,7 +74,7 @@ describe('finderHomeRow', () => {
 	it('still counts the programs near the place in a week with none new, without a count', () => {
 		expect(row({ newCount: 0, nearCount: 7 })).toStrictEqual({
 			name: 'SkillBridge',
-			detail: '7 opportunities near your selected location'
+			detail: '7 opportunities near your selected location (21046)'
 		});
 	});
 
@@ -82,7 +82,7 @@ describe('finderHomeRow', () => {
 		expect(row({ placeLabel: 'Maryland', newCount: 1, nearCount: 1 })).toStrictEqual({
 			name: 'SkillBridge',
 			count: '1 new',
-			detail: '1 opportunity near your selected location'
+			detail: '1 opportunity near your selected location (Maryland)'
 		});
 	});
 });

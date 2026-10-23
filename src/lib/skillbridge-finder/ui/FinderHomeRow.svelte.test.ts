@@ -107,7 +107,7 @@ describe('the SkillBridge row on Home', () => {
 
 		await expect
 			.poll(() => lines())
-			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location']);
+			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location (Maryland)']);
 		expect(row()!.getAttribute('href')).toBe('/skillbridge');
 	});
 
@@ -120,7 +120,7 @@ describe('the SkillBridge row on Home', () => {
 		// All six programs are listed; Foxtrot is online, so five are near.
 		await expect
 			.poll(() => lines())
-			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location']);
+			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location (Maryland)']);
 	});
 
 	// Last week is held on the device, so a count could be shown at once: it would be last week's, and read as nothing new.
@@ -241,7 +241,7 @@ describe('the SkillBridge row on Home while locked', () => {
 
 		await expect
 			.poll(() => lines())
-			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location']);
+			.toEqual(['SkillBridge - 2 new', '5 opportunities near your selected location (Maryland)']);
 	});
 });
 

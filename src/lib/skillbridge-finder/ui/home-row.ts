@@ -25,10 +25,9 @@ export function finderHomeRow(input: FinderHomeInput): HomeRow | null {
 	if (!input.setUp || !input.online || input.missedWeeks > MAX_MISSED_WEEKS) return null;
 	if (!input.unlocked) return { name: NAME, detail: 'Unlock to see what is new' };
 
-	// Home is the screen most often seen by others, so the place itself is not named here.
 	const near =
 		input.placeLabel !== null && input.nearCount > 0
-			? `${input.nearCount} ${input.nearCount === 1 ? 'opportunity' : 'opportunities'} near your selected location`
+			? `${input.nearCount} ${input.nearCount === 1 ? 'opportunity' : 'opportunities'} near your selected location (${input.placeLabel})`
 			: null;
 	if (input.newCount <= 0) return { name: NAME, detail: near ?? 'No new programs this week' };
 	return { name: NAME, count: `${input.newCount} new`, detail: near ?? 'New programs this week' };
