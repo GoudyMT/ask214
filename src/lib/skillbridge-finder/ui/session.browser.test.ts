@@ -327,6 +327,58 @@ describe('what the session asks the network for', () => {
 		expect(net.regionRequests()).not.toContain(pathOf.region('pacific'));
 	});
 
+	// "Look farther" starts the visit again after widening the reach; if that lands while the first visit is still
+	// downloading, the files the wider reach needs must still be fetched.
+	it('fetches the files a wider reach needs when it is widened while a visit is downloading', async () => {
+		const place = { kind: 'zip', zip: '23219' } as const;
+		const dev = await device({ place, radius: 25 });
+		const gate = heldAt(network(), pathOf.region('remote'));
+		const session = open(dev, gate.net);
+		const first = session.start();
+		await gate.reached;
+		expect(gate.net.regionRequests()).not.toContain(pathOf.region('middle-atlantic'));
+
+		await dev.finder.setSetup({ place, radius: 100 });
+		const second = session.start();
+		gate.release();
+		await Promise.all([first, second]);
+
+		expect(gate.net.regionRequests()).toContain(pathOf.region('middle-atlantic'));
+		expect(await dev.pack.readRegion('middle-atlantic')).toBeDefined();
+	});
+
+	// The person locked after widening: the visit owed to the wider reach is not run on a locked pack.
+	it('does not start the owed visit again once the pack has relocked', async () => {
+		const place = { kind: 'zip', zip: '23219' } as const;
+		const dev = await device({ place, radius: 25 });
+		const gate = heldAt(network(), pathOf.region('remote'));
+		const session = open(dev, gate.net);
+		const first = session.start();
+		await gate.reached;
+		await dev.finder.setSetup({ place, radius: 100 });
+		const second = session.start();
+
+		dev.pack.relockSync('user');
+		gate.release();
+		await Promise.all([first, second]);
+
+		expect(gate.net.calls.filter((c) => c === pathOf.index)).toHaveLength(1);
+		expect(session.status).toBe('loading');
+	});
+
+	// A second tap on Retry, or a second screen asking, while a visit runs is the same visit, not another download.
+	it('runs one visit for two starts when the setup did not move', async () => {
+		const gate = heldAt(network(), pathOf.region('remote'));
+		const session = open(await device({}), gate.net);
+		const first = session.start();
+		await gate.reached;
+		const second = session.start();
+		gate.release();
+		await Promise.all([first, second]);
+
+		expect(gate.net.calls.filter((c) => c === pathOf.index)).toHaveLength(1);
+	});
+
 	it('lists the nearest programs first with their distance, across a state line', async () => {
 		const session = open(
 			await device({ place: { kind: 'zip', zip: '21046' }, radius: 100 }),

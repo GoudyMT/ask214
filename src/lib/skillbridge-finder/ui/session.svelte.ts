@@ -84,6 +84,10 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	// Bumped by a relock: work that began before it must not put anything back.
 	let epoch = 0;
 	let running: Promise<void> | null = null;
+	// The files the running visit chose to download, so a start that finds it running can tell whether the person has
+	// moved the setup since; `again` asks that visit to run once more when they have.
+	let askedFor: string | null = null;
+	let again = false;
 
 	// Plain variables, not deriveds: a derived keeps its last value alive until something reads it again, and a relock
 	// must leave nothing decrypted behind.
@@ -93,6 +97,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 
 	const off = pack.onDrop(() => {
 		epoch++;
+		again = false;
 		_held = mapOf();
 		_listings = [];
 		_ids = undefined;
@@ -284,7 +289,9 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			const index = await fetchIndex(fetchFn, now);
 			if (at !== epoch) return;
 			if (!isRollback(pack.pullDate, index.pullDate)) {
-				if (!(await download(index, wantedFiles(false)))) outcome = 'offline';
+				const wanted = wantedFiles(false);
+				askedFor = wanted.join(',');
+				if (!(await download(index, wanted))) outcome = 'offline';
 				if (at !== epoch) return;
 				await readHeld();
 			}
@@ -303,6 +310,15 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			// The list is on screen for this pull: it is the newest the person has now seen.
 			await pack.advanceLastSeen(pull).catch(() => safeLog({ code: 'E_INTERNAL' }));
 		}
+	}
+
+	/** One visit, and one more for each time the setup moved on while it was downloading. */
+	async function visits(): Promise<void> {
+		do {
+			again = false;
+			askedFor = null;
+			await run();
+		} while (again);
 	}
 
 	function listingsById(): Map<number, Listing> {
@@ -433,8 +449,14 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			return _ids ? savedStatus(id, _ids, _changes) : { kind: 'listed', id };
 		},
 		start(): Promise<void> {
-			running ??= run().finally(() => {
+			if (running) {
+				// A visit already downloading chose its files from the setup of that moment.
+				if (askedFor !== null && askedFor !== wantedFiles(false).join(',')) again = true;
+				return running;
+			}
+			running = visits().finally(() => {
 				running = null;
+				askedFor = null;
 			});
 			return running;
 		},
