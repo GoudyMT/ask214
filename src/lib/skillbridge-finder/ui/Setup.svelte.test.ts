@@ -4,6 +4,7 @@ import { page, userEvent } from 'vitest/browser';
 import type { ZipsTable } from '../contract/tables';
 import type { FinderFilters, FinderPlace, FinderSetup } from '../state/types';
 import { INDUSTRIES } from '../contract/listing';
+import { NOT_AFFILIATED } from './copy';
 import Setup from './Setup.svelte';
 
 const ZIPS: ZipsTable = {
@@ -271,6 +272,15 @@ describe('nothing typed reaches the address', () => {
 		await show().click();
 
 		expect(location.href).toBe(before);
+	});
+});
+
+// The first screen a person sees must say the site is independent of the Department of Defense and of Department of War.
+describe('the independence line', () => {
+	it('is shown in full on the setup screen', async () => {
+		mount();
+
+		await expect.element(page.getByText(NOT_AFFILIATED, { exact: true })).toBeVisible();
 	});
 });
 
