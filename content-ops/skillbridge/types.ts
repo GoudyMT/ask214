@@ -96,7 +96,15 @@ export type PullRun = {
 };
 
 export type PullOutcome =
-	{ ok: true; run: PullRun } | { ok: false; stop: StopCode; requests: number; elapsedMs: number };
+	| { ok: true; run: PullRun }
+	| {
+			ok: false;
+			stop: StopCode;
+			requests: number;
+			elapsedMs: number;
+			/** The path of the request in flight when the run stopped; never its query, which names a provider. */
+			stoppedAt?: string;
+	  };
 
 /** A cleaned listing before the check step sets its first-listed date and the links step its links. */
 export type CleanListing = Omit<Listing, 'fl' | 'w' | 'li'>;

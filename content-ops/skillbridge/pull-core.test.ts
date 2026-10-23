@@ -492,7 +492,15 @@ describe('runPull: stop on any sign of a "no"', () => {
 		const w = makeWorld();
 		w.scripts.set(ALL_URL, [reply]);
 		const { outcome, urls, advanced } = await pull(w);
-		expect(outcome).toEqual({ ok: false, stop, requests: 3, elapsedMs: advanced() });
+		// The path (never the query, which names a provider) says which request the server refused, so a rate limit can
+		// be told from a block without asking the server again.
+		expect(outcome).toEqual({
+			ok: false,
+			stop,
+			requests: 3,
+			elapsedMs: advanced(),
+			stoppedAt: new URL(ALL_URL).pathname
+		});
 		expect(urls()).toEqual([ROBOTS_URL, FILTERS_URL, ALL_URL]);
 	});
 

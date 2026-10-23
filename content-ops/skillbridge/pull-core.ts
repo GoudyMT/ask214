@@ -231,6 +231,13 @@ function createSender(http: Http, clock: Clock) {
 	let requests = 0;
 	let errorsInARow = 0;
 	let rules: RobotsRule[] = [];
+	// The path of the request whose reply stopped the run; a stop of our own (robots.txt) names none.
+	let refusedAt: string | undefined;
+
+	function refuse(code: StopCode, url: string): never {
+		refusedAt = new URL(url).pathname;
+		stopRun(code);
+	}
 
 	async function send(url: string, isRobots: boolean): Promise<HttpReply> {
 		// Tested as sent, query included, and before the pacing wait: a forbidden request is never made.
@@ -250,8 +257,8 @@ function createSender(http: Http, clock: Clock) {
 				reply = null;
 			}
 			if (reply !== null) {
-				if (reply.status === 403) stopRun('E_HTTP_403');
-				if (reply.status === 429) stopRun('E_HTTP_429');
+				if (reply.status === 403) refuse('E_HTTP_403', url);
+				if (reply.status === 429) refuse('E_HTTP_429', url);
 				const absentRobots = isRobots && (reply.status === 404 || reply.status === 410);
 				const accepted = isRobots
 					? reply.status === 200
@@ -261,25 +268,25 @@ function createSender(http: Http, clock: Clock) {
 					return reply;
 				}
 				// A block or CAPTCHA page sent with an error status is a "no", not a hiccup: not asked again.
-				if (looksLikeHtml(reply)) stopRun(isRobots ? 'E_ROBOTS_UNREADABLE' : 'E_HTML_BODY');
+				if (looksLikeHtml(reply)) refuse(isRobots ? 'E_ROBOTS_UNREADABLE' : 'E_HTML_BODY', url);
 			}
 			errorsInARow++;
-			if (errorsInARow >= MAX_ERRORS_IN_A_ROW) stopRun('E_ERRORS_IN_A_ROW');
+			if (errorsInARow >= MAX_ERRORS_IN_A_ROW) refuse('E_ERRORS_IN_A_ROW', url);
 			await clock.sleep(BACKOFF_BASE_MS * 2 ** errorsInARow);
 		}
 	}
 
 	async function getJson<T>(url: string, parse: (v: unknown) => T | null): Promise<T> {
 		const reply = await send(url, false);
-		if (looksLikeHtml(reply)) stopRun('E_HTML_BODY');
+		if (looksLikeHtml(reply)) refuse('E_HTML_BODY', url);
 		let parsed: unknown;
 		try {
 			parsed = JSON.parse(reply.body);
 		} catch {
-			stopRun('E_NOT_JSON');
+			refuse('E_NOT_JSON', url);
 		}
 		const value = parse(parsed);
-		if (value === null) stopRun('E_BAD_ENVELOPE');
+		if (value === null) refuse('E_BAD_ENVELOPE', url);
 		return value;
 	}
 
@@ -287,6 +294,7 @@ function createSender(http: Http, clock: Clock) {
 		send,
 		getJson,
 		requests: () => requests,
+		refusedAt: () => refusedAt,
 		/** Called once, with the rules read from robots.txt; every later request is tested against them. */
 		obey: (parsed: RobotsRule[]) => {
 			rules = parsed;
@@ -312,11 +320,13 @@ export async function runPull(input: PullInput, http: Http, clock: Clock): Promi
 		return { ok: true, run };
 	} catch (e) {
 		if (e instanceof StopSignal) {
+			const at = sender.refusedAt();
 			return {
 				ok: false,
 				stop: e.stop,
 				requests: sender.requests(),
-				elapsedMs: clock.now() - startedAt
+				elapsedMs: clock.now() - startedAt,
+				...(at !== undefined ? { stoppedAt: at } : {})
 			};
 		}
 		throw e;

@@ -237,6 +237,22 @@ describe('buildReport', () => {
 		expect(text).toContain('Pull: stopped after 2 requests, so there are no totals.');
 	});
 
+	it('names the request the server refused, so a rate limit can be told from a block', () => {
+		const report = buildReport({
+			pull: {
+				ok: false,
+				stop: 'E_HTTP_403',
+				requests: 7,
+				elapsedMs: 27000,
+				stoppedAt: '/Location/LookupSkillbridge'
+			},
+			baseline: true,
+			pullDate: PULL_DATE
+		});
+		expect(report.stoppedAt).toBe('/Location/LookupSkillbridge');
+		expect(reportText(report)).toContain('Stopped at request 7: /Location/LookupSkillbridge');
+	});
+
 	it('also holds the week when the files could not be built, so Max sees why', () => {
 		const report = buildReport({
 			pull: ok(runOf()),

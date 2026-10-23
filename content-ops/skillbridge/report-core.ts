@@ -21,6 +21,8 @@ export type RunReport = {
 	baseline: boolean;
 	/** A stopped run: the rest is zero or empty. */
 	stop?: StopCode;
+	/** The path of the request a stopped run was refused on. */
+	stoppedAt?: string;
 	requests: number;
 	elapsedMs: number;
 	totalN: number;
@@ -81,6 +83,7 @@ export function buildReport(input: {
 		mode: run?.mode ?? 'full',
 		baseline,
 		...(pull.ok ? {} : { stop: pull.stop }),
+		...(!pull.ok && pull.stoppedAt !== undefined ? { stoppedAt: pull.stoppedAt } : {}),
 		requests: run?.requests ?? (pull.ok ? 0 : pull.requests),
 		elapsedMs: run?.elapsedMs ?? (pull.ok ? 0 : pull.elapsedMs),
 		totalN: run?.totalN ?? 0,
@@ -132,6 +135,8 @@ export function reportText(report: RunReport): string {
 	];
 	if (report.stop !== undefined)
 		lines.push(`STOPPED: ${safe(report.stop)}. Nothing from this run can be published.`);
+	if (report.stoppedAt !== undefined)
+		lines.push(`Stopped at request ${report.requests}: ${safe(report.stoppedAt)}`);
 	lines.push(
 		`Requests: ${report.requests} in ${(report.elapsedMs / 1000).toFixed(1)} s`,
 		// A pull that never finished has no totals; zeros beside "sum gate" would read as a check that failed.

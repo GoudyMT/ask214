@@ -115,7 +115,9 @@ Run from the repo root (each command is one line):
 
 ## When the run stops
 
-Exit 2, and the report ends "Publish: STOPPED (<code>)". The pull stops at once, and nothing is published, on:
+Exit 2, and the report ends "Publish: STOPPED (<code>)". When a server reply caused the stop, the report also names
+that request's path ("Stopped at request N: <path>"), so a refusal of one kind of request can be told from a refusal of
+every request without asking the server again. The pull stops at once, and nothing is published, on:
 a robots.txt rule that disallows a request (`E_ROBOTS_DISALLOW`, or `E_ROBOTS_UNREADABLE` for a robots.txt that is a
 web page); a 403 or 429 (`E_HTTP_403`, `E_HTTP_429`); a CAPTCHA or other web page instead of data, whatever its status
 (`E_HTML_BODY`); a reply that is not the expected JSON (`E_NOT_JSON`, `E_BAD_ENVELOPE`); three errors in a row
