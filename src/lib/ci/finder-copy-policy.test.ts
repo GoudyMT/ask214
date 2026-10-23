@@ -47,6 +47,9 @@ const CLAIM_WORDS = /\b(?:dis|in|un|re)?(?:qualif|eligib|entitl)\w*|\bfits?\b|\b
 // A word that starts with rate or rank, or holds one in camel case.
 const RATE_WORDS = /\b(?:rate|rank)\w*|\b\w*(?:Rate|Rank)\w*/g;
 const STORAGE_WORDS = /\b(?:sessionStorage|localStorage|snapshot)\b|\{@html\b/g;
+// Ways to send that the finder's one request path (fetch/fetch-files.ts) does not cover. A beacon sent as a page goes
+// away is also the one send the network test cannot see, so the finder may not hold one at all.
+const SEND_WORDS = /\b(?:sendBeacon|WebSocket|EventSource|XMLHttpRequest)\b/g;
 
 function hits(content: string, pattern: RegExp): string[] {
 	return withoutComments(content).match(pattern) ?? [];
@@ -81,6 +84,21 @@ describe('the finder copy and claim policy', () => {
 
 	it('uses no web storage, page snapshot or raw HTML', () => {
 		expect(scan(collect(), STORAGE_WORDS)).toEqual([]);
+	});
+
+	it('sends nothing except through its one request path', () => {
+		expect(scan(collect(), SEND_WORDS)).toEqual([]);
+	});
+
+	it.each([
+		[
+			'a beacon',
+			"addEventListener('pagehide', () => navigator.sendBeacon('/x', zip));",
+			['sendBeacon']
+		],
+		['a socket', "const s = new WebSocket('wss://x');", ['WebSocket']]
+	])('flags %s', (_name, content, words) => {
+		expect(hits(content, SEND_WORDS)).toEqual(words);
 	});
 
 	// A folder read that matched nothing would let every scan pass on an empty list.
