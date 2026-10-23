@@ -88,6 +88,8 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	// moved the setup since; `again` asks that visit to run once more when they have.
 	let askedFor: string | null = null;
 	let again = false;
+	// The epoch the running visit opened the pack under; a relock since then cut that visit short.
+	let visitAt: number | null = null;
 
 	// Plain variables, not deriveds: a derived keeps its last value alive until something reads it again, and a relock
 	// must leave nothing decrypted behind.
@@ -275,6 +277,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		}
 		// After the open: clearing unreadable rows tells the listeners, which is not a lock to give up on.
 		const at = epoch;
+		visitAt = at;
 		const previouslySeen = pack.lastSeenPull;
 		_status = 'loading';
 		passes = null;
@@ -323,6 +326,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		do {
 			again = false;
 			askedFor = null;
+			visitAt = null;
 			await run();
 		} while (again);
 	}
@@ -458,6 +462,9 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			if (running) {
 				// A visit already downloading chose its files from the setup of that moment.
 				if (askedFor !== null && askedFor !== wantedFiles(false).join(',')) again = true;
+				// A relock cut the running visit short and an Unlock has opened the pack again before it wound down: the
+				// cut-short visit puts nothing on screen, so this start is owed a visit of its own.
+				if (visitAt !== null && visitAt !== epoch && pack.ready && !pack.locked) again = true;
 				return running;
 			}
 			running = visits().finally(() => {
