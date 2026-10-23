@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { INDUSTRIES } from '../contract/listing';
 	import type { FinderFilters } from '../state/types';
 	import type { FinderStore } from '../state/store.svelte';
@@ -23,6 +24,8 @@
 	const SAVE_FAILED = 'Could not save that change. Try again.';
 
 	let dialogEl: HTMLDialogElement | undefined;
+	let titleEl: HTMLElement | undefined;
+	let fieldsetEl: HTMLFieldSetElement | undefined;
 	let showAll = $state(false);
 	let problem = $state<string | null>(null);
 
@@ -57,6 +60,19 @@
 
 	export function show(): void {
 		dialogEl?.showModal();
+		// The browser would pick the scrolling box, which has no name.
+		titleEl?.focus();
+	}
+
+	/** The button asking for them goes with the click, so focus moves to the first new field that can be ticked. */
+	async function showAllFields(): Promise<void> {
+		const had = new Set(fields);
+		showAll = true;
+		await tick();
+		const added = [...(fieldsetEl?.querySelectorAll('input') ?? [])].filter(
+			(_, n) => !had.has(INDUSTRIES[n]!)
+		);
+		(added.find((box) => !box.disabled) ?? fieldsetEl)?.focus();
 	}
 
 	/** A change is written to the record as it is made; one that fails reads the record again and says so. */
@@ -78,7 +94,7 @@
 	onclose={() => onclose?.()}
 >
 	<div class="sheet__body">
-		<h2 id="finder-sheet-title">Filters</h2>
+		<h2 id="finder-sheet-title" tabindex="-1" bind:this={titleEl}>Filters</h2>
 
 		<fieldset>
 			<legend>Format</legend>
@@ -97,7 +113,7 @@
 			{/each}
 		</fieldset>
 
-		<fieldset>
+		<fieldset tabindex="-1" bind:this={fieldsetEl}>
 			<legend>Field</legend>
 			{#each fields as industry (industry)}
 				{@const on = filters.industries?.includes(industry) ?? false}
@@ -115,7 +131,7 @@
 				</label>
 			{/each}
 			{#if !showAll}
-				<button type="button" class="sheet__link" onclick={() => (showAll = true)}
+				<button type="button" class="sheet__link" onclick={() => void showAllFields()}
 					>Show all {INDUSTRIES.length}</button
 				>
 			{/if}

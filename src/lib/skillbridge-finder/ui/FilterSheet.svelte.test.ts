@@ -143,6 +143,42 @@ describe('a count beside each value', () => {
 	});
 });
 
+// Focus must always land on something a person can read or use: not on the sheet's scrolling box, and not on the page
+// when the button they pressed leaves.
+describe('where focus goes', () => {
+	// On a short phone screen the choices scroll, and the browser would put focus on that unnamed box.
+	it('opens on the sheet heading', async () => {
+		dropCss = useAppCss();
+		await page.viewport(320, 568);
+		await open(undefined, false);
+
+		await expect.element(page.getByRole('heading', { name: 'Filters' })).toHaveFocus();
+	});
+
+	// A field with no programs is disabled and cannot take focus, so focus goes to the first one that can.
+	it('moves to the first field Show all added that can be ticked, when its button goes', async () => {
+		await open(undefined, false);
+		await page.getByRole('button', { name: 'Show all 24' }).click();
+
+		await expect.element(box('Healthcare Support')).toHaveFocus();
+	});
+
+	it('skips a field that was already shown because it was ticked', async () => {
+		await open(undefined, false, { industries: ['Healthcare Support'] });
+		await page.getByRole('button', { name: 'Show all 24' }).click();
+
+		await expect.element(box('Legal')).toHaveFocus();
+	});
+
+	it('stays on the Field group when Show all adds nothing that can be ticked', async () => {
+		// Only Air Force programs remain, and none of them is in a field the first eight leave out.
+		await open(undefined, false, { branches: ['Air Force'] });
+		await page.getByRole('button', { name: 'Show all 24' }).click();
+
+		await expect.element(page.getByRole('group', { name: 'Field' })).toHaveFocus();
+	});
+});
+
 describe('the footer', () => {
 	it('Show N programs closes the sheet and names the count', async () => {
 		const closed = vi.fn();
