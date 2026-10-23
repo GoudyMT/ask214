@@ -31,6 +31,9 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 			dismissCard: (now: number) => Promise<void>;
 			refresh?: () => Promise<void>;
 		},
+		// The finder's two stores, as far as Unlock reads them.
+		finder: null as null | { load: () => Promise<void> },
+		finderPack: null as null | { load: () => Promise<void> },
 		timeline: null as null | {
 			ready: boolean;
 			failed: boolean;
@@ -74,6 +77,8 @@ vi.mock('$lib/profile/context', () => ({
 		},
 		timeline: current.timeline,
 		calendar: current.calendar,
+		finder: current.finder,
+		finderPack: current.finderPack,
 		byok: null,
 		cause: null,
 		wipeAll: null,
@@ -174,6 +179,24 @@ describe('Timeline, its saved progress', () => {
 				expect(unhandled).toEqual([]);
 			}
 		);
+
+		// A finder locked when its code arrived opens only here: no automatic re-read undoes a Lock.
+		it('opens the finder and its downloaded listings with the rest', async () => {
+			current.load = endsAfter(0, false);
+			const finderLoad = vi.fn(async () => {});
+			const packLoad = vi.fn(async () => {});
+			current.finder = { load: finderLoad };
+			current.finderPack = { load: packLoad };
+			try {
+				await render(TimelinePage);
+				await page.getByRole('button', { name: 'Unlock' }).click();
+				await expect.poll(() => finderLoad.mock.calls.length).toBe(1);
+				expect(packLoad).toHaveBeenCalledTimes(1);
+			} finally {
+				current.finder = null;
+				current.finderPack = null;
+			}
+		});
 
 		it.each(timings)('puts focus on the heading when the load %s and succeeds', async (_, ms) => {
 			current.load = endsAfter(ms, false);
