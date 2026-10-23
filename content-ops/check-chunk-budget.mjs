@@ -438,6 +438,8 @@ const STATIC = 'static';
 //     place (whose own chunk is the state-name table), focus and live-region fixes, the tray's room for focus, and
 //     the full-device week. Two builds measured 264,110-264,130 B with 86 files. Trim pass: an import of the finder's
 //     parser into the backup check had split two shared chunks (87 files), now one; the rest is fixes, not trimmable.
+//     The re-sweep's fixes (a week kept off the disk, the count alone announced, focus only after a saved removal)
+//     measured 264,180 B in the gate: 264,150 -> 264,250 (owner's call, 2026-10-23), about 70 B of room for CI drift.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -450,7 +452,7 @@ const LIMIT = {
 	page: 107_000,
 	onDemand: 14_200,
 	precacheFiles: 86,
-	precacheBytes: 264_150,
+	precacheBytes: 264_250,
 	workerScripts: 147_200
 };
 
