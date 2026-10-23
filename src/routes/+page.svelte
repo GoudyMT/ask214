@@ -285,9 +285,11 @@
 	{:else if isIdle && (row || FinderRow)}
 		<!-- The finder's row is not known until its code has read its own stores, so both stay in the page, hidden, until a row exists. -->
 		<hr class="home-divider" hidden={!row && !finderRowShown} />
-		<!-- A plain region, not a live one: it is read when reached, never announced on load. -->
+		<!-- A plain region, not a live one: it is read when reached, never announced on load. Its rows name the person's
+			place and task dates, which a browser's page translation would send to its service. -->
 		<section
 			class="home-glance"
+			translate="no"
 			aria-labelledby="home-glance-heading"
 			hidden={!row && !finderRowShown}
 		>

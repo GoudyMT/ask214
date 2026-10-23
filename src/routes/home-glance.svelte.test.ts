@@ -252,6 +252,15 @@ describe('Home, the timeline row', () => {
 			expect(section()!.querySelector('h2')!.textContent).toBe('For you');
 		});
 
+		// The rows name the person's place and task dates, which a browser's page translation would send to its service.
+		it('keeps both rows out of page translation', async () => {
+			finderRow.present = true;
+			await render(HomePage);
+
+			await expect.poll(() => links()).toHaveLength(2);
+			for (const link of links()) expect(link.closest('[translate="no"]')).not.toBeNull();
+		});
+
 		it('sits below the Timeline row in the same section', async () => {
 			finderRow.present = true;
 			await render(HomePage);
