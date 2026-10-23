@@ -363,6 +363,55 @@ describe('the root layout navigation', () => {
 		expect(document.documentElement.hasAttribute('data-header-hidden')).toBe(false);
 	});
 
+	// The SkillBridge compare tray sits fixed on top of the bar: a control left under the tray (WebKit leaves one in the
+	// window where it is) is as hidden as one under the bar, and the tray's own button must not push the page.
+	describe('with the compare tray above the bar', () => {
+		const TRAY_PX = 60;
+		let tray: HTMLElement;
+		beforeEach(() => {
+			tray = document.createElement('div');
+			tray.className = 'tray';
+			tray.style.cssText = `position: fixed; left: 0; right: 0; bottom: 57px; height: ${TRAY_PX}px`;
+			const button = document.createElement('button');
+			button.type = 'button';
+			button.textContent = 'Compare';
+			tray.append(button);
+			document.body.append(tray);
+		});
+		afterEach(() => tray.remove());
+
+		it('moves a focused control clear of the tray when the browser does not scroll to it at 320 px', async () => {
+			await openAt(320, 568);
+			// A control partway down the tall page, so the page has room to scroll it up.
+			const control = document.createElement('button');
+			control.type = 'button';
+			control.textContent = 'Save';
+			control.style.cssText = 'display: block; margin-top: 800px';
+			document.querySelector('a[href="#top-of-page"]')?.after(control);
+			const bar = document.querySelector('.bottom-bar') as HTMLElement;
+			window.scrollBy(
+				0,
+				control.getBoundingClientRect().bottom - (bar.getBoundingClientRect().top - 8)
+			);
+			expect(control.getBoundingClientRect().bottom).toBeGreaterThan(
+				tray.getBoundingClientRect().top
+			);
+			control.focus({ preventScroll: true });
+			await expect
+				.poll(() => control.getBoundingClientRect().bottom <= tray.getBoundingClientRect().top)
+				.toBe(true);
+		});
+
+		it('leaves the page where it is when focus enters the tray at 320 px', async () => {
+			await openAt(320, 568);
+			window.scrollTo(0, 300);
+			await expect.poll(() => window.scrollY).toBe(300);
+			(tray.querySelector('button') as HTMLElement).focus({ preventScroll: true });
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			expect(window.scrollY).toBe(300);
+		});
+	});
+
 	// The bar's own links always sit "under the bar": focusing one must not push the page.
 	it('leaves the page where it is when focus enters the bar itself at 320 px', async () => {
 		await openAt(320, 568);

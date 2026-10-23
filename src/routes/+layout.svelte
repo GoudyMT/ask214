@@ -440,7 +440,8 @@
 		// after focusin, to under the bar - so a control below the window is looked at again for up to half a second. A
 		// control that starts in the window and runs under the bar is moved up, but never past its first line (the
 		// header's bottom while a move that short keeps it shown, the top of the window when the move hides it).
-		// The bar's own links stay put, and so does the page behind a modal dialog, which sits above the bar.
+		// The bar's own links stay put, and so does the page behind a modal dialog, which sits above the bar. The
+		// SkillBridge compare tray sits on the bar while it shows: it is then the edge, and its button stays put too.
 		const bar = document.querySelector('.bottom-bar');
 		const onFocusIn = ({ target }: FocusEvent) => {
 			if (!(target instanceof Element)) return;
@@ -448,7 +449,7 @@
 				state = startHeaderState(window.scrollY);
 				return setHidden(false);
 			}
-			if (!bar || target.closest('.bottom-bar,dialog[open]')) return;
+			if (!bar || target.closest('.bottom-bar,.tray,dialog[open]')) return;
 			let frames = 30;
 			const check = () => {
 				if (document.activeElement !== target) return;
@@ -457,7 +458,7 @@
 					if (--frames) requestAnimationFrame(check);
 					return;
 				}
-				const room = bottom - bar.getBoundingClientRect().top;
+				const room = bottom - (document.querySelector('.tray') ?? bar).getBoundingClientRect().top;
 				const shift = Math.min(
 					room,
 					room > HIDE_AFTER_PX ? top : top - el.getBoundingClientRect().bottom
