@@ -1,4 +1,4 @@
-import { expect, test, type Request } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 
 // Every request the page sends during this flow - to our own server, to Anthropic, for any file - checked for the
 // user's own data. The guard in src/lib/ci/pii-policy.ts reads names and imports; this reads values: the separation and
@@ -37,6 +37,18 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 function dateForms(iso: string): string[] {
 	const [year, month, day] = iso.split('-');
 	return [iso, iso.replace(/-/g, ''), `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}`];
+}
+
+/**
+ * Ticks the written-summary box on Settings. The box is drawn by the running app, so it is live once found. Under
+ * load, WebKit delivered a click made a few milliseconds after the test's own scroll to the box's section, not
+ * the box, though the click was at the box's centre; so the box is scrolled into view and seen there first.
+ */
+async function tickSummary(page: Page): Promise<void> {
+	const box = page.getByLabel(/add an ai-written summary/i);
+	await box.scrollIntoViewIfNeeded();
+	await expect(box).toBeInViewport();
+	await box.check();
 }
 
 /** A URL or form body read as the server would read it; unchanged when it is not validly encoded. */
@@ -110,7 +122,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 
 	// The written summary on, with a key, so the request to Anthropic is made too.
 	await page.goto('/settings');
-	await page.getByLabel(/add an ai-written summary/i).check();
+	await tickSummary(page);
 	await page.getByLabel('Your Anthropic API key').fill(TEST_KEY);
 	await page
 		.locator('.online-key')
@@ -230,7 +242,7 @@ test('an early Not sure keeps its stored return date on this device', async ({
 
 	// The same online paths as the flow above: a written summary with a key, an online question, a feedback message.
 	await page.goto('/settings');
-	await page.getByLabel(/add an ai-written summary/i).check();
+	await tickSummary(page);
 	await page.getByLabel('Your Anthropic API key').fill(TEST_KEY);
 	await page
 		.locator('.online-key')
