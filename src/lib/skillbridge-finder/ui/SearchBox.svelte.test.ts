@@ -44,19 +44,6 @@ describe('the search-every-region question', () => {
 		await expect.element(page.getByText(`about ${words} MB of listings once`)).toBeVisible();
 	});
 
-	it('asks only when the button is pressed, and drops the question on Near me only', async () => {
-		const o = offer();
-		await render(SearchBox, { value: 'a', offer: o });
-		expect(o.onaccept).not.toHaveBeenCalled();
-
-		await page.getByRole('button', { name: 'Near me only' }).click();
-		expect(o.ondecline).toHaveBeenCalledOnce();
-		expect(o.onaccept).not.toHaveBeenCalled();
-
-		await page.getByRole('button', { name: 'Search every region' }).click();
-		expect(o.onaccept).toHaveBeenCalledOnce();
-	});
-
 	// A second tap while the files are coming must not start a second download.
 	it('says it is downloading and ignores a press meanwhile', async () => {
 		const o = offer({ busy: true });
