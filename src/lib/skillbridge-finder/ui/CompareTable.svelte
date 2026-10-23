@@ -157,8 +157,12 @@
 		position: sticky;
 		left: 0;
 		z-index: 1;
-		min-width: 0;
+		/* A width the program columns cannot squeeze, and breaks only between words: "Where" one letter to a line is
+		   unreadable. */
+		min-width: 4.5rem;
 		width: 4.5rem;
+		padding-inline: var(--space-s);
+		overflow-wrap: normal;
 		background: var(--color-surface);
 		border-right: 1px solid var(--color-border);
 	}

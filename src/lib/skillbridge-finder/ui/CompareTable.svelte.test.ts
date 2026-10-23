@@ -186,6 +186,27 @@ describe('CompareTable', () => {
 			await vi.waitFor(() => expect(box.scrollLeft).toBeGreaterThan(0));
 		});
 
+		// The program columns must not squeeze the labels: "Where" set one letter to a line cannot be read.
+		it('keeps every row label word whole on one line', async () => {
+			const { container } = await render(CompareTable, {
+				props: { listings: [long(1), long(2), long(3)], ...handlers() }
+			});
+			const broken: string[] = [];
+			for (const th of container.querySelectorAll<HTMLElement>('tbody th[scope="row"]')) {
+				const text = th.firstChild;
+				if (!text || text.nodeType !== Node.TEXT_NODE) continue;
+				const value = text.textContent ?? '';
+				for (const match of value.matchAll(/\S+/g)) {
+					const range = document.createRange();
+					range.setStart(text, match.index);
+					range.setEnd(text, match.index + match[0].length);
+					const lines = new Set([...range.getClientRects()].map((r) => Math.round(r.top)));
+					if (lines.size > 1) broken.push(match[0]);
+				}
+			}
+			expect(broken).toEqual([]);
+		});
+
 		it('keeps the row headers in view while the table scrolls', async () => {
 			const { container } = await render(CompareTable, {
 				props: { listings: [long(1), long(2), long(3)], ...handlers() }
