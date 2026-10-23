@@ -4,9 +4,8 @@
 	import { getProfileApp } from '$lib/profile/context';
 	import { safeLog } from '../../log/safelog';
 	import { finderHomeRow, type FinderHomeInput } from './home-row';
-	import { placeText } from './place-text';
 	import { createFinderSession, type FinderSession } from './session.svelte';
-	import { isSetUp } from './setup-state';
+	import { isSetUp, placeText } from './setup-state';
 
 	// Home gives this nothing: it reads the stores itself, and says only whether it has a row, so Home can hide its
 	// section when neither tool has one.

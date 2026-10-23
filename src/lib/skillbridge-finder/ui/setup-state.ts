@@ -1,4 +1,13 @@
-import type { FinderFilters, FinderSetup } from '../state/types';
+import { STATE_NAMES } from '../search/state-names';
+import type { FinderFilters, FinderPlace, FinderSetup } from '../state/types';
+
+/**
+ * The field text for a place: a ZIP as its digits, a state by its name. It lives here, with the code Home already
+ * loads, so Home does not also fetch the setup field's parser and suggestions.
+ */
+export function placeText(place: FinderPlace): string {
+	return place.kind === 'zip' ? place.zip : STATE_NAMES[place.state];
+}
 
 /**
  * Whether the person has been through setup. The record keeps no separate flag: every save from the setup screen

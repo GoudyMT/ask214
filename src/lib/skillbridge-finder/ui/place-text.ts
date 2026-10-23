@@ -10,10 +10,7 @@ const MAX_SUGGESTIONS = 6;
 const ZIP_RE = /^\d{5}$/;
 const ZIP_LABEL_RE = /^(\d{5}) - /;
 
-/** The field text for a place: a ZIP as its digits, a state by its name. */
-export function placeText(place: FinderPlace): string {
-	return place.kind === 'zip' ? place.zip : STATE_NAMES[place.state];
-}
+export { placeText } from './setup-state';
 
 /**
  * The place a typed (or chosen) value names, or null. A ZIP is exactly five digits, alone or as a suggestion's label
