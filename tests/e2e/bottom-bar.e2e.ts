@@ -88,12 +88,10 @@ test('a person on a phone reaches every page from the bottom bar, and More keeps
 		);
 	}
 
-	// The placeholder sends a person to the official site rather than leaving them at a dead end.
+	// A first visit to the finder opens on its setup, so the tab leads somewhere a person can act, not a dead end.
 	await bar.getByRole('link', { name: 'SkillBridge', exact: true }).click();
-	await expect(page.getByRole('link', { name: 'DoD SkillBridge site' })).toHaveAttribute(
-		'href',
-		'https://www.skillbridge.mil/'
-	);
+	await expect(page.getByLabel('ZIP code or state')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Show programs' })).toBeVisible();
 
 	for (const row of MORE_ROWS) {
 		await bar.getByRole('link', { name: 'More', exact: true }).click();
