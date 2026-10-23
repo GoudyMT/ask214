@@ -227,6 +227,14 @@ const putPackRow = (row: PackRow) =>
 
 type Device = Awaited<ReturnType<typeof device>>;
 
+/** The real pack store with some of its members replaced, so a case can make one call misbehave at a chosen moment. */
+function around(pack: Device['pack'], over: Partial<Device['pack']>): Device['pack'] {
+	return new Proxy(pack, {
+		get: (target, prop) =>
+			Object.hasOwn(over, prop) ? Reflect.get(over, prop) : Reflect.get(target, prop)
+	});
+}
+
 // No worker is in charge in these tests, as on a first visit; the worker answer has its own tests below.
 const PASSES = () => Promise.resolve(true);
 
@@ -679,6 +687,52 @@ describe('Lock', () => {
 		expect(session.indexHeld).toBe(false);
 		expect(session.query).toBe('');
 		expect(session.pullDate).toBeUndefined();
+	});
+
+	// A read that finishes after the person locked must not put its listings back on a locked device.
+	it('puts nothing back when a lock lands while the held files are being read', async () => {
+		const dev = await device({});
+		await open(dev, network()).start();
+		const pack = around(dev.pack, {
+			readRegion: async (name) => {
+				const file = await dev.pack.readRegion(name);
+				dev.pack.relockSync('user');
+				return file;
+			}
+		});
+		const session = open({ finder: dev.finder, pack }, network());
+		await session.start();
+
+		expect(session.listings).toEqual([]);
+		expect(session.matches).toEqual([]);
+		expect(dev.pack.locked).toBe(true);
+	});
+
+	// Another tab moving the week on is answered by reading again; a lock that landed in between is not a reason to open
+	// the pack, which only the person's own Unlock does.
+	it('does not open a locked pack again to answer a week another tab moved on', async () => {
+		const dev = await device({});
+		await open(dev, network()).start();
+		let loads = 0;
+		const pack = around(dev.pack, {
+			readRegion: () => {
+				dev.pack.relockSync('user');
+				return Promise.reject(new Error('E_FINDER_PACK_STALE'));
+			},
+			load: () => {
+				loads++;
+				return dev.pack.load();
+			}
+		});
+		const net = network();
+		const session = open({ finder: dev.finder, pack }, net);
+		await session.start();
+
+		expect(loads).toBe(0);
+		expect(dev.pack.locked).toBe(true);
+		expect(dev.pack.ready).toBe(false);
+		expect(session.listings).toEqual([]);
+		expect(net.calls).toHaveLength(0);
 	});
 
 	it('fails closed when the pack is not open, and requests nothing', async () => {

@@ -164,6 +164,8 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			]);
 		} catch (e) {
 			if (!retry) throw e;
+			// The answer can arrive after a lock: reading again would open a pack the person closed.
+			if (at !== epoch || pack.locked) return;
 			await pack.load();
 			return readHeld(false);
 		}
