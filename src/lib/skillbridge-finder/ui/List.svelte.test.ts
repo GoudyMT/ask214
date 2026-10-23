@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { bootstrapLocalKeystore } from '../../keystore/bootstrap';
 import { deleteTestDb, openTestDb } from '../../db/_test-helpers';
+import { CREDIT_LINE, DIB_LINE } from './copy';
 import { createFinderSession } from './session.svelte';
 import { ALPHA, NOW, device, network, startedSession } from './list-world';
 import type { FinderSetup } from '../state/types';
@@ -28,7 +29,8 @@ const card = createRawSnippet<
 >((args) => ({
 	render: () => {
 		const { listing, isNew, status } = args();
-		return `<article>${listing.n}${isNew ? ' [new]' : ''}${status?.kind === 'missing' ? ' [gone]' : ''}</article>`;
+		// The real card's first button is its summary toggle, which is where the list sends focus.
+		return `<article><button type="button">${listing.n}${isNew ? ' [new]' : ''}${status?.kind === 'missing' ? ' [gone]' : ''}</button></article>`;
 	}
 }));
 
@@ -103,12 +105,9 @@ describe('the top of the page', () => {
 	it('closes with the defense-industry note and the data credit', async () => {
 		await mount();
 
-		await expect
-			.element(page.getByText(/Defense industry \(DIB\) programs can start up to 180 days out/))
-			.toBeVisible();
-		await expect
-			.element(page.getByText(/Job code matches use the O\*NET Military Crosswalk/))
-			.toBeVisible();
+		// The whole legal line, word for word: a start alone would let the rest of it drift.
+		await expect.element(page.getByText(DIB_LINE)).toBeVisible();
+		await expect.element(page.getByText(CREDIT_LINE)).toBeVisible();
 	});
 });
 
@@ -215,6 +214,51 @@ describe('the chips', () => {
 	});
 });
 
+// A control that goes away while it holds focus drops focus to the top of the page, and a keyboard user starts over.
+describe('where focus goes when the control pressed goes away', () => {
+	const filtersButton = () => page.getByRole('button', { name: /^Filters/ });
+
+	it('goes to the Filters button when a chip is removed', async () => {
+		await mount(STATE, { filters: { delivery: [1, 3] } });
+		await chip('Hybrid').click();
+
+		await expect.element(chip('Hybrid')).not.toBeInTheDocument();
+		await expect.element(filtersButton()).toHaveFocus();
+	});
+
+	it('goes to the Filters button after Clear all', async () => {
+		await mount(STATE, { filters: { delivery: [1, 3] } });
+		await page.getByRole('button', { name: 'Clear all' }).click();
+
+		await expect.element(page.getByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
+		await expect.element(filtersButton()).toHaveFocus();
+	});
+
+	it('goes to the Filters button after Mark all seen', async () => {
+		await mount();
+		await page.getByRole('button', { name: 'Mark all seen' }).click();
+
+		await expect
+			.element(page.getByRole('button', { name: 'Mark all seen' }))
+			.not.toBeInTheDocument();
+		await expect.element(filtersButton()).toHaveFocus();
+	});
+
+	it('goes to the first program that Show more added, only once the button has nothing left to add', async () => {
+		await mount(STATE, { fillers: 54 });
+		const more = page.getByRole('button', { name: 'Show 20 more' });
+		await more.click();
+		// Forty of sixty are shown: the button stays, and so does focus.
+		await expect.element(more).toHaveFocus();
+
+		await more.click();
+		await expect.element(more).not.toBeInTheDocument();
+		await expect
+			.poll(() => document.activeElement)
+			.toBe(page.getByRole('article').elements()[40]?.querySelector('button'));
+	});
+});
+
 describe('the filter sheet from the list', () => {
 	it('opens from the Filters button and gives focus back to it when Escape closes it', async () => {
 		await mount();
@@ -246,6 +290,16 @@ describe('search', () => {
 		await search().fill('paralegl');
 		await expect.element(page.getByText('1 program', { exact: true })).toBeVisible();
 		expect(cards().map((c) => c.textContent)).toEqual(['Charlie Legal [new]']);
+	});
+
+	// Typing changes the count and moves nothing the person can feel; only a status line tells a screen reader.
+	it('announces the count as a status, and its new text when the search narrows the list', async () => {
+		await mount();
+		const count = () => page.getByRole('status').element().textContent;
+		await expect.poll(count).toContain('6 programs');
+
+		await search().fill('legal');
+		await expect.poll(count).toContain('2 programs');
 	});
 
 	it('searches inside the filters, not around them', async () => {
@@ -404,6 +458,23 @@ describe('the Saved tab', () => {
 		expect(cards().map((c) => c.textContent)).toEqual(['Alpha Systems']);
 		await page.getByRole('tab', { name: 'Programs' }).click();
 		await expect.element(page.getByText('6 programs', { exact: true })).toBeVisible();
+	});
+
+	// The cards are h3: without an h2 above them in the panel, a screen reader's heading list skips a level.
+	it('puts a heading named for the tab at the top of each panel', async () => {
+		await mount();
+		const panel = page.getByRole('tabpanel');
+		await expect
+			.element(panel.getByRole('heading', { level: 2, name: 'Programs', exact: true }))
+			.toBeInTheDocument();
+
+		await page.getByRole('tab', { name: /^Saved/ }).click();
+		await expect
+			.element(panel.getByRole('heading', { level: 2, name: 'Saved', exact: true }))
+			.toBeInTheDocument();
+		expect(panel.getByRole('heading', { name: 'Programs', exact: true }).elements()).toHaveLength(
+			0
+		);
 	});
 
 	// A saved program that left the weekly files is still the person's; the card needs to be told it is gone.

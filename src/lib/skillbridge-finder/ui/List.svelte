@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { tick, type Snippet } from 'svelte';
 	import type { Listing } from '../contract/listing';
 	import { STATE_NAMES } from '../search/state-names';
 	import { countInState } from '../state/match';
@@ -46,6 +46,9 @@
 		};
 	});
 	let sheet = $state<FilterSheet>();
+	// Where focus goes when the control pressed leaves the page: a chip, Clear all or Mark all seen.
+	let filtersButton = $state<HTMLButtonElement>();
+	let panel = $state<HTMLElement>();
 
 	const setup = $derived(finder.setup);
 	const filters = $derived(finder.filters);
@@ -98,6 +101,7 @@
 	}
 
 	function remove(id: string): void {
+		filtersButton?.focus();
 		if (id === 'query') {
 			session.query = '';
 		} else if (id === 'place') {
@@ -108,10 +112,20 @@
 	}
 
 	function clearAll(): void {
+		filtersButton?.focus();
 		void write(async () => {
 			await finder.setSetup((cur) => clearAllChips(cur).setup);
 			await finder.setFilters({});
 		});
+	}
+
+	// Once the last page is shown the button is gone; focus goes to the first program it added, not to the top of the page.
+	async function showMore(): Promise<void> {
+		const firstNew = shown;
+		shown += PAGE_SIZE;
+		if (rows.length > shown) return;
+		await tick();
+		panel?.querySelectorAll('article')[firstNew]?.querySelector('button')?.focus();
 	}
 
 	async function lookFarther(): Promise<void> {
@@ -187,7 +201,9 @@
 	>
 </div>
 
-<div id="finder-panel" role="tabpanel" aria-labelledby="finder-tab-{tab}">
+<div id="finder-panel" role="tabpanel" aria-labelledby="finder-tab-{tab}" bind:this={panel}>
+	<!-- The cards are h3: this keeps the heading levels in order without a visible heading. -->
+	<h2 class="visually-hidden">{tab === 'saved' ? 'Saved' : 'Programs'}</h2>
 	{#if problem}<p class="list__problem" role="alert">{problem}</p>{/if}
 
 	{#if tab === 'saved'}
@@ -206,8 +222,11 @@
 			{#if chips.length >= 2}
 				<button type="button" class="list__link" onclick={clearAll}>Clear all</button>
 			{/if}
-			<button type="button" class="list__filters" onclick={() => sheet?.show()}
-				>Filters{chips.length > 0 ? ` (${chips.length})` : ''}</button
+			<button
+				type="button"
+				class="list__filters"
+				bind:this={filtersButton}
+				onclick={() => sheet?.show()}>Filters{chips.length > 0 ? ` (${chips.length})` : ''}</button
 			>
 		</div>
 
@@ -225,12 +244,17 @@
 				<p class="list__muted">No listings are available for this area right now.</p>
 			{/if}
 		{:else}
-			<p class="list__count">
+			<p class="list__count" role="status">
 				<strong>{rows.length} {rows.length === 1 ? 'program' : 'programs'}</strong>
 				{#if newCount > 0}
 					- {newCount} new
-					<button type="button" class="list__link" onclick={() => void session.markAllSeen()}
-						>Mark all seen</button
+					<button
+						type="button"
+						class="list__link"
+						onclick={() => {
+							filtersButton?.focus();
+							void session.markAllSeen();
+						}}>Mark all seen</button
 					>
 				{/if}
 			</p>
@@ -270,7 +294,7 @@
 					})}
 				{/each}
 				{#if rows.length > shown}
-					<button type="button" class="list__more" onclick={() => (shown += PAGE_SIZE)}
+					<button type="button" class="list__more" onclick={() => void showMore()}
 						>Show {Math.min(PAGE_SIZE, rows.length - shown)} more</button
 					>
 				{/if}
@@ -406,6 +430,15 @@
 		margin: 0 0 var(--space-s);
 		color: var(--color-danger);
 		font-size: var(--font-size-s);
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	.list__note {
