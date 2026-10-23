@@ -5,7 +5,7 @@ import type { ProfileApp } from '$lib/profile/context';
 import { createProfileStore } from '$lib/profile/store.svelte';
 import { createFinderStore } from '$lib/skillbridge-finder/state/store.svelte';
 import { createFinderPackStore } from '$lib/skillbridge-finder/state/pack-store.svelte';
-import { ALPHA, BRAVO, network } from '$lib/skillbridge-finder/ui/list-world';
+import { ALPHA, BRAVO, CHARLIE, network } from '$lib/skillbridge-finder/ui/list-world';
 import { cleanListing } from '$lib/skillbridge-finder/fixtures/clean';
 import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
@@ -194,6 +194,22 @@ describe('the compare table on the page', () => {
 		expect(first?.textContent).toContain('Zulu Shipyard');
 		expect(first?.textContent).toContain('No longer listed');
 		expect(second?.textContent).not.toContain('No longer listed');
+	});
+
+	// The Remove that was pressed leaves with its column; focus must land on a neighbour, not fall to the page.
+	it('puts focus on the next column Remove, or the previous one when the last column goes', async () => {
+		const { finder } = await device();
+		await finder.addCompare(ALPHA.i);
+		await finder.addCompare(BRAVO.i);
+		await finder.addCompare(CHARLIE.i);
+		await render(SkillBridgePage);
+		await page.getByRole('button', { name: 'Compare', exact: true }).last().click();
+
+		await page.getByRole('button', { name: 'Remove Alpha Systems' }).click();
+		await expect.element(page.getByRole('button', { name: 'Remove Bravo Health' })).toHaveFocus();
+
+		await page.getByRole('button', { name: 'Remove Charlie Legal' }).click();
+		await expect.element(page.getByRole('button', { name: 'Remove Bravo Health' })).toHaveFocus();
 	});
 
 	it('holds the place in a long list across the table and back', async () => {

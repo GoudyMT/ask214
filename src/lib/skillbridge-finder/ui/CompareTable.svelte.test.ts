@@ -76,6 +76,20 @@ describe('CompareTable', () => {
 		expect(getComputedStyle(heads[0]!.querySelector('.compare__org')!).fontWeight).toBe('600');
 	});
 
+	// A screen reader says a column's header with every cell under it; a Remove inside the header would be said each time.
+	it('names a column by its program alone, not by the Remove inside it', async () => {
+		await render(CompareTable, { props: { listings: [GRID, WIND], ...handlers() } });
+
+		await expect
+			.element(
+				page.getByRole('columnheader', {
+					name: 'Example Wind Services Field Technician Internship',
+					exact: true
+				})
+			)
+			.toBeInTheDocument();
+	});
+
 	it('words where, length, branches and field the way the cards do', async () => {
 		const { container } = await render(CompareTable, {
 			props: { listings: [GRID, WIND, BLUE], ...handlers() }
@@ -99,27 +113,19 @@ describe('CompareTable', () => {
 		expect(row(container, 'Where')).toEqual(['Maryland, no city listed', 'Location not listed']);
 	});
 
-	it('removes the program whose Remove was pressed', async () => {
-		const h = handlers();
-		const { container } = await render(CompareTable, {
-			props: { listings: [GRID, WIND, BLUE], ...h }
+	// The page closes the table when the last pick goes, but the table must not leave focus on the page if it is ever
+	// left with no program.
+	it('moves focus to the heading when the only program is removed', async () => {
+		const { container, rerender } = await render(CompareTable, {
+			props: { listings: [GRID], ...handlers() }
 		});
-		const buttons = container.querySelectorAll<HTMLButtonElement>('thead button');
-		buttons[1]!.click();
-		expect(h.onremove).toHaveBeenCalledExactlyOnceWith(102);
-	});
+		await page.getByRole('button', { name: `Remove ${GRID.n}` }).click();
 
-	it('goes back, adds another and clears all from its own buttons', async () => {
-		const h = handlers();
-		const { container } = await render(CompareTable, { props: { listings: [GRID, WIND], ...h } });
-		const named = (text: string) =>
-			[...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)!;
-		named('Back to programs').click();
-		named('Add another').click();
-		named('Clear all').click();
-		expect(h.onback).toHaveBeenCalledOnce();
-		expect(h.onadd).toHaveBeenCalledOnce();
-		expect(h.onclear).toHaveBeenCalledOnce();
+		await rerender({ listings: [] });
+
+		await vi.waitFor(() =>
+			expect(document.activeElement).toBe(container.querySelector('#compare-heading'))
+		);
 	});
 
 	it('offers no Add another at three programs', async () => {

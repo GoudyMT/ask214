@@ -15,6 +15,24 @@
 	};
 	let { listings, onremove, onback, onadd, onclear, unlisted }: Props = $props();
 
+	// The column pressed leaves only once the page has saved the removal, which can fail, so where focus goes is held
+	// until the program is gone from the list.
+	let pending: { gone: number; next: number | undefined } | undefined;
+	function remove(id: number): void {
+		const at = listings.findIndex((l) => l.i === id);
+		pending = { gone: id, next: (listings[at + 1] ?? listings[at - 1])?.i };
+		onremove(id);
+	}
+	$effect(() => {
+		const stillThere = listings.some((l) => l.i === pending?.gone);
+		if (!pending || stillThere) return;
+		const { next } = pending;
+		pending = undefined;
+		document
+			.getElementById(next === undefined ? 'compare-heading' : `compare-remove-${next}`)
+			?.focus();
+	});
+
 	const NOT_AFFILIATED =
 		'Listings from DoD SkillBridge (skillbridge.mil). Ask 214 is independent, not a Department of Defense or Department of War site, and not endorsed by either.';
 
@@ -64,15 +82,20 @@
 				<tr>
 					<td class="compare__corner"></td>
 					{#each listings as l (l.i)}
-						<th scope="col">
-							{#if unlisted?.has(l.i)}<span class="compare__gone">No longer listed</span>{/if}
-							<span class="compare__org">{l.n}</span>
-							<span class="compare__program">{l.p}</span>
+						<!-- Named by the program alone: a screen reader says a column's header with every cell under it, and
+						     the Remove in this cell would be said each time. -->
+						<th scope="col" aria-labelledby={`compare-program-${l.i}`}>
+							<div id={`compare-program-${l.i}`}>
+								{#if unlisted?.has(l.i)}<span class="compare__gone">No longer listed</span>{/if}
+								<span class="compare__org">{l.n}</span>
+								<span class="compare__program">{l.p}</span>
+							</div>
 							<button
+								id={`compare-remove-${l.i}`}
 								class="compare__text-button"
 								type="button"
 								aria-label={`Remove ${l.n}`}
-								onclick={() => onremove(l.i)}>Remove</button
+								onclick={() => remove(l.i)}>Remove</button
 							>
 						</th>
 					{/each}
