@@ -97,7 +97,9 @@ export function createFinderSession(opts: FinderSessionOptions) {
 
 	const off = pack.onDrop(() => {
 		epoch++;
+		// The cut-short visit owes nothing now: a start arriving while it winds down must not queue another.
 		again = false;
+		askedFor = null;
 		_held = mapOf();
 		_listings = [];
 		_ids = undefined;

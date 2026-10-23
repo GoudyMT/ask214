@@ -366,6 +366,30 @@ describe('what the session asks the network for', () => {
 		expect(session.status).toBe('loading');
 	});
 
+	// A start that arrives after the relock, while the cut-short visit is still winding down, must not queue a visit of
+	// its own: that would open the pack the relock closed, with nobody looking.
+	it.each(['user', 'hygiene'] as const)(
+		'queues no visit from a start that follows a %s relock mid-visit',
+		async (reason) => {
+			const place = { kind: 'zip', zip: '23219' } as const;
+			const dev = await device({ place, radius: 25 });
+			const gate = heldAt(network(), pathOf.region('remote'));
+			const session = open(dev, gate.net);
+			const first = session.start();
+			await gate.reached;
+
+			dev.pack.relockSync(reason);
+			await dev.finder.setSetup({ place, radius: 100 });
+			const second = session.start();
+			gate.release();
+			await Promise.all([first, second]);
+
+			expect(gate.net.calls.filter((c) => c === pathOf.index)).toHaveLength(1);
+			expect(dev.pack.ready).toBe(false);
+			expect(session.listings).toEqual([]);
+		}
+	);
+
 	// A second tap on Retry, or a second screen asking, while a visit runs is the same visit, not another download.
 	it('runs one visit for two starts when the setup did not move', async () => {
 		const gate = heldAt(network(), pathOf.region('remote'));
