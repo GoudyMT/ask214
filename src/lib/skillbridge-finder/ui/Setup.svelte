@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { DELIVERY, INDUSTRIES, type Delivery, type Industry } from '../contract/listing';
+	import { INDUSTRIES, type Delivery, type Industry } from '../contract/listing';
 	import type { ZipsTable } from '../contract/tables';
 	import type { FinderFilters, FinderPlace, FinderRadius, FinderSetup } from '../state/types';
 	import { NOT_AFFILIATED } from './copy';
+	import { FORMAT_LABELS, FORMAT_ORDER, toggled } from './list-model';
 	import { parsePlaceText, placeText, suggestPlaces, type PlaceSuggestion } from './place-text';
 
 	type Props = {
@@ -25,11 +26,6 @@
 		{ value: 'any', label: 'Any distance' }
 	];
 	const DEFAULT_RADIUS: FinderRadius = 50;
-	const FORMATS: { value: Delivery; label: string }[] = [
-		{ value: DELIVERY.inPerson, label: 'In person' },
-		{ value: DELIVERY.hybrid, label: 'Hybrid' },
-		{ value: DELIVERY.remote, label: 'Online' }
-	];
 	// The fields most listings fall under; the rest are one tap away.
 	const COMMON_FIELDS: readonly Industry[] = [
 		'Installation, Maintenance, and Repair',
@@ -108,10 +104,6 @@
 			open = false;
 			active = -1;
 		}
-	}
-
-	function toggle<T>(list: T[], value: T): T[] {
-		return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 	}
 
 	/** The place the field names, or why it names none; an empty field is no place, which is allowed. */
@@ -263,12 +255,12 @@
 
 	<h2>How?</h2>
 	<div class="setup__pills">
-		{#each FORMATS as f (f.value)}
+		{#each FORMAT_ORDER as format (format)}
 			<button
 				type="button"
 				class="setup__pill"
-				aria-pressed={delivery.includes(f.value)}
-				onclick={() => (delivery = toggle(delivery, f.value))}>{f.label}</button
+				aria-pressed={delivery.includes(format)}
+				onclick={() => (delivery = toggled(delivery, format) ?? [])}>{FORMAT_LABELS[format]}</button
 			>
 		{/each}
 	</div>
@@ -280,7 +272,7 @@
 				type="button"
 				class="setup__pill"
 				aria-pressed={industries.includes(industry)}
-				onclick={() => (industries = toggle(industries, industry))}>{industry}</button
+				onclick={() => (industries = toggled(industries, industry) ?? [])}>{industry}</button
 			>
 		{/each}
 	</div>
