@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import SourceList from '$lib/components/SourceList.svelte';
 	import { SOURCES_INDEX } from '$lib/sources/sources-index.data';
 </script>
@@ -39,3 +40,12 @@
 </p>
 
 <SourceList index={SOURCES_INDEX} />
+
+<p>
+	The SkillBridge finder's job code matches use the O*NET Military Crosswalk from the US Department
+	of Labor (CC BY 4.0). Some company links come from Wikidata (CC0).
+</p>
+<p>
+	A company contact shown in the finder is listed publicly by DoD on skillbridge.mil. To ask us to
+	stop showing yours, send a note through <a href={resolve('/feedback')}>Feedback</a>.
+</p>

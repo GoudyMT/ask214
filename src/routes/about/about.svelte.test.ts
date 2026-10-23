@@ -31,4 +31,19 @@ describe('About page sources index', () => {
 		expect(text).toMatch(/public US Government work/i);
 		expect(text).toMatch(/17 USC/i);
 	});
+
+	// CC BY 4.0 requires the credit wherever the crosswalk's matches are shown, and the removal path is the
+	// promise made to every company whose public DoD contact the finder shows.
+	it('credits the finder data and says how a company asks to be removed', async () => {
+		const { container } = await render(AboutPage);
+		const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+		expect(text).toContain(
+			"The SkillBridge finder's job code matches use the O*NET Military Crosswalk from the US Department of Labor (CC BY 4.0). Some company links come from Wikidata (CC0)."
+		);
+		expect(text).toContain(
+			'A company contact shown in the finder is listed publicly by DoD on skillbridge.mil. To ask us to stop showing yours, send a note through Feedback.'
+		);
+		const feedback = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Feedback');
+		expect(feedback?.getAttribute('href')).toBe('/feedback');
+	});
 });
