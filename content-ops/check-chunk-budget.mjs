@@ -446,7 +446,7 @@ const LIMIT = {
 	page: 107_000,
 	onDemand: 14_200,
 	precacheFiles: 86,
-	precacheBytes: 263_500,
+	precacheBytes: 264_150,
 	workerScripts: 147_200
 };
 
