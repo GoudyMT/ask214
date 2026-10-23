@@ -157,6 +157,16 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 			return _profile?.lastBackupAt ?? null;
 		},
 
+		/**
+		 * The place the person plans to live, as the text they saved (a ZIP or a state name), or null with none, or
+		 * while the profile is locked or not loaded. Reactive like `persona`. A screen shows it to the person whose
+		 * device it is.
+		 */
+		get destination(): string | null {
+			const saved = _profile?.geographicDestination;
+			return saved && saved.length > 0 ? new TextDecoder().decode(saved) : null;
+		},
+
 		/** Synchronous relock for the pagehide/freeze handlers (wired at app-init) - no await. */
 		relockSync(reason: RelockReason): void {
 			relockNow(reason);

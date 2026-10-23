@@ -132,6 +132,41 @@ describe('the first visit', () => {
 	});
 });
 
+describe('the place the profile names', () => {
+	const use = () => page.getByRole('button', { name: /^Use / });
+
+	it('offers it by name, fills the field only when tapped, and writes nothing until Show programs', async () => {
+		const { app, finder } = await device();
+		await app.store?.save({ geographicDestination: new TextEncoder().encode('21046') });
+		const before = { setup: finder.setup, filters: finder.filters };
+		await render(SkillBridgePage);
+
+		await expect.element(page.getByRole('button', { name: 'Use 21046' })).toBeVisible();
+		await expect.element(field()).toHaveValue('');
+		await page.getByRole('button', { name: 'Use 21046' }).click();
+
+		await expect.element(field()).toHaveValue('21046');
+		expect({ setup: finder.setup, filters: finder.filters }).toEqual(before);
+	});
+
+	it('offers nothing when the profile names no place', async () => {
+		await device();
+		await render(SkillBridgePage);
+
+		await expect.element(field()).toBeVisible();
+		expect(use().elements()).toHaveLength(0);
+	});
+
+	it('offers nothing when the saved text names no place', async () => {
+		const { app } = await device();
+		await app.store?.save({ geographicDestination: new TextEncoder().encode('Atlantis') });
+		await render(SkillBridgePage);
+
+		await expect.element(field()).toBeVisible();
+		expect(use().elements()).toHaveLength(0);
+	});
+});
+
 describe('changing the setup', () => {
 	it('shows it again, filled in, on #setup, and keeps the filters the list owns', async () => {
 		const { finder } = await device();

@@ -267,6 +267,30 @@ describe('ProfileStore.persona', () => {
 	});
 });
 
+describe('ProfileStore.destination', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	it('reads the saved place as text, and nothing with no profile or after a relock', async () => {
+		const store = createProfileStore(db);
+		expect(store.destination).toBeNull();
+		await store.save({ geographicDestination: bytes('21046') });
+		expect(store.destination).toBe('21046');
+		store.relockSync('user');
+		expect(store.destination).toBeNull();
+		await store.load();
+		expect(store.destination).toBe('21046');
+	});
+
+	it('reads nothing once the place is removed', async () => {
+		const store = createProfileStore(db);
+		await store.save({ geographicDestination: bytes('Maryland') });
+		await store.save({ geographicDestination: undefined });
+		expect(store.destination).toBeNull();
+	});
+});
+
 describe('ProfileStore.relockSync', () => {
 	beforeEach(async () => {
 		await bootstrapLocalKeystore(db);

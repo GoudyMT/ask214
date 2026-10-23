@@ -11,6 +11,7 @@
 		type FinderSession
 	} from '$lib/skillbridge-finder/ui/session.svelte';
 	import Setup from '$lib/skillbridge-finder/ui/Setup.svelte';
+	import { parsePlaceText } from '$lib/skillbridge-finder/ui/place-text';
 	import { isSetUp, withSetupChoices } from '$lib/skillbridge-finder/ui/setup-state';
 	import type { Listing } from '$lib/skillbridge-finder/contract/listing';
 	import type { SavedStatus } from '$lib/skillbridge-finder/state/saved-status';
@@ -41,6 +42,11 @@
 	// The finder's own lock: a Lock relocks every store at once, so this is also the profile's.
 	const lockedView = $derived(finder?.locked ?? false);
 	const unreadable = $derived(finder?.failed ?? false);
+	// The place the profile names, offered on the setup screen; null while the profile is locked or names none.
+	const destination = $derived.by(() => {
+		const saved = app.store?.destination;
+		return saved ? parsePlaceText(saved) : null;
+	});
 	const showSetup = $derived(
 		app.status === 'ready' && !!finder?.ready && (!isSetUp(finder.setup) || changing)
 	);
@@ -234,6 +240,7 @@
 		{:else if showSetup}
 			<Setup
 				initial={{ setup: finder.setup, filters: finder.filters }}
+				{destination}
 				loadZips={() => session?.ensureZips() ?? Promise.resolve(undefined)}
 				onsave={saveSetup}
 				error={saveError}

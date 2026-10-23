@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, tick, untrack } from 'svelte';
 	import SettingsDateRow from '$lib/components/SettingsDateRow.svelte';
+	import SettingsPlaceRow from '$lib/components/SettingsPlaceRow.svelte';
 	import SkillBridgePlanRow from '$lib/components/SkillBridgePlanRow.svelte';
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
@@ -33,6 +34,7 @@
 		type EaosCause
 	} from '$lib/profile/eaos';
 	import FinderSettings from '$lib/skillbridge-finder/ui/FinderSettings.svelte';
+	import { parsePlaceText, placeText } from '$lib/skillbridge-finder/ui/place-text';
 	import CalendarPanel from '$lib/components/CalendarPanel.svelte';
 	import OnlineAnswersPanel from '$lib/components/OnlineAnswersPanel.svelte';
 	import {
@@ -294,6 +296,23 @@
 				? { skillbridgeStart: undefined }
 				: { terminalLeaveStart: undefined }
 		);
+	}
+
+	// The place is only checked as a ZIP's shape or a state's name: the ZIP table is the finder's to fetch, and this
+	// screen makes no request.
+	const PLACE_ERROR = 'Enter a 5-digit ZIP code or a state name.';
+	const destination = $derived(app.store?.destination ?? null);
+
+	async function savePlace(draft: string): Promise<string | null> {
+		const place = parsePlaceText(draft);
+		if (place === null) return PLACE_ERROR;
+		// Stored as the canonical text, so "maryland" and "Maryland" are one place.
+		const bytes = new TextEncoder().encode(placeText(place));
+		return savePatch({ geographicDestination: bytes }, bytes);
+	}
+
+	function removePlace(): Promise<string | null> {
+		return savePatch({ geographicDestination: undefined });
 	}
 
 	// Until the timeline-state store provisions, fall back to empty state so the calendar panel
@@ -589,6 +608,14 @@
 					/>
 					<p class="settings-hint">{LEAVING_HINT}</p>
 					{#if outOfOrder}<p class="settings-hint">{ORDER_NOTE}</p>{/if}
+					<SettingsPlaceRow
+						id="destination"
+						label="Where you plan to live"
+						value={destination}
+						hint="A ZIP code or state. The SkillBridge finder can start from it. It stays on this device."
+						onSave={savePlace}
+						onRemove={removePlace}
+					/>
 
 					{#if app.store?.clockBackward}
 						<div class="clock-notice">
