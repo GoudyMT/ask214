@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { expect, test, type Request } from '@playwright/test';
 import { cleanListing } from '../../src/lib/skillbridge-finder/fixtures/clean';
 import type {
@@ -125,23 +126,48 @@ function base64Forms(value: string): string[] {
 
 /** The values as typed, found whatever their case. */
 const PLAIN = [ZIP, STATE_NAME, SEARCH].map((s) => s.toLowerCase());
+/** Each value as typed, and in lower and upper case: an encoding keeps the case it was handed. */
+const CASED = [ZIP, STATE_NAME, SEARCH].flatMap((s) => [
+	...new Set([s, s.toLowerCase(), s.toUpperCase()])
+]);
 /** The values as base64, where case is part of the code and so is kept. */
-const ENCODED = [...base64Forms(ZIP), ...base64Forms(STATE_NAME), ...base64Forms(SEARCH)];
-// The state's two letters are too short to look for as a substring; as a whole word they are not.
-const STATE_CODE_WORD = new RegExp(`\\b${STATE_CODE}\\b`);
+const ENCODED = CASED.flatMap(base64Forms);
+/** The values as a SHA-1 or SHA-256 hex digest: a hash still says which place was asked for. Hex is matched in any case. */
+const HASHED = CASED.flatMap((s) =>
+	['sha1', 'sha256'].map((alg) => createHash(alg).update(s).digest('hex'))
+);
+// The state's two letters are too short to look for as a substring; as a whole word, in any case, they are not.
+const STATE_CODE_WORD = new RegExp(`\\b${STATE_CODE}\\b`, 'i');
 
 type Sent = { url: string; method: string; headers: string; body: string; fromWorker: boolean };
 
-async function readAll(requests: Request[]): Promise<Sent[]> {
-	return Promise.all(
-		requests.map(async (request) => ({
-			url: request.url(),
-			method: request.method(),
-			headers: JSON.stringify(await request.allHeaders()),
-			body: request.postData() ?? '',
-			fromWorker: request.serviceWorker() !== null
-		}))
-	);
+/**
+ * Read as the request is made, not after: a request sent as the page closes (a beacon) can no longer give its full
+ * headers once the page is gone, so the headers it gave on the way out are kept instead.
+ */
+async function readOne(request: Request): Promise<Sent> {
+	const headers = await request.allHeaders().catch(() => request.headers());
+	return {
+		url: request.url(),
+		method: request.method(),
+		headers: JSON.stringify(headers),
+		body: request.postData() ?? '',
+		fromWorker: request.serviceWorker() !== null
+	};
+}
+
+/** How long a delayed send has to show up, and how long the recording must then hold still. */
+const LATE_WINDOW_MS = 5_000;
+const QUIET_MS = 1_000;
+
+/** Waits out the late window, then until the recording has held still for a quiet spell. */
+async function settle(requests: readonly unknown[]): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, LATE_WINDOW_MS));
+	let seen = -1;
+	while (seen !== requests.length) {
+		seen = requests.length;
+		await new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+	}
 }
 
 function leaksOf(sent: Sent[]): string[] {
@@ -158,6 +184,7 @@ function leaksOf(sent: Sent[]): string[] {
 		const lower = text.toLowerCase();
 		for (const value of PLAIN) if (lower.includes(value)) found.push(`${value} in ${r.url}`);
 		for (const value of ENCODED) if (text.includes(value)) found.push(`${value} in ${r.url}`);
+		for (const value of HASHED) if (lower.includes(value)) found.push(`a hash in ${r.url}`);
 		if (STATE_CODE_WORD.test(text)) found.push(`${STATE_CODE} in ${r.url}`);
 	}
 	return found;
@@ -172,8 +199,8 @@ test('what a person types into the finder reaches no request, with the service w
 		browserName === 'webkit',
 		'a route does not answer a fetch made under a service worker on Playwright WebKit'
 	);
-	const requests: Request[] = [];
-	context.on('request', (request) => requests.push(request));
+	const requests: Promise<Sent>[] = [];
+	context.on('request', (request) => requests.push(readOne(request)));
 	await context.route('**/skillbridge-data/**', (route) => {
 		const body = FILES.get(new URL(route.request().url()).pathname);
 		return body === undefined
@@ -207,7 +234,9 @@ test('what a person types into the finder reaches no request, with the service w
 	await expect(page.getByRole('button', { name: `Remove In ${STATE_NAME}` })).toBeVisible();
 	await page.getByLabel('Search programs').fill(SEARCH);
 	await expect(page.getByRole('heading', { name: 'No programs match all of these' })).toBeVisible();
-	await page.waitForLoadState('networkidle');
+	// A loaded page is idle at once, so a request sent a while after the last keystroke would be missed: wait out a
+	// window, then until nothing new arrives.
+	await settle(requests);
 
 	// Control for the abort: a send to the API fails, so none of the walk's requests could have reached it.
 	const control = await page.evaluate(() =>
@@ -218,7 +247,12 @@ test('what a person types into the finder reaches no request, with the service w
 	);
 	expect(control).toBe('aborted');
 
-	const sent = await readAll(requests);
+	// Leaving the page is a moment code may send on: leave it, then record. A fetch sent on pagehide is seen here; a
+	// beacon sent then is not (Chromium sends it outside the page), so src/lib/ci/finder-copy-policy.test.ts forbids
+	// beacons in the finder's code instead.
+	await page.goto('about:blank');
+	await settle(requests);
+	const sent = await Promise.all(requests);
 
 	const data = sent.filter((r) => new URL(r.url).pathname.startsWith('/skillbridge-data/'));
 	// The control for the check below: the finder did fetch, the index and the ZIP table among the files.
