@@ -90,6 +90,8 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	let again = false;
 	// The epoch the running visit opened the pack under; a relock since then cut that visit short.
 	let visitAt: number | null = null;
+	// The listings on screen came from the network and are not on disk: reading the disk back would empty the list.
+	let shownOnly = false;
 
 	// Plain variables, not deriveds: a derived keeps its last value alive until something reads it again, and a relock
 	// must leave nothing decrypted behind.
@@ -102,6 +104,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		// The cut-short visit owes nothing now: a start arriving while it winds down must not queue another.
 		again = false;
 		askedFor = null;
+		shownOnly = false;
 		_held = mapOf();
 		_listings = [];
 		_ids = undefined;
@@ -261,12 +264,25 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		// and every New mark would read as "not new". Within one week, or with nothing held yet, there is nothing to lose
 		// by keeping what arrived, and the missing file is asked for again on the next visit.
 		if (pack.pullDate !== undefined && !sameWeek && (!ids || !changes)) return false;
-		await pack.swap({
-			index,
-			regions: regions.files,
-			...(ids ? { ids } : {}),
-			...(changes ? { changes } : {})
-		});
+		try {
+			await pack.swap({
+				index,
+				regions: regions.files,
+				...(ids ? { ids } : {}),
+				...(changes ? { changes } : {})
+			});
+		} catch (e) {
+			if (at !== epoch || !(e instanceof DOMException && e.name === 'QuotaExceededError')) throw e;
+			// The device is too full to keep the week, but it did arrive: it is shown for this visit and asked for again on
+			// the next, rather than reported as a download that failed.
+			const held = sameWeek ? mapOf(_held) : mapOf<RegionFileName, RegionFile>();
+			for (const [name, file] of regions.files) held.set(name, file);
+			_held = held;
+			_listings = mergeRegionListings(held.values());
+			_ids = ids ?? (sameWeek ? _ids : undefined);
+			_changes = changes ?? (sameWeek ? _changes : undefined);
+			shownOnly = true;
+		}
 		return at === epoch;
 	}
 
@@ -282,6 +298,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		_status = 'loading';
 		passes = null;
 		_blocked = false;
+		shownOnly = false;
 		// A ZIP is a point only through the table; it is read before the list so the first sight is already nearest-first.
 		if (setup().place?.kind === 'zip') await zipsTable();
 		try {
@@ -302,7 +319,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 				askedFor = wanted.join(',');
 				if (!(await download(index, wanted))) outcome = 'offline';
 				if (at !== epoch) return;
-				await readHeld();
+				if (!shownOnly) await readHeld();
 			}
 		} catch {
 			outcome = 'offline';
@@ -478,7 +495,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			const index = pack.index;
 			if (index === undefined) return;
 			try {
-				if (await download(index, wantedFiles(true))) await readHeld();
+				if ((await download(index, wantedFiles(true))) && !shownOnly) await readHeld();
 			} catch {
 				if (at === epoch) _status = _blocked ? 'failed' : 'offline';
 			}

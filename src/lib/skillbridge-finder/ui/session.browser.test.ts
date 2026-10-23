@@ -939,6 +939,21 @@ describe('Lock', () => {
 		expect(session.zips).toBeUndefined();
 	});
 
+	// A full device refuses to keep the week, but it did download: saying it "couldn't be downloaded" would be untrue,
+	// so the week is shown for this visit and asked for again on the next.
+	it('shows a downloaded week the device could not keep, for this visit', async () => {
+		const dev = await device({ place: { kind: 'zip', zip: '21046' }, radius: 100 });
+		const pack = around(dev.pack, {
+			swap: () => Promise.reject(new DOMException('full', 'QuotaExceededError'))
+		});
+		const session = open({ finder: dev.finder, pack }, network());
+		await session.start();
+
+		expect(session.status).toBe('ready');
+		expect(ids(session.matches)).toContain(COLUMBIA.i);
+		expect(await dev.pack.readRegion('south-atlantic')).toBeUndefined();
+	});
+
 	// A read that finishes after the person locked must not put its listings back on a locked device.
 	it('puts nothing back when a lock lands while the held files are being read', async () => {
 		const dev = await device({});
