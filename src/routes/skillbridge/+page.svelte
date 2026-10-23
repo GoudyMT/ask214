@@ -52,7 +52,9 @@
 
 	// The picks as the table shows them, read from the held week or, for a saved program the week dropped, from the
 	// facts saved with it. A pick known to neither has nothing to show.
-	const picks = $derived.by(() => {
+	// A function read inside the table's own block, not a page-level derived: a derived nobody reads any more keeps its
+	// last value, and after a Lock that value would be the decrypted picks.
+	function comparePicks() {
 		if (!comparing || !session || !finder) return [];
 		const held = new Map(session.listings.map((l) => [l.i, l]));
 		const kept = session;
@@ -60,8 +62,7 @@
 			const listing = held.get(id) ?? finder.saved.find((s) => s.id === id)?.facts;
 			return listing ? [{ listing, unlisted: kept.savedStatus(id).kind === 'missing' }] : [];
 		});
-	});
-	const unlistedIds = $derived(new Set(picks.filter((p) => p.unlisted).map((p) => p.listing.i)));
+	}
 
 	async function openCompare(): Promise<void> {
 		listScrollY = window.scrollY;
@@ -239,10 +240,11 @@
 			/>
 		{:else if finder.ready && session}
 			{#if comparing}
+				{@const picks = comparePicks()}
 				{#if compareError}<p class="finder-problem" role="alert">{compareError}</p>{/if}
 				<CompareTable
 					listings={picks.map((p) => p.listing)}
-					unlisted={unlistedIds}
+					unlisted={new Set(picks.filter((p) => p.unlisted).map((p) => p.listing.i))}
 					onremove={(id) => void writeCompare(() => finder.removeCompare(id))}
 					onback={() => void closeCompare()}
 					onadd={() => void closeCompare()}
