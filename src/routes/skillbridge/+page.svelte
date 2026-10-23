@@ -3,6 +3,7 @@
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
 	import List from '$lib/skillbridge-finder/ui/List.svelte';
+	import ProgramCard from '$lib/skillbridge-finder/ui/ProgramCard.svelte';
 	import {
 		createFinderSession,
 		type FinderSession
@@ -10,6 +11,7 @@
 	import Setup from '$lib/skillbridge-finder/ui/Setup.svelte';
 	import { isSetUp, withSetupChoices } from '$lib/skillbridge-finder/ui/setup-state';
 	import type { Listing } from '$lib/skillbridge-finder/contract/listing';
+	import type { SavedStatus } from '$lib/skillbridge-finder/state/saved-status';
 	import type { FinderFilters, FinderSetup } from '$lib/skillbridge-finder/state/types';
 
 	const app = getProfileApp();
@@ -126,8 +128,22 @@
 	<title>SkillBridge - Ask 214</title>
 </svelte:head>
 
-{#snippet program(args: { listing: Listing })}
-	<article class="finder-program"><strong>{args.listing.n}</strong> {args.listing.p}</article>
+{#snippet program(args: {
+	listing: Listing;
+	miles?: number | undefined;
+	isNew: boolean;
+	status?: SavedStatus;
+})}
+	{#if session && finder}
+		<ProgramCard
+			listing={args.listing}
+			miles={args.miles}
+			isNew={args.isNew}
+			status={args.status}
+			{session}
+			{finder}
+		/>
+	{/if}
 {/snippet}
 
 <!-- A browser's page translation sends this screen's text to a translation service, and the place is the person's own. -->
@@ -168,14 +184,6 @@
 	h1:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
-	}
-
-	.finder-program {
-		margin-bottom: var(--space-s);
-		padding: var(--space-s) var(--space-m);
-		background: var(--color-surface);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-m);
 	}
 
 	.finder-note {

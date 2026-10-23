@@ -113,6 +113,27 @@ describe('from setup to the list', () => {
 	});
 });
 
+describe('a card on the page', () => {
+	// Opening a program is seeing it: the new count must follow, and a saved program must reach the Saved tab.
+	it('lowers the new count when opened, and a saved program shows under Saved', async () => {
+		const { finder } = await device();
+		await finder.setSetup({
+			place: { kind: 'state', state: 'MD' },
+			territories: false,
+			overseas: false
+		});
+		await render(SkillBridgePage);
+		await expect.element(programs(6)).toBeVisible();
+		await expect.element(page.getByText(/- 4 new/)).toBeVisible();
+
+		await page.getByRole('button', { name: /Alpha Systems/ }).click();
+		await expect.element(page.getByText(/- 3 new/)).toBeVisible();
+
+		await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+		await expect.element(page.getByRole('tab', { name: 'Saved (1)' })).toBeVisible();
+	});
+});
+
 describe('across a Lock', () => {
 	it('swaps the list for the locked panel, and brings it back on Unlock', async () => {
 		const { store, finder, pack } = await device();
