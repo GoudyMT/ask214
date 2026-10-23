@@ -24,7 +24,7 @@ import {
 	type FinderSavedItem,
 	type FinderSetup
 } from '../skillbridge-finder/state/types';
-import { parsePlaceText, placeText } from '../skillbridge-finder/ui/place-text';
+import { STATE_NAMES } from '../skillbridge-finder/search/state-names';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-key';
 import { decodeTimelineState, isSnoozeDate } from '../timeline/state-codec';
@@ -176,10 +176,13 @@ function isStoredDate(v: unknown): v is string {
 	}
 }
 
+const STORED_ZIP_RE = /^\d{5}$/;
+
 /**
- * A place as Settings stores it: base64 of text the finder's own parser reads as a place and spells the same way back
- * (a ZIP, or a state's full name). Free text, a second spelling or anything the parser does not name is refused, so a
- * crafted file cannot plant words the app would later show or use.
+ * A place as Settings stores it: base64 of the finder's own spelling, five digits or a state's full name. Free text or
+ * a second spelling is refused, so a crafted file cannot plant words the app would later show or use. The rule is
+ * spelled out here rather than imported from the finder's parser: importing it splits extra shared chunks into the
+ * precache.
  */
 function isStoredPlace(v: unknown): v is string {
 	if (typeof v !== 'string') return false;
@@ -187,8 +190,7 @@ function isStoredPlace(v: unknown): v is string {
 	if (bytes === null) return false;
 	try {
 		const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-		const place = parsePlaceText(text);
-		return place !== null && placeText(place) === text;
+		return STORED_ZIP_RE.test(text) || Object.values(STATE_NAMES).includes(text);
 	} catch {
 		return false;
 	} finally {
