@@ -137,6 +137,29 @@ describe('pii-policy: server source must not reference ProfileV1 PII fields', ()
 		expect(violations[0]?.token).toBe(`\\.${field}\\b`);
 	});
 
+	// The finder store hands the same record out under short names (setup, filters, saved, compare), which the field
+	// names above cannot see: a read through the store's handle is flagged by those names.
+	it.each([
+		'app.finder.setup.place',
+		'app.finder?.setup',
+		'JSON.stringify(finder.filters)',
+		'finder.saved.length',
+		'store.finder?.compare'
+	])('flags a read of the finder store, %s, in an online-path file', (read) => {
+		const violations = scanForPiiTokens([
+			{ path: 'src/lib/ask/online/x.ts', content: `const v = ${read};` }
+		]);
+		expect(violations).toHaveLength(1);
+	});
+
+	it('leaves a word that only ends in "finder" alone', () => {
+		expect(
+			scanForPiiTokens([
+				{ path: 'src/lib/ask/online/x.ts', content: 'const v = pathfinder.setup;' }
+			])
+		).toEqual([]);
+	});
+
 	it('does not flag clean server code', () => {
 		const violations = scanForPiiTokens([
 			{ path: 'src/routes/x/+server.ts', content: 'export const GET = () => new Response("ok");' }

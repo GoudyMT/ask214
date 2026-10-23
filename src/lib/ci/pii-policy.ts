@@ -74,6 +74,8 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\.finderCompare\b/,
 	/\.finderSeen\b/,
 	/\.finderLastSeenPull\b/,
+	// The finder store's getters hand that record out under short names; a read through its handle is the same data.
+	/\bfinder\??\.(?:setup|filters|saved|compare)\b/,
 	/\b_profileBytes\b/,
 	/\binstallUuid\b/,
 	// The same fields read without a dot, which the patterns above cannot see: by bracket (`profile['eaos']`), as a key
