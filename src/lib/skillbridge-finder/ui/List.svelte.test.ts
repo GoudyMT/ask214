@@ -40,6 +40,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+	vi.restoreAllMocks();
 	await deleteTestDb(db);
 });
 
@@ -418,6 +419,8 @@ describe('the Saved tab', () => {
 
 describe('with nothing to show yet', () => {
 	it('says it is offline and nothing is downloaded when the network is down on a first visit', async () => {
+		// The phone itself is offline: that is the only case the offline line may claim.
+		vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
 		const dev = await device(db, STATE);
 		const session = createFinderSession({
 			finder: dev.finder,
@@ -433,6 +436,29 @@ describe('with nothing to show yet', () => {
 			.element(page.getByText('You are offline and no listings are downloaded yet.'))
 			.toBeVisible();
 		expect(cards()).toHaveLength(0);
+	});
+
+	// The phone is online but the data host fails: "offline" would be untrue, and Try again is what helps.
+	it('says listings could not be downloaded, with a way to try again, when the host fails while online', async () => {
+		vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+		const dev = await device(db, STATE);
+		const session = createFinderSession({
+			finder: dev.finder,
+			pack: dev.pack,
+			fetchFn: () => Promise.resolve(new Response('down', { status: 503 })),
+			now: () => NOW,
+			workerPassesData: () => Promise.resolve(true)
+		});
+		await session.start();
+		await render(List, { session, finder: dev.finder, card });
+
+		await expect
+			.element(page.getByText("Listings couldn't be downloaded right now."))
+			.toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+		expect(
+			page.getByText('You are offline and no listings are downloaded yet.').elements()
+		).toHaveLength(0);
 	});
 
 	it('says listings could not be downloaded, with a way to try again, when the worker refuses', async () => {

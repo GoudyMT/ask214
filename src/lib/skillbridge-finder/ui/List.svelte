@@ -34,6 +34,17 @@
 	let declinedAll = $state(false);
 	let downloadingAll = $state(false);
 	let problem = $state<string | null>(null);
+	// A download can fail with the phone online (the data host is down); the offline line is only true when it is not.
+	let online = $state(navigator.onLine);
+	$effect(() => {
+		const update = () => (online = navigator.onLine);
+		window.addEventListener('online', update);
+		window.addEventListener('offline', update);
+		return () => {
+			window.removeEventListener('online', update);
+			window.removeEventListener('offline', update);
+		};
+	});
 	let sheet = $state<FilterSheet>();
 
 	const setup = $derived(finder.setup);
@@ -203,9 +214,9 @@
 		{#if session.listings.length === 0}
 			{#if session.status === 'loading'}
 				<p class="list__muted">Loading listings...</p>
-			{:else if session.status === 'offline'}
+			{:else if session.status === 'offline' && !online}
 				<p class="list__muted">You are offline and no listings are downloaded yet.</p>
-			{:else if session.status === 'failed'}
+			{:else if session.status === 'failed' || session.status === 'offline'}
 				<p class="list__muted" role="alert">Listings couldn't be downloaded right now.</p>
 				<button type="button" class="list__more" onclick={() => void session.start()}
 					>Try again</button
