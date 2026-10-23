@@ -447,6 +447,13 @@
 		cursor: pointer;
 	}
 
+	/* On the narrowest phones a picked program's wider "Comparing" would push Details to a line of its own. */
+	@media (max-width: 380px) {
+		.card__pill {
+			padding: 0 var(--space-s);
+		}
+	}
+
 	.card__pill:hover {
 		border-color: var(--color-accent);
 	}
@@ -467,6 +474,7 @@
 		color: var(--color-accent);
 		font-size: var(--font-size-s);
 		font-weight: 600;
+		white-space: nowrap;
 	}
 
 	.card__chevron {

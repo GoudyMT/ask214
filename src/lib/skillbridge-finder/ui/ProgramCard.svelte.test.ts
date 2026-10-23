@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-svelte';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import { bootstrapLocalKeystore } from '../../keystore/bootstrap';
 import { deleteTestDb, openTestDb } from '../../db/_test-helpers';
@@ -412,6 +412,36 @@ describe('motion', () => {
 			});
 		}
 	});
+});
+
+// The Details cue ends the action row; on the narrowest phone, a picked program's wider "Comparing" must not push it
+// onto a line of its own, where it reads as belonging to nothing.
+it('keeps Save, Comparing and Details on one line at 320 px', async () => {
+	dropCss = useAppCss();
+	const size = { width: window.innerWidth, height: window.innerHeight };
+	// The app's type sizes follow the viewport, so the phone's own width is set, not only the column's.
+	await page.viewport(320, 800);
+	onTestFinished(() => page.viewport(size.width, size.height));
+	await mount();
+	const root = page.getByRole('article').element();
+	(root.parentElement as HTMLElement).style.width = `${320 - 32}px`;
+	await page.getByRole('button', { name: 'Compare', exact: true }).click();
+	await expect.element(page.getByRole('button', { name: 'Comparing' })).toBeVisible();
+
+	// The list sits the card in a slightly narrower column than the page's (272 px measured on a 320 px phone).
+	for (const width of [256, 264, 272, 280, 288]) {
+		(root.parentElement as HTMLElement).style.width = `${width}px`;
+		const parts = [...root.querySelectorAll<HTMLElement>('.card__actions > *')];
+		const middles = parts.map((el) => {
+			const r = el.getBoundingClientRect();
+			return Math.round(r.top + r.height / 2);
+		});
+		expect(parts.length).toBeGreaterThanOrEqual(3);
+		expect(middles, `${width} px`).toEqual(middles.map(() => middles[0]));
+		// "Details" and its chevron stay side by side, not stacked.
+		const cue = root.querySelector<HTMLElement>('.card__cue')!;
+		expect(cue.getBoundingClientRect().height, `${width} px`).toBeLessThan(30);
+	}
 });
 
 describe('the tag line', () => {
