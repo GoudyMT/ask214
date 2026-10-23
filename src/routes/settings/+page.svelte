@@ -32,6 +32,7 @@
 		EaosFormatError,
 		type EaosCause
 	} from '$lib/profile/eaos';
+	import FinderSettings from '$lib/skillbridge-finder/ui/FinderSettings.svelte';
 	import CalendarPanel from '$lib/components/CalendarPanel.svelte';
 	import OnlineAnswersPanel from '$lib/components/OnlineAnswersPanel.svelte';
 	import {
@@ -610,6 +611,10 @@
 					{/if}
 				</section>
 			{/if}
+
+			<!-- Reads its own stores and draws nothing while they are closed, so a Lock empties it with the rest. -->
+
+			<FinderSettings />
 
 			{#if hasTimeline || holdsDocuments}
 				<section class="settings-section" aria-labelledby="privacy-heading">

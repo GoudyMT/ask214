@@ -86,6 +86,15 @@ describe('PackSettings', () => {
 		expect(props.onremove).not.toHaveBeenCalled();
 	});
 
+	it('says why a save or removal did not happen, as an alert', async () => {
+		const { container } = await render(PackSettings, {
+			props: off({ error: 'Could not save the listings right now. Try again.' })
+		});
+		expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+			'Could not save the listings right now. Try again.'
+		);
+	});
+
 	it('keeps its buttons at least 44 px tall', async () => {
 		const { container } = await render(PackSettings, { props: off() });
 		const controls = [...container.querySelectorAll('button, a')];

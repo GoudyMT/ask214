@@ -10,8 +10,10 @@
 		busy: boolean;
 		onsave: () => void;
 		onremove: () => void;
+		/** Why the last save or removal did not happen, said under the rows. */
+		error?: string | null;
 	};
-	let { setupSummary, held, offerBytes, busy, onsave, onremove }: Props = $props();
+	let { setupSummary, held, offerBytes, busy, onsave, onremove, error = null }: Props = $props();
 
 	const OFFLINE_HINT =
 		'Keeps the listings for your region, many-state and online programs on this device, encrypted, so the finder works without a signal. They update when you are online.';
@@ -57,6 +59,7 @@
 			{/if}
 			<p class="pack__hint">{OFFLINE_HINT}</p>
 		{/if}
+		{#if error}<p class="pack__error" role="alert">{error}</p>{/if}
 	</div>
 </section>
 
@@ -121,6 +124,12 @@
 	/* A busy press does nothing, so it must not look pressable or fade the label below its contrast minimum. */
 	.pack__button[aria-busy='true'] {
 		cursor: default;
+	}
+
+	.pack__error {
+		margin: var(--space-s) 0 0;
+		color: var(--color-danger);
+		font-size: var(--font-size-s);
 	}
 
 	.pack__hint {
