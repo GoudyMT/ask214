@@ -189,13 +189,13 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	async function openPack(): Promise<boolean> {
 		if (pack.ready) return true;
 		if (pack.locked) return false;
-		if (!pack.failed) {
-			try {
-				await pack.load();
-				return pack.ready;
-			} catch {
-				if (!pack.failed) return false;
-			}
+		// Read first even after an earlier failed open: another tab may have recovered the rows since, and clearing them now
+		// would throw its download away.
+		try {
+			await pack.load();
+			return pack.ready;
+		} catch {
+			if (!pack.failed) return false;
 		}
 		try {
 			await pack.drop();

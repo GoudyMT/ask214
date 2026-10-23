@@ -686,6 +686,26 @@ describe('rows the pack cannot read', () => {
 		expect(dev.pack.failed).toBe(false);
 	});
 
+	// The earlier failed open may have been fixed since, by another tab that cleared the rows and downloaded: clearing
+	// again would throw away the week it just stored.
+	it('reads a pack that a peer tab has recovered since its open failed, and does not clear it', async () => {
+		const dev = await device({}, false);
+		await putPackRow({ id: 'index', rec: new Uint8Array(32) });
+		await expect(dev.pack.load()).rejects.toThrow();
+		expect(dev.pack.failed).toBe(true);
+		const peer = createFinderPackStore(db, () => NOW);
+		await open({ finder: dev.finder, pack: peer }, network()).start();
+		expect(peer.pullDate).toBe(PULL);
+
+		const net = network();
+		const session = open(dev, net);
+		await session.start();
+
+		expect(net.calls).toEqual([pathOf.index]);
+		expect(session.pullDate).toBe(PULL);
+		expect(ids(session.matches).sort()).toEqual([2201, 2301]);
+	});
+
 	// A week another tab moved on is not damage: the files on disk are good, and clearing them would download the
 	// week again for nothing.
 	it('answers a week another tab moved on by reading again, not by clearing', async () => {
