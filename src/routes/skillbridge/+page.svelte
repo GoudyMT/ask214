@@ -112,9 +112,14 @@
 	});
 
 	// The week is opened and refreshed once the person is through setup and everything is open; a lock empties the
-	// session, and the Unlock that follows opens the stores again and lands here.
+	// session, and the Unlock that follows opens the stores again and lands here. A pack that failed to load starts it
+	// too: the session is what clears an unreadable week and downloads it again.
 	const listOpen = $derived(
-		!!session && !!finder?.ready && !!app.finderPack?.ready && isSetUp(finder.setup) && !changing
+		!!session &&
+			!!finder?.ready &&
+			(!!app.finderPack?.ready || !!app.finderPack?.failed) &&
+			isSetUp(finder.setup) &&
+			!changing
 	);
 	$effect(() => {
 		if (listOpen) void session?.start();
