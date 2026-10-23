@@ -131,6 +131,15 @@ describe('CompareTable', () => {
 		expect(texts).toContain('Clear all');
 	});
 
+	it('marks a program the weekly files no longer list, and only that one', async () => {
+		const { container } = await render(CompareTable, {
+			props: { listings: [GRID, WIND], unlisted: new Set([WIND.i]), ...handlers() }
+		});
+		const heads = [...container.querySelectorAll('thead th[scope="col"]')];
+		expect(heads[0]!.textContent).not.toContain('No longer listed');
+		expect(heads[1]!.textContent).toContain('No longer listed');
+	});
+
 	it('says the finder is not affiliated, in the locked words', async () => {
 		const { container } = await render(CompareTable, {
 			props: { listings: [GRID], ...handlers() }

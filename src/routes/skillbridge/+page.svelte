@@ -2,6 +2,8 @@
 	import { onMount, tick } from 'svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { getProfileApp } from '$lib/profile/context';
+	import CompareTable from '$lib/skillbridge-finder/ui/CompareTable.svelte';
+	import CompareTray from '$lib/skillbridge-finder/ui/CompareTray.svelte';
 	import List from '$lib/skillbridge-finder/ui/List.svelte';
 	import ProgramCard from '$lib/skillbridge-finder/ui/ProgramCard.svelte';
 	import {
@@ -18,15 +20,23 @@
 
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	const SAVE_FAILED = 'Could not save your choices right now. Try again.';
+	const COMPARE_FAILED = 'Could not save that change. Try again.';
+	// One pick has nothing to be compared with, so the tray waits for a second.
+	const MIN_PICKS_TO_COMPARE = 2;
 	const finder = $derived(app.finder);
 
-	let headingEl: HTMLElement | undefined;
+	let headingEl = $state<HTMLElement>();
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
 	let saveError = $state<string | null>(null);
 	// Settings links here with #setup; the page reads it again when it changes under an open page.
 	let changing = $state(false);
 	let session = $state.raw<FinderSession | null>(null);
+	// The table takes the list's place on the page; the list stays mounted underneath so its tab, paging and place
+	// in the scroll are as the person left them.
+	let comparing = $state(false);
+	let compareError = $state<string | null>(null);
+	let listScrollY = 0;
 
 	// The finder's own lock: a Lock relocks every store at once, so this is also the profile's.
 	const lockedView = $derived(finder?.locked ?? false);
@@ -39,6 +49,54 @@
 		void lockedView;
 		unlockError = null;
 	});
+
+	// The picks as the table shows them, read from the held week or, for a saved program the week dropped, from the
+	// facts saved with it. A pick known to neither has nothing to show.
+	const picks = $derived.by(() => {
+		if (!comparing || !session || !finder) return [];
+		const held = new Map(session.listings.map((l) => [l.i, l]));
+		const kept = session;
+		return finder.compare.flatMap((id) => {
+			const listing = held.get(id) ?? finder.saved.find((s) => s.id === id)?.facts;
+			return listing ? [{ listing, unlisted: kept.savedStatus(id).kind === 'missing' }] : [];
+		});
+	});
+	const unlistedIds = $derived(new Set(picks.filter((p) => p.unlisted).map((p) => p.listing.i)));
+
+	async function openCompare(): Promise<void> {
+		listScrollY = window.scrollY;
+		compareError = null;
+		comparing = true;
+		await tick();
+		window.scrollTo(0, 0);
+		document.getElementById('compare-heading')?.focus({ preventScroll: true });
+	}
+
+	async function closeCompare(): Promise<void> {
+		comparing = false;
+		await tick();
+		headingEl?.focus({ preventScroll: true });
+		window.scrollTo(0, listScrollY);
+	}
+
+	// A Lock empties the picks and the week with it, so the table must not outlive it; picks taken away down to none
+	// leave nothing to compare.
+	$effect(() => {
+		if (!comparing) return;
+		if (lockedView) comparing = false;
+		else if (finder?.ready && finder.compare.length === 0) void closeCompare();
+	});
+
+	/** A write to the record; one that fails reads the record again and says so. */
+	async function writeCompare(run: () => Promise<void>): Promise<void> {
+		compareError = null;
+		try {
+			await run();
+		} catch {
+			await finder?.refresh().catch(() => undefined);
+			compareError = COMPARE_FAILED;
+		}
+	}
 
 	// One session for the visit, over the stores the layout provides once they exist.
 	$effect(() => {
@@ -148,7 +206,9 @@
 
 <!-- A browser's page translation sends this screen's text to a translation service, and the place is the person's own. -->
 <div translate="no">
-	<h1 bind:this={headingEl} tabindex="-1">SkillBridge</h1>
+	{#if !comparing}
+		<h1 bind:this={headingEl} tabindex="-1">SkillBridge</h1>
+	{/if}
 
 	{#if app.finderFailed}
 		<div class="finder-note">
@@ -171,7 +231,25 @@
 				error={saveError}
 			/>
 		{:else if finder.ready && session}
-			<List {session} {finder} card={program} />
+			{#if comparing}
+				{#if compareError}<p class="finder-problem" role="alert">{compareError}</p>{/if}
+				<CompareTable
+					listings={picks.map((p) => p.listing)}
+					unlisted={unlistedIds}
+					onremove={(id) => void writeCompare(() => finder.removeCompare(id))}
+					onback={() => void closeCompare()}
+					onadd={() => void closeCompare()}
+					onclear={() => void writeCompare(() => finder.clearCompare())}
+				/>
+			{/if}
+			<div hidden={comparing}>
+				<List {session} {finder} card={program} />
+			</div>
+			{#if !comparing && finder.compare.length >= MIN_PICKS_TO_COMPARE}
+				<!-- The tray is fixed over the bottom of the page: this space keeps the last card clear of it. -->
+				<div class="tray-space" aria-hidden="true"></div>
+				<CompareTray count={finder.compare.length} oncompare={() => void openCompare()} />
+			{/if}
 		{/if}
 	{/if}
 </div>
@@ -196,6 +274,16 @@
 		border-left: 3px solid var(--color-danger);
 		border-radius: var(--radius-m);
 		padding: var(--space-s) var(--space-m);
+	}
+
+	.tray-space {
+		height: 72px;
+	}
+
+	.finder-problem {
+		margin: 0 0 var(--space-s);
+		color: var(--color-danger);
+		font-size: var(--font-size-s);
 	}
 
 	.finder-note p {

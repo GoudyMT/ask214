@@ -10,8 +10,10 @@
 		onback: () => void;
 		onadd: () => void;
 		onclear: () => void;
+		/** Ids of programs the weekly files no longer list; their saved facts still show. */
+		unlisted?: ReadonlySet<number>;
 	};
-	let { listings, onremove, onback, onadd, onclear }: Props = $props();
+	let { listings, onremove, onback, onadd, onclear, unlisted }: Props = $props();
 
 	const NOT_AFFILIATED =
 		'Listings from DoD SkillBridge (skillbridge.mil). Ask 214 is independent, not a Department of Defense or Department of War site, and not endorsed by either.';
@@ -50,7 +52,8 @@
 	<button class="compare__text-button compare__back" type="button" onclick={onback}>
 		Back to programs
 	</button>
-	<h1 id="compare-heading">Compare programs</h1>
+	<!-- tabindex -1: the page hands focus here when the table opens. -->
+	<h1 id="compare-heading" tabindex="-1">Compare programs</h1>
 
 	<!-- A scroll box a keyboard can reach: arrow keys scroll it once it has focus. Not a widget, so the compiler's rule
 	     against a tab stop on a non-interactive role does not fit; this is the scrollable region pattern. -->
@@ -62,6 +65,7 @@
 					<td class="compare__corner"></td>
 					{#each listings as l (l.i)}
 						<th scope="col">
+							{#if unlisted?.has(l.i)}<span class="compare__gone">No longer listed</span>{/if}
 							<span class="compare__org">{l.n}</span>
 							<span class="compare__program">{l.p}</span>
 							<button
@@ -99,6 +103,11 @@
 <style>
 	h1 {
 		margin: 0 0 var(--space-m);
+	}
+
+	h1:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 
 	/* A link-looking button: the page's text actions are buttons because none of them navigates by address. */
@@ -156,6 +165,19 @@
 
 	thead th {
 		font-weight: 400;
+	}
+
+	/* The card's own "No longer listed" tag. */
+	.compare__gone {
+		display: inline-block;
+		margin-bottom: var(--space-xs);
+		padding: 1px 6px;
+		border: 1px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
+		border-radius: var(--radius-s);
+		background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+		color: var(--color-danger);
+		line-height: 1.4;
+		white-space: nowrap;
 	}
 
 	.compare__org {
