@@ -963,12 +963,62 @@ describe('Lock', () => {
 		const pack = around(dev.pack, {
 			swap: () => Promise.reject(new DOMException('full', 'QuotaExceededError'))
 		});
-		const session = open({ finder: dev.finder, pack }, network());
+		const net = network();
+		const session = open({ finder: dev.finder, pack }, net);
 		await session.start();
 
 		expect(session.status).toBe('ready');
 		expect(session.pullDate).toBe(PULL);
 		expect(dev.pack.pullDate).toBe(LAST_PULL);
+
+		// The next visit, offline, has only the disk: it is dated by the disk's week.
+		net.goDown();
+		await session.start();
+		expect(session.pullDate).toBe(LAST_PULL);
+	});
+
+	// The week on screen is only in memory; a later download that the device does keep must not replace the whole older
+	// week on disk with a few files of the new one, which an offline visit would then show as a hole.
+	it('keeps the older week on disk whole when a later search follows a week shown from memory', async () => {
+		const dev = await device({});
+		await open(dev, network(LAST_PULL)).start();
+		let full = true;
+		const pack = around(dev.pack, {
+			swap: (input) =>
+				full ? Promise.reject(new DOMException('full', 'QuotaExceededError')) : dev.pack.swap(input)
+		});
+		const session = open({ finder: dev.finder, pack }, network());
+		await session.start();
+
+		full = false;
+		await session.searchAll();
+
+		expect(dev.pack.pullDate).toBe(LAST_PULL);
+		expect(await dev.pack.readRegion('remote')).toBeDefined();
+		expect(await dev.pack.readIds()).toBeDefined();
+	});
+
+	// A Lock clears a week shown from memory like any other, and the next visit starts from the disk again.
+	it('drops a week shown from memory on a Lock, and dates the next visit by the disk', async () => {
+		const place = { kind: 'zip', zip: '21046' } as const;
+		const dev = await device({ place, radius: 100 });
+		await open(dev, network(LAST_PULL)).start();
+		const pack = around(dev.pack, {
+			swap: () => Promise.reject(new DOMException('full', 'QuotaExceededError'))
+		});
+		const net = network();
+		const session = open({ finder: dev.finder, pack }, net);
+		await session.start();
+		expect(session.pullDate).toBe(PULL);
+
+		dev.pack.relockSync('user');
+		expect(session.pullDate).toBeUndefined();
+		expect(session.listings).toEqual([]);
+
+		await dev.pack.load();
+		net.goDown();
+		await session.start();
+		expect(session.pullDate).toBe(LAST_PULL);
 	});
 
 	// Only a full device is shown from memory; any other refusal (a week older than the one on disk, bad files) is the

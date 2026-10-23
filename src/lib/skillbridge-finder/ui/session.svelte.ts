@@ -282,6 +282,12 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			shownIndex = index;
 			shownOnly = true;
 		};
+		// The week on screen is only in memory: what arrives joins it there. Swapping a few of its files in would replace the
+		// whole older week on disk with them, and an offline visit would then show the hole.
+		if (shownOnly) {
+			showFetched();
+			return at === epoch;
+		}
 		try {
 			await pack.swap({
 				index,
@@ -296,8 +302,6 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			showFetched();
 			return true;
 		}
-		// Kept this time, but the rest of the shown week is only in memory: reading the disk back would drop it.
-		if (at === epoch && shownOnly) showFetched();
 		return at === epoch;
 	}
 
