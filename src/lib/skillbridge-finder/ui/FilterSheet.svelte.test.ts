@@ -93,6 +93,19 @@ describe('a count beside each value', () => {
 			.toHaveAccessibleName('Computer and Mathematical 1');
 	});
 
+	// The sheet opens over a searched list too; a count that left the search out would offer a value that shows nothing.
+	it('counts only the programs the search found, and disables a value the search leaves empty', async () => {
+		const { session } = await open();
+		session.query = 'Charlie';
+		await expect.element(footer()).toHaveTextContent('Show 1 program');
+
+		await expect.element(box('Legal')).toHaveAccessibleName('Legal 1');
+		await expect
+			.element(box('Computer and Mathematical'))
+			.toHaveAccessibleName('Computer and Mathematical 0');
+		await expect.element(box('Computer and Mathematical')).toBeDisabled();
+	});
+
 	it('does not count a filter against itself, so a ticked value still shows what the others hold', async () => {
 		const { finder } = await open();
 		await box('Legal').click();

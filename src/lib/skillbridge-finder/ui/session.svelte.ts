@@ -424,7 +424,11 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	}
 
 	function computeResults(): Match[] {
-		const rows = computeMatches();
+		return searched(computeMatches());
+	}
+
+	/** The rows the search keeps; all of them with no search. */
+	function searched(rows: Match[]): Match[] {
 		if (_query.trim() === '') return rows;
 		if (searchIndex?.listings !== _listings) {
 			searchIndex = { listings: _listings, index: buildSearchIndex(_listings) };
@@ -450,8 +454,8 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		get matches(): Match[] {
 			return computeMatches();
 		},
-		/** What the list would hold under other filters, for the counts beside each filter value. Not kept. */
-		matchesWith: matchesFor,
+		/** What the list would hold under other filters, searched as it is, for the counts beside each value. Not kept. */
+		matchesWith: (filters: FinderFilters) => searched(matchesFor(filters)),
 		get query(): string {
 			return _query;
 		},
