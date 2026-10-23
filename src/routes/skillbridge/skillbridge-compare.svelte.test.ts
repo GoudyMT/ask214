@@ -128,6 +128,25 @@ describe('the compare table on the page', () => {
 		await expect.element(page.getByRole('button', { name: 'Comparing' })).toBeVisible();
 	});
 
+	// A write that fails (a full disk, a lock in another tab) must not leave the table showing a removal that never
+	// happened: it says so, and the columns stay those of the saved record.
+	it('says so and keeps the saved picks when a removal cannot be saved', async () => {
+		const { finder } = await device();
+		await finder.addCompare(ALPHA.i);
+		await finder.addCompare(BRAVO.i);
+		vi.spyOn(finder, 'removeCompare').mockRejectedValue(new Error('E_TEST_WRITE'));
+		await render(SkillBridgePage);
+		await page.getByRole('button', { name: 'Compare', exact: true }).last().click();
+
+		await page.getByRole('button', { name: 'Remove Alpha Systems' }).click();
+
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent('Could not save that change. Try again.');
+		expect(finder.compare).toEqual([ALPHA.i, BRAVO.i]);
+		expect(columns()).toHaveLength(2);
+	});
+
 	it('clears every pick with Clear all and goes back to the list', async () => {
 		const { finder } = await device();
 		await finder.addCompare(ALPHA.i);
