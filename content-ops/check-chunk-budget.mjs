@@ -422,6 +422,11 @@ const STATIC = 'static';
 //     root layout 7,592 B (gzip-9). Trim pass: the take-over code first went in a lazy chunk of its own, which put
 //     on-demand chunks 320 B and precache files one over; it runs on every start anyway, so it moved into the
 //     layout and both fit again. The rest is the fixes themselves.
+//     The four finder entries above were measured on the base before the bottom bar. Rebased onto it, both sets of
+//     raises re-set from measurement, not added (owner's call, 2026-10-22): page 90,350 -> 95,150, precache
+//     222,500 -> 227,560, precache files 71 -> 72 and the root layout node 8,610 -> 8,920. Three builds measured
+//     page 95,102-95,105 B, precache 227,510-227,517 B, 72 files, root layout 8,877-8,879 B, about 40 B of room above
+//     the highest. Trim pass: the growth is the two approved sets of raises together, nothing new.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -431,10 +436,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 90_350,
+	page: 95_150,
 	onDemand: 8_189,
-	precacheFiles: 71,
-	precacheBytes: 222_500,
+	precacheFiles: 72,
+	precacheBytes: 227_560,
 	workerScripts: 147_200
 };
 
