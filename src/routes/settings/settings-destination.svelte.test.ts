@@ -94,11 +94,11 @@ describe('Settings, where you plan to live', () => {
 		await enter('21046');
 
 		await expect.element(row()).toMatchTextContent('21046');
-		expect(store.destination).toBe('21046');
+		expect(store.geographicDestination).toBe('21046');
 		// Held on disk, not just in memory: a relock and a re-read finds it.
 		store.relockSync('user');
 		await store.load();
-		expect(store.destination).toBe('21046');
+		expect(store.geographicDestination).toBe('21046');
 	});
 
 	it.each([
@@ -111,18 +111,21 @@ describe('Settings, where you plan to live', () => {
 		await enter(typed);
 
 		await expect.element(row()).toMatchTextContent(saved);
-		expect(store.destination).toBe(saved);
+		expect(store.geographicDestination).toBe(saved);
 	});
 
 	it.each(['12', 'Marylnd', '  '])(
 		'refuses %j with the finder line and saves nothing',
 		async (typed) => {
 			const store = await device();
+			// A write still in flight would not show in the store yet: the refusal must not start one at all.
+			const save = vi.spyOn(store, 'save');
 			await render(SettingsPage);
 			await enter(typed);
 
 			await expect.element(page.getByText(REFUSED)).toBeVisible();
-			expect(store.destination).toBeNull();
+			expect(save).not.toHaveBeenCalled();
+			expect(store.geographicDestination).toBeNull();
 			expect(store._getStateForTest()?.generation).toBe(1);
 		}
 	);
@@ -137,7 +140,7 @@ describe('Settings, where you plan to live', () => {
 			.click();
 
 		await expect.element(row()).toMatchTextContent('Not set');
-		expect(store.destination).toBeNull();
+		expect(store.geographicDestination).toBeNull();
 	});
 
 	it('says so, and keeps the form, when the save fails', async () => {
@@ -149,7 +152,7 @@ describe('Settings, where you plan to live', () => {
 		await expect
 			.element(page.getByText('Could not update right now - please try again.'))
 			.toBeVisible();
-		expect(store.destination).toBeNull();
+		expect(store.geographicDestination).toBeNull();
 	});
 
 	it('shows nothing of the place while the profile is locked', async () => {

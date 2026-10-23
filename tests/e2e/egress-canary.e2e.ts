@@ -66,6 +66,9 @@ const DAYS_TO_SEPARATION = 208;
 const SEPARATION = isoFromToday(DAYS_TO_SEPARATION);
 const SKILLBRIDGE = isoFromToday(28);
 const NOTE = 'Canary note that must stay on this device';
+// Where the person plans to live, saved from Settings as the SkillBridge finder spells it.
+const PLACE_LABEL = 'Where you plan to live';
+const PLACE = '20850';
 const QUESTION = 'What is SkillBridge?';
 // The titles of the two steps a Yes (or a late Not sure) adds to the timeline, as the task list shows them.
 const FIND_TITLE = 'Find a SkillBridge program and get an acceptance letter';
@@ -107,6 +110,13 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		.getByRole('button', { name: /^save$/i })
 		.click();
 	await expect(page.getByLabel('SkillBridge start')).toBeHidden();
+	await page.getByRole('button', { name: PLACE_LABEL }).click();
+	await page.getByLabel(PLACE_LABEL).fill(PLACE);
+	await page
+		.getByLabel('Transition timeline')
+		.getByRole('button', { name: /^save$/i })
+		.click();
+	await expect(page.getByRole('button', { name: PLACE_LABEL })).toContainText(PLACE);
 	await page.goto('/timeline');
 	await page.getByRole('button', { name: 'Add note' }).first().click();
 	await page.locator('.task-card__note-input').fill(NOTE);
@@ -167,6 +177,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		...dateForms(SKILLBRIDGE),
 		`${DAYS_TO_SEPARATION} days`,
 		NOTE,
+		PLACE,
 		// This Not sure is late, so the app stores no return day; the day stays forbidden so a regression that did store
 		// one (and then sent it) is caught here.
 		...dateForms(isoFromToday(DAYS_TO_SEPARATION - ASK_AGAIN_DAYS)),

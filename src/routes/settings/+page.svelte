@@ -301,7 +301,7 @@
 
 	// The place is only checked as a ZIP's shape or a state's name: the ZIP table is the finder's to fetch, and this
 	// screen makes no request.
-	const destination = $derived(app.store?.destination ?? null);
+	const destination = $derived(app.store?.geographicDestination ?? null);
 
 	async function savePlace(draft: string): Promise<string | null> {
 		const place = parsePlaceText(draft);

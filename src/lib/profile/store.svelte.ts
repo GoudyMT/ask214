@@ -160,9 +160,9 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		/**
 		 * The place the person plans to live, as the text they saved (a ZIP or a state name), or null with none, or
 		 * while the profile is locked or not loaded. Reactive like `persona`. A screen shows it to the person whose
-		 * device it is.
+		 * device it is. Named for its field so the guard that scans online code for personal fields sees every read.
 		 */
-		get destination(): string | null {
+		get geographicDestination(): string | null {
 			const saved = _profile?.geographicDestination;
 			return saved && saved.length > 0 ? new TextDecoder().decode(saved) : null;
 		},
