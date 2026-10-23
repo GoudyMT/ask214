@@ -96,13 +96,13 @@ describe('the first visit', () => {
 		await page.getByRole('button', { name: 'Management' }).click();
 		await show().click();
 
-		await vi.waitFor(() =>
-			expect(finder.setup).toEqual({
-				place: { kind: 'state', state: 'MD' },
-				territories: false,
-				overseas: false
-			})
-		);
+		// The setup closes once both its writes have landed (the place, then the filters it owns).
+		await expect.element(field()).not.toBeInTheDocument();
+		expect(finder.setup).toEqual({
+			place: { kind: 'state', state: 'MD' },
+			territories: false,
+			overseas: false
+		});
 		expect(finder.filters).toEqual({ delivery: [3], industries: ['Management'] });
 	});
 
