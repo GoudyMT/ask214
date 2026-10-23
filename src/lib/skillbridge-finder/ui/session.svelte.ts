@@ -244,6 +244,10 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		if (at !== epoch) return false;
 		// A region file missing would leave a hole in the list that reads as "nothing near you".
 		if (regions.dropped.length > 0) return false;
+		// A week that replaces the held one takes its ids and changes with it: without them the old rows would be deleted
+		// and every New mark would read as "not new". Within one week, or with nothing held yet, there is nothing to lose
+		// by keeping what arrived, and the missing file is asked for again on the next visit.
+		if (pack.pullDate !== undefined && !sameWeek && (!ids || !changes)) return false;
 		await pack.swap({
 			index,
 			regions: regions.files,

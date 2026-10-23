@@ -192,6 +192,12 @@ function network(pull = PULL) {
 	};
 }
 
+/** `net` with one path answering a server error. */
+const failingAt =
+	(net: ReturnType<typeof network>, path: string): FetchFn =>
+	(url, init) =>
+		url === path ? Promise.resolve(new Response('no', { status: 500 })) : net.fetchFn(url, init);
+
 let db: IDBDatabase;
 let sessions: FinderSession[] = [];
 
@@ -476,6 +482,42 @@ describe('the held week', () => {
 
 		expect(dev.pack.pullDate).toBe(LAST_PULL);
 		expect(session.status).toBe('offline');
+	});
+
+	// A newer week without its changes file would replace the held week's, and every New mark would read as "not new".
+	it.each([
+		['ids', pathOf.ids()],
+		['changes', pathOf.changes()]
+	])(
+		'keeps the held week and says offline when the newer week has no %s file',
+		async (_name, path) => {
+			const dev = await device({});
+			await open(dev, network(LAST_PULL)).start();
+			const net = network(PULL);
+			const session = open(dev, { ...net, fetchFn: failingAt(net, path) });
+			await session.start();
+
+			expect(dev.pack.pullDate).toBe(LAST_PULL);
+			expect(session.pullDate).toBe(LAST_PULL);
+			expect(session.status).toBe('offline');
+			expect((await dev.pack.readChanges())?.weeks[0]?.pullDate).toBe(LAST_PULL);
+		}
+	);
+
+	// Nothing held means nothing to lose: the list from a first download is worth showing without its New marks, and the
+	// next visit to the same week asks for what is missing.
+	it('shows a first download whose changes file is missing, and asks for it on the next visit', async () => {
+		const dev = await device({});
+		const net = network(PULL);
+		const first = open(dev, { ...net, fetchFn: failingAt(net, pathOf.changes()) });
+		await first.start();
+
+		expect(first.status).toBe('ready');
+		expect(ids(first.matches).sort()).toEqual([2201, 2301]);
+
+		const again = network(PULL);
+		await open(dev, again).start();
+		expect(again.calls).toContain(pathOf.changes());
 	});
 });
 
