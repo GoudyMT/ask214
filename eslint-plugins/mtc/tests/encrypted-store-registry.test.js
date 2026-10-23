@@ -36,6 +36,7 @@ describe('mtc/encrypted-store-registry', () => {
 					{ code: "tx.objectStore('profile-hwm').put(sidecar);" },
 					{ code: "tx.objectStore('timeline-state-hwm').put(sidecar);" },
 					{ code: "tx.objectStore('calendar-sync-hwm').put(sidecar);" },
+					{ code: "tx.objectStore('skillbridge-finder-hwm').put(sidecar);" },
 					{ code: "tx.objectStore('keystore').put(record);" },
 					// Reads and clears are not writes of ciphertext.
 					{ code: "tx.objectStore('profile').get(0);" },
@@ -71,6 +72,14 @@ describe('mtc/encrypted-store-registry', () => {
 					{
 						code: "tx.objectStore('byok').put({ id: 0, rec });",
 						errors: [{ messageId: 'writeUnsanctioned' }]
+					},
+					{
+						code: "tx.objectStore('skillbridge-finder').put({ id: 0, rec });",
+						errors: [{ messageId: 'writeUnsanctioned' }]
+					},
+					{
+						code: "tx.objectStore('skillbridge-finder-pack').put({ id: 1, rec });",
+						errors: [{ messageId: 'writeUnsanctioned' }]
 					}
 				]
 			})
@@ -78,7 +87,7 @@ describe('mtc/encrypted-store-registry', () => {
 	});
 
 	it('keeps a sanctioned write allowed by its inline disable, and that disable is used', () => {
-		// The four sanctioned writes carry this comment. With unused directives an error, a rule that stopped
+		// The sanctioned writes carry this comment. With unused directives an error, a rule that stopped
 		// matching the chain would fail here as well as in the repo lint.
 		expect(() =>
 			ruleTester.run('encrypted-store-registry', rule, {
@@ -93,12 +102,12 @@ describe('mtc/encrypted-store-registry', () => {
 		).not.toThrow();
 	});
 
-	it('keeps all four sanctioned writes allowed by their disables, each disable used', () => {
+	it('keeps every sanctioned write allowed by its disable, each disable used', () => {
 		const disabled = (store) =>
 			`// eslint-disable-next-line rule-to-test/encrypted-store-registry -- sanctioned\ntx.objectStore('${store}').put({ id: 0, rec: blob });`;
 		expect(() =>
 			ruleTester.run('encrypted-store-registry', rule, {
-				valid: ['profile', 'timeline-state', 'calendar-sync', 'byok'].map((store) => ({
+				valid: [...ENCRYPTED_STORES_LITERAL].map((store) => ({
 					code: disabled(store),
 					linterOptions: { reportUnusedDisableDirectives: 'error' }
 				})),

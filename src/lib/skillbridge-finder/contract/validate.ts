@@ -51,8 +51,14 @@ const BRANCH_SET: ReadonlySet<unknown> = new Set(BRANCHES);
 const INDUSTRY_SET: ReadonlySet<unknown> = new Set(INDUSTRIES);
 const STATE_SET: ReadonlySet<unknown> = new Set(STATE_CODES);
 
-// Control, format (zero-width, bidi) and private-use characters: invisible, so they can hide or reorder text.
-const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}]/u;
+// Characters that render as nothing or are not text: control, format (zero-width, bidi), private-use and lone
+// surrogate code points (with the u flag a surrogate outside a pair is its own code point); the ones Unicode marks
+// default-ignorable (Hangul fillers, the grapheme joiner, variation selectors); and line and paragraph separators,
+// which break a line inside a name. Unassigned code points are not refused: which ones are unassigned depends on the
+// browser's Unicode version, so a character a newer Unicode added would drop a whole file on an older phone.
+const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Default_Ignorable_Code_Point}\p{Zl}\p{Zp}]/u;
+// A blank braille cell is neither default-ignorable nor a space, yet draws as empty.
+const BRAILLE_BLANK = String.fromCharCode(0x2800);
 const ZIP_RE = /^\d{5}$/;
 const CODE_RE = /^[0-9A-Z]{2,6}$/;
 // One plain address; no `?` so a mailto link built from it cannot carry a subject, body or second recipient.
@@ -72,6 +78,7 @@ export function isSafeText(s: unknown): s is string {
 		s === s.trim() &&
 		s === s.normalize('NFKC') &&
 		!INVISIBLE_RE.test(s) &&
+		!s.includes(BRAILLE_BLANK) &&
 		!s.includes('<')
 	);
 }
@@ -178,7 +185,8 @@ export function validateListing(raw: unknown): ContractError[] {
 			Array.isArray(oc) &&
 			oc.length > 0 &&
 			oc.length <= CAPS.codes &&
-			oc.every((c) => typeof c === 'string' && CODE_RE.test(c));
+			oc.every((c) => typeof c === 'string' && CODE_RE.test(c)) &&
+			new Set(oc).size === oc.length;
 		if (!ok) fail('E_SBF_BAD_CODES', 'oc');
 	}
 
@@ -249,10 +257,24 @@ export function validateRegionFile(raw: unknown): ContractResult {
 	if (listings.length > MAX_LISTINGS_PER_FILE)
 		return result([...errors, { code: 'E_SBF_TOO_MANY_ROWS', field: 'listings' }]);
 
+	const pullDate = isIsoDate(raw.pullDate) ? raw.pullDate : undefined;
 	const seen = new Set<number>();
 	for (const listing of listings) {
 		errors.push(...validateListing(listing));
 		const id = isObject(listing) && isPositiveInt(listing.i) ? listing.i : undefined;
+		if (isObject(listing)) {
+			// A listing cannot be first seen or created after the file was pulled. It may be created after it was
+			// first seen: the pipeline dates an older listing it first sees after the baseline to the baseline.
+			const { fl, dc } = listing;
+			const late = (field: 'fl' | 'dc') =>
+				errors.push(
+					id === undefined
+						? { code: 'E_SBF_BAD_DATE', field }
+						: { code: 'E_SBF_BAD_DATE', id, field }
+				);
+			if (pullDate !== undefined && isIsoDate(fl) && fl > pullDate) late('fl');
+			if (pullDate !== undefined && isIsoDate(dc) && dc > pullDate) late('dc');
+		}
 		if (id === undefined) continue;
 		if (seen.has(id)) errors.push({ code: 'E_SBF_DUP_ID', id, field: 'i' });
 		seen.add(id);

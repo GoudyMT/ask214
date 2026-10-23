@@ -801,7 +801,8 @@ describe('showing what was typed', () => {
 	// A paste brings stray spaces, a tab, a line break or a non-breaking space; the numbers must still match the words.
 	it('numbers the words the same through stray spaces, a tab, a line break and a non-breaking space', async () => {
 		const card = await mount();
-		await typedBack(card, '  bamboo\tcopper harvest\n lantern   oxygen thimble ');
+		const nbsp = String.fromCharCode(0xa0);
+		await typedBack(card, `  bamboo\tcopper${nbsp}harvest\n lantern   oxygen thimble `);
 		await userEvent.click(button(CARD_LABELS.showTyped));
 		expect(typedWords()).toEqual(WORDS);
 	});

@@ -402,6 +402,31 @@ const STATIC = 'static';
 //     kept on screen and unflagged, and a header menu that wraps instead of scrolling sideways. Three builds measured
 //     root layout 8,568-8,569 B and precache 222,440-222,456 B, about 40 B of room above the highest. Trim pass first:
 //     the focused control measured in one place and the bar looked up once (about -20 B), kept.
+//     Page 90,300 -> 94,820, precache 218,860 -> 223,360 and precache files 68 -> 69 (owner's call, 2026-10-22): the
+//     SkillBridge finder's record in the encrypted backup. The backup chunk grew 24,489 -> 28,789 B gzip: the finder
+//     record's field-by-field check and the listing validator it reuses for each saved program. The extra file is the
+//     timeline store, which the bundler now splits into a chunk of its own (1,256 B). Three builds measured page
+//     94,763-94,771 B, precache 223,291-223,317 B, 69 files, at least 43 B of room above the highest. Trim pass:
+//     the growth is validation code, which a trim does not touch.
+//     Page 94,820 -> 94,890, precache 223,360 -> 223,490 and the root layout node (size-limit, package.json) 7,330 ->
+//     7,370 (owner's call, 2026-10-22): the finder review's fixes - stricter listing, crosswalk and ZIP-table checks,
+//     a ZIP's own state - and two checks in the calendar and timeline stores, which load on every page, that refuse a
+//     record whose signed marker is missing instead of reading it as empty. Three builds measured page 94,866-94,875 B,
+//     precache 223,422-223,445 B, root layout 7,329-7,332 B, at least 15 B of room above the highest page and 38 B
+//     above the highest root layout. Trim pass: the growth is safety checks, which a trim does not touch.
+//     Page 94,890 -> 95,070, precache 223,490 -> 223,890 and the root layout node 7,370 -> 7,630 (owner's call,
+//     2026-10-22): three fixes the pre-push op-test found in shipped behaviour - a release that raises the database
+//     takes over its service worker at once (offline, the older worker's pages could not open the raised database),
+//     a lock that lands while the app reloads on its own holds (the reload waits a short grace), and a tap made
+//     before another tab locks still saves. Three builds measured page 95,021-95,028 B, precache 223,847-223,850 B,
+//     root layout 7,592 B (gzip-9). Trim pass: the take-over code first went in a lazy chunk of its own, which put
+//     on-demand chunks 320 B and precache files one over; it runs on every start anyway, so it moved into the
+//     layout and both fit again. The rest is the fixes themselves.
+//     The four finder entries above were measured on the base before the bottom bar. Rebased onto it, both sets of
+//     raises re-set from measurement, not added (owner's call, 2026-10-22): page 90,350 -> 95,150, precache
+//     222,500 -> 227,560, precache files 71 -> 72 and the root layout node 8,610 -> 8,920. Three builds measured
+//     page 95,102-95,105 B, precache 227,510-227,517 B, 72 files, root layout 8,877-8,879 B, about 40 B of room above
+//     the highest. Trim pass: the growth is the two approved sets of raises together, nothing new.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -411,10 +436,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 90_350,
+	page: 95_150,
 	onDemand: 8_189,
-	precacheFiles: 71,
-	precacheBytes: 222_500,
+	precacheFiles: 72,
+	precacheBytes: 227_560,
 	workerScripts: 147_200
 };
 

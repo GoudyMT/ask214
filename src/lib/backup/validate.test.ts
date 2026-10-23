@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decodeCalendarSyncState } from '../calendar/codec';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { decodeProfile, encodeProfile } from '../profile/codec';
+import { BRANCHES, DURATIONS, INDUSTRIES, KINDS } from '../skillbridge-finder/contract/listing';
+import { CLEAN_CASES, cleanListing } from '../skillbridge-finder/fixtures/clean';
+import { decodeFinderRecord } from '../skillbridge-finder/state/codec';
+import { MAX_COMPARE, MAX_SAVED } from '../skillbridge-finder/state/types';
 import { decodeTimelineState } from '../timeline/state-codec';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
@@ -22,11 +26,34 @@ vi.mock('../profile/lifecycle', async (importOriginal) => {
 	};
 });
 
+// The finder's record decoder, a passthrough until a test arms it. The validator checks every rule itself and then asks
+// this decoder to read its answer back as a net; a lenient decoder (it hands back whatever it was given) shows each
+// rule of the validator refuses on its own, and one that throws shows the net is really cast. It keeps each buffer it
+// was handed, so a test can look at them once the validator has returned.
+const finderCodec = vi.hoisted(() => ({
+	mode: 'real' as 'real' | 'lenient' | 'throws',
+	seen: [] as Uint8Array[]
+}));
+vi.mock('../skillbridge-finder/state/codec', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../skillbridge-finder/state/codec')>();
+	return {
+		...real,
+		decodeFinderRecord: (bytes: Uint8Array) => {
+			finderCodec.seen.push(bytes);
+			if (finderCodec.mode === 'throws') throw new Error('E_TEST_CODEC_THROWS');
+			if (finderCodec.mode === 'lenient')
+				return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+			return real.decodeFinderRecord(bytes);
+		}
+	};
+});
+
 type Bag = Record<string, unknown>;
-type Store = 'profile' | 'timeline' | 'calendar';
+type Store = 'profile' | 'timeline' | 'calendar' | 'finder';
 
 // One good file as the real app writes it, in pieces the cases below edit one at a time. The profile comes from the
-// shipped encoder, so its wire keys and base64 are the app's own.
+// shipped encoder, so its wire keys and base64 are the app's own. `finder` is a good finder record that is NOT in the
+// file until a case puts it there: a file made before the finder existed has no such key.
 type Parts = {
 	inner: Bag;
 	stores: Bag;
@@ -36,6 +63,7 @@ type Parts = {
 	calendar: Bag;
 	exclusions: Bag;
 	card: Bag;
+	finder: Bag;
 };
 
 const NOW = 1_760_000_000_000;
@@ -69,8 +97,37 @@ function goodParts(): Parts {
 	const calendar: Bag = { schemaVersion: 1, exclusions, card };
 	const stores: Bag = { profile, 'timeline-state': timeline, 'calendar-sync': calendar };
 	const inner: Bag = { appVersion: __APP_VERSION__, backupSchema: 1, createdAt: NOW, stores };
-	return { inner, stores, profile, timeline, tasks, calendar, exclusions, card };
+	const finder: Bag = {
+		schemaVersion: 1,
+		finderSetup: {
+			place: { kind: 'zip', zip: '21046' },
+			radius: 50,
+			territories: true,
+			overseas: false
+		},
+		finderFilters: {
+			industries: ['Healthcare Support', 'Legal'],
+			branches: ['Army', 'Navy'],
+			durations: ['91-120'],
+			kinds: ['internship', 'fellowship'],
+			delivery: [1, 3]
+		},
+		finderSaved: [
+			{ id: 1001, savedOn: '2026-10-21', facts: cleanListing() },
+			{ id: 1013, savedOn: '2026-10-20', facts: CLEAN_CASES.multiState }
+		],
+		finderCompare: [1001, 1013]
+	};
+	return { inner, stores, profile, timeline, tasks, calendar, exclusions, card, finder };
 }
+
+/** Puts the good finder record into the file, then lets the case edit it. */
+const withFinder =
+	(edit: (finder: Bag, p: Parts) => void = () => {}) =>
+	(p: Parts) => {
+		p.stores['skillbridge-finder'] = p.finder;
+		edit(p.finder, p);
+	};
 
 /** The file as JSON.parse hands it over: no shared objects, no undefined values. */
 function make(edit: (p: Parts) => void = () => {}): unknown {
@@ -102,6 +159,11 @@ function expectDecodersAgree(inner: Bag) {
 	if (stores['calendar-sync'] !== null) {
 		expect(decodeCalendarSyncState(utf8(stores['calendar-sync']))).toEqual(stores['calendar-sync']);
 	}
+	if (stores['skillbridge-finder'] !== undefined) {
+		expect(decodeFinderRecord(utf8(stores['skillbridge-finder']))).toEqual(
+			stores['skillbridge-finder']
+		);
+	}
 	// The dates in the profile are the ones the Settings read check accepts.
 	expect(decodeEaos(profile.eaos ?? new Uint8Array())).toBe('2027-06-30');
 }
@@ -129,6 +191,111 @@ describe('validateInner: a good file', () => {
 			if (result.ok) expect((result.inner.stores as Bag)[key]).toBeNull();
 		}
 	);
+});
+
+// A backup made before the finder existed holds no finder key and must still restore; one made after holds the person's
+// answers, saved programs and compare picks.
+describe('validateInner: the finder record', () => {
+	it('a file made before the finder existed validates, with no finder key in the result', () => {
+		const result = validateInner(make());
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.inner.stores).not.toHaveProperty('skillbridge-finder');
+	});
+
+	it('a file with a finder record validates, round-trips and is read back by the shipped decoder', () => {
+		const file = make(withFinder());
+		const result = validateInner(file);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.inner).toEqual(file);
+		expectDecodersAgree(result.inner as unknown as Bag);
+	});
+
+	const EVERY = <T extends string>(all: readonly T[]) => [...all];
+	const accepted: [string, (f: Bag) => void][] = [
+		[
+			'nothing saved and no answers',
+			(f) => {
+				delete f.finderSetup;
+				delete f.finderFilters;
+				f.finderSaved = [];
+				f.finderCompare = [];
+			}
+		],
+		[
+			'an empty setup and empty filters',
+			(f) => {
+				f.finderSetup = {};
+				f.finderFilters = {};
+			}
+		],
+		[
+			'a state as the place',
+			(f) => ((f.finderSetup as Bag).place = { kind: 'state', state: 'TX' })
+		],
+		[
+			'a territory as the place',
+			(f) => ((f.finderSetup as Bag).place = { kind: 'state', state: 'PR' })
+		],
+		['reach set to any', (f) => ((f.finderSetup as Bag).radius = 'any')],
+		[
+			'every industry, branch, duration and kind picked',
+			(f) => {
+				f.finderFilters = {
+					industries: EVERY(INDUSTRIES),
+					branches: EVERY(BRANCHES),
+					durations: EVERY(DURATIONS),
+					kinds: EVERY(KINDS),
+					delivery: [1, 2, 3]
+				};
+			}
+		],
+		[
+			'a program with no place, a remote program and a territory program, saved',
+			(f) => {
+				f.finderSaved = [
+					CLEAN_CASES.locationUnknown,
+					CLEAN_CASES.remote,
+					CLEAN_CASES.territory
+				].map((facts) => ({ id: facts.i, savedOn: '2026-10-21', facts }));
+				f.finderCompare = [];
+			}
+		],
+		[
+			'the most programs that can be saved',
+			(f) => {
+				f.finderSaved = Array.from({ length: MAX_SAVED }, (_, n) => ({
+					id: n + 1,
+					savedOn: '2026-10-21',
+					facts: cleanListing({ i: n + 1 })
+				}));
+				f.finderCompare = Array.from({ length: MAX_COMPARE }, (_, n) => n + 1);
+			}
+		]
+	];
+	it.each(accepted)('accepts %s', (_name, edit) => {
+		const file = make(withFinder(edit));
+		const result = validateInner(file);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.inner).toEqual(file);
+		expectDecodersAgree(result.inner as unknown as Bag);
+	});
+
+	it('the finder record in the result is built fresh, down to a saved program', () => {
+		const file = make(withFinder()) as Bag;
+		const result = validateInner(file);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const mine = result.inner.stores['skillbridge-finder'];
+		const theirs = (file.stores as Bag)['skillbridge-finder'] as Bag;
+		const before = structuredClone(mine);
+		expect(mine).not.toBe(theirs);
+		expect(mine?.finderSaved[0]?.facts).not.toBe((theirs.finderSaved as Bag[])[0]?.facts);
+		(((theirs.finderSaved as Bag[])[0] as Bag).facts as Bag).n = 'Changed';
+		(theirs.finderCompare as number[]).push(5);
+		expect(mine).toEqual(before);
+	});
 });
 
 describe('validateInner: acceptance corpus (shapes the app writes)', () => {
@@ -258,6 +425,88 @@ describe('validateInner: acceptance corpus (shapes the app writes)', () => {
 	});
 });
 
+/** One bad value per rule of the finder record, at each level: the record, setup, place, filters, a saved program, compare. */
+function finderCases(): [string, (p: Parts) => void, Store][] {
+	const setup = (f: Bag) => f.finderSetup as Bag;
+	const filters = (f: Bag) => f.finderFilters as Bag;
+	const saved = (f: Bag) => f.finderSaved as Bag[];
+	const first = (f: Bag) => saved(f)[0] as Bag;
+	const facts = (f: Bag) => first(f).facts as Bag;
+	const list: [string, (f: Bag) => void][] = [
+		['an extra key in the finder record', (f) => (f.extra = 1)],
+		['finder schemaVersion 2', (f) => (f.schemaVersion = 2)],
+		['a finder record with no saved list', (f) => delete f.finderSaved],
+		['a finder record with no compare list', (f) => delete f.finderCompare],
+		// The setup.
+		['setup as null', (f) => (f.finderSetup = null)],
+		['an extra key in the setup', (f) => (setup(f).extra = 1)],
+		['a place as null', (f) => (setup(f).place = null)],
+		[
+			'an extra key in a zip place',
+			(f) => (setup(f).place = { kind: 'zip', zip: '21046', extra: 1 })
+		],
+		[
+			'an installation as the place',
+			(f) => (setup(f).place = { kind: 'installation', id: 'fort-meade' })
+		],
+		['a place with an unknown kind', (f) => (setup(f).place = { kind: 'city', city: 'Columbia' })],
+		['a zip place holding a state', (f) => (setup(f).place = { kind: 'zip', state: 'MD' })],
+		['a zip of four digits', (f) => (setup(f).place = { kind: 'zip', zip: '2104' })],
+		['a zip as a number', (f) => (setup(f).place = { kind: 'zip', zip: 21046 })],
+		['a zip with a trailing space', (f) => (setup(f).place = { kind: 'zip', zip: '21046 ' })],
+		['a state that is not one', (f) => (setup(f).place = { kind: 'state', state: 'ZZ' })],
+		['a state in lower case', (f) => (setup(f).place = { kind: 'state', state: 'tx' })],
+		['a state place holding a zip', (f) => (setup(f).place = { kind: 'state', zip: '21046' })],
+		['a reach of 75', (f) => (setup(f).radius = 75)],
+		['a reach given as text', (f) => (setup(f).radius = '25')],
+		['territories as text', (f) => (setup(f).territories = 'yes')],
+		['overseas as a number', (f) => (setup(f).overseas = 1)],
+		// The filters.
+		['filters as null', (f) => (f.finderFilters = null)],
+		['an extra key in the filters', (f) => (filters(f).extra = [])],
+		['an industry that is not listed', (f) => (filters(f).industries = ['Farming'])],
+		['a branch twice', (f) => (filters(f).branches = ['Army', 'Army'])],
+		['a branch that is not listed', (f) => (filters(f).branches = ['Navy Reserve'])],
+		['a duration that is not listed', (f) => (filters(f).durations = ['1-29'])],
+		['a kind that is not listed', (f) => (filters(f).kinds = ['volunteer'])],
+		['a delivery of 4', (f) => (filters(f).delivery = [4])],
+		['a delivery given as text', (f) => (filters(f).delivery = ['1'])],
+		['a filter list that is an object', (f) => (filters(f).industries = {})],
+		// A saved program.
+		['saved as an object', (f) => (f.finderSaved = {})],
+		['a saved item as null', (f) => (saved(f)[0] = null as unknown as Bag)],
+		['an extra key in a saved item', (f) => (first(f).extra = 1)],
+		['a saved item with no date', (f) => delete first(f).savedOn],
+		['a saved item with no facts', (f) => delete first(f).facts],
+		['a saved id of 0', (f) => ((first(f).id = 0), (facts(f).i = 0))],
+		['a saved id as text', (f) => (first(f).id = '1001')],
+		// One bad date and one bad listing: the rules for each are the contract's, tested there; this proves the call is made.
+		['a saved date that is no day', (f) => (first(f).savedOn = '2026-02-30')],
+		['facts of another id', (f) => (facts(f).i = 1002)],
+		['facts as null', (f) => (first(f).facts = null)],
+		['facts with a key the contract does not list', (f) => (facts(f).summary = 'Great program')],
+		['the same program saved twice', (f) => saved(f).push(structuredClone(first(f)))],
+		[
+			'201 programs saved',
+			(f) => {
+				f.finderSaved = Array.from({ length: MAX_SAVED + 1 }, (_, n) => ({
+					id: n + 1,
+					savedOn: '2026-10-21',
+					facts: cleanListing({ i: n + 1 })
+				}));
+				f.finderCompare = [];
+			}
+		],
+		// Compare.
+		['four programs to compare', (f) => (f.finderCompare = [1, 2, 3, 4])],
+		['the same program picked twice', (f) => (f.finderCompare = [1001, 1001])],
+		['a compare id as text', (f) => (f.finderCompare = ['1001'])],
+		['a compare id of 0', (f) => (f.finderCompare = [0])],
+		['compare as an object', (f) => (f.finderCompare = {})]
+	];
+	return list.map(([name, edit]) => [name, withFinder(edit), 'finder']);
+}
+
 describe('validateInner: refusal corpus (one change to a good file each)', () => {
 	const NEVER_WRITTEN = [
 		'rate',
@@ -273,7 +522,8 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 		'lastBackupAt',
 		'backupGenProfile',
 		'backupGenTimeline',
-		'backupGenCalendar'
+		'backupGenCalendar',
+		'backupGenFinder'
 	];
 	const b64 = (s: string) => btoa(s);
 
@@ -416,7 +666,11 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 		['dismissCount 1.5', (p) => (p.card.dismissCount = 1.5), 'calendar'],
 		['dismissCount -1', (p) => (p.card.dismissCount = -1), 'calendar'],
 		["dismissedAt '1'", (p) => (p.card.dismissedAt = '1'), 'calendar'],
-		['dismissedAt 8.64e15 + 1', (p) => (p.card.dismissedAt = 8.64e15 + 1), 'calendar']
+		['dismissedAt 8.64e15 + 1', (p) => (p.card.dismissedAt = 8.64e15 + 1), 'calendar'],
+		// The finder: what export writes and nothing else, at every level.
+		['a finder record of null', (p) => (p.stores['skillbridge-finder'] = null), 'finder'],
+		['a finder record that is a list', (p) => (p.stores['skillbridge-finder'] = []), 'finder'],
+		...finderCases()
 	];
 
 	it.each(cases)('%s', (_name, edit, store) => {
@@ -437,8 +691,80 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 		expect(validateInner(file)).toEqual(refusal(store));
 	});
 
+	it.each([
+		['the finder record', '"skillbridge-finder":{', '"skillbridge-finder":{"__proto__":{},'],
+		['the finder setup', '"finderSetup":{', '"finderSetup":{"__proto__":{},'],
+		['a finder place', '"place":{', '"place":{"__proto__":{},'],
+		['the finder filters', '"finderFilters":{', '"finderFilters":{"__proto__":[],'],
+		['a saved program', '"finderSaved":[{', '"finderSaved":[{"__proto__":{},'],
+		['a saved listing', '"facts":{', '"facts":{"__proto__":{},']
+	] as const)('an own __proto__ key in %s', (_name, anchor, inserted) => {
+		const parts = goodParts();
+		withFinder()(parts);
+		const text = JSON.stringify(parts.inner).replace(anchor, inserted);
+		expect(text).not.toBe(JSON.stringify(parts.inner));
+		expect(validateInner(JSON.parse(text))).toEqual(refusal('finder'));
+	});
+
 	it('a file that is null is CONTENT_INVALID', () => {
 		expect(validateInner(null)).toEqual(refusal());
+	});
+});
+
+// The finder's refusals again, with a codec that reads back whatever it is given. The check above passes whether the
+// validator's own lines or the codec refuse, so a rule that only the codec enforced would go unnoticed; here the
+// validator alone must refuse every case. The last case is the net itself: a record the validator accepts is still
+// refused when the codec cannot read it back.
+describe('validateInner: the finder refusals hold on the validator alone', () => {
+	beforeEach(() => {
+		finderCodec.mode = 'lenient';
+	});
+	afterEach(() => {
+		finderCodec.mode = 'real';
+	});
+
+	const cases: [string, (p: Parts) => void][] = [
+		['a finder record of null', (p) => (p.stores['skillbridge-finder'] = null)],
+		['a finder record that is a list', (p) => (p.stores['skillbridge-finder'] = [])],
+		...finderCases().map(([name, edit]): [string, (p: Parts) => void] => [name, edit])
+	];
+
+	it.each(cases)('%s', (_name, edit) => {
+		expect(validateInner(make(edit))).toEqual(refusal('finder'));
+	});
+
+	it('a record the codec cannot read back is refused', () => {
+		finderCodec.mode = 'throws';
+		expect(validateInner(make(withFinder()))).toEqual(refusal('finder'));
+	});
+});
+
+// The bytes handed to a shipped decoder hold the person's plaintext record, so the check wipes them whether the decoder
+// reads them back, disagrees or throws (the profile's own buffers are wiped the same way).
+describe('validateInner: the bytes a check decodes are wiped', () => {
+	beforeEach(() => {
+		finderCodec.seen = [];
+	});
+	afterEach(() => {
+		finderCodec.mode = 'real';
+	});
+
+	const expectWiped = () => {
+		expect(finderCodec.seen).toHaveLength(1);
+		const bytes = finderCodec.seen[0] as Uint8Array;
+		expect(bytes.length).toBeGreaterThan(0);
+		expect(bytes.every((b) => b === 0)).toBe(true);
+	};
+
+	it('after a decode that reads the record back', () => {
+		expect(validateInner(make(withFinder())).ok).toBe(true);
+		expectWiped();
+	});
+
+	it('after a decoder that throws', () => {
+		finderCodec.mode = 'throws';
+		expect(validateInner(make(withFinder()))).toEqual(refusal('finder'));
+		expectWiped();
 	});
 });
 
@@ -526,6 +852,34 @@ describe('validateInner: hostile input', () => {
 				result = validateInner(file);
 			}).not.toThrow();
 			expect(result).toEqual(refusal('timeline'));
+		}
+	});
+
+	// Every container of the finder record is checked for its type before it is entered.
+	it('a 100,000-deep nested array in any part of the finder record is CONTENT_INVALID and does not throw', () => {
+		const deep = (): unknown => {
+			let value: unknown = [];
+			for (let i = 0; i < 100_000; i += 1) value = [value];
+			return value;
+		};
+		const places: [string, (f: Bag) => void][] = [
+			['a saved item', (f) => ((f.finderSaved as unknown[])[0] = deep())],
+			['a saved listing', (f) => (((f.finderSaved as Bag[])[0] as Bag).facts = deep())],
+			['a listing field', (f) => ((((f.finderSaved as Bag[])[0] as Bag).facts as Bag).r = deep())],
+			['the setup', (f) => (f.finderSetup = deep())],
+			['a place', (f) => ((f.finderSetup as Bag).place = deep())],
+			['a filter list', (f) => ((f.finderFilters as Bag).industries = deep())],
+			['a compare id', (f) => (f.finderCompare = [deep()])]
+		];
+		for (const [place, edit] of places) {
+			// Built first and deepened after, as JSON.stringify itself would run out of stack on the deep value.
+			const file = make(withFinder());
+			edit(((file as Bag).stores as Bag)['skillbridge-finder'] as Bag);
+			let result: ReturnType<typeof validateInner> | undefined;
+			expect(() => {
+				result = validateInner(file);
+			}, place).not.toThrow();
+			expect(result, place).toEqual(refusal('finder'));
 		}
 	});
 

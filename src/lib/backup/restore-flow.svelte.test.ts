@@ -14,6 +14,9 @@ import {
 	readKeystoreRow,
 	type ProfileStore
 } from '../profile/store.svelte';
+import { cleanListing } from '../skillbridge-finder/fixtures/clean';
+import { createFinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
+import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { localTodayIso } from '../timeline/day-math';
 import { formatTimelineDate } from '../timeline/format-date';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
@@ -27,6 +30,7 @@ import {
 } from './copy';
 import { BACKUP_RELEASE_DATE, formatBackupDate } from './dates';
 import { newBackupSalt, decryptEnvelope, sealEnvelope } from './envelope';
+import { BACKUP_MANIFEST } from './manifest';
 import { buildExportInner } from './export-inner';
 import { captureBackupIntent, takeBackupIntent } from './intent';
 import { RestoreFlow, type FlowDeps } from './restore-flow';
@@ -228,7 +232,8 @@ async function exportFrom(device: Device, o: ExportOptions, name = OUR_NAME): Pr
 					lastBackupAt: o.createdAt,
 					backupGenProfile: snap.gens.profile + 1,
 					backupGenTimeline: snap.gens.timeline,
-					backupGenCalendar: snap.gens.calendar
+					backupGenCalendar: snap.gens.calendar,
+					backupGenFinder: snap.gens.finder
 				});
 			} catch (e) {
 				// Another tab got there first; the backup still stands, the device just carries no mark.
@@ -244,7 +249,9 @@ async function exportFrom(device: Device, o: ExportOptions, name = OUR_NAME): Pr
 // ---- rows ----------------------------------------------------------------------------------------------------------
 
 type Row = Record<string, unknown>;
-const SEVEN: StoreName[] = STORES.filter((store) => store !== 'byok');
+// The stores a restore replaces or clears: every one the manifest does not mark 'never' (the API key and the finder's
+// cached listings).
+const RESTORE_TOUCHES: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
 const hex = (bytes: Uint8Array): string =>
 	Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
@@ -269,10 +276,10 @@ function readRaw(db: IDBDatabase, store: StoreName): Promise<Row | undefined> {
 	);
 }
 
-/** The seven stores a restore writes, as the device holds them right now, bytes included. */
-async function sevenRows(db: IDBDatabase): Promise<Record<string, unknown>> {
+/** The stores a restore replaces or clears, as the device holds them right now, bytes included. */
+async function restoredRows(db: IDBDatabase): Promise<Record<string, unknown>> {
 	const out: Record<string, unknown> = {};
-	for (const store of SEVEN) out[store] = plain(await readRaw(db, store));
+	for (const store of RESTORE_TOUCHES) out[store] = plain(await readRaw(db, store));
 	return out;
 }
 
@@ -621,7 +628,7 @@ describe('typing the six words', () => {
 	// Cancel mid-way must end in the stopped line, not hang on "Stopping".
 	it('Cancel while the key is being made ends with the stopped line and nothing written', async () => {
 		const phone = await newPhone();
-		const before = await sevenRows(phone.db);
+		const before = await restoredRows(phone.db);
 		const r = restoreRig(phone, { worker: () => new SilentWorker() });
 		await toFileChosen(r, backupFile());
 		r.field.value = PHRASE;
@@ -632,7 +639,7 @@ describe('typing the six words', () => {
 		expect(r.session.stopping).toBe(false);
 		expect(r.session.message).toBe('E_RESTORE_CANCELLED');
 		expect(r.field.value).toBe('');
-		expect(await sevenRows(phone.db)).toStrictEqual(before);
+		expect(await restoredRows(phone.db)).toStrictEqual(before);
 	});
 });
 
@@ -663,7 +670,7 @@ describe('the confirm', () => {
 		expect(read).toHaveBeenCalledTimes(1);
 		expect(r.session.phase).toBe('confirm');
 		const confirm = need(r.flow.confirm);
-		expect(confirm.gens).toEqual({ profile: 0, timeline: 0, calendar: 0 });
+		expect(confirm.gens).toEqual({ profile: 0, timeline: 0, calendar: 0, finder: 0 });
 		expect(confirm.summary).toEqual({
 			madeOn: formatBackupDate(FILE_CREATED_AT),
 			label: OUR_LABEL,
@@ -726,12 +733,12 @@ describe('the confirm', () => {
 		const run = need(r.session.beginRun());
 		run.hold('confirm', null);
 		run.release();
-		const before = await sevenRows(phone.db);
+		const before = await restoredRows(phone.db);
 		await r.flow.replace();
 		expect(restoreBackup).not.toHaveBeenCalled();
 		expect(r.session.busy).toBe(false);
 		expect(r.session.phase).toBe('confirm');
-		expect(await sevenRows(phone.db)).toStrictEqual(before);
+		expect(await restoredRows(phone.db)).toStrictEqual(before);
 	});
 
 	it('a new phone with nothing saved says so and does not warn', async () => {
@@ -771,6 +778,62 @@ describe('the confirm', () => {
 			'This device was last changed ' + deviceDate(need(state.ts.timeline)) + '.'
 		);
 		expect(confirm.warning).toBe(true);
+	});
+
+	// The SkillBridge answers and saved programs are the person's data too: changing only those after a backup is a change
+	// the restore would replace.
+	it('a change to the finder alone after the backup warns, and the line dates the change', async () => {
+		const device = await finishedDevice(await newDb());
+		const finder = createFinderStore(device.db);
+		await finder.load();
+		await finder.setSetup({ radius: 25 });
+		const file = await exportFrom(device, { createdAt: Date.now() - MINUTE });
+		await finder.setSetup({ radius: 50 });
+		const state = await readDeviceState(device.db);
+		const r = restoreRig({ db: device.db, store: device.profile });
+		await toConfirm(r, file);
+		const confirm = need(r.flow.confirm);
+		expect(confirm.deviceLine).toBe(
+			'This device was last changed ' + deviceDate(need(state.ts.finder)) + '.'
+		);
+		expect(confirm.warning).toBe(true);
+	});
+
+	it('a device that backed up its finder and changed nothing since matches the backup', async () => {
+		const device = await finishedDevice(await newDb());
+		const finder = createFinderStore(device.db);
+		await finder.load();
+		await finder.setSetup({ radius: 25 });
+		const madeAt = Date.now() - MINUTE;
+		const file = await exportFrom(device, { createdAt: madeAt });
+		const r = restoreRig({ db: device.db, store: device.profile });
+		await toConfirm(r, file);
+		const confirm = need(r.flow.confirm);
+		expect(confirm.deviceLine).toBe(
+			'This device was last changed when its backup of ' + formatBackupDate(madeAt) + ' was made.'
+		);
+		expect(confirm.warning).toBe(false);
+	});
+
+	// A backup made before the finder existed holds a mark of four fields; the finder it matched was empty.
+	it('a mark of the four older fields still matches a device whose finder is empty', async () => {
+		const device = await finishedDevice(await newDb());
+		const madeAt = Date.now() - MINUTE;
+		const file = await exportFrom(device, { createdAt: madeAt, mark: false });
+		const { gens } = await readDeviceState(device.db);
+		await device.profile.save({
+			lastBackupAt: madeAt,
+			backupGenProfile: gens.profile + 1,
+			backupGenTimeline: gens.timeline,
+			backupGenCalendar: gens.calendar
+		});
+		const r = restoreRig({ db: device.db, store: device.profile });
+		await toConfirm(r, file);
+		const confirm = need(r.flow.confirm);
+		expect(confirm.deviceLine).toBe(
+			'This device was last changed when its backup of ' + formatBackupDate(madeAt) + ' was made.'
+		);
+		expect(confirm.warning).toBe(false);
 	});
 
 	// Another tab saving the profile in the gap between the snapshot and the mark leaves a device that holds a change the
@@ -835,11 +898,12 @@ describe('the confirm', () => {
 			const createdAt = madeAt();
 			const file = await exportFrom(source, { createdAt });
 			const crafted: DeviceState = {
-				gens: { profile: 1, timeline: timelineOffset === null ? 0 : 1, calendar: 0 },
+				gens: { profile: 1, timeline: timelineOffset === null ? 0 : 1, calendar: 0, finder: 0 },
 				ts: {
 					profile: createdAt + profileOffset,
 					timeline: timelineOffset === null ? null : createdAt + timelineOffset,
-					calendar: null
+					calendar: null,
+					finder: null
 				},
 				mark: null,
 				lastSeenAt: null
@@ -864,8 +928,8 @@ describe('the confirm', () => {
 		const savedAt = new Date(2026, 8, 15, 12).getTime();
 		expect(savedAt).toBeLessThan(BACKUP_RELEASE_DATE);
 		const crafted: DeviceState = {
-			gens: { profile: 1, timeline: 0, calendar: 0 },
-			ts: { profile: savedAt, timeline: null, calendar: null },
+			gens: { profile: 1, timeline: 0, calendar: 0, finder: 0 },
+			ts: { profile: savedAt, timeline: null, calendar: null, finder: null },
 			mark: null,
 			lastSeenAt: null
 		};
@@ -916,6 +980,35 @@ describe('Replace', () => {
 		expect(calendar.exclusions).toEqual({ taskIds: ['sha-schedule'], categories: ['finance'] });
 	});
 
+	// The SkillBridge answers, saved programs and compare picks travel with the backup, through the same steps a person takes.
+	it('carries the finder from one phone to another and clears what the new phone had cached', async () => {
+		const source = await finishedDevice(await newDb());
+		const sourceFinder = createFinderStore(source.db);
+		await sourceFinder.load();
+		await sourceFinder.setSetup({ place: { kind: 'state', state: 'TX' }, radius: 100 });
+		await sourceFinder.save(cleanListing(), '2026-10-21');
+		await sourceFinder.addCompare(1001);
+		const file = await exportFrom(source, { createdAt: Date.now() - MINUTE });
+		const phone = await newPhone();
+		const cache = createFinderPackStore(phone.db);
+		await cache.load();
+		await cache.markOpened([1001]);
+		const r = restoreRig(phone);
+		await toConfirm(r, file);
+
+		await r.flow.replace();
+
+		expect(r.session.phase).toBe('committed');
+		const finder = createFinderStore(phone.db);
+		await finder.load();
+		expect(finder.setup).toEqual({ place: { kind: 'state', state: 'TX' }, radius: 100 });
+		expect(finder.saved).toEqual([{ id: 1001, savedOn: '2026-10-21', facts: cleanListing() }]);
+		expect(finder.compare).toEqual([1001]);
+		const reread = createFinderPackStore(phone.db);
+		await reread.load();
+		expect(reread.seen.size).toBe(0);
+	});
+
 	// A reload that kept the note is what lets the Timeline say what happened; a replace of the location would drop it.
 	it('reloads once with the restored note and the address on the Timeline', async () => {
 		const { r } = await restoredNewPhone();
@@ -959,7 +1052,7 @@ describe('Replace', () => {
 		await toConfirm(r, file);
 		const first = need(r.flow.confirm);
 		await device.timeline.setStatus('sha-schedule', 'done');
-		const before = await sevenRows(device.db);
+		const before = await restoredRows(device.db);
 
 		await r.flow.replace();
 		expect(r.session.phase).toBe('confirm');
@@ -967,7 +1060,7 @@ describe('Replace', () => {
 		const again = need(r.flow.confirm);
 		expect(again.notice).toBe('E_RESTORE_DEVICE_MOVED');
 		expect(again.gens.timeline).toBe(first.gens.timeline + 1);
-		expect(await sevenRows(device.db)).toStrictEqual(before);
+		expect(await restoredRows(device.db)).toStrictEqual(before);
 		expect(r.published).toEqual([]);
 
 		await r.flow.replace();
@@ -1018,15 +1111,15 @@ describe('Replace', () => {
 		if (stage === 'checking') {
 			await toFileChosen(r, backupFile());
 			await tamper[kind](device.db);
-			const before = await sevenRows(device.db);
+			const before = await restoredRows(device.db);
 			await r.flow.submit(PHRASE);
-			expect(await sevenRows(device.db)).toStrictEqual(before);
+			expect(await restoredRows(device.db)).toStrictEqual(before);
 		} else {
 			await toConfirm(r, backupFile());
 			await tamper[kind](device.db);
-			const before = await sevenRows(device.db);
+			const before = await restoredRows(device.db);
 			await r.flow.replace();
-			expect(await sevenRows(device.db)).toStrictEqual(before);
+			expect(await restoredRows(device.db)).toStrictEqual(before);
 		}
 		expect(r.session.message).toBe(code);
 		expect(r.session.phase).toBe('file-chosen');
@@ -1061,7 +1154,7 @@ describe('Replace', () => {
 			const device = await finishedDevice(await newDb(), '2027-01-01');
 			const r = restoreRig({ db: device.db, store: device.profile });
 			await toConfirm(r, backupFile());
-			const before = await sevenRows(device.db);
+			const before = await restoredRows(device.db);
 			if (act) duringCommit(r, () => act(r));
 			const put = IDBObjectStore.prototype.put;
 			const spy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
@@ -1075,7 +1168,7 @@ describe('Replace', () => {
 			await r.flow.replace();
 			spy.mockRestore();
 
-			expect(await sevenRows(device.db)).toStrictEqual(before);
+			expect(await restoredRows(device.db)).toStrictEqual(before);
 			expect(r.session.message).toBe(message);
 			expect(r.flow.view.line).toContain('Nothing on this device was changed');
 			expect(r.session.committing).toBe(false);
@@ -1099,7 +1192,7 @@ describe('Replace', () => {
 		const device = await finishedDevice(await newDb(), '2027-01-01');
 		const r = restoreRig({ db: device.db, store: device.profile });
 		await toConfirm(r, backupFile());
-		const before = await sevenRows(device.db);
+		const before = await restoredRows(device.db);
 		const granted = deferred<void>();
 		const other = deferred<void>();
 		void navigator.locks.request('mtc-keystore', { mode: 'shared' }, () => {
@@ -1114,7 +1207,7 @@ describe('Replace', () => {
 		other.resolve();
 		await replacing;
 
-		expect(await sevenRows(device.db)).toStrictEqual(before);
+		expect(await restoredRows(device.db)).toStrictEqual(before);
 		expect(r.session.stopping).toBe(false);
 		expect(r.session.message).toBe('E_RESTORE_CANCELLED');
 		expect(r.published).toEqual([]);
@@ -1259,7 +1352,7 @@ describe('Check', () => {
 	// Check answers "can I trust this file" and nothing else: no device read, no write, no signal to other tabs.
 	it('says the backup opens and writes nothing, reads no device and tells no tab', async () => {
 		const device = await finishedDevice(await newDb(), '2027-01-01');
-		const before = await sevenRows(device.db);
+		const before = await restoredRows(device.db);
 		const read = vi.fn(realRead);
 		const r = restoreRig({ db: device.db, store: device.profile }, { readDevice: read });
 		await toFileChosen(r, backupFile(), 'check');
@@ -1276,7 +1369,7 @@ describe('Check', () => {
 		expect(r.published).toEqual([]);
 		expect(r.session.held('key')).toBeNull();
 		expect(r.field.value).toBe('');
-		expect(await sevenRows(device.db)).toStrictEqual(before);
+		expect(await restoredRows(device.db)).toStrictEqual(before);
 		r.flow.close();
 		expect(r.session.phase).toBe('idle');
 	});

@@ -88,7 +88,9 @@ the next release deletes. Files loaded only on demand (the on-device model and i
 the PDF library, saved documents) go to a second cache, `ask-assets-v1`, whose name never changes, so updates do
 not download them again; each release prunes the old versions nothing will request again.
 
-**How it answers.** Same-origin GET requests only, and nothing under `/api/` is ever stored. Built files come
+**How it answers.** Same-origin GET requests only, and nothing under `/api/` or `/skillbridge-data/` is ever
+stored: the SkillBridge listing files are public, but which of them a device fetched narrows where the person
+is, so no copy is kept. Built files come
 from the cache first. Everything else comes from the network first and falls back to the stored copy; a page
 with no stored copy falls back to the home page, whose router draws the page asked for. Pages that show personal
 data render only in the browser (`ssr = false`, required by a unit test), so no stored page holds anything of
@@ -146,9 +148,9 @@ live site sends.
 ### Budgets and Lighthouse
 
 **What they are.** `size-limit` caps the gzipped JavaScript: the SvelteKit entry at 10 KB, the root layout
-loaded on every page at 8,610 bytes, and the code of all pages together at 53,290 bytes. `pnpm check:chunks` caps what
-one page downloads (90,350 bytes), the code loaded on demand (8,189 bytes) and the service worker's install set
-(71 files, 222,500 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
+loaded on every page at 8,920 bytes, and the code of all pages together at 53,290 bytes. `pnpm check:chunks` caps what
+one page downloads (95,150 bytes), the code loaded on demand (8,189 bytes) and the service worker's install set
+(72 files, 227,560 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
 production build: accessibility below 0.95 or performance below 0.9 fails the build, and best practices or SEO
 below 0.9 warns. Reports stay in a CI artifact.
 

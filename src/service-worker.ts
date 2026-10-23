@@ -11,6 +11,7 @@ import {
 	keptOnActivate,
 	pruneSupersededEntries,
 	isApiRequest,
+	isFinderDataRequest,
 	keptOnFetch,
 	LIBRARY_RESTORE_DEADLINE_MS,
 	WORKER_SCRIPT_DEADLINE_MS,
@@ -20,6 +21,7 @@ import {
 	INSTALL_PAGES,
 	offlineResponse
 } from '$lib/ask/asset-cache';
+import { isTakeOver } from '$lib/sw/take-over-message';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -172,6 +174,12 @@ async function keepEmbedWorkerScript(cacheNames: string[]): Promise<void> {
 	}
 }
 
+// A page of this release that raised the database asks this worker to take over now (src/lib/sw/take-over.ts): the
+// older worker's cached pages cannot open the raised database offline.
+sw.addEventListener('message', (event) => {
+	if (isTakeOver(event.data, version)) void sw.skipWaiting();
+});
+
 sw.addEventListener('fetch', (event) => {
 	if (event.request.method !== 'GET') return;
 
@@ -184,6 +192,9 @@ sw.addEventListener('fetch', (event) => {
 	// so no query-derived response is ever stored. (A retrieve POST is already skipped by the GET guard
 	// above; this also excludes any same-origin GET under /api/.)
 	if (isApiRequest(url.pathname)) return;
+
+	// SkillBridge data files go straight to the network too: which ones a device fetched narrows where the person is.
+	if (isFinderDataRequest(url.pathname)) return;
 
 	event.respondWith(
 		(async () => {

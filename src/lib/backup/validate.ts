@@ -3,12 +3,33 @@ import { decodeProfile, encodeProfile } from '../profile/codec';
 import { decodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
 import type { ProfileV1 } from '../profile/types';
+import {
+	BRANCHES,
+	DELIVERY,
+	DURATIONS,
+	INDUSTRIES,
+	KINDS,
+	type Listing
+} from '../skillbridge-finder/contract/listing';
+import { STATE_CODES, isIsoDate, type StateCode } from '../skillbridge-finder/contract/places';
+import { validateListing } from '../skillbridge-finder/contract/validate';
+import { decodeFinderRecord } from '../skillbridge-finder/state/codec';
+import {
+	MAX_COMPARE,
+	MAX_SAVED,
+	type FinderFilters,
+	type FinderPlace,
+	type FinderRadius,
+	type FinderRecord,
+	type FinderSavedItem,
+	type FinderSetup
+} from '../skillbridge-finder/state/types';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-key';
 import { decodeTimelineState, isSnoozeDate } from '../timeline/state-codec';
 import type { TaskCategory, TaskStatus, TimelineState, TimelineTaskState } from '../timeline/types';
 import { b64DecodeStrict } from './envelope';
-import { CARRIED_STORES } from './manifest';
+import { CARRIED_STORES, OPTIONAL_CARRIED_STORES } from './manifest';
 import { MAX_NOTE_UNITS } from './note-cap';
 import { compareVersions, isAppVersion } from './version';
 
@@ -36,11 +57,13 @@ import { compareVersions, isAppVersion } from './version';
  *
  * Rules that keep a backup readable forever. Within `backupSchema` 1 this check may only be WIDENED. Anything that
  * tightens it, a store `schemaVersion` change, or a field that starts or stops being written bumps `backupSchema` in
- * the same change, with the migration for the old files. A new public setter on a store joins the writer-corpus test,
- * which writes every record the setters can make and validates it, and fails review unless it is added there.
+ * the same change, with the migration for the old files. A new OPTIONAL store key, which older files simply lack, is a
+ * widening: an older app refuses a file that holds it as "update the app" (the file names a newer version), which is
+ * the intended answer. A new public setter on a store joins the writer-corpus test, which writes every record the
+ * setters can make and validates it, and fails review unless it is added there.
  */
 
-export type RefusedStore = 'profile' | 'timeline' | 'calendar';
+export type RefusedStore = 'profile' | 'timeline' | 'calendar' | 'finder';
 
 /** The profile as the codec writes it: the dates are base64 text, exactly as in the file. */
 export type ValidProfile = {
@@ -60,6 +83,9 @@ export type ValidCalendar = {
 	card?: { dismissedAt: number; dismissCount: number };
 };
 
+/** The finder record as export writes it: the four known keys and their known shapes, nothing a newer release added. */
+export type ValidFinder = FinderRecord;
+
 export type ValidInner = {
 	appVersion: string;
 	backupSchema: 1;
@@ -68,6 +94,8 @@ export type ValidInner = {
 		profile: ValidProfile;
 		'timeline-state': TimelineState | null;
 		'calendar-sync': ValidCalendar | null;
+		/** Absent in a file made before the finder existed. */
+		'skillbridge-finder'?: ValidFinder;
 	};
 };
 
@@ -155,10 +183,14 @@ const utf8 = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.strin
 
 /** The shipped decoder reads the validated record's exact bytes and gets the same record back. */
 function decodesToSame(validated: unknown, decode: (bytes: Uint8Array) => unknown): boolean {
+	// The bytes are the person's plaintext record: wiped whether the decode agrees, differs or throws.
+	const bytes = utf8(validated);
 	try {
-		return sortedJson(decode(utf8(validated))) === sortedJson(validated);
+		return sortedJson(decode(bytes)) === sortedJson(validated);
 	} catch {
 		return false;
+	} finally {
+		bytes.fill(0);
 	}
 }
 
@@ -280,6 +312,144 @@ function readCalendar(raw: unknown): ValidCalendar | null {
 	return decodesToSame(calendar, decodeCalendarSyncState) ? calendar : null;
 }
 
+const ZIP_RE = /^\d{5}$/;
+const STATE_SET: ReadonlySet<unknown> = new Set(STATE_CODES);
+const RADII: ReadonlySet<unknown> = new Set([25, 50, 100, 'any']);
+const SETUP_KEYS = ['place', 'radius', 'territories', 'overseas'] as const;
+// In the order export writes them; each list holds each value once.
+const FILTER_LISTS: readonly (readonly [keyof FinderFilters, ReadonlySet<unknown>])[] = [
+	['industries', new Set(INDUSTRIES)],
+	['branches', new Set(BRANCHES)],
+	['durations', new Set(DURATIONS)],
+	['kinds', new Set(KINDS)],
+	['delivery', new Set(Object.values(DELIVERY))]
+];
+
+/** Only the two places the finder writes: a ZIP of five digits, or a state or territory code. */
+function readPlace(raw: unknown): FinderPlace | null {
+	if (!isObject(raw)) return null;
+	if (raw.kind === 'zip') {
+		if (!keysAre(raw, ['kind', 'zip']) || typeof raw.zip !== 'string' || !ZIP_RE.test(raw.zip)) {
+			return null;
+		}
+		return { kind: 'zip', zip: raw.zip };
+	}
+	if (raw.kind === 'state') {
+		if (!keysAre(raw, ['kind', 'state']) || !STATE_SET.has(raw.state)) return null;
+		return { kind: 'state', state: raw.state as StateCode };
+	}
+	return null;
+}
+
+function readSetup(raw: unknown): FinderSetup | null {
+	if (!isObject(raw) || !keysAre(raw, [], SETUP_KEYS)) return null;
+	const setup: FinderSetup = {};
+	if (Object.hasOwn(raw, 'place')) {
+		const place = readPlace(raw.place);
+		if (place === null) return null;
+		setup.place = place;
+	}
+	if (Object.hasOwn(raw, 'radius')) {
+		if (!RADII.has(raw.radius)) return null;
+		setup.radius = raw.radius as FinderRadius;
+	}
+	for (const flag of ['territories', 'overseas'] as const) {
+		if (!Object.hasOwn(raw, flag)) continue;
+		const value = raw[flag];
+		if (typeof value !== 'boolean') return null;
+		setup[flag] = value;
+	}
+	return setup;
+}
+
+function readFilters(raw: unknown): FinderFilters | null {
+	if (
+		!isObject(raw) ||
+		!keysAre(
+			raw,
+			[],
+			FILTER_LISTS.map(([key]) => key)
+		)
+	)
+		return null;
+	const filters: Record<string, unknown[]> = {};
+	for (const [key, allowed] of FILTER_LISTS) {
+		if (!Object.hasOwn(raw, key)) continue;
+		const list = raw[key];
+		// The length is checked before the list is walked: a list of a million entries is refused at its first line.
+		if (!Array.isArray(list) || list.length > allowed.size) return null;
+		const values: unknown[] = [];
+		for (const value of list as unknown[]) {
+			if (!allowed.has(value)) return null;
+			values.push(value);
+		}
+		if (new Set(values).size !== values.length) return null;
+		filters[key] = values;
+	}
+	return filters as FinderFilters;
+}
+
+function readSaved(raw: unknown): FinderSavedItem[] | null {
+	if (!Array.isArray(raw) || raw.length > MAX_SAVED) return null;
+	const saved: FinderSavedItem[] = [];
+	const ids = new Set<number>();
+	for (const item of raw as unknown[]) {
+		if (!isObject(item) || !keysAre(item, ['facts', 'id', 'savedOn'])) return null;
+		const { id, savedOn, facts } = item;
+		if (!isInteger(id, 1, Number.MAX_SAFE_INTEGER) || ids.has(id) || !isIsoDate(savedOn)) {
+			return null;
+		}
+		// The listing is kept whole, so it passes the same contract the weekly files do, and is the one the item names.
+		if (!isObject(facts) || validateListing(facts).length > 0 || facts.i !== id) return null;
+		ids.add(id);
+		saved.push({ id, savedOn, facts: structuredClone(facts) as Listing });
+	}
+	return saved;
+}
+
+function readCompare(raw: unknown): number[] | null {
+	if (!Array.isArray(raw) || raw.length > MAX_COMPARE) return null;
+	const picks: number[] = [];
+	for (const id of raw as unknown[]) {
+		if (!isInteger(id, 1, Number.MAX_SAFE_INTEGER)) return null;
+		picks.push(id);
+	}
+	return new Set(picks).size === picks.length ? picks : null;
+}
+
+/**
+ * Exactly what export writes for the finder: the four known keys and their known shapes. A key a newer release added,
+ * at any depth, refuses here (as "update the app" when the file names a newer app).
+ */
+function readFinder(raw: unknown): ValidFinder | null {
+	if (
+		!isObject(raw) ||
+		!keysAre(
+			raw,
+			['finderCompare', 'finderSaved', 'schemaVersion'],
+			['finderFilters', 'finderSetup']
+		)
+	) {
+		return null;
+	}
+	if (raw.schemaVersion !== 1) return null;
+	const finderSaved = readSaved(raw.finderSaved);
+	const finderCompare = readCompare(raw.finderCompare);
+	if (finderSaved === null || finderCompare === null) return null;
+	const finder: ValidFinder = { schemaVersion: 1, finderSaved, finderCompare };
+	if (Object.hasOwn(raw, 'finderSetup')) {
+		const finderSetup = readSetup(raw.finderSetup);
+		if (finderSetup === null) return null;
+		finder.finderSetup = finderSetup;
+	}
+	if (Object.hasOwn(raw, 'finderFilters')) {
+		const finderFilters = readFilters(raw.finderFilters);
+		if (finderFilters === null) return null;
+		finder.finderFilters = finderFilters;
+	}
+	return decodesToSame(finder, decodeFinderRecord) ? finder : null;
+}
+
 /** The checked file, or the store it was refused at (none when the refusal is the file's own frame). */
 function checkInner(
 	inner: Bag,
@@ -287,7 +457,7 @@ function checkInner(
 ): { inner: ValidInner } | { store?: RefusedStore } {
 	if (!keysAre(inner, INNER_KEYS) || !isTime(inner.createdAt)) return {};
 	const stores = inner.stores;
-	if (!isObject(stores) || !keysAre(stores, CARRIED_STORES)) return {};
+	if (!isObject(stores) || !keysAre(stores, CARRIED_STORES, OPTIONAL_CARRIED_STORES)) return {};
 
 	// A backup always comes from a finished setup, so the profile is never absent; the other two may be.
 	const profile = readProfile(stores.profile);
@@ -298,13 +468,22 @@ function checkInner(
 	const rawCalendar = stores['calendar-sync'];
 	const calendar = rawCalendar === null ? null : readCalendar(rawCalendar);
 	if (rawCalendar !== null && calendar === null) return { store: 'calendar' };
+	// The finder may be absent (a file from before it existed); present, it is a record and never null.
+	const hasFinder = Object.hasOwn(stores, 'skillbridge-finder');
+	const finder = hasFinder ? readFinder(stores['skillbridge-finder']) : null;
+	if (hasFinder && finder === null) return { store: 'finder' };
 
 	return {
 		inner: {
 			appVersion,
 			backupSchema: 1,
 			createdAt: inner.createdAt,
-			stores: { profile, 'timeline-state': timeline, 'calendar-sync': calendar }
+			stores: {
+				profile,
+				'timeline-state': timeline,
+				'calendar-sync': calendar,
+				...(finder && { 'skillbridge-finder': finder })
+			}
 		}
 	};
 }

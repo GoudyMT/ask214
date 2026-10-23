@@ -32,7 +32,14 @@ export const PII_FIELD_NAMES: readonly string[] = [
 	'lastBackupAt',
 	'backupGenProfile',
 	'backupGenTimeline',
-	'backupGenCalendar'
+	'backupGenCalendar',
+	'backupGenFinder',
+	'finderSetup',
+	'finderFilters',
+	'finderSaved',
+	'finderCompare',
+	'finderSeen',
+	'finderLastSeenPull'
 ];
 
 /**
@@ -56,6 +63,17 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\.backupGenProfile\b/,
 	/\.backupGenTimeline\b/,
 	/\.backupGenCalendar\b/,
+	/\.backupGenFinder\b/,
+	// The SkillBridge finder's own data. finderSetup, finderFilters, finderSaved and finderCompare are the record
+	// (src/lib/skillbridge-finder/state/types.ts): where a person is looking, what they saved and compare, and their
+	// filters. finderSeen and finderLastSeenPull are the pack's seen row (src/lib/skillbridge-finder/state/pack-codec.ts):
+	// what they opened and the newest pull they had seen. The `finder` prefix keeps these names out of ordinary words.
+	/\.finderSetup\b/,
+	/\.finderFilters\b/,
+	/\.finderSaved\b/,
+	/\.finderCompare\b/,
+	/\.finderSeen\b/,
+	/\.finderLastSeenPull\b/,
 	/\b_profileBytes\b/,
 	/\binstallUuid\b/,
 	// The same fields read without a dot, which the patterns above cannot see: by bracket (`profile['eaos']`), as a key
@@ -64,9 +82,9 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	// of prose can start with one. A name scan cannot see a value under a new name at all; the online request test
 	// (tests/e2e/egress-canary.e2e.ts) checks the values that leave the device - but no screen sets rate or rank yet, so
 	// it covers them only once one does and the test seeds them.
-	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar)['"`]\s*\]/,
-	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar)\b[^}]*\}/,
-	/^\s*(?:eaos|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar)\s*(?=[,:=]|$)/
+	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)['"`]\s*\]/,
+	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)\b[^}]*\}/,
+	/^\s*(?:eaos|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)\s*(?=[,:=]|$)/
 ];
 
 /**
@@ -123,6 +141,13 @@ export function scanForPiiTokens(
 export const FORBIDDEN_IMPORT_PATTERN =
 	/(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar|backup)(?:\/|$)/;
 
+/**
+ * The SkillBridge finder's own personal half: the person's place, saved programs and which listings they opened live
+ * in its `state` folder. Its fetch part asks the server for files, so it must receive file names only and never
+ * import that folder; the server would otherwise be one function call away from a place.
+ */
+export const FINDER_STATE_IMPORT_PATTERN = /(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?state(?:\/|$)/;
+
 // Any quote, including a template literal, and any whitespace - line breaks too - between `import(` or `from` and the
 // specifier, so the scan runs over the whole file rather than one line at a time. The specifier itself stops at a
 // line break: a quoted word ending in "from" in a string or comment would otherwise run on to the next quote and
@@ -135,18 +160,20 @@ const IMPORT_SPECIFIER =
  *
  * Args:
  *   files: array of { path, content } to scan.
+ *   pattern: the specifiers to refuse; the personal-data modules unless given.
  *
  * Returns:
  *   one PiiViolation per forbidden import, with the specifier as its token; empty array when clean.
  */
 export function scanForPiiImports(
-	files: ReadonlyArray<{ path: string; content: string }>
+	files: ReadonlyArray<{ path: string; content: string }>,
+	pattern: RegExp = FORBIDDEN_IMPORT_PATTERN
 ): PiiViolation[] {
 	const violations: PiiViolation[] = [];
 	for (const file of files) {
 		for (const match of file.content.matchAll(IMPORT_SPECIFIER)) {
 			const specifier = match[2] ?? '';
-			if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
+			if (pattern.test(specifier)) {
 				const line = file.content.slice(0, match.index).split('\n').length;
 				violations.push({ path: file.path, token: specifier, line });
 			}

@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-	MAX_BASE_ROWS,
 	MAX_CROSSWALK_ROWS,
+	MAX_ROWS_PER_CODE,
 	MAX_ZIP_ROWS,
-	validateBases,
 	validateCrosswalk,
 	validateZips
 } from './tables';
@@ -13,12 +12,13 @@ const codes = (r: { errors: { code: string }[] }) => r.errors.map((e) => e.code)
 describe('validateZips', () => {
 	const zips = (rows: unknown[]) => ({ v: 1, rows });
 
-	it('accepts five-digit ZIPs with a state and a point, including a leading zero', () => {
+	it('accepts five-digit ZIPs with a state and a point, including a leading zero and a territory', () => {
 		expect(
 			validateZips(
 				zips([
 					['21046', 'MD', 39.2, -76.86],
-					['02134', 'MA', 42.35, -71.13]
+					['02134', 'MA', 42.35, -71.13],
+					['00901', 'PR', 18.46, -66.1]
 				])
 			)
 		).toEqual({ valid: true, errors: [] });
@@ -35,7 +35,8 @@ describe('validateZips', () => {
 		[['21046', 'MD', 39.2], 'E_SBF_BAD_ROW'],
 		[['21046', 'ZZ', 39.2, -76.86], 'E_SBF_BAD_ENUM'],
 		[['21046', 'OS', 39.2, -76.86], 'E_SBF_BAD_ENUM'],
-		[['21046', 'Maryland', 39.2, -76.86], 'E_SBF_BAD_ENUM']
+		[['21046', 'Maryland', 39.2, -76.86], 'E_SBF_BAD_ENUM'],
+		[['21046', 'XX', 39.2, -76.86], 'E_SBF_BAD_ENUM']
 	])('refuses the row %j', (row, code) => {
 		expect(codes(validateZips(zips([row])))).toEqual([code]);
 	});
@@ -65,32 +66,6 @@ describe('validateZips', () => {
 	});
 });
 
-describe('validateBases', () => {
-	const bases = (rows: unknown[]) => ({ v: 1, rows });
-
-	it('accepts a named installation with its state and point', () => {
-		expect(validateBases(bases([['Fort Example', 'TX', 31.13, -97.78]]))).toEqual({
-			valid: true,
-			errors: []
-		});
-	});
-
-	it.each([
-		[['Fort <b>Example</b>', 'TX', 31.13, -97.78], 'E_SBF_BAD_TEXT'],
-		[['a'.repeat(151), 'TX', 31.13, -97.78], 'E_SBF_TOO_LONG'],
-		[['Fort Example', 'Texas', 31.13, -97.78], 'E_SBF_BAD_ENUM'],
-		[['Fort Example', 'TX', 31.13, 181], 'E_SBF_BAD_POINT']
-	])('refuses the row %j', (row, code) => {
-		expect(codes(validateBases(bases([row])))).toEqual([code]);
-	});
-
-	it('refuses more rows than the cap without walking them', () => {
-		expect(codes(validateBases(bases(new Array<unknown>(MAX_BASE_ROWS + 1).fill(null))))).toEqual([
-			'E_SBF_TOO_MANY_ROWS'
-		]);
-	});
-});
-
 describe('validateCrosswalk', () => {
 	const crosswalk = (rows: unknown[]) => ({ v: 1, rows });
 
@@ -116,5 +91,44 @@ describe('validateCrosswalk', () => {
 		expect(
 			codes(validateCrosswalk(crosswalk(new Array<unknown>(MAX_CROSSWALK_ROWS + 1).fill(null))))
 		).toEqual(['E_SBF_TOO_MANY_ROWS']);
+	});
+
+	// One code with thousands of rows makes every search that touches it walk them all.
+	it('refuses a military code with more than 50 rows, and keeps one with exactly 50', () => {
+		const rowsFor = (n: number) =>
+			Array.from({ length: n }, (_, k) => ['11B', 'Army', `49-${1000 + k}.00`, 'Infantry']);
+		expect(validateCrosswalk(crosswalk(rowsFor(MAX_ROWS_PER_CODE)))).toEqual({
+			valid: true,
+			errors: []
+		});
+		expect(validateCrosswalk(crosswalk(rowsFor(MAX_ROWS_PER_CODE + 1))).errors).toEqual([
+			{ code: 'E_SBF_TOO_MANY_ROWS', field: 'rows' }
+		]);
+	});
+
+	// Navy and Coast Guard ratings share codes, so the published table lists a code once per branch. Search folds a
+	// code's rows into its set of occupations, so the second branch costs nothing and must not count toward the cap.
+	it('keeps a code whose 50 occupations are listed under two branches', () => {
+		const rows = ['Navy', 'Coast Guard'].flatMap((branch) =>
+			Array.from({ length: MAX_ROWS_PER_CODE }, (_, k) => [
+				'BM',
+				branch,
+				`53-${5000 + k}.00`,
+				'Sailors'
+			])
+		);
+		expect(validateCrosswalk(crosswalk(rows))).toEqual({ valid: true, errors: [] });
+	});
+
+	it('refuses the same military code, branch and O*NET code listed twice', () => {
+		const row = ['91B', 'Army', '49-3023.00', 'Automotive Service Technicians'];
+		expect(codes(validateCrosswalk(crosswalk([row, [...row]])))).toEqual(['E_SBF_DUP_ID']);
+		expect(
+			validateCrosswalk(crosswalk([row, ['91B', 'Army', '49-3031.00', 'Bus Mechanics']])).valid
+		).toBe(true);
+		const navy = ['BM', 'Navy', '53-5011.00', 'Sailors and Marine Oilers'];
+		expect(
+			validateCrosswalk(crosswalk([navy, ['BM', 'Coast Guard', ...navy.slice(2)]])).valid
+		).toBe(true);
 	});
 });

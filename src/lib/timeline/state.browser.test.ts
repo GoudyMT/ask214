@@ -13,6 +13,7 @@ import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import type { KeystoreRecordV1 } from '../keystore/record';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { withStores, reqToPromise } from '../db/schema';
+import { wipeAllStores } from '../db/wipe';
 
 async function reload(db: IDBDatabase) {
 	const store = createTimelineStateStore(db);
@@ -204,6 +205,84 @@ describe('timeline-state store', () => {
 		await a.setStatus('x', 'done');
 		a.relockSync('user');
 		await expect(a.setStatus('y', 'done')).rejects.toThrow(TimelineRelockedError);
+		await deleteTestDb(db);
+	});
+
+	// The person's tap came first: another tab's Lock arriving while the save waits for its turn must not throw the
+	// change away (in WebKit the lock message reaches the tab before the save writes, and the tap was silently lost).
+	it('a tap made before a lock still lands, and the store stays locked', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('x', 'done');
+		const tap = a.setStatus('y', 'done');
+		a.relockSync('peer');
+		await tap;
+		expect(a.ready).toBe(false);
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({ x: { status: 'done' }, y: { status: 'done' } });
+		await deleteTestDb(db);
+	});
+
+	// Two taps queued before the lock: the second builds on what the first saved, so neither drops the other.
+	it('two taps queued before a lock both land', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		const first = a.setStatus('x', 'done');
+		const second = a.setNote('y', 'call the office');
+		a.relockSync('user');
+		await Promise.all([first, second]);
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({ x: { status: 'done' }, y: { notes: 'call the office' } });
+		await deleteTestDb(db);
+	});
+
+	// The second tap was made before the first save landed and before the lock: it builds on what the first saved, never
+	// on the record as it was when tapped, which would write the first save away.
+	it('a tap queued behind a save that landed before the lock lands on top of it', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		const first = a.setStatus('x', 'done');
+		const second = a.setStatus('y', 'done');
+		await first;
+		a.relockSync('peer');
+		await second;
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({ x: { status: 'done' }, y: { status: 'done' } });
+		await deleteTestDb(db);
+	});
+
+	// A save asked for on a store that is already locked was never tapped on a record: it stays refused, even while a
+	// save from before the lock still waits and holds one.
+	it('a save asked for after the lock is refused while an earlier one still lands', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+
+		const a = createTimelineStateStore(db);
+		await a.load();
+		const before = a.setStatus('x', 'done');
+		a.relockSync('user');
+		const after = a.setStatus('y', 'done');
+		await expect(after).rejects.toThrow(TimelineRelockedError);
+		await before;
+
+		const b = createTimelineStateStore(db);
+		await b.load();
+		expect(b.state.tasks).toEqual({ x: { status: 'done' } });
 		await deleteTestDb(db);
 	});
 
@@ -681,6 +760,32 @@ describe('timeline-state store', () => {
 		await deleteTestDb(db);
 	});
 
+	// A body whose marker is gone is damage, not a first visit: reading it as empty would let the next save write over
+	// the person's saved statuses and notes.
+	it('a body present but the marker missing: not ready, and the body is left alone', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createTimelineStateStore(db);
+		await a.load();
+		await a.setStatus('dd214-review', 'done');
+		const readBody = () =>
+			withStores(db, 'timeline-state', 'readonly', (tx) =>
+				reqToPromise(tx.objectStore('timeline-state').get(0))
+			);
+		const body = await readBody();
+		await withStores(db, 'timeline-state-hwm', 'readwrite', (tx) => {
+			tx.objectStore('timeline-state-hwm').clear();
+		});
+
+		const b = createTimelineStateStore(db);
+		await expect(b.load()).rejects.toThrow('E_TIMELINE_BODY_WITHOUT_MARK');
+		expect(b.ready).toBe(false);
+		expect(b.failed).toBe(true);
+		await expect(b.setStatus('x', 'done')).rejects.toThrow(TimelineRelockedError);
+		expect(await readBody()).toEqual(body);
+		await deleteTestDb(db);
+	});
+
 	it('a non-hygiene relock broadcasts its reason', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);
@@ -795,6 +900,100 @@ describe('timeline-state store', () => {
 		const fresh = createTimelineStateStore(db);
 		await fresh.load();
 		expect(fresh.state.tasks['t2']?.status).toBe('done');
+		await deleteTestDb(db);
+	});
+});
+
+// The rule every shipped writer keeps: the body and its marker are written together (the store's own save, and the
+// restore writer in one transaction) and dropped together (the store's wipe, and the erase of every store). So the rows
+// a person's device can hold are none, or a body with its marker - never a body alone - and the check for a lost marker
+// must let every one of them load. Each case here drives the real writer, then loads in a FRESH store. The restore
+// writer's side is proven in restore-writer.browser.test.ts: 'reload proof: a device at 5 / 9 / 2 restores a file made
+// elsewhere and opens ready with its content' (a file with the timeline) and 'a null timeline in the file writes an
+// empty record at +1' (a file without it).
+describe('timeline-state store: every row state a shipped writer leaves still loads', () => {
+	type Store = ReturnType<typeof createTimelineStateStore>;
+
+	async function freshLoad(db: IDBDatabase): Promise<Store> {
+		const fresh = createTimelineStateStore(db);
+		await fresh.load();
+		expect(fresh.ready).toBe(true);
+		expect(fresh.failed).toBe(false);
+		return fresh;
+	}
+
+	it('nothing ever written (a first visit)', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		expect((await freshLoad(db)).state.tasks).toEqual({});
+		await deleteTestDb(db);
+	});
+
+	const saves: {
+		name: string;
+		write: (store: Store) => Promise<void>;
+		expected: Record<string, TimelineTaskState>;
+	}[] = [
+		{
+			name: 'setStatus',
+			write: (s) => s.setStatus('x', 'done'),
+			expected: { x: { status: 'done' } }
+		},
+		{
+			name: 'setSnooze',
+			write: (s) => s.setSnooze('x', '2027-04-01'),
+			expected: { x: { status: 'snoozed', snoozeUntil: '2027-04-01' } }
+		},
+		{
+			name: 'setNote',
+			write: (s) => s.setNote('x', 'call back'),
+			expected: { x: { notes: 'call back' } }
+		},
+		{
+			// The body then holds no task at all, which is still a saved record with its marker.
+			name: 'setStatus cleared again',
+			write: async (s) => {
+				await s.setStatus('x', 'done');
+				await s.setStatus('x', undefined);
+			},
+			expected: {}
+		}
+	];
+	for (const { name, write, expected } of saves) {
+		it(`after ${name}`, async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createTimelineStateStore(db);
+			await store.load();
+			await write(store);
+
+			expect((await freshLoad(db)).state.tasks).toEqual(expected);
+			await deleteTestDb(db);
+		});
+	}
+
+	it('after the store wipes its own rows', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createTimelineStateStore(db);
+		await store.load();
+		await store.setStatus('x', 'done');
+		await store.wipe();
+
+		expect((await freshLoad(db)).state.tasks).toEqual({});
+		await deleteTestDb(db);
+	});
+
+	it('after the erase of every store, once the keystore is made again', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createTimelineStateStore(db);
+		await store.load();
+		await store.setStatus('x', 'done');
+		await wipeAllStores(db);
+		await bootstrapLocalKeystore(db);
+
+		expect((await freshLoad(db)).state.tasks).toEqual({});
 		await deleteTestDb(db);
 	});
 });

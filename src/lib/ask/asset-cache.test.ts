@@ -10,6 +10,7 @@ import {
 	pruneSupersededEntries,
 	SET_UP_FILES,
 	isApiRequest,
+	isFinderDataRequest,
 	keptOnFetch,
 	libraryToRestore,
 	answerLibraryToRestore,
@@ -269,6 +270,24 @@ describe('isApiRequest (the SW never caches the API namespace)', () => {
 		expect(isApiRequest('/ask')).toBe(false);
 		expect(isApiRequest('/corpus/corpus-v1.0.2.json')).toBe(false);
 		expect(isApiRequest('/apidocs')).toBe(false); // not the /api/ namespace
+	});
+});
+
+// Which SkillBridge files a device fetched narrows where the person is looking, so the worker keeps no copy of
+// any of them; the finder PAGE is an app page and stays cacheable for offline use.
+describe('isFinderDataRequest (the SW never keeps SkillBridge data files)', () => {
+	it('is true for the index, a weekly listing file and a table', () => {
+		expect(isFinderDataRequest('/skillbridge-data/index.json')).toBe(true);
+		expect(isFinderDataRequest('/skillbridge-data/w/2026-10-21/pacific.json')).toBe(true);
+		expect(isFinderDataRequest('/skillbridge-data/tables/zips.json')).toBe(true);
+	});
+
+	it('is false for the finder page, look-alike names and the API namespace', () => {
+		expect(isFinderDataRequest('/skillbridge')).toBe(false);
+		expect(isFinderDataRequest('/skillbridge/')).toBe(false);
+		expect(isFinderDataRequest('/skillbridge-datax/a.json')).toBe(false);
+		expect(isFinderDataRequest('/skillbridge-data')).toBe(false);
+		expect(isFinderDataRequest('/api/x')).toBe(false);
 	});
 });
 

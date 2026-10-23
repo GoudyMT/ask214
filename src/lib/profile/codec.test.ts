@@ -245,7 +245,8 @@ describe('the backup mark', () => {
 		lastBackupAt: 1716800000000,
 		backupGenProfile: 4,
 		backupGenTimeline: 2,
-		backupGenCalendar: 0
+		backupGenCalendar: 0,
+		backupGenFinder: 5
 	};
 	const base = (): ProfileV1 => ({
 		schemaVersion: 1,
@@ -256,13 +257,26 @@ describe('the backup mark', () => {
 		eaos: null
 	});
 
-	it('the four backup-mark fields round-trip', () => {
+	it('the five backup-mark fields round-trip', () => {
 		const dec = decodeProfile(encodeProfile({ ...base(), ...MARK }));
 		expect(dec.lastBackupAt).toBe(MARK.lastBackupAt);
 		expect(dec.backupGenProfile).toBe(4);
 		expect(dec.backupGenTimeline).toBe(2);
 		// Zero is a real generation (nothing written yet), so it must survive, not read as absent.
 		expect(dec.backupGenCalendar).toBe(0);
+		expect(dec.backupGenFinder).toBe(5);
+		expect(
+			decodeProfile(encodeProfile({ ...base(), ...MARK, backupGenFinder: 0 })).backupGenFinder
+		).toBe(0);
+	});
+
+	// A mark written before the finder existed has the four older fields; it must still decode, with no finder generation.
+	it('a mark of the four older fields decodes with no finder generation', () => {
+		const { backupGenFinder, ...older } = MARK;
+		expect(backupGenFinder).toBe(5);
+		const dec = decodeProfile(encodeProfile({ ...base(), ...older }));
+		expect(dec.backupGenCalendar).toBe(0);
+		expect(dec).not.toHaveProperty('backupGenFinder');
 	});
 
 	it('a profile without the mark encodes with none of its keys', () => {

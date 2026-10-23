@@ -8,6 +8,7 @@ import { OccConflictError } from '../profile/store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { withStores, reqToPromise } from '../db/schema';
+import { wipeAllStores } from '../db/wipe';
 import type { DesiredEvent, HandedOverEvent, TaskExclusions } from './types';
 
 // A passthrough over the cipher that counts decrypts, so a re-read that must not happen can be shown not to.
@@ -345,6 +346,34 @@ describe('calendar-sync store', () => {
 		await deleteTestDb(db);
 	});
 
+	// A body whose marker is gone is damage, not a first visit: reading it as empty would let the next save write over
+	// the person's saved calendar settings.
+	it('a body present but the marker missing: not ready, and the body is left alone', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const a = createCalendarSyncStore(db);
+		await a.load();
+		await a.setExclusions({ taskIds: ['t1'], categories: ['medical'] });
+		const readBody = () =>
+			withStores(db, 'calendar-sync', 'readonly', (tx) =>
+				reqToPromise<{ id: number; rec: Uint8Array } | undefined>(
+					tx.objectStore('calendar-sync').get(0)
+				)
+			);
+		const body = await readBody();
+		await withStores(db, 'calendar-sync-hwm', 'readwrite', (tx) => {
+			tx.objectStore('calendar-sync-hwm').clear();
+		});
+
+		const b = createCalendarSyncStore(db);
+		await expect(b.load()).rejects.toThrow('E_CALENDAR_BODY_WITHOUT_MARK');
+		expect(b.ready).toBe(false);
+		expect(b.failed).toBe(true);
+		await expect(b.setExclusions(EMPTY)).rejects.toThrow(CalendarRelockedError);
+		expect(await readBody()).toEqual(body);
+		await deleteTestDb(db);
+	});
+
 	it('a non-hygiene relock broadcasts its reason', async () => {
 		const db = await openTestDb();
 		await bootstrapLocalKeystore(db);
@@ -633,5 +662,114 @@ describe('calendar-sync store', () => {
 			]);
 			await deleteTestDb(db);
 		});
+	});
+});
+
+// The rule every shipped writer keeps: the body and its marker are written together (the store's own save, and the
+// restore writer in one transaction) and dropped together (the store's wipe, and the erase of every store). So the rows
+// a person's device can hold are none, or a body with its marker - never a body alone - and the check for a lost marker
+// must let every one of them load. Each case here drives the real writer, then loads in a FRESH store. The restore
+// writer's side is proven in restore-writer.browser.test.ts: 'reload proof: a device at 5 / 9 / 2 restores a file made
+// elsewhere and opens ready with its content' (a file with the calendar) and 'a null calendar in the file writes an
+// empty record at +1' (a file without it).
+describe('calendar-sync store: every row state a shipped writer leaves still loads', () => {
+	const EVENT: DesiredEvent = {
+		taskId: 'a',
+		moment: 'last',
+		title: 'Last day: a',
+		isoDate: '2099-01-01',
+		alarmDays: []
+	};
+	const HELD: HandedOverEvent = {
+		taskId: 'a',
+		moment: 'last',
+		title: 'Last day: a',
+		isoDate: '2099-01-01',
+		addedOn: '2026-10-04'
+	};
+	type Store = ReturnType<typeof createCalendarSyncStore>;
+
+	async function freshLoad(db: IDBDatabase): Promise<Store> {
+		const fresh = createCalendarSyncStore(db);
+		await fresh.load();
+		expect(fresh.ready).toBe(true);
+		expect(fresh.failed).toBe(false);
+		return fresh;
+	}
+
+	it('nothing ever written (a first visit)', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const fresh = await freshLoad(db);
+		expect(fresh.exclusions).toEqual({ taskIds: [], categories: [] });
+		await deleteTestDb(db);
+	});
+
+	const saves: {
+		name: string;
+		write: (store: Store) => Promise<void>;
+		expectContent: (fresh: Store) => void;
+	}[] = [
+		{
+			name: 'setExclusions',
+			write: (s) => s.setExclusions({ taskIds: ['t1'], categories: ['medical'] }),
+			expectContent: (f) =>
+				expect(f.exclusions).toEqual({ taskIds: ['t1'], categories: ['medical'] })
+		},
+		{
+			name: 'dismissCard',
+			write: (s) => s.dismissCard(1_000),
+			expectContent: (f) => expect(f.card).toEqual({ dismissedAt: 1_000, dismissCount: 1 })
+		},
+		{
+			name: 'recordAdd',
+			write: (s) => s.recordAdd([EVENT], '2026-10-04', '2026-10-04'),
+			expectContent: (f) => expect(f.lastAdd).toEqual([HELD])
+		},
+		{
+			name: 'acknowledgeStale',
+			write: async (s) => {
+				await s.recordAdd([EVENT], '2026-10-04', '2026-10-04');
+				await s.acknowledgeStale([HELD]);
+			},
+			expectContent: (f) => expect(f.lastAdd).toEqual([])
+		}
+	];
+	for (const { name, write, expectContent } of saves) {
+		it(`after ${name}`, async () => {
+			const db = await openTestDb();
+			await bootstrapLocalKeystore(db);
+			const store = createCalendarSyncStore(db);
+			await store.load();
+			await write(store);
+
+			expectContent(await freshLoad(db));
+			await deleteTestDb(db);
+		});
+	}
+
+	it('after the store wipes its own rows', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createCalendarSyncStore(db);
+		await store.load();
+		await store.setExclusions({ taskIds: ['t1'], categories: [] });
+		await store.wipe();
+
+		expect((await freshLoad(db)).exclusions).toEqual({ taskIds: [], categories: [] });
+		await deleteTestDb(db);
+	});
+
+	it('after the erase of every store, once the keystore is made again', async () => {
+		const db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const store = createCalendarSyncStore(db);
+		await store.load();
+		await store.setExclusions({ taskIds: ['t1'], categories: [] });
+		await wipeAllStores(db);
+		await bootstrapLocalKeystore(db);
+
+		expect((await freshLoad(db)).exclusions).toEqual({ taskIds: [], categories: [] });
+		await deleteTestDb(db);
 	});
 });

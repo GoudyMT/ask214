@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { version } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import AppGate from '$lib/components/AppGate.svelte';
@@ -31,6 +32,8 @@
 	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
 	import { openMtcDb } from '$lib/db/schema';
+	import { startReload, stopReloadForLock } from '$lib/profile/pending-reload';
+	import { markRaised, takeOverIfRaised } from '$lib/sw/take-over';
 	import { wipeAllStores } from '$lib/db/wipe';
 	import { stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
@@ -54,6 +57,12 @@
 	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
 	import { stashRoute } from '$lib/feedback/context';
 	let { children } = $props();
+
+	// After a database raise, this release's worker takes over at once (take-over.ts).
+	const takeOver = (raised?: boolean) => {
+		if (raised) markRaised(version);
+		void takeOverIfRaised(navigator.serviceWorker, version);
+	};
 
 	// Shell content width: one width for every route (shell-width.ts), set on nav, main and footer through
 	// the --shell-width CSS var. The 720px in the styles below is only the fallback for a missing var.
@@ -93,6 +102,7 @@
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/service-worker.js', { type: 'module' });
+			takeOver();
 		}
 
 		// Cross-tab bus: created up front so the store can publish change/relock signals via
@@ -121,7 +131,8 @@
 								// the takeover offers a reload onto the new bundle instead of a silent, data-less tab.
 								if (!destroyed) app.status = 'stale';
 							},
-							onBlocked
+							onBlocked,
+							() => takeOver(true)
 						),
 					bootstrap: bootstrapLocalKeystore,
 					createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
@@ -189,16 +200,29 @@
 				const relockables: Relockable[] = [result.store];
 				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
 				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
-				app.relockAll = () => relockAll(relockables, 'user');
+				// A lock (here or from another tab) that lands while a reload of the app's own waits out its grace cancels
+				// it, as the reload would decrypt again (pending-reload.ts). The tab then goes on as one locked before the
+				// signal (below).
+				const lockStopsReload = () => {
+					if (!stopReloadForLock()) return;
+					if (result.store.locked) app.reloadOnUnlock = true;
+					else app.replacedNotice = true;
+				};
+				app.relockAll = () => {
+					relockAll(relockables, 'user');
+					lockStopsReload();
+				};
 				app.joinRelock = createJoinRelock(relockables);
 				app.publish = (s) => echo.publish(s);
 				// refresh, not load: a peer's change is not the user asking to unlock, so each store
 				// refuses the re-read if IT has relocked. The gate lives in the store, per store.
 				const offBus = subscribeBus(bus, {
-					relocked: (s) =>
+					relocked: (s) => {
 						echo.answer(() =>
 							relockEachSync(relockables, 'peer', s.reason ? { peerReason: s.reason } : undefined)
-						),
+						);
+						lockStopsReload();
+					},
 					'profile-updated': () => result.store.refresh(),
 					'timeline-updated': () => app.timeline?.refresh(),
 					'calendar-updated': () => app.calendar?.refresh(),
@@ -219,9 +243,11 @@
 						else app.replacedNotice = true;
 					},
 					() =>
-						location.pathname === resolve('/wizard')
-							? location.replace(resolve('/timeline'))
-							: location.reload()
+						startReload(() =>
+							location.pathname === resolve('/wizard')
+								? location.replace(resolve('/timeline'))
+								: location.reload()
+						)
 				);
 				const offLifecycle = installLifecycle(relockables, {
 					win: window,

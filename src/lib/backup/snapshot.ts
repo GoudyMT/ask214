@@ -7,14 +7,17 @@ import { decryptProfileRecord } from '../profile/crypto-boundary';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { verifySidecar, type SignedSidecar } from '../profile/sidecars';
 import type { ProfileV1 } from '../profile/types';
+import { decryptFinderRecord } from '../skillbridge-finder/state/crypto-boundary';
+import type { FinderRecord } from '../skillbridge-finder/state/types';
 import { decryptTimelineRecord } from '../timeline/crypto-boundary';
 import type { TimelineState } from '../timeline/types';
 import type { RefusedStore } from './validate';
 
 /**
- * What a backup is made from: the three records the person saved on this device, read straight from storage and
- * decoded. `gens` are the three sidecar generations the records were read at (0 for a record never written); the
- * export's backup mark is built from them.
+ * What a backup is made from: the four records the person saved on this device, read straight from storage and
+ * decoded. `gens` are the four sidecar generations the records were read at (0 for a record never written); the
+ * export's backup mark is built from them. The finder's cached listings are not read: they are public data kept for
+ * this device alone.
  *
  * The caller owns the decoded profile, whose date fields are byte arrays: wipe them with `zeroizeRecord` when the
  * export is done, on every path. The plaintext each body was decrypted into is already wiped inside the decrypt
@@ -25,7 +28,8 @@ export type Snapshot = {
 	profile: ProfileV1;
 	timeline: TimelineState | null;
 	calendar: CalendarSyncState | null;
-	gens: { profile: number; timeline: number; calendar: number };
+	finder: FinderRecord | null;
+	gens: { profile: number; timeline: number; calendar: number; finder: number };
 };
 
 export type SnapshotResult =
@@ -37,7 +41,7 @@ type KeystoreRow = KeystoreRecordV1 & { id: number };
 type BodyRow = { id: number; rec: Uint8Array };
 type MarkRow = SignedSidecar<{ generation: number }>;
 
-// byok is never read: a backup does not carry the person's own API key.
+// byok and the finder's pack are never read: a backup does not carry the person's own API key or the cached listings.
 const SNAPSHOT_STORES: StoreName[] = [
 	'profile',
 	'profile-hwm',
@@ -45,7 +49,9 @@ const SNAPSHOT_STORES: StoreName[] = [
 	'timeline-state',
 	'timeline-state-hwm',
 	'calendar-sync',
-	'calendar-sync-hwm'
+	'calendar-sync-hwm',
+	'skillbridge-finder',
+	'skillbridge-finder-hwm'
 ];
 
 const failed = (store: RefusedStore): SnapshotResult => ({
@@ -98,7 +104,7 @@ async function readOptional<T>(
 async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 	let cut;
 	try {
-		// Seven gets issued together in one readonly transaction: IndexedDB shows it a single state, so a write
+		// Nine gets issued together in one readonly transaction: IndexedDB shows it a single state, so a write
 		// landing from another tab is wholly before or wholly after what is read here. Verifying and decrypting wait
 		// until the transaction has finished, because IndexedDB commits one that idles while the code awaits.
 		cut = await withStores(db, SNAPSHOT_STORES, 'readonly', (tx) => {
@@ -111,7 +117,9 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 				get<BodyRow>('timeline-state'),
 				get<MarkRow>('timeline-state-hwm'),
 				get<BodyRow>('calendar-sync'),
-				get<MarkRow>('calendar-sync-hwm')
+				get<MarkRow>('calendar-sync-hwm'),
+				get<BodyRow>('skillbridge-finder'),
+				get<MarkRow>('skillbridge-finder-hwm')
 			]);
 		});
 	} catch {
@@ -124,7 +132,9 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 		timelineBody,
 		timelineMark,
 		calendarBody,
-		calendarMark
+		calendarMark,
+		finderBody,
+		finderMark
 	] = cut;
 
 	let profile: ProfileV1 | null = null;
@@ -162,13 +172,27 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 			keystore,
 			decryptCalendarRecord
 		);
+		at = 'finder';
+		const finder = await readOptional(
+			'skillbridge-finder-hwm',
+			finderBody,
+			finderMark,
+			keystore,
+			decryptFinderRecord
+		);
 		handedOver = true;
 		return {
 			ok: true,
 			profile,
 			timeline: timeline.state,
 			calendar: calendar.state,
-			gens: { profile: profileGen, timeline: timeline.gen, calendar: calendar.gen }
+			finder: finder.state,
+			gens: {
+				profile: profileGen,
+				timeline: timeline.gen,
+				calendar: calendar.gen,
+				finder: finder.gen
+			}
 		};
 	} catch {
 		return failed(at);
@@ -179,10 +203,10 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 }
 
 /**
- * Reads the device's saved profile, timeline and calendar for a backup, from storage and never from what the screen
- * holds, so a screen that locked itself does not hide the person's data from their own backup.
+ * Reads the device's saved profile, timeline, calendar and finder record for a backup, from storage and never from what
+ * the screen holds, so a screen that locked itself does not hide the person's data from their own backup.
  *
- * Under the write locks (so no save of this tab or another lands mid-read) it takes one consistent cut of the seven
+ * Under the write locks (so no save of this tab or another lands mid-read) it takes one consistent cut of the nine
  * stores, then checks the key record's MAC and every sidecar's MAC and decrypts each body at the generation its sidecar
  * vouches for. Only raw helpers run under the lock: a store's own load or save would take the same non-reentrant lock,
  * and a bus publish would tell other tabs something changed.

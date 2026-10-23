@@ -138,6 +138,36 @@ describe('validateListing', () => {
 		expect(codes(listing({ [field]: value }))).toEqual(['E_SBF_BAD_TEXT']);
 	});
 
+	// Each class of character that renders as nothing, or breaks a line, or is not text at all: a name made of
+	// them reads as an empty one, and a line break inside a name splits a card.
+	it.each([
+		['a Hangul filler', 0x1160],
+		['a Hangul choseong filler', 0x115f],
+		['a combining grapheme joiner', 0x034f],
+		['a variation selector', 0xfe0f],
+		['a braille blank', 0x2800],
+		['a line separator', 0x2028],
+		['a paragraph separator', 0x2029],
+		['a lone surrogate', 0xd800]
+	])('refuses %s inside a name and a name made of it alone', (_class, code) => {
+		const mark = String.fromCharCode(code);
+		expect(codes(listing({ n: 'Acme' + mark + 'Corp' }))).toEqual(['E_SBF_BAD_TEXT']);
+		expect(codes(listing({ n: mark }))).toEqual(['E_SBF_BAD_TEXT']);
+	});
+
+	// The data is checked where it is built, on a newer Unicode than many phones run: a character that version added
+	// reads as unassigned on an older phone, and refusing it there would drop the whole file the listing sits in.
+	it('accepts a code point this device may not know yet', () => {
+		const unknown = String.fromCharCode(0x0378);
+		expect(validateListing(listing({ n: `Acme ${unknown} Corp` }))).toEqual([]);
+	});
+
+	it('still accepts an accented name and an emoji', () => {
+		const n = String.fromCharCode(0xf1);
+		const grin = String.fromCodePoint(0x1f600);
+		expect(validateListing(listing({ c: `Ca${n}on City`, n: `Acme ${grin} Corp` }))).toEqual([]);
+	});
+
 	it.each([
 		[['one two three four five six seven']],
 		[['Role: Technician']],
@@ -152,6 +182,14 @@ describe('validateListing', () => {
 		const forty = Array.from({ length: 40 }, (_, n) => `A${n}`);
 		expect(validateListing(listing({ oc: forty }))).toEqual([]);
 		expect(codes(listing({ oc: [...forty, 'B1'] }))).toEqual(['E_SBF_BAD_CODES']);
+	});
+
+	// A code repeated 40 times makes one listing cost 40 visits in every search that reaches it.
+	it('refuses an occupation code listed twice', () => {
+		expect(validateListing(listing({ oc: ['91B', '2A6X1'] }))).toEqual([]);
+		expect(validateListing(listing({ oc: ['91B', '2A6X1', '91B'] }))).toEqual([
+			{ code: 'E_SBF_BAD_CODES', id: 386, field: 'oc' }
+		]);
 	});
 
 	it.each([
@@ -236,6 +274,27 @@ describe('validateRegionFile', () => {
 		expect(validateRegionFile(file({ listings: rows })).errors).toEqual([
 			{ code: 'E_SBF_TOO_MANY_ROWS', field: 'listings' }
 		]);
+	});
+
+	// A first-seen date after the pull would sort first in "newest first" for everyone, and a creation date after
+	// the pull would read as New: neither can be true of a file published on its pull date.
+	it('refuses a first-seen date after the pull, and keeps one on the pull date', () => {
+		const dated = (fl: string) => validateRegionFile(file({ listings: [listing({ fl })] }));
+		expect(dated('2026-10-21')).toEqual({ valid: true, errors: [] });
+		expect(dated('2026-10-22').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'fl' }]);
+		expect(dated('9999-12-31').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'fl' }]);
+	});
+
+	// The pipeline dates an older listing it first sees after the baseline to the baseline itself, so its creation
+	// date can fall after its first-seen date; refusing that would refuse the whole week's file.
+	it('keeps a creation date after first-seen up to the pull, and refuses one after the pull', () => {
+		const dated = (dc: string) =>
+			validateRegionFile(file({ listings: [listing({ fl: '2026-10-14', dc })] }));
+		expect(dated('2026-10-14')).toEqual({ valid: true, errors: [] });
+		expect(dated('2026-10-15')).toEqual({ valid: true, errors: [] });
+		expect(dated('2026-10-21')).toEqual({ valid: true, errors: [] });
+		expect(dated('2026-10-22').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'dc' }]);
+		expect(dated('2099-01-01').errors).toEqual([{ code: 'E_SBF_BAD_DATE', id: 386, field: 'dc' }]);
 	});
 });
 

@@ -8,6 +8,7 @@ import { createJoinRelock, relockEachSync, type Relockable } from '../profile/ap
 import type { RelockReason } from '../profile/lifecycle';
 import { readDeviceState } from '../profile/device-state';
 import { createProfileStore, type ProfileStore } from '../profile/store.svelte';
+import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { decryptEnvelope, readBackupFile } from './envelope';
 import {
@@ -480,7 +481,7 @@ describe('a saved file', () => {
 		await calendar.setExclusions({ taskIds: ['job-search'], categories: ['finance'] });
 		await calendar.setExclusions({ taskIds: [], categories: ['finance'] });
 		const before = await readDeviceState(db);
-		expect(before.gens).toEqual({ profile: 1, timeline: 2, calendar: 3 });
+		expect(before.gens).toEqual({ profile: 1, timeline: 2, calendar: 3, finder: 0 });
 		expect(before.mark).toBeNull();
 		const f = fakeFile();
 		const { session, flow } = await rig(pickerOf(f.handle));
@@ -490,9 +491,44 @@ describe('a saved file', () => {
 
 		const state = await readDeviceState(db);
 		expect(state.mark?.at).toBe(backupAt);
-		expect(state.mark?.gens).toEqual({ profile: 2, timeline: 2, calendar: 3 });
+		expect(state.mark?.gens).toEqual({ profile: 2, timeline: 2, calendar: 3, finder: 0 });
 		expect(state.gens).toEqual(state.mark?.gens);
 		expect(session.busy).toBe(false);
+	});
+
+	// A backup made after the person used the finder holds it, and the mark vouches for the finder generation it matched,
+	// so a later change to the finder alone shows up as a change since the backup.
+	it('a device with a finder record exports it and writes its generation into the mark', async () => {
+		const finder = createFinderStore(db);
+		await finder.load();
+		await finder.setSetup({ radius: 25 });
+		await finder.setSetup({ radius: 50 });
+		const f = fakeFile();
+		const { flow } = await rig(pickerOf(f.handle));
+
+		expect(await submit(flow)).toEqual(SAVED);
+
+		const state = await readDeviceState(db);
+		expect(state.gens.finder).toBe(2);
+		expect(state.mark?.gens.finder).toBe(2);
+		expect(state.gens).toEqual(state.mark?.gens);
+		const read = await readBackupFile(new File([f.content], 'x.json'));
+		if (!read.ok) throw new Error('E_TEST_FILE');
+		const typed = canonicalizePhrase(TYPED);
+		if (!typed.ok) throw new Error('E_TEST_WORDS');
+		const opened = await decryptEnvelope(
+			read.envelope,
+			await keyFor(typed.bytes.buffer, read.envelope.salt)
+		);
+		if (!opened.ok) throw new Error('E_TEST_OPEN');
+		const checked = validateInner(opened.inner);
+		if (!checked.ok) throw new Error('E_TEST_VALID');
+		expect(checked.inner.stores['skillbridge-finder']).toEqual({
+			schemaVersion: 1,
+			finderSetup: { radius: 50 },
+			finderSaved: [],
+			finderCompare: []
+		});
 	});
 
 	// Another tab saved the profile after the snapshot: the older date stays, and the person still has their file.

@@ -84,7 +84,7 @@ export type ExportResult =
 			text: string;
 	  };
 
-type Gens = { profile: number; timeline: number; calendar: number };
+type Gens = { profile: number; timeline: number; calendar: number; finder: number };
 
 type Prepared = { text: string; gens: Gens; backupAt: number; fileName: string };
 
@@ -492,7 +492,8 @@ export class ExportFlow {
 				lastBackupAt: backupAt,
 				backupGenProfile: gens.profile + 1,
 				backupGenTimeline: gens.timeline,
-				backupGenCalendar: gens.calendar
+				backupGenCalendar: gens.calendar,
+				backupGenFinder: gens.finder
 			});
 		} catch (error) {
 			safeLog({ code: error instanceof OccConflictError ? 'E_OCC_CONFLICT' : 'E_INTERNAL' });

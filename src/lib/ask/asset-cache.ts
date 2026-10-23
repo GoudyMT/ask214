@@ -576,6 +576,20 @@ export function isApiRequest(pathname: string): boolean {
 }
 
 /**
+ * The service worker must keep no copy of a SkillBridge data file (the listings and tables under
+ * `/skillbridge-data/`). The listings are public, but which files a device fetched narrows where the person is
+ * looking, and a stored copy would sit in plain text in Cache Storage and survive an erase, which keeps dotted
+ * names in `app-*` caches. A matching request passes straight to the network; the page fetches with
+ * `cache: 'no-store'` too. The finder page itself (`/skillbridge`) is an app page and stays cacheable.
+ *
+ * @param pathname A same-origin request pathname.
+ * @returns true when the request is for a file under /skillbridge-data/ and must bypass the SW cache.
+ */
+export function isFinderDataRequest(pathname: string): boolean {
+	return pathname.startsWith('/skillbridge-data/');
+}
+
+/**
  * The page the service worker keeps at install, in the same cache as the app's code. Every page that shows
  * personal data renders in the browser (`ssr = false`), so this is the app's frame with nothing of the user's in
  * it: served for any top-level address, the router draws that page. Each release's install keeps its own copy

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import {
 	BYO_KEY_PATTERNS,
+	FINDER_STATE_IMPORT_PATTERN,
 	FORBIDDEN_PII_PATTERNS,
 	PII_FIELD_NAMES,
 	scanForPiiImports,
@@ -105,16 +106,36 @@ describe('pii-policy: server source must not reference ProfileV1 PII fields', ()
 		expect(violations[0]?.token).toBe(`\\.${field}\\b`);
 	});
 
-	it.each(['lastBackupAt', 'backupGenProfile', 'backupGenTimeline', 'backupGenCalendar'])(
-		'flags the backup mark %s',
-		(field) => {
-			const violations = scanForPiiTokens([
-				{ path: 'src/routes/x/+server.ts', content: `const v = profile.${field};` }
-			]);
-			expect(violations).toHaveLength(1);
-			expect(violations[0]?.token).toBe(`\\.${field}\\b`);
-		}
-	);
+	it.each([
+		'lastBackupAt',
+		'backupGenProfile',
+		'backupGenTimeline',
+		'backupGenCalendar',
+		'backupGenFinder'
+	])('flags the backup mark %s', (field) => {
+		const violations = scanForPiiTokens([
+			{ path: 'src/routes/x/+server.ts', content: `const v = profile.${field};` }
+		]);
+		expect(violations).toHaveLength(1);
+		expect(violations[0]?.token).toBe(`\\.${field}\\b`);
+	});
+
+	// The finder keeps where a person is looking, their saved programs, their filters and which listings they have
+	// opened; none of it may be named in code that can send a request off the device.
+	it.each([
+		'finderSetup',
+		'finderFilters',
+		'finderSaved',
+		'finderCompare',
+		'finderSeen',
+		'finderLastSeenPull'
+	])('flags the SkillBridge finder record %s in an online-path file', (field) => {
+		const violations = scanForPiiTokens([
+			{ path: 'src/lib/ask/online/x.ts', content: `const v = finder.${field};` }
+		]);
+		expect(violations).toHaveLength(1);
+		expect(violations[0]?.token).toBe(`\\.${field}\\b`);
+	});
 
 	it('does not flag clean server code', () => {
 		const violations = scanForPiiTokens([
@@ -141,7 +162,14 @@ describe('pii-policy: server source must not reference ProfileV1 PII fields', ()
 // The online path (the server-side retrieve Worker + the client egress + synthesis units) is the only code
 // that can send a request off-device. Beyond the runtime structural allowlist (assertOnlyKeys), this
 // statically forbids any profile PII field or the keystore install identifier from being named there.
-const ONLINE_PATH_DIRS = ['src/lib/ask/online', 'src/lib/ask/synthesis', 'workers/retrieve'];
+// The SkillBridge finder's fetch part requests the listing files, so it is an off-device path too.
+const FINDER_FETCH_DIR = 'src/lib/skillbridge-finder/fetch';
+const ONLINE_PATH_DIRS = [
+	'src/lib/ask/online',
+	'src/lib/ask/synthesis',
+	'workers/retrieve',
+	FINDER_FETCH_DIR
+];
 // The Ask store and the home route build the egress closures (retrieveOnline/synthesize), so a PII field
 // named there would ride into an off-device request just like one in the units above. They are single files,
 // not directory trees, so the guard names them explicitly.
@@ -193,6 +221,11 @@ describe('pii-policy: the online egress path must not name PII or the install id
 		const scanned = collectOnlinePathFiles();
 		expect(scanned.some((p) => p.endsWith(join('ask', 'store.svelte.ts')))).toBe(true);
 		expect(scanned.some((p) => p.endsWith(join('routes', '+page.svelte')))).toBe(true);
+	});
+
+	it('the guard covers the SkillBridge finder fetch part, which asks the server for files', () => {
+		const scanned = collectOnlinePathFiles();
+		expect(scanned.some((p) => p.endsWith(join('fetch', 'fetch-files.ts')))).toBe(true);
 	});
 
 	it('the guard covers the feedback form, its route and its library', () => {
@@ -331,6 +364,35 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 			content: readFileSync(path, 'utf8')
 		}));
 		expect(scanForPiiImports(files)).toEqual([]);
+	});
+});
+
+describe("pii-policy: the finder's fetch part must not import the finder's personal state", () => {
+	const scan = (content: string) =>
+		scanForPiiImports(
+			[{ path: 'src/lib/skillbridge-finder/fetch/x.ts', content }],
+			FINDER_STATE_IMPORT_PATTERN
+		);
+
+	it.each(['../state/select-files', '$lib/skillbridge-finder/state/store.svelte'])(
+		'flags an import of %s',
+		(specifier) => {
+			expect(scan(`import { a } from '${specifier}';`)).toHaveLength(1);
+		}
+	);
+
+	it('leaves the contract and its own folder alone', () => {
+		expect(scan(`import { dataPath } from '../contract/places';`)).toEqual([]);
+		expect(scan(`import { readCapped } from './read-capped';`)).toEqual([]);
+	});
+
+	it('the real fetch part imports nothing from the state folder', () => {
+		const files = findSourceFiles(join(process.cwd(), FINDER_FETCH_DIR)).map((path) => ({
+			path,
+			content: readFileSync(path, 'utf8')
+		}));
+		expect(files.length).toBeGreaterThan(0);
+		expect(scanForPiiImports(files, FINDER_STATE_IMPORT_PATTERN)).toEqual([]);
 	});
 });
 

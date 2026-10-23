@@ -2,10 +2,10 @@
  * Forbids direct raw-IndexedDB writes to encrypted stores -
  * `<tx>.objectStore('<encrypted>').{put|add}(...)` - outside the sanctioned
  * store path. Direct writes bypass the single encryption boundary: only the
- * sanctioned store paths (the profile, timeline-state, calendar-sync and BYO-key stores)
+ * sanctioned store paths (the profile, timeline-state, calendar-sync, BYO-key and SkillBridge finder stores)
  * may write ciphertext, each carrying an inline eslint-disable at its store's write
  * site, plus the backup restore writer (`src/lib/backup/restore-writer.ts`), the one
- * path that replaces the three stores in one transaction. Test files that stage fixtures are exempted in eslint.config.js.
+ * path that replaces the carried stores in one transaction. Test files that stage fixtures are exempted in eslint.config.js.
  * Opening a cursor (`openCursor`, `openKeyCursor`) on an encrypted store is refused too, because
  * `cursor.update()` writes the row it points at without any put or add call.
  *
@@ -31,7 +31,9 @@ export const ENCRYPTED_STORES_LITERAL = new Set([
 	'profile',
 	'timeline-state',
 	'calendar-sync',
-	'byok'
+	'byok',
+	'skillbridge-finder',
+	'skillbridge-finder-pack'
 ]);
 const FORBIDDEN_WRITE_METHODS = new Set(['put', 'add']);
 // A cursor's update() and delete() write the row it points at, with no put or add call to see.

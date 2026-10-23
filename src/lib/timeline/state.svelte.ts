@@ -26,11 +26,12 @@ import { withStores } from '../db/schema';
  * the factory closure (`_state`); never exported.
  *
  * load() is fail-closed: verify the keystore-record HMAC, then the signed HWM,
- * BEFORE any decrypt. A missing `timeline-state-hwm` = "no timeline state yet"
- * (generation 0, empty) - legitimate for a returning user; the HWM is created on
- * first save. Relock drops the in-memory reference (note strings are immutable JS
- * strings; cannot be byte-zeroized - documented residual); the on-disk record stays
- * encrypted.
+ * BEFORE any decrypt. No `timeline-state` body and no `timeline-state-hwm` = "no
+ * timeline state yet" (generation 0, empty) - legitimate for a returning user; the
+ * HWM is created on first save. An HWM with no body is a deleted record, and a body
+ * with no HWM is a lost marker: both fail the load. Relock drops the in-memory
+ * reference (note strings are immutable JS strings; cannot be byte-zeroized -
+ * documented residual); the on-disk record stays encrypted.
  *
  * Deviation: reuses `withWriteLocks` (profile-write exclusive) rather than a
  * dedicated `timeline-write` lock - safe full-serialization for a single-user app,
@@ -85,12 +86,18 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	let _failed = $state(false);
 	let _generation = 0; // the loaded/written HWM generation, for auto-OCC
 	let relockEpoch = 0;
+	// Saves still waiting for their turn. The tap came before any lock that lands while its save waits, so the lock
+	// hands each the record as this tab holds it, and the save still lands; the record lives only in the saves that
+	// hold it.
+	type Waiting = { base: TimelineState | null };
+	const waiting: Waiting[] = [];
 	// How this store came to have no plaintext. `_state === null` says the record is not in memory,
 	// never WHY - and the reasons demand opposite answers from a re-read. See refresh().
 	// Reactive: the Timeline offers Unlock while this stays `locked` after the profile has opened.
 	let lockState = $state<LockState>('unlocked');
 
 	function relockNow(reason: RelockReason): void {
+		if (_state !== null) for (const save of waiting) save.base = _state;
 		_state = null;
 		relockEpoch++;
 		lockState = nextLockState(lockState, reason);
@@ -115,48 +122,60 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 	 */
 	async function persist(mutate: (base: TimelineState) => TimelineState): Promise<void> {
 		const relockAtStart = relockEpoch;
+		// A save asked for on a locked store is handed nothing by a lock that already happened, so it stays refused.
+		const me: Waiting = { base: null };
+		waiting.push(me);
 		let ks: KeystoreRow | undefined;
-		await withWriteLocks(
-			async () => {
-				ks = await readVerifiedKeystore();
-				return ks.keystoreGeneration;
-			},
-			async () => {
-				if (!ks) throw new KeystoreNotInitializedError();
-				const keystore = ks;
+		try {
+			await withWriteLocks(
+				async () => {
+					ks = await readVerifiedKeystore();
+					return ks.keystoreGeneration;
+				},
+				async () => {
+					if (!ks) throw new KeystoreNotInitializedError();
+					const keystore = ks;
 
-				const currentGen = await readCurrentGeneration(keystore);
-				if (currentGen !== _generation) throw new OccConflictError();
-				if (_state === null) throw new TimelineRelockedError();
+					const currentGen = await readCurrentGeneration(keystore);
+					if (currentGen !== _generation) throw new OccConflictError();
+					// The handed record is the one at `_generation`, which OCC just matched to the disk.
+					const base = _state ?? me.base;
+					if (base === null) throw new TimelineRelockedError();
 
-				const next = mutate(_state);
-				const nextGen = currentGen + 1;
-				const blob = await encryptTimelineRecord(next, keystore, nextGen);
-				const newHwm = await signSidecar<TimelineHwmPayload>(
-					'timeline-state-hwm',
-					{
-						generation: nextGen,
-						keystoreGeneration: keystore.keystoreGeneration,
-						epoch: keystore.epoch,
-						ts: Date.now()
-					},
-					keystore.hmacKeyRef
-				);
+					const next = mutate(base);
+					const nextGen = currentGen + 1;
+					const blob = await encryptTimelineRecord(next, keystore, nextGen);
+					const newHwm = await signSidecar<TimelineHwmPayload>(
+						'timeline-state-hwm',
+						{
+							generation: nextGen,
+							keystoreGeneration: keystore.keystoreGeneration,
+							epoch: keystore.epoch,
+							ts: Date.now()
+						},
+						keystore.hmacKeyRef
+					);
 
-				await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
-					// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord, under withWriteLocks.
-					tx.objectStore('timeline-state').put({ id: 0, rec: blob });
-					tx.objectStore('timeline-state-hwm').put({ id: 0, ...newHwm });
-				});
+					await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
+						// eslint-disable-next-line mtc/encrypted-store-registry -- THE sanctioned encryption-boundary write: ciphertext from encryptRecord, under withWriteLocks.
+						tx.objectStore('timeline-state').put({ id: 0, rec: blob });
+						tx.objectStore('timeline-state-hwm').put({ id: 0, ...newHwm });
+					});
 
-				_generation = nextGen;
-				// Residency guard: a relockSync() during this save must not be undone by
-				// re-populating decrypted state (the IDB write already persisted the edit).
-				// No lockState update belongs here: the relocked check above means a write only ever
-				// runs on a store load() already opened.
-				if (relockEpoch === relockAtStart) _state = next;
-			}
-		);
+					_generation = nextGen;
+					// Residency guard: a relockSync() during this save must not be undone by
+					// re-populating decrypted state (the IDB write already persisted the edit).
+					// No lockState update belongs here: the relocked check above means a write only ever
+					// runs on a store load() already opened.
+					if (relockEpoch === relockAtStart) _state = next;
+					// Still locked: the saves behind this one build on what it wrote, so none drops it.
+					else if (_state === null)
+						for (const save of waiting) if (save.base !== null) save.base = next;
+				}
+			);
+		} finally {
+			waiting.splice(waiting.indexOf(me), 1);
+		}
 		opts.onBroadcast?.({ type: 'timeline-updated' });
 	}
 
@@ -224,6 +243,11 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 						// would otherwise pair the newer generation with the older statuses, and a write from them would
 						// pass the conflict check and lay them over the peer's save.
 						if (gen === 0) {
+							// A body with no marker is damage, never a first visit: reading it as empty would let the next
+							// save write over it. The backup snapshot refuses the same state.
+							if (await getRow<StateRow>(db, 'timeline-state')) {
+								throw new Error('E_TIMELINE_BODY_WITHOUT_MARK');
+							}
 							_generation = gen;
 							if (relockEpoch === relockAtStart) {
 								_state = { schemaVersion: 1, tasks: {} };

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { openMtcDb, withStores, reqToPromise, STORES, DB_VERSION } from './schema';
+import { openMtcDb, withStores, reqToPromise, STORES, DB_VERSION, type StoreName } from './schema';
 import { openTestDb, deleteTestDb } from './_test-helpers';
 
 // Real IndexedDB in the Chromium `client` Vitest project. Each test opens
@@ -44,10 +44,34 @@ function openV2Db(name: string): Promise<IDBDatabase> {
 	});
 }
 
-describe('openMtcDb schema (v6)', () => {
+// The v6 schema exactly as it shipped: the eight stores before the SkillBridge finder's. Frozen for the same reason as v2.
+const V6_STORES: StoreName[] = [
+	'byok',
+	'calendar-sync',
+	'calendar-sync-hwm',
+	'keystore',
+	'profile',
+	'profile-hwm',
+	'timeline-state',
+	'timeline-state-hwm'
+];
+
+function openV6Db(name: string): Promise<IDBDatabase> {
+	return new Promise<IDBDatabase>((resolve, reject) => {
+		const req = indexedDB.open(name, 6);
+		req.onupgradeneeded = () => {
+			for (const store of V6_STORES) req.result.createObjectStore(store, { keyPath: 'id' });
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error ?? new Error('v6-open-failed'));
+	});
+}
+
+describe('openMtcDb schema (v7)', () => {
 	it('opens at the current DB_VERSION with exactly the registered stores', async () => {
 		const db = await freshDb();
 		expect(db.version).toBe(DB_VERSION);
+		expect(db.version).toBe(7);
 		expect(Array.from(db.objectStoreNames).sort()).toEqual([
 			'byok',
 			'calendar-sync',
@@ -55,9 +79,59 @@ describe('openMtcDb schema (v6)', () => {
 			'keystore',
 			'profile',
 			'profile-hwm',
+			'skillbridge-finder',
+			'skillbridge-finder-hwm',
+			'skillbridge-finder-pack',
 			'timeline-state',
 			'timeline-state-hwm'
 		]);
+	});
+
+	// The upgrade every returning user runs: the finder's stores arrive and every row already on the device stays.
+	it('upgrades a v6 database with a row in every old store, keeping each row', async () => {
+		const name = 'mtc-test-' + crypto.randomUUID();
+		const v6 = await openV6Db(name);
+		expect(v6.version).toBe(6);
+		expect(v6.objectStoreNames.contains('skillbridge-finder')).toBe(false);
+		await withStores(v6, V6_STORES, 'readwrite', (tx) => {
+			for (const store of V6_STORES) tx.objectStore(store).put({ id: 0, marker: `row-${store}` });
+		});
+		v6.close();
+
+		const upgraded = await openMtcDb(name);
+		opened.push(upgraded);
+		expect(upgraded.version).toBe(7);
+		for (const store of [
+			'skillbridge-finder',
+			'skillbridge-finder-hwm',
+			'skillbridge-finder-pack'
+		]) {
+			expect(upgraded.objectStoreNames.contains(store), store).toBe(true);
+		}
+		for (const store of V6_STORES) {
+			const row = await withStores(upgraded, store, 'readonly', (tx) =>
+				reqToPromise<unknown>(tx.objectStore(store).get(0))
+			);
+			expect(row, store).toEqual({ id: 0, marker: `row-${store}` });
+		}
+	});
+
+	// The app asks this release's waiting worker to take over only after a raise: the older release's pages, which its
+	// worker serves offline, cannot open the raised database. A new database or one already raised is no such event.
+	it('says when it raised a database an older release made, and never otherwise', async () => {
+		const name = 'mtc-test-' + crypto.randomUUID();
+		(await openV6Db(name)).close();
+		const raised = vi.fn();
+		const upgraded = await openMtcDb(name, undefined, undefined, raised);
+		expect(raised).toHaveBeenCalledOnce();
+		upgraded.close();
+
+		const again = vi.fn();
+		opened.push(await openMtcDb(name, undefined, undefined, again));
+		const created = vi.fn();
+		opened.push(await openMtcDb('mtc-test-' + crypto.randomUUID(), undefined, undefined, created));
+		expect(again).not.toHaveBeenCalled();
+		expect(created).not.toHaveBeenCalled();
 	});
 
 	it('does NOT create the deferred journal/meta stores', async () => {
@@ -169,6 +243,9 @@ describe('openMtcDb schema (v6)', () => {
 			'keystore',
 			'profile',
 			'profile-hwm',
+			'skillbridge-finder',
+			'skillbridge-finder-hwm',
+			'skillbridge-finder-pack',
 			'timeline-state',
 			'timeline-state-hwm'
 		]);
@@ -202,7 +279,7 @@ describe('openMtcDb schema (v6)', () => {
 		};
 		const db = await openMtcDb(name);
 		expect(retired).toHaveBeenCalledOnce();
-		expect(db.version).toBe(6);
+		expect(db.version).toBe(DB_VERSION);
 		db.close();
 		await new Promise((r) => {
 			const del = indexedDB.deleteDatabase(name);

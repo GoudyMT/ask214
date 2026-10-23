@@ -32,6 +32,7 @@ import { canonicalizePhrase, type PhrasePosition } from './phrase';
 import { restoreBackup, type RestoreFailureCode, type RestoreGens } from './restore-writer';
 import { untilAborted, type BackupSession, type Run, type SessionKind } from './session.svelte';
 import { validateInner, type ValidInner } from './validate';
+import { startReload } from '../profile/pending-reload';
 
 /**
  * The restore and Check flow: everything a person does between "Restore" (or "Check a backup") and the result, driven
@@ -175,27 +176,29 @@ function summarize(inner: ValidInner, label: string | null): BackupSummary {
 
 /**
  * What this device holds now, from the one read, against the backup being restored. Three cases: nothing saved yet;
- * exactly the content of a backup made or restored here (the three generations still match the mark); or changes made
+ * exactly the content of a backup made or restored here (the four generations still match the mark); or changes made
  * since, dated by the newest write. A backup whose own date is unknown warns in the third case, because the device's
  * changes cannot be shown to be older.
  */
 function describeDevice(state: DeviceState, createdAt: number): { line: string; warning: boolean } {
 	const { gens, ts, mark } = state;
-	if (gens.profile < 1 && gens.timeline < 1 && gens.calendar < 1) {
+	if (gens.profile < 1 && gens.timeline < 1 && gens.calendar < 1 && gens.finder < 1) {
 		return { line: DEVICE_NO_DATA_LINE, warning: false };
 	}
 	if (
 		mark !== null &&
 		mark.gens.profile === gens.profile &&
 		mark.gens.timeline === gens.timeline &&
-		mark.gens.calendar === gens.calendar
+		mark.gens.calendar === gens.calendar &&
+		mark.gens.finder === gens.finder
 	) {
 		return { line: deviceMatchesLine(formatBackupDate(mark.at)), warning: mark.at > createdAt };
 	}
 	const written = [
 		gens.profile >= 1 ? ts.profile : null,
 		gens.timeline >= 1 ? ts.timeline : null,
-		gens.calendar >= 1 ? ts.calendar : null
+		gens.calendar >= 1 ? ts.calendar : null,
+		gens.finder >= 1 ? ts.finder : null
 	].filter((at): at is number => at !== null);
 	if (written.length === 0) return { line: DEVICE_NO_DATA_LINE, warning: false };
 	const newest = Math.max(...written);
@@ -244,8 +247,10 @@ export class RestoreFlow {
 		this.#db = deps.db;
 		this.#waitForControl = deps.waitForControl ?? waitForControl;
 		this.#readDevice = deps.readDevice ?? readDeviceNow;
-		this.#reload = deps.reload ?? ((): void => location.reload());
-		this.#replace = deps.replace ?? ((path: string): void => location.replace(path));
+		// Through startReload, so a lock landing before the page unloads stops the reload (pending-reload.ts).
+		this.#reload = deps.reload ?? ((): void => startReload(() => location.reload()));
+		this.#replace =
+			deps.replace ?? ((path: string): void => startReload(() => location.replace(path)));
 		this.#isVisible = deps.isVisible ?? ((): boolean => document.visibilityState === 'visible');
 		this.#onceVisible = deps.onceVisible ?? onceVisibleNow;
 		this.#timelinePath = deps.timelinePath ?? ((): string => resolve('/timeline'));

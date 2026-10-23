@@ -9,6 +9,7 @@ export const API_KEY_ITEM = 'your API key';
 export const ALWAYS_NOT_IN_BACKUPS: readonly string[] = [
 	"Ask's offline library",
 	'saved documents',
+	'downloaded SkillBridge listings',
 	"this device's settings (theme, Ask mode)"
 ];
 
