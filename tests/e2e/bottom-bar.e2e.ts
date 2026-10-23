@@ -92,7 +92,7 @@ test('a person on a phone reaches every page from the bottom bar, and More keeps
 	await bar.getByRole('link', { name: 'SkillBridge', exact: true }).click();
 	await expect(page.getByRole('link', { name: 'DoD SkillBridge site' })).toHaveAttribute(
 		'href',
-		'https://skillbridge.osd.mil/'
+		'https://www.skillbridge.mil/'
 	);
 
 	for (const row of MORE_ROWS) {
