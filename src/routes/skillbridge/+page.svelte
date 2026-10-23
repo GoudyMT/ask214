@@ -42,11 +42,6 @@
 	// The finder's own lock: a Lock relocks every store at once, so this is also the profile's.
 	const lockedView = $derived(finder?.locked ?? false);
 	const unreadable = $derived(finder?.failed ?? false);
-	// The place the profile names, offered on the setup screen; null while the profile is locked or names none.
-	const destination = $derived.by(() => {
-		const saved = app.store?.destination;
-		return saved ? parsePlaceText(saved) : null;
-	});
 	const showSetup = $derived(
 		app.status === 'ready' && !!finder?.ready && (!isSetUp(finder.setup) || changing)
 	);
@@ -248,9 +243,12 @@
 				<button type="button" onclick={() => location.reload()}>Reload</button>
 			</div>
 		{:else if showSetup}
+			<!-- The profile's place is read in the prop, not a page-level derived: a derived nobody reads after a Lock
+				keeps the decrypted place. -->
+			{@const saved = app.store?.geographicDestination}
 			<Setup
 				initial={{ setup: finder.setup, filters: finder.filters }}
-				{destination}
+				destination={saved ? parsePlaceText(saved) : null}
 				loadZips={() => session?.ensureZips() ?? Promise.resolve(undefined)}
 				onsave={saveSetup}
 				error={saveError}
