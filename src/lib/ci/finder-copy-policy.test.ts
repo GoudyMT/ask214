@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { PAYGRADE_NOTE } from '$lib/profile/leaving-copy';
+import { DIB_LINE } from '$lib/skillbridge-finder/ui/copy';
+
+// The shipped DIB sentence says "at any rank": a fact about the notice, not a sort or filter. It is the one place the
+// word may appear, and only word for word as Settings shows it.
+const SHIPPED_DIB = PAYGRADE_NOTE.slice(PAYGRADE_NOTE.indexOf('Defense industry'));
 
 // The finder lists programs; it never tells a person what they qualify for (38 CFR 14.629), never ranks or marks a
 // listing by their rate or rank, and keeps what it holds out of the places a browser leaves readable (web storage,
@@ -58,7 +64,19 @@ describe('the finder copy and claim policy', () => {
 	});
 
 	it('names no rate or rank, so nothing sorts, filters or marks by them', () => {
-		expect(scan(collect(), RATE_WORDS)).toEqual([]);
+		const files = collect().map((f) => ({ ...f, content: f.content.replaceAll(SHIPPED_DIB, '') }));
+		expect(scan(files, RATE_WORDS)).toEqual([]);
+	});
+
+	it('shows the DIB line word for word as Settings does', () => {
+		expect(SHIPPED_DIB).toMatch(/^Defense industry \(DIB\) programs .* at any rank /);
+		expect(DIB_LINE.startsWith(SHIPPED_DIB)).toBe(true);
+	});
+
+	// The exemption is the whole sentence: "rank" anywhere else still counts.
+	it('still flags rank beside the DIB line', () => {
+		const content = `const A = '${SHIPPED_DIB}'; rows.filter((r) => r.rank);`;
+		expect(hits(content.replaceAll(SHIPPED_DIB, ''), RATE_WORDS)).toEqual(['rank']);
 	});
 
 	it('uses no web storage, page snapshot or raw HTML', () => {
