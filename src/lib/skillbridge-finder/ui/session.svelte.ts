@@ -203,7 +203,11 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			if (!pack.failed) return false;
 		}
 		try {
+			// The clear tells this session once; a second notice means a relock (the person's, or the page going away) landed
+			// while it waited, and reading after it would open the pack that relock closed.
+			const before = epoch;
 			await pack.drop();
+			if (epoch !== before + 1 || pack.locked) return false;
 			await pack.load();
 			return pack.ready;
 		} catch {

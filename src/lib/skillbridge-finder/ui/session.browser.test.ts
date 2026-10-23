@@ -979,6 +979,62 @@ describe('Lock', () => {
 		expect(dev.pack.locked).toBe(true);
 	});
 
+	// The clear itself waits on the keystore and the pack lock, so a Lock, or the page going away, can land inside it. The
+	// read after the clear would then open the pack the person (or the page) just closed.
+	it.each(['user', 'hygiene'] as const)(
+		'opens nothing when a %s relock lands while an unreadable pack is being cleared',
+		async (reason) => {
+			const dev = await device({}, false);
+			await putPackRow({ id: 'index', rec: new Uint8Array(32) });
+			await expect(dev.pack.load()).rejects.toThrow();
+			let loads = 0;
+			const pack = around(dev.pack, {
+				load: async () => {
+					loads++;
+					await dev.pack.load();
+				},
+				drop: async () => {
+					const clearing = dev.pack.drop();
+					dev.pack.relockSync(reason);
+					await clearing;
+				}
+			});
+			const net = network();
+			const session = open({ finder: dev.finder, pack }, net);
+			await session.start();
+
+			// The first read is the one that finds the rows unreadable; none may follow the clear.
+			expect(loads).toBe(1);
+			expect(dev.pack.ready).toBe(false);
+			expect(session.listings).toEqual([]);
+			expect(net.calls).toHaveLength(0);
+		}
+	);
+
+	// The read after the clear can be cut short by a Lock too: it then returns with the pack shut.
+	it('requests nothing when a lock lands while the cleared pack is read again', async () => {
+		const dev = await device({}, false);
+		await putPackRow({ id: 'index', rec: new Uint8Array(32) });
+		await expect(dev.pack.load()).rejects.toThrow();
+		let loads = 0;
+		const pack = around(dev.pack, {
+			load: async () => {
+				loads++;
+				const opening = dev.pack.load();
+				if (loads === 2) dev.pack.relockSync('user');
+				await opening;
+			}
+		});
+		const net = network();
+		const session = open({ finder: dev.finder, pack }, net);
+		await session.start();
+
+		expect(loads).toBe(2);
+		expect(net.calls).toHaveLength(0);
+		expect(dev.pack.locked).toBe(true);
+		expect(session.listings).toEqual([]);
+	});
+
 	it('fails closed when the pack is not open, and requests nothing', async () => {
 		const dev = await device({});
 		dev.pack.relockSync('user');
