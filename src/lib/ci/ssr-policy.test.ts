@@ -30,7 +30,9 @@ const PII_ROUTES: { label: string; page: string }[] = [
 	{ label: '/', page: 'src/routes/+page.ts' },
 	{ label: '/wizard', page: 'src/routes/wizard/+page.ts' },
 	{ label: '/settings', page: 'src/routes/settings/+page.ts' },
-	{ label: '/timeline', page: 'src/routes/timeline/+page.ts' }
+	{ label: '/timeline', page: 'src/routes/timeline/+page.ts' },
+	// The finder's saved place, filters and programs.
+	{ label: '/skillbridge', page: 'src/routes/skillbridge/+page.ts' }
 ];
 
 describe('every PII route disables SSR (ADR-004)', () => {
