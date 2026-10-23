@@ -954,6 +954,57 @@ describe('Lock', () => {
 		expect(await dev.pack.readRegion('south-atlantic')).toBeUndefined();
 	});
 
+	// The usual weekly update on a full device: last week is on disk, this week cannot be kept. The list shows this
+	// week, so its date and New marks must be this week's, not last week's.
+	it('dates a week it could not keep by that week, not by the older one on disk', async () => {
+		const place = { kind: 'zip', zip: '21046' } as const;
+		const dev = await device({ place, radius: 100 });
+		await open(dev, network(LAST_PULL)).start();
+		const pack = around(dev.pack, {
+			swap: () => Promise.reject(new DOMException('full', 'QuotaExceededError'))
+		});
+		const session = open({ finder: dev.finder, pack }, network());
+		await session.start();
+
+		expect(session.status).toBe('ready');
+		expect(session.pullDate).toBe(PULL);
+		expect(dev.pack.pullDate).toBe(LAST_PULL);
+	});
+
+	// Only a full device is shown from memory; any other refusal (a week older than the one on disk, bad files) is the
+	// pack store saying no, and the list must not show what it refused.
+	it('shows nothing new when the pack refuses the week for another reason', async () => {
+		const dev = await device({ place: { kind: 'zip', zip: '21046' }, radius: 100 });
+		const pack = around(dev.pack, {
+			swap: () => Promise.reject(new Error('E_FINDER_PACK_ROLLBACK'))
+		});
+		const session = open({ finder: dev.finder, pack }, network());
+		await session.start();
+
+		expect(session.status).toBe('offline');
+		expect(session.listings).toEqual([]);
+	});
+
+	// "Search every region" after a visit the device could not keep: the files it adds join the shown week rather than
+	// replacing the list with what the disk holds.
+	it('adds the files a later search keeps to the week shown from memory', async () => {
+		const dev = await device({});
+		let full = true;
+		const pack = around(dev.pack, {
+			swap: (input) =>
+				full ? Promise.reject(new DOMException('full', 'QuotaExceededError')) : dev.pack.swap(input)
+		});
+		const session = open({ finder: dev.finder, pack }, network());
+		await session.start();
+		const shown = ids(session.matches);
+		expect(shown).toContain(REMOTE.i);
+
+		full = false;
+		await session.searchAll();
+
+		expect(ids(session.matches)).toEqual(expect.arrayContaining([...shown, SEATTLE.i]));
+	});
+
 	// A read that finishes after the person locked must not put its listings back on a locked device.
 	it('puts nothing back when a lock lands while the held files are being read', async () => {
 		const dev = await device({});

@@ -92,6 +92,12 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	let visitAt: number | null = null;
 	// The listings on screen came from the network and are not on disk: reading the disk back would empty the list.
 	let shownOnly = false;
+	let shownIndex = $state.raw<IndexFile | undefined>(undefined);
+
+	/** The week on screen: the one shown from memory, else the one on disk. */
+	function week(): IndexFile | undefined {
+		return shownIndex ?? pack.index;
+	}
 
 	// Plain variables, not deriveds: a derived keeps its last value alive until something reads it again, and a relock
 	// must leave nothing decrypted behind.
@@ -105,6 +111,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		again = false;
 		askedFor = null;
 		shownOnly = false;
+		shownIndex = undefined;
 		_held = mapOf();
 		_listings = [];
 		_ids = undefined;
@@ -246,7 +253,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	/** Fetches what `names` lacks of the index's week, and swaps it in with the week's ids and changes. */
 	async function download(index: IndexFile, names: RegionFileName[]): Promise<boolean> {
 		const at = epoch;
-		const sameWeek = pack.pullDate === index.pullDate;
+		const sameWeek = week()?.pullDate === index.pullDate;
 		const missing = sameWeek ? names.filter((n) => !_held.has(n)) : names;
 		const needIds = !sameWeek || _ids === undefined;
 		const needChanges = !sameWeek || _changes === undefined;
@@ -264,6 +271,17 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		// and every New mark would read as "not new". Within one week, or with nothing held yet, there is nothing to lose
 		// by keeping what arrived, and the missing file is asked for again on the next visit.
 		if (pack.pullDate !== undefined && !sameWeek && (!ids || !changes)) return false;
+		// The week shown from memory: what arrived joins it, and the list stays on it under its own index and date.
+		const showFetched = () => {
+			const held = sameWeek ? mapOf(_held) : mapOf<RegionFileName, RegionFile>();
+			for (const [name, file] of regions.files) held.set(name, file);
+			_held = held;
+			_listings = mergeRegionListings(held.values());
+			_ids = ids ?? (sameWeek ? _ids : undefined);
+			_changes = changes ?? (sameWeek ? _changes : undefined);
+			shownIndex = index;
+			shownOnly = true;
+		};
 		try {
 			await pack.swap({
 				index,
@@ -275,14 +293,11 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			if (at !== epoch || !(e instanceof DOMException && e.name === 'QuotaExceededError')) throw e;
 			// The device is too full to keep the week, but it did arrive: it is shown for this visit and asked for again on
 			// the next, rather than reported as a download that failed.
-			const held = sameWeek ? mapOf(_held) : mapOf<RegionFileName, RegionFile>();
-			for (const [name, file] of regions.files) held.set(name, file);
-			_held = held;
-			_listings = mergeRegionListings(held.values());
-			_ids = ids ?? (sameWeek ? _ids : undefined);
-			_changes = changes ?? (sameWeek ? _changes : undefined);
-			shownOnly = true;
+			showFetched();
+			return true;
 		}
+		// Kept this time, but the rest of the shown week is only in memory: reading the disk back would drop it.
+		if (at === epoch && shownOnly) showFetched();
 		return at === epoch;
 	}
 
@@ -299,6 +314,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		passes = null;
 		_blocked = false;
 		shownOnly = false;
+		shownIndex = undefined;
 		// A ZIP is a point only through the table; it is read before the list so the first sight is already nearest-first.
 		if (setup().place?.kind === 'zip') await zipsTable();
 		try {
@@ -328,7 +344,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		// A download the worker would have kept a copy of is not offline: the network may be fine.
 		_status = _blocked ? 'failed' : outcome;
 
-		const pull = pack.pullDate;
+		const pull = week()?.pullDate;
 		if (pull !== undefined) {
 			const weeks =
 				previouslySeen === undefined ? 0 : (dayOf(pull) - dayOf(previouslySeen)) / DAYS_PER_WEEK;
@@ -356,7 +372,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	}
 
 	function isNewId(id: number): boolean {
-		const index = pack.index;
+		const index = week();
 		const listing = listingsById().get(id);
 		if (!index || !listing || !_changes) return false;
 		return isNew(listing, {
@@ -414,7 +430,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 	}
 
 	function notHeldForAll(): { name: RegionFileName; bytes: number }[] {
-		const index = pack.index;
+		const index = week();
 		if (index === undefined) return [];
 		const want = setOf(wantedFiles(true));
 		return index.files.filter((f) => want.has(f.name) && !_held.has(f.name));
@@ -442,11 +458,11 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			return computeResults();
 		},
 		get pullDate(): string | undefined {
-			return pack.pullDate;
+			return week()?.pullDate;
 		},
 		/** Whole days from the pull date to the device clock; 0 with nothing held. */
 		get staleDays(): number {
-			const pull = pack.pullDate;
+			const pull = week()?.pullDate;
 			return pull === undefined ? 0 : Math.max(0, Math.floor(now() / MS_PER_DAY - dayOf(pull)));
 		},
 		/** True when a download was refused because an older worker would keep a copy of each file. */
@@ -492,7 +508,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 		},
 		async searchAll(): Promise<void> {
 			const at = epoch;
-			const index = pack.index;
+			const index = week();
 			if (index === undefined) return;
 			try {
 				if ((await download(index, wantedFiles(true))) && !shownOnly) await readHeld();
@@ -509,7 +525,7 @@ export function createFinderSession(opts: FinderSessionOptions) {
 			}
 		},
 		async markAllSeen(): Promise<void> {
-			const pull = pack.pullDate;
+			const pull = week()?.pullDate;
 			const newIds = computeMatches()
 				.map((r) => r.listing.i)
 				.filter(isNewId);
