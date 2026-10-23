@@ -1,4 +1,4 @@
-﻿import { FINDER_BYPASS } from './finder-bypass-message';
+import { FINDER_BYPASS } from './finder-bypass-message';
 
 /** How long a worker in charge has to answer; a worker that will answer does so at once. */
 const ANSWER_DEADLINE_MS = 1500;
