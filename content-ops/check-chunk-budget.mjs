@@ -442,6 +442,8 @@ const STATIC = 'static';
 //     measured 264,180 B in the gate: 264,150 -> 264,250 (owner's call, 2026-10-23), about 70 B of room for CI drift.
 //     The setup asked one question a step (where, how, what field) measured 264,441 B after a trim pass that grew it (shared
 //     button styles compressed worse): 264,250 -> 264,500 (owner's call, 2026-10-23), 59 B of room.
+//     The Home row's wording ('N opportunities near your selected location (place)', counting nearby programs only)
+//     measured 264,497 B, 3 B of room: 264,500 -> 264,600 (owner's call, 2026-10-24), about 100 B for CI drift.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -454,7 +456,7 @@ const LIMIT = {
 	page: 107_000,
 	onDemand: 14_200,
 	precacheFiles: 86,
-	precacheBytes: 264_500,
+	precacheBytes: 264_600,
 	workerScripts: 147_200
 };
 
