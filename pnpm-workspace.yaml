@@ -82,6 +82,9 @@ overrides:
   # patch sits inside the minor its parent asks for. Retire when @lhci/cli resolves them natively.
   'proxy-addr@<2.0.8': '2.0.8'
   'compression@<1.8.2': '1.8.2'
+  # Same chain, same kind of pin: body-parser (GHSA-27r3-jxmh-p828, high, up to <1.20.9) through @lhci/cli>express; the
+  # patch sits inside the ~1.20.5 express asks for. Retire when express resolves >=1.20.9 natively.
+  'body-parser@<1.20.9': '1.20.9'
   # Force patched source-map-js (GHSA-68fv-2mgg-jv7q, event-loop DoS through indexed source-map section offsets,
   # high; transitive build-only via vite>postcss, never in the client bundle). Targeted range pin, inside the
   # ^1.2.1 postcss asks for. Retire when the lockfile resolves >=1.2.2 without it.
