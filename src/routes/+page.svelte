@@ -15,6 +15,7 @@
 	} from '$lib/ask';
 	import { ACCEPTED_CORPUS_VERSION } from '$lib/corpus';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
+	import { detectEligibilityIntent } from '$lib/ask/synthesis/eligibility-gate';
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
 	import { deviceFilesKept } from '$lib/ask/device-files';
 	import { getProfileApp } from '$lib/profile/context';
@@ -101,6 +102,14 @@
 	// `keyboard`: the pill was pressed by keyboard or screen reader, so focus goes to the field once the question runs.
 	let earlyQuery: { query: string; mode: 'device' | 'online'; keyboard: boolean } | undefined;
 	let askView: ReturnType<typeof AskView> | undefined;
+
+	// The question the store was last given. An eligibility question never gets a summary, whatever the keys, so the
+	// locked line must not promise one: the store decides that on the trimmed question with this same function.
+	let askedQuery = $state('');
+	function askOnStore(query: string): void {
+		askedQuery = query;
+		void store?.ask(query);
+	}
 
 	// Whether a BYO key is saved, known while locked from a count of its row: an online answer then points to the Unlock
 	// where the summary would be. The query and the key go nowhere new; the summary itself waits for the keys.
@@ -248,7 +257,7 @@
 			const first = earlyQuery?.mode ?? earlyMode;
 			if (first === 'device') store.setMode('device');
 			if (earlyQuery !== undefined) {
-				void store.ask(earlyQuery.query);
+				askOnStore(earlyQuery.query);
 				// The pill unmounts with the feed now, outside any press, so focus falls: hand it on as a press would.
 				void toQuestionField(earlyQuery.keyboard);
 			}
@@ -284,7 +293,7 @@
 		showNudge={store?.showNudge ?? false}
 		onAsk={(q, press) =>
 			store
-				? void store.ask(q)
+				? askOnStore(q)
 				: (earlyQuery = {
 						query: q,
 						mode: earlyMode,
@@ -298,13 +307,18 @@
 		onDismissNudge={() => store?.dismissNudge()}
 		onOfferDevice={(q) => {
 			store?.setMode('device');
-			void store?.ask(q);
+			askOnStore(q);
 		}}
 		onRetryOnline={(q) => {
 			store?.setMode('online');
-			void store?.ask(q);
+			askOnStore(q);
 		}}
-		onUnlockSummaries={pinLocked && storedKey && isSynthesisEnabled() ? toUnlockCard : undefined}
+		onUnlockSummaries={pinLocked &&
+		storedKey &&
+		isSynthesisEnabled() &&
+		!detectEligibilityIntent(askedQuery.trim()).shortCircuit
+			? toUnlockCard
+			: undefined}
 	/>
 
 	{#if showInstallNudge}

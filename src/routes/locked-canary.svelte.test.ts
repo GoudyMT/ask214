@@ -3,6 +3,7 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
 import { chooseAnswer, toExtractiveAnswer } from '$lib/ask/answer/answer-view';
+import { detectEligibilityIntent } from '$lib/ask/synthesis/eligibility-gate';
 import type { AskState } from '$lib/ask';
 import { createByokStore } from '$lib/ask/byok/store';
 import { KDF_V1 } from '$lib/backup/kdf-params';
@@ -43,7 +44,9 @@ const harness = vi.hoisted(() => ({
 	db: null as Promise<IDBDatabase> | null,
 	app: null as ProfileApp | null,
 	// When set, stands in for the PIN check (the derive is Argon2id in a worker); otherwise the real one runs.
-	check: null as null | (() => Promise<unknown>)
+	check: null as null | (() => Promise<unknown>),
+	// When set, Home gets the real Ask store.
+	realAsk: false
 }));
 
 vi.mock('$lib/db/schema', async (importOriginal) => {
@@ -84,11 +87,38 @@ vi.mock('$lib/install/context', () => ({
 	}),
 	setInstallApp: () => {}
 }));
-vi.mock('$lib/ask', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/ask')>()),
-	createAskStore: () => askStore,
-	createRecoveringEmbed: () => ({ embed: async () => [], dispose: () => {} })
-}));
+vi.mock('$lib/ask', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/ask')>();
+	return {
+		...real,
+		// The stand-in, or the real store with the answer server replaced: the page's own summary closure, the consent and
+		// the summaries setting stay as the page gives them, so the state is the one the page really holds.
+		createAskStore: (deps: Parameters<typeof real.createAskStore>[0]) =>
+			harness.realAsk
+				? real.createAskStore({
+						...deps,
+						retrieveOnline: async () => ({
+							status: 'results',
+							corpusVersion: '1.0',
+							results: [
+								{
+									score: 0.9,
+									chunk: {
+										id: 'a',
+										text: 'An official passage.',
+										sourceId: 's',
+										sourceTitle: 'S',
+										url: 'https://x.gov',
+										tags: []
+									}
+								}
+							]
+						})
+					})
+				: askStore,
+		createRecoveringEmbed: () => ({ embed: async () => [], dispose: () => {} })
+	};
+});
 vi.mock('$lib/ask/embed-worker?worker', () => ({ default: class {} }));
 vi.mock('$lib/ask/device-files', () => ({ deviceFilesKept: async () => true }));
 // No worker controls the test page, so the real wait would last its full time.
@@ -106,6 +136,7 @@ const CANARY = {
 } as const;
 const CANARIES = Object.values(CANARY);
 const SUMMARIES_KEY = 'mtc:ask:synthesis-enabled';
+const CONSENT_KEY = 'mtc:ask:online-consented';
 const TASK = KNOWN_TASK_IDS[0] as string;
 
 const ask = $state<{ state: AskState; mode: 'device' | 'online' }>({
@@ -303,7 +334,9 @@ beforeEach(async () => {
 
 afterEach(async () => {
 	harness.check = null;
+	harness.realAsk = false;
 	localStorage.removeItem(SUMMARIES_KEY);
+	localStorage.removeItem(CONSENT_KEY);
 	dropSession();
 	setOnSessionMismatch(null);
 	vi.restoreAllMocks();
@@ -500,6 +533,47 @@ describe('Home, PIN-locked, with an online answer on screen', () => {
 		await expect.element(topMatch()).toBeVisible();
 		expect(page.getByText(LINE).query()).toBeNull();
 		expect(summaryUnlock()).toBeNull();
+	});
+
+	// The question decides whether a summary is ever made: the store answers an eligibility question with the quoted
+	// extract alone, and says so after an unlock. The line must agree with the store, so both read the same question.
+	describe('through the real Ask store', () => {
+		const GATED = 'how do I file a claim';
+		const UNGATED = 'what is the Transition Assistance Program';
+		const NO_SUMMARY_NOTE = 'No AI summary is shown for this answer.';
+
+		async function askAndSettle(question: string): Promise<void> {
+			harness.realAsk = true;
+			localStorage.setItem(CONSENT_KEY, '1');
+			const app = await readyApp();
+			const asked = vi.spyOn(need(app.byok), 'hasApiKey');
+			await render(HomePage);
+			await expect.element(page.getByRole('button', { name: 'Search' })).toBeEnabled();
+			typeQuestion(question);
+			await page.getByRole('button', { name: 'Search' }).click();
+			await expect.element(topMatch()).toBeVisible();
+			await vi.waitFor(() => expect(asked).toHaveBeenCalled());
+			expect(await asked.mock.results[0]?.value).toBe(true);
+			await tick();
+			await frame();
+		}
+
+		it('says the summary needs the PIN on a question that would get one', async () => {
+			expect(detectEligibilityIntent(UNGATED).shortCircuit).toBe(false);
+			await askAndSettle(UNGATED);
+
+			await expect.element(page.getByText(LINE)).toBeVisible();
+			expect(document.body.textContent).not.toContain(NO_SUMMARY_NOTE);
+		});
+
+		it('keeps the line off an eligibility question, which never gets a summary', async () => {
+			expect(detectEligibilityIntent(GATED).shortCircuit).toBe(true);
+			await askAndSettle(GATED);
+
+			expect(page.getByText(LINE).query()).toBeNull();
+			expect(summaryUnlock()).toBeNull();
+			expect(document.body.textContent).toContain(NO_SUMMARY_NOTE);
+		});
 	});
 
 	it('with a saved key, points to the Unlock, and the Unlock puts the cursor in the card PIN field', async () => {

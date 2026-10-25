@@ -1182,7 +1182,8 @@ describe('AskView, the summary a locked tab cannot make', () => {
 			onlineConsented: () => true,
 			synthesisEnabled: () => true
 		});
-		await store.ask('how do I file a claim');
+		// Not an eligibility question: those get no summary, and the page does not offer one for them.
+		await store.ask('what is the Transition Assistance Program');
 		expect(store.state).toMatchObject({ kind: 'results', origin: 'online' });
 		return props(store.state, over);
 	}
