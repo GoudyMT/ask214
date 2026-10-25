@@ -559,12 +559,15 @@
 			</p>
 		</section>
 		{#if app.pinLocked === true}
-			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
-			{#await loadPinUnlock() then card}
-				<card.default onunlocked={() => void focusHeading()} takeFocus={pinCardFocus} />
-			{:catch}
-				<LockedPanel onunlock={() => window.location.reload()} error={UNLOCK_FAILED} />
-			{/await}
+			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. It stands
+			     between two sections, so it keeps their gap above and below. -->
+			<div class="pin-card-gap">
+				{#await loadPinUnlock() then card}
+					<card.default onunlocked={() => void focusHeading()} takeFocus={pinCardFocus} />
+				{:catch}
+					<LockedPanel onunlock={() => window.location.reload()} error={UNLOCK_FAILED} />
+				{/await}
+			</div>
 			<!-- The Erase is the way out of a forgotten PIN, so it stays reachable behind the lock, with the App lock row. No
 			     Lock button: the app is already locked. -->
 			<section class="settings-section" aria-labelledby="privacy-heading">
@@ -791,6 +794,10 @@
 
 	.settings-section + .settings-section {
 		margin-top: var(--space-l);
+	}
+
+	.pin-card-gap {
+		margin: var(--space-l) 0;
 	}
 
 	.settings-section__heading {

@@ -2,6 +2,8 @@ import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
+// The spacing tokens the page's gaps are drawn from.
+import '../../app.css';
 
 const { isoFromToday } = vi.hoisted(() => ({
 	isoFromToday: (days: number) => {
@@ -141,5 +143,29 @@ describe('Settings, locked with a PIN', () => {
 		await expect.element(lockButton()).toBeVisible();
 		expect(cardHeading().query()).toBeNull();
 		await expect.poll(() => document.activeElement).toBe(pageHeading().element());
+	});
+
+	// The card stands between two sections, so it keeps the gap the sections keep between each other.
+	it.each([320, 1280])('keeps the section gap above and below the card at %i px', async (width) => {
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		await page.viewport(width, 800);
+		try {
+			const { container } = await render(SettingsPage);
+			await expect.element(cardHeading()).toBeVisible();
+			const box = (selector: string) => {
+				const el = container.querySelector(selector);
+				if (!el) throw new Error('E_TEST_MISSING_ELEMENT');
+				return el.getBoundingClientRect();
+			};
+			const appearance = box('[aria-labelledby="appearance-heading"]');
+			const install = box('[aria-labelledby="install-heading"]');
+			const sectionGap = install.top - appearance.bottom;
+			expect(sectionGap).toBeGreaterThan(0);
+			const card = box('.pin-unlock');
+			expect(card.top - box('[aria-labelledby="documents-heading"]').bottom).toBe(sectionGap);
+			expect(box('[aria-labelledby="privacy-heading"]').top - card.bottom).toBe(sectionGap);
+		} finally {
+			await page.viewport(size.width, size.height);
+		}
 	});
 });
