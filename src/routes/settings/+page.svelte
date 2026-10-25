@@ -5,6 +5,7 @@
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import BackupCard, { forgetResult } from '$lib/backup/BackupCard.svelte';
@@ -113,7 +114,8 @@
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
-	const lockedView = $derived(!!app.store?.locked);
+	// A PIN tab with no keys is locked whatever the store reads: with nothing saved a store reads unlocked after a Lock.
+	const lockedView = $derived(app.pinLocked === true || !!app.store?.locked);
 	// A failure line belongs to the lock it failed on, so it goes whenever the locked panel comes or goes: the profile can
 	// open without Unlock (the app re-reads it on its own, as when the tab is shown again), and a read can fail after it.
 	$effect(() => {
@@ -331,8 +333,15 @@
 		void handFocusOn('.locked-panel__unlock');
 	});
 
+	// Lock replaces itself with the PIN card, which takes the cursor into its field while this is set.
+	let pinCardFocus = $state(false);
+	$effect(() => {
+		if (app.pinLocked !== true) pinCardFocus = false;
+	});
+
 	function lock(): void {
 		lockPressed = true;
+		pinCardFocus = app.keyMode === 'pin';
 		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
 		// leaving them in memory is precisely what this button exists to prevent.
 		app.relockAll?.();
@@ -363,7 +372,11 @@
 		} finally {
 			unlocking = false;
 		}
-		// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+		await focusHeading();
+	}
+
+	// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+	async function focusHeading(): Promise<void> {
 		await tick();
 		if (document.activeElement === document.body) headingEl?.focus();
 	}
@@ -544,7 +557,14 @@
 				Read the official guides behind the answers, and choose which stay on this device.
 			</p>
 		</section>
-		{#if lockedView}
+		{#if app.pinLocked === true}
+			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
+			{#await loadPinUnlock() then card}
+				<card.default onunlocked={() => void focusHeading()} takeFocus={pinCardFocus} />
+			{:catch}
+				<LockedPanel onunlock={() => window.location.reload()} error={UNLOCK_FAILED} />
+			{/await}
+		{:else if lockedView}
 			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else}
 			{#if hasTimeline}

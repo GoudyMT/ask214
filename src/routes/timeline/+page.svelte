@@ -2,6 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
 	import TimelineList from '$lib/components/TimelineList.svelte';
 	import PhaseChips from '$lib/components/PhaseChips.svelte';
@@ -36,8 +37,10 @@
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
+	// A PIN tab with no keys is locked whatever the store reads: with nothing saved a store reads unlocked after a Lock.
 	const lockedView = $derived(
-		app.store?.locked ||
+		app.pinLocked === true ||
+			app.store?.locked ||
 			(app.timeline?.locked && !app.timeline.failed && app.store?.persona.completeness !== 'none')
 	);
 	// A failure line belongs to the lock it failed on, so it goes whenever the locked panel comes or goes: the profile can
@@ -198,7 +201,11 @@
 		} finally {
 			unlocking = false;
 		}
-		// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+		await focusHeading();
+	}
+
+	// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+	async function focusHeading(): Promise<void> {
 		await tick();
 		if (document.activeElement === document.body) headingEl?.focus();
 	}
@@ -294,7 +301,14 @@
 		<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
 	     Unless its load failed: then the note below says so, since Unlock would only fail again. And only with something
 	     saved: a first run has nothing to unlock, so it keeps the setup. -->
-		{#if lockedView}
+		{#if app.pinLocked === true}
+			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
+			{#await loadPinUnlock() then card}
+				<card.default onunlocked={() => void focusHeading()} />
+			{:catch}
+				<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
+			{/await}
+		{:else if lockedView}
 			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else if app.store?.persona.completeness === 'none'}
 			<SetupCTA />
