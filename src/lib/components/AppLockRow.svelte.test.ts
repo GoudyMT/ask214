@@ -573,3 +573,26 @@ describe('with the real moves of the records', () => {
 		await expect(createProfileStore(db).load()).rejects.toBeInstanceOf(KeystoreLockedError);
 	});
 });
+
+// Forced colors (Windows high contrast) repaint every colour from a small system palette and keep only borders and
+// text: a filled button with no border becomes unmarked text.
+describe('under forced colors', () => {
+	it('the Next button keeps an outline', async () => {
+		await mount();
+		await openRow();
+		const media = cdp();
+		await media.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'forced-colors', value: 'active' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			const outline = getComputedStyle(nextEl());
+			expect(outline.borderTopWidth).toBe('1px');
+			expect(outline.borderTopStyle).toBe('solid');
+		} finally {
+			await media.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+		}
+	});
+});

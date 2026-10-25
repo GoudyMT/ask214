@@ -663,3 +663,25 @@ describe('formatWait', () => {
 		expect(formatWait(ms)).toBe(line);
 	});
 });
+
+// Forced colors (Windows high contrast) repaint every colour from a small system palette and keep only borders and
+// text: a filled button with no border becomes unmarked text.
+describe('under forced colors', () => {
+	it('the Unlock button keeps an outline', async () => {
+		await mount();
+		const media = cdp();
+		await media.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'forced-colors', value: 'active' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			const outline = getComputedStyle(unlockEl());
+			expect(outline.borderTopWidth).toBe('1px');
+			expect(outline.borderTopStyle).toBe('solid');
+		} finally {
+			await media.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+		}
+	});
+});

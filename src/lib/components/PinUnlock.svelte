@@ -281,12 +281,14 @@
 		color: var(--color-fg-muted);
 	}
 
-	/* Primary CTA: filled accent + bg-colored text. */
+	/* Primary CTA: filled accent + bg-colored text. The border is clear and takes a pixel of the padding, so the button
+	   is the size it was: forced colors repaint a clear border in a system colour, which keeps a filled button's edge
+	   when its fill is taken away. */
 	.pin-unlock__unlock {
-		padding: var(--space-s) var(--space-l);
+		padding: calc(var(--space-s) - 1px) calc(var(--space-l) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-m);
 		font: inherit;
 		font-weight: 600;
