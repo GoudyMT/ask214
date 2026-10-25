@@ -228,6 +228,25 @@ describe('ProfileStore.save', () => {
 		if (loaded?.eaos) expect(new TextDecoder().decode(loaded.eaos)).toBe('2027-01-01');
 	});
 
+	// A save re-signs the keystore row, so it must check the row first: otherwise it would launder a tampered row
+	// into a freshly valid one.
+	it('refuses to save over a keystore whose record MAC no longer verifies, and writes nothing', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		const bodyBefore = (await readRow('profile'))?.rec as Uint8Array;
+		const ks = await readRow('keystore');
+		if (!ks) throw new Error('test setup: keystore missing');
+		await putRow('keystore', { ...ks, keystoreGeneration: 7 }); // not re-signed
+
+		await expect(store.save({ setupIntent: 'completed' })).rejects.toThrow(
+			KeystoreHmacMismatchError
+		);
+
+		const bodyAfter = (await readRow('profile'))?.rec as Uint8Array;
+		expect(Array.from(bodyAfter)).toEqual(Array.from(bodyBefore));
+		expect((await readRow('keystore'))?.keystoreGeneration).toBe(7);
+	});
+
 	it('resolves concurrent first-runs: exactly one succeeds', async () => {
 		const storeA = createProfileStore(db);
 		const storeB = createProfileStore(db);

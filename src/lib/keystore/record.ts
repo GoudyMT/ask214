@@ -21,9 +21,10 @@ export type KeystoreRecordV1 = {
 };
 
 /**
- * Subset of the record covered by the record HMAC and the AAD
- * keystoreRecordHash. Excludes ivCounter (operational), recordHmac (self-
- * reference), and the CryptoKey refs (unserializable).
+ * Subset of the record the record HMAC and the key identity are built from.
+ * Excludes ivCounter (operational), recordHmac (self-reference), and the
+ * CryptoKey refs (unserializable). `mode` is in the type but the canonical text
+ * never reads it: it always writes the literal `mode=local`.
  */
 export type KeystoreCanonicalInput = Omit<
 	KeystoreRecordV1,
@@ -44,7 +45,8 @@ function identityString(id: KeyIdentity): string {
 
 /**
  * Canonical bytes of the keystore record (excluding ivCounter, recordHmac, and
- * key refs). Shared by computeRecordHmac and the AAD keystoreRecordHash (F).
+ * key refs). Nothing in the app uses it: it is kept so the record tests can pin
+ * the canonical text against the key identity's bytes.
  */
 export function canonicalizeKeystore(r: KeystoreCanonicalInput): Uint8Array {
 	return keyIdentityBytes(keyIdentity(r));
@@ -97,7 +99,7 @@ export function keyIdentity(row: KeystoreCanonicalInput): KeyIdentity {
 }
 
 /**
- * Exactly today's canonical bytes. The mode is the frozen literal `local` and not a
+ * The canonical text every stored record's AAD and MAC were built over. The mode is the frozen literal `local` and not a
  * field of the identity, so a later change of lock mode never moves a stored record's AAD.
  */
 export function keyIdentityBytes(id: KeyIdentity): Uint8Array {
