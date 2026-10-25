@@ -8,7 +8,7 @@ import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
 	readKeystoreRow
-} from '../profile/store.svelte';
+} from '../keystore/read';
 import { localTodayIso } from '../timeline/day-math';
 import { formatTimelineDate } from '../timeline/format-date';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-key';
@@ -126,9 +126,9 @@ export type FlowDeps = {
 async function readDeviceNow(
 	db: IDBDatabase
 ): Promise<{ state: DeviceState; installUuid: Uint8Array }> {
-	const keystore = await readKeystoreRow(db);
+	const { row } = await readKeystoreRow(db);
 	const state = await readDeviceState(db);
-	return { state, installUuid: new Uint8Array(keystore.installUuid) };
+	return { state, installUuid: new Uint8Array(row.installUuid) };
 }
 
 function onceVisibleNow(fn: () => void): () => void {

@@ -8,10 +8,10 @@ import { createJoinRelock, relockEachSync, type Relockable } from '../profile/ap
 import type { ProfileApp } from '../profile/context';
 import type { RelockReason } from '../profile/lifecycle';
 import { readDeviceState, type DeviceState } from '../profile/device-state';
+import { readKeystoreRow } from '../keystore/read';
 import {
 	createProfileStore,
 	KeystoreNotInitializedError,
-	readKeystoreRow,
 	type ProfileStore
 } from '../profile/store.svelte';
 import BackupCard from './BackupCard.svelte';
@@ -199,7 +199,7 @@ async function newDevice(): Promise<{ db: IDBDatabase; profile: ProfileStore }> 
 async function realRead(
 	database: IDBDatabase
 ): Promise<{ state: DeviceState; installUuid: Uint8Array }> {
-	const keystore = await readKeystoreRow(database);
+	const { row: keystore } = await readKeystoreRow(database);
 	return {
 		state: await readDeviceState(database),
 		installUuid: new Uint8Array(keystore.installUuid)

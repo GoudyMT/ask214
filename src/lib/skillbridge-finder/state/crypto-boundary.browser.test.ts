@@ -7,7 +7,7 @@ import { AesGcmAuthError } from '../../crypto/aes-gcm';
 import { bootstrapLocalKeystore } from '../../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../../db/_test-helpers';
 import type { FinderRecord } from './types';
-import type { KeystoreRecordV1 } from '../../keystore/record';
+import { keyIdentity, type KeystoreRecordV1 } from '../../keystore/record';
 
 // Passthrough seams that record the byte buffers the boundary hands to its collaborators, so a test can look at them
 // after the call: what the encoder returned, the copy given to the cipher, and what the decoder was given. Each also
@@ -65,11 +65,11 @@ vi.mock('$lib/skillbridge-finder/state/crypto-boundary', async (importOriginal) 
 	return {
 		...real,
 		encryptFinderRecord: (...args: Parameters<typeof real.encryptFinderRecord>) => {
-			seen.encryptGenerations.push(args[2]);
+			seen.encryptGenerations.push(args[3]);
 			return real.encryptFinderRecord(...args);
 		},
 		decryptFinderRecord: (...args: Parameters<typeof real.decryptFinderRecord>) => {
-			seen.decryptGenerations.push(args[2]);
+			seen.decryptGenerations.push(args[3]);
 			return real.decryptFinderRecord(...args);
 		}
 	};
@@ -138,19 +138,20 @@ describe('the finder store encrypts through its boundary', () => {
 describe('encryptFinderRecord / decryptFinderRecord', () => {
 	it('roundtrips a record through encrypt + decrypt', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptFinderRecord(baseRecord, ks, 3);
-		expect(await decryptFinderRecord(blob, ks, 3)).toEqual(baseRecord);
+		const blob = await encryptFinderRecord(baseRecord, keyIdentity(ks), ks.dataKeyRef, 3);
+		expect(await decryptFinderRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3)).toEqual(baseRecord);
 	});
 
 	// The bytes on disk are bound to this store name and record id by their AAD, so a later writer of this record must
 	// produce what the store reads: pin the literal context, not just a self-consistent pair.
 	it('writes a record bound to the skillbridge-finder store context', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptFinderRecord(baseRecord, ks, 3);
+		const blob = await encryptFinderRecord(baseRecord, keyIdentity(ks), ks.dataKeyRef, 3);
 		const opened = decryptRecord(
 			{ storeName: 'skillbridge-finder', recordId: 'self', schemaVersion: 1 },
 			blob,
-			ks,
+			keyIdentity(ks),
+			ks.dataKeyRef,
 			3
 		).then((b) => JSON.parse(new TextDecoder().decode(b)) as unknown);
 		await expect(opened).resolves.toEqual(baseRecord);
@@ -163,16 +164,21 @@ describe('encryptFinderRecord / decryptFinderRecord', () => {
 		const foreign = await encryptRecord(
 			{ storeName: 'calendar-sync', recordId: 'self', schemaVersion: 1 },
 			plaintext,
-			ks,
+			keyIdentity(ks),
+			ks.dataKeyRef,
 			3
 		);
-		await expect(decryptFinderRecord(foreign, ks, 3)).rejects.toThrow(AesGcmAuthError);
+		await expect(decryptFinderRecord(foreign, keyIdentity(ks), ks.dataKeyRef, 3)).rejects.toThrow(
+			AesGcmAuthError
+		);
 	});
 
 	it('fails auth when the generation does not match (replay/generation binding)', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptFinderRecord(baseRecord, ks, 3);
-		await expect(decryptFinderRecord(blob, ks, 4)).rejects.toThrow(AesGcmAuthError);
+		const blob = await encryptFinderRecord(baseRecord, keyIdentity(ks), ks.dataKeyRef, 3);
+		await expect(decryptFinderRecord(blob, keyIdentity(ks), ks.dataKeyRef, 4)).rejects.toThrow(
+			AesGcmAuthError
+		);
 	});
 
 	// The plaintext JSON holds the person's place, saved programs and filters in one buffer. The decoded record carries
@@ -180,9 +186,9 @@ describe('encryptFinderRecord / decryptFinderRecord', () => {
 	describe('plaintext buffers', () => {
 		it('wipes the decrypted buffer once it has been decoded', async () => {
 			const ks = baseKeystore();
-			const blob = await encryptFinderRecord(baseRecord, ks, 3);
+			const blob = await encryptFinderRecord(baseRecord, keyIdentity(ks), ks.dataKeyRef, 3);
 
-			const dec = await decryptFinderRecord(blob, ks, 3);
+			const dec = await decryptFinderRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3);
 
 			expect(seen.decoderInput).toHaveLength(1);
 			expect(seen.decoderInputFull).toEqual([true]);
@@ -196,11 +202,14 @@ describe('encryptFinderRecord / decryptFinderRecord', () => {
 			const blob = await encryptRecord(
 				{ storeName: 'skillbridge-finder', recordId: 'self', schemaVersion: 1 },
 				wrongSchema,
-				ks,
+				keyIdentity(ks),
+				ks.dataKeyRef,
 				3
 			);
 
-			await expect(decryptFinderRecord(blob, ks, 3)).rejects.toThrow(FinderSchemaError);
+			await expect(decryptFinderRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3)).rejects.toThrow(
+				FinderSchemaError
+			);
 
 			expect(seen.decoderInput).toHaveLength(1);
 			expect(seen.decoderInputFull).toEqual([true]);
@@ -210,7 +219,7 @@ describe('encryptFinderRecord / decryptFinderRecord', () => {
 		it('wipes the encoded record and the copy given to the cipher once encryption is done', async () => {
 			const ks = baseKeystore();
 
-			await encryptFinderRecord(baseRecord, ks, 3);
+			await encryptFinderRecord(baseRecord, keyIdentity(ks), ks.dataKeyRef, 3);
 
 			expect(seen.encoded).toHaveLength(1);
 			expect(seen.cipherInput).toHaveLength(1);

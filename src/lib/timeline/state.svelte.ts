@@ -3,16 +3,11 @@ import { isSnoozeDate } from './state-codec';
 import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-key';
 import { MAX_NOTE_UNITS } from '../backup/note-cap';
 import { encryptTimelineRecord, decryptTimelineRecord } from './crypto-boundary';
-import type { KeystoreRecordV1 } from '../keystore/record';
+import { keyIdentity, type KeystoreKeys } from '../keystore/record';
+import { KeystoreNotInitializedError, readKeystoreRow, type KeystoreRow } from '../keystore/read';
 import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
-import {
-	KeystoreNotInitializedError,
-	OccConflictError,
-	getRow,
-	readKeystoreRow,
-	readHwmGeneration
-} from '../profile/store.svelte';
+import { OccConflictError, getRow, readHwmGeneration } from '../profile/store.svelte';
 import { withWriteLocks } from '../db/locks';
 import { withStores } from '../db/schema';
 
@@ -57,7 +52,7 @@ type TimelineHwmPayload = {
 	ts: number;
 };
 
-type KeystoreRow = KeystoreRecordV1 & { id: number };
+type VerifiedKeystore = { row: KeystoreRow; keys: KeystoreKeys };
 type StateRow = { id: number; rec: Uint8Array };
 
 /**
@@ -108,8 +103,8 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 
 	const readVerifiedKeystore = () => readKeystoreRow(db);
 	/** Current timeline generation (0 = no HWM yet = no timeline state written). */
-	const readCurrentGeneration = (keystore: KeystoreRow) =>
-		readHwmGeneration(db, 'timeline-state-hwm', keystore.hmacKeyRef);
+	const readCurrentGeneration = (keys: KeystoreKeys) =>
+		readHwmGeneration(db, 'timeline-state-hwm', keys.hmacKey);
 
 	/**
 	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
@@ -125,18 +120,18 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		// A save asked for on a locked store is handed nothing by a lock that already happened, so it stays refused.
 		const me: Waiting = { base: null };
 		waiting.push(me);
-		let ks: KeystoreRow | undefined;
+		let ks: VerifiedKeystore | undefined;
 		try {
 			await withWriteLocks(
 				async () => {
 					ks = await readVerifiedKeystore();
-					return ks.keystoreGeneration;
+					return ks.row.keystoreGeneration;
 				},
 				async () => {
 					if (!ks) throw new KeystoreNotInitializedError();
-					const keystore = ks;
+					const { row: keystore, keys } = ks;
 
-					const currentGen = await readCurrentGeneration(keystore);
+					const currentGen = await readCurrentGeneration(keys);
 					if (currentGen !== _generation) throw new OccConflictError();
 					// The handed record is the one at `_generation`, which OCC just matched to the disk.
 					const base = _state ?? me.base;
@@ -144,7 +139,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 
 					const next = mutate(base);
 					const nextGen = currentGen + 1;
-					const blob = await encryptTimelineRecord(next, keystore, nextGen);
+					const blob = await encryptTimelineRecord(
+						next,
+						keyIdentity(keystore),
+						keys.dataKey,
+						nextGen
+					);
 					const newHwm = await signSidecar<TimelineHwmPayload>(
 						'timeline-state-hwm',
 						{
@@ -153,7 +153,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 							epoch: keystore.epoch,
 							ts: Date.now()
 						},
-						keystore.hmacKeyRef
+						keys.hmacKey
 					);
 
 					await withStores(db, ['timeline-state', 'timeline-state-hwm'], 'readwrite', (tx) => {
@@ -224,7 +224,7 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 		 */
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
-			let ks: KeystoreRow | undefined;
+			let ks: VerifiedKeystore | undefined;
 			// The user's Unlock is a new attempt: the Timeline waits for it instead of repeating the last failure (an alert)
 			// while it runs. An automatic re-read keeps the failure, so a note that stays true is not announced again on
 			// every return to the page.
@@ -233,12 +233,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 				await withWriteLocks(
 					async () => {
 						ks = await readVerifiedKeystore();
-						return ks.keystoreGeneration;
+						return ks.row.keystoreGeneration;
 					},
 					async () => {
 						if (!ks) throw new KeystoreNotInitializedError();
-						const keystore = ks;
-						const gen = await readCurrentGeneration(keystore);
+						const { row: keystore, keys } = ks;
+						const gen = await readCurrentGeneration(keys);
 						// The generation moves only with the statuses it belongs to: a read that fails after a peer's save
 						// would otherwise pair the newer generation with the older statuses, and a write from them would
 						// pass the conflict check and lay them over the peer's save.
@@ -257,7 +257,12 @@ export function createTimelineStateStore(db: IDBDatabase, opts: TimelineStoreOpt
 						}
 						const row = await getRow<StateRow>(db, 'timeline-state');
 						if (!row) throw new Error('E_TIMELINE_BODY_MISSING');
-						const decoded = await decryptTimelineRecord(row.rec, keystore, gen);
+						const decoded = await decryptTimelineRecord(
+							row.rec,
+							keyIdentity(keystore),
+							keys.dataKey,
+							gen
+						);
 						_generation = gen;
 						if (relockEpoch === relockAtStart) {
 							_state = decoded;

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { encryptRecord, decryptRecord } from './record-crypto';
 import { AesGcmAuthError } from './aes-gcm';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
+import { keyIdentity } from '../keystore/record';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 
 // The record-agnostic encryption boundary (extracted from the profile-specific
@@ -16,8 +17,8 @@ describe('record-crypto (generic boundary)', () => {
 		const db = await openTestDb();
 		const { record: ks } = await bootstrapLocalKeystore(db);
 		const pt = new TextEncoder().encode('{"hello":"world"}');
-		const blob = await encryptRecord(CTX, pt, ks, 1);
-		const back = await decryptRecord(CTX, blob, ks, 1);
+		const blob = await encryptRecord(CTX, pt, keyIdentity(ks), ks.dataKeyRef, 1);
+		const back = await decryptRecord(CTX, blob, keyIdentity(ks), ks.dataKeyRef, 1);
 		expect(new TextDecoder().decode(back)).toBe('{"hello":"world"}');
 		await deleteTestDb(db);
 	});
@@ -25,10 +26,16 @@ describe('record-crypto (generic boundary)', () => {
 	it('fails auth when the store context differs (AAD storeName binding)', async () => {
 		const db = await openTestDb();
 		const { record: ks } = await bootstrapLocalKeystore(db);
-		const blob = await encryptRecord(CTX, new TextEncoder().encode('x'), ks, 1);
-		await expect(decryptRecord({ ...CTX, storeName: 'profile' }, blob, ks, 1)).rejects.toThrow(
-			AesGcmAuthError
+		const blob = await encryptRecord(
+			CTX,
+			new TextEncoder().encode('x'),
+			keyIdentity(ks),
+			ks.dataKeyRef,
+			1
 		);
+		await expect(
+			decryptRecord({ ...CTX, storeName: 'profile' }, blob, keyIdentity(ks), ks.dataKeyRef, 1)
+		).rejects.toThrow(AesGcmAuthError);
 		await deleteTestDb(db);
 	});
 
@@ -43,16 +50,18 @@ describe('record-crypto (generic boundary)', () => {
 	])('treats a stored record that is %s as failing authentication', async (_, blob) => {
 		const db = await openTestDb();
 		const { record: ks } = await bootstrapLocalKeystore(db);
-		await expect(decryptRecord(CTX, blob, ks, 1)).rejects.toThrow(AesGcmAuthError);
+		await expect(decryptRecord(CTX, blob, keyIdentity(ks), ks.dataKeyRef, 1)).rejects.toThrow(
+			AesGcmAuthError
+		);
 		await deleteTestDb(db);
 	});
 
 	it('reads a stored record of exactly an IV and a tag (an empty plaintext)', async () => {
 		const db = await openTestDb();
 		const { record: ks } = await bootstrapLocalKeystore(db);
-		const empty = await encryptRecord(CTX, new Uint8Array(0), ks, 1);
+		const empty = await encryptRecord(CTX, new Uint8Array(0), keyIdentity(ks), ks.dataKeyRef, 1);
 		expect(empty.length).toBe(28);
-		expect((await decryptRecord(CTX, empty, ks, 1)).length).toBe(0);
+		expect((await decryptRecord(CTX, empty, keyIdentity(ks), ks.dataKeyRef, 1)).length).toBe(0);
 		await deleteTestDb(db);
 	});
 
@@ -73,7 +82,7 @@ describe('record-crypto (generic boundary)', () => {
 		});
 		try {
 			const input = new TextEncoder().encode('{"hello":"world"}');
-			await encryptRecord(CTX, input, ks, 1);
+			await encryptRecord(CTX, input, keyIdentity(ks), ks.dataKeyRef, 1);
 			expect(seen.length).toBe(1);
 			expect(seen[0]).not.toBe(input);
 			expect(nonzeroAtCall[0]).toBe(input.length);

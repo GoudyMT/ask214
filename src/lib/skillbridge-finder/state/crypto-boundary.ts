@@ -1,7 +1,7 @@
 import { encryptRecord, decryptRecord, type RecordCtx } from '../../crypto/record-crypto';
 import { encodeFinderRecord, decodeFinderRecord } from './codec';
 import type { FinderRecord } from './types';
-import type { KeystoreRecordV1 } from '../../keystore/record';
+import type { KeyIdentity } from '../../keystore/record';
 
 /**
  * The finder record's encryption boundary - a thin wrapper over the record-agnostic crypto core
@@ -17,14 +17,15 @@ const FINDER_CTX: RecordCtx = {
 
 export async function encryptFinderRecord(
 	record: FinderRecord,
-	keystore: KeystoreRecordV1,
+	identity: KeyIdentity,
+	dataKey: CryptoKey,
 	generation: number
 ): Promise<Uint8Array> {
 	const encoded = encodeFinderRecord(record);
 	const plaintext = new Uint8Array(encoded);
 	try {
 		// Awaited inside the try: the wipe below must wait for the cipher to finish with the buffer.
-		return await encryptRecord(FINDER_CTX, plaintext, keystore, generation);
+		return await encryptRecord(FINDER_CTX, plaintext, identity, dataKey, generation);
 	} finally {
 		// The person's place, saved programs and filters as JSON, in two buffers. The cipher keeps its own copy and the
 		// ciphertext is all that is stored, so neither has a use once encryption ends.
@@ -35,10 +36,11 @@ export async function encryptFinderRecord(
 
 export async function decryptFinderRecord(
 	blob: Uint8Array,
-	keystore: KeystoreRecordV1,
+	identity: KeyIdentity,
+	dataKey: CryptoKey,
 	generation: number
 ): Promise<FinderRecord> {
-	const plaintext = await decryptRecord(FINDER_CTX, blob, keystore, generation);
+	const plaintext = await decryptRecord(FINDER_CTX, blob, identity, dataKey, generation);
 	try {
 		return decodeFinderRecord(plaintext);
 	} finally {

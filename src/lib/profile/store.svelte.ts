@@ -1,6 +1,12 @@
 import type { ProfileV1 } from './types';
 import { derivePersona, type PersonaFilters } from './persona';
-import { computeRecordHmac, verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
+import { keyIdentity, signKeystore, verifyKeystore } from '../keystore/record';
+import {
+	KeystoreHmacMismatchError,
+	KeystoreNotInitializedError,
+	keysForRow,
+	type KeystoreRow
+} from '../keystore/read';
 import { decryptProfileRecord, encryptProfileRecord } from './crypto-boundary';
 import { signSidecar, verifySidecar, type ProfileHwmPayload, type SignedSidecar } from './sidecars';
 import { bumpIvCounter } from '../keystore/iv-counter';
@@ -18,6 +24,9 @@ import {
 import { updateLastSeen, isClockBackward } from './clock';
 import { safeLog } from '../log/safelog';
 
+// The same classes the keystore read throws, so an instanceof check made through this module still matches.
+export { KeystoreNotInitializedError, KeystoreHmacMismatchError } from '../keystore/read';
+
 /**
  * ProfileStore - the orchestration layer over keystore + encryption boundary +
  * IDB. Profile state is held in the factory closure (`_profile`), never exported;
@@ -26,19 +35,6 @@ import { safeLog } from '../log/safelog';
  * load() runs under the hierarchical write locks and is fail-closed: it verifies
  * the keystore-record HMAC, then the signed HWM, BEFORE attempting any decrypt.
  */
-export class KeystoreNotInitializedError extends Error {
-	constructor() {
-		super('E_KEYSTORE_NOT_INITIALIZED');
-		this.name = 'KeystoreNotInitializedError';
-	}
-}
-
-export class KeystoreHmacMismatchError extends Error {
-	constructor() {
-		super('E_KEYSTORE_HMAC_MISMATCH');
-		this.name = 'KeystoreHmacMismatchError';
-	}
-}
 
 /** A write lost an optimistic-concurrency race (HWM generation moved under it). */
 export class OccConflictError extends Error {
@@ -56,7 +52,6 @@ export type ProfilePatch = Partial<
 export type BroadcastEvent = { type: 'profile-updated' | 'relocked'; reason?: 'idle' | 'user' };
 export type ProfileStoreOptions = { onBroadcast?: (e: BroadcastEvent) => void };
 
-export type KeystoreRow = KeystoreRecordV1 & { id: number };
 export type HwmRow = SignedSidecar<ProfileHwmPayload> & { id: number };
 export type ProfileRow = { id: number; rec: Uint8Array };
 
@@ -65,16 +60,6 @@ export function getRow<T>(db: IDBDatabase, store: StoreName): Promise<T | undefi
 	return withStores(db, store, 'readonly', (tx) =>
 		reqToPromise<T | undefined>(tx.objectStore(store).get(0))
 	);
-}
-
-/** The keystore row, verified: a missing or tampered keystore stops the read, never silently succeeds. */
-export async function readKeystoreRow(db: IDBDatabase): Promise<KeystoreRow> {
-	const ks = await getRow<KeystoreRow>(db, 'keystore');
-	if (!ks) throw new KeystoreNotInitializedError();
-	if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
-		throw new KeystoreHmacMismatchError();
-	}
-	return ks;
 }
 
 /** A store's current generation from its verified HWM sidecar (0 = no HWM yet = nothing written). */
@@ -257,14 +242,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 				async () => {
 					if (!ks) throw new KeystoreNotInitializedError(); // re-guard (narrows type)
 					const keystore = ks;
+					const keys = keysForRow(keystore);
 
 					// Fail-closed: the keystore record HMAC must verify before any field is trusted.
-					if (
-						!keystore.recordHmac ||
-						!(await verifyRecordHmac(keystore, keystore.hmacKeyRef, keystore.recordHmac))
-					) {
-						throw new KeystoreHmacMismatchError();
-					}
+					if (!(await verifyKeystore(keystore, keys))) throw new KeystoreHmacMismatchError();
 
 					// Read + verify the HWM sidecar under the single hmacKey.
 					const hwmRow = await getRow<HwmRow>(db, 'profile-hwm');
@@ -272,7 +253,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					const hwm = await verifySidecar<ProfileHwmPayload>(
 						'profile-hwm',
 						{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
-						keystore.hmacKeyRef
+						keys.hmacKey
 					);
 
 					// First run: generation 0 = keystore exists, no profile body written yet.
@@ -291,7 +272,12 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					// Read + decrypt the body, binding decrypt to the authoritative HWM generation.
 					const profRow = await getRow<ProfileRow>(db, 'profile');
 					if (!profRow) throw new Error('E_PROFILE_BODY_MISSING');
-					const decrypted = await decryptProfileRecord(profRow.rec, keystore, hwm.generation);
+					const decrypted = await decryptProfileRecord(
+						profRow.rec,
+						keyIdentity(keystore),
+						keys.dataKey,
+						hwm.generation
+					);
 					// A record exists on disk either way - that is what `locked` reads to tell "locked"
 					// apart from "never set up", and it must stay true through a relock.
 					hasProfile = true;
@@ -329,15 +315,11 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					async () => {
 						if (!ks) throw new KeystoreNotInitializedError();
 						const keystore = ks;
+						const keys = keysForRow(keystore);
 
 						// Fail-closed: verify before trusting/re-signing (prevents laundering a
 						// tampered keystore into a freshly-valid record).
-						if (
-							!keystore.recordHmac ||
-							!(await verifyRecordHmac(keystore, keystore.hmacKeyRef, keystore.recordHmac))
-						) {
-							throw new KeystoreHmacMismatchError();
-						}
+						if (!(await verifyKeystore(keystore, keys))) throw new KeystoreHmacMismatchError();
 
 						// Read + verify the current HWM under the single hmacKey.
 						const hwmRow = await getRow<HwmRow>(db, 'profile-hwm');
@@ -345,7 +327,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						const currentHwm = await verifySidecar<ProfileHwmPayload>(
 							'profile-hwm',
 							{ v: 1, payload: hwmRow.payload, mac: hwmRow.mac },
-							keystore.hmacKeyRef
+							keys.hmacKey
 						);
 
 						// Auto-OCC (merged G4 + concurrent first-run G5): the expected generation is
@@ -399,10 +381,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 							// Bump ivCounter (throws at exhaustion) + re-sign the keystore record.
 							const ivBump = bumpIvCounter(keystore.ivCounter);
 							const updatedKs: KeystoreRow = { ...keystore, ivCounter: ivBump.newValue };
-							updatedKs.recordHmac = await computeRecordHmac(updatedKs, keystore.hmacKeyRef);
+							updatedKs.recordHmac = await signKeystore(updatedKs, keys);
 
 							// Encrypt with the UPDATED keystore state bound into the AAD.
-							const blob = await encryptProfileRecord(next, updatedKs);
+							const blob = await encryptProfileRecord(next, keyIdentity(updatedKs), keys.dataKey);
 
 							// Sign the new HWM under the single hmacKey.
 							const newHwm = await signSidecar(
@@ -413,7 +395,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 									epoch: keystore.epoch,
 									ts: now
 								},
-								keystore.hmacKeyRef
+								keys.hmacKey
 							);
 
 							// Atomic write: profile body + HWM + keystore (the ivCounter bump) in one tx.

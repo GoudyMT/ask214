@@ -4,7 +4,7 @@ import { ProfileSchemaError } from './codec';
 import { encryptRecord } from '../crypto/record-crypto';
 import { AesGcmAuthError } from '../crypto/aes-gcm';
 import type { ProfileV1 } from './types';
-import type { KeystoreRecordV1 } from '../keystore/record';
+import { keyIdentity, type KeystoreRecordV1 } from '../keystore/record';
 
 // Passthrough seams that record the byte buffers the boundary hands to its collaborators, so a test can
 // look at them after the call: what the encoder returned, the copy given to the cipher, and what the
@@ -96,52 +96,57 @@ const baseProfile: ProfileV1 = {
 describe('encryptProfileRecord / decryptProfileRecord', () => {
 	it('roundtrips a profile through encrypt + decrypt', async () => {
 		const r = baseRecord();
-		const blob = await encryptProfileRecord(baseProfile, r);
-		const dec = await decryptProfileRecord(blob, r, baseProfile.generation);
+		const blob = await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
+		const dec = await decryptProfileRecord(
+			blob,
+			keyIdentity(r),
+			r.dataKeyRef,
+			baseProfile.generation
+		);
 		expect(dec.eaos).not.toBeNull();
 		if (dec.eaos) expect(new TextDecoder().decode(dec.eaos)).toBe('2027-04-15');
 	});
 
 	it('lays out iv(12) followed by ciphertext+tag (no plaintext header)', async () => {
 		const r = baseRecord();
-		const blob = await encryptProfileRecord(baseProfile, r);
+		const blob = await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
 		// iv + GCM ciphertext (>= plaintext) + 16-byte tag, all well past 12.
 		expect(blob.length).toBeGreaterThan(12 + 16);
 	});
 
 	it('uses a fresh IV on each encrypt', async () => {
 		const r = baseRecord();
-		const a = await encryptProfileRecord(baseProfile, r);
-		const b = await encryptProfileRecord(baseProfile, r);
+		const a = await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
+		const b = await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
 		expect(Array.from(a.subarray(0, 12))).not.toEqual(Array.from(b.subarray(0, 12)));
 	});
 
 	it('fails auth when expectedGeneration does not match (replay/generation binding)', async () => {
 		const r = baseRecord();
-		const blob = await encryptProfileRecord(baseProfile, r);
-		await expect(decryptProfileRecord(blob, r, baseProfile.generation + 1)).rejects.toThrow(
-			AesGcmAuthError
-		);
+		const blob = await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
+		await expect(
+			decryptProfileRecord(blob, keyIdentity(r), r.dataKeyRef, baseProfile.generation + 1)
+		).rejects.toThrow(AesGcmAuthError);
 	});
 
 	it('fails auth when the keystore state diverges (keystore-record binding)', async () => {
 		const r = baseRecord();
-		const blob = await encryptProfileRecord(baseProfile, r);
+		const blob = await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
 		// Same dataKey, different installUuid -> different keystoreRecordHash -> different AAD.
 		const diverged: KeystoreRecordV1 = { ...r, installUuid: new Uint8Array(16).fill(2) };
-		await expect(decryptProfileRecord(blob, diverged, baseProfile.generation)).rejects.toThrow(
-			AesGcmAuthError
-		);
+		await expect(
+			decryptProfileRecord(blob, keyIdentity(diverged), diverged.dataKeyRef, baseProfile.generation)
+		).rejects.toThrow(AesGcmAuthError);
 	});
 
 	it('fails auth when the ciphertext is tampered', async () => {
 		const r = baseRecord();
-		const blob = await encryptProfileRecord(baseProfile, r);
+		const blob = await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
 		const tampered = new Uint8Array(blob);
 		tampered[20] = (tampered[20] ?? 0) ^ 0xff; // flip a byte in the ciphertext region
-		await expect(decryptProfileRecord(tampered, r, baseProfile.generation)).rejects.toThrow(
-			AesGcmAuthError
-		);
+		await expect(
+			decryptProfileRecord(tampered, keyIdentity(r), r.dataKeyRef, baseProfile.generation)
+		).rejects.toThrow(AesGcmAuthError);
 	});
 
 	// The plaintext JSON is the whole profile in one buffer. The decoded record carries its own copies, so
@@ -149,9 +154,14 @@ describe('encryptProfileRecord / decryptProfileRecord', () => {
 	describe('plaintext buffers', () => {
 		it('wipes the decrypted buffer once it has been decoded', async () => {
 			const r = baseRecord();
-			const blob = await encryptProfileRecord(baseProfile, r);
+			const blob = await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
 
-			const dec = await decryptProfileRecord(blob, r, baseProfile.generation);
+			const dec = await decryptProfileRecord(
+				blob,
+				keyIdentity(r),
+				r.dataKeyRef,
+				baseProfile.generation
+			);
 
 			expect(seen.decoderInput).toHaveLength(1);
 			expect(seen.decoderInputFull).toEqual([true]);
@@ -166,13 +176,14 @@ describe('encryptProfileRecord / decryptProfileRecord', () => {
 			const blob = await encryptRecord(
 				{ storeName: 'profile', recordId: 'self', schemaVersion: 1 },
 				wrongSchema,
-				r,
+				keyIdentity(r),
+				r.dataKeyRef,
 				baseProfile.generation
 			);
 
-			await expect(decryptProfileRecord(blob, r, baseProfile.generation)).rejects.toThrow(
-				ProfileSchemaError
-			);
+			await expect(
+				decryptProfileRecord(blob, keyIdentity(r), r.dataKeyRef, baseProfile.generation)
+			).rejects.toThrow(ProfileSchemaError);
 
 			expect(seen.decoderInput).toHaveLength(1);
 			expect(seen.decoderInputFull).toEqual([true]);
@@ -182,7 +193,7 @@ describe('encryptProfileRecord / decryptProfileRecord', () => {
 		it('wipes the encoded profile and the copy given to the cipher once encryption is done', async () => {
 			const r = baseRecord();
 
-			await encryptProfileRecord(baseProfile, r);
+			await encryptProfileRecord(baseProfile, keyIdentity(r), r.dataKeyRef);
 
 			expect(seen.encoded).toHaveLength(1);
 			expect(seen.cipherInput).toHaveLength(1);

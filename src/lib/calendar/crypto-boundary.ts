@@ -1,7 +1,7 @@
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { encodeCalendarSyncState, decodeCalendarSyncState } from './codec';
 import type { CalendarSyncState } from './types';
-import type { KeystoreRecordV1 } from '../keystore/record';
+import type { KeyIdentity } from '../keystore/record';
 
 /**
  * The calendar-sync encryption boundary - a thin wrapper over the record-agnostic crypto core
@@ -13,14 +13,15 @@ const CALENDAR_CTX: RecordCtx = { storeName: 'calendar-sync', recordId: 'self', 
 
 export async function encryptCalendarRecord(
 	state: CalendarSyncState,
-	keystore: KeystoreRecordV1,
+	identity: KeyIdentity,
+	dataKey: CryptoKey,
 	generation: number
 ): Promise<Uint8Array> {
 	const encoded = encodeCalendarSyncState(state);
 	const plaintext = new Uint8Array(encoded);
 	try {
 		// Awaited inside the try: the wipe below must wait for the cipher to finish with the buffer.
-		return await encryptRecord(CALENDAR_CTX, plaintext, keystore, generation);
+		return await encryptRecord(CALENDAR_CTX, plaintext, identity, dataKey, generation);
 	} finally {
 		// The exclusions and handed-over events as JSON, in two buffers. The cipher keeps its own copy
 		// and the ciphertext is all that is stored, so neither has a use once encryption ends.
@@ -31,10 +32,11 @@ export async function encryptCalendarRecord(
 
 export async function decryptCalendarRecord(
 	blob: Uint8Array,
-	keystore: KeystoreRecordV1,
+	identity: KeyIdentity,
+	dataKey: CryptoKey,
 	generation: number
 ): Promise<CalendarSyncState> {
-	const plaintext = await decryptRecord(CALENDAR_CTX, blob, keystore, generation);
+	const plaintext = await decryptRecord(CALENDAR_CTX, blob, identity, dataKey, generation);
 	try {
 		return decodeCalendarSyncState(plaintext);
 	} finally {

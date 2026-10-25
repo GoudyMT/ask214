@@ -32,13 +32,13 @@ export type KeystoreCanonicalInput = Omit<
 
 const KEYSTORE_HMAC_PREFIX = 'mtc-v1|keystore-record|';
 
-function canonicalString(r: KeystoreCanonicalInput): string {
+function identityString(id: KeyIdentity): string {
 	return [
-		`v=${r.v}`,
-		`mode=${r.mode}`,
-		`keystoreGeneration=${r.keystoreGeneration}`,
-		`epoch=${r.epoch}`,
-		`installUuid=${byteHex(r.installUuid)}`
+		`v=${id.v}`,
+		'mode=local',
+		`keystoreGeneration=${id.keystoreGeneration}`,
+		`epoch=${id.epoch}`,
+		`installUuid=${byteHex(id.installUuid)}`
 	].join('\n');
 }
 
@@ -47,7 +47,7 @@ function canonicalString(r: KeystoreCanonicalInput): string {
  * key refs). Shared by computeRecordHmac and the AAD keystoreRecordHash (F).
  */
 export function canonicalizeKeystore(r: KeystoreCanonicalInput): Uint8Array {
-	return new TextEncoder().encode(canonicalString(r));
+	return keyIdentityBytes(keyIdentity(r));
 }
 
 /**
@@ -57,7 +57,7 @@ export function canonicalizeKeystore(r: KeystoreCanonicalInput): Uint8Array {
  * bytes of the same shape.
  */
 function recordHmacInput(r: KeystoreCanonicalInput): Uint8Array<ArrayBuffer> {
-	return new TextEncoder().encode(KEYSTORE_HMAC_PREFIX + canonicalString(r));
+	return new TextEncoder().encode(KEYSTORE_HMAC_PREFIX + identityString(r));
 }
 
 export function computeRecordHmac(
@@ -77,6 +77,55 @@ export function verifyRecordHmac(
 	mac: ArrayBuffer
 ): Promise<boolean> {
 	return hmacVerify(hmacKey, recordHmacInput(r), mac);
+}
+
+/** What binds every encrypted record to its keystore (the AAD's keystore fingerprint). */
+export type KeyIdentity = Readonly<{
+	v: 1;
+	keystoreGeneration: number;
+	epoch: number;
+	installUuid: Uint8Array;
+}>;
+
+export function keyIdentity(row: KeystoreCanonicalInput): KeyIdentity {
+	return {
+		v: row.v,
+		keystoreGeneration: row.keystoreGeneration,
+		epoch: row.epoch,
+		installUuid: row.installUuid
+	};
+}
+
+/**
+ * Exactly today's canonical bytes. The mode is the frozen literal `local` and not a
+ * field of the identity, so a later change of lock mode never moves a stored record's AAD.
+ */
+export function keyIdentityBytes(id: KeyIdentity): Uint8Array {
+	return new TextEncoder().encode(identityString(id));
+}
+
+/** The keys a tab may use with a row. In local mode the row's own HMAC key signs the row. */
+export type KeystoreKeys = Readonly<{
+	dataKey: CryptoKey;
+	hmacKey: CryptoKey;
+	bootstrapMacKey: CryptoKey;
+}>;
+
+/** The keystore record MAC. Local mode: the row's canonical bytes under its own HMAC key. */
+export function signKeystore(
+	row: KeystoreCanonicalInput,
+	keys: KeystoreKeys
+): Promise<ArrayBuffer> {
+	return computeRecordHmac(row, keys.bootstrapMacKey);
+}
+
+/** False when the row has no recordHmac or the MAC does not verify. */
+export async function verifyKeystore(
+	row: KeystoreCanonicalInput & { recordHmac?: ArrayBuffer },
+	keys: KeystoreKeys
+): Promise<boolean> {
+	if (!row.recordHmac) return false;
+	return verifyRecordHmac(row, keys.bootstrapMacKey, row.recordHmac);
 }
 
 function byteHex(b: Uint8Array): string {

@@ -8,12 +8,8 @@ import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { readDeviceState, type DeviceState } from '../profile/device-state';
-import {
-	createProfileStore,
-	OccConflictError,
-	readKeystoreRow,
-	type ProfileStore
-} from '../profile/store.svelte';
+import { readKeystoreRow } from '../keystore/read';
+import { createProfileStore, OccConflictError, type ProfileStore } from '../profile/store.svelte';
 import { cleanListing } from '../skillbridge-finder/fixtures/clean';
 import { createFinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
 import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
@@ -408,7 +404,7 @@ function restoreRig(
 }
 
 async function realRead(db: IDBDatabase): Promise<{ state: DeviceState; installUuid: Uint8Array }> {
-	const keystore = await readKeystoreRow(db);
+	const { row: keystore } = await readKeystoreRow(db);
 	return { state: await readDeviceState(db), installUuid: new Uint8Array(keystore.installUuid) };
 }
 

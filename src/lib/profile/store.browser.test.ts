@@ -3,6 +3,7 @@ import { flushSync } from 'svelte';
 import { toStore } from 'svelte/store';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
+import { keyIdentity } from '../keystore/record';
 import {
 	createProfileStore,
 	KeystoreNotInitializedError,
@@ -25,7 +26,7 @@ type Row = Record<string, unknown>;
 //   made and the caller never sees;
 // - zeroizeRecord records every record the store discards, so a test can show which one was wiped;
 // - decryptProfileRecord counts decrypts, so a refresh that must not read can be shown not to;
-// - computeRecordHmac can be made to throw, which reaches the step right after the staged copies exist.
+// - signKeystore can be made to throw, which reaches the step right after the staged copies exist.
 const seams = vi.hoisted(() => ({
 	cloned: [] as Uint8Array[],
 	zeroized: [] as Record<string, unknown>[],
@@ -69,9 +70,9 @@ vi.mock('$lib/keystore/record', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../keystore/record')>();
 	return {
 		...real,
-		computeRecordHmac: (...args: Parameters<typeof real.computeRecordHmac>) => {
+		signKeystore: (...args: Parameters<typeof real.signKeystore>) => {
 			if (seams.failHmac) throw new Error('E_TEST_HMAC');
-			return real.computeRecordHmac(...args);
+			return real.signKeystore(...args);
 		}
 	};
 });
@@ -144,7 +145,7 @@ describe('ProfileStore.load', () => {
 			setupIntentChangedAt: 1716700000000,
 			eaos: new TextEncoder().encode('2027-04-15')
 		};
-		const blob = await encryptProfileRecord(profile, record);
+		const blob = await encryptProfileRecord(profile, keyIdentity(record), record.dataKeyRef);
 		const hwmPayload: ProfileHwmPayload = {
 			generation: 1,
 			keystoreGeneration: 0,
@@ -397,7 +398,7 @@ describe('ProfileStore.clockBackward', () => {
 			setupIntentChangedAt: future,
 			eaos: null
 		};
-		const blob = await encryptProfileRecord(profile, record);
+		const blob = await encryptProfileRecord(profile, keyIdentity(record), record.dataKeyRef);
 		const hwm = await signSidecar(
 			'profile-hwm',
 			{ generation: 1, keystoreGeneration: 0, epoch: 0, ts: future },

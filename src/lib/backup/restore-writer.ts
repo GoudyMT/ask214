@@ -4,7 +4,12 @@ import type { CalendarSyncState, HandedOverEvent } from '../calendar/types';
 import { LOCK_TIMEOUT_MS, RunAbortedError, rotateOrUpgrade } from '../db/locks';
 import { withStores, type StoreName } from '../db/schema';
 import { bumpIvCounter } from '../keystore/iv-counter';
-import { computeRecordHmac } from '../keystore/record';
+import { keyIdentity, signKeystore, type KeyIdentity } from '../keystore/record';
+import {
+	KeystoreHmacMismatchError,
+	KeystoreNotInitializedError,
+	readKeystoreRow
+} from '../keystore/read';
 import { safeLog } from '../log/safelog';
 import { updateLastSeen } from '../profile/clock';
 import { decodeProfile, encodeProfile } from '../profile/codec';
@@ -12,12 +17,7 @@ import { encryptProfileRecord } from '../profile/crypto-boundary';
 import { readDeviceState } from '../profile/device-state';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { signSidecar } from '../profile/sidecars';
-import {
-	KeystoreHmacMismatchError,
-	KeystoreNotInitializedError,
-	getRow,
-	readKeystoreRow
-} from '../profile/store.svelte';
+import { getRow } from '../profile/store.svelte';
 import type { ProfileV1 } from '../profile/types';
 import { decodeFinderRecord, encodeFinderRecord } from '../skillbridge-finder/state/codec';
 import { encryptFinderRecord } from '../skillbridge-finder/state/crypto-boundary';
@@ -183,14 +183,15 @@ async function replaceStores(
 	const records: ProfileV1[] = [];
 	try {
 		// 1. The install is the one the person confirmed against. A missing keystore is another tab's erase.
-		let keystore: Awaited<ReturnType<typeof readKeystoreRow>>;
+		let verified: Awaited<ReturnType<typeof readKeystoreRow>>;
 		try {
-			keystore = await readKeystoreRow(db);
+			verified = await readKeystoreRow(db);
 		} catch (e) {
 			if (e instanceof KeystoreNotInitializedError) return fail('E_RESTORE_DEVICE_CHANGED');
 			if (e instanceof KeystoreHmacMismatchError) return fail('E_RESTORE_DEVICE_DAMAGED');
 			throw e;
 		}
+		const { row: keystore, keys } = verified;
 		if (!sameBytes(keystore.installUuid, expected.installUuid)) {
 			return fail('E_RESTORE_DEVICE_CHANGED');
 		}
@@ -259,7 +260,12 @@ async function replaceStores(
 		);
 		// The events handed to THIS phone's calendar belong to this device. If they cannot be read the record is being
 		// replaced anyway; only the reminders to delete those events are lost.
-		const handedOver = await readDeviceLastAdd(db, keystore, state.gens.calendar);
+		const handedOver = await readDeviceLastAdd(
+			db,
+			keyIdentity(keystore),
+			keys.dataKey,
+			state.gens.calendar
+		);
 		if (handedOver !== undefined) calendar.lastAdd = handedOver;
 
 		const finder: FinderRecord = structuredClone(
@@ -273,13 +279,24 @@ async function replaceStores(
 		// 5. One counter bump for the whole restore, and the key record signed again over it. Install, keys, epoch and
 		// generation stay as they are, so the stored API key still opens.
 		const nextKeystore = { ...keystore, ivCounter: bumpIvCounter(keystore.ivCounter).newValue };
-		nextKeystore.recordHmac = await computeRecordHmac(nextKeystore, keystore.hmacKeyRef);
+		nextKeystore.recordHmac = await signKeystore(nextKeystore, keys);
 
 		// 6. Encrypt through each store's own boundary and sign the sidecars. Every await ends here: the transaction below opens straight after.
-		const profileBlob = await encryptProfileRecord(profile, nextKeystore);
-		const timelineBlob = await encryptTimelineRecord(timeline, nextKeystore, gens.timeline);
-		const calendarBlob = await encryptCalendarRecord(calendar, nextKeystore, gens.calendar);
-		const finderBlob = await encryptFinderRecord(finder, nextKeystore, gens.finder);
+		const identity = keyIdentity(nextKeystore);
+		const profileBlob = await encryptProfileRecord(profile, identity, keys.dataKey);
+		const timelineBlob = await encryptTimelineRecord(
+			timeline,
+			identity,
+			keys.dataKey,
+			gens.timeline
+		);
+		const calendarBlob = await encryptCalendarRecord(
+			calendar,
+			identity,
+			keys.dataKey,
+			gens.calendar
+		);
+		const finderBlob = await encryptFinderRecord(finder, identity, keys.dataKey, gens.finder);
 		staged.push(profileBlob, timelineBlob, calendarBlob, finderBlob);
 		const sign = (name: string, generation: number) =>
 			signSidecar(
@@ -290,7 +307,7 @@ async function replaceStores(
 					epoch: keystore.epoch,
 					ts: at
 				},
-				keystore.hmacKeyRef
+				keys.hmacKey
 			);
 		const [profileMark, timelineMark, calendarMark, finderMark] = await Promise.all([
 			sign('profile-hwm', gens.profile),
@@ -348,14 +365,15 @@ async function dropFinderPack(db: IDBDatabase): Promise<void> {
 /** The calendar's "events you added" list as this device holds it, or undefined when there is none or it cannot be read. */
 async function readDeviceLastAdd(
 	db: IDBDatabase,
-	keystore: Awaited<ReturnType<typeof readKeystoreRow>>,
+	identity: KeyIdentity,
+	dataKey: CryptoKey,
 	generation: number
 ): Promise<HandedOverEvent[] | undefined> {
 	if (generation < 1) return undefined;
 	try {
 		const row = await getRow<{ id: number; rec: Uint8Array }>(db, 'calendar-sync');
 		if (!row) return undefined;
-		return (await decryptCalendarRecord(row.rec, keystore, generation)).lastAdd;
+		return (await decryptCalendarRecord(row.rec, identity, dataKey, generation)).lastAdd;
 	} catch {
 		return undefined;
 	}

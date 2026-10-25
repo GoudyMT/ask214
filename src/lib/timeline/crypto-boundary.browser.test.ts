@@ -7,7 +7,7 @@ import { AesGcmAuthError } from '../crypto/aes-gcm';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import type { TimelineState } from './types';
-import type { KeystoreRecordV1 } from '../keystore/record';
+import { keyIdentity, type KeystoreRecordV1 } from '../keystore/record';
 
 // Passthrough seams that record the byte buffers the boundary hands to its collaborators, so a test can
 // look at them after the call: what the encoder returned, the copy given to the cipher, and what the
@@ -66,11 +66,11 @@ vi.mock('$lib/timeline/crypto-boundary', async (importOriginal) => {
 	return {
 		...real,
 		encryptTimelineRecord: (...args: Parameters<typeof real.encryptTimelineRecord>) => {
-			seen.encryptGenerations.push(args[2]);
+			seen.encryptGenerations.push(args[3]);
 			return real.encryptTimelineRecord(...args);
 		},
 		decryptTimelineRecord: (...args: Parameters<typeof real.decryptTimelineRecord>) => {
-			seen.decryptGenerations.push(args[2]);
+			seen.decryptGenerations.push(args[3]);
 			return real.decryptTimelineRecord(...args);
 		}
 	};
@@ -143,19 +143,20 @@ describe('timeline stores encrypt through their boundary', () => {
 describe('encryptTimelineRecord / decryptTimelineRecord', () => {
 	it('roundtrips a timeline state through encrypt + decrypt', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptTimelineRecord(baseState, ks, 3);
-		expect(await decryptTimelineRecord(blob, ks, 3)).toEqual(baseState);
+		const blob = await encryptTimelineRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
+		expect(await decryptTimelineRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3)).toEqual(baseState);
 	});
 
 	// The bytes on disk are bound to this store name and record id by their AAD, so a later writer of this
 	// record must produce what the store reads: pin the literal context, not just a self-consistent pair.
 	it('writes a record bound to the timeline-state store context', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptTimelineRecord(baseState, ks, 3);
+		const blob = await encryptTimelineRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
 		const opened = decryptRecord(
 			{ storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 },
 			blob,
-			ks,
+			keyIdentity(ks),
+			ks.dataKeyRef,
 			3
 		).then((b) => JSON.parse(new TextDecoder().decode(b)) as unknown);
 		await expect(opened).resolves.toEqual(baseState);
@@ -163,8 +164,10 @@ describe('encryptTimelineRecord / decryptTimelineRecord', () => {
 
 	it('fails auth when the generation does not match (replay/generation binding)', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptTimelineRecord(baseState, ks, 3);
-		await expect(decryptTimelineRecord(blob, ks, 4)).rejects.toThrow(AesGcmAuthError);
+		const blob = await encryptTimelineRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
+		await expect(decryptTimelineRecord(blob, keyIdentity(ks), ks.dataKeyRef, 4)).rejects.toThrow(
+			AesGcmAuthError
+		);
 	});
 
 	// The plaintext JSON holds every status and note in one buffer. The decoded state carries its own
@@ -172,9 +175,9 @@ describe('encryptTimelineRecord / decryptTimelineRecord', () => {
 	describe('plaintext buffers', () => {
 		it('wipes the decrypted buffer once it has been decoded', async () => {
 			const ks = baseKeystore();
-			const blob = await encryptTimelineRecord(baseState, ks, 3);
+			const blob = await encryptTimelineRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
 
-			const dec = await decryptTimelineRecord(blob, ks, 3);
+			const dec = await decryptTimelineRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3);
 
 			expect(seen.decoderInput).toHaveLength(1);
 			expect(seen.decoderInputFull).toEqual([true]);
@@ -188,11 +191,14 @@ describe('encryptTimelineRecord / decryptTimelineRecord', () => {
 			const blob = await encryptRecord(
 				{ storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 },
 				wrongSchema,
-				ks,
+				keyIdentity(ks),
+				ks.dataKeyRef,
 				3
 			);
 
-			await expect(decryptTimelineRecord(blob, ks, 3)).rejects.toThrow(TimelineSchemaError);
+			await expect(decryptTimelineRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3)).rejects.toThrow(
+				TimelineSchemaError
+			);
 
 			expect(seen.decoderInput).toHaveLength(1);
 			expect(seen.decoderInputFull).toEqual([true]);
@@ -202,7 +208,7 @@ describe('encryptTimelineRecord / decryptTimelineRecord', () => {
 		it('wipes the encoded state and the copy given to the cipher once encryption is done', async () => {
 			const ks = baseKeystore();
 
-			await encryptTimelineRecord(baseState, ks, 3);
+			await encryptTimelineRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
 
 			expect(seen.encoded).toHaveLength(1);
 			expect(seen.cipherInput).toHaveLength(1);

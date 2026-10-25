@@ -2,7 +2,13 @@ import { decryptCalendarRecord } from '../calendar/crypto-boundary';
 import type { CalendarSyncState } from '../calendar/types';
 import { withWriteLocks } from '../db/locks';
 import { reqToPromise, withStores, type StoreName } from '../db/schema';
-import { verifyRecordHmac, type KeystoreRecordV1 } from '../keystore/record';
+import {
+	keyIdentity,
+	verifyKeystore,
+	type KeyIdentity,
+	type KeystoreKeys
+} from '../keystore/record';
+import { keysForRow, type KeystoreRow } from '../keystore/read';
 import { decryptProfileRecord } from '../profile/crypto-boundary';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { verifySidecar, type SignedSidecar } from '../profile/sidecars';
@@ -37,7 +43,6 @@ export type SnapshotResult =
 	| { ok: false; code: 'E_BACKUP_UNAVAILABLE' }
 	| { ok: false; code: 'E_SNAPSHOT_FAILED'; store: RefusedStore };
 
-type KeystoreRow = KeystoreRecordV1 & { id: number };
 type BodyRow = { id: number; rec: Uint8Array };
 type MarkRow = SignedSidecar<{ generation: number }>;
 
@@ -86,10 +91,16 @@ async function readOptional<T>(
 	name: string,
 	body: BodyRow | undefined,
 	mark: MarkRow | undefined,
-	keystore: KeystoreRow,
-	decrypt: (blob: Uint8Array, keystore: KeystoreRecordV1, generation: number) => Promise<T>
+	identity: KeyIdentity,
+	keys: KeystoreKeys,
+	decrypt: (
+		blob: Uint8Array,
+		identity: KeyIdentity,
+		dataKey: CryptoKey,
+		generation: number
+	) => Promise<T>
 ): Promise<{ state: T | null; gen: number }> {
-	const gen = await generationOf(name, mark, keystore.hmacKeyRef);
+	const gen = await generationOf(name, mark, keys.hmacKey);
 	if (gen === null) {
 		if (body) throw refuse();
 		return { state: null, gen: 0 };
@@ -98,7 +109,7 @@ async function readOptional<T>(
 		if (gen > 0) throw refuse();
 		return { state: null, gen: 0 };
 	}
-	return { state: await decrypt(body.rec, keystore, gen), gen };
+	return { state: await decrypt(body.rec, identity, keys.dataKey, gen), gen };
 }
 
 async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
@@ -141,19 +152,16 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 	let handedOver = false;
 	let at: RefusedStore = 'profile';
 	try {
-		if (
-			!keystore ||
-			!keystore.recordHmac ||
-			!(await verifyRecordHmac(keystore, keystore.hmacKeyRef, keystore.recordHmac))
-		) {
-			throw refuse();
-		}
-		const profileGen = await generationOf('profile-hwm', profileMark, keystore.hmacKeyRef);
+		if (!keystore) throw refuse();
+		const keys = keysForRow(keystore);
+		if (!(await verifyKeystore(keystore, keys))) throw refuse();
+		const identity = keyIdentity(keystore);
+		const profileGen = await generationOf('profile-hwm', profileMark, keys.hmacKey);
 		// No sidecar row at all is a damaged device; generation 0 is a device that was never set up.
 		if (profileGen === null) throw refuse();
 		if (profileGen === 0) return { ok: false, code: 'E_BACKUP_UNAVAILABLE' };
 		if (!profileBody) throw refuse();
-		profile = await decryptProfileRecord(profileBody.rec, keystore, profileGen);
+		profile = await decryptProfileRecord(profileBody.rec, identity, keys.dataKey, profileGen);
 		if (profile.setupIntent !== 'completed') return { ok: false, code: 'E_BACKUP_UNAVAILABLE' };
 
 		at = 'timeline';
@@ -161,7 +169,8 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 			'timeline-state-hwm',
 			timelineBody,
 			timelineMark,
-			keystore,
+			identity,
+			keys,
 			decryptTimelineRecord
 		);
 		at = 'calendar';
@@ -169,7 +178,8 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 			'calendar-sync-hwm',
 			calendarBody,
 			calendarMark,
-			keystore,
+			identity,
+			keys,
 			decryptCalendarRecord
 		);
 		at = 'finder';
@@ -177,7 +187,8 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 			'skillbridge-finder-hwm',
 			finderBody,
 			finderMark,
-			keystore,
+			identity,
+			keys,
 			decryptFinderRecord
 		);
 		handedOver = true;
