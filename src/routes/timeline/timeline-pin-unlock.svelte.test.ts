@@ -2,8 +2,11 @@ import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
+import { captureBackupIntent, markBackupIntent } from '$lib/backup/intent';
 
-const { isoFromToday } = vi.hoisted(() => ({
+const { isoFromToday, byok } = vi.hoisted(() => ({
+	// The stored API key, which only an unlocked tab may read.
+	byok: { readApiKey: vi.fn(async () => null as string | null) },
 	isoFromToday: (days: number) => {
 		const d = new Date();
 		d.setDate(d.getDate() + days);
@@ -40,7 +43,7 @@ vi.mock('$lib/profile/context', () => ({
 			load: () => Promise.resolve()
 		},
 		calendar: null,
-		byok: null,
+		byok,
 		cause: null,
 		db: {},
 		wipeAll: null,
@@ -67,6 +70,7 @@ beforeEach(() => {
 	lock.mode = 'pin';
 	lock.pinLocked = true;
 	lock.storeLocked = true;
+	byok.readApiKey.mockClear();
 });
 
 const cardHeading = () => page.getByRole('heading', { name: 'Your data is locked' });
@@ -97,6 +101,30 @@ describe('Timeline, locked with a PIN', () => {
 		expect(container.querySelector('.locked-panel__unlock')).not.toBeNull();
 		expect(pinField().query()).toBeNull();
 	});
+
+	// After a restore the page looks for the stored API key to say whether it must be added again. With no keys that read
+	// is not the page's to make, and a store that reads unlocked (nothing saved) must not let it through.
+	it.each([
+		['is PIN-locked with nothing saved', true, 0],
+		['is unlocked', false, 1]
+	])(
+		'after a restore, a tab that %s reads the stored API key %i times',
+		async (_name, pinLocked, reads) => {
+			lock.pinLocked = pinLocked;
+			lock.storeLocked = false;
+			markBackupIntent('restored', location.pathname);
+			captureBackupIntent();
+			await render(TimelinePage);
+			await expect
+				.element(
+					pinLocked ? cardHeading() : page.getByRole('heading', { level: 1, name: 'Timeline' })
+				)
+				.toBeVisible();
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			expect(byok.readApiKey).toHaveBeenCalledTimes(reads);
+		}
+	);
 
 	it('takes the card away and puts focus on the page heading when the unlock lands', async () => {
 		await render(TimelinePage);

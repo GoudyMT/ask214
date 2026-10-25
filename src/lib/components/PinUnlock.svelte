@@ -9,7 +9,14 @@
 	import { derivePinKeys, isPinFormat, PinNoMemoryError } from '../keystore/pin-derive';
 	import { KeystoreHmacMismatchError, type KeystoreRow } from '../keystore/read';
 	import type { KdfTuple } from '../keystore/record';
-	import { openPinSession, setSession, WrongPinError } from '../keystore/session';
+	import {
+		dropSession,
+		getSession,
+		openPinSession,
+		setSession,
+		WrongPinError,
+		type KeySession
+	} from '../keystore/session';
 	import { readPinRowAndCounter } from '../keystore/unlock-row';
 	import { safeLog } from '../log/safelog';
 	import { checkStoredBytes, readStoredBytes, sameStored } from '../profile/damaged-bytes';
@@ -94,10 +101,14 @@
 		clockTimer = setTimeout(check, Math.ceil(counting.remainingMs()));
 	}
 
-	async function showWait(db: IDBDatabase, waitMs: number): Promise<void> {
-		waitText = waitLine(waitMs);
+	// A new wait (a wrong try that owes one) starts its own count. A press that only finds the wait still owed leaves a
+	// running count alone: restarting it from the last stored remainder would push the end away with every press.
+	async function showWait(db: IDBDatabase, waitMs: number, fresh: boolean): Promise<void> {
+		const running = fresh ? null : clock;
+		const left = running?.remainingMs() ?? 0;
+		waitText = waitLine(left > 0 ? Math.ceil(left) : waitMs);
 		message = waitText;
-		startWait(db, await readTries(db));
+		if (left <= 0) startWait(db, await readTries(db));
 	}
 
 	onMount(() => {
@@ -132,7 +143,12 @@
 	});
 
 	// What one press learned inside the check, for the lines and screens that follow it.
-	type Found = { noMemory: boolean; damagedRow: KeystoreRow | null; reloading: boolean };
+	type Found = {
+		noMemory: boolean;
+		damagedRow: KeystoreRow | null;
+		reloading: boolean;
+		session: KeySession | null;
+	};
 
 	async function unlock(): Promise<void> {
 		const db = app.db;
@@ -152,7 +168,7 @@
 			return;
 		}
 		busy = true;
-		const found: Found = { noMemory: false, damagedRow: null, reloading: false };
+		const found: Found = { noMemory: false, damagedRow: null, reloading: false, session: null };
 		try {
 			// The row is read inside the check, under the tries lock, so it is the row this try is counted against.
 			const outcome = await runPinCheck(db, async (): Promise<PinCheckResult<true>> => {
@@ -168,6 +184,7 @@
 					const session = await openPinSession(row, keys, counter);
 					// Nothing between the open and the set: no task may run while the keys are open and not held.
 					setSession(session);
+					found.session = session;
 					return { kind: 'good', value: true };
 				} catch (err) {
 					if (err instanceof WrongPinError) return { kind: 'wrong' };
@@ -189,10 +206,10 @@
 				await app.unlockStores();
 				onunlocked?.();
 			} else if (outcome.kind === 'wrong') {
-				if (outcome.waitMs > 0) await showWait(db, outcome.waitMs);
+				if (outcome.waitMs > 0) await showWait(db, outcome.waitMs, true);
 				else message = NOT_RIGHT;
 			} else if (outcome.kind === 'waiting') {
-				await showWait(db, outcome.waitMs);
+				await showWait(db, outcome.waitMs, false);
 			} else if (found.noMemory) {
 				message = LOW_MEMORY;
 			} else if (found.damagedRow) {
@@ -206,6 +223,8 @@
 				}
 			}
 		} catch {
+			// The keys were opened inside the check; a failure after that must not leave them behind a card that says no.
+			if (found.session !== null && getSession() === found.session) dropSession();
 			safeLog({ code: 'E_INTERNAL' });
 			message = UNLOCK_FAILED;
 		} finally {

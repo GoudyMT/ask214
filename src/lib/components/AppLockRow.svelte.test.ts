@@ -21,6 +21,7 @@ type TestApp = {
 	joinRelock: (r: Relockable) => () => void;
 	publish: Mock<(signal: BusSignal) => void>;
 	keyMode: 'local' | 'pin';
+	pinLocked: boolean;
 };
 
 // Which tasks ran, in order, so a test can see that nothing ran between two of them.
@@ -114,6 +115,7 @@ beforeEach(async () => {
 		db,
 		joinRelock: createJoinRelock(relockables),
 		publish: vi.fn(),
+		pinLocked: false,
 		get keyMode() {
 			return mode.value;
 		},
@@ -338,6 +340,8 @@ describe('turning on', () => {
 		expect(getSession()).not.toBeNull();
 		expect(hasText(PIN_ON_LINE)).toBe(true);
 		expect([...document.querySelectorAll('input')]).toHaveLength(0);
+		// The pressed Next is gone with the form; the person is not dropped back at the top of the page.
+		await until(() => document.activeElement === toggleEl(), 'focus back on the toggle');
 	});
 
 	// Between the move and the session no task may run: the old keys are gone and the new ones are not yet held.
@@ -364,6 +368,61 @@ describe('turning on', () => {
 		await until(() => summary() === 'PIN on', 'the row reading PIN on');
 
 		expect(alertText()).toBe(shows ? PACK_LINE : null);
+	});
+});
+
+describe('a Lock while Next works', () => {
+	// A user Lock, an idle lock and a peer's Lock each drop the keys: the ones this turn-on derives must not outlive them.
+	it.each(['user', 'idle', 'peer'] as const)(
+		'writes nothing, and keeps the PIN off, when a %s lock lands during the derive',
+		async (reason) => {
+			derive.mockImplementation(async () => {
+				relockEachSync(relockables, reason);
+				return { macKey, kek };
+			});
+			await mount();
+			await submit('1234', '1234');
+			await until(() => derive.mock.calls.length > 0, 'the derive');
+			await real(150);
+
+			expect(rotate).not.toHaveBeenCalled();
+			expect(app.keyMode).toBe('local');
+			expect(app.pinLocked).toBe(false);
+			expect(app.publish).not.toHaveBeenCalled();
+			expect(getSession()).toBeNull();
+			expect(alertText()).toBeNull();
+		}
+	);
+
+	// The move may already have committed: the PIN is on, and the tab must stay without keys, on the PIN card.
+	it('holds no session, and shows the PIN lock, when a Lock lands during the move', async () => {
+		rotate.mockImplementation(async () => {
+			relockEachSync(relockables, 'user');
+			return { session: await fakeSession(), packHadFiles: false };
+		});
+		await mount();
+		await submit('1234', '1234');
+		await until(() => app.keyMode === 'pin', 'the mode reading PIN');
+
+		expect(getSession()).toBeNull();
+		expect(seams.events).toEqual([]);
+		expect(app.pinLocked).toBe(true);
+		expect(app.publish).toHaveBeenCalledTimes(1);
+		expect(app.publish).toHaveBeenCalledWith({ type: 'keys-changed' });
+	});
+
+	// A switch away locks nothing: during the move it changes nothing.
+	it('turns on as usual when a switch away lands during the move', async () => {
+		rotate.mockImplementation(async () => {
+			relockEachSync(relockables, 'hygiene');
+			return { session: await fakeSession(), packHadFiles: false };
+		});
+		await mount();
+		await submit('1234', '1234');
+		await until(() => summary() === 'PIN on', 'the row reading PIN on');
+
+		expect(getSession()).not.toBeNull();
+		expect(app.pinLocked).toBe(false);
 	});
 });
 

@@ -98,6 +98,15 @@
 		message = null;
 		const pin = first;
 		const again = second;
+		// A Lock, an idle lock or a peer's Lock while Next works must not be outlived by the keys it makes. A switch away
+		// (hygiene) locks nothing: the hidden-page rule above already covers it during the derive.
+		let relocked = false;
+		const leave = app.joinRelock?.({
+			relockSync: (reason) => {
+				if (reason !== 'hygiene') relocked = true;
+			},
+			refresh: () => Promise.resolve()
+		});
 		try {
 			const [pinDerive, rotation, kdf] = await loadAppLock();
 			if (!pinDerive.isPinFormat(pin)) {
@@ -134,23 +143,34 @@
 				return;
 			}
 
+			const counterBefore = await readCounter(db);
+			// A Lock that landed before the move starts: the keys are dropped, nothing is written and nothing is said.
+			if (relocked) return;
 			const result = await (deps.rotate ?? rotation.rotateToPin)(db, {
 				macKey: keys.macKey,
 				kek: keys.kek,
 				salt,
 				kdf: kdf.KDF_V1,
-				counterBefore: await readCounter(db)
+				counterBefore
 			});
-			// Nothing between the move and the session: the old keys are gone and the new ones are not yet held.
-			setSession(result.session);
-			app.publish?.({ type: 'keys-changed' });
-			app.keyMode = 'pin';
+			if (relocked) {
+				// A Lock that landed during the move, which may have committed: the PIN is on, and this tab was locked
+				// before it could hold the new keys, so it shows the PIN card and the other tabs read the new row.
+				app.publish?.({ type: 'keys-changed' });
+				app.keyMode = 'pin';
+				app.pinLocked = true;
+			} else {
+				// Nothing between the move and the session: the old keys are gone and the new ones are not yet held.
+				setSession(result.session);
+				app.publish?.({ type: 'keys-changed' });
+				app.keyMode = 'pin';
+			}
 			if (result.packHadFiles) message = PACK_LINE;
-			await toToggle();
 			await toToggle();
 		} catch (err) {
 			message = fail(err);
 		} finally {
+			leave?.();
 			firstField?.clear();
 			secondField?.clear();
 			busy = false;

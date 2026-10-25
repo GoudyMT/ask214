@@ -194,6 +194,41 @@ describe('a good PIN', () => {
 		expect(alertText()).toBe(UNLOCK_FAILED);
 		expect(onunlocked).not.toHaveBeenCalled();
 		expect(fieldEl().value).toBe('');
+		expect(getSession()).toBeNull();
+	});
+
+	// The keys are set inside the check; any failure after that leaves the card up, and the keys must not stay behind it.
+	it('holds no session when the tries reset fails after the keys were opened', async () => {
+		let armed = false;
+		derive.mockImplementation(async () => {
+			armed = true;
+			return { macKey: fx.macKey, kek: fx.kek };
+		});
+		const open = db.transaction.bind(db);
+		vi.spyOn(db, 'transaction').mockImplementation(((
+			stores: string | string[],
+			mode?: IDBTransactionMode,
+			options?: IDBTransactionOptions
+		) => {
+			if (armed && mode === 'readwrite') throw new Error('E_TEST_TX');
+			return open(stores, mode, options);
+		}) as typeof db.transaction);
+		await mount();
+		await press(GOOD);
+
+		expect(alertText()).toBe(UNLOCK_FAILED);
+		expect(getSession()).toBeNull();
+		expect(app.unlockStores).not.toHaveBeenCalled();
+		expect(onunlocked).not.toHaveBeenCalled();
+	});
+
+	it('holds no session when the app cannot load the stores', async () => {
+		Reflect.deleteProperty(app, 'unlockStores');
+		await mount();
+		await press(GOOD);
+
+		expect(alertText()).toBe(UNLOCK_FAILED);
+		expect(getSession()).toBeNull();
 	});
 });
 
@@ -297,6 +332,44 @@ describe('a wait owed', () => {
 		vi.advanceTimersByTime(5_000);
 		await real(100);
 		expect((await readTries(db)).waitMs).toBe(30_000);
+	});
+
+	// A person who keeps pressing Unlock while they wait must not push the end of the wait away: the count runs on, and
+	// the right PIN opens once it is over.
+	it('keeps counting through presses made every 3 seconds, and opens once the wait is over', async () => {
+		await putTries({ count: 4, waitMs: 30_000, pending: false });
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		let now = 0;
+		await mount({ clock: { perfNow: () => now } });
+		await until(() => alertText() !== null, 'the wait line at mount');
+
+		// Typed straight into the field and pressed in the page: the fake timers are the page's own.
+		const pressOnce = async () => {
+			fieldEl().value = GOOD;
+			fieldEl().dispatchEvent(new Event('input', { bubbles: true }));
+			unlockEl().click();
+			await until(
+				() => fieldEl().value === '' && settled(),
+				'the press ended and emptied the field'
+			);
+		};
+		const lines: (string | null)[] = [];
+		for (let i = 0; i < 9; i += 1) {
+			now += 3_000;
+			vi.advanceTimersByTime(3_000);
+			await pressOnce();
+			lines.push(alertText());
+		}
+		expect(lines.at(2)).toBe('That PIN is not right. You can try again in 21 seconds.');
+		expect(lines.at(-1)).toBe('That PIN is not right. You can try again in 3 seconds.');
+		expect(derive).not.toHaveBeenCalled();
+
+		now += 3_000;
+		vi.advanceTimersByTime(3_000);
+		await until(async () => (await readTries(db)).waitMs === 0, 'the stored wait at zero');
+		await pressOnce();
+		await until(() => onunlocked.mock.calls.length > 0, 'the page was told it unlocked');
+		expect(derive).toHaveBeenCalledTimes(1);
 	});
 });
 
