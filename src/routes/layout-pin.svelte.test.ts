@@ -19,6 +19,8 @@ import {
 	setSession
 } from '$lib/keystore/session';
 import { takeSnapshot } from '$lib/backup/snapshot';
+import { eraseEverything } from '$lib/profile/erase';
+import { KeystoreHmacMismatchError } from '$lib/keystore/read';
 import { readDeviceState } from '$lib/profile/device-state';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
 import { reqToPromise, withStores, type StoreName } from '$lib/db/schema';
@@ -33,10 +35,11 @@ const harness = vi.hoisted(() => ({
 	app: null as ProfileApp | null,
 	idle: [] as IdleTimerOptions[],
 	load: null as {
-		mock: { calls: unknown[] };
+		mock: { calls: unknown[]; results: { value: unknown }[] };
 		mockRejectedValueOnce: (e: unknown) => unknown;
 	} | null,
-	calendar: null as { load: () => Promise<void> } | null
+	calendar: null as { load: () => Promise<void> } | null,
+	timeline: null as { load: () => Promise<void> } | null
 }));
 
 vi.mock('$lib/db/schema', async (importOriginal) => {
@@ -75,6 +78,17 @@ vi.mock('$lib/calendar/store.svelte', async (importOriginal) => {
 		createCalendarSyncStore: (...args: Parameters<typeof real.createCalendarSyncStore>) => {
 			const store = real.createCalendarSyncStore(...args);
 			harness.calendar = store;
+			return store;
+		}
+	};
+});
+vi.mock('$lib/timeline/state.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/timeline/state.svelte')>();
+	return {
+		...real,
+		createTimelineStateStore: (...args: Parameters<typeof real.createTimelineStateStore>) => {
+			const store = real.createTimelineStateStore(...args);
+			harness.timeline = store;
 			return store;
 		}
 	};
@@ -205,6 +219,17 @@ async function readyApp(): Promise<ProfileApp> {
 async function unlock(app: ProfileApp): Promise<void> {
 	await openSession();
 	await need(app.unlockStores)();
+}
+
+/** Settings' Erase: it relocks first, then wipes through the app's own `wipeAll`. */
+function settingsErase(app: ProfileApp): Promise<void> {
+	return eraseEverything({
+		relock: () => app.relockAll?.(),
+		wipeAll: app.wipeAll ?? null,
+		clearStorage: () => {},
+		clearCaches: async () => {},
+		reload: () => {}
+	});
 }
 
 /** The app of a PIN tab that has been unlocked. */
@@ -396,7 +421,7 @@ describe('the root layout, an unlock that does not go through', () => {
 		expect(getSession()).toBeNull();
 		expect(app.store?.locked).toBe(true);
 		expect(app.status).toBe('damaged');
-		await need(app.wipeAll)();
+		await settingsErase(app);
 		expect(await readRaw('keystore')).toBeUndefined();
 		expect(getSession()).toBeNull();
 		await vi.waitFor(() => expect(heard).toContainEqual({ type: 'keys-changed' }));
@@ -421,8 +446,8 @@ describe('the root layout, an unlock that does not go through', () => {
 		expect(await readRaw('keystore')).toBeDefined();
 	});
 
-	// The idle lock does not move the lock counter, so only letting go of the held keys stops the erase's check from reading.
-	it('does not erase after an idle lock has ended the check on the damaged screen', async () => {
+	// The check holds no key, so a lock on the damaged screen leaves the person's way out intact.
+	it('still erases after an idle lock on the damaged screen', async () => {
 		await pinDevice(true);
 		await flipBody();
 		await render(Layout, { children });
@@ -430,12 +455,59 @@ describe('the root layout, an unlock that does not go through', () => {
 		await openSession();
 		await expect(need(app.unlockStores)()).rejects.toThrow();
 		harness.idle[0]?.onIdle();
-		const seen = holdNavigation();
 
-		await expect(need(app.wipeAll)()).rejects.toThrow('E_NO_LONGER_DAMAGED');
+		await settingsErase(app);
 
-		expect(seen).toHaveLength(1);
-		expect(await readRaw('keystore')).toBeDefined();
+		expect(await readRaw('keystore')).toBeUndefined();
+	});
+
+	// Another tab erased, restored or changed the lock while this unlock read: that damage is not this tab's to erase.
+	it.each([
+		[
+			'the keystore row is another install',
+			async () => {
+				const row = need(await readRaw('keystore'));
+				await putRaw('keystore', { ...row, installUuid: new Uint8Array(16).fill(9) });
+			}
+		],
+		['the lock counter moved', async () => void (await bumpCounter(need(db)))]
+	])('does not open the damaged screen when %s at the moment of failure', async (_name, change) => {
+		await pinDevice(true);
+		await render(Layout, { children });
+		const app = await readyApp();
+		await openSession();
+		await change();
+		harness.load?.mockRejectedValueOnce(new KeystoreHmacMismatchError());
+
+		await expect(need(app.unlockStores)()).rejects.toThrow(KeystoreHmacMismatchError);
+
+		expect(app.status).toBe('ready');
+		expect(getSession()).toBeNull();
+		expect(app.pinLocked).toBe(true);
+	});
+
+	// A switch away is not a lock: the keys stay, and coming back reads the profile again with no PIN.
+	it('keeps the keys when the page is hidden in the last moment of the unlock', async () => {
+		await pinDevice(true);
+		await render(Layout, { children });
+		const app = await readyApp();
+		const calendar = need(harness.calendar);
+		const read = calendar.load.bind(calendar);
+		// Once: the way back re-reads the calendar through the same method.
+		vi.spyOn(calendar, 'load').mockImplementationOnce(async () => {
+			await read();
+			setHidden(true);
+		});
+		const session = (await openSession(), getSession());
+
+		await need(app.unlockStores)();
+
+		expect(getSession()).toBe(session);
+		expect(app.pinLocked).toBe(false);
+		expect(app.store?._getStateForTest()).toBeNull();
+		setHidden(false);
+		await vi.waitFor(() => expect(app.store?._getStateForTest()).not.toBeNull());
+		expect(getSession()).toBe(session);
 	});
 });
 
@@ -593,30 +665,26 @@ describe('the root layout, which relocks drop the keys', () => {
 describe('the root layout, a tab that missed a Lock', () => {
 	it('a tab restored from the back/forward cache refuses the re-read after a Lock made elsewhere', async () => {
 		const app = await unlockedApp();
+		// The timeline and calendar re-reads refuse on a moved counter too and would drop the session first; they wait,
+		// so that it is the profile's own check that is shown to refuse.
+		let open = (): void => {};
+		const gate = new Promise<void>((resolve) => (open = resolve));
+		vi.spyOn(need(harness.timeline), 'load').mockImplementation(() => gate);
+		vi.spyOn(need(harness.calendar), 'load').mockImplementation(() => gate);
+		const reads = need(harness.load).mock.results.length;
 		// Another tab's Lock reaches the tab asleep in the cache only as this counter.
 		await bumpCounter(need(db));
 
 		window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
 
+		const reread = need(harness.load).mock.results[reads]?.value;
+		await expect(reread).rejects.toThrow(KeystoreLockedError);
+		open();
 		await vi.waitFor(() => {
 			expect(getSession()).toBeNull();
 			expect(app.pinLocked).toBe(true);
 		});
 		expect(app.store?._getStateForTest()).toBeNull();
-	});
-});
-
-describe('the root layout, a profile re-read after a Lock made elsewhere', () => {
-	// The timeline and calendar loads refuse on the moved counter too, so only a re-read that reaches the profile first
-	// shows that the profile's own check is there.
-	it('is refused by the profile store itself, before any other store has noticed', async () => {
-		const app = await unlockedApp();
-		await bumpCounter(need(db));
-
-		await expect(need(app.store).load()).rejects.toThrow(KeystoreLockedError);
-
-		expect(getSession()).toBeNull();
-		expect(app.pinLocked).toBe(true);
 	});
 });
 
@@ -646,16 +714,8 @@ describe('every other key read, with a live session', () => {
 });
 
 describe("the profile store's own reads, with a live session", () => {
-	// load() and save() read the row inside their own transactions, so they do not go through the check the other
-	// stores' reads do.
-	it('load refuses after the lock counter moved, and drops the session', async () => {
-		await pinDevice(true);
-		await openSession();
-		await bumpCounter(need(db));
-		await expect(createProfileStore(need(db)).load()).rejects.toThrow(KeystoreLockedError);
-		expect(getSession()).toBeNull();
-	});
-
+	// save() reads the row inside its own transaction, so it does not go through the check the other stores' reads do. (The
+	// load's own check is shown by the back/forward cache case above.)
 	it('save refuses after the lock counter moved, and drops the session', async () => {
 		await pinDevice(true);
 		await openSession();

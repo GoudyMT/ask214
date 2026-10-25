@@ -31,14 +31,13 @@
 	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus, type BusSignal } from '$lib/broadcast/bus';
 	import { bumpCounter } from '$lib/keystore/app-lock-store';
+	import { dropSession, getSession, setOnSessionMismatch } from '$lib/keystore/session';
 	import {
-		dropSession,
-		getSession,
-		KeystoreLockedError,
-		setOnSessionMismatch,
-		setSession,
-		type KeySession
-	} from '$lib/keystore/session';
+		checkStoredBytes,
+		keystoreHasIdentity,
+		readStoredBytes,
+		type StoredBytes
+	} from '$lib/profile/damaged-bytes';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
@@ -228,12 +227,8 @@
 				// relocked handler read the list at event time).
 				// The session relockable stands first: a relock that is not page hygiene forgets the keys before any store
 				// answers, so a store that cannot be reached still loses them.
-				// The keys of an unlock whose profile turned out damaged, held for the erase's own check and for nothing else:
-				// any lock that is not page hygiene lets go of them, so the erase then cannot read and refuses.
-				let heldForCheck: KeySession | null = null;
 				const relockables: Relockable[] = [
 					createSessionRelockable(() => {
-						heldForCheck = null;
 						if (app.keyMode === 'pin') app.pinLocked = true;
 					}),
 					result.store
@@ -277,28 +272,31 @@
 					try {
 						await result.store.load();
 					} catch (e) {
+						// The bytes that failed, taken before the lock: damage is this tab's only while the rows are still the ones
+						// these keys opened (another tab may have erased, restored or changed the lock meanwhile).
+						let seen: StoredBytes | null = null;
+						if (held && isDamagedRecord(e)) {
+							const now = await readStoredBytes(result.db).catch(() => null);
+							if (
+								now &&
+								now.counter === held.counter &&
+								keystoreHasIdentity(now.keystore, held.identity)
+							) {
+								seen = now;
+							}
+						}
 						// Fail closed: no keys and no plaintext stay behind the lock card, and a retry is a fresh unlock.
 						echo.answer(() => relockEachSync(relockables, 'peer'));
-						if (isDamagedRecord(e)) {
-							heldForCheck = held;
-							app.enterDamaged?.(async () => {
-								if (!heldForCheck) throw new KeystoreLockedError();
-								setSession(heldForCheck);
-								try {
-									const check = createProfileStore(result.db);
-									await check.load();
-									check.relockSync('user');
-								} finally {
-									dropSession();
-								}
-							});
-						}
+						const bytes = seen;
+						if (bytes) app.enterDamaged?.(() => checkStoredBytes(result.db, bytes));
 						throw e;
 					}
 					const rest = await Promise.allSettled([timelineStore?.load(), calendarStore?.load()]);
 					if (rest.some((r) => r.status === 'rejected')) safeLog({ code: 'E_INIT_FAILED' });
-					// A Lock that landed while the other stores were read leaves the lock up.
-					if (held && getSession() === held && !result.store.locked) app.pinLocked = false;
+					// A Lock that landed while the other stores were read leaves the lock up; a switch away did not lock anything.
+					if (held && getSession() === held && result.store.lockState !== 'locked') {
+						app.pinLocked = false;
+					}
 				};
 				app.joinRelock = createJoinRelock(relockables);
 				app.publish = (s) => echo.publish(s);
