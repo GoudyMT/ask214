@@ -40,10 +40,11 @@ afterEach(async () => {
  * data key and the HMAC key are made extractable ONLY here, to be wrapped into the bag.
  */
 async function pinFixture() {
-	const macKey = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, [
-		'sign',
-		'verify'
-	]);
+	const macKey = await crypto.subtle.generateKey(
+		{ name: 'HMAC', hash: 'SHA-256', length: 256 },
+		false,
+		['sign', 'verify']
+	);
 	const kek = await crypto.subtle.generateKey({ name: 'AES-KW', length: 256 }, false, [
 		'wrapKey',
 		'unwrapKey'
@@ -147,7 +148,8 @@ describe('with a PIN row and no session, no store reads or writes', () => {
 		await lockedDevice();
 		const before = await snapshot();
 		await expect(run()).rejects.toThrow(KeystoreLockedError);
-		expect(await snapshot()).toEqual(before);
+		// Strict, because toEqual reads two ArrayBuffers of different bytes (recordHmac, a MAC) as equal.
+		expect(await snapshot()).toStrictEqual(before);
 	});
 });
 

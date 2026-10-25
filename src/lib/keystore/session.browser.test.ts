@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KDF_V1 } from '../backup/kdf-params';
 import { keyIdentity, signKeystore, type KeystoreRecordPin, type KeystoreRecordV1 } from './record';
-import { keysForRow, type KeystoreRow } from './read';
+import { isDamagedRecord } from '../profile/damaged';
+import { keysForRow, KeystoreHmacMismatchError, type KeystoreRow } from './read';
 import {
 	assertSessionKeys,
 	dropSession,
@@ -21,10 +22,7 @@ const HMAC = { name: 'HMAC', hash: 'SHA-256', length: 256 } as const;
  * them. The data key and the HMAC key are made extractable ONLY here, to be wrapped into the bag.
  */
 async function pinFixture(opts: { generation?: number } = {}) {
-	const macKey = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, [
-		'sign',
-		'verify'
-	]);
+	const macKey = await crypto.subtle.generateKey(HMAC, false, ['sign', 'verify']);
 	const kek = await crypto.subtle.generateKey({ name: 'AES-KW', length: 256 }, false, [
 		'wrapKey',
 		'unwrapKey'
@@ -137,6 +135,24 @@ describe('assertSessionKeys: every session key is non-extractable with its algor
 			'bootstrapMacKey'
 		],
 		[
+			'an HMAC key of 512 bits',
+			async () =>
+				crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256', length: 512 }, false, [
+					'sign',
+					'verify'
+				]),
+			'hmacKey'
+		],
+		[
+			'a PIN MAC key of 512 bits',
+			async () =>
+				crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256', length: 512 }, false, [
+					'sign',
+					'verify'
+				]),
+			'bootstrapMacKey'
+		],
+		[
 			'a PIN MAC key made extractable',
 			async () => crypto.subtle.generateKey(HMAC, true, ['sign', 'verify']),
 			'bootstrapMacKey'
@@ -181,18 +197,38 @@ describe('openPinSession', () => {
 
 	it('is a wrong PIN when the record MAC does not verify under the PIN MAC key', async () => {
 		const { row, kek } = await pinFixture();
-		const other = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, [
-			'sign',
-			'verify'
-		]);
+		const other = await crypto.subtle.generateKey(HMAC, false, ['sign', 'verify']);
 		await expect(openPinSession(row, { macKey: other, kek }, 0)).rejects.toThrow(WrongPinError);
 	});
 
-	it('is a wrong PIN when the row carries no MAC', async () => {
+	// A row no PIN could open is damage: a wrong-PIN answer would count tries against a PIN that was never the problem.
+	it.each([
+		[
+			'carries no MAC',
+			(row: KeystoreRecordPin) => {
+				const bare = { ...row };
+				delete bare.recordHmac;
+				return bare;
+			}
+		],
+		['has a bag one byte short', (row: KeystoreRecordPin) => ({ ...row, bag: row.bag.slice(1) })],
+		['has a salt of 15 bytes', (row: KeystoreRecordPin) => ({ ...row, salt: row.salt.slice(1) })]
+	])('is damage, not a wrong PIN, when the row %s', async (_name, damage) => {
 		const { row, macKey, kek } = await pinFixture();
-		const bare = { ...row };
-		delete bare.recordHmac;
-		await expect(openPinSession(bare, { macKey, kek }, 0)).rejects.toThrow(WrongPinError);
+		const error = await openPinSession(damage(row), { macKey, kek }, 0).catch((e: unknown) => e);
+		expect(error).toBeInstanceOf(KeystoreHmacMismatchError);
+		expect(isDamagedRecord(error)).toBe(true);
+	});
+
+	it('is damage when the right MAC key meets a bag the wrapping key cannot open', async () => {
+		const { row, macKey } = await pinFixture();
+		const other = await crypto.subtle.generateKey({ name: 'AES-KW', length: 256 }, false, [
+			'wrapKey',
+			'unwrapKey'
+		]);
+		const error = await openPinSession(row, { macKey, kek: other }, 0).catch((e: unknown) => e);
+		expect(error).toBeInstanceOf(KeystoreHmacMismatchError);
+		expect(isDamagedRecord(error)).toBe(true);
 	});
 
 	it('names its errors', () => {
@@ -311,6 +347,19 @@ describe('keysForRow with no session', () => {
 		setOnSessionMismatch(handler);
 		expect(() => keysForRow(row)).toThrow(KeystoreLockedError);
 		expect(handler).not.toHaveBeenCalled();
+	});
+
+	// A stored row can say anything. A mode this build does not know has no keys to give: damage, never a raw TypeError.
+	it('refuses a row of an unknown mode as damage', async () => {
+		const odd = { ...(await localRow()), mode: 'passphrase' } as unknown as KeystoreRow;
+		let error: unknown;
+		try {
+			keysForRow(odd);
+		} catch (e) {
+			error = e;
+		}
+		expect(error).toBeInstanceOf(KeystoreHmacMismatchError);
+		expect(isDamagedRecord(error)).toBe(true);
 	});
 
 	it('gives a local row its own handles, as before', async () => {

@@ -8,7 +8,13 @@ import {
 	type KeystoreKeys,
 	type KeystoreRecord
 } from './record';
-import { failMismatch, getSession, inOwnKeyChange, KeystoreLockedError } from './session';
+import {
+	failMismatch,
+	getSession,
+	inOwnKeyChange,
+	KeystoreHmacMismatchError,
+	KeystoreLockedError
+} from './session';
 
 /**
  * The one place a reader gets the keys it may use. A reader never reaches into a row for a
@@ -22,12 +28,7 @@ export class KeystoreNotInitializedError extends Error {
 	}
 }
 
-export class KeystoreHmacMismatchError extends Error {
-	constructor() {
-		super('E_KEYSTORE_HMAC_MISMATCH');
-		this.name = 'KeystoreHmacMismatchError';
-	}
-}
+export { KeystoreHmacMismatchError };
 
 export type KeystoreRow = KeystoreRecord & { id: number };
 
@@ -61,6 +62,8 @@ export function keysForRow(row: KeystoreRow): KeystoreKeys {
 			bootstrapMacKey: session.bootstrapMacKey
 		};
 	}
+	// A stored row can say anything: a mode this build does not know has no keys to give and is damage, not a lock.
+	if (row.mode !== 'local') throw new KeystoreHmacMismatchError();
 	if (session && !inOwnKeyChange()) failMismatch();
 	return { dataKey: row.dataKeyRef, hmacKey: row.hmacKeyRef, bootstrapMacKey: row.hmacKeyRef };
 }

@@ -1,4 +1,11 @@
-import { keyIdentity, verifyKeystore, type KeyIdentity, type KeystoreRecordPin } from './record';
+import {
+	keyIdentity,
+	PIN_BAG_BYTES,
+	PIN_SALT_BYTES,
+	verifyKeystore,
+	type KeyIdentity,
+	type KeystoreRecordPin
+} from './record';
 
 /**
  * The keys one tab holds in memory after a PIN unlock. Nothing here is stored: a reload drops it, and the next read finds
@@ -20,6 +27,14 @@ export class WrongPinError extends Error {
 	}
 }
 
+// Defined here, and exported again by read.ts, so that opening a session can refuse a damaged row without a cycle.
+export class KeystoreHmacMismatchError extends Error {
+	constructor() {
+		super('E_KEYSTORE_HMAC_MISMATCH');
+		this.name = 'KeystoreHmacMismatchError';
+	}
+}
+
 export class KeystoreLockedError extends Error {
 	constructor() {
 		super('E_KEYSTORE_LOCKED');
@@ -29,7 +44,7 @@ export class KeystoreLockedError extends Error {
 
 // Wrapped keys are 32 bytes plus AES-KW's 8; the bag holds the data key, then the HMAC key.
 const WRAPPED_KEY_BYTES = 40;
-const MIN_HMAC_KEY_BITS = 256;
+const HMAC_KEY_BITS = 256;
 
 let session: KeySession | null = null;
 let onMismatch: (() => void) | null = null;
@@ -97,7 +112,7 @@ function isMacKey(key: CryptoKey): boolean {
 		!key.extractable &&
 		key.algorithm.name === 'HMAC' &&
 		(key.algorithm as HmacKeyAlgorithm).hash.name === 'SHA-256' &&
-		(key.algorithm as HmacKeyAlgorithm).length >= MIN_HMAC_KEY_BITS &&
+		(key.algorithm as HmacKeyAlgorithm).length === HMAC_KEY_BITS &&
 		sameUsages(key, ['sign', 'verify'])
 	);
 }
@@ -112,15 +127,26 @@ export function assertSessionKeys(
 }
 
 /**
- * From a PIN row and the two keys the PIN step derived: the record MAC is checked under the MAC key (a MAC that fails at
- * unlock means the PIN is wrong), then the bag is unwrapped under the wrapping key into keys that cannot be extracted.
- * Does not set the session.
+ * From a PIN row and the two keys the PIN step derived: a row with no MAC, or a salt or bag of the wrong length, is
+ * damaged (never a wrong try: no PIN could open it). Otherwise the record MAC is checked under the MAC key (a MAC that
+ * fails at unlock means the PIN is wrong), then the bag is unwrapped under the wrapping key into keys that cannot be
+ * extracted. Does not set the session.
  */
 export async function openPinSession(
 	row: KeystoreRecordPin,
 	pinKeys: { macKey: CryptoKey; kek: CryptoKey },
 	counter: number
 ): Promise<KeySession> {
+	const { salt, bag } = row;
+	if (
+		!row.recordHmac ||
+		!(salt instanceof Uint8Array) ||
+		salt.length !== PIN_SALT_BYTES ||
+		!(bag instanceof Uint8Array) ||
+		bag.length !== PIN_BAG_BYTES
+	) {
+		throw new KeystoreHmacMismatchError();
+	}
 	if (!(await verifyKeystore(row, { bootstrapMacKey: pinKeys.macKey }))) throw new WrongPinError();
 	let dataKey: CryptoKey;
 	let hmacKey: CryptoKey;
@@ -145,7 +171,7 @@ export async function openPinSession(
 		);
 	} catch {
 		// The MAC held, so the bag is the one that was made; a bag the wrapping key cannot open is a damaged row, not a typo.
-		throw new Error('E_KEYSTORE_SHAPE');
+		throw new KeystoreHmacMismatchError();
 	}
 	const keys = { dataKey, hmacKey, bootstrapMacKey: pinKeys.macKey };
 	assertSessionKeys(keys);

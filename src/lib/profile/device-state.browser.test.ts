@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { withStores, reqToPromise } from '../db/schema';
+import { KeystoreLockedError } from '../keystore/session';
 import { readDeviceState } from './device-state';
 import { signSidecar, type ProfileHwmPayload } from './sidecars';
 import { createProfileStore } from './store.svelte';
@@ -239,5 +240,23 @@ describe('readDeviceState', () => {
 		rec[rec.length - 1] = (rec[rec.length - 1] ?? 0) ^ 1;
 		await putRow('profile', { ...row, rec });
 		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
+	});
+
+	// A tab that locks between the key read and this one holds good data it cannot open; the restore flow offers an erase for damage.
+	it('a PIN row with no session is a locked tab, never DEVICE_DAMAGED', async () => {
+		await putRow('keystore', {
+			id: 0,
+			v: 1,
+			mode: 'pin',
+			keystoreGeneration: 0,
+			epoch: 0,
+			ivCounter: 0,
+			installUuid: new Uint8Array(16).fill(1),
+			kdf: { v: 19, m: 131072, t: 4, p: 2, dkLen: 32 },
+			salt: new Uint8Array(16).fill(2),
+			bag: new Uint8Array(80).fill(3),
+			recordHmac: new ArrayBuffer(32)
+		});
+		await expect(readDeviceState(db)).rejects.toThrow(KeystoreLockedError);
 	});
 });

@@ -6,6 +6,7 @@ import {
 	keysForRow,
 	type KeystoreRow
 } from '../keystore/read';
+import { KeystoreLockedError } from '../keystore/session';
 import { decryptProfileRecord } from './crypto-boundary';
 import { verifySidecar, type SignedSidecar } from './sidecars';
 import { withStores, reqToPromise, type StoreName } from '../db/schema';
@@ -149,8 +150,10 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 			mark,
 			lastSeenAt
 		};
-	} catch {
-		throw new Error('E_RESTORE_DEVICE_DAMAGED');
+	} catch (e) {
+		// A tab that locked in the middle of this read holds good data it cannot open right now: damage offers an erase.
+		if (e instanceof KeystoreLockedError) throw e;
+		throw new Error('E_RESTORE_DEVICE_DAMAGED', { cause: e });
 	} finally {
 		if (decoded) zeroizeRecord(decoded as unknown as Record<string, unknown>);
 	}
