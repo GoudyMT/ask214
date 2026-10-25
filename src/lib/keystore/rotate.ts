@@ -2,6 +2,7 @@ import { decryptCalendarRecord, encryptCalendarRecord } from '../calendar/crypto
 import type { CalendarSyncState } from '../calendar/types';
 import { decryptRecord, encryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { rotateOrUpgrade } from '../db/locks';
+import { ENCRYPTED_STORES, type EncryptedStoreName } from '../db/registry';
 import { reqToPromise, withStores, type StoreName } from '../db/schema';
 import { decryptProfileRecord, encryptProfileRecord } from '../profile/crypto-boundary';
 import { zeroizeRecord } from '../profile/lifecycle';
@@ -62,7 +63,18 @@ type Put = { store: StoreName; value: unknown };
 
 // Wrapped keys are 32 bytes plus AES-KW's 8; the bag holds the data key, then the HMAC key.
 const WRAPPED_KEY_BYTES = 40;
-const PACK_STORE: StoreName = 'skillbridge-finder-pack';
+// What the move does with each encrypted store. Every registry entry must be named, so a store added to the registry
+// fails the type-check here instead of being left behind under a key that is gone. A carried store is read out and
+// sealed again by the code below; a cleared one holds public, re-downloadable rows and is emptied.
+const FATE: Record<EncryptedStoreName, 'carried' | 'cleared'> = {
+	profile: 'carried',
+	'timeline-state': 'carried',
+	'calendar-sync': 'carried',
+	byok: 'carried',
+	'skillbridge-finder': 'carried',
+	'skillbridge-finder-pack': 'cleared'
+};
+const CLEARED: StoreName[] = ENCRYPTED_STORES.filter((store) => FATE[store] === 'cleared');
 // The stored API key has no marker: one fixed generation and the context its store seals it under.
 const BYOK_CTX: RecordCtx = { storeName: 'byok', recordId: 'self', schemaVersion: 1 };
 const BYOK_GENERATION = 1;
@@ -116,7 +128,13 @@ type Carried = {
  * does not verify or open is the store's error and nothing else.
  */
 async function carry<T>(
-	spec: { store: SidecarStore; required: boolean; codec: Codec<T> },
+	spec: {
+		store: SidecarStore;
+		required: boolean;
+		codec: Codec<T>;
+		/** For a record that carries its own generation: it is sealed at that number, so it must be the marker's. */
+		ownGeneration?: (value: T) => number;
+	},
 	body: Body | undefined,
 	mark: Mark | undefined,
 	identity: KeyIdentity,
@@ -142,6 +160,10 @@ async function carry<T>(
 		if (!body) throw new RotationStoreError(spec.store);
 		const value = await spec.codec.open(body.rec, identity, keys.dataKey, payload.generation);
 		opened?.(value);
+		// Sealed at one number and opened at another, a record would never open again, and this move drops the old key.
+		if (spec.ownGeneration && spec.ownGeneration(value) !== payload.generation) {
+			throw new RotationStoreError(spec.store);
+		}
 		return {
 			store: spec.store,
 			mark: markStore,
@@ -169,7 +191,7 @@ function readCut(db: IDBDatabase) {
 		'skillbridge-finder',
 		'skillbridge-finder-hwm',
 		'byok',
-		PACK_STORE
+		...CLEARED
 	];
 	return withStores(db, stores, 'readonly', (tx) => {
 		const get = <T>(store: StoreName) => reqToPromise<T | undefined>(tx.objectStore(store).get(0));
@@ -183,7 +205,9 @@ function readCut(db: IDBDatabase) {
 			get<Body>('skillbridge-finder'),
 			get<Mark>('skillbridge-finder-hwm'),
 			get<Body>('byok'),
-			reqToPromise<number>(tx.objectStore(PACK_STORE).count())
+			Promise.all(CLEARED.map((store) => reqToPromise<number>(tx.objectStore(store).count()))).then(
+				(counts) => counts.reduce((sum, count) => sum + count, 0)
+			)
 		]);
 	});
 }
@@ -296,7 +320,12 @@ async function move(
 	};
 	add(
 		await carry(
-			{ store: 'profile', required: true, codec: PROFILE },
+			{
+				store: 'profile',
+				required: true,
+				codec: PROFILE,
+				ownGeneration: (profile) => profile.generation
+			},
 			profileBody,
 			profileMark,
 			identity,
@@ -395,7 +424,7 @@ async function move(
 
 	// 4. One transaction. The counter goes first: if it is not the one the caller noted, the lock moved while the PIN was
 	// being made (an erase, a restore or another tab's change), and the whole move is dropped.
-	const touched = new Set<StoreName>([...puts.map((put) => put.store), PACK_STORE, 'app-lock']);
+	const touched = new Set<StoreName>([...puts.map((put) => put.store), ...CLEARED, 'app-lock']);
 	await commit(db, [...touched], async (tx) => {
 		let written = 0;
 		const counter = await bumpCounterIn(tx);
@@ -405,7 +434,7 @@ async function move(
 			tx.objectStore(put.store).put(put.value);
 			deps.afterPut?.(written++, put.store);
 		}
-		tx.objectStore(PACK_STORE).clear();
+		for (const store of CLEARED) tx.objectStore(store).clear();
 		clearTriesIn(tx);
 	});
 

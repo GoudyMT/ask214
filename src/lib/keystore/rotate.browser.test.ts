@@ -3,9 +3,12 @@ import { createByokStore } from '../ask/byok/store';
 import { KDF_V1 } from '../backup/kdf-params';
 import { createCalendarSyncStore } from '../calendar/store.svelte';
 import { AesGcmAuthError } from '../crypto/aes-gcm';
-import { decryptRecord } from '../crypto/record-crypto';
+import { decryptRecord, encryptRecord } from '../crypto/record-crypto';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
+import { ENCRYPTED_STORES, isEncryptedStore } from '../db/registry';
 import { reqToPromise, STORES, withStores, type StoreName } from '../db/schema';
+import { encodeProfile } from '../profile/codec';
+import { decryptProfileRecord } from '../profile/crypto-boundary';
 import { readDeviceState } from '../profile/device-state';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { createProfileStore } from '../profile/store.svelte';
@@ -152,6 +155,37 @@ async function snapshot(): Promise<Record<string, unknown>> {
 const packRows = () =>
 	withStores(db, PACK, 'readonly', (tx) => reqToPromise<Row[]>(tx.objectStore(PACK).getAll()));
 
+/** The write time in each of the four markers. */
+async function markerTimes(): Promise<number[]> {
+	const times: number[] = [];
+	for (const store of [
+		'profile-hwm',
+		'timeline-state-hwm',
+		'calendar-sync-hwm',
+		'skillbridge-finder-hwm'
+	] as const) {
+		times.push((need(await readRaw(store)).payload as { ts: number }).ts);
+	}
+	return times;
+}
+
+/** Every transaction opened on a database from now until `stop`, as it was opened. */
+function watchTransactions() {
+	const original = IDBDatabase.prototype.transaction;
+	const seen: { mode: IDBTransactionMode; durability: string; stores: string[] }[] = [];
+	const spy = vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (
+		this: IDBDatabase,
+		stores: string | Iterable<string>,
+		mode?: IDBTransactionMode,
+		options?: IDBTransactionOptions
+	) {
+		const tx = original.call(this, stores, mode, options);
+		seen.push({ mode: tx.mode, durability: tx.durability, stores: [...tx.objectStoreNames] });
+		return tx;
+	});
+	return { seen, stop: () => spy.mockRestore() };
+}
+
 /** The PIN step's two keys, as it makes them: non-extractable, the MAC key signing and the wrapping key wrapping. */
 async function pinFixture() {
 	const macKey = await crypto.subtle.generateKey(HMAC, false, ['sign', 'verify']);
@@ -258,7 +292,20 @@ describe('rotateToPin', () => {
 		await buildDevice();
 		const pin = await pinFixture();
 		const stores: string[] = [];
+		const cleared: string[] = [];
+		const originalClear = IDBObjectStore.prototype.clear;
+		const clearSpy = vi.spyOn(IDBObjectStore.prototype, 'clear').mockImplementation(function (
+			this: IDBObjectStore
+		) {
+			cleared.push(this.name);
+			return originalClear.call(this);
+		});
 		await rotate(pin, {}, { afterPut: (_index, store) => void stores.push(store) });
+		clearSpy.mockRestore();
+		// Every store the registry names is either put to or emptied: one added later cannot be left under a gone key.
+		expect(
+			new Set([...stores, ...cleared].filter((store) => isEncryptedStore(store)))
+		).toStrictEqual(new Set(ENCRYPTED_STORES));
 		expect([...stores].sort()).toStrictEqual([
 			'app-lock',
 			'byok',
@@ -299,11 +346,23 @@ describe('rotateToPin', () => {
 		await buildDevice();
 		const before = await readEverything();
 		const old = need(await readRaw('keystore'));
+		const writtenAt = await markerTimes();
 		const pin = await pinFixture();
 
+		const transactions = watchTransactions();
 		const { session, packHadFiles } = await rotate(pin);
+		transactions.stop();
 		setSession(session);
 
+		// One write transaction, durable, over everything the move changes - the counter and the pack included.
+		const writes = transactions.seen.filter((tx) => tx.mode !== 'readonly');
+		expect(writes).toHaveLength(1);
+		expect(writes[0]?.durability).toBe('strict');
+		expect(writes[0]?.stores).toEqual(
+			expect.arrayContaining(['keystore', 'app-lock', 'skillbridge-finder-pack'])
+		);
+		// The markers say when each record was last written, which a move does not change.
+		expect(await markerTimes()).toStrictEqual(writtenAt);
 		expect(packHadFiles).toBe(true);
 		expect(await readEverything()).toStrictEqual(before);
 		const row = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
@@ -428,6 +487,32 @@ describe('rotateToPin', () => {
 				'a byte of the stored key flipped',
 				async () => {
 					await flipRecordByte('byok');
+				}
+			],
+			[
+				'profile',
+				'its own generation differs from its marker',
+				async () => {
+					// Sealed under its marker's number but saying another inside: it opens, and sealed again at the number it
+					// says it would never open at the marker's.
+					const old = need(await readRaw('keystore')) as unknown as KeystoreRow & {
+						dataKeyRef: CryptoKey;
+					};
+					const marker = need(await readRaw('profile-hwm')).payload as { generation: number };
+					const profile = await decryptProfileRecord(
+						need(await readRaw('profile')).rec as Uint8Array,
+						keyIdentity(old),
+						old.dataKeyRef,
+						marker.generation
+					);
+					const rec = await encryptRecord(
+						{ storeName: 'profile', recordId: 'self', schemaVersion: 1 },
+						encodeProfile({ ...profile, generation: marker.generation + 6 }),
+						keyIdentity(old),
+						old.dataKeyRef,
+						marker.generation
+					);
+					await putRaw('profile', { id: 0, rec });
 				}
 			]
 		] as const)('%s: %s', async (store, _what, damage) => {
