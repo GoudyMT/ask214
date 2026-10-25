@@ -25,7 +25,8 @@
 		onDismissNudge = () => {},
 		onOfferDevice = () => {},
 		onRetryOnline = () => {},
-		onStayDevice = () => {}
+		onStayDevice = () => {},
+		onUnlockSummaries
 	}: {
 		askState: AskState;
 		ready: boolean;
@@ -42,6 +43,8 @@
 		onOfferDevice?: (query: string) => void;
 		onRetryOnline?: (query: string) => void;
 		onStayDevice?: () => void;
+		/** Given only by a locked tab that holds a saved API key: an online answer then points to the Unlock. */
+		onUnlockSummaries?: () => void;
 	} = $props();
 
 	let query = $state('');
@@ -327,6 +330,18 @@
 		{@const cards = askState.cards}
 		{#if askState.answer}
 			<AskAnswer view={askState.answer} onOpenSource={readSource} />
+		{:else if askState.origin === 'online' && onUnlockSummaries}
+			<!-- A locked tab holds no key to make a summary with. The press hands focus on to the Unlock card, so the key's
+			     repeats would land there: only a new press of Enter counts. -->
+			<p class="ask-locked-summary">
+				Summaries need your PIN.
+				<button
+					class="ask-locked-summary__unlock"
+					type="button"
+					onclick={onUnlockSummaries}
+					onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}>Unlock</button
+				>
+			</p>
 		{/if}
 		<!-- The LEAD card yields its excerpt to an EXTRACTIVE answer taken from that same card: the two would
 		     otherwise print the same sentences twice, at 120 words directly beneath the answer block.
@@ -562,6 +577,22 @@
 		font-size: var(--font-size-s);
 		color: var(--color-fg-muted);
 		margin: 0 0 var(--space-s);
+	}
+
+	.ask-locked-summary {
+		font-size: var(--font-size-s);
+		color: var(--color-fg-muted);
+		margin: 0 0 var(--space-s);
+	}
+	.ask-locked-summary__unlock {
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--color-accent);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 
 	.ask-toggle {

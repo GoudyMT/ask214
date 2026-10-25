@@ -565,6 +565,14 @@
 			{:catch}
 				<LockedPanel onunlock={() => window.location.reload()} error={UNLOCK_FAILED} />
 			{/await}
+			<!-- The Erase is the way out of a forgotten PIN, so it stays reachable behind the lock, with the App lock row. No
+			     Lock button: the app is already locked. -->
+			<section class="settings-section" aria-labelledby="privacy-heading">
+				<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
+				<AppLockRow />
+				{@render eraseZone()}
+			</section>
+			{@render eraseDialog()}
 		{:else if lockedView}
 			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else}
@@ -641,11 +649,7 @@
 						</p>
 					{/if}
 
-					<div class="danger-zone">
-						<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
-							Erase all data on this device
-						</button>
-					</div>
+					{@render eraseZone()}
 				</section>
 			{/if}
 		{/if}
@@ -731,6 +735,14 @@
 		{/if}
 		{@render eraseDialog()}
 	{/if}
+
+	{#snippet eraseZone()}
+		<div class="danger-zone">
+			<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
+				Erase all data on this device
+			</button>
+		</div>
+	{/snippet}
 
 	{#snippet eraseDialog()}
 		<dialog

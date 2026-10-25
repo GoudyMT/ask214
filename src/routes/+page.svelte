@@ -22,6 +22,8 @@
 	import type { HomeRow } from '$lib/timeline/home-glance';
 	import { FAILED_ROW, loadHomeGlance } from '$lib/timeline/load-home-glance';
 	import GlanceRow from '$lib/components/GlanceRow.svelte';
+	import LockedPanel from '$lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
 	import InstallNudge from '$lib/components/InstallNudge.svelte';
@@ -35,6 +37,10 @@
 	} from '$lib/ask/online-prefs';
 
 	const app = getProfileApp();
+	// A PIN tab with no keys is locked whatever the stores read: with nothing saved a store reads unlocked after a Lock. The
+	// Unlock card then takes the place of the first-run invitation and of the row, and Ask stays open above it.
+	const pinLocked = $derived(app.status === 'ready' && app.pinLocked === true);
+	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a
 	// timeline exists the timeline's glance row takes its place.
 	const showOnramp = $derived(
@@ -48,6 +54,7 @@
 	// downloads none of it. The row waits for it, as it waits for the stores.
 	const returning = $derived(
 		app.status === 'ready' &&
+			!pinLocked &&
 			!!app.store &&
 			(app.store.locked || app.store.persona.completeness !== 'none')
 	);
@@ -94,6 +101,33 @@
 	// `keyboard`: the pill was pressed by keyboard or screen reader, so focus goes to the field once the question runs.
 	let earlyQuery: { query: string; mode: 'device' | 'online'; keyboard: boolean } | undefined;
 	let askView: ReturnType<typeof AskView> | undefined;
+
+	// Whether a BYO key is saved, known while locked from a count of its row: an online answer then points to the Unlock
+	// where the summary would be. The query and the key go nowhere new; the summary itself waits for the keys.
+	let storedKey = $state(false);
+	$effect(() => {
+		const byok = app.byok;
+		if (!pinLocked || !byok) {
+			storedKey = false;
+			return;
+		}
+		let current = true;
+		byok.hasApiKey().then(
+			(has) => {
+				if (current) storedKey = has;
+			},
+			() => {
+				if (current) storedKey = false;
+			}
+		);
+		return () => {
+			current = false;
+		};
+	});
+	// The card is already on the page, so the press only takes the cursor into its field.
+	function toUnlockCard(): void {
+		document.getElementById('pin-unlock-field')?.focus();
+	}
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
@@ -258,6 +292,7 @@
 			store?.setMode('online');
 			void store?.ask(q);
 		}}
+		onUnlockSummaries={pinLocked && storedKey ? toUnlockCard : undefined}
 	/>
 
 	{#if showInstallNudge}
@@ -270,7 +305,15 @@
 		</div>
 	{/if}
 
-	{#if isIdle && showOnramp}
+	{#if pinLocked}
+		<hr class="home-divider" />
+		<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
+		{#await loadPinUnlock() then unlockCard}
+			<unlockCard.default onunlocked={() => void toQuestionField(true)} />
+		{:catch}
+			<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
+		{/await}
+	{:else if isIdle && showOnramp}
 		<hr class="home-divider" />
 		<section class="home-onramp" aria-labelledby="home-onramp-heading">
 			<h2 id="home-onramp-heading">Make it yours</h2>

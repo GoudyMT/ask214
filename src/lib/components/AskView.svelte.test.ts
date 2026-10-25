@@ -26,6 +26,7 @@ type ViewProps = {
 	onOfferDevice?: (query: string) => void;
 	onRetryOnline?: (query: string) => void;
 	onStayDevice?: () => void;
+	onUnlockSummaries?: () => void;
 };
 
 const noop = () => {};
@@ -1145,4 +1146,57 @@ describe('AskView, focus after the pressed button goes away', () => {
 			expect(document.activeElement).toBe(input);
 		}
 	);
+});
+
+// A locked tab can still ask online and read the raw cards; the summary needs the PIN, and the line says so.
+describe('AskView, the summary a locked tab cannot make', () => {
+	const LINE = 'Summaries need your PIN.';
+	const online = (over: Partial<ViewProps> = {}) =>
+		props({ kind: 'results', origin: 'online', cards: [card()] }, over);
+	const unlockButton = (container: Element) =>
+		[...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Unlock');
+
+	it('puts the line and an Unlock button where the summary would be, and the button runs the hand-off', async () => {
+		const onUnlockSummaries = vi.fn();
+		const { container } = await render(AskView, { props: online({ onUnlockSummaries }) });
+
+		const line = [...container.querySelectorAll('p')].find((p) => p.textContent?.includes(LINE));
+		expect(line?.textContent?.replace(/\s+/g, ' ').trim()).toBe(`${LINE} Unlock`);
+		// Before the cards: it stands where the AI summary stands.
+		const lead = container.querySelector('.ask-count');
+		expect(
+			line && lead && line.compareDocumentPosition(lead) & Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
+		unlockButton(container)?.click();
+		expect(onUnlockSummaries).toHaveBeenCalledOnce();
+	});
+
+	// Without the hand-off the page has no key to speak of (or is unlocked), and an on-device answer never had a summary.
+	it.each([
+		['no hand-off is given', online()],
+		[
+			'the answer came from the device',
+			props({ kind: 'results', origin: 'device', cards: [card()] }, { onUnlockSummaries: vi.fn() })
+		]
+	])('shows no line when %s', async (_name, viewProps) => {
+		const { container } = await render(AskView, { props: viewProps });
+		expect(container.textContent).not.toContain(LINE);
+		expect(unlockButton(container)).toBeUndefined();
+	});
+
+	// The hand-off moves focus to the card's field mid-press, so the key's repeats must not press the button again.
+	it('runs the hand-off once for an Enter held on Unlock', async () => {
+		const onUnlockSummaries = vi.fn();
+		const { container } = await render(AskView, { props: online({ onUnlockSummaries }) });
+		unlockButton(container)?.focus();
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 6; i++) {
+			await pause(40);
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+
+		expect(onUnlockSummaries).toHaveBeenCalledOnce();
+	});
 });

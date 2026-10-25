@@ -81,6 +81,18 @@ export function createByokStore(db: IDBDatabase) {
 			}
 		},
 
+		/**
+		 * Whether a key is stored: a count of the store's rows. It reads no keystore and opens no record, so it answers in
+		 * a tab that holds no keys, where the locked Ask asks it to point to the Unlock.
+		 */
+		async hasApiKey(): Promise<boolean> {
+			return (
+				(await withStores(db, 'byok', 'readonly', (tx) =>
+					reqToPromise<number>(tx.objectStore('byok').count())
+				)) > 0
+			);
+		},
+
 		/** Remove the stored key. */
 		async clearApiKey(): Promise<void> {
 			// Under the same locks as the save, so it orders against an erase. It reads no keystore: removing

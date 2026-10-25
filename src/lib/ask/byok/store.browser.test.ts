@@ -4,6 +4,9 @@ import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 import { KeystoreNotInitializedError } from '$lib/profile/store.svelte';
 import { withStores, reqToPromise, STORES } from '$lib/db/schema';
 import { openTestDb, deleteTestDb } from '$lib/db/_test-helpers';
+import { KDF_V1 } from '$lib/backup/kdf-params';
+import { signKeystore, type KeystoreRecordPin } from '$lib/keystore/record';
+import { dropSession, KeystoreLockedError } from '$lib/keystore/session';
 
 // Real Chromium (SubtleCrypto + IndexedDB). The byok store persists the user's BYO API key as a single
 // encrypted self-row through the shared record-crypto boundary (AES-GCM under the keystore dataKeyRef).
@@ -206,6 +209,68 @@ describe('byok store against an erase', () => {
 		}
 		await clear;
 		expect(await byokRow(db)).toBeUndefined();
+	});
+});
+
+// The locked Ask asks whether a key is stored so it can point to the Unlock: a count of rows, nothing opened.
+describe('byok store hasApiKey', () => {
+	let db: IDBDatabase;
+
+	beforeEach(async () => {
+		db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+	});
+
+	afterEach(async () => {
+		dropSession();
+		await deleteTestDb(db);
+	});
+
+	/** The keystore row of a device with a PIN set, as the turn-on leaves it; this tab holds no session. */
+	async function turnOnPinRow(): Promise<void> {
+		const macKey = await crypto.subtle.generateKey(
+			{ name: 'HMAC', hash: 'SHA-256', length: 256 },
+			false,
+			['sign', 'verify']
+		);
+		const row: KeystoreRecordPin & { id: number } = {
+			id: 0,
+			v: 1,
+			mode: 'pin',
+			keystoreGeneration: 0,
+			epoch: 0,
+			ivCounter: 0,
+			installUuid: crypto.getRandomValues(new Uint8Array(16)),
+			kdf: { ...KDF_V1 },
+			salt: crypto.getRandomValues(new Uint8Array(16)),
+			bag: new Uint8Array(80)
+		};
+		row.recordHmac = await signKeystore(row, { bootstrapMacKey: macKey });
+		await withStores(db, 'keystore', 'readwrite', (tx) => {
+			tx.objectStore('keystore').put(row);
+		});
+	}
+
+	it('is false with no key stored and true once one is saved, and false again after it is cleared', async () => {
+		const store = createByokStore(db);
+		expect(await store.hasApiKey()).toBe(false);
+		await store.saveApiKey(KEY);
+		expect(await store.hasApiKey()).toBe(true);
+		await store.clearApiKey();
+		expect(await store.hasApiKey()).toBe(false);
+	});
+
+	// The locked Home asks this with no keys in the tab: it must neither need them nor open the stored key.
+	it('answers while the tab is PIN-locked, where reading the key is refused', async () => {
+		const store = createByokStore(db);
+		await store.saveApiKey(KEY);
+		await turnOnPinRow();
+		dropSession();
+		seen.cipherOutput.length = 0;
+
+		await expect(store.readApiKey()).rejects.toThrow(KeystoreLockedError);
+		expect(await store.hasApiKey()).toBe(true);
+		expect(seen.cipherOutput).toHaveLength(0);
 	});
 });
 
