@@ -98,8 +98,10 @@ export type ProfileApp = {
 	unlockStores?: (() => Promise<void>) | null;
 	/**
 	 * Opens the damaged screen from a ready tab: drops the plaintext, sets the status to `damaged`, and makes the erase
-	 * check first, through `check`, that the data is still damaged. `check` re-reads it the way start-up does and rejects
-	 * when it cannot; a failure that is not damage never erases. Absent until app-init resolves ready.
+	 * check first, through `check`, that the data is still damaged. The erase relocks before it checks, so `check` holds no
+	 * key, session or counter: it compares the stored bytes with the ones that failed (`checkStoredBytes`) and rejects only
+	 * while they are unchanged; any change means another tab wrote, and nothing is erased. Absent until app-init resolves
+	 * ready.
 	 */
 	enterDamaged?: (check: () => Promise<unknown>) => void;
 };

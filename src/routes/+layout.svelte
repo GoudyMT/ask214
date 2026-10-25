@@ -36,6 +36,7 @@
 		checkStoredBytes,
 		keystoreHasIdentity,
 		readStoredBytes,
+		sameRecords,
 		type StoredBytes
 	} from '$lib/profile/damaged-bytes';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
@@ -269,16 +270,20 @@
 				// calendar that cannot be read never blocks it, as in the shipped Unlock.
 				app.unlockStores = async () => {
 					const held = getSession();
+					// Read before the load as well as after a failure: only bytes that were the same on both sides of the load
+					// are the ones it read and failed on. Another tab's save in between changes them (its marks only go up).
+					const before = held ? await readStoredBytes(result.db).catch(() => null) : null;
 					try {
 						await result.store.load();
 					} catch (e) {
 						// The bytes that failed, taken before the lock: damage is this tab's only while the rows are still the ones
 						// these keys opened (another tab may have erased, restored or changed the lock meanwhile).
 						let seen: StoredBytes | null = null;
-						if (held && isDamagedRecord(e)) {
+						if (before && held && isDamagedRecord(e)) {
 							const now = await readStoredBytes(result.db).catch(() => null);
 							if (
 								now &&
+								sameRecords(now, before) &&
 								now.counter === held.counter &&
 								keystoreHasIdentity(now.keystore, held.identity)
 							) {

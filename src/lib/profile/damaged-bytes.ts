@@ -83,18 +83,20 @@ export function keystoreHasIdentity(row: unknown, identity: KeyIdentity): boolea
 	}
 }
 
+/** Whether the three records (not the counter) are the same in both reads. */
+export function sameRecords(a: StoredBytes, b: StoredBytes): boolean {
+	return (
+		sameStored(a.keystore, b.keystore) &&
+		sameStored(a.hwm, b.hwm) &&
+		sameStored(a.profile, b.profile)
+	);
+}
+
 /**
  * Reads the same three records again and compares them with `before`. Unchanged: the same bytes that failed under the
  * right keys, so still damaged, and it throws what a failed check throws. Changed or gone: another tab has written
  * since, so it resolves, and the caller reloads onto what is there and erases nothing.
  */
 export async function checkStoredBytes(db: IDBDatabase, before: StoredBytes): Promise<void> {
-	const now = await readStoredBytes(db);
-	if (
-		sameStored(now.keystore, before.keystore) &&
-		sameStored(now.hwm, before.hwm) &&
-		sameStored(now.profile, before.profile)
-	) {
-		throw new KeystoreHmacMismatchError();
-	}
+	if (sameRecords(await readStoredBytes(db), before)) throw new KeystoreHmacMismatchError();
 }

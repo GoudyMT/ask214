@@ -37,6 +37,7 @@ const harness = vi.hoisted(() => ({
 	load: null as {
 		mock: { calls: unknown[]; results: { value: unknown }[] };
 		mockRejectedValueOnce: (e: unknown) => unknown;
+		mockImplementationOnce: (fn: () => Promise<never>) => unknown;
 	} | null,
 	calendar: null as { load: () => Promise<void> } | null,
 	timeline: null as { load: () => Promise<void> } | null
@@ -444,6 +445,27 @@ describe('the root layout, an unlock that does not go through', () => {
 
 		expect(seen).toHaveLength(1);
 		expect(await readRaw('keystore')).toBeDefined();
+	});
+
+	// Another tab's save can land after this tab's load read the damaged bytes and before it looks again: the bytes it
+	// then sees are not the ones that failed, so they must never become the ones the erase would wipe.
+	it('does not open the damaged screen when another tab saves while the failed load returns', async () => {
+		await pinDevice(true);
+		const good = await flipBody();
+		await render(Layout, { children });
+		const app = await readyApp();
+		await openSession();
+		need(harness.load).mockImplementationOnce(async () => {
+			const row = need(await readRaw('profile'));
+			await putRaw('profile', { ...row, rec: good });
+			throw new KeystoreHmacMismatchError();
+		});
+
+		await expect(need(app.unlockStores)()).rejects.toThrow(KeystoreHmacMismatchError);
+
+		expect(app.status).toBe('ready');
+		expect(getSession()).toBeNull();
+		expect(app.pinLocked).toBe(true);
 	});
 
 	// The check holds no key, so a lock on the damaged screen leaves the person's way out intact.
