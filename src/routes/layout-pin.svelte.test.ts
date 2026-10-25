@@ -18,6 +18,8 @@ import {
 	setOnSessionMismatch,
 	setSession
 } from '$lib/keystore/session';
+import { takeSnapshot } from '$lib/backup/snapshot';
+import { readDeviceState } from '$lib/profile/device-state';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
 import { reqToPromise, withStores, type StoreName } from '$lib/db/schema';
 import Layout from './+layout.svelte';
@@ -30,7 +32,11 @@ const harness = vi.hoisted(() => ({
 	db: null as Promise<IDBDatabase> | null,
 	app: null as ProfileApp | null,
 	idle: [] as IdleTimerOptions[],
-	load: null as { mock: { calls: unknown[] } } | null
+	load: null as {
+		mock: { calls: unknown[] };
+		mockRejectedValueOnce: (e: unknown) => unknown;
+	} | null,
+	calendar: null as { load: () => Promise<void> } | null
 }));
 
 vi.mock('$lib/db/schema', async (importOriginal) => {
@@ -58,6 +64,18 @@ vi.mock('$lib/profile/idle-timer', async (importOriginal) => {
 		createIdleTimer: (opts: IdleTimerOptions) => {
 			harness.idle.push(opts);
 			return real.createIdleTimer(opts);
+		}
+	};
+});
+// The app container wraps each store in a reactive proxy, which a spy put on it would not reach: the raw store is kept.
+vi.mock('$lib/calendar/store.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/calendar/store.svelte')>();
+	return {
+		...real,
+		createCalendarSyncStore: (...args: Parameters<typeof real.createCalendarSyncStore>) => {
+			const store = real.createCalendarSyncStore(...args);
+			harness.calendar = store;
+			return store;
 		}
 	};
 });
@@ -285,13 +303,139 @@ describe('the root layout, opened with a PIN set', () => {
 		expect(app.calendar?.ready).toBe(true);
 	});
 
-	it('leaves it locked when a store cannot be read', async () => {
+	// A profile that cannot be read fails closed: no keys and no plaintext stay behind the lock card, and a retry is a fresh
+	// unlock rather than a lockout.
+	it('fails closed when the profile cannot be read for a reason that is not damage', async () => {
 		await pinDevice(true);
 		await render(Layout, { children });
 		const app = await readyApp();
 		// No session: every load is refused.
 		await expect(need(app.unlockStores)()).rejects.toThrow(KeystoreLockedError);
 		expect(app.pinLocked).toBe(true);
+		expect(getSession()).toBeNull();
+		expect(app.store?.locked).toBe(true);
+		expect(app.status).toBe('ready');
+	});
+});
+
+describe('the root layout, an unlock that does not go through', () => {
+	// Whatever stopped the profile, the person must not be left with keys in memory and a lock card that retries into a
+	// lockout.
+	it('drops the keys and the plaintext when the profile fails for a reason that is not damage', async () => {
+		await pinDevice(true);
+		await render(Layout, { children });
+		const app = await readyApp();
+		await openSession();
+		harness.load?.mockRejectedValueOnce(new Error('E_TEST'));
+
+		await expect(need(app.unlockStores)()).rejects.toThrow('E_TEST');
+
+		expect(getSession()).toBeNull();
+		expect(app.pinLocked).toBe(true);
+		expect(app.store?.locked).toBe(true);
+		expect(app.store?._getStateForTest()).toBeNull();
+		expect(app.status).toBe('ready');
+	});
+
+	/** Flips the last byte of a stored body, the way damage that no key can open looks. */
+	async function flipBody(): Promise<Uint8Array> {
+		const row = need(await readRaw('profile'));
+		const good = row.rec as Uint8Array;
+		const rec = new Uint8Array(good);
+		rec[rec.length - 1] = (rec[rec.length - 1] ?? 0) ^ 1;
+		await putRaw('profile', { ...row, rec });
+		return good;
+	}
+
+	// The timeline and calendar never block an unlock: the Timeline says its own note, the profile is open.
+	it('opens the profile when the timeline cannot be read', async () => {
+		await pinDevice(true);
+		await putRaw('timeline-state-hwm', {
+			id: 0,
+			v: 1,
+			payload: { generation: 1, keystoreGeneration: 0, epoch: 0, ts: 1 },
+			mac: new ArrayBuffer(32)
+		});
+		await render(Layout, { children });
+		const app = await readyApp();
+
+		await unlock(app);
+
+		expect(app.timeline?.failed).toBe(true);
+		expect(app.store?._getStateForTest()).not.toBeNull();
+		expect(app.pinLocked).toBe(false);
+		expect(getSession()).not.toBeNull();
+	});
+
+	// A Lock pressed while the unlock is still reading: the lock card must stay up, with no keys behind it.
+	it('stays locked when a Lock lands while the other stores are still being read', async () => {
+		await pinDevice(true);
+		await render(Layout, { children });
+		const app = await readyApp();
+		vi.spyOn(need(harness.calendar), 'load').mockImplementation(async () => {
+			app.relockAll?.();
+		});
+
+		await unlock(app);
+
+		expect(app.pinLocked).toBe(true);
+		expect(getSession()).toBeNull();
+	});
+
+	it('shows the damaged screen when the profile is damaged, and the erase then wipes', async () => {
+		await pinDevice(true);
+		await flipBody();
+		await render(Layout, { children });
+		const app = await readyApp();
+		const heard: BusSignal[] = [];
+		need(peer).subscribe((s) => heard.push(s));
+
+		await openSession();
+		await expect(need(app.unlockStores)()).rejects.toThrow();
+
+		expect(getSession()).toBeNull();
+		expect(app.store?.locked).toBe(true);
+		expect(app.status).toBe('damaged');
+		await need(app.wipeAll)();
+		expect(await readRaw('keystore')).toBeUndefined();
+		expect(getSession()).toBeNull();
+		await vi.waitFor(() => expect(heard).toContainEqual({ type: 'keys-changed' }));
+	});
+
+	// Another tab may have repaired or replaced the data: nothing is erased on a guess.
+	it('does not erase data that reads again, and reloads onto it', async () => {
+		await pinDevice(true);
+		const good = await flipBody();
+		await render(Layout, { children });
+		const app = await readyApp();
+		await openSession();
+		await expect(need(app.unlockStores)()).rejects.toThrow();
+		expect(app.status).toBe('damaged');
+		const row = need(await readRaw('profile'));
+		await putRaw('profile', { ...row, rec: good });
+		const seen = holdNavigation();
+
+		await expect(need(app.wipeAll)()).rejects.toThrow('E_NO_LONGER_DAMAGED');
+
+		expect(seen).toHaveLength(1);
+		expect(await readRaw('keystore')).toBeDefined();
+	});
+
+	// The idle lock does not move the lock counter, so only letting go of the held keys stops the erase's check from reading.
+	it('does not erase after an idle lock has ended the check on the damaged screen', async () => {
+		await pinDevice(true);
+		await flipBody();
+		await render(Layout, { children });
+		const app = await readyApp();
+		await openSession();
+		await expect(need(app.unlockStores)()).rejects.toThrow();
+		harness.idle[0]?.onIdle();
+		const seen = holdNavigation();
+
+		await expect(need(app.wipeAll)()).rejects.toThrow('E_NO_LONGER_DAMAGED');
+
+		expect(seen).toHaveLength(1);
+		expect(await readRaw('keystore')).toBeDefined();
 	});
 });
 
@@ -329,6 +473,57 @@ describe('the root layout, which relocks drop the keys', () => {
 			expect(app.pinLocked).toBe(true);
 		});
 		expect(app.store?._getStateForTest()).toBeNull();
+	});
+
+	// The other tabs hold keys for rows that are gone; they learn it from this, or from the counter.
+	it('an Erase tells the other tabs the keys changed', async () => {
+		const app = await unlockedApp();
+		const heard: BusSignal[] = [];
+		need(peer).subscribe((s) => heard.push(s));
+
+		await app.wipeAll?.();
+
+		await vi.waitFor(() => expect(heard).toContainEqual({ type: 'keys-changed' }));
+	});
+
+	// A phone that slept through the timer comes back with a clock far ahead: a PIN tab must be locked before it reads.
+	describe('after 16 minutes away', () => {
+		const MINUTE = 60_000;
+		let skew = 0;
+		beforeEach(() => {
+			skew = 0;
+			const wall = Date.now.bind(Date);
+			const mono = performance.now.bind(performance);
+			vi.spyOn(Date, 'now').mockImplementation(() => wall() + skew);
+			vi.spyOn(performance, 'now').mockImplementation(() => mono() + skew);
+		});
+
+		it('a PIN tab forgets the keys and shows the PIN lock when it is shown again', async () => {
+			const app = await unlockedApp();
+			setHidden(true);
+			skew = 16 * MINUTE;
+			setHidden(false);
+
+			await vi.waitFor(() => {
+				expect(getSession()).toBeNull();
+				expect(app.pinLocked).toBe(true);
+			});
+			expect(app.store?._getStateForTest()).toBeNull();
+		});
+
+		it('a tab with no PIN reads its data back with no new tap, as after any short switch away', async () => {
+			await localDevice();
+			await render(Layout, { children });
+			await vi.waitFor(() => expect(harness.app?.store?._getStateForTest()).toBeTruthy());
+			const app = need(harness.app);
+			setHidden(true);
+			expect(app.store?._getStateForTest()).toBeNull();
+			skew = 16 * MINUTE;
+			setHidden(false);
+
+			await vi.waitFor(() => expect(app.store?._getStateForTest()).not.toBeNull());
+			expect(app.store?.locked).toBe(false);
+		});
 	});
 
 	// A restore replaced the rows, so the keys this tab holds no longer fit them; the reload that follows opens locked.
@@ -411,6 +606,45 @@ describe('the root layout, a tab that missed a Lock', () => {
 	});
 });
 
+describe('the root layout, a profile re-read after a Lock made elsewhere', () => {
+	// The timeline and calendar loads refuse on the moved counter too, so only a re-read that reaches the profile first
+	// shows that the profile's own check is there.
+	it('is refused by the profile store itself, before any other store has noticed', async () => {
+		const app = await unlockedApp();
+		await bumpCounter(need(db));
+
+		await expect(need(app.store).load()).rejects.toThrow(KeystoreLockedError);
+
+		expect(getSession()).toBeNull();
+		expect(app.pinLocked).toBe(true);
+	});
+});
+
+describe('every other key read, with a live session', () => {
+	it('a backup snapshot refuses after the lock counter moved, and drops the session', async () => {
+		await pinDevice(true);
+		await openSession();
+		expect((await takeSnapshot(need(db))).ok).toBe(true);
+		await bumpCounter(need(db));
+
+		const snap = await takeSnapshot(need(db));
+
+		expect(snap).toMatchObject({ ok: false, code: 'E_SNAPSHOT_FAILED' });
+		expect(getSession()).toBeNull();
+	});
+
+	it('the device-state read refuses after the lock counter moved, and drops the session', async () => {
+		await pinDevice(true);
+		await openSession();
+		expect((await readDeviceState(need(db))).gens.profile).toBe(1);
+		await bumpCounter(need(db));
+
+		await expect(readDeviceState(need(db))).rejects.toThrow(KeystoreLockedError);
+
+		expect(getSession()).toBeNull();
+	});
+});
+
 describe("the profile store's own reads, with a live session", () => {
 	// load() and save() read the row inside their own transactions, so they do not go through the check the other
 	// stores' reads do.
@@ -457,6 +691,24 @@ describe('the root layout, when another tab changes the keys', () => {
 		expect(app.keyMode).toBe('local');
 	});
 
+	// A reload starts the app over on a local row and so decrypts: a tab nobody can see waits until it is shown.
+	it('a hidden PIN-locked tab that finds a local row reloads only once it is shown', async () => {
+		await pinDevice(true);
+		await render(Layout, { children });
+		await readyApp();
+		const seen = holdNavigation();
+		setHidden(true);
+		await replaceRow('local');
+
+		need(peer).publish({ type: 'keys-changed' });
+		await pause(200);
+		expect(seen).toEqual([]);
+
+		setHidden(false);
+		await vi.waitFor(() => expect(seen).toHaveLength(1));
+		expect(seen[0]?.type).toBe('reload');
+	});
+
 	// Change PIN leaves a PIN row: the tab stays locked and asks for the new PIN, where a reload would gain nothing.
 	it('a PIN-locked tab that finds a PIN row stays locked and does not reload', async () => {
 		await pinDevice(true);
@@ -475,7 +727,7 @@ describe('the root layout, when another tab changes the keys', () => {
 	it('a tab with no PIN learns that one was set, and locks', async () => {
 		await localDevice();
 		await render(Layout, { children });
-		await vi.waitFor(() => expect(harness.app?.store?._getStateForTest()).not.toBeNull());
+		await vi.waitFor(() => expect(harness.app?.store?._getStateForTest()).toBeTruthy());
 		const app = need(harness.app);
 
 		const { row } = await pinRow();

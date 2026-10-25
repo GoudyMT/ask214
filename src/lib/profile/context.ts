@@ -91,9 +91,17 @@ export type ProfileApp = {
 	pinLocked?: boolean;
 	/**
 	 * After the caller has set a session: loads every store (profile, timeline, calendar) as a user unlock does, then
-	 * clears `pinLocked`. Rejects if any load fails, leaving `pinLocked` set. Null until a PIN-mode start-up is wired.
+	 * clears `pinLocked`. The profile must load: if it cannot, every key and every plaintext is dropped and the call
+	 * rejects, so a retry is a fresh unlock; a timeline or calendar that cannot be read never blocks. Absent until app-init
+	 * resolves ready.
 	 */
 	unlockStores?: (() => Promise<void>) | null;
+	/**
+	 * Opens the damaged screen from a ready tab: drops the plaintext, sets the status to `damaged`, and makes the erase
+	 * check first, through `check`, that the data is still damaged. `check` re-reads it the way start-up does and rejects
+	 * when it cannot; a failure that is not damage never erases. Absent until app-init resolves ready.
+	 */
+	enterDamaged?: (check: () => Promise<unknown>) => void;
 };
 
 const KEY = Symbol('mtc-profile-app');

@@ -8,7 +8,7 @@ import {
 	type KeyIdentity,
 	type KeystoreKeys
 } from '../keystore/record';
-import { keysForRow, type KeystoreRow } from '../keystore/read';
+import { checkSessionCounter, keysForRow, type KeystoreRow } from '../keystore/read';
 import { decryptProfileRecord } from '../profile/crypto-boundary';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { verifySidecar, type SignedSidecar } from '../profile/sidecars';
@@ -154,6 +154,8 @@ async function readCut(db: IDBDatabase): Promise<SnapshotResult> {
 	try {
 		if (!keystore) throw refuse();
 		const keys = keysForRow(keystore);
+		// After the cut's transaction has finished, so the counter read opens its own and the cut is never left idle.
+		await checkSessionCounter(db);
 		if (!(await verifyKeystore(keystore, keys))) throw refuse();
 		const identity = keyIdentity(keystore);
 		const profileGen = await generationOf('profile-hwm', profileMark, keys.hmacKey);

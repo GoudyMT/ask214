@@ -3,6 +3,7 @@ import { keyIdentity, verifyKeystore } from '../keystore/record';
 import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
+	checkSessionCounter,
 	keysForRow,
 	type KeystoreRow
 } from '../keystore/read';
@@ -83,6 +84,8 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 	let decoded: ProfileV1 | null = null;
 	try {
 		const keys = keysForRow(ks);
+		// After the transaction above has finished, so the counter read opens its own.
+		await checkSessionCounter(db);
 		if (!(await verifyKeystore(ks, keys))) throw new KeystoreHmacMismatchError();
 		// A sidecar that was never written reads as generation 0 with no time; one that is there must verify.
 		const verified = async (

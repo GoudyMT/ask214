@@ -31,7 +31,14 @@
 	import { createByokStore } from '$lib/ask/byok/store';
 	import { createProfileBus, type BusSignal } from '$lib/broadcast/bus';
 	import { bumpCounter } from '$lib/keystore/app-lock-store';
-	import { dropSession, setOnSessionMismatch } from '$lib/keystore/session';
+	import {
+		dropSession,
+		getSession,
+		KeystoreLockedError,
+		setOnSessionMismatch,
+		setSession,
+		type KeySession
+	} from '$lib/keystore/session';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
@@ -39,7 +46,7 @@
 	import { startReload, stopReloadForLock } from '$lib/profile/pending-reload';
 	import { markRaised, takeOverIfRaised } from '$lib/sw/take-over';
 	import { wipeAllStores } from '$lib/db/wipe';
-	import { stillDamaged } from '$lib/profile/damaged';
+	import { isDamagedRecord, stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { requestPersistentStorage } from '$lib/storage/persistence';
@@ -221,8 +228,12 @@
 				// relocked handler read the list at event time).
 				// The session relockable stands first: a relock that is not page hygiene forgets the keys before any store
 				// answers, so a store that cannot be reached still loses them.
+				// The keys of an unlock whose profile turned out damaged, held for the erase's own check and for nothing else:
+				// any lock that is not page hygiene lets go of them, so the erase then cannot read and refuses.
+				let heldForCheck: KeySession | null = null;
 				const relockables: Relockable[] = [
 					createSessionRelockable(() => {
+						heldForCheck = null;
 						if (app.keyMode === 'pin') app.pinLocked = true;
 					}),
 					result.store
@@ -244,10 +255,50 @@
 					if (app.keyMode === 'pin')
 						bumpCounter(result.db).catch(() => safeLog({ code: 'E_INTERNAL' }));
 				};
-				// After the person has set a session: read every store as an unlock does. One that fails leaves the lock up.
+				// The damaged screen of a ready tab: the plaintext goes, and the erase checks once more that the data is still
+				// damaged (another tab may have repaired or replaced it) before it wipes, then forgets the keys and tells the others.
+				app.enterDamaged = (check) => {
+					relockEachSync(relockables, 'hygiene');
+					app.status = 'damaged';
+					app.wipeAll = async () => {
+						if (!(await stillDamaged(check))) {
+							location.reload();
+							throw new Error('E_NO_LONGER_DAMAGED');
+						}
+						await wipeAllStores(result.db);
+						dropSession();
+						echo.publish({ type: 'keys-changed' });
+					};
+				};
+				// After the person has set a session: read every store as an unlock does. The profile must open; a timeline or
+				// calendar that cannot be read never blocks it, as in the shipped Unlock.
 				app.unlockStores = async () => {
-					await Promise.all([result.store.load(), timelineStore?.load(), calendarStore?.load()]);
-					app.pinLocked = false;
+					const held = getSession();
+					try {
+						await result.store.load();
+					} catch (e) {
+						// Fail closed: no keys and no plaintext stay behind the lock card, and a retry is a fresh unlock.
+						echo.answer(() => relockEachSync(relockables, 'peer'));
+						if (isDamagedRecord(e)) {
+							heldForCheck = held;
+							app.enterDamaged?.(async () => {
+								if (!heldForCheck) throw new KeystoreLockedError();
+								setSession(heldForCheck);
+								try {
+									const check = createProfileStore(result.db);
+									await check.load();
+									check.relockSync('user');
+								} finally {
+									dropSession();
+								}
+							});
+						}
+						throw e;
+					}
+					const rest = await Promise.allSettled([timelineStore?.load(), calendarStore?.load()]);
+					if (rest.some((r) => r.status === 'rejected')) safeLog({ code: 'E_INIT_FAILED' });
+					// A Lock that landed while the other stores were read leaves the lock up.
+					if (held && getSession() === held && !result.store.locked) app.pinLocked = false;
 				};
 				app.joinRelock = createJoinRelock(relockables);
 				app.publish = (s) => echo.publish(s);
@@ -278,9 +329,18 @@
 						const { mode } = await readKeyState(result.db);
 						app.keyMode = mode === 'pin' ? 'pin' : 'local';
 						if (mode === 'pin') app.pinLocked = true;
-						else if (app.pinLocked) location.reload();
+						else if (app.pinLocked) {
+							// The reload decrypts, so a tab nobody can see waits until it is shown.
+							document.addEventListener('visibilitychange', reloadOnShow);
+							reloadOnShow();
+						}
 					}
 				});
+				const reloadOnShow = () => {
+					if (document.visibilityState === 'hidden') return;
+					document.removeEventListener('visibilitychange', reloadOnShow);
+					location.reload();
+				};
 				// A locked tab never reloads itself, because a reload decrypts. A returning user's tab reloads on its Unlock; a
 				// first-run tab has no Unlock, so it offers a Reload line. Off the setup form: it would save over the
 				// restored date.
@@ -318,6 +378,7 @@
 					offReplaced();
 					offLifecycle();
 					setOnSessionMismatch(null);
+					document.removeEventListener('visibilitychange', reloadOnShow);
 				};
 
 				// Timeline-state store rides on the same db + bus; it joins the relock set the moment
