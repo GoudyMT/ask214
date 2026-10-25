@@ -74,6 +74,81 @@ describe('isWorkerAnswer: refusals', () => {
 	});
 });
 
+function pinBuffer(text: string): ArrayBuffer {
+	const bytes = new TextEncoder().encode(text);
+	const buffer = new ArrayBuffer(bytes.length);
+	new Uint8Array(buffer).set(bytes);
+	return buffer;
+}
+
+const PIN_SALT = (): Uint8Array<ArrayBuffer> => Uint8Array.from({ length: 16 }, (_, i) => i);
+
+describe('isWorkerRequest: the derive-pin shape', () => {
+	it.each(['1234', '12345', '135790', '0000'])('accepts the PIN %s with a 16-byte salt', (pin) => {
+		expect(isWorkerRequest({ op: 'derive-pin', pin: pinBuffer(pin), salt: PIN_SALT() })).toBe(true);
+	});
+
+	// Each refusal is a request the page should never send; the worker must turn it away before any Argon2id.
+	it.each([
+		['a 3-digit PIN', { pin: pinBuffer('123') }],
+		['a 7-digit PIN', { pin: pinBuffer('1234567') }],
+		['an empty PIN', { pin: pinBuffer('') }],
+		['a letter in the PIN', { pin: pinBuffer('12a4') }],
+		['a space in the PIN', { pin: pinBuffer('12 4') }],
+		['a full-width digit', { pin: pinBuffer(String.fromCharCode(0xff11) + '234') }],
+		['a PIN that is a view, not a buffer', { pin: new Uint8Array(pinBuffer('1234')) }],
+		['a PIN that is text', { pin: '1234' }],
+		['a salt of 15 bytes', { pin: pinBuffer('1234'), salt: new Uint8Array(15) }],
+		['a salt of 17 bytes', { pin: pinBuffer('1234'), salt: new Uint8Array(17) }],
+		['a salt that is text', { pin: pinBuffer('1234'), salt: 'x'.repeat(16) }],
+		['an extra key', { pin: pinBuffer('1234'), extra: 1 }],
+		['a purpose key', { pin: pinBuffer('1234'), purpose: 'restore' }],
+		['a pass instead of a pin', { pin: undefined, pass: pinBuffer('1234') }]
+	])('refuses %s', (_name, override) => {
+		const base: Record<string, unknown> = {
+			op: 'derive-pin',
+			pin: pinBuffer('1234'),
+			salt: PIN_SALT()
+		};
+		const request: Record<string, unknown> = { ...base, ...override };
+		if (request.pin === undefined) delete request.pin;
+		expect(isWorkerRequest(request)).toBe(false);
+	});
+
+	it('refuses a derive-pin request missing its salt', () => {
+		expect(isWorkerRequest({ op: 'derive-pin', pin: pinBuffer('1234') })).toBe(false);
+	});
+});
+
+describe('isWorkerAnswer: the pin-keys shape', () => {
+	async function macKey(): Promise<CryptoKey> {
+		return crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+	}
+	async function kek(): Promise<CryptoKey> {
+		return crypto.subtle.generateKey({ name: 'AES-KW', length: 256 }, false, [
+			'wrapKey',
+			'unwrapKey'
+		]);
+	}
+
+	it('accepts two CryptoKeys under exactly kek, macKey and type', async () => {
+		expect(isWorkerAnswer({ type: 'pin-keys', macKey: await macKey(), kek: await kek() })).toBe(
+			true
+		);
+	});
+
+	it('refuses a missing key, a key that is not a CryptoKey and an extra key', async () => {
+		expect(isWorkerAnswer({ type: 'pin-keys', macKey: await macKey() })).toBe(false);
+		expect(isWorkerAnswer({ type: 'pin-keys', macKey: {}, kek: await kek() })).toBe(false);
+		expect(
+			isWorkerAnswer({ type: 'pin-keys', macKey: await macKey(), kek: new Uint8Array(32) })
+		).toBe(false);
+		expect(
+			isWorkerAnswer({ type: 'pin-keys', macKey: await macKey(), kek: await kek(), text: 'x' })
+		).toBe(false);
+	});
+});
+
 describe('isWorkerRequest and isWorkerAnswer do not accept each other', () => {
 	it('a request is not an answer and an answer is not a request', () => {
 		expect(isWorkerAnswer({ op: 'generate' })).toBe(false);

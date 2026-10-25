@@ -11,11 +11,19 @@ export type WorkerRequest =
 			salt: Uint8Array<ArrayBuffer>;
 	  };
 
+/**
+ * The app lock's PIN request: a 4 to 6 digit PIN and the 16-byte PIN salt, which the worker turns into the lock's two
+ * keys at the backup's Argon2id settings. `pin` is transferred like `pass`. It is its own type, not a member of
+ * WorkerRequest, because the backup session and its test doubles take WorkerRequest and read `pass` from every derive.
+ */
+export type PinRequest = { op: 'derive-pin'; pin: ArrayBuffer; salt: Uint8Array<ArrayBuffer> };
+
 /** What the worker may answer. A code and a position never carry a word, only where it stood. */
 export type FromWorker =
 	| { type: 'words'; words: string[] }
 	| { type: 'progress'; percent: number }
 	| { type: 'key'; key: CryptoKey }
+	| { type: 'pin-keys'; macKey: CryptoKey; kek: CryptoKey }
 	| { type: 'error'; code: BackupCode; position?: 1 | 2 | 3 | 4 | 5 | 6 };
 
 const SALT_LENGTH = 16;
@@ -23,16 +31,35 @@ const WORD_COUNT = 6;
 const PLAIN_WORD = /^[a-z]+$/;
 const GENERATE_KEYS = 'op';
 const DERIVE_KEYS = 'op,pass,purpose,salt';
+const DERIVE_PIN_KEYS = 'op,pin,salt';
+const PIN_MIN_BYTES = 4;
+const PIN_MAX_BYTES = 6;
+const ASCII_ZERO = 0x30;
+const ASCII_NINE = 0x39;
+
+function isPinBuffer(value: unknown): value is ArrayBuffer {
+	if (!(value instanceof ArrayBuffer)) return false;
+	if (value.byteLength < PIN_MIN_BYTES || value.byteLength > PIN_MAX_BYTES) return false;
+	return new Uint8Array(value).every((byte) => byte >= ASCII_ZERO && byte <= ASCII_NINE);
+}
 
 /**
  * The exact request shapes and nothing else: own keys, value types and the salt length. Anything off is a bug on the
  * page or a stray message, so the worker refuses it before it reads a byte of `pass`.
  */
-export function isWorkerRequest(value: unknown): value is WorkerRequest {
+export function isWorkerRequest(value: unknown): value is WorkerRequest | PinRequest {
 	if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
 	const keys = Object.keys(value).sort().join(',');
 	const record = value as Record<string, unknown>;
 	if (record.op === 'generate') return keys === GENERATE_KEYS;
+	if (record.op === 'derive-pin') {
+		return (
+			keys === DERIVE_PIN_KEYS &&
+			isPinBuffer(record.pin) &&
+			record.salt instanceof Uint8Array &&
+			record.salt.length === SALT_LENGTH
+		);
+	}
 	if (record.op !== 'derive' || keys !== DERIVE_KEYS) return false;
 	return (
 		(record.purpose === 'export' || record.purpose === 'restore') &&
@@ -68,6 +95,13 @@ export function isWorkerAnswer(value: unknown): value is FromWorker {
 		case 'key':
 			return (
 				keys === 'key,type' && typeof CryptoKey !== 'undefined' && record.key instanceof CryptoKey
+			);
+		case 'pin-keys':
+			return (
+				keys === 'kek,macKey,type' &&
+				typeof CryptoKey !== 'undefined' &&
+				record.macKey instanceof CryptoKey &&
+				record.kek instanceof CryptoKey
 			);
 		case 'error':
 			if (keys === 'code,type') return isBackupCode(record.code);
