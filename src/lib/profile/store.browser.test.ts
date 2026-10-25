@@ -604,6 +604,31 @@ describe('ProfileStore.locked', () => {
 		expect(store.locked).toBe(false);
 	});
 
+	// A tab opened with a PIN set has no key to learn whether a profile exists with, so Home's setup prompt (which keys off
+	// `!locked`) would show over a saved profile unless `locked` reads true whatever the mark says.
+	it('startLocked reads locked whatever the profile mark says, until a load succeeds', async () => {
+		const store = createProfileStore(db);
+		store.startLocked(false);
+		expect(store.locked).toBe(true);
+		expect(store.lockState).toBe('locked');
+		await store.load();
+		expect(store.locked).toBe(false);
+		expect(store.lockState).toBe('unlocked');
+	});
+
+	it('startLocked(true) keeps a saved profile out of memory until a load reads it back', async () => {
+		await createProfileStore(db).save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const store = createProfileStore(db);
+		store.startLocked(true);
+		expect(store.locked).toBe(true);
+		expect(store._getStateForTest()).toBeNull();
+		await store.refresh();
+		expect(store.locked).toBe(true);
+		await store.load();
+		expect(store.locked).toBe(false);
+		expect(store._getStateForTest()).not.toBeNull();
+	});
+
 	// A first-run tab has no profile in storage, so `locked` stays false when it relocks: only lockState tells the UI.
 	it('lockState is reactive, and moves for a first-run tab that relocks', async () => {
 		const store = createProfileStore(db);

@@ -16,6 +16,8 @@
 		installLifecycle,
 		createJoinRelock,
 		createRelockEcho,
+		createSessionRelockable,
+		readKeyState,
 		relockAll,
 		relockEachSync,
 		reloadOnSignalWhenShown,
@@ -27,7 +29,9 @@
 	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline/state.svelte';
 	import { createCalendarSyncStore, type CalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createByokStore } from '$lib/ask/byok/store';
-	import { createProfileBus } from '$lib/broadcast/bus';
+	import { createProfileBus, type BusSignal } from '$lib/broadcast/bus';
+	import { bumpCounter } from '$lib/keystore/app-lock-store';
+	import { dropSession, setOnSessionMismatch } from '$lib/keystore/session';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
@@ -111,6 +115,12 @@
 		// Every store broadcasts through this seam so a relock answering a peer stays local; without
 		// it each hop multiplies by (stores x tabs) and the channel saturates.
 		const echo = createRelockEcho(bus);
+		// With a PIN set an idle lock stays in its own tab: another tab idling is not this person leaving, so only a Lock
+		// and a key change reach the others.
+		const broadcast = (e: BusSignal) => {
+			if (app.keyMode === 'pin' && e.type === 'relocked' && e.reason === 'idle') return;
+			echo.publish(e);
+		};
 		let destroyed = false;
 		let teardownRuntime: (() => void) | null = null;
 
@@ -135,7 +145,8 @@
 							() => takeOver(true)
 						),
 					bootstrap: bootstrapLocalKeystore,
-					createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
+					createStore: (db) => createProfileStore(db, { onBroadcast: broadcast }),
+					readKeyState
 				}),
 			app,
 			(result) => {
@@ -159,7 +170,8 @@
 						doc: document,
 						isHidden,
 						createIdleTimer,
-						idleThresholdMs: IDLE_THRESHOLD_MS
+						idleThresholdMs: IDLE_THRESHOLD_MS,
+						lockOnLongAbsence: () => app.keyMode === 'pin'
 					});
 					app.relockAll = () => relockAll(relockables, 'user');
 					app.joinRelock = createJoinRelock(relockables);
@@ -185,10 +197,20 @@
 					return;
 				}
 				app.store = result.store;
+				// A PIN set means this tab opened with no key: nothing is read until the person unlocks.
+				const pin = result.keyMode === 'pin';
+				app.keyMode = result.keyMode ?? 'local';
+				app.pinLocked = pin;
 				// Registry-driven, so the erase covers stores that never provisioned - they are the ones
 				// whose orphaned rows would otherwise block their own recovery.
 				app.db = result.db;
-				app.wipeAll = () => wipeAllStores(result.db);
+				// With a PIN the Erase also forgets this tab's keys and tells the others, which find no row (or a new one).
+				app.wipeAll = async () => {
+					await wipeAllStores(result.db);
+					if (app.keyMode !== 'pin') return;
+					relockEachSync(relockables, 'user');
+					echo.publish({ type: 'keys-changed' });
+				};
 				// The BYO-key store rides on the same db; it reads on demand and caches nothing, so it needs
 				// no relock join and no async load - just make it available once the keystore is usable.
 				app.byok = createByokStore(result.db);
@@ -197,7 +219,14 @@
 				// decrypted profile must always relock on idle/background). relockables is shared +
 				// mutable, so the timeline store joins it once provisioned (installLifecycle + the
 				// relocked handler read the list at event time).
-				const relockables: Relockable[] = [result.store];
+				// The session relockable stands first: a relock that is not page hygiene forgets the keys before any store
+				// answers, so a store that cannot be reached still loses them.
+				const relockables: Relockable[] = [
+					createSessionRelockable(() => {
+						if (app.keyMode === 'pin') app.pinLocked = true;
+					}),
+					result.store
+				];
 				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
 				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
 				// A lock (here or from another tab) that lands while a reload of the app's own waits out its grace cancels
@@ -211,6 +240,14 @@
 				app.relockAll = () => {
 					relockAll(relockables, 'user');
 					lockStopsReload();
+					// A tab asleep in the back/forward cache, or with no BroadcastChannel, hears of this Lock only as the counter.
+					if (app.keyMode === 'pin')
+						bumpCounter(result.db).catch(() => safeLog({ code: 'E_INTERNAL' }));
+				};
+				// After the person has set a session: read every store as an unlock does. One that fails leaves the lock up.
+				app.unlockStores = async () => {
+					await Promise.all([result.store.load(), timelineStore?.load(), calendarStore?.load()]);
+					app.pinLocked = false;
 				};
 				app.joinRelock = createJoinRelock(relockables);
 				app.publish = (s) => echo.publish(s);
@@ -227,8 +264,22 @@
 					'timeline-updated': () => app.timeline?.refresh(),
 					'calendar-updated': () => app.calendar?.refresh(),
 					// A restore in another tab replaced the data: drop what this tab decrypted first (no broadcast; a
-					// locked store stays locked), then reload as the wiring below decides.
-					'data-replaced': () => relockEachSync(relockables, 'hygiene')
+					// locked store stays locked), then reload as the wiring below decides. The keys went with the data.
+					'data-replaced': () => {
+						relockEachSync(relockables, 'hygiene');
+						if (app.keyMode !== 'pin') return;
+						dropSession();
+						app.pinLocked = true;
+					},
+					// Another tab turned the PIN on, changed it, removed it or erased: nothing here fits the rows any more.
+					// A tab that finds a local row (or none) needs no PIN, and a locked tab never re-reads by itself.
+					'keys-changed': async () => {
+						echo.answer(() => relockEachSync(relockables, 'peer'));
+						const { mode } = await readKeyState(result.db);
+						app.keyMode = mode === 'pin' ? 'pin' : 'local';
+						if (mode === 'pin') app.pinLocked = true;
+						else if (app.pinLocked) location.reload();
+					}
 				});
 				// A locked tab never reloads itself, because a reload decrypts. A returning user's tab reloads on its Unlock; a
 				// first-run tab has no Unlock, so it offers a Reload line. Off the setup form: it would save over the
@@ -254,12 +305,19 @@
 					doc: document,
 					isHidden,
 					createIdleTimer,
-					idleThresholdMs: IDLE_THRESHOLD_MS
+					idleThresholdMs: IDLE_THRESHOLD_MS,
+					lockOnLongAbsence: () => app.keyMode === 'pin'
+				});
+				// Another tab changed the lock under a live session: forget the keys and show the PIN lock.
+				setOnSessionMismatch(() => {
+					relockEachSync(relockables, 'peer');
+					app.pinLocked = true;
 				});
 				teardownRuntime = () => {
 					offBus();
 					offReplaced();
 					offLifecycle();
+					setOnSessionMismatch(null);
 				};
 
 				// Timeline-state store rides on the same db + bus; it joins the relock set the moment
@@ -268,12 +326,15 @@
 				let timelineStore: TimelineStateStore | null = null;
 				void provisionStore(
 					result.db,
-					(db) => createTimelineStateStore(db, { onBroadcast: (e) => echo.publish(e) }),
+					(db) => createTimelineStateStore(db, { onBroadcast: broadcast }),
 					(timeline) => {
 						relockables.push(timeline);
 						timelineStore = timeline;
+						// Landed locked, and quietly: this is no one's Lock, so the other tabs are not told.
+						if (pin) echo.answer(() => timeline.relockSync('peer'));
 					},
-					isHidden
+					isHidden,
+					pin
 				)
 					.then((timeline) => {
 						if (destroyed) return;
@@ -291,12 +352,14 @@
 				let calendarStore: CalendarSyncStore | null = null;
 				void provisionStore(
 					result.db,
-					(db) => createCalendarSyncStore(db, { onBroadcast: (e) => echo.publish(e) }),
+					(db) => createCalendarSyncStore(db, { onBroadcast: broadcast }),
 					(calendar) => {
 						relockables.push(calendar);
 						calendarStore = calendar;
+						if (pin) echo.answer(() => calendar.relockSync('peer'));
 					},
-					isHidden
+					isHidden,
+					pin
 				)
 					.then((calendar) => {
 						if (destroyed) return;

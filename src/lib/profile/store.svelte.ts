@@ -4,6 +4,7 @@ import { keyIdentity, signKeystore, verifyKeystore } from '../keystore/record';
 import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
+	checkSessionCounter,
 	keysForRow,
 	type KeystoreRow
 } from '../keystore/read';
@@ -97,6 +98,8 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 	// $state so `locked` recomputes reactively when it flips without a coincident `_profile` write
 	// (e.g. wipe-while-already-locked; first-save interrupted by a mid-save relock).
 	let hasProfile = $state(false);
+	// A tab opened with a PIN set and no key: it reads locked until a load succeeds, whatever the profile mark says.
+	let startedLocked = $state(false);
 
 	// Synchronous relock core: zeroize the in-memory profile bytes, drop the reference,
 	// then signal relocked. Shared by relockSync() (the sync pagehide/freeze handlers),
@@ -174,7 +177,18 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 		 * Unlock is a re-load (load() re-decrypts from the local key; no passphrase in v1.0).
 		 */
 		get locked(): boolean {
-			return hasProfile && _profile === null;
+			return startedLocked || (hasProfile && _profile === null);
+		},
+
+		/**
+		 * Start-up in PIN mode: nothing is read, so the store lands locked and says so even for a first run, since Home's
+		 * setup prompt keys off `!locked` and must never show over a PIN lock. `hasProfile` comes from the unauthenticated
+		 * profile mark; it only decides which empty state a later unlock replaces.
+		 */
+		startLocked(profileSaved: boolean): void {
+			hasProfile = profileSaved;
+			startedLocked = true;
+			lockState = 'locked';
 		},
 
 		/** Reactive lock state; unlike `locked` it tells a first-run tab that relocked from one that never loaded. */
@@ -243,6 +257,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					if (!ks) throw new KeystoreNotInitializedError(); // re-guard (narrows type)
 					const keystore = ks;
 					const keys = keysForRow(keystore);
+					await checkSessionCounter(db);
 
 					// Fail-closed: the keystore record HMAC must verify before any field is trusted.
 					if (!(await verifyKeystore(keystore, keys))) throw new KeystoreHmacMismatchError();
@@ -265,7 +280,10 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						// is no profile here to leave resident, which is exactly why this branch is easy
 						// to get wrong: walking the relock back costs nothing visible now, and leaves the
 						// tab willing to decrypt whatever a peer writes next.
-						if (relockEpoch === relockAtStart) lockState = 'unlocked';
+						if (relockEpoch === relockAtStart) {
+							lockState = 'unlocked';
+							startedLocked = false;
+						}
 						return null;
 					}
 
@@ -293,6 +311,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 					if (_profile) zeroizeRecord(_profile as unknown as Record<string, unknown>);
 					_profile = decrypted;
 					lockState = 'unlocked';
+					startedLocked = false;
 					return _profile;
 				}
 			);
@@ -316,6 +335,7 @@ export function createProfileStore(db: IDBDatabase, opts: ProfileStoreOptions = 
 						if (!ks) throw new KeystoreNotInitializedError();
 						const keystore = ks;
 						const keys = keysForRow(keystore);
+						await checkSessionCounter(db);
 
 						// Fail-closed: verify before trusting/re-signing (prevents laundering a
 						// tampered keystore into a freshly-valid record).

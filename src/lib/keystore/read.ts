@@ -1,5 +1,5 @@
 import { withStores, reqToPromise } from '../db/schema';
-import { readCounterIn } from './app-lock-store';
+import { readCounter, readCounterIn } from './app-lock-store';
 import {
 	keyIdentity,
 	keyIdentityBytes,
@@ -67,6 +67,18 @@ export function keysForRow(row: KeystoreRow): KeystoreKeys {
 	// A stored row can say anything: a mode this build does not know has no keys to give and is damage, not a lock.
 	if (row.mode !== 'local') throw new KeystoreHmacMismatchError();
 	return { dataKey: row.dataKeyRef, hmacKey: row.hmacKeyRef, bootstrapMacKey: row.hmacKeyRef };
+}
+
+/**
+ * For a reader that holds the row from its own transaction (keysForRow could not read the counter there): with a live
+ * session, a lock counter that differs from the one the session noted means a Lock or a key change was made elsewhere,
+ * so the tab is relocked and the read refused. No session, nothing to compare.
+ */
+export async function checkSessionCounter(db: IDBDatabase): Promise<void> {
+	const session = getSession();
+	if (!session || (await readCounter(db)) === session.counter) return;
+	if (inOwnKeyChange()) throw new KeystoreLockedError();
+	failMismatch();
 }
 
 /**

@@ -82,6 +82,18 @@ export type ProfileApp = {
 	 * Reload line. False until then.
 	 */
 	replacedNotice: boolean;
+	/** The keystore row's mode, read at start-up and again after a key-change signal. Absent reads as `local`. */
+	keyMode?: 'local' | 'pin';
+	/**
+	 * True while the keystore is in PIN mode and this tab holds no session. The routes show the PIN Unlock card then;
+	 * the unlock sets a session and calls `unlockStores`.
+	 */
+	pinLocked?: boolean;
+	/**
+	 * After the caller has set a session: loads every store (profile, timeline, calendar) as a user unlock does, then
+	 * clears `pinLocked`. Rejects if any load fails, leaving `pinLocked` set. Null until a PIN-mode start-up is wired.
+	 */
+	unlockStores?: (() => Promise<void>) | null;
 };
 
 const KEY = Symbol('mtc-profile-app');

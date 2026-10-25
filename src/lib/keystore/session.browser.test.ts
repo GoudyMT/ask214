@@ -1,8 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KDF_V1 } from '../backup/kdf-params';
+import { deleteTestDb, openTestDb } from '../db/_test-helpers';
+import { withStores } from '../db/schema';
+import { bumpCounter, readCounter } from './app-lock-store';
 import { keyIdentity, signKeystore, type KeystoreRecordPin, type KeystoreRecordV1 } from './record';
 import { isDamagedRecord } from '../profile/damaged';
-import { keysForRow, KeystoreHmacMismatchError, type KeystoreRow } from './read';
+import {
+	checkSessionCounter,
+	keysForRow,
+	KeystoreHmacMismatchError,
+	type KeystoreRow
+} from './read';
 import {
 	assertSessionKeys,
 	dropSession,
@@ -76,6 +84,62 @@ async function localRow(): Promise<KeystoreRecordV1 & { id: number }> {
 afterEach(() => {
 	dropSession();
 	setOnSessionMismatch(null);
+});
+
+describe('checkSessionCounter', () => {
+	let db: IDBDatabase;
+	beforeEach(async () => {
+		db = await openTestDb();
+	});
+	afterEach(() => deleteTestDb(db));
+
+	/** A live session that noted the counter as it stands now, and the handler the app would wire. */
+	async function live() {
+		const { row, macKey, kek } = await pinFixture();
+		setSession(await openPinSession(row, { macKey, kek }, await readCounter(db)));
+		const handler = vi.fn();
+		setOnSessionMismatch(handler);
+		return handler;
+	}
+
+	// A tab that sat in the back/forward cache missed the bus; the counter is what tells it a Lock was made elsewhere.
+	it.each([
+		['went up (a Lock or a key change)', 1],
+		['went down (a restore from an older copy)', -1]
+	])('relocks the tab when the counter %s', async (_name, step) => {
+		await bumpCounter(db);
+		const handler = await live();
+		if (step > 0) await bumpCounter(db);
+		else {
+			await withStores(db, 'app-lock', 'readwrite', (tx) => {
+				tx.objectStore('app-lock').put({ id: 'counter', value: 0 });
+			});
+		}
+		await expect(checkSessionCounter(db)).rejects.toThrow(KeystoreLockedError);
+		expect(getSession()).toBeNull();
+		expect(handler).toHaveBeenCalledTimes(1);
+	});
+
+	it('lets a tab whose counter is unchanged, or that holds no session, through', async () => {
+		await checkSessionCounter(db);
+		const handler = await live();
+		await checkSessionCounter(db);
+		expect(getSession()).not.toBeNull();
+		dropSession();
+		await bumpCounter(db);
+		await checkSessionCounter(db);
+		expect(handler).not.toHaveBeenCalled();
+	});
+
+	it('inside its own key change refuses a moved counter without dropping the session', async () => {
+		const handler = await live();
+		await bumpCounter(db);
+		await withOwnKeyChange(async () => {
+			await expect(checkSessionCounter(db)).rejects.toThrow(KeystoreLockedError);
+		});
+		expect(getSession()).not.toBeNull();
+		expect(handler).not.toHaveBeenCalled();
+	});
 });
 
 describe('assertSessionKeys: every session key is non-extractable with its algorithm and usages', () => {

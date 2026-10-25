@@ -6,6 +6,8 @@ import type { IdleTimer, IdleTimerOptions } from './idle-timer';
 import type { RelockReason } from './lifecycle';
 import { afterStartupFailure, afterStartupResult, type AppStatus } from './context';
 import { safeLog } from '../log/safelog';
+import { reqToPromise, withStores } from '../db/schema';
+import { dropSession } from '../keystore/session';
 
 /**
  * App-init orchestration for the profile subsystem. Pure + dependency-injected so the
@@ -19,19 +21,56 @@ import { safeLog } from '../log/safelog';
  */
 
 /** Minimal structural contract this module needs from the store. */
-type LoadableStore = { load: () => Promise<unknown> };
+type LoadableStore = {
+	load: () => Promise<unknown>;
+	startLocked?: (profileSaved: boolean) => void;
+};
 
 export type AppInitDeps<S extends LoadableStore> = {
 	checkSupport: () => Promise<CapabilityResult>;
 	openDb: () => Promise<IDBDatabase>;
 	bootstrap: (db: IDBDatabase) => Promise<unknown>;
 	createStore: (db: IDBDatabase) => S;
+	/** Reads the lock mode and the profile mark; absent, the start-up never looks and always reads (local mode). */
+	readKeyState?: typeof readKeyState;
 };
 
 export type AppInitResult<S extends LoadableStore> =
 	| { status: 'unsupported'; cause: CapabilityCause }
-	| { status: 'ready'; store: S; db: IDBDatabase }
+	| { status: 'ready'; store: S; db: IDBDatabase; keyMode?: 'pin' }
 	| { status: 'damaged'; db: IDBDatabase };
+
+/**
+ * The keystore row's mode and whether the profile mark says a profile was saved, read in plain: no key, no check. Neither
+ * is a secret. The mode decides whether to decrypt at all; the mark only decides which empty state a locked tab shows.
+ */
+export function readKeyState(db: IDBDatabase): Promise<{ mode: unknown; profileSaved: boolean }> {
+	return withStores(db, ['keystore', 'profile-hwm'], 'readonly', async (tx) => {
+		const [ks, mark] = await Promise.all([
+			reqToPromise<{ mode?: unknown } | undefined>(tx.objectStore('keystore').get(0)),
+			reqToPromise<{ payload?: { generation?: unknown } } | undefined>(
+				tx.objectStore('profile-hwm').get(0)
+			)
+		]);
+		const generation = mark?.payload?.generation;
+		return { mode: ks?.mode, profileSaved: typeof generation === 'number' && generation >= 1 };
+	});
+}
+
+/**
+ * Stands first in the relock list. Every relock but page hygiene forgets the keys; hygiene drops the decrypted data
+ * only, so a short switch away needs no PIN on the way back. `onForget` is the app saying so.
+ */
+export function createSessionRelockable(onForget: () => void): Relockable {
+	return {
+		relockSync: (reason) => {
+			if (reason === 'hygiene') return;
+			dropSession();
+			onForget();
+		},
+		refresh: () => Promise.resolve()
+	};
+}
 
 export async function initProfileApp<S extends LoadableStore>(
 	deps: AppInitDeps<S>
@@ -50,6 +89,12 @@ export async function initProfileApp<S extends LoadableStore>(
 	}
 
 	const store = deps.createStore(db);
+	// A PIN set and no key yet: reading would throw into the start-up banner and leave a tab that looks like a first run.
+	const state = await deps.readKeyState?.(db);
+	if (state?.mode === 'pin') {
+		store.startLocked?.(state.profileSaved);
+		return { status: 'ready', store, db, keyMode: 'pin' };
+	}
 	// Damaged saved data is named, with the open database, so the app can offer to erase it; every other failure
 	// rejects as before.
 	try {
@@ -121,10 +166,13 @@ export async function provisionStore<S extends LoadableStore & Pick<Relockable, 
 	db: IDBDatabase,
 	makeStore: (db: IDBDatabase) => S,
 	onCreated?: (store: S) => void,
-	isHidden?: () => boolean
+	isHidden?: () => boolean,
+	skipLoad = false
 ): Promise<S> {
 	const store = makeStore(db);
 	onCreated?.(store);
+	// A PIN-locked start-up has no key: the unlock loads the store later.
+	if (skipLoad) return store;
 	await store.load();
 	// load() decrypts whatever the store's state, so a read that ended after the page was hidden left plaintext in
 	// a hidden tab; the hide event it needed to answer came before it finished.

@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
 	subscribeBus,
 	installLifecycle,
+	readKeyState,
 	createRelockEcho,
 	initProfileApp,
 	superviseStartup,
@@ -11,6 +12,7 @@ import { createProfileBus, type ProfileBus } from '../broadcast/bus';
 import { createProfileStore } from './store.svelte';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
+import { withStores } from '../db/schema';
 import type { AppStatus } from './context';
 import type { IdleTimerOptions, IdleTimer } from './idle-timer';
 
@@ -425,6 +427,66 @@ describe('a re-read that fails', () => {
 		const unhandled = await unhandledDuring(() => doc.dispatchEvent(new Event('resume')));
 		expect(reads).toBe(1);
 		expect(unhandled).toBe(0);
+	});
+});
+
+describe('a start-up with a PIN set', () => {
+	let db: IDBDatabase | null = null;
+	afterEach(async () => {
+		if (db) await deleteTestDb(db);
+		db = null;
+	});
+
+	// The start-up reads the lock mode and the profile mark in plain, with no key: neither is a secret, and only the
+	// mode decides whether to decrypt and only the mark decides which empty state a locked tab shows.
+	async function pinDevice(generation: number | null): Promise<IDBDatabase> {
+		const opened = (db = await openTestDb());
+		await bootstrapLocalKeystore(opened);
+		await withStores(opened, ['keystore', 'profile-hwm'], 'readwrite', (tx) => {
+			tx.objectStore('keystore').put({ id: 0, mode: 'pin' });
+			if (generation === null) tx.objectStore('profile-hwm').delete(0);
+			else
+				tx.objectStore('profile-hwm').put({
+					id: 0,
+					payload: { generation },
+					mac: new Uint8Array(0)
+				});
+		});
+		return opened;
+	}
+
+	function startUp(opened: IDBDatabase) {
+		const store = { load: vi.fn().mockResolvedValue(null), startLocked: vi.fn() };
+		const start = initProfileApp({
+			checkSupport: async () => ({ ok: true }),
+			openDb: async () => opened,
+			bootstrap: bootstrapLocalKeystore,
+			createStore: () => store,
+			readKeyState
+		});
+		return { store, start };
+	}
+
+	it.each([
+		['a profile has been saved', 2, true],
+		['no profile was ever saved', 0, false],
+		['the mark is missing', null, false]
+	])('opens locked without reading when %s', async (_name, generation, hasProfile) => {
+		const { store, start } = startUp(await pinDevice(generation));
+		expect(await start).toMatchObject({ status: 'ready', keyMode: 'pin' });
+		expect(store.load).not.toHaveBeenCalled();
+		expect(store.startLocked).toHaveBeenCalledExactlyOnceWith(hasProfile);
+	});
+
+	it('reads as before when the lock is local, and says nothing of a mode', async () => {
+		db = await openTestDb();
+		await bootstrapLocalKeystore(db);
+		const { store, start } = startUp(db);
+		const result = await start;
+		expect(result.status).toBe('ready');
+		expect('keyMode' in result).toBe(false);
+		expect(store.load).toHaveBeenCalledOnce();
+		expect(store.startLocked).not.toHaveBeenCalled();
 	});
 });
 

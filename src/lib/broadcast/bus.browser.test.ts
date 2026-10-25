@@ -101,6 +101,23 @@ describe('createProfileBus', () => {
 		expect(await received).toEqual({ type: 'data-replaced' });
 	});
 
+	// Every key change tells the other tabs; a spoofed extra field never reaches a handler.
+	it('keys-changed is a bus signal, and a spoofed one is rebuilt bare', async () => {
+		const name = uniqueName();
+		const tabA = makeBus(name);
+		const tabB = makeBus(name);
+		const seen: BusSignal[] = [];
+		tabB.subscribe((s) => seen.push(s));
+		tabA.publish({ type: 'keys-changed' });
+		const raw = new BroadcastChannel(name);
+		raw.postMessage({ type: 'keys-changed', reason: 'user', evil: 1 });
+		raw.postMessage({ type: 'keys-changed ' });
+		await delay(200);
+		raw.close();
+		expect(seen).toEqual([{ type: 'keys-changed' }, { type: 'keys-changed', reason: 'user' }]);
+		for (const s of seen) expect('evil' in s).toBe(false);
+	});
+
 	it('delivers a skillbridge-finder-updated signal to another tab, and rebuilds a spoofed one bare', async () => {
 		const name = uniqueName();
 		const tabA = makeBus(name);
