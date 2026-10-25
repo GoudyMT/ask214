@@ -427,6 +427,18 @@ const STATIC = 'static';
 //     222,500 -> 227,560, precache files 71 -> 72 and the root layout node 8,610 -> 8,920. Three builds measured
 //     page 95,102-95,105 B, precache 227,510-227,517 B, 72 files, root layout 8,877-8,879 B, about 40 B of room above
 //     the highest. Trim pass: the growth is the two approved sets of raises together, nothing new.
+//     Page 95,150 -> 100,450, onDemand 8,189 -> 12,770, precache 227,560 -> 242,240, precache files 72 -> 80, the root
+//     layout node (size-limit, package.json) 8,920 -> 9,820 and the lazy route nodes 53,290 -> 55,870 (owner's call,
+//     2026-10-25): the app lock with an optional PIN - the key seam and the PIN session, the tries row and the lock
+//     counter, a start-up that knows the app is locked, the relock joins, the Unlock card, the Settings App lock row
+//     with the PIN setup and the move of every record onto the new keys, and the locked screens. Three builds
+//     measured page 100,404-100,410 B, on demand 12,728-12,730 B, precache 242,171-242,194 B, 80 files, root layout
+//     9,773-9,776 B and route nodes 55,816-55,830 B, about 40 B of room above the highest. Trim pass first: one lazy
+//     file for the PIN card and the derive (one file and about 160 B of precache less), kept; loading the Settings
+//     row lazily (one more file less) was dropped, because a failed fetch would hide the row without a word; splitting
+//     the keystore modules and fetching the damaged-row check on demand cut no file. The eight extra files are the
+//     lazy PIN chunk and its stylesheet, the derive's settings, the damaged-row check and the shared keystore,
+//     profile and finder pieces the bundler now splits off.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -436,10 +448,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 95_150,
-	onDemand: 8_189,
-	precacheFiles: 72,
-	precacheBytes: 227_560,
+	page: 100_450,
+	onDemand: 12_770,
+	precacheFiles: 80,
+	precacheBytes: 242_240,
 	workerScripts: 147_200
 };
 
