@@ -99,12 +99,19 @@ export async function derivePinKeys(
 	for (let i = 0; i < pin.length; i++) bytes.set([pin.charCodeAt(i)], i);
 	const salt = Uint8Array.from(params.salt);
 
-	const worker = (deps.createWorker ?? startWorker)();
+	let worker: PinWorkerLike | null = null;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
+		try {
+			worker = (deps.createWorker ?? startWorker)();
+		} catch {
+			// A worker that cannot start (a blocked script, no memory for a thread) is one more way the worker failed.
+			throw new Error('E_WORKER_FAILED');
+		}
+		const live = worker;
 		const reply = await new Promise<FromWorker>((resolve, reject) => {
 			const failed = (): void => reject(new Error('E_WORKER_FAILED'));
-			worker.onmessage = (event) => {
+			live.onmessage = (event) => {
 				if (!isWorkerAnswer(event.data)) {
 					failed();
 					return;
@@ -115,11 +122,11 @@ export async function derivePinKeys(
 				}
 				resolve(event.data);
 			};
-			worker.onmessageerror = failed;
-			worker.onerror = failed;
+			live.onmessageerror = failed;
+			live.onerror = failed;
 			timer = setTimeout(failed, PIN_DERIVE_DEADLINE_MS);
 			try {
-				worker.postMessage({ op: 'derive-pin', pin: buffer, salt }, [buffer]);
+				live.postMessage({ op: 'derive-pin', pin: buffer, salt }, [buffer]);
 			} catch {
 				failed();
 			}
@@ -135,7 +142,7 @@ export async function derivePinKeys(
 		// After a transfer the page's copy is detached and this is a no-op; if the post failed, it is the only copy.
 		bytes.fill(0);
 		try {
-			worker.terminate();
+			worker?.terminate();
 		} catch {
 			/* a worker that will not stop is still dropped */
 		}
