@@ -9,7 +9,7 @@ import type { StoreName } from '../db/schema';
  * - device-kept: belongs to this device alone; a restore only re-signs it.
  * - never: not read, not exported, not written by a restore (the person's own API key stays on the device, and so do
  *   the finder's downloaded listings and the ids the person opened; a restore only clears those rows, which are a
- *   cache that downloads again).
+ *   cache that downloads again; the app lock's wrong tries and counter are this device's alone).
  */
 export type BackupRole = 'carried' | 'rewritten' | 'device-kept' | 'never';
 
@@ -24,7 +24,8 @@ export const BACKUP_MANIFEST = {
 	byok: 'never',
 	'skillbridge-finder': 'carried',
 	'skillbridge-finder-hwm': 'rewritten',
-	'skillbridge-finder-pack': 'never'
+	'skillbridge-finder-pack': 'never',
+	'app-lock': 'never'
 } as const satisfies Record<StoreName, BackupRole>;
 
 /** The stores whose records every backup file holds, in the order the file lists them. */

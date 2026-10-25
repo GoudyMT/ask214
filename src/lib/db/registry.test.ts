@@ -39,6 +39,6 @@ describe('ENCRYPTED_STORES registry', () => {
 		expect(ENCRYPTED_STORES).toContain('calendar-sync');
 		expect(STORES).toContain('byok');
 		expect(ENCRYPTED_STORES).toContain('byok');
-		expect(DB_VERSION).toBe(7);
+		expect(DB_VERSION).toBe(8);
 	});
 });

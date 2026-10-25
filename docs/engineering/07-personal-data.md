@@ -12,7 +12,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 
 | Layer      | Tool                        | Version  | Purpose                                 |
 | ---------- | --------------------------- | -------- | --------------------------------------- |
-| Storage    | IndexedDB, raw API          | spec     | Eleven stores                           |
+| Storage    | IndexedDB, raw API          | spec     | Twelve stores                           |
 | Encryption | Web Crypto, AES-GCM 256     | spec     | Every personal record                   |
 | Integrity  | Web Crypto, HMAC-SHA-256    | spec     | Signs the key record and rollback marks |
 | Keys       | Non-extractable `CryptoKey` | spec     | Made on the device, never exportable    |
@@ -33,7 +33,8 @@ the answer to the SkillBridge question, the calendar choices, the SkillBridge fi
 filters), saved programs and compare picks, and the optional API key. Each lives as ciphertext in its own
 single-row IndexedDB store; four more stores hold signed rollback marks and one holds the keys. The finder's
 downloaded listings, its seen programs and its last-seen week sit in one more store, encrypted one row per file
-and kept on this device only: eleven stores in all. Pages that show personal data render only in the browser, and a CI test fails if any server
+and kept on this device only. A last, plain store holds the app lock's wrong-try count and a lock counter (nothing
+derived from the PIN) and never goes into a backup: twelve stores in all. Pages that show personal data render only in the browser, and a CI test fails if any server
 file names a profile field.
 
 **Why this project uses it.** With no server copy, there is nothing to breach, sell or hand over.

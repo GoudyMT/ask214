@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { wipeAllStores } from './wipe';
 import { withStores, reqToPromise, STORES } from './schema';
 import { LOCK_TIMEOUT_MS } from './locks';
+import { readCounter, readTries } from '../keystore/app-lock-store';
 import { openTestDb, deleteTestDb } from './_test-helpers';
 
 describe('wipeAllStores', () => {
@@ -24,6 +25,21 @@ describe('wipeAllStores', () => {
 			);
 			expect(row, `${store} still holds a row after the wipe`).toBeUndefined();
 		}
+		await deleteTestDb(db);
+	});
+
+	// A tab that noted the lock counter before an Erase must see it changed; clearing it with the rest would read 0 again.
+	it('keeps the lock counter one past where it was, and clears the wrong tries', async () => {
+		const db = await openTestDb();
+		await withStores(db, 'app-lock', 'readwrite', (tx) => {
+			tx.objectStore('app-lock').put({ id: 'counter', value: 41 });
+			tx.objectStore('app-lock').put({ id: 'tries', count: 5, waitMs: 60_000, pending: true });
+		});
+
+		await wipeAllStores(db);
+
+		expect(await readCounter(db)).toBe(42);
+		expect(await readTries(db)).toEqual({ count: 0, waitMs: 0, pending: false });
 		await deleteTestDb(db);
 	});
 
