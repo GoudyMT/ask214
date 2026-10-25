@@ -605,7 +605,9 @@ describe('the root layout, which relocks drop the keys', () => {
 			expect(app.store?._getStateForTest()).toBeNull();
 		});
 
-		it('a tab with no PIN reads its data back with no new tap, as after any short switch away', async () => {
+		// Without a PIN a long absence still shuts the screen, and one Unlock tap reads the data back, as before the PIN
+		// existed: the idle timer would have locked had the phone let it run.
+		it('a tab with no PIN shows its Unlock when it is shown again, and never reads the data first', async () => {
 			await localDevice();
 			await render(Layout, { children });
 			await vi.waitFor(() => expect(harness.app?.store?._getStateForTest()).toBeTruthy());
@@ -615,8 +617,26 @@ describe('the root layout, which relocks drop the keys', () => {
 			skew = 16 * MINUTE;
 			setHidden(false);
 
-			await vi.waitFor(() => expect(app.store?._getStateForTest()).not.toBeNull());
-			expect(app.store?.locked).toBe(false);
+			// The settled state, not the moment between the drop and a re-read: a re-read would end it unlocked.
+			await vi.waitFor(() => expect(app.store?.lockState).toBe('locked'));
+			expect(app.store?._getStateForTest()).toBeNull();
+			expect(app.pinLocked).not.toBe(true);
+		});
+
+		// Quiet minutes on screen count with the hidden ones: 14 and then 5 is a long absence too.
+		it('a tab with no PIN counts the quiet time before the hide: 14 minutes quiet, then 5 hidden, locks', async () => {
+			await localDevice();
+			await render(Layout, { children });
+			await vi.waitFor(() => expect(harness.app?.store?._getStateForTest()).toBeTruthy());
+			const app = need(harness.app);
+			skew = 14 * MINUTE;
+			setHidden(true);
+			skew = 19 * MINUTE;
+			setHidden(false);
+
+			// The settled state, not the moment between the drop and a re-read: a re-read would end it unlocked.
+			await vi.waitFor(() => expect(app.store?.lockState).toBe('locked'));
+			expect(app.store?._getStateForTest()).toBeNull();
 		});
 	});
 

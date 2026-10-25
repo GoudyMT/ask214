@@ -177,8 +177,7 @@
 						doc: document,
 						isHidden,
 						createIdleTimer,
-						idleThresholdMs: IDLE_THRESHOLD_MS,
-						lockOnLongAbsence: () => app.keyMode === 'pin'
+						idleThresholdMs: IDLE_THRESHOLD_MS
 					});
 					app.relockAll = () => relockAll(relockables, 'user');
 					app.joinRelock = createJoinRelock(relockables);
@@ -368,8 +367,7 @@
 					doc: document,
 					isHidden,
 					createIdleTimer,
-					idleThresholdMs: IDLE_THRESHOLD_MS,
-					lockOnLongAbsence: () => app.keyMode === 'pin'
+					idleThresholdMs: IDLE_THRESHOLD_MS
 				});
 				// Another tab changed the lock under a live session: forget the keys and show the PIN lock.
 				setOnSessionMismatch(() => {

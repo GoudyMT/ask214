@@ -542,9 +542,7 @@ describe('installLifecycle, coming back after time away', () => {
 	const THRESHOLD = IDLE_THRESHOLD_MS;
 	type WayName = 'a persisted pageshow' | 'resume' | 'becoming visible';
 
-	function setup(
-		opts: { lockOnLongAbsence?: boolean; hiddenAtStart?: boolean; realTimer?: boolean } = {}
-	) {
+	function setup(opts: { hiddenAtStart?: boolean; realTimer?: boolean } = {}) {
 		const clock = { wall: 1_700_000_000_000, perf: 50_000 };
 		const order: string[] = [];
 		const store = {
@@ -574,10 +572,7 @@ describe('installLifecycle, coming back after time away', () => {
 			createIdleTimer: opts.realTimer ? createIdleTimer : () => timer,
 			idleThresholdMs: THRESHOLD,
 			now: () => clock.wall,
-			perfNow: () => clock.perf,
-			...(opts.lockOnLongAbsence === undefined
-				? {}
-				: { lockOnLongAbsence: () => opts.lockOnLongAbsence === true })
+			perfNow: () => clock.perf
 		});
 		const pageshow = () => {
 			const e = new Event('pageshow');
@@ -621,9 +616,10 @@ describe('installLifecycle, coming back after time away', () => {
 	}
 	const WAY_NAMES: WayName[] = ['a persisted pageshow', 'resume', 'becoming visible'];
 
-	describe.each(WAY_NAMES)('with the lock on, %s', (name) => {
+	// With a PIN or without one: a long absence is shut before anything is read again.
+	describe.each(WAY_NAMES)('%s', (name) => {
 		it('relocks as idle before any re-read after 16 minutes away', () => {
-			const t = setup({ lockOnLongAbsence: true });
+			const t = setup();
 			const way = t.ways[name];
 			way.hide();
 			t.order.length = 0;
@@ -633,7 +629,7 @@ describe('installLifecycle, coming back after time away', () => {
 		});
 
 		it('only re-reads after 14 minutes away', () => {
-			const t = setup({ lockOnLongAbsence: true });
+			const t = setup();
 			const way = t.ways[name];
 			way.hide();
 			t.order.length = 0;
@@ -650,8 +646,8 @@ describe('installLifecycle, coming back after time away', () => {
 		['only the wall clock passed the threshold', 16 * MINUTE, 1 * MINUTE, true],
 		['exactly the threshold passed', THRESHOLD, THRESHOLD, true],
 		['one millisecond under the threshold passed', THRESHOLD - 1, THRESHOLD - 1, false]
-	])('with the lock on, %s', (_name, wallMs, perfMs, relocks) => {
-		const t = setup({ lockOnLongAbsence: true });
+	])('%s', (_name, wallMs, perfMs, relocks) => {
+		const t = setup();
 		t.ways['resume'].hide();
 		t.order.length = 0;
 		t.away(wallMs, perfMs);
@@ -662,7 +658,7 @@ describe('installLifecycle, coming back after time away', () => {
 
 	// pagehide and the visibility change both announce one departure; the time away runs from the first.
 	it('counts the time away from the first hide, not from a later one', () => {
-		const t = setup({ lockOnLongAbsence: true });
+		const t = setup();
 		t.ways['a persisted pageshow'].hide();
 		t.away(10 * MINUTE);
 		t.ways['becoming visible'].hide();
@@ -672,14 +668,14 @@ describe('installLifecycle, coming back after time away', () => {
 	});
 
 	it('counts a page that started hidden from the start', () => {
-		const t = setup({ lockOnLongAbsence: true, hiddenAtStart: true });
+		const t = setup({ hiddenAtStart: true });
 		t.away(16 * MINUTE);
 		t.ways['becoming visible'].back();
 		expect(t.store.lock).toHaveBeenCalledExactlyOnceWith('idle');
 	});
 
 	it('treats a way back with no hide as no time away', () => {
-		const t = setup({ lockOnLongAbsence: true });
+		const t = setup();
 		t.away(60 * MINUTE);
 		t.ways['resume'].back();
 		expect(t.store.lock).not.toHaveBeenCalled();
@@ -688,7 +684,7 @@ describe('installLifecycle, coming back after time away', () => {
 
 	// pageshow, resume and visible often arrive together; the first one is the way back, the rest find the store shut.
 	it('relocks once when all three ways back arrive for one absence', () => {
-		const t = setup({ lockOnLongAbsence: true });
+		const t = setup();
 		t.ways['a persisted pageshow'].hide();
 		t.ways['resume'].hide();
 		t.away(16 * MINUTE);
@@ -698,68 +694,14 @@ describe('installLifecycle, coming back after time away', () => {
 		expect(t.store.lock).toHaveBeenCalledOnce();
 	});
 
-	describe('without a PIN (the default)', () => {
-		it.each(WAY_NAMES)(
-			'%s after 16 minutes drops the plaintext and re-reads, locking nothing',
-			(name) => {
-				const t = setup();
-				const way = t.ways[name];
-				way.hide();
-				t.order.length = 0;
-				t.away(16 * MINUTE);
-				way.back();
-				expect(t.order).toEqual(['relockSync hygiene', 'refresh', 'timer start']);
-				expect(t.store.lock).not.toHaveBeenCalled();
-			}
-		);
-
-		it('after 14 minutes only re-reads, and leaves the timer to its own count', () => {
-			const t = setup();
-			t.ways['resume'].hide();
-			t.order.length = 0;
-			t.away(14 * MINUTE);
-			t.ways['resume'].back();
-			expect(t.order).toEqual(['refresh']);
-		});
-
-		// The overdue check would lock on the first touch after the return, as a lock the person never earned.
-		describe('with the real idle timer', () => {
-			beforeEach(() => vi.useFakeTimers());
-			afterEach(() => vi.useRealTimers());
-
-			it('the first touch after a long absence does not fire a stale idle lock', () => {
-				const t = setup({ realTimer: true });
-				t.ways['becoming visible'].hide();
-				t.away(16 * MINUTE);
-				t.ways['becoming visible'].back();
-				t.win.dispatchEvent(new Event('pointerdown'));
-				expect(t.store.lock).not.toHaveBeenCalled();
-				t.off();
-			});
-
-			// Local mode keeps its rule: the time away counts from the hide alone, so quiet time on screen before it does
-			// not turn a short absence into a long one.
-			it('counts only the time hidden: 14 minutes quiet, then 5 hidden, only re-reads', () => {
-				const t = setup({ realTimer: true });
-				t.away(14 * MINUTE);
-				t.ways['becoming visible'].hide();
-				t.order.length = 0;
-				t.away(5 * MINUTE);
-				t.ways['becoming visible'].back();
-				expect(t.order).toEqual(['refresh']);
-				t.off();
-			});
-		});
-	});
-
-	describe('with the lock on and the real idle timer', () => {
+	describe('with the real idle timer', () => {
 		beforeEach(() => vi.useFakeTimers());
 		afterEach(() => vi.useRealTimers());
 
 		// Time on screen with no touch is time away from the person too: 14 quiet minutes and 5 hidden ones are past the
 		// threshold, and the lock must come before the re-read.
 		it('counts quiet time before the hide: 14 minutes quiet, then 5 hidden, locks before any re-read', () => {
-			const t = setup({ lockOnLongAbsence: true, realTimer: true });
+			const t = setup({ realTimer: true });
 			t.away(14 * MINUTE);
 			t.ways['becoming visible'].hide();
 			t.order.length = 0;
@@ -769,8 +711,19 @@ describe('installLifecycle, coming back after time away', () => {
 			t.off();
 		});
 
+		// The long absence already locked once; the overdue count must not lock again on the touch that comes next.
+		it('the first touch after a long absence does not fire a second, stale idle lock', () => {
+			const t = setup({ realTimer: true });
+			t.ways['becoming visible'].hide();
+			t.away(16 * MINUTE);
+			t.ways['becoming visible'].back();
+			t.win.dispatchEvent(new Event('pointerdown'));
+			expect(t.store.lock).toHaveBeenCalledExactlyOnceWith('idle');
+			t.off();
+		});
+
 		it('a touch before the hide starts the count again', () => {
-			const t = setup({ lockOnLongAbsence: true, realTimer: true });
+			const t = setup({ realTimer: true });
 			t.away(14 * MINUTE);
 			t.win.dispatchEvent(new Event('pointerdown'));
 			t.ways['becoming visible'].hide();
@@ -785,7 +738,7 @@ describe('installLifecycle, coming back after time away', () => {
 	// A frozen page can be resumed while still hidden. That is not the person coming back, so the hide time must
 	// survive it for the way back that is.
 	it('keeps the hide time through a resume that arrives while the page is still hidden', () => {
-		const t = setup({ lockOnLongAbsence: true });
+		const t = setup();
 		t.ways['becoming visible'].hide();
 		t.doc.dispatchEvent(new Event('freeze'));
 		t.away(1 * MINUTE);

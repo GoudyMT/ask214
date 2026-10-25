@@ -420,9 +420,6 @@ type ProfileLifecycleDeps = {
 	now?: () => number;
 	/** The monotonic clock; injected so a test can move it. */
 	perfNow?: () => number;
-	/** Whether a long absence must lock before anything is shown again (a PIN is set). Without one the plaintext is
-	 * dropped and re-read, as for any hide and return. */
-	lockOnLongAbsence?: () => boolean;
 };
 
 /**
@@ -487,15 +484,13 @@ export function installLifecycle(
 		// A frozen page can be resumed while still hidden; that is not the person coming back, so the hide time stays
 		// for the way back that is.
 		if (!deps.isHidden()) hiddenAt = null;
-		const lock = deps.lockOnLongAbsence?.() === true;
 		const wallAway = left ? now() - left.wall : 0;
-		// With a PIN, quiet time on screen before the hide counts too: the person was not there for it either.
-		const away = Math.max(wallAway, left ? perfNow() - left.perf : 0, lock ? idle.quietMs() : 0);
+		// Quiet time on screen before the hide counts too: the person was not there for it either.
+		const away = Math.max(wallAway, left ? perfNow() - left.perf : 0, idle.quietMs());
 		if (wallAway >= 0 && away < deps.idleThresholdMs) return restore();
-		// With a PIN the stores are shut first, so the re-read finds them locked and leaves them shut. Without one the
-		// plaintext is dropped and read back, as for any hide and return (a no-op where the hide already did it).
-		if (lock) relockAll(relockables, 'idle');
-		else relockEachSync(relockables, 'hygiene');
+		// The stores are shut first, so the re-read finds them locked and leaves them shut: the idle lock the timer
+		// would have made had the phone let it run. With a PIN the keys go too; without one, Unlock reads the data back.
+		relockAll(relockables, 'idle');
 		restore();
 		// The old count is stale: its next touch would otherwise lock a person who has only just returned.
 		idle.start();
