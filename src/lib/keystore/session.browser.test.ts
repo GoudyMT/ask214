@@ -284,6 +284,16 @@ describe('keysForRow with a live session', () => {
 		expect(handler).toHaveBeenCalledTimes(1);
 	});
 
+	// A row whose mode changed under the session has changed: the keys must go, not stay in memory behind a damage report.
+	it('relocks the tab when a row of an unknown mode appears under the session', async () => {
+		await open();
+		const handler = armed();
+		const odd = { ...(await localRow()), mode: 'passphrase' } as unknown as KeystoreRow;
+		expect(() => keysForRow(odd)).toThrow(KeystoreLockedError);
+		expect(getSession()).toBeNull();
+		expect(handler).toHaveBeenCalledTimes(1);
+	});
+
 	it('relocks the tab when the PIN row is from another generation', async () => {
 		const { row } = await open();
 		const handler = armed();

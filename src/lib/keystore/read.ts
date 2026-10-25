@@ -62,9 +62,10 @@ export function keysForRow(row: KeystoreRow): KeystoreKeys {
 			bootstrapMacKey: session.bootstrapMacKey
 		};
 	}
+	// Any row that is not this session's PIN row has changed under a live session, whatever its mode: relock first.
+	if (session && !inOwnKeyChange()) failMismatch();
 	// A stored row can say anything: a mode this build does not know has no keys to give and is damage, not a lock.
 	if (row.mode !== 'local') throw new KeystoreHmacMismatchError();
-	if (session && !inOwnKeyChange()) failMismatch();
 	return { dataKey: row.dataKeyRef, hmacKey: row.hmacKeyRef, bootstrapMacKey: row.hmacKeyRef };
 }
 
