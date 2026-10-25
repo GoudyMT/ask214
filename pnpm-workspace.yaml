@@ -20,12 +20,13 @@ allowBuilds:
 # cross-user disclosure + parse-time crash, the >=8.0.0 <8.9.0 range), all high -> undici floor then
 # >=8.9.0; GHSA-rfgv-xxqx-mfg5 + GHSA-w293-vg96-wgc3 + GHSA-vp8m-p9jh-q5pm (undici WebSocket-subprotocol DoS,
 # BalancedPool TLS-validation bypass, interceptor cross-origin cache poisoning; up to <8.10.2), all high ->
-# undici floor now >=8.10.2. Floor pins - retire when wrangler/miniflare bundle them natively (Dependabot will
+# undici floor then >=8.10.2; GHSA-xjj6-f33q-929c (undici DoS through an unhandled error on excessive
+# content-encodings, high, >=8.0.0 <8.12.2) -> undici floor now >=8.12.2. Floor pins - retire when wrangler/miniflare bundle them natively (Dependabot will
 # surface it).
 overrides:
   tmp: '>=0.2.6'
   ws: '>=8.21.0'
-  undici: '>=8.10.2'
+  undici: '>=8.12.2'
   # Force patched nanoid (GHSA-2v37-7h3g-55p8, custom generators loop forever on size 0, high; transitive
   # dev/build-only via vite>postcss, never in the client bundle). Floor pin.
   nanoid: '>=3.3.17'
@@ -86,6 +87,17 @@ overrides:
   # high; transitive build-only via vite>postcss, never in the client bundle). Targeted range pin, inside the
   # ^1.2.1 postcss asks for. Retire when the lockfile resolves >=1.2.2 without it.
   'source-map-js@<1.2.2': '1.2.2'
+  # Force patched body-parser (GHSA-27r3-jxmh-p828, DoS through trailing bytes after a compressed request body,
+  # high; transitive dev-only via @lhci/cli>express, never in the client bundle). Targeted range pin, inside the
+  # 1.x express 4 asks for. Retire when the lockfile resolves >=1.20.9 without it.
+  'body-parser@<1.20.9': '1.20.9'
+  # Force patched zod (GHSA-mrhx-c7xc-m3w5, memory exhaustion while validating oversized constrained collections,
+  # high, every release <4.6.6; transitive dev-only via @lhci/cli>lighthouse>puppeteer-core>chromium-bidi, never in
+  # the client bundle). No 3.x patch exists, so this pin crosses a major, as the brace-expansion and basic-ftp pins
+  # do. The accepted cost: chromium-bidi was built against zod 3. Puppeteer loads it only for the WebDriver BiDi
+  # protocol, and Lighthouse drives Chrome over CDP, so the path is dormant; the Lighthouse gate proves the chain
+  # still runs. Retire when chromium-bidi asks for a patched zod (Dependabot will surface it).
+  'zod@<4.6.6': '4.6.6'
 
 # Accepted, unfixable, dev/CI-only advisories (never shipped in the client bundle): extract-zip
 # (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6; and GHSA-7pqw-9j4j-h8q3,
