@@ -1,7 +1,8 @@
 import { createRawSnippet, tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cdp, page } from 'vitest/browser';
+import { cdp, page, userEvent } from 'vitest/browser';
+import { chooseAnswer, toExtractiveAnswer } from '$lib/ask/answer/answer-view';
 import type { AskState } from '$lib/ask';
 import { createByokStore } from '$lib/ask/byok/store';
 import { KDF_V1 } from '$lib/backup/kdf-params';
@@ -40,7 +41,9 @@ import TimelinePage from './timeline/+page.svelte';
 // so a question and its answer are whatever the case says they are.
 const harness = vi.hoisted(() => ({
 	db: null as Promise<IDBDatabase> | null,
-	app: null as ProfileApp | null
+	app: null as ProfileApp | null,
+	// When set, stands in for the PIN check (the derive is Argon2id in a worker); otherwise the real one runs.
+	check: null as null | (() => Promise<unknown>)
 }));
 
 vi.mock('$lib/db/schema', async (importOriginal) => {
@@ -61,6 +64,14 @@ vi.mock('$lib/profile/context', async (importOriginal) => {
 			real.setProfileApp(app);
 		},
 		getProfileApp: () => harness.app
+	};
+});
+vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/keystore/app-lock-store')>();
+	return {
+		...real,
+		runPinCheck: ((...args: Parameters<typeof real.runPinCheck>) =>
+			harness.check ? harness.check() : real.runPinCheck(...args)) as typeof real.runPinCheck
 	};
 });
 vi.mock('$lib/install/context', () => ({
@@ -94,6 +105,7 @@ const CANARY = {
 	ask: 'CANARY-ASK-question'
 } as const;
 const CANARIES = Object.values(CANARY);
+const SUMMARIES_KEY = 'mtc:ask:synthesis-enabled';
 const TASK = KNOWN_TASK_IDS[0] as string;
 
 const ask = $state<{ state: AskState; mode: 'device' | 'online' }>({
@@ -266,7 +278,7 @@ function onScreen(): string[] {
 	return found;
 }
 
-const cardHeading = () => page.getByRole('heading', { name: 'Your data is locked' });
+// The PIN card is found by its field: LockedPanel, the local Unlock, shows the same heading and has no field.
 const pinField = () => page.getByLabelText('PIN', { exact: true });
 const lockButton = () => page.getByRole('button', { name: 'Lock', exact: true });
 // The lead card and its label both read this; the first is the label.
@@ -290,6 +302,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+	harness.check = null;
+	localStorage.removeItem(SUMMARIES_KEY);
 	dropSession();
 	setOnSessionMismatch(null);
 	vi.restoreAllMocks();
@@ -330,7 +344,7 @@ describe('a PIN-locked tab after a reload', () => {
 		await readyApp();
 		await render(Page);
 
-		await expect.element(cardHeading()).toBeVisible();
+		await expect.element(pinField()).toBeVisible();
 		expect(onScreen()).toEqual([]);
 	});
 });
@@ -358,7 +372,7 @@ describe('a tab that locks while saved text is on screen', () => {
 
 		app.relockAll?.();
 
-		await expect.element(cardHeading()).toBeVisible();
+		await expect.element(pinField()).toBeVisible();
 		expect(onScreen()).toEqual([]);
 	});
 
@@ -377,7 +391,7 @@ describe('a tab that locks while saved text is on screen', () => {
 		await frame();
 
 		expect(onScreen()).toEqual([]);
-		await expect.element(cardHeading()).toBeVisible();
+		await expect.element(pinField()).toBeVisible();
 	});
 });
 
@@ -386,7 +400,7 @@ describe('Settings, PIN-locked', () => {
 		const app = await readyApp();
 		await render(SettingsPage);
 
-		await expect.element(cardHeading()).toBeVisible();
+		await expect.element(pinField()).toBeVisible();
 		const row = page.getByRole('button', { name: /App lock/ });
 		await expect.element(row).toHaveTextContent('App lock PIN on');
 		await expect.element(row).toHaveAttribute('aria-expanded', 'false');
@@ -421,11 +435,11 @@ describe('Settings, PIN-locked', () => {
 	it('puts the privacy section after the Unlock card', async () => {
 		await readyApp();
 		await render(SettingsPage);
-		await expect.element(cardHeading()).toBeVisible();
+		await expect.element(pinField()).toBeVisible();
 
 		const privacy = page.getByRole('heading', { name: 'Privacy and security' }).element();
 		expect(
-			cardHeading().element().compareDocumentPosition(privacy) & Node.DOCUMENT_POSITION_FOLLOWING
+			pinField().element().compareDocumentPosition(privacy) & Node.DOCUMENT_POSITION_FOLLOWING
 		).toBeTruthy();
 	});
 });
@@ -435,7 +449,7 @@ describe('Home, PIN-locked', () => {
 		await readyApp();
 		await render(HomePage);
 
-		await expect.element(cardHeading()).toBeVisible();
+		await expect.element(pinField()).toBeVisible();
 		expect(page.getByText('Unlock to see what is due').query()).toBeNull();
 		expect(page.getByRole('heading', { name: 'For you', exact: true }).query()).toBeNull();
 		expect(page.getByRole('link', { name: 'Set up your timeline' }).query()).toBeNull();
@@ -450,7 +464,7 @@ describe('Home, PIN-locked', () => {
 		await expect.element(topMatch()).toBeVisible();
 		await expect.element(page.getByText('An intent to file lets you notify VA')).toBeVisible();
 		// The card stays under the answer: it is still the way in.
-		await expect.element(cardHeading()).toBeVisible();
+		await expect.element(pinField()).toBeVisible();
 	});
 });
 
@@ -458,10 +472,35 @@ describe('Home, PIN-locked, with an online answer on screen', () => {
 	const LINE = 'Summaries need your PIN.';
 	const summaryUnlock = () =>
 		document.querySelector<HTMLButtonElement>('.ask-locked-summary__unlock');
+	// An online answer as the store builds it with summaries asked for and none made: the quoted extract, with its note.
 	const onlineAnswer = async () => {
 		await expect.element(page.getByRole('button', { name: 'Search' })).toBeEnabled();
-		ask.state = { kind: 'results', origin: 'online', cards: [card()] };
+		const lead = card();
+		const answer = chooseAnswer({
+			eligibilityIntent: false,
+			synthesis: { kind: 'unavailable' },
+			extractive: toExtractiveAnswer([lead])
+		});
+		ask.state = { kind: 'results', origin: 'online', cards: [lead], ...(answer ? { answer } : {}) };
 	};
+	// Summaries are off until the person turns them on in Settings.
+	beforeEach(() => localStorage.setItem(SUMMARIES_KEY, '1'));
+
+	it('with a saved key but summaries off, shows the cards and no line', async () => {
+		localStorage.removeItem(SUMMARIES_KEY);
+		const app = await readyApp();
+		const asked = vi.spyOn(need(app.byok), 'hasApiKey');
+		await render(HomePage);
+		await onlineAnswer();
+		await vi.waitFor(() => expect(asked).toHaveBeenCalled());
+		expect(await asked.mock.results[0]?.value).toBe(true);
+		await tick();
+		await frame();
+
+		await expect.element(topMatch()).toBeVisible();
+		expect(page.getByText(LINE).query()).toBeNull();
+		expect(summaryUnlock()).toBeNull();
+	});
 
 	it('with a saved key, points to the Unlock, and the Unlock puts the cursor in the card PIN field', async () => {
 		await readyApp();
@@ -502,7 +541,7 @@ describe('Home, PIN-locked, with an online answer on screen', () => {
 		await expect.element(topMatch()).toBeVisible();
 		await pause(100);
 		expect(page.getByText(LINE).query()).toBeNull();
-		expect(cardHeading().query()).toBeNull();
+		expect(pinField().query()).toBeNull();
 	});
 
 	// The Unlock hands focus to the card's field mid-press, so the held key's repeats land there: the field must not
@@ -531,6 +570,50 @@ describe('Home, PIN-locked, with an online answer on screen', () => {
 
 		expect(document.activeElement).toBe(pinField().element());
 		expect(document.querySelector('.pin-unlock [role="alert"]')).toBeNull();
+	});
+});
+
+describe('Home, where focus goes once an unlock lands', () => {
+	// The check itself is the card's own test; here it only sets the session and ends well, and the app loads the stores.
+	const arm = () => {
+		harness.check = async () => {
+			const stored = need(await readRaw('keystore')) as unknown as KeystoreRecordPin;
+			setSession(await openPinSession(stored, need(keys), await readCounter(need(db))));
+			return { kind: 'good', value: true, wrongTries: 0, unfinished: false };
+		};
+	};
+	const gone = () => expect.poll(() => pinField().query()).toBeNull();
+
+	// A tap on a phone must not open the keyboard by focusing a text field.
+	it('after a tap on Unlock, goes to the page heading', async () => {
+		arm();
+		// A wide page has no bottom bar over the button, so a real pointer press reaches it.
+		const { width, height } = { width: window.innerWidth, height: window.innerHeight };
+		await page.viewport(1280, 900);
+		try {
+			await readyApp();
+			await render(HomePage);
+			await pinField().fill('1234');
+			await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+			await gone();
+			await frame();
+
+			expect(document.activeElement).toBe(document.querySelector('h1.home-hero'));
+		} finally {
+			await page.viewport(width, height);
+		}
+	});
+
+	it('after an Enter in the PIN field, goes to the question field', async () => {
+		arm();
+		await readyApp();
+		await render(HomePage);
+		await pinField().fill('1234');
+		await userEvent.keyboard('{Enter}');
+		await gone();
+		await frame();
+
+		expect(document.activeElement).toBe(askField());
 	});
 });
 

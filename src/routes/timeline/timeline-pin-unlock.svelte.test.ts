@@ -105,11 +105,11 @@ describe('Timeline, locked with a PIN', () => {
 	// After a restore the page looks for the stored API key to say whether it must be added again. With no keys that read
 	// is not the page's to make, and a store that reads unlocked (nothing saved) must not let it through.
 	it.each([
-		['is PIN-locked with nothing saved', true, 0],
-		['is unlocked', false, 1]
+		['is PIN-locked with nothing saved', 0, true],
+		['is unlocked', 1, false]
 	])(
 		'after a restore, a tab that %s reads the stored API key %i times',
-		async (_name, pinLocked, reads) => {
+		async (_name, reads, pinLocked) => {
 			lock.pinLocked = pinLocked;
 			lock.storeLocked = false;
 			markBackupIntent('restored', location.pathname);

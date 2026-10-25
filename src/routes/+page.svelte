@@ -180,6 +180,16 @@
 		await tick();
 		if (keyboard && document.activeElement === document.body) askView?.focusField();
 	}
+	// The Unlock card is gone and focus fell to the page. Where it goes follows the same rule: after a keyboard press the
+	// question field, and after a tap or a click the page heading, since a focused text field would open a phone's keyboard.
+	let unlockByTouch = false;
+	let heroEl: HTMLElement | undefined;
+	async function afterUnlock(): Promise<void> {
+		await tick();
+		if (document.activeElement !== document.body) return;
+		if (unlockByTouch) heroEl?.focus();
+		else askView?.focusField();
+	}
 
 	// A lock of any kind (the person's, the idle timer's, another tab's, the page being hidden) clears the question and
 	// the answer on screen: the page is going away, and its text with it. Ask answers again only when asked, so there
@@ -260,7 +270,9 @@
 </svelte:head>
 
 <div class="home">
-	<h1 class="home-hero">Answers for your military transition, from sources you can trust.</h1>
+	<h1 bind:this={heroEl} class="home-hero" tabindex="-1">
+		Answers for your military transition, from sources you can trust.
+	</h1>
 
 	<AskView
 		bind:this={askView}
@@ -292,7 +304,7 @@
 			store?.setMode('online');
 			void store?.ask(q);
 		}}
-		onUnlockSummaries={pinLocked && storedKey ? toUnlockCard : undefined}
+		onUnlockSummaries={pinLocked && storedKey && isSynthesisEnabled() ? toUnlockCard : undefined}
 	/>
 
 	{#if showInstallNudge}
@@ -307,12 +319,18 @@
 
 	{#if pinLocked}
 		<hr class="home-divider" />
-		<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
-		{#await loadPinUnlock() then unlockCard}
-			<unlockCard.default onunlocked={() => void toQuestionField(true)} />
-		{:catch}
-			<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
-		{/await}
+		<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. The wrapper
+		     only notes how the card was pressed, for where focus goes once it is gone. -->
+		<div
+			onclickcapture={(e) => (unlockByTouch = e.detail > 0)}
+			onkeydowncapture={(e) => e.key === 'Enter' && (unlockByTouch = false)}
+		>
+			{#await loadPinUnlock() then unlockCard}
+				<unlockCard.default onunlocked={() => void afterUnlock()} />
+			{:catch}
+				<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
+			{/await}
+		</div>
 	{:else if isIdle && showOnramp}
 		<hr class="home-divider" />
 		<section class="home-onramp" aria-labelledby="home-onramp-heading">
@@ -345,6 +363,11 @@
 		font-size: var(--font-size-h1-fluid);
 		line-height: 1.15;
 		margin: var(--space-xl) 0 var(--space-l);
+	}
+	/* Where focus goes after a tap on Unlock: the app's ring (app.css), as on a button. */
+	.home-hero:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 	/* The nudge card holds left-aligned content inside the centered hero column. */
 	.home-install {

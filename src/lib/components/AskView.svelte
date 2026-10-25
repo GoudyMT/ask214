@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import type { AskState } from '$lib/ask/types';
+	import type { AnswerView } from '$lib/ask/answer/answer-view';
 	import { sourceFromCard, type Source } from '$lib/ask/sources';
 	import { similarCards } from '$lib/ask/similar';
 	import AskResultCard from './AskResultCard.svelte';
@@ -46,6 +47,11 @@
 		/** Given only by a locked tab that holds a saved API key: an online answer then points to the Unlock. */
 		onUnlockSummaries?: () => void;
 	} = $props();
+
+	// The answer without the note that no summary is shown: said by the locked line instead, and never twice.
+	function withoutNote(view: AnswerView): AnswerView {
+		return view.kind === 'extractive' ? { kind: 'extractive', answer: view.answer } : view;
+	}
 
 	let query = $state('');
 	let showSimilar = $state(false);
@@ -328,11 +334,11 @@
 		</div>
 	{:else if askState.kind === 'results'}
 		{@const cards = askState.cards}
-		{#if askState.answer}
-			<AskAnswer view={askState.answer} onOpenSource={readSource} />
-		{:else if askState.origin === 'online' && onUnlockSummaries}
-			<!-- A locked tab holds no key to make a summary with. The press hands focus on to the Unlock card, so the key's
-			     repeats would land there: only a new press of Enter counts. -->
+		{@const lockedSummary = askState.origin === 'online' && onUnlockSummaries !== undefined}
+		{#if lockedSummary}
+			<!-- A locked tab holds no key to make a summary with, and says so where the summary would sit, above the extract the
+			     answer falls back to. The press hands focus on to the Unlock card, so the key's repeats would land there: only
+			     a new press of Enter counts. -->
 			<p class="ask-locked-summary">
 				Summaries need your PIN.
 				<button
@@ -342,6 +348,13 @@
 					onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}>Unlock</button
 				>
 			</p>
+		{/if}
+		{#if askState.answer}
+			<!-- The line above is the reason there is no summary, so the note that says there is none stays out. -->
+			<AskAnswer
+				view={lockedSummary ? withoutNote(askState.answer) : askState.answer}
+				onOpenSource={readSource}
+			/>
 		{/if}
 		<!-- The LEAD card yields its excerpt to an EXTRACTIVE answer taken from that same card: the two would
 		     otherwise print the same sentences twice, at 120 words directly beneath the answer block.

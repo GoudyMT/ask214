@@ -3,6 +3,7 @@ import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
 import { cdp, userEvent } from 'vitest/browser';
 import AskView from './AskView.svelte';
+import { createAskStore } from '$lib/ask';
 import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
 import type { ResultCard } from '$lib/corpus';
@@ -1151,14 +1152,48 @@ describe('AskView, focus after the pressed button goes away', () => {
 // A locked tab can still ask online and read the raw cards; the summary needs the PIN, and the line says so.
 describe('AskView, the summary a locked tab cannot make', () => {
 	const LINE = 'Summaries need your PIN.';
-	const online = (over: Partial<ViewProps> = {}) =>
-		props({ kind: 'results', origin: 'online', cards: [card()] }, over);
+	const NO_SUMMARY_NOTE = 'No AI summary is shown for this answer.';
+	// The state the page really holds after an online answer with summaries on and no key to make one with: the real store
+	// fills the answer slot with the quoted extract and a note, so a state built by hand without them would prove nothing.
+	async function realOnline(over: Partial<ViewProps> = {}): Promise<ViewProps> {
+		const store = createAskStore({
+			embed: async () => new Float32Array(),
+			getCorpus: async () => {
+				throw new Error('E_UNUSED');
+			},
+			retrieveOnline: async () => ({
+				status: 'results',
+				corpusVersion: '1.0',
+				results: [
+					{
+						score: 0.9,
+						chunk: {
+							id: 'a',
+							text: 'An official passage.',
+							sourceId: 's',
+							sourceTitle: 'S',
+							url: 'https://x.gov',
+							tags: []
+						}
+					}
+				]
+			}),
+			synthesize: async () => ({ kind: 'degraded' }),
+			onlineConsented: () => true,
+			synthesisEnabled: () => true
+		});
+		await store.ask('how do I file a claim');
+		expect(store.state).toMatchObject({ kind: 'results', origin: 'online' });
+		return props(store.state, over);
+	}
 	const unlockButton = (container: Element) =>
 		[...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Unlock');
 
 	it('puts the line and an Unlock button where the summary would be, and the button runs the hand-off', async () => {
 		const onUnlockSummaries = vi.fn();
-		const { container } = await render(AskView, { props: online({ onUnlockSummaries }) });
+		const { container } = await render(AskView, {
+			props: await realOnline({ onUnlockSummaries })
+		});
 
 		const line = [...container.querySelectorAll('p')].find((p) => p.textContent?.includes(LINE));
 		expect(line?.textContent?.replace(/\s+/g, ' ').trim()).toBe(`${LINE} Unlock`);
@@ -1171,15 +1206,32 @@ describe('AskView, the summary a locked tab cannot make', () => {
 		expect(onUnlockSummaries).toHaveBeenCalledOnce();
 	});
 
-	// Without the hand-off the page has no key to speak of (or is unlocked), and an on-device answer never had a summary.
-	it.each([
-		['no hand-off is given', online()],
-		[
-			'the answer came from the device',
-			props({ kind: 'results', origin: 'device', cards: [card()] }, { onUnlockSummaries: vi.fn() })
-		]
-	])('shows no line when %s', async (_name, viewProps) => {
-		const { container } = await render(AskView, { props: viewProps });
+	// The extract stays: it is the answer a locked tab can give. Only the second, contradicting statement goes.
+	it('keeps the quoted extract beside the line and does not also say no summary is shown', async () => {
+		const { container } = await render(AskView, {
+			props: await realOnline({ onUnlockSummaries: vi.fn() })
+		});
+
+		expect(container.querySelector('.ask-answer')).not.toBeNull();
+		expect(container.textContent).toContain(LINE);
+		expect(container.textContent).not.toContain(NO_SUMMARY_NOTE);
+	});
+
+	// Without the hand-off the page has no key to speak of (or is unlocked): the shipped note stands as it was.
+	it('without the hand-off, shows no line and the shipped note', async () => {
+		const { container } = await render(AskView, { props: await realOnline() });
+		expect(container.textContent).not.toContain(LINE);
+		expect(unlockButton(container)).toBeUndefined();
+		expect(container.textContent).toContain(NO_SUMMARY_NOTE);
+	});
+
+	it('shows no line when the answer came from the device', async () => {
+		const { container } = await render(AskView, {
+			props: props(
+				{ kind: 'results', origin: 'device', cards: [card()] },
+				{ onUnlockSummaries: vi.fn() }
+			)
+		});
 		expect(container.textContent).not.toContain(LINE);
 		expect(unlockButton(container)).toBeUndefined();
 	});
@@ -1187,7 +1239,9 @@ describe('AskView, the summary a locked tab cannot make', () => {
 	// The hand-off moves focus to the card's field mid-press, so the key's repeats must not press the button again.
 	it('runs the hand-off once for an Enter held on Unlock', async () => {
 		const onUnlockSummaries = vi.fn();
-		const { container } = await render(AskView, { props: online({ onUnlockSummaries }) });
+		const { container } = await render(AskView, {
+			props: await realOnline({ onUnlockSummaries })
+		});
 		unlockButton(container)?.focus();
 		const session = cdp();
 		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
