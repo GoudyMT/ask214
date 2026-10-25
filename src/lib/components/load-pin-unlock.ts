@@ -1,1 +1,1 @@
-export const loadPinUnlock = () => import('./PinUnlock.svelte');
+export const loadPinUnlock = () => import('./load-pin-code');
