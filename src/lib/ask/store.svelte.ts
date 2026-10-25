@@ -90,12 +90,16 @@ export function createAskStore(deps: {
 	// triggers the one-time ~23MB download) and `embedding` once set up. Shared by ask() (warm) + setUp().
 	async function runQuery(query: string): Promise<void> {
 		state = modelLoaded ? { kind: 'embedding' } : { kind: 'modelLoading' };
+		// This run's own working state: the run writes only while that very object is still the state (a lock, a
+		// crisis, a gate or a newer question each put a new one in its place).
+		const mine = state;
 		try {
 			// Load the model (embed) and the corpus in parallel. The corpus is fetched lazily here - only a
 			// device query needs it - so it stays off the initial page load, where a 3.5MB eager fetch would
 			// otherwise pin LCP/TTI to its download time.
 			const [vector, corpus] = await Promise.all([deps.embed(query), deps.getCorpus()]);
 			modelLoaded = true;
+			if (state !== mine) return;
 			const cards = toResultCards(filterByMinScore(search(vector, corpus, K), MIN_SCORE));
 			const answer = answerFor(query, cards);
 			commitIfCurrent(
@@ -110,7 +114,7 @@ export function createAskStore(deps: {
 			// count as set up: anything else asks again before downloading. A corpus failure leaves the model.
 			if (code !== ASK_ERROR.CORPUS) modelLoaded = deps.deviceKept ?? false;
 			// Superseded mid-embed (a crisis message routed to help, a pending consent gate) - do not clobber.
-			if (state.kind !== 'embedding' && state.kind !== 'modelLoading') return;
+			if (state !== mine) return;
 			// Offline only when a first-run (model-not-loaded) embed fails with no network: a warm embed
 			// needs no network, so its failure is a genuine error, not connectivity.
 			const online = typeof navigator === 'undefined' || navigator.onLine;
@@ -160,14 +164,17 @@ export function createAskStore(deps: {
 	// here - synthesize is a route closure that reads it on demand.
 	async function runOnline(query: string): Promise<void> {
 		state = { kind: 'embedding' };
+		const mine = state;
 		askedCount++;
 		let result: RetrieveResult;
 		try {
 			result = await deps.retrieveOnline!(query);
 		} catch {
-			degradeOnline(query);
-			return;
+			// A thrown call is a transport fault like any other: it degrades below.
+			result = { status: 'error' };
 		}
+		// A lock came while the answer was on its way: it lands nowhere, even if a newer question is running.
+		if (state !== mine) return;
 		if (result.status === 'empty') {
 			commitIfCurrent({ kind: 'empty' });
 			return;
@@ -195,6 +202,7 @@ export function createAskStore(deps: {
 				summary = { kind: 'unavailable' };
 			}
 		}
+		if (state !== mine) return;
 		// A crisis turn routes to help, never to benefits results - the same terminal state the keyword
 		// pre-gate in ask() commits. Rendering the crisis surface ABOVE a list of benefits cards would be
 		// the wrong answer to the question actually being asked, so the cards are dropped entirely and the
@@ -299,6 +307,12 @@ export function createAskStore(deps: {
 		nudgeDismissed = true;
 	}
 
+	// The app locked: drop the question, any held query and the answer on screen. The new state object also makes a run
+	// that is still in flight finish into nothing, even if the person has asked again since.
+	function clear(): void {
+		state = { kind: 'idle' };
+	}
+
 	return {
 		get state(): AskState {
 			return state;
@@ -317,6 +331,7 @@ export function createAskStore(deps: {
 		setMode,
 		consentOnline,
 		stayOnDevice,
-		dismissNudge
+		dismissNudge,
+		clear
 	};
 }

@@ -147,6 +147,19 @@
 		if (keyboard && document.activeElement === document.body) askView?.focusField();
 	}
 
+	// A lock of any kind (the person's, the idle timer's, another tab's, the page being hidden) clears the question and
+	// the answer on screen: the page is going away, and its text with it. Ask answers again only when asked, so there
+	// is nothing to read back on refresh. The list is offered once start-up resolves; the page leaves it when it goes.
+	$effect(() =>
+		app.joinRelock?.({
+			relockSync: () => {
+				store?.clear();
+				askView?.clear();
+			},
+			refresh: () => Promise.resolve()
+		})
+	);
+
 	onMount(() => {
 		// The ~23MB model + its embed worker are created lazily, on the first query that needs them - never
 		// on page load (the corpus is likewise lazy, via getCorpus above) - and made again after a failure.

@@ -101,6 +101,11 @@
 		fieldFocusedAt = Date.now();
 		inputEl?.focus();
 	}
+	// The app locked: what was typed and any source being read go, so the next person at the screen sees neither.
+	export function clear(): void {
+		query = '';
+		closeReader();
+	}
 	function skipSetup(press: MouseEvent) {
 		setupDismissed = true;
 		onDismiss();

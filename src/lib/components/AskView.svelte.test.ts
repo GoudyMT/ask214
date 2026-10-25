@@ -536,6 +536,48 @@ describe('AskView', () => {
 		await vi.waitFor(() => expect(loadSource).toHaveBeenCalledWith('va_intent_to_file'));
 	});
 
+	// When the app locks, the page clears the question the person typed, whatever the Ask store holds.
+	it('clear: empties the question the person typed', async () => {
+		const { container, component } = await render(AskView, { props: props({ kind: 'idle' }) });
+		const input = container.querySelector('.ask-input') as HTMLInputElement;
+		input.value = 'how do I file a claim';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		expect(input.value).toBe('how do I file a claim');
+		component.clear();
+		flushSync();
+		expect(input.value).toBe('');
+	});
+
+	// An open reader shows a source the person was reading for their question; a slow load must not bring it back.
+	it('clear: closes the open reader, and a load still pending does not reopen it', async () => {
+		let resolveLoad!: (s: Source | null) => void;
+		const loadSource = () => new Promise<Source | null>((r) => (resolveLoad = r));
+		const { container, component } = await render(AskView, {
+			props: props(
+				{ kind: 'results', origin: 'device', cards: [card({ sourceId: 'va_intent' })] },
+				{ loadSource }
+			)
+		});
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		flushSync();
+		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
+		expect(dialog.open).toBe(true);
+		component.clear();
+		flushSync();
+		expect(dialog.open).toBe(false);
+		resolveLoad(heldSource());
+		for (let i = 0; i < 6; i++) {
+			await Promise.resolve();
+			flushSync();
+		}
+		expect({
+			open: dialog.open,
+			hasPassage: !!container.querySelector('.reader__passage'),
+			title: container.querySelector('.reader__title')?.textContent?.trim() ?? null
+		}).toEqual({ open: false, hasPassage: false, title: null });
+	});
+
 	it('a device answer keeps the on-device copy even after the mode flips to online', async () => {
 		// The mirror: a genuinely on-device answer keeps its true "nothing sent" assurance, not the neutral
 		// online wording, when the toggle is later moved to online.

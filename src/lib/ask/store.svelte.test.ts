@@ -3,6 +3,7 @@ import { createAskStore } from './store.svelte';
 import { AskError, ASK_ERROR } from './errors';
 import type { Corpus, CorpusChunk } from '$lib/corpus';
 import type { RetrieveResult } from './online/outcome';
+import type { SynthesisResult } from './synthesis/synthesize';
 import { detectEligibilityIntent } from './synthesis/eligibility-gate';
 
 function chunk(id: string): CorpusChunk {
@@ -858,6 +859,151 @@ describe('createAskStore', () => {
 			expect(store.state.answer?.kind).toBe('extractive');
 			if (store.state.answer?.kind !== 'extractive') return;
 			expect(store.state.answer.answer.text).toContain('one year to submit');
+		});
+	});
+
+	// When the app locks, what the person asked and what came back must not stay for the next person to read.
+	describe('clear', () => {
+		function deferred<T>() {
+			let resolve!: (value: T) => void;
+			let reject!: (reason: unknown) => void;
+			const promise = new Promise<T>((res, rej) => {
+				resolve = res;
+				reject = rej;
+			});
+			return { promise, resolve, reject };
+		}
+
+		it('ends idle from a running query', async () => {
+			const embedding = deferred<Float32Array>();
+			const store = createAskStore({
+				embed: () => embedding.promise,
+				getCorpus: async () => fixtureCorpus(),
+				deviceKept: true
+			});
+			void store.ask('how do I file a claim');
+			expect(store.state.kind).toBe('embedding');
+			store.clear();
+			expect(store.state).toEqual({ kind: 'idle' });
+		});
+
+		it('ends idle from an answer with an AI summary, holding no card', async () => {
+			const store = onlineStore({
+				synthesisEnabled: () => true,
+				synthesize: async () => ({
+					kind: 'answer',
+					answer: {
+						text: 'A [a].',
+						citations: [{ id: 'a', url: 'https://x.gov', title: 'S' }],
+						inert: [],
+						disclaimer: 'd'
+					}
+				})
+			});
+			await store.ask('how do I file a claim');
+			expect(store.state.kind).toBe('results');
+			store.clear();
+			expect(store.state).toEqual({ kind: 'idle' });
+		});
+
+		it('drops the question the consent gate holds, so consenting afterwards sends nothing', async () => {
+			let sent = 0;
+			const store = onlineStore({
+				onlineConsented: () => false,
+				retrieveOnline: async () => {
+					sent++;
+					return { status: 'error' };
+				}
+			});
+			await store.ask('how do I file a claim');
+			expect(store.state).toEqual({
+				kind: 'needsReconsent',
+				pendingQuery: 'how do I file a claim'
+			});
+			store.clear();
+			expect(store.state).toEqual({ kind: 'idle' });
+			await store.consentOnline();
+			expect(sent).toBe(0);
+		});
+
+		it('drops the question the device setup holds, so setting up afterwards embeds nothing', async () => {
+			let embedded = 0;
+			const store = createAskStore({
+				embed: async () => {
+					embedded++;
+					return new Float32Array([1, 0, 0]);
+				},
+				getCorpus: async () => fixtureCorpus()
+			});
+			await store.ask('how do I file a claim');
+			expect(store.state).toEqual({ kind: 'needsSetup', pendingQuery: 'how do I file a claim' });
+			store.clear();
+			expect(store.state).toEqual({ kind: 'idle' });
+			await store.setUp();
+			expect(embedded).toBe(0);
+		});
+
+		// A run that was in flight when the app locked finishes later. If the person asks again meanwhile, that old run
+		// must not write its answer (or its failure) into the new question's turn.
+		it.each([
+			['a device answer', 'device-answer'],
+			['a device failure', 'device-failure'],
+			['an online failure', 'online-failure'],
+			['an AI summary', 'online-summary']
+		] as const)('lets %s that was in flight at the lock write nothing', async (_name, scenario) => {
+			const first = deferred<Float32Array | RetrieveResult | SynthesisResult>();
+			const second = deferred<Float32Array | RetrieveResult | SynthesisResult>();
+			const pick = (query: string) => (query === 'first question' ? first : second).promise;
+			const summary: SynthesisResult = {
+				kind: 'answer',
+				answer: {
+					text: 'A [a].',
+					citations: [{ id: 'a', url: 'https://x.gov', title: 'S' }],
+					inert: [],
+					disclaimer: 'd'
+				}
+			};
+			const store =
+				scenario === 'online-failure'
+					? onlineStore({ retrieveOnline: (q) => pick(q) as Promise<RetrieveResult> })
+					: scenario === 'online-summary'
+						? onlineStore({
+								synthesisEnabled: () => true,
+								synthesize: (q) => pick(q) as Promise<SynthesisResult>
+							})
+						: createAskStore({
+								embed: (text) => pick(text) as Promise<Float32Array>,
+								getCorpus: async () => fixtureCorpus(),
+								deviceKept: true
+							});
+			void store.ask('first question');
+			// The online answer reaches its summary call a moment after the question is asked.
+			await new Promise((done) => setTimeout(done, 0));
+			store.clear();
+			void store.ask('second question');
+			await new Promise((done) => setTimeout(done, 0));
+			expect(store.state.kind).toBe('embedding');
+
+			if (scenario === 'device-answer') first.resolve(new Float32Array([1, 0, 0]));
+			else if (scenario === 'device-failure') first.reject(new AskError(ASK_ERROR.EMBED));
+			else if (scenario === 'online-summary') first.resolve(summary);
+			else first.resolve({ status: 'error' });
+			await new Promise((done) => setTimeout(done, 0));
+			expect(store.state.kind).toBe('embedding');
+
+			if (scenario === 'online-failure') {
+				second.resolve({ status: 'empty' });
+				await expect.poll(() => store.state.kind).toBe('empty');
+			} else if (scenario === 'online-summary') {
+				second.resolve(summary);
+				await expect.poll(() => store.state.kind).toBe('results');
+			} else {
+				second.resolve(new Float32Array([0, 1, 0]));
+				await expect.poll(() => store.state.kind).toBe('results');
+				if (store.state.kind === 'results') {
+					expect(store.state.cards.map((c) => c.chunkId)).toEqual(['b']);
+				}
+			}
 		});
 	});
 });
