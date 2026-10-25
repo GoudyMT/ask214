@@ -5,6 +5,7 @@
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
+	import AppLockRow from '$lib/components/AppLockRow.svelte';
 	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
@@ -631,9 +632,12 @@
 					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
 					<!-- Only a profile can be locked; a device that holds saved documents alone still has the Erase. -->
 					{#if hasTimeline}
+						<AppLockRow />
 						<button class="settings-lock" type="button" onclick={lock}>Lock</button>
 						<p class="settings-hint">
-							Clears your profile from this screen. Use Unlock to view it again.
+							{app.keyMode === 'pin'
+								? 'Locks your saved information now.'
+								: 'Clears your profile from this screen. Use Unlock to view it again.'}
 						</p>
 					{/if}
 
