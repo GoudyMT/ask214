@@ -142,7 +142,12 @@ function makeLifecycleHarness() {
 		refresh: vi.fn().mockResolvedValue(null),
 		lock: vi.fn().mockResolvedValue(undefined)
 	};
-	const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+	const timer: IdleTimer = {
+		start: vi.fn(),
+		stop: vi.fn(),
+		recordActivity: vi.fn(),
+		quietMs: () => 0
+	};
 	let onIdle: (() => void) | undefined;
 	const createIdleTimer = vi.fn((opts: IdleTimerOptions): IdleTimer => {
 		onIdle = opts.onIdle;
@@ -305,7 +310,12 @@ describe('installLifecycle', () => {
 		};
 		const b = { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
 		const win = new EventTarget();
-		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		const timer: IdleTimer = {
+			start: vi.fn(),
+			stop: vi.fn(),
+			recordActivity: vi.fn(),
+			quietMs: () => 0
+		};
 		installLifecycle([a, b], {
 			win,
 			doc: new EventTarget(),
@@ -326,7 +336,12 @@ describe('installLifecycle', () => {
 		};
 		const b = { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
 		let onIdle: (() => void) | undefined;
-		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		const timer: IdleTimer = {
+			start: vi.fn(),
+			stop: vi.fn(),
+			recordActivity: vi.fn(),
+			quietMs: () => 0
+		};
 		installLifecycle([a, b], {
 			win: new EventTarget(),
 			doc: new EventTarget(),
@@ -383,7 +398,12 @@ describe('a re-read that fails', () => {
 	it('leaves no unhandled rejection from a page restore', async () => {
 		let reads = 0;
 		const doc = new EventTarget();
-		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		const timer: IdleTimer = {
+			start: vi.fn(),
+			stop: vi.fn(),
+			recordActivity: vi.fn(),
+			quietMs: () => 0
+		};
 		installLifecycle(
 			[
 				{
@@ -446,7 +466,12 @@ describe('a real start-up', () => {
 
 		let hidden = true;
 		const doc = new EventTarget();
-		const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+		const timer: IdleTimer = {
+			start: vi.fn(),
+			stop: vi.fn(),
+			recordActivity: vi.fn(),
+			quietMs: () => 0
+		};
 		const off = installLifecycle(made.store ? [made.store] : [], {
 			win: new EventTarget(),
 			doc,

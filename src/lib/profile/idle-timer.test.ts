@@ -142,6 +142,25 @@ describe('createIdleTimer, the first activity after a long quiet', () => {
 		expect(onIdle).toHaveBeenCalledTimes(1);
 	});
 
+	// The way back from a hide reads this, so quiet time on screen before the hide counts toward the absence.
+	it('reports the quiet since the last activity on the larger clock, without resetting', () => {
+		const { clock, onIdle, timer } = setup();
+		clock.wall += 2 * MINUTE;
+		clock.perf += 9 * MINUTE;
+		expect(timer.quietMs()).toBe(9 * MINUTE);
+		clock.wall += 20 * MINUTE;
+		expect(timer.quietMs()).toBe(22 * MINUTE);
+		expect(onIdle).not.toHaveBeenCalled();
+		timer.recordActivity();
+		expect(timer.quietMs()).toBe(0);
+	});
+
+	it('reports a wall clock that moved back as no quiet', () => {
+		const { clock, timer } = setup();
+		clock.wall -= 60 * MINUTE;
+		expect(timer.quietMs()).toBe(0);
+	});
+
 	it('wakes on the larger clock too, not only the wall clock', () => {
 		const { clock, onIdle } = setup();
 		clock.perf += THRESHOLD;

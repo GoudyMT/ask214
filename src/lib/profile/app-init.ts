@@ -436,13 +436,17 @@ export function installLifecycle(
 	// back is a long absence, because nothing can then say how long it was.
 	const comeBack = (): void => {
 		const left = hiddenAt;
-		hiddenAt = null;
+		// A frozen page can be resumed while still hidden; that is not the person coming back, so the hide time stays
+		// for the way back that is.
+		if (!deps.isHidden()) hiddenAt = null;
+		const lock = deps.lockOnLongAbsence?.() === true;
 		const wallAway = left ? now() - left.wall : 0;
-		const away = Math.max(wallAway, left ? perfNow() - left.perf : 0);
+		// With a PIN, quiet time on screen before the hide counts too: the person was not there for it either.
+		const away = Math.max(wallAway, left ? perfNow() - left.perf : 0, lock ? idle.quietMs() : 0);
 		if (wallAway >= 0 && away < deps.idleThresholdMs) return restore();
 		// With a PIN the stores are shut first, so the re-read finds them locked and leaves them shut. Without one the
 		// plaintext is dropped and read back, as for any hide and return (a no-op where the hide already did it).
-		if (deps.lockOnLongAbsence?.()) relockAll(relockables, 'idle');
+		if (lock) relockAll(relockables, 'idle');
 		else relockEachSync(relockables, 'hygiene');
 		restore();
 		// The old count is stale: its next touch would otherwise lock a person who has only just returned.

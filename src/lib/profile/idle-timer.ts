@@ -4,8 +4,8 @@
  * app-init layer binds DOM activity events to `recordActivity()` and points `onIdle`
  * at the relock action - this factory stays free of any DOM dependency.
  *
- * No timestamp quantization: `lastActivity` is module-private, never
- * exported or broadcast, so the keystroke-cadence side-channel does not exist.
+ * No timestamp quantization: the last-activity times are module-private, never
+ * exported or broadcast (`quietMs` hands out only a duration), so the keystroke-cadence side-channel does not exist.
  *
  * A phone that sleeps runs no timeout, so the time since the last activity is read from two clocks and the larger
  * wins: the wall clock can be set back, and the monotonic one may not count a sleep.
@@ -23,6 +23,8 @@ export type IdleTimer = {
 	start(): void;
 	stop(): void;
 	recordActivity(): void;
+	/** Time since the last activity, on the same two clocks the timer itself uses. Read-only. */
+	quietMs(): number;
 };
 
 export function createIdleTimer(opts: IdleTimerOptions): IdleTimer {
@@ -86,6 +88,7 @@ export function createIdleTimer(opts: IdleTimerOptions): IdleTimer {
 			if (!fired && elapsed() >= opts.thresholdMs) idle();
 			reset();
 			scheduleCheck();
-		}
+		},
+		quietMs: elapsed
 	};
 }
