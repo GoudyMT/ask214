@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { cdp, page } from 'vitest/browser';
-import PinUnlock, { formatWait, type PinUnlockDeps } from './PinUnlock.svelte';
+import PinUnlock, { type PinUnlockDeps } from './PinUnlock.svelte';
 import { KDF_V1 } from '../backup/kdf-params';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
 import { withStores } from '../db/schema';
@@ -644,23 +644,6 @@ describe('focus', () => {
 		await mount();
 		await real(100);
 		expect(document.activeElement).toBe(document.body);
-	});
-});
-
-describe('formatWait', () => {
-	it.each([
-		[1, '1 second'],
-		[1_001, '2 seconds'],
-		[29_001, '30 seconds'],
-		[30_000, '30 seconds'],
-		[59_000, '59 seconds'],
-		[59_001, '1 minute'],
-		[60_000, '1 minute'],
-		[60_001, '2 minutes'],
-		[300_000, '5 minutes'],
-		[900_000, '15 minutes']
-	])('%i ms reads %s', (ms, line) => {
-		expect(formatWait(ms)).toBe(line);
 	});
 });
 

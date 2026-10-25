@@ -31,23 +31,13 @@
 		clock?: Parameters<typeof createWaitClock>[2];
 		reload?: () => void;
 	};
-
-	const MS_PER_SECOND = 1_000;
-	const SECONDS_PER_MINUTE = 60;
-
-	/** A wait as a person reads it: whole seconds under a minute, else whole minutes rounded up. */
-	export function formatWait(ms: number): string {
-		const seconds = Math.ceil(ms / MS_PER_SECOND);
-		if (seconds < SECONDS_PER_MINUTE) return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
-		const minutes = Math.ceil(seconds / SECONDS_PER_MINUTE);
-		return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
-	}
 </script>
 
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { getProfileApp } from '../profile/context';
 	import PinField from './PinField.svelte';
+	import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, waitLine } from './pin-lines';
 
 	type Props = {
 		/** After the stores loaded; the page moves focus on, since this card is about to go. */
@@ -60,12 +50,9 @@
 
 	const app = getProfileApp();
 
-	// A wrong try and a try that was not 4-6 digits read the same on purpose: the card never says which it was.
-	const NOT_RIGHT = 'That PIN is not right.';
-	const LOW_MEMORY =
-		'This phone ran out of memory while checking your PIN. Your PIN may be right. Close other apps and tabs, then try again.';
+	const NOT_RIGHT = NOT_RIGHT_LINE;
+	const LOW_MEMORY = CHECK_LOW_MEMORY_LINE;
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
-	const waitLine = (ms: number): string => `${NOT_RIGHT} You can try again in ${formatWait(ms)}.`;
 
 	let value = $state('');
 	let field = $state<ReturnType<typeof PinField> | null>(null);
