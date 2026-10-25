@@ -368,6 +368,13 @@ type ProfileLifecycleDeps = {
 	isHidden: () => boolean;
 	createIdleTimer: (opts: IdleTimerOptions) => IdleTimer;
 	idleThresholdMs: number;
+	/** The wall clock; injected so a test can move it. */
+	now?: () => number;
+	/** The monotonic clock; injected so a test can move it. */
+	perfNow?: () => number;
+	/** Whether a long absence must lock before anything is shown again (a PIN is set). Without one the plaintext is
+	 * dropped and re-read, as for any hide and return. */
+	lockOnLongAbsence?: () => boolean;
 };
 
 /**
@@ -389,15 +396,27 @@ export function installLifecycle(
 	relockables: Relockable[],
 	deps: ProfileLifecycleDeps
 ): () => void {
+	// Read at call time, not captured, so a faked global clock is honoured.
+	const now = deps.now ?? (() => Date.now());
+	const perfNow = deps.perfNow ?? (() => performance.now());
 	const idle = deps.createIdleTimer({
 		thresholdMs: deps.idleThresholdMs,
-		onIdle: () => relockAll(relockables, 'idle')
+		onIdle: () => relockAll(relockables, 'idle'),
+		now,
+		perfNow
 	});
+
+	// When the page last went away, on both clocks; kept from the first hide until a way back uses it, because
+	// pagehide, freeze and the visibility change all announce the same departure.
+	let hiddenAt: { wall: number; perf: number } | null = null;
 
 	// The page is going away, so its plaintext goes with it. That is hygiene, not a decision the
 	// user made, so it stays undoable - pagehide and freeze both land here and their order is not
 	// consistent across browsers, which the state ladder absorbs.
-	const onHide = (): void => relockEachSync(relockables, 'hygiene');
+	const onHide = (): void => {
+		hiddenAt ??= { wall: now(), perf: perfNow() };
+		relockEachSync(relockables, 'hygiene');
+	};
 	// The page came back. Ask every store to re-read; each answers from how its own plaintext went
 	// away, so an evicted store restores and a locked one stays shut. No policy belongs here.
 	const restore = (): void => {
@@ -412,22 +431,39 @@ export function installLifecycle(
 			}
 		}
 	};
-	// Two ways back in, deliberately routed through the same branch rather than paired by arrival
+	// Every way back lands here. A sleeping phone runs no timer, so the time away is read from the clocks, and a
+	// long one is dealt with BEFORE anything is read again. The longer of the two readings wins; a wall clock set
+	// back is a long absence, because nothing can then say how long it was.
+	const comeBack = (): void => {
+		const left = hiddenAt;
+		hiddenAt = null;
+		const wallAway = left ? now() - left.wall : 0;
+		const away = Math.max(wallAway, left ? perfNow() - left.perf : 0);
+		if (wallAway >= 0 && away < deps.idleThresholdMs) return restore();
+		// With a PIN the stores are shut first, so the re-read finds them locked and leaves them shut. Without one the
+		// plaintext is dropped and read back, as for any hide and return (a no-op where the hide already did it).
+		if (deps.lockOnLongAbsence?.()) relockAll(relockables, 'idle');
+		else relockEachSync(relockables, 'hygiene');
+		restore();
+		// The old count is stale: its next touch would otherwise lock a person who has only just returned.
+		idle.start();
+	};
+	// Three ways back in, deliberately routed through the same branch rather than paired by arrival
 	// order: which of these fires, and in what sequence, is not consistent across browsers.
 	// `pageshow` is a restored navigation, so it must be the persisted kind to mean anything here.
 	const onShow = (e: Event): void => {
-		if ((e as PageTransitionEvent).persisted) restore();
+		if ((e as PageTransitionEvent).persisted) comeBack();
 	};
 	// `resume` is a frozen tab waking up - no navigation, no `persisted` flag, and on the browsers
 	// that freeze quiet background tabs it is the ONLY way back from the freeze that relocked us.
-	const onResume = (): void => restore();
+	const onResume = (): void => comeBack();
 	// The page becoming hidden is the one signal every browser fires, and on the platforms that
 	// suspend a backgrounded page it is the last moment code runs at all - so it is the last chance
 	// to get the plaintext out of the heap. It fires both ways and carries no flag to gate on, so
 	// becoming visible is simply the way back.
 	const onVisibility = (): void => {
 		if (deps.isHidden()) onHide();
-		else restore();
+		else comeBack();
 	};
 	const onActivity = (): void => idle.recordActivity();
 
