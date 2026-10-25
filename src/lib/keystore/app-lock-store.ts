@@ -144,7 +144,8 @@ export function runPinCheck<T>(
 			const row = await changeTries(db, (stored) => ({ ...stored, pending: false }));
 			return { kind: 'wrong', count: row.count, waitMs: row.waitMs, unfinished: before.pending };
 		}
-		// Undo only this check's own write. A row an Erase cleared, or a newer wrong try, is not this check's to put back.
+		// Undo only this check's own write. A row an Erase (or another clear of the row) emptied meanwhile is not this
+		// check's to put back.
 		await changeTries(db, (stored) =>
 			stored.count === before.count + 1 && stored.pending ? before : { ...stored, pending: false }
 		);
