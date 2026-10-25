@@ -139,8 +139,9 @@ export async function derivePinKeys(
 		return { macKey: reply.macKey, kek: reply.kek };
 	} finally {
 		if (timer !== undefined) clearTimeout(timer);
-		// After a transfer the page's copy is detached and this is a no-op; if the post failed, it is the only copy.
-		bytes.fill(0);
+		// After a transfer the page holds no copy (the buffer is detached, and filling it would throw over the result);
+		// if the post failed, this buffer is the only copy and is wiped.
+		if (buffer.byteLength > 0) bytes.fill(0);
 		try {
 			worker?.terminate();
 		} catch {

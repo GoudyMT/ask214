@@ -164,6 +164,27 @@ describe('derivePinKeys: the worker conversation', () => {
 		expect(new Uint8Array(sent ?? new ArrayBuffer(0)).every((byte) => byte === 0)).toBe(true);
 	});
 
+	// A real worker takes the PIN buffer away from the page at the post, leaving a detached buffer behind. The wipe that
+	// follows must not throw on it, or every real unlock and turn-on fails although the worker answered.
+	it('returns the keys when the post detaches the PIN buffer as a real transfer does', async () => {
+		const keys = { macKey: await macKey(), kek: await kek() };
+		const fake = fakeWorker((reply) => reply({ type: 'pin-keys', ...keys }));
+		const post = fake.worker.postMessage;
+		let leftOnPage: ArrayBuffer | undefined;
+		fake.worker.postMessage = (message, transfer) => {
+			leftOnPage = message.pin;
+			post(structuredClone(message, { transfer: [message.pin] }), transfer);
+		};
+		const result: unknown = await derivePinKeys('135790', PARAMS(), {
+			createWorker: fake.createWorker
+		}).catch((error: unknown) => error);
+		expect(result).not.toBeInstanceOf(Error);
+		expect((result as typeof keys).macKey).toBe(keys.macKey);
+		expect((result as typeof keys).kek).toBe(keys.kek);
+		// The fake really detached it: the page holds no PIN bytes after the post.
+		expect(leftOnPage?.byteLength).toBe(0);
+	});
+
 	it('NO_MEMORY from the worker becomes PinNoMemoryError, and the worker is stopped', async () => {
 		const { createWorker, terminate } = fakeWorker((reply) =>
 			reply({ type: 'error', code: 'E_NO_MEMORY' })
