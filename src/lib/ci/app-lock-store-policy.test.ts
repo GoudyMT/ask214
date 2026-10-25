@@ -28,9 +28,12 @@ function namingTheStore(files: Map<string, string>): string[] {
 		.map(([name]) => name);
 }
 
+// The device-state reader is the restore's own store list and lives outside the backup folder.
+const DEVICE_STATE = join(BACKUP_DIR, '../profile/device-state.ts');
+
 function backupFiles(): Map<string, string> {
 	return new Map(
-		sourceFiles(BACKUP_DIR).map((path) => [
+		[...sourceFiles(BACKUP_DIR), DEVICE_STATE].map((path) => [
 			relative(BACKUP_DIR, path).split(sep).join('/'),
 			readFileSync(path, 'utf8')
 		])
@@ -48,16 +51,18 @@ describe('the app lock store and backups', () => {
 		expect(ENCRYPTED_STORES as readonly string[]).not.toContain('app-lock');
 	});
 
-	it('is named by no backup source file except the manifest', () => {
+	it('is named by no backup source file or the device-state reader, the manifest excepted', () => {
 		const files = backupFiles();
 		// Control: a scan that read nothing would pass for the wrong reason.
 		expect(files.size).toBeGreaterThan(10);
 		expect(files.has('manifest.ts')).toBe(true);
+		expect(files.has('../profile/device-state.ts')).toBe(true);
 		expect(namingTheStore(files)).toEqual([]);
 	});
 
 	it('finds the name in a backup file that gains it', () => {
-		const files = new Map(backupFiles());
+		const files = new Map<string, string>();
+		files.set('note-cap.ts', 'export const NOTE_CAP = 4000;');
 		files.set('snapshot.ts', `const SNAPSHOT_STORES = ['profile', 'app-lock'];`);
 		files.set('restore-writer.ts', 'const WRITTEN = ["app-lock"];');
 		expect(namingTheStore(files).sort()).toEqual(['restore-writer.ts', 'snapshot.ts']);

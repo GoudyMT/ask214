@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openMtcDb, reqToPromise, withStores } from '../db/schema';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
 import { LockAcquisitionTimeout } from '../db/locks';
+import { wipeAllStores } from '../db/wipe';
 import {
 	TRIES_LOCK_NAME,
 	bumpCounter,
@@ -160,6 +161,28 @@ describe('runPinCheck', () => {
 		expect(await readTries(db)).toEqual({ count: 3, waitMs: 0, pending: false });
 	});
 
+	// A check left pending by a killed tab is still owed to the person: undoing this check's try must not erase that.
+	it('puts back a pending flag an earlier killed check left, so the next check reports it', async () => {
+		await putTries({ count: 1, waitMs: 0, pending: true });
+		await runPinCheck(db, async () => ({ kind: 'not-counted' }));
+		expect(await readTries(db)).toEqual({ count: 1, waitMs: 0, pending: true });
+		expect(await runPinCheck(db, async () => ({ kind: 'good', value: 1 }))).toMatchObject({
+			kind: 'good',
+			unfinished: true
+		});
+	});
+
+	// An Erase that lands during the check clears the row; undoing the try must not bring the old count back.
+	it('leaves the tries row cleared when an Erase happens during a check that could not count', async () => {
+		await putTries({ count: 6, waitMs: 0, pending: false });
+		const outcome = await runPinCheck(db, async () => {
+			await wipeAllStores(db);
+			return { kind: 'not-counted' };
+		});
+		expect(outcome).toEqual({ kind: 'not-counted' });
+		expect(await readTries(db)).toEqual({ count: 0, waitMs: 0, pending: false });
+	});
+
 	// The OS killed the tab mid-derive: that try was already counted, and the next check says so.
 	it('counts a check left pending and says it never finished', async () => {
 		await putTries({ count: 1, waitMs: 0, pending: true });
@@ -301,6 +324,18 @@ describe('createWaitClock', () => {
 		expect(clock.remainingMs()).toBe(25_000);
 		expect(await readTries(db)).toEqual({ count: 4, waitMs: 25_000, pending: false });
 		clock.stop();
+	});
+
+	// A hidden tab's timers are throttled: one tick can arrive long after the wait ran out. The count comes from the
+	// monotonic clock, not from how many ticks fired.
+	it('counts by performance.now, not by timer ticks, when the timers run late', async () => {
+		await putTries(from);
+		const clock = createWaitClock(db, from, { perfNow });
+		perf += 60_000;
+		vi.advanceTimersByTime(5_000);
+		expect(clock.remainingMs()).toBe(0);
+		expect(await readTries(db)).toEqual({ count: 4, waitMs: 0, pending: false });
+		expect(vi.getTimerCount()).toBe(0);
 	});
 
 	it('writes zero when the wait is over, then stops its timer', async () => {
