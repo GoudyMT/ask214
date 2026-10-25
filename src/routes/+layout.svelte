@@ -468,7 +468,6 @@
 			<nav aria-label="Primary">
 				<ul>
 					<li><a href={resolve('/timeline')}>Timeline</a></li>
-					<li><a href={resolve('/skillbridge')}>SkillBridge</a></li>
 					<li><a href={resolve('/resources')}>Resources</a></li>
 					<!-- Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable,
 					     so even a fresh no-timeline user has something to set there (the timeline sections hide inside
@@ -577,7 +576,7 @@
 		margin: 0 auto;
 	}
 
-	/* From 600px up the header carries the menu (Timeline, SkillBridge, Resources, Settings; Settings appears
+	/* From 600px up the header carries the menu (Timeline, Resources, Settings; Settings appears
 	   only when the app is ready or damaged). Below 600px the header is the brand alone and the bottom bar
 	   (BottomBar.svelte) is the Primary navigation; About and Feedback live in More and the footer. */
 	nav ul {

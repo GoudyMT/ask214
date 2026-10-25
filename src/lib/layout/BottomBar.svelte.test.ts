@@ -37,14 +37,13 @@ const marked = (container: Element) =>
 
 describe('BottomBar on a 320 px phone', () => {
 	// A person on a phone sees every place by name, so they never have to guess an icon.
-	it('shows Home, Timeline, SkillBridge and More in that order, each with its visible label', async () => {
+	it('shows Home, Timeline and More in that order, each with its visible label', async () => {
 		const { container } = await render(BottomBar);
 		const bar = container.querySelector('nav') as HTMLElement;
 		expect(getComputedStyle(bar).display).not.toBe('none');
 		expect(links(container).map((a) => [a.textContent?.trim(), a.getAttribute('href')])).toEqual([
 			['Home', '/'],
 			['Timeline', '/timeline'],
-			['SkillBridge', '/skillbridge'],
 			['More', '/more']
 		]);
 		for (const a of links(container)) {
@@ -54,15 +53,15 @@ describe('BottomBar on a 320 px phone', () => {
 		}
 	});
 
-	// A thumb needs a target of at least 56 px, four equal columns so no tab is harder to hit, and icons that stay put
+	// A thumb needs a target of at least 56 px, three equal columns so no tab is harder to hit, and icons that stay put
 	// when the marked tab changes (the mark must not push its own icon down).
 	it('gives each tab a 56 px tall equal column, with the icons level whichever tab is current', async () => {
 		const { container } = await render(BottomBar);
 		const boxes = links(container).map((a) => a.getBoundingClientRect());
-		expect(boxes).toHaveLength(4);
+		expect(boxes).toHaveLength(3);
 		for (const box of boxes) {
 			expect(box.height).toBeGreaterThanOrEqual(56);
-			expect(box.width).toBeCloseTo(PHONE.width / 4, 0);
+			expect(box.width).toBeCloseTo(PHONE.width / 3, 0);
 		}
 		// The longest label fits its column, so it never wraps and makes one tab taller than the rest.
 		for (const a of links(container)) expect(a.scrollWidth).toBeLessThanOrEqual(a.clientWidth);
@@ -84,7 +83,7 @@ describe('BottomBar on a 320 px phone', () => {
 			const labels = links(container).map((a) =>
 				(a.querySelector('span') as HTMLElement).getBoundingClientRect()
 			);
-			expect(labels).toHaveLength(4);
+			expect(labels).toHaveLength(3);
 			for (const label of labels) {
 				expect(label.left).toBeGreaterThanOrEqual(bar.left);
 				expect(label.right).toBeLessThanOrEqual(bar.right);
@@ -119,7 +118,6 @@ describe('BottomBar on a 320 px phone', () => {
 	// "current page" only for the tab whose page is open; for More behind it, it is the current section.
 	it.each([
 		['/', 'Home', 'page'],
-		['/skillbridge', 'SkillBridge', 'page'],
 		['/more', 'More', 'page'],
 		['/settings', 'More', 'true']
 	])('marks only %s as the current tab: %s, %s', async (pathname, label, how) => {
@@ -128,11 +126,15 @@ describe('BottomBar on a 320 px phone', () => {
 		expect(marked(container)).toEqual([[label, how]]);
 	});
 
-	it('marks no tab on a page no tab owns', async () => {
-		route.pathname = '/wizard';
-		const { container } = await render(BottomBar);
-		expect(marked(container)).toEqual([]);
-	});
+	// The finder's page is open but has no tab while it is not ready, so no other tab may claim it.
+	it.each(['/wizard', '/skillbridge'])(
+		'marks no tab on %s, a page no tab owns',
+		async (pathname) => {
+			route.pathname = pathname;
+			const { container } = await render(BottomBar);
+			expect(marked(container)).toEqual([]);
+		}
+	);
 
 	// Marked as the section only for the screen reader: the look of the current tab holds on every page behind More.
 	it('draws the 3 px top bar on More while a page behind it is open', async () => {
@@ -177,7 +179,7 @@ describe('BottomBar on a 320 px phone', () => {
 		});
 		try {
 			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
-			expect(tops()).toEqual(['none', '3px', 'none', 'none']);
+			expect(tops()).toEqual(['none', '3px', 'none']);
 		} finally {
 			await session.send('Emulation.setEmulatedMedia', {
 				features: [{ name: 'forced-colors', value: 'none' }]

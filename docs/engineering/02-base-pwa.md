@@ -40,9 +40,9 @@ meets WCAG AA contrast (4.5:1, and 3:1 for interface edges) in both themes.
 ### Layout and accessibility
 
 **What it is.** One layout wraps every page: a sticky header with the wordmark and, from 600 px wide, the top menu
-(Timeline, SkillBridge, Resources and Settings), a `main` region, and a footer with the not-affiliated statement,
+(Timeline, Resources and Settings), a `main` region, and a footer with the not-affiliated statement,
 links to About, Source and Feedback, and the release version. Below 600 px the top menu gives way to a bottom bar
-fixed to the screen edge with four tabs, Home, Timeline, SkillBridge and More, each an icon above a visible label
+fixed to the screen edge with three tabs, Home, Timeline and More, each an icon above a visible label
 (`src/lib/layout/BottomBar.svelte`). The current tab is marked by the accent colour and a 3 px bar on its top edge, so
 forced-colours mode still shows it, and by `aria-current="page"` on the tab whose own page is open; More carries
 `aria-current="true"` (the current section) while Settings, Resources, Documents, Feedback or About is open. Only one
