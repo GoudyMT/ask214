@@ -45,8 +45,8 @@ function identityString(id: KeyIdentity): string {
 
 /**
  * Canonical bytes of the keystore record (excluding ivCounter, recordHmac, and
- * key refs). Nothing in the app uses it: it is kept so the record tests can pin
- * the canonical text against the key identity's bytes.
+ * key refs). Nothing in the app uses it: it is kept because the older
+ * canonical-form tests call it.
  */
 export function canonicalizeKeystore(r: KeystoreCanonicalInput): Uint8Array {
 	return keyIdentityBytes(keyIdentity(r));

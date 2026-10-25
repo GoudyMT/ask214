@@ -245,6 +245,9 @@ describe('ProfileStore.save', () => {
 		const bodyAfter = (await readRow('profile'))?.rec as Uint8Array;
 		expect(Array.from(bodyAfter)).toEqual(Array.from(bodyBefore));
 		expect((await readRow('keystore'))?.keystoreGeneration).toBe(7);
+		// The row on disk must still fail its check: a save that re-signed the tampered row before refusing would leave
+		// generation 7 in place but make it valid.
+		await expect(createProfileStore(db).load()).rejects.toThrow(KeystoreHmacMismatchError);
 	});
 
 	it('resolves concurrent first-runs: exactly one succeeds', async () => {
