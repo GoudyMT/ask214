@@ -1132,6 +1132,25 @@ describe('an easy PIN at setup', () => {
 		await until(() => document.activeElement === chooseEl(), 'focus on Choose another');
 	});
 
+	// A warning, not an error: it reads before the choice it asks for, in the colour of the row's other guidance.
+	it('shows the warning above its two choices in the hint colour, not the error colour', async () => {
+		const root = document.documentElement;
+		root.style.setProperty('--color-fg-muted', 'rgb(1, 2, 3)');
+		root.style.setProperty('--color-danger', 'rgb(200, 0, 0)');
+		try {
+			await warned();
+			const line = document.querySelector('[role="alert"]') as HTMLElement;
+
+			expect(
+				line.compareDocumentPosition(chooseEl()) & Node.DOCUMENT_POSITION_FOLLOWING
+			).toBeTruthy();
+			expect(getComputedStyle(line).color).toBe('rgb(1, 2, 3)');
+		} finally {
+			root.style.removeProperty('--color-fg-muted');
+			root.style.removeProperty('--color-danger');
+		}
+	});
+
 	it('shows no warning for a PIN that is not on the list', async () => {
 		await mount();
 		await toStep(SETUP_PIN, SETUP_PIN);

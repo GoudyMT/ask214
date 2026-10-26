@@ -103,7 +103,7 @@
 	// fields that no longer hold the PIN it warned about.
 	let easy = $state<{ form: 'setup' | 'change'; seen: string } | null>(null);
 	let chooseEl = $state<HTMLButtonElement | null>(null);
-	const shown = $derived(easy === null ? message : EASY_LINE);
+	const shown = $derived(easy === null ? message : null);
 	$effect(() => {
 		if (easy !== null && easy.seen !== `${current},${first},${second}`) easy = null;
 	});
@@ -542,6 +542,8 @@
 />
 
 {#snippet easyChoices()}
+	<!-- A warning, not an error: it reads before the two choices it asks for, in the colour of the row's other guidance. -->
+	<p class="app-lock__hint" role="alert">{EASY_LINE}</p>
 	<!-- Held keys: the Next or Change PIN that raised the warning hands focus to the first button, and a repeat of Enter must
 	     not press it; only a new press counts. -->
 	<div class="app-lock__actions">
