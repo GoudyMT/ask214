@@ -49,25 +49,12 @@
 </script>
 
 <script lang="ts">
-	import { onDestroy, tick } from 'svelte';
-	import {
-		createWaitClock,
-		readCounter,
-		readTries,
-		runPinCheck,
-		type PinCheckResult
-	} from '../keystore/app-lock-store';
-	import {
-		KeystoreHmacMismatchError,
-		openPinSession,
-		setSession,
-		WrongPinError,
-		type KeySession
-	} from '../keystore/session';
-	import { readPinRowAndCounter } from '../keystore/unlock-row';
+	import { onDestroy, tick, untrack } from 'svelte';
+	import { readCounter } from '../keystore/app-lock-store';
+	import { setSession } from '../keystore/session';
 	import { getProfileApp } from '../profile/context';
+	import { createCurrentPinCheck } from './current-pin-check';
 	import { loadAppLock } from './load-app-lock';
-	import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, waitLine } from './pin-lines';
 	import PinField from './PinField.svelte';
 
 	type Props = { deps?: AppLockDeps };
@@ -93,9 +80,16 @@
 	let firstField = $state<ReturnType<typeof PinField> | null>(null);
 	let secondField = $state<ReturnType<typeof PinField> | null>(null);
 
-	// Counts an owed wait down while the row is up: nothing else does in Settings, so a wait on the row would never end.
-	let waitClock: ReturnType<typeof createWaitClock> | null = null;
-	onDestroy(() => waitClock?.stop());
+	// Its wait clock counts an owed wait down while the row is up: nothing else does in Settings, so a wait on the row
+	// would never end.
+	const pinCheck = untrack(() =>
+		createCurrentPinCheck({
+			derive: deps.derive,
+			clock: deps.clock,
+			loadDerive: async () => (await loadAppLock())[0]
+		})
+	);
+	onDestroy(() => pinCheck.stop());
 
 	// Set while a derive runs: a page that was hidden at any moment of it decides nothing for the person.
 	let deriving = false;
@@ -255,60 +249,6 @@
 		}
 	}
 
-	// The line for an owed wait: a new wait starts its own count, and a press that only finds the wait still owed leaves
-	// the running count alone, so pressing never pushes the end away.
-	async function showWait(db: IDBDatabase, waitMs: number, fresh: boolean): Promise<void> {
-		const left = fresh ? 0 : (waitClock?.remainingMs() ?? 0);
-		message = waitLine(left > 0 ? Math.ceil(left) : waitMs);
-		if (left > 0) return;
-		waitClock?.stop();
-		waitClock = createWaitClock(db, await readTries(db), deps.clock);
-	}
-
-	/**
-	 * Checks the current PIN against the PIN row, as an unlock does: the try is counted before the derive. The keys it
-	 * opens are returned and never held by the tab. Null when the PIN is not good; the line is set.
-	 */
-	async function checkCurrent(
-		db: IDBDatabase,
-		loaded: Loaded,
-		typed: string,
-		failed: string
-	): Promise<KeySession | null> {
-		const pinDerive = loaded[0];
-		if (!pinDerive.isPinFormat(typed)) {
-			message = NOT_RIGHT_LINE;
-			return null;
-		}
-		const found = { lowMemory: false };
-		const outcome = await runPinCheck(db, async (): Promise<PinCheckResult<KeySession>> => {
-			const { row, counter } = await readPinRowAndCounter(db);
-			if (row?.mode !== 'pin') return { kind: 'not-counted' };
-			try {
-				const keys = await (deps.derive ?? pinDerive.derivePinKeys)(typed, {
-					kdf: row.kdf,
-					salt: row.salt
-				});
-				return { kind: 'good', value: await openPinSession(row, keys, counter) };
-			} catch (err) {
-				if (err instanceof WrongPinError) return { kind: 'wrong' };
-				if (err instanceof pinDerive.PinNoMemoryError) {
-					found.lowMemory = true;
-					return { kind: 'not-counted' };
-				}
-				if (err instanceof KeystoreHmacMismatchError) return { kind: 'not-counted' };
-				throw err;
-			}
-		});
-		if (outcome.kind === 'good') return outcome.value;
-		if (outcome.kind === 'waiting') await showWait(db, outcome.waitMs, false);
-		else if (outcome.kind === 'wrong') {
-			if (outcome.waitMs > 0) await showWait(db, outcome.waitMs, true);
-			else message = NOT_RIGHT_LINE;
-		} else message = found.lowMemory ? CHECK_LOW_MEMORY_LINE : failed;
-		return null;
-	}
-
 	// Change PIN and Remove PIN. Both check the current PIN first; neither sets the session the check opened.
 	async function press(kind: 'change' | 'remove'): Promise<void> {
 		const db = app.db;
@@ -334,13 +274,16 @@
 				}
 			}
 			if (db === null) throw new Error('E_NOT_READY');
-			const opened = await checkCurrent(
+			const checked = await pinCheck.check(
 				db,
-				loaded,
 				typed,
 				kind === 'change' ? CHANGE_FAILED_LINE : REMOVE_FAILED_LINE
 			);
-			if (opened === null) return;
+			if (!checked.ok) {
+				message = checked.line;
+				return;
+			}
+			const opened = checked.session;
 
 			if (kind === 'change') {
 				// A Lock during the check: the new PIN is not derived for a tab that is locked.
