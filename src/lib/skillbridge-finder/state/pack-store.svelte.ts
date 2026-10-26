@@ -59,7 +59,7 @@ const GENERATION = 0;
  * a week further ahead than a clock that is a little off is a pipeline typo or a hostile deploy; held, it would make
  * every real week after it look like a rollback.
  */
-const MAX_FUTURE_DAYS = 7;
+export const MAX_FUTURE_DAYS = 7;
 const MS_PER_DAY = 86_400_000;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
