@@ -62,6 +62,22 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
+// The real row, drawn as it is; the wrapper only keeps the props the page mounted it with.
+const mounted = vi.hoisted(() => ({ rows: [] as Record<string, unknown>[] }));
+vi.mock('$lib/components/AppLockRow.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/components/AppLockRow.svelte')>();
+	const mount = real.default as unknown as (
+		anchor: unknown,
+		props: Record<string, unknown>
+	) => unknown;
+	return {
+		...real,
+		default: (anchor: unknown, props: Record<string, unknown>) => {
+			mounted.rows.push(props);
+			return mount(anchor, props);
+		}
+	};
+});
 vi.mock('$lib/install/context', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
@@ -83,6 +99,7 @@ const LOCAL_HINT = 'Clears your profile from this screen. Use Unlock to view it 
 const PIN_HINT = 'Locks your saved information now.';
 
 beforeEach(() => {
+	mounted.rows.length = 0;
 	state.mode = 'local';
 	state.completeness = 'eaos-only';
 	docs.held = false;
@@ -121,6 +138,18 @@ describe('Settings, App lock', () => {
 			.element(page.getByRole('button', { name: 'Erase all data on this device' }))
 			.toBeVisible();
 		expect(row().query()).toBeNull();
+	});
+
+	// The setup's backup card has a damaged-device line that offers the Erase: the row must reach the page's own dialog.
+	it("gives the row the page's Erase opener, which opens the Erase dialog", async () => {
+		await render(SettingsPage);
+		await expect.element(row()).toBeVisible();
+
+		const onerase = mounted.rows[0]?.onerase;
+		expect(typeof onerase).toBe('function');
+		(onerase as () => void)();
+		await expect.element(page.getByRole('dialog')).toBeVisible();
+		await expect.element(page.getByText('Erase all data on this device?')).toBeVisible();
 	});
 
 	it.each([

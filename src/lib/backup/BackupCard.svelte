@@ -122,11 +122,13 @@
 		restoreDeps?: Omit<FlowDeps, 'session' | 'app' | 'db'>;
 		/**
 		 * The form of the card for a host that offers one row: that row alone, with no heading, intro or list, under
-		 * `label` (the row's own name when none is given). The restore row is drawn without the card's own frame, for the
-		 * setup screen, which has one; the Check row keeps it. With `open` set, the row opens by itself, once, as soon as
-		 * it can start.
+		 * `label` (the row's own name when none is given). The restore and make rows are drawn without the card's own frame,
+		 * for the screens that have one; the Check row keeps it. With `open` set, the row opens by itself, once, as soon as
+		 * it can start. A single row never asks for the PIN: its host has done that (or, at the PIN's setup, has none yet).
 		 */
-		only?: { row: 'restore' | 'check'; label?: string; open?: boolean };
+		only?: { row: 'restore' | 'check' | 'export'; label?: string; open?: boolean };
+		/** Called once when a backup has been saved, after the card holds the result. */
+		onsaved?: () => void;
 	};
 	const props: Props = $props();
 
@@ -608,6 +610,7 @@
 					text: result.text
 				});
 				void refreshMark();
+				props.onsaved?.();
 				break;
 		}
 		await tick();
@@ -740,12 +743,12 @@
 
 <section
 	class="backup-card"
-	class:backup-card--bare={props.only?.row === 'restore'}
+	class:backup-card--bare={props.only !== undefined && props.only.row !== 'check'}
 	translate="no"
 	aria-labelledby={props.only === undefined ? 'backup-heading' : undefined}
 	aria-label={props.only === undefined
 		? undefined
-		: (props.only.label ?? (props.only.row === 'check' ? CARD_LABELS.check : CARD_LABELS.restore))}
+		: (props.only.label ?? CARD_LABELS[props.only.row === 'export' ? 'make' : props.only.row])}
 >
 	{#if props.only === undefined}
 		<h2 id="backup-heading" class="backup-card__heading">{CARD_LABELS.heading}</h2>
@@ -942,9 +945,9 @@
 	{/snippet}
 
 	<!-- Make a backup -->
-	{#if props.only === undefined}
+	{#if props.only === undefined || props.only.row === 'export'}
 		<div class="backup-row">
-			{@render toggleRowButton('export', CARD_LABELS.make, 'backup-make')}
+			{@render toggleRowButton('export', props.only?.label ?? CARD_LABELS.make, 'backup-make')}
 			{#if makeOpen}
 				<div id="backup-make" class="backup-body">
 					{#if stepUp}

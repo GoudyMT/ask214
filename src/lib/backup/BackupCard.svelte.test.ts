@@ -283,6 +283,9 @@ type Mount = {
 	locked?: boolean;
 	/** The app reads as having its PIN on. */
 	keyMode?: 'pin';
+	/** The card is a host's single-row form, and what the host does when a backup is saved. */
+	only?: { row: 'export'; label?: string; open?: boolean };
+	onsaved?: () => void;
 };
 
 async function mount(o: Mount = {}) {
@@ -339,6 +342,8 @@ async function mount(o: Mount = {}) {
 		db,
 		session,
 		onEraseRequest,
+		...(o.only === undefined ? {} : { only: o.only }),
+		...(o.onsaved === undefined ? {} : { onsaved: o.onsaved }),
 		exportDeps: { getSavePicker, download, readBackMs: o.readBackMs ?? 500 },
 		restoreDeps: {
 			waitForControl: o.wait ?? (() => Promise.resolve(true)),
@@ -2407,5 +2412,60 @@ describe('with the PIN on, making a backup', () => {
 
 		expect(card.session.kind).toBe('check');
 		expect(pinField().query()).toBeNull();
+	});
+});
+
+// ---- the Make row alone, for the PIN setup's backup step ---------------------------------------------------------------------
+
+describe("the Make a backup row as a host's single row", () => {
+	const LABEL = 'Make a backup and turn on';
+	const only = { row: 'export', label: LABEL, open: true } as const;
+
+	it("shows the row alone under the host's label, bare, and opens by itself on the words step", async () => {
+		const card = await mount({ only });
+
+		await expect.element(toggle(LABEL, true)).toBeVisible();
+		await expect.element(button(CARD_LABELS.show)).toBeVisible();
+		expect(card.session.kind).toBe('export');
+		const region = page.getByRole('region', { name: LABEL, exact: true });
+		await expect.element(region).toBeVisible();
+		// No heading, intro, other rows or list of what a backup leaves out.
+		expect(text(CARD_LABELS.heading).query()).toBeNull();
+		expect(text(CARD_INTRO_LINE).query()).toBeNull();
+		for (const name of [CARD_LABELS.restore, CARD_LABELS.check]) {
+			expect(page.getByRole('button', { name, exact: true }).query()).toBeNull();
+		}
+		expect(text(NOT_IN_BACKUPS_LEAD).query()).toBeNull();
+		// The setup screen has its own frame: the card takes none.
+		expect(getComputedStyle(region.element()).borderTopWidth).toBe('0px');
+	});
+
+	// The row is open already, so the words are shown and typed back without the toggle's tap.
+	async function typeBack(): Promise<void> {
+		await showWords();
+		await field().fill(TYPED);
+	}
+
+	it('does not tell its host when the save fails', async () => {
+		const onsaved = vi.fn();
+		const file = fakeFile();
+		file.failClose = true;
+		await mount({ only, onsaved, file });
+		await typeBack();
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.poll(() => file.closes).toBe(1);
+		await pause(100);
+		expect(onsaved).not.toHaveBeenCalled();
+		expect(text(savedLine('picked.json')).query()).toBeNull();
+	});
+
+	it('tells its host once when the backup is saved', async () => {
+		const onsaved = vi.fn();
+		await mount({ only, onsaved });
+		await typeBack();
+		await userEvent.click(submitOf(CARD_LABELS.make));
+
+		await expect.element(text(savedLine('picked.json'))).toBeVisible();
+		expect(onsaved).toHaveBeenCalledTimes(1);
 	});
 });

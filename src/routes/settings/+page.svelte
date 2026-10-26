@@ -652,7 +652,7 @@
 					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
 					<!-- Only a profile can be locked; a device that holds saved documents alone still has the Erase. -->
 					{#if hasTimeline}
-						<AppLockRow />
+						<AppLockRow onerase={openEraseFromBackup} />
 						<button class="settings-lock" type="button" onclick={lock}>Lock</button>
 						<p class="settings-hint">
 							{app.keyMode === 'pin'

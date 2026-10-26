@@ -40,6 +40,9 @@
 	const CHANGED_LINE = 'PIN changed.';
 	const REMOVED_LINE = 'PIN removed.';
 	const PACK_LINE = 'Offline SkillBridge listings download again.';
+	// A line the template would wrap carries the wrap into the page's text; kept here it reads as one line.
+	const BACKUP_HINT =
+		"If you forget your PIN, your data can't be opened. A backup lets you get it back. Keep the file and its six words together.";
 
 	function storeLine(store: string, done: string): string | null {
 		if (!Object.hasOwn(CARRIED_NAME, store)) return null;
@@ -51,15 +54,21 @@
 <script lang="ts">
 	import { onDestroy, tick, untrack } from 'svelte';
 	import { readCounter } from '../keystore/app-lock-store';
+	import BackupCard from '../backup/BackupCard.svelte';
 	import { setSession } from '../keystore/session';
 	import { getProfileApp } from '../profile/context';
 	import { createCurrentPinCheck } from './current-pin-check';
 	import { loadAppLock } from './load-app-lock';
 	import PinField from './PinField.svelte';
 
-	type Props = { deps?: AppLockDeps };
-	let { deps = {} }: Props = $props();
+	type Props = {
+		deps?: AppLockDeps;
+		/** Opens the host's Erase dialog, for the backup card the step mounts. */
+		onerase?: () => void;
+	};
+	let { deps = {}, onerase }: Props = $props();
 	type Loaded = Awaited<ReturnType<typeof loadAppLock>>;
+	type Made = NonNullable<Awaited<ReturnType<typeof deriveNew>>>;
 
 	const app = getProfileApp();
 
@@ -79,6 +88,12 @@
 	let currentField = $state<ReturnType<typeof PinField> | null>(null);
 	let firstField = $state<ReturnType<typeof PinField> | null>(null);
 	let secondField = $state<ReturnType<typeof PinField> | null>(null);
+	// The backup step: the keys the PIN derived and the backup card in the button's place. Raw, so the keys are held as they are.
+	let held = $state.raw<Made | null>(null);
+	let making = $state(false);
+	let makeEl = $state<HTMLButtonElement | null>(null);
+	let cardEl = $state<HTMLElement | null>(null);
+	let leaveHeld: (() => void) | null = null;
 
 	// Its wait clock counts an owed wait down while the row is up: nothing else does in Settings, so a wait on the row
 	// would never end.
@@ -109,6 +124,7 @@
 		if (open) {
 			open = false;
 			panel = 'main';
+			dropHeld();
 			await toToggle();
 			return;
 		}
@@ -121,6 +137,7 @@
 		if (busy) return;
 		open = false;
 		message = null;
+		dropHeld();
 		await toToggle();
 	}
 
@@ -200,7 +217,7 @@
 		const watch = watchRelock();
 		try {
 			const loaded = await loadAppLock();
-			const [pinDerive, rotation, kdf] = loaded;
+			const [pinDerive] = loaded;
 			if (!pinDerive.isPinFormat(pin)) {
 				message = FORMAT_LINE;
 				return;
@@ -213,18 +230,80 @@
 
 			const made = await deriveNew(loaded, pin);
 			if (made === null) return;
-			const { keys, salt } = made;
+			// A Lock that landed during the derive: the keys are dropped, nothing is shown and nothing is said.
+			if (watch.relocked()) return;
+			// Nothing is turned on yet: the person is first offered a backup, and the derived keys wait for their answer.
+			holdKeys(made);
+			await tick();
+			makeEl?.focus();
+		} catch (err) {
+			message = fail(err, 'on');
+		} finally {
+			watch.leave();
+			firstField?.clear();
+			secondField?.clear();
+			busy = false;
+		}
+	}
 
+	// The PIN's keys, derived on Next and kept (with their salt) while the backup step is up. Dropped when a Lock takes the
+	// keys away from the tab, when the row closes or goes, and when the turn-on has run; a switch away keeps them, as the
+	// derive is already done and was timed on a page the person could see.
+	function holdKeys(made: Made): void {
+		dropHeld();
+		held = made;
+		leaveHeld =
+			app.joinRelock?.({
+				relockSync: (reason) => {
+					if (reason !== 'hygiene') dropHeld();
+				},
+				refresh: () => Promise.resolve()
+			}) ?? null;
+	}
+
+	function dropHeld(): void {
+		held = null;
+		making = false;
+		leaveHeld?.();
+		leaveHeld = null;
+	}
+	onDestroy(dropHeld);
+
+	// Make a backup and turn on: the backup card takes the button's place and the turn-on waits for its saved report.
+	async function startBackup(): Promise<void> {
+		if (busy || held === null) return;
+		making = true;
+		await tick();
+		cardEl?.querySelector('button')?.focus();
+	}
+
+	/**
+	 * The turn-on, with the keys the step holds: the records move onto them, this tab holds the new session and the other
+	 * tabs hear of it. Skip and turn on presses it, and so does the backup card once it reports a saved backup.
+	 */
+	async function turnOn(): Promise<void> {
+		const db = app.db;
+		const kept = held;
+		// A saved report that arrives after the keys were dropped (a Lock, the row closing) finds nothing to turn on.
+		if (busy || kept === null) return;
+		busy = true;
+		message = null;
+		const watch = watchRelock();
+		let turnedOn = false;
+		try {
+			const [, rotation, kdf] = await loadAppLock();
+			if (db === null) throw new Error('E_NOT_READY');
 			const counterBefore = await readCounter(db);
 			// A Lock that landed before the move starts: the keys are dropped, nothing is written and nothing is said.
 			if (watch.relocked()) return;
 			const result = await (deps.rotate ?? rotation.rotateToPin)(db, {
-				macKey: keys.macKey,
-				kek: keys.kek,
-				salt,
+				macKey: kept.keys.macKey,
+				kek: kept.keys.kek,
+				salt: kept.salt,
 				kdf: kdf.KDF_V1,
 				counterBefore
 			});
+			turnedOn = true;
 			if (watch.relocked()) {
 				// A Lock that landed during the move, which may have committed: the PIN is on, and this tab was locked
 				// before it could hold the new keys, so it shows the PIN card and the other tabs read the new row.
@@ -243,9 +322,13 @@
 			message = fail(err, 'on');
 		} finally {
 			watch.leave();
-			firstField?.clear();
-			secondField?.clear();
+			dropHeld();
 			busy = false;
+		}
+		// A turn-on that did not happen puts the form back: the pressed button went with the step, and focus goes to the PIN.
+		if (!turnedOn && app.keyMode !== 'pin') {
+			await tick();
+			if (document.activeElement === document.body) firstField?.focus();
 		}
 	}
 
@@ -440,6 +523,38 @@
 						>Cancel</button
 					>
 				</div>
+			{:else if held !== null}
+				<p class="app-lock__strong">One more step: make a backup</p>
+				<p class="app-lock__hint">{BACKUP_HINT}</p>
+				<!-- Held keys: the Next that brought the step up hands focus to its first button, and a repeat of Enter must not
+				     press it; only a new press counts. -->
+				<div class="app-lock__actions">
+					{#if making}
+						<div class="app-lock__backup" bind:this={cardEl}>
+							<BackupCard
+								db={app.db}
+								onEraseRequest={() => onerase?.()}
+								only={{ row: 'export', label: 'Make a backup and turn on', open: true }}
+								onsaved={() => void turnOn()}
+							/>
+						</div>
+					{:else}
+						<button
+							bind:this={makeEl}
+							class="app-lock__next"
+							type="button"
+							aria-busy={busy}
+							onclick={() => void startBackup()}
+							onkeydown={noRepeat}>Make a backup and turn on</button
+						>
+					{/if}
+					<button
+						class="app-lock__cancel"
+						type="button"
+						onclick={() => void turnOn()}
+						onkeydown={noRepeat}>Skip and turn on</button
+					>
+				</div>
 			{:else}
 				<p class="app-lock__hint">
 					A PIN keeps other people out of your saved information on this phone.
@@ -570,6 +685,12 @@
 	.app-lock__next[aria-busy='true'] {
 		background: var(--color-accent);
 		cursor: default;
+	}
+
+	/* The backup card takes a whole line, and Skip and turn on wraps under it. */
+	.app-lock__backup {
+		flex: 1 1 100%;
+		min-width: 0;
 	}
 
 	/* The two choices of a PIN that is on: bordered, so each keeps its edge under forced colors, and Remove stands apart. */
