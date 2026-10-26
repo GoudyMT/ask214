@@ -2348,6 +2348,30 @@ describe('with the PIN on, making a backup', () => {
 		await expect.element(text(KEEP_WORDS_LINE)).toBeVisible();
 	});
 
+	// The person is told what the tries before this good PIN were, in a status region that was already on the row when the
+	// step opened, so a screen reader is listening. It stays until the row closes, and the next opening starts empty.
+	it('tells the wrong tries before a good PIN under the toggle until the row closes', async () => {
+		await pinOn();
+		await mount({ keyMode: 'pin' });
+		await openStepUp();
+		const region = document.querySelector('#backup-make .backup-notice');
+		expect(region?.getAttribute('role')).toBe('status');
+		expect(region?.textContent?.trim()).toBe('');
+
+		await press(OTHER_PIN);
+		await press(OTHER_PIN);
+		await press(CURRENT_PIN);
+		await expect.element(button(CARD_LABELS.show)).toBeVisible();
+		expect(document.querySelector('#backup-make .backup-notice')).toBe(region);
+		expect(region?.textContent?.trim()).toBe('2 wrong PIN tries since your last unlock.');
+
+		await userEvent.click(toggle(CARD_LABELS.make, true));
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		expect(document.querySelector('.backup-notice')).toBeNull();
+		await openStepUp();
+		expect(document.querySelector('.backup-notice')?.textContent?.trim()).toBe('');
+	});
+
 	it('grants one backup only: the session refuses a second start without another PIN', async () => {
 		await pinOn();
 		const card = await mount({ keyMode: 'pin' });

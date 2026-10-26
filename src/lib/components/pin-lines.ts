@@ -20,3 +20,17 @@ export function formatWait(ms: number): string {
 
 export const waitLine = (ms: number): string =>
 	`${NOT_RIGHT_LINE} You can try again in ${formatWait(ms)}.`;
+
+/**
+ * What a good PIN tells the person about the tries before it. A try that was cut off is not counted as wrong: it may have
+ * been the right PIN. Nothing to say is an empty list, never a line about zero.
+ */
+export function triesNotice(wrongTries: number, unfinished: boolean): string[] {
+	const wrong = unfinished ? wrongTries - 1 : wrongTries;
+	return [
+		...(wrong > 0
+			? [`${wrong} wrong PIN ${wrong === 1 ? 'try' : 'tries'} since your last unlock.`]
+			: []),
+		...(unfinished ? ['One PIN try did not finish.'] : [])
+	];
+}

@@ -201,6 +201,11 @@
 	// The Unlock card is gone and focus fell to the page. Where it goes follows the same rule: after a keyboard press the
 	// question field, and after a tap or a click the page heading, since a focused text field would open a phone's keyboard.
 	let unlockByTouch = false;
+	let pinNotice = $state<string[]>([]);
+	let noticeUp = $state(false);
+	$effect(() => {
+		if (pinLocked) noticeUp = true;
+	});
 	let heroEl: HTMLElement | undefined;
 	async function afterUnlock(): Promise<void> {
 		await tick();
@@ -340,6 +345,14 @@
 		</div>
 	{/if}
 
+	<!-- What a good PIN said about the tries before it, where the Unlock card stood. It is on the page from the moment the
+	     card is, so a screen reader is already listening when its lines arrive; the next unlock replaces it. -->
+	{#if noticeUp}
+		<div class="home-notice" role="status">
+			{#each pinNotice as line (line)}<p>{line}</p>{/each}
+		</div>
+	{/if}
+
 	{#if pinLocked}
 		<hr class="home-divider" />
 		<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. The wrapper
@@ -349,7 +362,13 @@
 			onkeydowncapture={(e) => e.key === 'Enter' && (unlockByTouch = false)}
 		>
 			{#await loadPinUnlock() then unlockCard}
-				<unlockCard.default onunlocked={() => void afterUnlock()} onerase={eraseAtSettings} />
+				<unlockCard.default
+					onunlocked={(notice) => {
+						pinNotice = notice;
+						void afterUnlock();
+					}}
+					onerase={eraseAtSettings}
+				/>
 			{:catch}
 				<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
 			{/await}
@@ -396,6 +415,18 @@
 	.home-install {
 		margin-top: var(--space-xl);
 		text-align: left;
+	}
+	/* What a good PIN said about the tries before it: hint text, and no space when there is nothing to say. */
+	.home-notice {
+		margin-top: var(--space-l);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+	.home-notice:empty {
+		margin: 0;
+	}
+	.home-notice p {
+		margin: 0;
 	}
 	/* Separates the Ask from the below-hero surface. Idle-only: once a query runs the results own the
 	   page and this whole block steps aside. */

@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { formatWait } from './pin-lines';
+import { formatWait, triesNotice } from './pin-lines';
+
+const SINCE = 'since your last unlock.';
+const UNFINISHED = 'One PIN try did not finish.';
+
+describe('triesNotice', () => {
+	// What a person is told after a good PIN: the wrong tries since the last unlock, and a try that was cut off. The cut-off
+	// try is not called wrong, because it may have been the right PIN.
+	it.each([
+		[0, false, []],
+		[1, false, [`1 wrong PIN try ${SINCE}`]],
+		[3, false, [`3 wrong PIN tries ${SINCE}`]],
+		[1, true, [UNFINISHED]],
+		[3, true, [`2 wrong PIN tries ${SINCE}`, UNFINISHED]],
+		[2, true, [`1 wrong PIN try ${SINCE}`, UNFINISHED]]
+	])('%i tries, unfinished %s -> %j', (tries, unfinished, lines) => {
+		expect(triesNotice(tries, unfinished)).toEqual(lines);
+	});
+});
 
 describe('formatWait', () => {
 	it.each([

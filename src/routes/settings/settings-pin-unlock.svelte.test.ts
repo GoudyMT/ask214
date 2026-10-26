@@ -96,14 +96,17 @@ vi.mock('$lib/install/context', () => ({
 	}),
 	setInstallApp: () => {}
 }));
-// The check itself is the card's own test; here it only has to end well.
+// The check itself is the card's own test; here it only has to end well, with the tries a case says came before it.
+const before = vi.hoisted(() => ({ wrongTries: 0, unfinished: false }));
 vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/keystore/app-lock-store')>()),
 	readTries: async () => ({ count: 0, waitMs: 0, pending: false }),
-	runPinCheck: async () => ({ kind: 'good', value: true, wrongTries: 0, unfinished: false })
+	runPinCheck: async () => ({ kind: 'good', value: true, ...before })
 }));
 
 beforeEach(() => {
+	before.wrongTries = 0;
+	before.unfinished = false;
 	lock.mode = 'pin';
 	lock.pinLocked = true;
 	lock.storeLocked = true;
@@ -232,6 +235,41 @@ describe('Settings, locked with a PIN', () => {
 		await expect.element(lockButton()).toBeVisible();
 		expect(cardHeading().query()).toBeNull();
 		await expect.poll(() => document.activeElement).toBe(pageHeading().element());
+	});
+
+	async function unlockOnce(): Promise<void> {
+		await pinField().fill('1234');
+		await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+		await expect.poll(() => cardHeading().query()).toBeNull();
+	}
+	const noticeLines = (region: Element | null) =>
+		[...(region?.querySelectorAll('p') ?? [])].map((p) => p.textContent?.trim());
+
+	// The person is told what the tries before this good PIN were, where the card stood. The region is on the page before
+	// its lines arrive, so a screen reader is already listening, and the next unlock replaces what it said.
+	it('tells the person the wrong tries before a good PIN in a status region that was already there, and the next unlock replaces it', async () => {
+		before.wrongTries = 4;
+		before.unfinished = true;
+		const { container } = await render(SettingsPage);
+		const region = container.querySelector('.settings-notice');
+		expect(region?.getAttribute('role')).toBe('status');
+		expect(noticeLines(region)).toEqual([]);
+
+		await unlockOnce();
+		expect(container.querySelector('.settings-notice')).toBe(region);
+		expect(noticeLines(region)).toEqual([
+			'3 wrong PIN tries since your last unlock.',
+			'One PIN try did not finish.'
+		]);
+
+		before.wrongTries = 0;
+		before.unfinished = false;
+		lock.pinLocked = true;
+		lock.storeLocked = true;
+		await expect.element(cardHeading()).toBeVisible();
+		await unlockOnce();
+		expect(container.querySelector('.settings-notice')).toBe(region);
+		expect(noticeLines(region)).toEqual([]);
 	});
 
 	// A restore that has just committed: the write is done, and the page is about to move on or to be locked.

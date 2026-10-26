@@ -124,6 +124,11 @@
 		unlockError = null;
 	});
 	let headingEl: HTMLElement | undefined;
+	let pinNotice = $state<string[]>([]);
+	let noticeUp = $state(false);
+	$effect(() => {
+		if (app.pinLocked === true) noticeUp = true;
+	});
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
 	let clockError = $state<string | null>(null);
@@ -564,13 +569,23 @@
 				Read the official guides behind the answers, and choose which stay on this device.
 			</p>
 		</section>
+		<!-- What a good PIN said about the tries before it, where the Unlock card stood. It is on the page from the moment the
+		     card is, so a screen reader is already listening when its lines arrive; the next unlock replaces it. -->
+		{#if noticeUp}
+			<div class="settings-notice" role="status">
+				{#each pinNotice as line (line)}<p>{line}</p>{/each}
+			</div>
+		{/if}
 		{#if app.pinLocked === true}
 			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. It stands
 			     between two sections, so it keeps their gap above and below. -->
 			<div class="pin-card-gap">
 				{#await loadPinUnlock() then card}
 					<card.default
-						onunlocked={() => void focusHeading()}
+						onunlocked={(notice) => {
+							pinNotice = notice;
+							void focusHeading();
+						}}
 						takeFocus={pinCardFocus}
 						onerase={openEraseFromBackup}
 						onforgot={(open) => (forgotUp = open)}
@@ -874,6 +889,21 @@
 
 	.restored-line {
 		margin: 0 0 var(--space-l);
+	}
+
+	/* What a good PIN said about the tries before it: hint text, and no space when there is nothing to say. */
+	.settings-notice {
+		margin: 0 0 var(--space-l);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.settings-notice:empty {
+		margin: 0;
+	}
+
+	.settings-notice p {
+		margin: 0;
 	}
 
 	.damaged-line {

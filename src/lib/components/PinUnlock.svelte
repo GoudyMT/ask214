@@ -43,12 +43,15 @@
 	import { onMount, tick } from 'svelte';
 	import { getProfileApp } from '../profile/context';
 	import PinField from './PinField.svelte';
-	import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, waitLine } from './pin-lines';
+	import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, triesNotice, waitLine } from './pin-lines';
 	import { createCountdown } from './wait-countdown';
 
 	type Props = {
-		/** After the stores loaded; the page moves focus on, since this card is about to go. */
-		onunlocked?: () => void;
+		/**
+		 * After the stores loaded; the page moves focus on, since this card is about to go. Given what to tell the person
+		 * about the tries before this good one (often nothing).
+		 */
+		onunlocked?: (notice: string[]) => void;
 		/** Set when focus is on its way here from a button that is about to go (Lock): the cursor goes to the field. */
 		takeFocus?: boolean;
 		/** "Erase and start over" on the Forgot screen: the page opens its Erase. */
@@ -209,7 +212,7 @@
 			if (outcome.kind === 'good') {
 				if (!app.unlockStores) throw new Error('E_NOT_READY');
 				await app.unlockStores();
-				onunlocked?.();
+				onunlocked?.(triesNotice(outcome.wrongTries, outcome.unfinished));
 			} else if (outcome.kind === 'wrong') {
 				if (outcome.waitMs > 0) await showWait(db, outcome.waitMs, true);
 				else message = NOT_RIGHT;

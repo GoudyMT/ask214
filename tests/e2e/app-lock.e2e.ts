@@ -193,6 +193,8 @@ test('wrong tries and the wait they earn survive a reload, and the right PIN ope
 	await expect(page.getByRole('alert')).toHaveCount(0);
 	await pressUnlock(page, PIN);
 	await expect(page.getByText(ANCHORED)).toBeVisible({ timeout: 30_000 });
+	// The person is told how many wrong tries came before this good one.
+	await expect(page.getByText('4 wrong PIN tries since your last unlock.')).toBeVisible();
 	// A good PIN gives the tries back.
 	await expect
 		.poll(() => readTriesRow(page))
@@ -299,6 +301,13 @@ test('a derive that never finished still counts as a try', async ({ page, contex
 	await expect(lockedHeading(reopened)).toBeVisible();
 	expect(await readTriesRow(reopened)).toMatchObject({ count: 1, pending: true });
 	await expect(reopened.getByText(/Anchored to/)).toHaveCount(0);
+
+	// The derive that was cut off may have been the right PIN, so a good one after it says only that a try did not finish.
+	await context.unroute('**/backup-kdf/**');
+	await pressUnlock(reopened, PIN);
+	await expect(reopened.getByText(ANCHORED)).toBeVisible({ timeout: 30_000 });
+	await expect(reopened.getByText('One PIN try did not finish.')).toBeVisible();
+	await expect(reopened.getByText(/wrong PIN tr(y|ies)/)).toHaveCount(0);
 });
 
 // 5. The use: a locked phone shows nothing and sends nothing. Every request from the first set-up to the unlock is read

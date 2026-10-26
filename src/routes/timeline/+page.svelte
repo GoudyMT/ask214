@@ -51,6 +51,11 @@
 		unlockError = null;
 	});
 	let headingEl: HTMLElement | undefined;
+	let pinNotice = $state<string[]>([]);
+	let noticeUp = $state(false);
+	$effect(() => {
+		if (app.pinLocked === true) noticeUp = true;
+	});
 
 	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not
 	// carry it.
@@ -310,6 +315,14 @@
 <div translate="no">
 	<h1 bind:this={headingEl} tabindex="-1">Timeline</h1>
 
+	<!-- What a good PIN said about the tries before it, where the Unlock card stood. It is on the page from the moment the
+	     card is, so a screen reader is already listening when its lines arrive; the next unlock replaces it. -->
+	{#if noticeUp}
+		<div class="timeline-notice" role="status">
+			{#each pinNotice as line (line)}<p>{line}</p>{/each}
+		</div>
+	{/if}
+
 	{#if app.status === 'ready'}
 		<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
 	     Unless its load failed: then the note below says so, since Unlock would only fail again. And only with something
@@ -317,7 +330,13 @@
 		{#if app.pinLocked === true}
 			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
 			{#await loadPinUnlock() then card}
-				<card.default onunlocked={() => void focusHeading()} onerase={eraseAtSettings} />
+				<card.default
+					onunlocked={(notice) => {
+						pinNotice = notice;
+						void focusHeading();
+					}}
+					onerase={eraseAtSettings}
+				/>
 			{:catch}
 				<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
 			{/await}
@@ -412,6 +431,21 @@
 	.timeline-subline {
 		margin: 0 0 var(--space-xs);
 		color: var(--color-fg-muted);
+	}
+
+	/* What a good PIN said about the tries before it: hint text, and no space when there is nothing to say. */
+	.timeline-notice {
+		margin: 0 0 var(--space-xs);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.timeline-notice:empty {
+		margin: 0;
+	}
+
+	.timeline-notice p {
+		margin: 0;
 	}
 
 	/* The one line a restore adds, under the subline. */

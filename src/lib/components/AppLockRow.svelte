@@ -414,6 +414,9 @@
 				return;
 			}
 			const opened = checked.session;
+			// Said at once, so a failure later in this press still leaves it under the row.
+			statuses = checked.notice;
+			// Said at once, so a failure later in this press still leaves it under the row.
 
 			if (kind === 'change') {
 				// A Lock during the check: the new PIN is not derived for a tab that is locked.
@@ -440,7 +443,7 @@
 					setSession(result.session);
 					app.publish?.({ type: 'keys-changed' });
 				}
-				statuses = result.packHadFiles ? [CHANGED_LINE, PACK_LINE] : [CHANGED_LINE];
+				statuses = [CHANGED_LINE, ...checked.notice, ...(result.packHadFiles ? [PACK_LINE] : [])];
 			} else {
 				const counterBefore = await readCounter(db);
 				// A Lock during the check or before the removal starts: nothing is written and nothing is said.
@@ -449,7 +452,7 @@
 				// A Lock during the removal leaves this tab locked as it was; a tab still unlocked reads the local row next time.
 				if (!watch.relocked()) app.keyMode = 'local';
 				app.publish?.({ type: 'keys-changed' });
-				statuses = [REMOVED_LINE];
+				statuses = [REMOVED_LINE, ...checked.notice];
 			}
 			open = false;
 			panel = 'main';

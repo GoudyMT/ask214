@@ -62,7 +62,7 @@ export function createCountdown(
 		clock = null;
 	}
 
-	// Looks again when the text next changes, at least once a second.
+	// Looks again each second: the text is read from the remainder, so a late look shows the right time.
 	function tick(): void {
 		const left = clock?.remainingMs() ?? 0;
 		if (left <= 0) {
@@ -71,8 +71,7 @@ export function createCountdown(
 			return;
 		}
 		say(waitLine(Math.ceil(left)));
-		const untilChange = left - (Math.ceil(left / TICK_MS) - 1) * TICK_MS;
-		timer = (deps.setTimeout ?? setTimeout)(tick, Math.min(TICK_MS, untilChange));
+		timer = (deps.setTimeout ?? setTimeout)(tick, TICK_MS);
 	}
 
 	function run(waitMs: number): void {

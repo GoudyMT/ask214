@@ -72,6 +72,8 @@ const LOW_MEMORY =
 	'This phone ran out of memory while checking your PIN. Your PIN may be right. Close other apps and tabs, then try again.';
 const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 const NO_TRIES: TriesState = { count: 0, waitMs: 0, pending: false };
+const SINCE = 'since your last unlock.';
+const UNFINISHED = 'One PIN try did not finish.';
 
 // Captured before any test fakes the timers: the waits below must stay real.
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
@@ -129,7 +131,7 @@ let relockables: Relockable[];
 let app: TestApp;
 let derive: Mock<(pin: string) => Promise<{ macKey: CryptoKey; kek: CryptoKey }>>;
 let reload: Mock<() => void>;
-let onunlocked: Mock<() => void>;
+let onunlocked: Mock<(notice: string[]) => void>;
 let onerase: Mock<() => void>;
 
 const putRow = (row: object) =>
@@ -217,6 +219,27 @@ describe('a good PIN', () => {
 		expect(onunlocked).toHaveBeenCalledTimes(1);
 		expect(fieldEl().value).toBe('');
 		expect(await readTries(db)).toEqual(NO_TRIES);
+	});
+
+	// What the person is told about the tries before this good one, from the row the check really read.
+	it.each<[string, TriesState, string[]]>([
+		['no wrong tries', NO_TRIES, []],
+		['three wrong tries', { count: 3, waitMs: 0, pending: false }, [`3 wrong PIN tries ${SINCE}`]],
+		['one wrong try', { count: 1, waitMs: 0, pending: false }, [`1 wrong PIN try ${SINCE}`]],
+		['a try that did not finish', { count: 1, waitMs: 0, pending: true }, [UNFINISHED]],
+		[
+			'three tries, the last of them cut off',
+			{ count: 3, waitMs: 0, pending: true },
+			[`2 wrong PIN tries ${SINCE}`, UNFINISHED]
+		]
+	])('tells the page about %s with the lines to show', async (_what, tries, lines) => {
+		await putTries(tries);
+		await mount();
+		await press(GOOD);
+		await until(() => onunlocked.mock.calls.length > 0, 'the page was told it unlocked');
+
+		expect(onunlocked).toHaveBeenCalledTimes(1);
+		expect(onunlocked).toHaveBeenCalledWith(lines);
 	});
 
 	// unlockStores drops the session itself when the profile will not open, so a retry is a fresh unlock.

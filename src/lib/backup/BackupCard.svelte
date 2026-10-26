@@ -243,6 +243,8 @@
 	let pinTyped = $state('');
 	let pinBusy = $state(false);
 	let pinMessage = $state<string | null>(null);
+	// What a good PIN says about the tries before it, under the Make row's toggle until the row closes.
+	let stepNotice = $state<string[]>([]);
 	let pinFieldRef = $state<ReturnType<typeof PinField> | null>(null);
 	// Moves with every relock: a check that was running when one landed must not go on to start a backup.
 	let stepUpEpoch = 0;
@@ -274,6 +276,9 @@
 	const concealed = $derived(session.concealed);
 
 	const makeOpen = $derived(kind === 'export' || exportOutcome !== null || stepUp);
+	$effect(() => {
+		if (!makeOpen) stepNotice = [];
+	});
 	const showingWords = $derived(
 		kind === 'export' && session.revealed && !concealed && session.words !== null
 	);
@@ -466,6 +471,7 @@
 				pinMessage = result.line;
 				return;
 			}
+			stepNotice = result.notice;
 			closeStepUp();
 			openRow('export', true);
 			await handFocusToRow('export');
@@ -963,6 +969,10 @@
 			{@render toggleRowButton('export', props.only?.label ?? CARD_LABELS.make, 'backup-make')}
 			{#if makeOpen}
 				<div id="backup-make" class="backup-body">
+					<!-- On the row before its lines arrive, so a screen reader is already listening. -->
+					<div class="backup-hint backup-notice" role="status">
+						{#each stepNotice as line (line)}<p>{line}</p>{/each}
+					</div>
 					{#if stepUp}
 						<PinField
 							bind:this={pinFieldRef}
@@ -1210,6 +1220,15 @@
 		margin: 0 0 var(--space-m);
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
+	}
+	/* Stays on the page when empty, so a screen reader is listening before its lines arrive; empty, it takes the body's gap
+	   back, so the row looks as it did. */
+	.backup-notice,
+	.backup-notice p {
+		margin: 0;
+	}
+	.backup-notice:empty {
+		margin-bottom: calc(var(--space-m) * -1);
 	}
 	.backup-lead {
 		margin: var(--space-l) 0 var(--space-s);

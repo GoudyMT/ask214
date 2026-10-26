@@ -13,10 +13,11 @@ import {
 import { readPinRowAndCounter } from '../keystore/unlock-row';
 import type { derivePinKeys } from '../keystore/pin-derive';
 import type { loadAppLock } from './load-app-lock';
-import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, waitLine } from './pin-lines';
+import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, triesNotice, waitLine } from './pin-lines';
 import { createCountdown } from './wait-countdown';
 
-export type CurrentPinResult = { ok: true; session: KeySession } | { ok: false; line: string };
+export type CurrentPinResult =
+	{ ok: true; session: KeySession; notice: string[] } | { ok: false; line: string };
 
 type CurrentPinDeps = {
 	derive?: typeof derivePinKeys | undefined;
@@ -77,7 +78,10 @@ export function createCurrentPinCheck(deps: CurrentPinDeps): {
 				throw err;
 			}
 		});
-		if (outcome.kind === 'good') return { ok: true, session: outcome.value };
+		if (outcome.kind === 'good') {
+			const notice = triesNotice(outcome.wrongTries, outcome.unfinished);
+			return { ok: true, session: outcome.value, notice };
+		}
 		if (outcome.kind === 'waiting')
 			return { ok: false, line: await waitText(db, outcome.waitMs, false) };
 		if (outcome.kind === 'wrong') {

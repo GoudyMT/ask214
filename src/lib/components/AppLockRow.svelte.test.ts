@@ -12,6 +12,7 @@ import { KDF_V1 } from '../backup/kdf-params';
 import type { FromWorker, WorkerRequest } from '../backup/worker/protocol';
 import { LockAcquisitionTimeout } from '../db/locks';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
+import { withStores } from '../db/schema';
 import { bumpCounter, readCounter, readTries, type TriesState } from '../keystore/app-lock-store';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { PinNoMemoryError } from '../keystore/pin-derive';
@@ -1813,6 +1814,54 @@ describe('removing the PIN', () => {
 		expect(app.publish).toHaveBeenCalledTimes(1);
 		expect(app.publish).toHaveBeenCalledWith({ type: 'keys-changed' });
 		expect(app.keyMode).toBe('pin');
+	});
+});
+
+describe('what a good current PIN says about the tries before it', () => {
+	const SINCE = 'since your last unlock.';
+	const putTries = (tries: TriesState) =>
+		withStores(db, 'app-lock', 'readwrite', (tx) => {
+			tx.objectStore('app-lock').put({ id: 'tries', ...tries });
+		});
+
+	beforeEach(async () => {
+		await pinOn();
+		deriveByPin();
+	});
+
+	it('shows the wrong tries between the changed line and the offline listings line', async () => {
+		rotate.mockResolvedValue({ session: await fakeSession(), packHadFiles: true });
+		await mount();
+		await openForm('Change PIN');
+		await pressChange(WRONG, NEW_PIN, NEW_PIN);
+		await pressChange(WRONG, NEW_PIN, NEW_PIN);
+		await pressChange(CURRENT, NEW_PIN, NEW_PIN);
+		await until(() => statusLines().length > 0, 'the status lines');
+
+		expect(statusLines()).toEqual([CHANGED_LINE, `2 wrong PIN tries ${SINCE}`, PACK_LINE]);
+	});
+
+	it('shows a try that did not finish after the removed line', async () => {
+		await putTries({ count: 1, waitMs: 0, pending: true });
+		await mount();
+		await openForm('Remove PIN');
+		await pressRemove(CURRENT);
+		await until(() => statusLines().length > 0, 'the status lines');
+
+		expect(statusLines()).toEqual([REMOVED_LINE, 'One PIN try did not finish.']);
+	});
+
+	// The tries are said as soon as the PIN is good, so a failure later in the same press does not take them away.
+	it('keeps them under the line of a press that fails after the PIN was good', async () => {
+		deriveByPin(5_001);
+		await putTries({ count: 1, waitMs: 0, pending: false });
+		await mount();
+		await openForm('Change PIN');
+		await pressChange(CURRENT, NEW_PIN, NEW_PIN);
+		await until(() => alertText() !== null, 'a line');
+
+		expect(alertText()).toBe(LOW_MEMORY_LINE);
+		expect(statusLines()).toEqual([`1 wrong PIN try ${SINCE}`]);
 	});
 });
 
