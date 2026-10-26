@@ -38,7 +38,8 @@ import {
 const seams = vi.hoisted(() => ({
 	capture: false,
 	encoded: [] as Uint8Array[],
-	zeroized: [] as Record<string, unknown>[]
+	zeroized: [] as Record<string, unknown>[],
+	onEncode: null as (() => void) | null
 }));
 
 vi.mock('$lib/profile/codec', async (importOriginal) => {
@@ -48,6 +49,7 @@ vi.mock('$lib/profile/codec', async (importOriginal) => {
 		encodeProfile: (...args: Parameters<typeof real.encodeProfile>) => {
 			const out = real.encodeProfile(...args);
 			if (seams.capture) seams.encoded.push(out);
+			seams.onEncode?.();
 			return out;
 		}
 	};
@@ -97,6 +99,7 @@ beforeEach(async () => {
 	seams.capture = false;
 	seams.encoded.length = 0;
 	seams.zeroized.length = 0;
+	seams.onEncode = null;
 });
 
 afterEach(async () => {
@@ -703,6 +706,33 @@ describe('restoreLockedDevice', () => {
 				RunAbortedError
 			);
 
+			expect(await snapshot()).toStrictEqual(before);
+		});
+
+		// The lock is already granted and the records are being made when the person cancels: the check at the write is
+		// the last thing that can stop it.
+		it('a run cancelled after the lock was granted, while the records were being made', async () => {
+			await buildPinDevice();
+			const before = await snapshot();
+			const expected = await confirmNow();
+			const { options, ctl, onCommitting } = run();
+			const inner = fileInner();
+			// The composer encodes under the keystore lock: the lock is read at the moment of the cancel.
+			let lockHeld: Promise<boolean> = Promise.resolve(false);
+			seams.onEncode = () => {
+				lockHeld = navigator.locks
+					.query()
+					.then((s) => (s.held ?? []).some((l) => l.name === 'mtc-keystore'));
+				ctl.abort();
+			};
+
+			await expect(restoreLockedDevice(db, inner, expected, options)).rejects.toBeInstanceOf(
+				RunAbortedError
+			);
+
+			expect(ctl.signal.aborted).toBe(true);
+			expect(await lockHeld).toBe(true);
+			expect(onCommitting).not.toHaveBeenCalled();
 			expect(await snapshot()).toStrictEqual(before);
 		});
 	});
