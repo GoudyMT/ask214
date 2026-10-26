@@ -46,7 +46,7 @@
 	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not
 	// carry it.
 	function eraseAtSettings(): void {
-		void import('$lib/backup/session.svelte').then(({ backupSession }) => {
+		void import('$lib/components/load-backup').then(({ backupSession }) => {
 			backupSession.requestErase();
 			return goto(resolve('/settings'));
 		});

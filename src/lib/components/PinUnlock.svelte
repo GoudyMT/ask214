@@ -315,7 +315,7 @@
 
 	// The backup card and the locked-device writer come on demand: the Unlock card's own chunk carries neither.
 	const loadRestore = () =>
-		Promise.all([import('../backup/BackupCard.svelte'), import('../keystore/forgot-restore')]);
+		import('./load-backup').then((all) => [all, all] as [typeof all, typeof all]);
 
 	async function showRestore(): Promise<void> {
 		if (restore !== null) return;
