@@ -247,7 +247,11 @@
 	let stepUpEpoch = 0;
 	// The wait this check starts to count down belongs to this card; the keys a good PIN opens are never held.
 	const pinCheck = createCurrentPinCheck({ loadDerive: async () => (await loadAppLock())[0] });
-	onDestroy(() => pinCheck.stop());
+	onDestroy(() => {
+		pinCheck.stop();
+		// A check still running when the card goes has no step left to pass.
+		stepUpEpoch += 1;
+	});
 
 	let exportPassEl = $state<HTMLInputElement | null>(null);
 	let filePassEl = $state<HTMLInputElement | null>(null);

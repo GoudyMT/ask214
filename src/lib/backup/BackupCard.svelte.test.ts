@@ -2392,6 +2392,31 @@ describe('with the PIN on, making a backup', () => {
 		expect(pinField().query()).toBeNull();
 	});
 
+	// The person left the page (or a lock took the card off) while the PIN was being derived: a card that is gone has no
+	// step to pass, and the check's good answer must not start a backup for nobody.
+	it('starts nothing, and leaves no grant, when the card is gone before its PIN check finishes', async () => {
+		await pinOn();
+		const gate = deferred<{ macKey: CryptoKey; kek: CryptoKey }>();
+		let deriving = false;
+		pinSeam.derive = () => {
+			deriving = true;
+			return gate.promise;
+		};
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await pinField().fill(CURRENT_PIN);
+		need(stepUpMake()).click();
+		await expect.poll(() => deriving).toBe(true);
+
+		card.unmount();
+		gate.resolve(rightKeys);
+		await pause(150);
+
+		expect(card.session.active).toBe(false);
+		expect(card.workers).toHaveLength(0);
+		expect(() => card.session.start(card.app, 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+	});
+
 	it('asks for the PIN again for Make a new backup after a Check', async () => {
 		await pinOn();
 		const card = await mount({ keyMode: 'pin' });
