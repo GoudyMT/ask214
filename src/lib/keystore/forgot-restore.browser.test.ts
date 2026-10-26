@@ -213,23 +213,6 @@ async function buildPinDevice(): Promise<{ session: KeySession }> {
 	await finder.load();
 	for (let i = 0; i < DEVICE.finder; i++) await finder.setSetup({ radius: i % 2 === 0 ? 50 : 25 });
 	await createByokStore(db).saveApiKey(API_KEY);
-	const pack = createFinderPackStore(db);
-	await pack.load();
-	await pack.swap({
-		index: {
-			v: 1,
-			pullDate: '2026-10-21',
-			baseline: false,
-			baselineDate: '2026-10-01',
-			files: [{ name: 'pacific', count: 1, bytes: 100 }]
-		},
-		regions: new Map([
-			[
-				'pacific',
-				{ v: 1, pullDate: '2026-10-21', file: 'pacific', listings: [cleanListing({ i: 1001 })] }
-			]
-		])
-	});
 	await putRaw('app-lock', TRIES_ROW);
 	const keys = await pinKeys();
 	const { session } = await rotateToPin(db, {
@@ -238,6 +221,30 @@ async function buildPinDevice(): Promise<{ session: KeySession }> {
 		kdf: { ...KDF_V1 },
 		counterBefore: await readCounter(db)
 	});
+	// The cached finder files are downloaded after the turn-on, which drops the ones from before it.
+	setSession(session);
+	try {
+		const pack = createFinderPackStore(db);
+		await pack.load();
+		await pack.swap({
+			index: {
+				v: 1,
+				pullDate: '2026-10-21',
+				baseline: false,
+				baselineDate: '2026-10-01',
+				files: [{ name: 'pacific', count: 1, bytes: 100 }]
+			},
+			regions: new Map([
+				[
+					'pacific',
+					{ v: 1, pullDate: '2026-10-21', file: 'pacific', listings: [cleanListing({ i: 1001 })] }
+				]
+			])
+		});
+	} finally {
+		dropSession();
+	}
+	expect((await rowsOf(PACK)).length).toBeGreaterThan(0);
 	return { session };
 }
 
@@ -356,6 +363,69 @@ describe('readLockedDevice', () => {
 		await bootstrapLocalKeystore(db);
 
 		await expect(readLockedDevice(db)).rejects.toBeInstanceOf(KeystoreNotInitializedError);
+	});
+});
+
+// The markers are plain rows anyone holding the phone could have written; whatever they hold, the read gives a number the
+// restore can add one to, or nothing.
+describe('markers forged on a locked device', () => {
+	const MARKS = [
+		'profile-hwm',
+		'timeline-state-hwm',
+		'calendar-sync-hwm',
+		'skillbridge-finder-hwm'
+	] as const;
+
+	async function forge(store: StoreName, patch: Record<string, unknown>): Promise<void> {
+		const row = need(await readRaw(store));
+		await putRaw(store, { ...row, payload: { ...(row.payload as Row), ...patch } });
+	}
+
+	it.each([
+		['NaN', Number.NaN],
+		['Infinity', Number.POSITIVE_INFINITY],
+		['a negative number', -3],
+		['a fraction', 1.5],
+		['a string', '7'],
+		['2^52', 2 ** 52]
+	])(
+		'a generation of %s reads as never saved, and the restore goes one step past that',
+		async (_what, forged) => {
+			await buildPinDevice();
+			await forge('profile-hwm', { generation: forged });
+
+			const device = await readLockedDevice(db);
+			const gens = expectSucceeded(
+				await restoreLockedDevice(db, fileInner(), device, run().options)
+			);
+
+			expect(device.gens).toStrictEqual({ ...DEVICE, profile: 0 });
+			expect(gens).toStrictEqual({
+				profile: 1,
+				timeline: DEVICE.timeline + 1,
+				calendar: DEVICE.calendar + 1,
+				finder: DEVICE.finder + 1
+			});
+		}
+	);
+
+	it.each([
+		['NaN', Number.NaN],
+		['Infinity', Number.POSITIVE_INFINITY],
+		['a negative number', -5],
+		['a string', '5']
+	])('a write time of %s is ignored, so the clock mark is not poisoned', async (_what, forged) => {
+		await buildPinDevice();
+		for (const store of MARKS) await forge(store, { ts: forged });
+
+		const device = await readLockedDevice(db);
+		expectSucceeded(await restoreLockedDevice(db, fileInner(), device, run().options));
+
+		expect(device.lastTs).toBeNull();
+		const loaded = need(await createProfileStore(db).load());
+		expect(Number.isFinite(loaded.lastSeenAt)).toBe(true);
+		expect(loaded.lastSeenAt).toBeGreaterThan(0);
+		expect(loaded.lastSeenAt).toBeLessThanOrEqual(Date.now());
 	});
 });
 
