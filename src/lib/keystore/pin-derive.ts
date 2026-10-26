@@ -86,8 +86,16 @@ export async function derivePinKeys(
 	deps: { createWorker?: () => PinWorkerLike; onProgress?: (percent: number) => void } = {}
 ): Promise<{ macKey: CryptoKey; kek: CryptoKey }> {
 	// Numbers other than the backup's, or a salt of the wrong size, mean the stored record is damaged. That is the same
-	// failure as a record that fails its MAC, and never a wrong try, so it is checked before anything is derived.
-	if (!sameTuple(params.kdf) || params.salt.length !== SALT_BYTES) {
+	// failure as a record that fails its MAC, and never a wrong try, so it is checked before anything is derived. The
+	// store is plain, so a missing field is checked for too: a crash here would be counted as a wrong try.
+	const stored = params as { kdf?: unknown; salt?: unknown };
+	if (
+		typeof stored.kdf !== 'object' ||
+		stored.kdf === null ||
+		!sameTuple(stored.kdf as typeof params.kdf) ||
+		!(stored.salt instanceof Uint8Array) ||
+		stored.salt.length !== SALT_BYTES
+	) {
 		throw new KeystoreHmacMismatchError();
 	}
 	// Callers check the PIN first; this stops a bug from costing a derive.

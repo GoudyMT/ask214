@@ -115,6 +115,22 @@ describe('derivePinKeys: the stored numbers are checked before any worker', () =
 		}
 	);
 
+	// The store is plain, so a hand-edited or half-written row can lack a field. A missing one is the same damage as a
+	// wrong one: it must not surface as a crash the check would count as a wrong try.
+	it.each([
+		['no kdf', { kdf: undefined, salt: SALT() }],
+		['no salt', { kdf: { ...KDF_V1 }, salt: undefined }],
+		['a salt that is not bytes', { kdf: { ...KDF_V1 }, salt: Array.from({ length: 16 }, () => 0) }]
+	])('a row with %s throws the damaged-record error and starts no worker', async (_n, params) => {
+		const { createWorker } = fakeWorker(answersNoMemory);
+		await expect(
+			derivePinKeys('1234', params as unknown as Parameters<typeof derivePinKeys>[1], {
+				createWorker
+			})
+		).rejects.toBeInstanceOf(KeystoreHmacMismatchError);
+		expect(createWorker).not.toHaveBeenCalled();
+	});
+
 	it('a PIN of the wrong shape throws E_PIN_FORMAT and starts no worker, after the tuple check', async () => {
 		const { createWorker } = fakeWorker(answersNoMemory);
 		await expect(derivePinKeys('12a4', PARAMS(), { createWorker })).rejects.toThrow('E_PIN_FORMAT');
