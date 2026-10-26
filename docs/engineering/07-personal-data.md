@@ -109,7 +109,8 @@ for the PIN.
 saved are outside it. Another browser on the same phone keeps its own data and needs its own PIN. Anyone holding
 the phone can still erase the app's data. Switching away for a short time does not lock the app; Lock does. The
 time away is read from the device's clocks, so someone who can unlock the phone itself and set its clock back can
-make a long time away read as a short one, and a tab left open without Lock may then open without the PIN. And a
+make a long time away read as a short one, and a tab left open without Lock may then open without the PIN. App
+lock appears in Settings once a profile is saved, so an API key saved before any profile is not covered. And a
 copy of the data taken off the phone can be tried against every 4 to 6 digit PIN away from the wait, which a
 short PIN cannot hold out against for long.
 

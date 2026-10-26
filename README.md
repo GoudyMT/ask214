@@ -44,6 +44,7 @@ the transition it is designed to help with.
 - **App lock (optional).** Set a 4 to 6 digit PIN in Settings, and the app asks for it when it opens,
   after 15 minutes idle, and after Lock. After three wrong tries, each try waits longer, up to 15
   minutes, and a wrong try never erases anything. If you forget the PIN, a backup brings your data back.
+  App lock appears once a profile is saved, so it does not cover an API key saved before any profile.
 - **Resources.** A curated hub of official outbound links (VA, DoD, DOL, TSP, SkillBridge). We link to
   the real government tools with context; we never recreate or replace them.
 - **Reference library.** TAP curriculum, VA guides, and agency pages, all public U.S. Government work.
