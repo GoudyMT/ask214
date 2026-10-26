@@ -104,7 +104,7 @@
 </script>
 
 <svelte:head>
-	<title>Set up your profile</title>
+	<title>Set up your profile - Ask 214</title>
 </svelte:head>
 
 <section class="wizard" aria-labelledby="wizard-heading" translate="no">
