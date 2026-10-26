@@ -134,9 +134,11 @@
 	// otherwise (nothing new may start behind the Unlock panel). A profile locked for real (a Lock, idle, another tab)
 	// takes the card away: those locks have already cleared the session, or left it for the Unlock to find again. A
 	// device with no profile has nothing to unlock, so its lock takes nothing away: the card would not come back until a
-	// reload. A card with no way to relock its session has nothing it may start.
+	// reload. A card with no way to relock its session has nothing it may start. Behind a PIN lock there is never one: the
+	// Unlock card's own Forgot screen carries the only backup card there, and two would share one session.
 	const showBackupCard = $derived(
 		app.joinRelock !== null &&
+			app.pinLocked !== true &&
 			app.store !== null &&
 			(app.store.lockState !== 'locked' || !app.store.locked) &&
 			(!lockedView || backupSession.active)

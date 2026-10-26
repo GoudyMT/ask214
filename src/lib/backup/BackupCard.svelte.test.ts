@@ -8,6 +8,7 @@ import { createJoinRelock, relockEachSync, type Relockable } from '../profile/ap
 import type { ProfileApp } from '../profile/context';
 import type { RelockReason } from '../profile/lifecycle';
 import { readDeviceState, type DeviceState } from '../profile/device-state';
+import type { readLockedDevice, restoreLockedDevice } from '../keystore/forgot-restore';
 import { readKeystoreRow } from '../keystore/read';
 import {
 	createProfileStore,
@@ -256,6 +257,8 @@ type Mount = {
 	readDevice?: (database: IDBDatabase) => Promise<{ state: DeviceState; installUuid: Uint8Array }>;
 	chooser?: 'api' | 'input';
 	readBackMs?: number;
+	/** The card is the Forgot screen's: it restores through the locked-device pair (recording stubs). */
+	locked?: boolean;
 };
 
 async function mount(o: Mount = {}) {
@@ -323,11 +326,30 @@ async function mount(o: Mount = {}) {
 			onceVisible: () => () => {}
 		}
 	};
-	const rendered = await render(BackupCard, { props });
+	// The locked-device pair, as stubs that record their calls and end the way the real writer does.
+	const lockedDevice = {
+		read: vi.fn<typeof readLockedDevice>(async () => ({
+			gens: { profile: 3, timeline: 2, calendar: 2, finder: 1 },
+			installUuid: new Uint8Array(16).fill(7),
+			lastTs: null
+		})),
+		write: vi.fn<typeof restoreLockedDevice>(async (_db, _inner, _expected, options) => {
+			options.onCommitting();
+			return { ok: true, gens: { profile: 4, timeline: 3, calendar: 3, finder: 2 } };
+		})
+	};
+	const propsFor = (locked: boolean) => ({
+		...props,
+		restoreDeps: { ...props.restoreDeps, ...(locked && { lockedDevice }) }
+	});
+	const rendered = await render(BackupCard, { props: propsFor(o.locked === true) });
 	return {
 		...rendered,
 		/** Mounts the card again over the same session, as Settings does when it brings the card back after an Unlock. */
-		remount: () => render(BackupCard, { props }),
+		remount: () => render(BackupCard, { props: propsFor(o.locked === true) }),
+		/** Mounts another card over the same session and database, a Forgot card or an ordinary one. */
+		mountAs: (locked: boolean) => render(BackupCard, { props: propsFor(locked) }),
+		lockedDevice,
 		session,
 		app,
 		workers,
@@ -1968,6 +1990,44 @@ function wrongLine(): string {
 		})
 	);
 }
+
+// The restore flow is kept for the tab's session, so a card that needs the locked-device path must not inherit the flow an
+// earlier card built without it, and an ordinary card must not inherit a Forgot card's: the ordinary one would wipe the
+// API key and the PIN on a device that is not locked, and the Forgot one would read keys it does not have.
+describe('the restore path a card gets after another card', () => {
+	/** Types the words and presses Replace on whichever restore row is open. */
+	async function restoreThrough(card: Card): Promise<void> {
+		await fileChosen(card, 'restore');
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		await userEvent.click(button(CARD_LABELS.replace));
+		await expect.poll(() => card.reload.mock.calls.length).toBe(1);
+	}
+
+	it('an ordinary card brought up after a Forgot card restores the ordinary way', async () => {
+		const card = await mount({ locked: true });
+		await card.unmount();
+		await card.mountAs(false);
+
+		await restoreThrough(card);
+
+		expect(card.lockedDevice.read).not.toHaveBeenCalled();
+		expect(card.lockedDevice.write).not.toHaveBeenCalled();
+		expect(card.published).toEqual([{ type: 'data-replaced' }]);
+	});
+
+	it('a Forgot card brought up after an ordinary card restores through the locked-device pair', async () => {
+		const card = await mount();
+		await card.unmount();
+		await card.mountAs(true);
+
+		await restoreThrough(card);
+
+		expect(card.lockedDevice.read).toHaveBeenCalledTimes(1);
+		expect(card.lockedDevice.write).toHaveBeenCalledTimes(1);
+		expect(card.published).toEqual([{ type: 'keys-changed' }, { type: 'data-replaced' }]);
+	});
+});
 
 describe('checking', () => {
 	it('says the backup opens and when it was made, and writes nothing', async () => {

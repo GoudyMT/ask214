@@ -29,6 +29,8 @@
 
 	type Kept = {
 		db: IDBDatabase | null;
+		/** Whether `restore` was built to restore onto a device locked by a forgotten PIN (the Forgot screen's card). */
+		locked: boolean;
 		restore: RestoreFlow | null;
 		exporter: ExportFlow | null;
 		warningName: string;
@@ -43,6 +45,7 @@
 		if (found === undefined) {
 			found = {
 				db: null,
+				locked: false,
 				restore: null,
 				exporter: null,
 				warningName: '',
@@ -130,8 +133,12 @@
 	const app = untrack(() => props.app ?? getProfileApp());
 	const memo = keptFor(session);
 	const startDb = untrack(() => props.db);
-	if (memo.restore === null || memo.db !== startDb) {
+	// A flow built for the Forgot screen restores through the locked-device pair, and an ordinary one through the shipped
+	// writer; a card that needs the other path must not inherit the kept flow.
+	const startLocked = untrack(() => props.restoreDeps?.lockedDevice !== undefined);
+	if (memo.restore === null || memo.db !== startDb || memo.locked !== startLocked) {
 		memo.db = startDb;
+		memo.locked = startLocked;
 		memo.exporter = null;
 		memo.outcome = null;
 		memo.restore = untrack(

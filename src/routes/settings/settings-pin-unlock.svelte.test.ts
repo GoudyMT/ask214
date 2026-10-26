@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
-import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
+import { backupSession } from '$lib/backup/session.svelte';
 import SettingsPage from './+page.svelte';
 // The spacing tokens the page's gaps are drawn from.
 import '../../app.css';
@@ -15,7 +16,15 @@ const { isoFromToday } = vi.hoisted(() => ({
 }));
 
 // Reactive, as the layout's app object is: the page swaps its sections the moment a lock or an unlock lands.
-const lock = $state({ mode: 'pin' as 'pin' | 'local', pinLocked: true, storeLocked: true });
+const lock = $state({
+	mode: 'pin' as 'pin' | 'local',
+	pinLocked: true,
+	storeLocked: true,
+	// The start-up seams the backup card needs (the relock list and the tab signal), off unless a case turns them on, and
+	// the store's lock state as an in-tab Lock leaves it.
+	backupSeams: false,
+	lockState: 'locked' as 'locked' | 'unlocked'
+});
 vi.mock('$lib/profile/context', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
@@ -28,6 +37,9 @@ vi.mock('$lib/profile/context', () => ({
 		store: {
 			get locked() {
 				return lock.storeLocked;
+			},
+			get lockState() {
+				return lock.lockState;
 			},
 			load: async () => {},
 			clockBackward: false,
@@ -62,8 +74,12 @@ vi.mock('$lib/profile/context', () => ({
 			lock.pinLocked = false;
 			lock.storeLocked = false;
 		},
-		joinRelock: null,
-		publish: null,
+		get joinRelock() {
+			return lock.backupSeams ? () => () => {} : null;
+		},
+		get publish() {
+			return lock.backupSeams ? () => {} : null;
+		},
 		reloadOnUnlock: false,
 		replacedNotice: false
 	}),
@@ -90,6 +106,13 @@ beforeEach(() => {
 	lock.mode = 'pin';
 	lock.pinLocked = true;
 	lock.storeLocked = true;
+	lock.backupSeams = false;
+	lock.lockState = 'locked';
+});
+
+afterEach(() => {
+	// A restore started from the Forgot screen leaves the tab's one backup session running.
+	backupSession.relockSync('user');
 });
 
 const cardHeading = () => page.getByRole('heading', { name: 'Your data is locked' });
@@ -133,6 +156,25 @@ describe('Settings, locked with a PIN', () => {
 
 		await expect.element(pinField()).toBeVisible();
 		await expect.poll(() => document.activeElement).toBe(pinField().element());
+	});
+
+	// A PIN device with nothing saved, locked in this tab: the store reads unlocked, and the page's keep-alive for a card
+	// whose session is running (the app-switch case of a local lock) would draw the ordinary Backup card beside the Forgot
+	// screen's own, sharing its session. Locked Settings shows App lock, the backup off, and the Erase.
+	it('draws no ordinary Backup card while the PIN lock is on, even with a restore running from the Forgot screen', async () => {
+		lock.backupSeams = true;
+		lock.storeLocked = false;
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Forgot PIN?', exact: true }).click();
+		await page.getByRole('button', { name: 'Restore from a backup', exact: true }).click();
+		await expect.poll(() => backupSession.active).toBe(true);
+		await expect.poll(() => document.querySelectorAll('#backup-toggle-restore').length).toBe(1);
+
+		expect(page.getByRole('heading', { name: 'Backup', exact: true }).query()).toBeNull();
+		expect(document.querySelectorAll('#backup-toggle-export, #backup-toggle-check')).toHaveLength(
+			0
+		);
+		expect(document.querySelectorAll('.backup-card')).toHaveLength(1);
 	});
 
 	// The page has the Erase dialog itself, so the card's Erase and start over opens that one: no trip to another page.
