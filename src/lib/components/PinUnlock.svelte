@@ -21,7 +21,10 @@
 	import { safeLog } from '../log/safelog';
 	import { checkStoredBytes, readStoredBytes, sameStored } from '../profile/damaged-bytes';
 
-	/** What a test stands in for: the derive (Argon2id lives in a worker), the row read, the wait clock and the reload. */
+	/**
+	 * What a test stands in for: the derive (Argon2id lives in a worker), the row read, the wait clock, the reload, and
+	 * the fetch of the Forgot screen's restore (a fetch can fail offline).
+	 */
 	export type PinUnlockDeps = {
 		derive?: (
 			pin: string,
@@ -30,6 +33,9 @@
 		readRow?: typeof readPinRowAndCounter;
 		clock?: Parameters<typeof createWaitClock>[2];
 		reload?: () => void;
+		loadRestore?: () => Promise<
+			[typeof import('../backup/BackupCard.svelte'), typeof import('../keystore/forgot-restore')]
+		>;
 	};
 </script>
 
@@ -55,6 +61,7 @@
 	const NOT_RIGHT = NOT_RIGHT_LINE;
 	const LOW_MEMORY = CHECK_LOW_MEMORY_LINE;
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
+	const RESTORE_OPEN_FAILED = 'Could not open the restore right now - please try again.';
 
 	let value = $state('');
 	let field = $state<ReturnType<typeof PinField> | null>(null);
@@ -278,13 +285,14 @@
 		void tick().then(() => field?.focus());
 	}
 
+	// The backup card and the locked-device writer come on demand: the Unlock card's own chunk carries neither.
+	const loadRestore = () =>
+		Promise.all([import('../backup/BackupCard.svelte'), import('../keystore/forgot-restore')]);
+
 	async function showRestore(): Promise<void> {
 		if (restore !== null) return;
 		try {
-			const [card, locked] = await Promise.all([
-				import('../backup/BackupCard.svelte'),
-				import('../keystore/forgot-restore')
-			]);
+			const [card, locked] = await (deps.loadRestore ?? loadRestore)();
 			if (gone || !forgot) return;
 			restoreFailed = false;
 			restore = {
@@ -358,7 +366,7 @@
 			>
 			<p class="pin-unlock__hint">Uses a backup file you saved and its six words.</p>
 		{/if}
-		{#if restoreFailed}<p class="pin-unlock__message" role="alert">{UNLOCK_FAILED}</p>{/if}
+		{#if restoreFailed}<p class="pin-unlock__message" role="alert">{RESTORE_OPEN_FAILED}</p>{/if}
 		<button class="pin-unlock__danger" type="button" onclick={handOver} onkeydown={guardEnter}
 			>Erase and start over</button
 		>

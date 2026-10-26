@@ -758,6 +758,18 @@ describe('Forgot PIN', () => {
 		expect(cardLines()).not.toContain('Forgot your PIN?');
 	});
 
+	it('a restore card that cannot be fetched says the restore did not open, and leaves the button to try again', async () => {
+		await mount({ loadRestore: () => Promise.reject(new Error('E_TEST_OFFLINE')) });
+		await openForgot();
+
+		restoreEl().click();
+		await until(() => alertText() !== null || restoreToggle() !== null, 'the load settled');
+
+		expect(alertText()).toBe('Could not open the restore right now - please try again.');
+		expect(restoreToggle()).toBeNull();
+		expect(restoreEl()).toBeTruthy();
+	});
+
 	it('Restore from a backup shows the backup card with only its restore row open, in place of the button', async () => {
 		await mount();
 		await openForgot();
