@@ -56,13 +56,18 @@ async function setUpProfile(page: Page): Promise<void> {
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 }
 
-/** Settings -> App lock -> the PIN twice -> Next, to the "PIN on" row. One real derive and the move of every record. */
+/**
+ * Settings -> App lock -> the PIN twice -> Next -> the backup step, skipped, to the "PIN on" row. One real derive and the
+ * move of every record.
+ */
 async function turnOnPin(page: Page, pin: string = PIN): Promise<void> {
 	await page.goto('/settings');
 	await appLockToggle(page).click();
 	await page.getByLabel('Choose a 4-6 digit PIN').fill(pin);
 	await page.getByLabel('Enter it again').fill(pin);
 	await page.getByRole('button', { name: 'Next', exact: true }).click();
+	await expect(page.getByText('One more step: make a backup')).toBeVisible({ timeout: 30_000 });
+	await page.getByRole('button', { name: 'Skip and turn on', exact: true }).click();
 	await expect(appLockToggle(page)).toContainText('PIN on', { timeout: 30_000 });
 	await expect(page.getByText(PIN_ON_LINE)).toBeVisible();
 }

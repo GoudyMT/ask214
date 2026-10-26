@@ -41,6 +41,8 @@ async function turnOnPin(page: Page): Promise<void> {
 	await page.getByLabel('Choose a 4-6 digit PIN').fill(PIN);
 	await page.getByLabel('Enter it again').fill(PIN);
 	await page.getByRole('button', { name: 'Next', exact: true }).click();
+	await expect(page.getByText('One more step: make a backup')).toBeVisible({ timeout: 30_000 });
+	await page.getByRole('button', { name: 'Skip and turn on', exact: true }).click();
 	await expect(appLockToggle(page)).toContainText('PIN on', { timeout: 30_000 });
 }
 
