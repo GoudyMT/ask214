@@ -322,7 +322,11 @@
 		// A backup begun here must not outlive the move into PIN mode, where making one asks for the PIN. A write that has
 		// begun is not cut short (the session's end leaves it), and the turn-on does not wait for it: Skip is off while a run is
 		// going, and a saved backup has finished writing.
-		if (making) backupSession.end();
+		if (making) {
+			backupSession.end();
+			// The card goes with its open control: nothing on it can start an export while the records move.
+			making = false;
+		}
 		const watch = watchRelock();
 		let turnedOn = false;
 		try {
@@ -351,6 +355,9 @@
 				app.publish?.({ type: 'keys-changed' });
 				app.keyMode = 'pin';
 			}
+			// In PIN mode no export runs without a good PIN: one opened while the PIN was off (here or on the page's own card)
+			// ends with the move. A save that has begun is never cut short, so the session's end leaves it.
+			if (backupSession.kind === 'export') backupSession.end();
 			if (result.packHadFiles) message = PACK_LINE;
 			await toToggle();
 		} catch (err) {

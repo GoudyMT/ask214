@@ -933,6 +933,69 @@ describe('the backup step', () => {
 		expect(backupSession.active).toBe(false);
 	});
 
+	// While the records move, the step's card is gone with its open control, so no export can start inside the move.
+	describe('while the records move', () => {
+		let release: () => void;
+		beforeEach(() => {
+			const gate = new Promise<void>((resolve) => (release = resolve));
+			rotate.mockImplementation(async () => {
+				await gate;
+				// A switch away during the move: a session still open would be left concealed, not cleared.
+				relockEachSync(relockables, 'hygiene');
+				return { session: await fakeSession(), packHadFiles: false };
+			});
+		});
+
+		async function skipIntoTheMove(): Promise<void> {
+			app.store = {};
+			await toCard();
+			await expect.element(page.getByRole('button', { name: 'Show my passphrase' })).toBeVisible();
+			skipEl().click();
+			await until(() => rotate.mock.calls.length > 0, 'the move started');
+		}
+
+		it("takes the step's card, and with it the control that would open an export", async () => {
+			await skipIntoTheMove();
+
+			expect(document.querySelector('#backup-toggle-export')).toBeNull();
+			expect(backupSession.active).toBe(false);
+			release();
+			await until(() => summary() === 'PIN on', 'the row reading PIN on');
+		});
+
+		it('leaves no export running in PIN mode, whatever was pressed on the card during the move', async () => {
+			await skipIntoTheMove();
+			document.querySelector<HTMLElement>('#backup-toggle-export')?.click();
+			await real(50);
+			release();
+			await until(() => summary() === 'PIN on', 'the row reading PIN on');
+			await real(100);
+
+			expect(backupSession.active).toBe(false);
+		});
+	});
+
+	// An export opened on the page's own card while the PIN was off is no more welcome in PIN mode than one begun in the step.
+	it("ends an export opened on the page's own card when the PIN turns on from Skip", async () => {
+		app.store = {};
+		await mount();
+		await toStep('1234', '1234');
+		await render(BackupCard, { props: { db, onEraseRequest: () => {} } });
+		await page.getByRole('button', { name: 'Make a backup', exact: true }).click();
+		await expect.element(page.getByRole('button', { name: 'Show my passphrase' })).toBeVisible();
+		expect(backupSession.active).toBe(true);
+
+		skipEl().click();
+		await until(() => summary() === 'PIN on', 'the row reading PIN on');
+		await real(100);
+
+		expect(backupSession.active).toBe(false);
+		expect(page.getByRole('button', { name: 'Show my passphrase' }).query()).toBeNull();
+		await expect
+			.element(page.getByRole('button', { name: 'Make a backup', exact: true }))
+			.toHaveAttribute('aria-expanded', 'false');
+	});
+
 	// The turn-on takes the keystore lock and moves every record: while a backup is being made from them, it waits.
 	it.each([
 		'picking-save',
