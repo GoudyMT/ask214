@@ -917,6 +917,122 @@ describe('Forgot PIN', () => {
 
 			expect(onerase).toHaveBeenCalledTimes(1);
 		});
+
+		// An Enter held on a button that opens the OS file picker has its release taken by the picker: the page never sees
+		// it. Without a way to forget the key, every later click on Erase would wait for a release that never comes.
+		it.each([
+			['the window loses focus', 'blur'],
+			['the page is hidden', 'hidden']
+		] as const)(
+			'a click on Erase and start over works at once after an Enter lost its release when %s',
+			async (_name, how) => {
+				await mount();
+				await openForgot();
+				await keyEnter('keyDown');
+				const state = vi.spyOn(document, 'visibilityState', 'get');
+				try {
+					if (how === 'blur') {
+						window.dispatchEvent(new Event('blur'));
+					} else {
+						state.mockReturnValue('hidden');
+						document.dispatchEvent(new Event('visibilitychange'));
+					}
+					eraseEl().click();
+
+					expect(onerase).toHaveBeenCalledTimes(1);
+				} finally {
+					state.mockRestore();
+					await keyEnter('keyUp');
+				}
+			}
+		);
+
+		it('keeps waiting for an Enter release when the page is only shown again', async () => {
+			await mount();
+			await openForgot();
+			await keyEnter('keyDown');
+			const state = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+			try {
+				document.dispatchEvent(new Event('visibilitychange'));
+				eraseEl().click();
+
+				expect(onerase).not.toHaveBeenCalled();
+			} finally {
+				state.mockRestore();
+				await keyEnter('keyUp');
+			}
+			await until(() => onerase.mock.calls.length > 0, 'the erase handed over');
+		});
+
+		// A press that waits when focus leaves would answer the next Enter release of any control: it is let go with the key.
+		it('drops a waiting erase when focus leaves the window, so a later Enter release hands nothing over', async () => {
+			await mount();
+			await openForgot();
+			await keyEnter('keyDown');
+			try {
+				eraseEl().click();
+				window.dispatchEvent(new Event('blur'));
+			} finally {
+				await keyEnter('keyUp');
+			}
+			await real(80);
+
+			expect(onerase).not.toHaveBeenCalled();
+		});
+
+		it('two presses on Erase while an Enter is held hand the erase over once, on the release', async () => {
+			await mount();
+			await openForgot();
+			await keyEnter('keyDown');
+			try {
+				eraseEl().click();
+				eraseEl().click();
+				expect(onerase).not.toHaveBeenCalled();
+			} finally {
+				await keyEnter('keyUp');
+			}
+			await until(() => onerase.mock.calls.length > 0, 'the erase handed over');
+			// A second press must not have left a listener of its own behind for the next Enter.
+			await keyEnter('keyDown');
+			await keyEnter('keyUp');
+			await real(50);
+
+			expect(onerase).toHaveBeenCalledTimes(1);
+		});
+
+		it('Back to Unlock drops a waiting erase, so the next Enter release in the PIN field hands nothing over', async () => {
+			await mount();
+			await openForgot();
+			await keyEnter('keyDown');
+			try {
+				eraseEl().click();
+				backEl().click();
+				await expect.element(unlockHeading()).toBeVisible();
+				fieldEl().focus();
+			} finally {
+				await keyEnter('keyUp');
+			}
+			await real(80);
+
+			expect(onerase).not.toHaveBeenCalled();
+		});
+
+		// The page's Erase must not open for a card that is no longer there: the person has moved on from the lock.
+		it('hands nothing over when the card goes before a held Enter is let go', async () => {
+			const rendered = await mount();
+			await openForgot();
+			eraseEl().focus();
+			await keyEnter('keyDown');
+			try {
+				eraseEl().click();
+				await rendered.unmount();
+			} finally {
+				await keyEnter('keyUp');
+			}
+			await real(80);
+
+			expect(onerase).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('under forced colors', () => {

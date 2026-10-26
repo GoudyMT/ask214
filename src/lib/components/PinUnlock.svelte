@@ -144,6 +144,7 @@
 		return () => {
 			gone = true;
 			stopWait();
+			dropWaiting();
 		};
 	});
 
@@ -253,19 +254,36 @@
 	// The page's Erase opens with its focus on Cancel, so a key still held when it opens would press Cancel on every repeat.
 	// The erase is handed over once an Enter that is down has been let go. Space clicks on release, so nothing is held then.
 	let enterDown = false;
+	// At most one erase waits for a release. It is dropped whenever the key's release can no longer be what it waited for.
+	let waiting: ((e: KeyboardEvent) => void) | null = null;
 	const trackEnter = (e: KeyboardEvent): void => {
 		if (e.key === 'Enter') enterDown = e.type === 'keydown';
+	};
+	function dropWaiting(): void {
+		if (waiting) removeEventListener('keyup', waiting, true);
+		waiting = null;
+	}
+	// A key let go while another window (the file picker a held Enter opened) has the focus is never seen here: the key is
+	// not down any more, whatever the last keydown said, and an erase waiting for it would answer some later Enter instead.
+	function forgetHeldEnter(): void {
+		enterDown = false;
+		dropWaiting();
+	}
+	const forgetWhenHidden = (): void => {
+		if (document.visibilityState === 'hidden') forgetHeldEnter();
 	};
 	function handOver(): void {
 		if (!enterDown) {
 			onerase?.();
 			return;
 		}
+		if (waiting) return;
 		const release = (e: KeyboardEvent): void => {
 			if (e.key !== 'Enter') return;
-			removeEventListener('keyup', release, true);
-			if (!gone) onerase?.();
+			dropWaiting();
+			onerase?.();
 		};
+		waiting = release;
 		addEventListener('keyup', release, true);
 	}
 
@@ -282,6 +300,7 @@
 		restore = null;
 		restoreFailed = false;
 		forgot = false;
+		dropWaiting();
 		void tick().then(() => field?.focus());
 	}
 
@@ -310,7 +329,8 @@
 	}
 </script>
 
-<svelte:window onkeydowncapture={trackEnter} onkeyupcapture={trackEnter} />
+<svelte:window onkeydowncapture={trackEnter} onkeyupcapture={trackEnter} onblur={forgetHeldEnter} />
+<svelte:document onvisibilitychange={forgetWhenHidden} />
 
 <section class="pin-unlock" aria-labelledby={forgot ? 'pin-forgot-heading' : 'pin-unlock-heading'}>
 	{#if !forgot}
