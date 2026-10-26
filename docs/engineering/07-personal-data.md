@@ -85,7 +85,8 @@ the profile: plain strings cannot be zeroized, so a lock drops the reference.
 
 **What it is.** An optional PIN of 4 to 6 digits, set in Settings under App lock. The PIN goes through Argon2id
 with the backup's settings, in the same worker, and HKDF turns the result into two keys: one signs the key record,
-the other (AES-KW) wraps the data keys. Nothing derived from the PIN is stored. Turning the PIN on moves every
+the other (AES-KW) wraps the data keys. No key derived from the PIN is stored; the key record's signature under
+the first key is, and it is what a guess at the PIN is checked against. Turning the PIN on moves every
 encrypted record onto new keys in one IndexedDB transaction, so either all of it moves or none does, and from then
 on the keys are stored only wrapped. Each new tab and each reload asks for the PIN. The keys then live in that
 tab's memory only, as non-extractable keys, and leave it after 15 minutes idle, on Lock, on a lock in another tab

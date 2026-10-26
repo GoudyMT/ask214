@@ -42,8 +42,8 @@ the transition it is designed to help with.
   The file opens only with a six-word passphrase that the app makes for you. There is no account, and
   nothing is uploaded.
 - **App lock (optional).** Set a 4 to 6 digit PIN in Settings, and the app asks for it when it opens,
-  after 15 minutes idle, and after Lock. Wrong tries wait longer each time, and a wrong try never erases
-  anything. If you forget the PIN, a backup brings your data back.
+  after 15 minutes idle, and after Lock. After three wrong tries, each try waits longer, up to 15
+  minutes, and a wrong try never erases anything. If you forget the PIN, a backup brings your data back.
 - **Resources.** A curated hub of official outbound links (VA, DoD, DOL, TSP, SkillBridge). We link to
   the real government tools with context; we never recreate or replace them.
 - **Reference library.** TAP curriculum, VA guides, and agency pages, all public U.S. Government work.

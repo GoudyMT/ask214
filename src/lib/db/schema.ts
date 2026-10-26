@@ -1,7 +1,7 @@
 /**
  * MTC v1 IndexedDB schema + the thin promise/transaction layer that is the ONLY
  * place raw IndexedDB request/transaction plumbing lives. 12 stores
- * (journal + meta deferred to v1.1 with key rotation):
+ * (no journal: a key change moves every record in one transaction):
  *
  *   - profile             ciphertext, single self-row (id = 0)
  *   - profile-hwm         signed HWM sidecar, single row (id = 0)
