@@ -218,8 +218,8 @@ describe("Settings, the PIN setup's backup step", () => {
 
 	async function toStepCard(): Promise<void> {
 		await row().click();
-		await page.getByLabelText('Choose a 4-6 digit PIN', { exact: true }).fill('1234');
-		await page.getByLabelText('Enter it again', { exact: true }).fill('1234');
+		await page.getByLabelText('Choose a 4-6 digit PIN', { exact: true }).fill('5739');
+		await page.getByLabelText('Enter it again', { exact: true }).fill('5739');
 		await button('Next').click();
 		await button('Make a backup and turn on').click();
 	}

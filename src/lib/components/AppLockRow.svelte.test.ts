@@ -115,10 +115,13 @@ const CHANGED_LINE = 'PIN changed.';
 const REMOVED_LINE = 'PIN removed.';
 const REMOVE_HINT = 'Anyone with your phone can open the app. Your data stays on this device.';
 
-// The PINs the PIN-on tests type: the right one, a wrong one and the one a change moves to.
-const CURRENT = '1234';
+// The PIN the setup tests type, and the PINs the PIN-on tests type: the right one, a wrong one and the one a change moves
+// to. None is on the easy list, so none meets the warning (its own tests use EASY_PIN).
+const SETUP_PIN = '5739';
+const CURRENT = '5739';
 const WRONG = '9999';
-const NEW_PIN = '5678';
+const NEW_PIN = '246802';
+const EASY_PIN = '1234';
 
 // Captured before any test fakes a timer: the waits below must stay real.
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
@@ -413,7 +416,7 @@ describe('setting up: what the person is told and asked', () => {
 	it('moves from the first field to the second on Enter, and presses Next from the second', async () => {
 		await mount();
 		await openRow();
-		await fill('1234', '1234');
+		await fill(SETUP_PIN, SETUP_PIN);
 		const session = cdp();
 		const press = async () => {
 			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
@@ -436,7 +439,7 @@ describe('setting up: what the person is told and asked', () => {
 	it('empties both fields when the app relocks', async () => {
 		await mount();
 		await openRow();
-		await fill('1234', '1234');
+		await fill(SETUP_PIN, SETUP_PIN);
 		relockEachSync(relockables, 'user');
 
 		await until(() => firstEl().value === '' && secondEl().value === '', 'both fields empty');
@@ -449,7 +452,7 @@ describe('setting up: what the person is told and asked', () => {
 	it('closes on Cancel with both fields empty, and the next opening starts empty', async () => {
 		await mount();
 		await openRow();
-		await fill('1234', '1234');
+		await fill(SETUP_PIN, SETUP_PIN);
 		cancelEl().click();
 		await until(() => !expanded(), 'the row closed');
 
@@ -470,7 +473,7 @@ describe('one derive, and what it may cost', () => {
 			return { macKey, kek };
 		});
 		await mount();
-		await submit('1234', '1234');
+		await submit(SETUP_PIN, SETUP_PIN);
 
 		await until(() => alertText() !== null || hasStep(), 'a result');
 		if (turnsOn) {
@@ -487,7 +490,7 @@ describe('one derive, and what it may cost', () => {
 	it('keeps the PIN off, and says why, when the phone has no memory for the derive', async () => {
 		derive.mockRejectedValue(new PinNoMemoryError());
 		await mount();
-		await submit('1234', '1234');
+		await submit(SETUP_PIN, SETUP_PIN);
 
 		await until(() => alertText() !== null, 'a line');
 		expect(alertText()).toBe(LOW_MEMORY_LINE);
@@ -505,7 +508,7 @@ describe('one derive, and what it may cost', () => {
 			return { macKey, kek };
 		});
 		await mount();
-		await submit('1234', '1234');
+		await submit(SETUP_PIN, SETUP_PIN);
 
 		await until(() => derive.mock.calls.length > 0, 'the derive');
 		await real(100);
@@ -522,7 +525,7 @@ describe('turning on', () => {
 		await bumpCounter(db);
 		await bumpCounter(db);
 		await mount();
-		await submitAndSkip('1234', '1234');
+		await submitAndSkip(SETUP_PIN, SETUP_PIN);
 		await until(() => summary() === 'PIN on', 'the row reading PIN on');
 
 		expect(rotate).toHaveBeenCalledTimes(1);
@@ -550,7 +553,7 @@ describe('turning on', () => {
 			return { session, packHadFiles: false };
 		});
 		await mount();
-		await submitAndSkip('1234', '1234');
+		await submitAndSkip(SETUP_PIN, SETUP_PIN);
 		await until(() => seams.events.includes('task'), 'the next task');
 
 		expect(seams.events).toEqual(['setSession', 'task']);
@@ -562,7 +565,7 @@ describe('turning on', () => {
 	])('with a pack that held files: %s, the SkillBridge line shows: %s', async (had, shows) => {
 		rotate.mockImplementation(async () => ({ session: await fakeSession(), packHadFiles: had }));
 		await mount();
-		await submitAndSkip('1234', '1234');
+		await submitAndSkip(SETUP_PIN, SETUP_PIN);
 		await until(() => summary() === 'PIN on', 'the row reading PIN on');
 
 		expect(alertText()).toBe(shows ? PACK_LINE : null);
@@ -579,7 +582,7 @@ describe('a Lock while Next works', () => {
 				return { macKey, kek };
 			});
 			await mount();
-			await submit('1234', '1234');
+			await submit(SETUP_PIN, SETUP_PIN);
 			await until(() => derive.mock.calls.length > 0, 'the derive');
 			await real(150);
 
@@ -599,7 +602,7 @@ describe('a Lock while Next works', () => {
 			return { session: await fakeSession(), packHadFiles: false };
 		});
 		await mount();
-		await submitAndSkip('1234', '1234');
+		await submitAndSkip(SETUP_PIN, SETUP_PIN);
 		await until(() => app.keyMode === 'pin', 'the mode reading PIN');
 
 		expect(getSession()).toBeNull();
@@ -616,7 +619,7 @@ describe('a Lock while Next works', () => {
 			return { session: await fakeSession(), packHadFiles: false };
 		});
 		await mount();
-		await submitAndSkip('1234', '1234');
+		await submitAndSkip(SETUP_PIN, SETUP_PIN);
 		await until(() => summary() === 'PIN on', 'the row reading PIN on');
 
 		expect(getSession()).not.toBeNull();
@@ -636,7 +639,7 @@ describe('a turn-on that fails', () => {
 	async function failsWith(error: Error, line: string): Promise<void> {
 		rotate.mockRejectedValue(error);
 		await mount();
-		await submitAndSkip('1234', '1234');
+		await submitAndSkip(SETUP_PIN, SETUP_PIN);
 		await until(() => alertText() !== null, 'a line');
 
 		expect(alertText()).toBe(line);
@@ -670,14 +673,14 @@ describe('the backup step', () => {
 
 	async function toCard(host: Host = {}): Promise<void> {
 		await mount({}, host);
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		makeEl().click();
 		await until(() => seams.card !== null, 'the backup card');
 	}
 
 	it('follows a good Next with its two lines and two buttons, and changes nothing on the device', async () => {
 		await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 
 		const lines = [...document.querySelectorAll('#app-lock-edit p')].map((p) =>
 			p.textContent?.trim()
@@ -701,7 +704,7 @@ describe('the backup step', () => {
 
 	it('turns on from Skip and turn on without starting a backup', async () => {
 		await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		skipEl().click();
 		await until(() => summary() === 'PIN on', 'the row reading PIN on');
 
@@ -744,7 +747,7 @@ describe('the backup step', () => {
 	// The step's keys are the ones derived on Next; a turn-on from the step must move the records onto those.
 	it('turns on with the keys derived on Next', async () => {
 		await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		skipEl().click();
 		await until(() => summary() === 'PIN on', 'the row reading PIN on');
 
@@ -779,7 +782,7 @@ describe('the backup step', () => {
 	// A switch away locks nothing, and the derive is already done: the step stays and still turns on.
 	it('keeps the step, and the keys, through a switch away', async () => {
 		await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		relockEachSync(relockables, 'hygiene');
 		await real(50);
 
@@ -806,7 +809,7 @@ describe('the backup step', () => {
 
 	it('drops the keys when the row goes, so a late saved report turns nothing on', async () => {
 		const view = await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		makeEl().click();
 		await until(() => seams.card !== null, 'the backup card');
 		const late = savedOf();
@@ -832,7 +835,7 @@ describe('the backup step', () => {
 
 		it('says up before the card mounts, and says nothing for a step that never made a backup', async () => {
 			await mount({}, { onbackupstep });
-			await toStep('1234', '1234');
+			await toStep(SETUP_PIN, SETUP_PIN);
 			expect(calls).toEqual([]);
 
 			makeEl().click();
@@ -844,7 +847,7 @@ describe('the backup step', () => {
 
 		it('says nothing when Skip and turn on ends a step that never made a backup', async () => {
 			await mount({}, { onbackupstep });
-			await submitAndSkip('1234', '1234');
+			await submitAndSkip(SETUP_PIN, SETUP_PIN);
 			await until(() => summary() === 'PIN on', 'the row reading PIN on');
 
 			expect(calls).toEqual([]);
@@ -874,7 +877,7 @@ describe('the backup step', () => {
 			]
 		])('says down once when the card goes with %s', async (_way, leave) => {
 			await mount({}, { onbackupstep });
-			await toStep('1234', '1234');
+			await toStep(SETUP_PIN, SETUP_PIN);
 			makeEl().click();
 			await until(() => seams.card !== null, 'the backup card');
 			await leave();
@@ -885,7 +888,7 @@ describe('the backup step', () => {
 
 		it('says down when the row goes', async () => {
 			const view = await mount({}, { onbackupstep });
-			await toStep('1234', '1234');
+			await toStep(SETUP_PIN, SETUP_PIN);
 			makeEl().click();
 			await until(() => seams.card !== null, 'the backup card');
 			view.unmount();
@@ -895,7 +898,7 @@ describe('the backup step', () => {
 
 		it('keeps the card, and says nothing more, through a switch away', async () => {
 			await mount({}, { onbackupstep });
-			await toStep('1234', '1234');
+			await toStep(SETUP_PIN, SETUP_PIN);
 			makeEl().click();
 			await until(() => seams.card !== null, 'the backup card');
 			relockEachSync(relockables, 'hygiene');
@@ -982,7 +985,7 @@ describe('the backup step', () => {
 	it("ends an export opened on the page's own card when the PIN turns on from Skip", async () => {
 		app.store = {};
 		await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		await render(BackupCard, { props: { db, onEraseRequest: () => {} } });
 		await page.getByRole('button', { name: 'Make a backup', exact: true }).click();
 		await expect.element(page.getByRole('button', { name: 'Show my passphrase' })).toBeVisible();
@@ -1044,6 +1047,296 @@ describe('the backup step', () => {
 	});
 });
 
+const FOLD_SUMMARY = 'What a PIN does not cover';
+const FOLD_LINES = [
+	'Ask, Resources and Documents stay open.',
+	'It does not protect the data if someone copies it off the phone.',
+	'Using the app in another browser? Set a PIN there too.',
+	'Calendar events and calendar files you saved are not covered.',
+	"Anyone holding your phone can still erase the app's data.",
+	'Switching away for a short time does not lock the app. Tap Lock before you hand your phone over.'
+];
+const EASY_LINE = 'This PIN is easy to guess.';
+const chooseEl = () =>
+	page.getByRole('button', { name: 'Choose another', exact: true }).element() as HTMLElement;
+const anywayEl = () =>
+	page.getByRole('button', { name: 'Use it anyway', exact: true }).element() as HTMLElement;
+const hasEasy = () => alertText() === EASY_LINE;
+// The form's own buttons, by name: the two a press swaps between.
+const actionNames = () =>
+	[...document.querySelectorAll('.app-lock__actions button')].map((b) => b.textContent?.trim());
+
+describe('what a PIN does not cover', () => {
+	it('lists the six lines in a fold that starts closed, after the up-front lines and before the fields', async () => {
+		await mount();
+		await openRow();
+
+		expect(document.querySelector('details')).not.toBeNull();
+		const fold = document.querySelector('details') as HTMLDetailsElement;
+		expect(fold.open).toBe(false);
+		expect(fold.querySelector('summary')?.textContent?.trim()).toBe(FOLD_SUMMARY);
+		expect([...fold.querySelectorAll('li')].map((li) => li.textContent?.trim())).toEqual(
+			FOLD_LINES
+		);
+		const hints = [...document.querySelectorAll('.app-lock__hint')];
+		const last = hints.find((p) => p.textContent === UP_FRONT_2) as Element;
+		expect(last.compareDocumentPosition(fold) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		expect(fold.compareDocumentPosition(firstEl()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+		(fold.querySelector('summary') as HTMLElement).click();
+		await until(() => fold.open, 'the fold open');
+	});
+
+	it('is part of the setup only: the Change form has no fold', async () => {
+		await pinOn();
+		await mount();
+		await openForm('Change PIN');
+
+		expect(document.querySelector('details')).toBeNull();
+	});
+});
+
+describe('an easy PIN at setup', () => {
+	async function warned(): Promise<void> {
+		await mount();
+		await submit(EASY_PIN, EASY_PIN);
+		await until(() => hasEasy(), 'the warning');
+	}
+
+	it('warns before anything is derived, keeps the typed PINs, and offers its two choices in place of Next and Cancel', async () => {
+		await warned();
+
+		expect(derive).not.toHaveBeenCalled();
+		expect(hasStep()).toBe(false);
+		expect(actionNames()).toEqual(['Choose another', 'Use it anyway']);
+		expect([firstEl().value, secondEl().value]).toEqual([EASY_PIN, EASY_PIN]);
+		await until(() => document.activeElement === chooseEl(), 'focus on Choose another');
+	});
+
+	it('shows no warning for a PIN that is not on the list', async () => {
+		await mount();
+		await toStep(SETUP_PIN, SETUP_PIN);
+
+		expect(alertText()).toBeNull();
+		expect(derive).toHaveBeenCalledTimes(1);
+	});
+
+	it('goes on with the same PIN from Use it anyway', async () => {
+		await warned();
+		anywayEl().click();
+		await until(() => hasStep(), 'the backup step');
+
+		expect(derive).toHaveBeenCalledTimes(1);
+		expect(derive.mock.calls[0]?.[0]).toBe(EASY_PIN);
+		expect(alertText()).toBeNull();
+		skipEl().click();
+		await until(() => summary() === 'PIN on', 'the row reading PIN on');
+		expect(rotate).toHaveBeenCalledTimes(1);
+	});
+
+	it('empties both fields from Choose another, puts the cursor in the first, and brings Next and Cancel back', async () => {
+		await warned();
+		chooseEl().click();
+
+		await until(() => document.activeElement === firstEl(), 'the cursor in the first field');
+		expect([firstEl().value, secondEl().value]).toEqual(['', '']);
+		expect(alertText()).toBeNull();
+		expect(actionNames()).toEqual(['Next', 'Cancel']);
+		expect(derive).not.toHaveBeenCalled();
+	});
+
+	it('closes when a field is typed in, and the form goes on from what is typed', async () => {
+		await warned();
+		await firstField().fill(SETUP_PIN);
+
+		await until(() => alertText() === null, 'the warning gone');
+		expect(actionNames()).toEqual(['Next', 'Cancel']);
+		expect([firstEl().value, secondEl().value]).toEqual([SETUP_PIN, EASY_PIN]);
+	});
+
+	// A relock empties the fields, so a Use it anyway that outlived it would press over nothing.
+	it.each(['user', 'idle', 'peer'] as const)(
+		'closes when a %s lock empties the fields, and a Use it anyway pressed after it does nothing',
+		async (reason) => {
+			await warned();
+			const late = anywayEl();
+			relockEachSync(relockables, reason);
+
+			await until(() => alertText() === null, 'the warning gone');
+			expect(actionNames()).toEqual(['Next', 'Cancel']);
+			late.click();
+			await real(100);
+			expect(alertText()).toBeNull();
+			expect(derive).not.toHaveBeenCalled();
+			expect(hasStep()).toBe(false);
+		}
+	);
+
+	it('ends with the row closing: the next opening has no warning and empty fields', async () => {
+		await warned();
+		toggleEl().click();
+		await until(() => !expanded(), 'the row closed');
+		await openRow();
+
+		expect(alertText()).toBeNull();
+		expect(actionNames()).toEqual(['Next', 'Cancel']);
+		expect([firstEl().value, secondEl().value]).toEqual(['', '']);
+	});
+});
+
+describe('an easy new PIN in Change', () => {
+	beforeEach(async () => {
+		await pinOn();
+		// The easy PIN is a good new PIN here; a current PIN that is not CURRENT is wrong.
+		derive.mockImplementation(async (pin: string) => {
+			deriveLog.push({ pin, tries: await readTries(db) });
+			if (pin === CURRENT) return { macKey, kek };
+			return pin === EASY_PIN ? newKeys : wrongKeys;
+		});
+	});
+
+	async function warnedWith(current: string): Promise<void> {
+		await mount();
+		await openForm('Change PIN');
+		await currentField().fill(current);
+		await firstField().fill(EASY_PIN);
+		await secondField().fill(EASY_PIN);
+		buttonEl('Change PIN').click();
+		await until(() => hasEasy(), 'the warning');
+	}
+
+	// A wrong current PIN would cost a try if the check ran first: no try, and no derive, may be spent on a warning.
+	it('warns before the current PIN is checked, counts no try, and keeps the typed PINs', async () => {
+		await warnedWith(WRONG);
+
+		expect(deriveLog).toHaveLength(0);
+		expect(await readTries(db)).toMatchObject({ count: 0, pending: false });
+		expect(rotate).not.toHaveBeenCalled();
+		expect(actionNames()).toEqual(['Choose another', 'Use it anyway']);
+		expect(hasButton('Change PIN')).toBe(false);
+		expect([currentEl().value, firstEl().value, secondEl().value]).toEqual([
+			WRONG,
+			EASY_PIN,
+			EASY_PIN
+		]);
+		await until(() => document.activeElement === chooseEl(), 'focus on Choose another');
+	});
+
+	it('checks the current PIN and changes to the same PIN from Use it anyway', async () => {
+		await warnedWith(CURRENT);
+		anywayEl().click();
+		await until(() => statusLines().length > 0, 'the status line');
+
+		expect(deriveLog.map((d) => d.pin)).toEqual([CURRENT, EASY_PIN]);
+		expect(rotate).toHaveBeenCalledTimes(1);
+		expect(statusLines()).toEqual([CHANGED_LINE]);
+		expect(alertText()).toBeNull();
+	});
+
+	it('still counts a wrong current PIN once Use it anyway is pressed: only the easy check is skipped', async () => {
+		await warnedWith(WRONG);
+		anywayEl().click();
+		await until(() => alertText() === NOT_RIGHT_LINE, 'the not-right line');
+
+		expect(await readTries(db)).toMatchObject({ count: 1 });
+		expect(rotate).not.toHaveBeenCalled();
+	});
+
+	it('empties the two new-PIN fields from Choose another, keeps the current PIN, and puts the cursor in the new-PIN field', async () => {
+		await warnedWith(CURRENT);
+		chooseEl().click();
+
+		await until(() => document.activeElement === firstEl(), 'the cursor in the new-PIN field');
+		expect([currentEl().value, firstEl().value, secondEl().value]).toEqual([CURRENT, '', '']);
+		expect(alertText()).toBeNull();
+		expect(actionNames()).toEqual(['Change PIN', 'Cancel']);
+		expect(deriveLog).toHaveLength(0);
+	});
+
+	it('closes when the current PIN field is typed in', async () => {
+		await warnedWith(CURRENT);
+		await currentField().fill(WRONG);
+
+		await until(() => alertText() === null, 'the warning gone');
+		expect(actionNames()).toEqual(['Change PIN', 'Cancel']);
+		expect([firstEl().value, secondEl().value]).toEqual([EASY_PIN, EASY_PIN]);
+	});
+
+	it('shows no warning for a new PIN that is not on the list', async () => {
+		await mount();
+		await openForm('Change PIN');
+		await pressChange(CURRENT, SETUP_PIN, SETUP_PIN);
+
+		expect(alertText()).toBeNull();
+		expect(deriveLog.map((d) => d.pin)).toEqual([CURRENT, SETUP_PIN]);
+	});
+});
+
+// A phone's width: the page gives the row its section's width, which is the screen less the page's padding. Component tests
+// run without app.css, so the case sets the tokens the row uses and the box model the page sets.
+describe('on a narrow phone', () => {
+	const TOKENS: Record<string, string> = {
+		'--space-xs': '4px',
+		'--space-s': '8px',
+		'--space-m': '16px',
+		'--space-l': '24px',
+		'--font-size-s': '14px',
+		'--radius-m': '8px',
+		'--color-border': '#888888'
+	};
+	const PAGE_PADDING = 48;
+
+	it.each([320, 360, 375, 414, 600])(
+		'every setup state fits a %i px screen with no sideways scroll',
+		async (width) => {
+			const root = document.documentElement;
+			const size = { width: window.innerWidth, height: window.innerHeight };
+			const reset = document.createElement('style');
+			reset.textContent = '* { box-sizing: border-box; } body { margin: 0; }';
+			document.head.append(reset);
+			for (const [name, value] of Object.entries(TOKENS)) root.style.setProperty(name, value);
+			const bodyFont = document.body.style.fontFamily;
+			document.body.style.fontFamily = 'Arial, Helvetica, sans-serif';
+			const fits = (state: string) => {
+				const row = document.querySelector('.app-lock') as HTMLElement;
+				expect(row.clientWidth, `${state}: the row is drawn`).toBeGreaterThan(0);
+				expect(row.scrollWidth, `${state}: the row`).toBeLessThanOrEqual(row.clientWidth);
+				expect(root.scrollWidth, `${state}: the document`).toBeLessThanOrEqual(root.clientWidth);
+			};
+			try {
+				await page.viewport(width, 800);
+				const view = await mount();
+				view.container.style.width = `${width - PAGE_PADDING}px`;
+				await openRow();
+				fits('the form');
+
+				expect(document.querySelector('summary')).not.toBeNull();
+				(document.querySelector('summary') as HTMLElement).click();
+				await until(
+					() => (document.querySelector('details') as HTMLDetailsElement).open,
+					'the fold'
+				);
+				fits('the fold open');
+
+				await fill(EASY_PIN, EASY_PIN);
+				nextEl().click();
+				await until(() => hasEasy(), 'the warning');
+				fits('the warning');
+
+				anywayEl().click();
+				await until(() => hasStep(), 'the backup step');
+				fits('the backup step');
+				view.unmount();
+			} finally {
+				for (const name of Object.keys(TOKENS)) root.style.removeProperty(name);
+				document.body.style.fontFamily = bodyFont;
+				reset.remove();
+				await page.viewport(size.width, size.height);
+			}
+		}
+	);
+});
+
 describe('held keys', () => {
 	async function hold(repeats = 10): Promise<void> {
 		const session = cdp();
@@ -1080,7 +1373,7 @@ describe('held keys', () => {
 		});
 		await mount();
 		await openRow();
-		await fill('1234', '1234');
+		await fill(SETUP_PIN, SETUP_PIN);
 		nextEl().focus();
 		await hold();
 
@@ -1099,7 +1392,7 @@ describe('held keys', () => {
 			return { macKey, kek };
 		});
 		await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		skipEl().focus();
 		await hold();
 
@@ -1113,7 +1406,7 @@ describe('held keys', () => {
 	// Make a backup and turn on hands focus to the card it mounts: the repeats must neither press Skip nor turn anything on.
 	it('mounts the card once for an Enter held on Make a backup and turn on, and turns nothing on', async () => {
 		await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		makeEl().focus();
 		await hold();
 
@@ -1130,12 +1423,26 @@ describe('held keys', () => {
 		});
 		await mount();
 		await openRow();
-		await fill('1234', '1234');
+		await fill(SETUP_PIN, SETUP_PIN);
 		nextEl().focus();
 		await hold();
 
 		expect(derive).toHaveBeenCalledTimes(1);
 		expect(alertText()).toBe(LOW_MEMORY_LINE);
+	});
+
+	// The warning hands focus to Choose another, which is where the key's repeats then land: they must not press it.
+	it('shows the easy-PIN warning once for an Enter held on Next, and the repeats that follow press nothing on it', async () => {
+		await mount();
+		await openRow();
+		await fill(EASY_PIN, EASY_PIN);
+		nextEl().focus();
+		await hold();
+
+		expect(alertText()).toBe(EASY_LINE);
+		expect([firstEl().value, secondEl().value]).toEqual([EASY_PIN, EASY_PIN]);
+		expect(document.activeElement).toBe(chooseEl());
+		expect(derive).not.toHaveBeenCalled();
 	});
 
 	// Cancel hands focus to the toggle, which is where the key's repeats then land: they must not open the row again.
@@ -1225,6 +1532,27 @@ describe('held keys', () => {
 				expect(alertText()).toBe(CHECK_LOW_MEMORY_LINE);
 			}
 		);
+
+		// The warning hands focus to Choose another, which is where the key's repeats then land: they must not press it.
+		it('shows the easy-PIN warning once for an Enter held on Change PIN, and the repeats that follow press nothing on it', async () => {
+			await mount();
+			await openForm('Change PIN');
+			await currentField().fill(CURRENT);
+			await firstField().fill(EASY_PIN);
+			await secondField().fill(EASY_PIN);
+			buttonEl('Change PIN').focus();
+			await hold();
+
+			expect(alertText()).toBe(EASY_LINE);
+			expect([currentEl().value, firstEl().value, secondEl().value]).toEqual([
+				CURRENT,
+				EASY_PIN,
+				EASY_PIN
+			]);
+			expect(document.activeElement).toBe(chooseEl());
+			expect(derive).not.toHaveBeenCalled();
+			expect(await readTries(db)).toMatchObject({ count: 0 });
+		});
 
 		// Cancel hands focus back to the button that opened the form, which is where the key's repeats then land.
 		it.each(['Change PIN', 'Remove PIN'] as const)(
@@ -1897,7 +2225,7 @@ describe('with the real moves of the records', () => {
 			props: { deps: { derive: async () => ({ macKey: fixedMac, kek: fixedKek }) } }
 		});
 		await openRow();
-		await fill('1234', '1234');
+		await fill(SETUP_PIN, SETUP_PIN);
 		nextEl().click();
 		await until(() => hasStep(), 'the backup step');
 		skipEl().click();
@@ -1986,9 +2314,29 @@ describe('under forced colors', () => {
 		}
 	});
 
+	it('the Choose another button keeps an outline', async () => {
+		await mount();
+		await submit(EASY_PIN, EASY_PIN);
+		await until(() => hasEasy(), 'the warning');
+		const media = cdp();
+		await media.send('Emulation.setEmulatedMedia', {
+			features: [{ name: 'forced-colors', value: 'active' }]
+		});
+		try {
+			await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+			const outline = getComputedStyle(chooseEl());
+			expect(outline.borderTopWidth).toBe('1px');
+			expect(outline.borderTopStyle).toBe('solid');
+		} finally {
+			await media.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'none' }]
+			});
+		}
+	});
+
 	it('the Make a backup and turn on button keeps an outline', async () => {
 		await mount();
-		await toStep('1234', '1234');
+		await toStep(SETUP_PIN, SETUP_PIN);
 		const media = cdp();
 		await media.send('Emulation.setEmulatedMedia', {
 			features: [{ name: 'forced-colors', value: 'active' }]
@@ -2106,7 +2454,7 @@ describe('the backup step, end to end', () => {
 		try {
 			// The real moves of the records; the derive answers with fixed keys instead of Argon2id.
 			await mount({ rotate: rotateToPin });
-			await toStep('1234', '1234');
+			await toStep(SETUP_PIN, SETUP_PIN);
 			makeEl().click();
 			await page.getByRole('button', { name: 'Show my passphrase' }).click();
 			await page.getByLabelText('Passphrase', { exact: true }).fill(WORDS.join(' '));
@@ -2163,7 +2511,7 @@ describe('the backup step, end to end', () => {
 		app.store = profile;
 		try {
 			await mount({ rotate: rotateToPin });
-			await toStep('1234', '1234');
+			await toStep(SETUP_PIN, SETUP_PIN);
 			makeEl().click();
 			await page.getByRole('button', { name: 'Show my passphrase' }).click();
 			await page.getByLabelText('Passphrase', { exact: true }).fill(WORDS.join(' '));

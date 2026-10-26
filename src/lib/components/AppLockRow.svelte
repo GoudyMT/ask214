@@ -40,6 +40,16 @@
 	const CHANGED_LINE = 'PIN changed.';
 	const REMOVED_LINE = 'PIN removed.';
 	const PACK_LINE = 'Offline SkillBridge listings download again.';
+	const EASY_LINE = 'This PIN is easy to guess.';
+	// What a PIN leaves open, each line whole so none can be shortened into a promise the PIN does not keep.
+	const NOT_COVERED = [
+		'Ask, Resources and Documents stay open.',
+		'It does not protect the data if someone copies it off the phone.',
+		'Using the app in another browser? Set a PIN there too.',
+		'Calendar events and calendar files you saved are not covered.',
+		"Anyone holding your phone can still erase the app's data.",
+		'Switching away for a short time does not lock the app. Tap Lock before you hand your phone over.'
+	];
 	// A line the template would wrap carries the wrap into the page's text; kept here it reads as one line.
 	const BACKUP_HINT =
 		"If you forget your PIN, your data can't be opened. A backup lets you get it back. Keep the file and its six words together.";
@@ -54,6 +64,7 @@
 <script lang="ts">
 	import { onDestroy, tick, untrack } from 'svelte';
 	import { readCounter } from '../keystore/app-lock-store';
+	import { isEasyPin } from '../keystore/easy-pin';
 	import BackupCard from '../backup/BackupCard.svelte';
 	import { backupSession, type Phase } from '../backup/session.svelte';
 	import { setSession } from '../keystore/session';
@@ -87,6 +98,15 @@
 	let second = $state('');
 	let busy = $state(false);
 	let message = $state<string | null>(null);
+	// The easy-PIN warning: which form raised it, and the fields as it found them. The typed PINs stay in their fields while
+	// it shows, and any change to them (typing, a relock, a hidden page) ends it, so a Use it anyway never presses over
+	// fields that no longer hold the PIN it warned about.
+	let easy = $state<{ form: 'setup' | 'change'; seen: string } | null>(null);
+	let chooseEl = $state<HTMLButtonElement | null>(null);
+	const shown = $derived(easy === null ? message : EASY_LINE);
+	$effect(() => {
+		if (easy !== null && easy.seen !== `${current},${first},${second}`) easy = null;
+	});
 	// What a change or a removal did, shown under the row after it closes.
 	let statuses = $state<string[]>([]);
 	let toggleEl = $state<HTMLButtonElement | null>(null);
@@ -233,7 +253,30 @@
 		return { keys, salt };
 	}
 
-	async function next(): Promise<void> {
+	// Held back before anything is derived or counted: the person may take the PIN anyway or choose another. The fields keep
+	// what was typed, and focus goes to the safe choice.
+	async function warnEasy(form: 'setup' | 'change', typed: string, pin: string, again: string) {
+		easy = { form, seen: `${typed},${pin},${again}` };
+		await tick();
+		chooseEl?.focus();
+	}
+
+	// The same press again with the fields as they are; only the easy check is skipped.
+	function useAnyway(): void {
+		const form = easy?.form;
+		easy = null;
+		if (form === 'setup') void next(true);
+		else if (form === 'change') void press('change', true);
+	}
+
+	function chooseAnother(): void {
+		easy = null;
+		firstField?.clear();
+		secondField?.clear();
+		firstField?.focus();
+	}
+
+	async function next(skipEasy = false): Promise<void> {
 		const db = app.db;
 		if (busy) return;
 		busy = true;
@@ -241,6 +284,7 @@
 		const pin = first;
 		const again = second;
 		const watch = watchRelock();
+		let warned = false;
 		try {
 			const loaded = await loadAppLock();
 			const [pinDerive] = loaded;
@@ -250,6 +294,11 @@
 			}
 			if (pin !== again) {
 				message = MISMATCH_LINE;
+				return;
+			}
+			if (!skipEasy && isEasyPin(pin)) {
+				warned = true;
+				await warnEasy('setup', current, pin, again);
 				return;
 			}
 			if (db === null) throw new Error('E_NOT_READY');
@@ -266,8 +315,10 @@
 			message = fail(err, 'on');
 		} finally {
 			watch.leave();
-			firstField?.clear();
-			secondField?.clear();
+			if (!warned) {
+				firstField?.clear();
+				secondField?.clear();
+			}
 			busy = false;
 		}
 	}
@@ -380,7 +431,7 @@
 	}
 
 	// Change PIN and Remove PIN. Both check the current PIN first; neither sets the session the check opened.
-	async function press(kind: 'change' | 'remove'): Promise<void> {
+	async function press(kind: 'change' | 'remove', skipEasy = false): Promise<void> {
 		const db = app.db;
 		if (busy) return;
 		busy = true;
@@ -390,6 +441,7 @@
 		const pin = first;
 		const again = second;
 		const watch = watchRelock();
+		let warned = false;
 		try {
 			const loaded = await loadAppLock();
 			const [pinDerive, rotation, kdf] = loaded;
@@ -400,6 +452,12 @@
 				}
 				if (pin !== again) {
 					message = MISMATCH_LINE;
+					return;
+				}
+				// Before the current PIN is checked, so a warning costs no try.
+				if (!skipEasy && isEasyPin(pin)) {
+					warned = true;
+					await warnEasy('change', typed, pin, again);
 					return;
 				}
 			}
@@ -460,9 +518,11 @@
 			message = fail(err, kind);
 		} finally {
 			watch.leave();
-			currentField?.clear();
-			firstField?.clear();
-			secondField?.clear();
+			if (!warned) {
+				currentField?.clear();
+				firstField?.clear();
+				secondField?.clear();
+			}
 			busy = false;
 		}
 	}
@@ -480,6 +540,23 @@
 		if (deriving && document.visibilityState === 'hidden') hiddenWhileDeriving = true;
 	}}
 />
+
+{#snippet easyChoices()}
+	<!-- Held keys: the Next or Change PIN that raised the warning hands focus to the first button, and a repeat of Enter must
+	     not press it; only a new press counts. -->
+	<div class="app-lock__actions">
+		<button
+			bind:this={chooseEl}
+			class="app-lock__next"
+			type="button"
+			onclick={chooseAnother}
+			onkeydown={noRepeat}>Choose another</button
+		>
+		<button class="app-lock__cancel" type="button" onclick={useAnyway} onkeydown={noRepeat}
+			>Use it anyway</button
+		>
+	</div>
+{/snippet}
 
 <div class="app-lock">
 	<!-- Opening hands focus to the first field and a turn-on hands it back here mid-press, so a held Enter's repeats would
@@ -560,18 +637,25 @@
 					/>
 				{/if}
 				<!-- Held keys: a repeat of Enter must not press again over the emptied fields; only a new press counts. -->
-				<div class="app-lock__actions">
-					<button
-						class="app-lock__next"
-						type="button"
-						aria-busy={busy}
-						onclick={() => void press(panel === 'remove' ? 'remove' : 'change')}
-						onkeydown={noRepeat}>{panel === 'remove' ? 'Remove PIN' : 'Change PIN'}</button
-					>
-					<button class="app-lock__cancel" type="button" disabled={busy} onclick={() => void back()}
-						>Cancel</button
-					>
-				</div>
+				{#if easy !== null}
+					{@render easyChoices()}
+				{:else}
+					<div class="app-lock__actions">
+						<button
+							class="app-lock__next"
+							type="button"
+							aria-busy={busy}
+							onclick={() => void press(panel === 'remove' ? 'remove' : 'change')}
+							onkeydown={noRepeat}>{panel === 'remove' ? 'Remove PIN' : 'Change PIN'}</button
+						>
+						<button
+							class="app-lock__cancel"
+							type="button"
+							disabled={busy}
+							onclick={() => void back()}>Cancel</button
+						>
+					</div>
+				{/if}
 			{:else if held !== null}
 				<p class="app-lock__strong">One more step: make a backup</p>
 				<p class="app-lock__hint">{BACKUP_HINT}</p>
@@ -610,6 +694,12 @@
 					A PIN keeps other people out of your saved information on this phone.
 				</p>
 				<p class="app-lock__hint">Don't use your phone's unlock PIN.</p>
+				<details class="app-lock__fold">
+					<summary>What a PIN does not cover</summary>
+					<ul>
+						{#each NOT_COVERED as line (line)}<li>{line}</li>{/each}
+					</ul>
+				</details>
 				<PinField
 					bind:this={firstField}
 					bind:value={first}
@@ -628,25 +718,29 @@
 				/>
 				<!-- A held Enter repeats, and Next keeps focus after a failure: each repeat would press it again over the
 				     emptied fields and replace the answer. Only a new press counts. -->
-				<div class="app-lock__actions">
-					<button
-						class="app-lock__next"
-						type="button"
-						aria-busy={busy}
-						onclick={() => void next()}
-						onkeydown={noRepeat}>Next</button
-					>
-					<button
-						class="app-lock__cancel"
-						type="button"
-						disabled={busy}
-						onclick={() => void cancel()}>Cancel</button
-					>
-				</div>
+				{#if easy !== null}
+					{@render easyChoices()}
+				{:else}
+					<div class="app-lock__actions">
+						<button
+							class="app-lock__next"
+							type="button"
+							aria-busy={busy}
+							onclick={() => void next()}
+							onkeydown={noRepeat}>Next</button
+						>
+						<button
+							class="app-lock__cancel"
+							type="button"
+							disabled={busy}
+							onclick={() => void cancel()}>Cancel</button
+						>
+					</div>
+				{/if}
 			{/if}
 			<!-- The wait line's seconds change inside a child that is not live: the alert is spoken when it appears, not on every tick. -->
-			{#if message}<p class="app-lock__message" role="alert">
-					<span aria-live="off">{message}</span>
+			{#if shown}<p class="app-lock__message" role="alert">
+					<span aria-live="off">{shown}</span>
 				</p>{/if}
 		</div>
 	{/if}
@@ -738,6 +832,23 @@
 	.app-lock__next[aria-busy='true'] {
 		background: var(--color-accent);
 		cursor: default;
+	}
+
+	/* What a PIN does not cover: closed until asked for, with a summary the size of a touch target. */
+	.app-lock__fold {
+		font-size: var(--font-size-s);
+		color: var(--color-fg-muted);
+	}
+	.app-lock__fold summary {
+		min-height: 44px;
+		display: flex;
+		align-items: center;
+		color: var(--color-fg);
+		cursor: pointer;
+	}
+	.app-lock__fold ul {
+		margin: 0 0 var(--space-s);
+		padding-left: 1.2em;
 	}
 
 	/* The backup card takes a whole line, and Skip and turn on wraps under it. */
