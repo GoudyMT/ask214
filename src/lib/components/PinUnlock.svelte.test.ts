@@ -723,6 +723,16 @@ async function holdEnter(repeats = 5): Promise<void> {
 	await frame();
 }
 
+/** The three parts of a held Enter, apart, so a test can look at what has happened between them. */
+const keyEnter = (type: 'keyDown' | 'keyUp', autoRepeat = false) =>
+	cdp().send('Input.dispatchKeyEvent', { type, ...(autoRepeat && { autoRepeat }), ...ENTER });
+async function repeatEnter(repeats: number): Promise<void> {
+	for (let i = 0; i < repeats; i += 1) {
+		await real(40);
+		await keyEnter('keyDown', true);
+	}
+}
+
 describe('Forgot PIN', () => {
 	it('opens the Forgot screen in the same card with its copy exactly, and the Unlock form is gone', async () => {
 		await mount();
@@ -849,6 +859,49 @@ describe('Forgot PIN', () => {
 			eraseEl().focus();
 
 			await holdEnter();
+
+			expect(onerase).toHaveBeenCalledTimes(1);
+		});
+
+		// The page's Erase opens with its focus on Cancel: a key still down when it opens would press Cancel on its repeats.
+		it('an Enter held on Erase and start over hands the erase over only once the key is let go', async () => {
+			await mount();
+			await openForgot();
+			eraseEl().focus();
+
+			await keyEnter('keyDown');
+			await repeatEnter(3);
+			expect(onerase).not.toHaveBeenCalled();
+
+			await keyEnter('keyUp');
+			await until(() => onerase.mock.calls.length > 0, 'the erase handed over');
+			await real(50);
+			expect(onerase).toHaveBeenCalledTimes(1);
+		});
+
+		it("the backup card's own Erase request waits for a held Enter in the same way", async () => {
+			await mount();
+			await openForgot();
+			restoreEl().click();
+			await until(() => h.card !== null, 'the backup card');
+			(document.activeElement as HTMLElement | null)?.blur();
+			const card = need(h.card) as { onEraseRequest: () => void };
+
+			await keyEnter('keyDown');
+			card.onEraseRequest();
+			expect(onerase).not.toHaveBeenCalled();
+			await keyEnter('keyUp');
+
+			await until(() => onerase.mock.calls.length > 0, 'the erase handed over');
+			expect(onerase).toHaveBeenCalledTimes(1);
+		});
+
+		it('hands the erase over at once when no Enter is down', async () => {
+			await mount();
+			await openForgot();
+			await keyEnter('keyDown');
+			await keyEnter('keyUp');
+			eraseEl().click();
 
 			expect(onerase).toHaveBeenCalledTimes(1);
 		});

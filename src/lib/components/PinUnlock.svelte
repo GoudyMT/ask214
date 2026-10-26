@@ -243,6 +243,25 @@
 		if (e.repeat && e.key === 'Enter') e.preventDefault();
 	};
 
+	// The page's Erase opens with its focus on Cancel, so a key still held when it opens would press Cancel on every repeat.
+	// The erase is handed over once an Enter that is down has been let go. Space clicks on release, so nothing is held then.
+	let enterDown = false;
+	const trackEnter = (e: KeyboardEvent): void => {
+		if (e.key === 'Enter') enterDown = e.type === 'keydown';
+	};
+	function handOver(): void {
+		if (!enterDown) {
+			onerase?.();
+			return;
+		}
+		const release = (e: KeyboardEvent): void => {
+			if (e.key !== 'Enter') return;
+			removeEventListener('keyup', release, true);
+			if (!gone) onerase?.();
+		};
+		addEventListener('keyup', release, true);
+	}
+
 	// The Unlock form goes with its field, which empties itself as it goes. Focus goes to the new screen's heading, a thing
 	// nothing presses, so a key still held from the button that opened it does nothing there.
 	async function openForgot(): Promise<void> {
@@ -282,6 +301,8 @@
 		}
 	}
 </script>
+
+<svelte:window onkeydowncapture={trackEnter} onkeyupcapture={trackEnter} />
 
 <section class="pin-unlock" aria-labelledby={forgot ? 'pin-forgot-heading' : 'pin-unlock-heading'}>
 	{#if !forgot}
@@ -323,7 +344,7 @@
 			<div class="pin-unlock__card">
 				<Card
 					db={app.db}
-					onEraseRequest={() => onerase?.()}
+					onEraseRequest={handOver}
 					only={{ row: 'restore', label: 'Restore from a backup', open: true }}
 					restoreDeps={restore.deps}
 				/>
@@ -338,11 +359,8 @@
 			<p class="pin-unlock__hint">Uses a backup file you saved and its six words.</p>
 		{/if}
 		{#if restoreFailed}<p class="pin-unlock__message" role="alert">{UNLOCK_FAILED}</p>{/if}
-		<button
-			class="pin-unlock__danger"
-			type="button"
-			onclick={() => onerase?.()}
-			onkeydown={guardEnter}>Erase and start over</button
+		<button class="pin-unlock__danger" type="button" onclick={handOver} onkeydown={guardEnter}
+			>Erase and start over</button
 		>
 		<p class="pin-unlock__hint">
 			Removes everything saved on this device, so the app can start again.

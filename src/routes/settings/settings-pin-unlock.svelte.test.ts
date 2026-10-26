@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { cdp, page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
 // The spacing tokens the page's gaps are drawn from.
 import '../../app.css';
@@ -145,6 +145,36 @@ describe('Settings, locked with a PIN', () => {
 		await page.getByRole('button', { name: 'Erase and start over', exact: true }).click();
 
 		await expect.poll(() => dialog()?.open).toBe(true);
+	});
+
+	// The Erase dialog opens with focus on Cancel. A key still held from the button that opened it must not reach Cancel:
+	// its repeats would close the dialog the moment it came up.
+	it('an Enter held on Erase and start over opens the Erase dialog once the key is let go, and it stays open', async () => {
+		await render(SettingsPage);
+		const dialog = () => document.querySelector<HTMLDialogElement>('dialog.wipe-dialog');
+		await page.getByRole('button', { name: 'Forgot PIN?', exact: true }).click();
+		const erase = page.getByRole('button', { name: 'Erase and start over', exact: true });
+		await expect.element(erase).toBeVisible();
+		(erase.element() as HTMLButtonElement).focus();
+		const keys = cdp();
+		const enter = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+
+		await keys.send('Input.dispatchKeyEvent', { type: 'keyDown', ...enter });
+		for (let i = 0; i < 4; i += 1) {
+			await new Promise((done) => setTimeout(done, 40));
+			await keys.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...enter });
+		}
+		expect(dialog()?.open).toBe(false);
+		await keys.send('Input.dispatchKeyEvent', { type: 'keyUp', ...enter });
+
+		await expect.poll(() => dialog()?.open).toBe(true);
+		await new Promise((done) => setTimeout(done, 100));
+		expect(dialog()?.open).toBe(true);
 	});
 
 	it('takes the card away and puts focus on the page heading when the unlock lands', async () => {

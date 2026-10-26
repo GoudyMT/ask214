@@ -528,6 +528,38 @@ describe('Home, PIN-locked', () => {
 		expect(backupSession.takeEraseRequest()).toBe(true);
 		expect(backupSession.takeEraseRequest()).toBe(false);
 	});
+
+	// Settings opens its Erase on arrival with focus on Cancel, so the move waits until a held key is let go.
+	it('an Enter held on Erase and start over goes to Settings only once the key is let go', async () => {
+		await readyApp();
+		await render(HomePage);
+		await expect.element(pinField()).toBeVisible();
+		(
+			page.getByRole('button', { name: 'Forgot PIN?', exact: true }).element() as HTMLButtonElement
+		).click();
+		const erase = page.getByRole('button', { name: 'Erase and start over', exact: true });
+		await expect.element(erase).toBeVisible();
+		(erase.element() as HTMLButtonElement).focus();
+		const keys = cdp();
+		const enter = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+
+		await keys.send('Input.dispatchKeyEvent', { type: 'keyDown', ...enter });
+		for (let i = 0; i < 4; i += 1) {
+			await pause(40);
+			await keys.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...enter });
+		}
+		expect(nav.goto).not.toHaveBeenCalled();
+		await keys.send('Input.dispatchKeyEvent', { type: 'keyUp', ...enter });
+
+		await vi.waitFor(() => expect(nav.goto).toHaveBeenCalledWith('/settings'));
+		expect(nav.goto).toHaveBeenCalledTimes(1);
+		expect(backupSession.takeEraseRequest()).toBe(true);
+	});
 });
 
 describe('Home, PIN-locked, with an online answer on screen', () => {
