@@ -902,6 +902,37 @@ describe('the backup step', () => {
 		});
 	});
 
+	// A backup begun at setup must not carry on into PIN mode, where making one asks for the PIN: the turn-on ends it.
+	it.each([
+		['with nothing else going on', false],
+		['with a switch away during the move, which leaves a card holding its session', true]
+	])('ends the setup backup session when the PIN turns on, %s', async (_what, awayDuringMove) => {
+		app.store = {};
+		if (awayDuringMove) {
+			rotate.mockImplementation(async () => {
+				relockEachSync(relockables, 'hygiene');
+				return { session: await fakeSession(), packHadFiles: false };
+			});
+		}
+		await toCard();
+		await expect.element(page.getByRole('button', { name: 'Show my passphrase' })).toBeVisible();
+		expect(backupSession.active).toBe(true);
+
+		skipEl().click();
+		await until(() => summary() === 'PIN on', 'the row reading PIN on');
+		await real(100);
+
+		expect(backupSession.active).toBe(false);
+		// With the PIN on, making a backup begins on the PIN step, not on the words.
+		await render(BackupCard, { props: { db, onEraseRequest: () => {} } });
+		await page.getByRole('button', { name: 'Make a backup', exact: true }).click();
+		await expect
+			.element(page.getByLabelText('Enter your current PIN', { exact: true }))
+			.toBeVisible();
+		expect(page.getByRole('button', { name: 'Show my passphrase' }).query()).toBeNull();
+		expect(backupSession.active).toBe(false);
+	});
+
 	// The turn-on takes the keystore lock and moves every record: while a backup is being made from them, it waits.
 	it.each([
 		'picking-save',

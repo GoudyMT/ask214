@@ -319,6 +319,10 @@
 		if (busy || kept === null) return;
 		busy = true;
 		message = null;
+		// A backup begun here must not outlive the move into PIN mode, where making one asks for the PIN. A write that has
+		// begun is not cut short (the session's end leaves it), and the turn-on does not wait for it: Skip is off while a run is
+		// going, and a saved backup has finished writing.
+		if (making) backupSession.end();
 		const watch = watchRelock();
 		let turnedOn = false;
 		try {
