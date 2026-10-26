@@ -176,7 +176,10 @@ afterEach(async () => {
 	await deleteTestDb(db);
 });
 
-async function mount(over: PinUnlockDeps = {}, props: { takeFocus?: boolean } = {}) {
+async function mount(
+	over: PinUnlockDeps = {},
+	props: { takeFocus?: boolean; onforgot?: (open: boolean) => void } = {}
+) {
 	const rendered = await render(PinUnlock, {
 		props: { onunlocked, onerase, ...props, deps: { derive, reload, ...over } }
 	});
@@ -756,6 +759,24 @@ describe('Forgot PIN', () => {
 		expect(fieldEl().value).toBe('');
 		await until(() => document.activeElement === fieldEl(), 'the cursor in the PIN field');
 		expect(cardLines()).not.toContain('Forgot your PIN?');
+	});
+
+	// The page hides a line that would be false above the Forgot screen: it has to know when that screen is up and when not.
+	it('tells the page when the Forgot screen opens, when Back to Unlock closes it, and when the card goes', async () => {
+		const onforgot = vi.fn<(open: boolean) => void>();
+		const rendered = await mount({}, { onforgot });
+		expect(onforgot).not.toHaveBeenCalled();
+
+		await openForgot();
+		expect(onforgot.mock.calls).toEqual([[true]]);
+
+		backEl().click();
+		await expect.element(unlockHeading()).toBeVisible();
+		expect(onforgot.mock.calls).toEqual([[true], [false]]);
+
+		await openForgot();
+		await rendered.unmount();
+		expect(onforgot.mock.calls).toEqual([[true], [false], [true], [false]]);
 	});
 
 	it('a restore card that cannot be fetched says the restore did not open, and leaves the button to try again', async () => {

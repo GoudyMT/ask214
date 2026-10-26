@@ -148,9 +148,11 @@
 	// for its return behind a lock is not for the next visit.
 	onDestroy(() => forgetResult(backupSession));
 	// A restore that finished while the profile was locked: the card that would say so is off the page, so the page does,
-	// above the Unlock panel.
+	// above the Unlock panel. Not above the Forgot screen: a restore made there is followed by a move to the timeline once
+	// the lock is known to be off, and until then the line would send the person to an Unlock they do not need.
+	let forgotUp = $state(false);
 	const restoredLine = $derived(
-		lockedView && !backupCardUp && backupSession.phase === 'committed'
+		lockedView && !backupCardUp && !forgotUp && backupSession.phase === 'committed'
 			? backupSession.lockedAfterRestore
 				? LOCKED_AFTER_RESTORE_LINE
 				: RESTORED_UNLOCK_LINE
@@ -569,6 +571,7 @@
 						onunlocked={() => void focusHeading()}
 						takeFocus={pinCardFocus}
 						onerase={openEraseFromBackup}
+						onforgot={(open) => (forgotUp = open)}
 					/>
 				{:catch}
 					<LockedPanel onunlock={() => window.location.reload()} error={UNLOCK_FAILED} />

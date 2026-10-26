@@ -52,9 +52,11 @@
 		takeFocus?: boolean;
 		/** "Erase and start over" on the Forgot screen: the page opens its Erase. */
 		onerase?: () => void;
+		/** True while the Forgot screen is up, false when it closes or the card goes. */
+		onforgot?: (open: boolean) => void;
 		deps?: PinUnlockDeps;
 	};
-	let { onunlocked, takeFocus = false, onerase, deps = {} }: Props = $props();
+	let { onunlocked, takeFocus = false, onerase, onforgot, deps = {} }: Props = $props();
 
 	const app = getProfileApp();
 
@@ -146,6 +148,13 @@
 			stopWait();
 			dropWaiting();
 		};
+	});
+
+	// The page shows no line of its own above the Forgot screen; its end is told on every way out, the card going included.
+	$effect(() => {
+		if (!forgot) return;
+		onforgot?.(true);
+		return () => onforgot?.(false);
 	});
 
 	// A relock stops the count; the PIN field joins the same list itself to empty its value.

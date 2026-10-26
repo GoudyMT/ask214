@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
+import { LOCKED_AFTER_RESTORE_LINE, RESTORED_UNLOCK_LINE } from '$lib/backup/copy';
 import { backupSession } from '$lib/backup/session.svelte';
 import SettingsPage from './+page.svelte';
 // The spacing tokens the page's gaps are drawn from.
@@ -111,7 +112,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	// A restore started from the Forgot screen leaves the tab's one backup session running.
+	// A restore started from the Forgot screen leaves the tab's one backup session running; a finished one ends through `done`.
+	if (backupSession.active) {
+		backupSession.enterPhase('done');
+		backupSession.end();
+	}
 	backupSession.relockSync('user');
 });
 
@@ -227,6 +232,49 @@ describe('Settings, locked with a PIN', () => {
 		await expect.element(lockButton()).toBeVisible();
 		expect(cardHeading().query()).toBeNull();
 		await expect.poll(() => document.activeElement).toBe(pageHeading().element());
+	});
+
+	// A restore that has just committed: the write is done, and the page is about to move on or to be locked.
+	function commitRestore(lockedAfter: boolean): void {
+		backupSession.start(
+			{ status: 'ready', joinRelock: () => () => {}, publish: () => {} },
+			'restore'
+		);
+		backupSession.enterPhase('committed');
+		backupSession.lockedAfterRestore = lockedAfter;
+	}
+	const restoredLines = () =>
+		[RESTORED_UNLOCK_LINE, LOCKED_AFTER_RESTORE_LINE].filter(
+			(line) => page.getByText(line).query() !== null
+		);
+	const twoFrames = () =>
+		new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+
+	// A restore from the Forgot screen on a device that had its lock turned off by the backup: the flow moves on after a
+	// moment, and until it does the sentence would tell the person to unlock a device that needs no PIN.
+	it('says nothing about a restore above the Forgot screen while the restore has just committed', async () => {
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Forgot PIN?', exact: true }).click();
+		await expect
+			.element(page.getByRole('heading', { name: 'Forgot your PIN?', exact: true }))
+			.toBeVisible();
+
+		commitRestore(false);
+		await twoFrames();
+
+		expect(restoredLines()).toEqual([]);
+	});
+
+	// A restore on an unlocked PIN-mode Settings that commits as Lock lands: the Unlock card is up with no Forgot screen, and
+	// the sentence is true.
+	it('says the device was locked after the restore above the Unlock card, when the Forgot screen is not up', async () => {
+		await render(SettingsPage);
+		await expect.element(cardHeading()).toBeVisible();
+
+		commitRestore(true);
+
+		await expect.element(page.getByText(LOCKED_AFTER_RESTORE_LINE)).toBeVisible();
+		expect(restoredLines()).toEqual([LOCKED_AFTER_RESTORE_LINE]);
 	});
 
 	// The card stands between two sections, so it keeps the gap the sections keep between each other.
