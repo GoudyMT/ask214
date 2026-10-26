@@ -11,6 +11,7 @@ import { encodeProfile } from '../profile/codec';
 import { decryptProfileRecord } from '../profile/crypto-boundary';
 import { readDeviceState } from '../profile/device-state';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
+import { verifySidecar, type ProfileHwmPayload, type SignedSidecar } from '../profile/sidecars';
 import { createProfileStore } from '../profile/store.svelte';
 import { cleanListing } from '../skillbridge-finder/fixtures/clean';
 import { createFinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
@@ -20,8 +21,8 @@ import { createTimelineStateStore } from '../timeline/state.svelte';
 import { readCounter, readTries } from './app-lock-store';
 import { bootstrapLocalKeystore } from './bootstrap';
 import { keyIdentity, verifyKeystore, type KeystoreRecordPin } from './record';
-import type { KeystoreRow } from './read';
-import { RotationStoreError, rotateToPin } from './rotate';
+import { keysForRow, type KeystoreRow } from './read';
+import { removePin, RotationStoreError, rotateToPin } from './rotate';
 import {
 	assertSessionKeys,
 	dropSession,
@@ -216,6 +217,27 @@ function rotate(
 	);
 }
 
+/** The finder's downloaded files: public rows that every move of the keys empties. */
+async function fillPack(): Promise<void> {
+	const pack = createFinderPackStore(db);
+	await pack.load();
+	await pack.swap({
+		index: {
+			v: 1,
+			pullDate: '2026-10-21',
+			baseline: false,
+			baselineDate: '2026-10-01',
+			files: [{ name: 'pacific', count: 1, bytes: 100 }]
+		},
+		regions: new Map([
+			[
+				'pacific',
+				{ v: 1, pullDate: '2026-10-21', file: 'pacific', listings: [cleanListing({ i: 1001 })] }
+			]
+		])
+	});
+}
+
 /** A device built the way a person builds one: real stores and real saves, a record in every encrypted store. */
 async function buildDevice() {
 	await bootstrapLocalKeystore(db);
@@ -236,23 +258,7 @@ async function buildDevice() {
 	await finder.load();
 	await finder.setSetup({ radius: 50 });
 	await createByokStore(db).saveApiKey(API_KEY);
-	const pack = createFinderPackStore(db);
-	await pack.load();
-	await pack.swap({
-		index: {
-			v: 1,
-			pullDate: '2026-10-21',
-			baseline: false,
-			baselineDate: '2026-10-01',
-			files: [{ name: 'pacific', count: 1, bytes: 100 }]
-		},
-		regions: new Map([
-			[
-				'pacific',
-				{ v: 1, pullDate: '2026-10-21', file: 'pacific', listings: [cleanListing({ i: 1001 })] }
-			]
-		])
-	});
+	await fillPack();
 	await putRaw('app-lock', TRIES_ROW);
 	return { profile };
 }
@@ -278,6 +284,31 @@ async function readEverything() {
 		apiKey: await createByokStore(db).readApiKey(),
 		gens: (await readDeviceState(db)).gens
 	};
+}
+
+/** Each encrypted record's store with the generation its marker says it was sealed at (the API key has one fixed number). */
+const GENERATION = (gens: Awaited<ReturnType<typeof readEverything>>['gens']) =>
+	[
+		['profile', gens.profile],
+		['timeline-state', gens.timeline],
+		['calendar-sync', gens.calendar],
+		['skillbridge-finder', gens.finder],
+		['byok', 1]
+	] as const;
+
+/** The mark the export writes after a backup: the date and the four generations the file matched. */
+async function markBackup(profile: Awaited<ReturnType<typeof buildDevice>>['profile']) {
+	const { gens } = await readDeviceState(db);
+	await profile.save({
+		lastBackupAt: BACKUP_AT,
+		backupGenProfile: gens.profile + 1,
+		backupGenTimeline: gens.timeline,
+		backupGenCalendar: gens.calendar,
+		backupGenFinder: gens.finder
+	});
+	const marked = await readDeviceState(db);
+	expect(marked.mark).toStrictEqual({ at: BACKUP_AT, gens: marked.gens });
+	return marked;
 }
 
 async function expectUntouched(before: Record<string, unknown>) {
@@ -415,15 +446,6 @@ describe('rotateToPin', () => {
 	});
 
 	describe('the keys from before', () => {
-		const GENERATION = (gens: Awaited<ReturnType<typeof readEverything>>['gens']) =>
-			[
-				['profile', gens.profile],
-				['timeline-state', gens.timeline],
-				['calendar-sync', gens.calendar],
-				['skillbridge-finder', gens.finder],
-				['byok', 1]
-			] as const;
-
 		it('cannot open any rotated record, with their identity or the new one', async () => {
 			await buildDevice();
 			const gens = (await readDeviceState(db)).gens;
@@ -534,17 +556,7 @@ describe('rotateToPin', () => {
 
 	it('keeps the backup mark true: the Settings backup card still reads the last backup as current', async () => {
 		const { profile } = await buildDevice();
-		// The mark the export writes after a backup: the date and the four generations the file matched.
-		const { gens } = await readDeviceState(db);
-		await profile.save({
-			lastBackupAt: BACKUP_AT,
-			backupGenProfile: gens.profile + 1,
-			backupGenTimeline: gens.timeline,
-			backupGenCalendar: gens.calendar,
-			backupGenFinder: gens.finder
-		});
-		const marked = await readDeviceState(db);
-		expect(marked.mark).toStrictEqual({ at: BACKUP_AT, gens: marked.gens });
+		const marked = await markBackup(profile);
 		const pin = await pinFixture();
 
 		const { session } = await rotate(pin);
@@ -637,5 +649,291 @@ describe('rotateToPin', () => {
 		await expect(crypto.subtle.exportKey('raw', held.hmacKey)).rejects.toThrow();
 		// It does not set the session: that is the caller's.
 		expect(getSession()).toBeNull();
+	});
+});
+
+/** A device already on a PIN, this tab holding the session, with files in the pack again and wrong tries on record. */
+async function pinDevice(opts: { markBackup?: boolean } = {}) {
+	const { profile } = await buildDevice();
+	const marked = opts.markBackup ? await markBackup(profile) : null;
+	const first = await pinFixture();
+	const { session } = await rotate(first);
+	setSession(session);
+	await fillPack();
+	await putRaw('app-lock', TRIES_ROW);
+	return { first, session, marked };
+}
+
+describe('rotateToPin, as a PIN change', () => {
+	const PUTS = [
+		'app-lock',
+		'byok',
+		'calendar-sync',
+		'calendar-sync-hwm',
+		'keystore',
+		'profile',
+		'profile-hwm',
+		'skillbridge-finder',
+		'skillbridge-finder-hwm',
+		'timeline-state',
+		'timeline-state-hwm'
+	];
+
+	// The cases below are one per put, so a put added to the move must add a case: this count fails first.
+	it('makes one step for the counter, then one for each row it writes', async () => {
+		await pinDevice();
+		const steps: string[] = [];
+
+		await rotate(await pinFixture(), {}, { afterPut: (_index, store) => void steps.push(store) });
+
+		expect(steps[0]).toBe('app-lock');
+		expect([...steps].sort()).toStrictEqual(PUTS);
+	});
+
+	it.each(PUTS.map((_, put) => put))(
+		'a failure after put %i leaves every store byte for byte as it was, and the old PIN still opens the row',
+		async (crashAfter) => {
+			const { first, session } = await pinDevice();
+			const before = await snapshot();
+			const second = await pinFixture();
+
+			await expect(
+				rotate(
+					second,
+					{},
+					{
+						afterPut: (index) => {
+							if (index === crashAfter) throw new Error('E_TEST_CRASH');
+						}
+					}
+				)
+			).rejects.toThrow('E_TEST_CRASH');
+
+			expect(await snapshot()).toStrictEqual(before);
+			const row = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
+			expect(row.mode).toBe('pin');
+			await expect(openPinSession(row, first, session.counter)).resolves.toMatchObject({
+				identity: session.identity
+			});
+			// The tab's own session is still the one that reads: the failed change took nothing from it.
+			expect(getSession()).toBe(session);
+			expect(need(await createProfileStore(db).load()).yearsOfService).toBe(4);
+		}
+	);
+
+	it('moves every store onto the new PIN one generation and epoch up, with a new salt, and the old PIN no longer opens it', async () => {
+		const { first, marked } = await pinDevice({ markBackup: true });
+		const before = await readEverything();
+		const old = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
+		const second = await pinFixture();
+
+		const { session, packHadFiles } = await rotate(second);
+		setSession(session);
+
+		expect(packHadFiles).toBe(true);
+		expect(await packRows()).toStrictEqual([]);
+		expect(await readEverything()).toStrictEqual(before);
+		const row = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
+		expect(row).toMatchObject({
+			mode: 'pin',
+			keystoreGeneration: old.keystoreGeneration + 1,
+			epoch: old.epoch + 1
+		});
+		expect(hex(row.salt)).toBe(hex(second.salt));
+		expect(hex(row.salt)).not.toBe(hex(old.salt));
+		await expect(openPinSession(row, first, session.counter)).rejects.toBeInstanceOf(WrongPinError);
+		// The backup card still reads the last backup as current.
+		const after = await readDeviceState(db);
+		expect(after.gens).toStrictEqual(need(marked).gens);
+		expect(after.mark).toStrictEqual({ at: BACKUP_AT, gens: after.gens });
+	});
+});
+
+/** A session over fresh keys that names `identity`: the shape the remove takes, for a case that must be refused. */
+async function sessionNaming(identity: KeySession['identity']): Promise<KeySession> {
+	const dataKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+		'encrypt',
+		'decrypt'
+	]);
+	const hmacKey = await crypto.subtle.generateKey(HMAC, false, ['sign', 'verify']);
+	return { dataKey, hmacKey, bootstrapMacKey: hmacKey, identity, counter: 0 };
+}
+
+function remove(
+	session: KeySession,
+	over: { counterBefore?: number } = {},
+	deps?: Parameters<typeof removePin>[2]
+) {
+	return readCounter(db).then((counter) =>
+		removePin(db, { session, counterBefore: over.counterBefore ?? counter }, deps)
+	);
+}
+
+/** One more save in every encrypted store while the PIN is on, so each holds a record written under the session. */
+async function writeUnderSession(): Promise<void> {
+	const profile = createProfileStore(db);
+	await profile.load();
+	await profile.save({ yearsOfService: 6 });
+	const timeline = createTimelineStateStore(db);
+	await timeline.load();
+	await timeline.setStatus(taskId(2), 'done');
+	const calendar = createCalendarSyncStore(db);
+	await calendar.load();
+	await calendar.setExclusions({ taskIds: [taskId(4)], categories: [] });
+	const finder = createFinderStore(db);
+	await finder.load();
+	await finder.setSetup({ radius: 100 });
+	await createByokStore(db).saveApiKey(`${API_KEY}-2`);
+}
+
+describe('removePin', () => {
+	it.each([
+		[0, 'the counter'],
+		[1, 'the key row'],
+		[2, 'the cleared tries']
+	])(
+		'a failure after step %i (%s) leaves the PIN row, the counter and the tries as they were',
+		async (crashAfter) => {
+			const { session } = await pinDevice();
+			const before = await snapshot();
+
+			await expect(
+				remove(
+					session,
+					{},
+					{
+						afterPut: (index) => {
+							if (index === crashAfter) throw new Error('E_TEST_CRASH');
+						}
+					}
+				)
+			).rejects.toThrow('E_TEST_CRASH');
+
+			expect(await snapshot()).toStrictEqual(before);
+			expect(need(await readRaw('keystore')).mode).toBe('pin');
+			// The tab still holds its keys: a remove that did not happen takes nothing from it.
+			expect(getSession()).toBe(session);
+		}
+	);
+
+	it.each(['profile', 'timeline-state', 'calendar-sync', 'skillbridge-finder', 'byok'] as const)(
+		'%s: the record written under the PIN keeps its bytes and its marker, and opens on the local row',
+		async (store) => {
+			const { session } = await pinDevice();
+			await writeUnderSession();
+			const gens = (await readDeviceState(db)).gens;
+			const generation = need(GENERATION(gens).find(([name]) => name === store))[1];
+			const sealed = hex(need(await readRaw(store)).rec as Uint8Array);
+			// The API key has no marker.
+			const markStore = store === 'byok' ? null : (`${store}-hwm` as const);
+			const marker = markStore === null ? undefined : await readRaw(markStore);
+
+			await remove(session);
+
+			const local = need(await readRaw('keystore')) as unknown as KeystoreRow;
+			// The local row's own keys, not the session's: the session is gone.
+			expect(local.mode).toBe('local');
+			expect(getSession()).toBeNull();
+			const keys = keysForRow(local);
+			const rec = need(await readRaw(store)).rec as Uint8Array;
+			expect(hex(rec)).toBe(sealed);
+			await expect(
+				decryptRecord(
+					{ storeName: store, recordId: 'self', schemaVersion: 1 },
+					rec,
+					keyIdentity(local),
+					keys.dataKey,
+					generation
+				)
+			).resolves.toBeInstanceOf(Uint8Array);
+			if (markStore !== null && marker) {
+				expect(plain(await readRaw(markStore))).toStrictEqual(plain(marker));
+				const { payload, mac } = marker as unknown as SignedSidecar<ProfileHwmPayload>;
+				await expect(
+					verifySidecar(markStore, { v: 1, payload, mac }, keys.hmacKey)
+				).resolves.toMatchObject({ generation });
+			}
+		}
+	);
+
+	it('writes a local row on the same keys in one durable transaction, and forgets the session and the tries', async () => {
+		const { session } = await pinDevice();
+		await writeUnderSession();
+		const before = await readEverything();
+		const old = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
+		const counterBefore = await readCounter(db);
+		const steps: string[] = [];
+
+		const transactions = watchTransactions();
+		await remove(session, {}, { afterPut: (_index, store) => void steps.push(store) });
+		transactions.stop();
+
+		const writes = transactions.seen.filter((tx) => tx.mode !== 'readonly');
+		expect(writes).toHaveLength(1);
+		expect(writes[0]?.durability).toBe('strict');
+		expect(steps).toStrictEqual(['app-lock', 'keystore', 'app-lock']);
+		const row = need(await readRaw('keystore')) as unknown as KeystoreRow;
+		expect(row).toMatchObject({
+			mode: 'local',
+			v: 1,
+			keystoreGeneration: old.keystoreGeneration,
+			epoch: old.epoch,
+			ivCounter: old.ivCounter
+		});
+		expect(hex(row.installUuid)).toBe(hex(old.installUuid));
+		for (const absent of ['kdf', 'salt', 'bag']) expect(row).not.toHaveProperty(absent);
+		if (row.mode !== 'local') throw new Error('test setup: the row is not local');
+		expect(row.dataKeyRef.extractable).toBe(false);
+		expect(row.hmacKeyRef.extractable).toBe(false);
+		expect(getSession()).toBeNull();
+		expect(await verifyKeystore(row, keysForRow(row))).toBe(true);
+		// Every store reads through its own load with no session, to the values it held under the PIN.
+		expect(await readEverything()).toStrictEqual(before);
+		expect(await readTries(db)).toStrictEqual({ count: 0, waitMs: 0, pending: false });
+		expect(await readCounter(db)).toBe(counterBefore + 1);
+	});
+
+	describe('refuses, writing nothing', () => {
+		it('when the lock moved since the counter was noted', async () => {
+			const { session } = await pinDevice();
+			const before = await snapshot();
+
+			await expect(remove(session, { counterBefore: (await readCounter(db)) + 3 })).rejects.toThrow(
+				'E_ROTATE_MOVED'
+			);
+
+			expect(await snapshot()).toStrictEqual(before);
+			expect(getSession()).toBe(session);
+		});
+
+		it.each([
+			[
+				'another generation',
+				(id: KeySession['identity']) => ({ ...id, keystoreGeneration: id.keystoreGeneration + 1 })
+			],
+			[
+				'another install',
+				(id: KeySession['identity']) => ({ ...id, installUuid: new Uint8Array(16).fill(1) })
+			]
+		])('when the session is from %s than the row', async (_name, other) => {
+			const { session } = await pinDevice();
+			const before = await snapshot();
+
+			await expect(remove(await sessionNaming(other(session.identity)))).rejects.toThrow(
+				'E_ROTATE_MOVED'
+			);
+
+			expect(await snapshot()).toStrictEqual(before);
+		});
+
+		it('when the row is not a PIN row', async () => {
+			await buildDevice();
+			const before = await snapshot();
+			const identity = keyIdentity(need(await readRaw('keystore')) as unknown as KeystoreRow);
+
+			await expect(remove(await sessionNaming(identity))).rejects.toThrow('E_ROTATE_MOVED');
+
+			expect(await snapshot()).toStrictEqual(before);
+		});
 	});
 });

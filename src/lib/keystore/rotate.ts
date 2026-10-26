@@ -24,14 +24,16 @@ import { bumpCounterIn, clearTriesIn } from './app-lock-store';
 import { readKeystoreRow } from './read';
 import {
 	keyIdentity,
+	keyIdentityBytes,
 	PIN_BAG_BYTES,
 	signKeystore,
 	type KdfTuple,
 	type KeyIdentity,
 	type KeystoreKeys,
+	type KeystoreRecordLocal,
 	type KeystoreRecordPin
 } from './record';
-import { openPinSession, withOwnKeyChange, type KeySession } from './session';
+import { dropSession, openPinSession, withOwnKeyChange, type KeySession } from './session';
 
 /** A store that held a record this run could not verify or open; nothing was written. The detail stays out of the code. */
 export class RotationStoreError extends Error {
@@ -288,6 +290,60 @@ export async function rotateToPin(
 		for (const bytes of staged) bytes.fill(0);
 		for (const record of records) zeroizeRecord(record as unknown as Record<string, unknown>);
 	}
+}
+
+function sameIdentity(a: KeyIdentity, b: KeyIdentity): boolean {
+	const x = keyIdentityBytes(a);
+	const y = keyIdentityBytes(b);
+	return x.length === y.length && x.every((byte, i) => byte === y[i]);
+}
+
+/**
+ * Under the exclusive keystore lock, turns the PIN row back into a local row that holds the session's own keys, in ONE
+ * strict readwrite transaction with the lock counter and the cleared wrong tries. The keys stay the same and so do the
+ * generation and epoch, so no record, no marker and no backup mark moves: every store reads as before, from the row's
+ * key handles instead of the session. It makes no key. The row must be this session's own PIN row; any other is refused
+ * with nothing written. Once the commit has landed this tab's session is dropped, since a live session beside a local
+ * row would read as a lock changed elsewhere.
+ */
+export async function removePin(
+	db: IDBDatabase,
+	input: { session: KeySession; counterBefore: number },
+	deps: Deps = {}
+): Promise<void> {
+	const { session, counterBefore } = input;
+	await rotateOrUpgrade(() =>
+		withOwnKeyChange(async () => {
+			const { row } = await readKeystoreRow(db);
+			if (row.mode !== 'pin' || !sameIdentity(keyIdentity(row), session.identity)) {
+				throw new Error('E_ROTATE_MOVED');
+			}
+			const local: KeystoreRecordLocal & { id: number } = {
+				id: 0,
+				v: 1,
+				mode: 'local',
+				keystoreGeneration: row.keystoreGeneration,
+				epoch: row.epoch,
+				ivCounter: row.ivCounter,
+				installUuid: new Uint8Array(row.installUuid),
+				dataKeyRef: session.dataKey,
+				hmacKeyRef: session.hmacKey
+			};
+			// A local row is signed under its own HMAC key, the one it holds.
+			local.recordHmac = await signKeystore(local, { bootstrapMacKey: session.hmacKey });
+			await commit(db, ['keystore', 'app-lock'], async (tx) => {
+				const counter = await bumpCounterIn(tx);
+				if (counter !== counterBefore + 1) throw new Error('E_ROTATE_MOVED');
+				deps.afterPut?.(0, 'app-lock');
+				tx.objectStore('keystore').put(local);
+				deps.afterPut?.(1, 'keystore');
+				clearTriesIn(tx);
+				deps.afterPut?.(2, 'app-lock');
+			});
+			// Nothing between the commit and the drop.
+			dropSession();
+		})
+	);
 }
 
 async function move(
