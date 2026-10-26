@@ -1,4 +1,12 @@
-import { expect, test, type BrowserContext, type Page, type Request } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import {
+	expect,
+	test,
+	type BrowserContext,
+	type Locator,
+	type Page,
+	type Request
+} from '@playwright/test';
 
 // The PIN lock in a real browser, through the served build and its real key worker (Argon2id at the production
 // tuple, about 1.5 s in Chromium and 2.5 s in WebKit per derive): turn it on, reload onto the Unlock card, count wrong
@@ -393,4 +401,216 @@ test('while locked, nothing saved, no PIN and no question leaves the page', asyn
 			expect(text, `${value} in ${request.url}`).not.toContain(value);
 		}
 	}
+});
+
+// ---- Change, Remove, the backup step and the step-up ------------------------------------------------------------------
+
+const NEW_PIN = '246802';
+const NEWLINE = String.fromCharCode(10);
+const lockButton = (page: Page) => page.getByRole('button', { name: 'Lock', exact: true });
+const unlockCard = (page: Page) => page.locator('.pin-unlock');
+
+/** A browser with no save or open picker (as Firefox and Safari are): a backup is handed to the downloads. */
+async function withoutPickers(context: BrowserContext): Promise<void> {
+	await context.addInitScript(() => {
+		const w = window as unknown as { showOpenFilePicker?: unknown; showSaveFilePicker?: unknown };
+		delete w.showOpenFilePicker;
+		delete w.showSaveFilePicker;
+	});
+}
+
+/** The six words a backup card shows, read from its text. */
+async function readWords(card: Locator): Promise<string> {
+	await expect(card).toContainText('Write these words down');
+	const lines = (await card.innerText())
+		.split(NEWLINE)
+		.map((s) => s.trim())
+		.filter(Boolean);
+	const at = lines.findIndex((s) => s.startsWith('Write these words down'));
+	const words = lines.slice(at + 1, at + 7).join(' ');
+	expect(words.split(' ')).toHaveLength(6);
+	return words;
+}
+
+/** The key record's lock mode, read straight from IndexedDB. */
+async function readKeystoreMode(page: Page): Promise<string> {
+	return page.evaluate(
+		() =>
+			new Promise<string>((resolve, reject) => {
+				const open = indexedDB.open('mtc');
+				open.onerror = () => reject(new Error('E_TEST_OPEN'));
+				open.onsuccess = () => {
+					const db = open.result;
+					const get = db.transaction('keystore', 'readonly').objectStore('keystore').get(0);
+					get.onerror = () => reject(new Error('E_TEST_READ'));
+					get.onsuccess = () => {
+						db.close();
+						resolve(String((get.result as { mode?: string } | undefined)?.mode));
+					};
+				};
+			})
+	);
+}
+
+/** Settings -> App lock -> Change PIN: the current PIN, the new one twice, and the button. */
+async function changePin(page: Page, current: string, next: string): Promise<void> {
+	await page.getByRole('button', { name: 'Change PIN', exact: true }).click();
+	await page.getByLabel('Enter your current PIN').fill(current);
+	await page.getByLabel('Choose a 4-6 digit PIN').fill(next);
+	await page.getByLabel('Enter it again').fill(next);
+	await page.getByRole('button', { name: 'Change PIN', exact: true }).click();
+	await expect(page.getByText('PIN changed.')).toBeVisible({ timeout: 60_000 });
+}
+
+// 6. The use: a person changes the PIN, and from then on only the new one opens the app.
+test('Change PIN: the old PIN is refused after a reload and the new PIN opens the data', async ({
+	page
+}) => {
+	await setUpProfile(page);
+	await turnOnPin(page);
+	await changePin(page, PIN, NEW_PIN);
+
+	await page.reload();
+	await expect(lockedHeading(page)).toBeVisible();
+	await pressUnlock(page, PIN);
+	await expect(unlockCard(page).getByRole('alert')).toHaveText(NOT_RIGHT, { timeout: 30_000 });
+	await expect(lockedHeading(page)).toBeVisible();
+	await expect(page.getByText(SEPARATION_ON_SCREEN)).toHaveCount(0);
+
+	await pressUnlock(page, NEW_PIN);
+	await expect(lockButton(page)).toBeVisible({ timeout: 30_000 });
+	await openTimeline(page);
+	await expect(lockedHeading(page)).toHaveCount(0);
+});
+
+// 7. The use: a person takes the PIN off, and the app opens by itself again with the data still there.
+test('Remove PIN: the row reads Off, and the next open shows the data with no PIN', async ({
+	page
+}) => {
+	await setUpProfile(page);
+	await turnOnPin(page);
+	expect(await readKeystoreMode(page)).toBe('pin');
+
+	await page.getByRole('button', { name: 'Remove PIN', exact: true }).click();
+	await expect(page.getByText('Remove your PIN?')).toBeVisible();
+	await expect(
+		page.getByText('Anyone with your phone can open the app. Your data stays on this device.')
+	).toBeVisible();
+	await page.getByLabel('Enter your current PIN').fill(PIN);
+	await page.getByRole('button', { name: 'Remove PIN', exact: true }).click();
+	await expect(page.getByText('PIN removed.')).toBeVisible({ timeout: 30_000 });
+	await expect(appLockToggle(page)).toContainText('Off');
+
+	await page.reload();
+	await expect(appLockToggle(page)).toContainText('Off');
+	await expect(lockedHeading(page)).toHaveCount(0);
+	await expect(pinField(page)).toHaveCount(0);
+	await expect(page.getByText(SEPARATION_ON_SCREEN)).toBeVisible();
+	await openTimeline(page);
+	expect(await readKeystoreMode(page)).toBe('local');
+});
+
+// 8. The use: the person is offered a backup before the PIN goes on, makes one, and it still counts as current after the
+// records have moved under the PIN's keys.
+test('the backup step: Make a backup and turn on saves a file, turns the PIN on, and the backup reads as current', async ({
+	page,
+	context
+}) => {
+	await withoutPickers(context);
+	await setUpProfile(page);
+	await page.goto('/settings');
+	await appLockToggle(page).click();
+	await page.getByLabel('Choose a 4-6 digit PIN').fill(PIN);
+	await page.getByLabel('Enter it again').fill(PIN);
+	await page.getByRole('button', { name: 'Next', exact: true }).click();
+
+	// The step comes before anything is turned on, with its own words.
+	await expect(page.getByText('One more step: make a backup')).toBeVisible({ timeout: 30_000 });
+	await expect(
+		page.getByText(
+			"If you forget your PIN, your data can't be opened. A backup lets you get it back. Keep the file and its six words together."
+		)
+	).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Skip and turn on', exact: true })).toBeVisible();
+	await expect(appLockToggle(page)).toContainText('Off');
+	expect(await readKeystoreMode(page)).toBe('local');
+
+	await page.getByRole('button', { name: 'Make a backup and turn on', exact: true }).click();
+	// The PIN is not on yet, so the backup asks for no PIN.
+	await expect(page.getByLabel('Enter your current PIN')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Show my passphrase' }).click();
+	const card = page.locator('.app-lock__backup .backup-card');
+	const words = await readWords(card);
+	const form = card.locator('form[aria-label="Make a backup"]');
+	await form.locator('input[type=password]').fill(words);
+	const downloading = page.waitForEvent('download');
+	await form.getByRole('button', { name: 'Make a backup' }).click();
+	const download = await downloading;
+	const backup = {
+		name: download.suggestedFilename(),
+		text: readFileSync(await download.path(), 'utf-8')
+	};
+	expect(() => JSON.parse(backup.text)).not.toThrow();
+
+	// The saved backup turns the PIN on by itself.
+	await expect(appLockToggle(page)).toContainText('PIN on', { timeout: 60_000 });
+	await expect(page.getByText(PIN_ON_LINE)).toBeVisible();
+	expect(await readKeystoreMode(page)).toBe('pin');
+
+	// The card is back with its last-backup line, and the file is the device's newest state: restoring it would not
+	// replace anything newer.
+	await expect(page.getByText(/^Last backup: /)).toBeVisible();
+	await expect(page.getByText('No backup yet.')).toHaveCount(0);
+	await page.locator('#backup-toggle-restore').click();
+	const chooser = page.waitForEvent('filechooser');
+	await page.getByRole('button', { name: 'Choose file' }).click();
+	await (
+		await chooser
+	).setFiles({
+		name: backup.name,
+		mimeType: 'application/json',
+		buffer: Buffer.from(backup.text)
+	});
+	const restore = page.locator('form[aria-label="Restore from a backup"]');
+	await restore.locator('input[type=password]').fill(words);
+	await restore.getByRole('button', { name: 'Restore', exact: true }).click();
+	const confirm = page.locator('dialog[open]');
+	await expect(confirm).toBeVisible({ timeout: 30_000 });
+	await expect(confirm).toContainText('This device was last changed when its backup of');
+	await expect(confirm).not.toContainText('This device has changes newer than this backup');
+	await confirm.getByRole('button', { name: 'Cancel' }).click();
+	await expect(confirm).toHaveCount(0);
+	await expect(appLockToggle(page)).toContainText('PIN on');
+});
+
+// 9. The use: with the PIN on, someone holding the unlocked phone cannot start a backup without the PIN, and guessing at
+// that step costs tries like any other.
+test('the step-up: Make a backup asks for the PIN first, counts a wrong one, and opens on the right one', async ({
+	page
+}) => {
+	await setUpProfile(page);
+	await turnOnPin(page);
+	const before = (await readTriesRow(page))?.count ?? 0;
+
+	await page.locator('#backup-toggle-export').click();
+	const body = page.locator('#backup-make');
+	await expect(body.getByLabel('Enter your current PIN')).toBeVisible();
+	// Nothing of the backup has started behind the question.
+	await expect(page.getByRole('button', { name: 'Show my passphrase' })).toHaveCount(0);
+	await expect(page.locator('form[aria-label="Make a backup"]')).toHaveCount(0);
+
+	await body.getByLabel('Enter your current PIN').fill(WRONG_PIN);
+	await body.getByRole('button', { name: 'Make a backup', exact: true }).click();
+	await expect(body.getByRole('alert')).toHaveText(NOT_RIGHT, { timeout: 30_000 });
+	await expect.poll(() => readTriesRow(page)).toMatchObject({ count: before + 1, pending: false });
+	await expect(page.getByRole('button', { name: 'Show my passphrase' })).toHaveCount(0);
+
+	await body.getByLabel('Enter your current PIN').fill(PIN);
+	await body.getByRole('button', { name: 'Make a backup', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'Show my passphrase' })).toBeVisible({
+		timeout: 30_000
+	});
+	await expect(body.getByLabel('Enter your current PIN')).toHaveCount(0);
+	// A good PIN gives the tries back.
+	await expect.poll(() => readTriesRow(page)).toMatchObject({ count: 0, pending: false });
 });

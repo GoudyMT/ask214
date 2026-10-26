@@ -202,3 +202,128 @@ test('turning the PIN on in one tab shows the Unlock card in a tab opened withou
 	await pressUnlock(tabB);
 	await expect(tabB.getByText(ANCHORED)).toBeVisible({ timeout: 30_000 });
 });
+
+// ---- Change and Remove reach the other tabs ---------------------------------------------------------------------------
+
+const NEW_PIN = '246802';
+const NOT_RIGHT = 'That PIN is not right.';
+
+type Seen = { doc: number; profile: boolean; locked: boolean };
+
+/**
+ * Two tabs that both hold the PIN's keys, the second one watched: every change of what it shows is reported as the
+ * document it happened in (a reload makes a new one), whether the saved date is on screen, and whether the Unlock card is.
+ */
+async function twoWatchedTabs(context: BrowserContext): Promise<{
+	first: Page;
+	second: Page;
+	seen: Seen[];
+}> {
+	const first = await context.newPage();
+	await setUpProfile(first);
+	await turnOnPin(first);
+	const second = await context.newPage();
+	const seen: Seen[] = [];
+	await second.exposeFunction('__tabSaw', (entry: string) => {
+		seen.push(JSON.parse(entry) as Seen);
+	});
+	await second.addInitScript((shown: string) => {
+		let last = '';
+		const look = () => {
+			const text = document.body ? document.body.innerText : '';
+			const now = JSON.stringify({
+				doc: performance.timeOrigin,
+				profile: text.includes(shown),
+				locked: document.getElementById('pin-unlock-field') !== null
+			});
+			if (now === last) return;
+			last = now;
+			try {
+				void (window as unknown as { __tabSaw: (s: string) => Promise<void> }).__tabSaw(now);
+			} catch {
+				// The report is only a witness: a page that cannot send it has nothing to tell.
+			}
+		};
+		new MutationObserver(look).observe(document, {
+			subtree: true,
+			childList: true,
+			characterData: true
+		});
+	}, SEPARATION_ON_SCREEN);
+	await second.goto('/settings');
+	await pressUnlock(second);
+	await expect(lockButton(second)).toBeVisible({ timeout: 30_000 });
+	await expect(second.getByText(SEPARATION_ON_SCREEN)).toBeVisible();
+	await expect.poll(() => seen.at(-1)).toMatchObject({ profile: true, locked: false });
+	return { first, second, seen };
+}
+
+// 5. The use: a PIN changed in one tab must not leave another tab open on the old one.
+test('Change PIN in one tab locks the other, refuses the old PIN there, and the new PIN opens it', async ({
+	context
+}) => {
+	const { first: tabA, second: tabB } = await twoUnlockedTabs(context);
+
+	await tabA.getByRole('button', { name: 'Change PIN', exact: true }).click();
+	await tabA.getByLabel('Enter your current PIN').fill(PIN);
+	await tabA.getByLabel('Choose a 4-6 digit PIN').fill(NEW_PIN);
+	await tabA.getByLabel('Enter it again').fill(NEW_PIN);
+	await tabA.getByRole('button', { name: 'Change PIN', exact: true }).click();
+	await expect(tabA.getByText('PIN changed.')).toBeVisible({ timeout: 60_000 });
+
+	// No reload in tab B: the key change reaches it and it closes the data.
+	await expect(lockedHeading(tabB)).toBeVisible();
+	await expect(tabB.getByText(SEPARATION_ON_SCREEN)).toHaveCount(0);
+	await expect(lockButton(tabB)).toHaveCount(0);
+
+	// It read the new lock: the old PIN is not right any more.
+	await pressUnlock(tabB);
+	await expect(tabB.locator('.pin-unlock').getByRole('alert')).toHaveText(NOT_RIGHT, {
+		timeout: 30_000
+	});
+	await expect(lockedHeading(tabB)).toBeVisible();
+	await expect(tabB.getByText(SEPARATION_ON_SCREEN)).toHaveCount(0);
+
+	// And the new one opens it, while the tab that changed it never lost the data.
+	await pinField(tabB).fill(NEW_PIN);
+	await tabB.getByRole('button', { name: 'Unlock', exact: true }).click();
+	await expect(lockButton(tabB)).toBeVisible({ timeout: 30_000 });
+	await expect(tabB.getByText(SEPARATION_ON_SCREEN)).toBeVisible();
+	await expect(lockButton(tabA)).toBeVisible();
+	await expect(tabA.getByText(SEPARATION_ON_SCREEN)).toBeVisible();
+});
+
+// 6. The use: a PIN removed in one tab must not leave another tab showing the data while it still believes the PIN is on.
+test('Remove PIN in one tab locks the other at once, then it reloads onto the data with no PIN', async ({
+	context
+}) => {
+	const { first: tabA, second: tabB, seen } = await twoWatchedTabs(context);
+	const firstDoc = seen.at(-1)?.doc;
+	expect(firstDoc).toBeDefined();
+	const mark = seen.length;
+
+	await tabA.getByRole('button', { name: 'Remove PIN', exact: true }).click();
+	await tabA.getByLabel('Enter your current PIN').fill(PIN);
+	await tabA.getByRole('button', { name: 'Remove PIN', exact: true }).click();
+	await expect(tabA.getByText('PIN removed.')).toBeVisible({ timeout: 30_000 });
+	await expect(appLockToggle(tabA)).toContainText('Off');
+	// The tab that removed it stays open on its data.
+	await expect(tabA.getByText(SEPARATION_ON_SCREEN)).toBeVisible();
+
+	// Tab B ends as a fresh load of a device with no PIN: a new document, showing the data, with no Unlock card.
+	await expect
+		.poll(() => seen.slice(mark).some((s) => s.doc !== firstDoc && s.profile && !s.locked), {
+			timeout: 30_000
+		})
+		.toBe(true);
+	await expect(tabB.getByText(SEPARATION_ON_SCREEN)).toBeVisible();
+	await expect(lockedHeading(tabB)).toHaveCount(0);
+	await expect(pinField(tabB)).toHaveCount(0);
+	await expect(appLockToggle(tabB)).toContainText('Off');
+
+	// Before that reload, tab B's own document closed the data and showed the Unlock card, and never showed the data again:
+	// it had not yet read that the PIN was gone.
+	const oldDocument = seen.slice(mark).filter((s) => s.doc === firstDoc);
+	expect(oldDocument.some((s) => s.locked)).toBe(true);
+	expect(oldDocument.some((s) => s.profile)).toBe(false);
+});
