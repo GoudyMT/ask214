@@ -114,12 +114,14 @@ describe('BottomBar on a 320 px phone', () => {
 		expect(rect.bottom + offset + width).toBeLessThanOrEqual(window.innerHeight);
 	});
 
-	// The wizard owns no tab; Settings, Resources, Documents, Feedback and About are under More. A screen reader says
-	// "current page" only for the tab whose page is open; for More behind it, it is the current section.
+	// The setup page is Home's first-run path, and Settings, Resources, Documents, Feedback and About are under More. A
+	// screen reader says "current page" only for the tab whose page is open; for the tab that holds the open page, it is
+	// the current section.
 	it.each([
 		['/', 'Home', 'page'],
 		['/more', 'More', 'page'],
-		['/settings', 'More', 'true']
+		['/settings', 'More', 'true'],
+		['/wizard', 'Home', 'true']
 	])('marks only %s as the current tab: %s, %s', async (pathname, label, how) => {
 		route.pathname = pathname;
 		const { container } = await render(BottomBar);
@@ -127,14 +129,11 @@ describe('BottomBar on a 320 px phone', () => {
 	});
 
 	// The finder's page is open but has no tab while it is not ready, so no other tab may claim it.
-	it.each(['/wizard', '/skillbridge'])(
-		'marks no tab on %s, a page no tab owns',
-		async (pathname) => {
-			route.pathname = pathname;
-			const { container } = await render(BottomBar);
-			expect(marked(container)).toEqual([]);
-		}
-	);
+	it('marks no tab on /skillbridge, a page no tab owns', async () => {
+		route.pathname = '/skillbridge';
+		const { container } = await render(BottomBar);
+		expect(marked(container)).toEqual([]);
+	});
 
 	// Marked as the section only for the screen reader: the look of the current tab holds on every page behind More.
 	it('draws the 3 px top bar on More while a page behind it is open', async () => {
