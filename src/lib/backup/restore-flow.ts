@@ -82,6 +82,8 @@ export type ConfirmHold = {
 	warning: boolean;
 	/** Set when Replace found the device had moved and the details were read again. */
 	notice: BackupCode | null;
+	/** False for a restore onto a device locked by a forgotten PIN: it clears the API key, so the confirm must not say it is kept. */
+	keepsApiKey: boolean;
 };
 
 type HeldFile = { envelope: ParsedEnvelope; label: string | null };
@@ -473,7 +475,8 @@ export class RestoreFlow {
 				summary: summarize(inner, label),
 				deviceLine: LOCKED_DEVICE_LINE,
 				warning: false,
-				notice
+				notice,
+				keepsApiKey: false
 			} satisfies ConfirmHold);
 			run.enter('confirm');
 			return;
@@ -500,7 +503,8 @@ export class RestoreFlow {
 			summary: summarize(inner, label),
 			deviceLine: described.line,
 			warning: described.warning,
-			notice
+			notice,
+			keepsApiKey: true
 		};
 		run.hold('confirm', confirm);
 		run.enter('confirm');

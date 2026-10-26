@@ -2027,6 +2027,19 @@ describe('the restore path a card gets after another card', () => {
 		expect(card.lockedDevice.write).toHaveBeenCalledTimes(1);
 		expect(card.published).toEqual([{ type: 'keys-changed' }, { type: 'data-replaced' }]);
 	});
+
+	it('the confirm on a locked device does not say the API key is kept, since that restore clears it', async () => {
+		const card = await mount({ locked: true });
+		await fileChosen(card, 'restore');
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog).toBeVisible();
+
+		const body = dialog.element().textContent ?? '';
+		expect(body).not.toContain('your API key (kept on this device if one is saved)');
+		for (const item of NOT_IN_BACKUPS.slice(1)) expect(body).toContain(item);
+	});
 });
 
 describe('checking', () => {

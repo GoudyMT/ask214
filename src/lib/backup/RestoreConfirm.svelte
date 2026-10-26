@@ -10,6 +10,7 @@
 		summaryLines
 	} from './copy';
 	import type { ConfirmHold } from './restore-flow';
+	import { ALWAYS_NOT_IN_BACKUPS } from './restored-note';
 	import type { BackupSession } from './session.svelte';
 
 	type Props = {
@@ -73,7 +74,7 @@
 	<p class="confirm__line">{ONLY_RESTORE_YOURS_LINE}</p>
 	<p class="confirm__line confirm__line--lead">{NOT_IN_BACKUPS_LEAD}</p>
 	<ul class="confirm__list">
-		{#each NOT_IN_BACKUPS as item (item)}
+		{#each confirm.keepsApiKey ? NOT_IN_BACKUPS : ALWAYS_NOT_IN_BACKUPS as item (item)}
 			<li>{item}</li>
 		{/each}
 	</ul>
