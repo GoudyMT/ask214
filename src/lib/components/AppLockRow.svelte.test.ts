@@ -69,6 +69,7 @@ vi.mock('$lib/backup/BackupCard.svelte', async (importOriginal) => {
 		...real,
 		default: (anchor: unknown, props: Record<string, unknown>) => {
 			seams.card = props;
+			seams.events.push('card');
 			return mount(anchor, { ...props, ...seams.cardExtra });
 		}
 	};
@@ -230,7 +231,9 @@ async function fixedKeys(byte: number): Promise<{ macKey: CryptoKey; kek: Crypto
 	};
 }
 
-function mount(over: AppLockDeps = {}, host: { onerase?: () => void } = {}) {
+type Host = { onerase?: () => void; onbackupstep?: (up: boolean) => void };
+
+function mount(over: AppLockDeps = {}, host: Host = {}) {
 	return render(AppLockRow, {
 		props: {
 			...host,
@@ -662,7 +665,7 @@ describe('the backup step', () => {
 		return saved as () => void;
 	};
 
-	async function toCard(host: { onerase?: () => void } = {}): Promise<void> {
+	async function toCard(host: Host = {}): Promise<void> {
 		await mount({}, host);
 		await toStep('1234', '1234');
 		makeEl().click();
@@ -810,6 +813,93 @@ describe('the backup step', () => {
 		await real(150);
 		expect(rotate).not.toHaveBeenCalled();
 		expect(app.keyMode).toBe('local');
+	});
+
+	// The page's own full backup card shares the tab's one backup session, so it must be off the page before the step's card
+	// mounts and may come back only once the step's card is gone.
+	describe('telling the host the step has a card up', () => {
+		let calls: string[];
+		const onbackupstep = (up: boolean) => {
+			calls.push(up ? 'up' : 'down');
+			seams.events.push(up ? 'up' : 'down');
+		};
+		beforeEach(() => {
+			calls = [];
+		});
+
+		it('says up before the card mounts, and says nothing for a step that never made a backup', async () => {
+			await mount({}, { onbackupstep });
+			await toStep('1234', '1234');
+			expect(calls).toEqual([]);
+
+			makeEl().click();
+			await until(() => seams.card !== null, 'the backup card');
+			expect(calls).toEqual(['up']);
+			// The card came after the word, with a tick between them for the page to take its own card away.
+			expect(seams.events.indexOf('up')).toBeLessThan(seams.events.indexOf('card'));
+		});
+
+		it('says nothing when Skip and turn on ends a step that never made a backup', async () => {
+			await mount({}, { onbackupstep });
+			await submitAndSkip('1234', '1234');
+			await until(() => summary() === 'PIN on', 'the row reading PIN on');
+
+			expect(calls).toEqual([]);
+		});
+
+		it.each([
+			[
+				'the turn-on',
+				async () => {
+					skipEl().click();
+					await until(() => summary() === 'PIN on', 'the row reading PIN on');
+				}
+			],
+			[
+				'the row closing',
+				async () => {
+					toggleEl().click();
+					await until(() => !expanded(), 'the row closed');
+				}
+			],
+			[
+				'a Lock',
+				async () => {
+					relockEachSync(relockables, 'user');
+					await until(() => !hasStep(), 'the step gone');
+				}
+			]
+		])('says down once when the card goes with %s', async (_way, leave) => {
+			await mount({}, { onbackupstep });
+			await toStep('1234', '1234');
+			makeEl().click();
+			await until(() => seams.card !== null, 'the backup card');
+			await leave();
+			await real(50);
+
+			expect(calls).toEqual(['up', 'down']);
+		});
+
+		it('says down when the row goes', async () => {
+			const view = await mount({}, { onbackupstep });
+			await toStep('1234', '1234');
+			makeEl().click();
+			await until(() => seams.card !== null, 'the backup card');
+			view.unmount();
+
+			expect(calls).toEqual(['up', 'down']);
+		});
+
+		it('keeps the card, and says nothing more, through a switch away', async () => {
+			await mount({}, { onbackupstep });
+			await toStep('1234', '1234');
+			makeEl().click();
+			await until(() => seams.card !== null, 'the backup card');
+			relockEachSync(relockables, 'hygiene');
+			await real(50);
+
+			expect(calls).toEqual(['up']);
+		});
 	});
 
 	// The setup's backup runs while the PIN is still off, so it is never asked for a PIN it does not have yet.

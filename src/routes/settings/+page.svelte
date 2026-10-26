@@ -143,7 +143,9 @@
 			(app.store.lockState !== 'locked' || !app.store.locked) &&
 			(!lockedView || backupSession.active)
 	);
-	const backupCardUp = $derived(showBackupCard && app.db !== null);
+	// The PIN setup's backup step mounts a card of its own on the same session, so the page's card is off while it is up.
+	let lockStepUp = $state(false);
+	const backupCardUp = $derived(showBackupCard && app.db !== null && !lockStepUp);
 	// This page stays up across a Lock and an Unlock, and only a move to another page ends the visit: a result the card kept
 	// for its return behind a lock is not for the next visit.
 	onDestroy(() => forgetResult(backupSession));
@@ -652,7 +654,7 @@
 					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
 					<!-- Only a profile can be locked; a device that holds saved documents alone still has the Erase. -->
 					{#if hasTimeline}
-						<AppLockRow onerase={openEraseFromBackup} />
+						<AppLockRow onerase={openEraseFromBackup} onbackupstep={(up) => (lockStepUp = up)} />
 						<button class="settings-lock" type="button" onclick={lock}>Lock</button>
 						<p class="settings-hint">
 							{app.keyMode === 'pin'

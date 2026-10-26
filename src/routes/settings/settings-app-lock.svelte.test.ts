@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
-import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
+import { backupSession } from '$lib/backup/session.svelte';
 import SettingsPage from './+page.svelte';
 
 const { isoFromToday } = vi.hoisted(() => ({
@@ -15,7 +16,42 @@ const { isoFromToday } = vi.hoisted(() => ({
 // Reactive, as the layout's app object is: the hint and the row's summary follow the mode.
 const state = $state({
 	mode: 'local' as 'local' | 'pin',
-	completeness: 'eaos-only' as 'eaos-only' | 'none'
+	completeness: 'eaos-only' as 'eaos-only' | 'none',
+	// With a relock set the page shows its own backup card, and the setup's backup card can start.
+	joinable: false
+});
+// What joined the app's relock list; every app object the page, the row and the cards ask for shares it.
+const relock = vi.hoisted(() => ({
+	list: [] as { relockSync: (reason: string) => void }[],
+	join: (r: { relockSync: (reason: string) => void }) => {
+		relock.list.push(r);
+		return () => {
+			relock.list.splice(relock.list.indexOf(r), 1);
+		};
+	}
+}));
+// The PIN's Argon2id lives in a worker: a fixed pair of keys answers for it. The rest of the module is the real one.
+vi.mock('$lib/keystore/pin-derive', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/keystore/pin-derive')>();
+	return {
+		...real,
+		derivePinKeys: async () => ({
+			macKey: await crypto.subtle.importKey(
+				'raw',
+				new Uint8Array(32).fill(7),
+				{ name: 'HMAC', hash: 'SHA-256', length: 256 },
+				false,
+				['sign', 'verify']
+			),
+			kek: await crypto.subtle.importKey(
+				'raw',
+				new Uint8Array(32).fill(9),
+				{ name: 'AES-KW' },
+				false,
+				['wrapKey', 'unwrapKey']
+			)
+		})
+	};
 });
 vi.mock('$lib/profile/context', () => ({
 	getProfileApp: () => ({
@@ -55,7 +91,9 @@ vi.mock('$lib/profile/context', () => ({
 		db: {},
 		wipeAll: null,
 		relockAll: () => {},
-		joinRelock: null,
+		get joinRelock() {
+			return state.joinable ? relock.join : null;
+		},
 		publish: null,
 		reloadOnUnlock: false,
 		replacedNotice: false
@@ -102,7 +140,13 @@ beforeEach(() => {
 	mounted.rows.length = 0;
 	state.mode = 'local';
 	state.completeness = 'eaos-only';
+	state.joinable = false;
 	docs.held = false;
+});
+
+afterEach(() => {
+	// The backup session is the tab's one: a test that started it must not leave it running for the next.
+	backupSession.relockSync('user');
 });
 
 const row = () => page.getByRole('button', { name: 'App lock' });
@@ -161,5 +205,44 @@ describe('Settings, App lock', () => {
 
 		await expect.element(text(shown)).toBeVisible();
 		expect(text(absent).query()).toBeNull();
+	});
+});
+
+// The page's own Backup card and the PIN setup's backup card draw from the tab's one backup session: both on the page would
+// show the words twice, under the same ids.
+describe("Settings, the PIN setup's backup step", () => {
+	const makeToggles = () => [...document.querySelectorAll('#backup-toggle-export')];
+	const makeBodies = () => document.querySelectorAll('#backup-make');
+	const pageCard = () => page.getByRole('region', { name: 'Backup', exact: true });
+	const button = (name: string) => page.getByRole('button', { name, exact: true });
+
+	async function toStepCard(): Promise<void> {
+		await row().click();
+		await page.getByLabelText('Choose a 4-6 digit PIN', { exact: true }).fill('1234');
+		await page.getByLabelText('Enter it again', { exact: true }).fill('1234');
+		await button('Next').click();
+		await button('Make a backup and turn on').click();
+	}
+
+	it("keeps one backup card on the page while the step makes its backup, and brings the page's back after", async () => {
+		state.joinable = true;
+		await render(SettingsPage);
+		await expect.element(pageCard()).toBeVisible();
+		expect(makeToggles()).toHaveLength(1);
+
+		await toStepCard();
+
+		await expect.element(page.getByRole('button', { name: 'Show my passphrase' })).toBeVisible();
+		expect(makeToggles()).toHaveLength(1);
+		expect(makeBodies()).toHaveLength(1);
+		expect(makeToggles()[0]?.textContent).toContain('Make a backup and turn on');
+		expect(pageCard().query()).toBeNull();
+
+		// Closing the row ends the step: the page's own card is back, and the step's session did not survive it.
+		await row().click();
+		await expect.element(pageCard()).toBeVisible();
+		expect(makeToggles()).toHaveLength(1);
+		expect(makeToggles()[0]?.textContent).not.toContain('turn on');
+		expect(backupSession.active).toBe(false);
 	});
 });

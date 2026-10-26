@@ -65,8 +65,13 @@
 		deps?: AppLockDeps;
 		/** Opens the host's Erase dialog, for the backup card the step mounts. */
 		onerase?: () => void;
+		/**
+		 * True just before the step mounts its backup card (and a tick ahead of it), false once that card has gone. Every
+		 * backup card in the tab draws on one session, so a host that shows its own card takes it off the page meanwhile.
+		 */
+		onbackupstep?: (up: boolean) => void;
 	};
-	let { deps = {}, onerase }: Props = $props();
+	let { deps = {}, onerase, onbackupstep }: Props = $props();
 	type Loaded = Awaited<ReturnType<typeof loadAppLock>>;
 	type Made = NonNullable<Awaited<ReturnType<typeof deriveNew>>>;
 
@@ -94,6 +99,8 @@
 	let makeEl = $state<HTMLButtonElement | null>(null);
 	let cardEl = $state<HTMLElement | null>(null);
 	let leaveHeld: (() => void) | null = null;
+	// The host has been told a card is coming and has not yet been told it is gone.
+	let cardAnnounced = false;
 
 	// Its wait clock counts an owed wait down while the row is up: nothing else does in Settings, so a wait on the row
 	// would never end.
@@ -266,12 +273,22 @@
 		making = false;
 		leaveHeld?.();
 		leaveHeld = null;
+		if (cardAnnounced) {
+			cardAnnounced = false;
+			onbackupstep?.(false);
+		}
 	}
 	onDestroy(dropHeld);
 
 	// Make a backup and turn on: the backup card takes the button's place and the turn-on waits for its saved report.
 	async function startBackup(): Promise<void> {
 		if (busy || held === null) return;
+		// The host's own card goes first, so it is gone before this one starts the session and cannot cancel it on the way out.
+		cardAnnounced = true;
+		onbackupstep?.(true);
+		await tick();
+		// A Lock during that tick has dropped the keys, and the host already heard it.
+		if (held === null) return;
 		making = true;
 		await tick();
 		cardEl?.querySelector('button')?.focus();
