@@ -1,3 +1,4 @@
+import { tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { cdp, page } from 'vitest/browser';
@@ -16,6 +17,7 @@ import { KeystoreHmacMismatchError } from '../keystore/read';
 import { dropSession, getSession } from '../keystore/session';
 import { readPinRowAndCounter } from '../keystore/unlock-row';
 import { createJoinRelock, relockEachSync, type Relockable } from '../profile/app-init';
+import { waitLine } from './pin-lines';
 
 type TestApp = {
 	status: 'ready';
@@ -348,22 +350,33 @@ describe('a wait owed', () => {
 		expect(alertText()).toBeNull();
 	});
 
-	it.each([
-		['the app relocks', () => relockEachSync(relockables, 'user')],
-		['the card is taken out', null]
-	])('stops counting down when %s', async (_name, stop) => {
+	it('stops counting down when the card is taken out', async () => {
 		await putTries({ count: 4, waitMs: 30_000, pending: false });
 		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
 		let now = 0;
 		const rendered = await mount({ clock: { perfNow: () => now } });
 		await until(() => alertText() !== null, 'the wait line at mount');
 
-		if (stop) stop();
-		else await rendered.unmount();
+		await rendered.unmount();
 		now = 5_000;
 		vi.advanceTimersByTime(5_000);
 		await real(100);
 		expect((await readTries(db)).waitMs).toBe(30_000);
+	});
+
+	// A Lock hides nothing of the wait: the card is still up and the wait is still owed, so the count goes on.
+	it('keeps counting down when the app relocks', async () => {
+		await putTries({ count: 4, waitMs: 30_000, pending: false });
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		let now = 0;
+		await mount({ clock: { perfNow: () => now } });
+		await until(() => alertText() !== null, 'the wait line at mount');
+
+		relockEachSync(relockables, 'user');
+		now = 5_000;
+		vi.advanceTimersByTime(5_000);
+		await until(async () => (await readTries(db)).waitMs === 25_000, 'the remainder written');
+		expect(alertText()).toBe(waitLine(25_000));
 	});
 
 	// A person who keeps pressing Unlock while they wait must not push the end of the wait away: the count runs on, and
@@ -402,6 +415,133 @@ describe('a wait owed', () => {
 		await pressOnce();
 		await until(() => onunlocked.mock.calls.length > 0, 'the page was told it unlocked');
 		expect(derive).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('the wait line, live', () => {
+	const TIMERS = ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] as const;
+	let now: number;
+	let date: number;
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	/** A card with a wait owed, on a clock the test moves; the page is shown. */
+	async function owed(waitMs: number): Promise<void> {
+		await putTries({ count: 4, waitMs, pending: false });
+		vi.useFakeTimers({ toFake: [...TIMERS] });
+		now = 0;
+		date = 1_700_000_000_000;
+		await mount({ clock: { perfNow: () => now }, dateNow: () => date });
+		await until(() => alertText() !== null, 'the wait line at mount');
+	}
+
+	/** Time passing in a shown page: both clocks and the page's timers move together. */
+	async function pass(ms: number): Promise<void> {
+		now += ms;
+		date += ms;
+		vi.advanceTimersByTime(ms);
+		await tick();
+	}
+
+	async function pageIs(state: 'hidden' | 'visible'): Promise<void> {
+		vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);
+		document.dispatchEvent(new Event('visibilitychange'));
+		await tick();
+	}
+
+	it('shows each second of the wait, in minutes above a minute, and takes the line away at zero', async () => {
+		await owed(90_000);
+		expect(alertText()).toBe(waitLine(90_000));
+		expect(alertText()).toContain('2 minutes');
+
+		await pass(30_000);
+		expect(alertText()).toContain('1 minute.');
+		await pass(30_000);
+		expect(alertText()).toBe(waitLine(30_000));
+		await pass(1_000);
+		expect(alertText()).toBe(waitLine(29_000));
+		await pass(29_000);
+		expect(alertText()).toBeNull();
+		await until(async () => (await readTries(db)).waitMs === 0, 'the stored wait at zero');
+	});
+
+	// A screen reader speaks the alert when it appears, not again on each tick: the part that changes sits in a child that
+	// is not live, and it changes in place.
+	it('changes the seconds inside the same alert, under a child that is not live', async () => {
+		await owed(30_000);
+		const alert = document.querySelector('[role="alert"]');
+		const changing = alert?.querySelector('[aria-live="off"]');
+		expect(changing?.textContent).toBe(waitLine(30_000));
+
+		await pass(1_000);
+
+		expect(document.querySelector('[role="alert"]')).toBe(alert);
+		expect(alert?.querySelector('[aria-live="off"]')).toBe(changing);
+		expect(changing?.textContent).toBe(waitLine(29_000));
+	});
+
+	it('does not write the wait down while the page is hidden, and counts the time away when both clocks agree', async () => {
+		await owed(30_000);
+		await pageIs('hidden');
+		now += 10_000;
+		date += 10_000;
+		vi.advanceTimersByTime(10_000);
+		await real(100);
+		expect((await readTries(db)).waitMs).toBe(30_000);
+
+		await pageIs('visible');
+		expect(alertText()).toBe(waitLine(20_000));
+		await pass(5_000);
+		await until(async () => (await readTries(db)).waitMs === 15_000, 'the remainder written');
+	});
+
+	it.each([
+		['the Date clock moved far more than the performance clock', 10_000, 100_000],
+		['the Date clock went back', 10_000, -50_000]
+	])('does not count the time away when %s', async (_name, byPerf, byDate) => {
+		await owed(30_000);
+		await pageIs('hidden');
+		now += byPerf;
+		date += byDate;
+		await pageIs('visible');
+
+		expect(alertText()).toBe(waitLine(30_000));
+		await pass(5_000);
+		await until(async () => (await readTries(db)).waitMs === 25_000, 'the remainder written');
+	});
+
+	// The person pressed Unlock with a PIN that could not be right: that line replaced the wait, and the count must not
+	// bring the wait back over it nor take it away.
+	it('leaves a line that replaced the wait alone, as the count runs on', async () => {
+		await owed(30_000);
+		fieldEl().value = '123';
+		fieldEl().dispatchEvent(new Event('input', { bubbles: true }));
+		unlockEl().click();
+		await until(() => alertText() === NOT_RIGHT, 'the line that replaced the wait');
+
+		await pass(5_000);
+		expect(alertText()).toBe(NOT_RIGHT);
+		await pass(25_000);
+		expect(alertText()).toBe(NOT_RIGHT);
+	});
+
+	// A key held on Unlock repeats while the wait is owed: only the first press counts, so no repeat checks anything or puts
+	// a "not right" line over the wait.
+	it('runs no check, and keeps the wait line, for an Enter held on Unlock while a wait is owed', async () => {
+		await owed(30_000);
+		fieldEl().value = GOOD;
+		fieldEl().dispatchEvent(new Event('input', { bubbles: true }));
+		unlockEl().focus();
+		await keyEnter('keyDown');
+		await repeatEnter(4);
+		await keyEnter('keyUp');
+		await real(100);
+
+		expect(alertText()).toBe(waitLine(30_000));
+		expect(derive).not.toHaveBeenCalled();
+		expect((await readTries(db)).count).toBe(4);
 	});
 });
 

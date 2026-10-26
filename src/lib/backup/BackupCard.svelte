@@ -69,6 +69,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { createCurrentPinCheck } from '../components/current-pin-check';
+	import { followWait } from '../components/wait-countdown';
 	import { loadAppLock } from '../components/load-app-lock';
 	import PinField from '../components/PinField.svelte';
 	import { getProfileApp, type ProfileApp } from '../profile/context';
@@ -246,7 +247,13 @@
 	// Moves with every relock: a check that was running when one landed must not go on to start a backup.
 	let stepUpEpoch = 0;
 	// The wait this check starts to count down belongs to this card; the keys a good PIN opens are never held.
-	const pinCheck = createCurrentPinCheck({ loadDerive: async () => (await loadAppLock())[0] });
+	const pinCheck = createCurrentPinCheck({
+		loadDerive: async () => (await loadAppLock())[0],
+		onWaitLine: followWait(
+			() => pinMessage,
+			(line) => (pinMessage = line)
+		)
+	});
 	onDestroy(() => {
 		pinCheck.stop();
 		// A check still running when the card goes has no step left to pass.
@@ -987,7 +994,8 @@
 							</button>
 						</div>
 						{#if pinMessage !== null}
-							<p class="backup-error" role="alert">{pinMessage}</p>
+							<!-- The wait line's seconds change inside a child that is not live: the alert is spoken when it appears. -->
+							<p class="backup-error" role="alert"><span aria-live="off">{pinMessage}</span></p>
 						{/if}
 					{/if}
 					{@render hiddenLine()}

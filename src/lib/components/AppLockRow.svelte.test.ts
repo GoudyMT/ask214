@@ -1,3 +1,4 @@
+import { tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { cdp, page } from 'vitest/browser';
@@ -207,6 +208,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+	vi.useRealTimers();
 	vi.restoreAllMocks();
 	// The backup session is the tab's one: a step that started it must not leave it running for the next test.
 	backupSession.relockSync('user');
@@ -1380,6 +1382,43 @@ describe('changing the PIN', () => {
 
 			expect(alertText()).toBe(waitLine(16_000));
 			expect(deriveLog).toHaveLength(4);
+		});
+
+		// Nothing else counts the wait down for a person in Settings, so the line has to: it shows the time that is left.
+		it('shows the time left on the wait line each second, and takes the line away at zero', async () => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+			await mount();
+			await openForm('Change PIN');
+			for (let tries = 0; tries < 4; tries += 1) await pressChange(WRONG, NEW_PIN, NEW_PIN);
+			expect(alertText()).toBe(waitLine(30_000));
+
+			clock.t += 1_000;
+			vi.advanceTimersByTime(1_000);
+			await tick();
+			expect(alertText()).toBe(waitLine(29_000));
+			clock.t += 29_000;
+			vi.advanceTimersByTime(29_000);
+			await tick();
+			expect(alertText()).toBeNull();
+		});
+
+		// A line that took the wait's place (the new PIN was not 4 to 6 digits) is the person's to read, not the count's.
+		it('leaves a line that replaced the wait line alone as the count runs on', async () => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+			await mount();
+			await openForm('Change PIN');
+			for (let tries = 0; tries < 4; tries += 1) await pressChange(WRONG, NEW_PIN, NEW_PIN);
+			await pressChange(CURRENT, '123', '123');
+			expect(alertText()).toBe(FORMAT_LINE);
+
+			clock.t += 5_000;
+			vi.advanceTimersByTime(5_000);
+			await tick();
+			expect(alertText()).toBe(FORMAT_LINE);
+			clock.t += 25_000;
+			vi.advanceTimersByTime(25_000);
+			await tick();
+			expect(alertText()).toBe(FORMAT_LINE);
 		});
 
 		it('says the memory ran out, and takes the try back, when the current PIN could not be checked', async () => {

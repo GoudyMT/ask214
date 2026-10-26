@@ -2266,6 +2266,42 @@ describe('with the PIN on, making a backup', () => {
 		expect(getSession()).toBeNull();
 	});
 
+	// Nothing else counts the wait down for a person on the Make row, so the line has to: it shows the time that is left.
+	it('shows the time left on the wait line each second, and takes the line away at zero', async () => {
+		await pinOn();
+		vi.useFakeTimers({
+			toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance']
+		});
+		await mount({ keyMode: 'pin' });
+		await openStepUp();
+		for (let tries = 0; tries < 4; tries += 1) await press(OTHER_PIN);
+		expect(alertText()).toBe(waitLine(30_000));
+
+		vi.advanceTimersByTime(1_000);
+		flushSync();
+		expect(alertText()).toBe(waitLine(29_000));
+		vi.advanceTimersByTime(29_000);
+		flushSync();
+		expect(alertText()).toBeNull();
+	});
+
+	// A line that took the wait's place (a PIN that could not be right) is the person's to read, not the count's.
+	it('leaves a line that replaced the wait line alone as the count runs on', async () => {
+		await pinOn();
+		vi.useFakeTimers({
+			toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance']
+		});
+		await mount({ keyMode: 'pin' });
+		await openStepUp();
+		for (let tries = 0; tries < 4; tries += 1) await press(OTHER_PIN);
+		await press('12');
+		expect(alertText()).toBe(NOT_RIGHT_LINE);
+
+		vi.advanceTimersByTime(30_000);
+		flushSync();
+		expect(alertText()).toBe(NOT_RIGHT_LINE);
+	});
+
 	it('says the memory ran out, and takes the try back, when the PIN could not be checked', async () => {
 		await pinOn();
 		pinSeam.derive = () => Promise.reject(new PinNoMemoryError());

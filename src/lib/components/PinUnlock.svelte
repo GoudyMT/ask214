@@ -3,8 +3,7 @@
 		createWaitClock,
 		readTries,
 		runPinCheck,
-		type PinCheckResult,
-		type TriesState
+		type PinCheckResult
 	} from '../keystore/app-lock-store';
 	import { derivePinKeys, isPinFormat, PinNoMemoryError } from '../keystore/pin-derive';
 	import { KeystoreHmacMismatchError, type KeystoreRow } from '../keystore/read';
@@ -32,6 +31,7 @@
 		) => Promise<{ macKey: CryptoKey; kek: CryptoKey }>;
 		readRow?: typeof readPinRowAndCounter;
 		clock?: Parameters<typeof createWaitClock>[2];
+		dateNow?: () => number;
 		reload?: () => void;
 		loadRestore?: () => Promise<
 			[typeof import('../backup/BackupCard.svelte'), typeof import('../keystore/forgot-restore')]
@@ -44,6 +44,7 @@
 	import { getProfileApp } from '../profile/context';
 	import PinField from './PinField.svelte';
 	import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, waitLine } from './pin-lines';
+	import { createCountdown } from './wait-countdown';
 
 	type Props = {
 		/** After the stores loaded; the page moves focus on, since this card is about to go. */
@@ -86,43 +87,32 @@
 	} | null>(null);
 	let restoreFailed = $state(false);
 
-	let clock: { remainingMs(): number; stop(): void } | null = null;
-	let clockTimer: ReturnType<typeof setTimeout> | undefined;
-	let waitText: string | null = null;
+	let counter: ReturnType<typeof createCountdown> | null = null;
+	let waitText = $state<string | null>(null);
 	let gone = false;
 
-	function stopWait(): void {
-		clock?.stop();
-		clock = null;
-		if (clockTimer !== undefined) clearTimeout(clockTimer);
-		clockTimer = undefined;
-	}
-
-	// The line shows the wait owed when it was shown; it goes when that wait is over, and the clock writes the rest.
-	function startWait(db: IDBDatabase, tries: TriesState): void {
-		stopWait();
-		if (gone || tries.waitMs <= 0) return;
-		const counting = createWaitClock(db, tries, deps.clock);
-		clock = counting;
-		const check = (): void => {
-			const left = counting.remainingMs();
-			if (left > 0) {
-				clockTimer = setTimeout(check, Math.ceil(left));
-				return;
+	// The line follows the count while it is still the wait line; a line that replaced it is left as it is.
+	function counting(db: IDBDatabase): ReturnType<typeof createCountdown> {
+		return (counter ??= createCountdown(
+			db,
+			{ clock: deps.clock, dateNow: deps.dateNow },
+			(line) => {
+				if (message === waitText) message = line;
+				waitText = line;
 			}
-			if (message === waitText) message = null;
-		};
-		clockTimer = setTimeout(check, Math.ceil(counting.remainingMs()));
+		));
 	}
 
 	// A new wait (a wrong try that owes one) starts its own count. A press that only finds the wait still owed leaves a
 	// running count alone: restarting it from the last stored remainder would push the end away with every press.
 	async function showWait(db: IDBDatabase, waitMs: number, fresh: boolean): Promise<void> {
-		const running = fresh ? null : clock;
-		const left = running?.remainingMs() ?? 0;
+		const left = fresh ? 0 : counting(db).remainingMs();
 		waitText = waitLine(left > 0 ? Math.ceil(left) : waitMs);
 		message = waitText;
-		if (left <= 0) startWait(db, await readTries(db));
+		if (left <= 0) {
+			const tries = await readTries(db);
+			if (!gone) counting(db).start(tries);
+		}
 	}
 
 	onMount(() => {
@@ -133,7 +123,7 @@
 					if (gone || tries.waitMs <= 0) return;
 					waitText = waitLine(tries.waitMs);
 					message = waitText;
-					startWait(db, tries);
+					counting(db).start(tries);
 				},
 				() => safeLog({ code: 'E_INTERNAL' })
 			);
@@ -145,7 +135,7 @@
 		}
 		return () => {
 			gone = true;
-			stopWait();
+			counter?.stop();
 			dropWaiting();
 		};
 	});
@@ -155,13 +145,6 @@
 		if (!forgot) return;
 		onforgot?.(true);
 		return () => onforgot?.(false);
-	});
-
-	// A relock stops the count; the PIN field joins the same list itself to empty its value.
-	$effect(() => {
-		const join = app.joinRelock;
-		if (!join) return;
-		return join({ relockSync: stopWait, refresh: () => Promise.resolve() });
 	});
 
 	// What one press learned inside the check, for the lines and screens that follow it.
@@ -364,7 +347,10 @@
 		>
 			{busy ? 'Unlocking...' : 'Unlock'}
 		</button>
-		{#if message}<p class="pin-unlock__message" role="alert">{message}</p>{/if}
+		<!-- The seconds change inside a child that is not live: the alert is spoken when it appears, not on every tick. -->
+		{#if message}<p class="pin-unlock__message" role="alert">
+				<span aria-live={message === waitText ? 'off' : undefined}>{message}</span>
+			</p>{/if}
 		<button
 			class="pin-unlock__quiet"
 			type="button"

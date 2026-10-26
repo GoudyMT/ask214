@@ -1,7 +1,7 @@
 import {
-	createWaitClock,
 	readTries,
 	runPinCheck,
+	type createWaitClock,
 	type PinCheckResult
 } from '../keystore/app-lock-store';
 import {
@@ -14,6 +14,7 @@ import { readPinRowAndCounter } from '../keystore/unlock-row';
 import type { derivePinKeys } from '../keystore/pin-derive';
 import type { loadAppLock } from './load-app-lock';
 import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, waitLine } from './pin-lines';
+import { createCountdown } from './wait-countdown';
 
 export type CurrentPinResult = { ok: true; session: KeySession } | { ok: false; line: string };
 
@@ -22,6 +23,8 @@ type CurrentPinDeps = {
 	clock?: Parameters<typeof createWaitClock>[2] | undefined;
 	/** The PIN code's page side, from the one lazy entry the settings rows share; this module imports none of it itself. */
 	loadDerive: () => Promise<Awaited<ReturnType<typeof loadAppLock>>[0]>;
+	/** Each new line of the wait this check starts to count down, and null when it is over (see `followWait`). */
+	onWaitLine?: ((line: string | null) => void) | undefined;
 };
 
 /**
@@ -33,16 +36,17 @@ export function createCurrentPinCheck(deps: CurrentPinDeps): {
 	check(db: IDBDatabase, typed: string, failedLine: string): Promise<CurrentPinResult>;
 	stop(): void;
 } {
-	let waitClock: ReturnType<typeof createWaitClock> | null = null;
+	let counter: ReturnType<typeof createCountdown> | null = null;
 
 	// The line for an owed wait: a new wait starts its own count, and a press that only finds the wait still owed leaves
-	// the running count alone, so pressing never pushes the end away.
+	// the running count alone, so pressing never pushes the end away. The caller hears the line returned as its own, so the
+	// count's later lines replace exactly that message.
 	async function waitText(db: IDBDatabase, waitMs: number, fresh: boolean): Promise<string> {
-		const left = fresh ? 0 : (waitClock?.remainingMs() ?? 0);
+		counter ??= createCountdown(db, { clock: deps.clock }, (line) => deps.onWaitLine?.(line));
+		const left = fresh ? 0 : counter.remainingMs();
 		const line = waitLine(left > 0 ? Math.ceil(left) : waitMs);
-		if (left > 0) return line;
-		waitClock?.stop();
-		waitClock = createWaitClock(db, await readTries(db), deps.clock);
+		if (left <= 0) counter.start(await readTries(db));
+		deps.onWaitLine?.(line);
 		return line;
 	}
 
@@ -83,5 +87,5 @@ export function createCurrentPinCheck(deps: CurrentPinDeps): {
 		return { ok: false, line: found.lowMemory ? CHECK_LOW_MEMORY_LINE : failedLine };
 	}
 
-	return { check, stop: () => waitClock?.stop() };
+	return { check, stop: () => counter?.stop() };
 }

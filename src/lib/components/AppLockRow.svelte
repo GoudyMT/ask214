@@ -61,6 +61,7 @@
 	import { createCurrentPinCheck } from './current-pin-check';
 	import { loadAppLock } from './load-app-lock';
 	import PinField from './PinField.svelte';
+	import { followWait } from './wait-countdown';
 
 	type Props = {
 		deps?: AppLockDeps;
@@ -117,12 +118,16 @@
 	const backingUp = $derived(making && RUNNING_PHASES.includes(backupSession.phase));
 
 	// Its wait clock counts an owed wait down while the row is up: nothing else does in Settings, so a wait on the row
-	// would never end.
+	// would never end. The line follows the count while it is still the message shown.
 	const pinCheck = untrack(() =>
 		createCurrentPinCheck({
 			derive: deps.derive,
 			clock: deps.clock,
-			loadDerive: async () => (await loadAppLock())[0]
+			loadDerive: async () => (await loadAppLock())[0],
+			onWaitLine: followWait(
+				() => message,
+				(line) => (message = line)
+			)
 		})
 	);
 	onDestroy(() => pinCheck.stop());
@@ -637,7 +642,10 @@
 					>
 				</div>
 			{/if}
-			{#if message}<p class="app-lock__message" role="alert">{message}</p>{/if}
+			<!-- The wait line's seconds change inside a child that is not live: the alert is spoken when it appears, not on every tick. -->
+			{#if message}<p class="app-lock__message" role="alert">
+					<span aria-live="off">{message}</span>
+				</p>{/if}
 		</div>
 	{/if}
 </div>
