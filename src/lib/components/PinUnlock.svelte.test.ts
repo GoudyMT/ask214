@@ -520,6 +520,49 @@ describe('the wait line, live', () => {
 		await until(async () => (await readTries(db)).waitMs === 15_000, 'the remainder written');
 	});
 
+	// A wait that begins in a hidden page is held to the same rule as one that was running when the page was hidden.
+	it('writes nothing for a wait found by a card opened in a hidden page, and counts the time away when both clocks agree', async () => {
+		await putTries({ count: 4, waitMs: 30_000, pending: false });
+		vi.useFakeTimers({ toFake: [...TIMERS] });
+		now = 0;
+		date = 1_700_000_000_000;
+		vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+		await mount({ clock: { perfNow: () => now }, dateNow: () => date });
+		await until(() => alertText() !== null, 'the wait line at mount');
+
+		now += 10_000;
+		date += 10_000;
+		vi.advanceTimersByTime(10_000);
+		await real(100);
+		expect((await readTries(db)).waitMs).toBe(30_000);
+		expect(alertText()).toBe(waitLine(30_000));
+
+		await pageIs('visible');
+		expect(alertText()).toBe(waitLine(20_000));
+	});
+
+	it('writes nothing for a wait a wrong try earned while the page was hidden, and does not count a time away the Date clock disagrees with', async () => {
+		await putTries({ count: 3, waitMs: 0, pending: false });
+		vi.useFakeTimers({ toFake: [...TIMERS] });
+		now = 0;
+		date = 1_700_000_000_000;
+		await mount({ clock: { perfNow: () => now }, dateNow: () => date });
+		await pageIs('hidden');
+		fieldEl().value = WRONG;
+		fieldEl().dispatchEvent(new Event('input', { bubbles: true }));
+		unlockEl().click();
+		await until(() => alertText() === waitLine(30_000), 'the wait the wrong try earned');
+
+		now += 10_000;
+		date += 100_000;
+		vi.advanceTimersByTime(10_000);
+		await real(100);
+		expect((await readTries(db)).waitMs).toBe(30_000);
+
+		await pageIs('visible');
+		expect(alertText()).toBe(waitLine(30_000));
+	});
+
 	it.each([
 		['the Date clock moved far more than the performance clock', 10_000, 100_000],
 		['the Date clock went back', 10_000, -50_000]

@@ -2276,10 +2276,16 @@ describe('with the PIN on, making a backup', () => {
 		await openStepUp();
 		for (let tries = 0; tries < 4; tries += 1) await press(OTHER_PIN);
 		expect(alertText()).toBe(waitLine(30_000));
+		// The seconds change inside a child that is not live, in the alert that was spoken when it appeared.
+		const alert = document.querySelector('#backup-make [role="alert"]');
+		const changing = alert?.querySelector('[aria-live="off"]');
+		expect(changing?.textContent).toBe(waitLine(30_000));
 
 		vi.advanceTimersByTime(1_000);
 		flushSync();
 		expect(alertText()).toBe(waitLine(29_000));
+		expect(document.querySelector('#backup-make [role="alert"]')).toBe(alert);
+		expect(alert?.querySelector('[aria-live="off"]')?.textContent).toBe(waitLine(29_000));
 		vi.advanceTimersByTime(29_000);
 		flushSync();
 		expect(alertText()).toBeNull();

@@ -416,7 +416,6 @@
 			const opened = checked.session;
 			// Said at once, so a failure later in this press still leaves it under the row.
 			statuses = checked.notice;
-			// Said at once, so a failure later in this press still leaves it under the row.
 
 			if (kind === 'change') {
 				// A Lock during the check: the new PIN is not derived for a tab that is locked.

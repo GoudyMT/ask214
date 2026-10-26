@@ -121,7 +121,12 @@ export function createCountdown(
 			tries = from.count;
 			doc = deps.doc ?? document;
 			doc.addEventListener('visibilitychange', onVisibility);
-			run(from.waitMs);
+			// Begun in a hidden page: no clock yet, so nothing is written and the first return applies the clocks rule.
+			if (doc.visibilityState !== 'hidden') run(from.waitMs);
+			else {
+				away = { left: from.waitMs, perf: perfNow(), date: dateNow() };
+				say(waitLine(Math.ceil(from.waitMs)));
+			}
 		},
 		remainingMs: () => (away ? away.left : over || clock === null ? 0 : clock.remainingMs()),
 		stop

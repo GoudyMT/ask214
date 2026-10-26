@@ -1392,11 +1392,17 @@ describe('changing the PIN', () => {
 			await openForm('Change PIN');
 			for (let tries = 0; tries < 4; tries += 1) await pressChange(WRONG, NEW_PIN, NEW_PIN);
 			expect(alertText()).toBe(waitLine(30_000));
+			// The seconds change inside a child that is not live, in the alert that was spoken when it appeared.
+			const alert = document.querySelector('[role="alert"]');
+			const changing = alert?.querySelector('[aria-live="off"]');
+			expect(changing?.textContent).toBe(waitLine(30_000));
 
 			clock.t += 1_000;
 			vi.advanceTimersByTime(1_000);
 			await tick();
 			expect(alertText()).toBe(waitLine(29_000));
+			expect(document.querySelector('[role="alert"]')).toBe(alert);
+			expect(alert?.querySelector('[aria-live="off"]')?.textContent).toBe(waitLine(29_000));
 			clock.t += 29_000;
 			vi.advanceTimersByTime(29_000);
 			await tick();

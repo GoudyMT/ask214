@@ -267,6 +267,42 @@ describe('while the page is hidden', () => {
 		count.stop();
 	});
 
+	// A wait that begins in a hidden page (a wrong try that resolves after a switch away, a card opened in a background tab)
+	// is held to the same rule: nothing is written, and the time away counts only when the two clocks agree.
+	it('begun while hidden, writes nothing and says the wait, then counts the time away when the clocks agree', async () => {
+		doc.visibilityState = 'hidden';
+		const count = counting();
+		count.start(OWED);
+		perf += 10_000;
+		date += 10_000;
+		vi.advanceTimersByTime(10_000);
+		await real(100);
+
+		expect(lines).toEqual([waitLine(30_000)]);
+		expect(await stored()).toBe(30_000);
+		expect(count.remainingMs()).toBe(30_000);
+
+		doc.show('visible');
+		expect(lines.at(-1)).toBe(waitLine(20_000));
+		expect(count.remainingMs()).toBe(20_000);
+		count.stop();
+	});
+
+	it('begun while hidden, does not count a time away the Date clock disagrees with', async () => {
+		doc.visibilityState = 'hidden';
+		const count = counting();
+		count.start(OWED);
+		perf += 10_000;
+		date += 100_000;
+		doc.show('visible');
+
+		expect(count.remainingMs()).toBe(30_000);
+		expect(lines).toEqual([waitLine(30_000)]);
+		pass(5_000);
+		await until(async () => (await stored()) === 25_000, 'the remainder written');
+		count.stop();
+	});
+
 	it('stops listening when it is stopped', async () => {
 		const count = counting();
 		count.start(OWED);
