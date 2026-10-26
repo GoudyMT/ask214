@@ -147,6 +147,81 @@ function sortedJson(value: unknown): string {
 	);
 }
 
+/** What the composer needs to know of the device it composes for. */
+export type DeviceMarks = {
+	/** The device's generations now. */
+	gens: RestoreGens;
+	/** The device's clock mark, or null where it cannot be read. */
+	lastSeenAt: number | null;
+	/** The profile marker's time. */
+	tsProfile: number | null;
+	/** The events this phone's calendar holds, when they could be read. */
+	lastAdd: HandedOverEvent[] | undefined;
+};
+
+/**
+ * What the device will hold after a restore, composed from the file and the device's marks alone: no database, no
+ * clock, no key. Every plaintext buffer and record it makes goes into `held` for the caller to wipe, also when it
+ * throws part way. A mismatch between the codecs and the file's content throws E_WRITE_FAILED before anything exists to
+ * write.
+ */
+export function composeRestore(
+	inner: ValidInner,
+	device: DeviceMarks,
+	at: number,
+	held: { staged: Uint8Array[]; records: ProfileV1[] }
+): {
+	gens: RestoreGens;
+	profile: ProfileV1;
+	timeline: TimelineState;
+	calendar: CalendarSyncState;
+	finder: FinderRecord;
+} {
+	// Each store moves one step past where this device is, so a peer's next save sees the change. The finder does too
+	// when the file holds no finder record: it is then written empty, never cleared. A cleared finder would start again
+	// at generation 0, and later saves would climb back to the number a stale tab holds, which would then pass its
+	// conflict check and write its old record over the newer one.
+	const gens: RestoreGens = {
+		profile: device.gens.profile + 1,
+		timeline: device.gens.timeline + 1,
+		calendar: device.gens.calendar + 1,
+		finder: device.gens.finder + 1
+	};
+
+	const wire = new TextEncoder().encode(JSON.stringify(inner.stores.profile));
+	held.staged.push(wire);
+	const fromFile = decodeProfile(wire);
+	held.records.push(fromFile);
+	const profile: ProfileV1 = {
+		...fromFile,
+		schemaVersion: 1,
+		generation: gens.profile,
+		// The clock mark only ever moves forward on this device, whatever the file says.
+		lastSeenAt: updateLastSeen(Math.max(device.lastSeenAt ?? 0, device.tsProfile ?? 0), at),
+		// A file dated ahead of this clock is marked as made now, so the mark never claims a future backup.
+		lastBackupAt: Math.min(inner.createdAt, at),
+		backupGenProfile: gens.profile,
+		backupGenTimeline: gens.timeline,
+		backupGenCalendar: gens.calendar,
+		backupGenFinder: gens.finder
+	};
+	held.records.push(profile);
+
+	const timeline: TimelineState = structuredClone(
+		inner.stores['timeline-state'] ?? emptyTimeline()
+	);
+	const calendar: CalendarSyncState = structuredClone(
+		inner.stores['calendar-sync'] ?? emptyCalendar()
+	);
+	if (device.lastAdd !== undefined) calendar.lastAdd = device.lastAdd;
+	const finder: FinderRecord = structuredClone(inner.stores['skillbridge-finder'] ?? emptyFinder());
+
+	// The writer's own check of itself, before anything is encrypted: the codecs give back exactly what is about to be
+	// written, and that holds exactly the file's content and nothing else.
+	verifyComposed(inner, profile, timeline, calendar, finder, held.records, held.staged);
+	return { gens, profile, timeline, calendar, finder };
+}
+
 /**
  * Restore `inner` onto this device.
  *
@@ -219,62 +294,23 @@ async function replaceStores(
 			return fail('E_RESTORE_DEVICE_MOVED');
 		}
 
-		// 3. Each store moves one step past where this device is, so a peer's next save sees the change. The finder does
-		// too when the file holds no finder record: it is then written empty, never cleared. A cleared finder would start
-		// again at generation 0, and later saves would climb back to the number a stale tab holds, which would then pass
-		// its conflict check and write its old record over the newer one.
-		const gens: RestoreGens = {
-			profile: state.gens.profile + 1,
-			timeline: state.gens.timeline + 1,
-			calendar: state.gens.calendar + 1,
-			finder: state.gens.finder + 1
-		};
-		const at = (opts.now ?? Date.now)();
-
-		// 4. Compose what the device will hold.
-		const wire = new TextEncoder().encode(JSON.stringify(inner.stores.profile));
-		staged.push(wire);
-		const fromFile = decodeProfile(wire);
-		records.push(fromFile);
-		const profile: ProfileV1 = {
-			...fromFile,
-			schemaVersion: 1,
-			generation: gens.profile,
-			// The clock mark only ever moves forward on this device, whatever the file says.
-			lastSeenAt: updateLastSeen(Math.max(state.lastSeenAt ?? 0, state.ts.profile ?? 0), at),
-			// A file dated ahead of this clock is marked as made now, so the mark never claims a future backup.
-			lastBackupAt: Math.min(inner.createdAt, at),
-			backupGenProfile: gens.profile,
-			backupGenTimeline: gens.timeline,
-			backupGenCalendar: gens.calendar,
-			backupGenFinder: gens.finder
-		};
-		records.push(profile);
-
-		const timeline: TimelineState = structuredClone(
-			inner.stores['timeline-state'] ?? emptyTimeline()
-		);
-
-		const calendar: CalendarSyncState = structuredClone(
-			inner.stores['calendar-sync'] ?? emptyCalendar()
-		);
-		// The events handed to THIS phone's calendar belong to this device. If they cannot be read the record is being
+		// 3. The events handed to THIS phone's calendar belong to this device. If they cannot be read the record is being
 		// replaced anyway; only the reminders to delete those events are lost.
-		const handedOver = await readDeviceLastAdd(
+		const at = (opts.now ?? Date.now)();
+		const lastAdd = await readDeviceLastAdd(
 			db,
 			keyIdentity(keystore),
 			keys.dataKey,
 			state.gens.calendar
 		);
-		if (handedOver !== undefined) calendar.lastAdd = handedOver;
 
-		const finder: FinderRecord = structuredClone(
-			inner.stores['skillbridge-finder'] ?? emptyFinder()
+		// 4. Compose what the device will hold.
+		const { gens, profile, timeline, calendar, finder } = composeRestore(
+			inner,
+			{ gens: state.gens, lastSeenAt: state.lastSeenAt, tsProfile: state.ts.profile, lastAdd },
+			at,
+			{ staged, records }
 		);
-
-		// The writer's own check of itself, before anything is encrypted: the codecs give back exactly what is about to
-		// be written, and that holds exactly the file's content and nothing else.
-		verifyComposed(inner, profile, timeline, calendar, finder, records, staged);
 
 		// 5. One counter bump for the whole restore, and the key record signed again over it. Install, keys, epoch and
 		// generation stay as they are, so the stored API key still opens.
