@@ -764,6 +764,16 @@ describe('the row with the PIN on', () => {
 		deriveByPin();
 	});
 
+	// A live region has to be in the page before its text arrives, or a screen reader may not speak the text.
+	it('keeps the status region on the page, shown, before there is anything to say', async () => {
+		await mount();
+
+		const region = document.querySelector('[role="status"]');
+		expect(region).not.toBeNull();
+		expect(region ? getComputedStyle(region).display : 'missing').not.toBe('none');
+		expect(statusLines()).toEqual([]);
+	});
+
 	it('offers Change PIN and Remove PIN under the PIN-on line', async () => {
 		await mount();
 		await openRow();
@@ -871,6 +881,23 @@ describe('changing the PIN', () => {
 			await pressChange(CURRENT, NEW_PIN, NEW_PIN);
 
 			await until(() => rotate.mock.calls.length === 1, 'the change');
+		});
+
+		// The stored remainder is written every few seconds, so it runs behind the clock: a press that restarted the count
+		// from it would push the end of the wait away and show a wait longer than the one left.
+		it('answers a press while the wait is owed with the time left on the running count, not the stored one', async () => {
+			await mount();
+			await openForm('Change PIN');
+			for (let tries = 0; tries < 4; tries += 1) await pressChange(WRONG, NEW_PIN, NEW_PIN);
+
+			clock.t += 10_000;
+			runWaitClock?.();
+			await until(async () => (await readTries(db)).waitMs === 20_000, 'the remainder written');
+			clock.t += 4_000;
+			await pressChange(CURRENT, NEW_PIN, NEW_PIN);
+
+			expect(alertText()).toBe(waitLine(16_000));
+			expect(deriveLog).toHaveLength(4);
 		});
 
 		it('says the memory ran out, and takes the try back, when the current PIN could not be checked', async () => {

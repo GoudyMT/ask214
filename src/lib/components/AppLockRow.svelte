@@ -590,12 +590,13 @@
 		margin: 0;
 		font-weight: 600;
 	}
-	/* What a change or a removal did, under the closed row. No box when there is nothing to say. */
+	/* What a change or a removal did, under the closed row. It stays on the page when empty, so a screen reader is
+	   already watching it when the line arrives; it only gives up its space. */
 	.app-lock__status {
 		margin: var(--space-s) 0 var(--space-l);
 	}
 	.app-lock__status:empty {
-		display: none;
+		margin: 0;
 	}
 	.app-lock__actions {
 		display: flex;
