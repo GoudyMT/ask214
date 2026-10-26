@@ -44,9 +44,11 @@
 		onunlocked?: () => void;
 		/** Set when focus is on its way here from a button that is about to go (Lock): the cursor goes to the field. */
 		takeFocus?: boolean;
+		/** "Erase and start over" on the Forgot screen: the page opens its Erase. */
+		onerase?: () => void;
 		deps?: PinUnlockDeps;
 	};
-	let { onunlocked, takeFocus = false, deps = {} }: Props = $props();
+	let { onunlocked, takeFocus = false, onerase, deps = {} }: Props = $props();
 
 	const app = getProfileApp();
 
@@ -58,6 +60,22 @@
 	let field = $state<ReturnType<typeof PinField> | null>(null);
 	let busy = $state(false);
 	let message = $state<string | null>(null);
+
+	// The Forgot screen takes the card's place. The backup card and the writer for a locked device are fetched only when
+	// the person asks to restore: the Unlock card's own code carries neither.
+	type RestoreCard = (typeof import('../backup/BackupCard.svelte'))['default'];
+	let forgot = $state(false);
+	let forgotHeadingEl = $state<HTMLElement | null>(null);
+	let restore = $state.raw<{
+		Card: RestoreCard;
+		deps: {
+			lockedDevice: {
+				read: typeof import('../keystore/forgot-restore').readLockedDevice;
+				write: typeof import('../keystore/forgot-restore').restoreLockedDevice;
+			};
+		};
+	} | null>(null);
+	let restoreFailed = $state(false);
 
 	let clock: { remainingMs(): number; stop(): void } | null = null;
 	let clockTimer: ReturnType<typeof setTimeout> | undefined;
@@ -219,31 +237,120 @@
 			busy = false;
 		}
 	}
+
+	// A held Enter would press the control focus lands on for every repeat: only a new press counts.
+	const guardEnter = (e: KeyboardEvent): void => {
+		if (e.repeat && e.key === 'Enter') e.preventDefault();
+	};
+
+	// The Unlock form goes with its field, which empties itself as it goes. Focus goes to the new screen's heading, a thing
+	// nothing presses, so a key still held from the button that opened it does nothing there.
+	async function openForgot(): Promise<void> {
+		if (busy) return;
+		forgot = true;
+		await tick();
+		forgotHeadingEl?.focus();
+	}
+
+	function backToUnlock(): void {
+		restore = null;
+		restoreFailed = false;
+		forgot = false;
+		void tick().then(() => field?.focus());
+	}
+
+	async function showRestore(): Promise<void> {
+		if (restore !== null) return;
+		try {
+			const [card, locked] = await Promise.all([
+				import('../backup/BackupCard.svelte'),
+				import('../keystore/forgot-restore')
+			]);
+			if (gone || !forgot) return;
+			restoreFailed = false;
+			restore = {
+				Card: card.default,
+				deps: { lockedDevice: { read: locked.readLockedDevice, write: locked.restoreLockedDevice } }
+			};
+			// The button the person pressed is gone: focus goes to the row that took its place.
+			await tick();
+			document.getElementById('backup-toggle-restore')?.focus();
+		} catch {
+			// The files come from the app's cache; a fetch that fails offline says so and the person can try again.
+			safeLog({ code: 'E_INTERNAL' });
+			restoreFailed = true;
+		}
+	}
 </script>
 
-<section class="pin-unlock" aria-labelledby="pin-unlock-heading">
-	<h2 id="pin-unlock-heading">Your data is locked</h2>
-	<p class="pin-unlock__body">Enter your PIN to open your information.</p>
-	<PinField
-		bind:this={field}
-		bind:value
-		id="pin-unlock-field"
-		label="PIN"
-		joinRelock={app.joinRelock}
-		onenter={() => void unlock()}
-	/>
-	<!-- Not `disabled`: a disabled button that holds focus drops it, so a press while it works is ignored instead. A held
+<section class="pin-unlock" aria-labelledby={forgot ? 'pin-forgot-heading' : 'pin-unlock-heading'}>
+	{#if !forgot}
+		<h2 id="pin-unlock-heading">Your data is locked</h2>
+		<p class="pin-unlock__body">Enter your PIN to open your information.</p>
+		<PinField
+			bind:this={field}
+			bind:value
+			id="pin-unlock-field"
+			label="PIN"
+			joinRelock={app.joinRelock}
+			onenter={() => void unlock()}
+		/>
+		<!-- Not `disabled`: a disabled button that holds focus drops it, so a press while it works is ignored instead. A held
 	     Enter's repeats would press again, so only a new press counts; Space clicks on release. -->
-	<button
-		class="pin-unlock__unlock"
-		type="button"
-		onclick={() => void unlock()}
-		onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
-		aria-busy={busy}
-	>
-		{busy ? 'Unlocking...' : 'Unlock'}
-	</button>
-	{#if message}<p class="pin-unlock__message" role="alert">{message}</p>{/if}
+		<button
+			class="pin-unlock__unlock"
+			type="button"
+			onclick={() => void unlock()}
+			onkeydown={guardEnter}
+			aria-busy={busy}
+		>
+			{busy ? 'Unlocking...' : 'Unlock'}
+		</button>
+		{#if message}<p class="pin-unlock__message" role="alert">{message}</p>{/if}
+		<button
+			class="pin-unlock__quiet"
+			type="button"
+			onclick={() => void openForgot()}
+			onkeydown={guardEnter}>Forgot PIN?</button
+		>
+	{:else}
+		<h2 id="pin-forgot-heading" tabindex="-1" bind:this={forgotHeadingEl}>Forgot your PIN?</h2>
+		<p class="pin-unlock__body">
+			Your PIN is not saved anywhere, so no one can reset it. You have two ways back.
+		</p>
+		{#if restore !== null}
+			{@const Card = restore.Card}
+			<div class="pin-unlock__card">
+				<Card
+					db={app.db}
+					onEraseRequest={() => onerase?.()}
+					only={{ row: 'restore', label: 'Restore from a backup', open: true }}
+					restoreDeps={restore.deps}
+				/>
+			</div>
+		{:else}
+			<button
+				class="pin-unlock__restore"
+				type="button"
+				onclick={() => void showRestore()}
+				onkeydown={guardEnter}>Restore from a backup</button
+			>
+			<p class="pin-unlock__hint">Uses a backup file you saved and its six words.</p>
+		{/if}
+		{#if restoreFailed}<p class="pin-unlock__message" role="alert">{UNLOCK_FAILED}</p>{/if}
+		<button
+			class="pin-unlock__danger"
+			type="button"
+			onclick={() => onerase?.()}
+			onkeydown={guardEnter}>Erase and start over</button
+		>
+		<p class="pin-unlock__hint">
+			Removes everything saved on this device, so the app can start again.
+		</p>
+		<button class="pin-unlock__quiet" type="button" onclick={backToUnlock} onkeydown={guardEnter}
+			>Back to Unlock</button
+		>
+	{/if}
 </section>
 
 <style>
@@ -271,7 +378,8 @@
 	/* Primary CTA: filled accent + bg-colored text. The border is clear and takes a pixel of the padding, so the button
 	   is the size it was: forced colors repaint a clear border in a system colour, which keeps a filled button's edge
 	   when its fill is taken away. */
-	.pin-unlock__unlock {
+	.pin-unlock__unlock,
+	.pin-unlock__restore {
 		padding: calc(var(--space-s) - 1px) calc(var(--space-l) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
@@ -282,7 +390,8 @@
 		cursor: pointer;
 	}
 
-	.pin-unlock__unlock:hover {
+	.pin-unlock__unlock:hover,
+	.pin-unlock__restore:hover {
 		background: var(--color-accent-muted);
 	}
 
@@ -296,5 +405,40 @@
 	.pin-unlock__message {
 		margin: 0;
 		color: var(--color-danger);
+	}
+
+	.pin-unlock__quiet {
+		min-height: 44px;
+		padding: var(--space-s);
+		background: none;
+		border: none;
+		color: var(--color-fg-muted);
+		font: inherit;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	/* The border is a real one, in the danger colour, so the button keeps its edge when forced colors take the colour. */
+	.pin-unlock__danger {
+		padding: var(--space-s) var(--space-l);
+		background: none;
+		color: var(--color-danger);
+		border: 1px solid var(--color-danger);
+		border-radius: var(--radius-m);
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.pin-unlock__hint {
+		margin: var(--space-s) 0 0;
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	/* The backup card is drawn without a frame of its own, across the card, with its text from the left. */
+	.pin-unlock__card {
+		width: 100%;
+		text-align: left;
 	}
 </style>

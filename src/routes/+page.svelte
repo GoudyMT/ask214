@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { waitForControl } from '$lib/ask/when-controlled';
 	import AskView from '$lib/components/AskView.svelte';
@@ -42,6 +43,14 @@
 	// Unlock card then takes the place of the first-run invitation and of the row, and Ask stays open above it.
 	const pinLocked = $derived(app.status === 'ready' && app.pinLocked === true);
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
+	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not
+	// carry it.
+	function eraseAtSettings(): void {
+		void import('$lib/backup/session.svelte').then(({ backupSession }) => {
+			backupSession.requestErase();
+			return goto(resolve('/settings'));
+		});
+	}
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a
 	// timeline exists the timeline's glance row takes its place.
 	const showOnramp = $derived(
@@ -340,7 +349,7 @@
 			onkeydowncapture={(e) => e.key === 'Enter' && (unlockByTouch = false)}
 		>
 			{#await loadPinUnlock() then unlockCard}
-				<unlockCard.default onunlocked={() => void afterUnlock()} />
+				<unlockCard.default onunlocked={() => void afterUnlock()} onerase={eraseAtSettings} />
 			{:catch}
 				<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
 			{/await}

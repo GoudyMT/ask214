@@ -563,7 +563,11 @@
 			     between two sections, so it keeps their gap above and below. -->
 			<div class="pin-card-gap">
 				{#await loadPinUnlock() then card}
-					<card.default onunlocked={() => void focusHeading()} takeFocus={pinCardFocus} />
+					<card.default
+						onunlocked={() => void focusHeading()}
+						takeFocus={pinCardFocus}
+						onerase={openEraseFromBackup}
+					/>
 				{:catch}
 					<LockedPanel onunlock={() => window.location.reload()} error={UNLOCK_FAILED} />
 				{/await}

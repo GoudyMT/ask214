@@ -3,6 +3,14 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
 import { captureBackupIntent, markBackupIntent } from '$lib/backup/intent';
+import { backupSession } from '$lib/backup/session.svelte';
+
+// A client navigation cannot run in the test page; the page's request to go to Settings is recorded instead.
+const nav = vi.hoisted(() => ({ goto: vi.fn<(url: string) => Promise<void>>(async () => {}) }));
+vi.mock('$app/navigation', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$app/navigation')>()),
+	goto: nav.goto
+}));
 
 const { isoFromToday, byok } = vi.hoisted(() => ({
 	// The stored API key, which only an unlocked tab may read.
@@ -71,6 +79,8 @@ beforeEach(() => {
 	lock.pinLocked = true;
 	lock.storeLocked = true;
 	byok.readApiKey.mockClear();
+	nav.goto.mockClear();
+	backupSession.takeEraseRequest();
 });
 
 const cardHeading = () => page.getByRole('heading', { name: 'Your data is locked' });
@@ -125,6 +135,20 @@ describe('Timeline, locked with a PIN', () => {
 			expect(byok.readApiKey).toHaveBeenCalledTimes(reads);
 		}
 	);
+
+	// The Erase lives in Settings, so the card's Erase and start over sets the request the Settings page opens its dialog on,
+	// and moves there: the way the setup screen does.
+	it('Forgot PIN, then Erase and start over, asks Settings to open its Erase dialog and goes there', async () => {
+		await render(TimelinePage);
+
+		await page.getByRole('button', { name: 'Forgot PIN?', exact: true }).click();
+		await page.getByRole('button', { name: 'Erase and start over', exact: true }).click();
+
+		await vi.waitFor(() => expect(nav.goto).toHaveBeenCalledWith('/settings'));
+		expect(nav.goto).toHaveBeenCalledTimes(1);
+		expect(backupSession.takeEraseRequest()).toBe(true);
+		expect(backupSession.takeEraseRequest()).toBe(false);
+	});
 
 	it('takes the card away and puts focus on the page heading when the unlock lands', async () => {
 		await render(TimelinePage);

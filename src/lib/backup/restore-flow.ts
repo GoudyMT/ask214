@@ -4,6 +4,7 @@ import { waitForControl } from '../ask/when-controlled';
 import { RunAbortedError } from '../db/locks';
 import type { ProfileApp } from '../profile/context';
 import { readDeviceState, type DeviceState } from '../profile/device-state';
+import type { readLockedDevice, restoreLockedDevice } from '../keystore/forgot-restore';
 import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
@@ -115,6 +116,11 @@ export type FlowDeps = {
 	waitForControl?: () => Promise<boolean>;
 	/** The one device read that builds the confirm: the verified state and the install it was read on. */
 	readDevice?: (db: IDBDatabase) => Promise<{ state: DeviceState; installUuid: Uint8Array }>;
+	/**
+	 * Set on a device that is locked behind a forgotten PIN: no key can read it, so the confirm is built from what the
+	 * markers show and the write replaces the whole device with a local one. Without it nothing here changes.
+	 */
+	lockedDevice?: { read: typeof readLockedDevice; write: typeof restoreLockedDevice };
 	reload?: () => void;
 	replace?: (path: string) => void;
 	isVisible?: () => boolean;
@@ -210,6 +216,9 @@ function describeDevice(state: DeviceState, createdAt: number): { line: string; 
 	};
 }
 
+// What the confirm says on a locked device: nothing on it can be read, so nothing of it is described, only replaced.
+const LOCKED_DEVICE_LINE = 'This replaces everything on this device with the backup.';
+
 const isLockReason = (mover: string | null): boolean =>
 	mover === 'idle' || mover === 'user' || mover === 'peer';
 
@@ -219,6 +228,7 @@ export class RestoreFlow {
 	readonly #db: IDBDatabase | null;
 	readonly #waitForControl: () => Promise<boolean>;
 	readonly #readDevice: NonNullable<FlowDeps['readDevice']>;
+	readonly #lockedDevice: FlowDeps['lockedDevice'];
 	readonly #reload: () => void;
 	readonly #replace: (path: string) => void;
 	readonly #isVisible: () => boolean;
@@ -232,6 +242,8 @@ export class RestoreFlow {
 	#offerErase = false;
 	#checked: { line: string; summary: BackupSummary } | null = null;
 	#after: After | null = null;
+	// The write that committed was the locked-device one: the PIN is off, and the next page says so.
+	#pinOff = false;
 	#stopWaiting: (() => void) | null = null;
 	readonly #updates = new Set<() => void>();
 	readonly #subscribe = createSubscriber((update) => {
@@ -247,6 +259,7 @@ export class RestoreFlow {
 		this.#db = deps.db;
 		this.#waitForControl = deps.waitForControl ?? waitForControl;
 		this.#readDevice = deps.readDevice ?? readDeviceNow;
+		this.#lockedDevice = deps.lockedDevice;
 		// Through startReload, so a lock landing before the page unloads stops the reload (pending-reload.ts).
 		this.#reload = deps.reload ?? ((): void => startReload(() => location.reload()));
 		this.#replace =
@@ -324,6 +337,7 @@ export class RestoreFlow {
 		this.#offerErase = false;
 		this.#checked = null;
 		this.#after = null;
+		this.#pinOff = false;
 		this.#notify();
 		const at = session.runId;
 		// True and false both move on: a page no worker controls still restores, only from the network.
@@ -442,6 +456,28 @@ export class RestoreFlow {
 			run.toPre('E_BACKUP_UNAVAILABLE');
 			return;
 		}
+		const locked = this.#lockedDevice;
+		if (locked !== undefined) {
+			let found: Awaited<ReturnType<typeof readLockedDevice>>;
+			try {
+				found = await locked.read(db);
+			} catch (e) {
+				if (!run.isCurrent()) return;
+				this.#failDevice(run, deviceReadCode(e));
+				return;
+			}
+			if (!run.isCurrent()) return;
+			run.hold('confirm', {
+				gens: found.gens,
+				installUuid: found.installUuid,
+				summary: summarize(inner, label),
+				deviceLine: LOCKED_DEVICE_LINE,
+				warning: false,
+				notice
+			} satisfies ConfirmHold);
+			run.enter('confirm');
+			return;
+		}
 		let device: Awaited<ReturnType<NonNullable<FlowDeps['readDevice']>>>;
 		try {
 			device = await this.#readDevice(db);
@@ -500,18 +536,19 @@ export class RestoreFlow {
 			}
 
 			// Awaited directly: once the writer has committed, nothing may drop what comes after it.
-			const result = await restoreBackup(
-				db,
-				checked.inner,
-				{ gens: confirm.gens, installUuid: confirm.installUuid },
-				{
-					signal: run.signal,
-					mayCommit: run.mayCommit,
-					onCommitting: session.markCommitting
-				}
-			);
+			const expected = { gens: confirm.gens, installUuid: confirm.installUuid };
+			const options = {
+				signal: run.signal,
+				mayCommit: run.mayCommit,
+				onCommitting: session.markCommitting
+			};
+			const locked = this.#lockedDevice;
+			const result =
+				locked === undefined
+					? await restoreBackup(db, checked.inner, expected, options)
+					: await locked.write(db, checked.inner, expected, options);
 			if (result.ok) {
-				this.#afterCommit();
+				this.#afterCommit(locked !== undefined);
 				return;
 			}
 			await this.#afterRefusal(run, result.code, checked.inner, file.label);
@@ -547,9 +584,19 @@ export class RestoreFlow {
 	}
 
 	/** Written. In the writer promise's own continuation, so no abort can drop any of it. */
-	#afterCommit(): void {
+	#afterCommit(pinOff: boolean): void {
 		const session = this.#session;
 		session.enterPhase('committed');
+		this.#pinOff = pinOff;
+		// A restore onto a locked device changed the keys: the other tabs relock and read the new row before they take the
+		// news that the data was replaced.
+		if (pinOff) {
+			try {
+				this.#app.publish?.({ type: 'keys-changed' });
+			} catch {
+				/* the other tabs learn on their next read; this tab's own result still shows */
+			}
+		}
 		try {
 			this.#app.publish?.({ type: 'data-replaced' });
 		} catch {
@@ -568,7 +615,8 @@ export class RestoreFlow {
 		this.#stopWaiting?.();
 		this.#stopWaiting = null;
 		const session = this.#session;
-		if (isLockReason(session.epochMovedBy)) {
+		// A restore onto a locked device left no PIN to unlock, so a lock during it changes nothing about where it goes.
+		if (!this.#pinOff && isLockReason(session.epochMovedBy)) {
 			if (this.#app.store?.locked === true) {
 				this.#app.reloadOnUnlock = true;
 				this.#after = 'unlock';
@@ -592,7 +640,7 @@ export class RestoreFlow {
 	#goToTimeline(): void {
 		const path = this.#timelinePath();
 		try {
-			markBackupIntent('restored', path);
+			markBackupIntent(this.#pinOff ? 'restored-pin-off' : 'restored', path);
 		} catch {
 			this.#replace(path);
 			return;

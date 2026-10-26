@@ -7,6 +7,7 @@ import { detectEligibilityIntent } from '$lib/ask/synthesis/eligibility-gate';
 import type { AskState } from '$lib/ask';
 import { createByokStore } from '$lib/ask/byok/store';
 import { KDF_V1 } from '$lib/backup/kdf-params';
+import { backupSession } from '$lib/backup/session.svelte';
 import { createCalendarSyncStore } from '$lib/calendar/store.svelte';
 import type { ResultCard } from '$lib/corpus';
 import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
@@ -49,6 +50,12 @@ const harness = vi.hoisted(() => ({
 	realAsk: false
 }));
 
+// A client navigation cannot run in the test page; the page's request to go to Settings is recorded instead.
+const nav = vi.hoisted(() => ({ goto: vi.fn<(url: string) => Promise<void>>(async () => {}) }));
+vi.mock('$app/navigation', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$app/navigation')>()),
+	goto: nav.goto
+}));
 vi.mock('$lib/db/schema', async (importOriginal) => {
 	const real = await importOriginal<typeof import('$lib/db/schema')>();
 	return {
@@ -327,6 +334,8 @@ beforeEach(async () => {
 	ask.mode = 'online';
 	askStore.ask.mockClear();
 	askStore.setMode.mockClear();
+	nav.goto.mockClear();
+	backupSession.takeEraseRequest();
 	harness.app = null;
 	vi.spyOn(navigator.serviceWorker, 'register').mockResolvedValue({} as ServiceWorkerRegistration);
 	await pinDevice();
@@ -498,6 +507,26 @@ describe('Home, PIN-locked', () => {
 		await expect.element(page.getByText('An intent to file lets you notify VA')).toBeVisible();
 		// The card stays under the answer: it is still the way in.
 		await expect.element(pinField()).toBeVisible();
+	});
+
+	// The Erase lives in Settings, so the card's Erase and start over sets the request the Settings page opens its dialog
+	// on, and moves there: the way the setup screen does.
+	it('Forgot PIN, then Erase and start over, asks Settings to open its Erase dialog and goes there', async () => {
+		await readyApp();
+		await render(HomePage);
+		await expect.element(pinField()).toBeVisible();
+
+		// Pressed in the page itself: the layout's bar, drawn beside this page rather than around it, covers the buttons.
+		const press = (name: string) =>
+			(page.getByRole('button', { name, exact: true }).element() as HTMLButtonElement).click();
+		press('Forgot PIN?');
+		await expect.element(page.getByRole('heading', { name: 'Forgot your PIN?' })).toBeVisible();
+		press('Erase and start over');
+
+		await vi.waitFor(() => expect(nav.goto).toHaveBeenCalledWith('/settings'));
+		expect(nav.goto).toHaveBeenCalledTimes(1);
+		expect(backupSession.takeEraseRequest()).toBe(true);
+		expect(backupSession.takeEraseRequest()).toBe(false);
 	});
 });
 

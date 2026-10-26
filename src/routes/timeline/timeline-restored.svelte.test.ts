@@ -73,6 +73,12 @@ function restoredHere(): void {
 	captureBackupIntent();
 }
 
+/** What a restore onto a device locked behind a forgotten PIN leaves before it reloads: the PIN is off afterwards. */
+function restoredPinOffHere(): void {
+	markBackupIntent('restored-pin-off', location.pathname + location.search);
+	captureBackupIntent();
+}
+
 /** Holds every navigation the page starts, recording its kind. */
 function holdNavigation(): string[] {
 	const seen: string[] = [];
@@ -104,6 +110,7 @@ afterEach(async () => {
 	release?.();
 	release = null;
 	takeBackupIntent('restored');
+	takeBackupIntent('restored-pin-off');
 	history.replaceState(history.state, '', START_URL);
 	vi.restoreAllMocks();
 	if (db) await deleteTestDb(db);
@@ -156,6 +163,39 @@ describe('the Timeline right after a restore', () => {
 		await expect
 			.element(page.getByRole('status'))
 			.toHaveTextContent(`${RESTORED} ${NOT_IN_BACKUPS_NO_KEY}`);
+	});
+});
+
+describe('the Timeline right after a restore onto a device locked by a forgotten PIN', () => {
+	const PIN_OFF = 'Your data is back. Your PIN is off. Turn it on again in Settings.';
+	const ADD_KEY = 'Add your API key again.';
+
+	// The data came from the backup and the key store was emptied: the two lines, and none of the ordinary ones (the
+	// backup's date and the list of what a backup leaves out), which would talk about a PIN that is not there.
+	it('shows the two lines in a status region, in place of the ordinary restored lines, and not again after a reload', async () => {
+		await device();
+		restoredPinOffHere();
+		const first = await render(TimelinePage);
+
+		const status = page.getByRole('status');
+		await expect.element(status).toHaveTextContent(`${PIN_OFF} ${ADD_KEY}`);
+		expect(status.elements()).toHaveLength(1);
+		expect(first.container.textContent).not.toContain('Backup restored');
+		expect(first.container.textContent).not.toContain('Not in backups');
+
+		await first.unmount();
+		await render(TimelinePage);
+		await expectNoStatusLine();
+		expect(takeBackupIntent('restored-pin-off')).toBe(false);
+	});
+
+	it('says both lines whether or not an API key is stored (none can be: the restore emptied the store)', async () => {
+		const { byok } = await device();
+		await byok.saveApiKey(KEY);
+		restoredPinOffHere();
+		await render(TimelinePage);
+
+		await expect.element(page.getByRole('status')).toHaveTextContent(`${PIN_OFF} ${ADD_KEY}`);
 	});
 });
 

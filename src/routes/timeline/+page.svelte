@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
 	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
@@ -51,9 +52,21 @@
 	});
 	let headingEl: HTMLElement | undefined;
 
+	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not
+	// carry it.
+	function eraseAtSettings(): void {
+		void import('$lib/backup/session.svelte').then(({ backupSession }) => {
+			backupSession.requestErase();
+			return goto(resolve('/settings'));
+		});
+	}
+
 	// A restore reloads onto this page with a note in the history entry. It is taken here, once, as the page starts: the
 	// take removes it, so a second visit or a reload says nothing, and a later re-render cannot say it twice.
 	const restored = takeBackupIntent('restored');
+	// A restore onto a device that was locked behind a forgotten PIN: the data is back, the PIN is off, and the API key
+	// (which no backup carries, and which was sealed under keys nobody could open) is to be added again.
+	const restoredPinOff = takeBackupIntent('restored-pin-off');
 	const restoredAt = $derived(app.store?.lastBackupAt ?? null);
 	// Whether this device holds no API key (a backup never carries it). Unknown until read; the line waits for the answer
 	// so it appears once, whole.
@@ -304,7 +317,7 @@
 		{#if app.pinLocked === true}
 			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
 			{#await loadPinUnlock() then card}
-				<card.default onunlocked={() => void focusHeading()} />
+				<card.default onunlocked={() => void focusHeading()} onerase={eraseAtSettings} />
 			{:catch}
 				<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
 			{/await}
@@ -317,7 +330,12 @@
 				Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 			</p>
 			<LeavingLine {leaving} />
-			{#if restoredAt !== null && apiKeyMissing !== null}
+			{#if restoredPinOff}
+				<div class="timeline-restored" role="status">
+					<p>Your data is back. Your PIN is off. Turn it on again in Settings.</p>
+					<p>Add your API key again.</p>
+				</div>
+			{:else if restoredAt !== null && apiKeyMissing !== null}
 				<div class="timeline-restored" role="status">
 					<p>{restoredLine(formatBackupDate(restoredAt))}</p>
 					<p>{notInBackupsLine(apiKeyMissing)}</p>

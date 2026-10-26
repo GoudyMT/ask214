@@ -33,6 +33,7 @@ afterEach(() => {
 	pathname = '/timeline';
 	takeBackupIntent('restore-row');
 	takeBackupIntent('restored');
+	takeBackupIntent('restored-pin-off');
 	vi.unstubAllGlobals();
 });
 
@@ -80,6 +81,17 @@ describe('backup intent', () => {
 		captureBackupIntent();
 		expect(takeBackupIntent('restored')).toBe(false);
 		expect(takeBackupIntent('restore-row')).toBe(true);
+	});
+
+	// A restore onto a device that was locked behind a forgotten PIN ends with the PIN off: the Timeline says that, not the
+	// ordinary restored note, so the two must never be taken for each other.
+	it('a restore onto a locked device leaves its own note, which the ordinary restored page does not take', () => {
+		entry.state = { 'sveltekit:history': 3, mtcBackupIntent: 'restored-pin-off' };
+		captureBackupIntent();
+		expect(entry.state).toEqual({ 'sveltekit:history': 3 });
+		expect(takeBackupIntent('restored')).toBe(false);
+		expect(takeBackupIntent('restored-pin-off')).toBe(true);
+		expect(takeBackupIntent('restored-pin-off')).toBe(false);
 	});
 
 	// A foreign value is never acted on, and the entry it sits in is left as it was.

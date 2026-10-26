@@ -2,10 +2,14 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import PinUnlock, { type PinUnlockDeps } from './PinUnlock.svelte';
+// The colour tokens the card's borders are drawn from.
+import '../../app.css';
 import { KDF_V1 } from '../backup/kdf-params';
+import { backupSession } from '../backup/session.svelte';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
 import { withStores } from '../db/schema';
 import { readTries, type TriesState } from '../keystore/app-lock-store';
+import { readLockedDevice, restoreLockedDevice } from '../keystore/forgot-restore';
 import { PinNoMemoryError } from '../keystore/pin-derive';
 import { signKeystore, type KeystoreRecordPin } from '../keystore/record';
 import { KeystoreHmacMismatchError } from '../keystore/read';
@@ -24,12 +28,31 @@ type TestApp = {
 	reloadOnUnlock: boolean;
 };
 
-const h = vi.hoisted(() => ({ app: {} as Record<string, unknown> }));
+const h = vi.hoisted(() => ({
+	app: {} as Record<string, unknown>,
+	// What the Forgot screen handed the backup card, kept as the card was mounted.
+	card: null as Record<string, unknown> | null
+}));
 // The rest of the module stays real: app-init, imported below for the relock join, reads helpers from it.
 vi.mock('$lib/profile/context', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/profile/context')>()),
 	getProfileApp: () => h.app
 }));
+// The real card, drawn as it is; the wrapper only keeps the props it was mounted with.
+vi.mock('$lib/backup/BackupCard.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('$lib/backup/BackupCard.svelte')>();
+	const mount = real.default as unknown as (
+		anchor: unknown,
+		props: Record<string, unknown>
+	) => unknown;
+	return {
+		...real,
+		default: (anchor: unknown, props: Record<string, unknown>) => {
+			h.card = props;
+			return mount(anchor, props);
+		}
+	};
+});
 
 const HMAC = { name: 'HMAC', hash: 'SHA-256', length: 256 } as const;
 const GOOD = '1234';
@@ -105,6 +128,7 @@ let app: TestApp;
 let derive: Mock<(pin: string) => Promise<{ macKey: CryptoKey; kek: CryptoKey }>>;
 let reload: Mock<() => void>;
 let onunlocked: Mock<() => void>;
+let onerase: Mock<() => void>;
 
 const putRow = (row: object) =>
 	withStores(db, 'keystore', 'readwrite', (tx) => {
@@ -139,17 +163,22 @@ beforeEach(async () => {
 	}));
 	reload = vi.fn();
 	onunlocked = vi.fn();
+	onerase = vi.fn();
+	h.card = null;
 });
 
 afterEach(async () => {
 	vi.useRealTimers();
 	dropSession();
+	// The Forgot screen's backup card starts the tab's one backup session; a test must not leave it running.
+	backupSession.relockSync('user');
+	backupSession.takeEraseRequest();
 	await deleteTestDb(db);
 });
 
 async function mount(over: PinUnlockDeps = {}, props: { takeFocus?: boolean } = {}) {
 	const rendered = await render(PinUnlock, {
-		props: { onunlocked, ...props, deps: { derive, reload, ...over } }
+		props: { onunlocked, onerase, ...props, deps: { derive, reload, ...over } }
 	});
 	return rendered;
 }
@@ -644,6 +673,208 @@ describe('focus', () => {
 		await mount();
 		await real(100);
 		expect(document.activeElement).toBe(document.body);
+	});
+});
+
+// ---- Forgot PIN ----------------------------------------------------------------------------------------------------------
+
+const FORGOT_LINES = [
+	'Forgot your PIN?',
+	'Your PIN is not saved anywhere, so no one can reset it. You have two ways back.',
+	'Restore from a backup',
+	'Uses a backup file you saved and its six words.',
+	'Erase and start over',
+	'Removes everything saved on this device, so the app can start again.',
+	'Back to Unlock'
+];
+
+const forgotEl = () =>
+	page.getByRole('button', { name: 'Forgot PIN?', exact: true }).element() as HTMLButtonElement;
+const restoreEl = () =>
+	page.getByRole('button', { name: 'Restore from a backup', exact: true }).element() as HTMLElement;
+const eraseEl = () =>
+	page.getByRole('button', { name: 'Erase and start over', exact: true }).element() as HTMLElement;
+const backEl = () =>
+	page.getByRole('button', { name: 'Back to Unlock', exact: true }).element() as HTMLElement;
+const forgotHeading = () => page.getByRole('heading', { name: 'Forgot your PIN?', exact: true });
+const unlockHeading = () => page.getByRole('heading', { name: 'Your data is locked', exact: true });
+const cardLines = () =>
+	Array.from(document.querySelectorAll('.pin-unlock h2, .pin-unlock p, .pin-unlock button'), (el) =>
+		el.textContent?.trim()
+	);
+const frame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
+const restoreToggle = () => document.getElementById('backup-toggle-restore');
+
+async function openForgot(): Promise<void> {
+	forgotEl().click();
+	await expect.element(forgotHeading()).toBeVisible();
+}
+
+/** An Enter pressed on the focused control and held: the first press, then the key's repeats, then the release. */
+async function holdEnter(repeats = 5): Promise<void> {
+	const session = cdp();
+	await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+	for (let i = 0; i < repeats; i += 1) {
+		await real(40);
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+	}
+	await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+	await real(50);
+	await frame();
+}
+
+describe('Forgot PIN', () => {
+	it('opens the Forgot screen in the same card with its copy exactly, and the Unlock form is gone', async () => {
+		await mount();
+		expect(cardLines()).not.toContain('Forgot your PIN?');
+		await openForgot();
+
+		expect(cardLines()).toEqual(FORGOT_LINES);
+		expect(unlockHeading().query()).toBeNull();
+		expect(field().query()).toBeNull();
+		expect(document.querySelectorAll('.pin-unlock')).toHaveLength(1);
+	});
+
+	it('clears what was typed on the way in, and Back to Unlock returns with an empty field that has the cursor', async () => {
+		await mount();
+		await field().fill('12');
+		await openForgot();
+
+		backEl().click();
+		await expect.element(unlockHeading()).toBeVisible();
+
+		expect(fieldEl().value).toBe('');
+		await until(() => document.activeElement === fieldEl(), 'the cursor in the PIN field');
+		expect(cardLines()).not.toContain('Forgot your PIN?');
+	});
+
+	it('Restore from a backup shows the backup card with only its restore row open, in place of the button', async () => {
+		await mount();
+		await openForgot();
+
+		restoreEl().click();
+		await until(() => restoreToggle() !== null, 'the backup card');
+
+		expect(restoreToggle()?.getAttribute('aria-expanded')).toBe('true');
+		expect(restoreToggle()?.textContent?.trim()).toBe('Restore from a backup');
+		expect(document.querySelectorAll('#backup-toggle-check, #backup-toggle-export')).toHaveLength(
+			0
+		);
+		// The card's row stands where the button stood: there is no second "Restore from a backup" to press.
+		expect(page.getByRole('button', { name: 'Restore from a backup' }).elements()).toHaveLength(1);
+		expect(cardLines()).not.toContain('Uses a backup file you saved and its six words.');
+		// Erase and Back to Unlock stay below it.
+		expect(eraseEl()).toBeTruthy();
+		expect(backEl()).toBeTruthy();
+		await until(() => document.activeElement === restoreToggle(), 'focus on the card row');
+	});
+
+	// A restore on a locked device must use the writer made for it: the shipped one reads keys this tab does not have.
+	it("hands the card this tab's database, the locked-device writer, and the same Erase", async () => {
+		await mount();
+		await openForgot();
+
+		restoreEl().click();
+		await until(() => h.card !== null, 'the backup card');
+
+		const card = need(h.card) as {
+			db: unknown;
+			only: unknown;
+			restoreDeps: { lockedDevice: { read: unknown; write: unknown } };
+			onEraseRequest: () => void;
+		};
+		expect(card.db).toBe(db);
+		expect(card.only).toEqual({ row: 'restore', label: 'Restore from a backup', open: true });
+		expect(card.restoreDeps.lockedDevice.read).toBe(readLockedDevice);
+		expect(card.restoreDeps.lockedDevice.write).toBe(restoreLockedDevice);
+		card.onEraseRequest();
+		expect(onerase).toHaveBeenCalledTimes(1);
+	});
+
+	it('Erase and start over asks the page to erase, once', async () => {
+		await mount();
+		await openForgot();
+
+		eraseEl().click();
+
+		expect(onerase).toHaveBeenCalledTimes(1);
+	});
+
+	// A key still held when focus moves must neither press the control focus lands on nor leave the screen it came to.
+	describe('held keys, at both ends of each hand-off', () => {
+		it('an Enter held on Forgot PIN? opens the screen once and presses nothing on it', async () => {
+			await mount();
+			forgotEl().focus();
+
+			await holdEnter();
+
+			await expect.element(forgotHeading()).toBeVisible();
+			expect(onerase).not.toHaveBeenCalled();
+			expect(restoreToggle()).toBeNull();
+			expect(cardLines()).toEqual(FORGOT_LINES);
+			// Focus is on the heading, which nothing presses, not on any of the screen's buttons.
+			expect(document.activeElement).toBe(forgotHeading().element());
+		});
+
+		it('an Enter held on Back to Unlock returns once, with the cursor in the field and no check run', async () => {
+			await mount();
+			await openForgot();
+			backEl().focus();
+
+			await holdEnter();
+
+			await expect.element(unlockHeading()).toBeVisible();
+			expect(document.activeElement).toBe(fieldEl());
+			expect(derive).not.toHaveBeenCalled();
+			expect(alertText()).toBeNull();
+			expect(await readTries(db)).toEqual(NO_TRIES);
+		});
+
+		it('an Enter held on Restore from a backup opens the card once and does not close its row', async () => {
+			await mount();
+			await openForgot();
+			restoreEl().focus();
+
+			await holdEnter();
+
+			await until(() => restoreToggle() !== null, 'the backup card');
+			expect(restoreToggle()?.getAttribute('aria-expanded')).toBe('true');
+			expect(document.querySelectorAll('#backup-toggle-restore')).toHaveLength(1);
+			expect(onerase).not.toHaveBeenCalled();
+		});
+
+		it('an Enter held on Erase and start over asks for the erase once', async () => {
+			await mount();
+			await openForgot();
+			eraseEl().focus();
+
+			await holdEnter();
+
+			expect(onerase).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('under forced colors', () => {
+		it('the Restore button keeps an outline and the Erase button has a border of its own', async () => {
+			await mount();
+			await openForgot();
+			const media = cdp();
+			await media.send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'active' }]
+			});
+			try {
+				await expect.poll(() => matchMedia('(forced-colors: active)').matches).toBe(true);
+				for (const el of [restoreEl(), eraseEl()]) {
+					const style = getComputedStyle(el);
+					expect(style.borderTopWidth).toBe('1px');
+					expect(style.borderTopStyle).toBe('solid');
+				}
+			} finally {
+				await media.send('Emulation.setEmulatedMedia', {
+					features: [{ name: 'forced-colors', value: 'none' }]
+				});
+			}
+		});
 	});
 });
 

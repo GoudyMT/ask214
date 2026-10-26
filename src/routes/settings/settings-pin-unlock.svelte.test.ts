@@ -135,6 +135,18 @@ describe('Settings, locked with a PIN', () => {
 		await expect.poll(() => document.activeElement).toBe(pinField().element());
 	});
 
+	// The page has the Erase dialog itself, so the card's Erase and start over opens that one: no trip to another page.
+	it('Forgot PIN, then Erase and start over, opens the page Erase dialog', async () => {
+		await render(SettingsPage);
+		const dialog = () => document.querySelector<HTMLDialogElement>('dialog.wipe-dialog');
+		expect(dialog()?.open).toBe(false);
+
+		await page.getByRole('button', { name: 'Forgot PIN?', exact: true }).click();
+		await page.getByRole('button', { name: 'Erase and start over', exact: true }).click();
+
+		await expect.poll(() => dialog()?.open).toBe(true);
+	});
+
 	it('takes the card away and puts focus on the page heading when the unlock lands', async () => {
 		await render(SettingsPage);
 		await pinField().fill('1234');
