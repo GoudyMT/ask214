@@ -127,7 +127,7 @@
 		 * it can start. A single row never asks for the PIN: its host has done that (or, at the PIN's setup, has none yet).
 		 */
 		only?: { row: 'restore' | 'check' | 'export'; label?: string; open?: boolean };
-		/** Called once when a backup has been saved, after the card holds the result. */
+		/** Called once when a backup has been saved and read back whole, after the card holds the result. */
 		onsaved?: () => void;
 	};
 	const props: Props = $props();
@@ -610,7 +610,9 @@
 					text: result.text
 				});
 				void refreshMark();
-				props.onsaved?.();
+				// A file that did not read back whole may not open: the card shows its mismatch line and offer, and the host
+				// is not told there is a backup to rely on.
+				if (result.readBack !== 'mismatch') props.onsaved?.();
 				break;
 		}
 		await tick();

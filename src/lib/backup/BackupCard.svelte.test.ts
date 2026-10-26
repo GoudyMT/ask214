@@ -2459,6 +2459,22 @@ describe("the Make a backup row as a host's single row", () => {
 		expect(text(savedLine('picked.json')).query()).toBeNull();
 	});
 
+	// A file that does not read back as what was written may not open: the card keeps its own mismatch line and offer for
+	// the person, and the host is not told there is a backup to rely on.
+	it('does not tell its host when the saved file does not read back whole, and offers a new backup', async () => {
+		const onsaved = vi.fn();
+		const file = fakeFile();
+		file.mangle = true;
+		await mount({ only, onsaved, file });
+		await typeBack();
+		await userEvent.click(submitOf(CARD_LABELS.make));
+
+		await expect.element(button(CARD_LABELS.makeAgain)).toBeVisible();
+		expect(document.body.textContent).toContain('the saved file does not match');
+		await pause(100);
+		expect(onsaved).not.toHaveBeenCalled();
+	});
+
 	it('tells its host once when the backup is saved', async () => {
 		const onsaved = vi.fn();
 		await mount({ only, onsaved });

@@ -902,6 +902,39 @@ describe('the backup step', () => {
 		});
 	});
 
+	// The turn-on takes the keystore lock and moves every record: while a backup is being made from them, it waits.
+	it.each([
+		'picking-save',
+		'save-chosen',
+		'replace-warning',
+		'deriving',
+		'snapshot',
+		'encrypting',
+		'verifying',
+		'writing'
+	] as const)(
+		'holds Skip and turn on off while the backup is in its %s phase, and frees it when the run ends',
+		async (phase) => {
+			app.store = {};
+			await toCard();
+			await expect.element(page.getByRole('button', { name: 'Show my passphrase' })).toBeVisible();
+			expect((skipEl() as HTMLButtonElement).disabled).toBe(false);
+
+			backupSession.enterPhase(phase);
+			await until(() => (skipEl() as HTMLButtonElement).disabled, 'Skip held off');
+			skipEl().click();
+			await real(100);
+			expect(rotate).not.toHaveBeenCalled();
+			expect(summary()).toBe('Off');
+
+			backupSession.cancel();
+			await until(() => !(skipEl() as HTMLButtonElement).disabled, 'Skip free again');
+			skipEl().click();
+			await until(() => summary() === 'PIN on', 'the row reading PIN on');
+			expect(rotate).toHaveBeenCalledTimes(1);
+		}
+	);
+
 	// The setup's backup runs while the PIN is still off, so it is never asked for a PIN it does not have yet.
 	it('asks for no PIN inside the step: the card opens on the words', async () => {
 		app.store = {};
@@ -1845,7 +1878,7 @@ class FakeKeyWorker implements WorkerLike {
 }
 
 // A save place the person picked: it holds what was written, and reads it back.
-function saveTarget(): SaveHandle & { written: () => string } {
+function saveTarget(mangle = false): SaveHandle & { written: () => string } {
 	let content = '';
 	let staged = '';
 	const writable: SaveWritable = {
@@ -1853,7 +1886,8 @@ function saveTarget(): SaveHandle & { written: () => string } {
 			staged = data;
 		},
 		close: async () => {
-			content = staged;
+			// A target that mangles the file: what it reads back is not what was written.
+			content = staged + (mangle ? ' ' : '');
 		},
 		abort: () => Promise.resolve()
 	};
@@ -1914,6 +1948,50 @@ describe('the backup step, end to end', () => {
 				.element(page.getByLabelText('Enter your current PIN', { exact: true }))
 				.toBeVisible();
 			expect(session.phase).toBe('idle');
+		} finally {
+			session.relockSync('user');
+			profile.relockSync('hygiene');
+		}
+	}, 30_000);
+
+	// A file that does not read back whole may not open: the card says so and offers another, and nothing is turned on.
+	it('does not turn the PIN on after a backup that does not read back whole, and leaves Skip to the person', async () => {
+		await bootstrapLocalKeystore(db);
+		const profile = createProfileStore(db);
+		await profile.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		const session = new BackupSession({
+			isVisible: () => true,
+			hasFocus: () => true,
+			createWorker: () => new FakeKeyWorker()
+		});
+		seams.cardExtra = {
+			session,
+			exportDeps: {
+				getSavePicker: () => async () => saveTarget(true),
+				download: vi.fn(),
+				readBackMs: 500
+			}
+		};
+		app.store = profile;
+		try {
+			await mount({ rotate: rotateToPin });
+			await toStep('1234', '1234');
+			makeEl().click();
+			await page.getByRole('button', { name: 'Show my passphrase' }).click();
+			await page.getByLabelText('Passphrase', { exact: true }).fill(WORDS.join(' '));
+			await page
+				.getByRole('form', { name: 'Make a backup' })
+				.getByRole('button', { name: 'Make a backup', exact: true })
+				.click();
+
+			await expect.element(page.getByRole('button', { name: 'Make a new backup' })).toBeVisible();
+			expect(hasText('the saved file does not match')).toBe(true);
+			await real(200);
+			expect(summary()).toBe('Off');
+			expect(app.keyMode).toBe('local');
+			expect(getSession()).toBeNull();
+			expect(hasStep()).toBe(true);
+			expect(skipEl()).not.toBeNull();
 		} finally {
 			session.relockSync('user');
 			profile.relockSync('hygiene');

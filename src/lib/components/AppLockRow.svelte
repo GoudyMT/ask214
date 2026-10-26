@@ -55,6 +55,7 @@
 	import { onDestroy, tick, untrack } from 'svelte';
 	import { readCounter } from '../keystore/app-lock-store';
 	import BackupCard from '../backup/BackupCard.svelte';
+	import { backupSession, type Phase } from '../backup/session.svelte';
 	import { setSession } from '../keystore/session';
 	import { getProfileApp } from '../profile/context';
 	import { createCurrentPinCheck } from './current-pin-check';
@@ -101,6 +102,19 @@
 	let leaveHeld: (() => void) | null = null;
 	// The host has been told a card is coming and has not yet been told it is gone.
 	let cardAnnounced = false;
+	// From the save place being asked for to the file being closed: the turn-on moves every record under the keystore lock,
+	// so it waits for the backup that is reading them.
+	const RUNNING_PHASES: readonly Phase[] = [
+		'picking-save',
+		'save-chosen',
+		'replace-warning',
+		'deriving',
+		'snapshot',
+		'encrypting',
+		'verifying',
+		'writing'
+	];
+	const backingUp = $derived(making && RUNNING_PHASES.includes(backupSession.phase));
 
 	// Its wait clock counts an owed wait down while the row is up: nothing else does in Settings, so a wait on the row
 	// would never end.
@@ -568,6 +582,7 @@
 					<button
 						class="app-lock__cancel"
 						type="button"
+						disabled={backingUp}
 						onclick={() => void turnOn()}
 						onkeydown={noRepeat}>Skip and turn on</button
 					>
