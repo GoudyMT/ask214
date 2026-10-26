@@ -68,7 +68,10 @@
 
 <script lang="ts">
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
-	import { getProfileApp } from '../profile/context';
+	import { createCurrentPinCheck } from '../components/current-pin-check';
+	import { loadAppLock } from '../components/load-app-lock';
+	import PinField from '../components/PinField.svelte';
+	import { getProfileApp, type ProfileApp } from '../profile/context';
 	import { readDeviceState } from '../profile/device-state';
 	import { TASK_DEFS } from '../timeline/task-defs';
 	import type { BackupCode } from './codes';
@@ -111,7 +114,7 @@
 		/** The open database. A backup and a restore need it; a Check does not. */
 		db: IDBDatabase | null;
 		/** Defaults to the app the layout provides. */
-		app?: FlowDeps['app'];
+		app?: FlowDeps['app'] & Pick<ProfileApp, 'keyMode'>;
 		/** Defaults to the tab's one backup session. */
 		session?: BackupSession;
 		/** The seams a test stands in for (the save picker, the download, the read-back time). */
@@ -231,6 +234,19 @@
 	// Which path an idle session's last message belongs to: a cleared session forgets its kind.
 	let lastKind = $state<SessionKind | null>(null);
 
+	// With the PIN on, the Make row opens on a step that asks for the current PIN before any backup session starts.
+	const STEP_UP_FAILED_LINE = 'Could not check your PIN right now - please try again.';
+	let stepUp = $state(false);
+	let pinTyped = $state('');
+	let pinBusy = $state(false);
+	let pinMessage = $state<string | null>(null);
+	let pinFieldRef = $state<ReturnType<typeof PinField> | null>(null);
+	// Moves with every relock: a check that was running when one landed must not go on to start a backup.
+	let stepUpEpoch = 0;
+	// The wait this check starts to count down belongs to this card; the keys a good PIN opens are never held.
+	const pinCheck = createCurrentPinCheck({ loadDerive: async () => (await loadAppLock())[0] });
+	onDestroy(() => pinCheck.stop());
+
 	let exportPassEl = $state<HTMLInputElement | null>(null);
 	let filePassEl = $state<HTMLInputElement | null>(null);
 	let showEl = $state<HTMLButtonElement | null>(null);
@@ -244,7 +260,7 @@
 	const phase = $derived(session.phase);
 	const concealed = $derived(session.concealed);
 
-	const makeOpen = $derived(kind === 'export' || exportOutcome !== null);
+	const makeOpen = $derived(kind === 'export' || exportOutcome !== null || stepUp);
 	const showingWords = $derived(
 		kind === 'export' && session.revealed && !concealed && session.words !== null
 	);
@@ -386,15 +402,85 @@
 
 	// ---- rows -----------------------------------------------------------------------------------------------------
 
-	function openRow(row: SessionKind): void {
+	// A relock of any reason closes the step; the field empties itself.
+	$effect(() => {
+		if (!stepUp) return;
+		return app.joinRelock?.({
+			relockSync: () => {
+				stepUpEpoch += 1;
+				closeStepUp();
+			},
+			refresh: () => Promise.resolve()
+		});
+	});
+
+	function closeStepUp(): void {
+		stepUp = false;
+		pinMessage = null;
+	}
+
+	async function openStepUp(): Promise<void> {
+		setOutcome(null);
+		inputError = null;
+		pinMessage = null;
+		stepUp = true;
+		await tick();
+		pinFieldRef?.focus();
+	}
+
+	// Closing hands focus back to the row's toggle unless the person has moved on: the pressed Cancel leaves with the step.
+	async function cancelStepUp(): Promise<void> {
+		if (pinBusy) return;
+		closeStepUp();
+		await handFocusToRow('export');
+	}
+
+	// A good PIN grants this one backup and opens the row exactly as a tap on it does without a PIN. The keys the check
+	// opened are not held: the PIN is asked for to confirm the person, not to unlock anything.
+	async function submitStepUp(): Promise<void> {
+		const db = props.db;
+		if (pinBusy) return;
+		pinBusy = true;
+		pinMessage = null;
+		const typed = pinTyped;
+		const epoch = stepUpEpoch;
+		try {
+			if (db === null) throw new Error('E_NOT_READY');
+			const result = await pinCheck.check(db, typed, STEP_UP_FAILED_LINE);
+			// A relock landed while the PIN was checked: the step is closed and nothing starts.
+			if (epoch !== stepUpEpoch) return;
+			if (!result.ok) {
+				pinMessage = result.line;
+				return;
+			}
+			closeStepUp();
+			openRow('export', true);
+			await handFocusToRow('export');
+		} catch {
+			if (epoch === stepUpEpoch) pinMessage = STEP_UP_FAILED_LINE;
+		} finally {
+			pinFieldRef?.clear();
+			pinBusy = false;
+		}
+	}
+
+	/** `granted`: the PIN step was passed for this very open; without it, the PIN on means the step comes first. */
+	function openRow(row: SessionKind, granted = false): void {
 		// The Make row is off on a device with nothing to back up (see `allowed`), and a tap on it says so.
 		startLine = row === 'export' && neverSetUp ? FINISH_SETUP_LINE : null;
 		if (!allowed(row)) return;
+		if (row === 'export' && !granted && props.only === undefined && app.keyMode === 'pin') {
+			void openStepUp();
+			return;
+		}
+		closeStepUp();
 		setOutcome(null);
 		inputError = null;
 		try {
-			if (row === 'export') session.start(app, 'export');
-			else
+			if (row === 'export') {
+				if (granted) session.grantExport();
+				session.start(app, 'export');
+			} else
 				void restore.open(row).catch(() => {
 					startLine = lineFor('E_WORKER_FAILED', { path: 'restore' });
 				});
@@ -415,6 +501,10 @@
 
 	function closeRow(): void {
 		if (session.stopping) return;
+		if (stepUp) {
+			void cancelStepUp();
+			return;
+		}
 		const row = kind;
 		if (session.canCancel) session.cancel('user-cancel');
 		else restore.close();
@@ -857,6 +947,40 @@
 			{@render toggleRowButton('export', CARD_LABELS.make, 'backup-make')}
 			{#if makeOpen}
 				<div id="backup-make" class="backup-body">
+					{#if stepUp}
+						<PinField
+							bind:this={pinFieldRef}
+							bind:value={pinTyped}
+							id="backup-current-pin"
+							label="Enter your current PIN"
+							joinRelock={app.joinRelock}
+							onenter={() => void submitStepUp()}
+						/>
+						<!-- Held keys: a repeat of Enter must not press again over the emptied field; only a new press counts. -->
+						<div class="backup-actions">
+							<button
+								class="backup-primary"
+								type="button"
+								aria-busy={pinBusy}
+								onclick={() => void submitStepUp()}
+								onkeydown={guardEnter}
+							>
+								{CARD_LABELS.make}
+							</button>
+							<button
+								class="backup-cancel"
+								type="button"
+								disabled={pinBusy}
+								onclick={() => void cancelStepUp()}
+								onkeydown={guardEnter}
+							>
+								{CARD_LABELS.cancel}
+							</button>
+						</div>
+						{#if pinMessage !== null}
+							<p class="backup-error" role="alert">{pinMessage}</p>
+						{/if}
+					{/if}
 					{@render hiddenLine()}
 					{#if showShow}
 						<p class="backup-hint" hidden={concealed}>{KEEP_WORDS_LINE}</p>
@@ -1194,6 +1318,10 @@
 		font: inherit;
 		text-decoration: underline;
 		cursor: pointer;
+	}
+	.backup-cancel:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 	.backup-typed {
 		align-self: flex-start;

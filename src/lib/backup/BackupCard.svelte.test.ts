@@ -2,8 +2,13 @@ import { flushSync } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
+import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, waitLine } from '../components/pin-lines';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
+import { readCounter, readTries, type TriesState } from '../keystore/app-lock-store';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
+import { PinNoMemoryError } from '../keystore/pin-derive';
+import { rotateToPin } from '../keystore/rotate';
+import { dropSession, getSession } from '../keystore/session';
 import { createJoinRelock, relockEachSync, type Relockable } from '../profile/app-init';
 import type { ProfileApp } from '../profile/context';
 import type { RelockReason } from '../profile/lifecycle';
@@ -45,6 +50,7 @@ import {
 } from './copy';
 import { formatBackupDate } from './dates';
 import { ExportFlow, type SaveHandle, type SavePicker, type SaveWritable } from './export-flow';
+import { KDF_V1 } from './kdf-params';
 import { BackupSession, type OpenPicker, type WorkerLike } from './session.svelte';
 import type { FromWorker, WorkerRequest } from './worker/protocol';
 
@@ -80,6 +86,22 @@ function deferred<T>(): Deferred<T> {
 	});
 	return { promise, resolve };
 }
+
+// ---- the PIN's derive ----------------------------------------------------------------------------------------------
+
+// The PIN's Argon2id lives in a worker and costs 128 MiB: a test answers for it with fixed keys. Everything else of the
+// PIN module (the format check, the no-memory error) is the real one.
+const pinSeam = vi.hoisted(() => ({
+	derive: null as null | ((pin: string) => Promise<{ macKey: CryptoKey; kek: CryptoKey }>)
+}));
+vi.mock('../keystore/pin-derive', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../keystore/pin-derive')>();
+	return {
+		...real,
+		derivePinKeys: (pin: string, params: Parameters<typeof real.derivePinKeys>[1]) =>
+			pinSeam.derive === null ? real.derivePinKeys(pin, params) : pinSeam.derive(pin)
+	};
+});
 
 // ---- the key worker ------------------------------------------------------------------------------------------------
 
@@ -259,6 +281,8 @@ type Mount = {
 	readBackMs?: number;
 	/** The card is the Forgot screen's: it restores through the locked-device pair (recording stubs). */
 	locked?: boolean;
+	/** The app reads as having its PIN on. */
+	keyMode?: 'pin';
 };
 
 async function mount(o: Mount = {}) {
@@ -292,12 +316,16 @@ async function mount(o: Mount = {}) {
 	});
 	sessions.push(session);
 	const published: unknown[] = [];
-	const app: Pick<ProfileApp, 'status' | 'joinRelock' | 'publish' | 'store' | 'reloadOnUnlock'> = {
+	const app: Pick<
+		ProfileApp,
+		'status' | 'joinRelock' | 'publish' | 'store' | 'reloadOnUnlock' | 'keyMode'
+	> = {
 		status: o.status ?? 'ready',
 		joinRelock: o.joinRelock === false ? null : joinRelock,
 		publish: o.publish === false ? null : (signal) => void published.push(signal),
 		store: profile,
-		reloadOnUnlock: false
+		reloadOnUnlock: false,
+		...(o.keyMode === undefined ? {} : { keyMode: o.keyMode })
 	};
 	const file = o.file ?? fakeFile();
 	const picker = o.picker === undefined ? pickerOf(file.handle) : o.picker;
@@ -2113,5 +2141,271 @@ describe('checking', () => {
 		await expect.element(button(CARD_LABELS.show)).toBeVisible();
 		expect(card.session.kind).toBe('export');
 		expect(toggle(CARD_LABELS.check, true).query()).toBeNull();
+	});
+});
+
+// ---- a PIN before a backup is made ----------------------------------------------------------------------------------
+
+describe('with the PIN on, making a backup', () => {
+	const HMAC = { name: 'HMAC', hash: 'SHA-256', length: 256 } as const;
+	const CURRENT_PIN = '1234';
+	const OTHER_PIN = '9999';
+	const FAILED_LINE = 'Could not check your PIN right now - please try again.';
+
+	let rightKeys: { macKey: CryptoKey; kek: CryptoKey };
+	let wrongKeys: { macKey: CryptoKey; kek: CryptoKey };
+	// What each derive saw of the tries row at the moment it ran.
+	let deriveLog: { pin: string; tries: TriesState }[];
+
+	async function fixedKeys(byte: number): Promise<{ macKey: CryptoKey; kek: CryptoKey }> {
+		return {
+			macKey: await crypto.subtle.importKey('raw', new Uint8Array(32).fill(byte), HMAC, false, [
+				'sign',
+				'verify'
+			]),
+			kek: await crypto.subtle.importKey(
+				'raw',
+				new Uint8Array(32).fill(byte + 1),
+				{ name: 'AES-KW' },
+				false,
+				['wrapKey', 'unwrapKey']
+			)
+		};
+	}
+
+	/** The device as a person who turned the PIN on has it: a PIN row the fixed keys of CURRENT_PIN open. */
+	async function pinOn(): Promise<void> {
+		rightKeys = await fixedKeys(7);
+		wrongKeys = await fixedKeys(13);
+		await rotateToPin(db, {
+			macKey: rightKeys.macKey,
+			kek: rightKeys.kek,
+			salt: crypto.getRandomValues(new Uint8Array(16)),
+			kdf: { ...KDF_V1 },
+			counterBefore: await readCounter(db)
+		});
+		pinSeam.derive = async (pin) => {
+			deriveLog.push({ pin, tries: await readTries(db) });
+			return pin === CURRENT_PIN ? rightKeys : wrongKeys;
+		};
+	}
+
+	beforeEach(() => {
+		deriveLog = [];
+	});
+
+	afterEach(() => {
+		pinSeam.derive = null;
+		dropSession();
+	});
+
+	const pinField = () => page.getByLabelText('Enter your current PIN', { exact: true });
+	const pinEl = () => pinField().element() as HTMLInputElement;
+	// The row's own button and its toggle share a name; the toggle is the one that says whether the row is open.
+	const stepUpMake = () =>
+		[...document.querySelectorAll<HTMLButtonElement>('#backup-make button')].find(
+			(b) => b.textContent?.trim() === CARD_LABELS.make
+		) ?? null;
+	const alertText = () =>
+		document.querySelector('#backup-make [role="alert"]')?.textContent?.trim() ?? null;
+
+	async function openStepUp(): Promise<void> {
+		await userEvent.click(toggle(CARD_LABELS.make, false));
+		await expect.element(pinField()).toBeVisible();
+	}
+
+	/** Types a PIN and presses the row's Make a backup; resolves when the press has emptied the field. */
+	async function press(pin: string): Promise<void> {
+		await pinField().fill(pin);
+		need(stepUpMake()).click();
+		await expect
+			.poll(() => document.querySelector<HTMLInputElement>('#backup-make input')?.value ?? '')
+			.toBe('');
+	}
+
+	it('opens on the PIN step with Make a backup and Cancel, and starts no session', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+
+		expect(card.session.phase).toBe('idle');
+		expect(card.workers).toHaveLength(0);
+		expect(stepUpMake()).not.toBeNull();
+		await expect.element(button(CARD_LABELS.cancel)).toBeVisible();
+		expect(button(CARD_LABELS.show).query()).toBeNull();
+		expect(pinEl().type).toBe('password');
+		await expect.element(toggle(CARD_LABELS.make, true)).toBeVisible();
+	});
+
+	it('counts a wrong PIN before it is derived, says it is not right for tries 1 to 3, then owes a wait and derives nothing while it is owed', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+
+		for (const tries of [1, 2, 3]) {
+			await press(OTHER_PIN);
+			expect(alertText()).toBe(NOT_RIGHT_LINE);
+			// The try was on the row when the derive ran, not after.
+			expect(deriveLog.at(-1)?.tries).toMatchObject({ count: tries, pending: true });
+		}
+		await press(OTHER_PIN);
+		expect(alertText()).toBe(waitLine(30_000));
+
+		// A press while the wait is owed is answered from the row: nothing is derived and no try is added.
+		const derives = deriveLog.length;
+		await press(CURRENT_PIN);
+		expect(alertText()).toBe(waitLine(30_000));
+		expect(deriveLog).toHaveLength(derives);
+		expect(await readTries(db)).toMatchObject({ count: 4, waitMs: 30_000 });
+		expect(card.session.phase).toBe('idle');
+		expect(getSession()).toBeNull();
+	});
+
+	it('says the memory ran out, and takes the try back, when the PIN could not be checked', async () => {
+		await pinOn();
+		pinSeam.derive = () => Promise.reject(new PinNoMemoryError());
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await press(CURRENT_PIN);
+
+		expect(alertText()).toBe(CHECK_LOW_MEMORY_LINE);
+		expect(await readTries(db)).toMatchObject({ count: 0, pending: false });
+		expect(card.session.phase).toBe('idle');
+	});
+
+	// Another tab may have taken the PIN off while this row sat open: there is no PIN row to check against.
+	it('says to try again, and counts nothing, when the device no longer has a PIN row', async () => {
+		pinSeam.derive = async (pin) => {
+			deriveLog.push({ pin, tries: await readTries(db) });
+			return fixedKeys(7);
+		};
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await press(CURRENT_PIN);
+
+		expect(alertText()).toBe(FAILED_LINE);
+		expect(await readTries(db)).toMatchObject({ count: 0 });
+		expect(deriveLog).toHaveLength(0);
+		expect(card.session.phase).toBe('idle');
+	});
+
+	it('opens the shipped row on a good PIN, clears the tries, and holds no key session', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		const before = getSession();
+		await openStepUp();
+		await press(CURRENT_PIN);
+
+		await expect.element(button(CARD_LABELS.show)).toBeVisible();
+		expect(card.session.kind).toBe('export');
+		expect(card.session.phase).toBe('phrase-hidden');
+		expect(pinField().query()).toBeNull();
+		expect(stepUpMake()).toBeNull();
+		// The session the check opened is dropped on the spot: the tab holds no more keys than before.
+		expect(getSession()).toBe(before);
+		expect(await readTries(db)).toMatchObject({ count: 0, pending: false });
+		await expect.element(text(KEEP_WORDS_LINE)).toBeVisible();
+	});
+
+	it('grants one backup only: the session refuses a second start without another PIN', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await press(CURRENT_PIN);
+		await expect.element(button(CARD_LABELS.show)).toBeVisible();
+		card.session.cancel();
+
+		expect(() => card.session.start(card.app, 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+	});
+
+	it('Cancel closes the row and puts focus on its toggle, with the field empty next time', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await pinField().fill(CURRENT_PIN);
+		await userEvent.click(button(CARD_LABELS.cancel));
+
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		expect(pinField().query()).toBeNull();
+		await expect.poll(() => document.activeElement).toBe(toggle(CARD_LABELS.make, false).element());
+		expect(card.session.phase).toBe('idle');
+		expect(deriveLog).toHaveLength(0);
+
+		await openStepUp();
+		expect(pinEl().value).toBe('');
+	});
+
+	it('closes the step on the row toggle too', async () => {
+		await pinOn();
+		await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await userEvent.click(toggle(CARD_LABELS.make, true));
+
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		expect(pinField().query()).toBeNull();
+	});
+
+	it.each<RelockReason>(['user', 'idle', 'peer', 'hygiene'])(
+		'a %s relock empties the field and closes the step, and the typed digits do not come back',
+		async (reason) => {
+			await pinOn();
+			const card = await mount({ keyMode: 'pin' });
+			await openStepUp();
+			await pinField().fill(CURRENT_PIN);
+			card.relock(reason);
+
+			await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+			expect(pinField().query()).toBeNull();
+			await openStepUp();
+			expect(pinEl().value).toBe('');
+			expect(deriveLog).toHaveLength(0);
+		}
+	);
+
+	// A Lock that lands while the PIN is being derived must not be outlived by the backup it would have started.
+	it('starts nothing when a Lock lands while the PIN is checked', async () => {
+		await pinOn();
+		const gate = deferred<{ macKey: CryptoKey; kek: CryptoKey }>();
+		let deriving = false;
+		pinSeam.derive = () => {
+			deriving = true;
+			return gate.promise;
+		};
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await pinField().fill(CURRENT_PIN);
+		need(stepUpMake()).click();
+		await expect.poll(() => deriving).toBe(true);
+
+		card.relock('user');
+		gate.resolve(rightKeys);
+		await pause(150);
+
+		expect(card.session.phase).toBe('idle');
+		expect(card.workers).toHaveLength(0);
+		expect(button(CARD_LABELS.show).query()).toBeNull();
+		expect(pinField().query()).toBeNull();
+	});
+
+	it('asks for the PIN again for Make a new backup after a Check', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await fileChosen(card, 'check');
+		await field().fill(WRONG);
+		await userEvent.click(submitOf(CARD_LABELS.check, CARD_LABELS.checkSubmit));
+		await userEvent.click(button(MAKE_NEW_BACKUP_BUTTON));
+
+		await expect.element(pinField()).toBeVisible();
+		expect(card.session.phase).toBe('idle');
+		expect(button(CARD_LABELS.show).query()).toBeNull();
+	});
+
+	it('leaves Check and Restore without a PIN step', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await fileChosen(card, 'check');
+
+		expect(card.session.kind).toBe('check');
+		expect(pinField().query()).toBeNull();
 	});
 });
