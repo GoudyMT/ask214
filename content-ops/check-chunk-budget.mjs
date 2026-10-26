@@ -439,6 +439,14 @@ const STATIC = 'static';
 //     the keystore modules and fetching the damaged-row check on demand cut no file. The eight extra files are the
 //     lazy PIN chunk and its stylesheet, the derive's settings, the damaged-row check and the shared keystore,
 //     profile and finder pieces the bundler now splits off.
+//     Page 100,450 -> 102,355, onDemand 12,770 -> 15,865, precache 242,240 -> 249,530 and the lazy route nodes
+//     (size-limit, package.json) 55,870 -> 57,940 (owner's call, 2026-10-26): the PIN's second set - Change PIN and
+//     Remove PIN, Forgot PIN with its restore on a locked device and Erase from the locked card, the backup step at
+//     setup and the PIN asked before a backup. Builds of the same code measured page 102,309-102,313 B, on demand
+//     15,815-15,823 B, precache 249,459-249,490 B and route nodes 57,881-57,897 B, about 40 B of room above the
+//     highest. Trim pass first: the backup code is fetched through one lazy entry, which took the precache back from
+//     92 files to 80 (the files limit is unchanged); a single shared chunk for it cost every page about 217 KB raw and
+//     was dropped.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -448,10 +456,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 100_450,
-	onDemand: 12_770,
+	page: 102_355,
+	onDemand: 15_865,
 	precacheFiles: 80,
-	precacheBytes: 242_240,
+	precacheBytes: 249_530,
 	workerScripts: 147_200
 };
 
