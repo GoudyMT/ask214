@@ -695,7 +695,9 @@
 				</p>
 				<p class="app-lock__hint">Don't use your phone's unlock PIN.</p>
 				<details class="app-lock__fold">
-					<summary>What a PIN does not cover</summary>
+					<summary
+						><span class="app-lock__chevron" aria-hidden="true"></span>What a PIN does not cover</summary
+					>
 					<ul>
 						{#each NOT_COVERED as line (line)}<li>{line}</li>{/each}
 					</ul>
@@ -776,7 +778,8 @@
 		border-bottom: 4px solid transparent;
 		flex: none;
 	}
-	.app-lock__chevron--open {
+	.app-lock__chevron--open,
+	.app-lock__fold[open] .app-lock__chevron {
 		transform: rotate(90deg);
 	}
 
@@ -834,7 +837,8 @@
 		cursor: default;
 	}
 
-	/* What a PIN does not cover: closed until asked for, with a summary the size of a touch target. */
+	/* What a PIN does not cover: closed until asked for, with a summary the size of a touch target. A flex summary drops
+	   the browser's own marker, so it carries the row's chevron instead. */
 	.app-lock__fold {
 		font-size: var(--font-size-s);
 		color: var(--color-fg-muted);
@@ -843,6 +847,7 @@
 		min-height: 44px;
 		display: flex;
 		align-items: center;
+		gap: var(--space-s);
 		color: var(--color-fg);
 		cursor: pointer;
 	}

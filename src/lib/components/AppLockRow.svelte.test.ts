@@ -1087,6 +1087,25 @@ describe('what a PIN does not cover', () => {
 		await until(() => fold.open, 'the fold open');
 	});
 
+	// A summary with no marker does not look like it opens: the fold shows its state the way the App lock row above it does.
+	it('marks the fold open or closed with the same chevron as the App lock row', async () => {
+		await mount();
+		await openRow();
+		const fold = document.querySelector('details') as HTMLDetailsElement;
+		const mark = fold.querySelector('summary [aria-hidden="true"]');
+		const rowMark = toggleEl().querySelector('[aria-hidden="true"]') as Element;
+		expect(mark).not.toBeNull();
+		const style = (el: Element) => getComputedStyle(el);
+
+		expect(style(mark as Element).borderLeftWidth).toBe(style(rowMark).borderLeftWidth);
+		expect(style(mark as Element).transform).toBe('none');
+		(fold.querySelector('summary') as HTMLElement).click();
+		await until(() => fold.open, 'the fold open');
+		// The row is open, so its chevron shows the open turn.
+		expect(style(mark as Element).transform).toBe(style(rowMark).transform);
+		expect(style(rowMark).transform).not.toBe('none');
+	});
+
 	it('is part of the setup only: the Change form has no fold', async () => {
 		await pinOn();
 		await mount();
