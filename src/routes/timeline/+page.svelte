@@ -53,8 +53,12 @@
 	let headingEl: HTMLElement | undefined;
 	let pinNotice = $state<string[]>([]);
 	let noticeUp = $state(false);
+	// A lock ends the visit the notice was about, so it goes: the same tries after the next unlock arrive as a new line.
 	$effect(() => {
-		if (app.pinLocked === true) noticeUp = true;
+		if (app.pinLocked === true) {
+			noticeUp = true;
+			pinNotice = [];
+		}
 	});
 
 	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not

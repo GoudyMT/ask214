@@ -203,8 +203,12 @@
 	let unlockByTouch = false;
 	let pinNotice = $state<string[]>([]);
 	let noticeUp = $state(false);
+	// A lock ends the visit the notice was about, so it goes: the same tries after the next unlock arrive as a new line.
 	$effect(() => {
-		if (pinLocked) noticeUp = true;
+		if (pinLocked) {
+			noticeUp = true;
+			pinNotice = [];
+		}
 	});
 	let heroEl: HTMLElement | undefined;
 	async function afterUnlock(): Promise<void> {

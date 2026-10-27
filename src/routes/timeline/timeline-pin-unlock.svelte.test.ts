@@ -220,4 +220,33 @@ describe('Timeline, locked with a PIN', () => {
 		expect(container.querySelector('.timeline-notice')).toBe(region);
 		expect(noticeLines(region)).toEqual([]);
 	});
+
+	// A Lock ends the visit the notice was about: it must not sit above "Your data is locked", and the same tries after the
+	// next unlock are news again, so the line has to arrive as a new node for a screen reader to speak it.
+	it('empties the notice when the page locks, and brings the same notice back as a new line after the next unlock', async () => {
+		before.wrongTries = 3;
+		const { container } = await render(TimelinePage);
+		const region = container.querySelector('.timeline-notice');
+		await unlockOnce();
+		expect(noticeLines(region)).toEqual(['3 wrong PIN tries since your last unlock.']);
+
+		lock.pinLocked = true;
+		lock.storeLocked = true;
+		await expect.element(cardHeading()).toBeVisible();
+		expect(container.querySelector('.timeline-notice')).toBe(region);
+		expect(noticeLines(region)).toEqual([]);
+
+		const arrived: (string | undefined)[] = [];
+		const watch = new MutationObserver((records) => {
+			for (const record of records)
+				for (const node of record.addedNodes) arrived.push(node.textContent?.trim());
+		});
+		watch.observe(region as Element, { childList: true });
+		await unlockOnce();
+		await expect
+			.poll(() => noticeLines(region))
+			.toEqual(['3 wrong PIN tries since your last unlock.']);
+		watch.disconnect();
+		expect(arrived).toEqual(['3 wrong PIN tries since your last unlock.']);
+	});
 });

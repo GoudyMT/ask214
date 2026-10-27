@@ -126,8 +126,12 @@
 	let headingEl: HTMLElement | undefined;
 	let pinNotice = $state<string[]>([]);
 	let noticeUp = $state(false);
+	// A lock ends the visit the notice was about, so it goes: the same tries after the next unlock arrive as a new line.
 	$effect(() => {
-		if (app.pinLocked === true) noticeUp = true;
+		if (app.pinLocked === true) {
+			noticeUp = true;
+			pinNotice = [];
+		}
 	});
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
