@@ -407,6 +407,17 @@ describe('setting up: what the person is told and asked', () => {
 		expect(summary()).toBe('Off');
 	});
 
+	// Two toggles that both read "Show PIN" cannot be told apart in a list of buttons: each names the field it shows.
+	it('names the two Show PIN toggles by their fields', async () => {
+		await mount();
+		await openRow();
+
+		expect([...document.querySelectorAll('.pin-show')].map((b) => b.textContent?.trim())).toEqual([
+			'Show new PIN',
+			'Show new PIN again'
+		]);
+	});
+
 	it('says the two PINs differ, with no derive, and empties both fields', async () => {
 		await mount();
 		await submit('1234', '1235');
