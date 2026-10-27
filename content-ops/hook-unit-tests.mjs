@@ -46,9 +46,7 @@ if (runs === null) {
 	process.exit(0);
 }
 for (const args of runs) {
-	console.log(
-		`[test:unit] vitest ${args.filter((arg) => arg.startsWith('-') || arg === 'related').join(' ')}`
-	);
+	console.log(`[test:unit] vitest ${args.filter((arg) => !arg.includes('/')).join(' ')}`);
 	const { outcome } = await runNodeWithDeadline([VITEST, ...args], DEADLINE_MS);
 	if (outcome === 'timed-out') {
 		console.error(
