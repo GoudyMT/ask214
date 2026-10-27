@@ -18,31 +18,43 @@
 // everything it started, and fails the commit.
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { runNodeWithDeadline, unitRunFor } from './hook-unit-tests-core.mjs';
+import { runNodeWithDeadline, unitRunsFor } from './hook-unit-tests-core.mjs';
 
 // Clean runs measured 20 to 158 s on this machine, the slow end under load; the hangs ran 10 to 30 minutes.
 const DEADLINE_MS = 5 * 60_000;
 const VITEST = resolve('node_modules/vitest/vitest.mjs');
 
-const staged = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], {
-	encoding: 'utf8'
-})
-	.split('\n')
-	.filter(Boolean);
-const args = unitRunFor(staged);
-if (args === null) {
-	console.log('[test:unit] No code staged, so no unit tests run.');
+/**
+ * The staged paths git reports for this filter; renames come out as a deletion and an addition.
+ * @param {string} filter
+ */
+function stagedWith(filter) {
+	return execFileSync(
+		'git',
+		['diff', '--cached', '--name-only', '--no-renames', `--diff-filter=${filter}`],
+		{
+			encoding: 'utf8'
+		}
+	)
+		.split('\n')
+		.filter(Boolean);
+}
+
+const runs = unitRunsFor(stagedWith('ACM'), stagedWith('D'));
+if (runs === null) {
+	console.log('[test:unit] Nothing staged, so no unit tests run.');
 	process.exit(0);
 }
-console.log(
-	args[0] === 'related'
-		? '[test:unit] The tests related to the staged code.'
-		: '[test:unit] The whole suite.'
-);
-const { outcome } = await runNodeWithDeadline([VITEST, ...args], DEADLINE_MS);
-if (outcome === 'timed-out') {
-	console.error(
-		`[test:unit] Still running after ${DEADLINE_MS / 60_000} minutes, so it was stopped with everything it started. That is well past a clean run, so it had most likely hung: commit again.`
+for (const args of runs) {
+	console.log(
+		`[test:unit] vitest ${args.filter((arg) => arg.startsWith('-') || arg === 'related').join(' ')}`
 	);
+	const { outcome } = await runNodeWithDeadline([VITEST, ...args], DEADLINE_MS);
+	if (outcome === 'timed-out') {
+		console.error(
+			`[test:unit] Still running after ${DEADLINE_MS / 60_000} minutes, so it was stopped with everything it started. That is well past a clean run, so it had most likely hung: commit again.`
+		);
+	}
+	if (outcome !== 'passed') process.exit(1);
 }
-process.exit(outcome === 'passed' ? 0 : 1);
+process.exit(0);

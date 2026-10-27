@@ -46,19 +46,24 @@ function stop(pid) {
 	}
 }
 
-// Only staged code under these folders can be traced to the tests it touches. Anything else that is not prose
-// (a config, the lockfile, a workflow a policy test reads) can move any test, so it runs the whole suite.
+// Only staged code under these folders can be traced to the browser tests it touches. Anything else that is not
+// prose (a config, the lockfile, a workflow a policy test reads) can move any test, so it runs the whole suite.
 const TRACEABLE = /^(src|content-ops)\/.+\.(ts|js|mjs|cjs|svelte)$/;
+// The server project always runs whole (about 20 s): its policy tests read source, docs and configs as text,
+// which import tracing cannot see. Only the slow browser project is narrowed to the related tests.
+const SERVER = ['--run', '--project', 'server'];
 
 /**
- * The vitest arguments for a commit's unit run: the tests related to its staged code, the whole suite when a
- * staged file can move every test, or null when nothing but prose is staged.
+ * The vitest runs for a commit: the whole server project plus the browser tests related to the staged code; the
+ * whole suite when a staged file can move every test or a file is deleted; null when nothing is staged.
  * @param {string[]} staged repo-relative paths, forward slashes
- * @returns {string[] | null}
+ * @param {string[]} [deleted] the staged deletions
+ * @returns {string[][] | null}
  */
-export function unitRunFor(staged) {
-	const files = staged.filter((file) => !file.endsWith('.md'));
-	if (files.length === 0) return null;
-	if (!files.every((file) => TRACEABLE.test(file))) return ['--run'];
-	return ['related', '--run', ...files];
+export function unitRunsFor(staged, deleted = []) {
+	if (staged.length === 0 && deleted.length === 0) return null;
+	const code = staged.filter((file) => !file.endsWith('.md'));
+	if (deleted.length > 0 || !code.every((file) => TRACEABLE.test(file))) return [['--run']];
+	if (code.length === 0) return [SERVER];
+	return [SERVER, ['related', '--run', '--project', 'client', '--passWithNoTests', ...code]];
 }
