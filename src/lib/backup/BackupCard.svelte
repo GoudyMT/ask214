@@ -248,7 +248,7 @@
 	let pinFieldRef = $state<ReturnType<typeof PinField> | null>(null);
 	// Moves with every relock: a check that was running when one landed must not go on to start a backup.
 	let stepUpEpoch = 0;
-	// The wait this check starts to count down belongs to this card; the keys a good PIN opens are never held.
+	// The card follows the tab's one count of an owed wait while it is up; the keys a good PIN opens are never held.
 	const pinCheck = createCurrentPinCheck({
 		loadDerive: async () => (await loadAppLock())[0],
 		onWaitLine: followWait(

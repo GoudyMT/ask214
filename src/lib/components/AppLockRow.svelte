@@ -138,8 +138,8 @@
 	];
 	const backingUp = $derived(making && RUNNING_PHASES.includes(backupSession.phase));
 
-	// Its wait clock counts an owed wait down while the row is up: nothing else does in Settings, so a wait on the row
-	// would never end. The line follows the count while it is still the message shown.
+	// The row follows the tab's one count of an owed wait while it is up; the count goes on without it when it goes. The
+	// line follows the count while it is still the message shown.
 	const pinCheck = untrack(() =>
 		createCurrentPinCheck({
 			derive: deps.derive,
