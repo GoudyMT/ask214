@@ -225,6 +225,7 @@
 		app.joinRelock?.({
 			relockSync: () => {
 				store?.clear();
+				askedQuery = '';
 				askView?.clear();
 			},
 			refresh: () => Promise.resolve()
