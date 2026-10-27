@@ -165,6 +165,53 @@ describe('the live line', () => {
 	});
 });
 
+// A good unlock clears the row, and the same count comes back after four new wrong tries: a countdown still parked in a
+// tab from the first wait must not end the second one.
+describe('a wait that is not the one the countdown counts', () => {
+	const wrongTry = () =>
+		runPinCheck(db, async (): Promise<PinCheckResult<number>> => ({ kind: 'wrong' }));
+	const rightPin = () =>
+		runPinCheck(db, async (): Promise<PinCheckResult<number>> => ({ kind: 'good', value: 1 }));
+
+	/** Four wrong tries in a row: the fourth owes 30 s, as a person guessing would earn it. */
+	async function fourWrongTries(): Promise<void> {
+		await putTries({ count: 0, waitMs: 0, pending: false });
+		for (let n = 0; n < 4; n++) await wrongTry();
+		expect(await readTries(db)).toEqual(OWED);
+	}
+
+	it('lowers the wait it started with, which carries an id of its own', async () => {
+		await fourWrongTries();
+		const count = counting();
+		count.start(OWED);
+		pass(5_000);
+
+		await until(async () => (await stored()) === 25_000, 'the remainder written');
+		count.stop();
+	});
+
+	it('leaves a later wait at the same try count alone when it returns after the first wait was cleared', async () => {
+		await fourWrongTries();
+		const count = counting();
+		count.start(OWED);
+		pass(28_000);
+		doc.show('hidden');
+
+		// The first wait ends in another tab and the owner unlocks; then four new wrong tries owe a second wait.
+		await fourWrongTries();
+		expect(await rightPin()).toMatchObject({ kind: 'waiting' });
+
+		perf += 3_000;
+		date += 3_000;
+		doc.show('visible');
+		pass(5_000);
+
+		expect(await stored()).toBeGreaterThanOrEqual(25_000);
+		expect(await rightPin()).toMatchObject({ kind: 'waiting' });
+		count.stop();
+	});
+});
+
 describe('while the page is hidden', () => {
 	// Both clocks agree: the time away is time the wait ran.
 	it('counts the time away when the performance and Date clocks moved together', async () => {

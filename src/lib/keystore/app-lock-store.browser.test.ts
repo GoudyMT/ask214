@@ -11,6 +11,7 @@ import {
 	createWaitClock,
 	readCounter,
 	readTries,
+	readTriesWithId,
 	runPinCheck,
 	waitAfterWrongTries,
 	type PinCheckResult,
@@ -49,6 +50,12 @@ function rawRows(): Promise<Record<string, unknown>[]> {
 }
 
 const wrong = async (): Promise<PinCheckResult<never>> => ({ kind: 'wrong' });
+
+/** The count and the wait id of the stored row. */
+async function readWaitId(database: IDBDatabase): Promise<{ count: number; waitId: number }> {
+	const { count, waitId } = await readTriesWithId(database);
+	return { count, waitId };
+}
 
 describe('waitAfterWrongTries', () => {
 	// The locked schedule: three wrong tries cost nothing, then 30 s, 1 min, 5 min, and 15 min for every try after.
@@ -361,6 +368,104 @@ describe('createWaitClock', () => {
 	});
 });
 
+// A reset brings the same count back, so a clock that only knew its count could lower a LATER wait at that count. The
+// wait id is what tells two waits at one count apart.
+describe('the wait id', () => {
+	const UINT32 = 2 ** 32;
+	let perf = 0;
+	const perfNow = () => perf;
+	const from: TriesState = { count: 4, waitMs: 30_000, pending: false };
+
+	/** A row at count 4 with 30 s owed, written the way the app writes it: by a counted try. */
+	async function countedToFour(): Promise<number> {
+		await putTries({ count: 3, waitMs: 0, pending: false });
+		await runPinCheck(db, wrong);
+		const row = await readWaitId(db);
+		expect(row.count).toBe(4);
+		return row.waitId;
+	}
+
+	function elapse(ms: number): void {
+		perf += ms;
+		vi.advanceTimersByTime(ms);
+	}
+
+	beforeEach(() => {
+		perf = 0;
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+	});
+
+	it('is a new random 32-bit number on every counted try', async () => {
+		await runPinCheck(db, wrong);
+		const first = await readWaitId(db);
+		await runPinCheck(db, wrong);
+		const second = await readWaitId(db);
+
+		expect([first.count, second.count]).toEqual([1, 2]);
+		for (const { waitId } of [first, second]) {
+			expect(Number.isInteger(waitId)).toBe(true);
+			expect(waitId).toBeGreaterThanOrEqual(0);
+			expect(waitId).toBeLessThan(UINT32);
+		}
+		expect(second.waitId).not.toBe(first.waitId);
+	});
+
+	it('is kept by the write that ends a check and by the clock', async () => {
+		await putTries({ count: 3, waitMs: 0, pending: false });
+		let during = -1;
+		await runPinCheck(db, async () => {
+			during = (await readWaitId(db)).waitId;
+			return { kind: 'wrong' };
+		});
+		expect(during).toBeGreaterThanOrEqual(0);
+		expect(await readWaitId(db)).toEqual({ count: 4, waitId: during });
+
+		const clock = createWaitClock(db, from, { perfNow, waitId: () => during });
+		elapse(5_000);
+		expect(await readTries(db)).toEqual({ count: 4, waitMs: 25_000, pending: false });
+		expect(await readWaitId(db)).toEqual({ count: 4, waitId: during });
+		clock.stop();
+	});
+
+	it('lets a clock for another wait at the same count write nothing', async () => {
+		const id = await countedToFour();
+		const clock = createWaitClock(db, from, { perfNow, waitId: () => (id + 1) % UINT32 });
+		elapse(5_000);
+
+		expect(await readTries(db)).toEqual({ count: 4, waitMs: 30_000, pending: false });
+		clock.stop();
+	});
+
+	// The store is plain: an older build's row has no id, and a script could leave anything.
+	it.each([
+		['no id', {}],
+		['a text id', { waitId: 'x' }],
+		['a negative id', { waitId: -1 }],
+		['a fractional id', { waitId: 1.5 }],
+		['an id past 32 bits', { waitId: UINT32 }],
+		['a NaN id', { waitId: Number.NaN }]
+	])('reads a row with %s as id 0, and a clock for id 0 may lower it', async (_name, extra) => {
+		await putTries({ ...from, ...extra });
+		expect(await readWaitId(db)).toEqual({ count: 4, waitId: 0 });
+
+		const clock = createWaitClock(db, from, { perfNow, waitId: () => 0 });
+		elapse(5_000);
+		expect(await readTries(db)).toEqual({ count: 4, waitMs: 25_000, pending: false });
+		clock.stop();
+	});
+
+	it('goes back with an undone try and goes away with a reset row', async () => {
+		await putTries({ count: 3, waitMs: 0, pending: false, waitId: 5 });
+		await runPinCheck(db, async () => ({ kind: 'not-counted' }));
+		expect(await readWaitId(db)).toEqual({ count: 3, waitId: 5 });
+
+		await runPinCheck(db, async () => ({ kind: 'good', value: 1 }));
+		const [row] = await rawRows();
+		expect(Object.keys(row ?? {}).sort()).toEqual(['count', 'id', 'pending', 'waitMs']);
+		expect(await readWaitId(db)).toEqual({ count: 0, waitId: 0 });
+	});
+});
+
 describe('the lock counter', () => {
 	it('reads an absent counter as 0 and changes it on every bump', async () => {
 		expect(await readCounter(db)).toBe(0);
@@ -410,16 +515,19 @@ describe('what the rows hold', () => {
 			return rows.map((row) => `${String(row.id)}:${Object.keys(row).sort().join(',')}`).sort();
 		};
 		const triesKeys = 'tries:count,id,pending,waitMs';
+		// A counted try also holds the random id of its wait, and nothing else is added.
+		const countedKeys = 'tries:count,id,pending,waitId,waitMs';
 		const counterKeys = 'counter:id,value';
 
 		await runPinCheck(db, wrong);
-		expect(await shape()).toEqual([triesKeys]);
+		expect(await shape()).toEqual([countedKeys]);
 		await runPinCheck(db, async () => ({ kind: 'good', value: 1 }));
+		expect(await shape()).toEqual([triesKeys]);
 		await runPinCheck(db, async () => ({ kind: 'not-counted' }));
 		await runPinCheck(db, async () => {
 			throw new Error('E_CHECK_FAILED');
 		}).catch(() => undefined);
-		expect(await shape()).toEqual([triesKeys]);
+		expect(await shape()).toEqual([countedKeys]);
 
 		await bumpCounter(db);
 		await withStores(db, 'app-lock', 'readwrite', (tx) => {

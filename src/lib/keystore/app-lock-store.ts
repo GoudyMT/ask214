@@ -5,7 +5,9 @@ import { safeLog } from '../log/safelog';
 /**
  * The app lock's plain store: two rows, the wrong-try row and a durable lock counter. It sits outside the encrypted
  * stores on purpose - the wrong tries must be readable before anything unlocks - so it holds nothing derived from the
- * PIN, nothing about its length and no time stamp: a count, a wait in milliseconds and two flags of state.
+ * PIN, nothing about its length and no time stamp: a count, a wait in milliseconds, a pending flag and a random id for
+ * the wait (new with every counted try, so a countdown can tell one wait from a later one at the same count), and
+ * the lock counter.
  */
 export const TRIES_LOCK_NAME = 'mtc-app-lock-tries';
 
@@ -26,7 +28,11 @@ export type PinCheckOutcome<T> =
 	| { kind: 'wrong'; count: number; waitMs: number; unfinished: boolean }
 	| { kind: 'not-counted' };
 
-const NO_TRIES: TriesState = { count: 0, waitMs: 0, pending: false };
+// The stored row: the three fields everyone sees, and the id of the wait. A row with no valid id reads as id 0, and an
+// id of 0 is never written, so an older build's row and a cleared one look alike.
+type TriesRow = TriesState & Readonly<{ waitId: number }>;
+
+const NO_TRIES: TriesRow = { count: 0, waitMs: 0, pending: false, waitId: 0 };
 
 /** The wait owed after the n-th wrong try in a row. */
 export function waitAfterWrongTries(count: number): number {
@@ -39,36 +45,52 @@ function nonNegative(value: unknown): number {
 	return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
-function asTries(row: unknown): TriesState {
+function asRow(row: unknown): TriesRow {
 	if (typeof row !== 'object' || row === null) return NO_TRIES;
 	const r = row as Record<string, unknown>;
+	const id = nonNegative(r.waitId);
 	return {
 		count: nonNegative(r.count),
 		waitMs: nonNegative(r.waitMs),
-		pending: r.pending === true
+		pending: r.pending === true,
+		// Only a whole number below 2^32 survives the unsigned shift unchanged.
+		waitId: id >>> 0 === id ? id : 0
 	};
 }
 
-function getTries(tx: IDBTransaction): Promise<TriesState> {
-	return reqToPromise<unknown>(tx.objectStore('app-lock').get(TRIES_ROW)).then(asTries);
+function getTries(tx: IDBTransaction): Promise<TriesRow> {
+	return reqToPromise<unknown>(tx.objectStore('app-lock').get(TRIES_ROW)).then(asRow);
 }
 
 // Fresh object, never a spread of what was read: a stray key in a stored row does not survive the next write.
-function putTries(tx: IDBTransaction, tries: TriesState): void {
+function putTries(tx: IDBTransaction, tries: TriesRow): void {
 	tx.objectStore('app-lock').put({
 		id: TRIES_ROW,
 		count: tries.count,
 		waitMs: tries.waitMs,
-		pending: tries.pending
+		pending: tries.pending,
+		...(tries.waitId ? { waitId: tries.waitId } : {})
 	});
 }
 
 export function readTries(db: IDBDatabase): Promise<TriesState> {
+	return withStores(db, 'app-lock', 'readonly', getTries).then(({ count, waitMs, pending }) => ({
+		count,
+		waitMs,
+		pending
+	}));
+}
+
+/**
+ * The stored row with the id of its wait, for a countdown to remember which wait it counts. Kept apart from `readTries`
+ * so that the state callers pass around stays three fields.
+ */
+export function readTriesWithId(db: IDBDatabase): Promise<TriesState & { waitId: number }> {
 	return withStores(db, 'app-lock', 'readonly', getTries);
 }
 
 /** Reads the row, changes it and writes it back in one transaction; resolves what was written. */
-function changeTries(db: IDBDatabase, next: (row: TriesState) => TriesState): Promise<TriesState> {
+function changeTries(db: IDBDatabase, next: (row: TriesRow) => TriesRow): Promise<TriesRow> {
 	return withStores(db, 'app-lock', 'readwrite', async (tx) => {
 		const written = next(await getTries(tx));
 		putTries(tx, written);
@@ -97,7 +119,7 @@ async function withTriesLock<T>(fn: () => Promise<T>): Promise<T> {
 	}
 }
 
-type Start = { kind: 'waiting'; waitMs: number } | { kind: 'go'; before: TriesState };
+type Start = { kind: 'waiting'; waitMs: number } | { kind: 'go'; before: TriesRow };
 
 /**
  * Runs ONE PIN check (unlock, change, remove or the backup step-up) under the tries web lock, held for the whole
@@ -114,7 +136,13 @@ export function runPinCheck<T>(
 			const before = await getTries(tx);
 			if (before.waitMs > 0) return { kind: 'waiting', waitMs: before.waitMs };
 			const count = before.count + 1;
-			putTries(tx, { count, waitMs: waitAfterWrongTries(count), pending: true });
+			putTries(tx, {
+				count,
+				waitMs: waitAfterWrongTries(count),
+				pending: true,
+				// Random and unrelated to the PIN or to time: it only has to differ from the id of the wait before it.
+				waitId: crypto.getRandomValues(new Uint32Array(1))[0] as number
+			});
 			return { kind: 'go', before };
 		});
 		if (start.kind === 'waiting') return start;
@@ -186,8 +214,10 @@ export function clearTriesIn(tx: IDBTransaction): void {
 /**
  * Counts an owed wait down by performance.now (never Date.now, so moving the clock skips nothing) in a live tab, and
  * every 5 s writes the remainder by compare-and-set inside one readwrite transaction: only while the row's count is
- * still the count the clock started from, and only ever LOWERING waitMs, never raising it and never touching count.
- * At zero it writes waitMs 0 (same rule) and stops. A reload starts a new clock from the stored remainder.
+ * still the count the clock started from AND its wait id is the id of the wait being counted, and only ever LOWERING
+ * waitMs, never raising it and never touching count. The same count comes back after every reset, so the count alone
+ * cannot tell this wait from a later one. `deps.waitId` gives that id when asked (a row with no id is id 0, the
+ * default). At zero it writes waitMs 0 (same rule) and stops. A reload starts a new clock from the stored remainder.
  */
 export function createWaitClock(
 	db: IDBDatabase,
@@ -196,6 +226,7 @@ export function createWaitClock(
 		perfNow?: () => number;
 		setInterval?: typeof setInterval;
 		clearInterval?: typeof clearInterval;
+		waitId?: () => number;
 	} = {}
 ): { remainingMs(): number; stop(): void; writeNow(): void } {
 	const now = deps.perfNow ?? (() => performance.now());
@@ -204,7 +235,7 @@ export function createWaitClock(
 
 	let timer: ReturnType<typeof setInterval> | undefined;
 	const stop = () => {
-		if (timer !== undefined) (deps.clearInterval ?? clearInterval)(timer);
+		(deps.clearInterval ?? clearInterval)(timer);
 		timer = undefined;
 	};
 	const write = () => {
@@ -214,7 +245,9 @@ export function createWaitClock(
 		// The transaction opens inside this call, before anything is awaited.
 		withStores(db, 'app-lock', 'readwrite', async (tx) => {
 			const row = await getTries(tx);
-			if (row.count === from.count && left < row.waitMs) putTries(tx, { ...row, waitMs: left });
+			// Asked inside the transaction: a countdown learns its id from a read that finished before this one began.
+			const same = row.count === from.count && row.waitId === (deps.waitId?.() ?? 0);
+			if (same && left < row.waitMs) putTries(tx, { ...row, waitMs: left });
 		}).catch(() => safeLog({ code: 'E_INTERNAL' }));
 	};
 	if (from.waitMs > 0) timer = (deps.setInterval ?? setInterval)(write, WAIT_WRITE_EVERY_MS);

@@ -1,4 +1,5 @@
-import { createWaitClock, type TriesState } from '../keystore/app-lock-store';
+import { createWaitClock, readTriesWithId, type TriesState } from '../keystore/app-lock-store';
+import { safeLog } from '../log/safelog';
 import { waitLine } from './pin-lines';
 
 // The performance and Date clocks "agree" over a stretch away when they moved the same, give or take this much.
@@ -8,8 +9,6 @@ const TICK_MS = 1_000;
 export type CountdownDeps = {
 	clock?: Parameters<typeof createWaitClock>[2] | undefined;
 	dateNow?: (() => number) | undefined;
-	setTimeout?: typeof setTimeout | undefined;
-	clearTimeout?: typeof clearTimeout | undefined;
 	doc?: Document | undefined;
 };
 
@@ -43,6 +42,9 @@ export function createCountdown(
 	const dateNow = deps.dateNow ?? (() => Date.now());
 	let doc: Document | undefined;
 	let tries = 0;
+	// The id of the stored wait this countdown counts, learned once at its start. Until that read is in (or for good, if
+	// the row had already moved to another try) it is the id of the wait counted before, which matches no newer wait.
+	let waitId = 0;
 	let clock: ReturnType<typeof createWaitClock> | null = null;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let shown: string | null = null;
@@ -56,7 +58,7 @@ export function createCountdown(
 	}
 
 	function park(): void {
-		(deps.clearTimeout ?? clearTimeout)(timer);
+		clearTimeout(timer);
 		timer = undefined;
 		clock?.stop();
 		clock = null;
@@ -71,22 +73,23 @@ export function createCountdown(
 			return;
 		}
 		say(waitLine(Math.ceil(left)));
-		timer = (deps.setTimeout ?? setTimeout)(tick, TICK_MS);
+		timer = setTimeout(tick, TICK_MS);
 	}
 
 	function run(waitMs: number, onReturn: boolean): void {
 		over = false;
-		clock = createWaitClock(db, { count: tries, waitMs, pending: false }, deps.clock);
+		clock = createWaitClock(
+			db,
+			{ count: tries, waitMs, pending: false },
+			{ ...deps.clock, waitId: () => waitId }
+		);
 		// A page that comes back writes what is left (zero for a wait that ran out while it was away) before anything else
 		// can open a transaction: a press is judged by the stored wait, and it must not find the wait from before the
 		// absence. IndexedDB runs overlapping readwrite transactions in the order they were created, and this one is
 		// created here, inside the visibility event, so any press that follows opens its transaction after this write.
 		if (onReturn) clock.writeNow();
-		if (waitMs > 0) tick();
-		else {
-			over = true;
-			say(null);
-		}
+		// A wait of zero reads as over at once: the line goes.
+		tick();
 	}
 
 	function onVisibility(): void {
@@ -102,7 +105,7 @@ export function createCountdown(
 		const byPerf = perfNow() - was.perf;
 		const byDate = dateNow() - was.date;
 		const agree = byPerf >= 0 && byDate >= 0 && Math.abs(byPerf - byDate) <= CLOCKS_AGREE_MS;
-		run(agree ? Math.max(0, was.left - byPerf) : was.left, true);
+		run(agree ? was.left - byPerf : was.left, true);
 	}
 
 	function stop(): void {
@@ -119,6 +122,14 @@ export function createCountdown(
 			stop();
 			if (from.waitMs <= 0) return;
 			tries = from.count;
+			// Opened before the first clock exists, so the read is ordered ahead of every write that clock makes. A read
+			// that lands late can only carry the id of its own count, and a restart at another count has its own read.
+			readTriesWithId(db).then(
+				(row) => {
+					if (row.count === tries) waitId = row.waitId;
+				},
+				() => safeLog({ code: 'E_INTERNAL' })
+			);
 			doc = deps.doc ?? document;
 			doc.addEventListener('visibilitychange', onVisibility);
 			// Begun in a hidden page: no clock yet, so nothing is written and the first return applies the clocks rule.
