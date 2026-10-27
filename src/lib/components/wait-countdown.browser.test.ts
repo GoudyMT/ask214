@@ -417,6 +417,28 @@ describe('while the page is hidden', () => {
 			count.stop();
 		});
 
+		// After a return the 5 s writes no longer fall on the end of the wait. Someone who presses as the line goes must not
+		// be refused by a remainder that is no longer owed.
+		it('lets a press made as the line goes through, when the end falls between two timed writes', async () => {
+			const count = counting();
+			count.start(OWED);
+			pass(2_000);
+			doc.show('hidden');
+			perf += 25_500;
+			date += 25_500;
+			doc.show('visible');
+			expect(await stored()).toBe(2_500);
+
+			pass(3_000);
+			expect(lines.at(-1)).toBeNull();
+			const outcome = await runPinCheck(db, async (): Promise<PinCheckResult<number>> => ({
+				kind: 'good',
+				value: 1
+			}));
+			expect(outcome.kind).toBe('good');
+			count.stop();
+		});
+
 		it('writes nothing lower than the remainder at hide when the two clocks disagree', async () => {
 			const count = counting();
 			count.start(OWED);

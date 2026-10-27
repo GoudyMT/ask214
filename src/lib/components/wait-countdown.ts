@@ -64,10 +64,13 @@ export function createCountdown(
 		clock = null;
 	}
 
-	// Looks again each second: the text is read from the remainder, so a late look shows the right time.
+	// Looks again each second: the text is read from the remainder, so a late look shows the right time. The end is
+	// written as the line goes: the timed writes fall every 5 s from the clock's start, not on the end, and a press is
+	// judged by the stored wait.
 	function tick(): void {
 		const left = clock?.remainingMs() ?? 0;
 		if (left <= 0) {
+			clock?.writeNow();
 			over = true;
 			say(null);
 			return;
