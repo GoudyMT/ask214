@@ -103,21 +103,16 @@
 	// fields that no longer hold the PIN it warned about.
 	let easy = $state<{ form: 'setup' | 'change'; seen: string } | null>(null);
 	let chooseEl = $state<HTMLButtonElement | null>(null);
-	// The form's primary button (Next, Change PIN or Remove PIN): where the cursor goes when a press ends on the form.
-	let primaryEl = $state<HTMLButtonElement | null>(null);
 	const shown = $derived(easy === null ? message : null);
 	$effect(() => {
 		if (easy !== null && easy.seen !== `${current},${first},${second}`) {
-			const { form } = easy;
 			easy = null;
-			void toFirstField(form);
+			// The fields were emptied under the warning: the cursor goes to the form's first one.
+			void keepCursor('#app-lock-edit input');
 		}
 	});
 	// What a change or a removal did, shown under the row after it closes.
 	let statuses = $state<string[]>([]);
-	let toggleEl = $state<HTMLButtonElement | null>(null);
-	let changeEl = $state<HTMLButtonElement | null>(null);
-	let removeEl = $state<HTMLButtonElement | null>(null);
 	let currentField = $state<ReturnType<typeof PinField> | null>(null);
 	let firstField = $state<ReturnType<typeof PinField> | null>(null);
 	let secondField = $state<ReturnType<typeof PinField> | null>(null);
@@ -164,10 +159,7 @@
 
 	// Closing unmounts the focused button; focus goes back to the row, so a keyboard user is not dropped - unless they
 	// have already moved on to another control.
-	async function toToggle(): Promise<void> {
-		await tick();
-		if (document.activeElement === document.body) toggleEl?.focus();
-	}
+	const toToggle = () => keepCursor('.app-lock__toggle');
 
 	async function toggle(): Promise<void> {
 		if (busy) return;
@@ -210,8 +202,7 @@
 		const was = panel;
 		panel = 'main';
 		message = null;
-		await tick();
-		if (document.activeElement === document.body) (was === 'change' ? changeEl : removeEl)?.focus();
+		await keepCursor(was === 'change' ? '.app-lock__secondary' : '.app-lock__remove');
 	}
 
 	// A Lock, an idle lock or a peer's Lock while a press works must not be outlived by the keys it makes. A switch away
@@ -267,25 +258,23 @@
 		chooseEl?.focus();
 	}
 
-	// The warning went because the fields were emptied under it, and its focused button went with it: the cursor goes to the
-	// form's first field, unless the person has already moved on.
-	async function toFirstField(form: 'setup' | 'change'): Promise<void> {
+	// A control that held the cursor went away and it fell to the page: it goes to the first control the selector finds once
+	// the page has settled, unless the person has already moved on.
+	async function keepCursor(selector: string): Promise<void> {
 		await tick();
 		if (document.activeElement === document.body)
-			(form === 'change' ? currentField : firstField)?.focus();
+			document.querySelector<HTMLElement>(selector)?.focus();
 	}
 
-	// The same press again with the fields as they are; only the easy check is skipped. The pressed button went with the
-	// warning, so a press that ends on the form (a wrong current PIN, no memory) hands the cursor to the primary button, where
-	// the same press without the warning leaves it.
+	// The same press again with the fields as they are; only the easy check is skipped. A press that ends on the form (a wrong
+	// current PIN, no memory) leaves the cursor on the form's primary button (Next or Change PIN), as the same press without
+	// the warning does.
 	async function useAnyway(): Promise<void> {
 		const form = easy?.form;
 		easy = null;
 		if (form === 'setup') await next(true);
 		else if (form === 'change') await press('change', true);
-		else return;
-		await tick();
-		if (document.activeElement === document.body) primaryEl?.focus();
+		await keepCursor('#app-lock-edit .app-lock__next');
 	}
 
 	function chooseAnother(): void {
@@ -573,11 +562,8 @@
 			onclick={chooseAnother}
 			onkeydown={noRepeat}>Choose another</button
 		>
-		<button
-			class="app-lock__cancel"
-			type="button"
-			onclick={() => void useAnyway()}
-			onkeydown={noRepeat}>Use it anyway</button
+		<button class="app-lock__cancel" type="button" onclick={useAnyway} onkeydown={noRepeat}
+			>Use it anyway</button
 		>
 	</div>
 {/snippet}
@@ -586,7 +572,6 @@
 	<!-- Opening hands focus to the first field and a turn-on hands it back here mid-press, so a held Enter's repeats would
 	     press again: only a new press toggles. -->
 	<button
-		bind:this={toggleEl}
 		class="app-lock__toggle"
 		type="button"
 		aria-expanded={open}
@@ -612,14 +597,12 @@
 				{#if app.pinLocked !== true}
 					<div class="app-lock__actions">
 						<button
-							bind:this={changeEl}
 							class="app-lock__secondary"
 							type="button"
 							onclick={() => void showForm('change')}
 							onkeydown={noRepeat}>Change PIN</button
 						>
 						<button
-							bind:this={removeEl}
 							class="app-lock__remove"
 							type="button"
 							onclick={() => void showForm('remove')}
@@ -666,7 +649,6 @@
 				{:else}
 					<div class="app-lock__actions">
 						<button
-							bind:this={primaryEl}
 							class="app-lock__next"
 							type="button"
 							aria-busy={busy}
@@ -750,7 +732,6 @@
 				{:else}
 					<div class="app-lock__actions">
 						<button
-							bind:this={primaryEl}
 							class="app-lock__next"
 							type="button"
 							aria-busy={busy}
