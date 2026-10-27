@@ -6,6 +6,8 @@
 	type Props = {
 		id: string;
 		label: string;
+		/** The toggle's name: a form of several PIN fields names each by its field. */
+		show?: string;
 		value?: string;
 		disabled?: boolean;
 		/** A new press of Enter in the field; a held key's repeats never call it. */
@@ -16,6 +18,7 @@
 	let {
 		id,
 		label,
+		show = 'Show PIN',
 		value = $bindable(''),
 		disabled = false,
 		onenter,
@@ -121,7 +124,7 @@
 		type="button"
 		aria-pressed={shown}
 		onclick={toggleDigits}
-		onkeydown={toggleKeydown}>Show PIN</button
+		onkeydown={toggleKeydown}>{show}</button
 	>
 	<!-- The digits as page text, so the field itself stays a password field: a keyboard never learns from them and
 	     a screen reader does not speak the field. Not for the clipboard. -->

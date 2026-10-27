@@ -632,6 +632,7 @@
 					bind:value={current}
 					id="app-lock-current"
 					label="Enter your current PIN"
+					show="Show current PIN"
 					joinRelock={app.joinRelock}
 					onenter={() => (panel === 'remove' ? void press('remove') : firstField?.focus())}
 				/>
@@ -641,6 +642,7 @@
 						bind:value={first}
 						id="app-lock-new"
 						label="Choose a 4-6 digit PIN"
+						show="Show new PIN"
 						joinRelock={app.joinRelock}
 						onenter={() => secondField?.focus()}
 					/>
@@ -649,6 +651,7 @@
 						bind:value={second}
 						id="app-lock-again"
 						label="Enter it again"
+						show="Show new PIN again"
 						joinRelock={app.joinRelock}
 						onenter={() => void press('change')}
 					/>

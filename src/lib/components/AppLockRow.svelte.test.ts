@@ -1836,6 +1836,21 @@ describe('the row with the PIN on', () => {
 		expect(hasButton('Change PIN')).toBe(false);
 	});
 
+	// Toggles that all read "Show PIN" cannot be told apart in a list of buttons: each names the field it shows.
+	it('names each Show PIN toggle by its field, in Change and in Remove', async () => {
+		const showNames = () =>
+			[...document.querySelectorAll('.pin-show')].map((b) => b.textContent?.trim());
+		await mount();
+		await openForm('Change PIN');
+		expect(showNames()).toEqual(['Show current PIN', 'Show new PIN', 'Show new PIN again']);
+
+		cancelEl().click();
+		await until(() => hasButton('Remove PIN'), 'the PIN-on row');
+		buttonEl('Remove PIN').click();
+		await until(() => inForm(), 'the Remove form');
+		expect(showNames()).toEqual(['Show current PIN']);
+	});
+
 	// By design, a row that could only open onto a line with nothing to press stays shut while the app is locked: Change
 	// and Remove need the saved data open, so the toggle is off and announces no expansion.
 	it('cannot be opened while the app is locked', async () => {
