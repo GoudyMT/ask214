@@ -177,6 +177,16 @@
 		}
 		busy = true;
 		const found: Found = { noMemory: false, damagedRow: null, reloading: false, session: null };
+		// A Lock, an idle lock or a peer's Lock during the derive must not be outlived by the keys it makes: idle moves no
+		// counter, so nothing else would notice. A switch away (hygiene) locks nothing: the page's own store load drops
+		// what a hidden page decrypted.
+		let relocked = false;
+		const leave = app.joinRelock?.({
+			relockSync: (reason) => {
+				relocked ||= reason !== 'hygiene';
+			},
+			refresh: async () => {}
+		});
 		try {
 			// The row is read inside the check, under the tries lock, so it is the row this try is counted against.
 			const outcome = await runPinCheck(db, async (): Promise<PinCheckResult<true>> => {
@@ -210,8 +220,11 @@
 			if (found.reloading) return;
 
 			if (outcome.kind === 'good') {
+				if (relocked) return;
 				if (!app.unlockStores) throw new Error('E_NOT_READY');
 				await app.unlockStores();
+				// The page holds the keys from here on.
+				found.session = null;
 				onunlocked?.(triesNotice(outcome.wrongTries, outcome.unfinished));
 			} else if (outcome.kind === 'wrong') {
 				if (outcome.waitMs > 0) await showWait(db, outcome.waitMs, true);
@@ -231,11 +244,13 @@
 				}
 			}
 		} catch {
-			// The keys were opened inside the check; a failure after that must not leave them behind a card that says no.
-			if (found.session !== null && getSession() === found.session) dropSession();
 			safeLog({ code: 'E_INTERNAL' });
 			message = UNLOCK_FAILED;
 		} finally {
+			// The keys were opened inside the check; a failure or a lock after that must not leave them behind a card that
+			// says no.
+			if (found.session !== null && getSession() === found.session) dropSession();
+			leave?.();
 			field?.clear();
 			busy = false;
 		}

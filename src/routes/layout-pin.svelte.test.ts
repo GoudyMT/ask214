@@ -531,6 +531,26 @@ describe('the root layout, an unlock that does not go through', () => {
 		await vi.waitFor(() => expect(app.store?._getStateForTest()).not.toBeNull());
 		expect(getSession()).toBe(session);
 	});
+
+	// The person switched away during the derive: nothing may decrypt into a page nobody can see, and the keys stay so the
+	// way back needs no PIN.
+	it('leaves no plaintext behind when the page is already hidden as the unlock runs, and reads again on return', async () => {
+		await pinDevice(true);
+		await render(Layout, { children });
+		const app = await readyApp();
+		setHidden(true);
+		const session = (await openSession(), getSession());
+
+		await need(app.unlockStores)();
+
+		expect(app.store?._getStateForTest()).toBeNull();
+		expect(app.store?.lockState).toBe('evicted');
+		expect(getSession()).toBe(session);
+		expect(app.pinLocked).toBe(false);
+		setHidden(false);
+		await vi.waitFor(() => expect(app.store?._getStateForTest()).not.toBeNull());
+		expect(getSession()).toBe(session);
+	});
 });
 
 describe('the root layout, which relocks drop the keys', () => {

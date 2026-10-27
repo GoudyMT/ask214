@@ -297,6 +297,9 @@
 					}
 					const rest = await Promise.allSettled([timelineStore?.load(), calendarStore?.load()]);
 					if (rest.some((r) => r.status === 'rejected')) safeLog({ code: 'E_INIT_FAILED' });
+					// The hide event of a page hidden during the derive came before these loads, so it dropped nothing: what they
+					// decrypted goes now, and the keys stay, so the way back reads it again with no PIN.
+					if (isHidden()) relockEachSync(relockables, 'hygiene');
 					// A Lock that landed while the other stores were read leaves the lock up; a switch away did not lock anything.
 					if (held && getSession() === held && result.store.lockState !== 'locked') {
 						app.pinLocked = false;

@@ -14,7 +14,7 @@ import { readLockedDevice, restoreLockedDevice } from '../keystore/forgot-restor
 import { PinNoMemoryError } from '../keystore/pin-derive';
 import { signKeystore, type KeystoreRecordPin } from '../keystore/record';
 import { KeystoreHmacMismatchError } from '../keystore/read';
-import { dropSession, getSession } from '../keystore/session';
+import { dropSession, getSession, openPinSession, setSession } from '../keystore/session';
 import { readPinRowAndCounter } from '../keystore/unlock-row';
 import { createJoinRelock, relockEachSync, type Relockable } from '../profile/app-init';
 import { waitLine } from './pin-lines';
@@ -286,6 +286,83 @@ describe('a good PIN', () => {
 
 		expect(alertText()).toBe(UNLOCK_FAILED);
 		expect(getSession()).toBeNull();
+	});
+});
+
+describe('a lock that lands while the derive runs', () => {
+	/** Starts a press with the right PIN and holds its derive until the test lets it go. */
+	async function holdDerive(): Promise<() => void> {
+		let letGo: () => void = () => {};
+		derive.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					letGo = () => resolve({ macKey: fx.macKey, kek: fx.kek });
+				})
+		);
+		await mount();
+		await field().fill(GOOD);
+		unlockEl().click();
+		await until(() => derive.mock.calls.length > 0, 'the derive started');
+		return () => letGo();
+	}
+
+	// The phone sleeps mid-unlock and wakes past the idle limit: the relock comes before the derive ends, and the keys
+	// that derive makes must not outlive it. Idle does not move the lock counter, so nothing else would catch it.
+	it.each(['idle', 'user'] as const)(
+		'holds no session and opens nothing when a %s lock lands during the derive',
+		async (reason) => {
+			const letGo = await holdDerive();
+			relockEachSync(relockables, reason);
+			letGo();
+			await until(settled, 'the press ended');
+
+			expect(app.unlockStores).not.toHaveBeenCalled();
+			expect(getSession()).toBeNull();
+			expect(onunlocked).not.toHaveBeenCalled();
+			expect(alertText()).toBeNull();
+		}
+	);
+
+	// A switch away locks nothing: the person is still unlocking.
+	it('goes on when only a switch away (hygiene) lands during the derive', async () => {
+		const letGo = await holdDerive();
+		relockEachSync(relockables, 'hygiene');
+		letGo();
+		await until(() => onunlocked.mock.calls.length > 0, 'the page was told it unlocked');
+
+		expect(app.unlockStores).toHaveBeenCalledTimes(1);
+		expect(getSession()).not.toBeNull();
+	});
+
+	// A lock that lands after the keys were set but before the press ended (the tries reset is still being written)
+	// is caught too; a session someone else set meanwhile is not the press's to drop.
+	it('drops only its own session, when a lock lands after the keys were set', async () => {
+		const { counter } = await readPinRowAndCounter(db);
+		const other = await openPinSession(fx.row, { macKey: fx.macKey, kek: fx.kek }, counter);
+		let armed = false;
+		derive.mockImplementation(async () => {
+			armed = true;
+			return { macKey: fx.macKey, kek: fx.kek };
+		});
+		const open = db.transaction.bind(db);
+		vi.spyOn(db, 'transaction').mockImplementation(((
+			stores: string | string[],
+			mode?: IDBTransactionMode,
+			options?: IDBTransactionOptions
+		) => {
+			if (armed && mode === 'readwrite') {
+				armed = false;
+				relockEachSync(relockables, 'user');
+				setSession(other);
+			}
+			return open(stores, mode, options);
+		}) as typeof db.transaction);
+		await mount();
+		await press(GOOD);
+
+		expect(app.unlockStores).not.toHaveBeenCalled();
+		expect(onunlocked).not.toHaveBeenCalled();
+		expect(getSession()).toBe(other);
 	});
 });
 
