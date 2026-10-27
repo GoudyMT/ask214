@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { waitForControl } from '$lib/ask/when-controlled';
 	import AskView from '$lib/components/AskView.svelte';
@@ -15,6 +16,7 @@
 	} from '$lib/ask';
 	import { ACCEPTED_CORPUS_VERSION } from '$lib/corpus';
 	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
+	import { detectEligibilityIntent } from '$lib/ask/synthesis/eligibility-gate';
 	import { createLazyCorpus } from '$lib/ask/corpus-loader';
 	import { deviceFilesKept } from '$lib/ask/device-files';
 	import { getProfileApp } from '$lib/profile/context';
@@ -22,6 +24,8 @@
 	import type { HomeRow } from '$lib/timeline/home-glance';
 	import { FAILED_ROW, loadHomeGlance } from '$lib/timeline/load-home-glance';
 	import GlanceRow from '$lib/components/GlanceRow.svelte';
+	import LockedPanel from '$lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
 	import { getInstallApp } from '$lib/install/context';
 	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
 	import InstallNudge from '$lib/components/InstallNudge.svelte';
@@ -35,6 +39,18 @@
 	} from '$lib/ask/online-prefs';
 
 	const app = getProfileApp();
+	// A PIN tab with no keys is locked whatever the stores read: with nothing saved a store reads unlocked after a Lock. The
+	// Unlock card then takes the place of the first-run invitation and of the row, and Ask stays open above it.
+	const pinLocked = $derived(app.status === 'ready' && app.pinLocked === true);
+	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
+	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not
+	// carry it.
+	function eraseAtSettings(): void {
+		void import('$lib/components/load-backup').then(({ backupSession }) => {
+			backupSession.requestErase();
+			return goto(resolve('/settings'));
+		});
+	}
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a
 	// timeline exists the timeline's glance row takes its place.
 	const showOnramp = $derived(
@@ -48,6 +64,7 @@
 	// downloads none of it. The row waits for it, as it waits for the stores.
 	const returning = $derived(
 		app.status === 'ready' &&
+			!pinLocked &&
 			!!app.store &&
 			(app.store.locked || app.store.persona.completeness !== 'none')
 	);
@@ -94,6 +111,41 @@
 	// `keyboard`: the pill was pressed by keyboard or screen reader, so focus goes to the field once the question runs.
 	let earlyQuery: { query: string; mode: 'device' | 'online'; keyboard: boolean } | undefined;
 	let askView: ReturnType<typeof AskView> | undefined;
+
+	// The question the store was last given. An eligibility question never gets a summary, whatever the keys, so the
+	// locked line must not promise one: the store decides that on the trimmed question with this same function.
+	let askedQuery = $state('');
+	function askOnStore(query: string): void {
+		askedQuery = query;
+		void store?.ask(query);
+	}
+
+	// Whether a BYO key is saved, known while locked from a count of its row: an online answer then points to the Unlock
+	// where the summary would be. The query and the key go nowhere new; the summary itself waits for the keys.
+	let storedKey = $state(false);
+	$effect(() => {
+		const byok = app.byok;
+		if (!pinLocked || !byok) {
+			storedKey = false;
+			return;
+		}
+		let current = true;
+		byok.hasApiKey().then(
+			(has) => {
+				if (current) storedKey = has;
+			},
+			() => {
+				if (current) storedKey = false;
+			}
+		);
+		return () => {
+			current = false;
+		};
+	});
+	// The card is already on the page, so the press only takes the cursor into its field.
+	function toUnlockCard(): void {
+		document.getElementById('pin-unlock-field')?.focus();
+	}
 
 	// Memoized lazy corpus load; populates `sources` (the offline reader's source map) on first resolve. A
 	// rejection is not cached, so a transient failure stays retryable rather than trapping the session.
@@ -146,6 +198,39 @@
 		await tick();
 		if (keyboard && document.activeElement === document.body) askView?.focusField();
 	}
+	// The Unlock card is gone and focus fell to the page. Where it goes follows the same rule: after a keyboard press the
+	// question field, and after a tap or a click the page heading, since a focused text field would open a phone's keyboard.
+	let unlockByTouch = false;
+	let pinNotice = $state<string[]>([]);
+	let noticeUp = $state(false);
+	// A lock ends the visit the notice was about, so it goes: the same tries after the next unlock arrive as a new line.
+	$effect(() => {
+		if (pinLocked) {
+			noticeUp = true;
+			pinNotice = [];
+		}
+	});
+	let heroEl: HTMLElement | undefined;
+	async function afterUnlock(): Promise<void> {
+		await tick();
+		if (document.activeElement !== document.body) return;
+		if (unlockByTouch) heroEl?.focus();
+		else askView?.focusField();
+	}
+
+	// A lock of any kind (the person's, the idle timer's, another tab's, the page being hidden) clears the question and
+	// the answer on screen: the page is going away, and its text with it. Ask answers again only when asked, so there
+	// is nothing to read back on refresh. The list is offered once start-up resolves; the page leaves it when it goes.
+	$effect(() =>
+		app.joinRelock?.({
+			relockSync: () => {
+				store?.clear();
+				askedQuery = '';
+				askView?.clear();
+			},
+			refresh: () => Promise.resolve()
+		})
+	);
 
 	onMount(() => {
 		// The ~23MB model + its embed worker are created lazily, on the first query that needs them - never
@@ -191,7 +276,7 @@
 			const first = earlyQuery?.mode ?? earlyMode;
 			if (first === 'device') store.setMode('device');
 			if (earlyQuery !== undefined) {
-				void store.ask(earlyQuery.query);
+				askOnStore(earlyQuery.query);
 				// The pill unmounts with the feed now, outside any press, so focus falls: hand it on as a press would.
 				void toQuestionField(earlyQuery.keyboard);
 			}
@@ -213,7 +298,9 @@
 </svelte:head>
 
 <div class="home">
-	<h1 class="home-hero">Answers for your military transition, from sources you can trust.</h1>
+	<h1 bind:this={heroEl} class="home-hero" tabindex="-1">
+		Answers for your military transition, from sources you can trust.
+	</h1>
 
 	<AskView
 		bind:this={askView}
@@ -225,7 +312,7 @@
 		showNudge={store?.showNudge ?? false}
 		onAsk={(q, press) =>
 			store
-				? void store.ask(q)
+				? askOnStore(q)
 				: (earlyQuery = {
 						query: q,
 						mode: earlyMode,
@@ -239,12 +326,18 @@
 		onDismissNudge={() => store?.dismissNudge()}
 		onOfferDevice={(q) => {
 			store?.setMode('device');
-			void store?.ask(q);
+			askOnStore(q);
 		}}
 		onRetryOnline={(q) => {
 			store?.setMode('online');
-			void store?.ask(q);
+			askOnStore(q);
 		}}
+		onUnlockSummaries={pinLocked &&
+		storedKey &&
+		isSynthesisEnabled() &&
+		!detectEligibilityIntent(askedQuery.trim()).shortCircuit
+			? toUnlockCard
+			: undefined}
 	/>
 
 	{#if showInstallNudge}
@@ -257,7 +350,35 @@
 		</div>
 	{/if}
 
-	{#if isIdle && showOnramp}
+	<!-- What a good PIN said about the tries before it, where the Unlock card stood. It is on the page from the moment the
+	     card is, so a screen reader is already listening when its lines arrive; the next unlock replaces it. -->
+	{#if noticeUp}
+		<div class="home-notice" role="status">
+			{#each pinNotice as line (line)}<p>{line}</p>{/each}
+		</div>
+	{/if}
+
+	{#if pinLocked}
+		<hr class="home-divider" />
+		<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. The wrapper
+		     only notes how the card was pressed, for where focus goes once it is gone. -->
+		<div
+			onclickcapture={(e) => (unlockByTouch = e.detail > 0)}
+			onkeydowncapture={(e) => e.key === 'Enter' && (unlockByTouch = false)}
+		>
+			{#await loadPinUnlock() then unlockCard}
+				<unlockCard.default
+					onunlocked={(notice) => {
+						pinNotice = notice;
+						void afterUnlock();
+					}}
+					onerase={eraseAtSettings}
+				/>
+			{:catch}
+				<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
+			{/await}
+		</div>
+	{:else if isIdle && showOnramp}
 		<hr class="home-divider" />
 		<section class="home-onramp" aria-labelledby="home-onramp-heading">
 			<h2 id="home-onramp-heading">Make it yours</h2>
@@ -290,10 +411,27 @@
 		line-height: 1.15;
 		margin: var(--space-xl) 0 var(--space-l);
 	}
+	/* Where focus goes after a tap on Unlock: the app's ring (app.css), as on a button. */
+	.home-hero:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
 	/* The nudge card holds left-aligned content inside the centered hero column. */
 	.home-install {
 		margin-top: var(--space-xl);
 		text-align: left;
+	}
+	/* What a good PIN said about the tries before it: hint text, and no space when there is nothing to say. */
+	.home-notice {
+		margin-top: var(--space-l);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+	.home-notice:empty {
+		margin: 0;
+	}
+	.home-notice p {
+		margin: 0;
 	}
 	/* Separates the Ask from the below-hero surface. Idle-only: once a query runs the results own the
 	   page and this whole block steps aside. */

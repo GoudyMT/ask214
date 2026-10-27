@@ -2,16 +2,11 @@ import type { CalendarSyncState, DesiredEvent, HandedOverEvent, TaskExclusions }
 import type { CardDismissal } from './card-visibility';
 import { encryptCalendarRecord, decryptCalendarRecord } from './crypto-boundary';
 import { mergeHandedOver, acknowledge } from './handed-over';
-import type { KeystoreRecordV1 } from '../keystore/record';
+import { keyIdentity, type KeystoreKeys } from '../keystore/record';
+import { KeystoreNotInitializedError, readKeystoreRow, type KeystoreRow } from '../keystore/read';
 import { signSidecar } from '../profile/sidecars';
 import { nextLockState, type LockState, type RelockReason } from '../profile/lifecycle';
-import {
-	KeystoreNotInitializedError,
-	OccConflictError,
-	getRow,
-	readKeystoreRow,
-	readHwmGeneration
-} from '../profile/store.svelte';
+import { OccConflictError, getRow, readHwmGeneration } from '../profile/store.svelte';
 import { withWriteLocks } from '../db/locks';
 import { withStores } from '../db/schema';
 
@@ -50,7 +45,7 @@ type CalendarHwmPayload = {
 	ts: number;
 };
 
-type KeystoreRow = KeystoreRecordV1 & { id: number };
+type VerifiedKeystore = { row: KeystoreRow; keys: KeystoreKeys };
 type StateRow = { id: number; rec: Uint8Array };
 
 export type CalendarBroadcastEvent = {
@@ -84,8 +79,8 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 
 	const readVerifiedKeystore = () => readKeystoreRow(db);
 	/** Current calendar generation (0 = no HWM yet = no calendar state written). */
-	const readCurrentGeneration = (keystore: KeystoreRow) =>
-		readHwmGeneration(db, 'calendar-sync-hwm', keystore.hmacKeyRef);
+	const readCurrentGeneration = (keys: KeystoreKeys) =>
+		readHwmGeneration(db, 'calendar-sync-hwm', keys.hmacKey);
 
 	/**
 	 * Apply `mutate` to the CURRENT record and persist the result. The merge runs INSIDE the write
@@ -97,23 +92,28 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 	 */
 	async function persist(mutate: (base: CalendarSyncState) => CalendarSyncState): Promise<void> {
 		const relockAtStart = relockEpoch;
-		let ks: KeystoreRow | undefined;
+		let ks: VerifiedKeystore | undefined;
 		await withWriteLocks(
 			async () => {
 				ks = await readVerifiedKeystore();
-				return ks.keystoreGeneration;
+				return ks.row.keystoreGeneration;
 			},
 			async () => {
 				if (!ks) throw new KeystoreNotInitializedError();
-				const keystore = ks;
+				const { row: keystore, keys } = ks;
 
-				const currentGen = await readCurrentGeneration(keystore);
+				const currentGen = await readCurrentGeneration(keys);
 				if (currentGen !== _generation) throw new OccConflictError();
 				if (_state === null) throw new CalendarRelockedError();
 
 				const next = mutate(_state);
 				const nextGen = currentGen + 1;
-				const blob = await encryptCalendarRecord(next, keystore, nextGen);
+				const blob = await encryptCalendarRecord(
+					next,
+					keyIdentity(keystore),
+					keys.dataKey,
+					nextGen
+				);
 				const newHwm = await signSidecar<CalendarHwmPayload>(
 					'calendar-sync-hwm',
 					{
@@ -122,7 +122,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 						epoch: keystore.epoch,
 						ts: Date.now()
 					},
-					keystore.hmacKeyRef
+					keys.hmacKey
 				);
 
 				await withStores(db, ['calendar-sync', 'calendar-sync-hwm'], 'readwrite', (tx) => {
@@ -189,7 +189,7 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 		 */
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
-			let ks: KeystoreRow | undefined;
+			let ks: VerifiedKeystore | undefined;
 			// The user's Unlock is a new attempt: a page waits for it instead of repeating the last failure while it
 			// runs. An automatic re-read keeps the failure, so a note that stays true is not taken down and put up
 			// again on every return to the page.
@@ -198,12 +198,12 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 				await withWriteLocks(
 					async () => {
 						ks = await readVerifiedKeystore();
-						return ks.keystoreGeneration;
+						return ks.row.keystoreGeneration;
 					},
 					async () => {
 						if (!ks) throw new KeystoreNotInitializedError();
-						const keystore = ks;
-						const gen = await readCurrentGeneration(keystore);
+						const { row: keystore, keys } = ks;
+						const gen = await readCurrentGeneration(keys);
 						// The generation moves only with the record it belongs to: a read that fails after a
 						// peer's save would otherwise pair the newer generation with the older record, and a
 						// write from them would pass the conflict check and lay it over the peer's save.
@@ -222,7 +222,12 @@ export function createCalendarSyncStore(db: IDBDatabase, opts: CalendarStoreOpti
 						}
 						const row = await getRow<StateRow>(db, 'calendar-sync');
 						if (!row) throw new Error('E_CALENDAR_BODY_MISSING');
-						const decoded = await decryptCalendarRecord(row.rec, keystore, gen);
+						const decoded = await decryptCalendarRecord(
+							row.rec,
+							keyIdentity(keystore),
+							keys.dataKey,
+							gen
+						);
 						_generation = gen;
 						if (relockEpoch === relockAtStart) {
 							_state = decoded;

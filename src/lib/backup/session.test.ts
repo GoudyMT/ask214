@@ -321,6 +321,67 @@ describe('start and the single operation', () => {
 	});
 });
 
+// ---- a backup while the PIN is on ----------------------------------------------------------------------------------
+
+describe('making a backup while the PIN is on', () => {
+	const pinApp = (): StartApp => makeApp({ keyMode: 'pin' }).app;
+
+	// The gate lives here so that no caller of the session can skip the PIN the card asks for.
+	it('refuses to start an export without the PIN step having granted it, and joins nothing', () => {
+		const h = harness();
+		const { app, joined } = makeApp({ keyMode: 'pin' });
+		expect(() => h.s.start(app, 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+		expect(h.s.active).toBe(false);
+		expect(joined).toHaveLength(0);
+	});
+
+	it('starts one export per grant: the grant is spent by the start', () => {
+		const h = harness();
+		const app = pinApp();
+		h.s.grantExport();
+		h.s.start(app, 'export');
+		expect(h.s.kind).toBe('export');
+		// A cancel, not an end: only the start itself may have spent the grant.
+		expect(h.s.cancel()).toBe(true);
+
+		expect(() => h.s.start(app, 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+	});
+
+	// A grant must not wait around for a later, unrelated start.
+	it('spends the grant on a start that is refused too', () => {
+		const h = harness();
+		h.s.grantExport();
+		const noRelock = makeApp({ keyMode: 'pin', joinRelock: null }).app;
+		expect(() => h.s.start(noRelock, 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+
+		expect(() => h.s.start(pinApp(), 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+	});
+
+	it.each<[string, (h: H) => void]>([
+		['a switch away', (h) => h.s.relockSync('hygiene')],
+		['a Lock', (h) => h.s.relockSync('user')],
+		['the session ending', (h) => h.s.end()]
+	])('drops an unspent grant on %s', (_why, drop) => {
+		const h = harness();
+		h.s.grantExport();
+		drop(h);
+
+		expect(() => h.s.start(pinApp(), 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+	});
+
+	it.each<SessionKind>(['check', 'restore'])('needs no grant to start a %s', (kind) => {
+		const h = harness();
+		h.s.start(pinApp(), kind);
+		expect(h.s.kind).toBe(kind);
+	});
+
+	it('starts an export with no grant when the PIN is off', () => {
+		const h = harness();
+		h.s.start(makeApp({ keyMode: 'local' }).app, 'export');
+		expect(h.s.kind).toBe('export');
+	});
+});
+
 // ---- the run API through a fake flow ---------------------------------------------------------------------------
 
 describe('runs', () => {

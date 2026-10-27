@@ -1,16 +1,18 @@
 import type { ProfileV1 } from './types';
-import { verifyRecordHmac } from '../keystore/record';
+import { keyIdentity, verifyKeystore } from '../keystore/record';
+import {
+	KeystoreHmacMismatchError,
+	KeystoreNotInitializedError,
+	checkSessionCounter,
+	keysForRow,
+	type KeystoreRow
+} from '../keystore/read';
+import { KeystoreLockedError } from '../keystore/session';
 import { decryptProfileRecord } from './crypto-boundary';
 import { verifySidecar, type SignedSidecar } from './sidecars';
 import { withStores, reqToPromise, type StoreName } from '../db/schema';
 import { zeroizeRecord } from './lifecycle';
-import {
-	KeystoreHmacMismatchError,
-	KeystoreNotInitializedError,
-	type HwmRow,
-	type KeystoreRow,
-	type ProfileRow
-} from './store.svelte';
+import type { HwmRow, ProfileRow } from './store.svelte';
 
 /**
  * Kept out of store.svelte.ts on purpose: only the backup and restore flows read the device's saved state, and the
@@ -81,9 +83,10 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 
 	let decoded: ProfileV1 | null = null;
 	try {
-		if (!ks.recordHmac || !(await verifyRecordHmac(ks, ks.hmacKeyRef, ks.recordHmac))) {
-			throw new KeystoreHmacMismatchError();
-		}
+		const keys = keysForRow(ks);
+		// After the transaction above has finished, so the counter read opens its own.
+		await checkSessionCounter(db);
+		if (!(await verifyKeystore(ks, keys))) throw new KeystoreHmacMismatchError();
 		// A sidecar that was never written reads as generation 0 with no time; one that is there must verify.
 		const verified = async (
 			store: 'profile-hwm' | 'timeline-state-hwm' | 'calendar-sync-hwm' | 'skillbridge-finder-hwm',
@@ -93,7 +96,7 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 			const payload = await verifySidecar(
 				store,
 				{ v: 1, payload: row.payload, mac: row.mac },
-				ks.hmacKeyRef
+				keys.hmacKey
 			);
 			return { generation: payload.generation, ts: payload.ts };
 		};
@@ -106,7 +109,12 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 		let lastSeenAt: number | null = null;
 		if (profile.generation >= 1) {
 			if (!profileRow) throw new Error('E_PROFILE_BODY_MISSING');
-			decoded = await decryptProfileRecord(profileRow.rec, ks, profile.generation);
+			decoded = await decryptProfileRecord(
+				profileRow.rec,
+				keyIdentity(ks),
+				keys.dataKey,
+				profile.generation
+			);
 			lastSeenAt = decoded.lastSeenAt;
 			const {
 				lastBackupAt,
@@ -145,8 +153,10 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 			mark,
 			lastSeenAt
 		};
-	} catch {
-		throw new Error('E_RESTORE_DEVICE_DAMAGED');
+	} catch (e) {
+		// A tab that locked in the middle of this read holds good data it cannot open right now: damage offers an erase.
+		if (e instanceof KeystoreLockedError) throw e;
+		throw new Error('E_RESTORE_DEVICE_DAMAGED', { cause: e });
 	} finally {
 		if (decoded) zeroizeRecord(decoded as unknown as Record<string, unknown>);
 	}

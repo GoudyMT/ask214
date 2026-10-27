@@ -1,13 +1,13 @@
 import { encryptRecord, decryptRecord, type RecordCtx } from '$lib/crypto/record-crypto';
-import type { KeystoreRecordV1 } from '$lib/keystore/record';
-import { readKeystoreRow, KeystoreNotInitializedError } from '$lib/profile/store.svelte';
+import { keyIdentity } from '$lib/keystore/record';
+import { readKeystoreRow, KeystoreNotInitializedError } from '$lib/keystore/read';
 import { withStores, reqToPromise } from '$lib/db/schema';
 import { withWriteLocks } from '$lib/db/locks';
 import { isAnthropicKeyShape } from './key-shape';
 
 /**
  * byok store - persists the user's BYO API key as ONE encrypted self-row through the shared
- * record-crypto boundary (AES-GCM under the keystore dataKeyRef). Unlike the profile/timeline/calendar
+ * record-crypto boundary (AES-GCM under the keystore data key). Unlike the profile/timeline/calendar
  * stores it carries NO HWM sidecar and NO in-memory cache: a single re-enterable key needs no OCC or
  * anti-rollback generation, and a raw secret is safer decrypted on demand than held resident for the
  * session. The AAD's storeName binding still isolates a byok record from every other store's ciphertext.
@@ -16,7 +16,6 @@ import { isAnthropicKeyShape } from './key-shape';
 const BYOK_CTX: RecordCtx = { storeName: 'byok', recordId: 'self', schemaVersion: 1 };
 // Fixed: with no HWM there is no generation to track - the key is a single, overwritten self-row.
 const BYOK_GENERATION = 1;
-
 type KeyRow = { id: number; rec: Uint8Array };
 
 export function createByokStore(db: IDBDatabase) {
@@ -30,20 +29,26 @@ export function createByokStore(db: IDBDatabase) {
 			if (!isAnthropicKeyShape(key)) throw new Error('E_KEY_SHAPE');
 			// The keystore read, the encrypt and the write all sit inside the shared keystore lock: a device erase
 			// holds it exclusive, so it runs wholly before or after this save and cannot be undone by its write.
-			let ks: KeystoreRecordV1 | undefined;
+			let ks: Awaited<ReturnType<typeof readVerifiedKeystore>> | undefined;
 			await withWriteLocks(
 				async () => {
 					ks = await readVerifiedKeystore();
-					return ks.keystoreGeneration;
+					return ks.row.keystoreGeneration;
 				},
 				async () => {
 					if (!ks) throw new KeystoreNotInitializedError();
-					const keystore = ks;
+					const { row: keystore, keys } = ks;
 					const plaintext = new TextEncoder().encode(key);
 					let blob: Uint8Array;
 					try {
 						// Awaited inside the try: the wipe must wait for the cipher to finish with the buffer.
-						blob = await encryptRecord(BYOK_CTX, plaintext, keystore, BYOK_GENERATION);
+						blob = await encryptRecord(
+							BYOK_CTX,
+							plaintext,
+							keyIdentity(keystore),
+							keys.dataKey,
+							BYOK_GENERATION
+						);
 					} finally {
 						plaintext.fill(0);
 					}
@@ -57,17 +62,35 @@ export function createByokStore(db: IDBDatabase) {
 
 		/** Decrypt + return the stored key, or null if none is set. Reads on demand; never cached. */
 		async readApiKey(): Promise<string | null> {
-			const keystore = await readVerifiedKeystore();
+			const { row: keystore, keys } = await readVerifiedKeystore();
 			const row = await withStores(db, 'byok', 'readonly', (tx) =>
 				reqToPromise<KeyRow | undefined>(tx.objectStore('byok').get(0))
 			);
 			if (!row) return null;
-			const bytes = await decryptRecord(BYOK_CTX, row.rec, keystore, BYOK_GENERATION);
+			const bytes = await decryptRecord(
+				BYOK_CTX,
+				row.rec,
+				keyIdentity(keystore),
+				keys.dataKey,
+				BYOK_GENERATION
+			);
 			try {
 				return new TextDecoder().decode(bytes);
 			} finally {
 				bytes.fill(0);
 			}
+		},
+
+		/**
+		 * Whether a key is stored: a count of the store's rows. It reads no keystore and opens no record, so it answers in
+		 * a tab that holds no keys, where the locked Ask asks it to point to the Unlock.
+		 */
+		async hasApiKey(): Promise<boolean> {
+			return (
+				(await withStores(db, 'byok', 'readonly', (tx) =>
+					reqToPromise<number>(tx.objectStore('byok').count())
+				)) > 0
+			);
 		},
 
 		/** Remove the stored key. */

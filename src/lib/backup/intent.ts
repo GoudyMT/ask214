@@ -12,7 +12,8 @@
  */
 const KEY = 'mtcBackupIntent';
 
-export type BackupIntent = 'restore-row' | 'restored';
+/** `restored-pin-off`: the restore was onto a device locked behind a forgotten PIN, so the PIN is off afterwards. */
+export type BackupIntent = 'restore-row' | 'restored' | 'restored-pin-off';
 
 /** The note start-up read, and the page it was left for. */
 let held: { intent: BackupIntent; path: string } | null = null;
@@ -27,7 +28,7 @@ export function captureBackupIntent(): void {
 	try {
 		const state = history.state ?? {};
 		const value: unknown = state[KEY];
-		if (value !== 'restore-row' && value !== 'restored') return;
+		if (value !== 'restore-row' && value !== 'restored' && value !== 'restored-pin-off') return;
 		held = { intent: value, path: location.pathname };
 		const rest = { ...state };
 		delete rest[KEY];

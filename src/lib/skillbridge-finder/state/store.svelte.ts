@@ -7,15 +7,15 @@ import {
 	type FinderSetup
 } from './types';
 import { encryptFinderRecord, decryptFinderRecord } from './crypto-boundary';
-import type { KeystoreRecordV1 } from '../../keystore/record';
-import { signSidecar, verifySidecar, type SignedSidecar } from '../../profile/sidecars';
-import { nextLockState, type LockState, type RelockReason } from '../../profile/lifecycle';
+import { keyIdentity, type KeystoreKeys } from '../../keystore/record';
 import {
 	KeystoreNotInitializedError,
-	OccConflictError,
-	getRow,
-	readKeystoreRow
-} from '../../profile/store.svelte';
+	readKeystoreRow,
+	type KeystoreRow
+} from '../../keystore/read';
+import { signSidecar, verifySidecar, type SignedSidecar } from '../../profile/sidecars';
+import { nextLockState, type LockState, type RelockReason } from '../../profile/lifecycle';
+import { OccConflictError, getRow } from '../../profile/store.svelte';
 import { withWriteLocks } from '../../db/locks';
 import { withStores } from '../../db/schema';
 
@@ -47,7 +47,7 @@ type FinderHwmPayload = {
 	ts: number;
 };
 
-type KeystoreRow = KeystoreRecordV1 & { id: number };
+type VerifiedKeystore = { row: KeystoreRow; keys: KeystoreKeys };
 type StateRow = { id: number; rec: Uint8Array };
 
 export type FinderBroadcastEvent = {
@@ -80,13 +80,13 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 	}
 
 	/** Current finder generation from its verified HWM sidecar (0 = no HWM yet = nothing written). */
-	async function readCurrentGeneration(keystore: KeystoreRow): Promise<number> {
+	async function readCurrentGeneration(keys: KeystoreKeys): Promise<number> {
 		const row = await getRow<SignedSidecar<FinderHwmPayload>>(db, HWM_STORE);
 		if (!row) return 0;
 		const hwm = await verifySidecar<FinderHwmPayload>(
 			HWM_STORE,
 			{ v: 1, payload: row.payload, mac: row.mac },
-			keystore.hmacKeyRef
+			keys.hmacKey
 		);
 		return hwm.generation;
 	}
@@ -101,25 +101,25 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 	 */
 	async function persist(mutate: (base: FinderRecord) => FinderRecord): Promise<void> {
 		const relockAtStart = relockEpoch;
-		let ks: KeystoreRow | undefined;
+		let ks: VerifiedKeystore | undefined;
 		let wrote = false;
 		await withWriteLocks(
 			async () => {
 				ks = await readKeystoreRow(db);
-				return ks.keystoreGeneration;
+				return ks.row.keystoreGeneration;
 			},
 			async () => {
 				if (!ks) throw new KeystoreNotInitializedError();
-				const keystore = ks;
+				const { row: keystore, keys } = ks;
 
-				const currentGen = await readCurrentGeneration(keystore);
+				const currentGen = await readCurrentGeneration(keys);
 				if (currentGen !== _generation) throw new OccConflictError();
 				if (_state === null) throw new FinderRelockedError();
 
 				const next = mutate(_state);
 				if (next === _state) return;
 				const nextGen = currentGen + 1;
-				const blob = await encryptFinderRecord(next, keystore, nextGen);
+				const blob = await encryptFinderRecord(next, keyIdentity(keystore), keys.dataKey, nextGen);
 				const newHwm = await signSidecar<FinderHwmPayload>(
 					HWM_STORE,
 					{
@@ -128,7 +128,7 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 						epoch: keystore.epoch,
 						ts: Date.now()
 					},
-					keystore.hmacKeyRef
+					keys.hmacKey
 				);
 
 				await withStores(db, ['skillbridge-finder', HWM_STORE], 'readwrite', (tx) => {
@@ -197,7 +197,7 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 		 */
 		async load(): Promise<void> {
 			const relockAtStart = relockEpoch;
-			let ks: KeystoreRow | undefined;
+			let ks: VerifiedKeystore | undefined;
 			// The person's Unlock is a new attempt: a page waits for it instead of repeating the last failure while it
 			// runs. An automatic re-read keeps the failure, so a note that stays true is not taken down and put up again.
 			if (lockState === 'locked') _failed = false;
@@ -205,12 +205,12 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 				await withWriteLocks(
 					async () => {
 						ks = await readKeystoreRow(db);
-						return ks.keystoreGeneration;
+						return ks.row.keystoreGeneration;
 					},
 					async () => {
 						if (!ks) throw new KeystoreNotInitializedError();
-						const keystore = ks;
-						const gen = await readCurrentGeneration(keystore);
+						const { row: keystore, keys } = ks;
+						const gen = await readCurrentGeneration(keys);
 						// The generation moves only with the record it belongs to: a read that fails after a peer's save
 						// would otherwise pair the newer generation with the older record, and a write from them would
 						// pass the conflict check and lay it over the peer's save.
@@ -229,7 +229,12 @@ export function createFinderStore(db: IDBDatabase, opts: FinderStoreOptions = {}
 						}
 						const row = await getRow<StateRow>(db, 'skillbridge-finder');
 						if (!row) throw new Error('E_FINDER_BODY_MISSING');
-						const decoded = await decryptFinderRecord(row.rec, keystore, gen);
+						const decoded = await decryptFinderRecord(
+							row.rec,
+							keyIdentity(keystore),
+							keys.dataKey,
+							gen
+						);
 						_generation = gen;
 						if (relockEpoch === relockAtStart) {
 							_state = decoded;

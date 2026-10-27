@@ -79,7 +79,7 @@ function checked<T>(raw: unknown, result: ContractResult): T {
 }
 
 /** The furthest an index may be dated past the device's own UTC day: a pull a few days early, never a far-off one. */
-const MAX_DAYS_AHEAD = 7;
+export const MAX_DAYS_AHEAD = 7;
 const MS_PER_DAY = 86_400_000;
 
 /** `now` is the device clock in ms; it is only read to refuse a pull date that cannot be true. */

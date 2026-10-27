@@ -3,6 +3,7 @@ import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
 import { cdp, userEvent } from 'vitest/browser';
 import AskView from './AskView.svelte';
+import { createAskStore } from '$lib/ask';
 import type { AskState } from '$lib/ask/types';
 import { ASK_ERROR } from '$lib/ask/errors';
 import type { ResultCard } from '$lib/corpus';
@@ -26,6 +27,7 @@ type ViewProps = {
 	onOfferDevice?: (query: string) => void;
 	onRetryOnline?: (query: string) => void;
 	onStayDevice?: () => void;
+	onUnlockSummaries?: () => void;
 };
 
 const noop = () => {};
@@ -534,6 +536,48 @@ describe('AskView', () => {
 
 		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
 		await vi.waitFor(() => expect(loadSource).toHaveBeenCalledWith('va_intent_to_file'));
+	});
+
+	// When the app locks, the page clears the question the person typed, whatever the Ask store holds.
+	it('clear: empties the question the person typed', async () => {
+		const { container, component } = await render(AskView, { props: props({ kind: 'idle' }) });
+		const input = container.querySelector('.ask-input') as HTMLInputElement;
+		input.value = 'how do I file a claim';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		expect(input.value).toBe('how do I file a claim');
+		component.clear();
+		flushSync();
+		expect(input.value).toBe('');
+	});
+
+	// An open reader shows a source the person was reading for their question; a slow load must not bring it back.
+	it('clear: closes the open reader, and a load still pending does not reopen it', async () => {
+		let resolveLoad!: (s: Source | null) => void;
+		const loadSource = () => new Promise<Source | null>((r) => (resolveLoad = r));
+		const { container, component } = await render(AskView, {
+			props: props(
+				{ kind: 'results', origin: 'device', cards: [card({ sourceId: 'va_intent' })] },
+				{ loadSource }
+			)
+		});
+		(container.querySelector('.ask-card__read') as HTMLButtonElement).click();
+		flushSync();
+		const dialog = container.querySelector('dialog.reader') as HTMLDialogElement;
+		expect(dialog.open).toBe(true);
+		component.clear();
+		flushSync();
+		expect(dialog.open).toBe(false);
+		resolveLoad(heldSource());
+		for (let i = 0; i < 6; i++) {
+			await Promise.resolve();
+			flushSync();
+		}
+		expect({
+			open: dialog.open,
+			hasPassage: !!container.querySelector('.reader__passage'),
+			title: container.querySelector('.reader__title')?.textContent?.trim() ?? null
+		}).toEqual({ open: false, hasPassage: false, title: null });
 	});
 
 	it('a device answer keeps the on-device copy even after the mode flips to online', async () => {
@@ -1103,4 +1147,111 @@ describe('AskView, focus after the pressed button goes away', () => {
 			expect(document.activeElement).toBe(input);
 		}
 	);
+});
+
+// A locked tab can still ask online and read the raw cards; the summary needs the PIN, and the line says so.
+describe('AskView, the summary a locked tab cannot make', () => {
+	const LINE = 'Summaries need your PIN.';
+	const NO_SUMMARY_NOTE = 'No AI summary is shown for this answer.';
+	// The state the page really holds after an online answer with summaries on and no key to make one with: the real store
+	// fills the answer slot with the quoted extract and a note, so a state built by hand without them would prove nothing.
+	async function realOnline(over: Partial<ViewProps> = {}): Promise<ViewProps> {
+		const store = createAskStore({
+			embed: async () => new Float32Array(),
+			getCorpus: async () => {
+				throw new Error('E_UNUSED');
+			},
+			retrieveOnline: async () => ({
+				status: 'results',
+				corpusVersion: '1.0',
+				results: [
+					{
+						score: 0.9,
+						chunk: {
+							id: 'a',
+							text: 'An official passage.',
+							sourceId: 's',
+							sourceTitle: 'S',
+							url: 'https://x.gov',
+							tags: []
+						}
+					}
+				]
+			}),
+			synthesize: async () => ({ kind: 'degraded' }),
+			onlineConsented: () => true,
+			synthesisEnabled: () => true
+		});
+		// Not an eligibility question: those get no summary, and the page does not offer one for them.
+		await store.ask('what is the Transition Assistance Program');
+		expect(store.state).toMatchObject({ kind: 'results', origin: 'online' });
+		return props(store.state, over);
+	}
+	const unlockButton = (container: Element) =>
+		[...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Unlock');
+
+	it('puts the line and an Unlock button where the summary would be, and the button runs the hand-off', async () => {
+		const onUnlockSummaries = vi.fn();
+		const { container } = await render(AskView, {
+			props: await realOnline({ onUnlockSummaries })
+		});
+
+		const line = [...container.querySelectorAll('p')].find((p) => p.textContent?.includes(LINE));
+		expect(line?.textContent?.replace(/\s+/g, ' ').trim()).toBe(`${LINE} Unlock`);
+		// Before the cards: it stands where the AI summary stands.
+		const lead = container.querySelector('.ask-count');
+		expect(
+			line && lead && line.compareDocumentPosition(lead) & Node.DOCUMENT_POSITION_FOLLOWING
+		).toBeTruthy();
+		unlockButton(container)?.click();
+		expect(onUnlockSummaries).toHaveBeenCalledOnce();
+	});
+
+	// The extract stays: it is the answer a locked tab can give. Only the second, contradicting statement goes.
+	it('keeps the quoted extract beside the line and does not also say no summary is shown', async () => {
+		const { container } = await render(AskView, {
+			props: await realOnline({ onUnlockSummaries: vi.fn() })
+		});
+
+		expect(container.querySelector('.ask-answer')).not.toBeNull();
+		expect(container.textContent).toContain(LINE);
+		expect(container.textContent).not.toContain(NO_SUMMARY_NOTE);
+	});
+
+	// Without the hand-off the page has no key to speak of (or is unlocked): the shipped note stands as it was.
+	it('without the hand-off, shows no line and the shipped note', async () => {
+		const { container } = await render(AskView, { props: await realOnline() });
+		expect(container.textContent).not.toContain(LINE);
+		expect(unlockButton(container)).toBeUndefined();
+		expect(container.textContent).toContain(NO_SUMMARY_NOTE);
+	});
+
+	it('shows no line when the answer came from the device', async () => {
+		const { container } = await render(AskView, {
+			props: props(
+				{ kind: 'results', origin: 'device', cards: [card()] },
+				{ onUnlockSummaries: vi.fn() }
+			)
+		});
+		expect(container.textContent).not.toContain(LINE);
+		expect(unlockButton(container)).toBeUndefined();
+	});
+
+	// The hand-off moves focus to the card's field mid-press, so the key's repeats must not press the button again.
+	it('runs the hand-off once for an Enter held on Unlock', async () => {
+		const onUnlockSummaries = vi.fn();
+		const { container } = await render(AskView, {
+			props: await realOnline({ onUnlockSummaries })
+		});
+		unlockButton(container)?.focus();
+		const session = cdp();
+		await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		for (let i = 0; i < 6; i++) {
+			await pause(40);
+			await session.send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...ENTER });
+		}
+		await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+
+		expect(onUnlockSummaries).toHaveBeenCalledOnce();
+	});
 });

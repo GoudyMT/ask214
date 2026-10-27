@@ -41,6 +41,10 @@ the transition it is designed to help with.
 - **Backup.** Save your profile, timeline, and notes as one encrypted file, and restore it on a new phone.
   The file opens only with a six-word passphrase that the app makes for you. There is no account, and
   nothing is uploaded.
+- **App lock (optional).** Set a 4 to 6 digit PIN in Settings, and the app asks for it when it opens,
+  after 15 minutes idle, and after Lock. After three wrong tries, each try waits longer, up to 15
+  minutes, and a wrong try never erases anything. If you forget the PIN, a backup brings your data back.
+  App lock appears once a profile is saved, so it does not cover an API key saved before any profile.
 - **Resources.** A curated hub of official outbound links (VA, DoD, DOL, TSP, SkillBridge). We link to
   the real government tools with context; we never recreate or replace them.
 - **Reference library.** TAP curriculum, VA guides, and agency pages, all public U.S. Government work.
@@ -55,6 +59,9 @@ Privacy is the architecture, not a setting.
   with AES-GCM via the Web Crypto API. Your profile, timeline, and notes are never sent anywhere. They
   leave the device only in a file you choose to save, an encrypted backup or a calendar file. An online
   question carries only the question text.
+- **An optional PIN keeps other people out.** With App lock on, the keys that open your data are stored
+  only wrapped under your PIN, and held in memory only while the app is unlocked. A PIN guards against
+  someone holding your phone; it does not protect a copy of the data taken off the phone.
 - **No trackers. No ads, ever.**
 - **Everything the app runs comes from its own site.** Its code, the libraries it uses, and the on-device
   model are served from ask214.com under a strict Content Security Policy. The only other address it may
@@ -78,8 +85,8 @@ Privacy is the architecture, not a setting.
   (`all-MiniLM-L6-v2`, quantized) on **ONNX Runtime Web** (WebAssembly), served from the app's own
   origin.
 - **[PDF.js](https://github.com/mozilla/pdf.js)** draws the official documents in the reader.
-- **[@noble/hashes](https://github.com/paulmillr/noble-hashes)** turns the backup passphrase into a key
-  (Argon2id), in a background worker.
+- **[@noble/hashes](https://github.com/paulmillr/noble-hashes)** turns the backup passphrase, and
+  the app lock's PIN, into a key (Argon2id), in a background worker.
 - **Installable PWA:** a service worker, offline after the first visit, add-to-home-screen.
 - **Content pipeline:** Node scripts build and check the reference library from the official sources;
   two Python scripts prepare the served copies of the PDFs.

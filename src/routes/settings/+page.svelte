@@ -5,6 +5,8 @@
 	import ThemeControl from '$lib/components/ThemeControl.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
+	import AppLockRow from '$lib/components/AppLockRow.svelte';
+	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
 	import { getProfileApp } from '$lib/profile/context';
 	import { getInstallApp } from '$lib/install/context';
 	import BackupCard, { forgetResult } from '$lib/backup/BackupCard.svelte';
@@ -113,7 +115,8 @@
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
-	const lockedView = $derived(!!app.store?.locked);
+	// A PIN tab with no keys is locked whatever the store reads: with nothing saved a store reads unlocked after a Lock.
+	const lockedView = $derived(app.pinLocked === true || !!app.store?.locked);
 	// A failure line belongs to the lock it failed on, so it goes whenever the locked panel comes or goes: the profile can
 	// open without Unlock (the app re-reads it on its own, as when the tab is shown again), and a read can fail after it.
 	$effect(() => {
@@ -121,6 +124,15 @@
 		unlockError = null;
 	});
 	let headingEl: HTMLElement | undefined;
+	let pinNotice = $state<string[]>([]);
+	let noticeUp = $state(false);
+	// A lock ends the visit the notice was about, so it goes: the same tries after the next unlock arrive as a new line.
+	$effect(() => {
+		if (app.pinLocked === true) {
+			noticeUp = true;
+			pinNotice = [];
+		}
+	});
 	let wipeDialog = $state<HTMLDialogElement | null>(null);
 	let clockFixEl = $state<HTMLButtonElement | null>(null);
 	let clockError = $state<string | null>(null);
@@ -131,21 +143,27 @@
 	// otherwise (nothing new may start behind the Unlock panel). A profile locked for real (a Lock, idle, another tab)
 	// takes the card away: those locks have already cleared the session, or left it for the Unlock to find again. A
 	// device with no profile has nothing to unlock, so its lock takes nothing away: the card would not come back until a
-	// reload. A card with no way to relock its session has nothing it may start.
+	// reload. A card with no way to relock its session has nothing it may start. Behind a PIN lock there is never one: the
+	// Unlock card's own Forgot screen carries the only backup card there, and two would share one session.
 	const showBackupCard = $derived(
 		app.joinRelock !== null &&
+			app.pinLocked !== true &&
 			app.store !== null &&
 			(app.store.lockState !== 'locked' || !app.store.locked) &&
 			(!lockedView || backupSession.active)
 	);
-	const backupCardUp = $derived(showBackupCard && app.db !== null);
+	// The PIN setup's backup step mounts a card of its own on the same session, so the page's card is off while it is up.
+	let lockStepUp = $state(false);
+	const backupCardUp = $derived(showBackupCard && app.db !== null && !lockStepUp);
 	// This page stays up across a Lock and an Unlock, and only a move to another page ends the visit: a result the card kept
 	// for its return behind a lock is not for the next visit.
 	onDestroy(() => forgetResult(backupSession));
 	// A restore that finished while the profile was locked: the card that would say so is off the page, so the page does,
-	// above the Unlock panel.
+	// above the Unlock panel. Not above the Forgot screen: a restore made there is followed by a move to the timeline once
+	// the lock is known to be off, and until then the line would send the person to an Unlock they do not need.
+	let forgotUp = $state(false);
 	const restoredLine = $derived(
-		lockedView && !backupCardUp && backupSession.phase === 'committed'
+		lockedView && !backupCardUp && !forgotUp && backupSession.phase === 'committed'
 			? backupSession.lockedAfterRestore
 				? LOCKED_AFTER_RESTORE_LINE
 				: RESTORED_UNLOCK_LINE
@@ -331,8 +349,15 @@
 		void handFocusOn('.locked-panel__unlock');
 	});
 
+	// Lock replaces itself with the PIN card, which takes the cursor into its field while this is set.
+	let pinCardFocus = $state(false);
+	$effect(() => {
+		if (app.pinLocked !== true) pinCardFocus = false;
+	});
+
 	function lock(): void {
 		lockPressed = true;
+		pinCardFocus = app.keyMode === 'pin';
 		// Every store, not just the profile: the timeline holds decrypted free-text task notes, and
 		// leaving them in memory is precisely what this button exists to prevent.
 		app.relockAll?.();
@@ -363,7 +388,11 @@
 		} finally {
 			unlocking = false;
 		}
-		// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+		await focusHeading();
+	}
+
+	// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+	async function focusHeading(): Promise<void> {
 		await tick();
 		if (document.activeElement === document.body) headingEl?.focus();
 	}
@@ -466,7 +495,7 @@
 </script>
 
 <svelte:head>
-	<title>Settings</title>
+	<title>Settings - Ask 214</title>
 </svelte:head>
 
 <!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
@@ -544,7 +573,40 @@
 				Read the official guides behind the answers, and choose which stay on this device.
 			</p>
 		</section>
-		{#if lockedView}
+		<!-- What a good PIN said about the tries before it, where the Unlock card stood. It is on the page from the moment the
+		     card is, so a screen reader is already listening when its lines arrive; the next unlock replaces it. -->
+		{#if noticeUp}
+			<div class="settings-notice" role="status">
+				{#each pinNotice as line (line)}<p>{line}</p>{/each}
+			</div>
+		{/if}
+		{#if app.pinLocked === true}
+			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. It stands
+			     between two sections, so it keeps their gap above and below. -->
+			<div class="pin-card-gap">
+				{#await loadPinUnlock() then card}
+					<card.default
+						onunlocked={(notice) => {
+							pinNotice = notice;
+							void focusHeading();
+						}}
+						takeFocus={pinCardFocus}
+						onerase={openEraseFromBackup}
+						onforgot={(open) => (forgotUp = open)}
+					/>
+				{:catch}
+					<LockedPanel onunlock={() => window.location.reload()} error={UNLOCK_FAILED} />
+				{/await}
+			</div>
+			<!-- The Erase is the way out of a forgotten PIN, so it stays reachable behind the lock, with the App lock row. No
+			     Lock button: the app is already locked. -->
+			<section class="settings-section" aria-labelledby="privacy-heading">
+				<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
+				<AppLockRow />
+				{@render eraseZone()}
+			</section>
+			{@render eraseDialog()}
+		{:else if lockedView}
 			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else}
 			{#if hasTimeline}
@@ -611,17 +673,16 @@
 					<h2 id="privacy-heading" class="settings-section__heading">Privacy and security</h2>
 					<!-- Only a profile can be locked; a device that holds saved documents alone still has the Erase. -->
 					{#if hasTimeline}
+						<AppLockRow onerase={openEraseFromBackup} onbackupstep={(up) => (lockStepUp = up)} />
 						<button class="settings-lock" type="button" onclick={lock}>Lock</button>
 						<p class="settings-hint">
-							Clears your profile from this screen. Use Unlock to view it again.
+							{app.keyMode === 'pin'
+								? 'Locks your saved information now.'
+								: 'Clears your profile from this screen. Use Unlock to view it again.'}
 						</p>
 					{/if}
 
-					<div class="danger-zone">
-						<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
-							Erase all data on this device
-						</button>
-					</div>
+					{@render eraseZone()}
 				</section>
 			{/if}
 		{/if}
@@ -708,6 +769,14 @@
 		{@render eraseDialog()}
 	{/if}
 
+	{#snippet eraseZone()}
+		<div class="danger-zone">
+			<button class="danger-cta" type="button" onclick={() => wipeDialog?.showModal()}>
+				Erase all data on this device
+			</button>
+		</div>
+	{/snippet}
+
 	{#snippet eraseDialog()}
 		<dialog
 			bind:this={wipeDialog}
@@ -755,6 +824,10 @@
 
 	.settings-section + .settings-section {
 		margin-top: var(--space-l);
+	}
+
+	.pin-card-gap {
+		margin: var(--space-l) 0;
 	}
 
 	.settings-section__heading {
@@ -820,6 +893,21 @@
 
 	.restored-line {
 		margin: 0 0 var(--space-l);
+	}
+
+	/* What a good PIN said about the tries before it: hint text, and no space when there is nothing to say. */
+	.settings-notice {
+		margin: 0 0 var(--space-l);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.settings-notice:empty {
+		margin: 0;
+	}
+
+	.settings-notice p {
+		margin: 0;
 	}
 
 	.damaged-line {

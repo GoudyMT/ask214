@@ -2,16 +2,22 @@ import { flushSync } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
+import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, waitLine } from '../components/pin-lines';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
+import { readCounter, readTries, type TriesState } from '../keystore/app-lock-store';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
+import { PinNoMemoryError } from '../keystore/pin-derive';
+import { rotateToPin } from '../keystore/rotate';
+import { dropSession, getSession } from '../keystore/session';
 import { createJoinRelock, relockEachSync, type Relockable } from '../profile/app-init';
 import type { ProfileApp } from '../profile/context';
 import type { RelockReason } from '../profile/lifecycle';
 import { readDeviceState, type DeviceState } from '../profile/device-state';
+import type { readLockedDevice, restoreLockedDevice } from '../keystore/forgot-restore';
+import { readKeystoreRow } from '../keystore/read';
 import {
 	createProfileStore,
 	KeystoreNotInitializedError,
-	readKeystoreRow,
 	type ProfileStore
 } from '../profile/store.svelte';
 import BackupCard from './BackupCard.svelte';
@@ -44,6 +50,7 @@ import {
 } from './copy';
 import { formatBackupDate } from './dates';
 import { ExportFlow, type SaveHandle, type SavePicker, type SaveWritable } from './export-flow';
+import { KDF_V1 } from './kdf-params';
 import { BackupSession, type OpenPicker, type WorkerLike } from './session.svelte';
 import type { FromWorker, WorkerRequest } from './worker/protocol';
 
@@ -79,6 +86,22 @@ function deferred<T>(): Deferred<T> {
 	});
 	return { promise, resolve };
 }
+
+// ---- the PIN's derive ----------------------------------------------------------------------------------------------
+
+// The PIN's Argon2id lives in a worker and costs 128 MiB: a test answers for it with fixed keys. Everything else of the
+// PIN module (the format check, the no-memory error) is the real one.
+const pinSeam = vi.hoisted(() => ({
+	derive: null as null | ((pin: string) => Promise<{ macKey: CryptoKey; kek: CryptoKey }>)
+}));
+vi.mock('../keystore/pin-derive', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../keystore/pin-derive')>();
+	return {
+		...real,
+		derivePinKeys: (pin: string, params: Parameters<typeof real.derivePinKeys>[1]) =>
+			pinSeam.derive === null ? real.derivePinKeys(pin, params) : pinSeam.derive(pin)
+	};
+});
 
 // ---- the key worker ------------------------------------------------------------------------------------------------
 
@@ -199,7 +222,7 @@ async function newDevice(): Promise<{ db: IDBDatabase; profile: ProfileStore }> 
 async function realRead(
 	database: IDBDatabase
 ): Promise<{ state: DeviceState; installUuid: Uint8Array }> {
-	const keystore = await readKeystoreRow(database);
+	const { row: keystore } = await readKeystoreRow(database);
 	return {
 		state: await readDeviceState(database),
 		installUuid: new Uint8Array(keystore.installUuid)
@@ -256,6 +279,13 @@ type Mount = {
 	readDevice?: (database: IDBDatabase) => Promise<{ state: DeviceState; installUuid: Uint8Array }>;
 	chooser?: 'api' | 'input';
 	readBackMs?: number;
+	/** The card is the Forgot screen's: it restores through the locked-device pair (recording stubs). */
+	locked?: boolean;
+	/** The app reads as having its PIN on. */
+	keyMode?: 'pin';
+	/** The card is a host's single-row form, and what the host does when a backup is saved. */
+	only?: { row: 'export'; label?: string; open?: boolean };
+	onsaved?: () => void;
 };
 
 async function mount(o: Mount = {}) {
@@ -289,12 +319,16 @@ async function mount(o: Mount = {}) {
 	});
 	sessions.push(session);
 	const published: unknown[] = [];
-	const app: Pick<ProfileApp, 'status' | 'joinRelock' | 'publish' | 'store' | 'reloadOnUnlock'> = {
+	const app: Pick<
+		ProfileApp,
+		'status' | 'joinRelock' | 'publish' | 'store' | 'reloadOnUnlock' | 'keyMode'
+	> = {
 		status: o.status ?? 'ready',
 		joinRelock: o.joinRelock === false ? null : joinRelock,
 		publish: o.publish === false ? null : (signal) => void published.push(signal),
 		store: profile,
-		reloadOnUnlock: false
+		reloadOnUnlock: false,
+		...(o.keyMode === undefined ? {} : { keyMode: o.keyMode })
 	};
 	const file = o.file ?? fakeFile();
 	const picker = o.picker === undefined ? pickerOf(file.handle) : o.picker;
@@ -308,6 +342,8 @@ async function mount(o: Mount = {}) {
 		db,
 		session,
 		onEraseRequest,
+		...(o.only === undefined ? {} : { only: o.only }),
+		...(o.onsaved === undefined ? {} : { onsaved: o.onsaved }),
 		exportDeps: { getSavePicker, download, readBackMs: o.readBackMs ?? 500 },
 		restoreDeps: {
 			waitForControl: o.wait ?? (() => Promise.resolve(true)),
@@ -323,11 +359,30 @@ async function mount(o: Mount = {}) {
 			onceVisible: () => () => {}
 		}
 	};
-	const rendered = await render(BackupCard, { props });
+	// The locked-device pair, as stubs that record their calls and end the way the real writer does.
+	const lockedDevice = {
+		read: vi.fn<typeof readLockedDevice>(async () => ({
+			gens: { profile: 3, timeline: 2, calendar: 2, finder: 1 },
+			installUuid: new Uint8Array(16).fill(7),
+			lastTs: null
+		})),
+		write: vi.fn<typeof restoreLockedDevice>(async (_db, _inner, _expected, options) => {
+			options.onCommitting();
+			return { ok: true, gens: { profile: 4, timeline: 3, calendar: 3, finder: 2 } };
+		})
+	};
+	const propsFor = (locked: boolean) => ({
+		...props,
+		restoreDeps: { ...props.restoreDeps, ...(locked && { lockedDevice }) }
+	});
+	const rendered = await render(BackupCard, { props: propsFor(o.locked === true) });
 	return {
 		...rendered,
 		/** Mounts the card again over the same session, as Settings does when it brings the card back after an Unlock. */
-		remount: () => render(BackupCard, { props }),
+		remount: () => render(BackupCard, { props: propsFor(o.locked === true) }),
+		/** Mounts another card over the same session and database, a Forgot card or an ordinary one. */
+		mountAs: (locked: boolean) => render(BackupCard, { props: propsFor(locked) }),
+		lockedDevice,
 		session,
 		app,
 		workers,
@@ -1969,6 +2024,57 @@ function wrongLine(): string {
 	);
 }
 
+// The restore flow is kept for the tab's session, so a card that needs the locked-device path must not inherit the flow an
+// earlier card built without it, and an ordinary card must not inherit a Forgot card's: the ordinary one would wipe the
+// API key and the PIN on a device that is not locked, and the Forgot one would read keys it does not have.
+describe('the restore path a card gets after another card', () => {
+	/** Types the words and presses Replace on whichever restore row is open. */
+	async function restoreThrough(card: Card): Promise<void> {
+		await fileChosen(card, 'restore');
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		await userEvent.click(button(CARD_LABELS.replace));
+		await expect.poll(() => card.reload.mock.calls.length).toBe(1);
+	}
+
+	it('an ordinary card brought up after a Forgot card restores the ordinary way', async () => {
+		const card = await mount({ locked: true });
+		await card.unmount();
+		await card.mountAs(false);
+
+		await restoreThrough(card);
+
+		expect(card.lockedDevice.read).not.toHaveBeenCalled();
+		expect(card.lockedDevice.write).not.toHaveBeenCalled();
+		expect(card.published).toEqual([{ type: 'data-replaced' }]);
+	});
+
+	it('a Forgot card brought up after an ordinary card restores through the locked-device pair', async () => {
+		const card = await mount();
+		await card.unmount();
+		await card.mountAs(true);
+
+		await restoreThrough(card);
+
+		expect(card.lockedDevice.read).toHaveBeenCalledTimes(1);
+		expect(card.lockedDevice.write).toHaveBeenCalledTimes(1);
+		expect(card.published).toEqual([{ type: 'keys-changed' }, { type: 'data-replaced' }]);
+	});
+
+	it('the confirm on a locked device does not say the API key is kept, since that restore clears it', async () => {
+		const card = await mount({ locked: true });
+		await fileChosen(card, 'restore');
+		await field().fill(TYPED);
+		await userEvent.click(submitOf(CARD_LABELS.restore, CARD_LABELS.restoreSubmit));
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog).toBeVisible();
+
+		const body = dialog.element().textContent ?? '';
+		expect(body).not.toContain('your API key (kept on this device if one is saved)');
+		for (const item of NOT_IN_BACKUPS.slice(1)) expect(body).toContain(item);
+	});
+});
+
 describe('checking', () => {
 	it('says the backup opens and when it was made, and writes nothing', async () => {
 		const card = await mount();
@@ -2040,5 +2146,446 @@ describe('checking', () => {
 		await expect.element(button(CARD_LABELS.show)).toBeVisible();
 		expect(card.session.kind).toBe('export');
 		expect(toggle(CARD_LABELS.check, true).query()).toBeNull();
+	});
+});
+
+// ---- a PIN before a backup is made ----------------------------------------------------------------------------------
+
+describe('with the PIN on, making a backup', () => {
+	const HMAC = { name: 'HMAC', hash: 'SHA-256', length: 256 } as const;
+	const CURRENT_PIN = '1234';
+	const OTHER_PIN = '9999';
+	const FAILED_LINE = 'Could not check your PIN right now - please try again.';
+
+	let rightKeys: { macKey: CryptoKey; kek: CryptoKey };
+	let wrongKeys: { macKey: CryptoKey; kek: CryptoKey };
+	// What each derive saw of the tries row at the moment it ran.
+	let deriveLog: { pin: string; tries: TriesState }[];
+
+	async function fixedKeys(byte: number): Promise<{ macKey: CryptoKey; kek: CryptoKey }> {
+		return {
+			macKey: await crypto.subtle.importKey('raw', new Uint8Array(32).fill(byte), HMAC, false, [
+				'sign',
+				'verify'
+			]),
+			kek: await crypto.subtle.importKey(
+				'raw',
+				new Uint8Array(32).fill(byte + 1),
+				{ name: 'AES-KW' },
+				false,
+				['wrapKey', 'unwrapKey']
+			)
+		};
+	}
+
+	/** The device as a person who turned the PIN on has it: a PIN row the fixed keys of CURRENT_PIN open. */
+	async function pinOn(): Promise<void> {
+		rightKeys = await fixedKeys(7);
+		wrongKeys = await fixedKeys(13);
+		await rotateToPin(db, {
+			macKey: rightKeys.macKey,
+			kek: rightKeys.kek,
+			salt: crypto.getRandomValues(new Uint8Array(16)),
+			kdf: { ...KDF_V1 },
+			counterBefore: await readCounter(db)
+		});
+		pinSeam.derive = async (pin) => {
+			deriveLog.push({ pin, tries: await readTries(db) });
+			return pin === CURRENT_PIN ? rightKeys : wrongKeys;
+		};
+	}
+
+	beforeEach(() => {
+		deriveLog = [];
+	});
+
+	afterEach(() => {
+		pinSeam.derive = null;
+		dropSession();
+	});
+
+	const pinField = () => page.getByLabelText('Enter your current PIN', { exact: true });
+	const pinEl = () => pinField().element() as HTMLInputElement;
+	// The row's own button and its toggle share a name; the toggle is the one that says whether the row is open.
+	const stepUpMake = () =>
+		[...document.querySelectorAll<HTMLButtonElement>('#backup-make button')].find(
+			(b) => b.textContent?.trim() === CARD_LABELS.make
+		) ?? null;
+	const alertText = () =>
+		document.querySelector('#backup-make [role="alert"]')?.textContent?.trim() ?? null;
+
+	async function openStepUp(): Promise<void> {
+		await userEvent.click(toggle(CARD_LABELS.make, false));
+		await expect.element(pinField()).toBeVisible();
+	}
+
+	/** Types a PIN and presses the row's Make a backup; resolves when the press has emptied the field. */
+	async function press(pin: string): Promise<void> {
+		await pinField().fill(pin);
+		need(stepUpMake()).click();
+		await expect
+			.poll(() => document.querySelector<HTMLInputElement>('#backup-make input')?.value ?? '')
+			.toBe('');
+	}
+
+	it('opens on the PIN step with Make a backup and Cancel, and starts no session', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+
+		expect(card.session.phase).toBe('idle');
+		expect(card.workers).toHaveLength(0);
+		expect(stepUpMake()).not.toBeNull();
+		await expect.element(button(CARD_LABELS.cancel)).toBeVisible();
+		expect(button(CARD_LABELS.show).query()).toBeNull();
+		expect(pinEl().type).toBe('password');
+		await expect.element(toggle(CARD_LABELS.make, true)).toBeVisible();
+	});
+
+	it('counts a wrong PIN before it is derived, says it is not right for tries 1 to 3, then owes a wait and derives nothing while it is owed', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+
+		for (const tries of [1, 2, 3]) {
+			await press(OTHER_PIN);
+			expect(alertText()).toBe(NOT_RIGHT_LINE);
+			// The try was on the row when the derive ran, not after.
+			expect(deriveLog.at(-1)?.tries).toMatchObject({ count: tries, pending: true });
+		}
+		await press(OTHER_PIN);
+		expect(alertText()).toBe(waitLine(30_000));
+
+		// A press while the wait is owed is answered from the row: nothing is derived and no try is added.
+		const derives = deriveLog.length;
+		await press(CURRENT_PIN);
+		expect(alertText()).toBe(waitLine(30_000));
+		expect(deriveLog).toHaveLength(derives);
+		expect(await readTries(db)).toMatchObject({ count: 4, waitMs: 30_000 });
+		expect(card.session.phase).toBe('idle');
+		expect(getSession()).toBeNull();
+	});
+
+	// Nothing else counts the wait down for a person on the Make row, so the line has to: it shows the time that is left.
+	it('shows the time left on the wait line each second, and takes the line away at zero', async () => {
+		await pinOn();
+		vi.useFakeTimers({
+			toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance']
+		});
+		await mount({ keyMode: 'pin' });
+		await openStepUp();
+		for (let tries = 0; tries < 4; tries += 1) await press(OTHER_PIN);
+		expect(alertText()).toBe(waitLine(30_000));
+		// The seconds change inside a child that is not live, in the alert that was spoken when it appeared.
+		const alert = document.querySelector('#backup-make [role="alert"]');
+		const changing = alert?.querySelector('[aria-live="off"]');
+		expect(changing?.textContent).toBe(waitLine(30_000));
+
+		vi.advanceTimersByTime(1_000);
+		flushSync();
+		expect(alertText()).toBe(waitLine(29_000));
+		expect(document.querySelector('#backup-make [role="alert"]')).toBe(alert);
+		expect(alert?.querySelector('[aria-live="off"]')?.textContent).toBe(waitLine(29_000));
+		vi.advanceTimersByTime(29_000);
+		flushSync();
+		expect(alertText()).toBeNull();
+	});
+
+	// A line that took the wait's place (a PIN that could not be right) is the person's to read, not the count's.
+	it('leaves a line that replaced the wait line alone as the count runs on', async () => {
+		await pinOn();
+		vi.useFakeTimers({
+			toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance']
+		});
+		await mount({ keyMode: 'pin' });
+		await openStepUp();
+		for (let tries = 0; tries < 4; tries += 1) await press(OTHER_PIN);
+		await press('12');
+		expect(alertText()).toBe(NOT_RIGHT_LINE);
+
+		vi.advanceTimersByTime(30_000);
+		flushSync();
+		expect(alertText()).toBe(NOT_RIGHT_LINE);
+	});
+
+	it('says the memory ran out, and takes the try back, when the PIN could not be checked', async () => {
+		await pinOn();
+		pinSeam.derive = () => Promise.reject(new PinNoMemoryError());
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await press(CURRENT_PIN);
+
+		expect(alertText()).toBe(CHECK_LOW_MEMORY_LINE);
+		expect(await readTries(db)).toMatchObject({ count: 0, pending: false });
+		expect(card.session.phase).toBe('idle');
+	});
+
+	// Another tab may have taken the PIN off while this row sat open: there is no PIN row to check against.
+	it('says to try again, and counts nothing, when the device no longer has a PIN row', async () => {
+		pinSeam.derive = async (pin) => {
+			deriveLog.push({ pin, tries: await readTries(db) });
+			return fixedKeys(7);
+		};
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await press(CURRENT_PIN);
+
+		expect(alertText()).toBe(FAILED_LINE);
+		expect(await readTries(db)).toMatchObject({ count: 0 });
+		expect(deriveLog).toHaveLength(0);
+		expect(card.session.phase).toBe('idle');
+	});
+
+	it('opens the shipped row on a good PIN, clears the tries, and holds no key session', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		const before = getSession();
+		await openStepUp();
+		await press(CURRENT_PIN);
+
+		await expect.element(button(CARD_LABELS.show)).toBeVisible();
+		expect(card.session.kind).toBe('export');
+		expect(card.session.phase).toBe('phrase-hidden');
+		expect(pinField().query()).toBeNull();
+		expect(stepUpMake()).toBeNull();
+		// The session the check opened is dropped on the spot: the tab holds no more keys than before.
+		expect(getSession()).toBe(before);
+		expect(await readTries(db)).toMatchObject({ count: 0, pending: false });
+		await expect.element(text(KEEP_WORDS_LINE)).toBeVisible();
+	});
+
+	// The person is told what the tries before this good PIN were, in a status region that was already on the row when the
+	// step opened, so a screen reader is listening. It stays until the row closes, and the next opening starts empty.
+	it('tells the wrong tries before a good PIN under the toggle until the row closes', async () => {
+		await pinOn();
+		await mount({ keyMode: 'pin' });
+		await openStepUp();
+		const region = document.querySelector('#backup-make .backup-notice');
+		expect(region?.getAttribute('role')).toBe('status');
+		expect(region?.textContent?.trim()).toBe('');
+
+		await press(OTHER_PIN);
+		await press(OTHER_PIN);
+		await press(CURRENT_PIN);
+		await expect.element(button(CARD_LABELS.show)).toBeVisible();
+		expect(document.querySelector('#backup-make .backup-notice')).toBe(region);
+		expect(region?.textContent?.trim()).toBe('2 wrong PIN tries since your last unlock.');
+
+		await userEvent.click(toggle(CARD_LABELS.make, true));
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		expect(document.querySelector('.backup-notice')).toBeNull();
+		await openStepUp();
+		expect(document.querySelector('.backup-notice')?.textContent?.trim()).toBe('');
+	});
+
+	it('grants one backup only: the session refuses a second start without another PIN', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await press(CURRENT_PIN);
+		await expect.element(button(CARD_LABELS.show)).toBeVisible();
+		card.session.cancel();
+
+		expect(() => card.session.start(card.app, 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+	});
+
+	it('Cancel closes the row and puts focus on its toggle, with the field empty next time', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await pinField().fill(CURRENT_PIN);
+		await userEvent.click(button(CARD_LABELS.cancel));
+
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		expect(pinField().query()).toBeNull();
+		await expect.poll(() => document.activeElement).toBe(toggle(CARD_LABELS.make, false).element());
+		expect(card.session.phase).toBe('idle');
+		expect(deriveLog).toHaveLength(0);
+
+		await openStepUp();
+		expect(pinEl().value).toBe('');
+	});
+
+	it('closes the step on the row toggle too', async () => {
+		await pinOn();
+		await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await userEvent.click(toggle(CARD_LABELS.make, true));
+
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		expect(pinField().query()).toBeNull();
+	});
+
+	it.each<RelockReason>(['user', 'idle', 'peer', 'hygiene'])(
+		'a %s relock empties the field and closes the step, and the typed digits do not come back',
+		async (reason) => {
+			await pinOn();
+			const card = await mount({ keyMode: 'pin' });
+			await openStepUp();
+			await pinField().fill(CURRENT_PIN);
+			card.relock(reason);
+
+			await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+			expect(pinField().query()).toBeNull();
+			await openStepUp();
+			expect(pinEl().value).toBe('');
+			expect(deriveLog).toHaveLength(0);
+		}
+	);
+
+	// The step goes with the relock, and the PIN field the cursor was in goes with it: Cancel hands the cursor to the row's
+	// toggle, and so does a relock.
+	it('puts the cursor on the row toggle when a relock closes the step', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await pinField().fill(CURRENT_PIN);
+		card.relock('user');
+
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		await expect.poll(() => document.activeElement).toBe(toggle(CARD_LABELS.make, false).element());
+	});
+
+	// A Lock that lands while the PIN is being derived must not be outlived by the backup it would have started.
+	it('starts nothing when a Lock lands while the PIN is checked', async () => {
+		await pinOn();
+		const gate = deferred<{ macKey: CryptoKey; kek: CryptoKey }>();
+		let deriving = false;
+		pinSeam.derive = () => {
+			deriving = true;
+			return gate.promise;
+		};
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await pinField().fill(CURRENT_PIN);
+		need(stepUpMake()).click();
+		await expect.poll(() => deriving).toBe(true);
+
+		card.relock('user');
+		gate.resolve(rightKeys);
+		await pause(150);
+
+		expect(card.session.phase).toBe('idle');
+		expect(card.workers).toHaveLength(0);
+		expect(button(CARD_LABELS.show).query()).toBeNull();
+		expect(pinField().query()).toBeNull();
+	});
+
+	// The person left the page (or a lock took the card off) while the PIN was being derived: a card that is gone has no
+	// step to pass, and the check's good answer must not start a backup for nobody.
+	it('starts nothing, and leaves no grant, when the card is gone before its PIN check finishes', async () => {
+		await pinOn();
+		const gate = deferred<{ macKey: CryptoKey; kek: CryptoKey }>();
+		let deriving = false;
+		pinSeam.derive = () => {
+			deriving = true;
+			return gate.promise;
+		};
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await pinField().fill(CURRENT_PIN);
+		need(stepUpMake()).click();
+		await expect.poll(() => deriving).toBe(true);
+
+		card.unmount();
+		gate.resolve(rightKeys);
+		await pause(150);
+
+		expect(card.session.active).toBe(false);
+		expect(card.workers).toHaveLength(0);
+		expect(() => card.session.start(card.app, 'export')).toThrow('E_BACKUP_UNAVAILABLE');
+	});
+
+	it('asks for the PIN again for Make a new backup after a Check', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await fileChosen(card, 'check');
+		await field().fill(WRONG);
+		await userEvent.click(submitOf(CARD_LABELS.check, CARD_LABELS.checkSubmit));
+		await userEvent.click(button(MAKE_NEW_BACKUP_BUTTON));
+
+		await expect.element(pinField()).toBeVisible();
+		expect(card.session.phase).toBe('idle');
+		expect(button(CARD_LABELS.show).query()).toBeNull();
+	});
+
+	it('leaves Check and Restore without a PIN step', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await fileChosen(card, 'check');
+
+		expect(card.session.kind).toBe('check');
+		expect(pinField().query()).toBeNull();
+	});
+});
+
+// ---- the Make row alone, for the PIN setup's backup step ---------------------------------------------------------------------
+
+describe("the Make a backup row as a host's single row", () => {
+	const LABEL = 'Make a backup and turn on';
+	const only = { row: 'export', label: LABEL, open: true } as const;
+
+	it("shows the row alone under the host's label, bare, and opens by itself on the words step", async () => {
+		const card = await mount({ only });
+
+		await expect.element(toggle(LABEL, true)).toBeVisible();
+		await expect.element(button(CARD_LABELS.show)).toBeVisible();
+		expect(card.session.kind).toBe('export');
+		const region = page.getByRole('region', { name: LABEL, exact: true });
+		await expect.element(region).toBeVisible();
+		// No heading, intro, other rows or list of what a backup leaves out.
+		expect(text(CARD_LABELS.heading).query()).toBeNull();
+		expect(text(CARD_INTRO_LINE).query()).toBeNull();
+		for (const name of [CARD_LABELS.restore, CARD_LABELS.check]) {
+			expect(page.getByRole('button', { name, exact: true }).query()).toBeNull();
+		}
+		expect(text(NOT_IN_BACKUPS_LEAD).query()).toBeNull();
+		// The setup screen has its own frame: the card takes none.
+		expect(getComputedStyle(region.element()).borderTopWidth).toBe('0px');
+	});
+
+	// The row is open already, so the words are shown and typed back without the toggle's tap.
+	async function typeBack(): Promise<void> {
+		await showWords();
+		await field().fill(TYPED);
+	}
+
+	it('does not tell its host when the save fails', async () => {
+		const onsaved = vi.fn();
+		const file = fakeFile();
+		file.failClose = true;
+		await mount({ only, onsaved, file });
+		await typeBack();
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect.poll(() => file.closes).toBe(1);
+		await pause(100);
+		expect(onsaved).not.toHaveBeenCalled();
+		expect(text(savedLine('picked.json')).query()).toBeNull();
+	});
+
+	// A file that does not read back as what was written may not open: the card keeps its own mismatch line and offer for
+	// the person, and the host is not told there is a backup to rely on.
+	it('does not tell its host when the saved file does not read back whole, and offers a new backup', async () => {
+		const onsaved = vi.fn();
+		const file = fakeFile();
+		file.mangle = true;
+		await mount({ only, onsaved, file });
+		await typeBack();
+		await userEvent.click(submitOf(CARD_LABELS.make));
+
+		await expect.element(button(CARD_LABELS.makeAgain)).toBeVisible();
+		expect(document.body.textContent).toContain('the saved file does not match');
+		await pause(100);
+		expect(onsaved).not.toHaveBeenCalled();
+	});
+
+	it('tells its host once when the backup is saved', async () => {
+		const onsaved = vi.fn();
+		await mount({ only, onsaved });
+		await typeBack();
+		await userEvent.click(submitOf(CARD_LABELS.make));
+
+		await expect.element(text(savedLine('picked.json'))).toBeVisible();
+		expect(onsaved).toHaveBeenCalledTimes(1);
 	});
 });

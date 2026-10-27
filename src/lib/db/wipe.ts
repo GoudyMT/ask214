@@ -1,5 +1,6 @@
 import { STORES, withStores } from './schema';
 import { rotateOrUpgrade } from './locks';
+import { readCounterIn, writeCounterIn } from '../keystore/app-lock-store';
 
 /**
  * Erase every registered store in ONE transaction.
@@ -17,11 +18,17 @@ import { rotateOrUpgrade } from './locks';
  * across its whole encrypt-then-write, and its IDB write lands at the END: an unlocked erase clears
  * first and the save then resurrects its row into a database the user was told was empty. Excluding
  * normal writes makes the erase the last writer, which is the only ordering that can be total.
+ *
+ * The app lock's counter is the one thing that does not go back to empty: a tab that noted it before the erase must
+ * read a different value after it, so the clear is followed by a write of the old value plus one, in the same
+ * transaction.
  */
 export function wipeAllStores(db: IDBDatabase): Promise<void> {
 	return rotateOrUpgrade(() =>
-		withStores(db, [...STORES], 'readwrite', (tx) => {
+		withStores(db, [...STORES], 'readwrite', async (tx) => {
+			const counter = await readCounterIn(tx);
 			for (const store of STORES) tx.objectStore(store).clear();
+			writeCounterIn(tx, counter + 1);
 		})
 	);
 }

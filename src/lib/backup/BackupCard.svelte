@@ -29,6 +29,8 @@
 
 	type Kept = {
 		db: IDBDatabase | null;
+		/** Whether `restore` was built to restore onto a device locked by a forgotten PIN (the Forgot screen's card). */
+		locked: boolean;
 		restore: RestoreFlow | null;
 		exporter: ExportFlow | null;
 		warningName: string;
@@ -43,6 +45,7 @@
 		if (found === undefined) {
 			found = {
 				db: null,
+				locked: false,
 				restore: null,
 				exporter: null,
 				warningName: '',
@@ -65,7 +68,11 @@
 
 <script lang="ts">
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
-	import { getProfileApp } from '../profile/context';
+	import { createCurrentPinCheck } from '../components/current-pin-check';
+	import { followWait } from '../components/wait-countdown';
+	import { loadAppLock } from '../components/load-app-lock';
+	import PinField from '../components/PinField.svelte';
+	import { getProfileApp, type ProfileApp } from '../profile/context';
 	import { readDeviceState } from '../profile/device-state';
 	import { TASK_DEFS } from '../timeline/task-defs';
 	import type { BackupCode } from './codes';
@@ -108,7 +115,7 @@
 		/** The open database. A backup and a restore need it; a Check does not. */
 		db: IDBDatabase | null;
 		/** Defaults to the app the layout provides. */
-		app?: FlowDeps['app'];
+		app?: FlowDeps['app'] & Pick<ProfileApp, 'keyMode'>;
 		/** Defaults to the tab's one backup session. */
 		session?: BackupSession;
 		/** The seams a test stands in for (the save picker, the download, the read-back time). */
@@ -116,11 +123,13 @@
 		restoreDeps?: Omit<FlowDeps, 'session' | 'app' | 'db'>;
 		/**
 		 * The form of the card for a host that offers one row: that row alone, with no heading, intro or list, under
-		 * `label` (the row's own name when none is given). The restore row is drawn without the card's own frame, for the
-		 * setup screen, which has one; the Check row keeps it. With `open` set, the row opens by itself, once, as soon as
-		 * it can start.
+		 * `label` (the row's own name when none is given). The restore and make rows are drawn without the card's own frame,
+		 * for the screens that have one; the Check row keeps it. With `open` set, the row opens by itself, once, as soon as
+		 * it can start. A single row never asks for the PIN: its host has done that (or, at the PIN's setup, has none yet).
 		 */
-		only?: { row: 'restore' | 'check'; label?: string; open?: boolean };
+		only?: { row: 'restore' | 'check' | 'export'; label?: string; open?: boolean };
+		/** Called once when a backup has been saved and read back whole, after the card holds the result. */
+		onsaved?: () => void;
 	};
 	const props: Props = $props();
 
@@ -130,8 +139,12 @@
 	const app = untrack(() => props.app ?? getProfileApp());
 	const memo = keptFor(session);
 	const startDb = untrack(() => props.db);
-	if (memo.restore === null || memo.db !== startDb) {
+	// A flow built for the Forgot screen restores through the locked-device pair, and an ordinary one through the shipped
+	// writer; a card that needs the other path must not inherit the kept flow.
+	const startLocked = untrack(() => props.restoreDeps?.lockedDevice !== undefined);
+	if (memo.restore === null || memo.db !== startDb || memo.locked !== startLocked) {
 		memo.db = startDb;
+		memo.locked = startLocked;
 		memo.exporter = null;
 		memo.outcome = null;
 		memo.restore = untrack(
@@ -224,6 +237,31 @@
 	// Which path an idle session's last message belongs to: a cleared session forgets its kind.
 	let lastKind = $state<SessionKind | null>(null);
 
+	// With the PIN on, the Make row opens on a step that asks for the current PIN before any backup session starts.
+	const STEP_UP_FAILED_LINE = 'Could not check your PIN right now - please try again.';
+	let stepUp = $state(false);
+	let pinTyped = $state('');
+	let pinBusy = $state(false);
+	let pinMessage = $state<string | null>(null);
+	// What a good PIN says about the tries before it, under the Make row's toggle until the row closes.
+	let stepNotice = $state<string[]>([]);
+	let pinFieldRef = $state<ReturnType<typeof PinField> | null>(null);
+	// Moves with every relock: a check that was running when one landed must not go on to start a backup.
+	let stepUpEpoch = 0;
+	// The card follows the tab's one count of an owed wait while it is up; the keys a good PIN opens are never held.
+	const pinCheck = createCurrentPinCheck({
+		loadDerive: async () => (await loadAppLock())[0],
+		onWaitLine: followWait(
+			() => pinMessage,
+			(line) => (pinMessage = line)
+		)
+	});
+	onDestroy(() => {
+		pinCheck.stop();
+		// A check still running when the card goes has no step left to pass.
+		stepUpEpoch += 1;
+	});
+
 	let exportPassEl = $state<HTMLInputElement | null>(null);
 	let filePassEl = $state<HTMLInputElement | null>(null);
 	let showEl = $state<HTMLButtonElement | null>(null);
@@ -237,7 +275,10 @@
 	const phase = $derived(session.phase);
 	const concealed = $derived(session.concealed);
 
-	const makeOpen = $derived(kind === 'export' || exportOutcome !== null);
+	const makeOpen = $derived(kind === 'export' || exportOutcome !== null || stepUp);
+	$effect(() => {
+		if (!makeOpen) stepNotice = [];
+	});
 	const showingWords = $derived(
 		kind === 'export' && session.revealed && !concealed && session.words !== null
 	);
@@ -379,15 +420,88 @@
 
 	// ---- rows -----------------------------------------------------------------------------------------------------
 
-	function openRow(row: SessionKind): void {
+	// A relock of any reason closes the step; the field empties itself. The field held the cursor, so it goes to the row's
+	// toggle as Cancel does.
+	$effect(() => {
+		if (!stepUp) return;
+		return app.joinRelock?.({
+			relockSync: () => {
+				stepUpEpoch += 1;
+				closeStepUp();
+				void handFocusToRow('export');
+			},
+			refresh: () => Promise.resolve()
+		});
+	});
+
+	function closeStepUp(): void {
+		stepUp = false;
+		pinMessage = null;
+	}
+
+	async function openStepUp(): Promise<void> {
+		setOutcome(null);
+		inputError = null;
+		pinMessage = null;
+		stepUp = true;
+		await tick();
+		pinFieldRef?.focus();
+	}
+
+	// Closing hands focus back to the row's toggle unless the person has moved on: the pressed Cancel leaves with the step.
+	async function cancelStepUp(): Promise<void> {
+		if (pinBusy) return;
+		closeStepUp();
+		await handFocusToRow('export');
+	}
+
+	// A good PIN grants this one backup and opens the row exactly as a tap on it does without a PIN. The keys the check
+	// opened are not held: the PIN is asked for to confirm the person, not to unlock anything.
+	async function submitStepUp(): Promise<void> {
+		const db = props.db;
+		if (pinBusy) return;
+		pinBusy = true;
+		pinMessage = null;
+		const typed = pinTyped;
+		const epoch = stepUpEpoch;
+		try {
+			if (db === null) throw new Error('E_NOT_READY');
+			const result = await pinCheck.check(db, typed, STEP_UP_FAILED_LINE);
+			// A relock landed while the PIN was checked: the step is closed and nothing starts.
+			if (epoch !== stepUpEpoch) return;
+			if (!result.ok) {
+				pinMessage = result.line;
+				return;
+			}
+			stepNotice = result.notice;
+			closeStepUp();
+			openRow('export', true);
+			await handFocusToRow('export');
+		} catch {
+			if (epoch === stepUpEpoch) pinMessage = STEP_UP_FAILED_LINE;
+		} finally {
+			pinFieldRef?.clear();
+			pinBusy = false;
+		}
+	}
+
+	/** `granted`: the PIN step was passed for this very open; without it, the PIN on means the step comes first. */
+	function openRow(row: SessionKind, granted = false): void {
 		// The Make row is off on a device with nothing to back up (see `allowed`), and a tap on it says so.
 		startLine = row === 'export' && neverSetUp ? FINISH_SETUP_LINE : null;
 		if (!allowed(row)) return;
+		if (row === 'export' && !granted && props.only === undefined && app.keyMode === 'pin') {
+			void openStepUp();
+			return;
+		}
+		closeStepUp();
 		setOutcome(null);
 		inputError = null;
 		try {
-			if (row === 'export') session.start(app, 'export');
-			else
+			if (row === 'export') {
+				if (granted) session.grantExport();
+				session.start(app, 'export');
+			} else
 				void restore.open(row).catch(() => {
 					startLine = lineFor('E_WORKER_FAILED', { path: 'restore' });
 				});
@@ -408,6 +522,10 @@
 
 	function closeRow(): void {
 		if (session.stopping) return;
+		if (stepUp) {
+			void cancelStepUp();
+			return;
+		}
 		const row = kind;
 		if (session.canCancel) session.cancel('user-cancel');
 		else restore.close();
@@ -511,6 +629,9 @@
 					text: result.text
 				});
 				void refreshMark();
+				// A file that did not read back whole may not open: the card shows its mismatch line and offer, and the host
+				// is not told there is a backup to rely on.
+				if (result.readBack !== 'mismatch') props.onsaved?.();
 				break;
 		}
 		await tick();
@@ -643,12 +764,12 @@
 
 <section
 	class="backup-card"
-	class:backup-card--bare={props.only?.row === 'restore'}
+	class:backup-card--bare={props.only !== undefined && props.only.row !== 'check'}
 	translate="no"
 	aria-labelledby={props.only === undefined ? 'backup-heading' : undefined}
 	aria-label={props.only === undefined
 		? undefined
-		: (props.only.label ?? (props.only.row === 'check' ? CARD_LABELS.check : CARD_LABELS.restore))}
+		: (props.only.label ?? CARD_LABELS[props.only.row === 'export' ? 'make' : props.only.row])}
 >
 	{#if props.only === undefined}
 		<h2 id="backup-heading" class="backup-card__heading">{CARD_LABELS.heading}</h2>
@@ -845,11 +966,50 @@
 	{/snippet}
 
 	<!-- Make a backup -->
-	{#if props.only === undefined}
+	{#if props.only === undefined || props.only.row === 'export'}
 		<div class="backup-row">
-			{@render toggleRowButton('export', CARD_LABELS.make, 'backup-make')}
+			{@render toggleRowButton('export', props.only?.label ?? CARD_LABELS.make, 'backup-make')}
 			{#if makeOpen}
 				<div id="backup-make" class="backup-body">
+					<!-- On the row before its lines arrive, so a screen reader is already listening. -->
+					<div class="backup-hint backup-notice" role="status">
+						{#each stepNotice as line (line)}<p>{line}</p>{/each}
+					</div>
+					{#if stepUp}
+						<PinField
+							bind:this={pinFieldRef}
+							bind:value={pinTyped}
+							id="backup-current-pin"
+							label="Enter your current PIN"
+							joinRelock={app.joinRelock}
+							onenter={() => void submitStepUp()}
+						/>
+						<!-- Held keys: a repeat of Enter must not press again over the emptied field; only a new press counts. -->
+						<div class="backup-actions">
+							<button
+								class="backup-primary"
+								type="button"
+								aria-busy={pinBusy}
+								onclick={() => void submitStepUp()}
+								onkeydown={guardEnter}
+							>
+								{CARD_LABELS.make}
+							</button>
+							<button
+								class="backup-cancel"
+								type="button"
+								disabled={pinBusy}
+								onclick={() => void cancelStepUp()}
+								onkeydown={guardEnter}
+							>
+								{CARD_LABELS.cancel}
+							</button>
+						</div>
+						{#if pinMessage !== null}
+							<!-- The wait line's seconds change inside a child that is not live: the alert is spoken when it appears. -->
+							<p class="backup-error" role="alert"><span aria-live="off">{pinMessage}</span></p>
+						{/if}
+					{/if}
 					{@render hiddenLine()}
 					{#if showShow}
 						<p class="backup-hint" hidden={concealed}>{KEEP_WORDS_LINE}</p>
@@ -1063,6 +1223,15 @@
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
 	}
+	/* Stays on the page when empty, so a screen reader is listening before its lines arrive; empty, it takes the body's gap
+	   back, so the row looks as it did. */
+	.backup-notice,
+	.backup-notice p {
+		margin: 0;
+	}
+	.backup-notice:empty {
+		margin-bottom: calc(var(--space-m) * -1);
+	}
 	.backup-lead {
 		margin: var(--space-l) 0 var(--space-s);
 	}
@@ -1187,6 +1356,10 @@
 		font: inherit;
 		text-decoration: underline;
 		cursor: pointer;
+	}
+	.backup-cancel:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 	.backup-typed {
 		align-self: flex-start;

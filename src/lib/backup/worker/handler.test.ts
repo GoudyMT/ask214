@@ -1,6 +1,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HKDF_INFO_V1, KDF_V1 } from '../kdf-params';
+import {
+	KAT_PIN,
+	KAT_PIN_MAC_MESSAGE,
+	KAT_PIN_SMALL,
+	KAT_PIN_WRAPPED_KEY,
+	KAT_SALT
+} from '../kdf-kat';
 import { WORDS_V1 } from '../words-v1';
 import { createHandler } from './handler';
 import type { FromWorker } from './protocol';
@@ -406,6 +413,244 @@ describe('generate and malformed requests', () => {
 		const { handle } = createHandler(WORDS_V1, (msg) => posts.push(msg));
 		await handle(message);
 		expect(posts).toEqual([{ type: 'error', code: 'E_WORKER_FAILED' }]);
+	});
+});
+
+const PIN_TEXT = KAT_PIN;
+
+type PinKeys = { macKey: CryptoKey; kek: CryptoKey };
+
+async function runDerivePin(
+	text: string = PIN_TEXT,
+	salt: Uint8Array<ArrayBuffer> = saltOf()
+): Promise<Run> {
+	const posts: FromWorker[] = [];
+	const pass = bufferOf(text);
+	const { handle } = createHandler(WORDS_V1, (msg) => posts.push(msg));
+	await handle({ op: 'derive-pin', pin: pass, salt });
+	return { posts, pass };
+}
+
+function pinKeysOf(posts: FromWorker[]): PinKeys {
+	const last = posts.at(-1);
+	if (last?.type !== 'pin-keys') throw new Error('no pin keys were posted');
+	return last;
+}
+
+function hex(bytes: ArrayBuffer | Uint8Array): string {
+	const view = bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes;
+	return Array.from(view, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+describe('derive-pin: a PIN of the wrong shape costs no derive', () => {
+	// The page checks the PIN first, so a bad one here is a bug; it must still never cost the several seconds, and the
+	// buffer the page gave away must be wiped.
+	it.each([
+		['a letter', '12a4'],
+		['3 digits', '123'],
+		['7 digits', '1234567'],
+		['a space', '12 4'],
+		['a full-width digit', String.fromCharCode(0xff11) + '234'],
+		['an empty PIN', '']
+	])(
+		'%s is refused with WORKER_FAILED before argon2id, and its buffer is zeroed',
+		async (_n, text) => {
+			const { posts, pass } = await runDerivePin(text);
+			expect(posts).toEqual([{ type: 'error', code: 'E_WORKER_FAILED' }]);
+			expect(argonCalls()).toBe(0);
+			expect(isZero(pass)).toBe(true);
+			if (text !== '') expect(pass.byteLength).toBeGreaterThan(0);
+		}
+	);
+});
+
+describe('derive-pin: the keys', () => {
+	it('posts one pin-keys answer with exactly kek, macKey and type, after progress', async () => {
+		const { posts } = await runDerivePin();
+		const last = posts.at(-1);
+		expect(Object.keys(last ?? {}).sort()).toEqual(['kek', 'macKey', 'type']);
+		expect(posts.slice(0, -1).every((msg) => msg.type === 'progress')).toBe(true);
+		expect(posts.filter((msg) => msg.type === 'progress').length).toBeGreaterThan(0);
+	});
+
+	it('the MAC key signs and verifies only, the KEK wraps and unwraps only, neither is extractable', async () => {
+		const { macKey, kek } = pinKeysOf((await runDerivePin()).posts);
+		expect(macKey).toBeInstanceOf(CryptoKey);
+		expect(kek).toBeInstanceOf(CryptoKey);
+		expect(macKey.extractable).toBe(false);
+		expect(kek.extractable).toBe(false);
+		expect(macKey.algorithm).toMatchObject({
+			name: 'HMAC',
+			hash: { name: 'SHA-256' },
+			length: 256
+		});
+		expect([...macKey.usages].sort()).toEqual(['sign', 'verify']);
+		expect(kek.algorithm).toMatchObject({ name: 'AES-KW', length: 256 });
+		expect([...kek.usages].sort()).toEqual(['unwrapKey', 'wrapKey']);
+		await expect(crypto.subtle.exportKey('raw', macKey)).rejects.toThrow();
+		await expect(crypto.subtle.exportKey('raw', kek)).rejects.toThrow();
+	});
+
+	it('argon2id gets the PIN bytes, the PIN salt and the backup tuple with the same memory cap', async () => {
+		let pinAtCall: number[] = [];
+		mocks.argon2id.mockImplementation((pin: Uint8Array) => {
+			pinAtCall = [...pin];
+			return Uint8Array.from(FAKE_OUTPUT);
+		});
+		const salt = saltOf();
+		await runDerivePin(PIN_TEXT, salt);
+		expect(mocks.argon2id).toHaveBeenCalledTimes(1);
+		const [, calledSalt, opts] = mocks.argon2id.mock.calls[0] as [
+			Uint8Array,
+			Uint8Array,
+			ArgonOptions
+		];
+		expect(Object.keys(opts).sort()).toEqual(
+			['dkLen', 'm', 'maxmem', 'onProgress', 'p', 't', 'version'].sort()
+		);
+		expect(opts).toMatchObject({
+			t: KDF_V1.t,
+			m: KDF_V1.m,
+			p: KDF_V1.p,
+			version: KDF_V1.v,
+			dkLen: KDF_V1.dkLen,
+			maxmem: MAXMEM
+		});
+		expect(pinAtCall).toEqual([...new TextEncoder().encode(PIN_TEXT)]);
+		expect([...calledSalt]).toEqual([...salt]);
+	});
+
+	// The backup's key and the PIN's MAC key come from the same kind of step; a different label is what keeps one
+	// from standing in for the other.
+	it('a key made with the backup label over the same output does not verify a PIN MAC', async () => {
+		const salt = saltOf();
+		const { macKey } = pinKeysOf((await runDerivePin(PIN_TEXT, salt)).posts);
+		const message = new TextEncoder().encode(KAT_PIN_MAC_MESSAGE);
+		const mac = await crypto.subtle.sign('HMAC', macKey, message);
+		expect(await crypto.subtle.verify('HMAC', macKey, mac, message)).toBe(true);
+
+		const material = await crypto.subtle.importKey(
+			'raw',
+			Uint8Array.from(FAKE_OUTPUT),
+			'HKDF',
+			false,
+			['deriveKey']
+		);
+		const backupLabelled = await crypto.subtle.deriveKey(
+			{ name: 'HKDF', hash: 'SHA-256', salt, info: new TextEncoder().encode(HKDF_INFO_V1) },
+			material,
+			{ name: 'HMAC', hash: 'SHA-256', length: 256 },
+			false,
+			['sign', 'verify']
+		);
+		expect(await crypto.subtle.verify('HMAC', backupLabelled, mac, message)).toBe(false);
+	});
+
+	it('a RangeError from argon2id posts NO_MEMORY and any other throw posts WORKER_FAILED', async () => {
+		mocks.argon2id.mockImplementation(() => {
+			throw new RangeError('Array buffer allocation failed');
+		});
+		expect((await runDerivePin()).posts).toEqual([{ type: 'error', code: 'E_NO_MEMORY' }]);
+		mocks.argon2id.mockImplementation(() => {
+			throw new Error('maxmem limit was hit');
+		});
+		expect((await runDerivePin()).posts).toEqual([{ type: 'error', code: 'E_WORKER_FAILED' }]);
+	});
+});
+
+describe('derive-pin: the answer matches an independent computation', () => {
+	// Argon2id here is the real noble at a small tuple (the full one is too slow for this suite and is checked through
+	// the built worker by the end-to-end spec). The expected values were computed outside this repository's code, so
+	// swapped labels, a wrong HKDF salt or a wrong algorithm all fail here.
+	it('gives the small-tuple Argon2id output, MAC proof and wrap proof', async () => {
+		const actual =
+			await vi.importActual<typeof import('@noble/hashes/argon2.js')>('@noble/hashes/argon2.js');
+		let argonHex = '';
+		mocks.argon2id.mockImplementation((pin: Uint8Array, salt: Uint8Array, opts: ArgonOptions) => {
+			const output = actual.argon2id(pin, salt, {
+				...(opts as object),
+				t: 1,
+				m: 64,
+				p: 1
+			} as Parameters<typeof actual.argon2id>[2]);
+			argonHex = hex(output);
+			return output;
+		});
+		const { macKey, kek } = pinKeysOf((await runDerivePin(PIN_TEXT, KAT_SALT)).posts);
+		expect(argonHex).toBe(KAT_PIN_SMALL.argon2Hex);
+
+		const mac = await crypto.subtle.sign(
+			'HMAC',
+			macKey,
+			new TextEncoder().encode(KAT_PIN_MAC_MESSAGE)
+		);
+		expect(hex(mac)).toBe(KAT_PIN_SMALL.macHex);
+
+		// Extractable only so the test can hand its bytes to the wrap; the derived keys stay non-extractable.
+		const toWrap = await crypto.subtle.importKey(
+			'raw',
+			KAT_PIN_WRAPPED_KEY,
+			{ name: 'HMAC', hash: 'SHA-256' },
+			true,
+			['sign']
+		);
+		const wrapped = await crypto.subtle.wrapKey('raw', toWrap, kek, 'AES-KW');
+		expect(hex(wrapped)).toBe(KAT_PIN_SMALL.wrapHex);
+	});
+});
+
+describe('derive-pin: the PIN bytes and the Argon2id output are wiped on every path', () => {
+	type Arrange = () => void;
+	const crashes =
+		(spy: () => { mockRejectedValue: (reason: unknown) => unknown }): Arrange =>
+		() => {
+			spy().mockRejectedValue(new Error('no'));
+		};
+
+	async function wiped(
+		arrange: Arrange
+	): Promise<{ posts: FromWorker[]; pin: ArrayBuffer; out?: Uint8Array }> {
+		let out: Uint8Array | undefined;
+		mocks.argon2id.mockImplementation(() => {
+			out = Uint8Array.from(FAKE_OUTPUT);
+			return out;
+		});
+		arrange();
+		try {
+			const { posts, pass } = await runDerivePin();
+			return out === undefined ? { posts, pin: pass } : { posts, pin: pass, out };
+		} finally {
+			vi.restoreAllMocks();
+		}
+	}
+
+	it('success: both are zero and the keys exist', async () => {
+		const { posts, pin, out } = await wiped(() => undefined);
+		expect(posts.at(-1)?.type).toBe('pin-keys');
+		expect(isZero(pin)).toBe(true);
+		expect(out?.every((byte) => byte === 0)).toBe(true);
+	});
+
+	it('NO_MEMORY: the PIN is zero', async () => {
+		const { posts, pin } = await wiped(() => {
+			mocks.argon2id.mockImplementation(() => {
+				throw new RangeError('Array buffer allocation failed');
+			});
+		});
+		expect(posts).toEqual([{ type: 'error', code: 'E_NO_MEMORY' }]);
+		expect(isZero(pin)).toBe(true);
+	});
+
+	it.each([
+		['importKey', crashes(() => vi.spyOn(crypto.subtle, 'importKey'))],
+		['deriveKey', crashes(() => vi.spyOn(crypto.subtle, 'deriveKey'))]
+	])('a crypto failure in %s: both are zero and no key is posted', async (_n, arrange) => {
+		const { posts, pin, out } = await wiped(arrange);
+		expect(posts.at(-1)).toEqual({ type: 'error', code: 'E_CRYPTO_FAILED' });
+		expect(posts.some((msg) => msg.type === 'pin-keys')).toBe(false);
+		expect(isZero(pin)).toBe(true);
+		expect(out).toBeDefined();
+		expect(out?.every((byte) => byte === 0)).toBe(true);
 	});
 });
 

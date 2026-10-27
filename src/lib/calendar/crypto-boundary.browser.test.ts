@@ -7,7 +7,7 @@ import { AesGcmAuthError } from '../crypto/aes-gcm';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import type { CalendarSyncState } from './types';
-import type { KeystoreRecordV1 } from '../keystore/record';
+import { keyIdentity, type KeystoreRecordV1 } from '../keystore/record';
 
 // Passthrough seams that record the byte buffers the boundary hands to its collaborators, so a test can
 // look at them after the call: what the encoder returned, the copy given to the cipher, and what the
@@ -66,11 +66,11 @@ vi.mock('$lib/calendar/crypto-boundary', async (importOriginal) => {
 	return {
 		...real,
 		encryptCalendarRecord: (...args: Parameters<typeof real.encryptCalendarRecord>) => {
-			seen.encryptGenerations.push(args[2]);
+			seen.encryptGenerations.push(args[3]);
 			return real.encryptCalendarRecord(...args);
 		},
 		decryptCalendarRecord: (...args: Parameters<typeof real.decryptCalendarRecord>) => {
-			seen.decryptGenerations.push(args[2]);
+			seen.decryptGenerations.push(args[3]);
 			return real.decryptCalendarRecord(...args);
 		}
 	};
@@ -137,19 +137,20 @@ describe('calendar stores encrypt through their boundary', () => {
 describe('encryptCalendarRecord / decryptCalendarRecord', () => {
 	it('roundtrips a calendar state through encrypt + decrypt', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptCalendarRecord(baseState, ks, 3);
-		expect(await decryptCalendarRecord(blob, ks, 3)).toEqual(baseState);
+		const blob = await encryptCalendarRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
+		expect(await decryptCalendarRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3)).toEqual(baseState);
 	});
 
 	// The bytes on disk are bound to this store name and record id by their AAD, so a later writer of this
 	// record must produce what the store reads: pin the literal context, not just a self-consistent pair.
 	it('writes a record bound to the calendar-sync store context', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptCalendarRecord(baseState, ks, 3);
+		const blob = await encryptCalendarRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
 		const opened = decryptRecord(
 			{ storeName: 'calendar-sync', recordId: 'self', schemaVersion: 1 },
 			blob,
-			ks,
+			keyIdentity(ks),
+			ks.dataKeyRef,
 			3
 		).then((b) => JSON.parse(new TextDecoder().decode(b)) as unknown);
 		await expect(opened).resolves.toEqual(baseState);
@@ -157,8 +158,10 @@ describe('encryptCalendarRecord / decryptCalendarRecord', () => {
 
 	it('fails auth when the generation does not match (replay/generation binding)', async () => {
 		const ks = baseKeystore();
-		const blob = await encryptCalendarRecord(baseState, ks, 3);
-		await expect(decryptCalendarRecord(blob, ks, 4)).rejects.toThrow(AesGcmAuthError);
+		const blob = await encryptCalendarRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
+		await expect(decryptCalendarRecord(blob, keyIdentity(ks), ks.dataKeyRef, 4)).rejects.toThrow(
+			AesGcmAuthError
+		);
 	});
 
 	// The plaintext JSON holds the exclusions and handed-over events in one buffer. The decoded state
@@ -166,9 +169,9 @@ describe('encryptCalendarRecord / decryptCalendarRecord', () => {
 	describe('plaintext buffers', () => {
 		it('wipes the decrypted buffer once it has been decoded', async () => {
 			const ks = baseKeystore();
-			const blob = await encryptCalendarRecord(baseState, ks, 3);
+			const blob = await encryptCalendarRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
 
-			const dec = await decryptCalendarRecord(blob, ks, 3);
+			const dec = await decryptCalendarRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3);
 
 			expect(seen.decoderInput).toHaveLength(1);
 			expect(seen.decoderInputFull).toEqual([true]);
@@ -182,11 +185,14 @@ describe('encryptCalendarRecord / decryptCalendarRecord', () => {
 			const blob = await encryptRecord(
 				{ storeName: 'calendar-sync', recordId: 'self', schemaVersion: 1 },
 				wrongSchema,
-				ks,
+				keyIdentity(ks),
+				ks.dataKeyRef,
 				3
 			);
 
-			await expect(decryptCalendarRecord(blob, ks, 3)).rejects.toThrow(CalendarSchemaError);
+			await expect(decryptCalendarRecord(blob, keyIdentity(ks), ks.dataKeyRef, 3)).rejects.toThrow(
+				CalendarSchemaError
+			);
 
 			expect(seen.decoderInput).toHaveLength(1);
 			expect(seen.decoderInputFull).toEqual([true]);
@@ -196,7 +202,7 @@ describe('encryptCalendarRecord / decryptCalendarRecord', () => {
 		it('wipes the encoded state and the copy given to the cipher once encryption is done', async () => {
 			const ks = baseKeystore();
 
-			await encryptCalendarRecord(baseState, ks, 3);
+			await encryptCalendarRecord(baseState, keyIdentity(ks), ks.dataKeyRef, 3);
 
 			expect(seen.encoded).toHaveLength(1);
 			expect(seen.cipherInput).toHaveLength(1);

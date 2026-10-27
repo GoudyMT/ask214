@@ -3,6 +3,7 @@ import { flushSync } from 'svelte';
 import { toStore } from 'svelte/store';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
+import { keyIdentity } from '../keystore/record';
 import {
 	createProfileStore,
 	KeystoreNotInitializedError,
@@ -25,7 +26,7 @@ type Row = Record<string, unknown>;
 //   made and the caller never sees;
 // - zeroizeRecord records every record the store discards, so a test can show which one was wiped;
 // - decryptProfileRecord counts decrypts, so a refresh that must not read can be shown not to;
-// - computeRecordHmac can be made to throw, which reaches the step right after the staged copies exist.
+// - signKeystore can be made to throw, which reaches the step right after the staged copies exist.
 const seams = vi.hoisted(() => ({
 	cloned: [] as Uint8Array[],
 	zeroized: [] as Record<string, unknown>[],
@@ -69,9 +70,9 @@ vi.mock('$lib/keystore/record', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../keystore/record')>();
 	return {
 		...real,
-		computeRecordHmac: (...args: Parameters<typeof real.computeRecordHmac>) => {
+		signKeystore: (...args: Parameters<typeof real.signKeystore>) => {
 			if (seams.failHmac) throw new Error('E_TEST_HMAC');
-			return real.computeRecordHmac(...args);
+			return real.signKeystore(...args);
 		}
 	};
 });
@@ -144,7 +145,7 @@ describe('ProfileStore.load', () => {
 			setupIntentChangedAt: 1716700000000,
 			eaos: new TextEncoder().encode('2027-04-15')
 		};
-		const blob = await encryptProfileRecord(profile, record);
+		const blob = await encryptProfileRecord(profile, keyIdentity(record), record.dataKeyRef);
 		const hwmPayload: ProfileHwmPayload = {
 			generation: 1,
 			keystoreGeneration: 0,
@@ -225,6 +226,28 @@ describe('ProfileStore.save', () => {
 		const loaded = await storeA.load();
 		expect(loaded).not.toBeNull();
 		if (loaded?.eaos) expect(new TextDecoder().decode(loaded.eaos)).toBe('2027-01-01');
+	});
+
+	// A save re-signs the keystore row, so it must check the row first: otherwise it would launder a tampered row
+	// into a freshly valid one.
+	it('refuses to save over a keystore whose record MAC no longer verifies, and writes nothing', async () => {
+		const store = createProfileStore(db);
+		await store.save({ eaos: new TextEncoder().encode('2027-04-15'), setupIntent: 'completed' });
+		const bodyBefore = (await readRow('profile'))?.rec as Uint8Array;
+		const ks = await readRow('keystore');
+		if (!ks) throw new Error('test setup: keystore missing');
+		await putRow('keystore', { ...ks, keystoreGeneration: 7 }); // not re-signed
+
+		await expect(store.save({ setupIntent: 'completed' })).rejects.toThrow(
+			KeystoreHmacMismatchError
+		);
+
+		const bodyAfter = (await readRow('profile'))?.rec as Uint8Array;
+		expect(Array.from(bodyAfter)).toEqual(Array.from(bodyBefore));
+		expect((await readRow('keystore'))?.keystoreGeneration).toBe(7);
+		// The row on disk must still fail its check: a save that re-signed the tampered row before refusing would leave
+		// generation 7 in place but make it valid.
+		await expect(createProfileStore(db).load()).rejects.toThrow(KeystoreHmacMismatchError);
 	});
 
 	it('resolves concurrent first-runs: exactly one succeeds', async () => {
@@ -397,7 +420,7 @@ describe('ProfileStore.clockBackward', () => {
 			setupIntentChangedAt: future,
 			eaos: null
 		};
-		const blob = await encryptProfileRecord(profile, record);
+		const blob = await encryptProfileRecord(profile, keyIdentity(record), record.dataKeyRef);
 		const hwm = await signSidecar(
 			'profile-hwm',
 			{ generation: 1, keystoreGeneration: 0, epoch: 0, ts: future },
@@ -579,6 +602,31 @@ describe('ProfileStore.locked', () => {
 		expect(store.locked).toBe(true);
 		await store.load();
 		expect(store.locked).toBe(false);
+	});
+
+	// A tab opened with a PIN set has no key to learn whether a profile exists with, so Home's setup prompt (which keys off
+	// `!locked`) would show over a saved profile unless `locked` reads true whatever the mark says.
+	it('startLocked reads locked whatever the profile mark says, until a load succeeds', async () => {
+		const store = createProfileStore(db);
+		store.startLocked(false);
+		expect(store.locked).toBe(true);
+		expect(store.lockState).toBe('locked');
+		await store.load();
+		expect(store.locked).toBe(false);
+		expect(store.lockState).toBe('unlocked');
+	});
+
+	it('startLocked(true) keeps a saved profile out of memory until a load reads it back', async () => {
+		await createProfileStore(db).save({ eaos: new TextEncoder().encode('2027-04-15') });
+		const store = createProfileStore(db);
+		store.startLocked(true);
+		expect(store.locked).toBe(true);
+		expect(store._getStateForTest()).toBeNull();
+		await store.refresh();
+		expect(store.locked).toBe(true);
+		await store.load();
+		expect(store.locked).toBe(false);
+		expect(store._getStateForTest()).not.toBeNull();
 	});
 
 	// A first-run tab has no profile in storage, so `locked` stays false when it relocks: only lockState tells the UI.

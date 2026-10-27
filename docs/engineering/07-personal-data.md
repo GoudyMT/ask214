@@ -12,7 +12,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 
 | Layer      | Tool                        | Version  | Purpose                                 |
 | ---------- | --------------------------- | -------- | --------------------------------------- |
-| Storage    | IndexedDB, raw API          | spec     | Eleven stores                           |
+| Storage    | IndexedDB, raw API          | spec     | Twelve stores                           |
 | Encryption | Web Crypto, AES-GCM 256     | spec     | Every personal record                   |
 | Integrity  | Web Crypto, HMAC-SHA-256    | spec     | Signs the key record and rollback marks |
 | Keys       | Non-extractable `CryptoKey` | spec     | Made on the device, never exportable    |
@@ -21,6 +21,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 | Export     | iCalendar file              | RFC 5545 | Deadlines into the user's own calendar  |
 | Backup key | `@noble/hashes`, Argon2id   | 2.4.0    | Passphrase into a key, in a worker      |
 | Backup     | Web Crypto, HKDF, AES-GCM   | spec     | Encrypts the backup file                |
+| App lock   | Argon2id, HKDF, AES-KW      | 2.4.0    | An optional PIN wraps the keys          |
 
 ## Decisions and Reasoning
 
@@ -33,7 +34,8 @@ the answer to the SkillBridge question, the calendar choices, the SkillBridge fi
 filters), saved programs and compare picks, and the optional API key. Each lives as ciphertext in its own
 single-row IndexedDB store; four more stores hold signed rollback marks and one holds the keys. The finder's
 downloaded listings, its seen programs and its last-seen week sit in one more store, encrypted one row per file
-and kept on this device only: eleven stores in all. Pages that show personal data render only in the browser, and a CI test fails if any server
+and kept on this device only. A last, plain store holds the app lock's wrong-try count and a lock counter (nothing
+derived from the PIN) and never goes into a backup: twelve stores in all. Pages that show personal data render only in the browser, and a CI test fails if any server
 file names a profile field.
 
 **Why this project uses it.** With no server copy, there is nothing to breach, sell or hand over.
@@ -56,10 +58,9 @@ decrypt. A project lint rule forbids writing to an encrypted store anywhere else
 transaction. Signed high-water marks beside the profile, timeline, calendar and finder records refuse an older copy, and
 errors carry opaque codes, never decrypted text.
 
-**What it does not protect.** There is no passphrase on the stored data yet (a backup file has its own, see
-Backup), so the key sits on the same device as the data.
-Non-extractable keys and authenticated encryption stop the key being exported and the records being altered or
-swapped, but not someone using the unlocked browser. A passphrase is planned for a later version.
+**What it does not protect.** Without the optional PIN (see App lock), the key sits on the same device as the
+data, ready to use. Non-extractable keys and authenticated encryption stop the key being exported and the records
+being altered or swapped, but not someone using the unlocked browser.
 
 **Tradeoffs accepted.** One key for everything, so losing the database loses the key and the data together.
 
@@ -74,9 +75,48 @@ hold personal data send `Cache-Control: no-store`, so the back-forward cache can
 through one sink that refuses error objects and keeps 64 entries in memory only; direct console use is a lint
 error.
 
-**Tradeoffs accepted.** Without a passphrase, Unlock is one tap: the lock clears the screen, it is not access
-control. Timeline notes, the calendar record and the finder's place and saved programs are not overwritten in
-memory like the profile: plain strings cannot be zeroized, so a lock drops the reference.
+**Tradeoffs accepted.** Without a PIN, Unlock is one tap: the lock clears the screen, it is not access control.
+Timeline notes, the calendar record and the finder's place and saved programs are not overwritten in memory like
+the profile: plain strings cannot be zeroized, so a lock drops the reference.
+
+---
+
+### App lock with a PIN
+
+**What it is.** An optional PIN of 4 to 6 digits, set in Settings under App lock. The PIN goes through Argon2id
+with the backup's settings, in the same worker, and HKDF turns the result into two keys: one signs the key record,
+the other (AES-KW) wraps the data keys. No key derived from the PIN is stored; the key record's signature under
+the first key is, and it is what a guess at the PIN is checked against. Turning the PIN on moves every
+encrypted record onto new keys in one IndexedDB transaction, so either all of it moves or none does, and from then
+on the keys are stored only wrapped. Each new tab and each reload asks for the PIN. The keys then live in that
+tab's memory only, as non-extractable keys, and leave it after 15 minutes idle, on Lock, on a lock in another tab
+and on every key change; switching away for a short time keeps them. While the app is locked, the pages that show
+personal data show the Unlock card instead and read nothing.
+
+**Wrong tries.** Three tries cost nothing. After that each try waits 30 seconds, then 1 minute, then 5 minutes,
+then 15 minutes for every try after. The count and the wait are written before the PIN is checked, in a plain
+store that holds no PIN data and never goes into a backup, so a reload or another tab cannot reset them. The wait
+counts down on the page's own clock, so setting the device's clock forward does not end it. A wrong try never
+erases anything. After a good PIN the app says how many wrong tries came before it.
+
+**Change, remove, forget.** Change moves the records onto new keys again. Remove writes the same keys back as an
+ordinary key record, so no record moves. A forgotten PIN cannot be reset, since it is not saved anywhere. The way
+back is a backup file made earlier with its six words, which replaces everything on the device and leaves the PIN
+off, or erasing and starting over. Setup offers to make a backup first, and with the PIN on, making a backup asks
+for the PIN.
+
+**What it does not cover.** Ask, Resources and Documents stay open. Calendar events and calendar files already
+saved are outside it. Another browser on the same phone keeps its own data and needs its own PIN. Anyone holding
+the phone can still erase the app's data. Switching away for a short time does not lock the app; Lock does. The
+time away is read from the device's clocks, so someone who can unlock the phone itself and set its clock back can
+make a long time away read as a short one, and a tab left open without Lock may then open without the PIN. App
+lock appears in Settings once a profile is saved, so an API key saved before any profile is not covered. And a
+copy of the data taken off the phone can be tried against every 4 to 6 digit PIN away from the wait, which a
+short PIN cannot hold out against for long.
+
+**Tradeoffs accepted.** A PIN keeps out people near the phone, not someone with a copy of its storage. Without a
+backup, a forgotten PIN means erasing. The wrong-try store cannot be signed while the app is locked, and anything
+that can write it can also copy the data.
 
 ---
 
@@ -186,7 +226,8 @@ API key, sent to its own provider, ever leave.
 - **One encryption function**, enforced by a lint rule.
 - **Non-extractable keys**, made on the device.
 - **Fail closed:** a record that does not verify is not used.
-- **State the limits:** without a passphrase, the device is the boundary.
+- **State the limits:** without a PIN, the device is the boundary; with one, a copy of the data is still open to
+  guessing.
 
 ## Further Reading
 
@@ -202,3 +243,4 @@ API key, sent to its own provider, ever leave.
 - 2026-10-02: First draft.
 - 2026-10-05: The leaving dates and the record of handed-over calendar events.
 - 2026-10-09: Every calendar moment named.
+- 2026-10-26: The app lock with an optional PIN.

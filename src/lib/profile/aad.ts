@@ -1,4 +1,4 @@
-import { canonicalizeKeystore, type KeystoreCanonicalInput } from '../keystore/record';
+import { keyIdentityBytes, type KeyIdentity } from '../keystore/record';
 
 /**
  * AAD (Additional Authenticated Data) binds AES-GCM profile ciphertext to its
@@ -42,15 +42,12 @@ export function buildAAD(p: AADParams): Uint8Array {
  * SHA-256 over the canonical keystore bytes - the SAME canonical form as the
  * record HMAC, but with NO domain prefix (the `mtc-v1|keystore-record|` prefix
  * is HMAC-only). Gives the AAD a stable fingerprint of the keystore's security
- * state. `ivCounter` is already excluded by `canonicalizeKeystore` (operational,
- * not integrity-critical).
+ * state. `ivCounter` is not part of the identity (operational, not integrity-critical).
  */
-export async function computeKeystoreRecordHash(
-	record: KeystoreCanonicalInput
-): Promise<Uint8Array> {
+export async function computeKeystoreRecordHash(identity: KeyIdentity): Promise<Uint8Array> {
 	// Fresh ArrayBuffer-backed copy so the bytes satisfy WebCrypto's BufferSource
 	// (bare Uint8Array infers ArrayBufferLike under TS 5.7).
-	const canonical = new Uint8Array(canonicalizeKeystore(record));
+	const canonical = new Uint8Array(keyIdentityBytes(identity));
 	const hash = await crypto.subtle.digest('SHA-256', canonical);
 	return new Uint8Array(hash);
 }

@@ -1,7 +1,7 @@
 import { encryptRecord, decryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { encodeProfile, decodeProfile } from './codec';
 import type { ProfileV1 } from './types';
-import type { KeystoreRecordV1 } from '../keystore/record';
+import type { KeyIdentity } from '../keystore/record';
 
 /**
  * The profile encryption boundary - a thin wrapper over the record-agnostic crypto
@@ -14,13 +14,14 @@ const PROFILE_CTX: RecordCtx = { storeName: 'profile', recordId: 'self', schemaV
 
 export async function encryptProfileRecord(
 	profile: ProfileV1,
-	keystore: KeystoreRecordV1
+	identity: KeyIdentity,
+	dataKey: CryptoKey
 ): Promise<Uint8Array> {
 	const encoded = encodeProfile(profile);
 	const plaintext = new Uint8Array(encoded);
 	try {
 		// Awaited inside the try: the wipe below must wait for the cipher to finish with the buffer.
-		return await encryptRecord(PROFILE_CTX, plaintext, keystore, profile.generation);
+		return await encryptRecord(PROFILE_CTX, plaintext, identity, dataKey, profile.generation);
 	} finally {
 		// The whole profile as JSON, in two buffers. The cipher keeps its own copy and the ciphertext
 		// is all that is stored, so neither has a use once encryption ends.
@@ -31,10 +32,11 @@ export async function encryptProfileRecord(
 
 export async function decryptProfileRecord(
 	blob: Uint8Array,
-	keystore: KeystoreRecordV1,
+	identity: KeyIdentity,
+	dataKey: CryptoKey,
 	expectedGeneration: number
 ): Promise<ProfileV1> {
-	const plaintext = await decryptRecord(PROFILE_CTX, blob, keystore, expectedGeneration);
+	const plaintext = await decryptRecord(PROFILE_CTX, blob, identity, dataKey, expectedGeneration);
 	try {
 		return decodeProfile(plaintext);
 	} finally {

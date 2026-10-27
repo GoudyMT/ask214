@@ -6,7 +6,8 @@ import { openTestDb, deleteTestDb } from '../../db/_test-helpers';
 import { withStores, reqToPromise } from '../../db/schema';
 import { rotateOrUpgrade } from '../../db/locks';
 import { encryptRecord, decryptRecord } from '../../crypto/record-crypto';
-import { readKeystoreRow } from '../../profile/store.svelte';
+import { readKeystoreRow } from '../../keystore/read';
+import { keyIdentity, type KeyIdentity } from '../../keystore/record';
 import { cleanListing } from '../fixtures/clean';
 import type { ChangesFile, IdsFile, IndexFile, RegionFile } from '../contract/listing';
 import type { RegionFileName } from '../contract/places';
@@ -78,6 +79,12 @@ function week(pull: string, names: RegionFileName[], withExtras = true) {
 
 type Row = { id: string; rec: Uint8Array };
 let db: IDBDatabase;
+
+/** What a record is sealed with: the identity of this device's verified keystore and its data key. */
+const identityAndKey = async (): Promise<[KeyIdentity, CryptoKey]> => {
+	const { row, keys } = await readKeystoreRow(db);
+	return [keyIdentity(row), keys.dataKey];
+};
 
 beforeEach(async () => {
 	db = await openTestDb();
@@ -197,7 +204,7 @@ describe('finder pack store', () => {
 			const rec = await encryptRecord(
 				{ storeName: 'skillbridge-finder-pack', recordId: `pacific@${WEEK_1}`, schemaVersion: 1 },
 				new TextEncoder().encode(JSON.stringify(bad)),
-				await readKeystoreRow(db),
+				...(await identityAndKey()),
 				0
 			);
 			await putRaw({ id: 'pacific', rec });
@@ -212,7 +219,7 @@ describe('finder pack store', () => {
 			const rec = await encryptRecord(
 				{ storeName: 'skillbridge-finder-pack', recordId: `changes@${WEEK_2}`, schemaVersion: 1 },
 				new TextEncoder().encode(JSON.stringify(changesFile(WEEK_1))),
-				await readKeystoreRow(db),
+				...(await identityAndKey()),
 				0
 			);
 			await putRaw({ id: 'changes', rec });
@@ -363,14 +370,15 @@ describe('finder pack store', () => {
 		});
 
 		it('a held index dated far ahead does not make the real week a rollback', async () => {
-			const keystore = await readKeystoreRow(db);
+			const [identity, dataKey] = await identityAndKey();
 			const plant = async (id: string, recordId: string, value: unknown) =>
 				putRaw({
 					id,
 					rec: await encryptRecord(
 						{ storeName: 'skillbridge-finder-pack', recordId, schemaVersion: 1 },
 						new TextEncoder().encode(JSON.stringify(value)),
-						keystore,
+						identity,
+						dataKey,
 						0
 					)
 				});
@@ -434,12 +442,13 @@ describe('finder pack store', () => {
 
 		// An older tab saving must not erase a key a newer release added to the row.
 		it('marking an id keeps a key this release does not know', async () => {
-			const keystore = await readKeystoreRow(db);
+			const [identity, dataKey] = await identityAndKey();
 			const aad = { storeName: 'skillbridge-finder-pack', recordId: 'seen', schemaVersion: 1 };
 			const rec = await encryptRecord(
 				aad,
 				new TextEncoder().encode(JSON.stringify({ finderSeen: [1], future: 'kept' })),
-				keystore,
+				identity,
+				dataKey,
 				0
 			);
 			await putRaw({ id: 'seen', rec });
@@ -447,7 +456,7 @@ describe('finder pack store', () => {
 			await (await opened()).markOpened([2]);
 
 			const row = await getRaw('seen');
-			const plain = await decryptRecord(aad, row?.rec ?? new Uint8Array(), keystore, 0);
+			const plain = await decryptRecord(aad, row?.rec ?? new Uint8Array(), identity, dataKey, 0);
 			expect(JSON.parse(new TextDecoder().decode(plain))).toEqual({
 				finderSeen: [1, 2],
 				future: 'kept'

@@ -12,11 +12,10 @@ const DESKTOP = { width: 1280, height: 800 };
 
 const BAR = 'nav.bottom-bar';
 
-// The bar's four tabs, in order. The home heading is the hero line, so it is matched loosely.
+// The bar's three tabs, in order. The home heading is the hero line, so it is matched loosely.
 const TABS: { name: string; path: string; heading: string | RegExp }[] = [
 	{ name: 'Home', path: '/', heading: /military transition/i },
 	{ name: 'Timeline', path: '/timeline', heading: 'Timeline' },
-	{ name: 'SkillBridge', path: '/skillbridge', heading: 'SkillBridge' },
 	{ name: 'More', path: '/more', heading: 'More' }
 ];
 
@@ -32,7 +31,6 @@ const MORE_ROWS: { name: string; path: string; heading: string }[] = [
 // The top menu from 600px. Settings is there once the app is ready, which a saved timeline makes it.
 const MENU: { name: string; path: string; heading: string }[] = [
 	{ name: 'Timeline', path: '/timeline', heading: 'Timeline' },
-	{ name: 'SkillBridge', path: '/skillbridge', heading: 'SkillBridge' },
 	{ name: 'Resources', path: '/resources', heading: 'Resources' },
 	{ name: 'Settings', path: '/settings', heading: 'Settings' }
 ];
@@ -88,8 +86,10 @@ test('a person on a phone reaches every page from the bottom bar, and More keeps
 		);
 	}
 
-	// The placeholder sends a person to the official site rather than leaving them at a dead end.
-	await bar.getByRole('link', { name: 'SkillBridge', exact: true }).click();
+	// The finder has no tab while it is not ready, but a saved address still opens its placeholder, which sends a
+	// person to the official site rather than leaving them at a dead end.
+	await page.goto('/skillbridge');
+	await expect(bar.getByRole('link', { name: 'SkillBridge', exact: true })).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'DoD SkillBridge site' })).toHaveAttribute(
 		'href',
 		'https://www.skillbridge.mil/'
@@ -128,6 +128,32 @@ test('a person on a desktop reaches every page from the top menu', async ({ page
 	const response = await page.goto('/resources');
 	expect(response?.status()).toBe(200);
 	await expect(page.getByRole('heading', { level: 1, name: 'Resources' })).toBeVisible();
+});
+
+// Every phone width from the narrowest (320) to the last one that shows the bar (599) gives three equal columns and
+// leaves the page free of sideways scroll: a label that is too wide for its column would otherwise push the bar out.
+test('the bottom bar keeps three equal columns and no sideways scroll from 320 to 599px wide', async ({
+	page,
+	context
+}) => {
+	await page.setViewportSize({ width: 599, height: 568 });
+	await sealApi(context, page);
+	await page.goto('/');
+	await expect(page.locator(BAR)).toBeVisible();
+	const failures: string[] = [];
+	for (let width = 320; width <= 599; width++) {
+		await page.setViewportSize({ width, height: 568 });
+		const measured = await page.evaluate(() => ({
+			columns: [...document.querySelectorAll('nav.bottom-bar a')].map(
+				(a) => a.getBoundingClientRect().width
+			),
+			overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+		}));
+		const equal =
+			measured.columns.length === 3 && measured.columns.every((w) => Math.abs(w - width / 3) <= 1);
+		if (!equal || measured.overflow > 0) failures.push(`${width}: ${JSON.stringify(measured)}`);
+	}
+	expect(failures).toEqual([]);
 });
 
 // 599 and 600 wide are one pixel apart and must not leave a person with no menu, or with two.

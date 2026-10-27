@@ -5,7 +5,15 @@ import { readBackupFile } from '../../src/lib/backup/envelope';
 import { GOLDEN_PASSWORD } from '../../src/lib/backup/golden/golden';
 import { HKDF_INFO_V1 } from '../../src/lib/backup/kdf-params';
 import { KDF_WORKER_SRC } from '../../src/lib/backup/kdf-paths';
-import { KAT_ARGON2_HEX, KAT_PASSWORD, KAT_SALT } from '../../src/lib/backup/kdf-kat';
+import {
+	KAT_ARGON2_HEX,
+	KAT_PASSWORD,
+	KAT_PIN,
+	KAT_PIN_FULL,
+	KAT_PIN_MAC_MESSAGE,
+	KAT_PIN_WRAPPED_KEY,
+	KAT_SALT
+} from '../../src/lib/backup/kdf-kat';
 
 // The only place the real Argon2id runs at the production tuple (128 MiB, 4 passes, 2 lanes), inside the built and
 // served key worker. Every unit test replaces that step, so without this spec a change to the worker, the noble
@@ -127,6 +135,76 @@ test('the worker matches an independent Argon2id at the production tuple', async
 	if (!opened.ok) return;
 	recordDeriveTime(browserName, opened.deriveMs);
 	expect(new TextDecoder().decode(Uint8Array.from(opened.plain))).toBe(message);
+});
+
+type PinProof =
+	{ ok: true; macHex: string; wrapHex: string; deriveMs: number } | { ok: false; code: string };
+
+/** What the page does with the real worker for the PIN step: derive the two keys, then prove each with a fixed input. */
+async function pinProofInPage(
+	page: Page,
+	args: { src: string; pin: string; salt: number[]; message: string; toWrap: number[] }
+): Promise<PinProof> {
+	await page.goto('/');
+	return page.evaluate(async (a): Promise<PinProof> => {
+		const worker = new Worker(a.src, { type: 'module' });
+		const started = performance.now();
+		const answer = await new Promise<{ macKey: CryptoKey; kek: CryptoKey } | { code: string }>(
+			(resolve) => {
+				worker.onmessage = (
+					event: MessageEvent<{ type: string; macKey?: CryptoKey; kek?: CryptoKey; code?: string }>
+				) => {
+					const data = event.data;
+					if (data.type === 'pin-keys' && data.macKey && data.kek) {
+						resolve({ macKey: data.macKey, kek: data.kek });
+					} else if (data.type === 'error') resolve({ code: data.code ?? 'NO_CODE' });
+				};
+				worker.onerror = () => resolve({ code: 'WORKER_ERROR' });
+				const pin = new TextEncoder().encode(a.pin).buffer;
+				worker.postMessage({ op: 'derive-pin', pin, salt: Uint8Array.from(a.salt) }, [pin]);
+			}
+		);
+		const deriveMs = performance.now() - started;
+		worker.terminate();
+		if (!('macKey' in answer)) return { ok: false, code: answer.code };
+		const hex = (buffer: ArrayBuffer) =>
+			Array.from(new Uint8Array(buffer), (b) => b.toString(16).padStart(2, '0')).join('');
+		const mac = await crypto.subtle.sign(
+			'HMAC',
+			answer.macKey,
+			new TextEncoder().encode(a.message)
+		);
+		// Extractable only so the page can hand its bytes to the wrap; the keys under test stay non-extractable.
+		const toWrap = await crypto.subtle.importKey(
+			'raw',
+			Uint8Array.from(a.toWrap),
+			{ name: 'HMAC', hash: 'SHA-256' },
+			true,
+			['sign']
+		);
+		const wrapped = await crypto.subtle.wrapKey('raw', toWrap, answer.kek, 'AES-KW');
+		return { ok: true, macHex: hex(mac), wrapHex: hex(wrapped), deriveMs };
+	}, args);
+}
+
+test('the PIN step of the worker matches an independent computation at the production tuple', async ({
+	page,
+	browserName
+}) => {
+	const proof = await pinProofInPage(page, {
+		src: KDF_WORKER_SRC,
+		pin: KAT_PIN,
+		salt: Array.from(KAT_SALT),
+		message: KAT_PIN_MAC_MESSAGE,
+		toWrap: Array.from(KAT_PIN_WRAPPED_KEY)
+	});
+
+	expect(proof).toEqual(expect.objectContaining({ ok: true }));
+	if (!proof.ok) return;
+	recordDeriveTime(browserName, proof.deriveMs);
+	// Computed outside this repository's code: the MAC key and the wrapping key are what the independent HKDF gives.
+	expect(proof.macHex).toBe(KAT_PIN_FULL.macHex);
+	expect(proof.wrapHex).toBe(KAT_PIN_FULL.wrapHex);
 });
 
 test('the v1 golden opens through the real worker', async ({ page, browserName }) => {

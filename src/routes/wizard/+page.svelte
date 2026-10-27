@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import BackupCard from '$lib/backup/BackupCard.svelte';
@@ -6,6 +7,8 @@
 	import { takeBackupIntent } from '$lib/backup/intent';
 	import { backupSession } from '$lib/backup/session.svelte';
 	import EaosInput from '$lib/components/EaosInput.svelte';
+	import LockedPanel from '$lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
 	import { getProfileApp } from '$lib/profile/context';
 	import { OccConflictError } from '$lib/profile/store.svelte';
 	import {
@@ -101,21 +104,60 @@
 		backupSession.requestErase();
 		void goto(resolve('/settings'));
 	}
+
+	// A profile behind a PIN is not a first run: the page asks for the PIN, as every locked page does.
+	let headingEl: HTMLElement | undefined;
+	let pinNotice = $state<string[]>([]);
+	let noticeUp = $state(false);
+	// A lock ends the visit the notice was about, so it goes: the same tries after the next unlock arrive as a new line.
+	$effect(() => {
+		if (app.pinLocked === true) {
+			noticeUp = true;
+			pinNotice = [];
+		}
+	});
 </script>
 
 <svelte:head>
-	<title>Set up your profile</title>
+	<title>Set up your profile - Ask 214</title>
 </svelte:head>
 
 <section class="wizard" aria-labelledby="wizard-heading" translate="no">
-	<h1 id="wizard-heading">Set up your profile</h1>
+	<h1 id="wizard-heading" bind:this={headingEl} tabindex="-1">Set up your profile</h1>
 	<p class="wizard__lead">
 		Add your separation date and we'll build a transition timeline around it. Everything stays
 		encrypted on this device. It leaves only in a file you choose to save: a backup, locked with its
 		passphrase, or a calendar file of your deadlines.
 	</p>
 
-	{#if app.status === 'ready'}
+	<!-- What a good PIN said about the tries before it, where the Unlock card stood. It is on the page from the moment the
+	     card is, so a screen reader is already listening when its lines arrive; the next unlock replaces it. -->
+	{#if noticeUp}
+		<div class="wizard-notice" role="status">
+			{#each pinNotice as line (line)}<p>{line}</p>{/each}
+		</div>
+	{/if}
+
+	{#if app.status === 'ready' && app.pinLocked === true}
+		<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
+		{#await loadPinUnlock() then card}
+			<card.default
+				onunlocked={(notice) => {
+					pinNotice = notice;
+					// The card with the pressed button is gone; focus goes to the heading unless the person moved it.
+					void tick().then(() => {
+						if (document.activeElement === document.body) headingEl?.focus();
+					});
+				}}
+				onerase={eraseFromBackup}
+			/>
+		{:catch}
+			<LockedPanel
+				onunlock={() => location.reload()}
+				error="Could not unlock right now - please try again."
+			/>
+		{/await}
+	{:else if app.status === 'ready'}
 		<!-- A held Enter repeats, in the field or on Save, and each repeat would save again once a failed save settled:
 		     only a new press submits. The form only filters its controls' keys; it is not a control itself, so the
 		     compiler's rule against key listeners on a non-interactive element does not fit. -->
@@ -143,8 +185,9 @@
 		</form>
 	{/if}
 
-	<!-- The app's one connection: there is nothing to restore onto before start-up has opened it. -->
-	{#if app.db}
+	<!-- The app's one connection: there is nothing to restore onto before start-up has opened it. Behind a PIN the Unlock
+	     card's own Forgot screen carries the only restore: two cards would share one session. -->
+	{#if app.db && app.pinLocked !== true}
 		<BackupCard
 			db={app.db}
 			onEraseRequest={eraseFromBackup}
@@ -171,6 +214,18 @@
 	.wizard__lead {
 		margin: 0;
 		color: var(--color-fg-muted);
+	}
+
+	.wizard-notice {
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+	/* Kept on the page while empty, so it gives back the gap it would add. */
+	.wizard-notice:empty {
+		margin-top: calc(-1 * var(--space-m));
+	}
+	.wizard-notice p {
+		margin: 0;
 	}
 
 	.wizard__form {

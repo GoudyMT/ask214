@@ -10,7 +10,7 @@ import { OccConflictError } from '../profile/store.svelte';
 import { signSidecar } from '../profile/sidecars';
 import { encryptRecord } from '../crypto/record-crypto';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
-import type { KeystoreRecordV1 } from '../keystore/record';
+import { keyIdentity, type KeystoreRecordV1 } from '../keystore/record';
 import { openTestDb, deleteTestDb } from '../db/_test-helpers';
 import { withStores, reqToPromise } from '../db/schema';
 import { wipeAllStores } from '../db/wipe';
@@ -29,7 +29,8 @@ async function seedRecord(db: IDBDatabase, json: string) {
 	const blob = await encryptRecord(
 		{ storeName: 'timeline-state', recordId: 'self', schemaVersion: 1 },
 		new TextEncoder().encode(json),
-		ks,
+		keyIdentity(ks),
+		ks.dataKeyRef,
 		1
 	);
 	const hwm = await signSidecar(

@@ -152,7 +152,7 @@ export type Run = {
 export type DeriveResult =
 	{ ok: true; key: CryptoKey } | { ok: false; code: BackupCode; position?: 1 | 2 | 3 | 4 | 5 | 6 };
 
-export type StartApp = Pick<ProfileApp, 'status' | 'joinRelock' | 'publish'>;
+export type StartApp = Pick<ProfileApp, 'status' | 'joinRelock' | 'publish' | 'keyMode'>;
 
 /** The parts of a Worker the session uses, so a test can stand in for one. */
 export type WorkerLike = {
@@ -327,6 +327,7 @@ export class BackupSession {
 	#sessionToken = 0;
 	#stopToken = -1;
 	#stopOutcome: BackupCode = 'E_RESTORE_CANCELLED';
+	#exportGranted = false;
 	/** What came with `epochMovedBy`, read only while that is set: another tab's idle lock is told from its Lock by this. */
 	#movedDetail: { peerReason?: 'idle' | 'user' } | undefined;
 	#relockable: Relockable = {
@@ -374,17 +375,30 @@ export class BackupSession {
 	// ---- start and end ---------------------------------------------------------------------------------------------
 
 	/**
+	 * With the PIN on, a backup may only be made by someone who has just typed it. The card checks the PIN and grants one
+	 * export here; `start` is the gate, so no other caller can skip the step. The grant is for the very next start and
+	 * for nothing else: a start, a relock of any reason and an end all spend it.
+	 */
+	grantExport(): void {
+		this.#exportGranted = true;
+	}
+
+	/**
 	 * Opens the session and joins the relock set. Refused unless the app can relock it: a ready app may export, restore
 	 * and check; a damaged one may only check; a restore also needs the seam that tells the other tabs.
 	 */
 	start(app: StartApp, kind: SessionKind): void {
 		const join = app.joinRelock;
 		const allowed = app.status === 'ready' || (app.status === 'damaged' && kind === 'check');
+		// Spent by any export start, so a grant never waits for a later one.
+		const granted = kind === 'export' && this.#exportGranted;
+		if (kind === 'export') this.#exportGranted = false;
 		if (
 			this.phase !== 'idle' ||
 			join === null ||
 			!allowed ||
-			(kind === 'restore' && app.publish === null)
+			(kind === 'restore' && app.publish === null) ||
+			(kind === 'export' && app.keyMode === 'pin' && !granted)
 		) {
 			throw new BackupError('E_BACKUP_UNAVAILABLE');
 		}
@@ -409,6 +423,7 @@ export class BackupSession {
 	 * which nothing may cut short (the flow ends the session once it reaches `done`).
 	 */
 	end(): void {
+		this.#exportGranted = false;
 		if (this.phase === 'idle' || this.#isCommit()) return;
 		this.#clear('end', null);
 	}
@@ -859,6 +874,7 @@ export class BackupSession {
 
 	/** The relock set's entry point; never throws, so it can never break the walk of the stores after it. */
 	relockSync(reason: RelockReason, detail?: { peerReason?: 'idle' | 'user' }): void {
+		this.#exportGranted = false;
 		try {
 			this.#relock(reason, detail);
 		} catch {

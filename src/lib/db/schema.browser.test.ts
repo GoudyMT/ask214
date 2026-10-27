@@ -67,12 +67,32 @@ function openV6Db(name: string): Promise<IDBDatabase> {
 	});
 }
 
-describe('openMtcDb schema (v7)', () => {
+// The v7 schema exactly as it shipped: the eleven stores before the app lock's. Frozen for the same reason as v2.
+const V7_STORES: StoreName[] = [
+	...V6_STORES,
+	'skillbridge-finder',
+	'skillbridge-finder-hwm',
+	'skillbridge-finder-pack'
+];
+
+function openV7Db(name: string): Promise<IDBDatabase> {
+	return new Promise<IDBDatabase>((resolve, reject) => {
+		const req = indexedDB.open(name, 7);
+		req.onupgradeneeded = () => {
+			for (const store of V7_STORES) req.result.createObjectStore(store, { keyPath: 'id' });
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error ?? new Error('v7-open-failed'));
+	});
+}
+
+describe('openMtcDb schema (v8)', () => {
 	it('opens at the current DB_VERSION with exactly the registered stores', async () => {
 		const db = await freshDb();
 		expect(db.version).toBe(DB_VERSION);
-		expect(db.version).toBe(7);
+		expect(db.version).toBe(8);
 		expect(Array.from(db.objectStoreNames).sort()).toEqual([
+			'app-lock',
 			'byok',
 			'calendar-sync',
 			'calendar-sync-hwm',
@@ -100,7 +120,7 @@ describe('openMtcDb schema (v7)', () => {
 
 		const upgraded = await openMtcDb(name);
 		opened.push(upgraded);
-		expect(upgraded.version).toBe(7);
+		expect(upgraded.version).toBe(8);
 		for (const store of [
 			'skillbridge-finder',
 			'skillbridge-finder-hwm',
@@ -114,6 +134,35 @@ describe('openMtcDb schema (v7)', () => {
 			);
 			expect(row, store).toEqual({ id: 0, marker: `row-${store}` });
 		}
+	});
+
+	// The upgrade every returning user runs for the app lock: its plain store arrives, every saved row stays byte for byte.
+	it('upgrades a v7 database with a row in every old store, keeping each row and adding app-lock', async () => {
+		const name = 'mtc-test-' + crypto.randomUUID();
+		const v7 = await openV7Db(name);
+		expect(v7.version).toBe(7);
+		expect(v7.objectStoreNames.contains('app-lock')).toBe(false);
+		const cipher = new Uint8Array([1, 2, 3, 250, 251, 252]);
+		await withStores(v7, V7_STORES, 'readwrite', (tx) => {
+			for (const store of V7_STORES)
+				tx.objectStore(store).put({ id: 0, marker: `row-${store}`, cipher });
+		});
+		v7.close();
+
+		const upgraded = await openMtcDb(name);
+		opened.push(upgraded);
+		expect(upgraded.version).toBe(8);
+		expect(upgraded.objectStoreNames.contains('app-lock')).toBe(true);
+		for (const store of V7_STORES) {
+			const row = await withStores(upgraded, store, 'readonly', (tx) =>
+				reqToPromise<unknown>(tx.objectStore(store).get(0))
+			);
+			expect(row, store).toEqual({ id: 0, marker: `row-${store}`, cipher });
+		}
+		const lockRows = await withStores(upgraded, 'app-lock', 'readonly', (tx) =>
+			reqToPromise<unknown[]>(tx.objectStore('app-lock').getAll())
+		);
+		expect(lockRows).toEqual([]);
 	});
 
 	// The app asks this release's waiting worker to take over only after a raise: the older release's pages, which its
@@ -237,6 +286,7 @@ describe('openMtcDb schema (v7)', () => {
 
 	it('STORES enumerates exactly the registered stores', () => {
 		expect([...STORES].sort()).toEqual([
+			'app-lock',
 			'byok',
 			'calendar-sync',
 			'calendar-sync-hwm',

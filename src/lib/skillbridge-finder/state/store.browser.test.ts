@@ -5,9 +5,10 @@ import { MAX_COMPARE, MAX_SAVED, type FinderRecord } from './types';
 import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
-	OccConflictError,
-	readKeystoreRow
+	OccConflictError
 } from '../../profile/store.svelte';
+import { readKeystoreRow } from '../../keystore/read';
+import { keyIdentity } from '../../keystore/record';
 import { wipeAllStores } from '../../db/wipe';
 import { SidecarTamperError, signSidecar } from '../../profile/sidecars';
 import { bootstrapLocalKeystore } from '../../keystore/bootstrap';
@@ -83,8 +84,8 @@ const putRow = (store: StoreName, value: Record<string, unknown>) =>
 
 /** A record a previous session left on the device: the body and its signed marker, at generation 1. */
 async function seed(record: FinderRecord): Promise<void> {
-	const ks = await readKeystoreRow(db);
-	const rec = await encryptFinderRecord(record, ks, 1);
+	const { row: ks, keys } = await readKeystoreRow(db);
+	const rec = await encryptFinderRecord(record, keyIdentity(ks), keys.dataKey, 1);
 	const hwm = await signSidecar(
 		'skillbridge-finder-hwm',
 		{
@@ -93,7 +94,7 @@ async function seed(record: FinderRecord): Promise<void> {
 			epoch: ks.epoch,
 			ts: 1716700000000
 		},
-		ks.hmacKeyRef
+		keys.hmacKey
 	);
 	await putRow('skillbridge-finder', { id: 0, rec });
 	await putRow('skillbridge-finder-hwm', { id: 0, ...hwm });
@@ -192,8 +193,13 @@ describe('finder store', () => {
 		// A body whose marker is gone is damage, not a first visit: reading it as empty would let the next save write over
 		// the person's saved programs.
 		it('a body present but the marker missing: not ready, and the body is left alone', async () => {
-			const ks = await readKeystoreRow(db);
-			const rec = await encryptFinderRecord({ ...EMPTY_RECORD, finderCompare: [386] }, ks, 1);
+			const { row: ks, keys } = await readKeystoreRow(db);
+			const rec = await encryptFinderRecord(
+				{ ...EMPTY_RECORD, finderCompare: [386] },
+				keyIdentity(ks),
+				keys.dataKey,
+				1
+			);
 			await putRow('skillbridge-finder', { id: 0, rec });
 
 			const b = createFinderStore(db);

@@ -6,6 +6,8 @@ import type { IdleTimer, IdleTimerOptions } from './idle-timer';
 import type { RelockReason } from './lifecycle';
 import { afterStartupFailure, afterStartupResult, type AppStatus } from './context';
 import { safeLog } from '../log/safelog';
+import { reqToPromise, withStores } from '../db/schema';
+import { dropSession } from '../keystore/session';
 
 /**
  * App-init orchestration for the profile subsystem. Pure + dependency-injected so the
@@ -19,19 +21,56 @@ import { safeLog } from '../log/safelog';
  */
 
 /** Minimal structural contract this module needs from the store. */
-type LoadableStore = { load: () => Promise<unknown> };
+type LoadableStore = {
+	load: () => Promise<unknown>;
+	startLocked?: (profileSaved: boolean) => void;
+};
 
 export type AppInitDeps<S extends LoadableStore> = {
 	checkSupport: () => Promise<CapabilityResult>;
 	openDb: () => Promise<IDBDatabase>;
 	bootstrap: (db: IDBDatabase) => Promise<unknown>;
 	createStore: (db: IDBDatabase) => S;
+	/** Reads the lock mode and the profile mark; absent, the start-up never looks and always reads (local mode). */
+	readKeyState?: typeof readKeyState;
 };
 
 export type AppInitResult<S extends LoadableStore> =
 	| { status: 'unsupported'; cause: CapabilityCause }
-	| { status: 'ready'; store: S; db: IDBDatabase }
+	| { status: 'ready'; store: S; db: IDBDatabase; keyMode?: 'pin' }
 	| { status: 'damaged'; db: IDBDatabase };
+
+/**
+ * The keystore row's mode and whether the profile mark says a profile was saved, read in plain: no key, no check. Neither
+ * is a secret. The mode decides whether to decrypt at all; the mark only decides which empty state a locked tab shows.
+ */
+export function readKeyState(db: IDBDatabase): Promise<{ mode: unknown; profileSaved: boolean }> {
+	return withStores(db, ['keystore', 'profile-hwm'], 'readonly', async (tx) => {
+		const [ks, mark] = await Promise.all([
+			reqToPromise<{ mode?: unknown } | undefined>(tx.objectStore('keystore').get(0)),
+			reqToPromise<{ payload?: { generation?: unknown } } | undefined>(
+				tx.objectStore('profile-hwm').get(0)
+			)
+		]);
+		const generation = mark?.payload?.generation;
+		return { mode: ks?.mode, profileSaved: typeof generation === 'number' && generation >= 1 };
+	});
+}
+
+/**
+ * Stands first in the relock list. Every relock but page hygiene forgets the keys; hygiene drops the decrypted data
+ * only, so a short switch away needs no PIN on the way back. `onForget` is the app saying so.
+ */
+export function createSessionRelockable(onForget: () => void): Relockable {
+	return {
+		relockSync: (reason) => {
+			if (reason === 'hygiene') return;
+			dropSession();
+			onForget();
+		},
+		refresh: () => Promise.resolve()
+	};
+}
 
 export async function initProfileApp<S extends LoadableStore>(
 	deps: AppInitDeps<S>
@@ -50,6 +89,12 @@ export async function initProfileApp<S extends LoadableStore>(
 	}
 
 	const store = deps.createStore(db);
+	// A PIN set and no key yet: reading would throw into the start-up banner and leave a tab that looks like a first run.
+	const state = await deps.readKeyState?.(db);
+	if (state?.mode === 'pin') {
+		store.startLocked?.(state.profileSaved);
+		return { status: 'ready', store, db, keyMode: 'pin' };
+	}
 	// Damaged saved data is named, with the open database, so the app can offer to erase it; every other failure
 	// rejects as before.
 	try {
@@ -121,10 +166,13 @@ export async function provisionStore<S extends LoadableStore & Pick<Relockable, 
 	db: IDBDatabase,
 	makeStore: (db: IDBDatabase) => S,
 	onCreated?: (store: S) => void,
-	isHidden?: () => boolean
+	isHidden?: () => boolean,
+	skipLoad = false
 ): Promise<S> {
 	const store = makeStore(db);
 	onCreated?.(store);
+	// A PIN-locked start-up has no key: the unlock loads the store later.
+	if (skipLoad) return store;
 	await store.load();
 	// load() decrypts whatever the store's state, so a read that ended after the page was hidden left plaintext in
 	// a hidden tab; the hide event it needed to answer came before it finished.
@@ -368,6 +416,10 @@ type ProfileLifecycleDeps = {
 	isHidden: () => boolean;
 	createIdleTimer: (opts: IdleTimerOptions) => IdleTimer;
 	idleThresholdMs: number;
+	/** The wall clock; injected so a test can move it. */
+	now?: () => number;
+	/** The monotonic clock; injected so a test can move it. */
+	perfNow?: () => number;
 };
 
 /**
@@ -389,15 +441,27 @@ export function installLifecycle(
 	relockables: Relockable[],
 	deps: ProfileLifecycleDeps
 ): () => void {
+	// Read at call time, not captured, so a faked global clock is honoured.
+	const now = deps.now ?? (() => Date.now());
+	const perfNow = deps.perfNow ?? (() => performance.now());
 	const idle = deps.createIdleTimer({
 		thresholdMs: deps.idleThresholdMs,
-		onIdle: () => relockAll(relockables, 'idle')
+		onIdle: () => relockAll(relockables, 'idle'),
+		now,
+		perfNow
 	});
+
+	// When the page last went away, on both clocks; kept from the first hide until a way back uses it, because
+	// pagehide, freeze and the visibility change all announce the same departure.
+	let hiddenAt: { wall: number; perf: number } | null = null;
 
 	// The page is going away, so its plaintext goes with it. That is hygiene, not a decision the
 	// user made, so it stays undoable - pagehide and freeze both land here and their order is not
 	// consistent across browsers, which the state ladder absorbs.
-	const onHide = (): void => relockEachSync(relockables, 'hygiene');
+	const onHide = (): void => {
+		hiddenAt ??= { wall: now(), perf: perfNow() };
+		relockEachSync(relockables, 'hygiene');
+	};
 	// The page came back. Ask every store to re-read; each answers from how its own plaintext went
 	// away, so an evicted store restores and a locked one stays shut. No policy belongs here.
 	const restore = (): void => {
@@ -412,22 +476,41 @@ export function installLifecycle(
 			}
 		}
 	};
-	// Two ways back in, deliberately routed through the same branch rather than paired by arrival
+	// Every way back lands here. A sleeping phone runs no timer, so the time away is read from the clocks, and a
+	// long one is dealt with BEFORE anything is read again. The longer of the two readings wins; a wall clock set
+	// back is a long absence, because nothing can then say how long it was.
+	const comeBack = (): void => {
+		const left = hiddenAt;
+		// A frozen page can be resumed while still hidden; that is not the person coming back, so the hide time stays
+		// for the way back that is.
+		if (!deps.isHidden()) hiddenAt = null;
+		const wallAway = left ? now() - left.wall : 0;
+		// Quiet time on screen before the hide counts too: the person was not there for it either.
+		const away = Math.max(wallAway, left ? perfNow() - left.perf : 0, idle.quietMs());
+		if (wallAway >= 0 && away < deps.idleThresholdMs) return restore();
+		// The stores are shut first, so the re-read finds them locked and leaves them shut: the idle lock the timer
+		// would have made had the phone let it run. With a PIN the keys go too; without one, Unlock reads the data back.
+		relockAll(relockables, 'idle');
+		restore();
+		// The old count is stale: its next touch would otherwise lock a person who has only just returned.
+		idle.start();
+	};
+	// Three ways back in, deliberately routed through the same branch rather than paired by arrival
 	// order: which of these fires, and in what sequence, is not consistent across browsers.
 	// `pageshow` is a restored navigation, so it must be the persisted kind to mean anything here.
 	const onShow = (e: Event): void => {
-		if ((e as PageTransitionEvent).persisted) restore();
+		if ((e as PageTransitionEvent).persisted) comeBack();
 	};
 	// `resume` is a frozen tab waking up - no navigation, no `persisted` flag, and on the browsers
 	// that freeze quiet background tabs it is the ONLY way back from the freeze that relocked us.
-	const onResume = (): void => restore();
+	const onResume = (): void => comeBack();
 	// The page becoming hidden is the one signal every browser fires, and on the platforms that
 	// suspend a backgrounded page it is the last moment code runs at all - so it is the last chance
 	// to get the plaintext out of the heap. It fires both ways and carries no flag to gate on, so
 	// becoming visible is simply the way back.
 	const onVisibility = (): void => {
 		if (deps.isHidden()) onHide();
-		else restore();
+		else comeBack();
 	};
 	const onActivity = (): void => idle.recordActivity();
 

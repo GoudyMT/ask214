@@ -1,7 +1,7 @@
 /**
  * MTC v1 IndexedDB schema + the thin promise/transaction layer that is the ONLY
- * place raw IndexedDB request/transaction plumbing lives. 11 stores
- * (journal + meta deferred to v1.1 with key rotation):
+ * place raw IndexedDB request/transaction plumbing lives. 12 stores
+ * (no journal: a key change moves every record in one transaction):
  *
  *   - profile             ciphertext, single self-row (id = 0)
  *   - profile-hwm         signed HWM sidecar, single row (id = 0)
@@ -17,6 +17,8 @@
  *   - skillbridge-finder-hwm  signed HWM sidecar for skillbridge-finder (id = 0)
  *   - skillbridge-finder-pack ciphertext, one row per downloaded data file; device only, no HWM
  *                         (the files are public and re-downloadable)
+ *   - app-lock            plain rows (the wrong-try row and the lock counter), keyed by name; device only,
+ *                         never in a backup
  *
  * Raw IndexedDB (no Dexie) honors the v2 audit "0 new prod deps" lock; the schema
  * is trivial (single-row stores and one keyed by file name, no indexes/queries) so a library adds no value.
@@ -28,7 +30,7 @@ export const DB_NAME = 'mtc';
 // signed bytes, a record's format): an older app then stops at the version, with Reload, instead of reading the
 // newer data as damaged and offering to erase it. An added optional key that an older codec ignores (profile
 // codec.ts: 'a key not listed is ignored') is not a format change and needs no raise.
-export const DB_VERSION = 7; // 6 -> 7 adds the SkillBridge finder stores; a tab on an older bundle retires (onversionchange -> 'stale')
+export const DB_VERSION = 8; // 7 -> 8 adds the app lock's plain store; a tab on an older bundle retires (onversionchange -> 'stale')
 export const STORES = [
 	'profile',
 	'profile-hwm',
@@ -40,7 +42,8 @@ export const STORES = [
 	'byok',
 	'skillbridge-finder',
 	'skillbridge-finder-hwm',
-	'skillbridge-finder-pack'
+	'skillbridge-finder-pack',
+	'app-lock'
 ] as const;
 export type StoreName = (typeof STORES)[number];
 

@@ -173,6 +173,14 @@ export default defineConfig(
 		}
 	},
 	{
+		// App code only: tests make extractable keys on purpose (fixtures, vectors). The rule has no tests-off override
+		// because the test files never get it.
+		files: ['src/**/*.{ts,js,svelte}'],
+		ignores: TEST_FILES,
+		plugins: { mtc },
+		rules: { 'mtc/no-extractable-keys': 'error' }
+	},
+	{
 		// Tests stage encrypted-store fixtures directly; the boundary rule guards
 		// production writes only.
 		files: ['**/*.test.ts', '**/*.browser.test.ts'],

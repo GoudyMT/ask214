@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import LockedPanel from '$lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
 	import SetupCTA from '$lib/components/SetupCTA.svelte';
 	import TimelineList from '$lib/components/TimelineList.svelte';
 	import PhaseChips from '$lib/components/PhaseChips.svelte';
@@ -36,8 +38,10 @@
 	const UNLOCK_FAILED = 'Could not unlock right now - please try again.';
 	let unlocking = $state(false);
 	let unlockError = $state<string | null>(null);
+	// A PIN tab with no keys is locked whatever the store reads: with nothing saved a store reads unlocked after a Lock.
 	const lockedView = $derived(
-		app.store?.locked ||
+		app.pinLocked === true ||
+			app.store?.locked ||
 			(app.timeline?.locked && !app.timeline.failed && app.store?.persona.completeness !== 'none')
 	);
 	// A failure line belongs to the lock it failed on, so it goes whenever the locked panel comes or goes: the profile can
@@ -47,10 +51,31 @@
 		unlockError = null;
 	});
 	let headingEl: HTMLElement | undefined;
+	let pinNotice = $state<string[]>([]);
+	let noticeUp = $state(false);
+	// A lock ends the visit the notice was about, so it goes: the same tries after the next unlock arrive as a new line.
+	$effect(() => {
+		if (app.pinLocked === true) {
+			noticeUp = true;
+			pinNotice = [];
+		}
+	});
+
+	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not
+	// carry it.
+	function eraseAtSettings(): void {
+		void import('$lib/components/load-backup').then(({ backupSession }) => {
+			backupSession.requestErase();
+			return goto(resolve('/settings'));
+		});
+	}
 
 	// A restore reloads onto this page with a note in the history entry. It is taken here, once, as the page starts: the
 	// take removes it, so a second visit or a reload says nothing, and a later re-render cannot say it twice.
 	const restored = takeBackupIntent('restored');
+	// A restore onto a device that was locked behind a forgotten PIN: the data is back, the PIN is off, and the API key
+	// (which no backup carries, and which was sealed under keys nobody could open) is to be added again.
+	const restoredPinOff = takeBackupIntent('restored-pin-off');
 	const restoredAt = $derived(app.store?.lastBackupAt ?? null);
 	// Whether this device holds no API key (a backup never carries it). Unknown until read; the line waits for the answer
 	// so it appears once, whole.
@@ -198,7 +223,11 @@
 		} finally {
 			unlocking = false;
 		}
-		// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+		await focusHeading();
+	}
+
+	// The panel with the pressed button is gone; focus goes to the page heading, unless the person already moved it.
+	async function focusHeading(): Promise<void> {
 		await tick();
 		if (document.activeElement === document.body) headingEl?.focus();
 	}
@@ -282,7 +311,7 @@
 </script>
 
 <svelte:head>
-	<title>Timeline</title>
+	<title>Timeline - Ask 214</title>
 </svelte:head>
 
 <!-- A browser's page translation sends this screen's text to a translation service, and its dates reveal the
@@ -290,11 +319,32 @@
 <div translate="no">
 	<h1 bind:this={headingEl} tabindex="-1">Timeline</h1>
 
+	<!-- What a good PIN said about the tries before it, where the Unlock card stood. It is on the page from the moment the
+	     card is, so a screen reader is already listening when its lines arrive; the next unlock replaces it. -->
+	{#if noticeUp}
+		<div class="timeline-notice" role="status">
+			{#each pinNotice as line (line)}<p>{line}</p>{/each}
+		</div>
+	{/if}
+
 	{#if app.status === 'ready'}
 		<!-- The timeline can stay locked after the profile opens (a page hidden while Unlock read it); Unlock reads it again.
 	     Unless its load failed: then the note below says so, since Unlock would only fail again. And only with something
 	     saved: a first run has nothing to unlock, so it keeps the setup. -->
-		{#if lockedView}
+		{#if app.pinLocked === true}
+			<!-- The card and its crypto load on demand; a card that cannot be fetched says so and offers a reload. -->
+			{#await loadPinUnlock() then card}
+				<card.default
+					onunlocked={(notice) => {
+						pinNotice = notice;
+						void focusHeading();
+					}}
+					onerase={eraseAtSettings}
+				/>
+			{:catch}
+				<LockedPanel onunlock={() => location.reload()} error={UNLOCK_FAILED} />
+			{/await}
+		{:else if lockedView}
 			<LockedPanel onunlock={() => void unlock()} busy={unlocking} error={unlockError} />
 		{:else if app.store?.persona.completeness === 'none'}
 			<SetupCTA />
@@ -303,7 +353,12 @@
 				Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 			</p>
 			<LeavingLine {leaving} />
-			{#if restoredAt !== null && apiKeyMissing !== null}
+			{#if restoredPinOff}
+				<div class="timeline-restored" role="status">
+					<p>Your data is back. Your PIN is off. Turn it on again in Settings.</p>
+					<p>Add your API key again.</p>
+				</div>
+			{:else if restoredAt !== null && apiKeyMissing !== null}
 				<div class="timeline-restored" role="status">
 					<p>{restoredLine(formatBackupDate(restoredAt))}</p>
 					<p>{notInBackupsLine(apiKeyMissing)}</p>
@@ -380,6 +435,21 @@
 	.timeline-subline {
 		margin: 0 0 var(--space-xs);
 		color: var(--color-fg-muted);
+	}
+
+	/* What a good PIN said about the tries before it: hint text, and no space when there is nothing to say. */
+	.timeline-notice {
+		margin: 0 0 var(--space-xs);
+		color: var(--color-fg-muted);
+		font-size: var(--font-size-s);
+	}
+
+	.timeline-notice:empty {
+		margin: 0;
+	}
+
+	.timeline-notice p {
+		margin: 0;
 	}
 
 	/* The one line a restore adds, under the subline. */

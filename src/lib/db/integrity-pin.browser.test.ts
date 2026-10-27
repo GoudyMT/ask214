@@ -183,7 +183,7 @@ describe('integrity pin: rows an earlier build wrote are read by the real load p
 	});
 
 	// The version is what keeps an older app from reading these bytes as damaged once they change.
-	it('is still database version 7', () => {
-		expect(DB_VERSION).toBe(7);
+	it('is still database version 8', () => {
+		expect(DB_VERSION).toBe(8);
 	});
 });

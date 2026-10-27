@@ -92,17 +92,12 @@ const linkTexts = (nav: Element) =>
 
 describe('the root layout navigation', () => {
 	// A screen reader lists landmarks: two shown "Primary" menus would read as the same menu twice.
-	it('shows the top menu and no bar at 1280 px, with SkillBridge among the links', async () => {
+	it('shows the top menu and no bar at 1280 px, with no SkillBridge link until the finder ships', async () => {
 		await openAt(1280, 800);
 		const [only, ...others] = primaryNavs();
 		expect(others).toHaveLength(0);
 		expect(only?.closest('header')).not.toBeNull();
-		expect(linkTexts(only as Element)).toEqual([
-			'Timeline',
-			'SkillBridge',
-			'Resources',
-			'Settings'
-		]);
+		expect(linkTexts(only as Element)).toEqual(['Timeline', 'Resources', 'Settings']);
 		const brand = document.querySelector('header a.brand') as HTMLAnchorElement;
 		expect(brand.textContent?.trim()).toBe('Ask 214');
 		expect(brand.closest('nav')).toBeNull();
@@ -113,7 +108,7 @@ describe('the root layout navigation', () => {
 		const [only, ...others] = primaryNavs();
 		expect(others).toHaveLength(0);
 		expect(only?.closest('header')).toBeNull();
-		expect(linkTexts(only as Element)).toEqual(['Home', 'Timeline', 'SkillBridge', 'More']);
+		expect(linkTexts(only as Element)).toEqual(['Home', 'Timeline', 'More']);
 		expect(getComputedStyle(document.querySelector('header a.brand') as Element).display).not.toBe(
 			'none'
 		);
@@ -312,7 +307,7 @@ describe('the root layout navigation', () => {
 		}
 	});
 
-	// From 600 px the header carries the menu: at 200 % text the brand and the four links no longer fit one line, so the
+	// From 600 px the header carries the menu: at 200 % text the brand and the links no longer fit one line, so the
 	// row must wrap instead of pushing the page sideways.
 	it('does not scroll sideways at 600 px with text at 200 %', async () => {
 		const root = document.documentElement;

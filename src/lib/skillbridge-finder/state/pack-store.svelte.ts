@@ -24,9 +24,9 @@ import { decodeSeen, encodeSeen, FinderPackError, type FinderSeenRow } from './p
 import { isRollback, nextLastSeen } from './new-rule';
 import { encryptRecord, decryptRecord } from '../../crypto/record-crypto';
 import { AesGcmAuthError } from '../../crypto/aes-gcm';
-import type { KeystoreRecordV1 } from '../../keystore/record';
+import { keyIdentity, type KeystoreKeys } from '../../keystore/record';
+import { readKeystoreRow, type KeystoreRow } from '../../keystore/read';
 import { nextLockState, type LockState, type RelockReason } from '../../profile/lifecycle';
-import { readKeystoreRow } from '../../profile/store.svelte';
 import { LOCK_TIMEOUT_MS, LockAcquisitionTimeout } from '../../db/locks';
 import { withStores, reqToPromise } from '../../db/schema';
 import { safeLog } from '../../log/safelog';
@@ -59,7 +59,7 @@ const GENERATION = 0;
  * a week further ahead than a clock that is a little off is a pipeline typo or a hostile deploy; held, it would make
  * every real week after it look like a rollback.
  */
-const MAX_FUTURE_DAYS = 7;
+export const MAX_FUTURE_DAYS = 7;
 const MS_PER_DAY = 86_400_000;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -120,8 +120,11 @@ function recordIdOf(key: RowKey, pull: string | undefined): string {
 	return `${key}@${pull}`;
 }
 
+/** A verified keystore row with the keys this tab may use with it. */
+type Verified = { row: KeystoreRow; keys: KeystoreKeys };
+
 async function sealBytes(
-	keystore: KeystoreRecordV1,
+	keystore: Verified,
 	recordId: string,
 	bytes: Uint8Array
 ): Promise<Uint8Array> {
@@ -129,7 +132,8 @@ async function sealBytes(
 		return await encryptRecord(
 			{ storeName: PACK_STORE, recordId, schemaVersion: 1 },
 			bytes,
-			keystore,
+			keyIdentity(keystore.row),
+			keystore.keys.dataKey,
 			GENERATION
 		);
 	} finally {
@@ -140,7 +144,7 @@ async function sealBytes(
 
 /** Decrypts one row; a blob that fails its check (wrong key, wrong week, damaged) is a bad row, never data. */
 async function openBytes(
-	keystore: KeystoreRecordV1,
+	keystore: Verified,
 	recordId: string,
 	rec: Uint8Array
 ): Promise<Uint8Array> {
@@ -148,7 +152,8 @@ async function openBytes(
 		return await decryptRecord(
 			{ storeName: PACK_STORE, recordId, schemaVersion: 1 },
 			rec,
-			keystore,
+			keyIdentity(keystore.row),
+			keystore.keys.dataKey,
 			GENERATION
 		);
 	} catch (e) {
@@ -259,7 +264,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 	}
 
 	async function sealFile(
-		keystore: KeystoreRecordV1,
+		keystore: Verified,
 		key: RowKey,
 		pull: string | undefined,
 		value: unknown
@@ -274,7 +279,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 
 	/** Decrypts and re-validates a file row: it must pass the contract, name its own key and belong to `pull`. */
 	async function openFile(
-		keystore: KeystoreRecordV1,
+		keystore: Verified,
 		key: RowKey,
 		pull: string | undefined,
 		rec: Uint8Array
@@ -292,7 +297,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 		return value;
 	}
 
-	async function openSeen(keystore: KeystoreRecordV1, rec: Uint8Array): Promise<FinderSeenRow> {
+	async function openSeen(keystore: Verified, rec: Uint8Array): Promise<FinderSeenRow> {
 		const bytes = await openBytes(keystore, 'seen', rec);
 		try {
 			return decodeSeen(bytes);
@@ -301,7 +306,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 		}
 	}
 
-	async function readStoredIndex(keystore: KeystoreRecordV1): Promise<IndexFile | undefined> {
+	async function readStoredIndex(keystore: Verified): Promise<IndexFile | undefined> {
 		const row = await getRow(db, 'index');
 		return row ? ((await openFile(keystore, 'index', undefined, row.rec)) as IndexFile) : undefined;
 	}
@@ -311,7 +316,7 @@ export function createFinderPackStore(db: IDBDatabase, now: () => number = Date.
 	 * then means this tab is behind a peer's swap (or a peer's drop), not that the row is damaged. Only the index row is
 	 * read; if that one does not read either, the row is judged on its own and nothing is claimed about the week.
 	 */
-	async function weekMovedOnDisk(keystore: KeystoreRecordV1, pull: string): Promise<boolean> {
+	async function weekMovedOnDisk(keystore: Verified, pull: string): Promise<boolean> {
 		try {
 			const onDisk = await readStoredIndex(keystore);
 			return onDisk?.pullDate !== pull;

@@ -1,4 +1,4 @@
-import { computeRecordHmac, type KeystoreRecordV1 } from './record';
+import { signKeystore, type KeystoreRecordV1 } from './record';
 import { signSidecar } from '../profile/sidecars';
 import { withStores, reqToPromise } from '../db/schema';
 
@@ -41,7 +41,11 @@ export async function bootstrapLocalKeystore(
 		dataKeyRef: dataKey,
 		hmacKeyRef: hmacKey
 	};
-	const recordHmac = await computeRecordHmac(recordWithoutHmac, hmacKey);
+	const recordHmac = await signKeystore(recordWithoutHmac, {
+		dataKey,
+		hmacKey,
+		bootstrapMacKey: hmacKey
+	});
 	const record: KeystoreRecordV1 = { ...recordWithoutHmac, recordHmac };
 
 	const initialHwm = await signSidecar(

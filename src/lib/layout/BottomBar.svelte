@@ -7,7 +7,7 @@
 	// reaches it. More is three filled dots, so its path is filled as well as stroked. A tab is named by its route:
 	// tabForPath says which tab a route belongs to.
 	const TABS: {
-		route: '/' | '/timeline' | '/skillbridge' | '/more';
+		route: '/' | '/timeline' | '/more';
 		label: string;
 		d: string;
 	}[] = [
@@ -16,11 +16,6 @@
 			route: '/timeline',
 			label: 'Timeline',
 			d: 'M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM3 10h18M8 3v4M16 3v4'
-		},
-		{
-			route: '/skillbridge',
-			label: 'SkillBridge',
-			d: 'M2 14h20M4 14a8 6 0 0 1 16 0M8 8.8V14M12 8v6M16 8.8V14M6 14v6M18 14v6'
 		},
 		{
 			route: '/more',
@@ -93,7 +88,7 @@
 		padding: 0;
 		display: grid;
 		/* minmax(0, ...) lets a column be narrower than its label, which then wraps (below) instead of widening the bar. */
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 
 	a {

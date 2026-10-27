@@ -8,12 +8,9 @@ import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { readDeviceState, type DeviceState } from '../profile/device-state';
-import {
-	createProfileStore,
-	OccConflictError,
-	readKeystoreRow,
-	type ProfileStore
-} from '../profile/store.svelte';
+import type { readLockedDevice, restoreLockedDevice } from '../keystore/forgot-restore';
+import { KeystoreNotInitializedError, readKeystoreRow } from '../keystore/read';
+import { createProfileStore, OccConflictError, type ProfileStore } from '../profile/store.svelte';
 import { cleanListing } from '../skillbridge-finder/fixtures/clean';
 import { createFinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
 import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
@@ -294,6 +291,7 @@ type RigOptions = {
 	worker?: () => WorkerLike;
 	timelinePath?: () => string;
 	visible?: boolean;
+	lockedDevice?: NonNullable<FlowDeps['lockedDevice']>;
 };
 
 type Rig = {
@@ -353,6 +351,7 @@ function makeRig(o: RigOptions): Rig {
 		waitForControl: o.wait ?? (() => Promise.resolve(true)),
 		...(o.readDevice && { readDevice: o.readDevice }),
 		...(o.timelinePath && { timelinePath: o.timelinePath }),
+		...(o.lockedDevice && { lockedDevice: o.lockedDevice }),
 		reload,
 		replace,
 		isVisible: () => visible.value,
@@ -408,7 +407,7 @@ function restoreRig(
 }
 
 async function realRead(db: IDBDatabase): Promise<{ state: DeviceState; installUuid: Uint8Array }> {
-	const keystore = await readKeystoreRow(db);
+	const { row: keystore } = await readKeystoreRow(db);
 	return { state: await readDeviceState(db), installUuid: new Uint8Array(keystore.installUuid) };
 }
 
@@ -1381,5 +1380,168 @@ describe('Check', () => {
 		await r.flow.submit(PHRASE);
 		expect(r.session.phase).toBe('done');
 		expect(r.flow.view.checked?.line).toContain('This backup opens');
+	});
+});
+
+// ---- a device locked behind a forgotten PIN ------------------------------------------------------------------------------
+
+/** A key worker whose derive runs out of memory, as the real one reports it. */
+class NoMemoryWorker implements WorkerLike {
+	onmessage: ((event: { data: unknown }) => void) | null = null;
+	onerror: ((event: unknown) => void) | null = null;
+	onmessageerror: ((event: unknown) => void) | null = null;
+	postMessage(): void {
+		setTimeout(() => this.onmessage?.({ data: { type: 'error', code: 'E_NO_MEMORY' } }), 0);
+	}
+	terminate(): void {}
+}
+
+describe('a restore onto a device locked behind a forgotten PIN', () => {
+	const GENS = { profile: 3, timeline: 2, calendar: 2, finder: 1 };
+	const AFTER = { profile: 4, timeline: 3, calendar: 3, finder: 2 };
+	const INSTALL = new Uint8Array(16).fill(7);
+	const CONFIRM_LINE = 'This replaces everything on this device with the backup.';
+
+	/** The two seams of the locked path, as stubs that record their calls; the real pair is tested on a real database. */
+	function stubs(over: { gens?: typeof GENS } = {}) {
+		const read = vi.fn<typeof readLockedDevice>(async () => ({
+			gens: over.gens ?? GENS,
+			installUuid: INSTALL,
+			lastTs: 123
+		}));
+		// As the real writer does at its point of no return: the session is told the write has begun.
+		const write = vi.fn<typeof restoreLockedDevice>(async (_db, _inner, _expected, options) => {
+			options.onCommitting();
+			return { ok: true, gens: AFTER };
+		});
+		return { read, write, deps: { read, write } };
+	}
+
+	async function lockedRig(over: Partial<RigOptions> = {}) {
+		const s = stubs();
+		// A device with its own local keystore and no saved profile: the shipped path would call it damaged, so only the
+		// locked path's own read can give the answers below.
+		const { db } = await newPhone();
+		const r = makeRig({ db, lockedDevice: s.deps, ...over });
+		return { ...s, db, r };
+	}
+
+	// The file opens first: a wrong word or a phone that runs out of memory is said before the device is looked at.
+	it.each<[string, string, () => WorkerLike, string]>([
+		['wrong words', OTHER_WORDS.join(' '), () => new HandlerWorker(), 'E_WRONG_PASSPHRASE'],
+		['a derive that runs out of memory', PHRASE, () => new NoMemoryWorker(), 'E_NO_MEMORY']
+	])('%s: the device is not read and nothing is written', async (_name, words, worker, code) => {
+		const { r, read, write } = await lockedRig({ worker });
+		await toFileChosen(r, backupFile());
+
+		await r.flow.submit(words);
+
+		expect(r.session.message).toBe(code);
+		expect(r.session.phase).toBe('file-chosen');
+		expect(read).not.toHaveBeenCalled();
+		expect(write).not.toHaveBeenCalled();
+		expect(restoreBackup).not.toHaveBeenCalled();
+		expect(r.published).toEqual([]);
+	});
+
+	it('builds the confirm from the one key-less read, with the line for a replaced device and no warning', async () => {
+		const { r, read, db } = await lockedRig();
+
+		await toConfirm(r, backupFile());
+
+		expect(read).toHaveBeenCalledTimes(1);
+		expect(read).toHaveBeenCalledWith(db);
+		const confirm = need(r.flow.confirm);
+		expect(confirm).toMatchObject({
+			deviceLine: CONFIRM_LINE,
+			warning: false,
+			notice: null,
+			gens: GENS
+		});
+		expect(hex(confirm.installUuid)).toBe(hex(INSTALL));
+	});
+
+	it('a device that is no longer behind a PIN stops at the file step and says the device changed', async () => {
+		const { r, read, write } = await lockedRig();
+		read.mockRejectedValue(new KeystoreNotInitializedError());
+
+		await toConfirm(r, backupFile());
+
+		expect(r.session.message).toBe('E_RESTORE_DEVICE_CHANGED');
+		expect(r.session.phase).toBe('file-chosen');
+		expect(write).not.toHaveBeenCalled();
+	});
+
+	it('Replace opens and checks the file again, then hands the locked writer what the read showed', async () => {
+		const { r, write, db } = await lockedRig();
+		await toConfirm(r, backupFile());
+
+		await r.flow.replace();
+
+		expect(decryptEnvelope).toHaveBeenCalledTimes(2);
+		expect(write).toHaveBeenCalledTimes(1);
+		expect(restoreBackup).not.toHaveBeenCalled();
+		const [writtenDb, inner, expected, options] = need(write.mock.calls[0]);
+		const checkedAgain = vi.mocked(validateInner).mock.results[1]?.value as {
+			ok: true;
+			inner: unknown;
+		};
+		expect(writtenDb).toBe(db);
+		expect(inner).toBe(checkedAgain.inner);
+		expect(expected).toEqual({ gens: GENS, installUuid: INSTALL });
+		expect(options.signal).toBeInstanceOf(AbortSignal);
+		expect(options.onCommitting).toBe(r.session.markCommitting);
+		expect(options.mayCommit()).toBe(true);
+	});
+
+	it('tells the other tabs the keys changed before it says the data was replaced, then reloads onto the Timeline', async () => {
+		const { r } = await lockedRig();
+		await toConfirm(r, backupFile());
+
+		await r.flow.replace();
+
+		expect(r.session.phase).toBe('committed');
+		expect(r.published).toEqual([{ type: 'keys-changed' }, { type: 'data-replaced' }]);
+		expect(r.reload).toHaveBeenCalledTimes(1);
+		expect(new URL(location.href).pathname).toBe(resolve('/timeline'));
+		// The reload is stood in for by the app's start-up reading the entry. The Timeline says the PIN is off, not the
+		// ordinary restored line.
+		captureBackupIntent();
+		expect(takeBackupIntent('restored')).toBe(false);
+		expect(takeBackupIntent('restored-pin-off')).toBe(true);
+	});
+
+	it('goes to the Timeline even when a lock lands during the write: there is no PIN left to unlock', async () => {
+		const { r } = await lockedRig();
+		await toConfirm(r, backupFile());
+		duringCommit(r, () => r.session.relockSync('user'));
+
+		await r.flow.replace();
+
+		expect(r.reload).toHaveBeenCalledTimes(1);
+		expect(r.app.reloadOnUnlock).toBe(false);
+		expect(r.flow.view.restored).toEqual({ line: null, reloadButton: false });
+		captureBackupIntent();
+		expect(takeBackupIntent('restored-pin-off')).toBe(true);
+	});
+
+	it('a device that moved meanwhile is read again from the same seam, and Replace then writes what it showed', async () => {
+		const { r, read, write } = await lockedRig();
+		await toConfirm(r, backupFile());
+		write.mockResolvedValueOnce({ ok: false, code: 'E_RESTORE_DEVICE_MOVED' });
+		read.mockResolvedValueOnce({ gens: AFTER, installUuid: INSTALL, lastTs: 456 });
+
+		await r.flow.replace();
+
+		expect(r.session.phase).toBe('confirm');
+		expect(read).toHaveBeenCalledTimes(2);
+		expect(need(r.flow.confirm)).toMatchObject({ gens: AFTER, notice: 'E_RESTORE_DEVICE_MOVED' });
+		expect(r.published).toEqual([]);
+
+		await r.flow.replace();
+
+		expect(write).toHaveBeenCalledTimes(2);
+		expect(write.mock.calls[1]?.[2]).toEqual({ gens: AFTER, installUuid: INSTALL });
+		expect(r.session.phase).toBe('committed');
 	});
 });

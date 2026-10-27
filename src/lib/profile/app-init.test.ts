@@ -21,7 +21,7 @@ import { KeystoreHmacMismatchError } from './store.svelte';
 import { LockAcquisitionTimeout } from '../db/locks';
 import { getDiagnosticsForTest } from '../log/safelog';
 import type { AppStatus } from './context';
-import type { IdleTimer } from './idle-timer';
+import { createIdleTimer, type IdleTimer } from './idle-timer';
 import type { BusSignal, ProfileBus } from '../broadcast/bus';
 
 const fakeDb = {} as IDBDatabase;
@@ -95,7 +95,12 @@ describe('relockAll', () => {
 });
 
 describe('walking the relock list', () => {
-	const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+	const timer: IdleTimer = {
+		start: vi.fn(),
+		stop: vi.fn(),
+		recordActivity: vi.fn(),
+		quietMs: () => 0
+	};
 	const fake = () => ({ relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) });
 	const throwing = () => ({
 		relockSync: vi.fn(() => {
@@ -495,7 +500,12 @@ describe('provisionStore', () => {
 });
 
 describe('installLifecycle when the page is already hidden', () => {
-	const timer: IdleTimer = { start: vi.fn(), stop: vi.fn(), recordActivity: vi.fn() };
+	const timer: IdleTimer = {
+		start: vi.fn(),
+		stop: vi.fn(),
+		recordActivity: vi.fn(),
+		quietMs: () => 0
+	};
 	function install(hidden: boolean) {
 		const a = { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
 		const b = { relockSync: vi.fn(), refresh: vi.fn().mockResolvedValue(null) };
@@ -522,6 +532,221 @@ describe('installLifecycle when the page is already hidden', () => {
 			expect(s.relockSync).not.toHaveBeenCalled();
 			expect(s.refresh).not.toHaveBeenCalled();
 		}
+	});
+});
+
+// A phone that sleeps runs no timer, so the way back is the only moment the app can notice how long it was gone. These
+// tests move injected clocks and never advance a timer, which is exactly that sleep.
+describe('installLifecycle, coming back after time away', () => {
+	const MINUTE = 60_000;
+	const THRESHOLD = IDLE_THRESHOLD_MS;
+	type WayName = 'a persisted pageshow' | 'resume' | 'becoming visible';
+
+	function setup(opts: { hiddenAtStart?: boolean; realTimer?: boolean } = {}) {
+		const clock = { wall: 1_700_000_000_000, perf: 50_000 };
+		const order: string[] = [];
+		const store = {
+			relockSync: vi.fn((reason: string) => void order.push('relockSync ' + reason)),
+			refresh: vi.fn(() => {
+				order.push('refresh');
+				return Promise.resolve(null);
+			}),
+			lock: vi.fn((reason: string) => {
+				order.push('lock ' + reason);
+				return Promise.resolve();
+			})
+		};
+		const timer: IdleTimer = {
+			start: vi.fn(() => void order.push('timer start')),
+			stop: vi.fn(),
+			recordActivity: vi.fn(),
+			quietMs: () => 0
+		};
+		const win = new EventTarget();
+		const doc = new EventTarget();
+		let hidden = opts.hiddenAtStart ?? false;
+		const off = installLifecycle([store], {
+			win,
+			doc,
+			isHidden: () => hidden,
+			createIdleTimer: opts.realTimer ? createIdleTimer : () => timer,
+			idleThresholdMs: THRESHOLD,
+			now: () => clock.wall,
+			perfNow: () => clock.perf
+		});
+		const pageshow = () => {
+			const e = new Event('pageshow');
+			Object.defineProperty(e, 'persisted', { value: true });
+			win.dispatchEvent(e);
+		};
+		const ways: Record<WayName, { hide: () => void; back: () => void }> = {
+			'a persisted pageshow': {
+				hide: () => win.dispatchEvent(new Event('pagehide')),
+				back: pageshow
+			},
+			resume: {
+				hide: () => doc.dispatchEvent(new Event('freeze')),
+				back: () => doc.dispatchEvent(new Event('resume'))
+			},
+			'becoming visible': {
+				hide: () => {
+					hidden = true;
+					doc.dispatchEvent(new Event('visibilitychange'));
+				},
+				back: () => {
+					hidden = false;
+					doc.dispatchEvent(new Event('visibilitychange'));
+				}
+			}
+		};
+		return {
+			clock,
+			order,
+			store,
+			timer,
+			win,
+			doc,
+			ways,
+			off,
+			away: (wallMs: number, perfMs: number = wallMs) => {
+				clock.wall += wallMs;
+				clock.perf += perfMs;
+			}
+		};
+	}
+	const WAY_NAMES: WayName[] = ['a persisted pageshow', 'resume', 'becoming visible'];
+
+	// With a PIN or without one: a long absence is shut before anything is read again.
+	describe.each(WAY_NAMES)('%s', (name) => {
+		it('relocks as idle before any re-read after 16 minutes away', () => {
+			const t = setup();
+			const way = t.ways[name];
+			way.hide();
+			t.order.length = 0;
+			t.away(16 * MINUTE);
+			way.back();
+			expect(t.order).toEqual(['lock idle', 'refresh', 'timer start']);
+		});
+
+		it('only re-reads after 14 minutes away', () => {
+			const t = setup();
+			const way = t.ways[name];
+			way.hide();
+			t.order.length = 0;
+			t.away(14 * MINUTE);
+			way.back();
+			expect(t.order).toEqual(['refresh']);
+		});
+	});
+
+	// Phone clocks are set by hand and by the network; either clock alone can be wrong, so the longer reading wins.
+	it.each([
+		['the wall clock moved back an hour', -60 * MINUTE, 1 * MINUTE, true],
+		['only the monotonic clock passed the threshold', 1 * MINUTE, 16 * MINUTE, true],
+		['only the wall clock passed the threshold', 16 * MINUTE, 1 * MINUTE, true],
+		['exactly the threshold passed', THRESHOLD, THRESHOLD, true],
+		['one millisecond under the threshold passed', THRESHOLD - 1, THRESHOLD - 1, false]
+	])('%s', (_name, wallMs, perfMs, relocks) => {
+		const t = setup();
+		t.ways['resume'].hide();
+		t.order.length = 0;
+		t.away(wallMs, perfMs);
+		t.ways['resume'].back();
+		expect(t.order.includes('lock idle')).toBe(relocks);
+		expect(t.store.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	// pagehide and the visibility change both announce one departure; the time away runs from the first.
+	it('counts the time away from the first hide, not from a later one', () => {
+		const t = setup();
+		t.ways['a persisted pageshow'].hide();
+		t.away(10 * MINUTE);
+		t.ways['becoming visible'].hide();
+		t.away(6 * MINUTE);
+		t.ways['resume'].back();
+		expect(t.store.lock).toHaveBeenCalledExactlyOnceWith('idle');
+	});
+
+	it('counts a page that started hidden from the start', () => {
+		const t = setup({ hiddenAtStart: true });
+		t.away(16 * MINUTE);
+		t.ways['becoming visible'].back();
+		expect(t.store.lock).toHaveBeenCalledExactlyOnceWith('idle');
+	});
+
+	it('treats a way back with no hide as no time away', () => {
+		const t = setup();
+		t.away(60 * MINUTE);
+		t.ways['resume'].back();
+		expect(t.store.lock).not.toHaveBeenCalled();
+		expect(t.store.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	// pageshow, resume and visible often arrive together; the first one is the way back, the rest find the store shut.
+	it('relocks once when all three ways back arrive for one absence', () => {
+		const t = setup();
+		t.ways['a persisted pageshow'].hide();
+		t.ways['resume'].hide();
+		t.away(16 * MINUTE);
+		t.ways['a persisted pageshow'].back();
+		t.ways['resume'].back();
+		t.ways['becoming visible'].back();
+		expect(t.store.lock).toHaveBeenCalledOnce();
+	});
+
+	describe('with the real idle timer', () => {
+		beforeEach(() => vi.useFakeTimers());
+		afterEach(() => vi.useRealTimers());
+
+		// Time on screen with no touch is time away from the person too: 14 quiet minutes and 5 hidden ones are past the
+		// threshold, and the lock must come before the re-read.
+		it('counts quiet time before the hide: 14 minutes quiet, then 5 hidden, locks before any re-read', () => {
+			const t = setup({ realTimer: true });
+			t.away(14 * MINUTE);
+			t.ways['becoming visible'].hide();
+			t.order.length = 0;
+			t.away(5 * MINUTE);
+			t.ways['becoming visible'].back();
+			expect(t.order).toEqual(['lock idle', 'refresh']);
+			t.off();
+		});
+
+		// The long absence already locked once; the overdue count must not lock again on the touch that comes next.
+		it('the first touch after a long absence does not fire a second, stale idle lock', () => {
+			const t = setup({ realTimer: true });
+			t.ways['becoming visible'].hide();
+			t.away(16 * MINUTE);
+			t.ways['becoming visible'].back();
+			t.win.dispatchEvent(new Event('pointerdown'));
+			expect(t.store.lock).toHaveBeenCalledExactlyOnceWith('idle');
+			t.off();
+		});
+
+		it('a touch before the hide starts the count again', () => {
+			const t = setup({ realTimer: true });
+			t.away(14 * MINUTE);
+			t.win.dispatchEvent(new Event('pointerdown'));
+			t.ways['becoming visible'].hide();
+			t.order.length = 0;
+			t.away(5 * MINUTE);
+			t.ways['becoming visible'].back();
+			expect(t.order).toEqual(['refresh']);
+			t.off();
+		});
+	});
+
+	// A frozen page can be resumed while still hidden. That is not the person coming back, so the hide time must
+	// survive it for the way back that is.
+	it('keeps the hide time through a resume that arrives while the page is still hidden', () => {
+		const t = setup();
+		t.ways['becoming visible'].hide();
+		t.doc.dispatchEvent(new Event('freeze'));
+		t.away(1 * MINUTE);
+		t.doc.dispatchEvent(new Event('resume'));
+		t.order.length = 0;
+		t.away(60 * MINUTE);
+		t.ways['becoming visible'].back();
+		expect(t.order).toEqual(['lock idle', 'refresh', 'timer start']);
 	});
 });
 

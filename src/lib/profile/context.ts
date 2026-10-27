@@ -82,6 +82,28 @@ export type ProfileApp = {
 	 * Reload line. False until then.
 	 */
 	replacedNotice: boolean;
+	/** The keystore row's mode, read at start-up and again after a key-change signal. Absent reads as `local`. */
+	keyMode?: 'local' | 'pin';
+	/**
+	 * True while the keystore is in PIN mode and this tab holds no session. The routes show the PIN Unlock card then;
+	 * the unlock sets a session and calls `unlockStores`.
+	 */
+	pinLocked?: boolean;
+	/**
+	 * After the caller has set a session: loads every store (profile, timeline, calendar) as a user unlock does, then
+	 * clears `pinLocked`. The profile must load: if it cannot, every key and every plaintext is dropped and the call
+	 * rejects, so a retry is a fresh unlock; a timeline or calendar that cannot be read never blocks. Absent until app-init
+	 * resolves ready.
+	 */
+	unlockStores?: (() => Promise<void>) | null;
+	/**
+	 * Opens the damaged screen from a ready tab: drops the plaintext, sets the status to `damaged`, and makes the erase
+	 * check first, through `check`, that the data is still damaged. The erase relocks before it checks, so `check` holds no
+	 * key, session or counter: it compares the stored bytes with the ones that failed (`checkStoredBytes`) and rejects only
+	 * while they are unchanged; any change means another tab wrote, and nothing is erased. Absent until app-init resolves
+	 * ready.
+	 */
+	enterDamaged?: (check: () => Promise<unknown>) => void;
 };
 
 const KEY = Symbol('mtc-profile-app');

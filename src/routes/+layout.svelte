@@ -16,6 +16,8 @@
 		installLifecycle,
 		createJoinRelock,
 		createRelockEcho,
+		createSessionRelockable,
+		readKeyState,
 		relockAll,
 		relockEachSync,
 		reloadOnSignalWhenShown,
@@ -27,7 +29,16 @@
 	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline/state.svelte';
 	import { createCalendarSyncStore, type CalendarSyncStore } from '$lib/calendar/store.svelte';
 	import { createByokStore } from '$lib/ask/byok/store';
-	import { createProfileBus } from '$lib/broadcast/bus';
+	import { createProfileBus, type BusSignal } from '$lib/broadcast/bus';
+	import { bumpCounter } from '$lib/keystore/app-lock-store';
+	import { dropSession, getSession, setOnSessionMismatch } from '$lib/keystore/session';
+	import {
+		checkStoredBytes,
+		keystoreHasIdentity,
+		readStoredBytes,
+		sameRecords,
+		type StoredBytes
+	} from '$lib/profile/damaged-bytes';
 	import { createIdleTimer } from '$lib/profile/idle-timer';
 	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
 	import { checkBrowserSupport } from '$lib/crypto/capability';
@@ -35,7 +46,7 @@
 	import { startReload, stopReloadForLock } from '$lib/profile/pending-reload';
 	import { markRaised, takeOverIfRaised } from '$lib/sw/take-over';
 	import { wipeAllStores } from '$lib/db/wipe';
-	import { stillDamaged } from '$lib/profile/damaged';
+	import { isDamagedRecord, stillDamaged } from '$lib/profile/damaged';
 	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
 	import { safeLog } from '$lib/log/safelog';
 	import { requestPersistentStorage } from '$lib/storage/persistence';
@@ -111,6 +122,12 @@
 		// Every store broadcasts through this seam so a relock answering a peer stays local; without
 		// it each hop multiplies by (stores x tabs) and the channel saturates.
 		const echo = createRelockEcho(bus);
+		// With a PIN set an idle lock stays in its own tab: another tab idling is not this person leaving, so only a Lock
+		// and a key change reach the others.
+		const broadcast = (e: BusSignal) => {
+			if (app.keyMode === 'pin' && e.type === 'relocked' && e.reason === 'idle') return;
+			echo.publish(e);
+		};
 		let destroyed = false;
 		let teardownRuntime: (() => void) | null = null;
 
@@ -135,7 +152,8 @@
 							() => takeOver(true)
 						),
 					bootstrap: bootstrapLocalKeystore,
-					createStore: (db) => createProfileStore(db, { onBroadcast: (e) => echo.publish(e) })
+					createStore: (db) => createProfileStore(db, { onBroadcast: broadcast }),
+					readKeyState
 				}),
 			app,
 			(result) => {
@@ -185,10 +203,20 @@
 					return;
 				}
 				app.store = result.store;
+				// A PIN set means this tab opened with no key: nothing is read until the person unlocks.
+				const pin = result.keyMode === 'pin';
+				app.keyMode = result.keyMode ?? 'local';
+				app.pinLocked = pin;
 				// Registry-driven, so the erase covers stores that never provisioned - they are the ones
 				// whose orphaned rows would otherwise block their own recovery.
 				app.db = result.db;
-				app.wipeAll = () => wipeAllStores(result.db);
+				// With a PIN the Erase also forgets this tab's keys and tells the others, which find no row (or a new one).
+				app.wipeAll = async () => {
+					await wipeAllStores(result.db);
+					if (app.keyMode !== 'pin') return;
+					relockEachSync(relockables, 'user');
+					echo.publish({ type: 'keys-changed' });
+				};
 				// The BYO-key store rides on the same db; it reads on demand and caches nothing, so it needs
 				// no relock join and no async load - just make it available once the keystore is usable.
 				app.byok = createByokStore(result.db);
@@ -197,7 +225,14 @@
 				// decrypted profile must always relock on idle/background). relockables is shared +
 				// mutable, so the timeline store joins it once provisioned (installLifecycle + the
 				// relocked handler read the list at event time).
-				const relockables: Relockable[] = [result.store];
+				// The session relockable stands first: a relock that is not page hygiene forgets the keys before any store
+				// answers, so a store that cannot be reached still loses them.
+				const relockables: Relockable[] = [
+					createSessionRelockable(() => {
+						if (app.keyMode === 'pin') app.pinLocked = true;
+					}),
+					result.store
+				];
 				// The ONE relock-everything seam. Every "lock" or "erase" walks this list; enumerating
 				// stores at a call site is how the timeline's decrypted notes got left in memory twice.
 				// A lock (here or from another tab) that lands while a reload of the app's own waits out its grace cancels
@@ -211,6 +246,64 @@
 				app.relockAll = () => {
 					relockAll(relockables, 'user');
 					lockStopsReload();
+					// A tab asleep in the back/forward cache, or with no BroadcastChannel, hears of this Lock only as the counter.
+					if (app.keyMode === 'pin')
+						bumpCounter(result.db).catch(() => safeLog({ code: 'E_INTERNAL' }));
+				};
+				// The damaged screen of a ready tab: the plaintext goes, and the erase checks once more that the data is still
+				// damaged (another tab may have repaired or replaced it) before it wipes, then forgets the keys and tells the others.
+				app.enterDamaged = (check) => {
+					relockEachSync(relockables, 'hygiene');
+					app.status = 'damaged';
+					app.wipeAll = async () => {
+						if (!(await stillDamaged(check))) {
+							location.reload();
+							throw new Error('E_NO_LONGER_DAMAGED');
+						}
+						await wipeAllStores(result.db);
+						dropSession();
+						echo.publish({ type: 'keys-changed' });
+					};
+				};
+				// After the person has set a session: read every store as an unlock does. The profile must open; a timeline or
+				// calendar that cannot be read never blocks it, as in the shipped Unlock.
+				app.unlockStores = async () => {
+					const held = getSession();
+					// Read before the load as well as after a failure: only bytes that were the same on both sides of the load
+					// are the ones it read and failed on. Another tab's save in between changes them (its marks only go up).
+					const before = held ? await readStoredBytes(result.db).catch(() => null) : null;
+					try {
+						await result.store.load();
+					} catch (e) {
+						// The bytes that failed, taken before the lock: damage is this tab's only while the rows are still the ones
+						// these keys opened (another tab may have erased, restored or changed the lock meanwhile).
+						let seen: StoredBytes | null = null;
+						if (before && held && isDamagedRecord(e)) {
+							const now = await readStoredBytes(result.db).catch(() => null);
+							if (
+								now &&
+								sameRecords(now, before) &&
+								now.counter === held.counter &&
+								keystoreHasIdentity(now.keystore, held.identity)
+							) {
+								seen = now;
+							}
+						}
+						// Fail closed: no keys and no plaintext stay behind the lock card, and a retry is a fresh unlock.
+						echo.answer(() => relockEachSync(relockables, 'peer'));
+						const bytes = seen;
+						if (bytes) app.enterDamaged?.(() => checkStoredBytes(result.db, bytes));
+						throw e;
+					}
+					const rest = await Promise.allSettled([timelineStore?.load(), calendarStore?.load()]);
+					if (rest.some((r) => r.status === 'rejected')) safeLog({ code: 'E_INIT_FAILED' });
+					// The hide event of a page hidden during the derive came before these loads, so it dropped nothing: what they
+					// decrypted goes now, and the keys stay, so the way back reads it again with no PIN.
+					if (isHidden()) relockEachSync(relockables, 'hygiene');
+					// A Lock that landed while the other stores were read leaves the lock up; a switch away did not lock anything.
+					if (held && getSession() === held && result.store.lockState !== 'locked') {
+						app.pinLocked = false;
+					}
 				};
 				app.joinRelock = createJoinRelock(relockables);
 				app.publish = (s) => echo.publish(s);
@@ -227,9 +320,32 @@
 					'timeline-updated': () => app.timeline?.refresh(),
 					'calendar-updated': () => app.calendar?.refresh(),
 					// A restore in another tab replaced the data: drop what this tab decrypted first (no broadcast; a
-					// locked store stays locked), then reload as the wiring below decides.
-					'data-replaced': () => relockEachSync(relockables, 'hygiene')
+					// locked store stays locked), then reload as the wiring below decides. The keys went with the data.
+					'data-replaced': () => {
+						relockEachSync(relockables, 'hygiene');
+						if (app.keyMode !== 'pin') return;
+						dropSession();
+						app.pinLocked = true;
+					},
+					// Another tab turned the PIN on, changed it, removed it or erased: nothing here fits the rows any more.
+					// A tab that finds a local row (or none) needs no PIN, and a locked tab never re-reads by itself.
+					'keys-changed': async () => {
+						echo.answer(() => relockEachSync(relockables, 'peer'));
+						const { mode } = await readKeyState(result.db);
+						app.keyMode = mode === 'pin' ? 'pin' : 'local';
+						if (mode === 'pin') app.pinLocked = true;
+						else if (app.pinLocked) {
+							// The reload decrypts, so a tab nobody can see waits until it is shown.
+							document.addEventListener('visibilitychange', reloadOnShow);
+							reloadOnShow();
+						}
+					}
 				});
+				const reloadOnShow = () => {
+					if (document.visibilityState === 'hidden') return;
+					document.removeEventListener('visibilitychange', reloadOnShow);
+					location.reload();
+				};
 				// A locked tab never reloads itself, because a reload decrypts. A returning user's tab reloads on its Unlock; a
 				// first-run tab has no Unlock, so it offers a Reload line. Off the setup form: it would save over the
 				// restored date.
@@ -256,10 +372,17 @@
 					createIdleTimer,
 					idleThresholdMs: IDLE_THRESHOLD_MS
 				});
+				// Another tab changed the lock under a live session: forget the keys and show the PIN lock.
+				setOnSessionMismatch(() => {
+					relockEachSync(relockables, 'peer');
+					app.pinLocked = true;
+				});
 				teardownRuntime = () => {
 					offBus();
 					offReplaced();
 					offLifecycle();
+					setOnSessionMismatch(null);
+					document.removeEventListener('visibilitychange', reloadOnShow);
 				};
 
 				// Timeline-state store rides on the same db + bus; it joins the relock set the moment
@@ -268,12 +391,15 @@
 				let timelineStore: TimelineStateStore | null = null;
 				void provisionStore(
 					result.db,
-					(db) => createTimelineStateStore(db, { onBroadcast: (e) => echo.publish(e) }),
+					(db) => createTimelineStateStore(db, { onBroadcast: broadcast }),
 					(timeline) => {
 						relockables.push(timeline);
 						timelineStore = timeline;
+						// Landed locked, and quietly: this is no one's Lock, so the other tabs are not told.
+						if (pin) echo.answer(() => timeline.relockSync('peer'));
 					},
-					isHidden
+					isHidden,
+					pin
 				)
 					.then((timeline) => {
 						if (destroyed) return;
@@ -291,12 +417,14 @@
 				let calendarStore: CalendarSyncStore | null = null;
 				void provisionStore(
 					result.db,
-					(db) => createCalendarSyncStore(db, { onBroadcast: (e) => echo.publish(e) }),
+					(db) => createCalendarSyncStore(db, { onBroadcast: broadcast }),
 					(calendar) => {
 						relockables.push(calendar);
 						calendarStore = calendar;
+						if (pin) echo.answer(() => calendar.relockSync('peer'));
 					},
-					isHidden
+					isHidden,
+					pin
 				)
 					.then((calendar) => {
 						if (destroyed) return;
@@ -468,7 +596,6 @@
 			<nav aria-label="Primary">
 				<ul>
 					<li><a href={resolve('/timeline')}>Timeline</a></li>
-					<li><a href={resolve('/skillbridge')}>SkillBridge</a></li>
 					<li><a href={resolve('/resources')}>Resources</a></li>
 					<!-- Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable,
 					     so even a fresh no-timeline user has something to set there (the timeline sections hide inside
@@ -577,7 +704,7 @@
 		margin: 0 auto;
 	}
 
-	/* From 600px up the header carries the menu (Timeline, SkillBridge, Resources, Settings; Settings appears
+	/* From 600px up the header carries the menu (Timeline, Resources, Settings; Settings appears
 	   only when the app is ready or damaged). Below 600px the header is the brand alone and the bottom bar
 	   (BottomBar.svelte) is the Primary navigation; About and Feedback live in More and the footer. */
 	nav ul {

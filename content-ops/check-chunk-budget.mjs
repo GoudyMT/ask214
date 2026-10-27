@@ -427,6 +427,49 @@ const STATIC = 'static';
 //     222,500 -> 227,560, precache files 71 -> 72 and the root layout node 8,610 -> 8,920. Three builds measured
 //     page 95,102-95,105 B, precache 227,510-227,517 B, 72 files, root layout 8,877-8,879 B, about 40 B of room above
 //     the highest. Trim pass: the growth is the two approved sets of raises together, nothing new.
+//     Page 95,150 -> 100,450, onDemand 8,189 -> 12,770, precache 227,560 -> 242,240, precache files 72 -> 80, the root
+//     layout node (size-limit, package.json) 8,920 -> 9,820 and the lazy route nodes 53,290 -> 55,870 (owner's call,
+//     2026-10-25): the app lock with an optional PIN - the key seam and the PIN session, the tries row and the lock
+//     counter, a start-up that knows the app is locked, the relock joins, the Unlock card, the Settings App lock row
+//     with the PIN setup and the move of every record onto the new keys, and the locked screens. Three builds
+//     measured page 100,404-100,410 B, on demand 12,728-12,730 B, precache 242,171-242,194 B, 80 files, root layout
+//     9,773-9,776 B and route nodes 55,816-55,830 B, about 40 B of room above the highest. Trim pass first: one lazy
+//     file for the PIN card and the derive (one file and about 160 B of precache less), kept; loading the Settings
+//     row lazily (one more file less) was dropped, because a failed fetch would hide the row without a word; splitting
+//     the keystore modules and fetching the damaged-row check on demand cut no file. The eight extra files are the
+//     lazy PIN chunk and its stylesheet, the derive's settings, the damaged-row check and the shared keystore,
+//     profile and finder pieces the bundler now splits off.
+//     Page 100,450 -> 102,355, onDemand 12,770 -> 15,865, precache 242,240 -> 249,530 and the lazy route nodes
+//     (size-limit, package.json) 55,870 -> 57,940 (owner's call, 2026-10-26): the PIN's second set - Change PIN and
+//     Remove PIN, Forgot PIN with its restore on a locked device and Erase from the locked card, the backup step at
+//     setup and the PIN asked before a backup. Builds of the same code measured page 102,309-102,313 B, on demand
+//     15,815-15,823 B, precache 249,459-249,490 B and route nodes 57,881-57,897 B, about 40 B of room above the
+//     highest. Trim pass first: the backup code is fetched through one lazy entry, which took the precache back from
+//     92 files to 80 (the files limit is unchanged); a single shared chunk for it cost every page about 217 KB raw and
+//     was dropped.
+//     Page 102,355 -> 103,075, precache 249,530 -> 251,640 and the lazy route nodes 57,940 -> 59,210 (owner's call,
+//     2026-10-26): the PIN's last set - the wait counted down on screen, the count of wrong tries since the last
+//     unlock, the easy-PIN warning, the fold of what a PIN does not cover, and a page of its own for a missing
+//     address. Builds of the same code measured page 103,021-103,026 B, precache 251,575-251,600 B and route nodes
+//     59,152-59,168 B, about 40 B of room above the highest; on demand and the files limit are unchanged. Trim pass
+//     first: a fixed one-second tick for the countdown (-20 B) and a pattern for the easy PINs in place of a list
+//     (-90 B) were kept; the countdown shares the chunk the PIN field already loads, and no other cut came without
+//     losing a function or adding a file.
+//     Page 103,075 -> 103,415, onDemand 15,865 -> 16,015, precache 251,640 -> 252,210 and the lazy route nodes
+//     59,210 -> 59,240 (owner's call, 2026-10-27): the fixes from the review of the PIN - one count of an owed wait per
+//     tab that goes on while no screen shows it, a wait id in the tries row so a count lowers only its own wait, the
+//     wait's end written as its line goes, and an unlock a lock overtook kept off the page with its tries notice held
+//     for the next one. Builds of the same code measured page 103,369-103,375 B, on demand 15,971-15,973 B, precache
+//     252,135-252,168 B and route nodes 59,170-59,196 B, about 40 B of room above the highest; the files limit is
+//     unchanged. Trim pass first: about 110 B came off the count; the count and the wait id guard the wait and were
+//     not cut further.
+//     Page 103,415 -> 103,485, onDemand 16,015 -> 16,050, precache 252,210 -> 252,830 and the lazy route nodes
+//     59,240 -> 59,715 (owner's call, 2026-10-27): the owner's design calls after the walkthrough - the wizard shows the
+//     Unlock card and the tries notice while the PIN locks the app, a press in a wait keeps the wait line, Use it
+//     anyway stays in place and busy through its press, the App lock row is off while locked, and each Show PIN toggle
+//     names its field. Four builds of the same code measured page 103,434-103,445 B, on demand 16,007-16,012 B,
+//     precache 252,772-252,792 B and route nodes 59,665-59,676 B, about 40 B of room above the highest; the files
+//     limit is unchanged.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -436,10 +479,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 95_150,
-	onDemand: 8_189,
-	precacheFiles: 72,
-	precacheBytes: 227_560,
+	page: 103_485,
+	onDemand: 16_050,
+	precacheFiles: 80,
+	precacheBytes: 252_830,
 	workerScripts: 147_200
 };
 
