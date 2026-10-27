@@ -512,6 +512,31 @@ describe('a wait owed', () => {
 		expect(alertText()).toBe(waitLine(20_000));
 	});
 
+	// The stored remainder is written every 5 s, so between writes it is older than the running count. A card that started
+	// again from it would push the end away on every move between locked pages.
+	it('does not push the end away when the card comes back between two writes', async () => {
+		await putTries({ count: 4, waitMs: 30_000, pending: false });
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		let now = 0;
+		const rendered = await mount({ clock: { perfNow: () => now } });
+		await until(() => alertText() !== null, 'the wait line at mount');
+		await rendered.unmount();
+		now = 5_000;
+		vi.advanceTimersByTime(5_000);
+		await until(async () => (await readTries(db)).waitMs === 25_000, 'the write at 5 s');
+		now = 7_000;
+		vi.advanceTimersByTime(2_000);
+
+		await mount({ clock: { perfNow: () => now } });
+		await until(() => alertText() === waitLine(23_000), 'the wait line with what is left');
+		// The mount's own read of the stored row (25 s) lands after the line was handed over.
+		await readTries(db);
+		now = 10_000;
+		vi.advanceTimersByTime(3_000);
+		await until(() => alertText() === waitLine(20_000), 'the line three seconds later');
+		expect(alertText()).toBe(waitLine(20_000));
+	});
+
 	// A good check reset the row. The card stays up here, so a count that went on would lower the next wait at that count.
 	it('ends the count when a good PIN opens', async () => {
 		await putTries({ count: 4, waitMs: 30_000, pending: false });
