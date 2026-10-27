@@ -44,7 +44,7 @@
 	import { getProfileApp } from '../profile/context';
 	import PinField from './PinField.svelte';
 	import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, triesNotice, waitLine } from './pin-lines';
-	import { createCountdown } from './wait-countdown';
+	import { endCountdown, followCountdown } from './wait-countdown';
 
 	type Props = {
 		/**
@@ -90,13 +90,14 @@
 	} | null>(null);
 	let restoreFailed = $state(false);
 
-	let counter: ReturnType<typeof createCountdown> | null = null;
+	let counter: ReturnType<typeof followCountdown> | null = null;
 	let waitText = $state<string | null>(null);
 	let gone = false;
 
+	// The tab's count, followed from the moment the card is up and left when it goes: the wait does not stop with the card.
 	// The line follows the count while it is still the wait line; a line that replaced it is left as it is.
-	function counting(db: IDBDatabase): ReturnType<typeof createCountdown> {
-		return (counter ??= createCountdown(
+	function counting(db: IDBDatabase): ReturnType<typeof followCountdown> {
+		return (counter ??= followCountdown(
 			db,
 			{ clock: deps.clock, dateNow: deps.dateNow },
 			(line) => {
@@ -121,12 +122,14 @@
 	onMount(() => {
 		const db = app.db;
 		if (db !== null) {
+			// A count already running was handed to the card as it followed; the stored remainder is older than it.
+			const count = counting(db);
 			readTries(db).then(
 				(tries) => {
-					if (gone || tries.waitMs <= 0) return;
+					if (gone || tries.waitMs <= 0 || count.remainingMs() > 0) return;
 					waitText = waitLine(tries.waitMs);
 					message = waitText;
-					counting(db).start(tries);
+					count.start(tries);
 				},
 				() => safeLog({ code: 'E_INTERNAL' })
 			);
@@ -138,7 +141,7 @@
 		}
 		return () => {
 			gone = true;
-			counter?.stop();
+			counter?.unfollow();
 			dropWaiting();
 		};
 	});
@@ -223,6 +226,7 @@
 			if (found.reloading) return;
 
 			if (outcome.kind === 'good') {
+				endCountdown(db);
 				if (relocked) return;
 				if (!app.unlockStores) throw new Error('E_NOT_READY');
 				await app.unlockStores();

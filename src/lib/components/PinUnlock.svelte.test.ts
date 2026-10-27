@@ -481,7 +481,8 @@ describe('a wait owed', () => {
 		expect(alertText()).toBeNull();
 	});
 
-	it('stops counting down when the card is taken out', async () => {
+	// The wait is the tab's, not the card's: reading Resources while locked is time waited.
+	it('keeps counting down when the card is taken out', async () => {
 		await putTries({ count: 4, waitMs: 30_000, pending: false });
 		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
 		let now = 0;
@@ -489,6 +490,43 @@ describe('a wait owed', () => {
 		await until(() => alertText() !== null, 'the wait line at mount');
 
 		await rendered.unmount();
+		now = 5_000;
+		vi.advanceTimersByTime(5_000);
+		await until(async () => (await readTries(db)).waitMs === 25_000, 'the remainder written');
+		expect((await readTries(db)).waitMs).toBe(25_000);
+	});
+
+	it('shows what is left when the card comes back after the wait went on without it', async () => {
+		await putTries({ count: 4, waitMs: 30_000, pending: false });
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		let now = 0;
+		const rendered = await mount({ clock: { perfNow: () => now } });
+		await until(() => alertText() !== null, 'the wait line at mount');
+		await rendered.unmount();
+		now = 10_000;
+		vi.advanceTimersByTime(10_000);
+
+		await mount({ clock: { perfNow: () => now } });
+		await until(() => alertText() === waitLine(20_000), 'the wait line with what is left');
+		await until(async () => (await readTries(db)).waitMs <= 20_000, 'the stored wait lowered');
+		expect(alertText()).toBe(waitLine(20_000));
+	});
+
+	// A good check reset the row. The card stays up here, so a count that went on would lower the next wait at that count.
+	it('ends the count when a good PIN opens', async () => {
+		await putTries({ count: 4, waitMs: 30_000, pending: false });
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
+		let now = 0;
+		await mount({ clock: { perfNow: () => now } });
+		await until(() => alertText() !== null, 'the wait line at mount');
+		// The wait ran out in another tab, so this press is checked.
+		await putTries({ count: 4, waitMs: 0, pending: false });
+		fieldEl().value = GOOD;
+		fieldEl().dispatchEvent(new Event('input', { bubbles: true }));
+		unlockEl().click();
+		await until(() => onunlocked.mock.calls.length > 0, 'the page was told it unlocked');
+		await putTries({ count: 4, waitMs: 30_000, pending: false });
+
 		now = 5_000;
 		vi.advanceTimersByTime(5_000);
 		await real(100);

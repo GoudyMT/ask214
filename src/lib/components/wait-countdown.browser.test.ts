@@ -7,8 +7,21 @@ import {
 	type PinCheckResult,
 	type TriesState
 } from '../keystore/app-lock-store';
+import { createCurrentPinCheck } from './current-pin-check';
 import { waitLine } from './pin-lines';
-import { createCountdown } from './wait-countdown';
+import { createCountdown, endCountdown, followCountdown } from './wait-countdown';
+
+// The current-PIN check, for the tests below, finds a PIN row and opens it: the keys themselves are not what they test.
+vi.mock('../keystore/unlock-row', () => ({
+	readPinRowAndCounter: async () => ({
+		row: { mode: 'pin', kdf: {}, salt: new Uint8Array(16) },
+		counter: 0
+	})
+}));
+vi.mock('../keystore/session', async (importOriginal) => ({
+	...(await importOriginal<typeof import('../keystore/session')>()),
+	openPinSession: async () => ({ opened: true })
+}));
 
 // Captured before any test fakes the timers: the waits on the store must stay real.
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
@@ -426,5 +439,106 @@ describe('while the page is hidden', () => {
 		count.stop();
 
 		expect(doc.listeners).toBe(0);
+	});
+});
+
+// A card or a form leaving the screen must not stop the wait: someone who reads Resources for ten minutes while locked has
+// waited ten minutes.
+describe('a count that screens follow', () => {
+	const deps = () => ({
+		clock: { perfNow: () => perf },
+		dateNow: () => date,
+		doc: doc as unknown as Document
+	});
+
+	it('goes on when a screen leaves, and hands the line at once to the screen that comes back', async () => {
+		const first: (string | null)[] = [];
+		const one = followCountdown(db, deps(), (line) => first.push(line));
+		one.start(OWED);
+		one.unfollow();
+		pass(10_000);
+
+		const back: (string | null)[] = [];
+		const two = followCountdown(db, deps(), (line) => back.push(line));
+		expect(back).toEqual([waitLine(20_000)]);
+		pass(1_000);
+		expect(back).toEqual([waitLine(20_000), waitLine(19_000)]);
+		expect(two.remainingMs()).toBe(19_000);
+		expect(first).toEqual([waitLine(30_000)]);
+		await until(
+			async () => (await stored()) <= 20_000,
+			'the remainder written while no screen followed'
+		);
+		two.unfollow();
+	});
+
+	it('tells a screen that arrives after the wait is over nothing', async () => {
+		const one = followCountdown(db, deps(), () => undefined);
+		one.start(OWED);
+		pass(30_000);
+
+		const late: (string | null)[] = [];
+		followCountdown(db, deps(), (line) => late.push(line)).unfollow();
+		expect(late).toEqual([]);
+		one.unfollow();
+	});
+
+	// A good check reset the row. A count that went on would lower the next wait that reaches the same try count.
+	it('ends with a good check: no more writes, and no line for a screen that follows after', async () => {
+		const one = followCountdown(db, deps(), () => undefined);
+		one.start(OWED);
+		endCountdown(db);
+
+		pass(5_000);
+		await real(100);
+		expect(await stored()).toBe(30_000);
+		const late: (string | null)[] = [];
+		followCountdown(db, deps(), (line) => late.push(line)).unfollow();
+		expect(late).toEqual([]);
+	});
+
+	describe('through the check of the current PIN', () => {
+		const PIN_CODE = {
+			isPinFormat: () => true,
+			derivePinKeys: async () => ({}),
+			PinNoMemoryError: class extends Error {}
+		};
+		const checker = (onWaitLine?: (line: string | null) => void) =>
+			createCurrentPinCheck({
+				loadDerive: async () => PIN_CODE as never,
+				clock: { perfNow: () => perf },
+				onWaitLine
+			});
+
+		it('reads what is left of a wait when the form is closed and opened again', async () => {
+			const first = checker();
+			expect(await first.check(db, '1234', 'failed')).toEqual({
+				ok: false,
+				line: waitLine(30_000)
+			});
+			first.stop();
+			pass(10_000);
+
+			const again = await checker().check(db, '1234', 'failed');
+			expect(again).toEqual({ ok: false, line: waitLine(20_000) });
+			await until(
+				async () => (await stored()) <= 20_000,
+				'the remainder written while no form followed'
+			);
+		});
+
+		it('ends the count with a good check', async () => {
+			const open = checker();
+			await open.check(db, '1234', 'failed');
+			// The wait ran out in another tab; this form's check is the good one.
+			await putTries({ count: 4, waitMs: 0, pending: false });
+			expect(await checker().check(db, '1234', 'failed')).toMatchObject({ ok: true });
+			await putTries(OWED);
+
+			pass(5_000);
+			await real(100);
+			expect(await stored()).toBe(30_000);
+			open.stop();
+		});
 	});
 });

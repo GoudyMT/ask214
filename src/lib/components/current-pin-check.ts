@@ -14,7 +14,7 @@ import { readPinRowAndCounter } from '../keystore/unlock-row';
 import type { derivePinKeys } from '../keystore/pin-derive';
 import type { loadAppLock } from './load-app-lock';
 import { CHECK_LOW_MEMORY_LINE, NOT_RIGHT_LINE, triesNotice, waitLine } from './pin-lines';
-import { createCountdown } from './wait-countdown';
+import { endCountdown, followCountdown } from './wait-countdown';
 
 export type CurrentPinResult =
 	{ ok: true; session: KeySession; notice: string[] } | { ok: false; line: string };
@@ -30,20 +30,20 @@ type CurrentPinDeps = {
 
 /**
  * The check of the current PIN that Change, Remove and the step-up before a backup all make, as an unlock does: the try is
- * counted before the derive. The keys a good PIN opens are returned and never held by the tab. One checker per row, so
- * the wait it starts to count down is the row's own; `stop` ends that count when the row goes.
+ * counted before the derive. The keys a good PIN opens are returned and never held by the tab. One checker per row;
+ * `stop` is the row going, which only stops it following the tab's count of the wait (the count goes on without it).
  */
 export function createCurrentPinCheck(deps: CurrentPinDeps): {
 	check(db: IDBDatabase, typed: string, failedLine: string): Promise<CurrentPinResult>;
 	stop(): void;
 } {
-	let counter: ReturnType<typeof createCountdown> | null = null;
+	let counter: ReturnType<typeof followCountdown> | null = null;
 
 	// The line for an owed wait: a new wait starts its own count, and a press that only finds the wait still owed leaves
 	// the running count alone, so pressing never pushes the end away. The caller hears the line returned as its own, so the
 	// count's later lines replace exactly that message.
 	async function waitText(db: IDBDatabase, waitMs: number, fresh: boolean): Promise<string> {
-		counter ??= createCountdown(db, { clock: deps.clock }, (line) => deps.onWaitLine?.(line));
+		counter ??= followCountdown(db, { clock: deps.clock }, (line) => deps.onWaitLine?.(line));
 		const left = fresh ? 0 : counter.remainingMs();
 		const line = waitLine(left > 0 ? Math.ceil(left) : waitMs);
 		if (left <= 0) counter.start(await readTries(db));
@@ -79,6 +79,7 @@ export function createCurrentPinCheck(deps: CurrentPinDeps): {
 			}
 		});
 		if (outcome.kind === 'good') {
+			endCountdown(db);
 			const notice = triesNotice(outcome.wrongTries, outcome.unfinished);
 			return { ok: true, session: outcome.value, notice };
 		}
@@ -91,5 +92,5 @@ export function createCurrentPinCheck(deps: CurrentPinDeps): {
 		return { ok: false, line: found.lowMemory ? CHECK_LOW_MEMORY_LINE : failedLine };
 	}
 
-	return { check, stop: () => counter?.stop() };
+	return { check, stop: () => counter?.unfollow() };
 }

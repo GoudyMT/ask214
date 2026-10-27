@@ -143,3 +143,53 @@ export function createCountdown(
 		stop
 	};
 }
+
+type Shared = {
+	db: IDBDatabase;
+	count: ReturnType<typeof createCountdown>;
+	followers: Set<(line: string | null) => void>;
+	line: string | null;
+};
+let shared: Shared | null = null;
+
+/**
+ * The tab's one count of the owed wait, for the screens that show it (the Unlock card, the forms that check the current
+ * PIN). A screen follows it and leaves it: leaving only stops that screen hearing the line, since the wait is owed whether
+ * or not a screen is up, and a count that stopped with its screen would let the wait pass unwritten. It is made on first use
+ * for a database handle (a new handle, after a restore or in a test, gets its own, and the old one ends). A follower is
+ * handed the current line at once, if a wait is counting.
+ */
+export function followCountdown(
+	db: IDBDatabase,
+	deps: CountdownDeps,
+	onLine: (line: string | null) => void
+): { start(from: TriesState): void; remainingMs(): number; unfollow(): void } {
+	if (shared?.db !== db) {
+		shared?.count.stop();
+		const made: Shared = {
+			db,
+			followers: new Set(),
+			line: null,
+			count: createCountdown(db, deps, (line) => {
+				made.line = line;
+				for (const follower of made.followers) follower(line);
+			})
+		};
+		shared = made;
+	}
+	const { count, followers, line } = shared;
+	followers.add(onLine);
+	if (line !== null) onLine(line);
+	return {
+		start: count.start,
+		remainingMs: count.remainingMs,
+		unfollow: () => followers.delete(onLine)
+	};
+}
+
+/** A good check reset the row: the count ends, and a screen that follows later is told nothing. */
+export function endCountdown(db: IDBDatabase): void {
+	if (shared?.db !== db) return;
+	shared.count.stop();
+	shared.line = null;
+}
