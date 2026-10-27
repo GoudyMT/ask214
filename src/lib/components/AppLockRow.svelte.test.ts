@@ -54,7 +54,9 @@ const seams = vi.hoisted(() => ({
 	// What the backup step handed the backup card, as the card was mounted, and what a test adds to it (the card's own
 	// seams: its session, the save picker).
 	card: null as Record<string, unknown> | null,
-	cardExtra: {} as Record<string, unknown>
+	cardExtra: {} as Record<string, unknown>,
+	// Runs when the row has read the counter, before it goes on to the move: a Lock landing in that gap.
+	afterCounterRead: null as (() => void) | null
 }));
 vi.mock('$lib/profile/context', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/profile/context')>()),
@@ -73,6 +75,17 @@ vi.mock('$lib/backup/BackupCard.svelte', async (importOriginal) => {
 			seams.card = props;
 			seams.events.push('card');
 			return mount(anchor, { ...props, ...seams.cardExtra });
+		}
+	};
+});
+vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => {
+	const real = await importOriginal<typeof import('../keystore/app-lock-store')>();
+	return {
+		...real,
+		readCounter: async (...args: Parameters<typeof real.readCounter>) => {
+			const counter = await real.readCounter(...args);
+			seams.afterCounterRead?.();
+			return counter;
 		}
 	};
 });
@@ -179,6 +192,7 @@ beforeEach(async () => {
 	seams.events.length = 0;
 	seams.card = null;
 	seams.cardExtra = {};
+	seams.afterCounterRead = null;
 	mode.value = 'local';
 	relockables = [];
 	app = {
@@ -594,6 +608,28 @@ describe('a Lock while Next works', () => {
 			expect(alertText()).toBeNull();
 		}
 	);
+
+	// The counter is read just before the move, and the keys the step holds are dropped by the Lock: the move must not start.
+	it('writes nothing, keeps the PIN off, and says nothing, when a Lock lands while the counter is read', async () => {
+		await mount();
+		await toStep(SETUP_PIN, SETUP_PIN);
+		let read = false;
+		seams.afterCounterRead = () => {
+			read = true;
+			relockEachSync(relockables, 'user');
+		};
+		skipEl().click();
+		await until(() => read, 'the counter read');
+		await real(150);
+
+		expect(rotate).not.toHaveBeenCalled();
+		expect(app.keyMode).toBe('local');
+		expect(summary()).toBe('Off');
+		expect(app.pinLocked).toBe(false);
+		expect(app.publish).not.toHaveBeenCalled();
+		expect(getSession()).toBeNull();
+		expect(alertText()).toBeNull();
+	});
 
 	// The move may already have committed: the PIN is on, and the tab must stay without keys, on the PIN card.
 	it('holds no session, and shows the PIN lock, when a Lock lands during the move', async () => {
