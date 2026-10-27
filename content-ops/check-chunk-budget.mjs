@@ -455,6 +455,14 @@ const STATIC = 'static';
 //     first: a fixed one-second tick for the countdown (-20 B) and a pattern for the easy PINs in place of a list
 //     (-90 B) were kept; the countdown shares the chunk the PIN field already loads, and no other cut came without
 //     losing a function or adding a file.
+//     Page 103,075 -> 103,415, onDemand 15,865 -> 16,015, precache 251,640 -> 252,210 and the lazy route nodes
+//     59,210 -> 59,240 (owner's call, 2026-10-27): the fixes from the review of the PIN - one count of an owed wait per
+//     tab that goes on while no screen shows it, a wait id in the tries row so a count lowers only its own wait, the
+//     wait's end written as its line goes, and an unlock a lock overtook kept off the page with its tries notice held
+//     for the next one. Builds of the same code measured page 103,369-103,375 B, on demand 15,971-15,973 B, precache
+//     252,135-252,168 B and route nodes 59,170-59,196 B, about 40 B of room above the highest; the files limit is
+//     unchanged. Trim pass first: about 110 B came off the count; the count and the wait id guard the wait and were
+//     not cut further.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -464,10 +472,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 103_075,
-	onDemand: 15_865,
+	page: 103_415,
+	onDemand: 16_015,
 	precacheFiles: 80,
-	precacheBytes: 251_640,
+	precacheBytes: 252_210,
 	workerScripts: 147_200
 };
 
