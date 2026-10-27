@@ -579,10 +579,11 @@
 
 <div class="app-lock">
 	<!-- Opening hands focus to the first field and a turn-on hands it back here mid-press, so a held Enter's repeats would
-	     press again: only a new press toggles. -->
+	     press again: only a new press toggles. Off while locked: what the row holds needs the saved data open. -->
 	<button
 		class="app-lock__toggle"
 		type="button"
+		disabled={app.pinLocked === true}
 		aria-expanded={open}
 		aria-controls="app-lock-edit"
 		onclick={() => void toggle()}

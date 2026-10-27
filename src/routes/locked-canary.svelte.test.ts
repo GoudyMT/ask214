@@ -438,6 +438,7 @@ describe('a tab that locks while saved text is on screen', () => {
 });
 
 describe('Settings, PIN-locked', () => {
+	// By design the App lock row reads PIN on and cannot be opened while locked: what it holds needs the keys.
 	it('shows the Unlock card, then App lock reading PIN on and the Erase, and nothing behind the keys', async () => {
 		const app = await readyApp();
 		await render(SettingsPage);
@@ -446,14 +447,7 @@ describe('Settings, PIN-locked', () => {
 		const row = page.getByRole('button', { name: /App lock/ });
 		await expect.element(row).toHaveTextContent('App lock PIN on');
 		await expect.element(row).toHaveAttribute('aria-expanded', 'false');
-		await row.click();
-		await expect
-			.element(
-				page.getByText(
-					'The app asks for your PIN when it opens, after 15 minutes idle, and after Lock.'
-				)
-			)
-			.toBeVisible();
+		await expect.element(row).toBeDisabled();
 		expect(page.getByLabelText('Choose a 4-6 digit PIN').query()).toBeNull();
 
 		// Already locked: no Lock button; and neither the calendar nor the backup, which need the keys.

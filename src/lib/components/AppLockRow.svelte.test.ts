@@ -1836,13 +1836,18 @@ describe('the row with the PIN on', () => {
 		expect(hasButton('Change PIN')).toBe(false);
 	});
 
-	// Both need the saved data open, so a locked screen has the line and nothing to press.
-	it('is the PIN-on line alone while the app is locked', async () => {
+	// By design, a row that could only open onto a line with nothing to press stays shut while the app is locked: Change
+	// and Remove need the saved data open, so the toggle is off and announces no expansion.
+	it('cannot be opened while the app is locked', async () => {
 		app.pinLocked = true;
 		await mount();
-		await openRow();
 
-		expect(hasText(PIN_ON_LINE)).toBe(true);
+		expect(toggleEl().disabled).toBe(true);
+		expect(expanded()).toBe(false);
+		toggleEl().click();
+		await real(50);
+		expect(expanded()).toBe(false);
+		expect(hasText(PIN_ON_LINE)).toBe(false);
 		expect(hasButton('Change PIN')).toBe(false);
 		expect(hasButton('Remove PIN')).toBe(false);
 	});
