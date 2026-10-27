@@ -45,3 +45,20 @@ function stop(pid) {
 		// It ended on its own between the deadline and the stop.
 	}
 }
+
+// Only staged code under these folders can be traced to the tests it touches. Anything else that is not prose
+// (a config, the lockfile, a workflow a policy test reads) can move any test, so it runs the whole suite.
+const TRACEABLE = /^(src|content-ops)\/.+\.(ts|js|mjs|cjs|svelte)$/;
+
+/**
+ * The vitest arguments for a commit's unit run: the tests related to its staged code, the whole suite when a
+ * staged file can move every test, or null when nothing but prose is staged.
+ * @param {string[]} staged repo-relative paths, forward slashes
+ * @returns {string[] | null}
+ */
+export function unitRunFor(staged) {
+	const files = staged.filter((file) => !file.endsWith('.md'));
+	if (files.length === 0) return null;
+	if (!files.every((file) => TRACEABLE.test(file))) return ['--run'];
+	return ['related', '--run', ...files];
+}

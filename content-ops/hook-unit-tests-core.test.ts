@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runNodeWithDeadline } from './hook-unit-tests-core.mjs';
+import { runNodeWithDeadline, unitRunFor } from './hook-unit-tests-core.mjs';
 
 // The pre-commit hook starts its unit run with node itself, so no shim's sh stands between them, and the run is
 // stopped and failed if it is still going at its deadline. These runs are real node processes, so the
@@ -143,5 +143,37 @@ describe('the hook', () => {
 			scripts: Record<string, string>;
 		};
 		expect(pkg.scripts['test:unit']).toBe('vitest');
+	});
+});
+
+// The hook runs only the tests a commit can affect; the whole suite runs at each phase's full gate and in CI. A
+// change that can move every test (config, setup, dependencies) still runs everything, and a commit with no code
+// in it runs nothing.
+describe('unitRunFor', () => {
+	it('runs only the tests related to the staged code', () => {
+		expect(unitRunFor(['src/lib/a.ts', 'src/lib/a.test.ts'])).toEqual([
+			'related',
+			'--run',
+			'src/lib/a.ts',
+			'src/lib/a.test.ts'
+		]);
+	});
+
+	it('runs everything when the staged files can change every test', () => {
+		for (const file of [
+			'package.json',
+			'pnpm-lock.yaml',
+			'vite.config.ts',
+			'tsconfig.json',
+			'wrangler.toml',
+			'.github/workflows/ci.yml'
+		]) {
+			expect(unitRunFor(['src/lib/a.ts', file])).toEqual(['--run']);
+		}
+	});
+
+	it('runs nothing when no code is staged', () => {
+		expect(unitRunFor(['README.md', 'docs/engineering/02-base-pwa.md'])).toBeNull();
+		expect(unitRunFor([])).toBeNull();
 	});
 });
