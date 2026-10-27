@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runNodeWithDeadline } from './hook-unit-tests-core.mjs';
+import { runNodeWithDeadline, unitRunsFor } from './hook-unit-tests-core.mjs';
 
 // The pre-commit hook starts its unit run with node itself, so no shim's sh stands between them, and the run is
 // stopped and failed if it is still going at its deadline. These runs are real node processes, so the
@@ -143,5 +143,55 @@ describe('the hook', () => {
 			scripts: Record<string, string>;
 		};
 		expect(pkg.scripts['test:unit']).toBe('vitest');
+	});
+});
+
+// The hook runs the server tests whole (about 20 s; its policy tests read files as text, which import tracing
+// cannot see) and only the browser tests related to the staged code; the whole suite runs at each phase's full
+// gate and in CI. A change that can move every test, or a deletion, still runs everything.
+describe('unitRunsFor', () => {
+	const SERVER = ['--run', '--project', 'server'];
+
+	it('runs the server tests whole and only the related browser tests', () => {
+		expect(unitRunsFor(['src/lib/a.ts', 'src/lib/a.test.ts'])).toEqual([
+			SERVER,
+			[
+				'related',
+				'--run',
+				'--project',
+				'client',
+				'--passWithNoTests',
+				'src/lib/a.ts',
+				'src/lib/a.test.ts'
+			]
+		]);
+	});
+
+	it('runs everything when a staged file can change every test', () => {
+		for (const file of [
+			'package.json',
+			'pnpm-lock.yaml',
+			'vite.config.ts',
+			'tsconfig.json',
+			'wrangler.toml',
+			'.github/workflows/ci.yml',
+			'workers/retrieve/src/index.ts',
+			'eslint-plugins/mtc/index.js'
+		]) {
+			expect(unitRunsFor(['src/lib/a.ts', file])).toEqual([['--run']]);
+		}
+	});
+
+	it('runs everything when a file is deleted, since a test may read or import it', () => {
+		expect(unitRunsFor([], ['.github/workflows/semgrep.yml'])).toEqual([['--run']]);
+		expect(unitRunsFor(['src/lib/a.ts'], ['src/lib/b.ts'])).toEqual([['--run']]);
+	});
+
+	it('still runs the server tests for prose, which policy tests scan', () => {
+		expect(unitRunsFor(['content-ops/skillbridge/README.md'])).toEqual([SERVER]);
+	});
+
+	it('runs nothing when nothing is staged', () => {
+		expect(unitRunsFor([], [])).toBeNull();
 	});
 });
