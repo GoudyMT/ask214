@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteTestDb, openTestDb } from '../db/_test-helpers';
 import { withStores } from '../db/schema';
-import { readTries, type TriesState } from '../keystore/app-lock-store';
+import {
+	readTries,
+	runPinCheck,
+	type PinCheckResult,
+	type TriesState
+} from '../keystore/app-lock-store';
 import { waitLine } from './pin-lines';
 import { createCountdown } from './wait-countdown';
 
@@ -301,6 +306,70 @@ describe('while the page is hidden', () => {
 		pass(5_000);
 		await until(async () => (await stored()) === 25_000, 'the remainder written');
 		count.stop();
+	});
+
+	// The stored wait is what a press is judged by: it has to be right the moment the page is back, not five seconds later.
+	describe('on the return', () => {
+		it('writes the remainder at once, and zero when the time away covered the wait', async () => {
+			const count = counting();
+			count.start(OWED);
+			doc.show('hidden');
+			perf += 40_000;
+			date += 40_000;
+			doc.show('visible');
+
+			// No timer has run: a read made now queues behind the write the return opened.
+			expect(await stored()).toBe(0);
+			count.stop();
+		});
+
+		it('writes what is left at once when the time away covered part of the wait', async () => {
+			const count = counting();
+			count.start(OWED);
+			doc.show('hidden');
+			perf += 10_000;
+			date += 10_000;
+			doc.show('visible');
+
+			const left = await stored();
+			expect(left).toBeLessThanOrEqual(20_000);
+			expect(left).toBeGreaterThan(19_000);
+			count.stop();
+		});
+
+		// The caller of a press opens its transaction after the return opened its own, and overlapping readwrite
+		// transactions run in the order they were created, so the press finds the lowered wait.
+		it('lets a press made right after the return through, with no timer run', async () => {
+			const count = counting();
+			count.start(OWED);
+			doc.show('hidden');
+			perf += 40_000;
+			date += 40_000;
+			doc.show('visible');
+
+			const check = vi.fn(async (): Promise<PinCheckResult<number>> => ({
+				kind: 'good',
+				value: 1
+			}));
+			const outcome = await runPinCheck(db, check);
+			expect(outcome.kind).toBe('good');
+			expect(check).toHaveBeenCalledOnce();
+			count.stop();
+		});
+
+		it('writes nothing lower than the remainder at hide when the two clocks disagree', async () => {
+			const count = counting();
+			count.start(OWED);
+			pass(2_000);
+			doc.show('hidden');
+			perf += 10_000;
+			date += 100_000;
+			doc.show('visible');
+
+			expect(await stored()).toBeGreaterThanOrEqual(28_000);
+			expect(count.remainingMs()).toBe(28_000);
+			count.stop();
+		});
 	});
 
 	it('stops listening when it is stopped', async () => {

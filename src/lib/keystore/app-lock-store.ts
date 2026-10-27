@@ -197,7 +197,7 @@ export function createWaitClock(
 		setInterval?: typeof setInterval;
 		clearInterval?: typeof clearInterval;
 	} = {}
-): { remainingMs(): number; stop(): void } {
+): { remainingMs(): number; stop(): void; writeNow(): void } {
 	const now = deps.perfNow ?? (() => performance.now());
 	const startedAt = now();
 	const remainingMs = () => Math.max(0, from.waitMs - (now() - startedAt));
@@ -218,5 +218,6 @@ export function createWaitClock(
 		}).catch(() => safeLog({ code: 'E_INTERNAL' }));
 	};
 	if (from.waitMs > 0) timer = (deps.setInterval ?? setInterval)(write, WAIT_WRITE_EVERY_MS);
-	return { remainingMs, stop };
+	// For a caller that needs the stored wait right now (a page that just came back), not at the next 5 s tick.
+	return { remainingMs, stop, writeNow: write };
 }
