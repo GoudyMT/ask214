@@ -177,12 +177,14 @@
 			reload();
 			return;
 		}
+		// A press during a wait is refused whatever was typed: the wait is what stops it, so its line is the answer.
+		const waiting = message !== null && message === waitText;
 		message = null;
 		if (!isPinFormat(pin)) {
 			// The old line comes off the page first: an alert that stays in place is not spoken again. No check runs here, so
 			// nothing is held in the meantime; the field is emptied only after the line is up.
 			await tick();
-			message = NOT_RIGHT;
+			message = waiting ? waitText : NOT_RIGHT;
 			field?.clear();
 			return;
 		}

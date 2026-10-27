@@ -795,19 +795,25 @@ describe('the wait line, live', () => {
 		await until(async () => (await readTries(db)).waitMs === 25_000, 'the remainder written');
 	});
 
-	// The person pressed Unlock with a PIN that could not be right: that line replaced the wait, and the count must not
-	// bring the wait back over it nor take it away.
-	it('leaves a line that replaced the wait alone, as the count runs on', async () => {
+	// By design, a press during a wait is refused whatever was typed, so a PIN that could not be right is answered with
+	// the wait, which is what stops the press, not with a line about the PIN. Nothing is checked or counted, and the wait
+	// runs on to its end.
+	it('keeps the wait line, counting on, for a press with a PIN that could not be right', async () => {
 		await owed(30_000);
-		fieldEl().value = '123';
+		await pass(5_000);
+		fieldEl().value = '12';
 		fieldEl().dispatchEvent(new Event('input', { bubbles: true }));
 		unlockEl().click();
-		await until(() => alertText() === NOT_RIGHT, 'the line that replaced the wait');
+		await until(() => fieldEl().value === '', 'the press ended and emptied the field');
+		await real(100);
 
+		expect(alertText()).toBe(waitLine(25_000));
+		expect(derive).not.toHaveBeenCalled();
+		expect((await readTries(db)).count).toBe(4);
 		await pass(5_000);
-		expect(alertText()).toBe(NOT_RIGHT);
-		await pass(25_000);
-		expect(alertText()).toBe(NOT_RIGHT);
+		expect(alertText()).toBe(waitLine(20_000));
+		await pass(20_000);
+		await until(() => alertText() === null, 'the line gone at the end of the wait');
 	});
 
 	// A key held on Unlock repeats while the wait is owed: only the first press counts, so no repeat checks anything or puts
