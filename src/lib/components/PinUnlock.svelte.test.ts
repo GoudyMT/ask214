@@ -384,6 +384,52 @@ describe('a lock that lands while the derive runs', () => {
 		expect(onunlocked).not.toHaveBeenCalled();
 		expect(getSession()).toBe(other);
 	});
+
+	// The dropped good PIN has already reset the tries row, so only this tab still knows about the tries before it.
+	it('tells the tries before a good PIN the lock dropped at the next good unlock, with the tries since', async () => {
+		await putTries({ count: 3, waitMs: 0, pending: false });
+		let letGo: () => void = () => {};
+		derive.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					letGo = () => resolve({ macKey: fx.macKey, kek: fx.kek });
+				})
+		);
+		await mount();
+		await field().fill(GOOD);
+		unlockEl().click();
+		await until(() => derive.mock.calls.length > 0, 'the derive started');
+		relockEachSync(relockables, 'idle');
+		letGo();
+		await until(settled, 'the press ended');
+		expect(onunlocked).not.toHaveBeenCalled();
+
+		await press('9999');
+		await press(GOOD);
+		await until(() => onunlocked.mock.calls.length > 0, 'the page was told it unlocked');
+		expect(onunlocked).toHaveBeenCalledOnce();
+		expect(onunlocked).toHaveBeenCalledWith([`4 wrong PIN tries ${SINCE}`]);
+	});
+});
+
+describe('a lock that lands while the stores load', () => {
+	it('does not tell the page it unlocked, holds no session, and tells the tries at the next good unlock', async () => {
+		await putTries({ count: 2, waitMs: 0, pending: false });
+		app.unlockStores.mockImplementationOnce(async () => {
+			relockEachSync(relockables, 'user');
+		});
+		await mount();
+		await press(GOOD);
+
+		expect(app.unlockStores).toHaveBeenCalledTimes(1);
+		expect(onunlocked).not.toHaveBeenCalled();
+		expect(getSession()).toBeNull();
+
+		await press(GOOD);
+		await until(() => onunlocked.mock.calls.length > 0, 'the page was told it unlocked');
+		expect(onunlocked).toHaveBeenCalledOnce();
+		expect(onunlocked).toHaveBeenCalledWith([`2 wrong PIN tries ${SINCE}`]);
+	});
 });
 
 describe('a wrong PIN', () => {

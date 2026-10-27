@@ -37,6 +37,11 @@
 			[typeof import('../backup/BackupCard.svelte'), typeof import('../keystore/forgot-restore')]
 		>;
 	};
+
+	// A good PIN resets the tries row before the page is told. When a lock drops that unlock (or the stores fail to load),
+	// what it would have said about the tries is kept for the tab's next good unlock, since no row holds it any more. Kept
+	// per database handle: a restored device starts with nothing owed.
+	let owed: { db: IDBDatabase; wrong: number; cut: boolean } | null = null;
 </script>
 
 <script lang="ts">
@@ -227,12 +232,23 @@
 
 			if (outcome.kind === 'good') {
 				endCountdown(db);
+				const before = owed?.db === db ? owed : null;
+				// A cut-off try is in the count of tries before it: only the wrong ones are added up.
+				const held = {
+					db,
+					wrong: (before?.wrong ?? 0) + outcome.wrongTries - (outcome.unfinished ? 1 : 0),
+					cut: outcome.unfinished || !!before?.cut
+				};
+				owed = held;
 				if (relocked) return;
 				if (!app.unlockStores) throw new Error('E_NOT_READY');
 				await app.unlockStores();
+				// A lock that landed while the stores loaded leaves the card up: the page is not told it unlocked.
+				if (relocked) return;
 				// The page holds the keys from here on.
 				found.session = null;
-				onunlocked?.(triesNotice(outcome.wrongTries, outcome.unfinished));
+				owed = null;
+				onunlocked?.(triesNotice(held.wrong + (held.cut ? 1 : 0), held.cut));
 			} else if (outcome.kind === 'wrong') {
 				if (outcome.waitMs > 0) await showWait(db, outcome.waitMs, true);
 				else message = NOT_RIGHT;
