@@ -1,6 +1,6 @@
 import { tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi, type Mock } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import PinUnlock, { type PinUnlockDeps } from './PinUnlock.svelte';
 // The colour tokens the card's borders are drawn from.
@@ -195,6 +195,35 @@ const fieldEl = () => field().element() as HTMLInputElement;
 const unlockEl = () => page.getByRole('button', { name: /^Unlock/ }).element() as HTMLButtonElement;
 const showEl = () => page.getByRole('button', { name: 'Show PIN' }).element() as HTMLButtonElement;
 const alertText = () => document.querySelector('[role="alert"]')?.textContent?.trim() ?? null;
+/**
+ * Counts the alerts put on the card from now on. A screen reader speaks an alert when its node is added, so a line that
+ * stays in place is not spoken again.
+ */
+function watchAlerts(): () => Promise<number> {
+	const card = document.querySelector('.pin-unlock');
+	if (card === null) throw new Error('test setup: no card');
+	let added = 0;
+	const count = (records: MutationRecord[]) => {
+		for (const record of records) {
+			for (const node of record.addedNodes) {
+				if (
+					node instanceof Element &&
+					(node.matches('[role="alert"]') || node.querySelector('[role="alert"]'))
+				) {
+					added += 1;
+				}
+			}
+		}
+	};
+	const observer = new MutationObserver(count);
+	observer.observe(card, { childList: true, subtree: true });
+	onTestFinished(() => observer.disconnect());
+	return async () => {
+		await tick();
+		count(observer.takeRecords());
+		return added;
+	};
+}
 const digits = () => Array.from(document.querySelectorAll('ul li'), (li) => li.textContent);
 const settled = () => unlockEl().textContent?.trim() === 'Unlock';
 
@@ -407,6 +436,17 @@ describe('a wrong PIN', () => {
 		expect(alertText()).toBe(NOT_RIGHT);
 		expect(derive).not.toHaveBeenCalled();
 		expect(await readTries(db)).toEqual(NO_TRIES);
+	});
+
+	// A line that stays on the page is not spoken again: the second short entry must put a new alert there.
+	it('puts the line on the page again for a second short entry in a row', async () => {
+		await mount();
+		const alerts = watchAlerts();
+		await press('123');
+		await press('123');
+
+		expect(alertText()).toBe(NOT_RIGHT);
+		expect(await alerts()).toBe(2);
 	});
 });
 
@@ -1072,6 +1112,20 @@ describe('Forgot PIN', () => {
 		expect(alertText()).toBe('Could not open the restore right now - please try again.');
 		expect(restoreToggle()).toBeNull();
 		expect(restoreEl()).toBeTruthy();
+	});
+
+	it('puts the restore did-not-open line on the page again when a second try fails the same way', async () => {
+		await mount({ loadRestore: () => Promise.reject(new Error('E_TEST_OFFLINE')) });
+		await openForgot();
+		const alerts = watchAlerts();
+
+		restoreEl().click();
+		await until(() => alertText() !== null, 'the first failure line');
+		restoreEl().click();
+		await until(async () => (await alerts()) >= 2, 'the line put on the page a second time');
+
+		expect(alertText()).toBe('Could not open the restore right now - please try again.');
+		expect(await alerts()).toBe(2);
 	});
 
 	it('Restore from a backup shows the backup card with only its restore row open, in place of the button', async () => {

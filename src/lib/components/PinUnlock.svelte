@@ -171,6 +171,9 @@
 		}
 		message = null;
 		if (!isPinFormat(pin)) {
+			// The old line comes off the page first: an alert that stays in place is not spoken again. No check runs here, so
+			// nothing is held in the meantime; the field is emptied only after the line is up.
+			await tick();
 			message = NOT_RIGHT;
 			field?.clear();
 			return;
@@ -334,6 +337,9 @@
 		} catch {
 			// The files come from the app's cache; a fetch that fails offline says so and the person can try again.
 			safeLog({ code: 'E_INTERNAL' });
+			// Off the page and back on, so a second failure is spoken again.
+			restoreFailed = false;
+			await tick();
 			restoreFailed = true;
 		}
 	}
