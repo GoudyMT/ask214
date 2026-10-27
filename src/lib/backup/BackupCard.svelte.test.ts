@@ -2433,6 +2433,19 @@ describe('with the PIN on, making a backup', () => {
 		}
 	);
 
+	// The step goes with the relock, and the PIN field the cursor was in goes with it: Cancel hands the cursor to the row's
+	// toggle, and so does a relock.
+	it('puts the cursor on the row toggle when a relock closes the step', async () => {
+		await pinOn();
+		const card = await mount({ keyMode: 'pin' });
+		await openStepUp();
+		await pinField().fill(CURRENT_PIN);
+		card.relock('user');
+
+		await expect.element(toggle(CARD_LABELS.make, false)).toBeVisible();
+		await expect.poll(() => document.activeElement).toBe(toggle(CARD_LABELS.make, false).element());
+	});
+
 	// A Lock that lands while the PIN is being derived must not be outlived by the backup it would have started.
 	it('starts nothing when a Lock lands while the PIN is checked', async () => {
 		await pinOn();

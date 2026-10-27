@@ -103,9 +103,15 @@
 	// fields that no longer hold the PIN it warned about.
 	let easy = $state<{ form: 'setup' | 'change'; seen: string } | null>(null);
 	let chooseEl = $state<HTMLButtonElement | null>(null);
+	// The form's primary button (Next, Change PIN or Remove PIN): where the cursor goes when a press ends on the form.
+	let primaryEl = $state<HTMLButtonElement | null>(null);
 	const shown = $derived(easy === null ? message : null);
 	$effect(() => {
-		if (easy !== null && easy.seen !== `${current},${first},${second}`) easy = null;
+		if (easy !== null && easy.seen !== `${current},${first},${second}`) {
+			const { form } = easy;
+			easy = null;
+			void toFirstField(form);
+		}
 	});
 	// What a change or a removal did, shown under the row after it closes.
 	let statuses = $state<string[]>([]);
@@ -261,12 +267,25 @@
 		chooseEl?.focus();
 	}
 
-	// The same press again with the fields as they are; only the easy check is skipped.
-	function useAnyway(): void {
+	// The warning went because the fields were emptied under it, and its focused button went with it: the cursor goes to the
+	// form's first field, unless the person has already moved on.
+	async function toFirstField(form: 'setup' | 'change'): Promise<void> {
+		await tick();
+		if (document.activeElement === document.body)
+			(form === 'change' ? currentField : firstField)?.focus();
+	}
+
+	// The same press again with the fields as they are; only the easy check is skipped. The pressed button went with the
+	// warning, so a press that ends on the form (a wrong current PIN, no memory) hands the cursor to the primary button, where
+	// the same press without the warning leaves it.
+	async function useAnyway(): Promise<void> {
 		const form = easy?.form;
 		easy = null;
-		if (form === 'setup') void next(true);
-		else if (form === 'change') void press('change', true);
+		if (form === 'setup') await next(true);
+		else if (form === 'change') await press('change', true);
+		else return;
+		await tick();
+		if (document.activeElement === document.body) primaryEl?.focus();
 	}
 
 	function chooseAnother(): void {
@@ -554,8 +573,11 @@
 			onclick={chooseAnother}
 			onkeydown={noRepeat}>Choose another</button
 		>
-		<button class="app-lock__cancel" type="button" onclick={useAnyway} onkeydown={noRepeat}
-			>Use it anyway</button
+		<button
+			class="app-lock__cancel"
+			type="button"
+			onclick={() => void useAnyway()}
+			onkeydown={noRepeat}>Use it anyway</button
 		>
 	</div>
 {/snippet}
@@ -644,6 +666,7 @@
 				{:else}
 					<div class="app-lock__actions">
 						<button
+							bind:this={primaryEl}
 							class="app-lock__next"
 							type="button"
 							aria-busy={busy}
@@ -727,6 +750,7 @@
 				{:else}
 					<div class="app-lock__actions">
 						<button
+							bind:this={primaryEl}
 							class="app-lock__next"
 							type="button"
 							aria-busy={busy}

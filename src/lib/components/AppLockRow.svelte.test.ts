@@ -1220,6 +1220,38 @@ describe('an easy PIN at setup', () => {
 		expect(actionNames()).toEqual(['Next', 'Cancel']);
 		expect([firstEl().value, secondEl().value]).toEqual(['', '']);
 	});
+
+	// Use it anyway goes with the press, so a press that ends on the form leaves focus on the page unless it is handed on.
+	it('puts the cursor on Next when Use it anyway ends on the phone-memory line', async () => {
+		await warned();
+		derive.mockRejectedValue(new PinNoMemoryError());
+		anywayEl().click();
+		await until(() => alertText() === LOW_MEMORY_LINE, 'the memory line');
+
+		await until(() => document.activeElement === nextEl(), 'the cursor on Next');
+		expect(document.activeElement).toBe(nextEl());
+	});
+
+	// The warning's own button goes with it when the fields are emptied under it (a switch away does it).
+	it('puts the cursor in the first field when a switch away empties the fields under the warning', async () => {
+		await warned();
+		relockEachSync(relockables, 'hygiene');
+
+		await until(() => alertText() === null, 'the warning gone');
+		await until(() => document.activeElement === firstEl(), 'the cursor in the first field');
+		expect(document.activeElement).toBe(firstEl());
+	});
+
+	// Someone who moved on keeps their place: only a cursor that fell to the page is handed on.
+	it('leaves the cursor where the person put it when the warning ends under a typed field', async () => {
+		await warned();
+		await secondField().fill(SETUP_PIN);
+
+		await until(() => alertText() === null, 'the warning gone');
+		await until(() => document.activeElement === secondEl(), 'the cursor in the second field');
+		await real(50);
+		expect(document.activeElement).toBe(secondEl());
+	});
 });
 
 describe('an easy new PIN in Change', () => {
@@ -1307,6 +1339,32 @@ describe('an easy new PIN in Change', () => {
 
 		expect(alertText()).toBeNull();
 		expect(deriveLog.map((d) => d.pin)).toEqual([CURRENT, SETUP_PIN]);
+	});
+
+	// Use it anyway goes with the press, so a press that ends on the form leaves focus on the page unless it is handed on.
+	it('puts the cursor on Change PIN when Use it anyway ends on a wrong current PIN', async () => {
+		await warnedWith(WRONG);
+		anywayEl().click();
+		await until(() => alertText() === NOT_RIGHT_LINE, 'the not-right line');
+
+		await until(
+			() => document.activeElement === buttonEl('Change PIN'),
+			'the cursor on Change PIN'
+		);
+		expect(document.activeElement).toBe(buttonEl('Change PIN'));
+	});
+
+	// The warning's own button goes with it when the fields are emptied under it (a switch away does it).
+	it('puts the cursor in the current-PIN field when a switch away empties the fields under the warning', async () => {
+		await warnedWith(CURRENT);
+		relockEachSync(relockables, 'hygiene');
+
+		await until(() => alertText() === null, 'the warning gone');
+		await until(
+			() => document.activeElement === currentEl(),
+			'the cursor in the current-PIN field'
+		);
+		expect(document.activeElement).toBe(currentEl());
 	});
 });
 
@@ -1483,6 +1541,26 @@ describe('held keys', () => {
 		expect(derive).not.toHaveBeenCalled();
 	});
 
+	// A failed Use it anyway hands focus on to Next, which is where the key's repeats then land: they must not press it over
+	// the emptied fields and replace the answer.
+	it('keeps the line a failed Use it anyway ended with, for an Enter held on it', async () => {
+		derive.mockImplementation(async () => {
+			await real(100);
+			throw new PinNoMemoryError();
+		});
+		await mount();
+		await openRow();
+		await fill(EASY_PIN, EASY_PIN);
+		nextEl().click();
+		await until(() => hasEasy(), 'the warning');
+		anywayEl().focus();
+		await hold();
+
+		expect(derive).toHaveBeenCalledTimes(1);
+		expect(alertText()).toBe(LOW_MEMORY_LINE);
+		expect(document.activeElement).toBe(nextEl());
+	});
+
 	// Cancel hands focus to the toggle, which is where the key's repeats then land: they must not open the row again.
 	it('closes once for an Enter held on Cancel, and the repeats that follow do not open it again', async () => {
 		await mount();
@@ -1590,6 +1668,29 @@ describe('held keys', () => {
 			expect(document.activeElement).toBe(chooseEl());
 			expect(derive).not.toHaveBeenCalled();
 			expect(await readTries(db)).toMatchObject({ count: 0 });
+		});
+
+		// A failed Use it anyway hands focus on to Change PIN, which is where the key's repeats then land: they must not press
+		// it again over the emptied fields and replace the answer.
+		it('keeps the line a failed Use it anyway ended with, for an Enter held on it in Change', async () => {
+			derive.mockImplementation(async (pin: string) => {
+				await real(100);
+				return pin === CURRENT ? { macKey, kek } : wrongKeys;
+			});
+			await mount();
+			await openForm('Change PIN');
+			await currentField().fill(WRONG);
+			await firstField().fill(EASY_PIN);
+			await secondField().fill(EASY_PIN);
+			buttonEl('Change PIN').click();
+			await until(() => alertText() === EASY_LINE, 'the warning');
+			anywayEl().focus();
+			await hold();
+
+			expect(derive).toHaveBeenCalledTimes(1);
+			expect(alertText()).toBe(NOT_RIGHT_LINE);
+			expect(document.activeElement).toBe(buttonEl('Change PIN'));
+			expect(await readTries(db)).toMatchObject({ count: 1 });
 		});
 
 		// Cancel hands focus back to the button that opened the form, which is where the key's repeats then land.

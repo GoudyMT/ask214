@@ -420,13 +420,15 @@
 
 	// ---- rows -----------------------------------------------------------------------------------------------------
 
-	// A relock of any reason closes the step; the field empties itself.
+	// A relock of any reason closes the step; the field empties itself. The field held the cursor, so it goes to the row's
+	// toggle as Cancel does.
 	$effect(() => {
 		if (!stepUp) return;
 		return app.joinRelock?.({
 			relockSync: () => {
 				stepUpEpoch += 1;
 				closeStepUp();
+				void handFocusToRow('export');
 			},
 			refresh: () => Promise.resolve()
 		});
