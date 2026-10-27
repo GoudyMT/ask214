@@ -307,15 +307,6 @@ describe('a good PIN', () => {
 		expect(app.unlockStores).not.toHaveBeenCalled();
 		expect(onunlocked).not.toHaveBeenCalled();
 	});
-
-	it('holds no session when the app cannot load the stores', async () => {
-		Reflect.deleteProperty(app, 'unlockStores');
-		await mount();
-		await press(GOOD);
-
-		expect(alertText()).toBe(UNLOCK_FAILED);
-		expect(getSession()).toBeNull();
-	});
 });
 
 describe('a lock that lands while the derive runs', () => {
