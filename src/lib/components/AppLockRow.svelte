@@ -101,11 +101,13 @@
 	// The easy-PIN warning: which form raised it, and the fields as it found them. The typed PINs stay in their fields while
 	// it shows, and any change to them (typing, a relock, a hidden page) ends it, so a Use it anyway never presses over
 	// fields that no longer hold the PIN it warned about.
-	let easy = $state<{ form: 'setup' | 'change'; seen: string } | null>(null);
+	// Use it anyway keeps the warning up, marked going, until its press ends: the pressed button holds the cursor meanwhile,
+	// and the press empties the fields itself.
+	let easy = $state<{ form: 'setup' | 'change'; seen: string; going?: true } | null>(null);
 	let chooseEl = $state<HTMLButtonElement | null>(null);
 	const shown = $derived(easy === null ? message : null);
 	$effect(() => {
-		if (easy !== null && easy.seen !== `${current},${first},${second}`) {
+		if (easy !== null && !easy.going && easy.seen !== `${current},${first},${second}`) {
 			easy = null;
 			// The fields were emptied under the warning: the cursor goes to the form's first one.
 			void keepCursor('#app-lock-edit input');
@@ -270,14 +272,17 @@
 	// current PIN, no memory) leaves the cursor on the form's primary button (Next or Change PIN), as the same press without
 	// the warning does.
 	async function useAnyway(): Promise<void> {
-		const form = easy?.form;
-		easy = null;
+		if (busy || easy === null) return;
+		const form = easy.form;
+		easy = { ...easy, going: true };
 		if (form === 'setup') await next(true);
-		else if (form === 'change') await press('change', true);
+		else await press('change', true);
+		easy = null;
 		await keepCursor('#app-lock-edit .app-lock__next');
 	}
 
 	function chooseAnother(): void {
+		if (busy) return;
 		easy = null;
 		firstField?.clear();
 		secondField?.clear();
@@ -562,8 +567,12 @@
 			onclick={chooseAnother}
 			onkeydown={noRepeat}>Choose another</button
 		>
-		<button class="app-lock__cancel" type="button" onclick={useAnyway} onkeydown={noRepeat}
-			>Use it anyway</button
+		<button
+			class="app-lock__cancel"
+			type="button"
+			aria-busy={busy}
+			onclick={useAnyway}
+			onkeydown={noRepeat}>Use it anyway</button
 		>
 	</div>
 {/snippet}

@@ -1268,6 +1268,26 @@ describe('an easy PIN at setup', () => {
 		expect(document.activeElement).toBe(nextEl());
 	});
 
+	// The pressed button stays where it was, busy, while the PIN is derived: a cursor that fell to the page for those
+	// seconds would leave a keyboard or screen reader user nowhere. Choose another waits for the press too.
+	it('keeps Use it anyway in place, busy, with the cursor on it, until the backup step takes its place', async () => {
+		await warned();
+		let release: () => void = () => {};
+		derive.mockImplementation(() => new Promise((done) => (release = () => done({ macKey, kek }))));
+		anywayEl().focus();
+		anywayEl().click();
+		await until(() => derive.mock.calls.length === 1, 'the derive started');
+		chooseEl().click();
+		await real(50);
+
+		expect(document.activeElement).toBe(anywayEl());
+		expect(anywayEl().getAttribute('aria-busy')).toBe('true');
+		expect([firstEl().value, secondEl().value]).toEqual([EASY_PIN, EASY_PIN]);
+		release();
+		await until(() => hasStep(), 'the backup step');
+		await until(() => document.activeElement === makeEl(), 'the cursor on the backup step');
+	});
+
 	// The warning's own button goes with it when the fields are emptied under it (a switch away does it).
 	it('puts the cursor in the first field when a switch away empties the fields under the warning', async () => {
 		await warned();
@@ -1388,6 +1408,25 @@ describe('an easy new PIN in Change', () => {
 			'the cursor on Change PIN'
 		);
 		expect(document.activeElement).toBe(buttonEl('Change PIN'));
+	});
+
+	// The pressed button stays where it was, busy, while the PINs are derived, so the cursor never falls to the page.
+	it('keeps Use it anyway in place, busy, with the cursor on it, until the change is done', async () => {
+		await warnedWith(CURRENT);
+		let release: () => void = () => {};
+		derive.mockImplementation(async (pin: string) =>
+			pin === CURRENT ? { macKey, kek } : new Promise((done) => (release = () => done(newKeys)))
+		);
+		anywayEl().focus();
+		anywayEl().click();
+		await until(() => derive.mock.calls.length === 2, 'the new PIN derive started');
+		await real(50);
+
+		expect(document.activeElement).toBe(anywayEl());
+		expect(anywayEl().getAttribute('aria-busy')).toBe('true');
+		release();
+		await until(() => statusLines().length > 0, 'the status line');
+		await until(() => document.activeElement === toggleEl(), 'the cursor on the row');
 	});
 
 	// The warning's own button goes with it when the fields are emptied under it (a switch away does it).
