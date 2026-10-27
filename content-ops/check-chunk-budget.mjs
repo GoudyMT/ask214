@@ -463,6 +463,13 @@ const STATIC = 'static';
 //     252,135-252,168 B and route nodes 59,170-59,196 B, about 40 B of room above the highest; the files limit is
 //     unchanged. Trim pass first: about 110 B came off the count; the count and the wait id guard the wait and were
 //     not cut further.
+//     Page 103,415 -> 103,485, onDemand 16,015 -> 16,050, precache 252,210 -> 252,830 and the lazy route nodes
+//     59,240 -> 59,715 (owner's call, 2026-10-27): the owner's design calls after the walkthrough - the wizard shows the
+//     Unlock card and the tries notice while the PIN locks the app, a press in a wait keeps the wait line, Use it
+//     anyway stays in place and busy through its press, the App lock row is off while locked, and each Show PIN toggle
+//     names its field. Four builds of the same code measured page 103,434-103,445 B, on demand 16,007-16,012 B,
+//     precache 252,772-252,792 B and route nodes 59,665-59,676 B, about 40 B of room above the highest; the files
+//     limit is unchanged.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -472,10 +479,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 103_415,
-	onDemand: 16_015,
+	page: 103_485,
+	onDemand: 16_050,
 	precacheFiles: 80,
-	precacheBytes: 252_210,
+	precacheBytes: 252_830,
 	workerScripts: 147_200
 };
 
