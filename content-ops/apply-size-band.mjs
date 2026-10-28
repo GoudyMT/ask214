@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import {
+	BUDGET_LINES,
 	highest,
 	parseBand,
 	planApply,
@@ -65,8 +66,9 @@ function measureOneBuild() {
 		routeNodes: named('Lazy route nodes'),
 		rootLayout: named('Root layout node')
 	};
-	for (const [line, size] of Object.entries(sizes))
-		if (!Number.isInteger(size)) {
+	// Every budget line by name: a size the check stopped printing is missing from `sizes`, not undefined in it.
+	for (const line of BUDGET_LINES)
+		if (!Number.isInteger(sizes[line])) {
 			console.log(`    No size read for ${line}`);
 			throw new Error('E_SIZE_BAND_NO_SIZES');
 		}
