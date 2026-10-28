@@ -93,7 +93,14 @@ const OLD = '/docs/tap_vet_centers.0badc0de.pdf';
  * request, whose headers a bare path lookup does not carry.
  */
 function recordingCaches(
-	options: { held?: string[]; exists?: boolean; putError?: Error; putGate?: Promise<void> } = {}
+	options: {
+		held?: string[];
+		exists?: boolean;
+		putError?: Error;
+		putGate?: Promise<void>;
+		// The real Cache API reports a body that failed while it read it as its own TypeError, not the body's error.
+		bodyErrorAsTypeError?: boolean;
+	} = {}
 ) {
 	const held = new Set(options.held ?? []);
 	const log: string[] = [];
@@ -109,7 +116,11 @@ function recordingCaches(
 					return held.has(path) && query?.ignoreVary === true ? new Response('held') : undefined;
 				},
 				async put(path: string, response: Response) {
-					await response.arrayBuffer();
+					try {
+						await response.arrayBuffer();
+					} catch (error) {
+						throw options.bodyErrorAsTypeError ? new TypeError('E_TEST_BODY') : error;
+					}
 					await options.putGate;
 					if (options.putError) throw options.putError;
 					log.push(`put ${path}`);
@@ -255,6 +266,29 @@ describe('saveDocument', () => {
 			})
 		).toBe('stopped');
 		expect([...caches.held]).toEqual([OLD]);
+	});
+
+	// A connection that is up but silent never fails on its own. The save gives up, and says it failed - not that the
+	// user stopped it, which they did not, and not offline, which the device is not.
+	it('reports a failure, and keeps the older copy, when the download goes silent part-way', async () => {
+		const caches = recordingCaches({ held: [OLD], bodyErrorAsTypeError: true });
+		let download: AbortSignal | undefined;
+		const fetchFn = vi.fn(async (_path: string, init?: RequestInit) => {
+			download = init?.signal ?? undefined;
+			const body = new ReadableStream<Uint8Array>({ start: (c) => c.enqueue(new Uint8Array(8)) });
+			return new Response(body, { status: 200 });
+		});
+		expect(
+			await saveDocument(CURRENT, [OLD], {
+				fetchFn,
+				cachesApi: caches.api,
+				isOnline: online,
+				library: [],
+				idleMs: 40
+			})
+		).toBe('failed');
+		expect([...caches.held]).toEqual([OLD]);
+		expect(download?.aborted).toBe(true);
 	});
 
 	it('reports a failure, rather than throwing, when the browser has no Cache API', async () => {
