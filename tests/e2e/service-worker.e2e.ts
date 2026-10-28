@@ -150,10 +150,18 @@ test('a page opened on a silent connection opens from the kept page', async ({
 	await page.reload();
 	expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
 
-	// The page's own address answers nothing, ever: headers never come.
-	await context.route('**/documents', () => {});
+	// The page's own address answers nothing, ever: headers never come. Counted, so the test knows the worker's own
+	// request reached the route rather than passing without it.
+	let asked = 0;
+	await context.route('**/documents', () => {
+		asked++;
+	});
 	await page.goto('/documents', { timeout: 15_000 });
-	await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 });
+	await expect(page.getByRole('heading', { level: 1, name: 'Documents' })).toBeVisible({
+		timeout: 10_000
+	});
+	expect(new URL(page.url()).pathname).toBe('/documents');
+	expect(asked).toBeGreaterThan(0);
 	await context.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
