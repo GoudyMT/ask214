@@ -27,6 +27,7 @@
 		"curate:backup-words": "tsx content-ops/curate-backup-words.mjs",
 		"build:backup-kdf": "tsx content-ops/build-backup-kdf.mjs",
 		"check:served-history": "node content-ops/check-served-history.mjs",
+		"check:live": "node content-ops/live-check.mjs",
 		"check:chunks": "tsx content-ops/check-chunk-budget.mjs",
 		"check:commit-msg": "tsx content-ops/check-commit-message.mjs",
 		"check:commits": "tsx content-ops/check-commit-message.mjs --range",
