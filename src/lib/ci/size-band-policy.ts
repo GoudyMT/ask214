@@ -1,0 +1,216 @@
+// The size band: a plan's one approved budget raise, applied from measurement and never past what was approved.
+// "Size Budgets: Trim Before You Ask" -> "One request, two checks" in the working standards is the rule; this module
+// is the arithmetic and the file edits, so neither is done by hand. content-ops/apply-size-band.mjs runs it.
+
+/** Every budget line the two size checks enforce: check-chunk-budget.mjs's LIMIT and package.json's size-limit. */
+export const BUDGET_LINES = [
+	'page',
+	'onDemand',
+	'precacheFiles',
+	'precacheBytes',
+	'workerScripts',
+	'routeNodes',
+	'rootLayout'
+] as const;
+
+export type BudgetLine = (typeof BUDGET_LINES)[number];
+export type Sizes = Record<BudgetLine, number>;
+
+/** A count, not bytes: a byte margin means nothing for it, so the script never raises or lowers it. */
+const COUNT_LINES: ReadonlySet<BudgetLine> = new Set(['precacheFiles']);
+
+/** The two lines whose limits live in package.json's size-limit, found there by their entry's name. */
+const SIZE_LIMIT_NAMES: Partial<Record<BudgetLine, string>> = {
+	routeNodes: 'Lazy route nodes (sum; no single page loads all of them)',
+	rootLayout: 'Root layout node (loaded on every page)'
+};
+
+export type Band = {
+	plan: string;
+	approved: string;
+	/** `main`'s measured sizes when the band was asked, so growth is counted from where the plan started. */
+	base: Sizes;
+	/** The limits when the band was approved: a raise is counted from these. */
+	limit: Sizes;
+	/** The approved raise per byte line, in bytes; a line not listed may not be raised. */
+	raise: Partial<Record<BudgetLine, number>>;
+};
+
+export type Change = {
+	line: BudgetLine;
+	from: number;
+	to: number;
+	measured: number;
+	growth: number;
+	margin: number;
+};
+export type Refusal = { line: BudgetLine; need: number; allowed: number; measured: number };
+export type Plan =
+	{ ok: true; changes: Change[] } | { ok: false; changes: []; refusals: Refusal[] };
+
+/**
+ * The room a limit keeps above its measured size: 10% of the growth or 40 B, whichever is larger.
+ *
+ * 40 B because builds of the same code differ by up to ~25 B between commits (a time-stamped chunk renames every
+ * file that imports it - L-28), so a smaller room fails CI on noise.
+ */
+export function marginFor(growth: number): number {
+	return Math.max(40, Math.ceil(Math.max(0, growth) * 0.1));
+}
+
+/** Each line's largest size across several builds of the same code, so a lucky small build never sets a limit. */
+export function highest(builds: Sizes[]): Sizes {
+	const out = { ...builds[0] } as Sizes;
+	for (const build of builds)
+		for (const line of BUDGET_LINES) out[line] = Math.max(out[line], build[line]);
+	return out;
+}
+
+/**
+ * Read and check a band file's contents.
+ *
+ * @throws Error `E_SIZE_BAND_FILE` when a line is missing or not a whole number, or a raise is negative or names a
+ *   count line. A band read wrong would let the script raise past what was approved.
+ */
+export function parseBand(value: unknown): Band {
+	const fail = () => {
+		throw new Error('E_SIZE_BAND_FILE');
+	};
+	const band = value as Band;
+	const whole = (n: unknown) => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+	if (typeof band?.plan !== 'string' || typeof band.approved !== 'string') fail();
+	for (const key of ['base', 'limit'] as const)
+		for (const line of BUDGET_LINES) if (!whole(band[key]?.[line])) fail();
+	for (const [line, bytes] of Object.entries(band.raise ?? fail())) {
+		const known = (BUDGET_LINES as readonly string[]).includes(line);
+		if (!known || COUNT_LINES.has(line as BudgetLine) || !whole(bytes)) fail();
+	}
+	return band;
+}
+
+function refuseOrChange(plan: { changes: Change[]; refusals: Refusal[] }): Plan {
+	return plan.refusals.length > 0
+		? { ok: false, changes: [], refusals: plan.refusals }
+		: { ok: true, changes: plan.changes };
+}
+
+/**
+ * The raise for this build: each line over (or within its margin of) its limit goes to its size plus the margin,
+ * when that fits the band. One line past its band refuses the whole plan, so nothing is written that a re-request
+ * from the measurement would have to undo.
+ */
+export function planApply(band: Band, measured: Sizes, current: Sizes): Plan {
+	const changes: Change[] = [];
+	const refusals: Refusal[] = [];
+	for (const line of BUDGET_LINES) {
+		const size = measured[line];
+		if (COUNT_LINES.has(line)) {
+			if (size > current[line])
+				refusals.push({ line, need: size, allowed: current[line], measured: size });
+			continue;
+		}
+		const growth = size - band.base[line];
+		const margin = marginFor(growth);
+		const need = size + margin;
+		if (need <= current[line]) continue;
+		const allowed = band.limit[line] + (band.raise[line] ?? 0);
+		if (need > allowed) refusals.push({ line, need, allowed, measured: size });
+		else changes.push({ line, from: current[line], to: need, measured: size, growth, margin });
+	}
+	return refuseOrChange({ changes, refusals });
+}
+
+/**
+ * The end check, after the sweep's fixes: a band line with more room than its margin is lowered to its size plus
+ * the margin; any line over its limit fails, back to a trim pass (a raise past the band is the owner's call).
+ */
+export function planFinal(band: Band, measured: Sizes, current: Sizes): Plan {
+	const changes: Change[] = [];
+	const refusals: Refusal[] = [];
+	for (const line of BUDGET_LINES) {
+		const size = measured[line];
+		const growth = size - band.base[line];
+		const margin = COUNT_LINES.has(line) ? 0 : marginFor(growth);
+		if (size > current[line]) {
+			refusals.push({ line, need: size + margin, allowed: current[line], measured: size });
+			continue;
+		}
+		if (!(line in band.raise) || current[line] - size <= margin) continue;
+		changes.push({ line, from: current[line], to: size + margin, measured: size, growth, margin });
+	}
+	return refuseOrChange({ changes, refusals });
+}
+
+// The last entry in LIMIT has no trailing comma; the comma is kept as found.
+const scriptLimit = (line: BudgetLine) => new RegExp(`^\\t${line}: ([\\d_]+)(,?)$`, 'gm');
+const sizeLimitEntry = (name: string) =>
+	new RegExp(
+		`("name": "${name.replace(/[()]/g, '\\$&')}",\\n\\t+"path": "[^"\\n]*",\\n\\t+"limit": ")(\\d+) B(")`,
+		'g'
+	);
+const RECORD_ANCHOR =
+	'// Raise a limit only with a measured reason recorded here; never to make a run pass.';
+
+function exactlyOne(source: string, pattern: RegExp): RegExpMatchArray {
+	const matches = [...source.matchAll(pattern)];
+	if (matches.length !== 1) throw new Error('E_SIZE_BAND_ANCHOR');
+	return matches[0] as RegExpMatchArray;
+}
+
+/**
+ * The current limits, read where the two checks read them.
+ *
+ * @throws Error `E_SIZE_BAND_ANCHOR` when a limit is not found exactly once.
+ */
+export function readLimits(script: string, packageJson: string): Sizes {
+	const out = {} as Sizes;
+	for (const line of BUDGET_LINES) {
+		const name = SIZE_LIMIT_NAMES[line];
+		out[line] =
+			name === undefined
+				? Number((exactlyOne(script, scriptLimit(line))[1] as string).replaceAll('_', ''))
+				: Number(exactlyOne(packageJson, sizeLimitEntry(name))[2]);
+	}
+	return out;
+}
+
+const grouped = (n: number, separator: string) =>
+	n.toLocaleString('en-US').replaceAll(',', separator);
+
+/**
+ * Both files with the changes written: each limit number in place, and one dated record line per change above the
+ * script's limits. Every anchor is found before either text is changed, so a miss changes nothing.
+ *
+ * @throws Error `E_SIZE_BAND_ANCHOR` when a limit or the record anchor is not found exactly once.
+ */
+export function rewriteLimits(
+	script: string,
+	packageJson: string,
+	changes: Change[],
+	record: { date: string; reason: string }
+): { script: string; packageJson: string } {
+	exactlyOne(script, new RegExp(`^${RECORD_ANCHOR.replace(/[.;]/g, '\\$&')}$`, 'gm'));
+	for (const { line } of changes) {
+		const name = SIZE_LIMIT_NAMES[line];
+		exactlyOne(
+			name === undefined ? script : packageJson,
+			name === undefined ? scriptLimit(line) : sizeLimitEntry(name)
+		);
+	}
+	let nextScript = script;
+	let nextPackage = packageJson;
+	for (const { line, to } of changes) {
+		const name = SIZE_LIMIT_NAMES[line];
+		if (name === undefined)
+			nextScript = nextScript.replace(scriptLimit(line), `\t${line}: ${grouped(to, '_')}$2`);
+		else nextPackage = nextPackage.replace(sizeLimitEntry(name), `$1${to} B$3`);
+	}
+	const lines = changes.map(
+		(c) =>
+			`//   ${record.date} ${record.reason}: ${c.line} ${grouped(c.from, ',')} -> ${grouped(c.to, ',')} ` +
+			`(measured ${grouped(c.measured, ',')} B, ${c.growth >= 0 ? '+' : ''}${grouped(c.growth, ',')} B on the plan's base, margin ${c.margin} B).`
+	);
+	if (lines.length > 0)
+		nextScript = nextScript.replace(RECORD_ANCHOR, `${lines.join('\n')}\n//\n${RECORD_ANCHOR}`);
+	return { script: nextScript, packageJson: nextPackage };
+}

@@ -554,6 +554,7 @@ let failed = 0;
  * @param {string} label
  * @param {string[]} files Paths relative to the client output.
  * @param {number} limit Gzipped bytes.
+ * @returns {number} The row's size, for the sizes line apply-size-band.mjs reads.
  */
 function sizeRow(label, files, limit) {
 	const size = total(files);
@@ -562,10 +563,13 @@ function sizeRow(label, files, limit) {
 	console.log(
 		`    ${label.padEnd(26)} ${kilobytes(size).padStart(8)} KB  <= ${kilobytes(limit)} KB  ${pass ? 'PASS' : 'FAIL'}  (${files.length} files, ${roomInBytes(size, limit)})`
 	);
+	return size;
 }
 
-sizeRow('chunks a page downloads', page, LIMIT.page);
-sizeRow('chunks loaded on demand', onDemand, LIMIT.onDemand);
+/** @type {Record<string, number>} */
+const measured = {};
+measured.page = sizeRow('chunks a page downloads', page, LIMIT.page);
+measured.onDemand = sizeRow('chunks loaded on demand', onDemand, LIMIT.onDemand);
 
 // The precache, read from the built worker's own list and filtered by the worker's own rule.
 const { listed, precached } = precachedPaths(readFileSync(`${CLIENT}/service-worker.js`, 'utf-8'));
@@ -650,7 +654,7 @@ if (unread.length > 0) {
 
 // The worker script is fetched under its own deadline (WORKER_SCRIPT_DEADLINE_MS), which assumes the size
 // measured below; a script that grows past it can miss that deadline on a slow connection.
-sizeRow(
+measured.workerScripts = sizeRow(
 	'worker scripts',
 	scriptsOnDisk.map((script) => script.slice(1)),
 	LIMIT.workerScripts
@@ -670,6 +674,9 @@ if (stray.length > 0) {
 	for (const file of stray) console.log(`    wasm outside /wasm/ ${file}`);
 	throw new Error('E_STRAY_WASM');
 }
+
+// One machine-read line: content-ops/apply-size-band.mjs reads the sizes from this check, so both use one instrument.
+console.log(`    sizes ${JSON.stringify({ ...measured, precacheFiles, precacheBytes })}`);
 
 if (failed > 0) {
 	console.log(

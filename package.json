@@ -29,6 +29,7 @@
 		"check:served-history": "node content-ops/check-served-history.mjs",
 		"check:live": "node content-ops/live-check.mjs",
 		"check:chunks": "tsx content-ops/check-chunk-budget.mjs",
+		"size:band": "tsx content-ops/apply-size-band.mjs",
 		"check:commit-msg": "tsx content-ops/check-commit-message.mjs",
 		"check:commits": "tsx content-ops/check-commit-message.mjs --range",
 		"ingest": "tsx content-ops/capture-extract.mjs",
