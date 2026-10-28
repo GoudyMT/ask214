@@ -141,6 +141,8 @@ describe('SourceDocument', () => {
 		await render(SourceDocument, {
 			props: props(loader, {
 				isSaved: () => new Promise<boolean>(() => {}),
+				// The same storage answers the look for older copies, so it does not answer either.
+				held: () => new Promise<string[]>(() => {}),
 				isOnline: () => false,
 				onfallback,
 				checkWait: 50

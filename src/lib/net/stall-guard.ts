@@ -20,8 +20,8 @@ type GuardOptions = {
 };
 
 /**
- * Fetch a file and give it up when nothing arrives for `idleMs` - before the headers, or between two pieces of the
- * body. The download itself is stopped then, not only the wait for it.
+ * Fetch a file and give it up when nothing arrives for `idleMs` - before the headers, or while the reader waits on a
+ * piece of the body. The download itself is stopped then, not only the wait for it.
  *
  * The response comes back with its status and headers and a body that carries the guard, so the caller reads or
  * stores it as it would the original.
