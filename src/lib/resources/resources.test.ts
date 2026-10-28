@@ -232,6 +232,13 @@ describe('the SkillBridge steps link to the pages that carry them out', () => {
 	});
 });
 
+// A member choosing a TAP track is deciding on a career path, which is where a mentor helps most.
+describe('mentorship links sit on the career-planning steps', () => {
+	it('lists the free mentoring programs after DoD TAP on the TAP track step', () => {
+		expect(resourcesForTask('tap-track').map((r) => r.id)).toEqual(['dodtap', 'acp', 'milmentor']);
+	});
+});
+
 describe('38 CFR 14.629 boundary: claims and benefits links stay official or accredited', () => {
 	// Claims and benefits destinations must be official .gov or a VA-accredited VSO - never an
 	// unaccredited or paid claims consultant. This makes the boundary an executable guard.

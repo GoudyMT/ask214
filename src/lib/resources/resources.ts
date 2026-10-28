@@ -258,18 +258,18 @@ export const RESOURCES: readonly Resource[] = [
 		title: 'American Corporate Partners (ACP)',
 		url: 'https://www.acp-usa.org',
 		description:
-			'Free yearlong one-on-one mentoring with corporate professionals for post-9/11 veterans and military spouses.',
+			'Free yearlong one-on-one career mentoring for transitioning service members, veterans, and active-duty spouses.',
 		displayCategory: 'mentorship-networking',
-		lastVerified: '2026-08-09'
+		lastVerified: '2026-10-27'
 	},
 	{
 		id: 'milmentor',
 		title: 'MilMentor',
 		url: 'https://www.milmentor.com',
 		description:
-			'A free, on-demand mentorship platform for veterans, transitioning service members, and military spouses.',
+			'Free mentoring from professionals at top companies for service members, veterans, and military spouses moving to civilian careers.',
 		displayCategory: 'mentorship-networking',
-		lastVerified: '2026-08-09'
+		lastVerified: '2026-10-27'
 	},
 	{
 		id: 'hire-heroes',
@@ -338,7 +338,7 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'document-medical': ['va-disability'],
 	'preseparation-counseling': ['dodtap', 'navy-transition'],
 	'tap-course': ['dodtap', 'dol-vets'],
-	'tap-track': ['dodtap'],
+	'tap-track': ['dodtap', 'acp', 'milmentor'],
 	'skillbridge-find': ['skillbridge'],
 	'skillbridge-request': ['mynavy-education', 'navy-skillbridge'],
 	'job-search': ['usajobs', 'hiring-our-heroes', 'hire-heroes'],
