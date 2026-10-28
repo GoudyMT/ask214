@@ -31,7 +31,12 @@ const DEFAULT_BUILDS = 2;
  */
 function node(args) {
 	try {
-		return execFileSync(process.execPath, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+		return execFileSync(process.execPath, args, {
+			encoding: 'utf8',
+			maxBuffer: 64 * 1024 * 1024,
+			// An over-budget check also prints its stack to stderr; the sizes line on stdout is all that is read.
+			stdio: 'pipe'
+		});
 	} catch (error) {
 		const failed = /** @type {{ stdout?: string }} */ (error);
 		return failed.stdout ?? '';
