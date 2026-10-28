@@ -46,7 +46,7 @@ const BAND = parseBand({
 });
 
 describe('marginFor', () => {
-	it('keeps at least 40 B, above the ~25 B a build drifts between commits (L-28)', () => {
+	it('keeps at least 40 B, above the ~25 B a build drifts between commits', () => {
 		expect(marginFor(0)).toBe(40);
 		expect(marginFor(264)).toBe(40);
 	});
@@ -185,7 +185,7 @@ describe('rewriteLimits on the real budget files', () => {
 	const realChanges = changes.map((c) => ({ ...c, from: current[c.line] }));
 	const out = rewriteLimits(BUDGET_SCRIPT, PACKAGE_JSON, realChanges, {
 		date: '2026-10-28',
-		reason: 'the money tools links (S133 band)'
+		reason: 'the money tools links'
 	});
 
 	it('writes the new limits where both checks read them', () => {

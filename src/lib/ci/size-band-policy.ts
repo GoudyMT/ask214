@@ -52,7 +52,7 @@ export type Plan =
  * The room a limit keeps above its measured size: 10% of the growth or 40 B, whichever is larger.
  *
  * 40 B because builds of the same code differ by up to ~25 B between commits (a time-stamped chunk renames every
- * file that imports it - L-28), so a smaller room fails CI on noise.
+ * file that imports it), so a smaller room fails CI on noise.
  */
 export function marginFor(growth: number): number {
 	return Math.max(40, Math.ceil(Math.max(0, growth) * 0.1));
