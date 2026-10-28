@@ -24,6 +24,7 @@ function entry(over: Partial<SourceEntry>): SourceEntry {
 		terms_notes: 'INTERNAL terms',
 		content_hash: 'deadbeefdeadbeef',
 		captured_path: 'content-ops/captures/deadbeefdeadbeef.html',
+		captured_at: '2026-06-25T22:02:05.188Z',
 		...over
 	};
 }
@@ -118,6 +119,29 @@ describe('buildSourcesIndex', () => {
 				})
 			])
 		).toThrow('E_SOURCES_INDEX_TAP_MULTI_URL');
+	});
+
+	// About tells readers how current the sources are; the dates come from the registry, so they stay true with
+	// no hand edit when sources are captured again.
+	it('spans the earliest to the latest capture date, by calendar day', () => {
+		const idx = buildSourcesIndex([
+			entry({ source_id: 'a', captured_at: '2026-09-15T20:06:06.770Z' }),
+			entry({ source_id: 'b', captured_at: '2026-06-25T22:02:05.188Z' }),
+			entry({ source_id: 'c', captured_at: '2026-07-04T08:00:00.000Z' })
+		]);
+		expect(idx.captured).toEqual({ from: '2026-06-25', to: '2026-09-15' });
+	});
+
+	// A source with no capture date would sit outside the range the page claims, so the build stops instead.
+	it('throws when a source has no readable capture date', () => {
+		const undated = entry({ source_id: 'b' });
+		delete undated.captured_at;
+		expect(() => buildSourcesIndex([entry({ source_id: 'a' }), undated])).toThrow(
+			'E_SOURCES_INDEX_NO_CAPTURE_DATE'
+		);
+		expect(() =>
+			buildSourcesIndex([entry({ source_id: 'a', captured_at: 'last summer' })])
+		).toThrow('E_SOURCES_INDEX_NO_CAPTURE_DATE');
 	});
 
 	it('handles a registry with no TAP guides (empty library url + guides)', () => {

@@ -25,6 +25,14 @@ describe('About page sources index', () => {
 		expect(tapLinks).toHaveLength(1);
 	});
 
+	// The registry's real capture range, in the app's date style, with the pointer to the official page.
+	it('says when the sources were captured and where the latest is', async () => {
+		const { container } = await render(AboutPage);
+		const text = container.textContent ?? '';
+		expect(text).toContain('Captured from Jun 25, 2026 to Sep 15, 2026.');
+		expect(text).toMatch(/official page has the latest/);
+	});
+
 	it('keeps the honest sources lede', async () => {
 		const { container } = await render(AboutPage);
 		const text = container.textContent ?? '';

@@ -13,7 +13,8 @@ const INDEX: SourcesIndex = {
 	tapGuides: [
 		{ title: 'TAP - Guide One', publisher: 'VA' },
 		{ title: 'TAP - Guide Two', publisher: 'DoD' }
-	]
+	],
+	captured: { from: '2026-06-25', to: '2026-09-15' }
 };
 
 describe('SourceList', () => {
