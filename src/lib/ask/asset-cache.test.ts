@@ -21,7 +21,8 @@ import {
 	carryOverSavedDocuments,
 	keptOnActivate,
 	APP_SHELL,
-	offlineResponse
+	offlineResponse,
+	answerNavigation
 } from './asset-cache';
 import { KDF_WORKER_SRC } from '../backup/kdf-paths';
 
@@ -1444,5 +1445,67 @@ describe('offlineResponse', () => {
 		const cache = cacheHolding({ [APP_SHELL]: 'shell' });
 		expect(await offlineResponse(cache, navigation('/about/'))).toBeUndefined();
 		expect(await offlineResponse(cache, navigation('/documents/x'))).toBeUndefined();
+	});
+});
+
+describe('answerNavigation', () => {
+	const WAIT_MS = 40;
+	const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+	// A network that answers when `answer` is called, fails when `fail` is, and otherwise stays silent.
+	function network() {
+		let answer!: (response: Response) => void;
+		let fail!: (error: Error) => void;
+		const pending = new Promise<Response>((resolve, reject) => {
+			answer = resolve;
+			fail = reject;
+		});
+		return { pending, answer, fail };
+	}
+	const kept = (body: string | null) => async () =>
+		body === null ? undefined : new Response(body);
+
+	it('serves the network page when it answers in time', async () => {
+		const net = network();
+		const run = answerNavigation(net.pending, kept('kept page'), WAIT_MS);
+		net.answer(new Response('fresh page'));
+		const { response, network: fromNetwork } = await run;
+		expect(await response?.text()).toBe('fresh page');
+		expect(fromNetwork).toBe(true);
+	});
+
+	// A connection that is up but silent would hold the page blank for minutes, with a working copy in the cache.
+	it('serves the kept page when the network stays silent past the wait', async () => {
+		const net = network();
+		const { response, network: fromNetwork } = await answerNavigation(
+			net.pending,
+			kept('kept page'),
+			WAIT_MS
+		);
+		expect(await response?.text()).toBe('kept page');
+		expect(fromNetwork).toBe(false);
+	});
+
+	it('keeps waiting for a slow network when no page is kept', async () => {
+		const net = network();
+		const run = answerNavigation(net.pending, kept(null), WAIT_MS);
+		await pause(WAIT_MS * 2);
+		net.answer(new Response('slow page'));
+		const { response, network: fromNetwork } = await run;
+		expect(await response?.text()).toBe('slow page');
+		expect(fromNetwork).toBe(true);
+	});
+
+	it('serves the kept page when the network fails, and nothing when none is kept', async () => {
+		const failing = network();
+		failing.fail(new TypeError('Failed to fetch'));
+		const served = await answerNavigation(failing.pending, kept('kept page'), WAIT_MS);
+		expect(await served.response?.text()).toBe('kept page');
+		expect(served.network).toBe(false);
+
+		const late = network();
+		const run = answerNavigation(late.pending, kept(null), WAIT_MS);
+		await pause(WAIT_MS * 2);
+		late.fail(new TypeError('Failed to fetch'));
+		expect((await run).response).toBeUndefined();
 	});
 });

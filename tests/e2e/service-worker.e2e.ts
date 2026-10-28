@@ -135,6 +135,28 @@ test('a hard-reloaded page starts an Ask setup without waiting out the worker li
 	await expect.poll(() => workers.length, { timeout: 5_000 }).toBe(1);
 });
 
+// A connection that is up but silent does not fail for minutes, and until it does the app would open blank though the
+// worker keeps its page. Past the worker's short wait the kept page is served, and the router draws the address.
+//
+// Chromium only: Playwright routes a service worker's own requests only there.
+test('a page opened on a silent connection opens from the kept page', async ({
+	page,
+	context,
+	browserName
+}) => {
+	test.skip(browserName === 'webkit', "Playwright routes the worker's requests on Chromium only");
+	await page.goto('/');
+	await page.evaluate(() => navigator.serviceWorker.ready);
+	await page.reload();
+	expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+
+	// The page's own address answers nothing, ever: headers never come.
+	await context.route('**/documents', () => {});
+	await page.goto('/documents', { timeout: 15_000 });
+	await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 });
+	await context.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 test('built assets are served from the service worker cache after first visit', async ({
 	page
 }) => {

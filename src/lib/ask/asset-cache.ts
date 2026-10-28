@@ -627,3 +627,52 @@ export async function offlineResponse(
 	// ignoreVary: install stored the shell under its own request, not under a navigation's headers.
 	return cache.match(APP_SHELL, { ignoreVary: true });
 }
+
+/**
+ * How long a page navigation waits for the network before the kept page is served instead.
+ *
+ * A connection that is up but silent does not fail for minutes, and until it does the app opens blank though its page
+ * is kept. The kept page is this release's own frame with nothing of the user's in it (`APP_SHELL`), so serving it
+ * early costs nothing but a fresh copy of the same page; a slow connection that works sends its first byte well
+ * inside this. It is a bound, not a measured limit.
+ */
+export const NAVIGATION_WAIT_MS = 5_000;
+
+/**
+ * Answer a page navigation from the network, or from the kept page when the network fails or stays silent for
+ * `waitMs`. With no page kept, a silent network is still waited for: there is nothing better to show.
+ *
+ * Args:
+ *   network: the navigation's fetch, already started
+ *   kept: reads the kept page (`offlineResponse`), only once it is needed
+ *   waitMs: how long the network may stay silent before the kept page is served
+ *
+ * Returns:
+ *   the response to serve (undefined when the network failed and no page is kept) and whether it came from the
+ *   network, so the caller keeps a copy only of a page the network sent.
+ */
+export async function answerNavigation(
+	network: Promise<Response>,
+	kept: () => Promise<Response | undefined>,
+	waitMs: number
+): Promise<{ response: Response | undefined; network: boolean }> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const silent = new Promise<'silent'>((resolve) => {
+		timer = setTimeout(() => resolve('silent'), waitMs);
+	});
+	try {
+		const first = await Promise.race([network, silent]);
+		if (first !== 'silent') return { response: first, network: true };
+		const page = await kept();
+		if (page !== undefined) {
+			// The network is no longer waited for; its late failure must not surface as an unhandled rejection.
+			network.catch(() => {});
+			return { response: page, network: false };
+		}
+		return { response: await network, network: true };
+	} catch {
+		return { response: await kept(), network: false };
+	} finally {
+		clearTimeout(timer);
+	}
+}
