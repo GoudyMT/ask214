@@ -19,10 +19,27 @@ export type Sizes = Record<BudgetLine, number>;
 /** A count, not bytes: a byte margin means nothing for it, so the script never raises or lowers it. */
 const COUNT_LINES: ReadonlySet<BudgetLine> = new Set(['precacheFiles']);
 
-/** The two lines whose limits live in package.json's size-limit, found there by their entry's name. */
-const SIZE_LIMIT_NAMES: Partial<Record<BudgetLine, string>> = {
-	routeNodes: 'Lazy route nodes (sum; no single page loads all of them)',
-	rootLayout: 'Root layout node (loaded on every page)'
+/**
+ * Where each limit is written: check-chunk-budget.mjs's LIMIT, or package.json's size-limit entry found by its name.
+ * Each pattern is a literal, built fresh per use (a global RegExp carries its position between calls). The last LIMIT
+ * entry has no trailing comma, so the comma is captured and kept as found.
+ */
+const LIMIT_AT: Record<BudgetLine, { file: 'script' | 'package'; pattern: () => RegExp }> = {
+	page: { file: 'script', pattern: () => /^\tpage: ([\d_]+)(,?)$/gm },
+	onDemand: { file: 'script', pattern: () => /^\tonDemand: ([\d_]+)(,?)$/gm },
+	precacheFiles: { file: 'script', pattern: () => /^\tprecacheFiles: ([\d_]+)(,?)$/gm },
+	precacheBytes: { file: 'script', pattern: () => /^\tprecacheBytes: ([\d_]+)(,?)$/gm },
+	workerScripts: { file: 'script', pattern: () => /^\tworkerScripts: ([\d_]+)(,?)$/gm },
+	routeNodes: {
+		file: 'package',
+		pattern: () =>
+			/("name": "Lazy route nodes \(sum; no single page loads all of them\)",\n\t+"path": "[^"\n]*",\n\t+"limit": ")(\d+) B(")/g
+	},
+	rootLayout: {
+		file: 'package',
+		pattern: () =>
+			/("name": "Root layout node \(loaded on every page\)",\n\t+"path": "[^"\n]*",\n\t+"limit": ")(\d+) B(")/g
+	}
 };
 
 export type Band = {
@@ -152,15 +169,10 @@ export function suggestRaise(band: Band, refusal: Refusal): number {
 	return Math.ceil((refusal.need - band.limit[refusal.line] + DRIFT_BYTES) / 10) * 10;
 }
 
-// The last entry in LIMIT has no trailing comma; the comma is kept as found.
-const scriptLimit = (line: BudgetLine) => new RegExp(`^\\t${line}: ([\\d_]+)(,?)$`, 'gm');
-const sizeLimitEntry = (name: string) =>
-	new RegExp(
-		`("name": "${name.replace(/[()]/g, '\\$&')}",\\n\\t+"path": "[^"\\n]*",\\n\\t+"limit": ")(\\d+) B(")`,
-		'g'
-	);
 const RECORD_ANCHOR =
 	'// Raise a limit only with a measured reason recorded here; never to make a run pass.';
+const RECORD_LINE = () =>
+	/^\/\/ Raise a limit only with a measured reason recorded here; never to make a run pass\.$/gm;
 
 function exactlyOne(source: string, pattern: RegExp): RegExpMatchArray {
 	const matches = [...source.matchAll(pattern)];
@@ -176,11 +188,11 @@ function exactlyOne(source: string, pattern: RegExp): RegExpMatchArray {
 export function readLimits(script: string, packageJson: string): Sizes {
 	const out = {} as Sizes;
 	for (const line of BUDGET_LINES) {
-		const name = SIZE_LIMIT_NAMES[line];
+		const { file, pattern } = LIMIT_AT[line];
 		out[line] =
-			name === undefined
-				? Number((exactlyOne(script, scriptLimit(line))[1] as string).replaceAll('_', ''))
-				: Number(exactlyOne(packageJson, sizeLimitEntry(name))[2]);
+			file === 'script'
+				? Number((exactlyOne(script, pattern())[1] as string).replaceAll('_', ''))
+				: Number(exactlyOne(packageJson, pattern())[2]);
 	}
 	return out;
 }
@@ -200,21 +212,18 @@ export function rewriteLimits(
 	changes: Change[],
 	record: { date: string; reason: string }
 ): { script: string; packageJson: string } {
-	exactlyOne(script, new RegExp(`^${RECORD_ANCHOR.replace(/[.;]/g, '\\$&')}$`, 'gm'));
+	exactlyOne(script, RECORD_LINE());
 	for (const { line } of changes) {
-		const name = SIZE_LIMIT_NAMES[line];
-		exactlyOne(
-			name === undefined ? script : packageJson,
-			name === undefined ? scriptLimit(line) : sizeLimitEntry(name)
-		);
+		const { file, pattern } = LIMIT_AT[line];
+		exactlyOne(file === 'script' ? script : packageJson, pattern());
 	}
 	let nextScript = script;
 	let nextPackage = packageJson;
 	for (const { line, to } of changes) {
-		const name = SIZE_LIMIT_NAMES[line];
-		if (name === undefined)
-			nextScript = nextScript.replace(scriptLimit(line), `\t${line}: ${grouped(to, '_')}$2`);
-		else nextPackage = nextPackage.replace(sizeLimitEntry(name), `$1${to} B$3`);
+		const { file, pattern } = LIMIT_AT[line];
+		if (file === 'script')
+			nextScript = nextScript.replace(pattern(), `\t${line}: ${grouped(to, '_')}$2`);
+		else nextPackage = nextPackage.replace(pattern(), `$1${to} B$3`);
 	}
 	const lines = changes.map(
 		(c) =>
