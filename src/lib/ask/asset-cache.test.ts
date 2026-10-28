@@ -21,6 +21,7 @@ import {
 	carryOverSavedDocuments,
 	keptOnActivate,
 	APP_SHELL,
+	mayServeEarly,
 	offlineResponse,
 	networkFirst
 } from './asset-cache';
@@ -1445,6 +1446,15 @@ describe('offlineResponse', () => {
 		const cache = cacheHolding({ [APP_SHELL]: 'shell' });
 		expect(await offlineResponse(cache, navigation('/about/'))).toBeUndefined();
 		expect(await offlineResponse(cache, navigation('/documents/x'))).toBeUndefined();
+	});
+});
+
+// SvelteKit asks this file whether a new release is out; a kept copy names the release that kept it, so served
+// early on a slow network it would say "no update".
+describe('mayServeEarly', () => {
+	it('never answers the version file early, and answers every other file', () => {
+		expect(mayServeEarly('/_app/version.json')).toBe(false);
+		expect(mayServeEarly('/_app/immutable/workers/embed-worker-abc.js')).toBe(true);
 	});
 });
 

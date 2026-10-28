@@ -655,6 +655,21 @@ export async function shellResponse(
 export const NETWORK_WAIT_MS = 5_000;
 
 /**
+ * Whether a kept copy may answer a request whose network is only silent, not failed.
+ *
+ * The app's version file is the exception: SvelteKit reads it to learn that a new release is out (and reloads into
+ * it after a failed navigation), and a kept copy always names the release that kept it, so served early it would say
+ * "no update" while the network was still bringing the answer. It waits for the network; a failed network still gets
+ * the kept copy.
+ *
+ * @param pathname A same-origin request pathname.
+ * @returns False for the version file, true for everything else.
+ */
+export function mayServeEarly(pathname: string): boolean {
+	return pathname !== '/_app/version.json';
+}
+
+/**
  * Answer a request from the network, or from a kept copy when the network stays silent for `waitMs` or fails. With
  * nothing kept for the silent case, or a cache that cannot be read, the network is still waited for: there is
  * nothing better to show.

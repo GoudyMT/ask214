@@ -21,6 +21,7 @@ import {
 	INSTALL_PAGES,
 	offlineResponse,
 	shellResponse,
+	mayServeEarly,
 	networkFirst,
 	NETWORK_WAIT_MS
 } from '$lib/ask/asset-cache';
@@ -234,7 +235,7 @@ sw.addEventListener('fetch', (event) => {
 			const kept = () => offlineResponse(cache, event.request);
 			const { response, network } = await networkFirst(
 				fetch(event.request),
-				{ silent: kept, failed: kept },
+				{ silent: mayServeEarly(url.pathname) ? kept : async () => undefined, failed: kept },
 				NETWORK_WAIT_MS
 			);
 			if (network && response?.status === 200 && keptOnFetch(url.pathname)) {
