@@ -15,7 +15,7 @@
 <p class="resources-lede">
 	Vetted links for benefits, employment, education, and transition. Claims and benefits links go
 	only to VA.gov and VA-accredited veterans service organizations; the rest are official government
-	programs and trusted nonprofits.
+	programs and trusted free programs.
 </p>
 
 <ResourceList resources={RESOURCES} />

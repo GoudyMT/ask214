@@ -2,7 +2,7 @@ import type { Resource } from './types';
 
 // The curated outbound link set. Claims and benefits links go only to official .gov (va.gov) or a
 // VA-accredited veterans service organization, per the 38 CFR 14.629 boundary; other categories may
-// include official government programs and vetted national nonprofits. Descriptions are informational
+// include official government programs and vetted free national programs. Descriptions are informational
 // and never assert personal eligibility. Each url is verified against the live official source on its
 // lastVerified date; re-verify the whole set about every 6 months. Grouped by displayCategory.
 export const RESOURCES: readonly Resource[] = [
@@ -258,7 +258,7 @@ export const RESOURCES: readonly Resource[] = [
 		title: 'American Corporate Partners (ACP)',
 		url: 'https://www.acp-usa.org',
 		description:
-			'Free yearlong one-on-one career mentoring for transitioning service members, veterans, and active-duty spouses.',
+			'Free yearlong one-on-one career mentoring for post-9/11 service members and veterans, and military spouses.',
 		displayCategory: 'mentorship-networking',
 		lastVerified: '2026-10-27'
 	},
