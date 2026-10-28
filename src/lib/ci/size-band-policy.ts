@@ -143,7 +143,8 @@ export function planApply(band: Band, measured: Sizes, current: Sizes): Plan {
 		const need = size + margin;
 		if (need <= current[line]) continue;
 		const raise = band.raise[line] ?? 0;
-		const allowed = band.limit[line] + raise;
+		// A line the band does not list may not rise at all - not even back to where it stood at approval.
+		const allowed = raise > 0 ? band.limit[line] + raise : current[line];
 		const change = { line, from: current[line], to: need, measured: size, growth, margin };
 		if (need <= allowed) changes.push(change);
 		else if (raise > 0 && need <= allowed + allowanceFor(raise))

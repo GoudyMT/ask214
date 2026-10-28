@@ -130,6 +130,27 @@ describe('planApply', () => {
 		});
 	});
 
+	// A line the band does not list stays at its current limit, even when main lowered it after the band was approved.
+	it('never raises an unlisted line above its current limit', () => {
+		const current = { ...LIMITS, workerScripts: 147_100 };
+		expect(planApply(BAND, { ...BASE, workerScripts: 147_150 }, current)).toEqual({
+			ok: false,
+			changes: [],
+			refusals: [{ line: 'workerScripts', need: 147_190, allowed: 147_100, measured: 147_150 }]
+		});
+	});
+
+	// A second apply on the same branch counts from the approved limit, so two raises never add up past the band.
+	it('caps a line at the approved limit plus its band, not at a limit an earlier apply already raised', () => {
+		const raised = { ...LIMITS, page: 104_340 };
+		// The band's cap: 104,076 + 390 = 104,466, + the 50 B allowance = 104,516; 104,480 B needs 104,526.
+		expect(planApply(BAND, { ...BASE, page: 104_480 }, raised)).toEqual({
+			ok: false,
+			changes: [],
+			refusals: [{ line: 'page', need: 104_526, allowed: 104_466, measured: 104_480 }]
+		});
+	});
+
 	it('refuses a file-count line over its limit; a count is never raised by the script', () => {
 		const plan = planApply(BAND, { ...BASE, precacheFiles: 81 }, LIMITS);
 		expect(plan).toEqual({
@@ -209,30 +230,39 @@ describe('parseBand', () => {
 		);
 		expect(() => parseBand({ ...BAND, raise: { page: -1 } })).toThrow('E_SIZE_BAND_FILE');
 		expect(() => parseBand({ ...BAND, raise: { precacheFiles: 1 } })).toThrow('E_SIZE_BAND_FILE');
+		// A misspelt line would be ignored, and a fractional size would write a limit no check can meet.
+		expect(() => parseBand({ ...BAND, raise: { pages: 100 } })).toThrow('E_SIZE_BAND_FILE');
+		expect(() => parseBand({ ...BAND, base: { ...BASE, page: 104_029.5 } })).toThrow(
+			'E_SIZE_BAND_FILE'
+		);
 	});
 });
 
 describe('rewriteLimits on the real budget files', () => {
-	const changes = [
+	// Counted from the limits the files hold now, so a real raise committed later does not turn these into no-ops.
+	const current = readLimits(BUDGET_SCRIPT, PACKAGE_JSON);
+	const page = current.page + 264;
+	const routeNodes = current.routeNodes + 25;
+	const realChanges = [
 		{
 			line: 'page' as const,
-			from: LIMITS.page,
-			to: 104_340,
-			measured: 104_300,
-			growth: 271,
+			from: current.page,
+			to: page,
+			measured: page - 40,
+			growth: 0,
 			margin: 40
 		},
 		{
 			line: 'routeNodes' as const,
-			from: LIMITS.routeNodes,
-			to: 59_890,
-			measured: 59_850,
-			growth: 41,
+			from: current.routeNodes,
+			to: routeNodes,
+			measured: routeNodes - 40,
+			growth: 0,
 			margin: 40
 		}
 	];
-	const current = readLimits(BUDGET_SCRIPT, PACKAGE_JSON);
-	const realChanges = changes.map((c) => ({ ...c, from: current[c.line] }));
+	const grouped = (n: number, separator: string) =>
+		n.toLocaleString('en-US').replaceAll(',', separator);
 	const out = rewriteLimits(BUDGET_SCRIPT, PACKAGE_JSON, realChanges, {
 		date: '2026-10-28',
 		reason: 'the money tools links'
@@ -240,14 +270,16 @@ describe('rewriteLimits on the real budget files', () => {
 
 	it('writes the new limits where both checks read them', () => {
 		const limits = readLimits(out.script, out.packageJson);
-		expect(limits.page).toBe(104_340);
-		expect(limits.routeNodes).toBe(59_890);
+		expect(limits.page).toBe(page);
+		expect(limits.routeNodes).toBe(routeNodes);
 		expect(limits.onDemand).toBe(current.onDemand);
 		const sizeLimit = JSON.parse(out.packageJson)['size-limit'] as {
 			name: string;
 			limit: string;
 		}[];
-		expect(sizeLimit.find((e) => e.name.startsWith('Lazy route nodes'))?.limit).toBe('59890 B');
+		expect(sizeLimit.find((e) => e.name.startsWith('Lazy route nodes'))?.limit).toBe(
+			`${routeNodes} B`
+		);
 	});
 
 	it('changes only the limit lines and adds only comment lines, so no code beside them moves', () => {
@@ -255,15 +287,23 @@ describe('rewriteLimits on the real budget files', () => {
 		const after = out.script.split('\n');
 		const added = after.filter((line) => !before.includes(line));
 		const removed = before.filter((line) => !after.includes(line));
-		expect(removed).toEqual([
-			`\tpage: ${current.page.toLocaleString('en-US').replaceAll(',', '_')},`
+		expect(removed).toEqual([`\tpage: ${grouped(current.page, '_')},`]);
+		expect(added.filter((line) => !line.startsWith('//'))).toEqual([
+			`\tpage: ${grouped(page, '_')},`
 		]);
-		expect(added.filter((line) => !line.startsWith('//'))).toEqual(['\tpage: 104_340,']);
-		const record = `page ${current.page.toLocaleString('en-US')} -> 104,340`;
+		const record = `page ${grouped(current.page, ',')} -> ${grouped(page, ',')}`;
 		expect(added.some((line) => line.startsWith('//') && line.includes(record))).toBe(true);
 		const pkgBefore = PACKAGE_JSON.split('\n');
 		const pkgChanged = out.packageJson.split('\n').filter((line, i) => line !== pkgBefore[i]);
-		expect(pkgChanged).toEqual(['\t\t\t"limit": "59890 B",']);
+		expect(pkgChanged).toEqual([`\t\t\t"limit": "${routeNodes} B",`]);
+	});
+
+	// Without the record anchor a limit would change with no line saying why.
+	it('refuses to rewrite when the record anchor is missing', () => {
+		const noAnchor = BUDGET_SCRIPT.replace('measured reason recorded here', 'reason');
+		expect(() =>
+			rewriteLimits(noAnchor, PACKAGE_JSON, realChanges, { date: '2026-10-28', reason: 'x' })
+		).toThrow('E_SIZE_BAND_ANCHOR');
 	});
 
 	// The reason is typed on the command line and written into a CI gate's source: a line break would write live code,
