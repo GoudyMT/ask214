@@ -20,6 +20,7 @@ import {
 	storeOnFetch,
 	INSTALL_PAGES,
 	offlineResponse,
+	shellResponse,
 	answerNavigation,
 	NAVIGATION_WAIT_MS
 } from '$lib/ask/asset-cache';
@@ -216,7 +217,10 @@ sw.addEventListener('fetch', (event) => {
 			if (event.request.mode === 'navigate') {
 				const { response, network } = await answerNavigation(
 					fetch(event.request),
-					() => offlineResponse(cache, event.request),
+					{
+						silent: () => shellResponse(cache, event.request),
+						failed: () => offlineResponse(cache, event.request)
+					},
 					NAVIGATION_WAIT_MS
 				);
 				if (network && response?.status === 200 && keptOnFetch(url.pathname)) {

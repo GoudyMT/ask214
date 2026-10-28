@@ -1461,33 +1461,39 @@ describe('answerNavigation', () => {
 		});
 		return { pending, answer, fail };
 	}
-	const kept = (body: string | null) => async () =>
+	const page = (body: string | null) => async () =>
 		body === null ? undefined : new Response(body);
+	// The frame install kept for the silent case, the address's own copy for a failed network.
+	const kept = (silent: string | null, failed: string | null = silent) => ({
+		silent: page(silent),
+		failed: page(failed)
+	});
 
 	it('serves the network page when it answers in time', async () => {
 		const net = network();
-		const run = answerNavigation(net.pending, kept('kept page'), WAIT_MS);
+		const run = answerNavigation(net.pending, kept('frame'), WAIT_MS);
 		net.answer(new Response('fresh page'));
 		const { response, network: fromNetwork } = await run;
 		expect(await response?.text()).toBe('fresh page');
 		expect(fromNetwork).toBe(true);
 	});
 
-	// A connection that is up but silent would hold the page blank for minutes, with a working copy in the cache.
-	it('serves the kept page when the network stays silent past the wait', async () => {
+	// A connection that is up but silent would hold the page blank for minutes, with a working frame in the cache. Only
+	// the frame is served early: the address's own copy may be from another release.
+	it("serves this release's frame, not the address's own copy, when the network stays silent", async () => {
 		const net = network();
 		const { response, network: fromNetwork } = await answerNavigation(
 			net.pending,
-			kept('kept page'),
+			kept('frame', 'address copy'),
 			WAIT_MS
 		);
-		expect(await response?.text()).toBe('kept page');
+		expect(await response?.text()).toBe('frame');
 		expect(fromNetwork).toBe(false);
 	});
 
-	it('keeps waiting for a slow network when no page is kept', async () => {
+	it('keeps waiting for a slow network when no frame is kept', async () => {
 		const net = network();
-		const run = answerNavigation(net.pending, kept(null), WAIT_MS);
+		const run = answerNavigation(net.pending, kept(null, 'address copy'), WAIT_MS);
 		await pause(WAIT_MS * 2);
 		net.answer(new Response('slow page'));
 		const { response, network: fromNetwork } = await run;
@@ -1495,11 +1501,26 @@ describe('answerNavigation', () => {
 		expect(fromNetwork).toBe(true);
 	});
 
-	it('serves the kept page when the network fails, and nothing when none is kept', async () => {
+	// A cache that cannot be read must not cost a page the network was still bringing.
+	it('keeps waiting for a slow network when the cache cannot be read', async () => {
+		const net = network();
+		const broken = {
+			silent: async () => {
+				throw new Error('E_TEST_CACHE');
+			},
+			failed: page(null)
+		};
+		const run = answerNavigation(net.pending, broken, WAIT_MS);
+		await pause(WAIT_MS * 2);
+		net.answer(new Response('slow page'));
+		expect(await (await run).response?.text()).toBe('slow page');
+	});
+
+	it("serves the address's own copy when the network fails, and nothing when none is kept", async () => {
 		const failing = network();
 		failing.fail(new TypeError('Failed to fetch'));
-		const served = await answerNavigation(failing.pending, kept('kept page'), WAIT_MS);
-		expect(await served.response?.text()).toBe('kept page');
+		const served = await answerNavigation(failing.pending, kept('frame', 'address copy'), WAIT_MS);
+		expect(await served.response?.text()).toBe('address copy');
 		expect(served.network).toBe(false);
 
 		const late = network();

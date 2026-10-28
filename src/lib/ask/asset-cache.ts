@@ -622,6 +622,21 @@ export async function offlineResponse(
 ): Promise<Response | undefined> {
 	const kept = await cache.match(request);
 	if (kept !== undefined || request.mode !== 'navigate') return kept;
+	return shellResponse(cache, request);
+}
+
+/**
+ * The page install kept from this release, APP_SHELL, for a navigation to a top-level address; it draws whatever
+ * page that address names.
+ *
+ * @param cache This release's cache.
+ * @param request The navigation.
+ * @returns The kept shell, or undefined for a deeper address or when none is kept.
+ */
+export async function shellResponse(
+	cache: Pick<Cache, 'match'>,
+	request: Request
+): Promise<Response | undefined> {
 	// Top-level addresses only: from anywhere deeper the shell's relative paths miss, and it opens blank.
 	if (!/^\/[^/]*$/.test(new URL(request.url).pathname)) return undefined;
 	// ignoreVary: install stored the shell under its own request, not under a navigation's headers.
@@ -632,19 +647,24 @@ export async function offlineResponse(
  * How long a page navigation waits for the network before the kept page is served instead.
  *
  * A connection that is up but silent does not fail for minutes, and until it does the app opens blank though its page
- * is kept. The kept page is this release's own frame with nothing of the user's in it (`APP_SHELL`), so serving it
- * early costs nothing but a fresh copy of the same page; a slow connection that works sends its first byte well
- * inside this. It is a bound, not a measured limit.
+ * is kept. What is served then is this release's own frame (`shellResponse`), with nothing of the user's in it, so
+ * serving it early costs a fresh copy of the same page and no more. It is a bound, not a measured limit: the slowest
+ * real links can take longer than this to send a first byte, and on them the frame is what opens.
  */
 export const NAVIGATION_WAIT_MS = 5_000;
 
 /**
- * Answer a page navigation from the network, or from the kept page when the network fails or stays silent for
- * `waitMs`. With no page kept, a silent network is still waited for: there is nothing better to show.
+ * Answer a page navigation from the network, or from a kept page when the network stays silent for `waitMs` or
+ * fails. With nothing kept for the silent case, or a cache that cannot be read, the network is still waited for:
+ * there is nothing better to show.
+ *
+ * The two cases read different kept pages. A silent network may be one that works, slowly, so only this release's
+ * own frame is served early; a copy kept for the address itself may come from another release (`storeOnFetch`).
+ * A failed network gets the copy kept for the address first, as `offlineResponse` gives.
  *
  * Args:
  *   network: the navigation's fetch, already started
- *   kept: reads the kept page (`offlineResponse`), only once it is needed
+ *   kept: `silent` and `failed` read the kept page for each case, only once it is needed
  *   waitMs: how long the network may stay silent before the kept page is served
  *
  * Returns:
@@ -653,7 +673,10 @@ export const NAVIGATION_WAIT_MS = 5_000;
  */
 export async function answerNavigation(
 	network: Promise<Response>,
-	kept: () => Promise<Response | undefined>,
+	kept: {
+		silent: () => Promise<Response | undefined>;
+		failed: () => Promise<Response | undefined>;
+	},
 	waitMs: number
 ): Promise<{ response: Response | undefined; network: boolean }> {
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -663,15 +686,11 @@ export async function answerNavigation(
 	try {
 		const first = await Promise.race([network, silent]);
 		if (first !== 'silent') return { response: first, network: true };
-		const page = await kept();
-		if (page !== undefined) {
-			// The network is no longer waited for; its late failure must not surface as an unhandled rejection.
-			network.catch(() => {});
-			return { response: page, network: false };
-		}
+		const page = await kept.silent().catch(() => undefined);
+		if (page !== undefined) return { response: page, network: false };
 		return { response: await network, network: true };
 	} catch {
-		return { response: await kept(), network: false };
+		return { response: await kept.failed(), network: false };
 	} finally {
 		clearTimeout(timer);
 	}
