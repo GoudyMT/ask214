@@ -485,7 +485,10 @@ const STATIC = 'static';
 //     LOWERED 16,153 -> 16,132. The review's fixes (a body timed only while it is read, bodies let go, the version
 //     file never answered early) put page 2 B and precache 17 B over; trim pass first: the copied status text no
 //     reader uses (-12 B page, -32 B precache), kept. Each line is now its measured size plus 40 B; on demand had more
-//     room than that, so it came down.
+//     room than that, so it came down. Then page 104,066 -> 104,076, onDemand 16,132 -> 16,137 and precache 253,629 ->
+//     253,668 (owner's call, 2026-10-28): four builds of the same code measured page 104,028-104,036 B, on demand
+//     16,091-16,097 B and precache 253,587-253,628 B (a 41 B swing as build file names change); each limit is now
+//     40 B above the highest.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -495,10 +498,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 104_066,
-	onDemand: 16_132,
+	page: 104_076,
+	onDemand: 16_137,
 	precacheFiles: 80,
-	precacheBytes: 253_629,
+	precacheBytes: 253_668,
 	workerScripts: 147_200
 };
 
