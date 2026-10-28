@@ -496,12 +496,15 @@ const STATIC = 'static';
 //     update can grow the worker past it; a raise then is expected, on a measured reason and as the owner's call,
 //     as for every limit here. The budget exists to make that growth a decision, not a surprise.
 //
+//   2026-10-28 the money tools links (owner's call): page 104,076 -> 104,520 (measured 104,475 B, +446 B on the plan's base, margin 45 B).
+//   2026-10-28 the money tools links (owner's call): precacheBytes 253,668 -> 254,089 (measured 254,043 B, +452 B on the plan's base, margin 46 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 104_076,
+	page: 104_520,
 	onDemand: 16_137,
 	precacheFiles: 80,
-	precacheBytes: 253_668,
+	precacheBytes: 254_089,
 	workerScripts: 147_200
 };
 
