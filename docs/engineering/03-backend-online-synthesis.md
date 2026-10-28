@@ -26,8 +26,8 @@ private working notes.
 
 **What it is.** The online path is built to cost nothing at any level of use. Every limit it touches stops with
 an error instead of charging: Workers' 100,000 requests a day, Workers AI's 10,000 neurons a day and KV's 1,000
-writes a day. The account stays on the free plan and turns on no product that bills by use, so there is nothing to
-bill. A payment method is on file for the domain's yearly renewal, the one expected charge, and a budget alert watches
+writes a day. The account stays on the free plan and turns on no product that bills by use, so use is never
+billed. A payment method is on file for the domain's yearly renewal, the one expected charge, and a budget alert watches
 for any other.
 
 **Tradeoffs accepted.** Under heavy use or an attack, online search answers "high demand" until midnight UTC and
@@ -50,7 +50,8 @@ with the index version. A genuine no-match answers `empty`; any failure answers 
 full.
 
 **Tradeoffs accepted.** It deploys by hand with wrangler, apart from the app's automatic deploy, so a new index
-version needs a manual upload and redeploy; a manual check after every merge asks the live server one question.
+version needs a manual upload and redeploy. A CI workflow asks the live server one question after every push to
+main and once a week, and fails when its answers come from a different library version than the app expects.
 
 ---
 
