@@ -2063,7 +2063,8 @@ describe("the line above a SkillBridge step's links", () => {
 
 describe('the TAP guides a task opens in the app', () => {
 	const tsp = TASK_DEFS.find((t) => t.id === 'tsp-decision');
-	const sgli = TASK_DEFS.find((t) => t.id === 'update-sgli');
+	// A task with a guide and no outbound link.
+	const guideOnly = TASK_DEFS.find((t) => t.id === 'login-gov-account');
 	const GUIDE = 'TAP - Financial Planning for Transition';
 
 	it('lists the guide first, counted with the links, and opens it in the app on a press', async () => {
@@ -2072,9 +2073,9 @@ describe('the TAP guides a task opens in the app', () => {
 		const { container } = await render(TaskCard, {
 			props: { item: makeItem({ def: tsp }), onSetStatus: noop, onSetSnooze: noop, onOpenGuide }
 		});
-		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		await page.getByRole('button', { name: /^Related resources \(3\)/ }).click();
 		const items = container.querySelectorAll('.task-card__related-list li');
-		expect(items).toHaveLength(2);
+		expect(items).toHaveLength(3);
 		const guide = items[0]?.querySelector('button');
 		expect(guide?.textContent?.trim()).toBe(`Read in the app: ${GUIDE}`);
 		expect(items[0]?.textContent).toContain('Works offline once saved');
@@ -2148,10 +2149,10 @@ describe('the TAP guides a task opens in the app', () => {
 	});
 
 	it('shows the list for a task whose only entry is a guide', async () => {
-		if (!sgli) throw new Error('E_TEST_TASK_MISSING');
+		if (!guideOnly) throw new Error('E_TEST_TASK_MISSING');
 		const { container } = await render(TaskCard, {
 			props: {
-				item: makeItem({ def: sgli }),
+				item: makeItem({ def: guideOnly }),
 				onSetStatus: noop,
 				onSetSnooze: noop,
 				onOpenGuide: noop
@@ -2159,20 +2160,20 @@ describe('the TAP guides a task opens in the app', () => {
 		});
 		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
 		expect(container.querySelector('.task-card__related-list button')?.textContent?.trim()).toBe(
-			'Read in the app: TAP - VA Life Insurance Benefits (Resource Guide)'
+			'Read in the app: TAP - VA Benefits and Services Participant Guide'
 		);
 	});
 
 	it('offers no guide where nothing can open it', async () => {
-		if (!sgli || !tsp) throw new Error('E_TEST_TASK_MISSING');
+		if (!guideOnly || !tsp) throw new Error('E_TEST_TASK_MISSING');
 		const { container } = await render(TaskCard, {
-			props: { item: makeItem({ def: sgli }), onSetStatus: noop, onSetSnooze: noop }
+			props: { item: makeItem({ def: guideOnly }), onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(page.getByRole('button', { name: /^Related resources/ }).elements()).toHaveLength(0);
 		const other = await render(TaskCard, {
 			props: { item: makeItem({ def: tsp }), onSetStatus: noop, onSetSnooze: noop }
 		});
-		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
+		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
 		expect(other.container.querySelector('.task-card__related-list button')).toBeNull();
 		expect(container.textContent).not.toContain('Read in the app');
 	});

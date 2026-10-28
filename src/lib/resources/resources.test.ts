@@ -87,6 +87,19 @@ describe('task-to-resource mapping integrity', () => {
 			expect(new Set(resIds).size, taskId).toBe(resIds.length);
 		}
 	});
+
+	// The money tools (links to the official calculators and pay pages, no rates kept in the app): a money task
+	// that shows no link leaves the member with the question and nowhere official to answer it.
+	it('every money task on the Timeline shows at least one official link', () => {
+		const money = TASK_DEFS.filter((t) => t.category === 'finance');
+		expect(money.length).toBeGreaterThan(0);
+		for (const task of money) {
+			const links = resourcesForTask(task.id);
+			expect(links.length, task.id).toBeGreaterThan(0);
+			for (const link of links)
+				expect(isGovernmentHost(link.url), `${task.id} -> ${link.url}`).toBe(true);
+		}
+	});
 });
 
 describe('task-to-guide mapping: the TAP guides a task opens in the app', () => {

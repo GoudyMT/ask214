@@ -181,6 +181,59 @@ export const RESOURCES: readonly Resource[] = [
 		displayCategory: 'finance',
 		lastVerified: '2026-08-09'
 	},
+	// The money tools: links to the official calculators and pay pages, so no rate is kept in the app.
+	{
+		id: 'military-pay-calculators',
+		title: 'Military Compensation Calculators',
+		url: 'https://militarypay.defense.gov/Calculators/',
+		description:
+			'Official DoD calculators, including Regular Military Compensation: your pay and allowances as one salary, to compare with a civilian offer.',
+		displayCategory: 'finance',
+		lastVerified: '2026-10-28'
+	},
+	{
+		id: 'bah-lookup',
+		title: 'BAH Rate Lookup',
+		url: 'https://www.travel.dod.mil/Allowances/Basic-Allowance-for-Housing/BAH-Rate-Lookup/',
+		description:
+			'The official housing allowance for a ZIP code and pay grade, to compare with the rent you will pay as a civilian.',
+		displayCategory: 'finance',
+		lastVerified: '2026-10-28'
+	},
+	{
+		id: 'leave-transition',
+		title: 'Leave Benefits During Transition',
+		url: 'https://militarypay.defense.gov/Benefits/Leave-Benefits-During-Transition/',
+		description:
+			'Official DoD page on using, selling back (up to 60 days in a career) or taking terminal leave before you separate.',
+		displayCategory: 'finance',
+		lastVerified: '2026-10-28'
+	},
+	{
+		id: 'mypay',
+		title: 'myPay (DFAS)',
+		url: 'https://mypay.dfas.mil/',
+		description: 'The official DFAS pay site, where you see your LES and your final pay.',
+		displayCategory: 'finance',
+		lastVerified: '2026-10-28'
+	},
+	{
+		id: 'tsp-calculators',
+		title: 'TSP Calculators',
+		url: 'https://www.tsp.gov/calculators/',
+		description:
+			'Official TSP calculators that estimate what your savings could pay in retirement.',
+		displayCategory: 'finance',
+		lastVerified: '2026-10-28'
+	},
+	{
+		id: 'sgli',
+		title: "Servicemembers' Group Life Insurance (SGLI)",
+		url: 'https://www.va.gov/life-insurance/options-eligibility/sgli/',
+		description: 'Official VA page on your SGLI coverage and how to manage it while you serve.',
+		displayCategory: 'finance',
+		lastVerified: '2026-10-28'
+	},
 
 	// SkillBridge & Transition
 	{
@@ -331,8 +384,9 @@ export const RESOURCES: readonly Resource[] = [
 // (src/lib/timeline/task-defs.ts); values are resource ids, in the order to show them.
 export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'va-gov-account': ['va-home'],
+	'update-sgli': ['sgli'],
 	'will-poa': ['military-onesource'],
-	'financial-counselor': ['mos-financial'],
+	'financial-counselor': ['mos-financial', 'military-pay-calculators', 'bah-lookup'],
 	'master-resume': ['hire-heroes', 'careeronestop', 'linkedin-veterans'],
 	'gi-bill-research': ['gi-bill', 'gi-bill-comparison', 'vet-tec'],
 	'document-medical': ['va-disability'],
@@ -353,8 +407,10 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'hhg-counseling': ['military-onesource'],
 	'separation-package': ['navy-transition'],
 	'tricare-elect': ['military-onesource'],
-	'tsp-decision': ['tsp'],
+	'financial-docs': ['mypay'],
+	'tsp-decision': ['tsp', 'tsp-calculators'],
 	'vgli-convert': ['vgli'],
+	'final-pay-check': ['mypay', 'leave-transition'],
 	'va-claim-fallback': ['va-disability', 'va-accredited-rep']
 };
 
