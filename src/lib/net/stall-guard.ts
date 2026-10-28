@@ -70,24 +70,42 @@ export async function guardedFetch(
 			reject(error);
 		});
 	});
+	// The headers are here. The body is timed only while a piece is asked for and not yet in: a body nobody is reading
+	// yet - the second of two files read one after the other - is not silent, only waiting its turn.
+	clearTimeout(timer);
 	if (response.body === null) {
 		finish();
 		return response;
 	}
-	// Each piece restarts the wait; the end of the body ends it, and so does a body that fails or is cancelled.
-	const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>({
-		start(controller) {
-			fail = (error) => controller.error(error);
-			wait();
+	const reader = response.body.getReader();
+	const body = new ReadableStream<Uint8Array>(
+		{
+			start(controller) {
+				fail = (error) => controller.error(error);
+			},
+			async pull(controller) {
+				wait();
+				try {
+					const { done, value } = await reader.read();
+					clearTimeout(timer);
+					if (done) {
+						finish();
+						controller.close();
+					} else controller.enqueue(value);
+				} catch (error) {
+					finish();
+					controller.error(error);
+				}
+			},
+			cancel(reason) {
+				finish();
+				return reader.cancel(reason);
+			}
 		},
-		transform(chunk, controller) {
-			wait();
-			controller.enqueue(chunk);
-		},
-		flush: finish
-	});
-	response.body.pipeTo(writable).catch(finish);
-	return new Response(readable, {
+		// No read ahead: a piece is asked for only when the reader wants one, so no wait runs while nobody reads.
+		{ highWaterMark: 0 }
+	);
+	return new Response(body, {
 		status: response.status,
 		statusText: response.statusText,
 		headers: response.headers

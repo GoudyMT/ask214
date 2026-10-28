@@ -15,7 +15,11 @@ function download() {
 	const fetchFn = (_path: string, init: RequestInit) => {
 		given = init.signal ?? undefined;
 		return new Promise<Response>((resolve, reject) => {
-			given?.addEventListener('abort', () => reject(given?.reason));
+			// As a real fetch does: a stop rejects the wait for the headers and errors a body already arriving.
+			given?.addEventListener('abort', () => {
+				reject(given?.reason);
+				push.error(given?.reason);
+			});
 			respond = () => resolve(new Response(body, { status: 200 }));
 		});
 	};
@@ -77,6 +81,63 @@ describe('guardedFetch', () => {
 		await pause(IDLE_MS * 2);
 		expect(stalls).toBe(0);
 		expect(net.signal()?.aborted).toBe(false);
+	});
+
+	// The answer library reads its two files one after the other: the second must not be cut while it waits its turn,
+	// its bytes still arriving.
+	it('never cuts a download that nobody is reading yet', async () => {
+		const net = download();
+		let stalls = 0;
+		const run = guardedFetch(net.fetchFn, '/corpus/c.embeddings.bin', {
+			idleMs: IDLE_MS,
+			onStall: () => stalls++
+		});
+		net.respond();
+		const response = await run;
+		for (let i = 0; i < 6; i++) {
+			await pause(IDLE_MS / 2);
+			net.send(5);
+		}
+		await pause(IDLE_MS * 2);
+		net.end();
+		expect((await response.arrayBuffer()).byteLength).toBe(30);
+		expect(stalls).toBe(0);
+		expect(net.signal()?.aborted).toBe(false);
+	});
+
+	it('reports a connection lost part-way as its own error, never as a stall', async () => {
+		let push!: ReadableStreamDefaultController<Uint8Array>;
+		const body = new ReadableStream<Uint8Array>({ start: (c) => void (push = c) });
+		let stalls = 0;
+		const response = await guardedFetch(
+			async () => new Response(body, { status: 200 }),
+			'/docs/a.pdf',
+			{ idleMs: IDLE_MS, onStall: () => stalls++ }
+		);
+		const read = response.arrayBuffer();
+		push.enqueue(new Uint8Array(4));
+		push.error(new TypeError('E_TEST_LOST'));
+		await expect(read).rejects.not.toSatisfy(isStall);
+		await pause(IDLE_MS * 2);
+		expect(stalls).toBe(0);
+	});
+
+	it('passes a stop part-way through the body as a stop, not a stall', async () => {
+		const net = download();
+		const stop = new AbortController();
+		let stalls = 0;
+		const run = guardedFetch(net.fetchFn, '/docs/a.pdf', {
+			idleMs: IDLE_MS,
+			signal: stop.signal,
+			onStall: () => stalls++
+		});
+		net.respond();
+		const read = (await run).arrayBuffer();
+		net.send(10);
+		stop.abort();
+		await expect(read).rejects.not.toSatisfy(isStall);
+		await pause(IDLE_MS * 2);
+		expect(stalls).toBe(0);
 	});
 
 	it('passes a stop from the caller through as a stop, not a stall', async () => {
