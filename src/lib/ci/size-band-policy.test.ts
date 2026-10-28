@@ -7,6 +7,7 @@ import {
 	parseBand,
 	planApply,
 	planFinal,
+	suggestRaise,
 	readLimits,
 	rewriteLimits,
 	type Sizes
@@ -149,6 +150,19 @@ describe('planFinal', () => {
 			changes: [],
 			refusals: [{ line: 'page', need: 104_440, allowed: 104_340, measured: 104_400 }]
 		});
+	});
+});
+
+describe('suggestRaise', () => {
+	// A real refusal: 254,060 B needs 254,107 B; a re-request at exactly 439 B failed the next build by drift alone.
+	it('asks for the shortfall plus 40 B of drift, rounded up to 10 B, so the next build still fits', () => {
+		const refusal = {
+			line: 'precacheBytes' as const,
+			need: 254_107,
+			allowed: 254_098,
+			measured: 254_060
+		};
+		expect(suggestRaise(BAND, refusal)).toBe(480);
 	});
 });
 

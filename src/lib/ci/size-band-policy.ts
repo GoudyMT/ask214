@@ -141,6 +141,17 @@ export function planFinal(band: Band, measured: Sizes, current: Sizes): Plan {
 	return refuseOrChange({ changes, refusals });
 }
 
+/** The most two local builds of the same code have been measured apart (41 B; CI's spread was ~25 B). */
+const DRIFT_BYTES = 40;
+
+/**
+ * The raise to re-request for a refused line: what this build needs over the approved limit, plus the drift the next
+ * build may add, rounded up to 10 B. A band set at exactly the measured need fails the next build on drift alone.
+ */
+export function suggestRaise(band: Band, refusal: Refusal): number {
+	return Math.ceil((refusal.need - band.limit[refusal.line] + DRIFT_BYTES) / 10) * 10;
+}
+
 // The last entry in LIMIT has no trailing comma; the comma is kept as found.
 const scriptLimit = (line: BudgetLine) => new RegExp(`^\\t${line}: ([\\d_]+)(,?)$`, 'gm');
 const sizeLimitEntry = (name: string) =>

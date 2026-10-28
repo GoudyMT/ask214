@@ -15,7 +15,8 @@ import {
 	planApply,
 	planFinal,
 	readLimits,
-	rewriteLimits
+	rewriteLimits,
+	suggestRaise
 } from '../src/lib/ci/size-band-policy.ts';
 
 const BUDGET_SCRIPT = 'content-ops/check-chunk-budget.mjs';
@@ -118,6 +119,11 @@ function main() {
 			console.log(
 				`    REFUSED ${r.line}: needs ${r.need.toLocaleString('en-US')} B, allowed ${r.allowed.toLocaleString('en-US')} B (measured ${r.measured.toLocaleString('en-US')} B, ${(r.need - r.allowed).toLocaleString('en-US')} B short)`
 			);
+		if (mode === 'apply')
+			for (const r of plan.refusals)
+				console.log(
+					`    Re-request ${r.line}: +${suggestRaise(band, r)} B (the need plus build drift)`
+				);
 		console.log(
 			'\nNothing written. Run a trim pass; if it finds too little, re-request from these numbers.'
 		);
