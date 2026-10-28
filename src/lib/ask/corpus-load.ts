@@ -20,16 +20,25 @@ export async function loadCorpus(
 	basePath: string,
 	idleMs: number = STALL_MS
 ): Promise<Corpus> {
+	// Every response that arrived, so a load that fails lets go of the bodies it will not read.
+	const arrived: Response[] = [];
+	const fetchFile = (path: string) =>
+		guardedFetch(fetchFn, path, { idleMs }).then((response) => {
+			arrived.push(response);
+			return response;
+		});
 	try {
 		const [mRes, bRes] = await Promise.all([
-			guardedFetch(fetchFn, `${basePath}.json`, { idleMs }),
-			guardedFetch(fetchFn, `${basePath}.embeddings.bin`, { idleMs })
+			fetchFile(`${basePath}.json`),
+			fetchFile(`${basePath}.embeddings.bin`)
 		]);
 		if (!mRes.ok || !bRes.ok) throw new AskError(ASK_ERROR.CORPUS);
 		const manifest = (await mRes.json()) as CorpusManifest;
 		const buffer = await bRes.arrayBuffer();
 		return decodeCorpus(manifest, buffer, EMBED_MODEL_ID); // B validates version/model/length/zero
 	} catch (e) {
+		// A body already read or being read refuses the cancel; that refusal is expected and ignored.
+		for (const response of arrived) void response.body?.cancel().catch(() => {});
 		if (e instanceof AskError) throw e;
 		throw new AskError(ASK_ERROR.CORPUS); // wrap B's CorpusFormatError/Version + JSON errors opaquely
 	}

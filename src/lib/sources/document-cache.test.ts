@@ -200,6 +200,22 @@ describe('saveDocument', () => {
 		expect([...caches.held]).toEqual([OLD]);
 	});
 
+	// A body nobody will read is let go at once, so its download does not hold a connection open.
+	it('lets go of the body of a response other than 200', async () => {
+		let cancelled = false;
+		const body = new ReadableStream<Uint8Array>({
+			cancel: () => void (cancelled = true)
+		});
+		const fetchFn = vi.fn(async () => new Response(body, { status: 500 }));
+		await saveDocument(CURRENT, [], {
+			fetchFn,
+			cachesApi: recordingCaches().api,
+			isOnline: online,
+			library: []
+		});
+		expect(cancelled).toBe(true);
+	});
+
 	// The older copy is still the user's record of the document; a failed save must not cost them it.
 	it('keeps the older copy when storing fails because the device is full', async () => {
 		const caches = recordingCaches({

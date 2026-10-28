@@ -311,7 +311,11 @@ async function storeDocument(
 				...(signal ? { signal } : {}),
 				onStall: () => (stalled = true)
 			});
-			if (response.status !== 200) return isOnline() ? 'failed' : 'offline';
+			if (response.status !== 200) {
+				// Let the body go, so its download does not hold a connection open.
+				void response.body?.cancel().catch(() => {});
+				return isOnline() ? 'failed' : 'offline';
+			}
 			await cache.put(file, response);
 		}
 		await deleteEach(cache, stale);
