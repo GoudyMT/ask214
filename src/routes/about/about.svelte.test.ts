@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import AboutPage from './+page.svelte';
+import { SOURCES_INDEX } from '$lib/sources/sources-index.data';
 
 // Integration: the real generated SOURCES_INDEX flows through the page. Asserts known agency + TAP
 // titles render (so the whole registry -> generator -> artifact -> component chain is wired), plus the
@@ -25,11 +26,13 @@ describe('About page sources index', () => {
 		expect(tapLinks).toHaveLength(1);
 	});
 
-	// The registry's real capture range, in the app's date style, with the pointer to the official page.
+	// The registry's real capture range, read from the generated index so a later capture needs no edit here.
 	it('says when the sources were captured and where the latest is', async () => {
 		const { container } = await render(AboutPage);
 		const text = container.textContent ?? '';
-		expect(text).toContain('Captured from Jun 25, 2026 to Sep 15, 2026.');
+		const { from, to } = SOURCES_INDEX.captured;
+		expect(from).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
+		expect(text).toContain(`Captured from ${from} to ${to}.`);
 		expect(text).toMatch(/official page has the latest/);
 	});
 

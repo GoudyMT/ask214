@@ -14,7 +14,7 @@ const INDEX: SourcesIndex = {
 		{ title: 'TAP - Guide One', publisher: 'VA' },
 		{ title: 'TAP - Guide Two', publisher: 'DoD' }
 	],
-	captured: { from: '2026-06-25', to: '2026-09-15' }
+	captured: { from: 'Jun 25, 2026', to: 'Sep 15, 2026' }
 };
 
 describe('SourceList', () => {

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import SourceList from '$lib/components/SourceList.svelte';
 	import { SOURCES_INDEX } from '$lib/sources/sources-index.data';
-	import { formatTimelineDate } from '$lib/timeline/format-date';
 </script>
 
 <svelte:head>
@@ -39,9 +38,8 @@
 	source it uses. Below is every source held in the app, each linked to its original.
 </p>
 <p>
-	Captured from {formatTimelineDate(SOURCES_INDEX.captured.from)} to {formatTimelineDate(
-		SOURCES_INDEX.captured.to
-	)}. Each answer reflects its source as it was captured; the source's official page has the latest.
+	Captured from {SOURCES_INDEX.captured.from} to {SOURCES_INDEX.captured.to}. Each answer reflects
+	its source as it was captured; the source's official page has the latest.
 </p>
 
 <SourceList index={SOURCES_INDEX} />

@@ -218,7 +218,7 @@ export const SOURCES_INDEX: SourcesIndex = {
 		}
 	],
 	captured: {
-		from: '2026-06-25',
-		to: '2026-09-15'
+		from: 'Jun 25, 2026',
+		to: 'Sep 15, 2026'
 	}
 };

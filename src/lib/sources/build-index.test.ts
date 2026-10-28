@@ -122,14 +122,20 @@ describe('buildSourcesIndex', () => {
 	});
 
 	// About tells readers how current the sources are; the dates come from the registry, so they stay true with
-	// no hand edit when sources are captured again.
-	it('spans the earliest to the latest capture date, by calendar day', () => {
+	// no hand edit when sources are captured again. A TAP guide sits at one end: guides count as much as pages.
+	it('spans the earliest to the latest capture date, by calendar day, in the app date style', () => {
 		const idx = buildSourcesIndex([
 			entry({ source_id: 'a', captured_at: '2026-09-15T20:06:06.770Z' }),
-			entry({ source_id: 'b', captured_at: '2026-06-25T22:02:05.188Z' }),
+			entry({
+				source_id: 'b',
+				content_type: 'pdf',
+				origin: 'VA (TAP curriculum)',
+				url: TAP_URL,
+				captured_at: '2026-06-25T22:02:05.188Z'
+			}),
 			entry({ source_id: 'c', captured_at: '2026-07-04T08:00:00.000Z' })
 		]);
-		expect(idx.captured).toEqual({ from: '2026-06-25', to: '2026-09-15' });
+		expect(idx.captured).toEqual({ from: 'Jun 25, 2026', to: 'Sep 15, 2026' });
 	});
 
 	// A source with no capture date would sit outside the range the page claims, so the build stops instead.

@@ -1,4 +1,5 @@
 import type { SourceEntry } from '$lib/content-ops/sources-schema';
+import { formatTimelineDate } from '../timeline/format-date';
 import type { Publisher, PublicSource, SourcesIndex, TapGuide } from './types';
 
 // Map a registry `origin` string to a clean public publisher label. The origin encodes the agency plus
@@ -59,9 +60,15 @@ export function buildSourcesIndex(entries: SourceEntry[]): SourcesIndex {
 	}
 	const tapLibraryUrl = tapUrls.values().next().value ?? '';
 
-	// ISO days sort as text, so the first and last are the earliest and latest.
+	// ISO days sort as text, so the first and last are the earliest and latest. They are formatted here, at
+	// generation, so the About page ships the two strings and none of the date code.
 	capturedDays.sort();
-	const captured = { from: capturedDays[0] ?? '', to: capturedDays.at(-1) ?? '' };
+	const first = capturedDays[0];
+	const last = capturedDays.at(-1);
+	const captured =
+		first === undefined || last === undefined
+			? { from: '', to: '' }
+			: { from: formatTimelineDate(first), to: formatTimelineDate(last) };
 
 	return { agency, tapLibraryUrl, tapGuides, captured };
 }
