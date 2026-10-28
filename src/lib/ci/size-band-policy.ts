@@ -228,6 +228,8 @@ export function rewriteLimits(
 	changes: Change[],
 	record: { date: string; reason: string }
 ): { script: string; packageJson: string } {
+	// The reason comes from the command line and lands in a gate script's source: one line of printable ASCII, no `$`.
+	if (!/^[\x20-\x23\x25-\x7E]+$/.test(record.reason)) throw new Error('E_SIZE_BAND_REASON');
 	exactlyOne(script, RECORD_LINE());
 	for (const { line } of changes) {
 		const { file, pattern } = LIMIT_AT[line];
@@ -250,6 +252,9 @@ export function rewriteLimits(
 				: `; ${c.overBand} B past the band, under the standing allowance).`)
 	);
 	if (lines.length > 0)
-		nextScript = nextScript.replace(RECORD_ANCHOR, `${lines.join('\n')}\n//\n${RECORD_ANCHOR}`);
+		nextScript = nextScript.replace(
+			RECORD_ANCHOR,
+			() => `${lines.join('\n')}\n//\n${RECORD_ANCHOR}`
+		);
 	return { script: nextScript, packageJson: nextPackage };
 }

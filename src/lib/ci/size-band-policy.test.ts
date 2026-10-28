@@ -266,6 +266,15 @@ describe('rewriteLimits on the real budget files', () => {
 		expect(pkgChanged).toEqual(['\t\t\t"limit": "59890 B",']);
 	});
 
+	// The reason is typed on the command line and written into a CI gate's source: a line break would write live code,
+	// a `$&` would be read as a replacement pattern, and a non-ASCII character breaks the repo's ASCII rule.
+	it('refuses a record reason that is not one line of plain ASCII text', () => {
+		for (const reason of ['two\nlines', 'cost $& more', `caf${String.fromCharCode(233)}`, ''])
+			expect(() =>
+				rewriteLimits(BUDGET_SCRIPT, PACKAGE_JSON, realChanges, { date: '2026-10-28', reason })
+			).toThrow('E_SIZE_BAND_REASON');
+	});
+
 	it('refuses to rewrite when a limit line cannot be found exactly once', () => {
 		const record = { date: '2026-10-28', reason: 'x' };
 		const missing = BUDGET_SCRIPT.replace(/\tpage: [\d_]+,\n/, '');
