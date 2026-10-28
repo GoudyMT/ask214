@@ -169,7 +169,7 @@ export function planFinal(band: Band, measured: Sizes, current: Sizes): Plan {
 			refusals.push({ line, need: size + margin, allowed: current[line], measured: size });
 			continue;
 		}
-		if (!(line in band.raise) || current[line] - size <= margin) continue;
+		if (!((band.raise[line] ?? 0) > 0) || current[line] - size <= margin) continue;
 		changes.push({ line, from: current[line], to: size + margin, measured: size, growth, margin });
 	}
 	return refuseOrChange({ changes, refusals });

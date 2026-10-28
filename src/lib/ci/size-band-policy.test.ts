@@ -188,6 +188,15 @@ describe('planFinal', () => {
 		});
 	});
 
+	// A real end check: a band file listing onDemand at 0 B lowered it 6 B to its margin, and the next build's drift then
+	// put it over. A line with no raise is treated as unlisted by apply, so the end check leaves it alone too.
+	it('leaves a line listed with a 0 B raise alone, as apply treats it as unlisted', () => {
+		const band = parseBand({ ...BAND, raise: { ...BAND.raise, onDemand: 0 } });
+		const limits = { ...LIMITS, page: 104_069, precacheBytes: 253_631, routeNodes: 59_849 };
+		expect(LIMITS.onDemand - BASE.onDemand).toBeGreaterThan(40);
+		expect(planFinal(band, BASE, limits)).toEqual({ ok: true, changes: [] });
+	});
+
 	it("leaves a line outside the band alone, even with room: that padding is not this plan's to take", () => {
 		// The band lines sit at their size plus 40 B; the worker line keeps its older 123 B of room.
 		const limits = {
