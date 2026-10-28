@@ -155,7 +155,8 @@
 			try {
 				// The library loads first, and gives no progress to watch, so a silent connection there is bounded by
 				// the same wait as a silent download. A load given up is still the one the loader keeps: if it arrives
-				// later, the next document opened uses it.
+				// later, the next document opened uses it; until it settles, each document opened falls back to its text
+				// after the same wait (the browser shares one fetch for one module, so a fresh load would wait on it too).
 				const library = await new Promise<PdfRuntime>((resolve, reject) => {
 					stall = setTimeout(() => reject(new Error('E_PDF_STALLED')), bound);
 					load().then(resolve, reject);
