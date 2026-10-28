@@ -481,6 +481,11 @@ const STATIC = 'static';
 //     each raise is that growth plus 10% or 40 B, whichever is larger, set once for the whole PR and checked once at
 //     its final gate, where a line with more room than that is lowered. Trim pass first: the guarded body passed
 //     through a transform stream (-37 B), kept.
+//     The end check (owner's call, 2026-10-28): page 104,036 -> 104,066, precache 253,604 -> 253,629, and onDemand
+//     LOWERED 16,153 -> 16,132. The review's fixes (a body timed only while it is read, bodies let go, the version
+//     file never answered early) put page 2 B and precache 17 B over; trim pass first: the copied status text no
+//     reader uses (-12 B page, -32 B precache), kept. Each line is now its measured size plus 40 B; on demand had more
+//     room than that, so it came down.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -490,10 +495,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 104_036,
-	onDemand: 16_153,
+	page: 104_066,
+	onDemand: 16_132,
 	precacheFiles: 80,
-	precacheBytes: 253_604,
+	precacheBytes: 253_629,
 	workerScripts: 147_200
 };
 
