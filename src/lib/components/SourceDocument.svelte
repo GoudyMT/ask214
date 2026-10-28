@@ -34,7 +34,8 @@
 		isSaved = isDocumentSaved,
 		isOnline = () => navigator.onLine,
 		held = listCachedDocuments,
-		loader = loadPdfRuntime
+		loader = loadPdfRuntime,
+		checkWait = 5_000
 	}: {
 		path: string;
 		bytes: number;
@@ -65,6 +66,10 @@
 		isOnline?: () => boolean;
 		held?: () => Promise<string[]>;
 		loader?: () => Promise<PdfRuntime>;
+		// How long, in ms, the device lookup may take before the document counts as not saved. A lookup takes
+		// milliseconds; a storage that never answers would otherwise hold the reader on its checking state. A bound,
+		// not a measured limit.
+		checkWait?: number;
 	} = $props();
 
 	let phase = $state<'checking' | 'view'>('checking');
@@ -93,13 +98,19 @@
 		const target = untrack(() => ({ path, page }));
 		const check = savedCheck;
 		const online = onlineCheck;
+		const wait = untrack(() => checkWait);
 		let cancelled = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
 		phase = 'checking';
 		landing = target.page;
 		pageCount = 0;
 		reported = false;
 
-		void check(target.path).then((found) => {
+		const lookup = Promise.race([
+			check(target.path),
+			new Promise<boolean>((resolve) => (timer = setTimeout(() => resolve(false), wait)))
+		]).finally(() => clearTimeout(timer));
+		void lookup.then((found) => {
 			if (cancelled) return;
 			saved = found;
 			if (found || online()) {
@@ -116,6 +127,7 @@
 		});
 		return () => {
 			cancelled = true;
+			clearTimeout(timer);
 		};
 	});
 
