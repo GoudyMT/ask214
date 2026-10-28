@@ -135,6 +135,74 @@ test('a hard-reloaded page starts an Ask setup without waiting out the worker li
 	await expect.poll(() => workers.length, { timeout: 5_000 }).toBe(1);
 });
 
+// A connection that is up but silent does not fail for minutes, and until it does the app would open blank though the
+// worker keeps its page. Past the worker's short wait the kept page is served, and the router draws the address.
+//
+// Chromium only: Playwright routes a service worker's own requests only there.
+test('a page opened on a silent connection opens from the kept page', async ({
+	page,
+	context,
+	browserName
+}) => {
+	test.skip(browserName === 'webkit', "Playwright routes the worker's requests on Chromium only");
+	await page.goto('/');
+	await page.evaluate(() => navigator.serviceWorker.ready);
+	await page.reload();
+	expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+
+	// The page's own address answers nothing, ever: headers never come. Counted, so the test knows the worker's own
+	// request reached the route rather than passing without it.
+	let asked = 0;
+	await context.route('**/documents', () => {
+		asked++;
+	});
+	// A copy kept for the address itself may be another release's page, so on a silent network only this release's
+	// frame is served. Planted here as a page no release ever was.
+	await page.evaluate(async () => {
+		const name = (await caches.keys()).find((key) => key.startsWith('app-'));
+		if (name === undefined) throw new Error('E_TEST_NO_RELEASE_CACHE');
+		const planted = '<!doctype html><title>planted</title><h1>Planted copy</h1>';
+		await (
+			await caches.open(name)
+		).put('/documents', new Response(planted, { headers: { 'content-type': 'text/html' } }));
+	});
+	await page.goto('/documents', { timeout: 15_000 });
+	await expect(page.getByRole('heading', { level: 1, name: 'Documents' })).toBeVisible({
+		timeout: 10_000
+	});
+	await expect(page.getByText('Planted copy')).toHaveCount(0);
+	expect(new URL(page.url()).pathname).toBe('/documents');
+	expect(asked).toBeGreaterThan(0);
+	await context.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+// The same wait holds for a file the worker answers network-first and keeps a copy of - the embed worker's script on a
+// set-up device is the one that matters, as a question cannot start without it. The app's own page, kept at install,
+// stands in for it here: fetched from the page, it is a plain request, not a navigation.
+test('a kept file asked for on a silent connection comes from its kept copy', async ({
+	page,
+	context,
+	browserName
+}) => {
+	test.skip(browserName === 'webkit', "Playwright routes the worker's requests on Chromium only");
+	await page.goto('/');
+	await page.evaluate(() => navigator.serviceWorker.ready);
+	await page.reload();
+	expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+
+	let asked = 0;
+	await context.route(
+		(url) => url.pathname === '/',
+		() => {
+			asked++;
+		}
+	);
+	const status = await page.evaluate(async () => (await fetch('/')).status);
+	expect(status).toBe(200);
+	expect(asked).toBeGreaterThan(0);
+	await context.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 test('built assets are served from the service worker cache after first visit', async ({
 	page
 }) => {

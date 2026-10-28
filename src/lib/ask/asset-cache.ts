@@ -622,8 +622,99 @@ export async function offlineResponse(
 ): Promise<Response | undefined> {
 	const kept = await cache.match(request);
 	if (kept !== undefined || request.mode !== 'navigate') return kept;
+	return shellResponse(cache, request);
+}
+
+/**
+ * The page install kept from this release, APP_SHELL, for a navigation to a top-level address; it draws whatever
+ * page that address names.
+ *
+ * @param cache This release's cache.
+ * @param request The navigation.
+ * @returns The kept shell, or undefined for a deeper address or when none is kept.
+ */
+export async function shellResponse(
+	cache: Pick<Cache, 'match'>,
+	request: Request
+): Promise<Response | undefined> {
 	// Top-level addresses only: from anywhere deeper the shell's relative paths miss, and it opens blank.
 	if (!/^\/[^/]*$/.test(new URL(request.url).pathname)) return undefined;
 	// ignoreVary: install stored the shell under its own request, not under a navigation's headers.
 	return cache.match(APP_SHELL, { ignoreVary: true });
+}
+
+/**
+ * How long a request the service worker answers network-first waits for the network before a kept copy is served.
+ *
+ * A connection that is up but silent does not fail for minutes, and until it does the app opens blank though its page
+ * is kept - or a set-up device cannot start answering though install kept the embed worker's script. For a page,
+ * what is served then is this release's own frame (`shellResponse`), with nothing of the user's in it, so serving it
+ * early costs a fresh copy of the same page and no more. It is a bound, not a measured limit: the slowest real links
+ * can take longer than this to send a first byte, and on them the kept copy is what opens.
+ */
+export const NETWORK_WAIT_MS = 5_000;
+
+/**
+ * Whether a kept copy may answer a request whose network is only silent, not failed.
+ *
+ * The app's version file is the exception: SvelteKit reads it to learn that a new release is out (and reloads into
+ * it after a failed navigation), and a kept copy always names the release that kept it, so served early it would say
+ * "no update" while the network was still bringing the answer. It waits for the network; a failed network still gets
+ * the kept copy.
+ *
+ * @param pathname A same-origin request pathname.
+ * @returns False for the version file, true for everything else.
+ */
+export function mayServeEarly(pathname: string): boolean {
+	return pathname !== '/_app/version.json';
+}
+
+/**
+ * Answer a request from the network, or from a kept copy when the network stays silent for `waitMs` or fails. With
+ * nothing kept for the silent case, or a cache that cannot be read, the network is still waited for: there is
+ * nothing better to show.
+ *
+ * The two cases may read different copies. For a page, a silent network may be one that works, slowly, so only this
+ * release's own frame is served early; a copy kept for the address itself may come from another release
+ * (`storeOnFetch`). A failed network gets the copy kept for the address first, as `offlineResponse` gives.
+ *
+ * Args:
+ *   network: the request's fetch, already started
+ *   kept: `silent` and `failed` read the kept copy for each case, only once it is needed
+ *   waitMs: how long the network may stay silent before the kept copy is served
+ *
+ * Returns:
+ *   the response to serve (undefined when the network failed and no page is kept) and whether it came from the
+ *   network, so the caller keeps a copy only of a page the network sent.
+ */
+export async function networkFirst(
+	network: Promise<Response>,
+	kept: {
+		silent: () => Promise<Response | undefined>;
+		failed: () => Promise<Response | undefined>;
+	},
+	waitMs: number
+): Promise<{ response: Response | undefined; network: boolean }> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const silent = new Promise<'silent'>((resolve) => {
+		timer = setTimeout(() => resolve('silent'), waitMs);
+	});
+	try {
+		const first = await Promise.race([network, silent]);
+		if (first !== 'silent') return { response: first, network: true };
+		const page = await kept.silent().catch(() => undefined);
+		if (page !== undefined) {
+			// Nothing reads the network's late answer, so its body is let go rather than downloaded for nothing.
+			void network.then(
+				(late) => late.body?.cancel().catch(() => {}),
+				() => {}
+			);
+			return { response: page, network: false };
+		}
+		return { response: await network, network: true };
+	} catch {
+		return { response: await kept.failed(), network: false };
+	} finally {
+		clearTimeout(timer);
+	}
 }

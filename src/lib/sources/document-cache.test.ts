@@ -93,7 +93,15 @@ const OLD = '/docs/tap_vet_centers.0badc0de.pdf';
  * request, whose headers a bare path lookup does not carry.
  */
 function recordingCaches(
-	options: { held?: string[]; exists?: boolean; putError?: Error; putGate?: Promise<void> } = {}
+	options: {
+		held?: string[];
+		exists?: boolean;
+		putError?: Error;
+		putGate?: Promise<void>;
+		// A browser may report a body that failed while the Cache API read it as an error of its own (not verified
+		// which: a TypeError or a NetworkError DOMException), so a save must not depend on the error it gets back.
+		bodyError?: Error;
+	} = {}
 ) {
 	const held = new Set(options.held ?? []);
 	const log: string[] = [];
@@ -109,7 +117,11 @@ function recordingCaches(
 					return held.has(path) && query?.ignoreVary === true ? new Response('held') : undefined;
 				},
 				async put(path: string, response: Response) {
-					await response.arrayBuffer();
+					try {
+						await response.arrayBuffer();
+					} catch (error) {
+						throw options.bodyError ?? error;
+					}
 					await options.putGate;
 					if (options.putError) throw options.putError;
 					log.push(`put ${path}`);
@@ -188,6 +200,22 @@ describe('saveDocument', () => {
 		expect([...caches.held]).toEqual([OLD]);
 	});
 
+	// A body nobody will read is let go at once, so its download does not hold a connection open.
+	it('lets go of the body of a response other than 200', async () => {
+		let cancelled = false;
+		const body = new ReadableStream<Uint8Array>({
+			cancel: () => void (cancelled = true)
+		});
+		const fetchFn = vi.fn(async () => new Response(body, { status: 500 }));
+		await saveDocument(CURRENT, [], {
+			fetchFn,
+			cachesApi: recordingCaches().api,
+			isOnline: online,
+			library: []
+		});
+		expect(cancelled).toBe(true);
+	});
+
 	// The older copy is still the user's record of the document; a failed save must not cost them it.
 	it('keeps the older copy when storing fails because the device is full', async () => {
 		const caches = recordingCaches({
@@ -255,6 +283,39 @@ describe('saveDocument', () => {
 			})
 		).toBe('stopped');
 		expect([...caches.held]).toEqual([OLD]);
+	});
+
+	// A connection that is up but silent never fails on its own. The save gives up, and says it failed - not that the
+	// user stopped it, which they did not, and not offline, which the device is not.
+	const silentSave = async (bodyError: Error, isOnline: () => boolean) => {
+		const caches = recordingCaches({ held: [OLD], bodyError });
+		let download: AbortSignal | undefined;
+		const fetchFn = vi.fn(async (_path: string, init?: RequestInit) => {
+			download = init?.signal ?? undefined;
+			const body = new ReadableStream<Uint8Array>({ start: (c) => c.enqueue(new Uint8Array(8)) });
+			return new Response(body, { status: 200 });
+		});
+		const result = await saveDocument(CURRENT, [OLD], {
+			fetchFn,
+			cachesApi: caches.api,
+			isOnline,
+			library: [],
+			idleMs: 40
+		});
+		return { result, held: [...caches.held], aborted: download?.aborted };
+	};
+
+	// A TypeError is the error the save would otherwise read as offline, so it is the one that proves the stall wins.
+	it('reports a failure, and keeps the older copy, when the download goes silent part-way', async () => {
+		expect(await silentSave(new TypeError('E_TEST_BODY'), online)).toEqual({
+			result: 'failed',
+			held: [OLD],
+			aborted: true
+		});
+	});
+
+	it('reports offline when the download goes silent while the device has lost its connection', async () => {
+		expect((await silentSave(new TypeError('E_TEST_BODY'), offline)).result).toBe('offline');
 	});
 
 	it('reports a failure, rather than throwing, when the browser has no Cache API', async () => {

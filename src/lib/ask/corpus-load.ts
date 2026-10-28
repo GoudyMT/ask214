@@ -1,6 +1,7 @@
 import { decodeCorpus, type Corpus, type CorpusManifest } from '$lib/corpus';
 import { EMBED_MODEL_ID } from './types';
 import { AskError, ASK_ERROR } from './errors';
+import { guardedFetch, STALL_MS } from '$lib/net/stall-guard';
 
 // Where the corpus artifact is served; kept beside the cache rules so a save can name it without this loader.
 export { CORPUS_BASE } from './asset-cache';
@@ -10,18 +11,34 @@ export { CORPUS_BASE } from './asset-cache';
  * into the in-memory `Corpus`. No IndexedDB / CDN in v1.0 - the artifact is a
  * same-origin static asset served (and service-worker-cached) by the app. `fetchFn` is injected for
  * testability. Any transport or decode failure -> AskError(E_ASK_CORPUS) (never leaks input).
+ *
+ * A download that goes silent for `idleMs` - headers or body - is a failure too: every question, "Read more" and
+ * Text view waits on this load, so a silent connection would otherwise hold them all for the rest of the session.
  */
-export async function loadCorpus(fetchFn: typeof fetch, basePath: string): Promise<Corpus> {
+export async function loadCorpus(
+	fetchFn: typeof fetch,
+	basePath: string,
+	idleMs: number = STALL_MS
+): Promise<Corpus> {
+	// Every response that arrived, so a load that fails lets go of the bodies it will not read.
+	const arrived: Response[] = [];
+	const fetchFile = (path: string) =>
+		guardedFetch(fetchFn, path, { idleMs }).then((response) => {
+			arrived.push(response);
+			return response;
+		});
 	try {
 		const [mRes, bRes] = await Promise.all([
-			fetchFn(`${basePath}.json`),
-			fetchFn(`${basePath}.embeddings.bin`)
+			fetchFile(`${basePath}.json`),
+			fetchFile(`${basePath}.embeddings.bin`)
 		]);
 		if (!mRes.ok || !bRes.ok) throw new AskError(ASK_ERROR.CORPUS);
 		const manifest = (await mRes.json()) as CorpusManifest;
 		const buffer = await bRes.arrayBuffer();
 		return decodeCorpus(manifest, buffer, EMBED_MODEL_ID); // B validates version/model/length/zero
 	} catch (e) {
+		// A body already read or being read refuses the cancel; that refusal is expected and ignored.
+		for (const response of arrived) void response.body?.cancel().catch(() => {});
 		if (e instanceof AskError) throw e;
 		throw new AskError(ASK_ERROR.CORPUS); // wrap B's CorpusFormatError/Version + JSON errors opaquely
 	}

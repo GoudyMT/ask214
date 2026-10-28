@@ -35,6 +35,35 @@ describe('loadCorpus', () => {
 		expect(corpus.modelId).toBe(EMBED_MODEL_ID);
 	});
 
+	it('gives up with AskError(E_ASK_CORPUS) when the library goes silent part-way, and stops the download', async () => {
+		let embeddings: AbortSignal | undefined;
+		const silent = (async (url: string, init?: RequestInit) => {
+			// The manifest arrives; the embeddings send their first bytes and then nothing more.
+			if (url.endsWith('.json')) return new Response('{}', { status: 200 });
+			embeddings = init?.signal ?? undefined;
+			const body = new ReadableStream<Uint8Array>({
+				start: (c) => c.enqueue(new Uint8Array(8))
+			});
+			return new Response(body, { status: 200 });
+		}) as typeof fetch;
+		await expect(loadCorpus(silent, '/corpus/corpus-v1.0.2', 40)).rejects.toBeInstanceOf(AskError);
+		expect(embeddings?.aborted).toBe(true);
+	});
+
+	// The library's other file is let go at once, so its download does not hold a connection open for nothing.
+	it('lets go of the other file when one of the two is refused', async () => {
+		let cancelled = false;
+		const oneRefused = (async (url: string) => {
+			if (url.endsWith('.json')) return new Response('x', { status: 500 });
+			const body = new ReadableStream<Uint8Array>({ cancel: () => void (cancelled = true) });
+			return new Response(body, { status: 200 });
+		}) as typeof fetch;
+		await expect(loadCorpus(oneRefused, '/corpus/corpus-v1.0.2', 40)).rejects.toBeInstanceOf(
+			AskError
+		);
+		expect(cancelled).toBe(true);
+	});
+
 	it('throws AskError(E_ASK_CORPUS) when a fetch fails', async () => {
 		const fail = (async () => new Response('x', { status: 500 })) as typeof fetch;
 		await expect(loadCorpus(fail, '/corpus/corpus-v1.0.2')).rejects.toBeInstanceOf(AskError);

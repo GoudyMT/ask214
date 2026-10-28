@@ -133,6 +133,25 @@ describe('SourceDocument', () => {
 		expect(calls.getDocument).toBe(0);
 	});
 
+	// A device storage lookup that never answers must not hold the reader on its checking state: past the wait the
+	// document counts as not saved, so offline the text shows and online the page downloads.
+	it('treats a saved check that never answers as not saved', async () => {
+		const onfallback = vi.fn();
+		const { loader } = fakeRuntime([FILLER, FILLER, WITH_PASSAGE]);
+		await render(SourceDocument, {
+			props: props(loader, {
+				isSaved: () => new Promise<boolean>(() => {}),
+				// The same storage answers the look for older copies, so it does not answer either.
+				held: () => new Promise<string[]>(() => {}),
+				isOnline: () => false,
+				onfallback,
+				checkWait: 50
+			})
+		});
+
+		await vi.waitFor(() => expect(onfallback).toHaveBeenCalledWith('offline'));
+	});
+
 	// The document was saved, then updated: its older copy is held and the new version is not. Offline, that is
 	// what the reader says, not that the document was never saved. Another document held says nothing of this one.
 	it('falls back to the text, offline, saying the new version is not saved when an older copy is', async () => {

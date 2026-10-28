@@ -34,7 +34,8 @@
 		isSaved = isDocumentSaved,
 		isOnline = () => navigator.onLine,
 		held = listCachedDocuments,
-		loader = loadPdfRuntime
+		loader = loadPdfRuntime,
+		checkWait = 5_000
 	}: {
 		path: string;
 		bytes: number;
@@ -65,6 +66,11 @@
 		isOnline?: () => boolean;
 		held?: () => Promise<string[]>;
 		loader?: () => Promise<PdfRuntime>;
+		// How long, in ms, each device lookup may take before the document counts as not saved (and, offline, as
+		// having no older copy). A lookup takes
+		// milliseconds; a storage that never answers would otherwise hold the reader on its checking state. A bound,
+		// not a measured limit.
+		checkWait?: number;
 	} = $props();
 
 	let phase = $state<'checking' | 'view'>('checking');
@@ -93,13 +99,22 @@
 		const target = untrack(() => ({ path, page }));
 		const check = savedCheck;
 		const online = onlineCheck;
+		const wait = untrack(() => checkWait);
+		// Each device lookup answers `fallback` once `wait` passes without an answer.
+		const bounded = <T,>(lookup: Promise<T>, fallback: T): Promise<T> => {
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			return Promise.race([
+				lookup,
+				new Promise<T>((resolve) => (timer = setTimeout(() => resolve(fallback), wait)))
+			]).finally(() => clearTimeout(timer));
+		};
 		let cancelled = false;
 		phase = 'checking';
 		landing = target.page;
 		pageCount = 0;
 		reported = false;
 
-		void check(target.path).then((found) => {
+		void bounded(check(target.path), false).then((found) => {
 			if (cancelled) return;
 			saved = found;
 			if (found || online()) {
@@ -109,7 +124,7 @@
 			// Known before trying: a load that must fail offline would only delay the text the user can have now.
 			// An older copy on the device means it was saved once and has been updated since.
 			const id = documentSourceId(target.path);
-			void held().then((paths) => {
+			void bounded(held(), []).then((paths) => {
 				if (!cancelled)
 					onfallback(paths.some((p) => documentSourceId(p) === id) ? 'updated' : 'offline');
 			});

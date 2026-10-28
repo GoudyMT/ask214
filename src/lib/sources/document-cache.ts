@@ -1,5 +1,6 @@
 import { ASK_ASSET_CACHE, CORPUS_BASE } from '$lib/ask/asset-cache';
 import { LIBRARY_SRC, WORKER_SRC } from './pdf-library-paths';
+import { guardedFetch, STALL_MS } from '$lib/net/stall-guard';
 
 /**
  * Whether a served document is already held on this device.
@@ -235,6 +236,10 @@ export async function savesSettled(): Promise<void> {
  * With the worker in control a lost connection does not reject the fetch - the worker answers 503 itself -
  * so any failure while the device reports no connection is read as offline.
  *
+ * A file that goes silent for `idleMs` - headers or body - is given up, and the save ends as failed (offline when
+ * the device reports no connection), never as stopped: a single save has no Stop, so a silent connection would
+ * otherwise leave it saving for good.
+ *
  * The save counts as running, for `savesSettled`, from the call until it ends, and `stopSaves` stops it as its
  * own signal would.
  *
@@ -273,6 +278,7 @@ type SaveOptions = {
 	signal?: AbortSignal;
 	isOnline?: () => boolean;
 	library?: readonly string[];
+	idleMs?: number;
 };
 
 // The save itself, as `saveDocument` describes it.
@@ -284,10 +290,14 @@ async function storeDocument(
 		cachesApi = globalThis.caches,
 		signal,
 		isOnline = () => navigator.onLine,
-		library = [LIBRARY_SRC, WORKER_SRC, `${CORPUS_BASE}.json`, `${CORPUS_BASE}.embeddings.bin`]
+		library = [LIBRARY_SRC, WORKER_SRC, `${CORPUS_BASE}.json`, `${CORPUS_BASE}.embeddings.bin`],
+		idleMs = STALL_MS
 	}: SaveOptions
 ): Promise<SaveResult> {
 	if (cachesApi === undefined) return 'failed';
+	// Set when a download went silent and was given up. The Cache API reports the body it could not read as its own
+	// error, so the error alone cannot tell a stall from a lost connection.
+	let stalled = false;
 	try {
 		const cache = await cachesApi.open(ASK_ASSET_CACHE);
 		const missing: string[] = [];
@@ -296,14 +306,23 @@ async function storeDocument(
 			if ((await cache.match(file, { ignoreVary: true })) === undefined) missing.push(file);
 		}
 		for (const file of [...missing, path]) {
-			const response = await fetchFn(file, signal ? { signal } : {});
-			if (response.status !== 200) return isOnline() ? 'failed' : 'offline';
+			const response = await guardedFetch(fetchFn, file, {
+				idleMs,
+				...(signal ? { signal } : {}),
+				onStall: () => (stalled = true)
+			});
+			if (response.status !== 200) {
+				// Let the body go, so its download does not hold a connection open.
+				void response.body?.cancel().catch(() => {});
+				return isOnline() ? 'failed' : 'offline';
+			}
 			await cache.put(file, response);
 		}
 		await deleteEach(cache, stale);
 		return 'saved';
 	} catch (error) {
 		if (signal?.aborted) return 'stopped';
+		if (stalled) return isOnline() ? 'failed' : 'offline';
 		if (error instanceof DOMException && error.name === 'QuotaExceededError') return 'quota';
 		if (error instanceof TypeError || !isOnline()) return 'offline';
 		return 'failed';
