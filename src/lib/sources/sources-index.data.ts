@@ -216,5 +216,9 @@ export const SOURCES_INDEX: SourcesIndex = {
 			title: 'TAP - VA Benefits for Reserve and National Guard (Resource Guide)',
 			publisher: 'VA'
 		}
-	]
+	],
+	captured: {
+		from: 'Jun 25, 2026',
+		to: 'Sep 15, 2026'
+	}
 };

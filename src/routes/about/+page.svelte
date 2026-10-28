@@ -37,5 +37,9 @@
 	Every answer is drawn from public US Government work (17 USC section 105) and cites the exact
 	source it uses. Below is every source held in the app, each linked to its original.
 </p>
+<p>
+	Captured from {SOURCES_INDEX.captured.from} to {SOURCES_INDEX.captured.to}. Each answer reflects
+	its source as it was captured; the source's official page has the latest.
+</p>
 
 <SourceList index={SOURCES_INDEX} />

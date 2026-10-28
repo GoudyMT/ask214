@@ -17,4 +17,6 @@ export type SourcesIndex = {
 	agency: PublicSource[];
 	tapLibraryUrl: string;
 	tapGuides: TapGuide[];
+	/** The earliest and latest days a source was captured ("Jun 25, 2026"), so readers know how current answers are. */
+	captured: { from: string; to: string };
 };

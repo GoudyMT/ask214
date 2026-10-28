@@ -2,7 +2,7 @@ import type { Resource } from './types';
 
 // The curated outbound link set. Claims and benefits links go only to official .gov (va.gov) or a
 // VA-accredited veterans service organization, per the 38 CFR 14.629 boundary; other categories may
-// include official government programs and vetted national nonprofits. Descriptions are informational
+// include official government programs and vetted free national programs. Descriptions are informational
 // and never assert personal eligibility. Each url is verified against the live official source on its
 // lastVerified date; re-verify the whole set about every 6 months. Grouped by displayCategory.
 export const RESOURCES: readonly Resource[] = [
@@ -258,18 +258,18 @@ export const RESOURCES: readonly Resource[] = [
 		title: 'American Corporate Partners (ACP)',
 		url: 'https://www.acp-usa.org',
 		description:
-			'Free yearlong one-on-one mentoring with corporate professionals for post-9/11 veterans and military spouses.',
+			'Free yearlong one-on-one career mentoring for post-9/11 service members and veterans, and military spouses.',
 		displayCategory: 'mentorship-networking',
-		lastVerified: '2026-08-09'
+		lastVerified: '2026-10-27'
 	},
 	{
 		id: 'milmentor',
 		title: 'MilMentor',
 		url: 'https://www.milmentor.com',
 		description:
-			'A free, on-demand mentorship platform for veterans, transitioning service members, and military spouses.',
+			'Free mentoring from professionals at top companies for service members, veterans, and military spouses moving to civilian careers.',
 		displayCategory: 'mentorship-networking',
-		lastVerified: '2026-08-09'
+		lastVerified: '2026-10-27'
 	},
 	{
 		id: 'hire-heroes',
@@ -338,7 +338,7 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'document-medical': ['va-disability'],
 	'preseparation-counseling': ['dodtap', 'navy-transition'],
 	'tap-course': ['dodtap', 'dol-vets'],
-	'tap-track': ['dodtap'],
+	'tap-track': ['dodtap', 'acp', 'milmentor'],
 	'skillbridge-find': ['skillbridge'],
 	'skillbridge-request': ['mynavy-education', 'navy-skillbridge'],
 	'job-search': ['usajobs', 'hiring-our-heroes', 'hire-heroes'],

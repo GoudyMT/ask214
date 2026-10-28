@@ -470,6 +470,10 @@ const STATIC = 'static';
 //     names its field. Four builds of the same code measured page 103,434-103,445 B, on demand 16,007-16,012 B,
 //     precache 252,772-252,792 B and route nodes 59,665-59,676 B, about 40 B of room above the highest; the files
 //     limit is unchanged.
+//     Precache 252,830 -> 252,985 and the lazy route nodes 59,715 -> 59,865 (owner's call, 2026-10-27): About says
+//     when the sources were captured, a sentence whose two dates are formatted when the index is generated so the
+//     page ships no date code. Three builds of the same code measured precache 252,926-252,945 B and route nodes
+//     59,802-59,824 B, about 40 B of room above the highest; page, on demand and the files limit unchanged.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -482,7 +486,7 @@ const LIMIT = {
 	page: 103_485,
 	onDemand: 16_050,
 	precacheFiles: 80,
-	precacheBytes: 252_830,
+	precacheBytes: 252_985,
 	workerScripts: 147_200
 };
 

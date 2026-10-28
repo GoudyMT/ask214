@@ -1,0 +1,46 @@
+name: Live check
+
+# Online answers depend on a Worker and an answer library that deploy by hand, apart from the app, so a merge can
+# break them with every other check green. This asks the live site one public question after each push to main,
+# and once a week in case something changes on the host's side with no merge at all. A failure turns the run red
+# and GitHub sends its failed-run notice to whoever started the run (for the schedule, whoever created it or last
+# changed its timing).
+#
+# It proves the live answers come from the library version the app expects. It cannot see a content refresh that
+# kept the same version: a refresh still needs the index uploaded and the Worker redeployed by hand.
+#
+# GitHub pauses scheduled runs in a public repository after 60 days with no activity; the push trigger still runs,
+# and a paused schedule is switched back on from the Actions tab.
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Off the hour: GitHub delays, and can drop, scheduled runs at busy times such as the top of each hour.
+    - cron: '37 14 * * 1'
+  workflow_dispatch:
+
+# Two quick merges: the older run could read the newer build against the older code, so only the newest run counts.
+# Keyed on the branch, so a manual run from another branch (skipped below) can never cancel a run on main.
+concurrency:
+  group: live-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live:
+    # The live site only ever runs main; a manual run from a branch would wait for a build that never comes.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # The deploy wait gives up at 20 minutes; this leaves room for the question and its one retry.
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      # Node built-ins only, so no install: nothing from the registry runs in this job.
+      - name: Ask the live site one question
+        run: node content-ops/live-check.mjs
