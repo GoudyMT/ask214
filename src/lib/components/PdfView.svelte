@@ -62,8 +62,9 @@
 		mayFocus?: () => boolean;
 		// A page asked for by number. Each request is a new object, so asking twice still moves.
 		request?: { page: number } | null;
-		// How long, in ms, the download may go with nothing arriving before it is given up as failed. Long
-		// enough for the library's worker, which loads before any of the document arrives on a first open.
+		// How long, in ms, the download may go with nothing arriving before it is given up as failed - and how long
+		// the library itself may take to load, first. Long enough for the library's worker, which loads before any
+		// of the document arrives on a first open.
 		stallAfter?: number;
 		// The runtime is injected so the view can be exercised without the real library; the default is the
 		// lazy loader, which keeps the library out of every bundle until a document is opened.
@@ -130,6 +131,9 @@
 		const target = untrack(() => ({ url, anchor, quote }));
 		// The page the passage is searched from. Moving to another page later does not load again.
 		const cited = untrack(() => landing);
+		// Read untracked like the rest: the library wait starts before the first await, and a change of bound alone
+		// must not load the document again.
+		const bound = untrack(() => stallAfter);
 
 		// Every await below can outlive this effect - the reader may close, or move to another citation, while
 		// the document is still loading. `cancelled` stops a stale run from writing state it no longer owns.
@@ -149,7 +153,13 @@
 
 		(async () => {
 			try {
-				const library = await load();
+				// The library loads first, and gives no progress to watch, so a silent connection there is bounded by
+				// the same wait as a silent download. A load given up is still the one the loader keeps: if it arrives
+				// later, the next document opened uses it.
+				const library = await new Promise<PdfRuntime>((resolve, reject) => {
+					stall = setTimeout(() => reject(new Error('E_PDF_STALLED')), bound);
+					load().then(resolve, reject);
+				}).finally(() => clearTimeout(stall));
 				if (cancelled) return;
 				// Whole, never in byte ranges. A document the user saved is one complete file, and the service
 				// worker serves it to any later request for the url, so a range read would be handed the whole
@@ -168,7 +178,7 @@
 						stall = setTimeout(() => {
 							void opened.destroy();
 							reject(new Error('E_PDF_STALLED'));
-						}, stallAfter);
+						}, bound);
 					};
 					opened.onProgress = (progress: { loaded: number }) => {
 						if (!cancelled) {

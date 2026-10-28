@@ -309,6 +309,18 @@ describe('PdfView', () => {
 		expect(calls.destroyed).toBe(1);
 	});
 
+	// The library loads before any of the document, and a silent connection can hold that load too.
+	it('gives the load up as failed when the page library itself never arrives', async () => {
+		const onfail = vi.fn();
+		const loader = () => new Promise<never>(() => {});
+		const { container } = await render(PdfView, {
+			props: props(loader, { bytes: 6_900_000, onfail, stallAfter: 100 })
+		});
+
+		await vi.waitFor(() => expect(onfail).toHaveBeenCalledTimes(1));
+		expect(container.querySelector('[role="status"]')).toBeNull();
+	});
+
 	it('keeps waiting while the download is still arriving', async () => {
 		let release!: () => void;
 		const holdDocument = new Promise<void>((resolve) => (release = resolve));
