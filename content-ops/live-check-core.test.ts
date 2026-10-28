@@ -1,5 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { deployLanded, judgeAnswer, readAcceptedVersion } from './live-check-core.mjs';
+import { ACCEPTED_CORPUS_VERSION } from '../src/lib/corpus/codec';
+import {
+	deployLanded,
+	judgeAnswer,
+	readAcceptedVersion,
+	worthRetrying
+} from './live-check-core.mjs';
 
 // The live check stands in for a person after every merge: the app deploys itself, but the retrieve Worker and its
 // index deploy by hand, so a merge that moves the app's expected answer library breaks every online answer with
@@ -58,9 +65,30 @@ describe('judgeAnswer', () => {
 	});
 });
 
+// The check runs with no one watching, so one network blip must not raise a false alarm; a wrong library is a
+// real outage and fails at once.
+describe('worthRetrying', () => {
+	it('retries a failure that a blip or a busy moment can cause', () => {
+		for (const code of ['E_LIVE_NETWORK', 'E_LIVE_HTTP', 'E_LIVE_NO_RESULTS']) {
+			expect(worthRetrying(code), code).toBe(true);
+		}
+	});
+
+	it('never retries a library mismatch', () => {
+		expect(worthRetrying('E_LIVE_VERSION_MISMATCH')).toBe(false);
+	});
+});
+
 describe('readAcceptedVersion', () => {
 	it('reads the version the app accepts from its codec source', () => {
 		expect(readAcceptedVersion("export const ACCEPTED_CORPUS_VERSION = '1.0.2';\n")).toBe('1.0.2');
+	});
+
+	// The runner reads the real file as text; a reshaped declaration there must fail here, not after a merge.
+	it('reads the real codec source the runner reads', () => {
+		expect(readAcceptedVersion(readFileSync('src/lib/corpus/codec.ts', 'utf8'))).toBe(
+			ACCEPTED_CORPUS_VERSION
+		);
 	});
 
 	// A renamed or reshaped constant must stop the check, never let it compare against nothing.

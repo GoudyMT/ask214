@@ -44,6 +44,17 @@ export function judgeAnswer(response, acceptedVersion) {
 }
 
 /**
+ * Whether a failed question is worth one more try. A network blip, a refused request or a busy moment can clear
+ * on its own; an answer from the wrong library is the outage itself and never clears by asking again.
+ *
+ * @param {string} code The static error code the question failed with.
+ * @returns {boolean} True when one retry may clear it.
+ */
+export function worthRetrying(code) {
+	return code !== 'E_LIVE_VERSION_MISMATCH';
+}
+
+/**
  * The answer-library version the app accepts, read from the codec's source.
  *
  * @param {string} codecSource The text of src/lib/corpus/codec.ts.
