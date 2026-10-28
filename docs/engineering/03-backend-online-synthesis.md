@@ -26,7 +26,9 @@ private working notes.
 
 **What it is.** The online path is built to cost nothing at any level of use. Every limit it touches stops with
 an error instead of charging: Workers' 100,000 requests a day, Workers AI's 10,000 neurons a day and KV's 1,000
-writes a day. The account is on the free plan with no payment method, so there is nothing to bill.
+writes a day. The account stays on the free plan and turns on no product that bills by use, so there is nothing to
+bill. A payment method is on file for the domain's yearly renewal, the one expected charge, and a budget alert watches
+for any other.
 
 **Tradeoffs accepted.** Under heavy use or an attack, online search answers "high demand" until midnight UTC and
 the app offers the on-device path instead. It degrades; it never bills.
@@ -165,7 +167,7 @@ do not support.
 
 ## Standards Adopted in This Section
 
-- **No cost that scales with use.** The free plan with no payment method is the hard guarantee.
+- **No cost that scales with use.** The free plan with no product that bills by use is the hard guarantee.
 - **No secrets and no logs on the search server.**
 - **Degrade, never bill; degrade, never mislead.** A fault is never shown as an empty search.
 - **Decision logic in tested functions**, with the platform code kept thin.
