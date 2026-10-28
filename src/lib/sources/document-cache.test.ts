@@ -98,8 +98,9 @@ function recordingCaches(
 		exists?: boolean;
 		putError?: Error;
 		putGate?: Promise<void>;
-		// The real Cache API reports a body that failed while it read it as its own TypeError, not the body's error.
-		bodyErrorAsTypeError?: boolean;
+		// A browser may report a body that failed while the Cache API read it as an error of its own (not verified
+		// which: a TypeError or a NetworkError DOMException), so a save must not depend on the error it gets back.
+		bodyError?: Error;
 	} = {}
 ) {
 	const held = new Set(options.held ?? []);
@@ -119,7 +120,7 @@ function recordingCaches(
 					try {
 						await response.arrayBuffer();
 					} catch (error) {
-						throw options.bodyErrorAsTypeError ? new TypeError('E_TEST_BODY') : error;
+						throw options.bodyError ?? error;
 					}
 					await options.putGate;
 					if (options.putError) throw options.putError;
@@ -270,25 +271,40 @@ describe('saveDocument', () => {
 
 	// A connection that is up but silent never fails on its own. The save gives up, and says it failed - not that the
 	// user stopped it, which they did not, and not offline, which the device is not.
-	it('reports a failure, and keeps the older copy, when the download goes silent part-way', async () => {
-		const caches = recordingCaches({ held: [OLD], bodyErrorAsTypeError: true });
+	const silentSave = async (bodyError: Error, isOnline: () => boolean) => {
+		const caches = recordingCaches({ held: [OLD], bodyError });
 		let download: AbortSignal | undefined;
 		const fetchFn = vi.fn(async (_path: string, init?: RequestInit) => {
 			download = init?.signal ?? undefined;
 			const body = new ReadableStream<Uint8Array>({ start: (c) => c.enqueue(new Uint8Array(8)) });
 			return new Response(body, { status: 200 });
 		});
-		expect(
-			await saveDocument(CURRENT, [OLD], {
-				fetchFn,
-				cachesApi: caches.api,
-				isOnline: online,
-				library: [],
-				idleMs: 40
-			})
-		).toBe('failed');
-		expect([...caches.held]).toEqual([OLD]);
-		expect(download?.aborted).toBe(true);
+		const result = await saveDocument(CURRENT, [OLD], {
+			fetchFn,
+			cachesApi: caches.api,
+			isOnline,
+			library: [],
+			idleMs: 40
+		});
+		return { result, held: [...caches.held], aborted: download?.aborted };
+	};
+
+	it.each([
+		['a TypeError', new TypeError('E_TEST_BODY')],
+		['a NetworkError', new DOMException('E_TEST_BODY', 'NetworkError')]
+	])(
+		'reports a failure, and keeps the older copy, when the download goes silent part-way (cache reports %s)',
+		async (_name, bodyError) => {
+			expect(await silentSave(bodyError, online)).toEqual({
+				result: 'failed',
+				held: [OLD],
+				aborted: true
+			});
+		}
+	);
+
+	it('reports offline when the download goes silent while the device has lost its connection', async () => {
+		expect((await silentSave(new TypeError('E_TEST_BODY'), offline)).result).toBe('offline');
 	});
 
 	it('reports a failure, rather than throwing, when the browser has no Cache API', async () => {
