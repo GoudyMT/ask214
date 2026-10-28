@@ -474,6 +474,13 @@ const STATIC = 'static';
 //     when the sources were captured, a sentence whose two dates are formatted when the index is generated so the
 //     page ships no date code. Three builds of the same code measured precache 252,926-252,945 B and route nodes
 //     59,802-59,824 B, about 40 B of room above the highest; page, on demand and the files limit unchanged.
+//     Page 103,485 -> 104,036, onDemand 16,050 -> 16,153 and precache 252,985 -> 253,604 (owner's call, 2026-10-28):
+//     the download stall guards - a fetch that gives up when nothing arrives for a while, used by the answer library
+//     and a document save, the reader's bound on the page library and on its saved check, and the worker's wait
+//     before it serves the kept page. Measured growth over the base: page +501 B, on demand +63 B, precache +563 B;
+//     each raise is that growth plus 10% or 40 B, whichever is larger, set once for the whole PR and checked once at
+//     its final gate, where a line with more room than that is lowered. Trim pass first: the guarded body passed
+//     through a transform stream (-37 B), kept.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
 //     code, which a device downloads the first time it asks a question on-device. The worker script's download
 //     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
@@ -483,10 +490,10 @@ const STATIC = 'static';
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 103_485,
-	onDemand: 16_050,
+	page: 104_036,
+	onDemand: 16_153,
 	precacheFiles: 80,
-	precacheBytes: 252_985,
+	precacheBytes: 253_604,
 	workerScripts: 147_200
 };
 
