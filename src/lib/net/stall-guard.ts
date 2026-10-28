@@ -107,7 +107,6 @@ export async function guardedFetch(
 	);
 	return new Response(body, {
 		status: response.status,
-		statusText: response.statusText,
 		headers: response.headers
 	});
 }
