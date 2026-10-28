@@ -37,9 +37,6 @@ export async function guardedFetch(
 	{ idleMs, signal, onStall }: GuardOptions
 ): Promise<Response> {
 	const inner = new AbortController();
-	const forward = () => inner.abort(signal?.reason);
-	signal?.addEventListener('abort', forward, { once: true });
-	if (signal?.aborted) forward();
 	const stalled = new Error(STALL_ERROR);
 	// Where a stall is reported: the wait for the headers first, then the body.
 	let fail: (error: Error) => void = () => {};
@@ -48,6 +45,13 @@ export async function guardedFetch(
 		clearTimeout(timer);
 		signal?.removeEventListener('abort', forward);
 	};
+	// A stop ends the wait too, so a stopped download is never reported as stalled.
+	const forward = () => {
+		finish();
+		inner.abort(signal?.reason);
+	};
+	signal?.addEventListener('abort', forward, { once: true });
+	if (signal?.aborted) forward();
 	const wait = () => {
 		clearTimeout(timer);
 		timer = setTimeout(() => {
@@ -58,49 +62,32 @@ export async function guardedFetch(
 		}, idleMs);
 	};
 
-	let response: Response;
-	try {
-		response = await new Promise<Response>((resolve, reject) => {
-			fail = reject;
-			wait();
-			fetchFn(path, { signal: inner.signal }).then(resolve, reject);
+	const response = await new Promise<Response>((resolve, reject) => {
+		fail = reject;
+		wait();
+		fetchFn(path, { signal: inner.signal }).then(resolve, (error: unknown) => {
+			finish();
+			reject(error);
 		});
-	} catch (error) {
-		finish();
-		throw error;
-	}
-	const source = response.body;
-	if (source === null) {
+	});
+	if (response.body === null) {
 		finish();
 		return response;
 	}
-	const reader = source.getReader();
-	const body = new ReadableStream<Uint8Array>({
+	// Each piece restarts the wait; the end of the body ends it, and so does a body that fails or is cancelled.
+	const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>({
 		start(controller) {
 			fail = (error) => controller.error(error);
 			wait();
 		},
-		async pull(controller) {
-			try {
-				const { done, value } = await reader.read();
-				if (done) {
-					finish();
-					controller.close();
-					return;
-				}
-				wait();
-				controller.enqueue(value);
-			} catch (error) {
-				finish();
-				controller.error(error);
-			}
+		transform(chunk, controller) {
+			wait();
+			controller.enqueue(chunk);
 		},
-		cancel(reason) {
-			finish();
-			return reader.cancel(reason);
-		}
+		flush: finish
 	});
-	return new Response(body, {
+	response.body.pipeTo(writable).catch(finish);
+	return new Response(readable, {
 		status: response.status,
 		statusText: response.statusText,
 		headers: response.headers
