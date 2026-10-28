@@ -703,7 +703,14 @@ export async function networkFirst(
 		const first = await Promise.race([network, silent]);
 		if (first !== 'silent') return { response: first, network: true };
 		const page = await kept.silent().catch(() => undefined);
-		if (page !== undefined) return { response: page, network: false };
+		if (page !== undefined) {
+			// Nothing reads the network's late answer, so its body is let go rather than downloaded for nothing.
+			void network.then(
+				(late) => late.body?.cancel().catch(() => {}),
+				() => {}
+			);
+			return { response: page, network: false };
+		}
 		return { response: await network, network: true };
 	} catch {
 		return { response: await kept.failed(), network: false };

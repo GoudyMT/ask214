@@ -1501,6 +1501,16 @@ describe('networkFirst', () => {
 		expect(fromNetwork).toBe(false);
 	});
 
+	// The page was served from the cache, so the network's late answer is let go rather than downloaded for nothing.
+	it('lets go of a network answer that comes after the kept copy was served', async () => {
+		const net = network();
+		await networkFirst(net.pending, kept('frame'), WAIT_MS);
+		let cancelled = false;
+		net.answer(new Response(new ReadableStream({ cancel: () => void (cancelled = true) })));
+		await pause(0);
+		expect(cancelled).toBe(true);
+	});
+
 	it('keeps waiting for a slow network when no frame is kept', async () => {
 		const net = network();
 		const run = networkFirst(net.pending, kept(null, 'address copy'), WAIT_MS);
