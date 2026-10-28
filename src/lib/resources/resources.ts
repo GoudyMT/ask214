@@ -205,7 +205,7 @@ export const RESOURCES: readonly Resource[] = [
 		title: 'Leave Benefits During Transition',
 		url: 'https://militarypay.defense.gov/Benefits/Leave-Benefits-During-Transition/',
 		description:
-			'Official DoD page on using, selling back (up to 60 days in a career) or taking terminal leave before you separate.',
+			'Official DoD page on using, selling back or taking terminal leave before you separate.',
 		displayCategory: 'finance',
 		lastVerified: '2026-10-28'
 	},
@@ -213,7 +213,7 @@ export const RESOURCES: readonly Resource[] = [
 		id: 'mypay',
 		title: 'myPay (DFAS)',
 		url: 'https://mypay.dfas.mil/',
-		description: 'The official DFAS pay site, where you see your LES and your final pay.',
+		description: 'The official DFAS pay site for your LES, including your final one.',
 		displayCategory: 'finance',
 		lastVerified: '2026-10-28'
 	},
