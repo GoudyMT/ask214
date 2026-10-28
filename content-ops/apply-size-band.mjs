@@ -12,6 +12,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import {
 	BUDGET_LINES,
 	highest,
+	isRecordReason,
 	parseBand,
 	planApply,
 	planFinal,
@@ -98,6 +99,10 @@ function main() {
 
 	// Step 1: read and check everything before any build or write.
 	console.log('\n[1/4] Reading the band and the current limits...');
+	if (!isRecordReason(reason)) {
+		console.log('    The reason must be one line of plain ASCII text with no $ sign.');
+		process.exit(2);
+	}
 	const band = parseBand(JSON.parse(readFileSync(option('--band') ?? DEFAULT_BAND, 'utf8')));
 	const script = readFileSync(BUDGET_SCRIPT, 'utf8');
 	const packageJson = readFileSync(PACKAGE_JSON, 'utf8');

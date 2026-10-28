@@ -214,6 +214,14 @@ export function readLimits(script: string, packageJson: string): Sizes {
 	return out;
 }
 
+/**
+ * Whether a reason may go in the record. It comes from the command line and lands in a gate script's source: one line
+ * of printable ASCII, no `$` (a line break would write live code; `$&` is a replacement pattern).
+ */
+export function isRecordReason(reason: string): boolean {
+	return /^[\x20-\x23\x25-\x7E]+$/.test(reason);
+}
+
 const grouped = (n: number, separator: string) =>
 	n.toLocaleString('en-US').replaceAll(',', separator);
 
@@ -229,8 +237,7 @@ export function rewriteLimits(
 	changes: Change[],
 	record: { date: string; reason: string }
 ): { script: string; packageJson: string } {
-	// The reason comes from the command line and lands in a gate script's source: one line of printable ASCII, no `$`.
-	if (!/^[\x20-\x23\x25-\x7E]+$/.test(record.reason)) throw new Error('E_SIZE_BAND_REASON');
+	if (!isRecordReason(record.reason)) throw new Error('E_SIZE_BAND_REASON');
 	exactlyOne(script, RECORD_LINE());
 	for (const { line } of changes) {
 		const { file, pattern } = LIMIT_AT[line];

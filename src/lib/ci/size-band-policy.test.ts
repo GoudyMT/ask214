@@ -10,6 +10,7 @@ import {
 	suggestRaise,
 	readLimits,
 	rewriteLimits,
+	type Change,
 	type Sizes
 } from './size-band-policy';
 
@@ -308,6 +309,31 @@ describe('rewriteLimits on the real budget files', () => {
 
 	// The reason is typed on the command line and written into a CI gate's source: a line break would write live code,
 	// a `$&` would be read as a replacement pattern, and a non-ASCII character breaks the repo's ASCII rule.
+	// The lasting record that an overrun was applied under the allowance, not asked: it must say so in the file.
+	it('records how far past the band an allowance raise went', () => {
+		const over: Change[] = [
+			{
+				line: 'page',
+				from: current.page,
+				to: page,
+				measured: page - 40,
+				growth: 0,
+				margin: 40,
+				overBand: 8
+			}
+		];
+		const written = rewriteLimits(BUDGET_SCRIPT, PACKAGE_JSON, over, {
+			date: '2026-10-28',
+			reason: 'x'
+		});
+		const added = written.script
+			.split('\n')
+			.filter((line) => !BUDGET_SCRIPT.split('\n').includes(line));
+		expect(added.some((line) => line.startsWith('//') && line.includes('8 B past the band'))).toBe(
+			true
+		);
+	});
+
 	it('refuses a record reason that is not one line of plain ASCII text', () => {
 		for (const reason of ['two\nlines', 'cost $& more', `caf${String.fromCharCode(233)}`, ''])
 			expect(() =>
