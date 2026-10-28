@@ -60,6 +60,8 @@ export type Change = {
 	measured: number;
 	growth: number;
 	margin: number;
+	/** Bytes past the approved band, applied under the standing allowance and reported rather than asked. */
+	overBand?: number;
 };
 export type Refusal = { line: BudgetLine; need: number; allowed: number; measured: number };
 export type Plan =
@@ -73,6 +75,16 @@ export type Plan =
  */
 export function marginFor(growth: number): number {
 	return Math.max(40, Math.ceil(Math.max(0, growth) * 0.1));
+}
+
+/**
+ * How far past its band a line may go and still be applied without asking (the owner's standing allowance): 50 B, or
+ * 10% of the band when that is larger. A band is asked from two builds, and the same code has measured up to ~30 B
+ * apart between builds, so an overrun this small is build drift, not new code; it is applied and reported. A line
+ * with no band gets none, and the end check lowers whatever room is left, so the allowance cannot pile up.
+ */
+export function allowanceFor(raise: number): number {
+	return Math.max(50, Math.ceil(raise * 0.1));
 }
 
 /** Each line's largest size across several builds of the same code, so a lucky small build never sets a limit. */
@@ -130,9 +142,13 @@ export function planApply(band: Band, measured: Sizes, current: Sizes): Plan {
 		const margin = marginFor(growth);
 		const need = size + margin;
 		if (need <= current[line]) continue;
-		const allowed = band.limit[line] + (band.raise[line] ?? 0);
-		if (need > allowed) refusals.push({ line, need, allowed, measured: size });
-		else changes.push({ line, from: current[line], to: need, measured: size, growth, margin });
+		const raise = band.raise[line] ?? 0;
+		const allowed = band.limit[line] + raise;
+		const change = { line, from: current[line], to: need, measured: size, growth, margin };
+		if (need <= allowed) changes.push(change);
+		else if (raise > 0 && need <= allowed + allowanceFor(raise))
+			changes.push({ ...change, overBand: need - allowed });
+		else refusals.push({ line, need, allowed, measured: size });
 	}
 	return refuseOrChange({ changes, refusals });
 }
@@ -228,7 +244,10 @@ export function rewriteLimits(
 	const lines = changes.map(
 		(c) =>
 			`//   ${record.date} ${record.reason}: ${c.line} ${grouped(c.from, ',')} -> ${grouped(c.to, ',')} ` +
-			`(measured ${grouped(c.measured, ',')} B, ${c.growth >= 0 ? '+' : ''}${grouped(c.growth, ',')} B on the plan's base, margin ${c.margin} B).`
+			`(measured ${grouped(c.measured, ',')} B, ${c.growth >= 0 ? '+' : ''}${grouped(c.growth, ',')} B on the plan's base, margin ${c.margin} B` +
+			(c.overBand === undefined
+				? ').'
+				: `; ${c.overBand} B past the band, under the standing allowance).`)
 	);
 	if (lines.length > 0)
 		nextScript = nextScript.replace(RECORD_ANCHOR, `${lines.join('\n')}\n//\n${RECORD_ANCHOR}`);

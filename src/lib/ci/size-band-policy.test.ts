@@ -85,6 +85,42 @@ describe('planApply', () => {
 		});
 	});
 
+	// A real run: page builds of the same code measured 104,478-104,506 B, so a band set from one build came in 8 B
+	// short on the next. A small overrun is applied and reported, not asked; a larger one still stops.
+	it('applies a raise up to the standing allowance past the band, and reports how far past it went', () => {
+		const band = { ...BAND, raise: { ...BAND.raise, page: 460 } };
+		expect(planApply(band, { ...BASE, page: 104_497 }, LIMITS)).toEqual({
+			ok: true,
+			changes: [
+				{
+					line: 'page',
+					from: 104_076,
+					to: 104_544,
+					measured: 104_497,
+					growth: 468,
+					margin: 47,
+					overBand: 8
+				}
+			]
+		});
+	});
+
+	it('refuses past the standing allowance: 50 B, or 10% of the band when that is larger', () => {
+		const band = { ...BAND, raise: { ...BAND.raise, page: 460 } };
+		// allowed 104,536 + 50 = 104,586; 104,540 B (margin 52 B) needs 104,592.
+		expect(planApply(band, { ...BASE, page: 104_540 }, LIMITS)).toEqual({
+			ok: false,
+			changes: [],
+			refusals: [{ line: 'page', need: 104_592, allowed: 104_536, measured: 104_540 }]
+		});
+		// 48 B past a 460 B band: inside the 50 B floor, though past 10% of the band (46 B).
+		expect(planApply(band, { ...BASE, page: 104_533 }, LIMITS).ok).toBe(true);
+		const wide = { ...BAND, raise: { ...BAND.raise, page: 1_000 } };
+		// allowed 105,076 + 100 = 105,176.
+		expect(planApply(wide, { ...BASE, page: 105_050 }, LIMITS).ok).toBe(true);
+		expect(planApply(wide, { ...BASE, page: 105_150 }, LIMITS).ok).toBe(false);
+	});
+
 	it('refuses a raise on a line the band does not list', () => {
 		const plan = planApply(BAND, { ...BASE, rootLayout: 9_800 }, LIMITS);
 		expect(plan).toEqual({

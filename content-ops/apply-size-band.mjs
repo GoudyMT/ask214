@@ -131,7 +131,10 @@ function main() {
 	}
 	for (const c of plan.changes)
 		console.log(
-			`    ${c.line}: ${c.from.toLocaleString('en-US')} -> ${c.to.toLocaleString('en-US')} (measured ${c.measured.toLocaleString('en-US')} B, margin ${c.margin} B)`
+			`    ${c.line}: ${c.from.toLocaleString('en-US')} -> ${c.to.toLocaleString('en-US')} (measured ${c.measured.toLocaleString('en-US')} B, margin ${c.margin} B)` +
+				(c.overBand === undefined
+					? ''
+					: ` - ${c.overBand} B PAST THE BAND, applied under the standing allowance: report it`)
 		);
 	if (plan.changes.length === 0) {
 		console.log('    No limit needs to change.');
