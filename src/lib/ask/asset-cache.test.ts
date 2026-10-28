@@ -22,7 +22,7 @@ import {
 	keptOnActivate,
 	APP_SHELL,
 	offlineResponse,
-	answerNavigation
+	networkFirst
 } from './asset-cache';
 import { KDF_WORKER_SRC } from '../backup/kdf-paths';
 
@@ -1448,7 +1448,7 @@ describe('offlineResponse', () => {
 	});
 });
 
-describe('answerNavigation', () => {
+describe('networkFirst', () => {
 	const WAIT_MS = 40;
 	const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 	// A network that answers when `answer` is called, fails when `fail` is, and otherwise stays silent.
@@ -1471,7 +1471,7 @@ describe('answerNavigation', () => {
 
 	it('serves the network page when it answers in time', async () => {
 		const net = network();
-		const run = answerNavigation(net.pending, kept('frame'), WAIT_MS);
+		const run = networkFirst(net.pending, kept('frame'), WAIT_MS);
 		net.answer(new Response('fresh page'));
 		const { response, network: fromNetwork } = await run;
 		expect(await response?.text()).toBe('fresh page');
@@ -1482,7 +1482,7 @@ describe('answerNavigation', () => {
 	// the frame is served early: the address's own copy may be from another release.
 	it("serves this release's frame, not the address's own copy, when the network stays silent", async () => {
 		const net = network();
-		const { response, network: fromNetwork } = await answerNavigation(
+		const { response, network: fromNetwork } = await networkFirst(
 			net.pending,
 			kept('frame', 'address copy'),
 			WAIT_MS
@@ -1493,7 +1493,7 @@ describe('answerNavigation', () => {
 
 	it('keeps waiting for a slow network when no frame is kept', async () => {
 		const net = network();
-		const run = answerNavigation(net.pending, kept(null, 'address copy'), WAIT_MS);
+		const run = networkFirst(net.pending, kept(null, 'address copy'), WAIT_MS);
 		await pause(WAIT_MS * 2);
 		net.answer(new Response('slow page'));
 		const { response, network: fromNetwork } = await run;
@@ -1510,7 +1510,7 @@ describe('answerNavigation', () => {
 			},
 			failed: page(null)
 		};
-		const run = answerNavigation(net.pending, broken, WAIT_MS);
+		const run = networkFirst(net.pending, broken, WAIT_MS);
 		await pause(WAIT_MS * 2);
 		net.answer(new Response('slow page'));
 		expect(await (await run).response?.text()).toBe('slow page');
@@ -1519,12 +1519,12 @@ describe('answerNavigation', () => {
 	it("serves the address's own copy when the network fails, and nothing when none is kept", async () => {
 		const failing = network();
 		failing.fail(new TypeError('Failed to fetch'));
-		const served = await answerNavigation(failing.pending, kept('frame', 'address copy'), WAIT_MS);
+		const served = await networkFirst(failing.pending, kept('frame', 'address copy'), WAIT_MS);
 		expect(await served.response?.text()).toBe('address copy');
 		expect(served.network).toBe(false);
 
 		const late = network();
-		const run = answerNavigation(late.pending, kept(null), WAIT_MS);
+		const run = networkFirst(late.pending, kept(null), WAIT_MS);
 		await pause(WAIT_MS * 2);
 		late.fail(new TypeError('Failed to fetch'));
 		expect((await run).response).toBeUndefined();

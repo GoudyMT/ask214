@@ -21,8 +21,8 @@ import {
 	INSTALL_PAGES,
 	offlineResponse,
 	shellResponse,
-	answerNavigation,
-	NAVIGATION_WAIT_MS
+	networkFirst,
+	NETWORK_WAIT_MS
 } from '$lib/ask/asset-cache';
 import { isTakeOver } from '$lib/sw/take-over-message';
 
@@ -213,15 +213,15 @@ sw.addEventListener('fetch', (event) => {
 				if (cached) return cached;
 			}
 
-			// A page opened: network-first, but the kept page once the network stays silent (answerNavigation).
+			// A page opened: network-first, but the kept page once the network stays silent (networkFirst).
 			if (event.request.mode === 'navigate') {
-				const { response, network } = await answerNavigation(
+				const { response, network } = await networkFirst(
 					fetch(event.request),
 					{
 						silent: () => shellResponse(cache, event.request),
 						failed: () => offlineResponse(cache, event.request)
 					},
-					NAVIGATION_WAIT_MS
+					NETWORK_WAIT_MS
 				);
 				if (network && response?.status === 200 && keptOnFetch(url.pathname)) {
 					storeOnFetch(event, cache, event.request, response);
@@ -229,18 +229,18 @@ sw.addEventListener('fetch', (event) => {
 				return response ?? new Response('Offline', { status: 503 });
 			}
 
-			// Network-first for pages, fall back to cache
-			try {
-				const response = await fetch(event.request);
-				if (response.status === 200 && keptOnFetch(url.pathname)) {
-					storeOnFetch(event, cache, event.request, response);
-				}
-				return response;
-			} catch {
-				return (
-					(await offlineResponse(cache, event.request)) ?? new Response('Offline', { status: 503 })
-				);
+			// Everything else network-first, with the same wait: a copy kept for this very request - the embed worker's
+			// script install kept, above all - is served once the network stays silent, or fails.
+			const kept = () => offlineResponse(cache, event.request);
+			const { response, network } = await networkFirst(
+				fetch(event.request),
+				{ silent: kept, failed: kept },
+				NETWORK_WAIT_MS
+			);
+			if (network && response?.status === 200 && keptOnFetch(url.pathname)) {
+				storeOnFetch(event, cache, event.request, response);
 			}
+			return response ?? new Response('Offline', { status: 503 });
 		})()
 	);
 });

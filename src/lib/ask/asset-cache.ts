@@ -644,34 +644,35 @@ export async function shellResponse(
 }
 
 /**
- * How long a page navigation waits for the network before the kept page is served instead.
+ * How long a request the service worker answers network-first waits for the network before a kept copy is served.
  *
  * A connection that is up but silent does not fail for minutes, and until it does the app opens blank though its page
- * is kept. What is served then is this release's own frame (`shellResponse`), with nothing of the user's in it, so
- * serving it early costs a fresh copy of the same page and no more. It is a bound, not a measured limit: the slowest
- * real links can take longer than this to send a first byte, and on them the frame is what opens.
+ * is kept - or a set-up device cannot start answering though install kept the embed worker's script. For a page,
+ * what is served then is this release's own frame (`shellResponse`), with nothing of the user's in it, so serving it
+ * early costs a fresh copy of the same page and no more. It is a bound, not a measured limit: the slowest real links
+ * can take longer than this to send a first byte, and on them the kept copy is what opens.
  */
-export const NAVIGATION_WAIT_MS = 5_000;
+export const NETWORK_WAIT_MS = 5_000;
 
 /**
- * Answer a page navigation from the network, or from a kept page when the network stays silent for `waitMs` or
- * fails. With nothing kept for the silent case, or a cache that cannot be read, the network is still waited for:
- * there is nothing better to show.
+ * Answer a request from the network, or from a kept copy when the network stays silent for `waitMs` or fails. With
+ * nothing kept for the silent case, or a cache that cannot be read, the network is still waited for: there is
+ * nothing better to show.
  *
- * The two cases read different kept pages. A silent network may be one that works, slowly, so only this release's
- * own frame is served early; a copy kept for the address itself may come from another release (`storeOnFetch`).
- * A failed network gets the copy kept for the address first, as `offlineResponse` gives.
+ * The two cases may read different copies. For a page, a silent network may be one that works, slowly, so only this
+ * release's own frame is served early; a copy kept for the address itself may come from another release
+ * (`storeOnFetch`). A failed network gets the copy kept for the address first, as `offlineResponse` gives.
  *
  * Args:
- *   network: the navigation's fetch, already started
- *   kept: `silent` and `failed` read the kept page for each case, only once it is needed
- *   waitMs: how long the network may stay silent before the kept page is served
+ *   network: the request's fetch, already started
+ *   kept: `silent` and `failed` read the kept copy for each case, only once it is needed
+ *   waitMs: how long the network may stay silent before the kept copy is served
  *
  * Returns:
  *   the response to serve (undefined when the network failed and no page is kept) and whether it came from the
  *   network, so the caller keeps a copy only of a page the network sent.
  */
-export async function answerNavigation(
+export async function networkFirst(
 	network: Promise<Response>,
 	kept: {
 		silent: () => Promise<Response | undefined>;
