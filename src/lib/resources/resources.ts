@@ -405,7 +405,7 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'tap-capstone': ['dodtap'],
 	'va-benefits-advisor': ['va-accredited-rep', 'va-welcome-kit'],
 	'hhg-counseling': ['military-onesource'],
-	'separation-package': ['navy-transition'],
+	'separation-package': ['navy-transition', 'leave-transition'],
 	'tricare-elect': ['military-onesource'],
 	'financial-docs': ['mypay'],
 	'tsp-decision': ['tsp', 'tsp-calculators'],
