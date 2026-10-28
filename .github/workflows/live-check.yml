@@ -20,8 +20,9 @@ on:
   workflow_dispatch:
 
 # Two quick merges: the older run could read the newer build against the older code, so only the newest run counts.
+# Keyed on the branch, so a manual run from another branch (skipped below) can never cancel a run on main.
 concurrency:
-  group: live-check
+  group: live-check-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
