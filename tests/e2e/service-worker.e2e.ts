@@ -156,10 +156,21 @@ test('a page opened on a silent connection opens from the kept page', async ({
 	await context.route('**/documents', () => {
 		asked++;
 	});
+	// A copy kept for the address itself may be another release's page, so on a silent network only this release's
+	// frame is served. Planted here as a page no release ever was.
+	await page.evaluate(async () => {
+		const name = (await caches.keys()).find((key) => key.startsWith('app-'));
+		if (name === undefined) throw new Error('E_TEST_NO_RELEASE_CACHE');
+		const planted = '<!doctype html><title>planted</title><h1>Planted copy</h1>';
+		await (
+			await caches.open(name)
+		).put('/documents', new Response(planted, { headers: { 'content-type': 'text/html' } }));
+	});
 	await page.goto('/documents', { timeout: 15_000 });
 	await expect(page.getByRole('heading', { level: 1, name: 'Documents' })).toBeVisible({
 		timeout: 10_000
 	});
+	await expect(page.getByText('Planted copy')).toHaveCount(0);
 	expect(new URL(page.url()).pathname).toBe('/documents');
 	expect(asked).toBeGreaterThan(0);
 	await context.unrouteAll({ behavior: 'ignoreErrors' });

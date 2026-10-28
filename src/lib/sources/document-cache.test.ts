@@ -305,19 +305,14 @@ describe('saveDocument', () => {
 		return { result, held: [...caches.held], aborted: download?.aborted };
 	};
 
-	it.each([
-		['a TypeError', new TypeError('E_TEST_BODY')],
-		['a NetworkError', new DOMException('E_TEST_BODY', 'NetworkError')]
-	])(
-		'reports a failure, and keeps the older copy, when the download goes silent part-way (cache reports %s)',
-		async (_name, bodyError) => {
-			expect(await silentSave(bodyError, online)).toEqual({
-				result: 'failed',
-				held: [OLD],
-				aborted: true
-			});
-		}
-	);
+	// A TypeError is the error the save would otherwise read as offline, so it is the one that proves the stall wins.
+	it('reports a failure, and keeps the older copy, when the download goes silent part-way', async () => {
+		expect(await silentSave(new TypeError('E_TEST_BODY'), online)).toEqual({
+			result: 'failed',
+			held: [OLD],
+			aborted: true
+		});
+	});
 
 	it('reports offline when the download goes silent while the device has lost its connection', async () => {
 		expect((await silentSave(new TypeError('E_TEST_BODY'), offline)).result).toBe('offline');
