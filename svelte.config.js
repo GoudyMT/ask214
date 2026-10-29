@@ -1,5 +1,9 @@
 import adapter from '@sveltejs/adapter-cloudflare';
 
+// A real past build stamp, not a round number: a run of zeros compresses smaller than any real stamp and would
+// measure the shipped files a few bytes light.
+const MEASURE_VERSION = '1793277697344';
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	compilerOptions: {
@@ -16,7 +20,7 @@ const config = {
 		// budgets with one fixed version. A live build keeps SvelteKit's default: it is stamped once per build,
 		// where a time computed here is computed again for each part of the build, and the service worker and the
 		// page would then carry different versions and never agree on an update.
-		...(process.env.MEASURE_BUILD === '1' && { version: { name: '1000000000000' } }),
+		...(process.env.MEASURE_BUILD === '1' && { version: { name: MEASURE_VERSION } }),
 		// Off: the layout registers /service-worker.js itself, as a module worker. SvelteKit's own call registers
 		// the same file as a classic one, and a second registration of a different type counts as an update, so
 		// every page load would install the worker again and leave a copy waiting behind the one in charge.
