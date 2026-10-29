@@ -11,11 +11,11 @@ import {
 	scanForPiiTokens
 } from './pii-policy';
 
-// Server-side SvelteKit source: anything that can execute on a server - a route's server file, hooks, any
-// `*.server` module and everything under src/lib/server. The feedback endpoint is the one today; the guard covers it
-// and any added later (PII stays on device).
-const SERVER_FILE_PATTERN = /(?:\+server|\.server)\.[jt]s$/;
-const SERVER_FOLDER_PATTERN = /[\\/]src[\\/]lib[\\/]server[\\/]/;
+// Server-side SvelteKit source: anything that can execute on a server - a route's server file, hooks, any `server`
+// or `*.server` module and everything in a `server` folder outside src/routes, the rule SvelteKit itself applies. The
+// feedback endpoint is the one today; the guard covers it and any added later (PII stays on device).
+const SERVER_FILE_PATTERN = /[\\/+.]server\.[cm]?[jt]s$/;
+const SERVER_FOLDER_PATTERN = /[\\/]src[\\/](?!routes[\\/])(?:.*[\\/])?server[\\/]/;
 
 /** Whether a file in a scanned folder is source the guard reads: every kind, tests and type declarations aside. */
 function isScannedSource(name: string): boolean {
@@ -29,8 +29,8 @@ function isScannedSource(name: string): boolean {
 /** Whether a source file runs on the server. */
 function isServerSource(path: string): boolean {
 	return (
-		SERVER_FILE_PATTERN.test(path) ||
-		(SERVER_FOLDER_PATTERN.test(`/${path}`) && isScannedSource(basename(path)))
+		(SERVER_FILE_PATTERN.test(path) || SERVER_FOLDER_PATTERN.test(`/${path}`)) &&
+		isScannedSource(basename(path))
 	);
 }
 
@@ -49,12 +49,19 @@ function findServerFiles(dir: string): string[] {
 }
 
 describe('pii-policy: what the guard reads', () => {
-	it('counts every server-only file: *.server modules and src/lib/server', () => {
+	// SvelteKit runs these on the server only: a file named `server.*` or `*.server.*`, and anything in a `server`
+	// folder outside src/routes.
+	it('counts every server-only file: server and *.server modules, and any server folder', () => {
 		expect(isServerSource(join('src', 'routes', 'api', 'feedback', '+server.ts'))).toBe(true);
 		expect(isServerSource(join('src', 'lib', 'resend.server.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'lib', 'mail', 'server.ts'))).toBe(true);
 		expect(isServerSource(join('src', 'lib', 'server', 'mailer.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'lib', 'mail', 'server', 'format.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'server', 'mailer.ts'))).toBe(true);
 		expect(isServerSource(join('src', 'lib', 'server', 'mailer.test.ts'))).toBe(false);
+		expect(isServerSource(join('src', 'routes', 'api', 'feedback', 'server.test.ts'))).toBe(false);
 		expect(isServerSource(join('src', 'lib', 'ask', 'store.svelte.ts'))).toBe(false);
+		expect(isServerSource(join('src', 'lib', 'ask', 'observer.ts'))).toBe(false);
 	});
 
 	it('skips build output: dot folders and node_modules', () => {
