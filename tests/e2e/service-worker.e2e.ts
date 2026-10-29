@@ -178,7 +178,8 @@ test('a page opened on a silent connection opens from the kept page', async ({
 
 // The same wait holds for a file the worker answers network-first and keeps a copy of - the embed worker's script on a
 // set-up device is the one that matters, as a question cannot start without it. The app's own page, kept at install,
-// stands in for it here: fetched from the page, it is a plain request, not a navigation.
+// stands in for it here for the wait: fetched from the page, it is a plain request, not a navigation. The script's own
+// kept copy being served is checked with the install tests below.
 test('a kept file asked for on a silent connection comes from its kept copy', async ({
 	page,
 	context,
@@ -292,7 +293,7 @@ test('activate drops a superseded corpus entry and keeps the heavy model bytes',
 	for (const path of SET_UP) expect(cached, path).toContain(path);
 });
 
-// The embed worker's script is left out of the build list the service worker precaches, and an update deletes the
+// The service worker never precaches the embed worker's script, and an update deletes the
 // previous release's cache, so a device that set up on-device answers would meet its first question after an update
 // offline with a worker script nothing had fetched. Install reads the script's name from this release's own code
 // and keeps it, for a device that set up - and only for one.
@@ -372,6 +373,22 @@ test.describe('install keeps the embed worker script for a device that set up on
 		const { workerScripts, requested } = await installAgain(page, SET_UP);
 		expect(workerScripts).toHaveLength(1);
 		expect(requested.filter((path) => WORKER_SCRIPT.test(path))).toEqual([]);
+	});
+
+	// The copy install kept is the one a question offline gets: the worker answers the script from the release cache,
+	// where install put it, not from the asset cache.
+	test('a set-up device offline after an update is served the script install kept', async ({
+		page,
+		context
+	}) => {
+		const { workerScripts } = await installAgain(page, SET_UP);
+		expect(workerScripts).toHaveLength(1);
+		await context.setOffline(true);
+		const status = await page.evaluate(
+			async (path) => (await fetch(path)).status,
+			workerScripts[0] ?? ''
+		);
+		expect(status).toBe(200);
 	});
 
 	test('a setup stopped part-way gets no worker script', async ({ page }) => {
