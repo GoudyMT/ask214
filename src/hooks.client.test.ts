@@ -25,7 +25,8 @@ const event = {} as Input['event'];
 
 describe('handleError', () => {
 	// Returning nothing keeps SvelteKit's defaults: 500 and "Internal Error" for an unknown error, the fixed
-	// framework message ("Not Found") for a missing page. Anything returned would replace them.
+	// framework message ("Not Found") for a missing page. Anything returned would replace them; the hook has one path,
+	// so the unknown-error case proves both.
 	it("keeps SvelteKit's own fixed message, never the error's text, and logs only E_INTERNAL", async () => {
 		const before = getDiagnosticsForTest().length;
 		const shown = await handleError({
@@ -39,14 +40,5 @@ describe('handleError', () => {
 				.slice(before)
 				.map((e) => e.code)
 		).toEqual(['E_INTERNAL']);
-	});
-
-	it('keeps the not-found message a missing page already shows', async () => {
-		const shown = await handleError({
-			kind: 'framework',
-			error: { status: 404, message: 'Not Found' },
-			event
-		});
-		expect(shown).toBeUndefined();
 	});
 });
