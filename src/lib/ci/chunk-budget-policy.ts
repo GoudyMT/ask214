@@ -144,6 +144,8 @@ export function roomInBytes(size: number, limit: number): string {
 /**
  * The page the service worker also keeps at install (APP_SHELL in ../ask/asset-cache): a served page, not a file
  * in the build, so the budget cannot weigh it on disk. This is its allowance in gzip-9 bytes; the offline-pages
- * E2E weighs the real page against it. Measured 1,469 B (that E2E, gzip-9 of the kept body) on 2026-09-26.
+ * E2E weighs the real page against it. Measured 1,469 B (that E2E, gzip-9 of the kept body) on 2026-09-26; 1,717 B
+ * on SvelteKit 3, which writes a modulepreload link per script into the page (from 1,349 B on the live SvelteKit 2
+ * page), so 1,754 B: the measurement plus 10% of the growth (owner's call, 2026-10-29).
  */
-export const SHELL_BYTES_ALLOWANCE = 1_600;
+export const SHELL_BYTES_ALLOWANCE = 1_754;
