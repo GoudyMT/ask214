@@ -32,7 +32,9 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
-describe('the build version', () => {
+// Each read resolves the whole Vite config with its plugins: about a second alone, and past the default 5 s while the
+// commit hook runs every server test file at once.
+describe('the build version', { timeout: 30_000 }, () => {
 	it('is one fixed stamp on every measuring build', async () => {
 		vi.stubEnv('MEASURE_BUILD', '1');
 		const [first, second] = await twoBuildReads();
