@@ -127,8 +127,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # A fixed build version, so the size checks below measure the same bytes for the same code on every run
+      # (the default, the build time, moves a few bytes through every hashed file name). The live build keeps it.
       - name: Build
         run: pnpm run build
+        env:
+          MEASURE_BUILD: '1'
 
       # Whether each citation opens the right served document at a page it has, and whether the passage and
       # the quote are found there, measured with the shipped matcher and reader. It reads the corpus from the
