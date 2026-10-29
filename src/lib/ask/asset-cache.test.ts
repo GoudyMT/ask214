@@ -77,6 +77,15 @@ describe('classifyAsset', () => {
 		];
 		expect(assets.filter((path) => classifyAsset(path) === 'precache')).toEqual(['/index.html']);
 	});
+
+	// A newer Vite lists the embed worker's script in SvelteKit's build list. Install keeps it only for a device
+	// that set up on-device answers; precached, every visitor would download it. It stays in the release cache,
+	// where install keeps it for those devices, so it is never routed to the asset cache either.
+	it("keeps the embed worker's script out of the install precache and in the release cache", () => {
+		const script = '/_app/immutable/workers/embed-worker-BaxhJHmd.js';
+		expect(classifyAsset(script)).not.toBe('precache');
+		expect(classifyAsset(script)).not.toBe('lazy');
+	});
 });
 
 // The lazy model/wasm live in their OWN cache, whose name is independent of the app version, so an app

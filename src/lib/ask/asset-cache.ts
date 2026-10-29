@@ -1,4 +1,4 @@
-export type CacheStrategy = 'precache' | 'lazy';
+export type CacheStrategy = 'precache' | 'lazy' | 'on-use';
 
 /**
  * Decide how the service worker caches a same-origin static asset. The heavy on-device search model +
@@ -18,8 +18,13 @@ export type CacheStrategy = 'precache' | 'lazy';
  * or a document is saved (and the library again after an update, on a device that saved one), which is when
  * the user has asked for them. A new heavy namespace belongs in this list
  * BEFORE it ships, not after someone notices the install got slower.
+ *
+ * The embed worker's script is 'on-use': never precached (install keeps it only for a device that set up on-device
+ * answers), and cached in the versioned app-shell cache when used, where that install copy lives. Newer Vite
+ * versions list it in SvelteKit's build list, so without this every visitor would download it at install.
  */
 export function classifyAsset(pathname: string): CacheStrategy {
+	if (pathname.startsWith(WORKER_SCRIPT_FOLDER)) return 'on-use';
 	if (
 		pathname.startsWith('/models/') ||
 		pathname.startsWith('/wasm/') ||
