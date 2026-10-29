@@ -13,9 +13,10 @@ const config = {
 		adapter: adapter(),
 		// The build time is the version by default, and every hashed file name that leads to it changes with it, so
 		// two builds of the same code differ by a few bytes. CI and the gate set MEASURE_BUILD=1 to measure the size
-		// budgets with one fixed version. The live build must keep the time: the service worker and the update
-		// hand-over see a new release only when the version changes.
-		version: { name: process.env.MEASURE_BUILD === '1' ? '1000000000000' : String(Date.now()) },
+		// budgets with one fixed version. A live build keeps SvelteKit's default: it is stamped once per build,
+		// where a time computed here is computed again for each part of the build, and the service worker and the
+		// page would then carry different versions and never agree on an update.
+		...(process.env.MEASURE_BUILD === '1' && { version: { name: '1000000000000' } }),
 		// Off: the layout registers /service-worker.js itself, as a module worker. SvelteKit's own call registers
 		// the same file as a classic one, and a second registration of a different type counts as an update, so
 		// every page load would install the worker again and leave a copy waiting behind the one in charge.
