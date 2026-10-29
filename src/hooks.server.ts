@@ -8,7 +8,9 @@ import headersFile from '../_headers?raw';
 const RULES = parseHeadersFile(headersFile);
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const response = await resolve(event);
+	// A copy, because a redirect or a passed-through fetch has headers that cannot be changed.
+	const resolved = await resolve(event);
+	const response = new Response(resolved.body, resolved);
 	for (const [name, value] of Object.entries(headersFor(RULES, event.url.pathname))) {
 		if (!response.headers.has(name)) response.headers.set(name, value);
 	}
