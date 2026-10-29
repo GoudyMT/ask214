@@ -60,7 +60,7 @@ describe('marginFor', () => {
 });
 
 describe('highest', () => {
-	it('takes each line from the largest of several builds, so a smaller build never sets a limit', () => {
+	it('takes each line from the largest of the builds measured', () => {
 		const a = { ...BASE, page: 104_300 };
 		const b = { ...BASE, page: 104_280, routeNodes: 59_830 };
 		expect(highest([a, b])).toEqual({ ...BASE, page: 104_300, routeNodes: 59_830 });
@@ -98,6 +98,16 @@ describe('planApply', () => {
 		});
 		// 104,488 B (margin 46 B) needs 104,534: inside the band.
 		expect(planApply(band, { ...BASE, page: 104_488 }, LIMITS).ok).toBe(true);
+	});
+
+	it('applies a line that lands exactly on its band and refuses one byte past it', () => {
+		// allowed 104,076 + 390 = 104,466; 104,426 B (margin 40 B) needs exactly 104,466.
+		expect(planApply(BAND, { ...BASE, page: 104_426 }, LIMITS).ok).toBe(true);
+		expect(planApply(BAND, { ...BASE, page: 104_427 }, LIMITS)).toEqual({
+			ok: false,
+			changes: [],
+			refusals: [{ line: 'page', need: 104_467, allowed: 104_466, measured: 104_427 }]
+		});
 	});
 
 	it('refuses a raise on a line the band does not list', () => {

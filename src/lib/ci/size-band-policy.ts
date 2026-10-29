@@ -73,7 +73,7 @@ export function marginFor(growth: number): number {
 	return Math.ceil(Math.max(0, growth) * 0.1);
 }
 
-/** Each line's largest size across several builds of the same code, so a lucky small build never sets a limit. */
+/** Each line's largest size across the builds measured. */
 export function highest(builds: Sizes[]): Sizes {
 	const out = { ...builds[0] } as Sizes;
 	for (const build of builds)
