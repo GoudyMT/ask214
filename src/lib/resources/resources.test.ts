@@ -87,6 +87,27 @@ describe('task-to-resource mapping integrity', () => {
 			expect(new Set(resIds).size, taskId).toBe(resIds.length);
 		}
 	});
+
+	// The money tools (links to the official calculators and pay pages, no rates kept in the app): a money task
+	// that shows no link leaves the member with the question and nowhere official to answer it.
+	// Selling back or taking terminal leave is chosen before separation; a leave page shown only after it is too late.
+	it('shows the leave page on a task that ends before separation, while the choice is open', () => {
+		const before = TASK_DEFS.filter(
+			(t) => t.windowEnd < 0 && resourcesForTask(t.id).some((r) => r.id === 'leave-transition')
+		);
+		expect(before.length).toBeGreaterThan(0);
+	});
+
+	it('every money task on the Timeline shows at least one official link', () => {
+		const money = TASK_DEFS.filter((t) => t.category === 'finance');
+		expect(money.length).toBeGreaterThan(0);
+		for (const task of money) {
+			const links = resourcesForTask(task.id);
+			expect(links.length, task.id).toBeGreaterThan(0);
+			for (const link of links)
+				expect(isGovernmentHost(link.url), `${task.id} -> ${link.url}`).toBe(true);
+		}
+	});
 });
 
 describe('task-to-guide mapping: the TAP guides a task opens in the app', () => {

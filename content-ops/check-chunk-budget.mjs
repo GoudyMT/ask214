@@ -496,12 +496,15 @@ const STATIC = 'static';
 //     update can grow the worker past it; a raise then is expected, on a measured reason and as the owner's call,
 //     as for every limit here. The budget exists to make that growth a decision, not a surprise.
 //
+//   2026-10-28 the money tools links (owner's call): page 104,076 -> 104,520 (measured 104,475 B, +446 B on the plan's base, margin 45 B).
+//   2026-10-28 the money tools links (owner's call): precacheBytes 253,668 -> 254,089 (measured 254,043 B, +452 B on the plan's base, margin 46 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 104_076,
+	page: 104_520,
 	onDemand: 16_137,
 	precacheFiles: 80,
-	precacheBytes: 253_668,
+	precacheBytes: 254_089,
 	workerScripts: 147_200
 };
 
@@ -554,6 +557,7 @@ let failed = 0;
  * @param {string} label
  * @param {string[]} files Paths relative to the client output.
  * @param {number} limit Gzipped bytes.
+ * @returns {number} The row's size, for the sizes line apply-size-band.mjs reads.
  */
 function sizeRow(label, files, limit) {
 	const size = total(files);
@@ -562,10 +566,13 @@ function sizeRow(label, files, limit) {
 	console.log(
 		`    ${label.padEnd(26)} ${kilobytes(size).padStart(8)} KB  <= ${kilobytes(limit)} KB  ${pass ? 'PASS' : 'FAIL'}  (${files.length} files, ${roomInBytes(size, limit)})`
 	);
+	return size;
 }
 
-sizeRow('chunks a page downloads', page, LIMIT.page);
-sizeRow('chunks loaded on demand', onDemand, LIMIT.onDemand);
+/** @type {Record<string, number>} */
+const measured = {};
+measured.page = sizeRow('chunks a page downloads', page, LIMIT.page);
+measured.onDemand = sizeRow('chunks loaded on demand', onDemand, LIMIT.onDemand);
 
 // The precache, read from the built worker's own list and filtered by the worker's own rule.
 const { listed, precached } = precachedPaths(readFileSync(`${CLIENT}/service-worker.js`, 'utf-8'));
@@ -650,7 +657,7 @@ if (unread.length > 0) {
 
 // The worker script is fetched under its own deadline (WORKER_SCRIPT_DEADLINE_MS), which assumes the size
 // measured below; a script that grows past it can miss that deadline on a slow connection.
-sizeRow(
+measured.workerScripts = sizeRow(
 	'worker scripts',
 	scriptsOnDisk.map((script) => script.slice(1)),
 	LIMIT.workerScripts
@@ -670,6 +677,9 @@ if (stray.length > 0) {
 	for (const file of stray) console.log(`    wasm outside /wasm/ ${file}`);
 	throw new Error('E_STRAY_WASM');
 }
+
+// One machine-read line: content-ops/apply-size-band.mjs reads the sizes from this check, so both use one instrument.
+console.log(`    sizes ${JSON.stringify({ ...measured, precacheFiles, precacheBytes })}`);
 
 if (failed > 0) {
 	console.log(
