@@ -499,13 +499,16 @@ const STATIC = 'static';
 //   2026-10-28 the money tools links (owner's call): page 104,076 -> 104,520 (measured 104,475 B, +446 B on the plan's base, margin 45 B).
 //   2026-10-28 the money tools links (owner's call): precacheBytes 253,668 -> 254,089 (measured 254,043 B, +452 B on the plan's base, margin 46 B).
 //
+//   2026-10-29 vite 8.3 output: the worker bundle and every route node grew with no app code change: workerScripts 147,200 -> 147,316 (measured 147,294 B, +217 B on the plan's base, margin 22 B).
+//   2026-10-29 vite 8.3 output: the worker bundle and every route node grew with no app code change: routeNodes 59,865 -> 59,869 (measured 59,863 B, +57 B on the plan's base, margin 6 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 104_520,
 	onDemand: 16_137,
 	precacheFiles: 80,
 	precacheBytes: 254_089,
-	workerScripts: 147_200
+	workerScripts: 147_316
 };
 
 /**
