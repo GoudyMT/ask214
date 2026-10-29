@@ -83,8 +83,7 @@ describe('classifyAsset', () => {
 	// where install keeps it for those devices, so it is never routed to the asset cache either.
 	it("keeps the embed worker's script out of the install precache and in the release cache", () => {
 		const script = '/_app/immutable/workers/embed-worker-BaxhJHmd.js';
-		expect(classifyAsset(script)).not.toBe('precache');
-		expect(classifyAsset(script)).not.toBe('lazy');
+		expect(classifyAsset(script)).toBe('on-use');
 	});
 });
 
