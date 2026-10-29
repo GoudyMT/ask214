@@ -24,7 +24,7 @@ import {
 const BUDGET_SCRIPT = 'content-ops/check-chunk-budget.mjs';
 const PACKAGE_JSON = 'package.json';
 const DEFAULT_BAND = '.claude/size-band.json';
-const DEFAULT_BUILDS = 2;
+const DEFAULT_BUILDS = 1;
 
 /**
  * Run a node script and return what it printed, even when it exits non-zero (an over-budget check still prints).
@@ -52,7 +52,11 @@ function node(args) {
  * @returns {import('../src/lib/ci/size-band-policy.ts').Sizes}
  */
 function measureOneBuild() {
-	execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], { stdio: 'ignore' });
+	// The fixed build version CI and the gate measure with, so the limits written here hold there.
+	execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], {
+		stdio: 'ignore',
+		env: { ...process.env, MEASURE_BUILD: '1' }
+	});
 	const sizeLimit = JSON.parse(
 		node(['node_modules/size-limit/bin.js', '--json']).replace(/^[^[]*/, '')
 	);
@@ -86,9 +90,9 @@ function main() {
 	const mode = process.argv[2];
 	const reason = option('--reason') ?? (mode === 'final' ? 'end check' : undefined);
 	const builds = Number(option('--builds') ?? DEFAULT_BUILDS);
-	if ((mode !== 'apply' && mode !== 'final') || reason === undefined || !(builds >= 2)) {
+	if ((mode !== 'apply' && mode !== 'final') || reason === undefined || !(builds >= 1)) {
 		console.log(
-			'Usage: size:band apply --reason "<what grew>" | final  [--band <file>] [--builds <n, at least 2>]'
+			'Usage: size:band apply --reason "<what grew>" | final  [--band <file>] [--builds <n, at least 1>]'
 		);
 		process.exit(2);
 	}
@@ -109,8 +113,8 @@ function main() {
 	const current = readLimits(script, packageJson);
 	console.log(`    Plan: ${band.plan} (approved ${band.approved})`);
 
-	// Step 2: measure several builds; builds of the same code differ by a few bytes, so the highest sets the limit.
-	console.log(`\n[2/4] Building and measuring ${builds} times...`);
+	// Step 2: measure the builds asked for; the highest of each line sets its limit.
+	console.log(`\n[2/4] Building and measuring ${builds} time(s)...`);
 	const runs = [];
 	for (let i = 0; i < builds; i += 1) {
 		runs.push(measureOneBuild());
@@ -129,7 +133,7 @@ function main() {
 		if (mode === 'apply')
 			for (const r of plan.refusals)
 				console.log(
-					`    Re-request ${r.line}: +${suggestRaise(band, r)} B (the need plus build drift)`
+					`    Re-request ${r.line}: +${suggestRaise(band, r)} B (the need over the approved limit)`
 				);
 		console.log(
 			'\nNothing written. Run a trim pass; if it finds too little, re-request from these numbers.'
@@ -138,10 +142,7 @@ function main() {
 	}
 	for (const c of plan.changes)
 		console.log(
-			`    ${c.line}: ${c.from.toLocaleString('en-US')} -> ${c.to.toLocaleString('en-US')} (measured ${c.measured.toLocaleString('en-US')} B, margin ${c.margin} B)` +
-				(c.overBand === undefined
-					? ''
-					: ` - ${c.overBand} B PAST THE BAND, applied under the standing allowance: report it`)
+			`    ${c.line}: ${c.from.toLocaleString('en-US')} -> ${c.to.toLocaleString('en-US')} (measured ${c.measured.toLocaleString('en-US')} B, margin ${c.margin} B)`
 		);
 	if (plan.changes.length === 0) {
 		console.log('    No limit needs to change.');

@@ -10,7 +10,6 @@ import {
 	suggestRaise,
 	readLimits,
 	rewriteLimits,
-	type Change,
 	type Sizes
 } from './size-band-policy';
 
@@ -48,18 +47,20 @@ const BAND = parseBand({
 });
 
 describe('marginFor', () => {
-	it('keeps at least 40 B, above the ~25 B a build drifts between commits', () => {
-		expect(marginFor(0)).toBe(40);
-		expect(marginFor(264)).toBe(40);
+	// Measured builds carry one fixed version, so the same code measures the same bytes: no room is kept for drift.
+	it('is 10% of the growth, rounded up, with no floor', () => {
+		expect(marginFor(0)).toBe(0);
+		expect(marginFor(264)).toBe(27);
+		expect(marginFor(1_001)).toBe(101);
 	});
 
-	it('is 10% of the growth, rounded up, once that is larger', () => {
-		expect(marginFor(1_001)).toBe(101);
+	it('keeps no room for a line that shrank', () => {
+		expect(marginFor(-50)).toBe(0);
 	});
 });
 
 describe('highest', () => {
-	it('takes each line from the largest of several builds, so a smaller build never sets a limit', () => {
+	it('takes each line from the largest of the builds measured', () => {
 		const a = { ...BASE, page: 104_300 };
 		const b = { ...BASE, page: 104_280, routeNodes: 59_830 };
 		expect(highest([a, b])).toEqual({ ...BASE, page: 104_300, routeNodes: 59_830 });
@@ -72,7 +73,7 @@ describe('planApply', () => {
 		expect(planApply(BAND, measured, LIMITS)).toEqual({
 			ok: true,
 			changes: [
-				{ line: 'page', from: 104_076, to: 104_340, measured: 104_300, growth: 271, margin: 40 }
+				{ line: 'page', from: 104_076, to: 104_328, measured: 104_300, growth: 271, margin: 28 }
 			]
 		});
 	});
@@ -86,48 +87,35 @@ describe('planApply', () => {
 		});
 	});
 
-	// A real run: page builds of the same code measured 104,478-104,506 B, so a band set from one build came in 8 B
-	// short on the next. A small overrun is applied and reported, not asked; a larger one still stops.
-	it('applies a raise up to the standing allowance past the band, and reports how far past it went', () => {
+	// Every byte past the band is new code, so even a small overrun goes back to the owner as a re-request.
+	it('refuses a line that needs even a few bytes past its band', () => {
 		const band = { ...BAND, raise: { ...BAND.raise, page: 460 } };
+		// allowed 104,076 + 460 = 104,536; 104,497 B (margin 47 B) needs 104,544.
 		expect(planApply(band, { ...BASE, page: 104_497 }, LIMITS)).toEqual({
-			ok: true,
-			changes: [
-				{
-					line: 'page',
-					from: 104_076,
-					to: 104_544,
-					measured: 104_497,
-					growth: 468,
-					margin: 47,
-					overBand: 8
-				}
-			]
-		});
-	});
-
-	it('refuses past the standing allowance: 50 B, or 10% of the band when that is larger', () => {
-		const band = { ...BAND, raise: { ...BAND.raise, page: 460 } };
-		// allowed 104,536 + 50 = 104,586; 104,540 B (margin 52 B) needs 104,592.
-		expect(planApply(band, { ...BASE, page: 104_540 }, LIMITS)).toEqual({
 			ok: false,
 			changes: [],
-			refusals: [{ line: 'page', need: 104_592, allowed: 104_536, measured: 104_540 }]
+			refusals: [{ line: 'page', need: 104_544, allowed: 104_536, measured: 104_497 }]
 		});
-		// 48 B past a 460 B band: inside the 50 B floor, though past 10% of the band (46 B).
-		expect(planApply(band, { ...BASE, page: 104_533 }, LIMITS).ok).toBe(true);
-		const wide = { ...BAND, raise: { ...BAND.raise, page: 1_000 } };
-		// allowed 105,076 + 100 = 105,176.
-		expect(planApply(wide, { ...BASE, page: 105_050 }, LIMITS).ok).toBe(true);
-		expect(planApply(wide, { ...BASE, page: 105_150 }, LIMITS).ok).toBe(false);
+		// 104,488 B (margin 46 B) needs 104,534: inside the band.
+		expect(planApply(band, { ...BASE, page: 104_488 }, LIMITS).ok).toBe(true);
+	});
+
+	it('applies a line that lands exactly on its band and refuses one byte past it', () => {
+		// allowed 104,076 + 390 = 104,466; 104,426 B (margin 40 B) needs exactly 104,466.
+		expect(planApply(BAND, { ...BASE, page: 104_426 }, LIMITS).ok).toBe(true);
+		expect(planApply(BAND, { ...BASE, page: 104_427 }, LIMITS)).toEqual({
+			ok: false,
+			changes: [],
+			refusals: [{ line: 'page', need: 104_467, allowed: 104_466, measured: 104_427 }]
+		});
 	});
 
 	it('refuses a raise on a line the band does not list', () => {
-		const plan = planApply(BAND, { ...BASE, rootLayout: 9_800 }, LIMITS);
+		const plan = planApply(BAND, { ...BASE, rootLayout: 9_818 }, LIMITS);
 		expect(plan).toEqual({
 			ok: false,
 			changes: [],
-			refusals: [{ line: 'rootLayout', need: 9_840, allowed: 9_820, measured: 9_800 }]
+			refusals: [{ line: 'rootLayout', need: 9_824, allowed: 9_820, measured: 9_818 }]
 		});
 	});
 
@@ -137,18 +125,18 @@ describe('planApply', () => {
 		expect(planApply(BAND, { ...BASE, workerScripts: 147_150 }, current)).toEqual({
 			ok: false,
 			changes: [],
-			refusals: [{ line: 'workerScripts', need: 147_190, allowed: 147_100, measured: 147_150 }]
+			refusals: [{ line: 'workerScripts', need: 147_158, allowed: 147_100, measured: 147_150 }]
 		});
 	});
 
 	// A second apply on the same branch counts from the approved limit, so two raises never add up past the band.
 	it('caps a line at the approved limit plus its band, not at a limit an earlier apply already raised', () => {
 		const raised = { ...LIMITS, page: 104_340 };
-		// The band's cap: 104,076 + 390 = 104,466, + the 50 B allowance = 104,516; 104,480 B needs 104,526.
-		expect(planApply(BAND, { ...BASE, page: 104_480 }, raised)).toEqual({
+		// The band's cap: 104,076 + 390 = 104,466; 104,430 B (margin 41 B) needs 104,471.
+		expect(planApply(BAND, { ...BASE, page: 104_430 }, raised)).toEqual({
 			ok: false,
 			changes: [],
-			refusals: [{ line: 'page', need: 104_526, allowed: 104_466, measured: 104_480 }]
+			refusals: [{ line: 'page', need: 104_471, allowed: 104_466, measured: 104_430 }]
 		});
 	});
 
@@ -171,42 +159,35 @@ describe('planApply', () => {
 
 describe('planFinal', () => {
 	it('lowers a band line left with more room than its margin, so padding never accumulates', () => {
-		// Every other line already sits at its size plus 40 B, so only the page line has padding to give back.
-		const tight = Object.fromEntries(
-			Object.entries(BASE).map(([line, size]) => [
-				line,
-				line === 'precacheFiles' ? size : size + 40
-			])
-		) as Sizes;
-		const limits = { ...tight, page: 104_340 };
+		// The other band lines grew nothing and sit at their size, so only the page line has padding to give back.
+		const limits = { ...BASE, page: 104_340 };
 		const measured = { ...BASE, page: 104_200 };
 		expect(planFinal(BAND, measured, limits)).toEqual({
 			ok: true,
 			changes: [
-				{ line: 'page', from: 104_340, to: 104_240, measured: 104_200, growth: 171, margin: 40 }
+				{ line: 'page', from: 104_340, to: 104_218, measured: 104_200, growth: 171, margin: 18 }
 			]
 		});
 	});
 
-	// A real end check: a band file listing onDemand at 0 B lowered it 6 B to its margin, and the next build's drift then
-	// put it over. A line with no raise is treated as unlisted by apply, so the end check leaves it alone too.
+	// A line with no raise is treated as unlisted by apply, so the end check leaves it alone too.
 	it('leaves a line listed with a 0 B raise alone, as apply treats it as unlisted', () => {
 		const band = parseBand({ ...BAND, raise: { ...BAND.raise, onDemand: 0 } });
-		const limits = { ...LIMITS, page: 104_069, precacheBytes: 253_631, routeNodes: 59_849 };
-		expect(LIMITS.onDemand - BASE.onDemand).toBeGreaterThan(40);
+		const limits = { ...LIMITS, page: 104_029, precacheBytes: 253_591, routeNodes: 59_809 };
+		expect(LIMITS.onDemand - BASE.onDemand).toBeGreaterThan(0);
 		expect(planFinal(band, BASE, limits)).toEqual({ ok: true, changes: [] });
 	});
 
 	it("leaves a line outside the band alone, even with room: that padding is not this plan's to take", () => {
-		// The band lines sit at their size plus 40 B; the worker line keeps its older 123 B of room.
+		// The band lines sit at their size; the worker line keeps its older 123 B of room.
 		const limits = {
 			...LIMITS,
-			page: 104_069,
-			onDemand: 16_131,
-			precacheBytes: 253_631,
-			routeNodes: 59_849
+			page: 104_029,
+			onDemand: 16_091,
+			precacheBytes: 253_591,
+			routeNodes: 59_809
 		};
-		expect(LIMITS.workerScripts - BASE.workerScripts).toBeGreaterThan(40);
+		expect(LIMITS.workerScripts - BASE.workerScripts).toBeGreaterThan(0);
 		expect(planFinal(BAND, BASE, limits)).toEqual({ ok: true, changes: [] });
 	});
 
@@ -215,21 +196,21 @@ describe('planFinal', () => {
 		expect(plan).toEqual({
 			ok: false,
 			changes: [],
-			refusals: [{ line: 'page', need: 104_440, allowed: 104_340, measured: 104_400 }]
+			refusals: [{ line: 'page', need: 104_438, allowed: 104_340, measured: 104_400 }]
 		});
 	});
 });
 
 describe('suggestRaise', () => {
-	// A real refusal: 254,060 B needs 254,107 B; a re-request at exactly 439 B failed the next build by drift alone.
-	it('asks for the shortfall plus 40 B of drift, rounded up to 10 B, so the next build still fits', () => {
+	// A real refusal: 254,060 B needs 254,107 B against a limit of 253,668 B.
+	it('asks for the shortfall over the approved limit, rounded up to 10 B', () => {
 		const refusal = {
 			line: 'precacheBytes' as const,
 			need: 254_107,
 			allowed: 254_098,
 			measured: 254_060
 		};
-		expect(suggestRaise(BAND, refusal)).toBe(480);
+		expect(suggestRaise(BAND, refusal)).toBe(440);
 	});
 });
 
@@ -318,31 +299,6 @@ describe('rewriteLimits on the real budget files', () => {
 
 	// The reason is typed on the command line and written into a CI gate's source: a line break would write live code,
 	// a `$&` would be read as a replacement pattern, and a non-ASCII character breaks the repo's ASCII rule.
-	// The lasting record that an overrun was applied under the allowance, not asked: it must say so in the file.
-	it('records how far past the band an allowance raise went', () => {
-		const over: Change[] = [
-			{
-				line: 'page',
-				from: current.page,
-				to: page,
-				measured: page - 40,
-				growth: 0,
-				margin: 40,
-				overBand: 8
-			}
-		];
-		const written = rewriteLimits(BUDGET_SCRIPT, PACKAGE_JSON, over, {
-			date: '2026-10-28',
-			reason: 'x'
-		});
-		const added = written.script
-			.split('\n')
-			.filter((line) => !BUDGET_SCRIPT.split('\n').includes(line));
-		expect(added.some((line) => line.startsWith('//') && line.includes('8 B past the band'))).toBe(
-			true
-		);
-	});
-
 	it('refuses a record reason that is not one line of plain ASCII text', () => {
 		for (const reason of ['two\nlines', 'cost $& more', `caf${String.fromCharCode(233)}`, ''])
 			expect(() =>

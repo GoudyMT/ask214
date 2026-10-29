@@ -1,4 +1,4 @@
-// Run after `pnpm build`: `pnpm check:chunks` (CI gate). Budgets the built client's shared chunks by HOW
+// Run after `pnpm build` with MEASURE_BUILD=1, as CI does: `pnpm check:chunks` (CI gate). Budgets the built client's shared chunks by HOW
 // THEY LOAD rather than as one sum: the chunks a page downloads, and the chunks fetched only on demand. A
 // single sum counted the PDF viewer - which loads only when someone opens a document - against every page
 // load, so it could no longer say what the budget exists to say. It also budgets the service worker's
