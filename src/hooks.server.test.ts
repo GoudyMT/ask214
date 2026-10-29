@@ -40,8 +40,10 @@ describe('handle', () => {
 		}
 	});
 
-	// The page's own policy carries the hashes of its inline scripts; a header from the file must never replace it.
+	// The page's own policy carries the hashes of its inline scripts; a header from the file must never replace it. A
+	// folder URL under /pdf-worker/ is no file, so the Worker draws the missing-page page there, and the file gives that
+	// folder a policy of its own.
 	it("keeps the page's own content security policy", async () => {
-		expect((await render('/')).get('content-security-policy')).toBe(PAGE_CSP);
+		expect((await render('/pdf-worker/6.3.289/')).get('content-security-policy')).toBe(PAGE_CSP);
 	});
 });
