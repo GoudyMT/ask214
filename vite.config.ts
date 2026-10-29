@@ -27,6 +27,10 @@ const MEASURE_VERSION = '1793277697344';
 
 export default defineConfig({
 	define: { __APP_VERSION__: JSON.stringify(version) },
+	// The live site sends no CORS headers on the app's files. Vite's preview adds `Vary: Origin` to every file by
+	// default, and the service worker's cache lookups then miss a module script (sent with an Origin header) that
+	// install stored without one, so the app would not open offline in the E2E suite though it does on the live site.
+	preview: { cors: false },
 	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
 	// sends `upgrade-insecure-requests` and browsers that honour it rewrite every asset URL to https.
 	// Over plain HTTP that yields a page with no stylesheet at all - which is not a product bug (in
