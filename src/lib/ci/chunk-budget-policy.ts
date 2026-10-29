@@ -85,7 +85,7 @@ export function precachedPaths(workerSource: string): { listed: string[]; precac
  * The worker scripts in the build that install cannot find.
  *
  * Install keeps the embed worker's script for a device that set up on-device answers, reading its name from the
- * built page code (`workerScriptsNamed`) because SvelteKit's build list leaves worker scripts out. A bundler
+ * built page code (`workerScriptsNamed`) because the precache never holds a worker's script. A bundler
  * change that writes the name another way would leave the script unkept, and nothing would fail until a device
  * asked its first question offline after an update. Comparing what the reading finds with what the build wrote to
  * disk turns that into a failed build.

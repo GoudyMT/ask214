@@ -6,7 +6,8 @@ export type CacheStrategy = 'precache' | 'lazy' | 'on-use';
  * on first use (a device query or a "Read more" click), never eagerly precached at install. That keeps SW
  * install light + robust (a flaky connection can't fail the whole install on a multi-megabyte asset), keeps
  * the corpus off every passive page load (so it never blocks LCP/TTI), and spares online-only users the
- * corpus download. Everything else (the app shell + icons) is precached so the shell works offline at once.
+ * corpus download. Everything else (the app shell + icons) is precached so the shell works offline at once, except
+ * the embed worker's script (below).
  *
  * The lazy prefixes mirror the worker's self-host config: `localModelPath = '/models/'` and
  * `wasmPaths = '/wasm/'` (see embed-worker.ts); `/corpus/` is the versioned corpus artifact.
@@ -425,8 +426,8 @@ export const WORKER_SCRIPT_FOLDER = '/_app/immutable/workers/';
 /**
  * The worker scripts a built chunk starts, as absolute pathnames.
  *
- * SvelteKit's build list leaves a worker's script out, so the service worker cannot precache it from that list;
- * the one place this release names it is the page code that starts the worker, as a string literal ending in
+ * The service worker never precaches a worker's script (`classifyAsset` marks it 'on-use'), and SvelteKit's build
+ * list does not always name it; the one place this release always names it is the page code that starts the worker, as a string literal ending in
  * `workers/<name>.js` that the page resolves against its own address (`new URL(literal, import.meta.url)`).
  * This resolves it the same way, against the chunk's pathname. Only a script directly in the worker folder
  * counts: `workers/assets/` is where SvelteKit writes a worker's non-script files, never a script to keep. The

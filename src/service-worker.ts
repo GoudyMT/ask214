@@ -32,7 +32,8 @@ const sw = self as unknown as ServiceWorkerGlobalScope;
 const CACHE = `app-${version}`;
 const ASSETS = [...build, ...files];
 // Precache the app shell + small static assets at install; the heavy model/wasm (classifyAsset -> 'lazy')
-// are EXCLUDED so install stays light + robust, and they cache on first /ask fetch instead.
+// are EXCLUDED so install stays light + robust, and they cache on first /ask fetch instead. The embed worker's
+// script ('on-use') is excluded too: install keeps it only for a device that set up on-device answers.
 const PRECACHE = ASSETS.filter((path) => classifyAsset(path) === 'precache');
 
 sw.addEventListener('install', (event) => {
@@ -151,7 +152,7 @@ async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
  * Keep the embed worker's script in this release's cache when the device finished setting up on-device answers
  * (the whole model and runtime held; a setup stopped part-way keeps nothing here).
  *
- * The build list this worker precaches leaves worker scripts out, and the page fetches the script only when it
+ * The precache never holds a worker's script (`classifyAsset` marks it 'on-use'), and the page fetches it only when it
  * first asks a question - after an update deleted the last release's copy, and perhaps with no connection. So
  * install, while online, stores it from the name this release's own page code carries (`keepWorkerScripts`),
  * and activation tries again for a script install could not store. It sits in the release's cache, so it goes
@@ -231,7 +232,7 @@ sw.addEventListener('fetch', (event) => {
 			}
 
 			// Everything else network-first, with the same wait: a copy kept for this very request - the embed worker's
-			// script install kept, above all - is served once the network stays silent, or fails.
+			// script install kept, when the build list does not name it - is served once the network stays silent, or fails.
 			const kept = () => offlineResponse(cache, event.request);
 			const { response, network } = await networkFirst(
 				fetch(event.request),
