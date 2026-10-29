@@ -65,8 +65,9 @@ export default defineConfig({
 				// build, where a time computed here could be computed again for each part of the build, and the service
 				// worker and the page would then carry different versions and never agree on an update.
 				...(process.env.MEASURE_BUILD === '1' && { name: MEASURE_VERSION }),
-				// Off: the service worker owns updates (the layout's take-over), and an hourly fetch of the version file
-				// is a background request the app does not need.
+				// Off: the hourly timer. The service worker owns updates (the layout's take-over). SvelteKit still fetches
+				// the version file each time the app comes back into view (window focus, the tab shown again); no
+				// setting turns that off, and the worker keeps no copy of it.
 				pollInterval: 0
 			},
 			// Off: the layout registers /service-worker.js itself, as a module worker, just before it runs the

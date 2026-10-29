@@ -1,4 +1,3 @@
-// Relative, not `#lib`: the budget script imports this module under tsx, which does not resolve the alias.
 import { classifyAsset } from '../ask/asset-cache';
 
 /** One file in the Vite build manifest, keyed there by its source; only the fields the split reads. */
@@ -60,7 +59,7 @@ export function splitChunksByLoading(manifest: BuildManifest): {
  * The paths a built service worker installs from, read from the worker itself.
  *
  * SvelteKit writes the worker's `immutable` and `assets` lists into it as `{path}` objects whose paths are template
- * strings relative to the site root, so only those entries are read and never another string in the worker's code.
+ * strings relative to the base path (the site root: the app sets no base), so only those entries are read and never another string in the worker's code.
  * Each is read as the root path the worker compares with a request, and the precache is then filtered by the rule the
  * worker itself applies, so the two cannot disagree about what a visitor downloads at install.
  *

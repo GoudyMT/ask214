@@ -196,7 +196,7 @@ export function documentSourceId(pathname: string): string {
  *
  * Args:
  *   pathname: the pathname of a cached entry's request URL
- *   currentAssets: the pathnames this build ships (the service worker's build + files list), which carries
+ *   currentAssets: the pathnames this build ships (the service worker's immutable + assets list), which carries
  *     each namespace's current identity - so no filename or release is hardcoded here and a bump needs no edit
  *
  * Returns:
@@ -231,7 +231,7 @@ export function isSupersededVersionedEntry(
  * @param cache ASK_ASSET_CACHE, to read the held entries from and delete from.
  * @param origin This worker's origin; only entries under it are read, so the pathnames compared with the shipped
  *   list are this app's own.
- * @param shipped The pathnames this build ships (the service worker's build + files list).
+ * @param shipped The pathnames this build ships (the service worker's immutable + assets list).
  */
 export async function pruneSupersededEntries(
 	cache: Pick<Cache, 'keys' | 'delete'>,
@@ -292,7 +292,7 @@ function holdsShippedDocument(cachedPaths: readonly string[], shipped: readonly 
  *
  * Args:
  *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
- *   shipped: the pathnames this build ships (the service worker's build + files list), which carries the
+ *   shipped: the pathnames this build ships (the service worker's immutable + assets list), which carries the
  *     current release's folder and the sources it still ships - so no release is hardcoded here and a bump needs
  *     no edit
  *

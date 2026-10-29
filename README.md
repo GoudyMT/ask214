@@ -78,7 +78,7 @@ Privacy is the architecture, not a setting.
 
 ## Tech stack
 
-- **SvelteKit 2** with **Svelte 5** (runes) and **TypeScript** (strict).
+- **SvelteKit 3** with **Svelte 5** (runes) and **TypeScript** (strict).
 - **Cloudflare Workers** via `adapter-cloudflare` for the app and its static assets, and a separate
   stateless Worker for online search (Workers AI, KV).
 - **On-device embeddings** with [Transformers.js](https://github.com/huggingface/transformers.js)

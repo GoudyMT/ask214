@@ -21,7 +21,7 @@ import { INSTALL_PAGES, workerScriptsNamed } from '../src/lib/ask/asset-cache.ts
 
 const CLIENT = '.svelte-kit/output/client';
 const CHUNK_DIR = `${CLIENT}/_app/immutable/chunks`;
-// SvelteKit's static folder (the default; svelte.config.js does not move it). Its files are the worker's `files`.
+// SvelteKit's static folder (the default; vite.config.ts does not move it). Its files are the worker's `assets`.
 const STATIC = 'static';
 
 // Pre-registered limits.

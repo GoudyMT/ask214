@@ -16,7 +16,7 @@ test('CSP is present and strict (header or meta tag)', async ({ page, request })
 
 	expect(csp).toBeTruthy();
 
-	// Verify every directive we configured in svelte.config.js kit.csp.directives is
+	// Verify every directive we configured in the sveltekit() plugin's csp.directives (vite.config.ts) is
 	// actually emitted. If SvelteKit drops one silently (e.g., upstream regression),
 	// the corresponding assertion fails and we know exactly what's missing.
 	expect(csp).toMatch(/default-src 'self'/);
