@@ -52,7 +52,11 @@ function node(args) {
  * @returns {import('../src/lib/ci/size-band-policy.ts').Sizes}
  */
 function measureOneBuild() {
-	execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], { stdio: 'ignore' });
+	// The fixed build version CI and the gate measure with, so the limits written here hold there.
+	execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], {
+		stdio: 'ignore',
+		env: { ...process.env, MEASURE_BUILD: '1' }
+	});
 	const sizeLimit = JSON.parse(
 		node(['node_modules/size-limit/bin.js', '--json']).replace(/^[^[]*/, '')
 	);
