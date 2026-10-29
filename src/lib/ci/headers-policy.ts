@@ -1,11 +1,9 @@
 /**
  * Cloudflare `_headers` policy parser.
  *
- * Closes the "_headers has ZERO automated coverage" gap: the edge headers (HSTS,
- * Referrer-Policy, per-route Cache-Control) are applied by Cloudflare at deploy and are NOT
- * served by `vite preview`, so they cannot be asserted via the live E2E. This pure parser lets
- * a vitest test assert the file's directives directly (pre-commit + CI), cross-platform. Live
- * edge validation of the served headers stays in the deferred cross-browser launch gate.
+ * Cloudflare applies the file to the static files it serves; the server hook applies the same file to the pages the
+ * Worker renders, through these functions. A vitest test asserts the file's directives directly, and the E2E asserts
+ * a rendered page's headers.
  */
 
 /**
@@ -44,4 +42,31 @@ export function parseHeadersFile(content: string): Map<string, Record<string, st
 		}
 	}
 	return blocks;
+}
+
+/**
+ * The headers `_headers` gives one path: every block whose path matches it, in file order.
+ *
+ * A block path ending in `/*` matches everything under its folder (`/*` matches every path); any other block path
+ * matches only itself. This is the subset of Cloudflare's matching the file uses.
+ *
+ * Args:
+ *   rules: the parsed file, from parseHeadersFile.
+ *   pathname: the request's path, e.g. '/settings/backup'.
+ *
+ * Returns:
+ *   The merged headers; a later block's value wins over an earlier one's.
+ */
+export function headersFor(
+	rules: Map<string, Record<string, string>>,
+	pathname: string
+): Record<string, string> {
+	const merged: Record<string, string> = {};
+	for (const [path, headers] of rules) {
+		const matches = path.endsWith('/*')
+			? pathname.startsWith(path.slice(0, -1))
+			: pathname === path;
+		if (matches) Object.assign(merged, headers);
+	}
+	return merged;
 }

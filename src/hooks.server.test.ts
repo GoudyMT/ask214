@@ -1,0 +1,47 @@
+import type { Handle } from '@sveltejs/kit/hooks';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, it, expect } from 'vitest';
+import { handle } from './hooks.server';
+import { parseHeadersFile } from '#lib/ci/headers-policy.js';
+
+// Cloudflare applies `_headers` to the static files only: a page the Worker renders goes out with SvelteKit's
+// headers alone, so the live pages had no HSTS, nosniff or Referrer-Policy. The hook gives them the same file's
+// headers, and these tests run it the way SvelteKit does, on the response a page render returns.
+const GLOBAL = parseHeadersFile(readFileSync(join(process.cwd(), '_headers'), 'utf8')).get('/*');
+const PAGE_CSP = "default-src 'self'";
+
+async function render(pathname: string, init?: ResponseInit): Promise<Headers> {
+	const event = { url: new URL(`https://ask214.com${pathname}`) } as Parameters<Handle>[0]['event'];
+	const response = await handle({
+		event,
+		resolve: async () =>
+			new Response('<!doctype html>', {
+				...init,
+				headers: { 'content-security-policy': PAGE_CSP, ...init?.headers }
+			})
+	});
+	return response.headers;
+}
+
+describe('handle', () => {
+	it('sends every global header from _headers on a rendered page', async () => {
+		const headers = await render('/ask');
+		expect(Object.keys(GLOBAL ?? {})).toContain('Strict-Transport-Security');
+		for (const [name, value] of Object.entries(GLOBAL ?? {})) {
+			expect(headers.get(name), name).toBe(value);
+		}
+		expect(headers.get('cache-control')).toBeNull();
+	});
+
+	it('marks the pages that hold profile data no-store, and the settings pages under them', async () => {
+		for (const path of ['/', '/wizard', '/settings', '/settings/backup', '/timeline']) {
+			expect((await render(path)).get('cache-control'), path).toBe('no-store');
+		}
+	});
+
+	// The page's own policy carries the hashes of its inline scripts; a header from the file must never replace it.
+	it("keeps the page's own content security policy", async () => {
+		expect((await render('/')).get('content-security-policy')).toBe(PAGE_CSP);
+	});
+});

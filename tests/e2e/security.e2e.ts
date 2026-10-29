@@ -51,6 +51,15 @@ test('CSP is present and strict (header or meta tag)', async ({ page, request })
 	expect(scriptSrcValue).toMatch(/'sha(256|384|512)-[A-Za-z0-9+/=]+'/);
 });
 
+test('a rendered page sends the security headers from _headers', async ({ request }) => {
+	// Cloudflare applies `_headers` to static files only; the server hook gives rendered pages the same headers.
+	const headers = (await request.get('/')).headers();
+	expect(headers['strict-transport-security']).toBe('max-age=63072000; includeSubDomains; preload');
+	expect(headers['x-content-type-options']).toBe('nosniff');
+	expect(headers['referrer-policy']).toBe('no-referrer');
+	expect(headers['cache-control']).toBe('no-store');
+});
+
 test('all external script sources have SRI integrity attributes', async ({ page }) => {
 	// SRI is required on any external <script src>; there are none today (CSP connect-src 'self'), so
 	// this guards against a future component or vendored snippet adding one without integrity.

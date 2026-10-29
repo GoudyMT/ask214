@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseHeadersFile } from './headers-policy';
+import { headersFor, parseHeadersFile } from './headers-policy';
 
 describe('parseHeadersFile', () => {
 	it('splits path blocks and their indented headers', () => {
@@ -10,6 +10,26 @@ describe('parseHeadersFile', () => {
 		);
 		expect(parsed.get('/*')).toEqual({ 'Referrer-Policy': 'no-referrer' });
 		expect(parsed.get('/wizard')).toEqual({ 'Cache-Control': 'no-store' });
+	});
+});
+
+describe('headersFor', () => {
+	const rules = parseHeadersFile(
+		'/*\n  Referrer-Policy: no-referrer\n\n/settings\n  Cache-Control: no-store\n\n/settings/*\n  Cache-Control: no-store\n\n/docs/*\n  X-Robots-Tag: noindex\n'
+	);
+
+	it('gives every path the global block, and a listed path its own block too', () => {
+		expect(headersFor(rules, '/settings')).toEqual({
+			'Referrer-Policy': 'no-referrer',
+			'Cache-Control': 'no-store'
+		});
+		expect(headersFor(rules, '/ask')).toEqual({ 'Referrer-Policy': 'no-referrer' });
+	});
+
+	it('matches a /* block under its folder only, never a path that only starts with its name', () => {
+		expect(headersFor(rules, '/settings/backup')['Cache-Control']).toBe('no-store');
+		expect(headersFor(rules, '/settingsx')['Cache-Control']).toBeUndefined();
+		expect(headersFor(rules, '/docs')['X-Robots-Tag']).toBeUndefined();
 	});
 });
 
@@ -32,9 +52,9 @@ describe('_headers policy (P1b)', () => {
 	});
 
 	it('the global security headers are locked at their hardened values', () => {
-		// `_headers` applies only at the Cloudflare edge; `vite preview` never serves it, so a weakened
-		// HSTS (dropped preload / lower max-age) or a deleted X-Frame-Options would pass every other unit
-		// gate. Pin the exact values so a regression fails the build here.
+		// The rendered pages take these from the file as written, so a weakened HSTS (dropped preload / lower
+		// max-age) or a deleted X-Frame-Options would ship on every page. Pin the exact values so a regression
+		// fails the build here.
 		const global = headers.get('/*');
 		expect(global?.['Strict-Transport-Security']).toBe(
 			'max-age=63072000; includeSubDomains; preload'
