@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createByokStore } from './store';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { KeystoreNotInitializedError } from '$lib/profile/store.svelte';
-import { withStores, reqToPromise, STORES } from '$lib/db/schema';
-import { openTestDb, deleteTestDb } from '$lib/db/_test-helpers';
-import { KDF_V1 } from '$lib/backup/kdf-params';
-import { signKeystore, type KeystoreRecordPin } from '$lib/keystore/record';
-import { dropSession, KeystoreLockedError } from '$lib/keystore/session';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { KeystoreNotInitializedError } from '#lib/profile/store.svelte.js';
+import { withStores, reqToPromise, STORES } from '#lib/db/schema.js';
+import { openTestDb, deleteTestDb } from '#lib/db/_test-helpers.js';
+import { KDF_V1 } from '#lib/backup/kdf-params.js';
+import { signKeystore, type KeystoreRecordPin } from '#lib/keystore/record.js';
+import { dropSession, KeystoreLockedError } from '#lib/keystore/session.js';
 
 // Real Chromium (SubtleCrypto + IndexedDB). The byok store persists the user's BYO API key as a single
 // encrypted self-row through the shared record-crypto boundary (AES-GCM under the keystore dataKeyRef).
@@ -26,9 +26,9 @@ const seen = vi.hoisted(() => ({
 }));
 const hasData = (b: Uint8Array): boolean => b.some((x) => x !== 0);
 
-// `$lib` aliases on purpose: a relative path never applied to the module under test in this runner.
-vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/crypto/record-crypto')>();
+// `#lib` aliases on purpose: a relative path never applied to the module under test in this runner.
+vi.mock('#lib/crypto/record-crypto.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/crypto/record-crypto.js')>();
 	return {
 		...real,
 		encryptRecord: async (...args: Parameters<typeof real.encryptRecord>) => {

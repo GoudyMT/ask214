@@ -60,16 +60,16 @@ vi.mock('@noble/hashes/argon2.js', () => ({
 }));
 
 // Passthrough spies, so a test can see what the flow asked of the real validator, the real decrypt and the real writer.
-// `$lib` paths on purpose: with a relative path a mock never applied to the flow's own import in this browser runner.
-vi.mock('$lib/backup/validate', async (importOriginal) => {
+// `#lib` paths on purpose: with a relative path a mock never applied to the flow's own import in this browser runner.
+vi.mock('#lib/backup/validate.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./validate')>();
 	return { ...real, validateInner: vi.fn(real.validateInner) };
 });
-vi.mock('$lib/backup/envelope', async (importOriginal) => {
+vi.mock('#lib/backup/envelope.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./envelope')>();
 	return { ...real, decryptEnvelope: vi.fn(real.decryptEnvelope) };
 });
-vi.mock('$lib/backup/restore-writer', async (importOriginal) => {
+vi.mock('#lib/backup/restore-writer.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./restore-writer')>();
 	return { ...real, restoreBackup: vi.fn(real.restoreBackup) };
 });
@@ -574,7 +574,9 @@ describe('typing the six words', () => {
 			'E_NOT_A_WORD',
 			'Word 2 is not one of the backup words'
 		],
+
 		['five words', WORDS.slice(0, 5).join(' '), 'E_WORD_COUNT', 'Enter all 6 words'],
+
 		[
 			'a comma after a word',
 			WORDS.map((w, i) => (i === 0 ? w + ',' : w)).join(' '),
@@ -881,6 +883,7 @@ describe('the confirm', () => {
 	// existed has no believable date, so the phone's changes cannot be shown to be older.
 	it.each<[string, () => number, number, number | null, boolean]>([
 		['a backup with an unknown date', () => BACKUP_RELEASE_DATE - 1000, -4000, null, true],
+
 		[
 			'the oldest write predates the backup and the newest postdates it',
 			() => Date.now() - MINUTE,
@@ -1013,7 +1016,7 @@ describe('Replace', () => {
 		const { r } = await restoredNewPhone();
 		expect(r.reload).toHaveBeenCalledTimes(1);
 		expect(r.replace).not.toHaveBeenCalled();
-		expect(new URL(location.href).pathname).toBe(resolve('/timeline'));
+		expect(new URL(location.href).pathname).toBe(resolve('timeline'));
 		// The reload is stood in for by the app's start-up reading the entry.
 		captureBackupIntent();
 		expect(takeBackupIntent('restored')).toBe(true);
@@ -1135,6 +1138,7 @@ describe('Replace', () => {
 	// A phone that runs out of room at the last moment keeps everything it had, and the person can try again.
 	it.each<[string, ((r: Rig) => void) | null, string, string | null]>([
 		['nothing else happens', null, 'file-chosen', 'E_WRITE_FAILED'],
+
 		[
 			'the person switches apps meanwhile',
 			(r) => r.session.relockSync('hygiene'),
@@ -1503,7 +1507,7 @@ describe('a restore onto a device locked behind a forgotten PIN', () => {
 		expect(r.session.phase).toBe('committed');
 		expect(r.published).toEqual([{ type: 'keys-changed' }, { type: 'data-replaced' }]);
 		expect(r.reload).toHaveBeenCalledTimes(1);
-		expect(new URL(location.href).pathname).toBe(resolve('/timeline'));
+		expect(new URL(location.href).pathname).toBe(resolve('timeline'));
 		// The reload is stood in for by the app's start-up reading the entry. The Timeline says the PIN is off, not the
 		// ordinary restored line.
 		captureBackupIntent();

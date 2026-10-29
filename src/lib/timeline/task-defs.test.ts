@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { TASK_DEFS, PHASE_BUCKETS } from './task-defs';
-import { RESOURCES, TASK_AFTER_LINK, TASK_LINK_NOTE } from '$lib/resources/resources';
+import { RESOURCES, TASK_AFTER_LINK, TASK_LINK_NOTE } from '#lib/resources/resources.js';
 import * as SKILLBRIDGE_COPY from './skillbridge-copy';
-import { DELETE_FILE_HINT, DEVICE_HINT, IOS_APP_HINT } from '$lib/calendar/delivery';
+import { DELETE_FILE_HINT, DEVICE_HINT, IOS_APP_HINT } from '#lib/calendar/delivery.js';
 import {
 	LEAVING_HINT,
 	PAYGRADE_NOTE,
@@ -10,7 +10,7 @@ import {
 	AFTER_SEPARATION,
 	AFTER_SKILLBRIDGE,
 	BEFORE_TERMINAL_LEAVE
-} from '$lib/profile/leaving-copy';
+} from '#lib/profile/leaving-copy.js';
 import { makesPersonalClaim } from './personal-claim';
 
 // Well-formedness guards for the seed: these pass for ANY valid seed, so editing the

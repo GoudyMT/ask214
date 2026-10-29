@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { formatTimelineDate } from '$lib/timeline/format-date';
-	import type { LeavingDates } from '$lib/profile/persona';
+	import { formatTimelineDate } from '#lib/timeline/format-date.js';
+	import type { LeavingDates } from '#lib/profile/persona.js';
 
 	let { leaving }: { leaving: LeavingDates | undefined } = $props();
 
@@ -29,10 +29,10 @@
 <p class="leaving-line">
 	{#if bothNotUsed}
 		{BOTH_NOT_USED}
-		<a href={resolve('/settings')}>Change</a>
+		<a href={resolve('settings')}>Change</a>
 	{:else if notUsed}
 		Your {notUsed.what} date (<span class="leaving-line__date">{f(notUsed.iso)}</span>) {NOT_USED}
-		<a href={resolve('/settings')}>Change</a>
+		<a href={resolve('settings')}>Change</a>
 	{:else if inUse}
 		{#if leaving?.skillbridgeStart}SkillBridge from <span class="leaving-line__date"
 				>{f(leaving.skillbridgeStart)}</span
@@ -40,9 +40,9 @@
 		{#if leaving?.terminalLeaveStart}Terminal leave from <span class="leaving-line__date"
 				>{f(leaving.terminalLeaveStart)}</span
 			>.{/if}
-		<a href={resolve('/settings')}>Change</a>
+		<a href={resolve('settings')}>Change</a>
 	{:else}
-		Doing SkillBridge or taking terminal leave? <a href={resolve('/settings')}
+		Doing SkillBridge or taking terminal leave? <a href={resolve('settings')}
 			>Add your dates in Settings</a
 		>
 	{/if}

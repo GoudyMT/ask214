@@ -1,4 +1,4 @@
-import type { SourceEntry } from '$lib/content-ops/sources-schema';
+import type { SourceEntry } from '#lib/content-ops/sources-schema.js';
 import { formatTimelineDate } from '../timeline/format-date';
 import type { Publisher, PublicSource, SourcesIndex, TapGuide } from './types';
 

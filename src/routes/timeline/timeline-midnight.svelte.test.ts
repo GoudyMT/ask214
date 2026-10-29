@@ -3,11 +3,11 @@ import { tick } from 'svelte';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
-import type { CalendarFile } from '$lib/calendar/build-ics';
-import { TASK_DEFS } from '$lib/timeline';
-import { addDays, localTodayIso } from '$lib/timeline/day-math';
-import { formatTimelineDate } from '$lib/timeline/format-date';
-import { LAST_ASK_DAYS } from '$lib/timeline/skillbridge-plan';
+import type { CalendarFile } from '#lib/calendar/build-ics.js';
+import { TASK_DEFS } from '#lib/timeline/index.js';
+import { addDays, localTodayIso } from '#lib/timeline/day-math.js';
+import { formatTimelineDate } from '#lib/timeline/format-date.js';
+import { LAST_ASK_DAYS } from '#lib/timeline/skillbridge-plan.js';
 
 const { current, handOver } = vi.hoisted(() => ({
 	handOver: vi.fn<(file: CalendarFile) => Promise<void>>(async () => {}),
@@ -15,7 +15,7 @@ const { current, handOver } = vi.hoisted(() => ({
 	current: { eaos: '' }
 }));
 
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
@@ -43,7 +43,7 @@ vi.mock('$lib/profile/context', () => ({
 }));
 
 // The page's own hand-over of the calendar file would start a real download.
-vi.mock('$lib/calendar/hand-over', () => ({ handOver }));
+vi.mock('#lib/calendar/hand-over.js', () => ({ handOver }));
 
 // A soft task with a recommended day and a later window end: on its recommended day it is aimed for that day, and once
 // that day has passed the view aims for the window end.

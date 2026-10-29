@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { TimelineItem } from '$lib/timeline/generate';
-	import type { TaskExclusions } from '$lib/calendar/types';
-	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
-	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
+	import type { TimelineItem } from '#lib/timeline/generate.js';
+	import type { TaskExclusions } from '#lib/calendar/types.js';
+	import { buildIcs, type CalendarFile } from '#lib/calendar/build-ics.js';
+	import { currentDeviceHint, DELETE_FILE_HINT } from '#lib/calendar/delivery.js';
 
 	type Props = {
 		items: TimelineItem[];

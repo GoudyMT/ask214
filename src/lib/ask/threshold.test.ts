@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { filterByMinScore } from './threshold';
-import type { RetrievalResult, CorpusChunk } from '$lib/corpus';
+import type { RetrievalResult, CorpusChunk } from '#lib/corpus/index.js';
 
 // The chunk content is irrelevant to filterByMinScore (only `score` drives the decision), so this
 // builds a minimal valid CorpusChunk and tags each result with a distinct id for ordering assertions.

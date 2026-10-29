@@ -2,10 +2,10 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { page } from 'vitest/browser';
 import NeedsNow from './NeedsNow.svelte';
-import type { TimelineItem } from '$lib/timeline';
-import type { NeedsNowGroups } from '$lib/timeline/needs-now';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
-import { formatTimelineDate } from '$lib/timeline/format-date';
+import type { TimelineItem } from '#lib/timeline/index.js';
+import type { NeedsNowGroups } from '#lib/timeline/needs-now.js';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
+import { formatTimelineDate } from '#lib/timeline/format-date.js';
 
 function item(id: string, title: string, extra: Partial<TimelineItem> = {}): TimelineItem {
 	return {

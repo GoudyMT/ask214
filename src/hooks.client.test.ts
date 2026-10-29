@@ -1,7 +1,7 @@
+import type { HandleClientError } from '@sveltejs/kit/hooks';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import type { HandleClientError } from '@sveltejs/kit';
 import { handleError, init } from './hooks.client';
-import { getDiagnosticsForTest } from '$lib/log/safelog';
+import { getDiagnosticsForTest } from '#lib/log/safelog.js';
 
 // The start-up hook installs the catcher on the window. This project runs in Node, so the window is a real event
 // target standing in for it; the catcher's own behaviour in a browser is tested beside it in src/lib/log.
@@ -24,15 +24,16 @@ type Input = Parameters<HandleClientError>[0];
 const event = {} as Input['event'];
 
 describe('handleError', () => {
-	it("shows SvelteKit's own fixed message, never the error's text, and logs only E_INTERNAL", async () => {
+	// Returning nothing keeps SvelteKit's defaults: 500 and "Internal Error" for an unknown error, the fixed
+	// framework message ("Not Found") for a missing page. Anything returned would replace them.
+	it("keeps SvelteKit's own fixed message, never the error's text, and logs only E_INTERNAL", async () => {
 		const before = getDiagnosticsForTest().length;
 		const shown = await handleError({
+			kind: 'unknown',
 			error: new Error('bad date 2026-11-01'),
-			event,
-			status: 500,
-			message: 'Internal Error'
+			event
 		});
-		expect(shown).toEqual({ message: 'Internal Error' });
+		expect(shown).toBeUndefined();
 		expect(
 			getDiagnosticsForTest()
 				.slice(before)
@@ -42,11 +43,10 @@ describe('handleError', () => {
 
 	it('keeps the not-found message a missing page already shows', async () => {
 		const shown = await handleError({
-			error: new Error('x'),
-			event,
-			status: 404,
-			message: 'Not Found'
+			kind: 'framework',
+			error: { status: 404, message: 'Not Found' },
+			event
 		});
-		expect(shown).toEqual({ message: 'Not Found' });
+		expect(shown).toBeUndefined();
 	});
 });

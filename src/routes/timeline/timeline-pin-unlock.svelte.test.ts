@@ -2,15 +2,13 @@ import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
-import { captureBackupIntent, markBackupIntent } from '$lib/backup/intent';
-import { backupSession } from '$lib/backup/session.svelte';
+import { captureBackupIntent, markBackupIntent } from '#lib/backup/intent.js';
+import { backupSession } from '#lib/backup/session.svelte.js';
 
-// A client navigation cannot run in the test page; the page's request to go to Settings is recorded instead.
+// A client navigation cannot run in the test page; the page's request to go to Settings is recorded instead. The mock
+// stands alone: importing the real module in this runner never settles, and the whole file then hangs.
 const nav = vi.hoisted(() => ({ goto: vi.fn<(url: string) => Promise<void>>(async () => {}) }));
-vi.mock('$app/navigation', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$app/navigation')>()),
-	goto: nav.goto
-}));
+vi.mock('$app/navigation', () => ({ goto: nav.goto }));
 
 const { isoFromToday, byok } = vi.hoisted(() => ({
 	// The stored API key, which only an unlocked tab may read.
@@ -25,7 +23,7 @@ const { isoFromToday, byok } = vi.hoisted(() => ({
 
 // Reactive, as the layout's app object is: the page swaps the card for the list the moment the unlock lands.
 const lock = $state({ mode: 'pin' as 'pin' | 'local', pinLocked: true, storeLocked: true });
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		get keyMode() {
@@ -69,8 +67,8 @@ vi.mock('$lib/profile/context', () => ({
 }));
 // The check itself is the card's own test; here it only has to end well, with the tries a case says came before it.
 const before = vi.hoisted(() => ({ wrongTries: 0, unfinished: false }));
-vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/keystore/app-lock-store')>()),
+vi.mock('#lib/keystore/app-lock-store.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/keystore/app-lock-store.js')>()),
 	readTries: async () => ({ count: 0, waitMs: 0, pending: false }),
 	runPinCheck: async () => ({ kind: 'good', value: true, ...before })
 }));

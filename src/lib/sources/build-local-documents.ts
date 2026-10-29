@@ -1,4 +1,4 @@
-import type { SourceEntry } from '$lib/content-ops/sources-schema';
+import type { SourceEntry } from '#lib/content-ops/sources-schema.js';
 
 /** Source id -> the app path its served copy is published at. Served pdf sources only; see buildLocalDocuments. */
 export type LocalDocuments = Record<string, string>;

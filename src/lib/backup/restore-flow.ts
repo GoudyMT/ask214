@@ -268,7 +268,7 @@ export class RestoreFlow {
 			deps.replace ?? ((path: string): void => startReload(() => location.replace(path)));
 		this.#isVisible = deps.isVisible ?? ((): boolean => document.visibilityState === 'visible');
 		this.#onceVisible = deps.onceVisible ?? onceVisibleNow;
-		this.#timelinePath = deps.timelinePath ?? ((): string => resolve('/timeline'));
+		this.#timelinePath = deps.timelinePath ?? ((): string => resolve('timeline'));
 	}
 
 	// ---- what the card reads -----------------------------------------------------------------------------------------
@@ -353,8 +353,10 @@ export class RestoreFlow {
 		const chosen = this.#session.chooseFile();
 		const file = await chosen;
 		const session = this.#session;
+
 		if (file === null || (session.phase !== 'choose-file' && session.phase !== 'file-chosen'))
 			return;
+
 		const run = session.beginRun();
 		if (run === null) return;
 		this.#clearMarks();

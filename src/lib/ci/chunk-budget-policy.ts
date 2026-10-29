@@ -1,4 +1,4 @@
-// Relative, not `$lib`: the budget script imports this module under tsx, which does not resolve the alias.
+// Relative, not `#lib`: the budget script imports this module under tsx, which does not resolve the alias.
 import { classifyAsset } from '../ask/asset-cache';
 
 /** One file in the Vite build manifest, keyed there by its source; only the fields the split reads. */
@@ -59,25 +59,20 @@ export function splitChunksByLoading(manifest: BuildManifest): {
 /**
  * The paths a built service worker installs from, read from the worker itself.
  *
- * SvelteKit writes the worker's `build` and `files` lists into it as template strings, each prefixed with a
- * base path the worker reads from its own location. That base is found first, so only list entries are read
- * and never another string in the worker's code; the precache is then filtered by the rule the worker itself
- * applies, so the two cannot disagree about what a visitor downloads at install.
+ * SvelteKit writes the worker's `immutable` and `assets` lists into it as `{path}` objects whose paths are template
+ * strings relative to the site root, so only those entries are read and never another string in the worker's code.
+ * Each is read as the root path the worker compares with a request, and the precache is then filtered by the rule the
+ * worker itself applies, so the two cannot disagree about what a visitor downloads at install.
  *
  * @param workerSource The built service worker's text.
  * @returns Every listed path, and the ones the worker precaches at install.
- * @throws E_PRECACHE_LIST_UNREADABLE when the worker's base path cannot be found.
+ * @throws E_PRECACHE_LIST_UNREADABLE when the worker holds no list entry in that shape.
  */
 export function precachedPaths(workerSource: string): { listed: string[]; precached: string[] } {
-	const base = /([A-Za-z_$][\w$]*)=location\.pathname\.split\(/.exec(workerSource)?.[1];
-	if (base === undefined) throw new Error('E_PRECACHE_LIST_UNREADABLE');
 	const listed = [
-		...new Set(
-			[...workerSource.matchAll(/([A-Za-z_$][\w$]*)\+`(\/[^`]+)`/g)]
-				.filter((match) => match[1] === base)
-				.map((match) => match[2] as string)
-		)
+		...new Set([...workerSource.matchAll(/\{path:`([^`]+)`\}/g)].map((match) => `/${match[1]}`))
 	];
+	if (listed.length === 0) throw new Error('E_PRECACHE_LIST_UNREADABLE');
 	return { listed, precached: listed.filter((path) => classifyAsset(path) === 'precache') };
 }
 

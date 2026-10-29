@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import { LOCAL_DOCUMENTS } from '$lib/sources/local-documents.data';
-import { LOCAL_DOCUMENT_INFO } from '$lib/sources/local-document-info.data';
+import { LOCAL_DOCUMENTS } from '#lib/sources/local-documents.data.js';
+import { LOCAL_DOCUMENT_INFO } from '#lib/sources/local-document-info.data.js';
 
 // The served documents are proven against their captures only on the machine that holds the captures, and
 // the captures never reach CI. So publishing writes a manifest of what it proved - each served file's hash,

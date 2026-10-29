@@ -12,7 +12,7 @@ import {
 	BG_LIGHT,
 	THEME_KEY
 } from './theme';
-import { tokens, tokensLight } from '$lib/styles/tokens';
+import { tokens, tokensLight } from '#lib/styles/tokens.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

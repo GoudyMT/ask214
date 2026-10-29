@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createLazyCorpus } from './corpus-loader';
-import type { Corpus } from '$lib/corpus';
+import type { Corpus } from '#lib/corpus/index.js';
 
 function fixtureCorpus(): Corpus {
 	return { version: '1.0.2', dim: 1, modelId: 'm', chunks: [], embeddings: [] };

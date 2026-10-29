@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import type { AnswerView, SynthesisNote } from '$lib/ask/answer/answer-view';
+	import type { AnswerView, SynthesisNote } from '#lib/ask/answer/answer-view.js';
 
 	// Each reason in its own words - only the one that actually applied is true for the reader.
 	const SYNTHESIS_NOTE: Record<SynthesisNote, string> = {

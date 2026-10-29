@@ -29,7 +29,7 @@ function localFile(rawSpecifier: string, from: string): string | null {
 	const specifier = rawSpecifier.split('?')[0] ?? rawSpecifier;
 	let base: string;
 	if (specifier.startsWith('.')) base = resolve(dirname(from), specifier);
-	else if (specifier.startsWith('$lib/')) base = join(SRC, 'lib', specifier.slice('$lib/'.length));
+	else if (specifier.startsWith('#lib/')) base = join(SRC, 'lib', specifier.slice('#lib/'.length));
 	else return null;
 	const stem = base.endsWith('.js') ? base.slice(0, -'.js'.length) : base;
 	return (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ResultCard } from '$lib/corpus';
+import type { ResultCard } from '#lib/corpus/index.js';
 import { similarCards } from './similar';
 
 const card = (excerpt: string): ResultCard => ({

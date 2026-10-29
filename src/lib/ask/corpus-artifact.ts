@@ -1,4 +1,4 @@
-import type { CorpusChunk, CorpusManifest } from '$lib/corpus';
+import type { CorpusChunk, CorpusManifest } from '#lib/corpus/index.js';
 
 /**
  * Assemble a shipped corpus artifact (manifest + flat Float32 blob) from chunks + their embedding

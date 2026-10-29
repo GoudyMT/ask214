@@ -72,7 +72,7 @@ describe('the finder code that matches and orders listings', () => {
 	});
 
 	it.each([
-		['the profile', "import { loadProfile } from '$lib/profile/store';"],
+		['the profile', "import { loadProfile } from '#lib/profile/store';"],
 		['the keystore', "import { keystore } from '../../keystore/record';"]
 	])('flags an import of %s', (_name, content) => {
 		const planted = [{ path: `${SEARCH_DIR}/index.ts`, content }];

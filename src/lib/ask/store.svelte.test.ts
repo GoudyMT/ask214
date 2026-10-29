@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createAskStore } from './store.svelte';
 import { AskError, ASK_ERROR } from './errors';
-import type { Corpus, CorpusChunk } from '$lib/corpus';
+import type { Corpus, CorpusChunk } from '#lib/corpus/index.js';
 import type { RetrieveResult } from './online/outcome';
 import type { SynthesisResult } from './synthesis/synthesize';
 import { detectEligibilityIntent } from './synthesis/eligibility-gate';

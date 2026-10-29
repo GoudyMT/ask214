@@ -1,9 +1,5 @@
-/// <reference types="@sveltejs/kit" />
-/// <reference no-default-lib="true" />
-/// <reference lib="esnext" />
-/// <reference lib="webworker" />
-
-import { build, files, version } from '$service-worker';
+import { version } from '$app/env';
+import { assets, immutable } from '$app/manifest';
 import {
 	classifyAsset,
 	ASK_ASSET_CACHE,
@@ -24,13 +20,14 @@ import {
 	mayServeEarly,
 	networkFirst,
 	NETWORK_WAIT_MS
-} from '$lib/ask/asset-cache';
-import { isTakeOver } from '$lib/sw/take-over-message';
+} from '#lib/ask/asset-cache.js';
+import { isTakeOver } from '#lib/sw/take-over-message.js';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 const CACHE = `app-${version}`;
-const ASSETS = [...build, ...files];
+// Root paths, as the fetch handler compares them with a request's pathname; the manifest lists them relative to it.
+const ASSETS = [...immutable, ...assets].map(({ path }) => `/${path}`);
 // Precache the app shell + small static assets at install; the heavy model/wasm (classifyAsset -> 'lazy')
 // are EXCLUDED so install stays light + robust, and they cache on first /ask fetch instead. The embed worker's
 // script ('on-use') is excluded too: install keeps it only for a device that set up on-device answers.

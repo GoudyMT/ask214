@@ -2,9 +2,9 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import TimelinePage from './+page.svelte';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
-import { formatTimelineDate } from '$lib/timeline/format-date';
-import { TASK_DEFS } from '$lib/timeline';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
+import { formatTimelineDate } from '#lib/timeline/format-date.js';
+import { TASK_DEFS } from '#lib/timeline/index.js';
 
 // Days from the real clock: the page builds the timeline from today.
 const { isoFromToday, current, handOver } = vi.hoisted(() => ({
@@ -54,7 +54,7 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 const profile = $state({ locked: false, reads: 0 });
 
 // The profile is unlocked with a separation date; each test sets where the timeline's saved progress stands.
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
@@ -87,7 +87,7 @@ vi.mock('$lib/profile/context', () => ({
 }));
 
 // The page's own hand-over of the calendar file would start a real download.
-vi.mock('$lib/calendar/hand-over', () => ({ handOver }));
+vi.mock('#lib/calendar/hand-over.js', () => ({ handOver }));
 
 const NOTE =
 	"Your saved progress couldn't be loaded, so your tasks aren't shown. Reload to try again. If it keeps happening, you can erase all data in Settings and start again.";

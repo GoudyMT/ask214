@@ -34,7 +34,7 @@ const seams = vi.hoisted(() => ({
 	afterSnapshot: null as (() => Promise<void>) | null
 }));
 
-vi.mock('$lib/backup/phrase', async (importOriginal) => {
+vi.mock('#lib/backup/phrase.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./phrase')>();
 	return {
 		...real,
@@ -46,7 +46,7 @@ vi.mock('$lib/backup/phrase', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/backup/envelope', async (importOriginal) => {
+vi.mock('#lib/backup/envelope.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./envelope')>();
 	return {
 		...real,
@@ -77,7 +77,7 @@ vi.mock('$lib/backup/envelope', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/backup/snapshot', async (importOriginal) => {
+vi.mock('#lib/backup/snapshot.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./snapshot')>();
 	return {
 		...real,

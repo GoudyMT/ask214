@@ -3,13 +3,13 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
-import type { TimelineItem } from '$lib/timeline/generate';
-import type { TaskDef } from '$lib/timeline/types';
-import type { HandedOverEvent, TaskExclusions } from '$lib/calendar/types';
-import type { CalendarFile } from '$lib/calendar/build-ics';
-import type { PanelAccess } from '$lib/timeline/store-access';
+import type { TimelineItem } from '#lib/timeline/generate.js';
+import type { TaskDef } from '#lib/timeline/types.js';
+import type { HandedOverEvent, TaskExclusions } from '#lib/calendar/types.js';
+import type { CalendarFile } from '#lib/calendar/build-ics.js';
+import type { PanelAccess } from '#lib/timeline/store-access.js';
 import { resolve } from '$app/paths';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 function def(id: string, category: TaskDef['category']): TaskDef {
 	return {
@@ -348,12 +348,14 @@ describe('CalendarPanel', () => {
 		'keeps Customize off while a category save is pending, and on again once it %s',
 		async (_, fails) => {
 			let settle: (error?: Error) => void = () => {};
+
 			const onSetExclusions = vi.fn(
 				() =>
 					new Promise<void>((resolve, reject) => {
 						settle = (error) => (error ? reject(error) : resolve());
 					})
 			);
+
 			await render(CalendarPanel, {
 				props: {
 					items: [item(def('a', 'admin'))],
@@ -475,9 +477,11 @@ describe('CalendarPanel', () => {
 			const toggle = page.getByRole('button', { name: CUSTOMIZE }).element() as HTMLButtonElement;
 			toggle.focus();
 			toggle.click();
+
 			const box = (await vi.waitFor(() =>
 				page.getByRole('checkbox', { name: 'medical' }).element()
 			)) as HTMLInputElement;
+
 			expect(document.activeElement).toBe(toggle);
 			box.click();
 			await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -817,7 +821,7 @@ describe('CalendarPanel (the states it cannot add in)', () => {
 		const { container } = await render(CalendarPanel, { props: propsFor('timeline-locked') });
 		await expect.element(page.getByText(LOCKED_LINE, { exact: true })).toBeVisible();
 		const link = page.getByRole('link', { name: 'Timeline' });
-		await expect.element(link).toHaveAttribute('href', resolve('/timeline'));
+		await expect.element(link).toHaveAttribute('href', resolve('timeline'));
 		expect(container.textContent).not.toContain('could not be loaded');
 		expect(summaryOf(container)).toBe('Locked');
 	});
@@ -949,6 +953,7 @@ describe('CalendarPanel (the sentence for this device)', () => {
 		vi.spyOn(window, 'matchMedia').mockImplementation(
 			(query) => ({ matches: query === '(display-mode: standalone)' }) as MediaQueryList
 		);
+
 		const hint = hintOf((await render(CalendarPanel, { props: panelProps() })).container);
 		expect(hint).toContain('Open it from Downloads');
 		expect(hint).not.toContain('Safari');

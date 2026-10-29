@@ -1,13 +1,13 @@
 import { createRawSnippet } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
-import type { IdleTimerOptions } from '$lib/profile/idle-timer';
-import type { ProfileApp } from '$lib/profile/context';
-import { createProfileStore } from '$lib/profile/store.svelte';
-import { createProfileBus } from '$lib/broadcast/bus';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
+import { IDLE_THRESHOLD_MS } from '#lib/profile/idle-threshold.js';
+import type { IdleTimerOptions } from '#lib/profile/idle-timer.js';
+import type { ProfileApp } from '#lib/profile/context.js';
+import { createProfileStore } from '#lib/profile/store.svelte.js';
+import { createProfileBus } from '#lib/broadcast/bus.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
 import Layout from './+layout.svelte';
 
 // The layout runs the real start-up on a test database; only the database it opens and the two seams a test must read
@@ -19,16 +19,16 @@ const harness = vi.hoisted(() => ({
 }));
 
 // The layout opens the default database (no name); the test helpers open a named one, which stays real.
-vi.mock('$lib/db/schema', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/db/schema')>();
+vi.mock('#lib/db/schema.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/db/schema.js')>();
 	return {
 		...real,
 		openMtcDb: (...args: Parameters<typeof real.openMtcDb>) =>
 			args[0] === undefined ? harness.db : real.openMtcDb(...args)
 	};
 });
-vi.mock('$lib/profile/context', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/context')>();
+vi.mock('#lib/profile/context.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/context.js')>();
 	return {
 		...real,
 		setProfileApp: (app: ProfileApp) => {
@@ -37,8 +37,8 @@ vi.mock('$lib/profile/context', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('$lib/profile/idle-timer', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/idle-timer')>();
+vi.mock('#lib/profile/idle-timer.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/idle-timer.js')>();
 	return {
 		...real,
 		createIdleTimer: (opts: IdleTimerOptions) => {

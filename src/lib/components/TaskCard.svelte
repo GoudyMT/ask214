@@ -1,17 +1,22 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
-	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '$lib/timeline/snooze';
-	import type { TimelineItem, TaskCategory, DisplayStatus, TaskStatus } from '$lib/timeline';
+	import { formatTimelineDate, formatDaysLeft } from '#lib/timeline/format-date.js';
+	import { SNOOZE_DATE_MAX, SNOOZE_PRESETS, snoozeUntilIso } from '#lib/timeline/snooze.js';
+	import type {
+		TimelineItem,
+		TaskCategory,
+		DisplayStatus,
+		TaskStatus
+	} from '#lib/timeline/index.js';
 	import {
 		resourcesForTask,
 		guidesForTask,
 		afterLinkForTask,
 		linkNoteForTask
-	} from '$lib/resources';
-	import { MAX_NOTE_UNITS } from '$lib/backup/note-cap';
-	import { closedOnDate, isFirmWarning, type FitReason } from '$lib/timeline/generate';
-	import { afterYouLeaveWord } from '$lib/timeline/needs-now';
+	} from '#lib/resources/index.js';
+	import { MAX_NOTE_UNITS } from '#lib/backup/note-cap.js';
+	import { closedOnDate, isFirmWarning, type FitReason } from '#lib/timeline/generate.js';
+	import { afterYouLeaveWord } from '#lib/timeline/needs-now.js';
 
 	let {
 		item,

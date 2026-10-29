@@ -50,7 +50,7 @@ const { isoFromToday, timeline, calendar } = vi.hoisted(() => {
 // Reactive, unlike the store flags above: Unlock opens the profile, and the page swaps its locked panel for the
 // sections at that moment.
 const profile = $state({ locked: false });
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
@@ -76,7 +76,7 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,
@@ -141,7 +141,7 @@ describe('Settings, the calendar add', () => {
 		await expect.element(page.getByText(LOCKED_LINE, { exact: true })).toBeVisible();
 		await expect
 			.element(page.getByText(LOCKED_LINE, { exact: true }).getByRole('link', { name: 'Timeline' }))
-			.toHaveAttribute('href', resolve('/timeline'));
+			.toHaveAttribute('href', resolve('timeline'));
 		await expect.element(customizeSummary()).toMatchTextContent('Locked');
 	});
 

@@ -3,7 +3,7 @@ import { cdp } from 'vitest/browser';
 import { describe, it, expect, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import PhaseChips from './PhaseChips.svelte';
-import type { TimelineView, TimelineItem } from '$lib/timeline';
+import type { TimelineView, TimelineItem } from '#lib/timeline/index.js';
 
 // PhaseChips is the jump-nav: one chip per non-empty phase (short label + total task count),
 // clicking a chip smooth-scrolls to that phase's <section id> (jump, NOT filter). Scroll-spy

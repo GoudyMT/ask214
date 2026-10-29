@@ -1,6 +1,6 @@
-import { ASK_ASSET_CACHE, CORPUS_BASE } from '$lib/ask/asset-cache';
+import { ASK_ASSET_CACHE, CORPUS_BASE } from '#lib/ask/asset-cache.js';
 import { LIBRARY_SRC, WORKER_SRC } from './pdf-library-paths';
-import { guardedFetch, STALL_MS } from '$lib/net/stall-guard';
+import { guardedFetch, STALL_MS } from '#lib/net/stall-guard.js';
 
 /**
  * Whether a served document is already held on this device.

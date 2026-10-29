@@ -30,12 +30,12 @@ function sourceFiles(folder: string): string[] {
 
 /**
  * The source file a local specifier names, or null when it is not a local one (a package, or a file that is not
- * source). `$lib` is `src/lib`.
+ * source). `#lib` is `src/lib`.
  */
 function localFile(specifier: string, from: string): string | null {
 	let base: string;
 	if (specifier.startsWith('.')) base = resolve(dirname(from), specifier);
-	else if (specifier.startsWith('$lib/')) base = join(SRC, 'lib', specifier.slice('$lib/'.length));
+	else if (specifier.startsWith('#lib/')) base = join(SRC, 'lib', specifier.slice('#lib/'.length));
 	else return null;
 	// A `.js` specifier names the `.ts` file beside it, the way the bundler resolves it.
 	const stem = base.endsWith('.js') ? base.slice(0, -'.js'.length) : base;
@@ -47,7 +47,7 @@ function localFile(specifier: string, from: string): string | null {
 }
 
 function isLocal(specifier: string): boolean {
-	return specifier.startsWith('.') || specifier.startsWith('$lib/');
+	return specifier.startsWith('.') || specifier.startsWith('#lib/');
 }
 
 describe('the backup word list', () => {

@@ -4,7 +4,7 @@
 		DISPLAY_CATEGORY_LABEL,
 		COMMAND_INSTRUCTIONS,
 		type Resource
-	} from '$lib/resources';
+	} from '#lib/resources/index.js';
 
 	let { resources }: { resources: readonly Resource[] } = $props();
 

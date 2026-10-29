@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 // The erase refuses here, as one that cannot reach every store does: a real erase ends in a page reload, which this
 // page test cannot survive. The end-to-end test erases for real.
@@ -13,7 +13,7 @@ const { wipeAll } = vi.hoisted(() => ({
 }));
 
 // The data saved on this device failed its checks at start-up: no profile, no stores, only the erase.
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'damaged',
 		store: null,
@@ -30,7 +30,7 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,

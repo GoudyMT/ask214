@@ -1,21 +1,21 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
-import type { ProfileApp } from '$lib/profile/context';
-import { createProfileStore } from '$lib/profile/store.svelte';
-import { createTimelineStateStore } from '$lib/timeline/state.svelte';
-import { createByokStore } from '$lib/ask/byok/store';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
-import { captureBackupIntent, markBackupIntent, takeBackupIntent } from '$lib/backup/intent';
-import { formatBackupDate } from '$lib/backup/dates';
+import type { ProfileApp } from '#lib/profile/context.js';
+import { createProfileStore } from '#lib/profile/store.svelte.js';
+import { createTimelineStateStore } from '#lib/timeline/state.svelte.js';
+import { createByokStore } from '#lib/ask/byok/store.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
+import { captureBackupIntent, markBackupIntent, takeBackupIntent } from '#lib/backup/intent.js';
+import { formatBackupDate } from '#lib/backup/dates.js';
 import TimelinePage from './+page.svelte';
 
 // The page runs on the real profile, timeline and API-key stores over a test database; only the app container the layout
 // would hand it is replaced, so each case can set the lock and the Unlock flag. A reload cannot run in the test page, so
 // it is held at the browser's own navigate event and recorded.
 const harness = vi.hoisted(() => ({ app: null as ProfileApp | null }));
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => harness.app,
 	setProfileApp: () => {}
 }));

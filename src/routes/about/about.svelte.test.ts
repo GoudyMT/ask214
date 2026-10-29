@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import AboutPage from './+page.svelte';
-import { SOURCES_INDEX } from '$lib/sources/sources-index.data';
+import { SOURCES_INDEX } from '#lib/sources/sources-index.data.js';
 
 // Integration: the real generated SOURCES_INDEX flows through the page. Asserts known agency + TAP
 // titles render (so the whole registry -> generator -> artifact -> component chain is wired), plus the

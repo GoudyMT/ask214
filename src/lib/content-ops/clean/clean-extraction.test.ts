@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { Block } from '$lib/content-ops/extract/pdf-text';
+import type { Block } from '#lib/content-ops/extract/pdf-text.js';
 import { cleanExtraction } from './clean-extraction';
 import { detectRunningAffix } from './detect-running-affix';
 import { stripFused } from './strip-fused';

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import type { ComponentProps } from 'svelte';
 import SettingsDateRow from './SettingsDateRow.svelte';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 // Enter as a keyboard sends it: the key, its code and the carriage return it types.
 const ENTER = {

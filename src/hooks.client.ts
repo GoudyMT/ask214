@@ -1,7 +1,7 @@
-import type { ClientInit, HandleClientError } from '@sveltejs/kit';
-import { installGlobalErrorSanitizer } from '$lib/log/global-errors';
-import { safeLog } from '$lib/log/safelog';
-import { captureBackupIntent } from '$lib/backup/intent';
+import type { ClientInit, HandleClientError } from '@sveltejs/kit/hooks';
+import { installGlobalErrorSanitizer } from '#lib/log/global-errors.js';
+import { safeLog } from '#lib/log/safelog.js';
+import { captureBackupIntent } from '#lib/backup/intent.js';
 
 /** Installed before the app starts, so an error thrown while it starts is caught too. */
 export const init: ClientInit = () => {
@@ -12,10 +12,9 @@ export const init: ClientInit = () => {
 
 /**
  * An error SvelteKit catches while loading or rendering. SvelteKit's default prints the raw error to the console,
- * where a message can carry what the user typed; this logs a static code instead. The page keeps SvelteKit's own
- * fixed message ("Internal Error", "Not Found"), which never contains the error's text.
+ * where a message can carry what the user typed; this logs a static code instead. Returning nothing keeps
+ * SvelteKit's own fixed message ("Internal Error", "Not Found"), which never contains the error's text.
  */
-export const handleError: HandleClientError = ({ message }) => {
+export const handleError: HandleClientError = () => {
 	safeLog({ code: 'E_INTERNAL' });
-	return { message };
 };

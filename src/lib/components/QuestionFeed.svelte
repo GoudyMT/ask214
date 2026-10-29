@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { EXAMPLE_QUESTIONS } from '$lib/ask/example-questions';
+	import { EXAMPLE_QUESTIONS } from '#lib/ask/example-questions.js';
 
 	let { onPick }: { onPick: (question: string, press: MouseEvent) => void } = $props();
 

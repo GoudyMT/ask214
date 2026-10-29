@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveExpectedIds, type GroundTruthQuery } from './resolve-ground-truth';
-import type { CorpusChunk } from '$lib/corpus';
+import type { CorpusChunk } from '#lib/corpus/index.js';
 
 const chunk = (id: string, sourceId: string, text: string): CorpusChunk => ({
 	id,

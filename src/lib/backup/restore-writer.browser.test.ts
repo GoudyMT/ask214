@@ -28,7 +28,7 @@ import {
 } from './restore-writer';
 import { validateInner, type ValidInner } from './validate';
 
-// Seams over four modules, each a passthrough until a test arms it. The paths are `$lib` aliases on purpose: with a
+// Seams over four modules, each a passthrough until a test arms it. The paths are `#lib` aliases on purpose: with a
 // relative path a mock silently never applied to the writer's own import in this browser runner.
 // - decodeProfile can add a field to the profile it decodes from the FILE (a composer that invents content);
 // - encodeCalendarSyncState can drop the card (a codec that does not round-trip what it was given);
@@ -44,7 +44,7 @@ const seams = vi.hoisted(() => ({
 	decrypted: [] as string[]
 }));
 
-vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
+vi.mock('#lib/crypto/record-crypto.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../crypto/record-crypto')>();
 	return {
 		...real,
@@ -55,7 +55,7 @@ vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/skillbridge-finder/state/codec', async (importOriginal) => {
+vi.mock('#lib/skillbridge-finder/state/codec.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../skillbridge-finder/state/codec')>();
 	return {
 		...real,
@@ -67,7 +67,7 @@ vi.mock('$lib/skillbridge-finder/state/codec', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/profile/codec', async (importOriginal) => {
+vi.mock('#lib/profile/codec.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../profile/codec')>();
 	return {
 		...real,
@@ -79,7 +79,7 @@ vi.mock('$lib/profile/codec', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/calendar/codec', async (importOriginal) => {
+vi.mock('#lib/calendar/codec.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../calendar/codec')>();
 	return {
 		...real,
@@ -97,7 +97,7 @@ vi.mock('$lib/calendar/codec', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/timeline/state-codec', async (importOriginal) => {
+vi.mock('#lib/timeline/state-codec.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../timeline/state-codec')>();
 	return {
 		...real,
@@ -109,7 +109,7 @@ vi.mock('$lib/timeline/state-codec', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/profile/sidecars', async (importOriginal) => {
+vi.mock('#lib/profile/sidecars.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../profile/sidecars')>();
 	return {
 		...real,
@@ -121,7 +121,7 @@ vi.mock('$lib/profile/sidecars', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
+vi.mock('#lib/profile/lifecycle.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../profile/lifecycle')>();
 	return {
 		...real,

@@ -291,14 +291,14 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		scanForPiiImports([{ path: 'src/lib/ask/online/x.ts', content }]);
 
 	it.each([
-		'$lib/profile/store.svelte',
+		'#lib/profile/store.svelte.js',
 		'../../profile/codec',
-		'$lib/keystore/record',
-		'$lib/timeline/state.svelte',
-		'$lib/calendar/store.svelte',
-		'$lib/db/schema',
-		'$lib/crypto/aes-gcm',
-		'$lib/backup/session.svelte',
+		'#lib/keystore/record.js',
+		'#lib/timeline/state.svelte.js',
+		'#lib/calendar/store.svelte.js',
+		'#lib/db/schema.js',
+		'#lib/crypto/aes-gcm.js',
+		'#lib/backup/session.svelte.js',
 		'../../../src/lib/profile/types'
 	])('flags an import of %s', (specifier) => {
 		const violations = scan(`import { a } from '${specifier}';`);
@@ -307,29 +307,29 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 	});
 
 	it('flags a dynamic import, a side-effect import and an import split over several lines', () => {
-		expect(scan(`const m = await import('$lib/profile/store.svelte');`)).toHaveLength(1);
-		expect(scan(`import '$lib/keystore/record';`)).toHaveLength(1);
+		expect(scan(`const m = await import('#lib/profile/store.svelte');`)).toHaveLength(1);
+		expect(scan(`import '#lib/keystore/record';`)).toHaveLength(1);
 		expect(
-			scan(['import {', '\ta,', '\tb', "} from '$lib/profile/codec';"].join('\n'))
+			scan(['import {', '\ta,', '\tb', "} from '#lib/profile/codec';"].join('\n'))
 		).toHaveLength(1);
 	});
 
 	it('flags the other ways to spell the same import', () => {
-		expect(scan('const m = await import(`$lib/profile/store.svelte`);')).toHaveLength(1);
-		expect(scan("import { a } from '$lib/ask/../profile/persona';")).toHaveLength(1);
+		expect(scan('const m = await import(`#lib/profile/store.svelte`);')).toHaveLength(1);
+		expect(scan("import { a } from '#lib/ask/../profile/persona';")).toHaveLength(1);
 		expect(scan("import { a } from '/src/lib/profile/persona';")).toHaveLength(1);
 		expect(
-			scan(['const m = await import(', "\t'$lib/profile/store.svelte'", ');'].join('\n'))
+			scan(['const m = await import(', "\t'#lib/profile/store.svelte'", ');'].join('\n'))
 		).toHaveLength(1);
 	});
 
 	it('does not let a quoted word ending in "from" hide the next import', () => {
 		expect(
-			scan(["const label = 'Imported from';", "import { a } from '$lib/profile/x';"].join('\n'))
+			scan(["const label = 'Imported from';", "import { a } from '#lib/profile/x';"].join('\n'))
 		).toHaveLength(1);
 		expect(
 			scan(
-				["// Resend's 'from' address is verified", "import { a } from '$lib/profile/x';"].join('\n')
+				["// Resend's 'from' address is verified", "import { a } from '#lib/profile/x';"].join('\n')
 			)
 		).toHaveLength(1);
 	});
@@ -346,8 +346,8 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 	});
 
 	it('leaves public modules and platform modules alone', () => {
-		expect(scan(`import type { CorpusChunk } from '$lib/corpus';`)).toEqual([]);
-		expect(scan(`import { isGovernmentHost } from '$lib/sources/government-host';`)).toEqual([]);
+		expect(scan(`import type { CorpusChunk } from '#lib/corpus';`)).toEqual([]);
+		expect(scan(`import { isGovernmentHost } from '#lib/sources/government-host';`)).toEqual([]);
 		expect(scan(`import { webcrypto } from 'node:crypto';`)).toEqual([]);
 		expect(scan(`import { createHash } from 'crypto';`)).toEqual([]);
 	});
@@ -374,7 +374,7 @@ describe("pii-policy: the finder's fetch part must not import the finder's perso
 			FINDER_STATE_IMPORT_PATTERN
 		);
 
-	it.each(['../state/select-files', '$lib/skillbridge-finder/state/store.svelte'])(
+	it.each(['../state/select-files', '#lib/skillbridge-finder/state/store.svelte.js'])(
 		'flags an import of %s',
 		(specifier) => {
 			expect(scan(`import { a } from '${specifier}';`)).toHaveLength(1);

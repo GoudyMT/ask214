@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import type { Source } from '$lib/ask/sources';
+	import type { Source } from '#lib/ask/sources.js';
 	import { resolve } from '$app/paths';
 	import type SourceDocumentView from './SourceDocument.svelte';
 	import type { PassageNote } from './SourceDocument.svelte';
 	import type DocumentPagerView from './DocumentPager.svelte';
 	import type DocumentSaveView from './DocumentSave.svelte';
-	import { documentUrl } from '$lib/sources/document-url';
-	import { localDocumentPath, localDocumentSize } from '$lib/sources/local-document';
-	import type { PdfRuntime } from '$lib/sources/pdf-runtime';
+	import { documentUrl } from '#lib/sources/document-url.js';
+	import { localDocumentPath, localDocumentSize } from '#lib/sources/local-document.js';
+	import type { PdfRuntime } from '#lib/sources/pdf-runtime.js';
 
 	// Opens the modal for any of: a loaded `source`, a `loading` fetch in progress, or an `error`. The
 	// corpus IS the on-device reference library; this shows all the official text held locally for one
@@ -549,7 +549,7 @@
 				>
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 				<!-- Leaving closes the reader first, which is all the link does when the Documents page is already open. -->
-				<a class="reader__link" href={resolve('/documents')} data-refocus="all" onclick={onClose}
+				<a class="reader__link" href={resolve('documents')} data-refocus="all" onclick={onClose}
 					>All documents</a
 				>
 				<!-- True of the answer library's text only. A served document may not be saved, and its Save says what is kept. -->

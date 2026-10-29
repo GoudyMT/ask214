@@ -1,8 +1,8 @@
-import { encryptRecord, decryptRecord, type RecordCtx } from '$lib/crypto/record-crypto';
-import { keyIdentity } from '$lib/keystore/record';
-import { readKeystoreRow, KeystoreNotInitializedError } from '$lib/keystore/read';
-import { withStores, reqToPromise } from '$lib/db/schema';
-import { withWriteLocks } from '$lib/db/locks';
+import { encryptRecord, decryptRecord, type RecordCtx } from '#lib/crypto/record-crypto.js';
+import { keyIdentity } from '#lib/keystore/record.js';
+import { readKeystoreRow, KeystoreNotInitializedError } from '#lib/keystore/read.js';
+import { withStores, reqToPromise } from '#lib/db/schema.js';
+import { withWriteLocks } from '#lib/db/locks.js';
 import { isAnthropicKeyShape } from './key-shape';
 
 /**

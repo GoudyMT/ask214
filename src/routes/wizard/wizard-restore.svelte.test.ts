@@ -2,21 +2,21 @@ import { render } from 'vitest-browser-svelte';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import WizardPage from './+page.svelte';
-import { ERASE_DEVICE_BUTTON } from '$lib/backup/copy';
+import { ERASE_DEVICE_BUTTON } from '#lib/backup/copy.js';
 import {
 	ExportFlow,
 	type SaveHandle,
 	type SavePicker,
 	type SaveWritable
-} from '$lib/backup/export-flow';
-import { captureBackupIntent, markBackupIntent, takeBackupIntent } from '$lib/backup/intent';
-import { backupSession, BackupSession, type WorkerLike } from '$lib/backup/session.svelte';
-import type { FromWorker, WorkerRequest } from '$lib/backup/worker/protocol';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { createJoinRelock } from '$lib/profile/app-init';
-import type { ProfileApp } from '$lib/profile/context';
-import { createProfileStore, type ProfileStore } from '$lib/profile/store.svelte';
+} from '#lib/backup/export-flow.js';
+import { captureBackupIntent, markBackupIntent, takeBackupIntent } from '#lib/backup/intent.js';
+import { backupSession, BackupSession, type WorkerLike } from '#lib/backup/session.svelte.js';
+import type { FromWorker, WorkerRequest } from '#lib/backup/worker/protocol.js';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { createJoinRelock } from '#lib/profile/app-init.js';
+import type { ProfileApp } from '#lib/profile/context.js';
+import { createProfileStore, type ProfileStore } from '#lib/profile/store.svelte.js';
 
 // The setup screen is driven the way a person drives it: the real page, the real card, the real session and flows, and
 // a real IndexedDB behind them. Only what a person cannot touch is stood in for: the key worker (a quick stand-in for
@@ -31,14 +31,14 @@ const rig = vi.hoisted(() => ({
 }));
 const goto = rig.goto;
 
-vi.mock('$lib/profile/context', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/profile/context')>()),
+vi.mock('#lib/profile/context.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/profile/context.js')>()),
 	getProfileApp: () => rig.app
 }));
 vi.mock('$app/navigation', () => ({ goto: rig.goto }));
-vi.mock('$lib/ask/when-controlled', () => ({ waitForControl: () => Promise.resolve(true) }));
-vi.mock('$lib/backup/session.svelte', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('$lib/backup/session.svelte')>();
+vi.mock('#lib/ask/when-controlled.js', () => ({ waitForControl: () => Promise.resolve(true) }));
+vi.mock('#lib/backup/session.svelte.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('#lib/backup/session.svelte.js')>();
 	return {
 		...actual,
 		backupSession: new actual.BackupSession({

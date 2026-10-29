@@ -1,10 +1,10 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
 import SourceDocument from './SourceDocument.svelte';
-import { selectAnswer } from '$lib/ask/answer/select-answer';
-import type { PdfContentItem } from '$lib/sources/pdf-text';
-import type { PdfDocument, PdfRuntime } from '$lib/sources/pdf-runtime';
-import { LOCAL_DOCUMENTS } from '$lib/sources/local-documents.data';
+import { selectAnswer } from '#lib/ask/answer/select-answer.js';
+import type { PdfContentItem } from '#lib/sources/pdf-text.js';
+import type { PdfDocument, PdfRuntime } from '#lib/sources/pdf-runtime.js';
+import { LOCAL_DOCUMENTS } from '#lib/sources/local-documents.data.js';
 
 /** A text run at (x, baseline y) in page units, the shape the reader emits. */
 function run(str: string, x: number, y: number): PdfContentItem {

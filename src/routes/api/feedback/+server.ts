@@ -1,15 +1,14 @@
-import { json } from '@sveltejs/kit';
+import { env } from 'cloudflare:workers';
 import type { RequestHandler } from './$types';
-import { decideFeedback } from '$lib/feedback/decide';
+import { decideFeedback } from '#lib/feedback/decide.js';
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
-export const POST: RequestHandler = async ({ request, platform, getClientAddress }) => {
-	const env = platform?.env;
+export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	// The key + destination + sender are deployment config (a secret + vars); never committed. All
 	// three are required - no default sender (Resend's shared test sender won't reach an arbitrary To).
-	if (!env?.RESEND_API_KEY || !env.FEEDBACK_TO || !env.FEEDBACK_FROM) {
-		return json({ ok: false }, { status: 500 });
+	if (!env.RESEND_API_KEY || !env.FEEDBACK_TO || !env.FEEDBACK_FROM) {
+		return Response.json({ ok: false }, { status: 500 });
 	}
 
 	// Per-IP rapid-fire limit (atomic edge binding). Resend's free-tier daily quota bounds total sends;
@@ -17,7 +16,7 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 	if (env.FEEDBACK_LIMITER) {
 		try {
 			const { success } = await env.FEEDBACK_LIMITER.limit({ key: getClientAddress() });
-			if (!success) return json({ ok: false }, { status: 429 });
+			if (!success) return Response.json({ ok: false }, { status: 429 });
 		} catch {
 			// A limiter failure must not take the endpoint down; fall through (Resend's daily quota is
 			// the backstop). Same "guard external I/O" idiom as the fetch below.
@@ -28,12 +27,12 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 	try {
 		raw = await request.json();
 	} catch {
-		return json({ ok: false }, { status: 400 });
+		return Response.json({ ok: false }, { status: 400 });
 	}
 
 	// Rate-limiting is handled above by the binding, so decide's own checkLimit is a pass-through here.
 	const decision = await decideFeedback(raw, { checkLimit: async () => true });
-	if (decision.kind !== 'send') return json({ ok: false }, { status: 400 });
+	if (decision.kind !== 'send') return Response.json({ ok: false }, { status: 400 });
 
 	let res: Response;
 	try {
@@ -53,8 +52,8 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		});
 	} catch {
 		// Transport failure (DNS/TLS/timeout) - the same "upstream failed" class as a non-ok response.
-		return json({ ok: false }, { status: 502 });
+		return Response.json({ ok: false }, { status: 502 });
 	}
 
-	return json({ ok: res.ok }, { status: res.ok ? 200 : 502 });
+	return Response.json({ ok: res.ok }, { status: res.ok ? 200 : 502 });
 };

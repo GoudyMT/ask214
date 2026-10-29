@@ -1,5 +1,5 @@
-import type { Corpus } from '$lib/corpus';
-import { search, toResultCards } from '$lib/corpus';
+import type { Corpus } from '#lib/corpus/index.js';
+import { search, toResultCards } from '#lib/corpus/index.js';
 import { filterByMinScore } from '../threshold';
 import { toExtractiveAnswer } from '../answer/answer-view';
 import { stripHeadingEcho } from '../answer/heading-echo';

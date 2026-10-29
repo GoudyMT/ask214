@@ -1,7 +1,7 @@
-import { decodeCorpus, type Corpus, type CorpusManifest } from '$lib/corpus';
+import { decodeCorpus, type Corpus, type CorpusManifest } from '#lib/corpus/index.js';
 import { EMBED_MODEL_ID } from './types';
 import { AskError, ASK_ERROR } from './errors';
-import { guardedFetch, STALL_MS } from '$lib/net/stall-guard';
+import { guardedFetch, STALL_MS } from '#lib/net/stall-guard.js';
 
 // Where the corpus artifact is served; kept beside the cache rules so a save can name it without this loader.
 export { CORPUS_BASE } from './asset-cache';

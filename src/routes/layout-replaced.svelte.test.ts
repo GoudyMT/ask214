@@ -3,12 +3,12 @@ import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolve } from '$app/paths';
-import type { ProfileApp } from '$lib/profile/context';
-import { createProfileStore } from '$lib/profile/store.svelte';
-import { BackupSession } from '$lib/backup/session.svelte';
-import { createProfileBus } from '$lib/broadcast/bus';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
+import type { ProfileApp } from '#lib/profile/context.js';
+import { createProfileStore } from '#lib/profile/store.svelte.js';
+import { BackupSession } from '#lib/backup/session.svelte.js';
+import { createProfileBus } from '#lib/broadcast/bus.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
 import Layout from './+layout.svelte';
 
 // The layout runs the real start-up on a test database and a real BroadcastChannel carries the peer's signal; only the
@@ -20,16 +20,16 @@ const harness = vi.hoisted(() => ({
 }));
 
 // The layout opens the default database (no name); the test helpers open a named one, which stays real.
-vi.mock('$lib/db/schema', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/db/schema')>();
+vi.mock('#lib/db/schema.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/db/schema.js')>();
 	return {
 		...real,
 		openMtcDb: (...args: Parameters<typeof real.openMtcDb>) =>
 			args[0] === undefined ? harness.db : real.openMtcDb(...args)
 	};
 });
-vi.mock('$lib/profile/context', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/context')>();
+vi.mock('#lib/profile/context.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/context.js')>();
 	return {
 		...real,
 		setProfileApp: (app: ProfileApp) => {
@@ -172,7 +172,7 @@ describe('the root layout, when another tab restored a backup', () => {
 		expect(app.reloadOnUnlock).toBe(false);
 
 		await userEvent.click(page.getByRole('button', { name: 'Reload' }));
-		expect(seen).toEqual([{ type: 'replace', path: resolve('/timeline') }]);
+		expect(seen).toEqual([{ type: 'replace', path: resolve('timeline') }]);
 	});
 
 	// The wizard would save its form over the restored date if it booted again, so the peer leaves it for the Timeline.
@@ -180,13 +180,13 @@ describe('the root layout, when another tab restored a backup', () => {
 		await device(false);
 		await render(Layout, { children });
 		await readyApp(false);
-		history.replaceState(history.state, '', resolve('/wizard'));
+		history.replaceState(history.state, '', resolve('wizard'));
 		const seen = holdNavigation();
 
 		peer?.publish({ type: 'data-replaced' });
 		await vi.waitFor(() => expect(seen).toHaveLength(1));
 
-		expect(seen).toEqual([{ type: 'replace', path: resolve('/timeline') }]);
+		expect(seen).toEqual([{ type: 'replace', path: resolve('timeline') }]);
 	});
 
 	// A hidden tab waits to be shown; if the layout is gone by then, that wait must have been taken down with it.

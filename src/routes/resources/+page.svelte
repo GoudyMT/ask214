@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ResourceList from '$lib/components/ResourceList.svelte';
-	import { RESOURCES } from '$lib/resources';
+	import ResourceList from '#lib/components/ResourceList.svelte';
+	import { RESOURCES } from '#lib/resources/index.js';
 </script>
 
 <svelte:head>

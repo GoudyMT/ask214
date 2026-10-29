@@ -3,7 +3,7 @@ import { loadCorpus } from './corpus-load';
 import { buildCorpusArtifact } from './corpus-artifact';
 import { EMBED_MODEL_ID } from './types';
 import { AskError } from './errors';
-import { ACCEPTED_CORPUS_VERSION, type CorpusChunk } from '$lib/corpus';
+import { ACCEPTED_CORPUS_VERSION, type CorpusChunk } from '#lib/corpus/index.js';
 
 function chunk(id: string): CorpusChunk {
 	return { id, text: id, sourceId: 's', sourceTitle: 'S', tags: [], url: 'https://example.gov/' };

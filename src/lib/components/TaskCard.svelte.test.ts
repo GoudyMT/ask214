@@ -3,17 +3,17 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import TaskCard from './TaskCard.svelte';
-import { SNOOZE_DATE_MAX, snoozeUntilIso } from '$lib/timeline/snooze';
-import { addDays, localTodayIso } from '$lib/timeline/day-math';
-import { TASK_DEFS } from '$lib/timeline';
-import type { TimelineItem, TaskDef, TaskStatus } from '$lib/timeline';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { SNOOZE_DATE_MAX, snoozeUntilIso } from '#lib/timeline/snooze.js';
+import { addDays, localTodayIso } from '#lib/timeline/day-math.js';
+import { TASK_DEFS } from '#lib/timeline/index.js';
+import type { TimelineItem, TaskDef, TaskStatus } from '#lib/timeline/index.js';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 // A guide's title is the shipped document's own, so a case that needs an unbroken one sets it here; the rest read
 // the real titles.
 const guideTitle = vi.hoisted(() => ({ override: undefined as string | undefined }));
-vi.mock('$lib/resources', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/resources')>();
+vi.mock('#lib/resources/index.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/resources/index.js')>();
 	return {
 		...real,
 		guidesForTask: (taskId: string) =>

@@ -21,8 +21,8 @@ const seen = vi.hoisted(() => ({
 }));
 const hasData = (b: Uint8Array): boolean => b.some((x) => x !== 0);
 
-// `$lib` aliases on purpose: a relative path here never applied to the module under test in this runner.
-vi.mock('$lib/profile/codec', async (importOriginal) => {
+// `#lib` aliases on purpose: a relative path here never applied to the module under test in this runner.
+vi.mock('#lib/profile/codec.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./codec')>();
 	return {
 		...real,
@@ -40,7 +40,7 @@ vi.mock('$lib/profile/codec', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
+vi.mock('#lib/crypto/record-crypto.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../crypto/record-crypto')>();
 	return {
 		...real,

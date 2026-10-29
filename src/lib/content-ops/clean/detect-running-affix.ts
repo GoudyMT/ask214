@@ -1,4 +1,4 @@
-import type { Block } from '$lib/content-ops/extract/pdf-text';
+import type { Block } from '#lib/content-ops/extract/pdf-text.js';
 
 /** A running header/footer learned from a document: the ordered CONSTANT text segments that
  *  repeat at the start (prefix) or end (suffix) of most blocks, with a variable page-number run

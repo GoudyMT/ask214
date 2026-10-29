@@ -13,8 +13,8 @@ import {
 	type SaveResult
 } from './document-cache';
 import { LIBRARY_SRC, WORKER_SRC } from './pdf-library-paths';
-import { ASK_ASSET_CACHE } from '$lib/ask/asset-cache';
-import { CORPUS_BASE } from '$lib/ask/corpus-load';
+import { ASK_ASSET_CACHE } from '#lib/ask/asset-cache.js';
+import { CORPUS_BASE } from '#lib/ask/corpus-load.js';
 
 const PATH = '/docs/tap_vet_centers.1dcfd966.pdf';
 

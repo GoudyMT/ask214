@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { formatTimelineDate, formatDaysLeft } from '$lib/timeline/format-date';
-	import { closedOnDate } from '$lib/timeline/generate';
-	import type { TimelineItem } from '$lib/timeline';
-	import { afterYouLeaveWord, type NeedsNowGroups } from '$lib/timeline/needs-now';
+	import { formatTimelineDate, formatDaysLeft } from '#lib/timeline/format-date.js';
+	import { closedOnDate } from '#lib/timeline/generate.js';
+	import type { TimelineItem } from '#lib/timeline/index.js';
+	import { afterYouLeaveWord, type NeedsNowGroups } from '#lib/timeline/needs-now.js';
 
 	let { groups }: { groups: NeedsNowGroups } = $props();
 

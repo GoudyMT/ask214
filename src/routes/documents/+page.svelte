@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import DocumentsList from '$lib/components/DocumentsList.svelte';
-	import SourceReader from '$lib/components/SourceReader.svelte';
-	import { CORPUS_BASE, loadCorpus } from '$lib/ask/corpus-load';
-	import { createLazyCorpus } from '$lib/ask/corpus-loader';
-	import { waitForControl } from '$lib/ask/when-controlled';
-	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
-	import { documentLibrary } from '$lib/sources/document-library';
+	import DocumentsList from '#lib/components/DocumentsList.svelte';
+	import SourceReader from '#lib/components/SourceReader.svelte';
+	import { CORPUS_BASE, loadCorpus } from '#lib/ask/corpus-load.js';
+	import { createLazyCorpus } from '#lib/ask/corpus-loader.js';
+	import { waitForControl } from '#lib/ask/when-controlled.js';
+	import { sourcesFromCorpus, type Source } from '#lib/ask/sources.js';
+	import { documentLibrary } from '#lib/sources/document-library.js';
 	import {
 		heldBytes,
 		isAnswerLibraryHeld,
@@ -18,9 +18,9 @@
 		stopSave,
 		stopSaves,
 		type SaveResult
-	} from '$lib/sources/document-cache';
-	import { saveAll } from '$lib/sources/save-all.svelte';
-	import { WEB_SOURCE_COUNT } from '$lib/sources/local-document-info.data';
+	} from '#lib/sources/document-cache.js';
+	import { saveAll } from '#lib/sources/save-all.svelte.js';
+	import { WEB_SOURCE_COUNT } from '#lib/sources/local-document-info.data.js';
 
 	// What the asset cache holds. It is read again after every change rather than updated by hand, so the
 	// list can only ever show what is really on the device.

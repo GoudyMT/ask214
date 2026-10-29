@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { readStashedRoute } from '$lib/feedback/context';
+import { readStashedRoute } from '#lib/feedback/context.js';
 import MorePage from './+page.svelte';
 
 // The profile app the page reads and the page the person came from, both set per test. `arrive` reports a later
@@ -13,7 +13,10 @@ const ctx = vi.hoisted(() => ({
 	leave: (() => {}) as (to: string) => void
 }));
 
-vi.mock('$lib/profile/context', () => ({ getProfileApp: () => ctx.app, setProfileApp: () => {} }));
+vi.mock('#lib/profile/context.js', () => ({
+	getProfileApp: () => ctx.app,
+	setProfileApp: () => {}
+}));
 // SvelteKit reports the previous page to afterNavigate and the next one to beforeNavigate; here the test says what
 // they are.
 vi.mock('$app/navigation', () => ({

@@ -17,10 +17,10 @@ type Store =
 type Row = Record<string, unknown>;
 
 // zeroizeRecord records every record the read discards, so a test can show the decoded profile was wiped. The path
-// is a `$lib` alias on purpose: with a relative path the mock silently never applied in this browser runner.
+// is a `#lib` alias on purpose: with a relative path the mock silently never applied in this browser runner.
 const seams = vi.hoisted(() => ({ zeroized: [] as Record<string, unknown>[] }));
 
-vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
+vi.mock('#lib/profile/lifecycle.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./lifecycle')>();
 	return {
 		...real,

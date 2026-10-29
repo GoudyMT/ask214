@@ -2,9 +2,9 @@
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { waitForControl } from '$lib/ask/when-controlled';
-	import AskView from '$lib/components/AskView.svelte';
-	import EmbedWorker from '$lib/ask/embed-worker?worker';
+	import { waitForControl } from '#lib/ask/when-controlled.js';
+	import AskView from '#lib/components/AskView.svelte';
+	import EmbedWorker from '#lib/ask/embed-worker?worker';
 	import {
 		ASK_ERROR,
 		AskError,
@@ -13,30 +13,30 @@
 		createRecoveringEmbed,
 		loadCorpus,
 		type AskState
-	} from '$lib/ask';
-	import { ACCEPTED_CORPUS_VERSION } from '$lib/corpus';
-	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
-	import { detectEligibilityIntent } from '$lib/ask/synthesis/eligibility-gate';
-	import { createLazyCorpus } from '$lib/ask/corpus-loader';
-	import { deviceFilesKept } from '$lib/ask/device-files';
-	import { getProfileApp } from '$lib/profile/context';
-	import { LocalToday } from '$lib/timeline/local-today.svelte';
-	import type { HomeRow } from '$lib/timeline/home-glance';
-	import { FAILED_ROW, loadHomeGlance } from '$lib/timeline/load-home-glance';
-	import GlanceRow from '$lib/components/GlanceRow.svelte';
-	import LockedPanel from '$lib/components/LockedPanel.svelte';
-	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
-	import { getInstallApp } from '$lib/install/context';
-	import { isNudgeDismissed, dismissNudge } from '$lib/install/dismissed';
-	import InstallNudge from '$lib/components/InstallNudge.svelte';
-	import { retrieveOnline } from '$lib/ask/online/retrieve-online';
-	import { synthesize } from '$lib/ask/synthesis/synthesize';
+	} from '#lib/ask/index.js';
+	import { ACCEPTED_CORPUS_VERSION } from '#lib/corpus/index.js';
+	import { sourcesFromCorpus, type Source } from '#lib/ask/sources.js';
+	import { detectEligibilityIntent } from '#lib/ask/synthesis/eligibility-gate.js';
+	import { createLazyCorpus } from '#lib/ask/corpus-loader.js';
+	import { deviceFilesKept } from '#lib/ask/device-files.js';
+	import { getProfileApp } from '#lib/profile/context.js';
+	import { LocalToday } from '#lib/timeline/local-today.svelte.js';
+	import type { HomeRow } from '#lib/timeline/home-glance.js';
+	import { FAILED_ROW, loadHomeGlance } from '#lib/timeline/load-home-glance.js';
+	import GlanceRow from '#lib/components/GlanceRow.svelte';
+	import LockedPanel from '#lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '#lib/components/load-pin-unlock.js';
+	import { getInstallApp } from '#lib/install/context.js';
+	import { isNudgeDismissed, dismissNudge } from '#lib/install/dismissed.js';
+	import InstallNudge from '#lib/components/InstallNudge.svelte';
+	import { retrieveOnline } from '#lib/ask/online/retrieve-online.js';
+	import { synthesize } from '#lib/ask/synthesis/synthesize.js';
 	import {
 		getDefaultMode,
 		isOnlineConsented,
 		setOnlineConsented,
 		isSynthesisEnabled
-	} from '$lib/ask/online-prefs';
+	} from '#lib/ask/online-prefs.js';
 
 	const app = getProfileApp();
 	// A PIN tab with no keys is locked whatever the stores read: with nothing saved a store reads unlocked after a Lock. The
@@ -46,9 +46,9 @@
 	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not
 	// carry it.
 	function eraseAtSettings(): void {
-		void import('$lib/components/load-backup').then(({ backupSession }) => {
+		void import('#lib/components/load-backup.js').then(({ backupSession }) => {
 			backupSession.requestErase();
-			return goto(resolve('/settings'));
+			return goto(resolve('settings'));
 		});
 	}
 	// First-run = a ready, unlocked profile with no persona yet. The on-ramp invites setup; once a
@@ -386,7 +386,7 @@
 				Add your separation date and Ask 214 builds a timeline of what to do and when - tailored to
 				your date, still fully on your device.
 			</p>
-			<a class="home-onramp__action" href={resolve('/wizard')}>Set up your timeline</a>
+			<a class="home-onramp__action" href={resolve('wizard')}>Set up your timeline</a>
 		</section>
 	{:else if isIdle && row}
 		<hr class="home-divider" />

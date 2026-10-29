@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { TimelineView } from '$lib/timeline';
+	import type { TimelineView } from '#lib/timeline/index.js';
 
 	let { view }: { view: TimelineView } = $props();
 

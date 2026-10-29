@@ -1,10 +1,10 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import PdfView from './PdfView.svelte';
-import { searchPages } from '$lib/sources/highlight-match';
-import type { PdfContentItem } from '$lib/sources/pdf-text';
-import type { PdfDocument, PdfLoadingTask, PdfRuntime } from '$lib/sources/pdf-runtime';
-import { pageInView } from '$lib/sources/scroll-pages';
+import { searchPages } from '#lib/sources/highlight-match.js';
+import type { PdfContentItem } from '#lib/sources/pdf-text.js';
+import type { PdfDocument, PdfLoadingTask, PdfRuntime } from '#lib/sources/pdf-runtime.js';
+import { pageInView } from '#lib/sources/scroll-pages.js';
 
 const PASSAGE = 'The notice explains who may apply and what evidence is required.';
 

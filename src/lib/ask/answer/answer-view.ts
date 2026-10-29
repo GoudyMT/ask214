@@ -1,4 +1,4 @@
-import type { ResultCard } from '$lib/corpus';
+import type { ResultCard } from '#lib/corpus/index.js';
 import type { CitedAnswer } from '../synthesis/cited-answer';
 import type { SynthesisView } from '../synthesis/synthesis-view';
 import { stripHeadingEcho } from './heading-echo';

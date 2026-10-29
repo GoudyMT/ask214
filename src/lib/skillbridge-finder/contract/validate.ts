@@ -6,7 +6,7 @@
  * field as data (never interpolated into a message), and collects every violation rather than stopping at one.
  */
 
-import { isGovernmentHost } from '$lib/sources/government-host';
+import { isGovernmentHost } from '#lib/sources/government-host.js';
 import {
 	BRANCHES,
 	CAPS,

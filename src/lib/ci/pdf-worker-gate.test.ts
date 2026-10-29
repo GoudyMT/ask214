@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { LIBRARY_BYTES, LIBRARY_SRC, WORKER_SRC } from '$lib/sources/pdf-library-paths';
+import { LIBRARY_BYTES, LIBRARY_SRC, WORKER_SRC } from '#lib/sources/pdf-library-paths.js';
 
 // The pdf-worker gate compares the vendored library and worker with the installed package. It must also
 // refuse any file in the release folder that it does not check: the service worker restores every shipped

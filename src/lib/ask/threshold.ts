@@ -1,4 +1,4 @@
-import type { RetrievalResult } from '$lib/corpus';
+import type { RetrievalResult } from '#lib/corpus/index.js';
 
 /**
  * Keep only retrieval results that clear a minimum score.

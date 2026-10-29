@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import type { PlanAnswer, PlanRead } from '$lib/timeline/skillbridge-plan';
+	import type { PlanAnswer, PlanRead } from '#lib/timeline/skillbridge-plan.js';
 	import {
 		ANSWER_LABEL,
 		ROW_LABEL,
@@ -14,9 +14,9 @@
 		ROW_LOCKED_AFTER,
 		ROW_HINT_LATE,
 		rowHintEarly
-	} from '$lib/timeline/skillbridge-copy';
+	} from '#lib/timeline/skillbridge-copy.js';
 	import { resolve } from '$app/paths';
-	import type { TimelineAccess } from '$lib/timeline/store-access';
+	import type { TimelineAccess } from '#lib/timeline/store-access.js';
 
 	type Props = {
 		/** The answer, or null while the timeline store cannot be read (no value is shown and nothing is offered). */
@@ -135,7 +135,7 @@
 	{#if plan === null && access === 'locked'}
 		<!-- tabindex -1: a target for the focus move above, never a stop on the Tab order. -->
 		<p bind:this={unavailableEl} class="sb-row__hint" tabindex="-1">
-			{ROW_LOCKED_BEFORE}<a href={resolve('/timeline')}>{ROW_LOCKED_LINK}</a>{ROW_LOCKED_AFTER}
+			{ROW_LOCKED_BEFORE}<a href={resolve('timeline')}>{ROW_LOCKED_LINK}</a>{ROW_LOCKED_AFTER}
 		</p>
 	{:else if plan === null && access === 'failed'}
 		<p bind:this={unavailableEl} class="sb-row__hint" tabindex="-1">{ROW_UNAVAILABLE}</p>

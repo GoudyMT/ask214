@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { sourceFromCard, sourcesFromCorpus } from './sources';
 import { toExtractiveAnswer } from './answer/answer-view';
 import { selectAnswer } from './answer/select-answer';
-import { toResultCards } from '$lib/corpus/cards';
-import type { Corpus, CorpusChunk } from '$lib/corpus';
+import { toResultCards } from '#lib/corpus/cards.js';
+import type { Corpus, CorpusChunk } from '#lib/corpus/index.js';
 
 function chunk(over: Partial<CorpusChunk>): CorpusChunk {
 	return { id: 'x', text: 't', sourceId: 's', sourceTitle: 'S', tags: [], url: 'u', ...over };

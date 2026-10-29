@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { findAnchorInDocument, searchPages } from '$lib/sources/highlight-match';
+	import { findAnchorInDocument, searchPages } from '#lib/sources/highlight-match.js';
 	import {
 		joinTextItems,
 		rangeToBoxes,
 		type Box,
 		type PdfContentItem
-	} from '$lib/sources/pdf-text';
+	} from '#lib/sources/pdf-text.js';
 	import {
 		loadPdfRuntime,
 		type PdfDocument,
@@ -14,8 +14,8 @@
 		type PdfPage,
 		type PdfRenderTask,
 		type PdfRuntime
-	} from '$lib/sources/pdf-runtime';
-	import { pageInView, scrollParent } from '$lib/sources/scroll-pages';
+	} from '#lib/sources/pdf-runtime.js';
+	import { pageInView, scrollParent } from '#lib/sources/scroll-pages.js';
 
 	// The whole served document as a scrolled stack of pages, the cited passage marked on every page it covers.
 	// Pages are drawn as they come near the view and released when far from it, each holding its shape until

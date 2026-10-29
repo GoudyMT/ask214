@@ -10,7 +10,7 @@
 <section class="setup-cta" aria-labelledby="setup-cta-heading">
 	<h2 id="setup-cta-heading">Set up your profile</h2>
 	<p>Add your separation date to get a timeline built around your transition.</p>
-	<a class="setup-cta__action" href={resolve('/wizard')}>Get started</a>
+	<a class="setup-cta__action" href={resolve('wizard')}>Get started</a>
 </section>
 
 <style>

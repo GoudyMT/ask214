@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import type { AskState } from '$lib/ask/types';
-	import type { AnswerView } from '$lib/ask/answer/answer-view';
-	import { sourceFromCard, type Source } from '$lib/ask/sources';
-	import { similarCards } from '$lib/ask/similar';
+	import type { AskState } from '#lib/ask/types.js';
+	import type { AnswerView } from '#lib/ask/answer/answer-view.js';
+	import { sourceFromCard, type Source } from '#lib/ask/sources.js';
+	import { similarCards } from '#lib/ask/similar.js';
 	import AskResultCard from './AskResultCard.svelte';
 	import SourceReader from './SourceReader.svelte';
 	import QuestionFeed from './QuestionFeed.svelte';
 	import CrisisCard from './CrisisCard.svelte';
 	import AskAnswer from './AskAnswer.svelte';
-	import { OFFICIAL_FALLBACK } from '$lib/ask/crisis/contacts';
+	import { OFFICIAL_FALLBACK } from '#lib/ask/crisis/contacts.js';
 
 	let {
 		askState,

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { RESOURCES, COMMAND_INSTRUCTIONS } from '$lib/resources';
-	import type { PlanAnswer } from '$lib/timeline/skillbridge-plan';
+	import { RESOURCES, COMMAND_INSTRUCTIONS } from '#lib/resources/index.js';
+	import type { PlanAnswer } from '#lib/timeline/skillbridge-plan.js';
 	import {
 		QUESTION_FIRST,
 		QUESTION_AGAIN,
@@ -11,7 +11,7 @@
 		ANSWERED,
 		CLOSE_LABEL,
 		askAgainLine
-	} from '$lib/timeline/skillbridge-copy';
+	} from '#lib/timeline/skillbridge-copy.js';
 
 	type Props = {
 		wording: 'first' | 'again';

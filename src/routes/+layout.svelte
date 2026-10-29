@@ -2,13 +2,13 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { version } from '$app/environment';
+	import { version } from '$app/env';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import AppGate from '$lib/components/AppGate.svelte';
-	import ClockBackwardBanner from '$lib/components/ClockBackwardBanner.svelte';
-	import InitErrorBanner from '$lib/components/InitErrorBanner.svelte';
-	import { setProfileApp, type ProfileApp } from '$lib/profile/context';
+	import AppGate from '#lib/components/AppGate.svelte';
+	import ClockBackwardBanner from '#lib/components/ClockBackwardBanner.svelte';
+	import InitErrorBanner from '#lib/components/InitErrorBanner.svelte';
+	import { setProfileApp, type ProfileApp } from '#lib/profile/context.js';
 	import {
 		initProfileApp,
 		provisionStore,
@@ -24,49 +24,49 @@
 		reloadWhenShown,
 		superviseStartup,
 		type Relockable
-	} from '$lib/profile/app-init';
-	import { createProfileStore } from '$lib/profile/store.svelte';
-	import { createTimelineStateStore, type TimelineStateStore } from '$lib/timeline/state.svelte';
-	import { createCalendarSyncStore, type CalendarSyncStore } from '$lib/calendar/store.svelte';
-	import { createByokStore } from '$lib/ask/byok/store';
-	import { createProfileBus, type BusSignal } from '$lib/broadcast/bus';
-	import { bumpCounter } from '$lib/keystore/app-lock-store';
-	import { dropSession, getSession, setOnSessionMismatch } from '$lib/keystore/session';
+	} from '#lib/profile/app-init.js';
+	import { createProfileStore } from '#lib/profile/store.svelte.js';
+	import { createTimelineStateStore, type TimelineStateStore } from '#lib/timeline/state.svelte.js';
+	import { createCalendarSyncStore, type CalendarSyncStore } from '#lib/calendar/store.svelte.js';
+	import { createByokStore } from '#lib/ask/byok/store.js';
+	import { createProfileBus, type BusSignal } from '#lib/broadcast/bus.js';
+	import { bumpCounter } from '#lib/keystore/app-lock-store.js';
+	import { dropSession, getSession, setOnSessionMismatch } from '#lib/keystore/session.js';
 	import {
 		checkStoredBytes,
 		keystoreHasIdentity,
 		readStoredBytes,
 		sameRecords,
 		type StoredBytes
-	} from '$lib/profile/damaged-bytes';
-	import { createIdleTimer } from '$lib/profile/idle-timer';
-	import { IDLE_THRESHOLD_MS } from '$lib/profile/idle-threshold';
-	import { checkBrowserSupport } from '$lib/crypto/capability';
-	import { openMtcDb } from '$lib/db/schema';
-	import { startReload, stopReloadForLock } from '$lib/profile/pending-reload';
-	import { markRaised, takeOverIfRaised } from '$lib/sw/take-over';
-	import { wipeAllStores } from '$lib/db/wipe';
-	import { isDamagedRecord, stillDamaged } from '$lib/profile/damaged';
-	import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-	import { safeLog } from '$lib/log/safelog';
-	import { requestPersistentStorage } from '$lib/storage/persistence';
-	import { setInstallApp, type InstallApp } from '$lib/install/context';
+	} from '#lib/profile/damaged-bytes.js';
+	import { createIdleTimer } from '#lib/profile/idle-timer.js';
+	import { IDLE_THRESHOLD_MS } from '#lib/profile/idle-threshold.js';
+	import { checkBrowserSupport } from '#lib/crypto/capability.js';
+	import { openMtcDb } from '#lib/db/schema.js';
+	import { startReload, stopReloadForLock } from '#lib/profile/pending-reload.js';
+	import { markRaised, takeOverIfRaised } from '#lib/sw/take-over.js';
+	import { wipeAllStores } from '#lib/db/wipe.js';
+	import { isDamagedRecord, stillDamaged } from '#lib/profile/damaged.js';
+	import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+	import { safeLog } from '#lib/log/safelog.js';
+	import { requestPersistentStorage } from '#lib/storage/persistence.js';
+	import { setInstallApp, type InstallApp } from '#lib/install/context.js';
 	import {
 		createInstallController,
 		readCapturedPrompt,
 		type InstallController
-	} from '$lib/install/install-prompt';
-	import { isInstalled, isIOS } from '$lib/install/install-state';
-	import BottomBar from '$lib/layout/BottomBar.svelte';
+	} from '#lib/install/install-prompt.js';
+	import { isInstalled, isIOS } from '#lib/install/install-state.js';
+	import BottomBar from '#lib/layout/BottomBar.svelte';
 	import {
 		HIDE_AFTER_PX,
 		nextHeaderState,
 		PHONE_QUERY,
 		startHeaderState
-	} from '$lib/layout/header-scroll';
-	import { shellWidthFor } from '$lib/layout/shell-width';
-	import { applyStorageChange, readChoice, syncThemeColor } from '$lib/theme/theme';
-	import { stashRoute } from '$lib/feedback/context';
+	} from '#lib/layout/header-scroll.js';
+	import { shellWidthFor } from '#lib/layout/shell-width.js';
+	import { applyStorageChange, readChoice, syncThemeColor } from '#lib/theme/theme.js';
+	import { stashRoute } from '#lib/feedback/context.js';
 	let { children } = $props();
 
 	// After a database raise, this release's worker takes over at once (take-over.ts).
@@ -360,8 +360,8 @@
 					},
 					() =>
 						startReload(() =>
-							location.pathname === resolve('/wizard')
-								? location.replace(resolve('/timeline'))
+							location.pathname === resolve('wizard')
+								? location.replace(resolve('timeline'))
 								: location.reload()
 						)
 				);
@@ -595,13 +595,13 @@
 			<a href={resolve('/')} class="brand">Ask 214</a>
 			<nav aria-label="Primary">
 				<ul>
-					<li><a href={resolve('/timeline')}>Timeline</a></li>
-					<li><a href={resolve('/resources')}>Resources</a></li>
+					<li><a href={resolve('timeline')}>Timeline</a></li>
+					<li><a href={resolve('resources')}>Resources</a></li>
 					<!-- Settings is reachable whenever the app is ready: the "Online answers" panel is always configurable,
 					     so even a fresh no-timeline user has something to set there (the timeline sections hide inside
 					     Settings). And when the saved data is damaged, where its erase is the only way back. -->
 					{#if app.status === 'ready' || app.status === 'damaged'}
-						<li><a href={resolve('/settings')}>Settings</a></li>
+						<li><a href={resolve('settings')}>Settings</a></li>
 					{/if}
 				</ul>
 			</nav>
@@ -613,7 +613,7 @@
 	<BottomBar />
 
 	{#if app.status === 'ready' && app.store?.clockBackward}
-		<ClockBackwardBanner onfix={() => void goto(resolve('/settings'))} />
+		<ClockBackwardBanner onfix={() => void goto(resolve('settings'))} />
 	{:else if app.status === 'error' || app.status === 'damaged'}
 		<InitErrorBanner damaged={app.status === 'damaged'} />
 	{/if}
@@ -622,7 +622,7 @@
 		{#if app.replacedNotice}
 			<p role="status">
 				Data on this device was replaced from a backup in another tab. Reload to see it.
-				<button type="button" onclick={() => location.replace(resolve('/timeline'))}>Reload</button>
+				<button type="button" onclick={() => location.replace(resolve('timeline'))}>Reload</button>
 			</p>
 		{/if}
 		{@render children()}
@@ -635,12 +635,12 @@
 			branch of the US military.
 		</p>
 		<p>
-			<a href={resolve('/about')}>About</a> &middot;
+			<a href={resolve('about')}>About</a> &middot;
 			<a href="https://github.com/GoudyMT/ask214" rel="external">Source</a>
 			&middot;
 			<!-- On More the page the person came from is already remembered, and "/more" would clear it. -->
 			<a
-				href={resolve('/feedback')}
+				href={resolve('feedback')}
 				onclick={() => {
 					if (page.url.pathname !== '/more') stashRoute(page.url.pathname);
 				}}>Feedback</a

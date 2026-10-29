@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Corpus, CorpusChunk } from '$lib/corpus';
+import type { Corpus, CorpusChunk } from '#lib/corpus/index.js';
 import { measureAnswers, mcnemarExactP, evaluateBar, type AnswerEvalItem } from './measure-answer';
 
 // A 2-dimension corpus so a hit's cosine is controllable exactly: the query is [1, 0], so an embedding of

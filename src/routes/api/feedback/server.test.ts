@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { POST } from './+server';
 
+// The deployment's bindings come from the workerd-only `cloudflare:workers` module, as they do on Cloudflare; each
+// test sets them through makeEvent.
+const env = vi.hoisted(() => ({}) as Record<string, unknown>);
+vi.mock('cloudflare:workers', () => ({ env }));
+
 type Event = Parameters<typeof POST>[0];
 
 function makeEvent(
@@ -13,19 +18,18 @@ function makeEvent(
 		noLimiter?: boolean;
 	} = {}
 ): Event {
+	for (const key of Object.keys(env)) delete env[key];
+	Object.assign(env, {
+		RESEND_API_KEY: opts.noKey ? undefined : 're_test',
+		FEEDBACK_TO: 'inbox@example.com',
+		FEEDBACK_FROM: opts.noFrom ? undefined : 'Test <feedback@send.example.com>',
+		FEEDBACK_LIMITER: opts.noLimiter
+			? undefined
+			: { limit: async () => ({ success: !opts.limited }) }
+	});
 	return {
 		request: { json: async () => body },
-		getClientAddress: () => opts.ip ?? '1.2.3.4',
-		platform: {
-			env: {
-				RESEND_API_KEY: opts.noKey ? undefined : 're_test',
-				FEEDBACK_TO: 'inbox@example.com',
-				FEEDBACK_FROM: opts.noFrom ? undefined : 'Test <feedback@send.example.com>',
-				FEEDBACK_LIMITER: opts.noLimiter
-					? undefined
-					: { limit: async () => ({ success: !opts.limited }) }
-			}
-		}
+		getClientAddress: () => opts.ip ?? '1.2.3.4'
 	} as unknown as Event;
 }
 

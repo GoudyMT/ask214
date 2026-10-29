@@ -2,13 +2,13 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
-import { formatTimelineDate } from '$lib/timeline/format-date';
+import { formatTimelineDate } from '#lib/timeline/format-date.js';
 import {
 	AFTER_SEPARATION,
 	AFTER_SKILLBRIDGE,
 	BEFORE_TERMINAL_LEAVE,
 	ORDER_NOTE
-} from '$lib/profile/leaving-copy';
+} from '#lib/profile/leaving-copy.js';
 
 // Days from the real clock: the page reads each typed date against the separation date and the other leaving date.
 const { isoFromToday, store } = vi.hoisted(() => ({
@@ -27,7 +27,7 @@ const { isoFromToday, store } = vi.hoisted(() => ({
 	}
 }));
 
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store,
@@ -52,7 +52,7 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,

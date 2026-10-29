@@ -100,7 +100,7 @@ describe('the Cache API and the origin-private file system stay closed to app co
 		);
 	});
 
-	it.each(['src/lib/sources/document-cache.ts', 'src/service-worker.ts'])(
+	it.each(['src/lib/sources/document-cache.ts', 'src/service-worker/index.ts'])(
 		'allows %s, which holds public documents only',
 		async (filePath) => {
 			const ids = await ruleIds(
@@ -112,7 +112,7 @@ describe('the Cache API and the origin-private file system stay closed to app co
 		}
 	);
 
-	it.each(['src/lib/sources/document-cache.ts', 'src/service-worker.ts'])(
+	it.each(['src/lib/sources/document-cache.ts', 'src/service-worker/index.ts'])(
 		'keeps web storage banned in %s',
 		async (filePath) => {
 			expect(await ruleIds('localStorage.setItem("k", "v");', filePath)).toContain(
@@ -142,18 +142,18 @@ describe('the Cache API and the origin-private file system stay closed to app co
 
 describe('the safelog test accessor stays out of app code', () => {
 	it.each([
-		["import { getDiagnosticsForTest } from '$lib/log/safelog';", 'no-restricted-imports'],
+		["import { getDiagnosticsForTest } from '#lib/log/safelog';", 'no-restricted-imports'],
 		["import { getDiagnosticsForTest } from '../log/safelog';", 'no-restricted-imports'],
 		[
 			"import { safeLog, getDiagnosticsForTest } from '../../lib/log/safelog';",
 			'no-restricted-imports'
 		],
 		["import { getDiagnosticsForTest } from './safelog';", 'no-restricted-imports'],
-		["import { getDiagnosticsForTest } from '$lib/log/safelog.js';", 'no-restricted-imports'],
+		["import { getDiagnosticsForTest } from '#lib/log/safelog.js';", 'no-restricted-imports'],
 		["import { getDiagnosticsForTest } from './safelog.ts';", 'no-restricted-imports'],
-		["export const m = await import('$lib/log/safelog');", 'no-restricted-syntax'],
+		["export const m = await import('#lib/log/safelog');", 'no-restricted-syntax'],
 		["export const m = await import('./safelog.js');", 'no-restricted-syntax'],
-		['export const m = await import(`$lib/log/safelog`);', 'no-restricted-syntax']
+		['export const m = await import(`#lib/log/safelog`);', 'no-restricted-syntax']
 	])('flags %s in app source', async (code, rule) => {
 		expect(await ruleIds(code, 'src/lib/log/planted.ts')).toContain(rule);
 	});
@@ -161,7 +161,7 @@ describe('the safelog test accessor stays out of app code', () => {
 	it('flags the accessor imported from a plain .js file', async () => {
 		expect(
 			await ruleIds(
-				"import { getDiagnosticsForTest } from '$lib/log/safelog';",
+				"import { getDiagnosticsForTest } from '#lib/log/safelog';",
 				'src/lib/log/planted.js'
 			)
 		).toContain('no-restricted-imports');
@@ -169,13 +169,13 @@ describe('the safelog test accessor stays out of app code', () => {
 
 	it('allows the sink itself', async () => {
 		expect(
-			await ruleIds("import { safeLog } from '$lib/log/safelog';", 'src/lib/log/planted.ts')
+			await ruleIds("import { safeLog } from '#lib/log/safelog';", 'src/lib/log/planted.ts')
 		).not.toContain('no-restricted-imports');
 	});
 
 	it('allows tests to read the buffer', async () => {
 		const ids = await ruleIds(
-			"import { getDiagnosticsForTest } from '$lib/log/safelog';",
+			"import { getDiagnosticsForTest } from '#lib/log/safelog';",
 			'src/lib/log/planted.test.ts'
 		);
 		expect(ids).not.toContain('no-restricted-imports');

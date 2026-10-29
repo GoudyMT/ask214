@@ -2,8 +2,8 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import SkillBridgeQuestion from './SkillBridgeQuestion.svelte';
-import { RESOURCES } from '$lib/resources';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { RESOURCES } from '#lib/resources/index.js';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 const SKILLBRIDGE = RESOURCES.find((r) => r.id === 'skillbridge');
 // The Timeline's calendar card has a button named Dismiss too, so this one carries the full name.

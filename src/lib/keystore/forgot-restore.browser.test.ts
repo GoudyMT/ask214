@@ -31,7 +31,7 @@ import {
 	type KeySession
 } from './session';
 
-// Seams over two modules, each a passthrough until a test arms it. The paths are `$lib` aliases on purpose: with a
+// Seams over two modules, each a passthrough until a test arms it. The paths are `#lib` aliases on purpose: with a
 // relative path a mock silently never applied to the writer's own import in this browser runner.
 // - encodeProfile keeps every buffer it hands out while armed, so a test can see which were wiped;
 // - zeroizeRecord keeps every record it wipes, so a test can look at what the writer left behind.
@@ -42,7 +42,7 @@ const seams = vi.hoisted(() => ({
 	onEncode: null as (() => void) | null
 }));
 
-vi.mock('$lib/profile/codec', async (importOriginal) => {
+vi.mock('#lib/profile/codec.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../profile/codec')>();
 	return {
 		...real,
@@ -55,7 +55,7 @@ vi.mock('$lib/profile/codec', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
+vi.mock('#lib/profile/lifecycle.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../profile/lifecycle')>();
 	return {
 		...real,

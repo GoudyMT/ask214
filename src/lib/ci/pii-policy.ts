@@ -134,19 +134,19 @@ export function scanForPiiTokens(
 /**
  * Modules that hold or derive personal data. Code that can send a request off the device must not import them. This
  * stops a direct import only: a module the code imports can still pass a value along, which the online request test
- * (tests/e2e/egress-canary.e2e.ts) checks instead. Matched on `$lib/...`, relative and `/src/...` specifiers, with the
+ * (tests/e2e/egress-canary.e2e.ts) checks instead. Matched on `#lib/...`, relative and `/src/...` specifiers, with the
  * banned folder anywhere in the path, so a platform module such as `node:crypto` or a route such as `/timeline` is
  * not caught.
  */
 export const FORBIDDEN_IMPORT_PATTERN =
-	/(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar|backup)(?:\/|$)/;
+	/(?:^[#$]lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?(?:profile|keystore|crypto|db|timeline|calendar|backup)(?:\/|$)/;
 
 /**
  * The SkillBridge finder's own personal half: the person's place, saved programs and which listings they opened live
  * in its `state` folder. Its fetch part asks the server for files, so it must receive file names only and never
  * import that folder; the server would otherwise be one function call away from a place.
  */
-export const FINDER_STATE_IMPORT_PATTERN = /(?:^\$lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?state(?:\/|$)/;
+export const FINDER_STATE_IMPORT_PATTERN = /(?:^[#$]lib\/|^\.\.?\/|^\/src\/)(?:.*\/)?state(?:\/|$)/;
 
 // Any quote, including a template literal, and any whitespace - line breaks too - between `import(` or `from` and the
 // specifier, so the scan runs over the whole file rather than one line at a time. The specifier itself stops at a

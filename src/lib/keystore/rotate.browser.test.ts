@@ -34,14 +34,14 @@ import {
 	type KeySession
 } from './session';
 
-// Seams over two modules, each a passthrough until a test arms it. The paths are `$lib` aliases on purpose: with a
+// Seams over two modules, each a passthrough until a test arms it. The paths are `#lib` aliases on purpose: with a
 // relative path a mock silently never applied to the code's own import in this browser runner.
 // - decodeProfile and decryptRecord (for the API key) keep every plaintext byte array they hand out, with a copy of what
 //   it held, so a test can see which were wiped and that they held something to wipe.
 type Held = { live: Uint8Array; copy: Uint8Array };
 const seams = vi.hoisted(() => ({ capture: false, held: [] as Held[] }));
 
-vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
+vi.mock('#lib/crypto/record-crypto.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../crypto/record-crypto')>();
 	return {
 		...real,
@@ -55,7 +55,7 @@ vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/profile/codec', async (importOriginal) => {
+vi.mock('#lib/profile/codec.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../profile/codec')>();
 	return {
 		...real,

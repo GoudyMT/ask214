@@ -6,7 +6,7 @@ import {
 	TASK_LINK_NOTE,
 	TASK_GUIDES
 } from './resources';
-import { LOCAL_DOCUMENT_INFO } from '$lib/sources/local-document-info.data';
+import { LOCAL_DOCUMENT_INFO } from '#lib/sources/local-document-info.data.js';
 
 // Human-readable heading for each browse category, shown on the Resources page.
 export const DISPLAY_CATEGORY_LABEL: Record<DisplayCategory, string> = {

@@ -14,10 +14,10 @@ import type { RegionFileName } from '../contract/places';
 import type { ZipsTable } from '../contract/tables';
 
 // A passthrough over the cipher that counts decrypts, so "decrypted again only when asked" can be shown. The path is a
-// `$lib` alias on purpose: with a relative path the mock silently never applied to the store's own import in this
+// `#lib` alias on purpose: with a relative path the mock silently never applied to the store's own import in this
 // browser runner.
 const seams = vi.hoisted(() => ({ decrypts: 0 }));
-vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
+vi.mock('#lib/crypto/record-crypto.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../../crypto/record-crypto')>();
 	return {
 		...real,

@@ -2,17 +2,17 @@ import { createRawSnippet } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createProfileStore } from '$lib/profile/store.svelte';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
-import { readStashedRoute, stashRoute } from '$lib/feedback/context';
+import { createProfileStore } from '#lib/profile/store.svelte.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
+import { readStashedRoute, stashRoute } from '#lib/feedback/context.js';
 import Layout from './+layout.svelte';
 
 // The real layout starts up on a test database with a saved profile (status ready); only the database it opens is
 // pointed at the test one.
 const harness = vi.hoisted(() => ({ name: '' }));
-vi.mock('$lib/db/schema', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/db/schema')>();
+vi.mock('#lib/db/schema.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/db/schema.js')>();
 	return {
 		...real,
 		openMtcDb: (...args: Parameters<typeof real.openMtcDb>) =>

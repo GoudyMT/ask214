@@ -1,4 +1,4 @@
-import { search, toResultCards, type Corpus, type ResultCard } from '$lib/corpus';
+import { search, toResultCards, type Corpus, type ResultCard } from '#lib/corpus/index.js';
 import { filterByMinScore } from './threshold';
 import { detectCrisisIntent } from './crisis/detect';
 import { detectEligibilityIntent } from './synthesis/eligibility-gate';

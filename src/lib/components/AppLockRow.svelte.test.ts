@@ -58,13 +58,13 @@ const seams = vi.hoisted(() => ({
 	// Runs when the row has read the counter, before it goes on to the move: a Lock landing in that gap.
 	afterCounterRead: null as (() => void) | null
 }));
-vi.mock('$lib/profile/context', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/profile/context')>()),
+vi.mock('#lib/profile/context.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/profile/context.js')>()),
 	getProfileApp: () => seams.app
 }));
 // The real card, drawn as it is; the wrapper only keeps the props it was mounted with and adds a test's seams.
-vi.mock('$lib/backup/BackupCard.svelte', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/backup/BackupCard.svelte')>();
+vi.mock('#lib/backup/BackupCard.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/backup/BackupCard.svelte')>();
 	const mount = real.default as unknown as (
 		anchor: unknown,
 		props: Record<string, unknown>
@@ -78,7 +78,7 @@ vi.mock('$lib/backup/BackupCard.svelte', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => {
+vi.mock('#lib/keystore/app-lock-store.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../keystore/app-lock-store')>();
 	return {
 		...real,
@@ -89,7 +89,7 @@ vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('$lib/keystore/session', async (importOriginal) => {
+vi.mock('#lib/keystore/session.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../keystore/session')>();
 	return {
 		...real,

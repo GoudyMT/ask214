@@ -36,13 +36,13 @@ const h = vi.hoisted(() => ({
 	card: null as Record<string, unknown> | null
 }));
 // The rest of the module stays real: app-init, imported below for the relock join, reads helpers from it.
-vi.mock('$lib/profile/context', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/profile/context')>()),
+vi.mock('#lib/profile/context.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/profile/context.js')>()),
 	getProfileApp: () => h.app
 }));
 // The real card, drawn as it is; the wrapper only keeps the props it was mounted with.
-vi.mock('$lib/backup/BackupCard.svelte', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/backup/BackupCard.svelte')>();
+vi.mock('#lib/backup/BackupCard.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/backup/BackupCard.svelte')>();
 	const mount = real.default as unknown as (
 		anchor: unknown,
 		props: Record<string, unknown>

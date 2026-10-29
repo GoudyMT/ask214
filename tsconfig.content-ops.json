@@ -10,11 +10,6 @@
 		// via linkedom (querySelectorAll / childNodes / getAttribute). @types/node coexists with dom cleanly.
 		"lib": ["esnext", "dom", "dom.iterable"],
 		"types": ["node"],
-		// The .mjs orchestrators import a few src/lib units that use the $lib alias; map it so the graph resolves.
-		"paths": {
-			"$lib": ["./src/lib"],
-			"$lib/*": ["./src/lib/*"]
-		},
 		"allowJs": true,
 		"checkJs": true,
 		"strict": true,

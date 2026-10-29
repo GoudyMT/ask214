@@ -1,4 +1,4 @@
-import { documentSourceId } from '$lib/ask/asset-cache';
+import { documentSourceId } from '#lib/ask/asset-cache.js';
 
 export type DocumentState = 'saved' | 'updated' | 'unsaved';
 
