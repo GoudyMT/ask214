@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // fails this file loudly.
 const KIT_CONFIG_LOADER = '../../../node_modules/@sveltejs/kit/src/core/config/index.js';
 
-type LoadConfig = () => Promise<{ kit: { version: { name: string } } }>;
+type LoadSvelteConfig = () => Promise<{ kit: { version: { name: string } } }>;
 
 // The build version reaches every hashed file name that leads to it, so a version that changes between builds
 // moves the measured sizes a few bytes. CI and the gate set MEASURE_BUILD=1 to measure with one fixed version. A
@@ -15,10 +15,12 @@ type LoadConfig = () => Promise<{ kit: { version: { name: string } } }>;
 const PROCESS_START_MS = Date.now() - process.uptime() * 1000;
 
 async function twoBuildReads(): Promise<[string, string]> {
-	const { load_config } = (await import(KIT_CONFIG_LOADER)) as { load_config: LoadConfig };
-	const first = (await load_config()).kit.version.name;
+	const { load_svelte_config } = (await import(KIT_CONFIG_LOADER)) as {
+		load_svelte_config: LoadSvelteConfig;
+	};
+	const first = (await load_svelte_config()).kit.version.name;
 	await new Promise((resolve) => setTimeout(resolve, 5));
-	const second = (await load_config()).kit.version.name;
+	const second = (await load_svelte_config()).kit.version.name;
 	return [first, second];
 }
 
