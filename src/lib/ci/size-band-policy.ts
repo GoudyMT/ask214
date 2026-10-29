@@ -60,31 +60,17 @@ export type Change = {
 	measured: number;
 	growth: number;
 	margin: number;
-	/** Bytes past the approved band, applied under the standing allowance and reported rather than asked. */
-	overBand?: number;
 };
 export type Refusal = { line: BudgetLine; need: number; allowed: number; measured: number };
 export type Plan =
 	{ ok: true; changes: Change[] } | { ok: false; changes: []; refusals: Refusal[] };
 
 /**
- * The room a limit keeps above its measured size: 10% of the growth or 40 B, whichever is larger.
- *
- * 40 B because builds of the same code differ by up to ~25 B between commits (a time-stamped chunk renames every
- * file that imports it), so a smaller room fails CI on noise.
+ * The room a limit keeps above its measured size: 10% of the growth, rounded up. Measured builds carry one fixed
+ * version, so the same code measures the same bytes and no room is kept for build-to-build noise.
  */
 export function marginFor(growth: number): number {
-	return Math.max(40, Math.ceil(Math.max(0, growth) * 0.1));
-}
-
-/**
- * How far past its band a line may go and still be applied without asking (the owner's standing allowance): 50 B, or
- * 10% of the band when that is larger. A band is asked from two builds, and the same code has measured up to ~30 B
- * apart between builds, so an overrun this small is build drift, not new code; it is applied and reported. A line
- * with no band gets none, and the end check lowers whatever room is left, so the allowance cannot pile up.
- */
-export function allowanceFor(raise: number): number {
-	return Math.max(50, Math.ceil(raise * 0.1));
+	return Math.ceil(Math.max(0, growth) * 0.1);
 }
 
 /** Each line's largest size across several builds of the same code, so a lucky small build never sets a limit. */
@@ -146,9 +132,8 @@ export function planApply(band: Band, measured: Sizes, current: Sizes): Plan {
 		// A line the band does not list may not rise at all - not even back to where it stood at approval.
 		const allowed = raise > 0 ? band.limit[line] + raise : current[line];
 		const change = { line, from: current[line], to: need, measured: size, growth, margin };
+		// Every byte past the band is new code: the owner is asked, from the measurement.
 		if (need <= allowed) changes.push(change);
-		else if (raise > 0 && need <= allowed + allowanceFor(raise))
-			changes.push({ ...change, overBand: need - allowed });
 		else refusals.push({ line, need, allowed, measured: size });
 	}
 	return refuseOrChange({ changes, refusals });
@@ -175,15 +160,9 @@ export function planFinal(band: Band, measured: Sizes, current: Sizes): Plan {
 	return refuseOrChange({ changes, refusals });
 }
 
-/** The most two local builds of the same code have been measured apart (41 B; CI's spread was ~25 B). */
-const DRIFT_BYTES = 40;
-
-/**
- * The raise to re-request for a refused line: what this build needs over the approved limit, plus the drift the next
- * build may add, rounded up to 10 B. A band set at exactly the measured need fails the next build on drift alone.
- */
+/** The raise to re-request for a refused line: what this build needs over the approved limit, rounded up to 10 B. */
 export function suggestRaise(band: Band, refusal: Refusal): number {
-	return Math.ceil((refusal.need - band.limit[refusal.line] + DRIFT_BYTES) / 10) * 10;
+	return Math.ceil((refusal.need - band.limit[refusal.line]) / 10) * 10;
 }
 
 const RECORD_ANCHOR =
@@ -254,10 +233,7 @@ export function rewriteLimits(
 	const lines = changes.map(
 		(c) =>
 			`//   ${record.date} ${record.reason}: ${c.line} ${grouped(c.from, ',')} -> ${grouped(c.to, ',')} ` +
-			`(measured ${grouped(c.measured, ',')} B, ${c.growth >= 0 ? '+' : ''}${grouped(c.growth, ',')} B on the plan's base, margin ${c.margin} B` +
-			(c.overBand === undefined
-				? ').'
-				: `; ${c.overBand} B past the band, under the standing allowance).`)
+			`(measured ${grouped(c.measured, ',')} B, ${c.growth >= 0 ? '+' : ''}${grouped(c.growth, ',')} B on the plan's base, margin ${c.margin} B).`
 	);
 	if (lines.length > 0)
 		nextScript = nextScript.replace(
