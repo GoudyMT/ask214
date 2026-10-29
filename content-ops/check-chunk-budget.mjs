@@ -502,12 +502,12 @@ const STATIC = 'static';
 //   2026-10-29 vite 8.3 output: the worker bundle and every route node grew with no app code change: workerScripts 147,200 -> 147,316 (measured 147,294 B, +217 B on the plan's base, margin 22 B).
 //   2026-10-29 vite 8.3 output: the worker bundle and every route node grew with no app code change: routeNodes 59,865 -> 59,869 (measured 59,863 B, +57 B on the plan's base, margin 6 B).
 //
-//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; no app code change (owner's call): precacheFiles 80 -> 87 (measured 86 files: the kit's split runtime and its new payload entry; margin 1).
+//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; app code changed only by the API renames it forced (owner's call): precacheFiles 80 -> 87 (measured 86 files: the kit's split runtime and its new payload entry; margin 1).
 //
-//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; no app code change: page 104,520 -> 110,821 (measured 110,244 B, +5,769 B on the plan's base, margin 577 B).
-//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; no app code change: onDemand 16,137 -> 16,138 (measured 16,133 B, +42 B on the plan's base, margin 5 B).
-//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; no app code change: precacheBytes 254,089 -> 260,480 (measured 259,894 B, +5,851 B on the plan's base, margin 586 B).
-//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; no app code change: routeNodes 59,869 -> 60,224 (measured 60,191 B, +328 B on the plan's base, margin 33 B).
+//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; app code changed only by the API renames it forced: page 104,520 -> 110,821 (measured 110,244 B, +5,769 B on the plan's base, margin 577 B).
+//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; app code changed only by the API renames it forced: onDemand 16,137 -> 16,138 (measured 16,133 B, +42 B on the plan's base, margin 5 B).
+//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; app code changed only by the API renames it forced: precacheBytes 254,089 -> 260,480 (measured 259,894 B, +5,851 B on the plan's base, margin 586 B).
+//   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; app code changed only by the API renames it forced: routeNodes 59,869 -> 60,224 (measured 60,191 B, +328 B on the plan's base, margin 33 B).
 //
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
