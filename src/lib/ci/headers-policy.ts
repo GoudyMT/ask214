@@ -48,19 +48,22 @@ export function parseHeadersFile(content: string): Map<string, Record<string, st
  * The headers `_headers` gives one path: every block whose path matches it, in file order.
  *
  * A block path ending in `/*` matches everything under its folder (`/*` matches every path); any other block path
- * matches only itself. This is the subset of Cloudflare's matching the file uses.
+ * matches only itself. This is the subset of Cloudflare's matching the file uses. The path is decoded first, as
+ * SvelteKit decodes it to pick the route (`%25` stays escaped), so an escaped spelling of a page gets that page's
+ * headers.
  *
  * Args:
  *   rules: the parsed file, from parseHeadersFile.
- *   pathname: the request's path, e.g. '/settings/backup'.
+ *   rawPathname: the request's path as sent, e.g. '/settings/backup'.
  *
  * Returns:
  *   The merged headers; a later block's value wins over an earlier one's.
  */
 export function headersFor(
 	rules: Map<string, Record<string, string>>,
-	pathname: string
+	rawPathname: string
 ): Record<string, string> {
+	const pathname = rawPathname.split('%25').map(decodeURI).join('%25');
 	const merged: Record<string, string> = {};
 	for (const [path, headers] of rules) {
 		const matches = path.endsWith('/*')

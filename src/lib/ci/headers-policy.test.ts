@@ -31,6 +31,12 @@ describe('headersFor', () => {
 		expect(headersFor(rules, '/settingsx')['Cache-Control']).toBeUndefined();
 		expect(headersFor(rules, '/docs')['X-Robots-Tag']).toBeUndefined();
 	});
+
+	// SvelteKit routes on the decoded path, so `/%73ettings` draws the settings page and must get its headers too.
+	it('matches a path written with escapes the way the router reads it', () => {
+		expect(headersFor(rules, '/%73ettings')['Cache-Control']).toBe('no-store');
+		expect(headersFor(rules, '/%73ettings/backup')['Cache-Control']).toBe('no-store');
+	});
 });
 
 describe('_headers policy (P1b)', () => {
