@@ -93,6 +93,13 @@ describe('the Cache API and the origin-private file system stay closed to app co
 		expect(await ruleIds(code, 'src/lib/planted/cache.ts')).toContain(rule);
 	});
 
+	// The worker's exemption names its one file, not its folder: anything added beside it is app source.
+	it('flags the Cache API in a new file beside the service worker', async () => {
+		expect(await ruleIds('await caches.open("c");', 'src/service-worker/planted.ts')).toContain(
+			'no-restricted-globals'
+		);
+	});
+
 	it('flags the Cache API in a Svelte template', async () => {
 		const code = '<button onclick={() => caches.delete("c")}>Clear</button>\n';
 		expect(await ruleIds(code, 'src/lib/components/EaosInput.svelte')).toContain(
