@@ -51,14 +51,9 @@ const harness = vi.hoisted(() => ({
 }));
 
 // A client navigation cannot run in the test page; the page's request to go to Settings is recorded instead. The mock
-// stands alone, with the two hooks the drawn pages register as no-ops: importing the real module in this runner never
-// settles, and the whole file then hangs.
+// stands alone: built over the real module with importOriginal, it hung the whole file in this runner.
 const nav = vi.hoisted(() => ({ goto: vi.fn<(url: string) => Promise<void>>(async () => {}) }));
-vi.mock('$app/navigation', () => ({
-	goto: nav.goto,
-	afterNavigate: () => {},
-	beforeNavigate: () => {}
-}));
+vi.mock('$app/navigation', () => ({ goto: nav.goto }));
 vi.mock('#lib/db/schema.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('#lib/db/schema.js')>();
 	return {

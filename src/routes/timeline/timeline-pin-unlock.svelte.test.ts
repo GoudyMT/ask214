@@ -6,7 +6,7 @@ import { captureBackupIntent, markBackupIntent } from '#lib/backup/intent.js';
 import { backupSession } from '#lib/backup/session.svelte.js';
 
 // A client navigation cannot run in the test page; the page's request to go to Settings is recorded instead. The mock
-// stands alone: importing the real module in this runner never settles, and the whole file then hangs.
+// stands alone: built over the real module with importOriginal, it hung the whole file in this runner.
 const nav = vi.hoisted(() => ({ goto: vi.fn<(url: string) => Promise<void>>(async () => {}) }));
 vi.mock('$app/navigation', () => ({ goto: nav.goto }));
 
