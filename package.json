@@ -6,7 +6,7 @@
 	"type": "module",
 	"packageManager": "pnpm@11.2.2",
 	"engines": {
-		"node": ">=22.13"
+		"node": ">=22.22.1"
 	},
 	"scripts": {
 		"dev": "vite dev",
