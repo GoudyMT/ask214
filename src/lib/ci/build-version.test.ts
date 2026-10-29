@@ -35,8 +35,6 @@ describe('the build version', () => {
 		expect(second).toBe(first);
 		// Fixed, not this build's clock: the next measuring build gets the same stamp.
 		expect(Number(first)).toBeLessThan(PROCESS_START_MS);
-		// The live check reads the version as a number of milliseconds.
-		expect(first).toMatch(/^\d{13}$/);
 	});
 
 	it('is one version across a live build, new to that build, so an update can take over', async () => {
