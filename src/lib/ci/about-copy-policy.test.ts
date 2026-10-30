@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 
 // The About page tells a first-time reader what the app is, so its claims must match the shipped reality.
 // The corpus is built and every answer cites its source, so the page must not promise a source list as
-// future work, and must state the sources honestly: public US-gov work, cited on each answer.
+// future work, and must state the sources honestly: public documents published by US Government agencies, cited
+// on each answer.
 describe('About page sources copy is honest', () => {
 	// Collapse whitespace so the assertions match regardless of how the markup is line-wrapped.
 	const about = readFileSync(
@@ -17,9 +18,15 @@ describe('About page sources copy is honest', () => {
 	});
 
 	it('states the source provenance and that answers cite their sources', () => {
-		expect(about).toMatch(/public US Government work/i);
-		expect(about).toMatch(/17 USC/i);
+		expect(about).toMatch(/public documents published by US Government agencies/i);
 		expect(about).toMatch(/cite/i);
+	});
+
+	// Three TAP guides show contractor work and their rights are not settled, so the page must not tell a reader
+	// that every answer is US Government work under 17 USC 105.
+	it('does not claim every answer is US Government work under 17 USC 105', () => {
+		expect(about).not.toMatch(/drawn from public US Government work/i);
+		expect(about).not.toMatch(/17 USC/i);
 	});
 
 	it('does not imply an opt-in analytics feature (zero telemetry is built, not deferred)', () => {

@@ -509,6 +509,8 @@ const STATIC = 'static';
 //   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; app code changed only by the API renames it forced: precacheBytes 254,089 -> 260,480 (measured 259,894 B, +5,851 B on the plan's base, margin 586 B).
 //   2026-10-29 SvelteKit 3 and adapter-cloudflare 8 runtime; app code changed only by the API renames it forced: routeNodes 59,869 -> 60,224 (measured 60,191 B, +328 B on the plan's base, margin 33 B).
 //
+//   2026-10-30 the About page's TAP contractor credit line: routeNodes 60,224 -> 60,273 (measured 60,268 B, +44 B on the plan's base, margin 5 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 110_821,

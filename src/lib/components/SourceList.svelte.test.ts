@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { page } from 'vitest/browser';
 import SourceList from './SourceList.svelte';
 import type { SourcesIndex } from '#lib/sources/types.js';
+import { SOURCES_INDEX } from '#lib/sources/sources-index.data.js';
 
 const INDEX: SourcesIndex = {
 	agency: [
@@ -63,6 +64,27 @@ describe('SourceList', () => {
 			a.textContent?.includes('TAP - Guide One')
 		);
 		expect(asLink).toBe(false);
+	});
+
+	// Contractors whose work the guide files show are credited by name, in the TAP section, without claiming they
+	// wrote the text.
+	it('credits the contractors whose work the TAP guide files show', async () => {
+		const { container } = await render(SourceList, { props: { index: INDEX } });
+		const tap = container.querySelector('section[aria-labelledby="src-tap"]');
+		expect(tap?.textContent?.replace(/\s+/g, ' ') ?? '').toContain(
+			'The files of three guides show design work by agency contractors: Serco on the two DOL employment guides, and Cathexis on the VA Benefits and Services guide.'
+		);
+	});
+
+	// The credit line names guides by hand; if one leaves the shipped index, the line is wrong and must change with it.
+	it('names only guides the shipped index still lists', () => {
+		const titles = SOURCES_INDEX.tapGuides.map((g) => g.title);
+		for (const credited of [
+			'TAP - DOL Employment Fundamentals of Career Transition (EFCT) Participant Guide',
+			'TAP - DOL Employment Workshop Participant Guide',
+			'TAP - VA Benefits and Services Participant Guide'
+		])
+			expect(titles).toContain(credited);
 	});
 
 	// A source title is a printed name and can carry one long unbroken word; on a 320 px phone it must wrap inside

@@ -399,14 +399,14 @@
   url: 'https://www.tapevents.mil/resources/documents'
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/VA-Benefits-Participant-Guide.pdf'
   origin: 'VA (TAP curriculum)'
-  copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
+  copyright_status: us_government_work_claimed_open
+  legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
-  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
-  terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
+  license_notes: "17 USC 105 claimed - VA-published; no copyright notice (S29 and 2026-10-30 scans). OPEN: placed artwork links point to Cathexis (contractor) curriculum design folders; VA asked in writing who holds rights in the text (ADR-030). Served on the owner's decision while open, not on an agency clearance; a restricted answer pulls it. Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution."
+  terms_reviewed_date: 2026-10-30
+  terms_notes: 'Public TAP doc on tapevents.mil; VA-published, contractor-assisted (Cathexis design folder paths in placed artwork links); no copyright notice on the document; stock-image rights metadata only (2026-10-30 review, ADR-030). File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -431,7 +431,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Financial_Planning_Transition.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published. File: Financial_Planning_Transition.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -456,7 +456,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (DoD/DHS); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (DoD + DHS). File: Pre_Separation_Counseling_Resource_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (DoD + DHS). File: Pre_Separation_Counseling_Resource_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -481,7 +481,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Transition.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published. File: Managing_Your_Transition.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -506,7 +506,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. References MilGears (DoD tool).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MOC_Crosswalk.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published. File: MOC_Crosswalk.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -531,7 +531,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: Managing_Your_Education.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published. File: Managing_Your_Education.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -549,14 +549,14 @@
   url: 'https://www.tapevents.mil/resources/documents'
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/DOL-1-Day-EFCT.pdf'
   origin: 'DOL (TAP curriculum)'
-  copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
+  copyright_status: us_government_work_claimed_open
+  legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
-  license_notes: '17 USC 105 - US Government work (DOL); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
-  terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (DOL). File: DOL-1-Day-EFCT.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DOL.'
+  license_notes: "17 USC 105 claimed - DOL names itself author; no copyright notice (S29 and 2026-10-30 scans). Served on the owner's decision while open, not on an agency clearance; a restricted answer pulls it. OPEN: two embedded images carry metadata naming Serco-NA (DOL TAP contractor) as company and two Serco staff as creators, while the document metadata names DOL; DOL asked in writing who holds rights in the text (ADR-030). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution."
+  terms_reviewed_date: 2026-10-30
+  terms_notes: 'Public TAP doc on tapevents.mil; DOL-published, contractor-assisted (Serco-NA in embedded image metadata). File: DOL-1-Day-EFCT.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DOL.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -574,14 +574,14 @@
   url: 'https://www.tapevents.mil/resources/documents'
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/Employment-Track-DOL-Employment-Workshop.pdf'
   origin: 'DOL (TAP curriculum)'
-  copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
+  copyright_status: us_government_work_claimed_open
+  legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
-  license_notes: '17 USC 105 - US Government work (DOL); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
-  terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (DOL). File: Employment-Track-DOL-Employment-Workshop.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DOL.'
+  license_notes: "17 USC 105 claimed - DOL names itself author; no copyright notice (S29 and 2026-10-30 scans). Served on the owner's decision while open, not on an agency clearance; a restricted answer pulls it. OPEN: its photo links point to a Serco (DOL TAP contractor) staff folder; DOL asked in writing who holds rights in the text (ADR-030). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution."
+  terms_reviewed_date: 2026-10-30
+  terms_notes: 'Public TAP doc on tapevents.mil; DOL-published, contractor-assisted (Serco staff paths in file metadata). File: Employment-Track-DOL-Employment-Workshop.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DOL.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -606,7 +606,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: VA_WHTT_ParticipantHandbook.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: VA_WHTT_ParticipantHandbook.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -631,7 +631,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (interagency/DoD); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. A curated directory of official .gov/.mil links.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: TAP_Interagency_Website_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published. File: TAP_Interagency_Website_Guide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -656,7 +656,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide (curated links + overview).'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-VA101.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: MLC-VA101.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -681,7 +681,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-DC.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: MLC-DC.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -706,7 +706,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-EDBEN.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: MLC-EDBEN.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -731,7 +731,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-EDSDC.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: MLC-EDSDC.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -756,7 +756,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-HLGP.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: MLC-HLGP.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -781,7 +781,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-LIB.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: MLC-LIB.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -806,7 +806,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MLC-MHF.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published. File: MLC-MHF.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -831,7 +831,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored. File: MLC-Reserve_Component_Dual.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published. File: MLC-Reserve_Component_Dual.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -856,7 +856,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: MLC-VETCEN.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: MLC-VETCEN.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -881,7 +881,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: VA_MLC_OTH_ReferenceGuide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: VA_MLC_OTH_ReferenceGuide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
@@ -906,7 +906,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; federal-authored (VA). File: VA_MLC_RNG_ResourceGuide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
+  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published (VA). File: VA_MLC_RNG_ResourceGuide.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by VA.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21

@@ -61,6 +61,10 @@
 				</li>
 			{/each}
 		</ul>
+		<p class="tap-note tap-credit">
+			The files of three guides show design work by agency contractors: Serco on the two DOL
+			employment guides, and Cathexis on the VA Benefits and Services guide.
+		</p>
 	</section>
 </div>
 
@@ -119,6 +123,10 @@
 		font-size: var(--font-size-s);
 		color: var(--color-fg-muted);
 		margin: 0 0 var(--space-s);
+	}
+
+	.tap-credit {
+		margin: var(--space-s) 0 0;
 	}
 
 	.tap-open {
