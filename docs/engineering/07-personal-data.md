@@ -27,7 +27,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 
 ### What is stored, and where
 
-**What it is.** The profile holds the separation date (EAOS) and, optionally, rate, rank, years of service,
+**What it is.** The profile holds the separation date and, optionally, rate, rank, years of service,
 anticipated disability rating, family status, intended path, destination, special situations, and SkillBridge
 and terminal leave start dates. Beside it are the timeline's task statuses, snooze dates and notes, among them
 the answer to the SkillBridge question, the calendar choices, the SkillBridge finder's answers (a ZIP or a state,

@@ -131,11 +131,11 @@ pnpm lint       # Prettier + ESLint
 
 ## Project status
 
-Ask 214 has been live at [ask214.com](https://ask214.com) since August 28, 2026. Version 1 focuses on one
-persona done well: Navy active-duty enlisted members separating at the end of their service. Each release
-and what it changed is listed on the [Releases](https://github.com/GoudyMT/ask214/releases) page. Later
-versions expand to additional branches and components, a deeper SkillBridge module, and a curated
-peer-story layer.
+Ask 214 has been live at [ask214.com](https://ask214.com) since August 28, 2026. It serves
+service members of every branch, officer and enlisted, separating from active duty at the end of their
+service. Each release and what it changed is listed on the
+[Releases](https://github.com/GoudyMT/ask214/releases) page. Later versions add Reserve, Guard, retirement and
+medical-separation paths, a deeper SkillBridge module, and a curated peer-story layer.
 
 ---
 
