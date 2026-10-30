@@ -24,9 +24,7 @@
 		LEAVING_HINT,
 		PAYGRADE_NOTE,
 		ORDER_NOTE,
-		AFTER_SEPARATION,
-		AFTER_SKILLBRIDGE,
-		BEFORE_TERMINAL_LEAVE
+		AFTER_SEPARATION
 	} from '#lib/profile/leaving-copy.js';
 	import {
 		validateEaosAtInput,
@@ -286,18 +284,6 @@
 		if (currentEaos && draft >= currentEaos) {
 			bytes.fill(0);
 			return AFTER_SEPARATION;
-		}
-		// Terminal leave follows SkillBridge (NAVADMIN 160/22 5.e), so a pair out of order or on one day is refused.
-		// Only a used date holds the other back; one on or after separation is not used.
-		const order =
-			field === 'skillbridgeStart'
-				? leaving?.terminalLeaveStart &&
-					draft >= leaving.terminalLeaveStart &&
-					BEFORE_TERMINAL_LEAVE
-				: leaving?.skillbridgeStart && draft <= leaving.skillbridgeStart && AFTER_SKILLBRIDGE;
-		if (order) {
-			bytes.fill(0);
-			return order;
 		}
 		const patch: ProfilePatch =
 			field === 'skillbridgeStart' ? { skillbridgeStart: bytes } : { terminalLeaveStart: bytes };

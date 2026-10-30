@@ -3,12 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
 import { formatTimelineDate } from '#lib/timeline/format-date.js';
-import {
-	AFTER_SEPARATION,
-	AFTER_SKILLBRIDGE,
-	BEFORE_TERMINAL_LEAVE,
-	ORDER_NOTE
-} from '#lib/profile/leaving-copy.js';
+import { AFTER_SEPARATION, ORDER_NOTE } from '#lib/profile/leaving-copy.js';
 
 // Days from the real clock: the page reads each typed date against the separation date and the other leaving date.
 const { isoFromToday, store } = vi.hoisted(() => ({
@@ -94,36 +89,35 @@ async function enter(
 		.click();
 }
 
-describe('Settings, the SkillBridge and terminal leave dates in order', () => {
-	// A terminal leave start typed 11 days before a saved SkillBridge start (Oct 8 against Oct 19), or on its day.
+describe('Settings, the SkillBridge and terminal leave dates in either order', () => {
+	// Some services put SkillBridge before terminal leave and some do not, so the app saves either order: a terminal
+	// leave start typed 11 days before a saved SkillBridge start (Oct 8 against Oct 19), or on its day.
 	it.each([
 		['before', -11],
 		['on', 0]
-	])(
-		'refuses a terminal leave start %s the SkillBridge start, and saves nothing',
-		async (_, offset) => {
-			withLeaving({ skillbridgeStart: isoFromToday(STORED) });
-			await render(SettingsPage);
-			await enter('Terminal leave start', isoFromToday(STORED + offset));
-			await expect.element(page.getByText(AFTER_SKILLBRIDGE)).toBeVisible();
-			expect(store.save).not.toHaveBeenCalled();
-		}
-	);
+	])('saves a terminal leave start %s the SkillBridge start', async (_, offset) => {
+		withLeaving({ skillbridgeStart: isoFromToday(STORED) });
+		await render(SettingsPage);
+		await enter('Terminal leave start', isoFromToday(STORED + offset));
+		await expect.element(page.getByLabelText('Terminal leave start')).not.toBeInTheDocument();
+		expect(store.save.mock.calls.map(([patch]) => Object.keys(patch as object))).toEqual([
+			['terminalLeaveStart']
+		]);
+	});
 
 	// The same pair entered the other way round: terminal leave first, then a SkillBridge start on or after it.
 	it.each([
 		['after', 10],
 		['on', 0]
-	])(
-		'refuses a SkillBridge start %s the terminal leave start, and saves nothing',
-		async (_, offset) => {
-			withLeaving({ terminalLeaveStart: isoFromToday(STORED) });
-			await render(SettingsPage);
-			await enter('SkillBridge start', isoFromToday(STORED + offset));
-			await expect.element(page.getByText(BEFORE_TERMINAL_LEAVE)).toBeVisible();
-			expect(store.save).not.toHaveBeenCalled();
-		}
-	);
+	])('saves a SkillBridge start %s the terminal leave start', async (_, offset) => {
+		withLeaving({ terminalLeaveStart: isoFromToday(STORED) });
+		await render(SettingsPage);
+		await enter('SkillBridge start', isoFromToday(STORED + offset));
+		await expect.element(page.getByLabelText('SkillBridge start')).not.toBeInTheDocument();
+		expect(store.save.mock.calls.map(([patch]) => Object.keys(patch as object))).toEqual([
+			['skillbridgeStart']
+		]);
+	});
 
 	// The range runs back 5 years as well as forward 15, so the message names both ends: a year typo into the past
 	// was told "within about 15 years from today", which it already was.
@@ -136,13 +130,12 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 		expect(store.save).not.toHaveBeenCalled();
 	});
 
-	// A date that breaks both rules gets the separation line: no leaving date can be on or after separation at all.
-	it('refuses a SkillBridge start on separation day and after terminal leave with the separation line', async () => {
+	// No leaving date can be on or after separation, whatever the other date is.
+	it('refuses a SkillBridge start on separation day, and saves nothing', async () => {
 		withLeaving({ terminalLeaveStart: isoFromToday(STORED) });
 		await render(SettingsPage);
 		await enter('SkillBridge start', isoFromToday(SEPARATION));
 		await expect.element(page.getByText(AFTER_SEPARATION)).toBeVisible();
-		expect(page.getByText(BEFORE_TERMINAL_LEAVE).query()).toBeNull();
 		expect(store.save).not.toHaveBeenCalled();
 	});
 
@@ -171,8 +164,7 @@ describe('Settings, the SkillBridge and terminal leave dates in order', () => {
 		expect(store.save).toHaveBeenCalledTimes(1);
 	});
 
-	// A pair stored before the refusal existed, or brought into use when the separation date moved, keeps a note
-	// whenever the refusal would turn it away, so the person can fix it.
+	// A pair with SkillBridge on or after terminal leave keeps a note, so the person checks their service's guidance.
 	it.each([
 		['out of order', -11],
 		['on one day', 0]

@@ -9,5 +9,3 @@ export const PAYGRADE_NOTE =
 export const ORDER_NOTE =
 	"Some services require SkillBridge to come before terminal leave. Check your service's guidance.";
 export const AFTER_SEPARATION = 'This date needs to be before your separation date.';
-export const AFTER_SKILLBRIDGE = 'This date needs to be after your SkillBridge start.';
-export const BEFORE_TERMINAL_LEAVE = 'This date needs to be before your terminal leave start.';

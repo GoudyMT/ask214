@@ -139,7 +139,7 @@ test('a SkillBridge date pulls TAP in and reaches the calendar file, with nothin
 
 // Terminal leave is entered like SkillBridge and leaves the device the same way: never. Settings refuses a SkillBridge
 // start after it, and a start already past is kept. No request may carry a typed date or the day before it.
-test('a terminal leave date, the order refusal and a past date, with nothing sent anywhere', async ({
+test('a terminal leave date, a SkillBridge start after it with the order note, and a past date, with nothing sent anywhere', async ({
 	page,
 	context
 }) => {
@@ -161,9 +161,14 @@ test('a terminal leave date, the order refusal and a past date, with nothing sen
 	await page.goto('/timeline');
 	await expect(page.getByText(`Terminal leave from ${shownDate(TL_IN)}.`)).toBeVisible();
 
+	// Services differ on the order, so a SkillBridge start after terminal leave saves and the note asks the person to
+	// check their service's guidance.
 	await enterSkillBridge(page, isoFromToday(TL_IN + 10));
+	await expect(page.getByLabel('SkillBridge start')).toBeHidden();
 	await expect(
-		page.getByText('This date needs to be before your terminal leave start.')
+		page.getByText(
+			"Some services require SkillBridge to come before terminal leave. Check your service's guidance."
+		)
 	).toBeVisible();
 
 	await enterTerminalLeave(page, isoFromToday(-10));
