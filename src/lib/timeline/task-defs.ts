@@ -266,7 +266,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: 'Schools and employers use it to credit your military training. The JST serves every branch; Air Force members usually use the Community College of the Air Force transcript.'
+		why: 'Schools and employers use it to credit your military training. Air Force members order theirs through Air University instead.'
 	},
 	{
 		id: 'reserve-affiliation',

@@ -309,6 +309,14 @@ describe('firm deadlines match their official sources', () => {
 		expect(at('skillbridge-find')?.why).toContain('DoD approval covers your program dates');
 	});
 
+	// Military OneSource: the JST serves the Army, Marine Corps, Navy and Coast Guard, and "Air Force members should
+	// contact the Air University to order official transcripts". The line points Air Force members there.
+	it('sends Air Force members to Air University for their transcript', () => {
+		expect(at('jst-order')?.why).toBe(
+			'Schools and employers use it to credit your military training. Air Force members order theirs through Air University instead.'
+		);
+	});
+
 	// The locked wording of both steps, in full, so a later edit to any part of it fails here.
 	it('words the SkillBridge steps exactly as approved', () => {
 		expect(at('skillbridge-find')).toMatchObject({
