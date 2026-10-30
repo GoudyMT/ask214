@@ -406,7 +406,7 @@
   redistribution_cleared: true
   license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
   terms_reviewed_date: 2026-06-21
-  terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document; stock-image rights metadata only (2026-10-30 scan, ADR-030); agency-published. File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
+  terms_notes: 'Public TAP doc on tapevents.mil; VA-published, contractor-assisted (Cathexis design folder paths in embedded image metadata); no copyright notice on the document; stock-image rights metadata only (2026-10-30 review, ADR-030). File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
   access: open
   reviewed_by: max
   reviewed_date: 2026-06-21
