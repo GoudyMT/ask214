@@ -38,8 +38,9 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
 /**
  * Task definitions for an active-duty member of any branch, officer or enlisted, separating at the end of service;
  * research-reconciled against current DoD/VA/DoL sources (2024-2026). Each line must stay true for every branch: a
- * rule one service sets (a form, a portal, a deadline) is named as "your service's" step, never as the rule. Timing is anchored to the EAOS; when the profile holds a
- * SkillBridge or terminal leave start, a task's last day comes in to fit before the date it must finish before
+ * rule one service sets (a form, a portal, a deadline) is named as "your service's" step, never as the rule. Timing
+ * is anchored to the separation date; when the profile holds a SkillBridge or terminal leave start, a task's last
+ * day comes in to fit before the date it must finish before
  * (`finishBefore`), and its opening never moves - except a task whose rule counts from the leaving day
  * (`countsFrom`), which moves its whole window.
  *

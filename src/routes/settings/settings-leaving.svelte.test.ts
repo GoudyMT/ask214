@@ -5,7 +5,7 @@ import SettingsPage from './+page.svelte';
 import { formatTimelineDate } from '#lib/timeline/format-date.js';
 import { AFTER_SEPARATION, ORDER_NOTE } from '#lib/profile/leaving-copy.js';
 
-// Days from the real clock: the page reads each typed date against the separation date and the other leaving date.
+// Days from the real clock: the page reads each typed date against the separation date.
 const { isoFromToday, store } = vi.hoisted(() => ({
 	isoFromToday: (days: number) => {
 		const d = new Date();

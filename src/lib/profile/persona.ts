@@ -2,7 +2,7 @@ import type { ProfileV1 } from './types';
 import { parseEaosAtRead, daysUntilSeparation, decodeEaos, type EaosString } from './eaos';
 
 /**
- * The dates a sailor leaves the command before separation (ISO). A stored date on or after separation is not used
+ * The dates a member leaves the command before separation (ISO). A stored date on or after separation is not used
  * - no one leaves the command after they separate - and is reported under `notUsed` so the Timeline can say so.
  */
 export type LeavingDates = {

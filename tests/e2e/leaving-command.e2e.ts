@@ -137,8 +137,8 @@ test('a SkillBridge date pulls TAP in and reaches the calendar file, with nothin
 	}
 });
 
-// Terminal leave is entered like SkillBridge and leaves the device the same way: never. Settings refuses a SkillBridge
-// start after it, and a start already past is kept. No request may carry a typed date or the day before it.
+// Terminal leave is entered like SkillBridge and leaves the device the same way: never. Settings saves a SkillBridge
+// start after it with a note, and a start already past is kept. No request may carry a typed date or the day before it.
 test('a terminal leave date, a SkillBridge start after it with the order note, and a past date, with nothing sent anywhere', async ({
 	page,
 	context
