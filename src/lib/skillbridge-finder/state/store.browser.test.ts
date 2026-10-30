@@ -17,10 +17,10 @@ import { withStores, reqToPromise, type StoreName } from '../../db/schema';
 import type { Listing } from '../contract/listing';
 
 // A passthrough over the cipher that counts decrypts, so a re-read that must not happen can be shown not to. The path is
-// a `$lib` alias on purpose: with a relative path the mock silently never applied to the store's own import in this
+// a `#lib` alias on purpose: with a relative path the mock silently never applied to the store's own import in this
 // browser runner.
 const seams = vi.hoisted(() => ({ decrypts: 0, onEncrypt: null as (() => void) | null }));
-vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
+vi.mock('#lib/crypto/record-crypto.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../../crypto/record-crypto')>();
 	return {
 		...real,

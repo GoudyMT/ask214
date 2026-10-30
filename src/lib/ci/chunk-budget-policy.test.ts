@@ -183,24 +183,25 @@ describe('roomInBytes', () => {
 	});
 });
 
-// The head of a real built service worker, cut to a few entries per list: SvelteKit reads a base path from the
-// worker's own location, then writes its `build` list and its `files` list, each entry prefixed with that base.
-// The template strings after them are the worker's own code - the asset rules' prefixes - and name no asset.
+// The head of a real built service worker, cut to a few entries per list: SvelteKit writes its `immutable` list and
+// its `assets` list as `{path}` objects, each path relative to the site root. The template strings after them are the
+// worker's own code - the asset rules' prefixes - and name no asset.
 const WORKER =
-	'var e=location.pathname.split(`/`).slice(0,-1).join(`/`),' +
-	't=[e+`/_app/immutable/entry/app.CGWxtLHK.js`,e+`/_app/immutable/nodes/0.BBKT8Lpe.js`,' +
-	'e+`/_app/immutable/assets/0.DjlkDVm5.css`],' +
-	'n=[e+`/.well-known/security.txt`,e+`/corpus/corpus-v1.0.2.json`,e+`/docs/tap_dol_efct.6dbd2705.pdf`,' +
-	'e+`/models/Xenova/all-MiniLM-L6-v2/tokenizer_config.json`,e+`/pdf-worker/6.3.289/pdf.min.mjs`,' +
-	'e+`/robots.txt`,e+`/wasm/ort-wasm-simd-threaded.asyncify.wasm`],r=`1790302866627`;' +
-	'function i(e){return e.startsWith(`/models/`)||e.startsWith(`/wasm/`)}';
+	'globalThis.__sveltekit_1395828={base:location.pathname.split(`/`).slice(0,-1).join(`/`),env:{},' +
+	'version:`1793277697344`};var e=(globalThis.__sveltekit_1395828??{}).version,' +
+	't=[{path:`_app/immutable/entry/app.BXyjP7xG.js`},{path:`_app/immutable/nodes/0.kXa9uCp8.js`},' +
+	'{path:`_app/immutable/assets/0.CLo3brv2.css`}],' +
+	'n=[{path:`.well-known/security.txt`},{path:`corpus/corpus-v1.0.2.json`},{path:`docs/tap_dol_efct.6dbd2705.pdf`},' +
+	'{path:`models/Xenova/all-MiniLM-L6-v2/tokenizer_config.json`},{path:`pdf-worker/6.3.289/pdf.min.mjs`},' +
+	'{path:`robots.txt`},{path:`wasm/ort-wasm-simd-threaded.asyncify.wasm`}];' +
+	'function r(e){return e.startsWith(`/models/`)||e.startsWith(`/wasm/`)}';
 
 describe('precachedPaths', () => {
 	it('reads every path the worker lists, build files and static files alike', () => {
 		expect(precachedPaths(WORKER).listed).toEqual([
-			'/_app/immutable/entry/app.CGWxtLHK.js',
-			'/_app/immutable/nodes/0.BBKT8Lpe.js',
-			'/_app/immutable/assets/0.DjlkDVm5.css',
+			'/_app/immutable/entry/app.BXyjP7xG.js',
+			'/_app/immutable/nodes/0.kXa9uCp8.js',
+			'/_app/immutable/assets/0.CLo3brv2.css',
 			'/.well-known/security.txt',
 			'/corpus/corpus-v1.0.2.json',
 			'/docs/tap_dol_efct.6dbd2705.pdf',
@@ -214,26 +215,19 @@ describe('precachedPaths', () => {
 	// The worker downloads its precache at install, for every visitor; the rest it keeps only once fetched.
 	it('keeps for the precache only what the worker installs with, never a lazy asset', () => {
 		expect(precachedPaths(WORKER).precached).toEqual([
-			'/_app/immutable/entry/app.CGWxtLHK.js',
-			'/_app/immutable/nodes/0.BBKT8Lpe.js',
-			'/_app/immutable/assets/0.DjlkDVm5.css',
+			'/_app/immutable/entry/app.BXyjP7xG.js',
+			'/_app/immutable/nodes/0.kXa9uCp8.js',
+			'/_app/immutable/assets/0.CLo3brv2.css',
 			'/.well-known/security.txt',
 			'/robots.txt'
 		]);
 	});
 
-	// The bundler names the base whatever it likes. Only strings prefixed with THAT name are list entries; a path
-	// the worker's own code builds from another value is not an asset.
-	it('reads the base name from the worker itself, and nothing prefixed with another name', () => {
-		const renamed =
-			WORKER.replaceAll('e+`', 'a+`').replace('var e=', 'var a=') + 'o+`/api/retrieve`';
-		expect(precachedPaths(renamed).listed).toEqual(precachedPaths(WORKER).listed);
-	});
-
-	// A worker written in another shape must stop the gate, not read as an empty precache that passes.
-	it('refuses a worker whose base path it cannot find', () => {
+	// A worker written in another shape - the lists SvelteKit 2 wrote, prefixed with a base path - must stop the
+	// gate, not read as an empty precache that passes.
+	it('refuses a worker whose lists it cannot find', () => {
 		expect(() =>
-			precachedPaths('self.addEventListener(`install`,()=>{}),n=[a+`/robots.txt`]')
+			precachedPaths('var e=location.pathname.split(`/`).slice(0,-1).join(`/`),n=[e+`/robots.txt`]')
 		).toThrow('E_PRECACHE_LIST_UNREADABLE');
 	});
 });

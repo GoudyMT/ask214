@@ -1,25 +1,25 @@
 <script lang="ts">
 	import { onDestroy, tick, untrack } from 'svelte';
-	import SettingsDateRow from '$lib/components/SettingsDateRow.svelte';
-	import SkillBridgePlanRow from '$lib/components/SkillBridgePlanRow.svelte';
-	import ThemeControl from '$lib/components/ThemeControl.svelte';
-	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
-	import LockedPanel from '$lib/components/LockedPanel.svelte';
-	import AppLockRow from '$lib/components/AppLockRow.svelte';
-	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
-	import { getProfileApp } from '$lib/profile/context';
-	import { getInstallApp } from '$lib/install/context';
-	import BackupCard, { forgetResult } from '$lib/backup/BackupCard.svelte';
+	import SettingsDateRow from '#lib/components/SettingsDateRow.svelte';
+	import SkillBridgePlanRow from '#lib/components/SkillBridgePlanRow.svelte';
+	import ThemeControl from '#lib/components/ThemeControl.svelte';
+	import InstallPrompt from '#lib/components/InstallPrompt.svelte';
+	import LockedPanel from '#lib/components/LockedPanel.svelte';
+	import AppLockRow from '#lib/components/AppLockRow.svelte';
+	import { loadPinUnlock } from '#lib/components/load-pin-unlock.js';
+	import { getProfileApp } from '#lib/profile/context.js';
+	import { getInstallApp } from '#lib/install/context.js';
+	import BackupCard, { forgetResult } from '#lib/backup/BackupCard.svelte';
 	import {
 		DAMAGED_BACKUP_LINE,
 		LOCKED_AFTER_RESTORE_LINE,
 		RESTORED_UNLOCK_LINE
-	} from '$lib/backup/copy';
-	import { markBackupIntent } from '$lib/backup/intent';
-	import { backupSession } from '$lib/backup/session.svelte';
-	import { eraseEverything } from '$lib/profile/erase';
-	import { eraseCaches } from '$lib/profile/erase-caches';
-	import { OccConflictError, type ProfilePatch } from '$lib/profile/store.svelte';
+	} from '#lib/backup/copy.js';
+	import { markBackupIntent } from '#lib/backup/intent.js';
+	import { backupSession } from '#lib/backup/session.svelte.js';
+	import { eraseEverything } from '#lib/profile/erase.js';
+	import { eraseCaches } from '#lib/profile/erase-caches.js';
+	import { OccConflictError, type ProfilePatch } from '#lib/profile/store.svelte.js';
 	import {
 		LEAVING_HINT,
 		PAYGRADE_NOTE,
@@ -27,34 +27,34 @@
 		AFTER_SEPARATION,
 		AFTER_SKILLBRIDGE,
 		BEFORE_TERMINAL_LEAVE
-	} from '$lib/profile/leaving-copy';
+	} from '#lib/profile/leaving-copy.js';
 	import {
 		validateEaosAtInput,
 		encodeEaos,
 		EaosFormatError,
 		type EaosCause
-	} from '$lib/profile/eaos';
-	import CalendarPanel from '$lib/components/CalendarPanel.svelte';
-	import OnlineAnswersPanel from '$lib/components/OnlineAnswersPanel.svelte';
+	} from '#lib/profile/eaos.js';
+	import CalendarPanel from '#lib/components/CalendarPanel.svelte';
+	import OnlineAnswersPanel from '#lib/components/OnlineAnswersPanel.svelte';
 	import {
 		getDefaultMode,
 		setDefaultMode,
 		isSynthesisEnabled,
 		setSynthesisEnabled
-	} from '$lib/ask/online-prefs';
-	import { handOver } from '$lib/calendar/hand-over';
-	import { panelAccess, timelineAccess } from '$lib/timeline/store-access';
-	import { staleEvents } from '$lib/calendar/handed-over';
-	import { computeDesiredEvents } from '$lib/calendar/desired';
-	import { localTodayIso } from '$lib/timeline/day-math';
-	import { LocalToday } from '$lib/timeline/local-today.svelte';
-	import { readablePlan, type PlanAnswer } from '$lib/timeline/skillbridge-plan';
-	import { savePlanAnswer } from '$lib/timeline/skillbridge-save';
-	import { generateTimeline, TASK_DEFS, type TimelineState } from '$lib/timeline';
+	} from '#lib/ask/online-prefs.js';
+	import { handOver } from '#lib/calendar/hand-over.js';
+	import { panelAccess, timelineAccess } from '#lib/timeline/store-access.js';
+	import { staleEvents } from '#lib/calendar/handed-over.js';
+	import { computeDesiredEvents } from '#lib/calendar/desired.js';
+	import { localTodayIso } from '#lib/timeline/day-math.js';
+	import { LocalToday } from '#lib/timeline/local-today.svelte.js';
+	import { readablePlan, type PlanAnswer } from '#lib/timeline/skillbridge-plan.js';
+	import { savePlanAnswer } from '#lib/timeline/skillbridge-save.js';
+	import { generateTimeline, TASK_DEFS, type TimelineState } from '#lib/timeline/index.js';
 	import { resolve } from '$app/paths';
-	import { documentStates } from '$lib/sources/document-states';
-	import { LOCAL_DOCUMENT_BYTES, LOCAL_DOCUMENTS } from '$lib/sources/local-documents.data';
-	import { heldBytes, listCachedDocuments, stopSaves } from '$lib/sources/document-cache';
+	import { documentStates } from '#lib/sources/document-states.js';
+	import { LOCAL_DOCUMENT_BYTES, LOCAL_DOCUMENTS } from '#lib/sources/local-documents.data.js';
+	import { heldBytes, listCachedDocuments, stopSaves } from '#lib/sources/document-cache.js';
 
 	const app = getProfileApp();
 	const install = getInstallApp();
@@ -451,7 +451,7 @@
 				reload: () => {
 					if (thenRestore) {
 						try {
-							markBackupIntent('restore-row', resolve('/wizard'));
+							markBackupIntent('restore-row', resolve('wizard'));
 						} catch {
 							// The data is already gone, so the reload goes on and the setup screen opens at its start.
 						}
@@ -567,7 +567,7 @@
 						? `, plus ${older.count} older ${older.count === 1 ? 'copy' : 'copies'}${older.bytes === null ? '' : ` (${(older.bytes / 1e6).toFixed(1)} MB)`}`
 						: ''}</span
 				>
-				<a class="documents-manage" href={resolve('/documents')}>Manage documents</a>
+				<a class="documents-manage" href={resolve('documents')}>Manage documents</a>
 			</div>
 			<p class="settings-hint">
 				Read the official guides behind the answers, and choose which stay on this device.

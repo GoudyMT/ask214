@@ -1,8 +1,8 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import ResourceList from './ResourceList.svelte';
-import { RESOURCES, type Resource } from '$lib/resources';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { RESOURCES, type Resource } from '#lib/resources/index.js';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 const FIXTURE: Resource[] = [
 	{

@@ -308,6 +308,12 @@ describe('keptOnFetch (what the worker keeps from a response it passes through)'
 		expect(keptOnFetch('/docs/tap_dol_employment_workshop.99c9fb99.pdf')).toBe(false);
 	});
 
+	// SvelteKit asks for the version file each time the app comes back into view. A copy kept by an older worker can
+	// name a newer release, and served offline it would tell that older page an update is out.
+	it('keeps no copy of the version file', () => {
+		expect(keptOnFetch('/_app/version.json')).toBe(false);
+	});
+
 	it('keeps the model, the wasm, the corpus, the pdf library and the app shell', () => {
 		expect(keptOnFetch('/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx')).toBe(true);
 		expect(keptOnFetch('/wasm/ort-wasm-simd-threaded.asyncify.wasm')).toBe(true);

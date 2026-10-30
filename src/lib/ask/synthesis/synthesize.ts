@@ -10,8 +10,8 @@ import { checkNumericGrounding } from './grounding';
 import { mentionsCrisisLine, mentionsOfficialFallback } from '../crisis/contacts';
 import { toCitedAnswer, type Citation, type CitedAnswer } from './cited-answer';
 import { assertOnlyKeys } from '../online/payload';
-import { cleanExcerpt } from '$lib/corpus';
-import { documentUrl } from '$lib/sources/document-url';
+import { cleanExcerpt } from '#lib/corpus/index.js';
+import { documentUrl } from '#lib/sources/document-url.js';
 import type { FetchLike } from '../online/retrieve-online';
 
 /** A retrieved chunk: the text the model reads plus the fields a rendered citation is built from. */

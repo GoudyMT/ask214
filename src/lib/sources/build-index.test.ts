@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { SourceEntry } from '$lib/content-ops/sources-schema';
+import type { SourceEntry } from '#lib/content-ops/sources-schema.js';
 import { buildSourcesIndex } from './build-index';
 
 // A full SourceEntry with sane defaults; override per case. The internal fields below (content_hash,

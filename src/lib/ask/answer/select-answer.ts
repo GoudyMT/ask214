@@ -1,4 +1,4 @@
-import { splitSentences } from '$lib/content-ops/chunk/sentences';
+import { splitSentences } from '#lib/content-ops/chunk/sentences.js';
 
 // The answer surface shown above the result cards. It emits the OPENING sentences of the chosen chunk,
 // whole, up to 120 words.

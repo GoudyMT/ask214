@@ -31,7 +31,7 @@ describe('mtc/encrypted-store-registry', () => {
 		expect(() =>
 			ruleTester.run('encrypted-store-registry', rule, {
 				valid: [
-					{ code: "import { ENCRYPTED_STORES } from '$lib/db/registry';" },
+					{ code: "import { ENCRYPTED_STORES } from '#lib/db/registry';" },
 					// Unencrypted stores (signed sidecars, keys) are not gated.
 					{ code: "tx.objectStore('profile-hwm').put(sidecar);" },
 					{ code: "tx.objectStore('timeline-state-hwm').put(sidecar);" },

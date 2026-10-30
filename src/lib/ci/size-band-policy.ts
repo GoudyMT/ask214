@@ -16,7 +16,7 @@ export const BUDGET_LINES = [
 export type BudgetLine = (typeof BUDGET_LINES)[number];
 export type Sizes = Record<BudgetLine, number>;
 
-/** A count, not bytes: a byte margin means nothing for it, so the script never raises or lowers it. */
+/** A count, not bytes: a byte margin means nothing for it, so a band that lists it moves it to the count exactly. */
 const COUNT_LINES: ReadonlySet<BudgetLine> = new Set(['precacheFiles']);
 
 /**
@@ -98,7 +98,7 @@ export function parseBand(value: unknown): Band {
 		for (const line of BUDGET_LINES) if (!whole(band[key]?.[line])) fail();
 	for (const [line, bytes] of Object.entries(band.raise ?? fail())) {
 		const known = (BUDGET_LINES as readonly string[]).includes(line);
-		if (!known || COUNT_LINES.has(line as BudgetLine) || !whole(bytes)) fail();
+		if (!known || !whole(bytes)) fail();
 	}
 	return band;
 }
@@ -110,31 +110,30 @@ function refuseOrChange(plan: { changes: Change[]; refusals: Refusal[] }): Plan 
 }
 
 /**
- * The raise for this build: each line over (or within its margin of) its limit goes to its size plus the margin,
- * when that fits the band. One line past its band refuses the whole plan, so nothing is written that a re-request
- * from the measurement would have to undo.
+ * The raise for this build. A band line goes to its size plus the margin, written only as far as its band reaches:
+ * the margin is room above the measurement, not part of what was approved. A count line in the band goes to the
+ * measured count exactly. A line the band does not list keeps its limit while it fits. Only a measured size past
+ * what the line may reach is refused, and one refusal refuses the whole plan, so nothing is written that a
+ * re-request from the measurement would have to undo.
  */
 export function planApply(band: Band, measured: Sizes, current: Sizes): Plan {
 	const changes: Change[] = [];
 	const refusals: Refusal[] = [];
 	for (const line of BUDGET_LINES) {
 		const size = measured[line];
-		if (COUNT_LINES.has(line)) {
-			if (size > current[line])
-				refusals.push({ line, need: size, allowed: current[line], measured: size });
-			continue;
-		}
 		const growth = size - band.base[line];
-		const margin = marginFor(growth);
-		const need = size + margin;
-		if (need <= current[line]) continue;
+		const margin = COUNT_LINES.has(line) ? 0 : marginFor(growth);
 		const raise = band.raise[line] ?? 0;
 		// A line the band does not list may not rise at all - not even back to where it stood at approval.
 		const allowed = raise > 0 ? band.limit[line] + raise : current[line];
-		const change = { line, from: current[line], to: need, measured: size, growth, margin };
 		// Every byte past the band is new code: the owner is asked, from the measurement.
-		if (need <= allowed) changes.push(change);
-		else refusals.push({ line, need, allowed, measured: size });
+		if (size > allowed) {
+			refusals.push({ line, need: size + margin, allowed, measured: size });
+			continue;
+		}
+		const to = raise > 0 ? Math.min(size + margin, allowed) : current[line];
+		if (to <= current[line]) continue;
+		changes.push({ line, from: current[line], to, measured: size, growth, margin: to - size });
 	}
 	return refuseOrChange({ changes, refusals });
 }

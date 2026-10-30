@@ -2,8 +2,8 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import StaleEvents from './StaleEvents.svelte';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
-import type { HandedOverEvent } from '$lib/calendar/types';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
+import type { HandedOverEvent } from '#lib/calendar/types.js';
 
 // Two adds on different days, the later one first: only the earliest add date is "since you added it".
 const E: HandedOverEvent[] = [

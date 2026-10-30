@@ -1,8 +1,8 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
-import { LOCKED_AFTER_RESTORE_LINE, RESTORED_UNLOCK_LINE } from '$lib/backup/copy';
-import { backupSession } from '$lib/backup/session.svelte';
+import { LOCKED_AFTER_RESTORE_LINE, RESTORED_UNLOCK_LINE } from '#lib/backup/copy.js';
+import { backupSession } from '#lib/backup/session.svelte.js';
 import SettingsPage from './+page.svelte';
 // The spacing tokens the page's gaps are drawn from.
 import '../../app.css';
@@ -26,7 +26,7 @@ const lock = $state({
 	backupSeams: false,
 	lockState: 'locked' as 'locked' | 'unlocked'
 });
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		get keyMode() {
@@ -86,7 +86,7 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,
@@ -98,8 +98,8 @@ vi.mock('$lib/install/context', () => ({
 }));
 // The check itself is the card's own test; here it only has to end well, with the tries a case says came before it.
 const before = vi.hoisted(() => ({ wrongTries: 0, unfinished: false }));
-vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/keystore/app-lock-store')>()),
+vi.mock('#lib/keystore/app-lock-store.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/keystore/app-lock-store.js')>()),
 	readTries: async () => ({ count: 0, waitMs: 0, pending: false }),
 	runPinCheck: async () => ({ kind: 'good', value: true, ...before })
 }));

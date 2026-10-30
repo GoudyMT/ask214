@@ -196,7 +196,7 @@ export function documentSourceId(pathname: string): string {
  *
  * Args:
  *   pathname: the pathname of a cached entry's request URL
- *   currentAssets: the pathnames this build ships (the service worker's build + files list), which carries
+ *   currentAssets: the pathnames this build ships (the service worker's immutable + assets list), which carries
  *     each namespace's current identity - so no filename or release is hardcoded here and a bump needs no edit
  *
  * Returns:
@@ -231,7 +231,7 @@ export function isSupersededVersionedEntry(
  * @param cache ASK_ASSET_CACHE, to read the held entries from and delete from.
  * @param origin This worker's origin; only entries under it are read, so the pathnames compared with the shipped
  *   list are this app's own.
- * @param shipped The pathnames this build ships (the service worker's build + files list).
+ * @param shipped The pathnames this build ships (the service worker's immutable + assets list).
  */
 export async function pruneSupersededEntries(
 	cache: Pick<Cache, 'keys' | 'delete'>,
@@ -292,7 +292,7 @@ function holdsShippedDocument(cachedPaths: readonly string[], shipped: readonly 
  *
  * Args:
  *   cachedPaths: the same-origin pathnames held in ASK_ASSET_CACHE
- *   shipped: the pathnames this build ships (the service worker's build + files list), which carries the
+ *   shipped: the pathnames this build ships (the service worker's immutable + assets list), which carries the
  *     current release's folder and the sources it still ships - so no release is hardcoded here and a bump needs
  *     no edit
  *
@@ -525,7 +525,9 @@ export async function keepWorkerScripts(
  * Everything it passes is kept, except a source document: viewing a document keeps nothing, and only the
  * user's explicit save puts one on the device (the page writes that copy itself, so a full disk reaches it).
  * A document the worker kept on every view would fill the device with files the user never chose to keep,
- * up to 40 MB, and none of them would show as saved or be removable one by one.
+ * up to 40 MB, and none of them would show as saved or be removable one by one. Nor the app's version file:
+ * SvelteKit asks for it each time the app comes back into view, a copy an older worker kept can name a newer
+ * release, and served offline it would tell that older page an update is out.
  *
  * Args:
  *   pathname: a same-origin request pathname
@@ -534,7 +536,7 @@ export async function keepWorkerScripts(
  *   true when the worker may cache the response.
  */
 export function keptOnFetch(pathname: string): boolean {
-	return !pathname.startsWith('/docs/');
+	return !pathname.startsWith('/docs/') && pathname !== '/_app/version.json';
 }
 
 /**
@@ -664,9 +666,9 @@ export const NETWORK_WAIT_MS = 5_000;
  * Whether a kept copy may answer a request whose network is only silent, not failed.
  *
  * The app's version file is the exception: SvelteKit reads it to learn that a new release is out (and reloads into
- * it after a failed navigation), and a kept copy always names the release that kept it, so served early it would say
- * "no update" while the network was still bringing the answer. It waits for the network; a failed network still gets
- * the kept copy.
+ * it after a failed navigation), and a kept copy would name an older release, so served early it would say "no
+ * update" while the network was still bringing the answer. It waits for the network. The worker no longer keeps the
+ * file (`keptOnFetch`), so this guards only a copy kept before that.
  *
  * @param pathname A same-origin request pathname.
  * @returns False for the version file, true for everything else.

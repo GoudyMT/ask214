@@ -2,35 +2,35 @@ import { createRawSnippet, tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
-import { chooseAnswer, toExtractiveAnswer } from '$lib/ask/answer/answer-view';
-import { detectEligibilityIntent } from '$lib/ask/synthesis/eligibility-gate';
-import type { AskState } from '$lib/ask';
-import { createByokStore } from '$lib/ask/byok/store';
-import { KDF_V1 } from '$lib/backup/kdf-params';
-import { backupSession } from '$lib/backup/session.svelte';
-import { createCalendarSyncStore } from '$lib/calendar/store.svelte';
-import type { ResultCard } from '$lib/corpus';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
-import { reqToPromise, withStores, type StoreName } from '$lib/db/schema';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { readCounter } from '$lib/keystore/app-lock-store';
-import type { KeystoreRecordPin } from '$lib/keystore/record';
-import { rotateToPin } from '$lib/keystore/rotate';
+import { chooseAnswer, toExtractiveAnswer } from '#lib/ask/answer/answer-view.js';
+import { detectEligibilityIntent } from '#lib/ask/synthesis/eligibility-gate.js';
+import type { AskState } from '#lib/ask/index.js';
+import { createByokStore } from '#lib/ask/byok/store.js';
+import { KDF_V1 } from '#lib/backup/kdf-params.js';
+import { backupSession } from '#lib/backup/session.svelte.js';
+import { createCalendarSyncStore } from '#lib/calendar/store.svelte.js';
+import type { ResultCard } from '#lib/corpus/index.js';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
+import { reqToPromise, withStores, type StoreName } from '#lib/db/schema.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { readCounter } from '#lib/keystore/app-lock-store.js';
+import type { KeystoreRecordPin } from '#lib/keystore/record.js';
+import { rotateToPin } from '#lib/keystore/rotate.js';
 import {
 	dropSession,
 	openPinSession,
 	setOnSessionMismatch,
 	setSession
-} from '$lib/keystore/session';
-import type { ProfileApp } from '$lib/profile/context';
-import { encodeEaos, parseEaosAtRead } from '$lib/profile/eaos';
-import { createProfileStore } from '$lib/profile/store.svelte';
-import { cleanListing } from '$lib/skillbridge-finder/fixtures/clean';
-import { createFinderPackStore } from '$lib/skillbridge-finder/state/pack-store.svelte';
-import { createFinderStore } from '$lib/skillbridge-finder/state/store.svelte';
-import { localTodayIso } from '$lib/timeline/day-math';
-import { KNOWN_TASK_IDS } from '$lib/timeline/known-task-ids';
-import { createTimelineStateStore } from '$lib/timeline/state.svelte';
+} from '#lib/keystore/session.js';
+import type { ProfileApp } from '#lib/profile/context.js';
+import { encodeEaos, parseEaosAtRead } from '#lib/profile/eaos.js';
+import { createProfileStore } from '#lib/profile/store.svelte.js';
+import { cleanListing } from '#lib/skillbridge-finder/fixtures/clean.js';
+import { createFinderPackStore } from '#lib/skillbridge-finder/state/pack-store.svelte.js';
+import { createFinderStore } from '#lib/skillbridge-finder/state/store.svelte.js';
+import { localTodayIso } from '#lib/timeline/day-math.js';
+import { KNOWN_TASK_IDS } from '#lib/timeline/known-task-ids.js';
+import { createTimelineStateStore } from '#lib/timeline/state.svelte.js';
 import DocumentsPage from './documents/+page.svelte';
 import HomePage from './+page.svelte';
 import Layout from './+layout.svelte';
@@ -50,22 +50,20 @@ const harness = vi.hoisted(() => ({
 	realAsk: false
 }));
 
-// A client navigation cannot run in the test page; the page's request to go to Settings is recorded instead.
+// A client navigation cannot run in the test page; the page's request to go to Settings is recorded instead. The mock
+// stands alone: built over the real module with importOriginal, it hung the whole file in this runner.
 const nav = vi.hoisted(() => ({ goto: vi.fn<(url: string) => Promise<void>>(async () => {}) }));
-vi.mock('$app/navigation', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$app/navigation')>()),
-	goto: nav.goto
-}));
-vi.mock('$lib/db/schema', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/db/schema')>();
+vi.mock('$app/navigation', () => ({ goto: nav.goto }));
+vi.mock('#lib/db/schema.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/db/schema.js')>();
 	return {
 		...real,
 		openMtcDb: (...args: Parameters<typeof real.openMtcDb>) =>
 			args[0] === undefined ? harness.db : real.openMtcDb(...args)
 	};
 });
-vi.mock('$lib/profile/context', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/context')>();
+vi.mock('#lib/profile/context.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/context.js')>();
 	return {
 		...real,
 		// The layout sets the app; a page drawn beside it reads the same one.
@@ -76,15 +74,15 @@ vi.mock('$lib/profile/context', async (importOriginal) => {
 		getProfileApp: () => harness.app
 	};
 });
-vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/keystore/app-lock-store')>();
+vi.mock('#lib/keystore/app-lock-store.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/keystore/app-lock-store.js')>();
 	return {
 		...real,
 		runPinCheck: ((...args: Parameters<typeof real.runPinCheck>) =>
 			harness.check ? harness.check() : real.runPinCheck(...args)) as typeof real.runPinCheck
 	};
 });
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,
@@ -94,8 +92,8 @@ vi.mock('$lib/install/context', () => ({
 	}),
 	setInstallApp: () => {}
 }));
-vi.mock('$lib/ask', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/ask')>();
+vi.mock('#lib/ask/index.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/ask/index.js')>();
 	return {
 		...real,
 		// The stand-in, or the real store with the answer server replaced: the page's own summary closure, the consent and
@@ -126,10 +124,10 @@ vi.mock('$lib/ask', async (importOriginal) => {
 		createRecoveringEmbed: () => ({ embed: async () => [], dispose: () => {} })
 	};
 });
-vi.mock('$lib/ask/embed-worker?worker', () => ({ default: class {} }));
-vi.mock('$lib/ask/device-files', () => ({ deviceFilesKept: async () => true }));
+vi.mock('#lib/ask/embed-worker?worker', () => ({ default: class {} }));
+vi.mock('#lib/ask/device-files.js', () => ({ deviceFilesKept: async () => true }));
 // No worker controls the test page, so the real wait would last its full time.
-vi.mock('$lib/ask/when-controlled', () => ({ waitForControl: () => Promise.resolve(true) }));
+vi.mock('#lib/ask/when-controlled.js', () => ({ waitForControl: () => Promise.resolve(true) }));
 
 // One distinct string in each encrypted store's plaintext, and one for the typed question.
 const CANARY = {

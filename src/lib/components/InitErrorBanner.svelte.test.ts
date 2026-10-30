@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import InitErrorBanner from './InitErrorBanner.svelte';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 describe('InitErrorBanner', () => {
 	it('says the saved information could not be opened, and offers a reload', async () => {

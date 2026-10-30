@@ -1,4 +1,4 @@
-import type { Block } from '$lib/content-ops/extract/pdf-text';
+import type { Block } from '#lib/content-ops/extract/pdf-text.js';
 
 export type BlockKind = 'content' | 'toc' | 'disclaimer' | 'frontmatter' | 'exercise' | 'chrome';
 

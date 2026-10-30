@@ -16,7 +16,7 @@ const { isoFromToday, current } = vi.hoisted(() => ({
 
 // The profile is unlocked with a separation date and the calendar store has loaded; the timeline store holds statuses
 // from an earlier read, and each test sets whether its last read failed.
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
@@ -37,7 +37,7 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,

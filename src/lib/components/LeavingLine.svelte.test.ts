@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { page } from 'vitest/browser';
 import LeavingLine from './LeavingLine.svelte';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 const show = async (leaving: object | undefined) =>
 	await render(LeavingLine, { props: { leaving: leaving as never } });

@@ -1,15 +1,15 @@
 import { createRawSnippet } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProfileApp } from '$lib/profile/context';
-import type { IdleTimerOptions } from '$lib/profile/idle-timer';
-import { createProfileStore } from '$lib/profile/store.svelte';
-import { signSidecar } from '$lib/profile/sidecars';
-import { createProfileBus, type BusSignal } from '$lib/broadcast/bus';
-import { KDF_V1 } from '$lib/backup/kdf-params';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { bumpCounter, readCounter } from '$lib/keystore/app-lock-store';
-import { signKeystore, type KeystoreRecordPin } from '$lib/keystore/record';
+import type { ProfileApp } from '#lib/profile/context.js';
+import type { IdleTimerOptions } from '#lib/profile/idle-timer.js';
+import { createProfileStore } from '#lib/profile/store.svelte.js';
+import { signSidecar } from '#lib/profile/sidecars.js';
+import { createProfileBus, type BusSignal } from '#lib/broadcast/bus.js';
+import { KDF_V1 } from '#lib/backup/kdf-params.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { bumpCounter, readCounter } from '#lib/keystore/app-lock-store.js';
+import { signKeystore, type KeystoreRecordPin } from '#lib/keystore/record.js';
 import {
 	dropSession,
 	getSession,
@@ -17,13 +17,13 @@ import {
 	openPinSession,
 	setOnSessionMismatch,
 	setSession
-} from '$lib/keystore/session';
-import { takeSnapshot } from '$lib/backup/snapshot';
-import { eraseEverything } from '$lib/profile/erase';
-import { KeystoreHmacMismatchError } from '$lib/keystore/read';
-import { readDeviceState } from '$lib/profile/device-state';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
-import { reqToPromise, withStores, type StoreName } from '$lib/db/schema';
+} from '#lib/keystore/session.js';
+import { takeSnapshot } from '#lib/backup/snapshot.js';
+import { eraseEverything } from '#lib/profile/erase.js';
+import { KeystoreHmacMismatchError } from '#lib/keystore/read.js';
+import { readDeviceState } from '#lib/profile/device-state.js';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
+import { reqToPromise, withStores, type StoreName } from '#lib/db/schema.js';
 import Layout from './+layout.svelte';
 
 // The layout runs the real start-up on a test database with a PIN row, and a real BroadcastChannel carries the peer's
@@ -43,16 +43,16 @@ const harness = vi.hoisted(() => ({
 	timeline: null as { load: () => Promise<void> } | null
 }));
 
-vi.mock('$lib/db/schema', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/db/schema')>();
+vi.mock('#lib/db/schema.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/db/schema.js')>();
 	return {
 		...real,
 		openMtcDb: (...args: Parameters<typeof real.openMtcDb>) =>
 			args[0] === undefined ? harness.db : real.openMtcDb(...args)
 	};
 });
-vi.mock('$lib/profile/context', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/context')>();
+vi.mock('#lib/profile/context.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/context.js')>();
 	return {
 		...real,
 		setProfileApp: (app: ProfileApp) => {
@@ -61,8 +61,8 @@ vi.mock('$lib/profile/context', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('$lib/profile/idle-timer', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/idle-timer')>();
+vi.mock('#lib/profile/idle-timer.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/idle-timer.js')>();
 	return {
 		...real,
 		createIdleTimer: (opts: IdleTimerOptions) => {
@@ -72,8 +72,8 @@ vi.mock('$lib/profile/idle-timer', async (importOriginal) => {
 	};
 });
 // The app container wraps each store in a reactive proxy, which a spy put on it would not reach: the raw store is kept.
-vi.mock('$lib/calendar/store.svelte', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/calendar/store.svelte')>();
+vi.mock('#lib/calendar/store.svelte.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/calendar/store.svelte.js')>();
 	return {
 		...real,
 		createCalendarSyncStore: (...args: Parameters<typeof real.createCalendarSyncStore>) => {
@@ -83,8 +83,8 @@ vi.mock('$lib/calendar/store.svelte', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('$lib/timeline/state.svelte', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/timeline/state.svelte')>();
+vi.mock('#lib/timeline/state.svelte.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/timeline/state.svelte.js')>();
 	return {
 		...real,
 		createTimelineStateStore: (...args: Parameters<typeof real.createTimelineStateStore>) => {
@@ -95,8 +95,8 @@ vi.mock('$lib/timeline/state.svelte', async (importOriginal) => {
 	};
 });
 // The layout is the only caller that passes options, so its store is the one a spy is put on.
-vi.mock('$lib/profile/store.svelte', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/store.svelte')>();
+vi.mock('#lib/profile/store.svelte.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/store.svelte.js')>();
 	return {
 		...real,
 		createProfileStore: (...args: Parameters<typeof real.createProfileStore>) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { SourceEntry } from '$lib/content-ops/sources-schema';
+import type { SourceEntry } from '#lib/content-ops/sources-schema.js';
 import { buildDocumentUrls } from './build-document-urls';
 
 // Same shape as build-index.test.ts: a full SourceEntry with sane defaults, overridden per case.

@@ -2,9 +2,9 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
 import SkillBridgePlanRow from './SkillBridgePlanRow.svelte';
-import type { PlanRead } from '$lib/timeline/skillbridge-plan';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
-import { tokens } from '$lib/styles/tokens';
+import type { PlanRead } from '#lib/timeline/skillbridge-plan.js';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
+import { tokens } from '#lib/styles/tokens.js';
 import { resolve } from '$app/paths';
 
 const plan = (over: Partial<PlanRead> = {}): PlanRead => ({
@@ -420,6 +420,7 @@ describe('SkillBridgePlanRow', () => {
 		const { container } = await render(SkillBridgePlanRow, {
 			props: { plan: plan(), access: 'ready', onSave }
 		});
+
 		await toggle().click();
 		await page.getByRole('radio', { name: 'Yes' }).click();
 		await page.getByRole('button', { name: 'Save' }).click();
@@ -441,6 +442,7 @@ describe('SkillBridgePlanRow', () => {
 		const { container } = await render(SkillBridgePlanRow, {
 			props: { plan: plan(), access: 'ready', onSave }
 		});
+
 		await toggle().click();
 		await page.getByRole('radio', { name: 'Yes' }).click();
 		await page.getByRole('button', { name: 'Save' }).click();
@@ -645,7 +647,7 @@ describe('SkillBridgePlanRow (the states it cannot be changed in)', () => {
 		await expect.element(page.getByText(LOCKED_LINE, { exact: true })).toBeVisible();
 		await expect
 			.element(page.getByRole('link', { name: 'Timeline' }))
-			.toHaveAttribute('href', resolve('/timeline'));
+			.toHaveAttribute('href', resolve('timeline'));
 		expect(container.textContent).not.toContain('could not be loaded');
 	});
 

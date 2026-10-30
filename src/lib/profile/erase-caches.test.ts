@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ASK_ASSET_CACHE } from '$lib/ask/asset-cache';
+import { ASK_ASSET_CACHE } from '#lib/ask/asset-cache.js';
 import { eraseCaches } from './erase-caches';
 
 // Cache Storage in memory: cache name -> pathname -> body.

@@ -41,7 +41,7 @@ describe('every page route is top-level, so the offline fallback page can draw i
 // uncounted.
 describe('the worker installs the pages the budget counts', () => {
 	it('installs INSTALL_PAGES with the precache, and nothing else', () => {
-		const worker = readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8');
+		const worker = readFileSync(join(process.cwd(), 'src/service-worker/index.ts'), 'utf8');
 		expect(worker).toMatch(/cache\.addAll\(\[\.\.\.PRECACHE, \.\.\.INSTALL_PAGES\]\)/);
 		// The one precache call at install (the library restore and the worker script store with put): no second
 		// add, even a commented-out one, beside it.
@@ -62,7 +62,7 @@ describe('the worker does its install and activate work in order', () => {
 	const withoutComments = (source: string) =>
 		source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
 	const worker = withoutComments(
-		readFileSync(join(process.cwd(), 'src/service-worker.ts'), 'utf8')
+		readFileSync(join(process.cwd(), 'src/service-worker/index.ts'), 'utf8')
 	);
 	const assetCache = withoutComments(
 		readFileSync(join(process.cwd(), 'src/lib/ask/asset-cache.ts'), 'utf8')

@@ -2,11 +2,11 @@ import { createRawSnippet, mount, unmount, type Component } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProfileApp } from '$lib/profile/context';
-import { createProfileStore } from '$lib/profile/store.svelte';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
-import { DB_VERSION } from '$lib/db/schema';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
+import type { ProfileApp } from '#lib/profile/context.js';
+import { createProfileStore } from '#lib/profile/store.svelte.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
+import { DB_VERSION } from '#lib/db/schema.js';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
 import Layout from './+layout.svelte';
 import SettingsPage from './settings/+page.svelte';
 import WizardPage from './wizard/+page.svelte';
@@ -22,8 +22,8 @@ const harness = vi.hoisted(() => ({
 	mounted: null as object | null
 }));
 
-vi.mock('$lib/db/schema', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/db/schema')>();
+vi.mock('#lib/db/schema.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/db/schema.js')>();
 	return {
 		...real,
 		openMtcDb: (...args: Parameters<typeof real.openMtcDb>) => {
@@ -34,8 +34,8 @@ vi.mock('$lib/db/schema', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('$lib/profile/context', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/context')>();
+vi.mock('#lib/profile/context.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/context.js')>();
 	return {
 		...real,
 		// The shown page sits outside the layout's component tree, so it reads the app the layout set.
@@ -46,7 +46,7 @@ vi.mock('$lib/profile/context', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,
@@ -57,7 +57,7 @@ vi.mock('$lib/install/context', () => ({
 	setInstallApp: () => {}
 }));
 // No service worker controls the test page, and the wait for one is ten seconds.
-vi.mock('$lib/ask/when-controlled', () => ({ waitForControl: () => Promise.resolve(true) }));
+vi.mock('#lib/ask/when-controlled.js', () => ({ waitForControl: () => Promise.resolve(true) }));
 
 // The page under test is mounted by the layout's own children, so it lives and goes with the layout.
 const children = createRawSnippet(() => ({

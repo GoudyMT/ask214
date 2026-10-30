@@ -1,9 +1,9 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import SettingsPage from './+page.svelte';
-import { ASK_ASSET_CACHE } from '$lib/ask/asset-cache';
-import { LOCAL_DOCUMENTS } from '$lib/sources/local-documents.data';
-import { OccConflictError } from '$lib/profile/store.svelte';
+import { ASK_ASSET_CACHE } from '#lib/ask/asset-cache.js';
+import { LOCAL_DOCUMENTS } from '#lib/sources/local-documents.data.js';
+import { OccConflictError } from '#lib/profile/store.svelte.js';
 import { page } from 'vitest/browser';
 
 // The page reads the app's state from the layout's context. Here the app is ready, with no profile yet, and
@@ -37,11 +37,11 @@ const { app, store } = vi.hoisted(() => ({
 	}
 }));
 
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => app,
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,

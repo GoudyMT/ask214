@@ -1,4 +1,4 @@
-import type { CleanReport } from '$lib/content-ops/clean/clean-extraction';
+import type { CleanReport } from '#lib/content-ops/clean/clean-extraction.js';
 
 export type SourceReview = { sourceId: string; report: CleanReport };
 

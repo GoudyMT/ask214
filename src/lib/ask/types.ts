@@ -1,4 +1,4 @@
-import type { ResultCard } from '$lib/corpus';
+import type { ResultCard } from '#lib/corpus/index.js';
 import type { AskErrorCode } from './errors';
 import type { Rung } from './online/ladder';
 import type { AnswerView } from './answer/answer-view';

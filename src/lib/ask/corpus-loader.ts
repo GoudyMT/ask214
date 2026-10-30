@@ -1,4 +1,4 @@
-import type { Corpus } from '$lib/corpus';
+import type { Corpus } from '#lib/corpus/index.js';
 
 /**
  * A memoized lazy corpus loader. The corpus is fetched once on first call and reused; `onLoaded` fires

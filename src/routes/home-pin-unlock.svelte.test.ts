@@ -4,20 +4,20 @@ import { page } from 'vitest/browser';
 import HomePage from './+page.svelte';
 
 // Home runs the real Ask store; only what leaves the page or needs a worker is replaced, as in the other Home tests.
-vi.mock('$lib/ask', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/ask')>()),
+vi.mock('#lib/ask/index.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/ask/index.js')>()),
 	createRecoveringEmbed: () => ({ embed: async () => [], dispose: () => {} })
 }));
-vi.mock('$lib/ask/embed-worker?worker', () => ({ default: class {} }));
-vi.mock('$lib/ask/device-files', () => ({ deviceFilesKept: async () => true }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/ask/embed-worker?worker', () => ({ default: class {} }));
+vi.mock('#lib/ask/device-files.js', () => ({ deviceFilesKept: async () => true }));
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({ canPrompt: false, installed: true, ios: false, persisted: false }),
 	setInstallApp: () => {}
 }));
 
 // Reactive, as the layout's app object is: the page swaps the card away the moment the unlock lands.
 const lock = $state({ pinLocked: true });
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		keyMode: 'pin',
@@ -40,8 +40,8 @@ vi.mock('$lib/profile/context', () => ({
 }));
 // The check itself is the card's own test; here it only has to end well, with the tries a case says came before it.
 const before = vi.hoisted(() => ({ wrongTries: 0, unfinished: false }));
-vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/keystore/app-lock-store')>()),
+vi.mock('#lib/keystore/app-lock-store.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/keystore/app-lock-store.js')>()),
 	readTries: async () => ({ count: 0, waitMs: 0, pending: false }),
 	runPinCheck: async () => ({ kind: 'good', value: true, ...before })
 }));

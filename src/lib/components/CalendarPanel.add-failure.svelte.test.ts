@@ -2,12 +2,12 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
-import type { TimelineItem } from '$lib/timeline/generate';
-import type { TaskDef } from '$lib/timeline/types';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import type { TimelineItem } from '#lib/timeline/generate.js';
+import type { TaskDef } from '#lib/timeline/types.js';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 // Its own file so the mock reaches no other test: the first build rejects, as a browser that cannot make the file would.
-// The path is a `$lib` alias on purpose: a relative path silently never applies to the component's own import here.
+// The path is a `#lib` alias on purpose: a relative path silently never applies to the component's own import here.
 // A build can also be held: it finishes only once `gate` is open, so a test can look at the page while it runs.
 // `builds` counts the builds started, so a second build is seen at once, not after a wait.
 const seams = vi.hoisted(() => ({
@@ -15,8 +15,8 @@ const seams = vi.hoisted(() => ({
 	gate: null as Promise<void> | null,
 	builds: 0
 }));
-vi.mock('$lib/calendar/build-ics', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/calendar/build-ics')>();
+vi.mock('#lib/calendar/build-ics.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/calendar/build-ics.js')>();
 	return {
 		...real,
 		buildIcs: async (...args: Parameters<typeof real.buildIcs>) => {

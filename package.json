@@ -6,14 +6,14 @@
 	"type": "module",
 	"packageManager": "pnpm@11.2.2",
 	"engines": {
-		"node": ">=22.13"
+		"node": ">=22.22.1"
 	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "husky",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p src/service-worker",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"check:bundle": "size-limit",
 		"check:embed-determinism": "tsx content-ops/check-embed-determinism.mjs",
@@ -81,7 +81,7 @@
 		{
 			"name": "Lazy route nodes (sum; no single page loads all of them)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
-			"limit": "59869 B",
+			"limit": "60224 B",
 			"gzip": true
 		}
 	],
@@ -91,8 +91,9 @@
 		"@lhci/cli": "^0.15.1",
 		"@playwright/test": "1.64.1",
 		"@size-limit/file": "^13.0.3",
-		"@sveltejs/adapter-cloudflare": "^7.2.9",
-		"@sveltejs/kit": "^2.70.3",
+		"@sveltejs/adapter-cloudflare": "^8.0.1",
+		"@sveltejs/kit": "^3.1.0",
+		"@sveltejs/load-config": "^0.2.3",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@types/node": "^26",
 		"@vitejs/plugin-basic-ssl": "^2.3.0",
@@ -110,8 +111,8 @@
 		"prettier": "^3.9.10",
 		"prettier-plugin-svelte": "^4.1.1",
 		"size-limit": "^13.0.3",
-		"svelte": "^5.57.1",
-		"svelte-check": "^4.7.6",
+		"svelte": "^5.57.3",
+		"svelte-check": "^4.7.7",
 		"tsx": "^4.23.15",
 		"typescript": "^6.0.2",
 		"typescript-eslint": "^8.72.0",
@@ -125,5 +126,9 @@
 		"@huggingface/transformers": "^4.2.0",
 		"@noble/hashes": "2.4.0",
 		"pdfjs-dist": "^6.3.289"
+	},
+	"imports": {
+		"#lib": "./src/lib/index.js",
+		"#lib/*": "./src/lib/*"
 	}
 }

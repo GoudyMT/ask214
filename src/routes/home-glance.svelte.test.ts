@@ -1,12 +1,12 @@
 import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import type { AskState } from '$lib/ask';
-import { generateTimeline, TASK_DEFS } from '$lib/timeline';
-import { selectNeedsNow } from '$lib/timeline/needs-now';
-import { addDays, localTodayIso } from '$lib/timeline/day-math';
-import { textOf } from '$lib/timeline/personal-claim';
-import type { EaosString } from '$lib/profile/eaos';
-import type { PersonaFilters } from '$lib/profile/persona';
+import type { AskState } from '#lib/ask/index.js';
+import { generateTimeline, TASK_DEFS } from '#lib/timeline/index.js';
+import { selectNeedsNow } from '#lib/timeline/needs-now.js';
+import { addDays, localTodayIso } from '#lib/timeline/day-math.js';
+import { textOf } from '#lib/timeline/personal-claim.js';
+import type { EaosString } from '#lib/profile/eaos.js';
+import type { PersonaFilters } from '#lib/profile/persona.js';
 import HomePage from './+page.svelte';
 
 // The Ask store is replaced by one the test controls; the cache read that makes it lands at once.
@@ -48,23 +48,23 @@ const app = $state<{
 	replacedNotice: false
 });
 
-vi.mock('$lib/ask', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/ask')>()),
+vi.mock('#lib/ask/index.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/ask/index.js')>()),
 	createAskStore: () => store,
 	createRecoveringEmbed: () => ({ embed: async () => [], dispose: () => {} })
 }));
-vi.mock('$lib/ask/embed-worker?worker', () => ({ default: class {} }));
-vi.mock('$lib/ask/device-files', () => ({ deviceFilesKept: async () => true }));
-vi.mock('$lib/profile/context', () => ({ getProfileApp: () => app, setProfileApp: () => {} }));
+vi.mock('#lib/ask/embed-worker?worker', () => ({ default: class {} }));
+vi.mock('#lib/ask/device-files.js', () => ({ deviceFilesKept: async () => true }));
+vi.mock('#lib/profile/context.js', () => ({ getProfileApp: () => app, setProfileApp: () => {} }));
 // The Home row's code is fetched through this loader, so a test can see whether it was fetched, and make it fail.
-type Loader = typeof import('$lib/timeline/load-home-glance').loadHomeGlance;
+type Loader = typeof import('#lib/timeline/load-home-glance.js').loadHomeGlance;
 const glance = vi.hoisted(() => ({ load: vi.fn(), real: null as unknown as Loader }));
-vi.mock('$lib/timeline/load-home-glance', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/timeline/load-home-glance')>();
+vi.mock('#lib/timeline/load-home-glance.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/timeline/load-home-glance.js')>();
 	glance.real = real.loadHomeGlance;
 	return { ...real, loadHomeGlance: () => glance.load() };
 });
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({ canPrompt: false, installed: true, ios: false, persisted: false }),
 	setInstallApp: () => {}
 }));

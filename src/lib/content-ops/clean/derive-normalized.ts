@@ -1,5 +1,5 @@
-import { normalizeText } from '$lib/corpus/normalize';
-import type { Block } from '$lib/content-ops/extract/pdf-text';
+import { normalizeText } from '#lib/corpus/normalize.js';
+import type { Block } from '#lib/content-ops/extract/pdf-text.js';
 
 // The exact join used by both extraction paths (assemblePdfText's per-page blocks, shapeHtmlBlocks'
 // per-element blocks) before the single normalizeText pass. Must match verbatim - a different

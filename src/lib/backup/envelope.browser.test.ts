@@ -18,7 +18,7 @@ import {
 } from './envelope';
 
 // Records what the real AES-GCM wrapper was given and what it returned, so a test can read the plaintext arrays after
-// the promise has resolved and see whether they were wiped. The path is a `$lib` alias on purpose: a relative path
+// the promise has resolved and see whether they were wiped. The path is a `#lib` alias on purpose: a relative path
 // here silently never reaches the module under test's own import in this browser runner.
 const seams = vi.hoisted(() => ({
 	plaintexts: [] as Uint8Array[],
@@ -26,7 +26,7 @@ const seams = vi.hoisted(() => ({
 	decryptCalls: 0
 }));
 
-vi.mock('$lib/crypto/aes-gcm', async (importOriginal) => {
+vi.mock('#lib/crypto/aes-gcm.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../crypto/aes-gcm')>();
 	return {
 		...actual,
@@ -47,7 +47,7 @@ vi.mock('$lib/crypto/aes-gcm', async (importOriginal) => {
 // over the cap can pass the size check and meet only the ciphertext bound. The factory is evaluated once, so the
 // numbers are plain values: a getter is flattened and a later `doMock` does not reach a module already loaded.
 // Every other cap is the real one, and the real size bound is pinned in caps.test.ts.
-vi.mock('$lib/backup/caps', async (importOriginal) => {
+vi.mock('#lib/backup/caps.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./caps')>();
 	return {
 		...actual,

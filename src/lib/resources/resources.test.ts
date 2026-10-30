@@ -7,11 +7,11 @@ import {
 	TASK_LINK_NOTE,
 	TASK_GUIDES
 } from './resources';
-import { LOCAL_DOCUMENT_INFO } from '$lib/sources/local-document-info.data';
+import { LOCAL_DOCUMENT_INFO } from '#lib/sources/local-document-info.data.js';
 import { linkNoteForTask, resourcesForTask } from './select';
 import * as INDEX from './index';
-import { TASK_DEFS } from '$lib/timeline/task-defs';
-import { isGovernmentHost } from '$lib/sources/government-host';
+import { TASK_DEFS } from '#lib/timeline/task-defs.js';
+import { isGovernmentHost } from '#lib/sources/government-host.js';
 
 const DISPLAY_CATEGORIES = new Set<DisplayCategory>([
 	'benefits-va',

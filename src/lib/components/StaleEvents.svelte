@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { formatTimelineDate } from '$lib/timeline/format-date';
-	import type { HandedOverEvent } from '$lib/calendar/types';
-	import { handedOverKey } from '$lib/calendar/handed-over';
+	import { formatTimelineDate } from '#lib/timeline/format-date.js';
+	import type { HandedOverEvent } from '#lib/calendar/types.js';
+	import { handedOverKey } from '#lib/calendar/handed-over.js';
 
 	let { events, onAcknowledge }: { events: HandedOverEvent[]; onAcknowledge: () => Promise<void> } =
 		$props();

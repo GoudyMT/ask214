@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect } from 'vitest';
 import QuestionFeed from './QuestionFeed.svelte';
-import { EXAMPLE_QUESTIONS } from '$lib/ask/example-questions';
+import { EXAMPLE_QUESTIONS } from '#lib/ask/example-questions.js';
 
 describe('QuestionFeed', () => {
 	it('renders an interactive pill per curated question', async () => {

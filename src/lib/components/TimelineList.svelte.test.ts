@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import { flushSync } from 'svelte';
 import TimelineList from './TimelineList.svelte';
-import type { TimelineView, TimelineItem, DisplayStatus, TaskStatus } from '$lib/timeline';
+import type { TimelineView, TimelineItem, DisplayStatus, TaskStatus } from '#lib/timeline/index.js';
 
 // TimelineList renders a generated TimelineView: one labelled <section> per non-empty
 // phase (h2 = bucket.label, id = bucket.id to seed scroll-spy), each holding a TaskCard per

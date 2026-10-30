@@ -7,11 +7,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import PdfView from './PdfView.svelte';
-	import { documentSourceId } from '$lib/ask/asset-cache';
-	import { selectAnswer } from '$lib/ask/answer/select-answer';
-	import { isDocumentSaved, listCachedDocuments } from '$lib/sources/document-cache';
-	import { LOCAL_DOCUMENTS_WITH_PICTURES } from '$lib/sources/local-documents-with-pictures.data';
-	import { loadPdfRuntime, type PdfRuntime } from '$lib/sources/pdf-runtime';
+	import { documentSourceId } from '#lib/ask/asset-cache.js';
+	import { selectAnswer } from '#lib/ask/answer/select-answer.js';
+	import { isDocumentSaved, listCachedDocuments } from '#lib/sources/document-cache.js';
+	import { LOCAL_DOCUMENTS_WITH_PICTURES } from '#lib/sources/local-documents-with-pictures.data.js';
+	import { loadPdfRuntime, type PdfRuntime } from '#lib/sources/pdf-runtime.js';
 
 	// The reader's page view: the whole served document, scrolled, landing on the answer's passage with the
 	// quoted text marked. It opens at once - viewing keeps nothing on the device, and the loading box states the

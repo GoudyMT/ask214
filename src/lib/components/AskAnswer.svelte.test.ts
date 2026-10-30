@@ -3,7 +3,7 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { page } from 'vitest/browser';
 import AskAnswer from './AskAnswer.svelte';
-import type { AnswerView } from '$lib/ask/answer/answer-view';
+import type { AnswerView } from '#lib/ask/answer/answer-view.js';
 
 // The component receives text that toCitedAnswer has ALREADY stripped of citation markers, and the model
 // writes 2-3 paragraphs separated by a blank line. The previous fixture was a single line carrying a

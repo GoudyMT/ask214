@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import config from '../../../svelte.config.js';
+import { loadConfig } from '@sveltejs/load-config';
 
-// The CSP is defined in svelte.config.js kit.csp.directives and emitted by SvelteKit at render. This
-// asserts the egress contract at its source (pre-commit + cross-platform); the live emission is covered by
-// tests/e2e/security.e2e.ts.
-const directives = config.kit?.csp?.directives;
+// The CSP is defined in the sveltekit() plugin options in vite.config.ts (csp.directives) and emitted by SvelteKit
+// at render. This asserts the egress contract at its source (pre-commit + cross-platform); the live emission is
+// covered by tests/e2e/security.e2e.ts.
+const loaded = await loadConfig(process.cwd(), { traverse: false });
+const directives = (
+	loaded && 'config' in loaded
+		? (loaded.config as { csp?: { directives?: Record<string, string[]> } }).csp?.directives
+		: undefined
+) as Record<string, string[]> | undefined;
 
 describe('CSP egress contract', () => {
 	it('connect-src is exactly self plus the one path-scoped Anthropic messages endpoint', () => {

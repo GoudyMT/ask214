@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildCorpusArtifact } from './corpus-artifact';
-import { decodeCorpus } from '$lib/corpus';
-import type { CorpusChunk } from '$lib/corpus';
+import { decodeCorpus } from '#lib/corpus/index.js';
+import type { CorpusChunk } from '#lib/corpus/index.js';
 
 const MODEL = 'all-MiniLM-L6-v2';
 function chunk(id: string): CorpusChunk {

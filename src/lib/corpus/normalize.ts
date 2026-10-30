@@ -5,7 +5,7 @@
  * SUPERSEDED for the highlight viewer, which this docblock used to require it for: the viewer needs
  * offsets into the text it was handed, and collapsing whitespace shortens that string, so a normalized
  * offset points several characters early and drifts further the more whitespace precedes the passage. The
- * viewer folds the raw text to alphanumerics instead (`$lib/sources/highlight-match`), which subsumes this
+ * viewer folds the raw text to alphanumerics instead (`#lib/sources/highlight-match.js`), which subsumes this
  * function's whitespace collapse, zero-width stripping and de-hyphenation, and covers its ligature
  * expansion by decomposing each character. Determinism is preserved because BOTH sides go through that
  * same fold - which is what this contract was really asking for.

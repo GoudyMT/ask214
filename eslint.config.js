@@ -6,15 +6,18 @@ import svelte from 'eslint-plugin-svelte';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import ts from 'typescript-eslint';
-import svelteConfig from './svelte.config.js';
+import { loadConfig } from '@sveltejs/load-config';
 import mtc from './eslint-plugins/mtc/index.js';
+
+// The Svelte options now live in the sveltekit() plugin in vite.config.ts; the Svelte parser reads them from there.
+const svelteConfig = (await loadConfig('./', { traverse: false }))?.config;
 
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
 const STORAGE_MESSAGE =
 	'Personal data persists only in the encrypted IndexedDB stores. A device setting with nothing personal belongs in an exempt file, or in a disable with its reason.';
 const CACHE_MESSAGE =
-	'Personal data must not reach unencrypted storage, and the Cache API and the origin-private file system are unencrypted. Public documents are cached only in src/lib/sources/document-cache.ts and src/service-worker.ts; anything else needs a disable with its reason.';
+	'Personal data must not reach unencrypted storage, and the Cache API and the origin-private file system are unencrypted. Public documents are cached only in src/lib/sources/document-cache.ts and src/service-worker/index.ts; anything else needs a disable with its reason.';
 const SAFELOG_MESSAGE = 'getDiagnosticsForTest is for tests only; app code logs through safeLog.';
 
 // The two restriction lists below are built from these pieces because a later config block replaces a rule's options
@@ -52,7 +55,7 @@ const STORAGE_EXEMPT = [
 	'src/lib/feedback/context.ts'
 ];
 // Public documents only, free to use the Cache API and the origin-private file system.
-const CACHE_EXEMPT = ['src/lib/sources/document-cache.ts', 'src/service-worker.ts'];
+const CACHE_EXEMPT = ['src/lib/sources/document-cache.ts', 'src/service-worker/index.ts'];
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),

@@ -11,7 +11,7 @@
 // So the ids here are DERIVED, never written down. `deriveChunkId` is the shipped identity rule, so these
 // carry the real shape - including the digits that made the marker look like a numeric claim to the
 // grounding gate - and they cannot drift the way a hard-coded literal would when the corpus is re-cleaned.
-import { deriveChunkId } from '$lib/corpus/chunk-id';
+import { deriveChunkId } from '#lib/corpus/chunk-id.js';
 import type { RetrievedChunk } from './synthesize';
 
 // Real prose from the shipped corpus, chosen so the fixture exercises what the unrealistic ones hid:

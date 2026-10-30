@@ -2,21 +2,21 @@
 	import { tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import BackupCard from '$lib/backup/BackupCard.svelte';
-	import { RESTORE_ENTRY } from '$lib/backup/copy';
-	import { takeBackupIntent } from '$lib/backup/intent';
-	import { backupSession } from '$lib/backup/session.svelte';
-	import EaosInput from '$lib/components/EaosInput.svelte';
-	import LockedPanel from '$lib/components/LockedPanel.svelte';
-	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
-	import { getProfileApp } from '$lib/profile/context';
-	import { OccConflictError } from '$lib/profile/store.svelte';
+	import BackupCard from '#lib/backup/BackupCard.svelte';
+	import { RESTORE_ENTRY } from '#lib/backup/copy.js';
+	import { takeBackupIntent } from '#lib/backup/intent.js';
+	import { backupSession } from '#lib/backup/session.svelte.js';
+	import EaosInput from '#lib/components/EaosInput.svelte';
+	import LockedPanel from '#lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '#lib/components/load-pin-unlock.js';
+	import { getProfileApp } from '#lib/profile/context.js';
+	import { OccConflictError } from '#lib/profile/store.svelte.js';
 	import {
 		validateEaosAtInput,
 		encodeEaos,
 		EaosFormatError,
 		type EaosCause
-	} from '$lib/profile/eaos';
+	} from '#lib/profile/eaos.js';
 
 	const app = getProfileApp();
 
@@ -66,7 +66,7 @@
 			await store.save({ eaos: bytes, setupIntent: 'completed' });
 			// Land on the timeline the user just set up - "Save and continue" continues to the thing
 			// they built. (Skip, below, stays on Home since nothing was set up.)
-			await goto(resolve('/timeline'));
+			await goto(resolve('timeline'));
 		} catch (err) {
 			// OCC: another tab set up the profile first. Re-read the authoritative state and ask the user
 			// to review + retry (reload, don't clobber). refresh, not load: the user asked to SAVE, not
@@ -102,7 +102,7 @@
 	// request from the session (in memory, never in the address) when the page opens.
 	function eraseFromBackup(): void {
 		backupSession.requestErase();
-		void goto(resolve('/settings'));
+		void goto(resolve('settings'));
 	}
 
 	// A profile behind a PIN is not a first run: the page asks for the PIN, as every locked page does.

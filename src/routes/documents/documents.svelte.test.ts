@@ -1,17 +1,17 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import DocumentsPage from './+page.svelte';
-import { ASK_ASSET_CACHE } from '$lib/ask/asset-cache';
-import { CORPUS_BASE } from '$lib/ask/corpus-load';
-import { saveDocument, savesSettled, stopSaves } from '$lib/sources/document-cache';
-import { LOCAL_DOCUMENTS } from '$lib/sources/local-documents.data';
-import { LIBRARY_SRC, WORKER_SRC } from '$lib/sources/pdf-library-paths';
-import { SOURCES_INDEX } from '$lib/sources/sources-index.data';
+import { ASK_ASSET_CACHE } from '#lib/ask/asset-cache.js';
+import { CORPUS_BASE } from '#lib/ask/corpus-load.js';
+import { saveDocument, savesSettled, stopSaves } from '#lib/sources/document-cache.js';
+import { LOCAL_DOCUMENTS } from '#lib/sources/local-documents.data.js';
+import { LIBRARY_SRC, WORKER_SRC } from '#lib/sources/pdf-library-paths.js';
+import { SOURCES_INDEX } from '#lib/sources/sources-index.data.js';
 
 // No worker controls the page in this browser, so the real wait would last its full time. Every case starts with it
 // over at once; the cases about the wait hold it and end it themselves.
 const control = vi.hoisted(() => ({ wait: Promise.resolve(true) }));
-vi.mock('$lib/ask/when-controlled', () => ({ waitForControl: () => control.wait }));
+vi.mock('#lib/ask/when-controlled.js', () => ({ waitForControl: () => control.wait }));
 
 // Integration: the real generated maps flow through the page, and the page reads the real Cache API. The
 // cache is emptied first, so each case starts on a device that has saved nothing.
@@ -30,7 +30,7 @@ const REAL_DOWNLOAD = { timeout: 10_000 };
 // The reader loads its page view, pager and Save lazily. Loaded once here, each test renders against loaded
 // modules, as the app does after a first open; a cold load under a busy full run can outlast a wait below.
 beforeAll(async () => {
-	await import('$lib/components/reader-parts');
+	await import('#lib/components/reader-parts.js');
 });
 
 beforeEach(async () => {

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import FeedbackForm from '$lib/components/FeedbackForm.svelte';
-	import { readStashedRoute } from '$lib/feedback/context';
-	import type { FeedbackInput } from '$lib/feedback/types';
+	import FeedbackForm from '#lib/components/FeedbackForm.svelte';
+	import { readStashedRoute } from '#lib/feedback/context.js';
+	import type { FeedbackInput } from '#lib/feedback/types.js';
 
 	const attachedRoute = readStashedRoute();
 

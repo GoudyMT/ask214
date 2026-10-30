@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SourcesIndex } from '$lib/sources/types';
+	import type { SourcesIndex } from '#lib/sources/types.js';
 
 	let { index }: { index: SourcesIndex } = $props();
 </script>

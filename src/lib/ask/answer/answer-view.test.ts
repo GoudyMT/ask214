@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deriveChunkId } from '$lib/corpus/chunk-id';
-import type { ResultCard } from '$lib/corpus';
+import { deriveChunkId } from '#lib/corpus/chunk-id.js';
+import type { ResultCard } from '#lib/corpus/index.js';
 import type { CitedAnswer } from '../synthesis/cited-answer';
 import { chooseAnswer, toExtractiveAnswer, type ExtractiveAnswer } from './answer-view';
 

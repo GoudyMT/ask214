@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import type { RouteId } from '$app/types';
-	import type { HomeRow } from '$lib/timeline/home-glance';
+	import type { HomeRow } from '#lib/timeline/home-glance.js';
 
 	let { row, to }: { row: HomeRow; to: RouteId } = $props();
 </script>

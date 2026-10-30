@@ -6,7 +6,7 @@
  * sourceId/field travel as DATA. Collects ALL violations (does not stop at the first).
  */
 
-import { isGovernmentHost } from '$lib/sources/government-host';
+import { isGovernmentHost } from '#lib/sources/government-host.js';
 
 export type LegalTier = 'confident_pd' | 'verified_gray_zone' | 'excluded';
 export type ContentType = 'html' | 'pdf';

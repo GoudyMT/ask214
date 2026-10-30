@@ -81,7 +81,7 @@ describe('keystore key policy: what the scan catches', () => {
 		['a named import', "import { verifyRecordHmac } from '../keystore/record';"],
 		[
 			'an import of both',
-			"import { computeRecordHmac, verifyRecordHmac } from '$lib/keystore/record';"
+			"import { computeRecordHmac, verifyRecordHmac } from '#lib/keystore/record';"
 		],
 		['a dynamic import', "const { computeRecordHmac } = await import('../keystore/record');"]
 	])('reports the raw MAC functions in %s', (_name, content) => {

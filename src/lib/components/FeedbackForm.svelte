@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { routeLabel, type FeedbackInput, type KnownRoute } from '$lib/feedback/types';
+	import { routeLabel, type FeedbackInput, type KnownRoute } from '#lib/feedback/types.js';
 
 	let {
 		attachedRoute = null,

@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import WizardPage from './+page.svelte';
-import { OccConflictError } from '$lib/profile/store.svelte';
+import { OccConflictError } from '#lib/profile/store.svelte.js';
 
 type Patch = { eaos: Uint8Array; setupIntent: string };
 
@@ -14,7 +14,7 @@ const { store, goto } = vi.hoisted(() => ({
 	goto: vi.fn<(url: string) => Promise<void>>()
 }));
 
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store,

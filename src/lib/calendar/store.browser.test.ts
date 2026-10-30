@@ -12,10 +12,10 @@ import { wipeAllStores } from '../db/wipe';
 import type { DesiredEvent, HandedOverEvent, TaskExclusions } from './types';
 
 // A passthrough over the cipher that counts decrypts, so a re-read that must not happen can be shown not to.
-// The path is a `$lib` alias on purpose: with a relative path the mock silently never applied to the store's own
+// The path is a `#lib` alias on purpose: with a relative path the mock silently never applied to the store's own
 // import in this browser runner.
 const seams = vi.hoisted(() => ({ decrypts: 0 }));
-vi.mock('$lib/crypto/record-crypto', async (importOriginal) => {
+vi.mock('#lib/crypto/record-crypto.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../crypto/record-crypto')>();
 	return {
 		...real,

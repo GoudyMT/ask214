@@ -25,7 +25,7 @@ const { isoFromToday, ctl } = vi.hoisted(() => ({
 // Reactive, unlike a plain flag: each control below goes away when the state it acts on changes, as it does in the app.
 const profile = $state({ locked: false, clockBackward: true });
 const install = $state({ installed: false, canPrompt: true, ios: false, persisted: false });
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
@@ -71,7 +71,7 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		get installed() {
 			return install.installed;

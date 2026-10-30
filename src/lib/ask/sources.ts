@@ -1,5 +1,5 @@
-import type { Corpus, ResultCard } from '$lib/corpus';
-import { cleanExcerpt } from '$lib/corpus';
+import type { Corpus, ResultCard } from '#lib/corpus/index.js';
+import { cleanExcerpt } from '#lib/corpus/index.js';
 import { stripHeadingEcho } from './answer/heading-echo';
 
 /**

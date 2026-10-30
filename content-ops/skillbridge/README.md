@@ -20,7 +20,7 @@ folder is git-ignored, and the state folder must lie outside the repo (the comma
 ## Before the first run (once)
 
 1. Node 22 and the repo's packages installed (`pnpm install --frozen-lockfile`), and `pnpm check` run once, so
-   `.svelte-kit/tsconfig.json` exists (the scripts' `$lib` imports need it). In every new PowerShell window, set Node
+   SvelteKit's generated files exist. In every new PowerShell window, set Node
    22 first (the run checks its Unicode version: 17.0, Node 22.22.3 when this was written):
 
    ```

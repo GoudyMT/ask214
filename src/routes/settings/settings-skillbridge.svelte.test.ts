@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { page } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
-import { OccConflictError } from '$lib/profile/store.svelte';
+import { OccConflictError } from '#lib/profile/store.svelte.js';
 
 // Days from the real clock: the page reads its separation date against today.
 const { isoFromToday, timeline } = vi.hoisted(() => ({
@@ -29,7 +29,7 @@ const { isoFromToday, timeline } = vi.hoisted(() => ({
 // Reactive, unlike the store flags above: Unlock opens the profile, and the page swaps its locked panel for the
 // sections at that moment.
 const profile = $state({ locked: false });
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		store: {
@@ -60,7 +60,7 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,

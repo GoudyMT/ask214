@@ -1,4 +1,4 @@
-import type { SourceEntry } from '$lib/content-ops/sources-schema';
+import type { SourceEntry } from '#lib/content-ops/sources-schema.js';
 
 /** Source id -> the url of that source's own document. PDF sources only; see buildDocumentUrls. */
 export type DocumentUrls = Record<string, string>;

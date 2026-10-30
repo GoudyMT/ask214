@@ -1,6 +1,6 @@
 <script lang="ts">
-	import SourceList from '$lib/components/SourceList.svelte';
-	import { SOURCES_INDEX } from '$lib/sources/sources-index.data';
+	import SourceList from '#lib/components/SourceList.svelte';
+	import { SOURCES_INDEX } from '#lib/sources/sources-index.data.js';
 </script>
 
 <svelte:head>

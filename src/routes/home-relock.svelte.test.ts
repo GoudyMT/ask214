@@ -1,9 +1,9 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
-import { createJoinRelock, relockEachSync, type Relockable } from '$lib/profile/app-init';
-import type { RelockReason } from '$lib/profile/lifecycle';
-import type { RetrieveResult } from '$lib/ask/online/outcome';
+import { createJoinRelock, relockEachSync, type Relockable } from '#lib/profile/app-init.js';
+import type { RelockReason } from '#lib/profile/lifecycle.js';
+import type { RetrieveResult } from '#lib/ask/online/outcome.js';
 import HomePage from './+page.svelte';
 
 // Home runs the real Ask store. Only what leaves the page is replaced: the answer server, the summary call, the
@@ -11,10 +11,10 @@ import HomePage from './+page.svelte';
 const online = vi.hoisted(() => ({
 	retrieve: null as unknown as (query: string) => Promise<unknown>
 }));
-vi.mock('$lib/ask/online/retrieve-online', () => ({
+vi.mock('#lib/ask/online/retrieve-online.js', () => ({
 	retrieveOnline: (query: string) => online.retrieve(query)
 }));
-vi.mock('$lib/ask/synthesis/synthesize', () => ({
+vi.mock('#lib/ask/synthesis/synthesize.js', () => ({
 	synthesize: async (query: string) => ({
 		kind: 'answer',
 		answer: {
@@ -25,13 +25,13 @@ vi.mock('$lib/ask/synthesis/synthesize', () => ({
 		}
 	})
 }));
-vi.mock('$lib/ask', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/ask')>()),
+vi.mock('#lib/ask/index.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/ask/index.js')>()),
 	createRecoveringEmbed: () => ({ embed: async () => [], dispose: () => {} })
 }));
-vi.mock('$lib/ask/embed-worker?worker', () => ({ default: class {} }));
-vi.mock('$lib/ask/device-files', () => ({ deviceFilesKept: async () => true }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/ask/embed-worker?worker', () => ({ default: class {} }));
+vi.mock('#lib/ask/device-files.js', () => ({ deviceFilesKept: async () => true }));
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({ canPrompt: false, installed: true, ios: false, persisted: false }),
 	setInstallApp: () => {}
 }));
@@ -57,8 +57,8 @@ const app = $state<{
 	reloadOnUnlock: false,
 	replacedNotice: false
 });
-vi.mock('$lib/profile/context', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/profile/context')>()),
+vi.mock('#lib/profile/context.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/profile/context.js')>()),
 	getProfileApp: () => app
 }));
 

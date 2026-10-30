@@ -7,8 +7,8 @@
 <script lang="ts">
 	import { afterNavigate, beforeNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { stashRoute } from '$lib/feedback/context';
-	import { getProfileApp } from '$lib/profile/context';
+	import { stashRoute } from '#lib/feedback/context.js';
+	import { getProfileApp } from '#lib/profile/context.js';
 
 	const app = getProfileApp();
 	// The header's rule: Settings is offered when the app is ready, and when damaged (its erase is the way back).
@@ -37,7 +37,7 @@
 {#if showSettings}
 	<ul class="group">
 		<li>
-			<a class="row" href={resolve('/settings')}>
+			<a class="row" href={resolve('settings')}>
 				<span class="row__title">Settings</span>
 				<span class="row__text">Your dates, backup, theme, online answers</span>
 			</a>
@@ -47,13 +47,13 @@
 
 <ul class="group">
 	<li>
-		<a class="row" href={resolve('/resources')}>
+		<a class="row" href={resolve('resources')}>
 			<span class="row__title">Resources</span>
 			<span class="row__text">Official links for benefits, jobs and school</span>
 		</a>
 	</li>
 	<li>
-		<a class="row" href={resolve('/documents')}>
+		<a class="row" href={resolve('documents')}>
 			<span class="row__title">Documents</span>
 			<span class="row__text">Guides saved for offline</span>
 		</a>
@@ -62,13 +62,13 @@
 
 <ul class="group">
 	<li>
-		<a class="row" href={resolve('/feedback')}>
+		<a class="row" href={resolve('feedback')}>
 			<span class="row__title">Feedback</span>
 			<span class="row__text">Tell us what to fix or add</span>
 		</a>
 	</li>
 	<li>
-		<a class="row" href={resolve('/about')}>
+		<a class="row" href={resolve('about')}>
 			<span class="row__title">About</span>
 			<span class="row__text">Sources, privacy, how Ask 214 works</span>
 		</a>

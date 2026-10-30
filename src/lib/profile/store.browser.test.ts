@@ -34,9 +34,9 @@ const seams = vi.hoisted(() => ({
 	failHmac: false
 }));
 
-// The paths are `$lib` aliases on purpose: with a relative path the mock silently never applied to the
+// The paths are `#lib` aliases on purpose: with a relative path the mock silently never applied to the
 // store's own import in this browser runner.
-vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
+vi.mock('#lib/profile/lifecycle.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./lifecycle')>();
 	return {
 		...real,
@@ -55,7 +55,7 @@ vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/profile/crypto-boundary', async (importOriginal) => {
+vi.mock('#lib/profile/crypto-boundary.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('./crypto-boundary')>();
 	return {
 		...real,
@@ -66,7 +66,7 @@ vi.mock('$lib/profile/crypto-boundary', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/keystore/record', async (importOriginal) => {
+vi.mock('#lib/keystore/record.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../keystore/record')>();
 	return {
 		...real,

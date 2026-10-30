@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
-import { backupSession } from '$lib/backup/session.svelte';
+import { backupSession } from '#lib/backup/session.svelte.js';
 import SettingsPage from './+page.svelte';
 
 const { isoFromToday } = vi.hoisted(() => ({
@@ -31,8 +31,8 @@ const relock = vi.hoisted(() => ({
 	}
 }));
 // The PIN's Argon2id lives in a worker: a fixed pair of keys answers for it. The rest of the module is the real one.
-vi.mock('$lib/keystore/pin-derive', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/keystore/pin-derive')>();
+vi.mock('#lib/keystore/pin-derive.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/keystore/pin-derive.js')>();
 	return {
 		...real,
 		derivePinKeys: async () => ({
@@ -53,7 +53,7 @@ vi.mock('$lib/keystore/pin-derive', async (importOriginal) => {
 		})
 	};
 });
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		get keyMode() {
@@ -102,8 +102,8 @@ vi.mock('$lib/profile/context', () => ({
 }));
 // The real row, drawn as it is; the wrapper only keeps the props the page mounted it with.
 const mounted = vi.hoisted(() => ({ rows: [] as Record<string, unknown>[] }));
-vi.mock('$lib/components/AppLockRow.svelte', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/components/AppLockRow.svelte')>();
+vi.mock('#lib/components/AppLockRow.svelte', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/components/AppLockRow.svelte')>();
 	const mount = real.default as unknown as (
 		anchor: unknown,
 		props: Record<string, unknown>
@@ -116,7 +116,7 @@ vi.mock('$lib/components/AppLockRow.svelte', async (importOriginal) => {
 		}
 	};
 });
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,
@@ -129,7 +129,7 @@ vi.mock('$lib/install/context', () => ({
 
 // A device with no profile can still hold saved documents, and then its Privacy and security section has the Erase alone.
 const docs = vi.hoisted(() => ({ held: false }));
-vi.mock('$lib/sources/document-states', () => ({
+vi.mock('#lib/sources/document-states.js', () => ({
 	documentStates: () => (docs.held ? { 'a-saved-document': { state: 'saved', stale: [] } } : {})
 }));
 

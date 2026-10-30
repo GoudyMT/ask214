@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TaskCard from './TaskCard.svelte';
-	import { formatTimelineDate } from '$lib/timeline/format-date';
-	import type { TimelineView, TaskStatus } from '$lib/timeline';
+	import { formatTimelineDate } from '#lib/timeline/format-date.js';
+	import type { TimelineView, TaskStatus } from '#lib/timeline/index.js';
 
 	let {
 		view,

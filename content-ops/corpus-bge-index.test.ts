@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { decodeCorpus } from '$lib/corpus';
-import type { CorpusManifest } from '$lib/corpus/types';
+import { decodeCorpus } from '#lib/corpus/index.js';
+import type { CorpusManifest } from '#lib/corpus/types.js';
 
 // The retrieve Worker decodes the KV index under this exact model id (workers/retrieve/src/index.ts).
 const BGE_MODEL_ID = '@cf/baai/bge-small-en-v1.5';

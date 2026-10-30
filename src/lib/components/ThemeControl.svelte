@@ -6,7 +6,7 @@
 		readChoice,
 		setTheme,
 		type ThemeChoice
-	} from '$lib/theme/theme';
+	} from '#lib/theme/theme.js';
 
 	let choice = $state<ThemeChoice>(readChoice());
 	const LABEL: Record<ThemeChoice, string> = { system: 'System', light: 'Light', dark: 'Dark' };

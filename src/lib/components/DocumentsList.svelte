@@ -1,7 +1,7 @@
 <script lang="ts" module>
-	import type { DocumentState } from '$lib/sources/document-states';
-	import type { StoppedBy } from '$lib/sources/save-all.svelte';
-	import type { Publisher } from '$lib/sources/types';
+	import type { DocumentState } from '#lib/sources/document-states.js';
+	import type { StoppedBy } from '#lib/sources/save-all.svelte.js';
+	import type { Publisher } from '#lib/sources/types.js';
 
 	/** One served document as the list shows it. */
 	export type DocumentRow = {
@@ -26,8 +26,8 @@
 
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { CORPUS_BYTES } from '$lib/ask/asset-cache';
-	import { LIBRARY_BYTES } from '$lib/sources/pdf-library-paths';
+	import { CORPUS_BYTES } from '#lib/ask/asset-cache.js';
+	import { LIBRARY_BYTES } from '#lib/sources/pdf-library-paths.js';
 
 	// Every served document, what this device holds of it, and the actions on it. The list only shows state
 	// and reports what the user asked for; the page does the saving and removing, then passes the new state.
@@ -310,7 +310,7 @@
 
 	<p class="docs-web">
 		{webSources} more sources are web pages, read on their official sites.
-		<a href={resolve('/about')}>See them all on About</a>
+		<a href={resolve('about')}>See them all on About</a>
 	</p>
 </div>
 

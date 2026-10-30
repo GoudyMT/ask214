@@ -13,7 +13,7 @@ import { takeSnapshot, type SnapshotResult } from './snapshot';
 
 // A call log over the paths a snapshot must not take. Each factory hands back the real store with its read and write
 // entry points recording their names; the lock helpers record theirs; the wipe records the records it was given. The
-// paths are `$lib` aliases on purpose: with a relative path a mock silently never applied to the module's own import
+// paths are `#lib` aliases on purpose: with a relative path a mock silently never applied to the module's own import
 // in this browser runner.
 const seams = vi.hoisted(() => {
 	const calls: string[] = [];
@@ -33,7 +33,7 @@ const seams = vi.hoisted(() => {
 	return { calls, wiped, watch };
 });
 
-vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
+vi.mock('#lib/profile/lifecycle.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../profile/lifecycle')>();
 	return {
 		...real,
@@ -44,7 +44,7 @@ vi.mock('$lib/profile/lifecycle', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/profile/store.svelte', async (importOriginal) => {
+vi.mock('#lib/profile/store.svelte.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../profile/store.svelte')>();
 	return {
 		...real,
@@ -53,7 +53,7 @@ vi.mock('$lib/profile/store.svelte', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/timeline/state.svelte', async (importOriginal) => {
+vi.mock('#lib/timeline/state.svelte.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../timeline/state.svelte')>();
 	return {
 		...real,
@@ -62,7 +62,7 @@ vi.mock('$lib/timeline/state.svelte', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/calendar/store.svelte', async (importOriginal) => {
+vi.mock('#lib/calendar/store.svelte.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../calendar/store.svelte')>();
 	return {
 		...real,
@@ -71,7 +71,7 @@ vi.mock('$lib/calendar/store.svelte', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/db/locks', async (importOriginal) => {
+vi.mock('#lib/db/locks.js', async (importOriginal) => {
 	const real = await importOriginal<typeof import('../db/locks')>();
 	return {
 		...real,

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import EaosInput from './EaosInput.svelte';
-	import { formatTimelineDate } from '$lib/timeline/format-date';
+	import { formatTimelineDate } from '#lib/timeline/format-date.js';
 
 	type Props = {
 		/** Distinct per row: the form, input, hint and error ids derive from it. */

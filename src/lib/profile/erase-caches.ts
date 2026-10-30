@@ -1,4 +1,4 @@
-import { APP_SHELL, WORKER_SCRIPT_FOLDER } from '$lib/ask/asset-cache';
+import { APP_SHELL, WORKER_SCRIPT_FOLDER } from '#lib/ask/asset-cache.js';
 
 /**
  * Clear Cache Storage for an erase, keeping only the app's own code.

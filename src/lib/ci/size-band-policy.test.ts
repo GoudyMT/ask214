@@ -87,35 +87,41 @@ describe('planApply', () => {
 		});
 	});
 
-	// Every byte past the band is new code, so even a small overrun goes back to the owner as a re-request.
-	it('refuses a line that needs even a few bytes past its band', () => {
-		const band = { ...BAND, raise: { ...BAND.raise, page: 460 } };
-		// allowed 104,076 + 460 = 104,536; 104,497 B (margin 47 B) needs 104,544.
-		expect(planApply(band, { ...BASE, page: 104_497 }, LIMITS)).toEqual({
-			ok: false,
-			changes: [],
-			refusals: [{ line: 'page', need: 104_544, allowed: 104_536, measured: 104_497 }]
-		});
-		// 104,488 B (margin 46 B) needs 104,534: inside the band.
-		expect(planApply(band, { ...BASE, page: 104_488 }, LIMITS).ok).toBe(true);
-	});
-
-	it('applies a line that lands exactly on its band and refuses one byte past it', () => {
-		// allowed 104,076 + 390 = 104,466; 104,426 B (margin 40 B) needs exactly 104,466.
-		expect(planApply(BAND, { ...BASE, page: 104_426 }, LIMITS).ok).toBe(true);
+	// The margin is room above the measured size, not part of the need: a line whose bytes fit its band is applied, and
+	// the margin is written only as far as the band reaches.
+	it('applies a line that fits its band and caps its margin at the band', () => {
+		// allowed 104,076 + 390 = 104,466; 104,427 B wants 104,467 with its margin, so it is written at 104,466.
 		expect(planApply(BAND, { ...BASE, page: 104_427 }, LIMITS)).toEqual({
-			ok: false,
-			changes: [],
-			refusals: [{ line: 'page', need: 104_467, allowed: 104_466, measured: 104_427 }]
+			ok: true,
+			changes: [
+				{ line: 'page', from: 104_076, to: 104_466, measured: 104_427, growth: 398, margin: 39 }
+			]
 		});
 	});
 
-	it('refuses a raise on a line the band does not list', () => {
-		const plan = planApply(BAND, { ...BASE, rootLayout: 9_818 }, LIMITS);
-		expect(plan).toEqual({
+	// Every byte past the band is new code, so even a one-byte overrun goes back to the owner as a re-request.
+	it('refuses a line whose measured size is past its band, with the re-request need', () => {
+		// 104,467 B is one past 104,466; the need asked for is its size plus its margin.
+		expect(planApply(BAND, { ...BASE, page: 104_467 }, LIMITS)).toEqual({
 			ok: false,
 			changes: [],
-			refusals: [{ line: 'rootLayout', need: 9_824, allowed: 9_820, measured: 9_818 }]
+			refusals: [{ line: 'page', need: 104_511, allowed: 104_466, measured: 104_467 }]
+		});
+	});
+
+	// A line the plan did not ask about keeps its limit while it fits; its margin is not this plan's to raise.
+	it('leaves a line the band does not list alone while it fits its limit, even inside its margin', () => {
+		expect(planApply(BAND, { ...BASE, rootLayout: 9_818 }, LIMITS)).toEqual({
+			ok: true,
+			changes: []
+		});
+	});
+
+	it('refuses a line the band does not list once it is over its limit', () => {
+		expect(planApply(BAND, { ...BASE, rootLayout: 9_821 }, LIMITS)).toEqual({
+			ok: false,
+			changes: [],
+			refusals: [{ line: 'rootLayout', need: 9_828, allowed: 9_820, measured: 9_821 }]
 		});
 	});
 
@@ -132,20 +138,34 @@ describe('planApply', () => {
 	// A second apply on the same branch counts from the approved limit, so two raises never add up past the band.
 	it('caps a line at the approved limit plus its band, not at a limit an earlier apply already raised', () => {
 		const raised = { ...LIMITS, page: 104_340 };
-		// The band's cap: 104,076 + 390 = 104,466; 104,430 B (margin 41 B) needs 104,471.
-		expect(planApply(BAND, { ...BASE, page: 104_430 }, raised)).toEqual({
+		// The band's cap: 104,076 + 390 = 104,466, whatever the earlier apply wrote.
+		expect(planApply(BAND, { ...BASE, page: 104_467 }, raised)).toEqual({
 			ok: false,
 			changes: [],
-			refusals: [{ line: 'page', need: 104_471, allowed: 104_466, measured: 104_430 }]
+			refusals: [{ line: 'page', need: 104_511, allowed: 104_466, measured: 104_467 }]
 		});
 	});
 
-	it('refuses a file-count line over its limit; a count is never raised by the script', () => {
+	it('refuses a file-count line over its limit when the band does not list it', () => {
 		const plan = planApply(BAND, { ...BASE, precacheFiles: 81 }, LIMITS);
 		expect(plan).toEqual({
 			ok: false,
 			changes: [],
 			refusals: [{ line: 'precacheFiles', need: 81, allowed: 80, measured: 81 }]
+		});
+	});
+
+	// A count has no byte margin: a band that lists it raises it to the measured count exactly, and no further.
+	it('raises a file-count line in the band to the measured count, never past its raise', () => {
+		const band = parseBand({ ...BAND, raise: { ...BAND.raise, precacheFiles: 7 } });
+		expect(planApply(band, { ...BASE, precacheFiles: 86 }, LIMITS)).toEqual({
+			ok: true,
+			changes: [{ line: 'precacheFiles', from: 80, to: 86, measured: 86, growth: 6, margin: 0 }]
+		});
+		expect(planApply(band, { ...BASE, precacheFiles: 88 }, LIMITS)).toEqual({
+			ok: false,
+			changes: [],
+			refusals: [{ line: 'precacheFiles', need: 88, allowed: 87, measured: 88 }]
 		});
 	});
 
@@ -220,7 +240,7 @@ describe('parseBand', () => {
 			'E_SIZE_BAND_FILE'
 		);
 		expect(() => parseBand({ ...BAND, raise: { page: -1 } })).toThrow('E_SIZE_BAND_FILE');
-		expect(() => parseBand({ ...BAND, raise: { precacheFiles: 1 } })).toThrow('E_SIZE_BAND_FILE');
+		expect(() => parseBand({ ...BAND, raise: { precacheFiles: 1.5 } })).toThrow('E_SIZE_BAND_FILE');
 		// A misspelt line would be ignored, and a fractional size would write a limit no check can meet.
 		expect(() => parseBand({ ...BAND, raise: { pages: 100 } })).toThrow('E_SIZE_BAND_FILE');
 		expect(() => parseBand({ ...BAND, base: { ...BASE, page: 104_029.5 } })).toThrow(

@@ -1,6 +1,6 @@
-import type { CorpusChunk, RetrievalResult } from '$lib/corpus';
+import type { CorpusChunk, RetrievalResult } from '#lib/corpus/index.js';
 import type { RetrievedChunk } from '../synthesis/synthesize';
-import { isGovernmentHost } from '$lib/sources/government-host';
+import { isGovernmentHost } from '#lib/sources/government-host.js';
 
 // The server sends the full CorpusChunk, but the body arrived as unknown. Validate only the fields the two
 // consumers actually read (cards + synthesize) and pass optional display fields through when present; a hit

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { statSync } from 'node:fs';
-import { CORPUS_BASE, CORPUS_BYTES } from '$lib/ask/asset-cache';
+import { CORPUS_BASE, CORPUS_BYTES } from '#lib/ask/asset-cache.js';
 
 // The Save all question states what a first save downloads, the answer library included, so the size it states
 // must be the library files' real size. A new corpus changes it, and this fails until it is stated again.

@@ -2,34 +2,39 @@
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import LockedPanel from '$lib/components/LockedPanel.svelte';
-	import { loadPinUnlock } from '$lib/components/load-pin-unlock';
-	import SetupCTA from '$lib/components/SetupCTA.svelte';
-	import TimelineList from '$lib/components/TimelineList.svelte';
-	import PhaseChips from '$lib/components/PhaseChips.svelte';
-	import { getProfileApp } from '$lib/profile/context';
-	import { generateTimeline, TASK_DEFS, type TimelineState, type TaskStatus } from '$lib/timeline';
-	import { formatTimelineDate } from '$lib/timeline/format-date';
-	import CalendarCard from '$lib/components/CalendarCard.svelte';
-	import NeedsNow from '$lib/components/NeedsNow.svelte';
-	import { handOver } from '$lib/calendar/hand-over';
-	import { shouldShowCalendarCard } from '$lib/calendar/card-visibility';
-	import { selectNeedsNow } from '$lib/timeline/needs-now';
-	import { computeDesiredEvents } from '$lib/calendar/desired';
-	import LeavingLine from '$lib/components/LeavingLine.svelte';
-	import SkillBridgeQuestion from '$lib/components/SkillBridgeQuestion.svelte';
-	import { readablePlan, type PlanAnswer } from '$lib/timeline/skillbridge-plan';
-	import { savePlanAnswer } from '$lib/timeline/skillbridge-save';
-	import { localTodayIso } from '$lib/timeline/day-math';
-	import { LocalToday } from '$lib/timeline/local-today.svelte';
-	import SourceReader from '$lib/components/SourceReader.svelte';
-	import { CORPUS_BASE, loadCorpus } from '$lib/ask/corpus-load';
-	import { createLazyCorpus } from '$lib/ask/corpus-loader';
-	import { waitForControl } from '$lib/ask/when-controlled';
-	import { sourcesFromCorpus, type Source } from '$lib/ask/sources';
-	import { takeBackupIntent } from '$lib/backup/intent';
-	import { formatBackupDate } from '$lib/backup/dates';
-	import { notInBackupsLine, restoredLine } from '$lib/backup/restored-note';
+	import LockedPanel from '#lib/components/LockedPanel.svelte';
+	import { loadPinUnlock } from '#lib/components/load-pin-unlock.js';
+	import SetupCTA from '#lib/components/SetupCTA.svelte';
+	import TimelineList from '#lib/components/TimelineList.svelte';
+	import PhaseChips from '#lib/components/PhaseChips.svelte';
+	import { getProfileApp } from '#lib/profile/context.js';
+	import {
+		generateTimeline,
+		TASK_DEFS,
+		type TimelineState,
+		type TaskStatus
+	} from '#lib/timeline/index.js';
+	import { formatTimelineDate } from '#lib/timeline/format-date.js';
+	import CalendarCard from '#lib/components/CalendarCard.svelte';
+	import NeedsNow from '#lib/components/NeedsNow.svelte';
+	import { handOver } from '#lib/calendar/hand-over.js';
+	import { shouldShowCalendarCard } from '#lib/calendar/card-visibility.js';
+	import { selectNeedsNow } from '#lib/timeline/needs-now.js';
+	import { computeDesiredEvents } from '#lib/calendar/desired.js';
+	import LeavingLine from '#lib/components/LeavingLine.svelte';
+	import SkillBridgeQuestion from '#lib/components/SkillBridgeQuestion.svelte';
+	import { readablePlan, type PlanAnswer } from '#lib/timeline/skillbridge-plan.js';
+	import { savePlanAnswer } from '#lib/timeline/skillbridge-save.js';
+	import { localTodayIso } from '#lib/timeline/day-math.js';
+	import { LocalToday } from '#lib/timeline/local-today.svelte.js';
+	import SourceReader from '#lib/components/SourceReader.svelte';
+	import { CORPUS_BASE, loadCorpus } from '#lib/ask/corpus-load.js';
+	import { createLazyCorpus } from '#lib/ask/corpus-loader.js';
+	import { waitForControl } from '#lib/ask/when-controlled.js';
+	import { sourcesFromCorpus, type Source } from '#lib/ask/sources.js';
+	import { takeBackupIntent } from '#lib/backup/intent.js';
+	import { formatBackupDate } from '#lib/backup/dates.js';
+	import { notInBackupsLine, restoredLine } from '#lib/backup/restored-note.js';
 
 	const app = getProfileApp();
 	// Everything derived from today reads this clock, which turns at local midnight; an act at a tap reads the clock at the tap.
@@ -64,9 +69,9 @@
 	// The Erase lives in Settings: ask for its dialog, then go there. The session is fetched only now, so this page does not
 	// carry it.
 	function eraseAtSettings(): void {
-		void import('$lib/components/load-backup').then(({ backupSession }) => {
+		void import('#lib/components/load-backup.js').then(({ backupSession }) => {
 			backupSession.requestErase();
-			return goto(resolve('/settings'));
+			return goto(resolve('settings'));
 		});
 	}
 
@@ -370,7 +375,7 @@
 				<div class="timeline-note">
 					<p class="timeline-note__msg" role="alert">
 						Your saved progress couldn't be loaded, so your tasks aren't shown. Reload to try again.
-						If it keeps happening, you can erase all data in <a href={resolve('/settings')}
+						If it keeps happening, you can erase all data in <a href={resolve('settings')}
 							>Settings</a
 						> and start again.
 					</p>

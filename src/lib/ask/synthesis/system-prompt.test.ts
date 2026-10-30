@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildMessages, SYSTEM_PROMPT, type SourceChunk } from './system-prompt';
-import { assertOnlyKeys } from '$lib/ask/online/payload';
-import { deriveChunkId } from '$lib/corpus/chunk-id';
+import { assertOnlyKeys } from '#lib/ask/online/payload.js';
+import { deriveChunkId } from '#lib/corpus/chunk-id.js';
 import { parseCitedIds } from './citation-validation';
 
 // Real chunk-id shape, DERIVED rather than written down. These were colon-free slugs, which is why the

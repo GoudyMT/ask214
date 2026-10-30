@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import { page } from 'vitest/browser';
 import SourceList from './SourceList.svelte';
-import type { SourcesIndex } from '$lib/sources/types';
+import type { SourcesIndex } from '#lib/sources/types.js';
 
 const INDEX: SourcesIndex = {
 	agency: [

@@ -13,7 +13,7 @@ decision's full reasoning is kept in private working notes.
 | Tokens and themes | TypeScript registry, CSS variables | n/a      | Colour, spacing, type; light and dark   |
 | Install           | Web App Manifest                   | spec     | Home screen install                     |
 | Offline           | Service Worker                     | spec     | Opens with no connection                |
-| Script policy     | SvelteKit CSP, hash mode           | 2.x      | Only named scripts run                  |
+| Script policy     | SvelteKit CSP, hash mode           | 3.x      | Only named scripts run                  |
 | Edge headers      | Cloudflare `_headers`              | n/a      | Transport, framing, referrer, isolation |
 | Disclosure        | `security.txt`                     | RFC 9116 | Where to report a vulnerability         |
 | Budgets           | size-limit, `check:chunks`         | 13.x     | Gzipped size limits                     |
@@ -82,7 +82,7 @@ the browser's own menu.
 
 ### Service worker
 
-**What it is.** `src/service-worker.ts`, with its rules in `src/lib/ask/asset-cache.ts`. Install stores the
+**What it is.** `src/service-worker/index.ts`, with its rules in `src/lib/ask/asset-cache.ts`. Install stores the
 built app, the small static files and the home page in a cache named for the release (`app-<version>`), which
 the next release deletes. Files loaded only on demand (the on-device model and its runtime, the answer library,
 the PDF library, saved documents) go to a second cache, `ask-assets-v1`, whose name never changes, so updates do
@@ -106,7 +106,7 @@ tab of the old one has closed; there is no "update available" prompt yet.
 
 ### Content Security Policy
 
-**What it is.** SvelteKit builds the policy from `kit.csp` in `svelte.config.js`, in hash mode: each inline
+**What it is.** SvelteKit builds the policy from `csp` in `vite.config.ts`, in hash mode: each inline
 script it writes is allowed by its SHA-256 hash, so scripts never need `'unsafe-inline'`. Of its 13 directives,
 the ones that matter most:
 
@@ -148,9 +148,9 @@ live site sends.
 ### Budgets and Lighthouse
 
 **What they are.** `size-limit` caps the gzipped JavaScript: the SvelteKit entry at 10 KB, the root layout
-loaded on every page at 8,920 bytes, and the code of all pages together at 53,290 bytes. `pnpm check:chunks` caps what
-one page downloads (95,150 bytes), the code loaded on demand (8,189 bytes) and the service worker's install set
-(72 files, 227,560 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
+loaded on every page at 9,820 bytes, and the code of all pages together at 60,224 bytes. `pnpm check:chunks` caps what
+one page downloads (110,821 bytes), the code loaded on demand (16,138 bytes) and the service worker's install set
+(87 files, 260,480 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
 production build: accessibility below 0.95 or performance below 0.9 fails the build, and best practices or SEO
 below 0.9 warns. Reports stay in a CI artifact.
 
@@ -190,3 +190,4 @@ the browser enforce the privacy claims, and the budgets hold it all to a measure
 
 - 2026-05-26: First draft, the Phase 1 shell.
 - 2026-10-02: Updated to the shipped shell and cut to the word cap.
+- 2026-10-29: SvelteKit 3 paths and budgets.

@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { KDF_WORKER_SRC } from '$lib/backup/kdf-paths';
+import { KDF_WORKER_SRC } from '#lib/backup/kdf-paths.js';
 import {
 	curateWords,
 	parseRemovals,

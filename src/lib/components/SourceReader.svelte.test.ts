@@ -3,11 +3,11 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
 import SourceReader from './SourceReader.svelte';
-import type { Source } from '$lib/ask/sources';
-import type { PdfDocument, PdfRuntime } from '$lib/sources/pdf-runtime';
-import { ASK_ASSET_CACHE } from '$lib/ask/asset-cache';
-import { localDocumentPath } from '$lib/sources/local-document';
-import { pageInView } from '$lib/sources/scroll-pages';
+import type { Source } from '#lib/ask/sources.js';
+import type { PdfDocument, PdfRuntime } from '#lib/sources/pdf-runtime.js';
+import { ASK_ASSET_CACHE } from '#lib/ask/asset-cache.js';
+import { localDocumentPath } from '#lib/sources/local-document.js';
+import { pageInView } from '#lib/sources/scroll-pages.js';
 
 function source(over: Partial<Source> = {}): Source {
 	return {

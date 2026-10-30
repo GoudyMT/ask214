@@ -1,5 +1,5 @@
 import { normalizeText } from '../../corpus/normalize';
-import type { CorpusChunk } from '$lib/corpus';
+import type { CorpusChunk } from '#lib/corpus/index.js';
 
 /**
  * A positive eval item: the answer IS in the corpus. `sourceId` + `answerSnippet` is the primary

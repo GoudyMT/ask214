@@ -3,13 +3,13 @@ import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
 import { cdp, userEvent } from 'vitest/browser';
 import AskView from './AskView.svelte';
-import { createAskStore } from '$lib/ask';
-import type { AskState } from '$lib/ask/types';
-import { ASK_ERROR } from '$lib/ask/errors';
-import type { ResultCard } from '$lib/corpus';
-import type { Source } from '$lib/ask/sources';
-import type { AnswerView } from '$lib/ask/answer/answer-view';
-import { OFFICIAL_FALLBACK } from '$lib/ask/crisis/contacts';
+import { createAskStore } from '#lib/ask/index.js';
+import type { AskState } from '#lib/ask/types.js';
+import { ASK_ERROR } from '#lib/ask/errors.js';
+import type { ResultCard } from '#lib/corpus/index.js';
+import type { Source } from '#lib/ask/sources.js';
+import type { AnswerView } from '#lib/ask/answer/answer-view.js';
+import { OFFICIAL_FALLBACK } from '#lib/ask/crisis/contacts.js';
 
 type ViewProps = {
 	askState: AskState;

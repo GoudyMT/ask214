@@ -1,8 +1,8 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import GlanceRow from './GlanceRow.svelte';
-import type { HomeRow } from '$lib/timeline/home-glance';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import type { HomeRow } from '#lib/timeline/home-glance.js';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 // Each line exactly as the page holds it: a check that evened out the spacing passed a row reading "Your timeline-".
 const lines = (container: Element) => [

@@ -1,4 +1,3 @@
-// Relative, not `$lib`: the budget script imports this module under tsx, which does not resolve the alias.
 import { classifyAsset } from '../ask/asset-cache';
 
 /** One file in the Vite build manifest, keyed there by its source; only the fields the split reads. */
@@ -59,25 +58,20 @@ export function splitChunksByLoading(manifest: BuildManifest): {
 /**
  * The paths a built service worker installs from, read from the worker itself.
  *
- * SvelteKit writes the worker's `build` and `files` lists into it as template strings, each prefixed with a
- * base path the worker reads from its own location. That base is found first, so only list entries are read
- * and never another string in the worker's code; the precache is then filtered by the rule the worker itself
- * applies, so the two cannot disagree about what a visitor downloads at install.
+ * SvelteKit writes the worker's `immutable` and `assets` lists into it as `{path}` objects whose paths are template
+ * strings relative to the base path (the site root: the app sets no base), so only those entries are read and never another string in the worker's code.
+ * Each is read as the root path the worker compares with a request, and the precache is then filtered by the rule the
+ * worker itself applies, so the two cannot disagree about what a visitor downloads at install.
  *
  * @param workerSource The built service worker's text.
  * @returns Every listed path, and the ones the worker precaches at install.
- * @throws E_PRECACHE_LIST_UNREADABLE when the worker's base path cannot be found.
+ * @throws E_PRECACHE_LIST_UNREADABLE when the worker holds no list entry in that shape.
  */
 export function precachedPaths(workerSource: string): { listed: string[]; precached: string[] } {
-	const base = /([A-Za-z_$][\w$]*)=location\.pathname\.split\(/.exec(workerSource)?.[1];
-	if (base === undefined) throw new Error('E_PRECACHE_LIST_UNREADABLE');
 	const listed = [
-		...new Set(
-			[...workerSource.matchAll(/([A-Za-z_$][\w$]*)\+`(\/[^`]+)`/g)]
-				.filter((match) => match[1] === base)
-				.map((match) => match[2] as string)
-		)
+		...new Set([...workerSource.matchAll(/\{path:`([^`]+)`\}/g)].map((match) => `/${match[1]}`))
 	];
+	if (listed.length === 0) throw new Error('E_PRECACHE_LIST_UNREADABLE');
 	return { listed, precached: listed.filter((path) => classifyAsset(path) === 'precache') };
 }
 
@@ -150,6 +144,8 @@ export function roomInBytes(size: number, limit: number): string {
 /**
  * The page the service worker also keeps at install (APP_SHELL in ../ask/asset-cache): a served page, not a file
  * in the build, so the budget cannot weigh it on disk. This is its allowance in gzip-9 bytes; the offline-pages
- * E2E weighs the real page against it. Measured 1,469 B (that E2E, gzip-9 of the kept body) on 2026-09-26.
+ * E2E weighs the real page against it. Measured 1,469 B (that E2E, gzip-9 of the kept body) on 2026-09-26; 1,717 B
+ * on SvelteKit 3, which writes a modulepreload link per script into the page (from 1,349 B on the live SvelteKit 2
+ * page), so 1,754 B: the measurement plus 10% of the growth (owner's call, 2026-10-29).
  */
-export const SHELL_BYTES_ALLOWANCE = 1_600;
+export const SHELL_BYTES_ALLOWANCE = 1_754;

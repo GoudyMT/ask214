@@ -2,10 +2,10 @@ import { render } from 'vitest-browser-svelte';
 import { flushSync } from 'svelte';
 import { describe, it, expect, vi } from 'vitest';
 import CalendarCard from './CalendarCard.svelte';
-import type { TimelineItem } from '$lib/timeline/generate';
-import type { TaskDef } from '$lib/timeline/types';
-import type { CalendarFile } from '$lib/calendar/build-ics';
-import { makesPersonalClaim, textOf } from '$lib/timeline/personal-claim';
+import type { TimelineItem } from '#lib/timeline/generate.js';
+import type { TaskDef } from '#lib/timeline/types.js';
+import type { CalendarFile } from '#lib/calendar/build-ics.js';
+import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 function def(id: string, category: TaskDef['category']): TaskDef {
 	return {

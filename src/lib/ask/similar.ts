@@ -1,4 +1,4 @@
-import type { ResultCard } from '$lib/corpus';
+import type { ResultCard } from '#lib/corpus/index.js';
 
 /**
  * The most words a passage can have and still be a heading cut off from its text. Every shown card this short,

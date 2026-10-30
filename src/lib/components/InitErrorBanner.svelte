@@ -30,7 +30,7 @@
 		{#if damaged}
 			<p class="init-banner__msg" role="alert">
 				The information saved on this device can't be read. You can erase it in <a
-					href={resolve('/settings')}>Settings</a
+					href={resolve('settings')}>Settings</a
 				> and start again.
 			</p>
 		{:else}

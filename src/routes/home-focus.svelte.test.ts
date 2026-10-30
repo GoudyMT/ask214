@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
-import type { AskState } from '$lib/ask';
+import type { AskState } from '#lib/ask/index.js';
 import HomePage from './+page.svelte';
 
 // The Ask store is replaced by one the test controls, and the cache read that makes it is held until `gate.land()`.
@@ -32,14 +32,14 @@ const store = {
 	dismissNudge: () => {}
 };
 
-vi.mock('$lib/ask', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/ask')>()),
+vi.mock('#lib/ask/index.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/ask/index.js')>()),
 	createAskStore: () => store,
 	createRecoveringEmbed: () => ({ embed: async () => [], dispose: () => {} })
 }));
-vi.mock('$lib/ask/embed-worker?worker', () => ({ default: class {} }));
-vi.mock('$lib/ask/device-files', () => ({ deviceFilesKept: () => gate.held }));
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/ask/embed-worker?worker', () => ({ default: class {} }));
+vi.mock('#lib/ask/device-files.js', () => ({ deviceFilesKept: () => gate.held }));
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'loading',
 		store: null,
@@ -51,7 +51,7 @@ vi.mock('$lib/profile/context', () => ({
 	}),
 	setProfileApp: () => {}
 }));
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: true,
 		installed: false,

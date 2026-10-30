@@ -16,7 +16,7 @@ test('CSP is present and strict (header or meta tag)', async ({ page, request })
 
 	expect(csp).toBeTruthy();
 
-	// Verify every directive we configured in svelte.config.js kit.csp.directives is
+	// Verify every directive we configured in the sveltekit() plugin's csp.directives (vite.config.ts) is
 	// actually emitted. If SvelteKit drops one silently (e.g., upstream regression),
 	// the corresponding assertion fails and we know exactly what's missing.
 	expect(csp).toMatch(/default-src 'self'/);
@@ -49,6 +49,15 @@ test('CSP is present and strict (header or meta tag)', async ({ page, request })
 	// still load with script-src 'self' but inline hydration would error at runtime.
 	// Without this check, the test would silently pass a broken implementation.
 	expect(scriptSrcValue).toMatch(/'sha(256|384|512)-[A-Za-z0-9+/=]+'/);
+});
+
+test('a rendered page sends the security headers from _headers', async ({ request }) => {
+	// Cloudflare applies `_headers` to static files only; the server hook gives rendered pages the same headers.
+	const headers = (await request.get('/')).headers();
+	expect(headers['strict-transport-security']).toBe('max-age=63072000; includeSubDomains; preload');
+	expect(headers['x-content-type-options']).toBe('nosniff');
+	expect(headers['referrer-policy']).toBe('no-referrer');
+	expect(headers['cache-control']).toBe('no-store');
 });
 
 test('all external script sources have SRI integrity attributes', async ({ page }) => {

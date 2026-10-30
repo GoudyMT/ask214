@@ -1,12 +1,12 @@
 import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
-import { RESTORE_ENTRY } from '$lib/backup/copy';
+import { RESTORE_ENTRY } from '#lib/backup/copy.js';
 import WizardPage from './+page.svelte';
 
 // Reactive, as the layout's app object is: the page swaps the card away the moment the unlock lands.
 const lock = $state({ pinLocked: true });
-vi.mock('$lib/profile/context', () => ({
+vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
 		status: 'ready',
 		keyMode: 'pin',
@@ -28,8 +28,8 @@ vi.mock('$lib/profile/context', () => ({
 	setProfileApp: () => {}
 }));
 // The check itself is the card's own test; here it only has to end well, after one wrong try.
-vi.mock('$lib/keystore/app-lock-store', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/keystore/app-lock-store')>()),
+vi.mock('#lib/keystore/app-lock-store.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('#lib/keystore/app-lock-store.js')>()),
 	readTries: async () => ({ count: 0, waitMs: 0, pending: false }),
 	runPinCheck: async () => ({ kind: 'good', value: true, wrongTries: 1, unfinished: false })
 }));

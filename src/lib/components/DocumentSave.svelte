@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { CORPUS_BASE, CORPUS_BYTES, documentSourceId } from '$lib/ask/asset-cache';
+	import { CORPUS_BASE, CORPUS_BYTES, documentSourceId } from '#lib/ask/asset-cache.js';
 	import {
 		isAnswerLibraryHeld,
 		listCachedDocuments,
 		runningSave,
 		saveDocument,
 		type SaveResult
-	} from '$lib/sources/document-cache';
-	import { documentStates } from '$lib/sources/document-states';
+	} from '#lib/sources/document-cache.js';
+	import { documentStates } from '#lib/sources/document-states.js';
 
 	// The reader's own Save. Viewing a document keeps nothing on the device, so this is how a document opened
 	// from an answer is kept for offline use. What the device holds, and the connection, are read when the

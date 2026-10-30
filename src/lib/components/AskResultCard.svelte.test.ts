@@ -3,7 +3,7 @@ import { flushSync } from 'svelte';
 import { describe, it, expect } from 'vitest';
 import { page } from 'vitest/browser';
 import AskResultCard from './AskResultCard.svelte';
-import type { ResultCard } from '$lib/corpus';
+import type { ResultCard } from '#lib/corpus/index.js';
 
 function fullCard(over: Partial<ResultCard> = {}): ResultCard {
 	return {

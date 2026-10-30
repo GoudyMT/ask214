@@ -9,7 +9,7 @@ checks, hosting, and license.
 
 | Layer                    | Tool               | Version   | Purpose                                           |
 | ------------------------ | ------------------ | --------- | ------------------------------------------------- |
-| Framework                | SvelteKit          | 2.x       | Full-stack framework for Svelte 5                 |
+| Framework                | SvelteKit          | 3.x       | Full-stack framework for Svelte 5                 |
 | UI                       | Svelte             | 5.x       | Compiled components with runes                    |
 | Language                 | TypeScript         | 6.x       | Strict type checking across all source            |
 | Package manager          | pnpm               | 11.x      | Strict, reproducible installs, pinned by Corepack |

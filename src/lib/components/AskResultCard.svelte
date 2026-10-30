@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ResultCard } from '$lib/corpus';
-	import { documentUrl } from '$lib/sources/document-url';
+	import type { ResultCard } from '#lib/corpus/index.js';
+	import { documentUrl } from '#lib/sources/document-url.js';
 
 	let {
 		card,

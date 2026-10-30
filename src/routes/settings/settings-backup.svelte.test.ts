@@ -2,18 +2,18 @@ import { render } from 'vitest-browser-svelte';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { resolve } from '$app/paths';
-import { deleteTestDb, openTestDb } from '$lib/db/_test-helpers';
-import { withStores } from '$lib/db/schema';
-import { wipeAllStores } from '$lib/db/wipe';
-import { bootstrapLocalKeystore } from '$lib/keystore/bootstrap';
+import { deleteTestDb, openTestDb } from '#lib/db/_test-helpers.js';
+import { withStores } from '#lib/db/schema.js';
+import { wipeAllStores } from '#lib/db/wipe.js';
+import { bootstrapLocalKeystore } from '#lib/keystore/bootstrap.js';
 import {
 	createJoinRelock,
 	relockAll,
 	relockEachSync,
 	type Relockable
-} from '$lib/profile/app-init';
-import type { ProfileApp } from '$lib/profile/context';
-import { createProfileStore, type ProfileStore } from '$lib/profile/store.svelte';
+} from '#lib/profile/app-init.js';
+import type { ProfileApp } from '#lib/profile/context.js';
+import { createProfileStore, type ProfileStore } from '#lib/profile/store.svelte.js';
 import {
 	CARD_INTRO_LINE,
 	CARD_LABELS,
@@ -24,15 +24,15 @@ import {
 	PHRASE_NOTE,
 	RESTORED_UNLOCK_LINE,
 	savedLine
-} from '$lib/backup/copy';
-import type { SaveHandle } from '$lib/backup/export-flow';
-import goldenText from '$lib/backup/golden/v1-1.ask214backup?raw';
-import { GOLDEN_PASSWORD } from '$lib/backup/golden/golden';
-import { captureBackupIntent, takeBackupIntent } from '$lib/backup/intent';
-import { backupSession, type OpenPicker, type WorkerLike } from '$lib/backup/session.svelte';
-import { createHandler } from '$lib/backup/worker/handler';
-import type { WorkerRequest } from '$lib/backup/worker/protocol';
-import { WORDS_V1 } from '$lib/backup/words-v1';
+} from '#lib/backup/copy.js';
+import type { SaveHandle } from '#lib/backup/export-flow.js';
+import goldenText from '#lib/backup/golden/v1-1.ask214backup?raw';
+import { GOLDEN_PASSWORD } from '#lib/backup/golden/golden.js';
+import { captureBackupIntent, takeBackupIntent } from '#lib/backup/intent.js';
+import { backupSession, type OpenPicker, type WorkerLike } from '#lib/backup/session.svelte.js';
+import { createHandler } from '#lib/backup/worker/handler.js';
+import type { WorkerRequest } from '#lib/backup/worker/protocol.js';
+import { WORDS_V1 } from '#lib/backup/words-v1.js';
 import SettingsPage from './+page.svelte';
 
 // The page runs on a real device: a test database with the real profile store, the real relock walk, the tab's real
@@ -41,8 +41,8 @@ import SettingsPage from './+page.svelte';
 const harness = vi.hoisted(() => ({ app: null as ProfileApp | null }));
 // The write itself, held after it has committed: the one moment a person can press Lock "during the write".
 const writer = vi.hoisted(() => ({ hold: null as Promise<void> | null }));
-vi.mock('$lib/backup/restore-writer', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/backup/restore-writer')>();
+vi.mock('#lib/backup/restore-writer.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/backup/restore-writer.js')>();
 	return {
 		...real,
 		restoreBackup: async (...args: Parameters<typeof real.restoreBackup>) => {
@@ -53,11 +53,11 @@ vi.mock('$lib/backup/restore-writer', async (importOriginal) => {
 	};
 });
 
-vi.mock('$lib/profile/context', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/profile/context')>();
+vi.mock('#lib/profile/context.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/profile/context.js')>();
 	return { ...real, getProfileApp: () => harness.app, setProfileApp: () => {} };
 });
-vi.mock('$lib/install/context', () => ({
+vi.mock('#lib/install/context.js', () => ({
 	getInstallApp: () => ({
 		canPrompt: false,
 		installed: true,
@@ -68,8 +68,8 @@ vi.mock('$lib/install/context', () => ({
 	setInstallApp: () => {}
 }));
 // No service worker controls the test page, and the wait for one is ten seconds.
-vi.mock('$lib/ask/when-controlled', async (importOriginal) => {
-	const real = await importOriginal<typeof import('$lib/ask/when-controlled')>();
+vi.mock('#lib/ask/when-controlled.js', async (importOriginal) => {
+	const real = await importOriginal<typeof import('#lib/ask/when-controlled.js')>();
 	return { ...real, waitForControl: () => Promise.resolve(true) };
 });
 // A backup made here has words of its own, which the pinned output cannot answer: while this is set, the key step is a
@@ -77,7 +77,7 @@ vi.mock('$lib/ask/when-controlled', async (importOriginal) => {
 const kdf = vi.hoisted(() => ({ standIn: false }));
 // The slow key step answers with the pinned output for exactly the pinned password, salt and settings.
 vi.mock('@noble/hashes/argon2.js', async () => {
-	const golden = await import('$lib/backup/golden/golden');
+	const golden = await import('#lib/backup/golden/golden.js');
 	const same = (a: Uint8Array, b: Uint8Array) =>
 		a.length === b.length && a.every((x, i) => x === b[i]);
 	return {
@@ -656,7 +656,7 @@ describe('Settings, Erase', () => {
 
 		expect(wipeAll).toHaveBeenCalledOnce();
 		expect(seen[0]?.type).toBe('reload');
-		expect(location.pathname).not.toBe(resolve('/wizard'));
+		expect(location.pathname).not.toBe(resolve('wizard'));
 		captureBackupIntent();
 		expect(takeBackupIntent('restore-row')).toBe(false);
 	});
@@ -668,7 +668,7 @@ describe('Settings, Erase', () => {
 
 		expect(wipeAll).toHaveBeenCalledOnce();
 		expect(seen[0]?.type).toBe('reload');
-		expect(location.pathname).toBe(resolve('/wizard'));
+		expect(location.pathname).toBe(resolve('wizard'));
 		// Nothing about a backup is in the address bar: the note lives in the history entry's state.
 		expect(location.search).toBe('');
 		expect(location.hash).toBe('');
@@ -702,7 +702,7 @@ describe('Settings, Erase', () => {
 		await userEvent.click(dialogButton('Erase everything'));
 		await vi.waitFor(() => expect(seen).toHaveLength(1));
 		expect(wipeAll).toHaveBeenCalledOnce();
-		expect(location.pathname).toBe(resolve('/wizard'));
+		expect(location.pathname).toBe(resolve('wizard'));
 		expect(location.search).toBe('');
 		expect(location.hash).toBe('');
 		captureBackupIntent();
@@ -716,15 +716,15 @@ describe('Settings, Erase', () => {
 			session().requestErase();
 			await render(SettingsPage);
 			await vi.waitFor(() => expect(dialogEl()?.open).toBe(true));
+
 			if (how === 'the Cancel button') await userEvent.click(dialogButton('Cancel'));
 			else await userEvent.keyboard('{Escape}');
+
 			await vi.waitFor(() => expect(dialogEl()?.open).toBe(false));
-
 			await eraseFromButton();
-
 			captureBackupIntent();
 			expect(takeBackupIntent('restore-row')).toBe(false);
-			expect(location.pathname).not.toBe(resolve('/wizard'));
+			expect(location.pathname).not.toBe(resolve('wizard'));
 		}
 	);
 
@@ -776,8 +776,8 @@ describe('Settings, when the saved data cannot be read', () => {
 		wipeAll.mockImplementationOnce(async () => {
 			activeAtWipe = session().active;
 		});
-		await render(SettingsPage);
 
+		await render(SettingsPage);
 		await expect
 			.element(
 				page.getByText(

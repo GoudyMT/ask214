@@ -11,11 +11,11 @@ import {
 	scanForPiiTokens
 } from './pii-policy';
 
-// Server-side SvelteKit source: anything that can execute on a server - a route's server file, hooks, any
-// `*.server` module and everything under src/lib/server. The feedback endpoint is the one today; the guard covers it
-// and any added later (PII stays on device).
-const SERVER_FILE_PATTERN = /(?:\+server|\.server)\.[jt]s$/;
-const SERVER_FOLDER_PATTERN = /[\\/]src[\\/]lib[\\/]server[\\/]/;
+// Server-side SvelteKit source: anything that can execute on a server - a route's server file, hooks, any `server`
+// or `*.server` module and everything in a `server` folder outside src/routes, the rule SvelteKit itself applies. The
+// feedback endpoint is the one today; the guard covers it and any added later (PII stays on device).
+const SERVER_FILE_PATTERN = /[\\/+.]server\.[cm]?[jt]s$/;
+const SERVER_FOLDER_PATTERN = /[\\/]src[\\/](?!routes[\\/])(?:.*[\\/])?server[\\/]/;
 
 /** Whether a file in a scanned folder is source the guard reads: every kind, tests and type declarations aside. */
 function isScannedSource(name: string): boolean {
@@ -29,8 +29,8 @@ function isScannedSource(name: string): boolean {
 /** Whether a source file runs on the server. */
 function isServerSource(path: string): boolean {
 	return (
-		SERVER_FILE_PATTERN.test(path) ||
-		(SERVER_FOLDER_PATTERN.test(`/${path}`) && isScannedSource(basename(path)))
+		(SERVER_FILE_PATTERN.test(path) || SERVER_FOLDER_PATTERN.test(`/${path}`)) &&
+		isScannedSource(basename(path))
 	);
 }
 
@@ -49,12 +49,19 @@ function findServerFiles(dir: string): string[] {
 }
 
 describe('pii-policy: what the guard reads', () => {
-	it('counts every server-only file: *.server modules and src/lib/server', () => {
+	// SvelteKit runs these on the server only: a file named `server.*` or `*.server.*`, and anything in a `server`
+	// folder outside src/routes.
+	it('counts every server-only file: server and *.server modules, and any server folder', () => {
 		expect(isServerSource(join('src', 'routes', 'api', 'feedback', '+server.ts'))).toBe(true);
 		expect(isServerSource(join('src', 'lib', 'resend.server.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'lib', 'mail', 'server.ts'))).toBe(true);
 		expect(isServerSource(join('src', 'lib', 'server', 'mailer.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'lib', 'mail', 'server', 'format.ts'))).toBe(true);
+		expect(isServerSource(join('src', 'server', 'mailer.ts'))).toBe(true);
 		expect(isServerSource(join('src', 'lib', 'server', 'mailer.test.ts'))).toBe(false);
+		expect(isServerSource(join('src', 'routes', 'api', 'feedback', 'server.test.ts'))).toBe(false);
 		expect(isServerSource(join('src', 'lib', 'ask', 'store.svelte.ts'))).toBe(false);
+		expect(isServerSource(join('src', 'lib', 'ask', 'observer.ts'))).toBe(false);
 	});
 
 	it('skips build output: dot folders and node_modules', () => {
@@ -291,14 +298,14 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		scanForPiiImports([{ path: 'src/lib/ask/online/x.ts', content }]);
 
 	it.each([
-		'$lib/profile/store.svelte',
+		'#lib/profile/store.svelte.js',
 		'../../profile/codec',
-		'$lib/keystore/record',
-		'$lib/timeline/state.svelte',
-		'$lib/calendar/store.svelte',
-		'$lib/db/schema',
-		'$lib/crypto/aes-gcm',
-		'$lib/backup/session.svelte',
+		'#lib/keystore/record.js',
+		'#lib/timeline/state.svelte.js',
+		'#lib/calendar/store.svelte.js',
+		'#lib/db/schema.js',
+		'#lib/crypto/aes-gcm.js',
+		'#lib/backup/session.svelte.js',
 		'../../../src/lib/profile/types'
 	])('flags an import of %s', (specifier) => {
 		const violations = scan(`import { a } from '${specifier}';`);
@@ -307,29 +314,29 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 	});
 
 	it('flags a dynamic import, a side-effect import and an import split over several lines', () => {
-		expect(scan(`const m = await import('$lib/profile/store.svelte');`)).toHaveLength(1);
-		expect(scan(`import '$lib/keystore/record';`)).toHaveLength(1);
+		expect(scan(`const m = await import('#lib/profile/store.svelte');`)).toHaveLength(1);
+		expect(scan(`import '#lib/keystore/record';`)).toHaveLength(1);
 		expect(
-			scan(['import {', '\ta,', '\tb', "} from '$lib/profile/codec';"].join('\n'))
+			scan(['import {', '\ta,', '\tb', "} from '#lib/profile/codec';"].join('\n'))
 		).toHaveLength(1);
 	});
 
 	it('flags the other ways to spell the same import', () => {
-		expect(scan('const m = await import(`$lib/profile/store.svelte`);')).toHaveLength(1);
-		expect(scan("import { a } from '$lib/ask/../profile/persona';")).toHaveLength(1);
+		expect(scan('const m = await import(`#lib/profile/store.svelte`);')).toHaveLength(1);
+		expect(scan("import { a } from '#lib/ask/../profile/persona';")).toHaveLength(1);
 		expect(scan("import { a } from '/src/lib/profile/persona';")).toHaveLength(1);
 		expect(
-			scan(['const m = await import(', "\t'$lib/profile/store.svelte'", ');'].join('\n'))
+			scan(['const m = await import(', "\t'#lib/profile/store.svelte'", ');'].join('\n'))
 		).toHaveLength(1);
 	});
 
 	it('does not let a quoted word ending in "from" hide the next import', () => {
 		expect(
-			scan(["const label = 'Imported from';", "import { a } from '$lib/profile/x';"].join('\n'))
+			scan(["const label = 'Imported from';", "import { a } from '#lib/profile/x';"].join('\n'))
 		).toHaveLength(1);
 		expect(
 			scan(
-				["// Resend's 'from' address is verified", "import { a } from '$lib/profile/x';"].join('\n')
+				["// Resend's 'from' address is verified", "import { a } from '#lib/profile/x';"].join('\n')
 			)
 		).toHaveLength(1);
 	});
@@ -346,8 +353,8 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 	});
 
 	it('leaves public modules and platform modules alone', () => {
-		expect(scan(`import type { CorpusChunk } from '$lib/corpus';`)).toEqual([]);
-		expect(scan(`import { isGovernmentHost } from '$lib/sources/government-host';`)).toEqual([]);
+		expect(scan(`import type { CorpusChunk } from '#lib/corpus';`)).toEqual([]);
+		expect(scan(`import { isGovernmentHost } from '#lib/sources/government-host';`)).toEqual([]);
 		expect(scan(`import { webcrypto } from 'node:crypto';`)).toEqual([]);
 		expect(scan(`import { createHash } from 'crypto';`)).toEqual([]);
 	});
@@ -374,7 +381,7 @@ describe("pii-policy: the finder's fetch part must not import the finder's perso
 			FINDER_STATE_IMPORT_PATTERN
 		);
 
-	it.each(['../state/select-files', '$lib/skillbridge-finder/state/store.svelte'])(
+	it.each(['../state/select-files', '#lib/skillbridge-finder/state/store.svelte.js'])(
 		'flags an import of %s',
 		(specifier) => {
 			expect(scan(`import { a } from '${specifier}';`)).toHaveLength(1);

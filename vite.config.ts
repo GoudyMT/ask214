@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import adapter from '@sveltejs/adapter-cloudflare';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
@@ -19,8 +21,16 @@ const { version } = JSON.parse(
 	version: string;
 };
 
+// A real past build stamp, not a round number: a run of zeros compresses smaller than any real stamp and would
+// measure the shipped files a few bytes light.
+const MEASURE_VERSION = '1793277697344';
+
 export default defineConfig({
 	define: { __APP_VERSION__: JSON.stringify(version) },
+	// The live site sends no CORS headers on the app's files. Vite's preview adds `Vary: Origin` to every file by
+	// default, and the service worker's cache lookups then miss a module script (sent with an Origin header) that
+	// install stored without one, so the app would not open offline in the E2E suite though it does on the live site.
+	preview: { cors: false },
 	// The preview server serves HTTPS off a generated self-signed cert, because the production CSP
 	// sends `upgrade-insecure-requests` and browsers that honour it rewrite every asset URL to https.
 	// Over plain HTTP that yields a page with no stylesheet at all - which is not a product bug (in
@@ -36,7 +46,79 @@ export default defineConfig({
 					? code.replaceAll('{__APP_VERSION__}', version)
 					: null
 		},
-		sveltekit(),
+
+		sveltekit({
+			compilerOptions: {
+				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
+				runes: ({ filename }) =>
+					filename.split(/[/\\]/).includes('node_modules') ? undefined : true,
+
+				// Off: every compiled component would otherwise import a module that records Svelte's version on
+				// window.__svelte for outside tools. Nothing here reads it, and each import costs page bytes.
+				discloseVersion: false
+			},
+			adapter: adapter(),
+			version: {
+				// The build time is the version by default, and every hashed file name that leads to it changes with it,
+				// so two builds of the same code differ by a few bytes. CI and the gate set MEASURE_BUILD=1 to measure
+				// the size budgets with one fixed version. A live build keeps SvelteKit's default: it is stamped once per
+				// build, where a time computed here could be computed again for each part of the build, and the service
+				// worker and the page would then carry different versions and never agree on an update.
+				...(process.env.MEASURE_BUILD === '1' && { name: MEASURE_VERSION }),
+				// Off: the hourly timer. The service worker owns updates (the layout's take-over). SvelteKit still fetches
+				// the version file each time the app comes back into view (window focus, the tab shown again); no
+				// setting turns that off, and the worker keeps no copy of it.
+				pollInterval: 0
+			},
+			// Off: the layout registers /service-worker.js itself, as a module worker, just before it runs the
+			// take-over that follows a database raise; SvelteKit's own registration would only repeat that call.
+			serviceWorker: { register: false },
+			csp: {
+				// Hash mode generates SHA hashes for SvelteKit's inline hydration scripts and
+				// injects them into script-src - avoids 'unsafe-inline' on scripts. Style-src
+				// keeps 'unsafe-inline' for Svelte's per-component <style> blocks (deferred to
+				// v1.1 cleanup via the same hash mechanism).
+				mode: 'hash',
+
+				directives: {
+					'default-src': ['self'],
+					// 'wasm-unsafe-eval' lets the embedding worker compile the self-hosted ONNX WASM;
+					// it does NOT permit JS eval(). connect-src stays 'self' - no third-party fetch.
+					// The two sha256 hashes pin the hand-added inline scripts in src/app.html: the pre-paint
+					// theme script (sets data-theme before first paint to avoid a wrong-palette flash) and the
+					// early install-prompt capture (stashes beforeinstallprompt before hydration). Hash mode
+					// auto-hashes only SvelteKit's own inline scripts, so a hand-added <head> script must be
+					// pinned here by hand; recompute if either script's bytes change.
+					'script-src': [
+						'self',
+						'wasm-unsafe-eval',
+						'sha256-PTImSrhvB2j8WuYiUGnYhan7q+Hc/ZFGv5riOPKpqpY=',
+						'sha256-KRU6Jj9ERIRGlkSmcnfwHnaSovaCnZSGFOtK6zaCFVc='
+					],
+					'style-src': ['self', 'unsafe-inline'],
+					'img-src': ['self', 'data:'],
+					'font-src': ['self', 'data:'],
+					// 'self' covers the same-origin retrieve Worker (/api/retrieve). The one cross-origin
+					// egress is browser-direct BYO-key synthesis, path-scoped to api.anthropic.com/v1/messages
+					// (no trailing slash) so the browser blocks every other Anthropic path as defense-in-depth
+					// behind the structural payload allowlist. Google Calendar hosts (accounts.google.com,
+					// oauth2.googleapis.com, www.googleapis.com) join here when OAuth lands - not pre-allowed.
+					'connect-src': ['self', 'https://api.anthropic.com/v1/messages'],
+					'frame-ancestors': ['none'],
+					'base-uri': ['self'],
+					'form-action': ['self'],
+					'manifest-src': ['self'],
+					'worker-src': ['self'],
+					// Blocks Flash/legacy plugin injection vectors per OWASP ASVS V14.4.3.
+					'object-src': ['none'],
+
+					// Coerces any same-origin http:// reference to https:// before the request
+					// fires (OWASP ASVS V14.4.5). SvelteKit accepts boolean for valueless
+					// directives like this one.
+					'upgrade-insecure-requests': true
+				}
+			}
+		}),
 		basicSsl()
 	],
 	worker: {
@@ -83,6 +165,12 @@ export default defineConfig({
 				test: {
 					name: 'server',
 					environment: 'node',
+					// The alias plugin runs before the adapter's resolver, so tests can vi.mock this module.
+					alias: {
+						'cloudflare:workers': fileURLToPath(
+							new URL('./src/lib/ci/cloudflare-workers.stub.ts', import.meta.url)
+						)
+					},
 					env: { TZ: TEST_TIME_ZONE },
 					include: [
 						'src/**/*.{test,spec}.{js,ts}',

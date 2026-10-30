@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import type { TimelineItem } from '$lib/timeline/generate';
-	import type { TaskCategory } from '$lib/timeline/types';
-	import type { HandedOverEvent, TaskExclusions } from '$lib/calendar/types';
-	import { buildIcs, type CalendarFile } from '$lib/calendar/build-ics';
+	import type { TimelineItem } from '#lib/timeline/generate.js';
+	import type { TaskCategory } from '#lib/timeline/types.js';
+	import type { HandedOverEvent, TaskExclusions } from '#lib/calendar/types.js';
+	import { buildIcs, type CalendarFile } from '#lib/calendar/build-ics.js';
 	import StaleEvents from './StaleEvents.svelte';
-	import { computeDesiredEvents } from '$lib/calendar/desired';
-	import { currentDeviceHint, DELETE_FILE_HINT } from '$lib/calendar/delivery';
-	import { localTodayIso } from '$lib/timeline/day-math';
+	import { computeDesiredEvents } from '#lib/calendar/desired.js';
+	import { currentDeviceHint, DELETE_FILE_HINT } from '#lib/calendar/delivery.js';
+	import { localTodayIso } from '#lib/timeline/day-math.js';
 	import { resolve } from '$app/paths';
-	import type { PanelAccess } from '$lib/timeline/store-access';
+	import type { PanelAccess } from '#lib/timeline/store-access.js';
 
 	type Props = {
 		items: TimelineItem[];
@@ -175,7 +175,7 @@
 		<!-- Muted, not danger: nothing failed, the user's own lock holds. -->
 		<p class="cal-hint cal-hint--locked">
 			Your timeline is locked, so adding is unavailable right now. Unlock it on the
-			<a href={resolve('/timeline')}>Timeline</a> page.
+			<a href={resolve('timeline')}>Timeline</a> page.
 		</p>
 	{/if}
 	{#if ready && !hasEvents}

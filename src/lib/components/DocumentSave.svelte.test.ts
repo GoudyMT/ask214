@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
 import DocumentSave from './DocumentSave.svelte';
-import { saveDocument, type SaveResult } from '$lib/sources/document-cache';
+import { saveDocument, type SaveResult } from '#lib/sources/document-cache.js';
 
 // Shaped like the generated map: a source id, a hash of the content, the extension. An update ships the same
 // source under a new hash, so the older copy shares the source id and nothing else.

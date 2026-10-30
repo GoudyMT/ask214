@@ -1,4 +1,4 @@
-import type { Block } from '$lib/content-ops/extract/pdf-text';
+import type { Block } from '#lib/content-ops/extract/pdf-text.js';
 import { detectRunningAffix } from './detect-running-affix';
 import { classifyBlock } from './classify-block';
 import { stripFused } from './strip-fused';
