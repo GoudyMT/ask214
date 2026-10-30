@@ -400,12 +400,12 @@
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/VA-Benefits-Participant-Guide.pdf'
   origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
+  legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
-  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
-  terms_reviewed_date: 2026-06-21
+  license_notes: '17 USC 105 claimed - VA-published; no copyright notice (S29 and 2026-10-30 scans). OPEN: placed artwork links point to Cathexis (contractor) curriculum design folders; VA asked in writing who holds rights in the text (ADR-030). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
+  terms_reviewed_date: 2026-10-30
   terms_notes: 'Public TAP doc on tapevents.mil; VA-published, contractor-assisted (Cathexis design folder paths in embedded image metadata); no copyright notice on the document; stock-image rights metadata only (2026-10-30 review, ADR-030). File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
   access: open
   reviewed_by: max
