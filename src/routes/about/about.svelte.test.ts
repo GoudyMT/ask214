@@ -39,7 +39,7 @@ describe('About page sources index', () => {
 	it('keeps the honest sources lede', async () => {
 		const { container } = await render(AboutPage);
 		const text = container.textContent ?? '';
-		expect(text).toMatch(/public US Government work/i);
-		expect(text).toMatch(/17 USC/i);
+		expect(text).toMatch(/public documents published by US Government agencies/i);
+		expect(text).toMatch(/exact source it uses/i);
 	});
 });

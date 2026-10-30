@@ -17,9 +17,15 @@ describe('About page sources copy is honest', () => {
 	});
 
 	it('states the source provenance and that answers cite their sources', () => {
-		expect(about).toMatch(/public US Government work/i);
-		expect(about).toMatch(/17 USC/i);
+		expect(about).toMatch(/public documents published by US Government agencies/i);
 		expect(about).toMatch(/cite/i);
+	});
+
+	// Three TAP guides show contractor work and their rights are not settled, so the page must not tell a reader
+	// that every answer is US Government work under 17 USC 105.
+	it('does not claim every answer is US Government work under 17 USC 105', () => {
+		expect(about).not.toMatch(/drawn from public US Government work/i);
+		expect(about).not.toMatch(/17 USC/i);
 	});
 
 	it('does not imply an opt-in analytics feature (zero telemetry is built, not deferred)', () => {
