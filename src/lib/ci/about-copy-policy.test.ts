@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 
 // The About page tells a first-time reader what the app is, so its claims must match the shipped reality.
 // The corpus is built and every answer cites its source, so the page must not promise a source list as
-// future work, and must state the sources honestly: public US-gov work, cited on each answer.
+// future work, and must state the sources honestly: public documents published by US Government agencies, cited
+// on each answer.
 describe('About page sources copy is honest', () => {
 	// Collapse whitespace so the assertions match regardless of how the markup is line-wrapped.
 	const about = readFileSync(
