@@ -285,6 +285,13 @@ describe('firm deadlines match their official sources', () => {
 		expect(at('dd214-review')).toMatchObject({ countsFrom: 'leaving', windowEnd: -15 });
 	});
 
+	// The 120-day deadline is one service's rule; other branches set their own, so the step is a recommended window
+	// with no "by" date and no "what now" link that would claim one.
+	it('makes the separation package a recommended step with no deadline link', () => {
+		expect(at('separation-package')?.kind).toBe('soft');
+		expect(TASK_AFTER_LINK['separation-package']).toBeUndefined();
+	});
+
 	// skillbridge.mil notice, June 3, 2026: members "in the last 180 days of their service who request SkillBridge
 	// participation within the DIB will be approved", an exception to the Service rank limits the note lists.
 	it('names the defense industry exception beside the paygrade limits', () => {
@@ -311,7 +318,7 @@ describe('firm deadlines match their official sources', () => {
 			recommendedOffset: -364,
 			windowEnd: -201
 		});
-		expect(at('skillbridge-request')?.why).toContain('at least 3 weeks before your start');
+		expect(at('skillbridge-request')?.why).toContain('first field-grade commander');
 		expect(at('skillbridge-find')?.why).toContain('DoD approval covers your program dates');
 	});
 
@@ -322,8 +329,8 @@ describe('firm deadlines match their official sources', () => {
 			why: 'Start about 14 months out: pick a reputable program whose DoD approval covers your program dates, and get its acceptance letter.'
 		});
 		expect(at('skillbridge-request')).toMatchObject({
-			title: "Submit your SkillBridge request (MyNavy Education and your command's package)",
-			why: "It opens a year before separation; submit as soon as it opens, at least 3 weeks before your start. Print the request's pages for the package your command asks for; your command approver decides."
+			title: "Submit your SkillBridge request and get your commander's written approval",
+			why: 'The first field-grade commander in your chain of command approves it before you start, and your service sets the steps and any limits by rank. Submit it as soon as you have an acceptance letter.'
 		});
 	});
 

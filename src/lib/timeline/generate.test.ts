@@ -484,7 +484,7 @@ describe('Fit: the leaving dates pull in a last day, never an opening', () => {
 		expect(pkg.targetDate).toBe('2026-06-04'); // 150 days before
 		expect(pkg.windowEndDate).toBe('2026-07-04'); // 120 days before
 		expect(pkg.fit).toBeUndefined(); // moved whole, never shortened
-		expect(pkg.status).toBe('late');
+		expect(pkg.status).toBe('still-to-do'); // a recommended step past its window, never "late"
 	});
 
 	it('the separation package counts from SkillBridge when terminal leave follows it', () => {
@@ -499,7 +499,7 @@ describe('Fit: the leaving dates pull in a last day, never an opening', () => {
 		const pkg = item(leaving({ terminalLeaveStart: '2027-03-01' }), 'separation-package');
 		expect(pkg.windowStartDate).toBe('2026-06-04');
 		expect(pkg.windowEndDate).toBe('2026-11-01');
-		expect(pkg.status).toBe('closing-soon'); // 28 days left
+		expect(pkg.status).toBe('start-now'); // 28 days left, but a recommended step never says "closing soon"
 	});
 
 	it('with no leaving date the separation package closes 120 days before separation', () => {

@@ -617,7 +617,7 @@
 
 					<SettingsDateRow
 						id="eaos"
-						label="Separation date (EAOS)"
+						label="Separation date"
 						value={currentEaos}
 						hint="Your End of Active Obligated Service - the date your current obligation ends."
 						onSave={saveEaos}

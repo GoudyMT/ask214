@@ -119,7 +119,7 @@ describe('SkillBridgeQuestion', () => {
 		await expect
 			.element(
 				page.getByText(
-					"Also follow your command's SkillBridge instructions: they set what your request package needs."
+					"Also follow your unit's SkillBridge instructions: your service and command set what your request needs."
 				)
 			)
 			.toBeVisible();

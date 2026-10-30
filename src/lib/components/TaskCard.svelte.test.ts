@@ -2015,13 +2015,13 @@ describe("the line above a SkillBridge step's links", () => {
 		const { container } = await render(TaskCard, {
 			props: { item: makeItem({ def: request }), onSetStatus: noop, onSetSnooze: noop }
 		});
-		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
 		const note = container.querySelector('.task-card__related-note');
 		expect(note?.textContent).toBe(
-			"Also follow your command's SkillBridge instructions: they set what your request package needs."
+			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs."
 		);
 		expect(note?.nextElementSibling?.tagName).toBe('UL');
-		expect(container.querySelectorAll('.task-card__related-list li')).toHaveLength(2);
+		expect(container.querySelectorAll('.task-card__related-list li')).toHaveLength(1);
 		const text = textOf(container);
 		expect(makesPersonalClaim(text), text).toBe(false);
 	});
@@ -2054,9 +2054,9 @@ describe("the line above a SkillBridge step's links", () => {
 			props: { item: makeItem({ def: request }), onSetStatus: noop, onSetSnooze: noop }
 		});
 		expect(container.querySelector('.task-card__related-note')).toBeNull();
-		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
 		expect(container.querySelector('.task-card__related-note')).not.toBeNull();
-		await page.getByRole('button', { name: /^Related resources \(2\)/ }).click();
+		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
 		expect(container.querySelector('.task-card__related-note')).toBeNull();
 	});
 });

@@ -16,7 +16,7 @@ async function seedProfile(page: Page, separationInDays: number): Promise<void> 
 }
 
 const FIND = 'Find a SkillBridge program and get an acceptance letter';
-const REQUEST = "Submit your SkillBridge request (MyNavy Education and your command's package)";
+const REQUEST = "Submit your SkillBridge request and get your commander's written approval";
 
 test('Yes shows both steps and keeps them after a reload', async ({ page }) => {
 	await seedProfile(page, 208);

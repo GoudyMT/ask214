@@ -36,16 +36,15 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
 ];
 
 /**
- * v1.0 SEED task definitions (US Navy AD Enlisted ETS), research-reconciled against
- * current DoD/VA/DoL/Navy sources (2024-2026). Timing is anchored to the EAOS; when the profile holds a
+ * Task definitions for an active-duty member of any branch, officer or enlisted, separating at the end of service;
+ * research-reconciled against current DoD/VA/DoL sources (2024-2026). Each line must stay true for every branch: a
+ * rule one service sets (a form, a portal, a deadline) is named as "your service's" step, never as the rule. Timing is anchored to the EAOS; when the profile holds a
  * SkillBridge or terminal leave start, a task's last day comes in to fit before the date it must finish before
  * (`finishBefore`), and its opening never moves - except a task whose rule counts from the leaving day
  * (`countsFrom`), which moves its whole window.
  *
  * Tasks with no authoritative fixed date use a wide early window (best-practice prep). `requires` gates a task on
  * a persona field (hidden until set + matched).
- *
- * Authored and confirmed from lived Navy-ETS experience, backed by a research pass.
  */
 export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Early prep (no authoritative fixed date; recommended 18-24 months out) ----
@@ -160,7 +159,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -365,
 		recommendedOffset: -400,
 		why: 'TAP officially starts here, and it is required no later than 365 days out.',
-		afterNote: "Still required. Contact your command's Transition Assistance office to start now."
+		afterNote:
+			"Still required. Contact your installation's transition assistance office to start now."
 	},
 	{
 		id: 'tap-course',
@@ -200,7 +200,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'skillbridge-request',
-		title: "Submit your SkillBridge request (MyNavy Education and your command's package)",
+		title: "Submit your SkillBridge request and get your commander's written approval",
 		category: 'career',
 		finishBefore: 'leaving',
 		skillbridgeStep: true,
@@ -208,7 +208,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -364,
 		windowEnd: -201,
 		recommendedOffset: -364,
-		why: "It opens a year before separation; submit as soon as it opens, at least 3 weeks before your start. Print the request's pages for the package your command asks for; your command approver decides."
+		why: 'The first field-grade commander in your chain of command approves it before you start, and your service sets the steps and any limits by rank. Submit it as soon as you have an acceptance letter.'
 	},
 
 	// ---- Job / benefits prep (mid window) ----
@@ -258,14 +258,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'jst-order',
-		title: 'Order your Joint Services Transcript (JST)',
+		title: 'Order your military training transcript (JST)',
 		category: 'career',
 		finishBefore: 'separation',
 		kind: 'soft',
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: 'Schools and employers use your JST to credit your military training.'
+		why: 'Schools and employers use it to credit your military training. The JST serves every branch; Air Force members usually use the Community College of the Air Force transcript.'
 	},
 	{
 		id: 'reserve-affiliation',
@@ -302,8 +302,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: "Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your command's medical department.",
-		afterNote: "Still required before you separate. Contact your command's medical department."
+		why: "Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your unit's medical department.",
+		afterNote: "Still required before you separate. Contact your unit's medical department."
 	},
 	{
 		id: 'sha-complete',
@@ -315,7 +315,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -90,
 		recommendedOffset: -120,
 		why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
-		afterNote: "Still required before you separate. Contact your command's medical department."
+		afterNote: "Still required before you separate. Contact your unit's medical department."
 	},
 	{
 		id: 'va-bdd-claim',
@@ -342,7 +342,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -90,
 		recommendedOffset: -120,
 		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
-		afterNote: "Still required before you separate. Contact your command's TAP office."
+		afterNote:
+			"Still required before you separate. Contact your installation's transition assistance office."
 	},
 	{
 		id: 'va-benefits-advisor',
@@ -392,16 +393,15 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'separation-package',
-		title: 'Submit your Navy separation package (1306, eval, award, statement of service)',
+		title: 'Turn in your separation paperwork to your admin or personnel office',
 		category: 'admin',
 		finishBefore: 'leaving',
 		countsFrom: 'leaving',
-		kind: 'required',
+		kind: 'soft',
 		windowStart: -270,
 		windowEnd: -120,
 		recommendedOffset: -150,
-		why: 'Your admin office must send it to the Navy at least 120 days before you leave: SkillBridge, terminal leave or separation, whichever comes first.',
-		afterNote: 'Still required; a late package can delay your orders, DD-214 and final pay.'
+		why: 'Your admin or personnel office prepares your orders and DD-214 from it. Ask them early for their list and deadline.'
 	},
 	{
 		id: 'dd214-review',
@@ -413,7 +413,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -90,
 		windowEnd: -15,
 		recommendedOffset: -30,
-		why: 'If it is not final 14 days before you leave, the Navy can finalize it without your signature.'
+		why: 'Check every block on your DD-214 worksheet with your personnel office before your last day; fixing it after you leave takes a separate request.'
 	},
 
 	// ---- Near / at separation ----
