@@ -303,8 +303,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: "Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your unit's medical department.",
-		afterNote: "Still required before you separate. Contact your unit's medical department."
+		why: "Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your installation's military medical clinic.",
+		afterNote:
+			"Still required before you separate. Contact your installation's military medical clinic."
 	},
 	{
 		id: 'sha-complete',
@@ -316,7 +317,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -90,
 		recommendedOffset: -120,
 		why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
-		afterNote: "Still required before you separate. Contact your unit's medical department."
+		afterNote:
+			"Still required before you separate. Contact your installation's military medical clinic."
 	},
 	{
 		id: 'va-bdd-claim',

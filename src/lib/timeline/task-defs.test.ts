@@ -318,6 +318,17 @@ describe('firm deadlines match their official sources', () => {
 		expect(at('skillbridge-find')?.why).toContain('DoD approval covers your program dates');
 	});
 
+	// Every branch does the separation health assessment at a military treatment facility on the installation; a
+	// "medical department" is one service's name for it.
+	it('sends a late separation health assessment to the installation clinic', () => {
+		const contact = "Contact your installation's military medical clinic.";
+		expect(at('sha-schedule')?.why).toContain(
+			"book it through your installation's military medical clinic."
+		);
+		expect(at('sha-schedule')?.afterNote).toBe(`Still required before you separate. ${contact}`);
+		expect(at('sha-complete')?.afterNote).toBe(`Still required before you separate. ${contact}`);
+	});
+
 	// Military OneSource: the JST serves the Army, Marine Corps, Navy and Coast Guard, and "Air Force members should
 	// contact the Air University to order official transcripts". The line points Air Force members there.
 	it('sends Air Force members to Air University for their transcript', () => {
