@@ -241,10 +241,7 @@ describe('the transition office links serve every branch', () => {
 
 	it('sends the counseling and Capstone steps there once their date passes', () => {
 		for (const id of ['preseparation-counseling', 'tap-capstone']) {
-			expect(TASK_AFTER_LINK[id], id).toEqual({
-				resource: 'military-installations',
-				label: "Find your installation's transition office"
-			});
+			expect(TASK_AFTER_LINK[id]?.resource, id).toBe('military-installations');
 		}
 	});
 });

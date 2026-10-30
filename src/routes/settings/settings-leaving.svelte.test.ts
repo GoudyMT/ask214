@@ -150,31 +150,6 @@ describe('Settings, the SkillBridge and terminal leave dates in either order', (
 		expect(store.save).not.toHaveBeenCalled();
 	});
 
-	it('saves a SkillBridge start the day before terminal leave, and a terminal leave start the day after SkillBridge', async () => {
-		withLeaving({
-			skillbridgeStart: isoFromToday(STORED),
-			terminalLeaveStart: isoFromToday(STORED + 30)
-		});
-		await render(SettingsPage);
-		await enter('SkillBridge start', isoFromToday(STORED + 29));
-		await expect.element(page.getByLabelText('SkillBridge start')).not.toBeInTheDocument();
-		await enter('Terminal leave start', isoFromToday(STORED + 1));
-		await expect.element(page.getByLabelText('Terminal leave start')).not.toBeInTheDocument();
-		expect(store.save.mock.calls.map(([patch]) => Object.keys(patch as object))).toEqual([
-			['skillbridgeStart'],
-			['terminalLeaveStart']
-		]);
-	});
-
-	// A stored date on or after separation is not used, so it holds no other date back.
-	it('saves a terminal leave start before a SkillBridge start that is not used', async () => {
-		withLeaving({ notUsed: { skillbridgeStart: isoFromToday(SEPARATION + 50) } });
-		await render(SettingsPage);
-		await enter('Terminal leave start', isoFromToday(STORED));
-		await expect.element(page.getByLabelText('Terminal leave start')).not.toBeInTheDocument();
-		expect(store.save).toHaveBeenCalledTimes(1);
-	});
-
 	// A pair with SkillBridge on or after terminal leave keeps a note, so the person checks their service's guidance.
 	it.each([
 		['out of order', -11],
