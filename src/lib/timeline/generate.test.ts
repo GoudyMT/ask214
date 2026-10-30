@@ -478,21 +478,25 @@ describe('Fit: the leaving dates pull in a last day, never an opening', () => {
 		expect(capstonePhase?.bucket.id).toBe('12-6mo');
 	});
 
-	it('the separation package counts its whole window from the day you leave', () => {
+	// Some services clear a member out before SkillBridge and some after it, so a SkillBridge start does not move the
+	// separation paperwork or the DD-214 review; terminal leave, which every service clears out before, does.
+	it('a SkillBridge start does not move the separation package', () => {
 		const pkg = item(leaving({ skillbridgeStart: '2026-11-01' }), 'separation-package');
-		expect(pkg.windowStartDate).toBe('2026-02-04'); // 270 days before Nov 1
-		expect(pkg.targetDate).toBe('2026-06-04'); // 150 days before
-		expect(pkg.windowEndDate).toBe('2026-07-04'); // 120 days before
-		expect(pkg.fit).toBeUndefined(); // moved whole, never shortened
-		expect(pkg.status).toBe('still-to-do'); // a recommended step past its window, never "late"
+		expect(pkg.windowStartDate).toBe('2026-08-03'); // as with no leaving date
+		expect(pkg.targetDate).toBe('2026-12-01');
+		expect(pkg.windowEndDate).toBe('2026-12-31');
+		expect(pkg.fit).toBeUndefined();
+		expect(pkg.status).toBe('start-now');
 	});
 
-	it('the separation package counts from SkillBridge when terminal leave follows it', () => {
+	it('the separation package counts its whole window from terminal leave, even after SkillBridge', () => {
 		const pkg = item(
 			leaving({ skillbridgeStart: '2026-11-01', terminalLeaveStart: '2027-03-01' }),
 			'separation-package'
 		);
-		expect(pkg.windowEndDate).toBe('2026-07-04');
+		expect(pkg.windowStartDate).toBe('2026-06-04'); // 270 days before Mar 1
+		expect(pkg.windowEndDate).toBe('2026-11-01'); // 120 days before
+		expect(pkg.fit).toBeUndefined(); // moved whole, never shortened
 	});
 
 	it('the separation package counts from terminal leave when it is the only date', () => {
@@ -510,13 +514,12 @@ describe('Fit: the leaving dates pull in a last day, never an opening', () => {
 		expect(pkg.status).toBe('start-now');
 	});
 
-	it('the DD-214 review counts from the day you leave and ends 15 days before it', () => {
+	it('a SkillBridge start does not move the DD-214 review', () => {
 		const review = item(leaving({ skillbridgeStart: '2026-11-01' }), 'dd214-review');
-		expect(review.windowStartDate).toBe('2026-08-03'); // 90 days before Nov 1
-		expect(review.targetDate).toBe('2026-10-02'); // 30 days before
-		expect(review.windowEndDate).toBe('2026-10-17'); // 15 days before: the day before the 14-day mark
+		expect(review.windowStartDate).toBe('2027-01-30'); // as with no leaving date
+		expect(review.targetDate).toBe('2027-03-31');
+		expect(review.windowEndDate).toBe('2027-04-15');
 		expect(review.fit).toBeUndefined();
-		expect(review.status).toBe('start-now'); // it fits before SkillBridge
 	});
 
 	it('the DD-214 review counts from terminal leave when it is the only date', () => {

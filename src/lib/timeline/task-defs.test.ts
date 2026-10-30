@@ -269,8 +269,8 @@ describe('firm deadlines match their official sources', () => {
 	// separation leave" (2.b(3)) sets its last day; complete packages 5 to 9 months before separation (2.a) set its
 	// opening and aim, counted here from the leaving day like the last day. A DD 214 not final 14 days before
 	// departure on PTDY or separation leave is finalized without the member's signature (2.a), so its last day is the
-	// day before that mark. The leaving day includes a SkillBridge start: its participants are on permissive TDY
-	// orders (NAVADMIN 160/22 5.e), read here as that departure, and SkillBridge comes first.
+	// day before that mark. These are one service's numbers, kept as recommended windows; the day they count from is
+	// terminal leave alone, since services differ on whether a member clears out before SkillBridge or after it.
 	it("counts the separation package and the DD-214 review from the leaving day, with CH-93's last days", () => {
 		expect(at('separation-package')).toMatchObject({
 			countsFrom: 'leaving',
@@ -380,11 +380,9 @@ describe('what each task must finish before', () => {
 	it('TAP and the command-side tasks finish before leaving the command', () => {
 		expect(by('leaving')).toEqual(
 			[
-				'dd214-review',
 				'document-medical',
 				'preseparation-counseling',
 				'reference-letters',
-				'separation-package',
 				'skillbridge-find',
 				'skillbridge-request',
 				'tap-capstone',
@@ -395,8 +393,15 @@ describe('what each task must finish before', () => {
 		);
 	});
 
-	it('the separation health assessment finishes before terminal leave only', () => {
-		expect(by('terminal-leave')).toEqual(['sha-complete', 'sha-schedule']);
+	// Some services clear a member out before SkillBridge and some after it, so the out-processing steps wait on
+	// terminal leave alone, like the separation health assessment.
+	it('the separation health assessment and the out-processing steps finish before terminal leave only', () => {
+		expect(by('terminal-leave')).toEqual([
+			'dd214-review',
+			'separation-package',
+			'sha-complete',
+			'sha-schedule'
+		]);
 	});
 
 	it('every other task, the track fixes included, counts from separation alone', () => {
@@ -411,10 +416,10 @@ describe('what each task must finish before', () => {
 			if (t.finalEnd !== undefined) expect(t.finishBefore).toBe('separation');
 	});
 
-	it('only the separation package and the DD-214 review count from the leaving day, and both finish before it', () => {
+	it('only the separation package and the DD-214 review count from the leaving day, and both finish before terminal leave', () => {
 		const counted = TASK_DEFS.filter((t) => t.countsFrom === 'leaving');
 		expect(counted.map((t) => t.id).sort()).toEqual(['dd214-review', 'separation-package']);
-		for (const t of counted) expect(t.finishBefore).toBe('leaving');
+		for (const t of counted) expect(t.finishBefore).toBe('terminal-leave');
 	});
 
 	// A task finished before the user leaves the command, or counted from that day, is over before separation: no one
