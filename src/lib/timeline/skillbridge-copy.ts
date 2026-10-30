@@ -14,7 +14,7 @@ export const QUESTION_FIRST = {
 };
 export const QUESTION_AGAIN = {
 	heading: 'Still thinking about SkillBridge?',
-	line: 'The search for a program works best from about 14 months before separation, and the request opens at 12 months. Say yes and its steps join your timeline.'
+	line: 'The search for a program works best from about 14 months before separation. Say yes and its steps join your timeline.'
 };
 export const ANSWER_LABEL: Record<PlanAnswer, string> = {
 	yes: 'Yes',
