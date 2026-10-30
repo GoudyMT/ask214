@@ -550,7 +550,7 @@
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/DOL-1-Day-EFCT.pdf'
   origin: 'DOL (TAP curriculum)'
   copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
+  legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
@@ -575,7 +575,7 @@
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/Employment-Track-DOL-Employment-Workshop.pdf'
   origin: 'DOL (TAP curriculum)'
   copyright_status: us_government_work_public_domain
-  legal_tier: confident_pd
+  legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
