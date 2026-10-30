@@ -172,7 +172,7 @@
 				{error}
 				onchange={onInput}
 				label="Separation date"
-				hint="Your End of Active Obligated Service - the date your current obligation ends."
+				hint="Your last day on active duty, as shown on your separation orders."
 			/>
 			<p class="wizard__today">Today on this device: {todayDisplay}</p>
 
