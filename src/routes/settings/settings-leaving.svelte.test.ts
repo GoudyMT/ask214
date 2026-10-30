@@ -130,6 +130,17 @@ describe('Settings, the SkillBridge and terminal leave dates in either order', (
 		expect(store.save).not.toHaveBeenCalled();
 	});
 
+	// The store keeps its own copy, so the bytes of the typed date are wiped once the save settles.
+	it('zeroes the typed date it handed to the store once the save settles', async () => {
+		withLeaving({ skillbridgeStart: isoFromToday(STORED) });
+		await render(SettingsPage);
+		await enter('Terminal leave start', isoFromToday(STORED + 5));
+		await expect.element(page.getByLabelText('Terminal leave start')).not.toBeInTheDocument();
+		const [patch] = store.save.mock.calls[0] as [{ terminalLeaveStart: Uint8Array }];
+		expect(patch.terminalLeaveStart.length).toBeGreaterThan(0);
+		expect(patch.terminalLeaveStart.every((b) => b === 0)).toBe(true);
+	});
+
 	// No leaving date can be on or after separation, whatever the other date is.
 	it('refuses a SkillBridge start on separation day, and saves nothing', async () => {
 		withLeaving({ terminalLeaveStart: isoFromToday(STORED) });
