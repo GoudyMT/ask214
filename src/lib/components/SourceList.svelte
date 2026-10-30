@@ -63,7 +63,7 @@
 		</ul>
 		<p class="tap-note tap-credit">
 			The files of three guides show work by agency contractors: Serco on the two DOL employment
-			guides, and Cathexis on the VA Benefits guide.
+			guides, and Cathexis on the VA Benefits and Services guide.
 		</p>
 	</section>
 </div>

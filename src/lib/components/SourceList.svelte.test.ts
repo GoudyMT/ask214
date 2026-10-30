@@ -72,7 +72,7 @@ describe('SourceList', () => {
 		const { container } = await render(SourceList, { props: { index: INDEX } });
 		const tap = container.querySelector('section[aria-labelledby="src-tap"]');
 		expect(tap?.textContent?.replace(/\s+/g, ' ') ?? '').toContain(
-			'The files of three guides show work by agency contractors: Serco on the two DOL employment guides, and Cathexis on the VA Benefits guide.'
+			'The files of three guides show work by agency contractors: Serco on the two DOL employment guides, and Cathexis on the VA Benefits and Services guide.'
 		);
 	});
 
