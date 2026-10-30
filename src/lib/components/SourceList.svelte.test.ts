@@ -65,6 +65,16 @@ describe('SourceList', () => {
 		expect(asLink).toBe(false);
 	});
 
+	// Contractors whose work the guide files show are credited by name, in the TAP section, without claiming they
+	// wrote the text.
+	it('credits the contractors whose work the TAP guide files show', async () => {
+		const { container } = await render(SourceList, { props: { index: INDEX } });
+		const tap = container.querySelector('section[aria-labelledby="src-tap"]');
+		expect(tap?.textContent?.replace(/\s+/g, ' ') ?? '').toContain(
+			'The files of three guides show work by agency contractors: Serco on the two DOL employment guides, and Cathexis on the VA Benefits guide.'
+		);
+	});
+
 	// A source title is a printed name and can carry one long unbroken word; on a 320 px phone it must wrap inside
 	// its row, in an agency row and in a TAP guide row alike, not push the page sideways.
 	it('on a 320 px phone a long unbroken title wraps inside its row and the page does not scroll sideways', async () => {
