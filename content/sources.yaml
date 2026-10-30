@@ -399,12 +399,12 @@
   url: 'https://www.tapevents.mil/resources/documents'
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/VA-Benefits-Participant-Guide.pdf'
   origin: 'VA (TAP curriculum)'
-  copyright_status: us_government_work_public_domain
+  copyright_status: us_government_work_claimed_open
   legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
-  license_notes: '17 USC 105 claimed - VA-published; no copyright notice (S29 and 2026-10-30 scans). OPEN: placed artwork links point to Cathexis (contractor) curriculum design folders; VA asked in writing who holds rights in the text (ADR-030). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
+  license_notes: "17 USC 105 claimed - VA-published; no copyright notice (S29 and 2026-10-30 scans). OPEN: placed artwork links point to Cathexis (contractor) curriculum design folders; VA asked in writing who holds rights in the text (ADR-030). Served on the owner's decision while open, not on an agency clearance; a restricted answer pulls it. Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution."
   terms_reviewed_date: 2026-10-30
   terms_notes: 'Public TAP doc on tapevents.mil; VA-published, contractor-assisted (Cathexis design folder paths in embedded image metadata); no copyright notice on the document; stock-image rights metadata only (2026-10-30 review, ADR-030). File: VA-Benefits-Participant-Guide.pdf. Offline highlight via anchor on app-rendered text; link-out to the official doc. Unofficial; not endorsed by VA/DoD.'
   access: open
@@ -549,12 +549,12 @@
   url: 'https://www.tapevents.mil/resources/documents'
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/DOL-1-Day-EFCT.pdf'
   origin: 'DOL (TAP curriculum)'
-  copyright_status: us_government_work_public_domain
+  copyright_status: us_government_work_claimed_open
   legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
-  license_notes: '17 USC 105 claimed - DOL names itself author; no copyright notice (S29 and 2026-10-30 scans). OPEN: two embedded images carry metadata naming Serco-NA (DOL TAP contractor) as company and two Serco staff as creators, while the document metadata names DOL; DOL asked in writing who holds rights in the text (ADR-030). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
+  license_notes: "17 USC 105 claimed - DOL names itself author; no copyright notice (S29 and 2026-10-30 scans). Served on the owner's decision while open, not on an agency clearance; a restricted answer pulls it. OPEN: two embedded images carry metadata naming Serco-NA (DOL TAP contractor) as company and two Serco staff as creators, while the document metadata names DOL; DOL asked in writing who holds rights in the text (ADR-030). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution."
   terms_reviewed_date: 2026-10-30
   terms_notes: 'Public TAP doc on tapevents.mil; DOL-published, contractor-assisted (Serco-NA in embedded image metadata). File: DOL-1-Day-EFCT.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DOL.'
   access: open
@@ -574,12 +574,12 @@
   url: 'https://www.tapevents.mil/resources/documents'
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/Employment-Track-DOL-Employment-Workshop.pdf'
   origin: 'DOL (TAP curriculum)'
-  copyright_status: us_government_work_public_domain
+  copyright_status: us_government_work_claimed_open
   legal_tier: verified_gray_zone
   content_type: pdf
   served: true
   redistribution_cleared: true
-  license_notes: '17 USC 105 claimed - DOL names itself author; no copyright notice (S29 and 2026-10-30 scans). OPEN: its photo links point to a Serco (DOL TAP contractor) staff folder; DOL asked in writing who holds rights in the text (ADR-030). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution.'
+  license_notes: "17 USC 105 claimed - DOL names itself author; no copyright notice (S29 and 2026-10-30 scans). Served on the owner's decision while open, not on an agency clearance; a restricted answer pulls it. OPEN: its photo links point to a Serco (DOL TAP contractor) staff folder; DOL asked in writing who holds rights in the text (ADR-030). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution."
   terms_reviewed_date: 2026-10-30
   terms_notes: 'Public TAP doc on tapevents.mil; DOL-published, contractor-assisted (Serco staff paths in file metadata). File: Employment-Track-DOL-Employment-Workshop.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed by DOL.'
   access: open
