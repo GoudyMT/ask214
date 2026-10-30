@@ -116,7 +116,7 @@ describe('buildIcs', () => {
 		const withYes = titles(await fileFor({ 'skillbridge-plan': { status: 'done' } }));
 		expect([...withYes].filter((t) => !without.has(t)).sort()).toEqual([
 			'Aim for: Find a SkillBridge program and get an acceptance letter',
-			"Aim for: Submit your SkillBridge request and get your commander's written approval"
+			'Aim for: Submit your SkillBridge request and get it approved'
 		]);
 		for (const t of without) expect(withYes.has(t), t).toBe(true);
 	});

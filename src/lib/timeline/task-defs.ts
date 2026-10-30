@@ -201,7 +201,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'skillbridge-request',
-		title: "Submit your SkillBridge request and get your commander's written approval",
+		title: 'Submit your SkillBridge request and get it approved',
 		category: 'career',
 		finishBefore: 'leaving',
 		skillbridgeStep: true,
@@ -209,7 +209,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -364,
 		windowEnd: -201,
 		recommendedOffset: -364,
-		why: 'The first field-grade commander in your chain of command approves it before you start, and your service sets the steps and any limits by rank. Submit it as soon as you have an acceptance letter.'
+		why: 'Your commander approves it before you start (in DoD services, the first field-grade commander in your chain of command), and your service sets the steps and any limits by rank. Submit it as soon as you have an acceptance letter.'
 	},
 
 	// ---- Job / benefits prep (mid window) ----

@@ -69,7 +69,7 @@ const NOTE = 'Canary note that must stay on this device';
 const QUESTION = 'What is SkillBridge?';
 // The titles of the two steps a Yes (or a late Not sure) adds to the timeline, as the task list shows them.
 const FIND_TITLE = 'Find a SkillBridge program and get an acceptance letter';
-const REQUEST_TITLE = "Submit your SkillBridge request and get your commander's written approval";
+const REQUEST_TITLE = 'Submit your SkillBridge request and get it approved';
 // A made-up key in Anthropic's format; the request carrying it is answered by the mock below and never leaves.
 const TEST_KEY = 'sk-ant-test-canary-0000';
 const ANTHROPIC = 'https://api.anthropic.com/';

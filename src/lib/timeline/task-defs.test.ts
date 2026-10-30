@@ -280,6 +280,15 @@ describe('firm deadlines match their official sources', () => {
 		});
 		expect(at('dd214-review')).toMatchObject({ countsFrom: 'leaving', windowEnd: -15 });
 	});
+
+	// DoDI 1322.29 names the first field-grade commander as the approver for DoD services; the Coast Guard routes the
+	// request through its own command, so the line names the commander first and the DoD rule second.
+	it('names the commander as the approver and the DoD rule as DoD only', () => {
+		expect(PAYGRADE_NOTE).toContain(
+			'Your commander approves it (in DoD services, the first field-grade commander in your chain of command), and your service may set shorter limits by rank.'
+		);
+	});
+
 	// skillbridge.mil notice, June 3, 2026: members "in the last 180 days of their service who request SkillBridge
 	// participation within the DIB will be approved", an exception to the Service rank limits the note lists.
 	it('names the defense industry exception beside the paygrade limits', () => {
@@ -324,8 +333,8 @@ describe('firm deadlines match their official sources', () => {
 			why: 'Start about 14 months out: pick a reputable program whose DoD approval covers your program dates, and get its acceptance letter.'
 		});
 		expect(at('skillbridge-request')).toMatchObject({
-			title: "Submit your SkillBridge request and get your commander's written approval",
-			why: 'The first field-grade commander in your chain of command approves it before you start, and your service sets the steps and any limits by rank. Submit it as soon as you have an acceptance letter.'
+			title: 'Submit your SkillBridge request and get it approved',
+			why: 'Your commander approves it before you start (in DoD services, the first field-grade commander in your chain of command), and your service sets the steps and any limits by rank. Submit it as soon as you have an acceptance letter.'
 		});
 	});
 
