@@ -64,8 +64,6 @@ function largestNoteTask(snap: Snapshot): string {
  * describes this device and not the person's data, so it never travels. A leaving answer this release does not know
  * (stored by a newer one) reads as no answer here and would fail the restore check, so it stays out too.
  */
-const exactText = new TextDecoder('utf-8', { ignoreBOM: true });
-
 function fileProfile(profile: ProfileV1): unknown {
 	const copy: ProfileV1 = { ...profile };
 	delete copy.lastBackupAt;
@@ -73,9 +71,7 @@ function fileProfile(profile: ProfileV1): unknown {
 	delete copy.backupGenTimeline;
 	delete copy.backupGenCalendar;
 	delete copy.backupGenFinder;
-	// Read as the restore check reads it, a byte-order mark kept, so the two agree on what is unknown.
-	const answer = copy.separationPath && exactText.decode(copy.separationPath);
-	if (answer !== undefined && !parseSeparationPath(answer)) delete copy.separationPath;
+	if (copy.separationPath && !parseSeparationPath(copy.separationPath)) delete copy.separationPath;
 	return asJson(encodeProfile(copy));
 }
 

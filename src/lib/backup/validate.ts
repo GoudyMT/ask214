@@ -155,14 +155,12 @@ function isInteger(v: unknown, min: number, max: number): v is number {
 const isTime = (v: unknown): v is number => isInteger(v, 0, MAX_TIME);
 const isTimeOrNull = (v: unknown): v is number | null => v === null || isTime(v);
 
-// A default decoder drops a leading byte-order mark, which would let a second spelling of a known answer through. The
-// dates keep the shipped decoder: a release already accepted them that way, and this check only widens.
-const exactText = new TextDecoder('utf-8', { ignoreBOM: true });
-
 /**
  * A date as the profile stores it: base64 of an ISO day the Settings read check (parseEaosAtRead) accepts. The base64
  * is the envelope's strict kind (the one reader that also survives a multi-megabyte value), which refuses a last
- * group with spare bits set: a second spelling of the same bytes that the shipped encoder never writes.
+ * group with spare bits set: a second spelling of the same bytes that the shipped encoder never writes. The day is read
+ * with the shipped decoder, which drops a byte-order mark: a release already accepted it that way, and this check only
+ * widens.
  */
 function isStoredDate(v: unknown): v is string {
 	if (typeof v !== 'string') return false;
@@ -184,7 +182,7 @@ function isStoredPath(v: unknown): v is string {
 	const bytes = b64DecodeStrict(v);
 	if (bytes === null) return false;
 	try {
-		return parseSeparationPath(exactText.decode(bytes)) !== undefined;
+		return parseSeparationPath(bytes) !== undefined;
 	} finally {
 		bytes.fill(0);
 	}

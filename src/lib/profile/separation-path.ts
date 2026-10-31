@@ -14,9 +14,14 @@ export const SEPARATION_PATH_LABEL: Record<SeparationPath, string> = {
 	'reserve-component': 'Leaving the Guard or Reserve'
 };
 
-/** The stored text as a path, or undefined for no answer or a value this release does not know. */
-export function parseSeparationPath(s: string | undefined): SeparationPath | undefined {
-	return (SEPARATION_PATHS as readonly string[]).includes(s ?? '')
-		? (s as SeparationPath)
-		: undefined;
+// A default decoder drops a leading byte-order mark, which would let a second spelling of a known answer through.
+const exactText = new TextDecoder('utf-8', { ignoreBOM: true });
+
+/**
+ * The stored bytes as a path, or undefined for no answer or a value this release does not know. The timeline, the
+ * backup check and the export all read the answer here, so they agree on which bytes are one.
+ */
+export function parseSeparationPath(bytes: Uint8Array | undefined): SeparationPath | undefined {
+	const s = bytes ? exactText.decode(bytes) : '';
+	return (SEPARATION_PATHS as readonly string[]).includes(s) ? (s as SeparationPath) : undefined;
 }
