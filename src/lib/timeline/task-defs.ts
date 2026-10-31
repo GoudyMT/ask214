@@ -161,7 +161,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		recommendedOffset: -400,
 		why: 'TAP officially starts here, and it is required no later than 365 days out.',
 		afterNote:
-			"Still required. Contact your installation's transition assistance office to start now."
+			"Still required. Contact your installation's transition assistance office to start now.",
+		windowFor: { retirement: { windowStart: -730, recommendedOffset: -600 } },
+		hideFor: ['reserve-component']
 	},
 	{
 		id: 'tap-course',
@@ -172,7 +174,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -270,
-		why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
+		why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.',
+		hideFor: ['reserve-component']
 	},
 	{
 		id: 'tap-track',
@@ -183,7 +186,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -240,
-		why: 'Each member picks one focused 2-day track for their path.'
+		why: 'Each member picks one focused 2-day track for their path.',
+		hideFor: ['reserve-component']
 	},
 
 	// ---- SkillBridge: shown only when the user's answer to the SkillBridge question shows them ----
@@ -270,15 +274,15 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'reserve-affiliation',
-		title: 'Start reserve affiliation',
+		title: 'Talk to a Guard or Reserve recruiter if you plan to join',
 		category: 'career',
 		finishBefore: 'separation',
 		kind: 'soft',
 		windowStart: -300,
 		windowEnd: 0,
 		recommendedOffset: -180,
-		why: 'Affiliating with the reserves takes paperwork and lead time. TAMP coverage through the Selected Reserve requires joining the day after you separate.',
-		requires: { intendedPath: ['reserves'] }
+		why: 'Joining the Guard or Reserve takes paperwork and lead time, so start while you are still on active duty. TAMP coverage through the Selected Reserve requires joining the day after you separate.',
+		hideFor: ['reserve-component']
 	},
 	{
 		id: 'school-apply',
@@ -332,6 +336,105 @@ export const TASK_DEFS: readonly TaskDef[] = [
 			'BDD is no longer available. A VA claim can still be filed the standard way, and an accredited VSO helps for free.'
 	},
 
+	// ---- Shown only for the leaving answer they belong to (10 USC 1142 and 1448; tricare.mil TAMP; health.mil IDES) ----
+	{
+		id: 'retirement-request',
+		title: 'Ask your personnel office when to submit your retirement request',
+		category: 'admin',
+		finishBefore: 'separation',
+		kind: 'soft',
+		windowStart: -730,
+		windowEnd: -365,
+		recommendedOffset: -540,
+		why: 'Your service sets how far ahead a retirement request goes in. Your personnel or retirement services office has the date.',
+		requires: { separationPath: ['retirement'] }
+	},
+	{
+		id: 'sbp-election',
+		title: 'Get Survivor Benefit Plan counseling and make your SBP choice',
+		category: 'finance',
+		finishBefore: 'separation',
+		kind: 'closes',
+		windowStart: -365,
+		windowEnd: 0,
+		recommendedOffset: -120,
+		why: 'The SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.',
+		afterNote: 'Retired pay has begun. Ask your retirement services office what can still change.',
+		requires: { separationPath: ['retirement'] }
+	},
+	{
+		id: 'peblo-contact',
+		title: 'Meet your PEBLO, who guides you through the medical board',
+		category: 'medical',
+		finishBefore: 'separation',
+		kind: 'soft',
+		windowStart: -365,
+		windowEnd: 0,
+		recommendedOffset: -300,
+		why: 'A Physical Evaluation Board Liaison Officer (PEBLO) guides service members through the whole Integrated Disability Evaluation System (IDES). The board sets the separation date, so update yours here when it changes.',
+		requires: { separationPath: ['medical'] }
+	},
+	{
+		id: 'va-msc-claim',
+		title: 'Talk with your VA Military Service Coordinator',
+		category: 'benefits',
+		finishBefore: 'separation',
+		kind: 'soft',
+		windowStart: -365,
+		windowEnd: 0,
+		recommendedOffset: -270,
+		why: 'VA Military Service Coordinators help service members file their VA benefits claim before they leave. An accredited VSO also helps, for free.',
+		requires: { separationPath: ['medical'] }
+	},
+	{
+		id: 'ides-review-options',
+		title: 'Learn the review and appeal steps, and the free legal counsel',
+		category: 'admin',
+		finishBefore: 'separation',
+		kind: 'soft',
+		windowStart: -365,
+		windowEnd: 0,
+		recommendedOffset: -240,
+		why: 'The medical board process has review and appeal steps, and legal counsel is provided at no cost. Your PEBLO can say who to contact.',
+		requires: { separationPath: ['medical'] }
+	},
+	{
+		id: 'rc-tap',
+		title: 'Complete TAP if you are being released from active duty orders',
+		category: 'admin',
+		finishBefore: 'separation',
+		kind: 'soft',
+		windowStart: -365,
+		windowEnd: 0,
+		recommendedOffset: -300,
+		why: 'Transition counseling is required for members released from active duty, Guard and Reserve included. Your transition assistance office confirms what you need.',
+		requires: { separationPath: ['reserve-component'] }
+	},
+	{
+		id: 'tamp-check',
+		title: 'See whether TAMP health coverage applies',
+		category: 'benefits',
+		finishBefore: 'separation',
+		kind: 'soft',
+		windowStart: -90,
+		windowEnd: 0,
+		recommendedOffset: -60,
+		why: 'TAMP gives 180 days of health care after regular TRICARE ends. It covers some Guard and Reserve members leaving more than 30 days in a row of active duty for a preplanned mission or a contingency; tricare.mil lists who qualifies.',
+		requires: { separationPath: ['reserve-component'] }
+	},
+	{
+		id: 'rcsbp-election',
+		title: 'Make your Reserve SBP choice within 90 days of your 20-year letter',
+		category: 'finance',
+		finishBefore: 'separation',
+		kind: 'soft',
+		windowStart: -365,
+		windowEnd: 0,
+		recommendedOffset: -180,
+		why: 'The letter says you have the years of service for retired pay, and the Reserve Component Survivor Benefit Plan choice is due within 90 days of it. Your Guard or Reserve personnel office can say when to expect the letter.',
+		requires: { separationPath: ['reserve-component'] }
+	},
+
 	// ---- Capstone + final-90 ----
 	{
 		id: 'tap-capstone',
@@ -344,7 +447,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		recommendedOffset: -120,
 		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
 		afterNote:
-			"Still required before you separate. Contact your installation's transition assistance office."
+			"Still required before you separate. Contact your installation's transition assistance office.",
+		hideFor: ['reserve-component']
 	},
 	{
 		id: 'va-benefits-advisor',

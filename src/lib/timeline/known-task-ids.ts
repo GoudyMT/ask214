@@ -42,5 +42,13 @@ export const KNOWN_TASK_IDS: readonly string[] = Object.freeze([
 	'tsp-decision',
 	'vgli-convert',
 	'final-pay-check',
-	'va-claim-fallback'
+	'va-claim-fallback',
+	'retirement-request',
+	'sbp-election',
+	'peblo-contact',
+	'va-msc-claim',
+	'ides-review-options',
+	'rc-tap',
+	'tamp-check',
+	'rcsbp-election'
 ]);

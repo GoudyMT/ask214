@@ -12,6 +12,7 @@ import { SKILLBRIDGE_PLAN_KEY } from './skillbridge-plan';
 import { eaosOffsetDate, daysUntilSeparation, type EaosString } from '../profile/eaos';
 import { addDays, daysBetween, localTodayIso } from './day-math';
 import type { PersonaFilters } from '../profile/persona';
+import type { SeparationPath } from '../profile/separation-path';
 import type { TaskDef, TimelineTaskState, TimelineState } from './types';
 
 const EAOS = '2027-04-15' as EaosString;
@@ -1300,5 +1301,95 @@ describe('A soft aim from before separation', () => {
 		).phases.flatMap((p) => p.items)[0];
 		expect(u1?.status).toBe('done');
 		expect(u1?.aimLapsed).toBeUndefined();
+	});
+});
+
+describe('the leaving answer gates its own tasks', () => {
+	const pathTask: TaskDef = { ...universal, id: 'p1', requires: { separationPath: ['medical'] } };
+	const hiddenFor: TaskDef = { ...universal, id: 'h1', hideFor: ['reserve-component'] };
+	const persona = (separationPath?: SeparationPath): PersonaFilters => ({
+		...eaosOnly,
+		...(separationPath ? { separationPath } : {})
+	});
+	const gated = (p: PersonaFilters) =>
+		filterAndAnchor(p, [pathTask, hiddenFor]).map((i) => i.def.id);
+
+	it('shows a path task only for a stored, listed path, and on any completeness', () => {
+		expect(gated(persona())).toEqual(['h1']);
+		expect(gated(persona('retirement'))).toEqual(['h1']);
+		expect(gated(persona('medical'))).toEqual(['p1', 'h1']);
+		expect(gated({ ...completeWork, separationPath: 'medical' })).toEqual(['p1', 'h1']);
+	});
+
+	it('hides a hideFor task only for a stored, listed path', () => {
+		expect(gated(persona('reserve-component'))).toEqual([]);
+		expect(gated(persona('ets'))).toEqual(['h1']);
+	});
+});
+
+describe('the leaving answer on the real task list', () => {
+	const TODAY = new Date(2026, 9, 31, 12);
+	const SEP = '2028-06-30' as EaosString;
+	const TRACKS: Record<SeparationPath, string[]> = {
+		ets: [],
+		retirement: ['sbp-election', 'retirement-request'],
+		medical: ['peblo-contact', 'va-msc-claim', 'ides-review-options'],
+		'reserve-component': ['rc-tap', 'tamp-check', 'rcsbp-election']
+	};
+	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
+	const items = (separationPath?: SeparationPath, tasks: TimelineState['tasks'] = {}) =>
+		generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: SEP,
+				daysUntilSeparation: 0,
+				...(separationPath ? { separationPath } : {})
+			},
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks },
+			TODAY
+		).phases.flatMap((p) => p.items);
+	const ids = (separationPath?: SeparationPath) => items(separationPath).map((i) => i.def.id);
+	const trackIds = Object.values(TRACKS).flat();
+
+	it('with no answer shows no track task, and the Reserve or Guard reminder', () => {
+		const shown = ids();
+		for (const id of trackIds) expect(shown).not.toContain(id);
+		expect(shown).toContain('reserve-affiliation');
+		expect(ids('ets')).toEqual(shown);
+	});
+
+	it.each(Object.entries(TRACKS) as [SeparationPath, string[]][])(
+		'the %s answer adds exactly its own track',
+		(path, own) => {
+			const added = ids(path).filter((id) => !ids().includes(id));
+			expect(added.sort()).toEqual([...own].sort());
+		}
+	);
+
+	it('the Guard or Reserve answer replaces the active-duty TAP steps and the reminder with its own', () => {
+		const shown = ids('reserve-component');
+		for (const id of [...TAP, 'reserve-affiliation']) expect(shown).not.toContain(id);
+		for (const path of ['retirement', 'medical'] as const) {
+			for (const id of TAP) expect(ids(path)).toContain(id);
+		}
+	});
+
+	it('retiring opens counseling two years out and keeps its 365-day deadline', () => {
+		const counseling = (path?: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'preseparation-counseling');
+		expect(counseling('retirement')?.windowStartDate).toBe(eaosOffsetDate(SEP, -730));
+		expect(counseling('retirement')?.targetDate).toBe(eaosOffsetDate(SEP, -600));
+		expect(counseling('retirement')?.windowEndDate).toBe(eaosOffsetDate(SEP, -365));
+		expect(counseling('retirement')?.def.kind).toBe('required');
+		expect(counseling()?.windowStartDate).toBe(eaosOffsetDate(SEP, -540));
+	});
+
+	it('keeps a track task done after the answer changes and changes back (state is kept by id)', () => {
+		const tasks = { 'sbp-election': { status: 'done' as const } };
+		expect(items('ets', tasks).some((i) => i.def.id === 'sbp-election')).toBe(false);
+		expect(items('retirement', tasks).find((i) => i.def.id === 'sbp-election')?.status).toBe(
+			'done'
+		);
 	});
 });

@@ -49,6 +49,25 @@ function includeTask(persona: PersonaFilters, def: TaskDef): boolean {
 	return true;
 }
 
+/**
+ * The leaving answer, read on any completeness (it never needs the other answers). A task listed for some paths
+ * shows only for a stored one of them; a task hidden for some paths still shows when there is no answer.
+ */
+function includeForPath(persona: PersonaFilters, def: TaskDef): boolean {
+	const path = persona.completeness === 'none' ? undefined : persona.separationPath;
+	if (def.requires?.separationPath && !(path && def.requires.separationPath.includes(path))) {
+		return false;
+	}
+	return !(path && def.hideFor?.includes(path));
+}
+
+/** The def with its path's earlier opening and recommended day, when its rule starts earlier for that path. */
+function forPath(persona: PersonaFilters, def: TaskDef): TaskDef {
+	const path = persona.completeness === 'none' ? undefined : persona.separationPath;
+	const window = path && def.windowFor?.[path];
+	return window ? { ...def, ...window } : def;
+}
+
 /** The first day away a task must be finished before, and why; undefined when no entered date applies. */
 function anchorFor(
 	def: TaskDef,
@@ -117,8 +136,8 @@ function anchorTask(
 export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): AnchoredTask[] {
 	if (persona.completeness === 'none') return [];
 	return defs
-		.filter((def) => includeTask(persona, def))
-		.map((def) => anchorTask(persona.eaos, def, persona.leaving));
+		.filter((def) => includeTask(persona, def) && includeForPath(persona, def))
+		.map((def) => anchorTask(persona.eaos, forPath(persona, def), persona.leaving));
 }
 
 /** Display status for a task card: paired with a text label in the view (never color-only). */

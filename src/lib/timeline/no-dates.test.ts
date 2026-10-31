@@ -52,9 +52,10 @@ function project(view: TimelineView) {
 
 // The frozen view is v1.2.0's except for the two tasks whose rule now counts from the leaving day, which falls on
 // separation when no date is entered: the separation package (opens 270, aims 150 and ends 120 days before; v1.2.0 had
-// 120, 75 and 60, so its phase moved too) and the DD-214 review (ends 15 days before, not 1). A phase header also
+// 120, 75 and 60, so its phase moved too) and the DD-214 review (ends 15 days before, not 1). The Guard or Reserve
+// recruiter reminder now shows with no leaving answer (it was gated on a field no screen asks). A phase header also
 // counts closed tasks apart from "to do", so each phase carries a closed count.
-describe("the no-dates view is v1.2.0's, but for the two tasks counted from the leaving day", () => {
+describe("the no-dates view is v1.2.0's, but for the leaving-day tasks and the recruiter reminder", () => {
 	it('matches the frozen view for three separation dates', async () => {
 		const views = [
 			persona('2027-04-30', 208),

@@ -3,6 +3,8 @@
  * types (TaskDef, PersonaGate, TaskCategory, PhaseBucket) and the generated-view types.
  */
 
+import type { SeparationPath } from '../profile/separation-path';
+
 /** Terminal/deferred states the user sets explicitly. Absence of an entry = active. */
 export type TaskStatus = 'done' | 'skipped' | 'snoozed';
 
@@ -42,11 +44,11 @@ export type TaskKind = 'soft' | 'required' | 'closes';
 /**
  * Optional persona gate. No gate = universal (shows for everyone). A gated task shows
  * only when the persona field is SET and its value is in the list (hide-when-unset).
- * Extensible: v2.0 adds branch/component keys.
  */
 export type PersonaGate = Partial<{
 	intendedPath: string[];
 	familyStatus: string[];
+	separationPath: SeparationPath[];
 }>;
 
 /**
@@ -76,6 +78,10 @@ export type TaskDef = {
 	recommendedOffset?: number; // defaults to windowStart
 	why: string; // why it matters (plain language, 1-2 sentences)
 	requires?: PersonaGate; // absent = universal
+	/** Hidden for these leaving answers, where a source says the task does not apply; no answer never hides it. */
+	hideFor?: SeparationPath[];
+	/** A different opening and recommended day for a leaving answer whose rule starts earlier (10 USC 1142). */
+	windowFor?: Partial<Record<SeparationPath, { windowStart: number; recommendedOffset: number }>>;
 	calendar?: { allDay?: boolean; durationMin?: number }; // consumed by the later Calendar sub-project
 };
 
