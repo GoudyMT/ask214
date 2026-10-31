@@ -7,6 +7,8 @@
 	import { takeBackupIntent } from '#lib/backup/intent.js';
 	import { backupSession } from '#lib/backup/session.svelte.js';
 	import EaosInput from '#lib/components/EaosInput.svelte';
+	import SeparationPathChoices from '#lib/components/SeparationPathChoices.svelte';
+	import type { SeparationPath } from '#lib/profile/separation-path.js';
 	import LockedPanel from '#lib/components/LockedPanel.svelte';
 	import { loadPinUnlock } from '#lib/components/load-pin-unlock.js';
 	import { getProfileApp } from '#lib/profile/context.js';
@@ -23,6 +25,7 @@
 	let value = $state('');
 	let error = $state<string | null>(null);
 	let saving = $state(false);
+	let path = $state<SeparationPath | undefined>(undefined);
 
 	// Device clock display feeds the implicit clock check (read-only, not PII).
 	const todayDisplay = new Date().toLocaleDateString();
@@ -61,9 +64,15 @@
 			throw err;
 		}
 
+		// The answer goes in the same save as the date, so a relock or a failure keeps both or neither.
+		const pathBytes = path ? new TextEncoder().encode(path) : undefined;
 		saving = true;
 		try {
-			await store.save({ eaos: bytes, setupIntent: 'completed' });
+			await store.save({
+				eaos: bytes,
+				setupIntent: 'completed',
+				...(pathBytes && { separationPath: pathBytes })
+			});
 			// Land on the timeline the user just set up - "Save and continue" continues to the thing
 			// they built. (Skip, below, stays on Home since nothing was set up.)
 			await goto(resolve('timeline'));
@@ -85,6 +94,7 @@
 			// The store copies the bytes it keeps, so once the save has settled this array only
 			// holds the typed date; wiping it earlier would wipe what is being saved.
 			bytes.fill(0);
+			pathBytes?.fill(0);
 			saving = false;
 		}
 	}
@@ -172,9 +182,10 @@
 				{error}
 				onchange={onInput}
 				label="Separation date"
-				hint="The day your active duty is set to end. Ask your personnel office if you are not sure."
+				hint="The day your service is set to end. Ask your personnel office if you are not sure."
 			/>
 			<p class="wizard__today">Today on this device: {todayDisplay}</p>
+			<SeparationPathChoices name="wizard-path" value={path} onchange={(next) => (path = next)} />
 
 			<div class="wizard__actions">
 				<button class="wizard__save" type="submit" aria-busy={saving}>Save and continue</button>

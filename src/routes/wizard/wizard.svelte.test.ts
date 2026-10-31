@@ -129,15 +129,80 @@ describe('Wizard, a save that fails', () => {
 });
 
 // Each branch names this date differently (ETS, EAOS, DOS), and orders come late, so the hint names the day itself
-// and who to ask.
+// and who to ask. "Service", not "active duty": a Guard or Reserve member leaving their own component uses it too.
 describe('Wizard, the separation date hint', () => {
-	it('describes the date in words every branch uses', async () => {
+	it('describes the date in words every branch and component uses', async () => {
 		await render(WizardPage);
 		await expect
 			.element(page.getByLabelText('Separation date'))
 			.toHaveAccessibleDescription(
-				'The day your active duty is set to end. Ask your personnel office if you are not sure.'
+				'The day your service is set to end. Ask your personnel office if you are not sure.'
 			);
+	});
+});
+
+describe('Wizard, how the member is leaving', () => {
+	const decode = (bytes: Uint8Array | undefined) =>
+		bytes ? new TextDecoder().decode(bytes) : undefined;
+	const lastPatch = () =>
+		store.save.mock.calls.at(-1)?.[0] as Patch & { separationPath?: Uint8Array };
+
+	it('asks it as an optional group of five choices, with its hint', async () => {
+		await render(WizardPage);
+		const group = page.getByRole('radiogroup', { name: 'How are you leaving? (optional)' });
+		await expect
+			.element(group)
+			.toHaveAccessibleDescription('This adds the steps for your path. It stays on this device.');
+		for (const choice of [
+			'Finishing my service',
+			'Retiring',
+			'A medical board',
+			'Leaving the Guard or Reserve',
+			'Not sure yet'
+		]) {
+			await expect.element(group.getByRole('radio', { name: choice })).not.toBeChecked();
+		}
+	});
+
+	it('saves the picked path with the date, in one save, and wipes its bytes once it settles', async () => {
+		// Read while the save runs: the page wipes its copy of the bytes once the save has settled, as it does the date.
+		let seen: string | undefined;
+		store.save.mockImplementation(async (patch) => {
+			seen = decode((patch as Patch & { separationPath?: Uint8Array }).separationPath);
+			return { generation: 1 };
+		});
+		await render(WizardPage);
+		await page.getByRole('radio', { name: 'A medical board' }).click();
+		await page.getByLabelText('Separation date').fill(TYPED);
+		await page.getByRole('button', { name: 'Save and continue' }).click();
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/timeline'));
+		expect(store.save).toHaveBeenCalledTimes(1);
+		expect(seen).toBe('medical');
+		expect(lastPatch().setupIntent).toBe('completed');
+		expect(allZero(lastPatch().separationPath as Uint8Array)).toBe(true);
+	});
+
+	it.each([
+		['no pick', null],
+		['Not sure yet', 'Not sure yet'],
+		['Not sure yet after another pick', 'Retiring']
+	])('saves no path for %s', async (_name, first) => {
+		store.save.mockResolvedValue({ generation: 1 });
+		await render(WizardPage);
+		if (first) await page.getByRole('radio', { name: first }).click();
+		if (first === 'Retiring') await page.getByRole('radio', { name: 'Not sure yet' }).click();
+		await page.getByLabelText('Separation date').fill(TYPED);
+		await page.getByRole('button', { name: 'Save and continue' }).click();
+		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
+		expect('separationPath' in lastPatch()).toBe(false);
+	});
+
+	it('saves nothing when the member skips, whatever was picked', async () => {
+		await render(WizardPage);
+		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('button', { name: 'Skip for now' }).click();
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/'));
+		expect(store.save).not.toHaveBeenCalled();
 	});
 });
 
