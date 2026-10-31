@@ -371,7 +371,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: 0,
 		recommendedOffset: -300,
-		why: 'A Physical Evaluation Board Liaison Officer (PEBLO) guides service members through the whole Integrated Disability Evaluation System (IDES). The board sets the separation date, so update yours here when it changes.',
+		why: 'A Physical Evaluation Board Liaison Officer (PEBLO) guides service members through the whole Integrated Disability Evaluation System (IDES). If the process moves your separation date, update it here.',
 		requires: { separationPath: ['medical'] }
 	},
 	{
@@ -407,7 +407,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: 0,
 		recommendedOffset: -300,
-		why: 'Transition counseling is required for members released from active duty, Guard and Reserve included. Your transition assistance office confirms what you need.',
+		why: 'If you are being released from active duty orders, TAP applies. Your transition assistance office confirms what you need.',
 		requires: { separationPath: ['reserve-component'] }
 	},
 	{
@@ -424,7 +424,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'rcsbp-election',
-		title: 'Make your Reserve SBP choice within 90 days of your 20-year letter',
+		title: 'If you have your 20-year letter, make your Reserve SBP choice within 90 days of it',
 		category: 'finance',
 		finishBefore: 'separation',
 		kind: 'soft',

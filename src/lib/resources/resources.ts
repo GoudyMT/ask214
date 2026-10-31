@@ -417,7 +417,7 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'reserve-affiliation': ['tamp'],
 	'sbp-election': ['sbp'],
 	'peblo-contact': ['ides'],
-	'va-msc-claim': ['ides', 'va-accredited-rep'],
+	'va-msc-claim': ['ides', 'va-disability', 'va-accredited-rep'],
 	'ides-review-options': ['ides'],
 	'rc-tap': ['dodtap', 'military-installations'],
 	'tamp-check': ['tamp'],
