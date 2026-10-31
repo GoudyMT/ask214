@@ -29,7 +29,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 
 **What it is.** The profile holds the separation date and, optionally, rate, rank, years of service,
 anticipated disability rating, family status, intended path, destination, special situations, and SkillBridge
-and terminal leave start dates. Beside it are the timeline's task statuses, snooze dates and notes, among them
+and terminal leave start dates, and how the member is leaving. Beside it are the timeline's task statuses, snooze dates and notes, among them
 the answer to the SkillBridge question, the calendar choices, the SkillBridge finder's answers (a ZIP or a state,
 filters), saved programs and compare picks, and the optional API key. Each lives as ciphertext in its own
 single-row IndexedDB store; four more stores hold signed rollback marks and one holds the keys. The finder's
@@ -159,9 +159,10 @@ clear every store, and if it stops, it says nothing was deleted.
 
 ### The timeline and the calendar file
 
-**What it is.** The timeline is computed on the device: 37 task definitions with day offsets from the
-separation date, each shown only when the profile is known to meet its conditions. Two of them, finding a
-SkillBridge program and submitting the request, show only after the sailor answers Yes to the Timeline's
+**What it is.** The timeline is computed on the device: 45 task definitions with day offsets from the
+separation date, each shown only when the profile is known to meet its conditions; eight show only for the
+leaving answer they belong to. Two of them, finding a
+SkillBridge program and submitting the request, show only after the member answers Yes to the Timeline's
 SkillBridge question, or Not sure when it asks a second time. Each window has a firmness:
 soft (good timing only), required until separation, closing for good, or changing how it works. Each task also
 names what it must finish before: separation, terminal leave, or leaving the command (SkillBridge or terminal
