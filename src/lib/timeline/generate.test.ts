@@ -519,6 +519,15 @@ describe('Fit: the leaving dates pull in a last day, never an opening', () => {
 		expect(review.status).toBe('start-now'); // it fits before SkillBridge
 	});
 
+	it('the DD-214 review counts from SkillBridge when terminal leave follows it, like the separation package', () => {
+		const review = item(
+			leaving({ skillbridgeStart: '2026-11-01', terminalLeaveStart: '2027-03-01' }),
+			'dd214-review'
+		);
+		expect(review.windowStartDate).toBe('2026-08-03');
+		expect(review.windowEndDate).toBe('2026-10-17');
+	});
+
 	it('the DD-214 review counts from terminal leave when it is the only date', () => {
 		const review = item(leaving({ terminalLeaveStart: '2027-03-01' }), 'dd214-review');
 		expect(review.windowStartDate).toBe('2026-12-01');
