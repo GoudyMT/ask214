@@ -1,6 +1,6 @@
 import { decodeCalendarSyncState } from '../calendar/codec';
 import { decodeProfile, encodeProfile } from '../profile/codec';
-import { parseEaosAtRead } from '../profile/eaos';
+import { decodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { parseSeparationPath } from '../profile/separation-path';
 import type { ProfileV1 } from '../profile/types';
@@ -155,7 +155,8 @@ function isInteger(v: unknown, min: number, max: number): v is number {
 const isTime = (v: unknown): v is number => isInteger(v, 0, MAX_TIME);
 const isTimeOrNull = (v: unknown): v is number | null => v === null || isTime(v);
 
-// A default decoder drops a leading byte-order mark, which would let a second spelling of a known value through.
+// A default decoder drops a leading byte-order mark, which would let a second spelling of a known answer through. The
+// dates keep the shipped decoder: a release already accepted them that way, and this check only widens.
 const exactText = new TextDecoder('utf-8', { ignoreBOM: true });
 
 /**
@@ -168,7 +169,7 @@ function isStoredDate(v: unknown): v is string {
 	const bytes = b64DecodeStrict(v);
 	if (bytes === null) return false;
 	try {
-		parseEaosAtRead(exactText.decode(bytes));
+		parseEaosAtRead(decodeEaos(bytes));
 		return true;
 	} catch {
 		return false;

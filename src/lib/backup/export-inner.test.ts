@@ -317,7 +317,9 @@ describe('buildExportInner: what a person exports', () => {
 	// release reads it as no answer, and the restore check refuses it, so the file leaves it out rather than fail.
 	it.each([
 		['known', 'medical', 'bWVkaWNhbA=='],
-		['unknown', 'discharge', undefined]
+		['unknown', 'discharge', undefined],
+		// The restore check refuses a byte-order mark before the answer, so the filter must read it the same way.
+		['marked', String.fromCharCode(0xfeff) + 'ets', undefined]
 	])('exports a %s leaving answer as this release reads it', (_name, word, inFile) => {
 		const separationPath = new TextEncoder().encode(word);
 		const bytes = exported(snapshot({ profile: deviceProfile({ separationPath }) }));

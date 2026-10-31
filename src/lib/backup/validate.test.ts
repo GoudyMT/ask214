@@ -408,6 +408,14 @@ describe('validateInner: acceptance corpus (shapes the app writes)', () => {
 				}
 			]
 		),
+		// The shipped release read dates with a decoder that drops a byte-order mark, and this check only widens within
+		// backupSchema 1, so a file that release accepted still restores.
+		[
+			'a date behind a byte-order mark',
+			(p) => {
+				p.profile.skillbridgeStart = btoa(String.fromCharCode(0xef, 0xbb, 0xbf) + '2027-03-01');
+			}
+		],
 		[
 			'a time ahead of the clock',
 			(p) => {
@@ -602,15 +610,11 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 			'profile'
 		],
 		['a leaving answer that is empty', (p) => (p.profile.separationPath = ''), 'profile'],
-		// A default text decoder drops a leading byte-order mark, so these read as known values the encoder never writes.
+		// A default text decoder drops a leading byte-order mark, so this reads as a known answer the encoder never writes.
+		// No shipped release stored an answer, so refusing it narrows nothing an older file held.
 		[
 			'a leaving answer behind a byte-order mark',
 			(p) => (p.profile.separationPath = btoa(BOM + 'ets')),
-			'profile'
-		],
-		[
-			'skillbridgeStart behind a byte-order mark',
-			(p) => (p.profile.skillbridgeStart = btoa(BOM + '2027-03-01')),
 			'profile'
 		],
 		...NEVER_WRITTEN.map((key): [string, (p: Parts) => void, Store] => [
