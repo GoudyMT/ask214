@@ -48,10 +48,24 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
  * a persona field (hidden until set + matched).
  */
 // 10 USC 1142 covers a release from active duty, so a Guard or Reserve member on orders keeps the TAP deadlines and one
-// leaving drill status may not have them; the line says which.
-const ON_ORDERS =
-	'For the Guard or Reserve, this applies if you are being released from active duty orders.';
-const onOrders = (why: string) => ({ 'reserve-component': { why: `${ON_ORDERS} ${why}` } });
+// leaving drill status may not have them. Every line the task shows says which: the Home row, Needs you now and the
+// calendar show only the title, and a late card shows the after note.
+const ON_ORDERS = 'if you are being released from active duty orders';
+function onOrders(def: TaskDef): TaskDef {
+	return {
+		...def,
+		copyFor: {
+			...def.copyFor,
+			'reserve-component': {
+				title: `${def.title}, ${ON_ORDERS}`,
+				why: `For the Guard or Reserve, this applies ${ON_ORDERS}. ${def.why}`,
+				...(def.afterNote && {
+					afterNote: `For the Guard or Reserve, ${ON_ORDERS}: ${def.afterNote}`
+				})
+			}
+		}
+	};
+}
 
 export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Early prep (no authoritative fixed date; recommended 18-24 months out) ----
@@ -156,7 +170,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- TAP / counseling (federally anchored) ----
-	{
+	onOrders({
 		id: 'preseparation-counseling',
 		title: 'Complete Initial and Pre-separation Counseling',
 		category: 'admin',
@@ -168,10 +182,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		why: 'TAP officially starts here, and it is required no later than 365 days out.',
 		afterNote:
 			"Still required. Contact your installation's transition assistance office to start now.",
-		windowFor: { retirement: { windowStart: -730, recommendedOffset: -600 } },
-		copyFor: onOrders('TAP officially starts here, and it is required no later than 365 days out.')
-	},
-	{
+		windowFor: { retirement: { windowStart: -730, recommendedOffset: -600 } }
+	}),
+	onOrders({
 		id: 'tap-course',
 		title: 'Attend your required TAP curriculum',
 		category: 'admin',
@@ -180,12 +193,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -270,
-		why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.',
-		copyFor: onOrders(
-			'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
-		)
-	},
-	{
+		why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
+	}),
+	onOrders({
 		id: 'tap-track',
 		title: 'Attend a TAP 2-day track (Employment / Education / Vocational / Entrepreneurship)',
 		category: 'admin',
@@ -194,9 +204,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: -120,
 		recommendedOffset: -240,
-		why: 'Each member picks one focused 2-day track for their path.',
-		copyFor: onOrders('Each member picks one focused 2-day track for their path.')
-	},
+		why: 'Each member picks one focused 2-day track for their path.'
+	}),
 
 	// ---- SkillBridge: shown only when the user's answer to the SkillBridge question shows them ----
 	{
@@ -448,7 +457,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- Capstone + final-90 ----
-	{
+	onOrders({
 		id: 'tap-capstone',
 		title: 'Complete your TAP Capstone',
 		category: 'admin',
@@ -459,11 +468,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		recommendedOffset: -120,
 		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
 		afterNote:
-			"Still required before you separate. Contact your installation's transition assistance office.",
-		copyFor: onOrders(
-			'Your commander verifies you meet Career Readiness Standards no later than 90 days out.'
-		)
-	},
+			"Still required before you separate. Contact your installation's transition assistance office."
+	}),
 	{
 		id: 'va-benefits-advisor',
 		title: 'Meet one-on-one with a VA benefits advisor',

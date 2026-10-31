@@ -188,9 +188,15 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		// a list of every answer or step travelling is caught although only one answer is seeded.
 		'separationPath',
 		'=medical',
+		'/medical',
 		'medical-',
 		'A medical board',
 		PEBLO_TITLE,
+		// As a calendar file writes it: the comma escaped.
+		'Meet your PEBLO\\, who guides',
+		'Talk with your VA Military Service Coordinator',
+		'Learn the review and appeal steps',
+		'If the board retires you',
 		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
 		...(['medical', 'retirement', 'reserve-component'] as const).flatMap((v) => [
 			`"${v}"`,

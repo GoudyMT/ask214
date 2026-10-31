@@ -1387,9 +1387,14 @@ describe('the leaving answer on the real task list', () => {
 		const ORDERS = 'released from active duty orders';
 		const shown = items('reserve-component');
 		expect(shown.map((i) => i.def.id)).not.toContain('reserve-affiliation');
+		// The Home row, Needs you now and the calendar show only the title, and a late card shows the after note.
 		for (const id of TAP) {
-			expect(shown.find((i) => i.def.id === id)?.def.why, id).toContain(ORDERS);
-			expect(items().find((i) => i.def.id === id)?.def.why, id).not.toContain(ORDERS);
+			const def = shown.find((i) => i.def.id === id)?.def;
+			expect(def?.why, id).toContain(ORDERS);
+			expect(def?.title, id).toContain(ORDERS);
+			if (def?.afterNote) expect(def.afterNote, id).toContain(ORDERS);
+			const plain = items().find((i) => i.def.id === id)?.def;
+			expect(`${plain?.title} ${plain?.why} ${plain?.afterNote ?? ''}`, id).not.toContain(ORDERS);
 		}
 	});
 
