@@ -678,6 +678,7 @@ describe('the confirm', () => {
 			separationDate: true,
 			skillbridgeStart: false,
 			terminalLeaveStart: false,
+			separationPath: false,
 			tasks: 2,
 			notes: 1,
 			calendarExclusions: 2,
@@ -693,7 +694,11 @@ describe('the confirm', () => {
 		const start = encodeEaos(parseEaosAtRead('2027-03-22'));
 		const leave = encodeEaos(parseEaosAtRead('2027-04-26'));
 		try {
-			await source.profile.save({ skillbridgeStart: start, terminalLeaveStart: leave });
+			await source.profile.save({
+				skillbridgeStart: start,
+				terminalLeaveStart: leave,
+				separationPath: new TextEncoder().encode('medical')
+			});
 		} finally {
 			start.fill(0);
 			leave.fill(0);
@@ -714,13 +719,14 @@ describe('the confirm', () => {
 			separationDate: true,
 			skillbridgeStart: true,
 			terminalLeaveStart: true,
+			separationPath: true,
 			tasks: 2,
 			notes: 1,
 			calendarExclusions: 2,
 			calendarCard: true
 		});
 		const text = JSON.stringify(summary);
-		for (const value of ['2028-02-01', '2027-03-22', '2027-04-26', 'TAP office']) {
+		for (const value of ['2028-02-01', '2027-03-22', '2027-04-26', 'TAP office', 'medical']) {
 			expect(text).not.toContain(value);
 		}
 	});

@@ -400,6 +400,14 @@ describe('validateInner: acceptance corpus (shapes the app writes)', () => {
 				p.profile.setupIntentChangedAt = null;
 			}
 		],
+		...(['ets', 'retirement', 'medical', 'reserve-component'] as const).map(
+			(path): [string, (p: Parts) => void] => [
+				`a profile with the leaving answer ${path}`,
+				(p) => {
+					p.profile.separationPath = btoa(path);
+				}
+			]
+		),
 		[
 			'a time ahead of the clock',
 			(p) => {
@@ -581,6 +589,17 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 			(p) => (p.profile.terminalLeaveStart = b64('1800-05-01')),
 			'profile'
 		],
+		[
+			'a leaving answer this release does not know',
+			(p) => (p.profile.separationPath = b64('discharge')),
+			'profile'
+		],
+		[
+			'a leaving answer that is not base64',
+			(p) => (p.profile.separationPath = 'medical'),
+			'profile'
+		],
+		['a leaving answer that is empty', (p) => (p.profile.separationPath = ''), 'profile'],
 		...NEVER_WRITTEN.map((key): [string, (p: Parts) => void, Store] => [
 			`the never-written profile field ${key}`,
 			(p) => (p.profile[key] = b64('x')),

@@ -535,6 +535,21 @@ const PROFILE_MEMBERS: Member[] = [
 		}
 	},
 	{
+		name: 'profile: the leaving answer',
+		run: async (ctx) => {
+			await ctx.profile.save({ separationPath: new TextEncoder().encode('medical') });
+		},
+		holds: (seen) => expect(text(seen.file.profile.separationPath)).toBe('medical')
+	},
+	{
+		name: 'profile: the leaving answer cleared',
+		run: async (ctx) => {
+			await ctx.profile.save({ separationPath: new TextEncoder().encode('retirement') });
+			await ctx.profile.save({ separationPath: undefined });
+		},
+		holds: (seen) => expect(seen.file.profile.separationPath).toBeUndefined()
+	},
+	{
 		name: 'profile: both leaving dates cleared',
 		run: async (ctx) => {
 			await bothLeavingDates(ctx);
