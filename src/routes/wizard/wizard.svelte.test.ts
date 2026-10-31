@@ -128,6 +128,19 @@ describe('Wizard, a save that fails', () => {
 	});
 });
 
+// Each branch names this date differently (ETS, EAOS, DOS), and orders come late, so the hint names the day itself
+// and who to ask.
+describe('Wizard, the separation date hint', () => {
+	it('describes the date in words every branch uses', async () => {
+		await render(WizardPage);
+		await expect
+			.element(page.getByLabelText('Separation date'))
+			.toHaveAccessibleDescription(
+				'The day your active duty is set to end. Ask your personnel office if you are not sure.'
+			);
+	});
+});
+
 describe('Wizard, the typed date in memory', () => {
 	it('is zeroed once a save that worked has settled, not before, and the page moves on', async () => {
 		const { seen, settle } = pendingSave();

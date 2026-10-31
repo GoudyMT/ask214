@@ -605,7 +605,7 @@
 						id="eaos"
 						label="Separation date"
 						value={currentEaos}
-						hint="Your last day on active duty, as shown on your separation orders."
+						hint="The day your active duty is set to end. Ask your personnel office if you are not sure."
 						onSave={saveEaos}
 					/>
 					<SkillBridgePlanRow
