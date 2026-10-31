@@ -1,28 +1,28 @@
 <script lang="ts">
-	import type { SeparationPath } from '#lib/profile/separation-path.js';
+	import {
+		SEPARATION_PATHS,
+		SEPARATION_PATH_LABEL,
+		type SeparationPath
+	} from '#lib/profile/separation-path.js';
 
 	let {
 		value,
 		onchange,
 		name,
 		disabled = false,
-		label = 'How are you leaving? (optional)',
-		hint = 'This adds the steps for your path. It stays on this device.'
+		hideLabel = false
 	}: {
 		value: SeparationPath | undefined;
 		/** "Not sure yet" sends undefined: it stores nothing, the same as no answer. */
 		onchange: (next: SeparationPath | undefined) => void;
 		name: string;
 		disabled?: boolean;
-		label?: string;
-		hint?: string;
+		/** Inside a Settings row, whose toggle already names the question: the label still names the group. */
+		hideLabel?: boolean;
 	} = $props();
 
 	const CHOICES: { value: SeparationPath | undefined; label: string }[] = [
-		{ value: 'ets', label: 'Finishing my service' },
-		{ value: 'retirement', label: 'Retiring' },
-		{ value: 'medical', label: 'A medical board' },
-		{ value: 'reserve-component', label: 'Leaving the Guard or Reserve' },
+		...SEPARATION_PATHS.map((p) => ({ value: p, label: SEPARATION_PATH_LABEL[p] })),
 		{ value: undefined, label: 'Not sure yet' }
 	];
 
@@ -33,8 +33,12 @@
 </script>
 
 <div class="path-choices" role="radiogroup" aria-labelledby={labelId} aria-describedby={hintId}>
-	<p class="path-choices__label" id={labelId}>{label}</p>
-	<p class="path-choices__hint" id={hintId}>{hint}</p>
+	<p class="path-choices__label" class:visually-hidden={hideLabel} id={labelId}>
+		How are you leaving? (optional)
+	</p>
+	<p class="path-choices__hint" id={hintId}>
+		This adds the steps for your path. It stays on this device.
+	</p>
 	<div class="path-choices__options">
 		{#each CHOICES as c (c.label)}
 			<label class="path-choices__choice">
@@ -114,5 +118,16 @@
 	.path-choices__choice:has(input:focus-visible) {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

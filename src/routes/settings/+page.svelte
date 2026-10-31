@@ -2,6 +2,8 @@
 	import { onDestroy, tick, untrack } from 'svelte';
 	import SettingsDateRow from '#lib/components/SettingsDateRow.svelte';
 	import SkillBridgePlanRow from '#lib/components/SkillBridgePlanRow.svelte';
+	import SeparationPathRow from '#lib/components/SeparationPathRow.svelte';
+	import type { SeparationPath } from '#lib/profile/separation-path.js';
 	import ThemeControl from '#lib/components/ThemeControl.svelte';
 	import InstallPrompt from '#lib/components/InstallPrompt.svelte';
 	import LockedPanel from '#lib/components/LockedPanel.svelte';
@@ -288,6 +290,17 @@
 		const patch: ProfilePatch =
 			field === 'skillbridgeStart' ? { skillbridgeStart: bytes } : { terminalLeaveStart: bytes };
 		return savePatch(patch, bytes);
+	}
+
+	const separationPath = $derived.by(() => {
+		const p = app.store?.persona;
+		return p && p.completeness !== 'none' ? p.separationPath : undefined;
+	});
+
+	// No answer is an absent key, as a removed date is: the store drops it and zeroizes the record it replaces.
+	function savePath(next: SeparationPath | undefined): Promise<string | null> {
+		const bytes = next ? new TextEncoder().encode(next) : undefined;
+		return savePatch({ separationPath: bytes }, bytes);
 	}
 
 	function removeLeaving(field: 'skillbridgeStart' | 'terminalLeaveStart'): Promise<string | null> {
@@ -612,6 +625,11 @@
 						{plan}
 						access={timelineAccess(app.timeline, unlocking)}
 						onSave={savePlan}
+					/>
+					<SeparationPathRow
+						value={separationPath}
+						onSave={savePath}
+						onRemove={() => savePath(undefined)}
 					/>
 					<SettingsDateRow
 						id="skillbridge-start"

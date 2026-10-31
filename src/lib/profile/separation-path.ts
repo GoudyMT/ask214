@@ -6,6 +6,14 @@ export const SEPARATION_PATHS = ['ets', 'retirement', 'medical', 'reserve-compon
 
 export type SeparationPath = (typeof SEPARATION_PATHS)[number];
 
+/** Each path in the words the setup question and the Settings row show. */
+export const SEPARATION_PATH_LABEL: Record<SeparationPath, string> = {
+	ets: 'Finishing my service',
+	retirement: 'Retiring',
+	medical: 'A medical board',
+	'reserve-component': 'Leaving the Guard or Reserve'
+};
+
 /** The stored text as a path, or undefined for no answer or a value this release does not know. */
 export function parseSeparationPath(s: string | undefined): SeparationPath | undefined {
 	return (SEPARATION_PATHS as readonly string[]).includes(s ?? '')
