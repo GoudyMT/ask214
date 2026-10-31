@@ -78,6 +78,7 @@ describe('user-facing copy serves every branch', () => {
 			'Your EAOS.',
 			'Your End of Active Obligated Service.',
 			'Visit Fleet & Family Support.',
+			'Visit Fleet and Family Support.',
 			`Ask your command${RIGHT_QUOTE}s TAP office.`
 		];
 		expect(planted.filter((line) => !isForbidden(line))).toEqual([]);

@@ -94,7 +94,8 @@ describe('Settings, the SkillBridge and terminal leave dates in either order', (
 	// leave start typed 11 days before a saved SkillBridge start (Oct 8 against Oct 19), or on its day.
 	it.each([
 		['before', -11],
-		['on', 0]
+		['on', 0],
+		['after', 30]
 	])('saves a terminal leave start %s the SkillBridge start', async (_, offset) => {
 		withLeaving({ skillbridgeStart: isoFromToday(STORED) });
 		await render(SettingsPage);
@@ -108,7 +109,8 @@ describe('Settings, the SkillBridge and terminal leave dates in either order', (
 	// The same pair entered the other way round: terminal leave first, then a SkillBridge start on or after it.
 	it.each([
 		['after', 10],
-		['on', 0]
+		['on', 0],
+		['before', -30]
 	])('saves a SkillBridge start %s the terminal leave start', async (_, offset) => {
 		withLeaving({ terminalLeaveStart: isoFromToday(STORED) });
 		await render(SettingsPage);
@@ -130,14 +132,19 @@ describe('Settings, the SkillBridge and terminal leave dates in either order', (
 		expect(store.save).not.toHaveBeenCalled();
 	});
 
-	// The store keeps its own copy, so the bytes of the typed date are wiped once the save settles.
-	it('zeroes the typed date it handed to the store once the save settles', async () => {
+	// The store keeps its own copy, so the bytes of the typed date are wiped once the save settles - not before, or
+	// the store would be handed zeros.
+	it('zeroes the typed date it handed to the store once the save settles, not before', async () => {
+		let atSave: number[] = [];
+		store.save.mockImplementation(async (patch: { terminalLeaveStart: Uint8Array }) => {
+			atSave = Array.from(patch.terminalLeaveStart);
+		});
 		withLeaving({ skillbridgeStart: isoFromToday(STORED) });
 		await render(SettingsPage);
 		await enter('Terminal leave start', isoFromToday(STORED + 5));
 		await expect.element(page.getByLabelText('Terminal leave start')).not.toBeInTheDocument();
+		expect(atSave.some((b) => b !== 0)).toBe(true);
 		const [patch] = store.save.mock.calls[0] as [{ terminalLeaveStart: Uint8Array }];
-		expect(patch.terminalLeaveStart.length).toBeGreaterThan(0);
 		expect(patch.terminalLeaveStart.every((b) => b === 0)).toBe(true);
 	});
 
