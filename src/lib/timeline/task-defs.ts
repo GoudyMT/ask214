@@ -266,7 +266,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -150,
-		why: 'Schools and employers use it to credit your military training. Air Force members order theirs through Air University instead.'
+		why: 'Schools and employers use it to credit your military training. Air Force members usually order theirs through Air University.'
 	},
 	{
 		id: 'reserve-affiliation',

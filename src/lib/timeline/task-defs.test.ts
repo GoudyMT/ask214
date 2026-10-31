@@ -332,10 +332,11 @@ describe('firm deadlines match their official sources', () => {
 	});
 
 	// Military OneSource: the JST serves the Army, Marine Corps, Navy and Coast Guard, and "Air Force members should
-	// contact the Air University to order official transcripts". The line points Air Force members there.
+	// contact the Air University to order official transcripts". Some Air Force members hold a JST for ACE-credited
+	// courses, so the line says "usually".
 	it('sends Air Force members to Air University for their transcript', () => {
 		expect(at('jst-order')?.why).toBe(
-			'Schools and employers use it to credit your military training. Air Force members order theirs through Air University instead.'
+			'Schools and employers use it to credit your military training. Air Force members usually order theirs through Air University.'
 		);
 	});
 
