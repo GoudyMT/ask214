@@ -219,8 +219,8 @@ describe('Settings, a date saved while another tab changed the profile', () => {
 
 		await render(SettingsPage);
 		const section = page.getByRole('region', { name: 'Transition timeline' });
-		await section.getByRole('button', { name: 'Separation date (EAOS)' }).click();
-		await page.getByLabelText('Separation date (EAOS)').fill(iso);
+		await section.getByRole('button', { name: /^Separation date/ }).click();
+		await page.getByLabelText('Separation date', { exact: true }).fill(iso);
 		await section.getByRole('button', { name: /^save$/i }).click();
 
 		await expect.element(page.getByText(OCC)).toBeVisible();

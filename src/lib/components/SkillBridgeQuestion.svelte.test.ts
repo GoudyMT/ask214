@@ -119,7 +119,7 @@ describe('SkillBridgeQuestion', () => {
 		await expect
 			.element(
 				page.getByText(
-					"Also follow your command's SkillBridge instructions: they set what your request package needs."
+					"Also follow your unit's SkillBridge instructions: your service and command set what your request needs."
 				)
 			)
 			.toBeVisible();
@@ -132,8 +132,14 @@ describe('SkillBridgeQuestion', () => {
 		await expect
 			.element(page.getByRole('heading', { name: 'Still thinking about SkillBridge?' }))
 			.toBeVisible();
+		// When the request opens is each service's rule, so the line gives only the search's timing.
 		await expect
-			.element(page.getByText(/works best from about 14 months before separation/))
+			.element(
+				page.getByText(
+					'The search for a program works best from about 14 months before separation. Say yes and its steps join your timeline.',
+					{ exact: true }
+				)
+			)
 			.toBeVisible();
 		expect(makesPersonalClaim(textOf(container))).toBe(false);
 	});

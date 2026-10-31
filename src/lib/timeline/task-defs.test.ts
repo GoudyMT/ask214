@@ -7,9 +7,7 @@ import {
 	LEAVING_HINT,
 	PAYGRADE_NOTE,
 	ORDER_NOTE,
-	AFTER_SEPARATION,
-	AFTER_SKILLBRIDGE,
-	BEFORE_TERMINAL_LEAVE
+	AFTER_SEPARATION
 } from '#lib/profile/leaving-copy.js';
 import { makesPersonalClaim } from './personal-claim';
 
@@ -207,8 +205,6 @@ describe('task-defs seed', () => {
 			PAYGRADE_NOTE,
 			ORDER_NOTE,
 			AFTER_SEPARATION,
-			AFTER_SKILLBRIDGE,
-			BEFORE_TERMINAL_LEAVE,
 			...skillbridgeLines,
 			...Object.values(TASK_LINK_NOTE)
 		];
@@ -273,8 +269,10 @@ describe('firm deadlines match their official sources', () => {
 	// separation leave" (2.b(3)) sets its last day; complete packages 5 to 9 months before separation (2.a) set its
 	// opening and aim, counted here from the leaving day like the last day. A DD 214 not final 14 days before
 	// departure on PTDY or separation leave is finalized without the member's signature (2.a), so its last day is the
-	// day before that mark. The leaving day includes a SkillBridge start: its participants are on permissive TDY
-	// orders (NAVADMIN 160/22 5.e), read here as that departure, and SkillBridge comes first.
+	// day before that mark. These are one service's numbers, kept as recommended windows. The leaving day is the
+	// earlier of SkillBridge and terminal leave: a service whose members leave on SkillBridge orders (NAVADMIN 160/22
+	// 5.e, permissive TDY) needs the window before SkillBridge, and a service that clears members out later sees it
+	// early, never late.
 	it("counts the separation package and the DD-214 review from the leaving day, with CH-93's last days", () => {
 		expect(at('separation-package')).toMatchObject({
 			countsFrom: 'leaving',
@@ -283,6 +281,14 @@ describe('firm deadlines match their official sources', () => {
 			windowEnd: -120
 		});
 		expect(at('dd214-review')).toMatchObject({ countsFrom: 'leaving', windowEnd: -15 });
+	});
+
+	// DoDI 1322.29 names the first field-grade commander as the approver for DoD services; the Coast Guard routes the
+	// request through its own command, so the line names the commander first and the DoD rule second.
+	it('names the commander as the approver and the DoD rule as DoD only', () => {
+		expect(PAYGRADE_NOTE).toContain(
+			'Your commander approves it (in DoD services, the first field-grade commander in your chain of command), and your service may set shorter limits by rank.'
+		);
 	});
 
 	// skillbridge.mil notice, June 3, 2026: members "in the last 180 days of their service who request SkillBridge
@@ -311,8 +317,25 @@ describe('firm deadlines match their official sources', () => {
 			recommendedOffset: -364,
 			windowEnd: -201
 		});
-		expect(at('skillbridge-request')?.why).toContain('at least 3 weeks before your start');
 		expect(at('skillbridge-find')?.why).toContain('DoD approval covers your program dates');
+	});
+
+	// The separation health assessment is done by military medical staff: a ship's or unit's medical department, an
+	// installation clinic, or a clinic a remote member is sent to. "Your military medical clinic" fits each of them.
+	it('sends a late separation health assessment to the military medical clinic', () => {
+		const contact = 'Contact your military medical clinic.';
+		expect(at('sha-schedule')?.why).toContain('book it through your military medical clinic.');
+		expect(at('sha-schedule')?.afterNote).toBe(`Still required before you separate. ${contact}`);
+		expect(at('sha-complete')?.afterNote).toBe(`Still required before you separate. ${contact}`);
+	});
+
+	// Military OneSource: the JST serves the Army, Marine Corps, Navy and Coast Guard, and "Air Force members should
+	// contact the Air University to order official transcripts". Some Air Force members hold a JST for ACE-credited
+	// courses, so the line says "usually".
+	it('sends Air Force members to Air University for their transcript', () => {
+		expect(at('jst-order')?.why).toBe(
+			'Schools and employers use it to credit your military training. Air Force members usually order theirs through Air University.'
+		);
 	});
 
 	// The locked wording of both steps, in full, so a later edit to any part of it fails here.
@@ -322,8 +345,8 @@ describe('firm deadlines match their official sources', () => {
 			why: 'Start about 14 months out: pick a reputable program whose DoD approval covers your program dates, and get its acceptance letter.'
 		});
 		expect(at('skillbridge-request')).toMatchObject({
-			title: "Submit your SkillBridge request (MyNavy Education and your command's package)",
-			why: "It opens a year before separation; submit as soon as it opens, at least 3 weeks before your start. Print the request's pages for the package your command asks for; your command approver decides."
+			title: 'Submit your SkillBridge request and get it approved',
+			why: 'Your commander approves it before you start (in DoD services, the first field-grade commander in your chain of command), and your service sets the steps and any limits by rank. Submit it as soon as you have an acceptance letter.'
 		});
 	});
 

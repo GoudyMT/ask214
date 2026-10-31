@@ -206,7 +206,7 @@ describe("the line shown above a task card's links", () => {
 
 	it('is read by task id, and absent for any other task', () => {
 		expect(linkNoteForTask('skillbridge-request')).toBe(
-			"Also follow your command's SkillBridge instructions: they set what your request package needs."
+			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs."
 		);
 		expect(linkNoteForTask('skillbridge-find')).toBe(linkNoteForTask('skillbridge-request'));
 		expect(linkNoteForTask('tap-course')).toBeUndefined();
@@ -220,36 +220,32 @@ describe("the line shown above a task card's links", () => {
 });
 
 describe('the SkillBridge steps link to the pages that carry them out', () => {
-	it('lists the DoD page for the search and the Navy request pages for the request', () => {
+	// Each service runs its own request process, so both steps point at the DoD program page every branch shares.
+	it('lists the DoD SkillBridge page for both the search and the request', () => {
 		expect(resourcesForTask('skillbridge-find').map((r) => r.id)).toEqual(['skillbridge']);
-		expect(resourcesForTask('skillbridge-request').map((r) => r.id)).toEqual([
-			'mynavy-education',
-			'navy-skillbridge'
-		]);
+		expect(resourcesForTask('skillbridge-request').map((r) => r.id)).toEqual(['skillbridge']);
+	});
+});
+
+// The transition office a member is sent to must be one any branch can find, on an official page.
+describe('the transition office links serve every branch', () => {
+	it('points at the MilitaryINSTALLATIONS directory, checked on one day', () => {
+		const installations = RESOURCES.find((r) => r.id === 'military-installations');
+		expect(installations).toMatchObject({
+			url: 'https://installations.militaryonesource.mil/',
+			displayCategory: 'skillbridge-transition',
+			lastVerified: '2026-10-30'
+		});
+		expect(isGovernmentHost(installations?.url ?? '')).toBe(true);
 	});
 
-	it('points the two new links at their official Navy pages, checked on one day', () => {
-		const byId = new Map(RESOURCES.map((r) => [r.id, r]));
-		expect(byId.get('mynavy-education')).toMatchObject({
-			url: 'https://myeducation.netc.navy.mil',
-			displayCategory: 'skillbridge-transition',
-			lastVerified: '2026-10-07'
-		});
-		expect(byId.get('navy-skillbridge')).toMatchObject({
-			url: 'https://www.mynavyhr.navy.mil/Career-Management/Transition/SkillBridge/',
-			displayCategory: 'skillbridge-transition',
-			lastVerified: '2026-10-07'
-		});
-		for (const id of ['mynavy-education', 'navy-skillbridge']) {
-			expect(isGovernmentHost(byId.get(id)?.url ?? ''), id).toBe(true);
+	it('sends the counseling and Capstone steps there once their date passes', () => {
+		for (const id of ['preseparation-counseling', 'tap-capstone']) {
+			expect(TASK_AFTER_LINK[id], id).toEqual({
+				resource: 'military-installations',
+				label: "Find your installation's transition office"
+			});
 		}
-	});
-
-	// The portal takes a CAC or a DoD ID login, so the line names both.
-	it('says the MyNavy Education portal takes a CAC or DoD ID login', () => {
-		expect(RESOURCES.find((r) => r.id === 'mynavy-education')?.description).toBe(
-			'The Navy portal where you submit your SkillBridge request (CAC or DoD ID login).'
-		);
 	});
 });
 

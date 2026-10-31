@@ -71,7 +71,7 @@
 		color: var(--color-fg);
 	}
 
-	/* The command's own instructions decide the SkillBridge request; the links below cannot. */
+	/* The unit's own instructions decide the SkillBridge request; the links below cannot. */
 	.resource-note {
 		margin: 0 0 var(--space-s);
 		color: var(--color-fg-muted);

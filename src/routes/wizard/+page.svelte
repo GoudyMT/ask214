@@ -171,8 +171,8 @@
 				{value}
 				{error}
 				onchange={onInput}
-				label="Separation date (EAOS)"
-				hint="Your End of Active Obligated Service - the date your current obligation ends."
+				label="Separation date"
+				hint="The day your active duty is set to end. Ask your personnel office if you are not sure."
 			/>
 			<p class="wizard__today">Today on this device: {todayDisplay}</p>
 

@@ -246,23 +246,6 @@ export const RESOURCES: readonly Resource[] = [
 		lastVerified: '2026-08-10'
 	},
 	{
-		id: 'mynavy-education',
-		title: 'MyNavy Education',
-		url: 'https://myeducation.netc.navy.mil',
-		description: 'The Navy portal where you submit your SkillBridge request (CAC or DoD ID login).',
-		displayCategory: 'skillbridge-transition',
-		lastVerified: '2026-10-07'
-	},
-	{
-		id: 'navy-skillbridge',
-		title: 'Navy SkillBridge (MyNavyHR)',
-		url: 'https://www.mynavyhr.navy.mil/Career-Management/Transition/SkillBridge/',
-		description:
-			"The Navy's SkillBridge page: the timeline, the paygrade limits and the program office's contact.",
-		displayCategory: 'skillbridge-transition',
-		lastVerified: '2026-10-07'
-	},
-	{
 		id: 'dodtap',
 		title: 'DoD Transition Assistance Program (TAP)',
 		url: 'https://www.dodtap.mil',
@@ -279,12 +262,13 @@ export const RESOURCES: readonly Resource[] = [
 		lastVerified: '2026-08-09'
 	},
 	{
-		id: 'navy-transition',
-		title: 'Navy Fleet & Family Support: Transition Assistance',
-		url: 'https://ffr.cnic.navy.mil/Family-Readiness/Fleet-And-Family-Support-Program/Work-and-Family-Life/Transition-Assistance/',
-		description: "The Navy's transition assistance program through Fleet and Family Support.",
+		id: 'military-installations',
+		title: 'MilitaryINSTALLATIONS',
+		url: 'https://installations.militaryonesource.mil/',
+		description:
+			'Find the offices on your installation, including its transition assistance program.',
 		displayCategory: 'skillbridge-transition',
-		lastVerified: '2026-08-09'
+		lastVerified: '2026-10-30'
 	},
 	{
 		id: 'mos-final-move',
@@ -292,15 +276,6 @@ export const RESOURCES: readonly Resource[] = [
 		url: 'https://www.militaryonesource.mil/resources/millife-guides/post-separation-housing-options/',
 		description:
 			'Housing after you separate, including your final move at government expense and its time limits.',
-		displayCategory: 'skillbridge-transition',
-		lastVerified: '2026-10-03'
-	},
-	{
-		id: 'navy-reserve',
-		title: 'Navy Reserve: Transitioning from Active Duty',
-		url: 'https://www.navy.com/joining/ways-to-join/reserve/transitioning-to-reserve',
-		description:
-			"The Navy's page on moving from active duty to the Navy Reserve, with recruiter contacts.",
 		displayCategory: 'skillbridge-transition',
 		lastVerified: '2026-10-03'
 	},
@@ -390,11 +365,11 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'master-resume': ['hire-heroes', 'careeronestop', 'linkedin-veterans'],
 	'gi-bill-research': ['gi-bill', 'gi-bill-comparison', 'vet-tec'],
 	'document-medical': ['va-disability'],
-	'preseparation-counseling': ['dodtap', 'navy-transition'],
+	'preseparation-counseling': ['dodtap', 'military-installations'],
 	'tap-course': ['dodtap', 'dol-vets'],
 	'tap-track': ['dodtap', 'acp', 'milmentor'],
 	'skillbridge-find': ['skillbridge'],
-	'skillbridge-request': ['mynavy-education', 'navy-skillbridge'],
+	'skillbridge-request': ['skillbridge'],
 	'job-search': ['usajobs', 'hiring-our-heroes', 'hire-heroes'],
 	'health-insurance-research': ['military-onesource'],
 	'life-insurance-research': ['vgli', 'mos-financial'],
@@ -405,7 +380,7 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'tap-capstone': ['dodtap'],
 	'va-benefits-advisor': ['va-accredited-rep', 'va-welcome-kit'],
 	'hhg-counseling': ['military-onesource'],
-	'separation-package': ['navy-transition', 'leave-transition'],
+	'separation-package': ['military-installations', 'leave-transition'],
 	'tricare-elect': ['military-onesource'],
 	'financial-docs': ['mypay'],
 	'tsp-decision': ['tsp', 'tsp-calculators'],
@@ -453,29 +428,25 @@ export const TASK_GUIDES: Record<string, readonly string[]> = {
 // the timeline tasks whose kind is 'required' or 'closes'; each names a resource above and the link text to show.
 export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }> = {
 	'preseparation-counseling': {
-		resource: 'navy-transition',
-		label: 'Find Navy transition help (Fleet and Family Support)'
+		resource: 'military-installations',
+		label: "Find your installation's transition office"
 	},
 	'tap-capstone': {
-		resource: 'navy-transition',
-		label: 'Find Navy transition help (Fleet and Family Support)'
+		resource: 'military-installations',
+		label: "Find your installation's transition office"
 	},
 	'sha-schedule': { resource: 'sha', label: 'The Separation Health Assessment on health.mil' },
 	'sha-complete': { resource: 'sha', label: 'The Separation Health Assessment on health.mil' },
-	'separation-package': {
-		resource: 'navy-transition',
-		label: 'Find Navy transition help (Fleet and Family Support)'
-	},
 	'va-bdd-claim': { resource: 'va-accredited-rep', label: 'Find a VSO on VA.gov' },
 	'tricare-elect': { resource: 'chcbp', label: 'CHCBP on tricare.mil' },
 	'vgli-convert': { resource: 'va-life-insurance', label: 'VA life insurance options on VA.gov' },
 	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' }
 };
 
-// One line shown above a task card's links: in a sailor's experience each command sets what its SkillBridge request
-// package needs, and the links cannot hold that.
+// One line shown above a task card's links: each service and command sets what its SkillBridge request needs, and
+// the links cannot hold that.
 export const COMMAND_INSTRUCTIONS =
-	"Also follow your command's SkillBridge instructions: they set what your request package needs.";
+	"Also follow your unit's SkillBridge instructions: your service and command set what your request needs.";
 export const TASK_LINK_NOTE: Record<string, string> = {
 	'skillbridge-find': COMMAND_INSTRUCTIONS,
 	'skillbridge-request': COMMAND_INSTRUCTIONS

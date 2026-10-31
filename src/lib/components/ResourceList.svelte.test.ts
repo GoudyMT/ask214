@@ -67,7 +67,7 @@ describe('ResourceList', () => {
 
 	describe('command instructions line', () => {
 		const LINE =
-			"Also follow your command's SkillBridge instructions: they set what your request package needs.";
+			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs.";
 
 		function groupOf(container: Element, heading: string): Element {
 			const h2 = [...container.querySelectorAll('h2')].find(
