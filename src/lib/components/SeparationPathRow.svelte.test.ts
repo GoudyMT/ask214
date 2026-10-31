@@ -56,18 +56,50 @@ describe('SeparationPathRow', () => {
 		await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith(undefined));
 	});
 
-	it('offers Remove answer only for a saved answer, and removes it', async () => {
-		const onRemove = vi.fn(async () => null);
-		await row({ onRemove });
+	it('offers no Remove answer when nothing is saved', async () => {
+		await row();
 		await toggle().click();
 		await expect
 			.element(page.getByRole('button', { name: 'Remove answer' }))
 			.not.toBeInTheDocument();
-		await toggle().click();
+	});
+
+	it('removes a saved answer with Remove answer', async () => {
+		const onRemove = vi.fn(async () => null);
 		await row({ value: 'ets', onRemove });
-		await page.getByRole('button', { name: /finishing my service/i }).click();
+		await toggle().click();
 		await page.getByRole('button', { name: 'Remove answer' }).click();
 		await vi.waitFor(() => expect(onRemove).toHaveBeenCalledOnce());
+	});
+
+	// A save writes a new profile version, tells the other tabs and marks the backup out of date.
+	it.each([
+		['nothing saved and nothing picked', undefined, null],
+		['nothing saved and Not sure yet picked', undefined, 'Not sure yet'],
+		['the saved answer still picked', 'medical', null]
+	] as const)('closes without saving for %s', async (_name, value, pick) => {
+		const onSave = vi.fn(async () => null);
+		await row({ value, onSave });
+		await toggle().click();
+		if (pick) await page.getByRole('radio', { name: pick }).click();
+		await saveButton().click();
+		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
+		expect(onSave).not.toHaveBeenCalled();
+	});
+
+	// The form closes when a save lands, so a pick taken while it runs would be dropped unseen.
+	it('holds the choices while a save runs', async () => {
+		let settle: (v: string | null) => void = () => {};
+		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (settle = resolve)));
+		await row({ onSave });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await saveButton().click();
+		await page.getByRole('radio', { name: 'A medical board' }).click();
+		await expect.element(page.getByRole('radio', { name: 'Retiring' })).toBeChecked();
+		await expect.element(page.getByRole('radio', { name: 'A medical board' })).not.toBeChecked();
+		settle(null);
+		await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith('retirement'));
 	});
 
 	it('says a failed save and keeps the form open', async () => {

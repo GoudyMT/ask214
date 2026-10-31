@@ -10,6 +10,7 @@
 		onchange,
 		name,
 		disabled = false,
+		hold = false,
 		hideLabel = false
 	}: {
 		value: SeparationPath | undefined;
@@ -17,6 +18,9 @@
 		onchange: (next: SeparationPath | undefined) => void;
 		name: string;
 		disabled?: boolean;
+		/** Refuse a new pick but keep focus (a disabled radio that holds focus drops it): a cancelled click puts the
+		 *  radio back, by mouse or arrow key. */
+		hold?: boolean;
 		/** Inside a Settings row, whose toggle already names the question: the label still names the group. */
 		hideLabel?: boolean;
 	} = $props();
@@ -47,6 +51,7 @@
 					{name}
 					{disabled}
 					checked={c.value === undefined ? value === undefined && unsurePicked : value === c.value}
+					onclick={(e) => hold && e.preventDefault()}
 					onchange={() => {
 						unsurePicked = c.value === undefined;
 						onchange(c.value);

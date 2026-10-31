@@ -60,10 +60,13 @@ function withPath(separationPath?: string): void {
 
 // What each save carried, read while it runs: the page wipes its copy of the bytes once a save settles.
 const saved: Record<string, unknown>[] = [];
+const sentBytes: Uint8Array[] = [];
 beforeEach(() => {
 	saved.length = 0;
+	sentBytes.length = 0;
 	store.save.mockReset().mockImplementation(async (patch: Record<string, unknown>) => {
 		const p = patch.separationPath;
+		if (p instanceof Uint8Array) sentBytes.push(p);
 		saved.push({
 			...patch,
 			...(p instanceof Uint8Array ? { separationPath: new TextDecoder().decode(p) } : {})
@@ -85,16 +88,18 @@ describe('Settings, how the member is leaving', () => {
 		);
 		const sb = toggles.findIndex((t) => /skillbridge plan|skillbridge\b/i.test(t));
 		const path = toggles.findIndex((t) => t.includes('How you are leaving'));
-		expect(path).toBeGreaterThan(sb);
+		expect(sb).toBeGreaterThanOrEqual(0);
+		expect(path).toBe(sb + 1);
 	});
 
-	it('saves a new answer as the profile field', async () => {
+	it('saves a new answer as the profile field, and wipes its bytes once the save settles', async () => {
 		withPath();
 		await render(SettingsPage);
 		await row().click();
 		await timelineSection().getByRole('radio', { name: 'Leaving the Guard or Reserve' }).click();
 		await timelineSection().getByRole('button', { name: 'Save', exact: true }).click();
 		await vi.waitFor(() => expect(saved).toEqual([{ separationPath: 'reserve-component' }]));
+		await vi.waitFor(() => expect(sentBytes[0]?.every((b) => b === 0)).toBe(true));
 	});
 
 	it.each([

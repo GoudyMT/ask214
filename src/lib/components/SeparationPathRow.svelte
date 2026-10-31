@@ -93,13 +93,21 @@
 			class="settings-edit"
 			onsubmit={(e) => {
 				e.preventDefault();
+				// The saved answer, still in effect: a write would only add a profile version and mark the backup out of date.
+				if (choice === value) {
+					if (!busy) void close();
+					return;
+				}
 				void run('save', () => onSave(choice));
 			}}
 			onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 		>
+			<!-- The form closes when a save lands, so a pick made while it runs would be dropped unseen: the choices hold
+			     until it settles. -->
 			<SeparationPathChoices
 				name="settings-path"
 				value={choice}
+				hold={busy}
 				onchange={(next) => {
 					choice = next;
 					error = null;
@@ -150,11 +158,11 @@
 		cursor: pointer;
 		text-align: left;
 	}
-	/* The answer reads as one piece: the label wraps before the answer does. */
+	/* The longest answer does not fit beside the label at 320 px, so it wraps on the right rather than overflow. */
 	.settings-disclosure__summary {
 		margin-left: auto;
 		color: var(--color-fg-muted);
-		white-space: nowrap;
+		text-align: right;
 	}
 	.settings-chevron {
 		width: 0;
