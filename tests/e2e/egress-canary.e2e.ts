@@ -182,7 +182,11 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		FIND_TITLE,
 		REQUEST_TITLE,
 		// The leaving answer says a member faces a medical board: its stored value and the steps it adds must not travel.
-		'medical',
+		// The bare word is in the synthesis prompt's own rules ("legal, or medical"), so the value is matched as a
+		// serializer would write it: quoted, under its field name, or base64 as the codec stores it.
+		'"medical"',
+		'separationPath',
+		btoa('medical'),
 		'peblo-contact',
 		'va-msc-claim',
 		'ides-review-options',
