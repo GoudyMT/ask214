@@ -144,5 +144,14 @@ describe('derivePersona', () => {
 			if (r.completeness === 'none') return;
 			expect('separationPath' in r).toBe(false);
 		});
+
+		// The backup leaves out an answer it would refuse to restore, so the timeline must not act on it either.
+		it('reads a known answer behind a byte-order mark as not answered, as the backup does', () => {
+			const r = derivePersona(
+				withEaos({ separationPath: enc(String.fromCharCode(0xfeff) + 'ets') })
+			);
+			if (r.completeness === 'none') throw new Error('expected a persona');
+			expect('separationPath' in r).toBe(false);
+		});
 	});
 });

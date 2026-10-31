@@ -50,6 +50,8 @@ function decode(u8?: Uint8Array | null): string | undefined {
 	return u8 ? new TextDecoder().decode(u8) : undefined;
 }
 
+const exactText = new TextDecoder('utf-8', { ignoreBOM: true });
+
 export function derivePersona(profile: ProfileV1 | null, today = new Date()): PersonaFilters {
 	if (!profile?.eaos) return { completeness: 'none' };
 
@@ -81,8 +83,11 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 	const rank = decode(profile.rank);
 	const familyStatus = decode(profile.familyStatus);
 	const intendedPath = decode(profile.intendedPath);
-	// The answer stands on its own, like the leaving dates: it never changes the completeness.
-	const separationPath = parseSeparationPath(decode(profile.separationPath));
+	// The answer stands on its own, like the leaving dates: it never changes the completeness. It is read with a
+	// byte-order mark kept, as the backup reads it, so the timeline never acts on an answer a backup would leave out.
+	const separationPath = parseSeparationPath(
+		profile.separationPath ? exactText.decode(profile.separationPath) : undefined
+	);
 
 	if (rate && rank && familyStatus && intendedPath) {
 		return {
