@@ -208,6 +208,10 @@ describe('task-defs seed', () => {
 		expect(skillbridgeLines.length).toBeGreaterThanOrEqual(27);
 		const lines = [
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
+			// The wording a leaving answer swaps in is shown the same way.
+			...TASK_DEFS.flatMap((t) =>
+				Object.values(t.copyFor ?? {}).flatMap((c) => [c.title, c.why, c.afterNote])
+			).filter((line): line is string => line !== undefined),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
 			...RESOURCES.flatMap((r) => [r.title, r.description]),
 			...[...Object.values(DEVICE_HINT), IOS_APP_HINT].map((hint) => `${hint.lead} ${hint.text}`),

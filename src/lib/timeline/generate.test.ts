@@ -1325,6 +1325,19 @@ describe('the leaving answer gates its own tasks', () => {
 		expect(gated(persona('reserve-component'))).toEqual([]);
 		expect(gated(persona('ets'))).toEqual(['h1']);
 	});
+
+	it("words a task for a stored, listed path and keeps every other answer's wording", () => {
+		const worded: TaskDef = {
+			...universal,
+			id: 'w1',
+			why: 'base',
+			copyFor: { medical: { why: 'board' } }
+		};
+		const why = (p: PersonaFilters) => filterAndAnchor(p, [worded])[0]?.def.why;
+		expect(why(persona('medical'))).toBe('board');
+		expect(why(persona('retirement'))).toBe('base');
+		expect(why(persona())).toBe('base');
+	});
 });
 
 describe('the leaving answer on the real task list', () => {
@@ -1332,9 +1345,10 @@ describe('the leaving answer on the real task list', () => {
 	const SEP = '2028-06-30' as EaosString;
 	const TRACKS: Record<SeparationPath, string[]> = {
 		ets: [],
-		retirement: ['sbp-election', 'retirement-request'],
-		medical: ['peblo-contact', 'va-msc-claim', 'ides-review-options'],
-		'reserve-component': ['rc-tap', 'tamp-check', 'rcsbp-election']
+		// A Guard or Reserve retirement makes the Reserve SBP choice; a board can retire a member, who then makes the SBP one.
+		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election'],
+		medical: ['peblo-contact', 'va-msc-claim', 'ides-review-options', 'sbp-election'],
+		'reserve-component': ['tamp-check', 'rcsbp-election']
 	};
 	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
 	const items = (separationPath?: SeparationPath, tasks: TimelineState['tasks'] = {}) =>
@@ -1367,12 +1381,30 @@ describe('the leaving answer on the real task list', () => {
 		}
 	);
 
-	it('the Guard or Reserve answer replaces the active-duty TAP steps and the reminder with its own', () => {
-		const shown = ids('reserve-component');
-		for (const id of [...TAP, 'reserve-affiliation']) expect(shown).not.toContain(id);
-		for (const path of ['retirement', 'medical'] as const) {
-			for (const id of TAP) expect(ids(path)).toContain(id);
+	// A member on active-duty orders keeps the firm TAP deadlines; the condition says when they apply, so a member
+	// leaving drill status can tell they may not.
+	it('the Guard or Reserve answer keeps the TAP steps, says when they apply, and hides only the recruiter reminder', () => {
+		const ORDERS = 'released from active duty orders';
+		const shown = items('reserve-component');
+		expect(shown.map((i) => i.def.id)).not.toContain('reserve-affiliation');
+		for (const id of TAP) {
+			expect(shown.find((i) => i.def.id === id)?.def.why, id).toContain(ORDERS);
+			expect(items().find((i) => i.def.id === id)?.def.why, id).not.toContain(ORDERS);
 		}
+	});
+
+	it('says when the SBP steps apply to a medical board and to a retirement', () => {
+		const def = (path: SeparationPath, id: string) => items(path).find((i) => i.def.id === id)?.def;
+		expect(def('medical', 'sbp-election')?.why).toMatch(/^If the board retires you/);
+		expect(def('retirement', 'sbp-election')?.why).not.toMatch(/board/);
+		expect(def('retirement', 'rcsbp-election')?.title).toMatch(
+			/^If you are retiring from the Guard or Reserve/
+		);
+		expect(def('reserve-component', 'rcsbp-election')?.title).toMatch(
+			/^If you have your 20-year letter/
+		);
+		// Retired pay from the Guard or Reserve usually starts at 60, so the line after the date cannot say it began.
+		expect(def('retirement', 'sbp-election')?.afterNote).toMatch(/^If retired pay has begun/);
 	});
 
 	it('retiring opens counseling two years out and keeps its 365-day deadline', () => {

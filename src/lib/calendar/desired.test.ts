@@ -42,6 +42,18 @@ describe('computeDesiredEvents', () => {
 		]);
 	});
 
+	it('gives a task kept off the calendar no event, soft or firm', () => {
+		const out = computeDesiredEvents(
+			[
+				item(def('a', 'soft', { offCalendar: true }), { aimDate: '2026-11-01' }),
+				item(def('b', 'closes', { offCalendar: true }))
+			],
+			NONE,
+			TODAY
+		);
+		expect(out).toEqual([]);
+	});
+
 	it('moves a snoozed soft task to its snooze date', () => {
 		const snoozed = item(def('a', 'soft'), {
 			status: 'snoozed',

@@ -82,6 +82,10 @@ export type TaskDef = {
 	hideFor?: SeparationPath[];
 	/** A different opening and recommended day for a leaving answer whose rule starts earlier (10 USC 1142). */
 	windowFor?: Partial<Record<SeparationPath, { windowStart: number; recommendedOffset: number }>>;
+	/** Different wording for a leaving answer the default line is not true for as written. */
+	copyFor?: Partial<Record<SeparationPath, { title?: string; why?: string; afterNote?: string }>>;
+	/** Kept out of the calendar file: its title tells whoever sees that calendar about the member's health. */
+	offCalendar?: true;
 	calendar?: { allDay?: boolean; durationMin?: number }; // consumed by the later Calendar sub-project
 };
 

@@ -120,6 +120,36 @@ describe('buildIcs', () => {
 		]);
 		for (const t of without) expect(withYes.has(t), t).toBe(true);
 	});
+
+	// A calendar file can land in a calendar others see, often a work one; a medical board is health information.
+	it('the medical board answer adds no medical-board step to the file, only the SBP step everyone retiring gets', async () => {
+		const now = new Date(2026, 9, 7, 12);
+		const fileFor = async (separationPath?: 'medical') => {
+			const items = generateTimeline(
+				{
+					completeness: 'eaos-only',
+					eaos: '2027-06-30' as EaosString,
+					daysUntilSeparation: 266,
+					...(separationPath ? { separationPath } : {})
+				},
+				[...TASK_DEFS],
+				{ schemaVersion: 1, tasks: {} },
+				now
+			).phases.flatMap((p) => p.items);
+			expect(items.some((i) => i.def.id === 'peblo-contact')).toBe(separationPath === 'medical');
+			return (await buildIcs(items, { taskIds: [], categories: [] }, now)).ics.replace(
+				/\r\n /g,
+				''
+			);
+		};
+		const titles = (ics: string) =>
+			new Set([...ics.matchAll(/SUMMARY:(.*)/g)].map((m) => m[1] ?? ''));
+		const without = titles(await fileFor());
+		const added = [...titles(await fileFor('medical'))].filter((t) => !without.has(t));
+		expect(added.length).toBeGreaterThan(0);
+		for (const t of added)
+			expect(t).toMatch(/: Get Survivor Benefit Plan counseling and make your SBP choice$/);
+	});
 });
 
 // The file's today is the date on the user's clock: on a New York evening the UTC date is already tomorrow, and on

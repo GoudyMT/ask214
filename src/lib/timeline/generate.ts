@@ -61,11 +61,13 @@ function includeForPath(persona: PersonaFilters, def: TaskDef): boolean {
 	return !(path && def.hideFor?.includes(path));
 }
 
-/** The def with its path's earlier opening and recommended day, when its rule starts earlier for that path. */
+/** The def with its path's own opening and recommended day, and its path's own wording, where it has them. */
 function forPath(persona: PersonaFilters, def: TaskDef): TaskDef {
 	const path = persona.completeness === 'none' ? undefined : persona.separationPath;
-	const window = path && def.windowFor?.[path];
-	return window ? { ...def, ...window } : def;
+	if (!path) return def;
+	const window = def.windowFor?.[path];
+	const copy = def.copyFor?.[path];
+	return window || copy ? { ...def, ...window, ...copy } : def;
 }
 
 /** The first day away a task must be finished before, and why; undefined when no entered date applies. */

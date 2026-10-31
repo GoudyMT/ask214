@@ -202,7 +202,6 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'ides-review-options',
 		'retirement-request',
 		'sbp-election',
-		'rc-tap',
 		'tamp-check',
 		'rcsbp-election'
 	];

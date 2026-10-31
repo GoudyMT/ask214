@@ -48,7 +48,6 @@ export const KNOWN_TASK_IDS: readonly string[] = Object.freeze([
 	'peblo-contact',
 	'va-msc-claim',
 	'ides-review-options',
-	'rc-tap',
 	'tamp-check',
 	'rcsbp-election'
 ]);

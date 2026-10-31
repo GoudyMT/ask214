@@ -419,7 +419,6 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'peblo-contact': ['ides'],
 	'va-msc-claim': ['ides', 'va-disability', 'va-accredited-rep'],
 	'ides-review-options': ['ides'],
-	'rc-tap': ['dodtap', 'military-installations'],
 	'tamp-check': ['tamp'],
 	'rcsbp-election': ['sbp']
 };
