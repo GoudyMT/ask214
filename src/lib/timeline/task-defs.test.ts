@@ -320,13 +320,11 @@ describe('firm deadlines match their official sources', () => {
 		expect(at('skillbridge-find')?.why).toContain('DoD approval covers your program dates');
 	});
 
-	// Every branch does the separation health assessment at a military treatment facility on the installation; a
-	// "medical department" is one service's name for it.
-	it('sends a late separation health assessment to the installation clinic', () => {
-		const contact = "Contact your installation's military medical clinic.";
-		expect(at('sha-schedule')?.why).toContain(
-			"book it through your installation's military medical clinic."
-		);
+	// The separation health assessment is done by military medical staff: a ship's or unit's medical department, an
+	// installation clinic, or a clinic a remote member is sent to. "Your military medical clinic" fits each of them.
+	it('sends a late separation health assessment to the military medical clinic', () => {
+		const contact = 'Contact your military medical clinic.';
+		expect(at('sha-schedule')?.why).toContain('book it through your military medical clinic.');
 		expect(at('sha-schedule')?.afterNote).toBe(`Still required before you separate. ${contact}`);
 		expect(at('sha-complete')?.afterNote).toBe(`Still required before you separate. ${contact}`);
 	});
