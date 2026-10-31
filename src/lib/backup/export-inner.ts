@@ -2,6 +2,7 @@ import { encodeCalendarSyncState } from '../calendar/codec';
 import type { CalendarSyncState } from '../calendar/types';
 import { safeLog } from '../log/safelog';
 import { encodeProfile } from '../profile/codec';
+import { parseSeparationPath } from '../profile/separation-path';
 import type { ProfileV1 } from '../profile/types';
 import { encodeFinderRecord } from '../skillbridge-finder/state/codec';
 import type {
@@ -60,7 +61,8 @@ function largestNoteTask(snap: Snapshot): string {
 
 /**
  * The profile for the file. The backup mark (when this device last backed up and which saved states that matched)
- * describes this device and not the person's data, so it never travels.
+ * describes this device and not the person's data, so it never travels. A leaving answer this release does not know
+ * (stored by a newer one) reads as no answer here and would fail the restore check, so it stays out too.
  */
 function fileProfile(profile: ProfileV1): unknown {
 	const copy: ProfileV1 = { ...profile };
@@ -69,6 +71,8 @@ function fileProfile(profile: ProfileV1): unknown {
 	delete copy.backupGenTimeline;
 	delete copy.backupGenCalendar;
 	delete copy.backupGenFinder;
+	if (copy.separationPath && !parseSeparationPath(new TextDecoder().decode(copy.separationPath)))
+		delete copy.separationPath;
 	return asJson(encodeProfile(copy));
 }
 

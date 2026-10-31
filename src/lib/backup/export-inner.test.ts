@@ -313,6 +313,18 @@ describe('buildExportInner: what a person exports', () => {
 		expect(profile).toHaveProperty('eaos');
 	});
 
+	// A newer release, in another tab or before a rollback, can store a leaving answer this one does not know. This
+	// release reads it as no answer, and the restore check refuses it, so the file leaves it out rather than fail.
+	it.each([
+		['known', 'medical', 'bWVkaWNhbA=='],
+		['unknown', 'discharge', undefined]
+	])('exports a %s leaving answer as this release reads it', (_name, word, inFile) => {
+		const separationPath = new TextEncoder().encode(word);
+		const bytes = exported(snapshot({ profile: deviceProfile({ separationPath }) }));
+		expect((storesOf(bytes).profile as Bag).separationPath).toBe(inFile);
+		expect(validateInner(parse(bytes)).ok).toBe(true);
+	});
+
 	// Two earlier releases could save a repeated category; the restore check refuses a repeat, so the export
 	// writes each once, in the order first seen.
 	it('a device calendar record with a duplicate category exports once and validates', () => {
