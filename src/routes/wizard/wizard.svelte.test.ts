@@ -186,15 +186,31 @@ describe('Wizard, how the member is leaving', () => {
 		['no pick', null],
 		['Not sure yet', 'Not sure yet'],
 		['Not sure yet after another pick', 'Retiring']
-	])('saves no path for %s', async (_name, first) => {
+	])('clears any earlier path for %s', async (_name, first) => {
+		// The store merges a patch over the saved record, so only a present-but-empty key clears an answer saved
+		// before (a member who came Back to this page, or another tab that set it up first).
 		store.save.mockResolvedValue({ generation: 1 });
 		await render(WizardPage);
 		if (first) await page.getByRole('radio', { name: first }).click();
 		if (first === 'Retiring') await page.getByRole('radio', { name: 'Not sure yet' }).click();
+		if (first)
+			await expect.element(page.getByRole('radio', { name: 'Not sure yet' })).toBeChecked();
 		await page.getByLabelText('Separation date').fill(TYPED);
 		await page.getByRole('button', { name: 'Save and continue' }).click();
 		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
-		expect('separationPath' in lastPatch()).toBe(false);
+		expect('separationPath' in lastPatch()).toBe(true);
+		expect(lastPatch().separationPath).toBeUndefined();
+	});
+
+	it('wipes the picked path bytes when the save fails too', async () => {
+		store.save.mockRejectedValue(new Error('E_TEST'));
+		await render(WizardPage);
+		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByLabelText('Separation date').fill(TYPED);
+		await page.getByRole('button', { name: 'Save and continue' }).click();
+		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
+		await vi.waitFor(() => expect(allZero(lastPatch().separationPath as Uint8Array)).toBe(true));
+		expect(goto).not.toHaveBeenCalled();
 	});
 
 	it('saves nothing when the member skips, whatever was picked', async () => {

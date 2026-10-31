@@ -64,15 +64,12 @@
 			throw err;
 		}
 
-		// The answer goes in the same save as the date, so a relock or a failure keeps both or neither.
+		// The answer goes in the same save as the date, so a relock or a failure keeps both or neither. The key is
+		// always sent: the store merges a patch over the saved record, and only an empty key clears an earlier answer.
 		const pathBytes = path ? new TextEncoder().encode(path) : undefined;
 		saving = true;
 		try {
-			await store.save({
-				eaos: bytes,
-				setupIntent: 'completed',
-				...(pathBytes && { separationPath: pathBytes })
-			});
+			await store.save({ eaos: bytes, setupIntent: 'completed', separationPath: pathBytes });
 			// Land on the timeline the user just set up - "Save and continue" continues to the thing
 			// they built. (Skip, below, stays on Home since nothing was set up.)
 			await goto(resolve('timeline'));
