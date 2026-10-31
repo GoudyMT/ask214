@@ -534,6 +534,8 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 		'backupGenFinder'
 	];
 	const b64 = (s: string) => btoa(s);
+	// The UTF-8 byte-order mark, one Latin-1 character per byte, as btoa takes it.
+	const BOM = String.fromCharCode(0xef, 0xbb, 0xbf);
 
 	const cases: [string, (p: Parts) => void, Store?][] = [
 		// The file as a whole.
@@ -600,6 +602,17 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 			'profile'
 		],
 		['a leaving answer that is empty', (p) => (p.profile.separationPath = ''), 'profile'],
+		// A default text decoder drops a leading byte-order mark, so these read as known values the encoder never writes.
+		[
+			'a leaving answer behind a byte-order mark',
+			(p) => (p.profile.separationPath = btoa(BOM + 'ets')),
+			'profile'
+		],
+		[
+			'skillbridgeStart behind a byte-order mark',
+			(p) => (p.profile.skillbridgeStart = btoa(BOM + '2027-03-01')),
+			'profile'
+		],
 		...NEVER_WRITTEN.map((key): [string, (p: Parts) => void, Store] => [
 			`the never-written profile field ${key}`,
 			(p) => (p.profile[key] = b64('x')),

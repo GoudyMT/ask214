@@ -1,6 +1,6 @@
 import { decodeCalendarSyncState } from '../calendar/codec';
 import { decodeProfile, encodeProfile } from '../profile/codec';
-import { decodeEaos, parseEaosAtRead } from '../profile/eaos';
+import { parseEaosAtRead } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { parseSeparationPath } from '../profile/separation-path';
 import type { ProfileV1 } from '../profile/types';
@@ -155,6 +155,9 @@ function isInteger(v: unknown, min: number, max: number): v is number {
 const isTime = (v: unknown): v is number => isInteger(v, 0, MAX_TIME);
 const isTimeOrNull = (v: unknown): v is number | null => v === null || isTime(v);
 
+// A default decoder drops a leading byte-order mark, which would let a second spelling of a known value through.
+const exactText = new TextDecoder('utf-8', { ignoreBOM: true });
+
 /**
  * A date as the profile stores it: base64 of an ISO day the Settings read check (parseEaosAtRead) accepts. The base64
  * is the envelope's strict kind (the one reader that also survives a multi-megabyte value), which refuses a last
@@ -165,7 +168,7 @@ function isStoredDate(v: unknown): v is string {
 	const bytes = b64DecodeStrict(v);
 	if (bytes === null) return false;
 	try {
-		parseEaosAtRead(decodeEaos(bytes));
+		parseEaosAtRead(exactText.decode(bytes));
 		return true;
 	} catch {
 		return false;
@@ -180,7 +183,7 @@ function isStoredPath(v: unknown): v is string {
 	const bytes = b64DecodeStrict(v);
 	if (bytes === null) return false;
 	try {
-		return parseSeparationPath(new TextDecoder().decode(bytes)) !== undefined;
+		return parseSeparationPath(exactText.decode(bytes)) !== undefined;
 	} finally {
 		bytes.fill(0);
 	}
