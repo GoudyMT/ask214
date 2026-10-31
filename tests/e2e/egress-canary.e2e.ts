@@ -183,14 +183,28 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		REQUEST_TITLE,
 		// The leaving answer says a member faces a medical board: its stored value and the steps it adds must not travel.
 		// The bare word is in the synthesis prompt's own rules ("legal, or medical"), so the value is matched as a
-		// serializer would write it: quoted, under its field name, or base64 as the codec stores it.
-		'"medical"',
+		// serializer would write it: quoted, under its field name, as a query or form value, inside a longer token, as the
+		// words on the screen, or base64 as the codec stores it. The other answers and their steps are forbidden too, so
+		// a list of every answer or step travelling is caught although only one answer is seeded.
 		'separationPath',
-		btoa('medical'),
+		'=medical',
+		'medical-',
+		'A medical board',
+		PEBLO_TITLE,
+		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
+		...(['medical', 'retirement', 'reserve-component'] as const).flatMap((v) => [
+			`"${v}"`,
+			btoa(v)
+		]),
+		'"ets"',
 		'peblo-contact',
 		'va-msc-claim',
 		'ides-review-options',
-		PEBLO_TITLE
+		'retirement-request',
+		'sbp-election',
+		'rc-tap',
+		'tamp-check',
+		'rcsbp-election'
 	];
 	for (const request of sent) {
 		const text = [
