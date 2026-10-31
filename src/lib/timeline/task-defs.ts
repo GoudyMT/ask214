@@ -48,19 +48,26 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
  * a persona field (hidden until set + matched).
  */
 // 10 USC 1142 covers a release from active duty, so a Guard or Reserve member on orders keeps the TAP deadlines and one
-// leaving drill status may not have them. Every line the task shows says which: the Home row, Needs you now and the
-// calendar show only the title, and a late card shows the after note.
-const ON_ORDERS = 'if you are being released from active duty orders';
+// leaving drill status may not have them. The Home row, Needs you now and the calendar show only the title, so the
+// condition leads it; the why names the exceptions ((a)(4): not before 180 continuous days, training days not counted;
+// a waiver for some reservists) once, and a late card's note says it only if TAP applies.
+const ON_ORDERS_WHY =
+	'For the Guard or Reserve, TAP applies on release from active duty orders, with exceptions (for example, before 180 days in a row on active duty). Your transition assistance office confirms what you need.';
 function onOrders(def: TaskDef): TaskDef {
+	const title = def.title.charAt(0).toLowerCase() + def.title.slice(1);
 	return {
 		...def,
 		copyFor: {
 			...def.copyFor,
 			'reserve-component': {
-				title: `${def.title}, ${ON_ORDERS}`,
-				why: `For the Guard or Reserve, this applies ${ON_ORDERS}. ${def.why}`,
+				...def.copyFor?.['reserve-component'],
+				title: `If you are leaving active duty orders, ${title}`,
+				why: `${ON_ORDERS_WHY} ${def.why}`,
 				...(def.afterNote && {
-					afterNote: `For the Guard or Reserve, ${ON_ORDERS}: ${def.afterNote}`
+					afterNote: def.afterNote.replace(
+						/^Still required/,
+						'If TAP applies to you, it is still required'
+					)
 				})
 			}
 		}

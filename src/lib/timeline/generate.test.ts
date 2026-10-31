@@ -1384,17 +1384,21 @@ describe('the leaving answer on the real task list', () => {
 	// A member on active-duty orders keeps the firm TAP deadlines; the condition says when they apply, so a member
 	// leaving drill status can tell they may not.
 	it('the Guard or Reserve answer keeps the TAP steps, says when they apply, and hides only the recruiter reminder', () => {
-		const ORDERS = 'released from active duty orders';
 		const shown = items('reserve-component');
 		expect(shown.map((i) => i.def.id)).not.toContain('reserve-affiliation');
-		// The Home row, Needs you now and the calendar show only the title, and a late card shows the after note.
+		// The Home row, Needs you now and the calendar show only the title, so the condition leads it; the why names
+		// the statute's exceptions (10 USC 1142(a)(4)) and who confirms; a late card says it only if TAP applies.
 		for (const id of TAP) {
 			const def = shown.find((i) => i.def.id === id)?.def;
-			expect(def?.why, id).toContain(ORDERS);
-			expect(def?.title, id).toContain(ORDERS);
-			if (def?.afterNote) expect(def.afterNote, id).toContain(ORDERS);
 			const plain = items().find((i) => i.def.id === id)?.def;
-			expect(`${plain?.title} ${plain?.why} ${plain?.afterNote ?? ''}`, id).not.toContain(ORDERS);
+			expect(def?.title, id).toMatch(/^If you are leaving active duty orders, [a-z]/);
+			expect(def?.why, id).toContain('180 days in a row');
+			expect(def?.why, id).toContain('Your transition assistance office confirms what you need.');
+			if (plain?.afterNote)
+				expect(def?.afterNote, id).toMatch(/^If TAP applies to you, it is still required/);
+			expect(`${plain?.title} ${plain?.why} ${plain?.afterNote ?? ''}`, id).not.toMatch(
+				/orders|applies to you/
+			);
 		}
 	});
 
