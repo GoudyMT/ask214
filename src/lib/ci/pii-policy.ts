@@ -29,6 +29,7 @@ export const PII_FIELD_NAMES: readonly string[] = [
 	'specialSituations',
 	'skillbridgeStart',
 	'terminalLeaveStart',
+	'separationPath',
 	'lastBackupAt',
 	'backupGenProfile',
 	'backupGenTimeline',
@@ -59,6 +60,7 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	/\.specialSituations\b/,
 	/\.skillbridgeStart\b/,
 	/\.terminalLeaveStart\b/,
+	/\.separationPath\b/,
 	/\.lastBackupAt\b/,
 	/\.backupGenProfile\b/,
 	/\.backupGenTimeline\b/,
@@ -82,9 +84,9 @@ export const FORBIDDEN_PII_PATTERNS: readonly RegExp[] = [
 	// of prose can start with one. A name scan cannot see a value under a new name at all; the online request test
 	// (tests/e2e/egress-canary.e2e.ts) checks the values that leave the device - but no screen sets rate or rank yet, so
 	// it covers them only once one does and the test seeds them.
-	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)['"`]\s*\]/,
-	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)\b[^}]*\}/,
-	/^\s*(?:eaos|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)\s*(?=[,:=]|$)/
+	/\[\s*['"`](?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|separationPath|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)['"`]\s*\]/,
+	/\{[^}]*\b(?:eaos|rate|rank|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|separationPath|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)\b[^}]*\}/,
+	/^\s*(?:eaos|yearsOfService|anticipatedDisabilityRating|familyStatus|intendedPath|geographicDestination|specialSituations|skillbridgeStart|terminalLeaveStart|separationPath|lastBackupAt|backupGenProfile|backupGenTimeline|backupGenCalendar|backupGenFinder|finderSetup|finderFilters|finderSaved|finderCompare|finderSeen|finderLastSeenPull)\s*(?=[,:=]|$)/
 ];
 
 /**

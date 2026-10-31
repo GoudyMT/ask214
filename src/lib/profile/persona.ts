@@ -1,5 +1,6 @@
 import type { ProfileV1 } from './types';
 import { parseEaosAtRead, daysUntilSeparation, decodeEaos, type EaosString } from './eaos';
+import { parseSeparationPath, type SeparationPath } from './separation-path';
 
 /**
  * The dates a member leaves the command before separation (ISO). A stored date on or after separation is not used
@@ -22,6 +23,7 @@ export type PersonaFilters =
 			eaos: EaosString;
 			daysUntilSeparation: number;
 			leaving?: LeavingDates;
+			separationPath?: SeparationPath;
 	  }
 	| {
 			completeness: 'partial';
@@ -30,6 +32,7 @@ export type PersonaFilters =
 			rate?: string;
 			rank?: string;
 			leaving?: LeavingDates;
+			separationPath?: SeparationPath;
 	  }
 	| {
 			completeness: 'complete';
@@ -40,6 +43,7 @@ export type PersonaFilters =
 			familyStatus: string;
 			intendedPath: string;
 			leaving?: LeavingDates;
+			separationPath?: SeparationPath;
 	  };
 
 function decode(u8?: Uint8Array | null): string | undefined {
@@ -77,6 +81,8 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 	const rank = decode(profile.rank);
 	const familyStatus = decode(profile.familyStatus);
 	const intendedPath = decode(profile.intendedPath);
+	// The answer stands on its own, like the leaving dates: it never changes the completeness.
+	const separationPath = parseSeparationPath(decode(profile.separationPath));
 
 	if (rate && rank && familyStatus && intendedPath) {
 		return {
@@ -87,7 +93,8 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 			rank,
 			familyStatus,
 			intendedPath,
-			...(hasLeaving && { leaving })
+			...(hasLeaving && { leaving }),
+			...(separationPath && { separationPath })
 		};
 	}
 	if (rate || rank || familyStatus || intendedPath) {
@@ -97,13 +104,15 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 			daysUntilSeparation: dus,
 			rate,
 			rank,
-			...(hasLeaving && { leaving })
+			...(hasLeaving && { leaving }),
+			...(separationPath && { separationPath })
 		};
 	}
 	return {
 		completeness: 'eaos-only',
 		eaos,
 		daysUntilSeparation: dus,
-		...(hasLeaving && { leaving })
+		...(hasLeaving && { leaving }),
+		...(separationPath && { separationPath })
 	};
 }

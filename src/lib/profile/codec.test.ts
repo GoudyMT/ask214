@@ -382,3 +382,38 @@ describe('the leaving dates', () => {
 		expect(tl.every((b) => b === 0)).toBe(true);
 	});
 });
+
+describe('the leaving answer', () => {
+	const enc = (s: string) => new TextEncoder().encode(s);
+	const base = (): ProfileV1 => ({
+		schemaVersion: 1,
+		generation: 1,
+		lastSeenAt: 0,
+		setupIntent: 'completed',
+		setupIntentChangedAt: 0,
+		eaos: enc('2027-04-30')
+	});
+
+	it('round-trips as bytes', () => {
+		const dec = decodeProfile(encodeProfile({ ...base(), separationPath: enc('retirement') }));
+		expect(new TextDecoder().decode(dec.separationPath)).toBe('retirement');
+	});
+
+	it('omits the key when not answered, so clearing it drops the key', () => {
+		const wire = JSON.parse(
+			new TextDecoder().decode(encodeProfile({ ...base(), separationPath: undefined }))
+		) as Record<string, unknown>;
+		expect('separationPath' in wire).toBe(false);
+	});
+
+	it('a record holding it with the wrong type is a schema error', () => {
+		const wire = JSON.parse(new TextDecoder().decode(encodeProfile(base()))) as Record<
+			string,
+			unknown
+		>;
+		wire['separationPath'] = 7;
+		expect(() => decodeProfile(new TextEncoder().encode(JSON.stringify(wire)))).toThrow(
+			ProfileSchemaError
+		);
+	});
+});

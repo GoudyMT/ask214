@@ -105,6 +105,14 @@ describe('pii-policy: server source must not reference ProfileV1 PII fields', ()
 		expect(violations[0]?.token).toBe('\\.eaos\\b');
 	});
 
+	it('flags the leaving answer, which can say a member faces a medical board', () => {
+		const violations = scanForPiiTokens([
+			{ path: 'src/routes/x/+server.ts', content: 'const v = persona.separationPath;' }
+		]);
+		expect(violations).toHaveLength(1);
+		expect(violations[0]?.token).toBe('\\.separationPath\\b');
+	});
+
 	it.each(['skillbridgeStart', 'terminalLeaveStart'])('flags the leaving date %s', (field) => {
 		const violations = scanForPiiTokens([
 			{ path: 'src/routes/x/+server.ts', content: `const v = persona.leaving.${field};` }

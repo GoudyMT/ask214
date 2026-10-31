@@ -51,6 +51,7 @@ type WireProfile = {
 	specialSituations?: string[];
 	skillbridgeStart?: string;
 	terminalLeaveStart?: string;
+	separationPath?: string;
 	lastBackupAt?: number;
 	backupGenProfile?: number;
 	backupGenTimeline?: number;
@@ -82,6 +83,7 @@ export function encodeProfile(p: ProfileV1): Uint8Array {
 		}),
 		...(p.skillbridgeStart && { skillbridgeStart: b64encode(p.skillbridgeStart) }),
 		...(p.terminalLeaveStart && { terminalLeaveStart: b64encode(p.terminalLeaveStart) }),
+		...(p.separationPath && { separationPath: b64encode(p.separationPath) }),
 		...(p.lastBackupAt !== undefined && { lastBackupAt: p.lastBackupAt }),
 		...(p.backupGenProfile !== undefined && { backupGenProfile: p.backupGenProfile }),
 		...(p.backupGenTimeline !== undefined && { backupGenTimeline: p.backupGenTimeline }),
@@ -123,6 +125,7 @@ const WIRE_TYPES: Record<string, (v: unknown) => boolean> = {
 	specialSituations: (v) => Array.isArray(v) && v.every(isText),
 	skillbridgeStart: isText,
 	terminalLeaveStart: isText,
+	separationPath: isText,
 	lastBackupAt: isNumber,
 	backupGenProfile: isNumber,
 	backupGenTimeline: isNumber,
@@ -169,6 +172,7 @@ export function decodeProfile(bytes: Uint8Array): ProfileV1 {
 		}),
 		...(wire.skillbridgeStart && { skillbridgeStart: b64decode(wire.skillbridgeStart) }),
 		...(wire.terminalLeaveStart && { terminalLeaveStart: b64decode(wire.terminalLeaveStart) }),
+		...(wire.separationPath && { separationPath: b64decode(wire.separationPath) }),
 		...(wire.lastBackupAt !== undefined && { lastBackupAt: wire.lastBackupAt }),
 		...(wire.backupGenProfile !== undefined && { backupGenProfile: wire.backupGenProfile }),
 		...(wire.backupGenTimeline !== undefined && { backupGenTimeline: wire.backupGenTimeline }),
