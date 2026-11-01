@@ -29,7 +29,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 
 **What it is.** The profile holds the separation date and, optionally, rate, rank, years of service,
 anticipated disability rating, family status, intended path, destination, special situations, and SkillBridge
-and terminal leave start dates. Beside it are the timeline's task statuses, snooze dates and notes, among them
+and terminal leave start dates, and how the member is leaving. Beside it are the timeline's task statuses, snooze dates and notes, among them
 the answer to the SkillBridge question, the calendar choices, the SkillBridge finder's answers (a ZIP or a state,
 filters), saved programs and compare picks, and the optional API key. Each lives as ciphertext in its own
 single-row IndexedDB store; four more stores hold signed rollback marks and one holds the keys. The finder's
@@ -159,9 +159,10 @@ clear every store, and if it stops, it says nothing was deleted.
 
 ### The timeline and the calendar file
 
-**What it is.** The timeline is computed on the device: 37 task definitions with day offsets from the
-separation date, each shown only when the profile is known to meet its conditions. Two of them, finding a
-SkillBridge program and submitting the request, show only after the sailor answers Yes to the Timeline's
+**What it is.** The timeline is computed on the device: 44 task definitions with day offsets from the
+separation date, each shown only when the profile is known to meet its conditions; seven show only for the
+leaving answers they belong to. Two of them, finding a
+SkillBridge program and submitting the request, show only after the member answers Yes to the Timeline's
 SkillBridge question, or Not sure when it asks a second time. Each window has a firmness:
 soft (good timing only), required until separation, closing for good, or changing how it works. Each task also
 names what it must finish before: separation, terminal leave, or leaving the command (SkillBridge or terminal
@@ -173,7 +174,8 @@ moment still ahead (a window opening, a change in how a window works, a last day
 command for a task that cannot fit there, or a soft task's target date), with alerts before each firm date and
 target date, never an event before today. Events and alerts carry only a stable ID, the date and the
 task's title with its moment, never notes or profile details, though the dates can reveal the separation and
-leaving days, and the two SkillBridge steps reveal that the sailor plans SkillBridge. Stable IDs and a rising
+leaving days, and the two SkillBridge steps reveal that the member plans SkillBridge. The medical board steps
+never go in the file, as a calendar is often one others see. Stable IDs and a rising
 version number let an app that honors them update events rather than duplicate them. Not every app does, so the
 calendar record keeps each event handed over (task, moment, title, date and day of the add), and after a change
 Settings lists the ones to delete until the user marks them deleted.

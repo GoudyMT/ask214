@@ -400,6 +400,22 @@ describe('validateInner: acceptance corpus (shapes the app writes)', () => {
 				p.profile.setupIntentChangedAt = null;
 			}
 		],
+		...(['ets', 'retirement', 'medical', 'reserve-component'] as const).map(
+			(path): [string, (p: Parts) => void] => [
+				`a profile with the leaving answer ${path}`,
+				(p) => {
+					p.profile.separationPath = btoa(path);
+				}
+			]
+		),
+		// The shipped release read dates with a decoder that drops a byte-order mark, and this check only widens within
+		// backupSchema 1, so a file that release accepted still restores.
+		[
+			'a date behind a byte-order mark',
+			(p) => {
+				p.profile.skillbridgeStart = btoa(String.fromCharCode(0xef, 0xbb, 0xbf) + '2027-03-01');
+			}
+		],
 		[
 			'a time ahead of the clock',
 			(p) => {
@@ -526,6 +542,8 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 		'backupGenFinder'
 	];
 	const b64 = (s: string) => btoa(s);
+	// The UTF-8 byte-order mark, one Latin-1 character per byte, as btoa takes it.
+	const BOM = String.fromCharCode(0xef, 0xbb, 0xbf);
 
 	const cases: [string, (p: Parts) => void, Store?][] = [
 		// The file as a whole.
@@ -579,6 +597,24 @@ describe('validateInner: refusal corpus (one change to a good file each)', () =>
 		[
 			'terminalLeaveStart that decodes to year 1800',
 			(p) => (p.profile.terminalLeaveStart = b64('1800-05-01')),
+			'profile'
+		],
+		[
+			'a leaving answer this release does not know',
+			(p) => (p.profile.separationPath = b64('discharge')),
+			'profile'
+		],
+		[
+			'a leaving answer that is not base64',
+			(p) => (p.profile.separationPath = 'medical'),
+			'profile'
+		],
+		['a leaving answer that is empty', (p) => (p.profile.separationPath = ''), 'profile'],
+		// A default text decoder drops a leading byte-order mark, so this reads as a known answer the encoder never writes.
+		// No shipped release stored an answer, so refusing it narrows nothing an older file held.
+		[
+			'a leaving answer behind a byte-order mark',
+			(p) => (p.profile.separationPath = btoa(BOM + 'ets')),
 			'profile'
 		],
 		...NEVER_WRITTEN.map((key): [string, (p: Parts) => void, Store] => [

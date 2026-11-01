@@ -109,4 +109,49 @@ describe('derivePersona', () => {
 			}
 		);
 	});
+
+	describe('the leaving answer', () => {
+		const enc = (s: string) => new TextEncoder().encode(s);
+
+		it.each([
+			['eaos-only', {}],
+			['partial', { rate: enc('IT') }],
+			[
+				'complete',
+				{
+					rate: enc('IT'),
+					rank: enc('E5'),
+					familyStatus: enc('single'),
+					intendedPath: enc('career')
+				}
+			]
+		])('carries the answer on a %s persona', (completeness, extra) => {
+			const r = derivePersona(withEaos({ ...extra, separationPath: enc('medical') }));
+			expect(r.completeness).toBe(completeness);
+			if (r.completeness === 'none') return;
+			expect(r.separationPath).toBe('medical');
+		});
+
+		it('carries no answer when none is stored', () => {
+			const r = derivePersona(withEaos());
+			if (r.completeness === 'none') throw new Error('expected a persona');
+			expect('separationPath' in r).toBe(false);
+		});
+
+		it('reads a value this release does not know as not answered, leaving the rest alone', () => {
+			const r = derivePersona(withEaos({ separationPath: enc('discharge') }));
+			expect(r.completeness).toBe('eaos-only');
+			if (r.completeness === 'none') return;
+			expect('separationPath' in r).toBe(false);
+		});
+
+		// The backup leaves out an answer it would refuse to restore, so the timeline must not act on it either.
+		it('reads a known answer behind a byte-order mark as not answered, as the backup does', () => {
+			const r = derivePersona(
+				withEaos({ separationPath: enc(String.fromCharCode(0xfeff) + 'ets') })
+			);
+			if (r.completeness === 'none') throw new Error('expected a persona');
+			expect('separationPath' in r).toBe(false);
+		});
+	});
 });

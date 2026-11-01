@@ -1,6 +1,6 @@
 [
 	{
-		"total": 33,
+		"total": 34,
 		"todayMarkerIndex": 1,
 		"daysToSeparation": 208,
 		"phases": [
@@ -171,11 +171,20 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 10,
+					"toDo": 11,
 					"closed": 0
 				},
 				"collapsible": false,
 				"items": [
+					{
+						"id": "reserve-affiliation",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-11-01",
+						"windowStartDate": "2026-07-04",
+						"windowEndDate": "2027-04-30",
+						"aimDate": "2026-11-01"
+					},
 					{
 						"id": "jst-order",
 						"kind": "soft",
@@ -364,7 +373,7 @@
 		]
 	},
 	{
-		"total": 33,
+		"total": 34,
 		"todayMarkerIndex": 3,
 		"daysToSeparation": 72,
 		"phases": [
@@ -535,11 +544,20 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 9,
+					"toDo": 10,
 					"closed": 1
 				},
 				"collapsible": false,
 				"items": [
+					{
+						"id": "reserve-affiliation",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-06-18",
+						"windowStartDate": "2026-02-18",
+						"windowEndDate": "2026-12-15",
+						"aimDate": "2026-12-15"
+					},
 					{
 						"id": "jst-order",
 						"kind": "soft",
@@ -728,7 +746,7 @@
 		]
 	},
 	{
-		"total": 33,
+		"total": 34,
 		"todayMarkerIndex": 4,
 		"daysToSeparation": -64,
 		"phases": [
@@ -899,11 +917,20 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 6,
+					"toDo": 7,
 					"closed": 4
 				},
 				"collapsible": false,
 				"items": [
+					{
+						"id": "reserve-affiliation",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-02-02",
+						"windowStartDate": "2025-10-05",
+						"windowEndDate": "2026-08-01",
+						"aimDate": "2026-08-01"
+					},
 					{
 						"id": "jst-order",
 						"kind": "soft",

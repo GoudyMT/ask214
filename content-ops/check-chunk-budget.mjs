@@ -511,12 +511,19 @@ const STATIC = 'static';
 //
 //   2026-10-30 the About page's TAP contractor credit line: routeNodes 60,224 -> 60,273 (measured 60,268 B, +44 B on the plan's base, margin 5 B).
 //
+//   2026-10-31 the leaving answer: setup section, Settings row, track steps: page 110,821 -> 112,578 (measured 112,475 B, +2,552 B on the plan's base, margin 103 B).
+//   2026-10-31 the leaving answer: setup section, Settings row, track steps: precacheFiles 87 -> 88 (measured 88 B, +2 B on the plan's base, margin 0 B).
+//   2026-10-31 the leaving answer: setup section, Settings row, track steps: precacheBytes 260,480 -> 263,770 (measured 263,543 B, +3,762 B on the plan's base, margin 227 B).
+//   2026-10-31 the leaving answer: setup section, Settings row, track steps: routeNodes 60,273 -> 60,813 (measured 60,760 B, +530 B on the plan's base, margin 53 B).
+//
+//   2026-10-31 re-sweep wording and decoder fixes, after a 56 B trim: page 112,578 -> 112,902 (measured 112,631 B, +2,708 B on the plan's base, margin 271 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
-	page: 110_821,
+	page: 112_902,
 	onDemand: 16_138,
-	precacheFiles: 87,
-	precacheBytes: 260_480,
+	precacheFiles: 88,
+	precacheBytes: 263_770,
 	workerScripts: 147_316
 };
 

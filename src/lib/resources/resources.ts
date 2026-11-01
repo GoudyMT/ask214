@@ -351,6 +351,33 @@ export const RESOURCES: readonly Resource[] = [
 			'Official TRICARE information on CHCBP, temporary health coverage after TRICARE ends.',
 		displayCategory: 'health-wellbeing',
 		lastVerified: '2026-10-03'
+	},
+	{
+		id: 'tamp',
+		title: 'Transitional Assistance Management Program (TAMP)',
+		url: 'https://www.tricare.mil/Plans/SpecialPrograms/TAMP',
+		description:
+			'Official TRICARE information on TAMP: 180 days of health care after regular TRICARE ends, and who it covers.',
+		displayCategory: 'health-wellbeing',
+		lastVerified: '2026-10-31'
+	},
+	{
+		id: 'ides',
+		title: 'Integrated Disability Evaluation System (IDES)',
+		url: 'https://health.mil/Military-Health-Topics/Access-Cost-Quality-and-Safety/DES/Integrated-Evaluation-System',
+		description:
+			'The Military Health System page on the medical board process: the PEBLO, the VA coordinator, reviews and appeals.',
+		displayCategory: 'health-wellbeing',
+		lastVerified: '2026-10-31'
+	},
+	{
+		id: 'sbp',
+		title: 'Survivor Benefit Plan (SBP)',
+		url: 'https://militarypay.defense.gov/Benefits/Survivor-Benefit-Plan/',
+		description:
+			'The DoD page on the Survivor Benefit Plan and its resources for retiring members.',
+		displayCategory: 'finance',
+		lastVerified: '2026-10-31'
 	}
 ];
 
@@ -386,7 +413,14 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'tsp-decision': ['tsp', 'tsp-calculators'],
 	'vgli-convert': ['vgli'],
 	'final-pay-check': ['mypay', 'leave-transition'],
-	'va-claim-fallback': ['va-disability', 'va-accredited-rep']
+	'va-claim-fallback': ['va-disability', 'va-accredited-rep'],
+	'reserve-affiliation': ['tamp'],
+	'sbp-election': ['sbp'],
+	'peblo-contact': ['ides'],
+	'va-msc-claim': ['ides', 'va-disability', 'va-accredited-rep'],
+	'ides-review-options': ['ides'],
+	'tamp-check': ['tamp'],
+	'rcsbp-election': ['sbp']
 };
 
 // The TAP guides a task opens in the app's own reader, listed first under its Related resources. Curated by hand and
@@ -440,7 +474,8 @@ export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }
 	'va-bdd-claim': { resource: 'va-accredited-rep', label: 'Find a VSO on VA.gov' },
 	'tricare-elect': { resource: 'chcbp', label: 'CHCBP on tricare.mil' },
 	'vgli-convert': { resource: 'va-life-insurance', label: 'VA life insurance options on VA.gov' },
-	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' }
+	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' },
+	'sbp-election': { resource: 'sbp', label: 'The Survivor Benefit Plan on militarypay.defense.gov' }
 };
 
 // One line shown above a task card's links: each service and command sets what its SkillBridge request needs, and

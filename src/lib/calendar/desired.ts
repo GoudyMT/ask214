@@ -43,7 +43,7 @@ export function computeDesiredEvents(
 		});
 	};
 	for (const it of items) {
-		if (it.status === 'done' || it.status === 'skipped') continue;
+		if (it.status === 'done' || it.status === 'skipped' || it.def.offCalendar) continue;
 		if (excludedIds.has(it.def.id) || excludedCats.has(it.def.category)) continue;
 		// A task that cannot fit before the user leaves the command gets one reminder, on the last day there.
 		if (it.status === 'after-you-leave') {

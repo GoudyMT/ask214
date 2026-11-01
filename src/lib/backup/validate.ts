@@ -2,6 +2,7 @@ import { decodeCalendarSyncState } from '../calendar/codec';
 import { decodeProfile, encodeProfile } from '../profile/codec';
 import { decodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { zeroizeRecord } from '../profile/lifecycle';
+import { parseSeparationPath } from '../profile/separation-path';
 import type { ProfileV1 } from '../profile/types';
 import {
 	BRANCHES,
@@ -75,6 +76,7 @@ export type ValidProfile = {
 	eaos: string;
 	skillbridgeStart?: string;
 	terminalLeaveStart?: string;
+	separationPath?: string;
 };
 
 export type ValidCalendar = {
@@ -156,7 +158,9 @@ const isTimeOrNull = (v: unknown): v is number | null => v === null || isTime(v)
 /**
  * A date as the profile stores it: base64 of an ISO day the Settings read check (parseEaosAtRead) accepts. The base64
  * is the envelope's strict kind (the one reader that also survives a multi-megabyte value), which refuses a last
- * group with spare bits set: a second spelling of the same bytes that the shipped encoder never writes.
+ * group with spare bits set: a second spelling of the same bytes that the shipped encoder never writes. The day is read
+ * with the shipped decoder, which drops a byte-order mark: a release already accepted it that way, and this check only
+ * widens.
  */
 function isStoredDate(v: unknown): v is string {
 	if (typeof v !== 'string') return false;
@@ -167,6 +171,18 @@ function isStoredDate(v: unknown): v is string {
 		return true;
 	} catch {
 		return false;
+	} finally {
+		bytes.fill(0);
+	}
+}
+
+/** The leaving answer as the profile stores it: base64 (the strict kind, as above) of one of the known paths. */
+function isStoredPath(v: unknown): v is string {
+	if (typeof v !== 'string') return false;
+	const bytes = b64DecodeStrict(v);
+	if (bytes === null) return false;
+	try {
+		return parseSeparationPath(bytes) !== undefined;
 	} finally {
 		bytes.fill(0);
 	}
@@ -196,7 +212,8 @@ function decodesToSame(validated: unknown, decode: (bytes: Uint8Array) => unknow
 
 /** Only the keys the codec writes for a finished setup; every field no screen writes, and the backup mark, refuses. */
 function readProfile(raw: unknown): ValidProfile | null {
-	if (!isObject(raw) || !keysAre(raw, PROFILE_REQUIRED, PROFILE_DATES)) return null;
+	if (!isObject(raw) || !keysAre(raw, PROFILE_REQUIRED, [...PROFILE_DATES, 'separationPath']))
+		return null;
 	const { schemaVersion, generation, lastSeenAt, setupIntent, setupIntentChangedAt, eaos } = raw;
 	if (schemaVersion !== 1 || setupIntent !== 'completed') return null;
 	// The writer replaces the generation, so only its shape is checked.
@@ -216,6 +233,10 @@ function readProfile(raw: unknown): ValidProfile | null {
 		const date = raw[key];
 		if (!isStoredDate(date)) return null;
 		profile[key] = date;
+	}
+	if (Object.hasOwn(raw, 'separationPath')) {
+		if (!isStoredPath(raw.separationPath)) return null;
+		profile.separationPath = raw.separationPath;
 	}
 	// The decoder gives bytes, so the shipped encoder turns them back into the codec's text. The decoded record holds
 	// the person's dates as bytes, so it and the buffers around it are wiped before this returns.

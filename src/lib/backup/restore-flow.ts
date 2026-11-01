@@ -66,6 +66,7 @@ export type BackupSummary = {
 	separationDate: boolean;
 	skillbridgeStart: boolean;
 	terminalLeaveStart: boolean;
+	separationPath: boolean;
 	tasks: number;
 	notes: number;
 	calendarExclusions: number;
@@ -173,6 +174,7 @@ function summarize(inner: ValidInner, label: string | null): BackupSummary {
 		separationDate: true,
 		skillbridgeStart: profile.skillbridgeStart !== undefined,
 		terminalLeaveStart: profile.terminalLeaveStart !== undefined,
+		separationPath: profile.separationPath !== undefined,
 		tasks: tasks.length,
 		notes: tasks.filter((task) => task.notes !== undefined).length,
 		calendarExclusions: calendar

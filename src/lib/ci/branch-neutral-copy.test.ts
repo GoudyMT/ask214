@@ -26,6 +26,11 @@ function userFacingCopy(): Array<[string, string]> {
 		if (def.why) copy.push([`task ${def.id} why`, def.why]);
 		if (def.afterNote) copy.push([`task ${def.id} afterNote`, def.afterNote]);
 		if (def.changeNote) copy.push([`task ${def.id} changeNote`, def.changeNote]);
+		for (const [path, words] of Object.entries(def.copyFor ?? {})) {
+			for (const [field, line] of Object.entries(words)) {
+				copy.push([`task ${def.id} ${field} for ${path}`, line]);
+			}
+		}
 	}
 	for (const r of RESOURCES) {
 		copy.push([`resource ${r.id} title`, r.title]);

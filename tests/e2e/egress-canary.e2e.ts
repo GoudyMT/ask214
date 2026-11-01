@@ -3,7 +3,8 @@ import { expect, test, type Page, type Request } from '@playwright/test';
 // Every request the page sends during this flow - to our own server, to Anthropic, for any file - checked for the
 // user's own data. The guard in src/lib/ci/pii-policy.ts reads names and imports; this reads values: the separation and
 // SkillBridge dates in each form the app shows (ISO, compact, "Mon D, YYYY"), the day count it shows ("208 days"), a
-// task note, the SkillBridge answer (its stored key, its value and the day a Not sure brings the question back), and
+// task note, the SkillBridge answer (its stored key, its value and the day a Not sure brings the question back), the
+// leaving answer (its value and the steps it adds), and
 // the user's own API key, which may go to Anthropic and nowhere else. URLs and bodies are also read
 // decoded, so an encoded value is still found, and the headers include cookies. A value changed some other way (a sum,
 // a hash) is outside what a string check can see. The service worker is blocked so every request comes from the page
@@ -70,6 +71,7 @@ const QUESTION = 'What is SkillBridge?';
 // The titles of the two steps a Yes (or a late Not sure) adds to the timeline, as the task list shows them.
 const FIND_TITLE = 'Find a SkillBridge program and get an acceptance letter';
 const REQUEST_TITLE = 'Submit your SkillBridge request and get it approved';
+const PEBLO_TITLE = 'Meet your PEBLO, who guides you through the medical board';
 // A made-up key in Anthropic's format; the request carrying it is answered by the mock below and never leaves.
 const TEST_KEY = 'sk-ant-test-canary-0000';
 const ANTHROPIC = 'https://api.anthropic.com/';
@@ -93,11 +95,13 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
 	);
 
-	// The user's own data: a separation date, a SkillBridge start and a task note.
+	// The user's own data: a separation date, how they are leaving, a SkillBridge start and a task note.
 	await page.goto('/wizard');
 	await page.getByLabel(/separation date/i).fill(SEPARATION);
+	await page.getByRole('radio', { name: 'A medical board' }).click();
 	await page.getByRole('button', { name: /save and continue/i }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
+	await expect(page.getByText(PEBLO_TITLE)).toBeVisible();
 	await page.goto('/settings');
 	await page.getByRole('button', { name: /skillbridge start/i }).click();
 	await page.getByLabel('SkillBridge start').fill(SKILLBRIDGE);
@@ -176,7 +180,36 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'skillbridge-find',
 		'skillbridge-request',
 		FIND_TITLE,
-		REQUEST_TITLE
+		REQUEST_TITLE,
+		// The leaving answer says a member faces a medical board: its stored value and the steps it adds must not travel.
+		// The bare word is in the synthesis prompt's own rules ("legal, or medical"), so the value is matched as a
+		// serializer would write it: quoted, under its field name, as a query or form value, inside a longer token, as the
+		// words on the screen, or base64 as the codec stores it. The other answers and their steps are forbidden too, so
+		// a list of every answer or step travelling is caught although only one answer is seeded.
+		'separationPath',
+		'=medical',
+		'/medical',
+		'medical-',
+		'A medical board',
+		PEBLO_TITLE,
+		// As a calendar file writes it: the comma escaped.
+		'Meet your PEBLO\\, who guides',
+		'Talk with your VA Military Service Coordinator',
+		'Learn the review and appeal steps',
+		'If the board retires you',
+		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
+		...(['medical', 'retirement', 'reserve-component'] as const).flatMap((v) => [
+			`"${v}"`,
+			btoa(v)
+		]),
+		'"ets"',
+		'peblo-contact',
+		'va-msc-claim',
+		'ides-review-options',
+		'retirement-request',
+		'sbp-election',
+		'tamp-check',
+		'rcsbp-election'
 	];
 	for (const request of sent) {
 		const text = [

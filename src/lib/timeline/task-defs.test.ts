@@ -30,6 +30,17 @@ describe('task-defs seed', () => {
 		}
 	});
 
+	// A leaving answer can move a task's opening; the moved window has to hold the same rules as the default one.
+	it('keeps each window a leaving answer sets valid, with the recommended offset inside it', () => {
+		for (const t of TASK_DEFS) {
+			for (const w of Object.values(t.windowFor ?? {})) {
+				expect(w.windowStart).toBeLessThanOrEqual(t.windowEnd);
+				expect(w.recommendedOffset).toBeGreaterThanOrEqual(w.windowStart);
+				expect(w.recommendedOffset).toBeLessThanOrEqual(t.windowEnd);
+			}
+		}
+	});
+
 	it('orders phase buckets furthest-out first (strictly increasing startOffset)', () => {
 		const offsets = PHASE_BUCKETS.map((b) => b.startOffset);
 		expect(offsets).toEqual([...offsets].sort((a, b) => a - b));
@@ -197,6 +208,10 @@ describe('task-defs seed', () => {
 		expect(skillbridgeLines.length).toBeGreaterThanOrEqual(27);
 		const lines = [
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
+			// The wording a leaving answer swaps in is shown the same way.
+			...TASK_DEFS.flatMap((t) =>
+				Object.values(t.copyFor ?? {}).flatMap((c) => [c.title, c.why, c.afterNote])
+			).filter((line): line is string => line !== undefined),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
 			...RESOURCES.flatMap((r) => [r.title, r.description]),
 			...[...Object.values(DEVICE_HINT), IOS_APP_HINT].map((hint) => `${hint.lead} ${hint.text}`),
@@ -235,7 +250,9 @@ describe('firm deadlines match their official sources', () => {
 		['va-claim-fallback', 'soft', 365, undefined],
 		// tricare.mil TAMP - a Selected Reservist "the day immediately following release"; affiliating later is still
 		// possible, so the task is soft with its aim at separation.
-		['reserve-affiliation', 'soft', 0, undefined]
+		['reserve-affiliation', 'soft', 0, undefined],
+		// 10 USC 1448(a) - the SBP election is made before retired pay begins, which follows the retirement date.
+		['sbp-election', 'closes', 0, undefined]
 	] as const)('%s is %s with its last day at %d', (id, kind, windowEnd, finalEnd) => {
 		const t = at(id);
 		expect(t?.kind).toBe(kind);
