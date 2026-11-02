@@ -125,7 +125,7 @@
 	"dependencies": {
 		"@huggingface/transformers": "^4.2.0",
 		"@noble/hashes": "2.4.0",
-		"pdfjs-dist": "^6.3.289"
+		"pdfjs-dist": "^6.4.299"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.js",
