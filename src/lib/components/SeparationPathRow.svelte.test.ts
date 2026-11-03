@@ -115,6 +115,37 @@ describe('SeparationPathRow', () => {
 		await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith('retirement'));
 	});
 
+	// While one action runs, the other two would close the form or write again under it: a remove landing after a save
+	// would undo the answer just saved, and Cancel would close away the line a failure needs.
+	it('turns off Remove and Cancel while a save runs', async () => {
+		let settle: (v: string | null) => void = () => {};
+		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (settle = resolve)));
+		const onRemove = vi.fn(async () => null);
+		await row({ value: 'ets', onSave, onRemove });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await saveButton().click();
+		await expect.element(page.getByRole('button', { name: 'Remove answer' })).toBeDisabled();
+		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+		settle(null);
+		await vi.waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+		expect(onRemove).not.toHaveBeenCalled();
+	});
+
+	it('turns off Save and Cancel while a remove runs', async () => {
+		let settle: (v: string | null) => void = () => {};
+		const onRemove = vi.fn(() => new Promise<string | null>((resolve) => (settle = resolve)));
+		const onSave = vi.fn(async () => null);
+		await row({ value: 'ets', onSave, onRemove });
+		await toggle().click();
+		await page.getByRole('button', { name: 'Remove answer' }).click();
+		await expect.element(saveButton()).toBeDisabled();
+		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+		settle(null);
+		await vi.waitFor(() => expect(onRemove).toHaveBeenCalledOnce());
+		expect(onSave).not.toHaveBeenCalled();
+	});
+
 	it('says a failed save and keeps the form open', async () => {
 		await row({ onSave: vi.fn(async () => Promise.reject(new Error('E_LOCK_TIMEOUT'))) });
 		await toggle().click();
