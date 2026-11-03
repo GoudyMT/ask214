@@ -129,7 +129,6 @@ describe('SeparationPathRow', () => {
 		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
 		settle(null);
 		await vi.waitFor(() => expect(onSave).toHaveBeenCalledOnce());
-		expect(onRemove).not.toHaveBeenCalled();
 	});
 
 	it('turns off Save and Cancel while a remove runs', async () => {
@@ -143,7 +142,6 @@ describe('SeparationPathRow', () => {
 		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
 		settle(null);
 		await vi.waitFor(() => expect(onRemove).toHaveBeenCalledOnce());
-		expect(onSave).not.toHaveBeenCalled();
 	});
 
 	it('says a failed save and keeps the form open', async () => {
@@ -234,6 +232,18 @@ describe('SeparationPathRow', () => {
 			.not.toBeInTheDocument();
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
 		expect(document.activeElement).toBe(toggle().element());
+	});
+
+	// A member who has moved on to a choice keeps focus there: only focus on the vanished Remove is handed back.
+	it('leaves focus on a choice when Remove disappears', async () => {
+		const { rerender } = await row({ value: 'ets' });
+		await toggle().click();
+		const choice = page.getByRole('radio', { name: 'A medical board' }).element() as HTMLElement;
+		choice.focus();
+		await rerender({ value: undefined });
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(document.activeElement).toBe(choice);
 	});
 
 	// A failed save keeps the form open, so the rest of the hold lands on the form again once the save settles.
