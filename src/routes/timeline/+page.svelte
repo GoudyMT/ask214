@@ -370,7 +370,7 @@
 			<p class="timeline-subline">
 				Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 			</p>
-			<LeavingLine {leaving} />
+			<!-- Under the date it explains, so it is not read as part of the card below. -->
 			{#if boardMayHaveMovedDate}
 				<p class="timeline-subline">
 					If the board moved your separation date, update it in <a href={resolve('settings')}
@@ -378,6 +378,7 @@
 					>.
 				</p>
 			{/if}
+			<LeavingLine {leaving} />
 			{#if restoredPinOff}
 				<div class="timeline-restored" role="status">
 					<p>Your data is back. Your PIN is off. Turn it on again in Settings.</p>

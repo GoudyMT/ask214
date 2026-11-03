@@ -78,6 +78,9 @@ describe('the Timeline for a medical board once the separation date has passed',
 		await expect
 			.element(page.getByRole('link', { name: 'Settings', exact: true }))
 			.toHaveAttribute('href', '/settings');
+		// It follows the date line it explains, before anything else on the page.
+		const dateLine = page.getByText('Anchored to').element();
+		expect(dateLine.nextElementSibling).toBe(page.getByText(LINE).element());
 	});
 
 	it.each([
