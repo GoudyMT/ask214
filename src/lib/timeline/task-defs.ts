@@ -196,7 +196,10 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		why: 'TAP officially starts here, and it is required no later than 365 days out.',
 		afterNote:
 			"Still required. Contact your installation's transition assistance office to start now.",
-		windowFor: { retirement: { windowStart: -730, recommendedOffset: -600 } }
+		windowFor: {
+			retirement: { windowStart: -730, recommendedOffset: -600 },
+			'reserve-retirement': { windowStart: -730, recommendedOffset: -600 }
+		}
 	}),
 	onOrders({
 		id: 'tap-course',
@@ -404,13 +407,19 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		why: 'The SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.',
 		afterNote:
 			'If retired pay has begun, ask your retirement services office what can still change.',
-		// 10 USC 1448(a) covers anyone who becomes entitled to retired pay, a disability retirement included.
+		// 10 USC 1448(a) covers anyone who becomes entitled to retired pay, a disability retirement included. A Guard or
+		// Reserve member retiring from full-time active duty makes this choice; one leaving drill status makes the
+		// Reserve one, so the title says when it applies.
 		copyFor: {
 			medical: {
 				why: 'If the board retires you, the SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.'
+			},
+			'reserve-retirement': {
+				title:
+					'If you are retiring from full-time active duty, get Survivor Benefit Plan counseling and make your SBP choice'
 			}
 		},
-		requires: { separationPath: ['retirement', 'medical'] }
+		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
 	},
 	{
 		id: 'peblo-contact',

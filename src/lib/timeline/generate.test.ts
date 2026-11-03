@@ -1349,8 +1349,9 @@ describe('the leaving answer on the real task list', () => {
 		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election'],
 		medical: ['peblo-contact', 'va-msc-claim', 'ides-review-options', 'sbp-election'],
 		'reserve-component': ['tamp-check', 'rcsbp-election'],
-		// A Guard or Reserve retiree makes the Reserve SBP choice, not the active-duty one, and asks when to file.
-		'reserve-retirement': ['retirement-request', 'tamp-check', 'rcsbp-election']
+		// A Guard or Reserve retiree makes the Reserve SBP choice, or the active-duty one when retiring from full-time
+		// active duty (10 USC 1448(a)(2)), and asks when to file.
+		'reserve-retirement': ['retirement-request', 'tamp-check', 'rcsbp-election', 'sbp-election']
 	};
 	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
 	const items = (separationPath?: SeparationPath, tasks: TimelineState['tasks'] = {}) =>
@@ -1445,19 +1446,30 @@ describe('the leaving answer on the real task list', () => {
 		expect(def('reserve-retirement', 'rcsbp-election')?.title).toMatch(
 			/^If you are retiring from the Guard or Reserve/
 		);
+		// A drill-status retiree makes only the Reserve choice, so the active-duty step says when it applies.
+		expect(def('reserve-retirement', 'sbp-election')?.title).toBe(
+			'If you are retiring from full-time active duty, get Survivor Benefit Plan counseling and make your SBP choice'
+		);
+		expect(def('retirement', 'sbp-election')?.title).toBe(
+			'Get Survivor Benefit Plan counseling and make your SBP choice'
+		);
 		// Retired pay from the Guard or Reserve usually starts at 60, so the line after the date cannot say it began.
 		expect(def('retirement', 'sbp-election')?.afterNote).toMatch(/^If retired pay has begun/);
 	});
 
-	it('retiring opens counseling two years out and keeps its 365-day deadline', () => {
-		const counseling = (path?: SeparationPath) =>
-			items(path).find((i) => i.def.id === 'preseparation-counseling');
-		expect(counseling('retirement')?.windowStartDate).toBe(eaosOffsetDate(SEP, -730));
-		expect(counseling('retirement')?.targetDate).toBe(eaosOffsetDate(SEP, -600));
-		expect(counseling('retirement')?.windowEndDate).toBe(eaosOffsetDate(SEP, -365));
-		expect(counseling('retirement')?.def.kind).toBe('required');
-		expect(counseling()?.windowStartDate).toBe(eaosOffsetDate(SEP, -540));
-	});
+	// 10 USC 1142(a)(3): "as soon as possible during the 24-month period preceding the anticipated retirement date".
+	it.each(['retirement', 'reserve-retirement'] as const)(
+		'the %s answer opens counseling two years out and keeps its 365-day deadline',
+		(path) => {
+			const counseling = (p?: SeparationPath) =>
+				items(p).find((i) => i.def.id === 'preseparation-counseling');
+			expect(counseling(path)?.windowStartDate).toBe(eaosOffsetDate(SEP, -730));
+			expect(counseling(path)?.targetDate).toBe(eaosOffsetDate(SEP, -600));
+			expect(counseling(path)?.windowEndDate).toBe(eaosOffsetDate(SEP, -365));
+			expect(counseling(path)?.def.kind).toBe('required');
+			expect(counseling()?.windowStartDate).toBe(eaosOffsetDate(SEP, -540));
+		}
+	);
 
 	it('keeps a track task done after the answer changes and changes back (state is kept by id)', () => {
 		const tasks = { 'sbp-election': { status: 'done' as const } };
