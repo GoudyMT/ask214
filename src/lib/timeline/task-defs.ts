@@ -76,6 +76,8 @@ function onOrders(def: TaskDef): TaskDef {
 const RETIRING_RCSBP_TITLE =
 	'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it';
 
+const BDD_FALLBACK =
+	'A VA claim can still be filed the standard way, and an accredited VSO helps for free.';
 const BDD_WHY =
 	'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.';
 
@@ -361,8 +363,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -90,
 		recommendedOffset: -120,
 		why: BDD_WHY,
-		afterNote:
-			'BDD is no longer available. A VA claim can still be filed the standard way, and an accredited VSO helps for free.',
+		afterNote: `BDD is no longer available. ${BDD_FALLBACK}`,
 		// va.gov: BDD is for "a service member on full-time active duty (including a member of the National Guard, Reserve,
 		// or Coast Guard)", so a member leaving drill status cannot use it.
 		copyFor: Object.fromEntries(
@@ -371,7 +372,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 				{
 					title:
 						'If you are on full-time active duty, file your VA disability claim through BDD (Benefits Delivery at Discharge)',
-					why: `BDD is for members on full-time active duty, the Guard and Reserve included. ${BDD_WHY}`
+					why: `BDD is for members on full-time active duty, the Guard and Reserve included. ${BDD_WHY}`,
+					afterNote: `If BDD applied to you, it is no longer available. ${BDD_FALLBACK}`
 				}
 			])
 		)

@@ -1422,6 +1422,10 @@ describe('the leaving answer on the real task list', () => {
 				`BDD is for members on full-time active duty, the Guard and Reserve included. ${plain?.why}`
 			);
 			expect(bdd?.kind).toBe('closes');
+			// A member who left drill status never had BDD, so the late note may not say it is "no longer" there.
+			expect(bdd?.afterNote).toBe(
+				'If BDD applied to you, it is no longer available. A VA claim can still be filed the standard way, and an accredited VSO helps for free.'
+			);
 			for (const other of ['ets', 'retirement', 'medical'] as const) {
 				expect(items(other).find((i) => i.def.id === 'va-bdd-claim')?.def.title).toBe(plain?.title);
 			}
