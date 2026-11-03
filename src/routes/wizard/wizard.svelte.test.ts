@@ -263,11 +263,13 @@ describe('Wizard, how the member is leaving', () => {
 				const pill = page
 					.getByRole('radio', { name: 'Retiring from the Guard or Reserve' })
 					.element()
-					.closest('label');
-				expect(parseFloat(getComputedStyle(pill as Element).paddingTop)).toBeGreaterThanOrEqual(4);
-				expect(parseFloat(getComputedStyle(pill as Element).paddingBottom)).toBeGreaterThanOrEqual(
-					4
-				);
+					.closest('label') as Element;
+				// The text's own box against the pill's inner edge, as drawn: the 44 px floor alone leaves ~2 px here.
+				const box = pill.getBoundingClientRect();
+				const text = (pill.querySelector('span') as Element).getBoundingClientRect();
+				const border = parseFloat(getComputedStyle(pill).borderTopWidth);
+				expect(text.top - box.top - border).toBeGreaterThanOrEqual(4);
+				expect(box.bottom - text.bottom - border).toBeGreaterThanOrEqual(4);
 			} finally {
 				root.style.fontSize = before;
 			}
@@ -293,7 +295,29 @@ describe('Wizard, how the member is leaving', () => {
 			}
 		}));
 
-	// A keyboard user may press Enter to pick a choice; it picks, and setup is saved only from the Save button.
+	// A touch screen keeps the last tapped pill hovered; on a device that cannot hover, a hovered pill keeps its border.
+	it('draws no hover border on a device that cannot hover', () =>
+		withSpacing(async () => {
+			const root = document.documentElement;
+			root.style.setProperty('--color-accent', '#0b5cad');
+			// A phone as the browser's device mode makes it: touch points, so the page reads "(hover: none)".
+			await cdp().send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+			try {
+				await render(WizardPage);
+				expect(matchMedia('(hover: none)').matches).toBe(true);
+				const radio = page.getByRole('radio', { name: 'A medical board' });
+				const pill = radio.element().closest('label') as Element;
+				const resting = getComputedStyle(pill).borderTopColor;
+				await radio.hover();
+				expect(getComputedStyle(pill).borderTopColor).toBe(resting);
+			} finally {
+				root.style.removeProperty('--color-accent');
+				await cdp().send('Emulation.setTouchEmulationEnabled', { enabled: false });
+			}
+		}));
+
+	// A member may press Enter on a choice expecting it to act: setup is saved only from the Save button or the date
+	// field, so Enter on a choice saves nothing.
 	it('does not save on Enter on a choice', async () => {
 		store.save.mockResolvedValue({ generation: 1 });
 		await render(WizardPage);
