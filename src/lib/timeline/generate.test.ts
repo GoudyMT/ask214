@@ -1407,6 +1407,27 @@ describe('the leaving answer on the real task list', () => {
 		}
 	);
 
+	// va.gov's BDD page: "You're a service member on full-time active duty (including a member of the National Guard,
+	// Reserve, or Coast Guard)". A Guard or Reserve member leaving drill status cannot use BDD, so the step says when it
+	// applies; every other answer keeps the plain step.
+	it.each(['reserve-component', 'reserve-retirement'] as const)(
+		'the %s answer says BDD is for full-time active duty',
+		(path) => {
+			const bdd = items(path).find((i) => i.def.id === 'va-bdd-claim')?.def;
+			const plain = items().find((i) => i.def.id === 'va-bdd-claim')?.def;
+			expect(bdd?.title).toBe(
+				'If you are on full-time active duty, file your VA disability claim through BDD (Benefits Delivery at Discharge)'
+			);
+			expect(bdd?.why).toBe(
+				`BDD is for members on full-time active duty, the Guard and Reserve included. ${plain?.why}`
+			);
+			expect(bdd?.kind).toBe('closes');
+			for (const other of ['ets', 'retirement', 'medical'] as const) {
+				expect(items(other).find((i) => i.def.id === 'va-bdd-claim')?.def.title).toBe(plain?.title);
+			}
+		}
+	);
+
 	it('says when the SBP steps apply to a medical board and to a retirement', () => {
 		const def = (path: SeparationPath, id: string) => items(path).find((i) => i.def.id === id)?.def;
 		expect(def('medical', 'sbp-election')?.why).toMatch(/^If the board retires you/);

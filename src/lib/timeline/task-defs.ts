@@ -76,6 +76,9 @@ function onOrders(def: TaskDef): TaskDef {
 const RETIRING_RCSBP_TITLE =
 	'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it';
 
+const BDD_WHY =
+	'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.';
+
 export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Early prep (no authoritative fixed date; recommended 18-24 months out) ----
 	{
@@ -357,9 +360,21 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -120,
-		why: 'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.',
+		why: BDD_WHY,
 		afterNote:
-			'BDD is no longer available. A VA claim can still be filed the standard way, and an accredited VSO helps for free.'
+			'BDD is no longer available. A VA claim can still be filed the standard way, and an accredited VSO helps for free.',
+		// va.gov: BDD is for "a service member on full-time active duty (including a member of the National Guard, Reserve,
+		// or Coast Guard)", so a member leaving drill status cannot use it.
+		copyFor: Object.fromEntries(
+			GUARD_OR_RESERVE.map((path) => [
+				path,
+				{
+					title:
+						'If you are on full-time active duty, file your VA disability claim through BDD (Benefits Delivery at Discharge)',
+					why: `BDD is for members on full-time active duty, the Guard and Reserve included. ${BDD_WHY}`
+				}
+			])
+		)
 	},
 
 	// ---- Shown only for the leaving answer they belong to (10 USC 1142 and 1448; tricare.mil TAMP; health.mil IDES) ----
