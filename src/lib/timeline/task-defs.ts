@@ -53,26 +53,28 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
 // a waiver for some reservists) once, and a late card's note says it only if TAP applies.
 const ON_ORDERS_WHY =
 	'For the Guard or Reserve, TAP applies on release from active duty orders, with exceptions (for example, before 180 days in a row on active duty). Your transition assistance office confirms what you need.';
+const GUARD_OR_RESERVE = ['reserve-component', 'reserve-retirement'] as const;
 function onOrders(def: TaskDef): TaskDef {
 	const title = def.title.charAt(0).toLowerCase() + def.title.slice(1);
-	return {
-		...def,
-		copyFor: {
-			...def.copyFor,
-			'reserve-component': {
-				...def.copyFor?.['reserve-component'],
-				title: `If you are leaving active duty orders, ${title}`,
-				why: `${ON_ORDERS_WHY} ${def.why}`,
-				...(def.afterNote && {
-					afterNote: def.afterNote.replace(
-						/^Still required/,
-						'If TAP applies to you, it is still required'
-					)
-				})
-			}
-		}
-	};
+	const copyFor = { ...def.copyFor };
+	for (const path of GUARD_OR_RESERVE) {
+		copyFor[path] = {
+			...def.copyFor?.[path],
+			title: `If you are leaving active duty orders, ${title}`,
+			why: `${ON_ORDERS_WHY} ${def.why}`,
+			...(def.afterNote && {
+				afterNote: def.afterNote.replace(
+					/^Still required/,
+					'If TAP applies to you, it is still required'
+				)
+			})
+		};
+	}
+	return { ...def, copyFor };
 }
+
+const RETIRING_RCSBP_TITLE =
+	'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it';
 
 export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Early prep (no authoritative fixed date; recommended 18-24 months out) ----
@@ -306,7 +308,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 0,
 		recommendedOffset: -180,
 		why: 'Joining the Guard or Reserve takes paperwork and lead time, so start while you are still on active duty. TAMP coverage through the Selected Reserve requires joining the day after you separate.',
-		hideFor: ['reserve-component']
+		hideFor: [...GUARD_OR_RESERVE]
 	},
 	{
 		id: 'school-apply',
@@ -371,7 +373,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -365,
 		recommendedOffset: -540,
 		why: 'Your service sets how far ahead a retirement request goes in. Your personnel or retirement services office has the date.',
-		requires: { separationPath: ['retirement'] }
+		requires: { separationPath: ['retirement', 'reserve-retirement'] }
 	},
 	{
 		id: 'sbp-election',
@@ -442,7 +444,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 0,
 		recommendedOffset: -60,
 		why: 'TAMP gives 180 days of health care after regular TRICARE ends. It covers some Guard and Reserve members leaving more than 30 days in a row of active duty for a preplanned mission or a contingency; tricare.mil lists who qualifies.',
-		requires: { separationPath: ['reserve-component'] }
+		requires: { separationPath: [...GUARD_OR_RESERVE] }
 	},
 	{
 		id: 'rcsbp-election',
@@ -454,13 +456,13 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 0,
 		recommendedOffset: -180,
 		why: 'The letter says you have the years of service for retired pay, and the Reserve Component Survivor Benefit Plan choice is due within 90 days of it. Your Guard or Reserve personnel office can say when to expect the letter.',
+		// "Retiring" keeps this step for a Guard or Reserve member who answered before the Guard or Reserve retirement
+		// answer existed, so its title says when it applies.
 		copyFor: {
-			retirement: {
-				title:
-					'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it'
-			}
+			retirement: { title: RETIRING_RCSBP_TITLE },
+			'reserve-retirement': { title: RETIRING_RCSBP_TITLE }
 		},
-		requires: { separationPath: ['reserve-component', 'retirement'] }
+		requires: { separationPath: [...GUARD_OR_RESERVE, 'retirement'] }
 	},
 
 	// ---- Capstone + final-90 ----

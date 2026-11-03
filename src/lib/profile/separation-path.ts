@@ -2,7 +2,13 @@
  * How a member is leaving: the optional answer that turns on the timeline steps for their path. "Not sure yet"
  * is not a value - choosing it stores nothing, so it reads the same as no answer.
  */
-export const SEPARATION_PATHS = ['ets', 'retirement', 'medical', 'reserve-component'] as const;
+export const SEPARATION_PATHS = [
+	'ets',
+	'retirement',
+	'reserve-retirement',
+	'medical',
+	'reserve-component'
+] as const;
 
 export type SeparationPath = (typeof SEPARATION_PATHS)[number];
 
@@ -10,6 +16,7 @@ export type SeparationPath = (typeof SEPARATION_PATHS)[number];
 export const SEPARATION_PATH_LABEL: Record<SeparationPath, string> = {
 	ets: 'Finishing my service',
 	retirement: 'Retiring',
+	'reserve-retirement': 'Retiring from the Guard or Reserve',
 	medical: 'A medical board',
 	'reserve-component': 'Leaving the Guard or Reserve'
 };

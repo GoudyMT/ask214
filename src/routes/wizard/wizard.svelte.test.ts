@@ -147,21 +147,32 @@ describe('Wizard, how the member is leaving', () => {
 	const lastPatch = () =>
 		store.save.mock.calls.at(-1)?.[0] as Patch & { separationPath?: Uint8Array };
 
-	it('asks it as an optional group of five choices, with its hint', async () => {
+	it('asks it as an optional group of six choices in order, with its hint', async () => {
 		await render(WizardPage);
 		const group = page.getByRole('radiogroup', { name: 'How are you leaving? (optional)' });
 		await expect
 			.element(group)
 			.toHaveAccessibleDescription('This adds the steps for your path. It stays on this device.');
-		for (const choice of [
+		// The two retiring answers sit side by side, so a Guard or Reserve retiree sees theirs beside "Retiring".
+		const choices = [
 			'Finishing my service',
 			'Retiring',
+			'Retiring from the Guard or Reserve',
 			'A medical board',
 			'Leaving the Guard or Reserve',
 			'Not sure yet'
-		]) {
-			await expect.element(group.getByRole('radio', { name: choice })).not.toBeChecked();
+		];
+		for (const choice of choices) {
+			await expect
+				.element(group.getByRole('radio', { name: choice, exact: true }))
+				.not.toBeChecked();
 		}
+		expect(
+			group
+				.getByRole('radio')
+				.elements()
+				.map((radio) => radio.closest('label')?.textContent?.trim())
+		).toEqual(choices);
 	});
 
 	it('saves the picked path with the date, in one save, and wipes its bytes once it settles', async () => {
@@ -191,7 +202,7 @@ describe('Wizard, how the member is leaving', () => {
 		// before (a member who came Back to this page, or another tab that set it up first).
 		store.save.mockResolvedValue({ generation: 1 });
 		await render(WizardPage);
-		if (first) await page.getByRole('radio', { name: first }).click();
+		if (first) await page.getByRole('radio', { name: first, exact: true }).click();
 		if (first === 'Retiring') await page.getByRole('radio', { name: 'Not sure yet' }).click();
 		if (first)
 			await expect.element(page.getByRole('radio', { name: 'Not sure yet' })).toBeChecked();
@@ -205,7 +216,7 @@ describe('Wizard, how the member is leaving', () => {
 	it('wipes the picked path bytes when the save fails too', async () => {
 		store.save.mockRejectedValue(new Error('E_TEST'));
 		await render(WizardPage);
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		await page.getByLabelText('Separation date').fill(TYPED);
 		await page.getByRole('button', { name: 'Save and continue' }).click();
 		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
@@ -215,7 +226,7 @@ describe('Wizard, how the member is leaving', () => {
 
 	it('saves nothing when the member skips, whatever was picked', async () => {
 		await render(WizardPage);
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		await page.getByRole('button', { name: 'Skip for now' }).click();
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/'));
 		expect(store.save).not.toHaveBeenCalled();

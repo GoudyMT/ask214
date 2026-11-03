@@ -1348,7 +1348,9 @@ describe('the leaving answer on the real task list', () => {
 		// A Guard or Reserve retirement makes the Reserve SBP choice; a board can retire a member, who then makes the SBP one.
 		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election'],
 		medical: ['peblo-contact', 'va-msc-claim', 'ides-review-options', 'sbp-election'],
-		'reserve-component': ['tamp-check', 'rcsbp-election']
+		'reserve-component': ['tamp-check', 'rcsbp-election'],
+		// A Guard or Reserve retiree makes the Reserve SBP choice, not the active-duty one, and asks when to file.
+		'reserve-retirement': ['retirement-request', 'tamp-check', 'rcsbp-election']
 	};
 	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
 	const items = (separationPath?: SeparationPath, tasks: TimelineState['tasks'] = {}) =>
@@ -1383,24 +1385,27 @@ describe('the leaving answer on the real task list', () => {
 
 	// A member on active-duty orders keeps the firm TAP deadlines; the condition says when they apply, so a member
 	// leaving drill status can tell they may not.
-	it('the Guard or Reserve answer keeps the TAP steps, says when they apply, and hides only the recruiter reminder', () => {
-		const shown = items('reserve-component');
-		expect(shown.map((i) => i.def.id)).not.toContain('reserve-affiliation');
-		// The Home row, Needs you now and the calendar show only the title, so the condition leads it; the why names
-		// the statute's exceptions (10 USC 1142(a)(4)) and who confirms; a late card says it only if TAP applies.
-		for (const id of TAP) {
-			const def = shown.find((i) => i.def.id === id)?.def;
-			const plain = items().find((i) => i.def.id === id)?.def;
-			expect(def?.title, id).toMatch(/^If you are leaving active duty orders, [a-z]/);
-			expect(def?.why, id).toContain('180 days in a row');
-			expect(def?.why, id).toContain('Your transition assistance office confirms what you need.');
-			if (plain?.afterNote)
-				expect(def?.afterNote, id).toMatch(/^If TAP applies to you, it is still required/);
-			expect(`${plain?.title} ${plain?.why} ${plain?.afterNote ?? ''}`, id).not.toMatch(
-				/orders|applies to you/
-			);
+	it.each(['reserve-component', 'reserve-retirement'] as const)(
+		'the %s answer keeps the TAP steps, says when they apply, and hides only the recruiter reminder',
+		(path) => {
+			const shown = items(path);
+			expect(shown.map((i) => i.def.id)).not.toContain('reserve-affiliation');
+			// The Home row, Needs you now and the calendar show only the title, so the condition leads it; the why names
+			// the statute's exceptions (10 USC 1142(a)(4)) and who confirms; a late card says it only if TAP applies.
+			for (const id of TAP) {
+				const def = shown.find((i) => i.def.id === id)?.def;
+				const plain = items().find((i) => i.def.id === id)?.def;
+				expect(def?.title, id).toMatch(/^If you are leaving active duty orders, [a-z]/);
+				expect(def?.why, id).toContain('180 days in a row');
+				expect(def?.why, id).toContain('Your transition assistance office confirms what you need.');
+				if (plain?.afterNote)
+					expect(def?.afterNote, id).toMatch(/^If TAP applies to you, it is still required/);
+				expect(`${plain?.title} ${plain?.why} ${plain?.afterNote ?? ''}`, id).not.toMatch(
+					/orders|applies to you/
+				);
+			}
 		}
-	});
+	);
 
 	it('says when the SBP steps apply to a medical board and to a retirement', () => {
 		const def = (path: SeparationPath, id: string) => items(path).find((i) => i.def.id === id)?.def;
@@ -1411,6 +1416,9 @@ describe('the leaving answer on the real task list', () => {
 		);
 		expect(def('reserve-component', 'rcsbp-election')?.title).toMatch(
 			/^If you have your 20-year letter/
+		);
+		expect(def('reserve-retirement', 'rcsbp-election')?.title).toMatch(
+			/^If you are retiring from the Guard or Reserve/
 		);
 		// Retired pay from the Guard or Reserve usually starts at 60, so the line after the date cannot say it began.
 		expect(def('retirement', 'sbp-election')?.afterNote).toMatch(/^If retired pay has begun/);

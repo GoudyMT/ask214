@@ -317,6 +317,7 @@ describe('buildExportInner: what a person exports', () => {
 	// release reads it as no answer, and the restore check refuses it, so the file leaves it out rather than fail.
 	it.each([
 		['known', 'medical', 'bWVkaWNhbA=='],
+		['known', 'reserve-retirement', btoa('reserve-retirement')],
 		['unknown', 'discharge', undefined],
 		// The restore check refuses a byte-order mark before the answer, so the filter must read it the same way.
 		['marked', String.fromCharCode(0xfeff) + 'ets', undefined]

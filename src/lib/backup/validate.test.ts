@@ -400,7 +400,7 @@ describe('validateInner: acceptance corpus (shapes the app writes)', () => {
 				p.profile.setupIntentChangedAt = null;
 			}
 		],
-		...(['ets', 'retirement', 'medical', 'reserve-component'] as const).map(
+		...(['ets', 'retirement', 'reserve-retirement', 'medical', 'reserve-component'] as const).map(
 			(path): [string, (p: Parts) => void] => [
 				`a profile with the leaving answer ${path}`,
 				(p) => {
