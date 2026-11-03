@@ -83,7 +83,8 @@
 		gap: var(--space-s);
 	}
 	/* Each choice is a pill with a 44px target that may wrap to a second line at large text sizes rather than
-	   overflow the card; the radio stays focusable but is drawn as the pill. */
+	   overflow the card, with room above and below for the wrapped lines; the radio stays focusable but is drawn as
+	   the pill. */
 	.path-choices__choice {
 		position: relative;
 		display: inline-flex;
@@ -91,7 +92,7 @@
 		box-sizing: border-box;
 		max-width: 100%;
 		min-height: 44px;
-		padding: 0 var(--space-m);
+		padding: var(--space-xs) var(--space-m);
 		border: 1px solid var(--color-border);
 		border-radius: 999px;
 		color: var(--color-accent);
@@ -107,17 +108,23 @@
 		opacity: 0;
 		cursor: pointer;
 	}
-	.path-choices__choice:hover {
-		border-color: var(--color-accent);
+	/* A touch screen keeps the last tapped pill hovered, which would read as a second pick. */
+	@media (hover: hover) {
+		.path-choices__choice:hover {
+			border-color: var(--color-accent);
+		}
 	}
 	.path-choices__choice:has(input:checked) {
 		border-color: var(--color-accent);
 		background: color-mix(in srgb, var(--color-accent) 15%, transparent);
 		color: var(--color-fg);
 	}
+	/* The fill does not show in forced colors, so the pick is a thicker border; the padding gives back its extra 2px
+	   so the pills do not shift when the pick moves. */
 	@media (forced-colors: active) {
 		.path-choices__choice:has(input:checked) {
 			border: 3px solid Highlight;
+			padding: calc(var(--space-xs) - 2px) calc(var(--space-m) - 2px);
 		}
 	}
 	.path-choices__choice:has(input:focus-visible) {

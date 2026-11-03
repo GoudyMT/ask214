@@ -232,6 +232,82 @@ describe('Wizard, how the member is leaving', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
+	// Component tests run without app.css, so the pill cases set its spacing and border tokens as the app defines them
+	// (an undefined border colour drops the whole border), and remove them.
+	const TOKENS = {
+		'--space-xs': '4px',
+		'--space-s': '8px',
+		'--space-m': '16px',
+		'--space-l': '24px',
+		'--color-border': '#2a313a'
+	};
+	async function withSpacing(run: () => Promise<void>): Promise<void> {
+		const root = document.documentElement;
+		for (const [name, value] of Object.entries(TOKENS)) root.style.setProperty(name, value);
+		try {
+			await run();
+		} finally {
+			for (const name of Object.keys(TOKENS)) root.style.removeProperty(name);
+		}
+	}
+
+	// At large text a long choice wraps to two lines inside its pill; with no padding above and below, the lines touch
+	// the pill's edge.
+	it('keeps space between a choice and its pill edge at 200% text', () =>
+		withSpacing(async () => {
+			const root = document.documentElement;
+			const before = root.style.fontSize;
+			root.style.fontSize = '200%';
+			try {
+				await render(WizardPage);
+				const pill = page
+					.getByRole('radio', { name: 'Retiring from the Guard or Reserve' })
+					.element()
+					.closest('label');
+				expect(parseFloat(getComputedStyle(pill as Element).paddingTop)).toBeGreaterThanOrEqual(4);
+				expect(parseFloat(getComputedStyle(pill as Element).paddingBottom)).toBeGreaterThanOrEqual(
+					4
+				);
+			} finally {
+				root.style.fontSize = before;
+			}
+		}));
+
+	// In forced colors the pick is a thicker border; a pill that grew with it would push the others along the row.
+	it('keeps a pill the same size when it is picked in forced colors', () =>
+		withSpacing(async () => {
+			await cdp().send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'active' }]
+			});
+			try {
+				await render(WizardPage);
+				const radio = page.getByRole('radio', { name: 'A medical board' });
+				const pill = radio.element().closest('label') as Element;
+				const before = pill.getBoundingClientRect();
+				await radio.click();
+				await expect.element(radio).toBeChecked();
+				const after = pill.getBoundingClientRect();
+				expect([after.width, after.height]).toEqual([before.width, before.height]);
+			} finally {
+				await cdp().send('Emulation.setEmulatedMedia', { features: [] });
+			}
+		}));
+
+	// A keyboard user may press Enter to pick a choice; it picks, and setup is saved only from the Save button.
+	it('does not save on Enter on a choice', async () => {
+		store.save.mockResolvedValue({ generation: 1 });
+		await render(WizardPage);
+		await page.getByLabelText('Separation date').fill(TYPED);
+		const radio = page.getByRole('radio', { name: 'A medical board' });
+		await radio.click();
+		(radio.element() as HTMLElement).focus();
+		await cdp().send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await cdp().send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(store.save).not.toHaveBeenCalled();
+		await expect.element(radio).toBeChecked();
+	});
+
 	it('saves nothing when the member skips, whatever was picked', async () => {
 		await render(WizardPage);
 		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
