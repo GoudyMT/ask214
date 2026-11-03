@@ -193,8 +193,17 @@ describe('Wizard, how the member is leaving', () => {
 		expect(allZero(lastPatch().separationPath as Uint8Array)).toBe(true);
 	});
 
+	// Another tab can save an answer after this one opened; a member who picked nothing here has said nothing about it.
+	it('leaves a saved answer alone when nothing is picked', async () => {
+		store.save.mockResolvedValue({ generation: 1 });
+		await render(WizardPage);
+		await page.getByLabelText('Separation date').fill(TYPED);
+		await page.getByRole('button', { name: 'Save and continue' }).click();
+		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
+		expect('separationPath' in lastPatch()).toBe(false);
+	});
+
 	it.each([
-		['no pick', null],
 		['Not sure yet', 'Not sure yet'],
 		['Not sure yet after another pick', 'Retiring']
 	])('clears any earlier path for %s', async (_name, first) => {
@@ -202,10 +211,9 @@ describe('Wizard, how the member is leaving', () => {
 		// before (a member who came Back to this page, or another tab that set it up first).
 		store.save.mockResolvedValue({ generation: 1 });
 		await render(WizardPage);
-		if (first) await page.getByRole('radio', { name: first, exact: true }).click();
+		await page.getByRole('radio', { name: first, exact: true }).click();
 		if (first === 'Retiring') await page.getByRole('radio', { name: 'Not sure yet' }).click();
-		if (first)
-			await expect.element(page.getByRole('radio', { name: 'Not sure yet' })).toBeChecked();
+		await expect.element(page.getByRole('radio', { name: 'Not sure yet' })).toBeChecked();
 		await page.getByLabelText('Separation date').fill(TYPED);
 		await page.getByRole('button', { name: 'Save and continue' }).click();
 		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));

@@ -571,6 +571,28 @@ describe('ProfileStore relock-vs-save race', () => {
 	});
 });
 
+describe('ProfileStore, two tabs', () => {
+	beforeEach(async () => {
+		await bootstrapLocalKeystore(db);
+	});
+
+	// Two tabs on setup: B saves a leaving answer, A (refreshed by B's broadcast) saves its date with nothing picked,
+	// which the setup page sends without the answer's key. B's answer stands.
+	it("keeps another tab's leaving answer when a save leaves its key out", async () => {
+		const tabA = createProfileStore(db);
+		const tabB = createProfileStore(db);
+		await tabA.save({ eaos: new TextEncoder().encode('2027-04-15') });
+		await tabB.load();
+		await tabB.save({ separationPath: new TextEncoder().encode('reserve-retirement') });
+		await tabA.refresh();
+		await tabA.save({ eaos: new TextEncoder().encode('2028-01-01'), setupIntent: 'completed' });
+		const fresh = createProfileStore(db);
+		await fresh.load();
+		const persona = fresh.persona;
+		expect(persona.completeness !== 'none' && persona.separationPath).toBe('reserve-retirement');
+	});
+});
+
 describe('ProfileStore.locked', () => {
 	beforeEach(async () => {
 		await bootstrapLocalKeystore(db);

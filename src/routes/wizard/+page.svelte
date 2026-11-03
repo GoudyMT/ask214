@@ -26,6 +26,8 @@
 	let error = $state<string | null>(null);
 	let saving = $state(false);
 	let path = $state<SeparationPath | undefined>(undefined);
+	// Whether the member answered here; "Not sure yet" is an answer that clears, picking nothing is not one.
+	let answered = $state(false);
 
 	// Device clock display feeds the implicit clock check (read-only, not PII).
 	const todayDisplay = new Date().toLocaleDateString();
@@ -64,12 +66,17 @@
 			throw err;
 		}
 
-		// The answer goes in the same save as the date, so a relock or a failure keeps both or neither. The key is
-		// always sent: the store merges a patch over the saved record, and only an empty key clears an earlier answer.
+		// The answer goes in the same save as the date, so a relock or a failure keeps both or neither. The store merges a
+		// patch over the saved record: the key is sent once the member answered (empty for "Not sure yet", which clears an
+		// earlier answer) and left out when they picked nothing, so an answer another tab saved stands.
 		const pathBytes = path ? new TextEncoder().encode(path) : undefined;
 		saving = true;
 		try {
-			await store.save({ eaos: bytes, setupIntent: 'completed', separationPath: pathBytes });
+			await store.save({
+				eaos: bytes,
+				setupIntent: 'completed',
+				...(answered && { separationPath: pathBytes })
+			});
 			// Land on the timeline the user just set up - "Save and continue" continues to the thing
 			// they built. (Skip, below, stays on Home since nothing was set up.)
 			await goto(resolve('timeline'));
@@ -182,7 +189,14 @@
 				hint="The day your service is set to end. Ask your personnel office if you are not sure."
 			/>
 			<p class="wizard__today">Today on this device: {todayDisplay}</p>
-			<SeparationPathChoices name="wizard-path" value={path} onchange={(next) => (path = next)} />
+			<SeparationPathChoices
+				name="wizard-path"
+				value={path}
+				onchange={(next) => {
+					path = next;
+					answered = true;
+				}}
+			/>
 
 			<div class="wizard__actions">
 				<button class="wizard__save" type="submit" aria-busy={saving}>Save and continue</button>
