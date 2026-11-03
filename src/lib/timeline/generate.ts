@@ -61,8 +61,11 @@ function includeForPath(persona: PersonaFilters, def: TaskDef): boolean {
 	return !(path && def.hideFor?.includes(path));
 }
 
-/** The def with its path's own opening and recommended day, and its path's own wording, where it has them. */
-function forPath(persona: PersonaFilters, def: TaskDef): TaskDef {
+/**
+ * The def with its path's own opening and recommended day, and its path's own wording, where it has them. Anything
+ * that names a task to the member reads its title here, so it matches the timeline.
+ */
+export function forPath(persona: PersonaFilters, def: TaskDef): TaskDef {
 	const path = persona.completeness === 'none' ? undefined : persona.separationPath;
 	if (!path) return def;
 	const window = def.windowFor?.[path];
