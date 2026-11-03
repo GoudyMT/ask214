@@ -23,6 +23,18 @@
 	let running = $state<'save' | 'remove' | null>(null);
 	const busy = $derived(running !== null);
 	let toggleEl = $state<HTMLButtonElement | null>(null);
+	let removeEl = $state<HTMLButtonElement | null>(null);
+
+	// Remove goes when the answer does, which another tab can do with this form open; focus on it would fall to the page.
+	// Read before the update removes it, then handed to the row once a browser that moves focus late has done so.
+	$effect.pre(() => {
+		if (value !== undefined || removeEl === null || document.activeElement !== removeEl) return;
+		const gone = removeEl;
+		void tick().then(() => {
+			const active = document.activeElement;
+			if (active === document.body || active === gone) toggleEl?.focus();
+		});
+	});
 
 	// Closing unmounts the focused control; focus goes back to the row, so a keyboard user is not dropped - unless they
 	// have already moved on to another control.
@@ -127,6 +139,7 @@
 				>
 				{#if value}
 					<button
+						bind:this={removeEl}
 						class="settings-remove"
 						type="button"
 						disabled={running === 'save'}

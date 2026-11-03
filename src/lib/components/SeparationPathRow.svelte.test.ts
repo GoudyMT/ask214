@@ -198,6 +198,44 @@ describe('SeparationPathRow', () => {
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
 	});
 
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)(
+		'removes once and stays closed for a held Enter on Remove, removed %s',
+		async (_, ms) => {
+			const onRemove = vi.fn(
+				() => new Promise<string | null>((resolve) => setTimeout(() => resolve(null), ms))
+			);
+			await row({ value: 'ets', onRemove });
+			await toggle().click();
+			(page.getByRole('button', { name: 'Remove answer' }).element() as HTMLElement).focus();
+			await hold();
+			await new Promise((resolve) => setTimeout(resolve, ms + 50));
+			expect(onRemove).toHaveBeenCalledOnce();
+			await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
+			expect(document.activeElement).toBe(toggle().element());
+			await pressOnce();
+			await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
+		}
+	);
+
+	// Another tab removes the answer while this form is open with focus on Remove: the button goes, the form stays.
+	it('moves focus to the row when Remove disappears under it', async () => {
+		const { rerender } = await row({ value: 'ets' });
+		await toggle().click();
+		(page.getByRole('button', { name: 'Remove answer' }).element() as HTMLElement).focus();
+		await rerender({ value: undefined });
+		// Read after a drawn frame: a browser can move focus off a removed element late.
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		await expect
+			.element(page.getByRole('button', { name: 'Remove answer' }))
+			.not.toBeInTheDocument();
+		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
+		expect(document.activeElement).toBe(toggle().element());
+	});
+
 	// A failed save keeps the form open, so the rest of the hold lands on the form again once the save settles.
 	it.each([
 		['Save', 'at once', 0],
