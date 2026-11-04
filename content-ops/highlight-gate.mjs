@@ -35,9 +35,9 @@ const CORPUS = `.svelte-kit/output/client${CORPUS_BASE}.json`;
 //   rightPage 0.99. The design bar: a citation opens its own document, at a page that document has. Its
 //     population is every chunk from a served document that carries a page, anchored or not, because a
 //     citation opens the page either way. Measured 100% (1,613 of 1,613) when the row was added.
-//   located 0.95. Measured 96.1% over the full population, on both pdfjs 6.2.108 and 6.3.289 - the fold
-//     is what makes it survive a reader change. About one point, or 18 chunks, of slack: real but not
-//     generous, so left where it is rather than tightened onto the measurement.
+//   located 0.95. Measured 96.0% (1,549 of 1,613) over the full population, on both pdfjs 6.3.289 and
+//     6.4.299 - the fold is what makes it survive a reader change. About one point, or 16 chunks, of slack:
+//     real but not generous, so left where it is rather than tightened onto the measurement.
 //   onCitedPage 0.88. This floor was briefly raised to 0.90 against a reading of 91.1%, and that reading
 //     was WRONG: the matcher was returning offsets into a normalized copy of the page while the page
 //     bounds were computed from the raw text, so misaligned ranges overlapped the cited page by accident.
