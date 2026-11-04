@@ -42,7 +42,6 @@ import sys
 import pypdf
 from PIL import Image
 from pypdf._page import ImageFile
-from pypdf._xobj_image_helpers import _xobj_to_image
 from pypdf.generic import (
     ArrayObject,
     ContentStream,
@@ -53,6 +52,7 @@ from pypdf.generic import (
     NumberObject,
     StreamObject,
 )
+from pypdf.generic._image_xobject import _xobj_to_image
 
 # Step 0: Configuration
 SOURCES_PATH = 'content/sources.yaml'
