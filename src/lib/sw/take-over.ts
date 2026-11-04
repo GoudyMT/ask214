@@ -11,7 +11,7 @@ import { TAKE_OVER } from './take-over-message';
  * nothing personal. Its key names the database version: a page of the release before, served offline by its own worker,
  * would otherwise clear the mark as another build's, and no later page of this build would ask.
  */
-export const RAISED_KEY = `mtc:db-raised-${DB_VERSION}`;
+export const RAISED_KEY = `mtc:raised-${DB_VERSION}`;
 
 type MarkStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 // eslint-disable-next-line no-restricted-globals -- a build name, nothing personal (see above)
