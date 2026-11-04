@@ -13,3 +13,7 @@ bun.lockb
 
 # The crash page ships as a string inside the reader's on-demand budget, so it is kept compact by hand
 /src/error.html
+
+# Local records, never committed: the kit's state and the sweep contracts
+/.kit/
+/docs/sweeps/
