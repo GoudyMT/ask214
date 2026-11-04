@@ -21,9 +21,6 @@ export const BACKUP_MANIFEST = {
 	'calendar-sync-hwm': 'rewritten',
 	keystore: 'device-kept',
 	byok: 'never',
-	'skillbridge-finder': 'never',
-	'skillbridge-finder-hwm': 'never',
-	'skillbridge-finder-pack': 'never',
 	'app-lock': 'never'
 } as const satisfies Record<StoreName, BackupRole>;
 

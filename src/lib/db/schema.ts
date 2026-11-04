@@ -1,6 +1,6 @@
 /**
  * MTC v1 IndexedDB schema + the thin promise/transaction layer that is the ONLY
- * place raw IndexedDB request/transaction plumbing lives. 12 stores
+ * place raw IndexedDB request/transaction plumbing lives. 9 stores
  * (no journal: a key change moves every record in one transaction):
  *
  *   - profile             ciphertext, single self-row (id = 0)
@@ -12,16 +12,11 @@
  *   - calendar-sync-hwm   signed HWM sidecar for calendar-sync (id = 0)
  *   - byok                ciphertext (BYO API key), single self-row (id = 0); no HWM -
  *                         a re-enterable key needs no OCC/anti-rollback generation
- *   - skillbridge-finder  ciphertext (the finder's place, saved programs, compare picks and
- *                         filters), single self-row (id = 0)
- *   - skillbridge-finder-hwm  signed HWM sidecar for skillbridge-finder (id = 0)
- *   - skillbridge-finder-pack ciphertext, one row per downloaded data file; device only, no HWM
- *                         (the files are public and re-downloadable)
  *   - app-lock            plain rows (the wrong-try row and the lock counter), keyed by name; device only,
  *                         never in a backup
  *
  * Raw IndexedDB (no Dexie) honors the v2 audit "0 new prod deps" lock; the schema
- * is trivial (single-row stores and one keyed by file name, no indexes/queries) so a library adds no value.
+ * is trivial (a few rows per store, no indexes/queries) so a library adds no value.
  */
 export const DB_NAME = 'mtc';
 // Fix forward only: never roll the deployed app back past a version that raised this. An older bundle cannot open the
@@ -30,7 +25,7 @@ export const DB_NAME = 'mtc';
 // signed bytes, a record's format): an older app then stops at the version, with Reload, instead of reading the
 // newer data as damaged and offering to erase it. An added optional key that an older codec ignores (profile
 // codec.ts: 'a key not listed is ignored') is not a format change and needs no raise.
-export const DB_VERSION = 8; // 7 -> 8 adds the app lock's plain store; a tab on an older bundle retires (onversionchange -> 'stale')
+export const DB_VERSION = 9; // 8 -> 9 deletes the retired stores; a tab on an older bundle retires (onversionchange -> 'stale')
 export const STORES = [
 	'profile',
 	'profile-hwm',
@@ -40,12 +35,12 @@ export const STORES = [
 	'calendar-sync',
 	'calendar-sync-hwm',
 	'byok',
-	'skillbridge-finder',
-	'skillbridge-finder-hwm',
-	'skillbridge-finder-pack',
 	'app-lock'
 ] as const;
 export type StoreName = (typeof STORES)[number];
+
+// Stores an older release made that the app no longer has. Nothing reads them, so a raise deletes them with their rows.
+const RETIRED_STORES = ['skillbridge-finder', 'skillbridge-finder-hwm', 'skillbridge-finder-pack'];
 
 export function openMtcDb(
 	name: string = DB_NAME,
@@ -63,6 +58,9 @@ export function openMtcDb(
 				if (!db.objectStoreNames.contains(store)) {
 					db.createObjectStore(store, { keyPath: 'id' });
 				}
+			}
+			for (const store of RETIRED_STORES) {
+				if (db.objectStoreNames.contains(store)) db.deleteObjectStore(store);
 			}
 		};
 		req.onsuccess = () => {
