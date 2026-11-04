@@ -38,7 +38,8 @@ overrides:
   # GHSA-f88m-g3jw-g9cj + GHSA-rgj7-g3m4-5g8c (sharp/libvips CVEs), then GHSA-wq5f-xc86-pv6w (sharp's librsvg,
   # CVE-2026-96889, up to <0.35.5). Targeted range pins - only the
   # vulnerable ranges are bumped, so any patched consumer is left alone. Retire when the parents bundle
-  # the patched versions natively (Dependabot will surface it).
+  # the patched versions natively (Dependabot will surface it, except for transformers, which it ignores:
+  # check adm-zip and sharp by hand when transformers is next updated).
   #
   # js-yaml, sharp and adm-zip each moved forward one patch when a LATER advisory widened the vulnerable range past
   # the version the previous pin had landed on. A pin is only ever correct for the advisory it was written
