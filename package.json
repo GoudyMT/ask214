@@ -123,7 +123,7 @@
 		"yaml": "^2.9.1"
 	},
 	"dependencies": {
-		"@huggingface/transformers": "^4.2.0",
+		"@huggingface/transformers": "^4.3.2",
 		"@noble/hashes": "2.4.0",
 		"pdfjs-dist": "^6.3.289"
 	},
