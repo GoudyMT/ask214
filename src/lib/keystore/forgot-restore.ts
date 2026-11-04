@@ -21,13 +21,13 @@ import { keyIdentity, signKeystore, type KeystoreRecordV1 } from './record';
 /**
  * The restore onto a device that is locked behind a forgotten PIN. No key can be had, so nothing on the device is read
  * through a key: the device is replaced whole. Under the exclusive keystore lock, in ONE transaction, every store is
- * emptied and a fresh local keystore, the four records and their markers are written, so the PIN ends off and the app
+ * emptied and a fresh local keystore, the three records and their markers are written, so the PIN ends off and the app
  * opens with the backup's data. Either all of it is written or none of it is.
  *
  * What this cannot carry over, and says so: the API key (it is sealed under keys nobody can open), the calendar's list of
  * events handed to this phone (same reason), and the wrong tries (cleared with the rest).
  *
- * The values read without a key (the four generations and the newest write time) are plaintext rows anyone with the phone
+ * The values read without a key (the three generations and the newest write time) are plaintext rows anyone with the phone
  * could have written, and no key can check them. They are used for two things only: to set the restored generations one
  * step past them, which a stale tab must see as a change, and to keep the clock mark from going back. A forged number
  * can make a generation or the mark larger than it should be; it cannot read or write anything.
@@ -138,7 +138,7 @@ function commit(db: IDBDatabase, fn: (tx: IDBTransaction) => Promise<void>): Pro
  * Returns the new generations, or the code of the one thing that stopped it. A run that was cancelled throws
  * RunAbortedError itself (nothing was written). A lock timeout and a transaction that failed both report as
  * E_WRITE_FAILED: the write is one transaction, so a failure means nothing was written. `afterPut` is called after each
- * step of the transaction, counting from 0: one clear per store, the lock counter, then the nine rows.
+ * step of the transaction, counting from 0: one clear per store, the lock counter, then the seven rows.
  */
 export async function restoreLockedDevice(
 	db: IDBDatabase,

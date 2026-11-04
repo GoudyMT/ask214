@@ -12,7 +12,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 
 | Layer      | Tool                        | Version  | Purpose                                 |
 | ---------- | --------------------------- | -------- | --------------------------------------- |
-| Storage    | IndexedDB, raw API          | spec     | Twelve stores                           |
+| Storage    | IndexedDB, raw API          | spec     | Nine stores                             |
 | Encryption | Web Crypto, AES-GCM 256     | spec     | Every personal record                   |
 | Integrity  | Web Crypto, HMAC-SHA-256    | spec     | Signs the key record and rollback marks |
 | Keys       | Non-extractable `CryptoKey` | spec     | Made on the device, never exportable    |
@@ -204,8 +204,8 @@ and calendar records in one IndexedDB transaction, under the key lock alone, and
 them. A file from a release that still carried a SkillBridge search record restores too: that record is dropped
 unread. If anything fails, nothing was written.
 
-**What a backup does not carry.** The API key, Ask's offline library, saved documents, downloaded SkillBridge
-listings and this device's settings (theme, Ask mode). The key store stays on the device. The user sets these up
+**What a backup does not carry.** The API key, Ask's offline library, saved documents and this device's
+settings (theme, Ask mode). The key store stays on the device. The user sets these up
 again in Settings.
 
 **Tradeoffs accepted.** A lost passphrase cannot be recovered: there is no server copy and no reset. Erase does

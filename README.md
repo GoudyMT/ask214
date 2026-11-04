@@ -134,8 +134,7 @@ pnpm lint       # Prettier + ESLint
 Ask 214 has been live at [ask214.com](https://ask214.com) since August 28, 2026. It serves
 service members of every branch, officer and enlisted, whether they are finishing their service, retiring,
 going through a medical board, or leaving the Guard or Reserve. Each release and what it changed is listed on
-the [Releases](https://github.com/GoudyMT/ask214/releases) page. A later version adds a deeper SkillBridge
-module.
+the [Releases](https://github.com/GoudyMT/ask214/releases) page.
 
 ---
 

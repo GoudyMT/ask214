@@ -153,7 +153,7 @@ async function snapshot(): Promise<Record<string, unknown>> {
 	return out;
 }
 
-/** The write time in each of the four plaintext markers. */
+/** The write time in each of the three plaintext markers. */
 async function markerTimes(): Promise<number[]> {
 	return Promise.all(
 		(['profile-hwm', 'timeline-state-hwm', 'calendar-sync-hwm'] as const).map(
@@ -506,7 +506,7 @@ describe('restoreLockedDevice', () => {
 			expect(state.mark?.gens).toStrictEqual(gens);
 		});
 
-		it('signs the four markers for the new keystore and the restore time, under its own key', async () => {
+		it('signs the three markers for the new keystore and the restore time, under its own key', async () => {
 			const { gens, oldMarkTimes } = await restoreOnce({ clockBehindMs: DAY });
 
 			const { row, keys } = await readKeystoreRow(db);
