@@ -11,7 +11,7 @@ Documents page. Each decision's full reasoning is kept in private working notes.
 
 | Layer          | Tool                            | Version | Purpose                                     |
 | -------------- | ------------------------------- | ------- | ------------------------------------------- |
-| PDF engine     | PDF.js (`pdfjs-dist`), vendored | 6.3.289 | Draws pages and reads their text layer      |
+| PDF engine     | PDF.js (`pdfjs-dist`), vendored | 6.4.299 | Draws pages and reads their text layer      |
 | Reader         | Native `<dialog>`               | spec    | Focus trap, Esc and backdrop                |
 | Passage finder | `highlight-match.ts`            | n/a     | Finds a stored anchor in the page text      |
 | Text view      | The answer library              | 1.0.2   | Every source's text, offline                |
@@ -38,7 +38,7 @@ heavy moments. The Text view works offline for every source and reads well with 
 ### The page view
 
 **What it is.** PDF.js loads only when a served document opens, never with the Ask page, from
-`/pdf-worker/6.3.289/`. The folder is named for the release, so a new library never meets an old cached worker,
+`/pdf-worker/6.4.299/`. The folder is named for the release, so a new library never meets an old cached worker,
 and `check:pdf-worker` fails CI when the vendored files differ from the installed package. The document
 downloads whole, never in byte ranges, because a saved copy is served whole; its size is shown with a loading
 bar, and a download that stalls is stopped. Every page takes its size before any page is drawn (17 ms for the

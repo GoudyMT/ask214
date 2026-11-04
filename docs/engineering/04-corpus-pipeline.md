@@ -13,7 +13,7 @@ live server. Each decision's full reasoning is kept in private working notes.
 | -------------- | ---------------------------- | --------------- | --------------------------------------- |
 | Registry       | `content/sources.yaml`, yaml | 2.x             | The legal record of every source        |
 | Web capture    | fetch, Playwright, linkedom  | 1.63.x, 0.18.x  | Page text, captured politely            |
-| PDF text       | PDF.js, pdftotext            | 6.3.289, n/a    | Text, cross-checked by two tools        |
+| PDF text       | PDF.js, pdftotext            | 6.4.299, n/a    | Text, cross-checked by two tools        |
 | Passages       | Transformers.js tokenizer    | 4.x             | Passage size in the model's own tokens  |
 | Device vectors | all-MiniLM-L6-v2, quantized  | n/a             | The on-device index                     |
 | Served PDFs    | Python, pypdf, Pillow        | 3.12, 6.6, 11.2 | Copies with uncleared pictures removed  |

@@ -8,9 +8,9 @@
  * The paths live apart from the loader because saving a document stores the library with it: a page that
  * saves needs the paths, and must not ship the loader for them.
  */
-const PDF_DIR = '/pdf-worker/6.3.289/';
+const PDF_DIR = '/pdf-worker/6.4.299/';
 export const LIBRARY_SRC = `${PDF_DIR}pdf.min.mjs`;
 export const WORKER_SRC = `${PDF_DIR}pdf.worker.min.mjs`;
 // The two files' size together, which a first save states it downloads. A test holds it to the files on disk,
 // so a new release fails until it is stated again.
-export const LIBRARY_BYTES = 1_724_118;
+export const LIBRARY_BYTES = 1_723_246;
