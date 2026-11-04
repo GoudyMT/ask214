@@ -2,6 +2,7 @@ import { decryptCalendarRecord, encryptCalendarRecord } from '../calendar/crypto
 import type { CalendarSyncState } from '../calendar/types';
 import { decryptRecord, encryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { rotateOrUpgrade } from '../db/locks';
+import type { EncryptedStoreName } from '../db/registry';
 import { reqToPromise, withStores, type StoreName } from '../db/schema';
 import { decryptProfileRecord, encryptProfileRecord } from '../profile/crypto-boundary';
 import { zeroizeRecord } from '../profile/lifecycle';
@@ -56,6 +57,15 @@ type MarkStore = `${SidecarStore}-hwm`;
 type Body = { id: number; rec: Uint8Array };
 type Mark = SignedSidecar<ProfileHwmPayload> & { id: number };
 type Put = { store: StoreName; value: unknown };
+
+// What the move reads, each encrypted store with its marker. Every registry entry must be named, so a store added to the
+// registry fails the type-check here instead of being left behind under a key that is gone.
+const CARRIED: Record<EncryptedStoreName, MarkStore | null> = {
+	profile: 'profile-hwm',
+	'timeline-state': 'timeline-state-hwm',
+	'calendar-sync': 'calendar-sync-hwm',
+	byok: null
+};
 
 // Wrapped keys are 32 bytes plus AES-KW's 8; the bag holds the data key, then the HMAC key.
 const WRAPPED_KEY_BYTES = 40;
@@ -161,15 +171,9 @@ async function carry<T>(
  * another.
  */
 function readCut(db: IDBDatabase) {
-	const stores: StoreName[] = [
-		'profile',
-		'profile-hwm',
-		'timeline-state',
-		'timeline-state-hwm',
-		'calendar-sync',
-		'calendar-sync-hwm',
-		'byok'
-	];
+	const stores = Object.entries(CARRIED).flatMap(([store, mark]) =>
+		mark === null ? [store] : [store, mark]
+	) as StoreName[];
 	return withStores(db, stores, 'readonly', (tx) => {
 		const get = <T>(store: StoreName) => reqToPromise<T | undefined>(tx.objectStore(store).get(0));
 		return Promise.all([
