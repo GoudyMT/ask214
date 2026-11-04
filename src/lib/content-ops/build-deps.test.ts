@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 // The build-only libs must NEVER be imported by a src/ runtime module: they execute only at build time on
 // dev/CI (the content-ops/*.mjs scripts), so a runtime vuln in one of them cannot reach a shipped user.
-const BUILD_ONLY = ['linkedom', 'yaml', 'playwright'];
+const BUILD_ONLY = ['linkedom', 'yaml', 'playwright', 'axe-core'];
 
 // `pdfjs-dist` LEFT this list when the reader began rendering the source documents, which happens in the
 // browser and therefore cannot be done by a build-time library. That is a real reduction in what this file
