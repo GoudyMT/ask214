@@ -58,14 +58,10 @@ type Body = { id: number; rec: Uint8Array };
 type Mark = SignedSidecar<ProfileHwmPayload> & { id: number };
 type Put = { store: StoreName; value: unknown };
 
-// What the move reads, each encrypted store with its marker. Every registry entry must be named, so a store added to the
-// registry fails the type-check here instead of being left behind under a key that is gone.
-const CARRIED: Record<EncryptedStoreName, MarkStore | null> = {
-	profile: 'profile-hwm',
-	'timeline-state': 'timeline-state-hwm',
-	'calendar-sync': 'calendar-sync-hwm',
-	byok: null
-};
+// Every registry entry must be carried below, so a store added to the registry fails the type-check here instead of being
+// left behind under a key that is gone. A type alone, so it ships nothing.
+type Nothing<T extends never> = T;
+export type UncarriedStore = Nothing<Exclude<EncryptedStoreName, SidecarStore | 'byok'>>;
 
 // Wrapped keys are 32 bytes plus AES-KW's 8; the bag holds the data key, then the HMAC key.
 const WRAPPED_KEY_BYTES = 40;
@@ -171,9 +167,15 @@ async function carry<T>(
  * another.
  */
 function readCut(db: IDBDatabase) {
-	const stores = Object.entries(CARRIED).flatMap(([store, mark]) =>
-		mark === null ? [store] : [store, mark]
-	) as StoreName[];
+	const stores: StoreName[] = [
+		'profile',
+		'profile-hwm',
+		'timeline-state',
+		'timeline-state-hwm',
+		'calendar-sync',
+		'calendar-sync-hwm',
+		'byok'
+	];
 	return withStores(db, stores, 'readonly', (tx) => {
 		const get = <T>(store: StoreName) => reqToPromise<T | undefined>(tx.objectStore(store).get(0));
 		return Promise.all([
