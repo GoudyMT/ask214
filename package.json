@@ -98,7 +98,7 @@
 		"@types/node": "^26",
 		"@vitejs/plugin-basic-ssl": "^2.3.0",
 		"@vitest/browser-playwright": "5.0.5",
-		"axe-core": "4.11.4",
+		"axe-core": "4.14.0",
 		"esbuild": "0.28.2",
 		"eslint": "^10.13.0",
 		"eslint-config-prettier": "^10.1.8",
