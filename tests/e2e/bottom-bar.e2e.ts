@@ -86,7 +86,11 @@ test('a person on a phone reaches every page from the bottom bar, and More keeps
 		);
 	}
 
-	await expect(bar.getByRole('link', { name: 'SkillBridge', exact: true })).toHaveCount(0);
+	// An address saved from a page that is gone belongs to no tab, so none may claim it.
+	const gone = await page.goto('/skillbridge');
+	expect(gone?.status()).toBe(404);
+	await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+	await expect(bar.locator('a[aria-current]')).toHaveCount(0);
 
 	for (const row of MORE_ROWS) {
 		await bar.getByRole('link', { name: 'More', exact: true }).click();
