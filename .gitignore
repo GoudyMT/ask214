@@ -145,6 +145,7 @@ workers/retrieve/worker-configuration.d.ts
 wrangler.local.jsonc
 
 # ---- Misc local-only ----
+docs/sweeps/
 TODO.private
 NOTES.private
 *.local
