@@ -198,10 +198,10 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'Learn the review and appeal steps',
 		'If the board retires you',
 		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
-		...(['medical', 'retirement', 'reserve-component'] as const).flatMap((v) => [
-			`"${v}"`,
-			btoa(v)
-		]),
+		'Retiring from the Guard or Reserve',
+		...(['medical', 'retirement', 'reserve-retirement', 'reserve-component'] as const).flatMap(
+			(v) => [`"${v}"`, btoa(v)]
+		),
 		'"ets"',
 		'peblo-contact',
 		'va-msc-claim',

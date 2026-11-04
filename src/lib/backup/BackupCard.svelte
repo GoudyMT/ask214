@@ -74,6 +74,7 @@
 	import PinField from '../components/PinField.svelte';
 	import { getProfileApp, type ProfileApp } from '../profile/context';
 	import { readDeviceState } from '../profile/device-state';
+	import { forPath } from '../timeline/generate';
 	import { TASK_DEFS } from '../timeline/task-defs';
 	import type { BackupCode } from './codes';
 	import {
@@ -587,7 +588,9 @@
 	}
 
 	function taskTitle(taskId: string): string | undefined {
-		return TASK_DEFS.find((def) => def.id === taskId)?.title;
+		const def = TASK_DEFS.find((d) => d.id === taskId);
+		if (def === undefined || app.store === null) return def?.title;
+		return forPath(app.store.persona, def).title;
 	}
 
 	async function applyExport(result: ExportResult): Promise<void> {

@@ -26,6 +26,8 @@
 	let error = $state<string | null>(null);
 	let saving = $state(false);
 	let path = $state<SeparationPath | undefined>(undefined);
+	// Whether the member answered here; "Not sure yet" is an answer that clears, picking nothing is not one.
+	let answered = $state(false);
 
 	// Device clock display feeds the implicit clock check (read-only, not PII).
 	const todayDisplay = new Date().toLocaleDateString();
@@ -64,12 +66,17 @@
 			throw err;
 		}
 
-		// The answer goes in the same save as the date, so a relock or a failure keeps both or neither. The key is
-		// always sent: the store merges a patch over the saved record, and only an empty key clears an earlier answer.
+		// The answer goes in the same save as the date, so a relock or a failure keeps both or neither. The store merges a
+		// patch over the saved record: the key is sent once the member answered (empty for "Not sure yet", which clears an
+		// earlier answer) and left out when they picked nothing, so an answer another tab saved stands.
 		const pathBytes = path ? new TextEncoder().encode(path) : undefined;
 		saving = true;
 		try {
-			await store.save({ eaos: bytes, setupIntent: 'completed', separationPath: pathBytes });
+			await store.save({
+				eaos: bytes,
+				setupIntent: 'completed',
+				...(answered && { separationPath: pathBytes })
+			});
 			// Land on the timeline the user just set up - "Save and continue" continues to the thing
 			// they built. (Skip, below, stays on Home since nothing was set up.)
 			await goto(resolve('timeline'));
@@ -166,13 +173,17 @@
 		{/await}
 	{:else if app.status === 'ready'}
 		<!-- A held Enter repeats, in the field or on Save, and each repeat would save again once a failed save settled:
-		     only a new press submits. The form only filters its controls' keys; it is not a control itself, so the
-		     compiler's rule against key listeners on a non-interactive element does not fit. -->
+		     only a new press submits. Enter on a leaving choice saves nothing: a member may press it expecting it to pick,
+		     and Space or the arrow keys do. The form only filters its controls' keys; it is not a control itself, so the compiler's rule against
+		     key listeners on a non-interactive element does not fit. -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<form
 			class="wizard__form"
 			onsubmit={(e) => void save(e)}
-			onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
+			onkeydown={(e) =>
+				e.key === 'Enter' &&
+				(e.repeat || (e.target instanceof HTMLInputElement && e.target.type === 'radio')) &&
+				e.preventDefault()}
 		>
 			<EaosInput
 				{value}
@@ -182,7 +193,14 @@
 				hint="The day your service is set to end. Ask your personnel office if you are not sure."
 			/>
 			<p class="wizard__today">Today on this device: {todayDisplay}</p>
-			<SeparationPathChoices name="wizard-path" value={path} onchange={(next) => (path = next)} />
+			<SeparationPathChoices
+				name="wizard-path"
+				value={path}
+				onchange={(next) => {
+					path = next;
+					answered = true;
+				}}
+			/>
 
 			<div class="wizard__actions">
 				<button class="wizard__save" type="submit" aria-busy={saving}>Save and continue</button>

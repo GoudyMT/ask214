@@ -53,26 +53,33 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
 // a waiver for some reservists) once, and a late card's note says it only if TAP applies.
 const ON_ORDERS_WHY =
 	'For the Guard or Reserve, TAP applies on release from active duty orders, with exceptions (for example, before 180 days in a row on active duty). Your transition assistance office confirms what you need.';
+const GUARD_OR_RESERVE = ['reserve-component', 'reserve-retirement'] as const;
 function onOrders(def: TaskDef): TaskDef {
 	const title = def.title.charAt(0).toLowerCase() + def.title.slice(1);
-	return {
-		...def,
-		copyFor: {
-			...def.copyFor,
-			'reserve-component': {
-				...def.copyFor?.['reserve-component'],
-				title: `If you are leaving active duty orders, ${title}`,
-				why: `${ON_ORDERS_WHY} ${def.why}`,
-				...(def.afterNote && {
-					afterNote: def.afterNote.replace(
-						/^Still required/,
-						'If TAP applies to you, it is still required'
-					)
-				})
-			}
-		}
-	};
+	const copyFor = { ...def.copyFor };
+	for (const path of GUARD_OR_RESERVE) {
+		copyFor[path] = {
+			...def.copyFor?.[path],
+			title: `If you are leaving active duty orders, ${title}`,
+			why: `${ON_ORDERS_WHY} ${def.why}`,
+			...(def.afterNote && {
+				afterNote: def.afterNote.replace(
+					/^Still required/,
+					'If TAP applies to you, it is still required'
+				)
+			})
+		};
+	}
+	return { ...def, copyFor };
 }
+
+const RETIRING_RCSBP_TITLE =
+	'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it';
+
+const BDD_FALLBACK =
+	'A VA claim can still be filed the standard way, and an accredited VSO helps for free.';
+const BDD_WHY =
+	'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.';
 
 export const TASK_DEFS: readonly TaskDef[] = [
 	// ---- Early prep (no authoritative fixed date; recommended 18-24 months out) ----
@@ -189,7 +196,10 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		why: 'TAP officially starts here, and it is required no later than 365 days out.',
 		afterNote:
 			"Still required. Contact your installation's transition assistance office to start now.",
-		windowFor: { retirement: { windowStart: -730, recommendedOffset: -600 } }
+		windowFor: {
+			retirement: { windowStart: -730, recommendedOffset: -600 },
+			'reserve-retirement': { windowStart: -730, recommendedOffset: -600 }
+		}
 	}),
 	onOrders({
 		id: 'tap-course',
@@ -306,7 +316,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 0,
 		recommendedOffset: -180,
 		why: 'Joining the Guard or Reserve takes paperwork and lead time, so start while you are still on active duty. TAMP coverage through the Selected Reserve requires joining the day after you separate.',
-		hideFor: ['reserve-component']
+		hideFor: [...GUARD_OR_RESERVE]
 	},
 	{
 		id: 'school-apply',
@@ -355,9 +365,21 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -180,
 		windowEnd: -90,
 		recommendedOffset: -120,
-		why: 'Filing 180-90 days out is the fastest path and often decides your claim near separation; you must be available for VA exams within 45 days.',
-		afterNote:
-			'BDD is no longer available. A VA claim can still be filed the standard way, and an accredited VSO helps for free.'
+		why: BDD_WHY,
+		afterNote: `BDD is no longer available. ${BDD_FALLBACK}`,
+		// va.gov: BDD is for "a service member on full-time active duty (including a member of the National Guard, Reserve,
+		// or Coast Guard)", so a member leaving drill status cannot use it.
+		copyFor: Object.fromEntries(
+			GUARD_OR_RESERVE.map((path) => [
+				path,
+				{
+					title:
+						'If you are on full-time active duty, file your VA disability claim through BDD (Benefits Delivery at Discharge)',
+					why: `BDD is for members on full-time active duty, the Guard and Reserve included. ${BDD_WHY}`,
+					afterNote: `If BDD applied to you, it is no longer available. ${BDD_FALLBACK}`
+				}
+			])
+		)
 	},
 
 	// ---- Shown only for the leaving answer they belong to (10 USC 1142 and 1448; tricare.mil TAMP; health.mil IDES) ----
@@ -371,7 +393,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -365,
 		recommendedOffset: -540,
 		why: 'Your service sets how far ahead a retirement request goes in. Your personnel or retirement services office has the date.',
-		requires: { separationPath: ['retirement'] }
+		requires: { separationPath: ['retirement', 'reserve-retirement'] }
 	},
 	{
 		id: 'sbp-election',
@@ -385,13 +407,19 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		why: 'The SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.',
 		afterNote:
 			'If retired pay has begun, ask your retirement services office what can still change.',
-		// 10 USC 1448(a) covers anyone who becomes entitled to retired pay, a disability retirement included.
+		// 10 USC 1448(a) covers anyone who becomes entitled to retired pay, a disability retirement included. A Guard or
+		// Reserve member retiring from full-time active duty makes this choice; one leaving drill status makes the
+		// Reserve one, so the title says when it applies.
 		copyFor: {
 			medical: {
 				why: 'If the board retires you, the SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.'
+			},
+			'reserve-retirement': {
+				title:
+					'If you are retiring from full-time active duty, get Survivor Benefit Plan counseling and make your SBP choice'
 			}
 		},
-		requires: { separationPath: ['retirement', 'medical'] }
+		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
 	},
 	{
 		id: 'peblo-contact',
@@ -442,7 +470,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 0,
 		recommendedOffset: -60,
 		why: 'TAMP gives 180 days of health care after regular TRICARE ends. It covers some Guard and Reserve members leaving more than 30 days in a row of active duty for a preplanned mission or a contingency; tricare.mil lists who qualifies.',
-		requires: { separationPath: ['reserve-component'] }
+		requires: { separationPath: [...GUARD_OR_RESERVE] }
 	},
 	{
 		id: 'rcsbp-election',
@@ -454,13 +482,13 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 0,
 		recommendedOffset: -180,
 		why: 'The letter says you have the years of service for retired pay, and the Reserve Component Survivor Benefit Plan choice is due within 90 days of it. Your Guard or Reserve personnel office can say when to expect the letter.',
+		// "Retiring" keeps this step for a Guard or Reserve member who answered before the Guard or Reserve retirement
+		// answer existed, so its title says when it applies.
 		copyFor: {
-			retirement: {
-				title:
-					'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it'
-			}
+			retirement: { title: RETIRING_RCSBP_TITLE },
+			'reserve-retirement': { title: RETIRING_RCSBP_TITLE }
 		},
-		requires: { separationPath: ['reserve-component', 'retirement'] }
+		requires: { separationPath: [...GUARD_OR_RESERVE, 'retirement'] }
 	},
 
 	// ---- Capstone + final-90 ----

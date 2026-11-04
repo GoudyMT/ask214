@@ -111,6 +111,19 @@
 		return p && p.completeness !== 'none' ? p.leaving : undefined;
 	});
 
+	// A medical board can move the separation date, and once the entered date has passed the timeline reads the member
+	// as separated. The date stays theirs to change, so the page says where. The day count is the view's, so the line
+	// appears when the day turns at midnight.
+	const boardMayHaveMovedDate = $derived.by(() => {
+		const p = app.store?.persona;
+		return (
+			p !== undefined &&
+			p.completeness !== 'none' &&
+			p.separationPath === 'medical' &&
+			(view?.daysToSeparation ?? 0) < 0
+		);
+	});
+
 	// The generated timeline projection (pure): re-derives when the persona or the stored
 	// per-task state changes, and when the day turns at local midnight. TASK_DEFS is readonly;
 	// generateTimeline takes a mutable array.
@@ -357,6 +370,14 @@
 			<p class="timeline-subline">
 				Anchored to {formatTimelineDate(eaos)} - tracking your 24-month runway.
 			</p>
+			<!-- Under the date it explains, so it is not read as part of the card below. -->
+			{#if boardMayHaveMovedDate}
+				<p class="timeline-subline">
+					If the board moved your separation date, update it in <a href={resolve('settings')}
+						>Settings</a
+					>.
+				</p>
+			{/if}
 			<LeavingLine {leaving} />
 			{#if restoredPinOff}
 				<div class="timeline-restored" role="status">

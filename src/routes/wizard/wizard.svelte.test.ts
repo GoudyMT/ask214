@@ -147,21 +147,32 @@ describe('Wizard, how the member is leaving', () => {
 	const lastPatch = () =>
 		store.save.mock.calls.at(-1)?.[0] as Patch & { separationPath?: Uint8Array };
 
-	it('asks it as an optional group of five choices, with its hint', async () => {
+	it('asks it as an optional group of six choices in order, with its hint', async () => {
 		await render(WizardPage);
 		const group = page.getByRole('radiogroup', { name: 'How are you leaving? (optional)' });
 		await expect
 			.element(group)
 			.toHaveAccessibleDescription('This adds the steps for your path. It stays on this device.');
-		for (const choice of [
+		// The two retiring answers sit side by side, so a Guard or Reserve retiree sees theirs beside "Retiring".
+		const choices = [
 			'Finishing my service',
 			'Retiring',
+			'Retiring from the Guard or Reserve',
 			'A medical board',
 			'Leaving the Guard or Reserve',
 			'Not sure yet'
-		]) {
-			await expect.element(group.getByRole('radio', { name: choice })).not.toBeChecked();
+		];
+		for (const choice of choices) {
+			await expect
+				.element(group.getByRole('radio', { name: choice, exact: true }))
+				.not.toBeChecked();
 		}
+		expect(
+			group
+				.getByRole('radio')
+				.elements()
+				.map((radio) => radio.closest('label')?.textContent?.trim())
+		).toEqual(choices);
 	});
 
 	it('saves the picked path with the date, in one save, and wipes its bytes once it settles', async () => {
@@ -182,8 +193,17 @@ describe('Wizard, how the member is leaving', () => {
 		expect(allZero(lastPatch().separationPath as Uint8Array)).toBe(true);
 	});
 
+	// Another tab can save an answer after this one opened; a member who picked nothing here has said nothing about it.
+	it('leaves a saved answer alone when nothing is picked', async () => {
+		store.save.mockResolvedValue({ generation: 1 });
+		await render(WizardPage);
+		await page.getByLabelText('Separation date').fill(TYPED);
+		await page.getByRole('button', { name: 'Save and continue' }).click();
+		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
+		expect('separationPath' in lastPatch()).toBe(false);
+	});
+
 	it.each([
-		['no pick', null],
 		['Not sure yet', 'Not sure yet'],
 		['Not sure yet after another pick', 'Retiring']
 	])('clears any earlier path for %s', async (_name, first) => {
@@ -191,10 +211,9 @@ describe('Wizard, how the member is leaving', () => {
 		// before (a member who came Back to this page, or another tab that set it up first).
 		store.save.mockResolvedValue({ generation: 1 });
 		await render(WizardPage);
-		if (first) await page.getByRole('radio', { name: first }).click();
+		await page.getByRole('radio', { name: first, exact: true }).click();
 		if (first === 'Retiring') await page.getByRole('radio', { name: 'Not sure yet' }).click();
-		if (first)
-			await expect.element(page.getByRole('radio', { name: 'Not sure yet' })).toBeChecked();
+		await expect.element(page.getByRole('radio', { name: 'Not sure yet' })).toBeChecked();
 		await page.getByLabelText('Separation date').fill(TYPED);
 		await page.getByRole('button', { name: 'Save and continue' }).click();
 		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
@@ -205,7 +224,7 @@ describe('Wizard, how the member is leaving', () => {
 	it('wipes the picked path bytes when the save fails too', async () => {
 		store.save.mockRejectedValue(new Error('E_TEST'));
 		await render(WizardPage);
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		await page.getByLabelText('Separation date').fill(TYPED);
 		await page.getByRole('button', { name: 'Save and continue' }).click();
 		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
@@ -213,9 +232,109 @@ describe('Wizard, how the member is leaving', () => {
 		expect(goto).not.toHaveBeenCalled();
 	});
 
+	// Component tests run without app.css, so the pill cases set its spacing and border tokens as the app defines them
+	// (an undefined border colour drops the whole border), and remove them.
+	const TOKENS = {
+		'--space-xs': '4px',
+		'--space-s': '8px',
+		'--space-m': '16px',
+		'--space-l': '24px',
+		'--color-border': '#2a313a'
+	};
+	async function withSpacing(run: () => Promise<void>): Promise<void> {
+		const root = document.documentElement;
+		for (const [name, value] of Object.entries(TOKENS)) root.style.setProperty(name, value);
+		try {
+			await run();
+		} finally {
+			for (const name of Object.keys(TOKENS)) root.style.removeProperty(name);
+		}
+	}
+
+	// At large text a long choice wraps to two lines inside its pill; with no padding above and below, the lines touch
+	// the pill's edge.
+	it('keeps space between a choice and its pill edge at 200% text', () =>
+		withSpacing(async () => {
+			const root = document.documentElement;
+			const before = root.style.fontSize;
+			root.style.fontSize = '200%';
+			try {
+				await render(WizardPage);
+				const pill = page
+					.getByRole('radio', { name: 'Retiring from the Guard or Reserve' })
+					.element()
+					.closest('label') as Element;
+				// The text's own box against the pill's inner edge, as drawn: the 44 px floor alone leaves ~2 px here.
+				const box = pill.getBoundingClientRect();
+				const text = (pill.querySelector('span') as Element).getBoundingClientRect();
+				const border = parseFloat(getComputedStyle(pill).borderTopWidth);
+				expect(text.top - box.top - border).toBeGreaterThanOrEqual(4);
+				expect(box.bottom - text.bottom - border).toBeGreaterThanOrEqual(4);
+			} finally {
+				root.style.fontSize = before;
+			}
+		}));
+
+	// In forced colors the pick is a thicker border; a pill that grew with it would push the others along the row.
+	it('keeps a pill the same size when it is picked in forced colors', () =>
+		withSpacing(async () => {
+			await cdp().send('Emulation.setEmulatedMedia', {
+				features: [{ name: 'forced-colors', value: 'active' }]
+			});
+			try {
+				await render(WizardPage);
+				const radio = page.getByRole('radio', { name: 'A medical board' });
+				const pill = radio.element().closest('label') as Element;
+				const before = pill.getBoundingClientRect();
+				await radio.click();
+				await expect.element(radio).toBeChecked();
+				const after = pill.getBoundingClientRect();
+				expect([after.width, after.height]).toEqual([before.width, before.height]);
+			} finally {
+				await cdp().send('Emulation.setEmulatedMedia', { features: [] });
+			}
+		}));
+
+	// A touch screen keeps the last tapped pill hovered; on a device that cannot hover, a hovered pill keeps its border.
+	it('draws no hover border on a device that cannot hover', () =>
+		withSpacing(async () => {
+			const root = document.documentElement;
+			root.style.setProperty('--color-accent', '#0b5cad');
+			// A phone as the browser's device mode makes it: touch points, so the page reads "(hover: none)".
+			await cdp().send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+			try {
+				await render(WizardPage);
+				expect(matchMedia('(hover: none)').matches).toBe(true);
+				const radio = page.getByRole('radio', { name: 'A medical board' });
+				const pill = radio.element().closest('label') as Element;
+				const resting = getComputedStyle(pill).borderTopColor;
+				await radio.hover();
+				expect(getComputedStyle(pill).borderTopColor).toBe(resting);
+			} finally {
+				root.style.removeProperty('--color-accent');
+				await cdp().send('Emulation.setTouchEmulationEnabled', { enabled: false });
+			}
+		}));
+
+	// A member may press Enter on a choice expecting it to act: setup is saved only from the Save button or the date
+	// field, so Enter on a choice saves nothing.
+	it('does not save on Enter on a choice', async () => {
+		store.save.mockResolvedValue({ generation: 1 });
+		await render(WizardPage);
+		await page.getByLabelText('Separation date').fill(TYPED);
+		const radio = page.getByRole('radio', { name: 'A medical board' });
+		await radio.click();
+		(radio.element() as HTMLElement).focus();
+		await cdp().send('Input.dispatchKeyEvent', { type: 'keyDown', ...ENTER });
+		await cdp().send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(store.save).not.toHaveBeenCalled();
+		await expect.element(radio).toBeChecked();
+	});
+
 	it('saves nothing when the member skips, whatever was picked', async () => {
 		await render(WizardPage);
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		await page.getByRole('button', { name: 'Skip for now' }).click();
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/'));
 		expect(store.save).not.toHaveBeenCalled();

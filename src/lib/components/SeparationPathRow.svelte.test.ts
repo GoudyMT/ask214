@@ -39,11 +39,24 @@ describe('SeparationPathRow', () => {
 		const onSave = vi.fn(async () => null);
 		await row({ onSave });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		await saveButton().click();
 		await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith('retirement'));
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
 		expect(document.activeElement).toBe(toggle().element());
+	});
+
+	it('saves a Guard or Reserve retirement as its own answer and shows it in words', async () => {
+		const onSave = vi.fn(async () => null);
+		await row({ onSave });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Retiring from the Guard or Reserve' }).click();
+		await saveButton().click();
+		await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith('reserve-retirement'));
+		await row({ value: 'reserve-retirement' });
+		await expect
+			.element(page.getByRole('button', { name: /retiring from the guard or reserve/i }))
+			.toBeVisible();
 	});
 
 	it('opens on the saved answer, and Not sure yet saves no answer', async () => {
@@ -93,19 +106,48 @@ describe('SeparationPathRow', () => {
 		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (settle = resolve)));
 		await row({ onSave });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		await saveButton().click();
 		await page.getByRole('radio', { name: 'A medical board' }).click();
-		await expect.element(page.getByRole('radio', { name: 'Retiring' })).toBeChecked();
+		await expect.element(page.getByRole('radio', { name: 'Retiring', exact: true })).toBeChecked();
 		await expect.element(page.getByRole('radio', { name: 'A medical board' })).not.toBeChecked();
 		settle(null);
 		await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith('retirement'));
 	});
 
+	// While one action runs, the other two would close the form or write again under it: a remove landing after a save
+	// would undo the answer just saved, and Cancel would close away the line a failure needs.
+	it('turns off Remove and Cancel while a save runs', async () => {
+		let settle: (v: string | null) => void = () => {};
+		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (settle = resolve)));
+		const onRemove = vi.fn(async () => null);
+		await row({ value: 'ets', onSave, onRemove });
+		await toggle().click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await saveButton().click();
+		await expect.element(page.getByRole('button', { name: 'Remove answer' })).toBeDisabled();
+		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+		settle(null);
+		await vi.waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+	});
+
+	it('turns off Save and Cancel while a remove runs', async () => {
+		let settle: (v: string | null) => void = () => {};
+		const onRemove = vi.fn(() => new Promise<string | null>((resolve) => (settle = resolve)));
+		const onSave = vi.fn(async () => null);
+		await row({ value: 'ets', onSave, onRemove });
+		await toggle().click();
+		await page.getByRole('button', { name: 'Remove answer' }).click();
+		await expect.element(saveButton()).toBeDisabled();
+		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+		settle(null);
+		await vi.waitFor(() => expect(onRemove).toHaveBeenCalledOnce());
+	});
+
 	it('says a failed save and keeps the form open', async () => {
 		await row({ onSave: vi.fn(async () => Promise.reject(new Error('E_LOCK_TIMEOUT'))) });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		await saveButton().click();
 		await expect.element(page.getByText(FAILED)).toBeVisible();
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
@@ -139,11 +181,11 @@ describe('SeparationPathRow', () => {
 		);
 		await row({ onSave });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		const target =
 			on === 'Save'
 				? saveButton().element()
-				: page.getByRole('radio', { name: 'Retiring' }).element();
+				: page.getByRole('radio', { name: 'Retiring', exact: true }).element();
 		(target as HTMLElement).focus();
 		await hold();
 		await new Promise((resolve) => setTimeout(resolve, ms + 50));
@@ -152,6 +194,56 @@ describe('SeparationPathRow', () => {
 		expect(document.activeElement).toBe(toggle().element());
 		await pressOnce();
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
+	});
+
+	it.each([
+		['at once', 0],
+		['after a while', 100]
+	] as const)(
+		'removes once and stays closed for a held Enter on Remove, removed %s',
+		async (_, ms) => {
+			const onRemove = vi.fn(
+				() => new Promise<string | null>((resolve) => setTimeout(() => resolve(null), ms))
+			);
+			await row({ value: 'ets', onRemove });
+			await toggle().click();
+			(page.getByRole('button', { name: 'Remove answer' }).element() as HTMLElement).focus();
+			await hold();
+			await new Promise((resolve) => setTimeout(resolve, ms + 50));
+			expect(onRemove).toHaveBeenCalledOnce();
+			await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
+			expect(document.activeElement).toBe(toggle().element());
+			await pressOnce();
+			await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
+		}
+	);
+
+	// Another tab removes the answer while this form is open with focus on Remove: the button goes, the form stays.
+	it('moves focus to the row when Remove disappears under it', async () => {
+		const { rerender } = await row({ value: 'ets' });
+		await toggle().click();
+		(page.getByRole('button', { name: 'Remove answer' }).element() as HTMLElement).focus();
+		await rerender({ value: undefined });
+		// Read after a drawn frame: a browser can move focus off a removed element late.
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		await expect
+			.element(page.getByRole('button', { name: 'Remove answer' }))
+			.not.toBeInTheDocument();
+		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
+		expect(document.activeElement).toBe(toggle().element());
+	});
+
+	// A member who has moved on to a choice keeps focus there: only focus on the vanished Remove is handed back.
+	it('leaves focus on a choice when Remove disappears', async () => {
+		const { rerender } = await row({ value: 'ets' });
+		await toggle().click();
+		const choice = page.getByRole('radio', { name: 'A medical board' }).element() as HTMLElement;
+		choice.focus();
+		await rerender({ value: undefined });
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(document.activeElement).toBe(choice);
 	});
 
 	// A failed save keeps the form open, so the rest of the hold lands on the form again once the save settles.
@@ -166,11 +258,11 @@ describe('SeparationPathRow', () => {
 		);
 		await row({ onSave });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring' }).click();
+		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
 		const target =
 			on === 'Save'
 				? saveButton().element()
-				: page.getByRole('radio', { name: 'Retiring' }).element();
+				: page.getByRole('radio', { name: 'Retiring', exact: true }).element();
 		(target as HTMLElement).focus();
 		await hold();
 		await expect.element(page.getByText(FAILED)).toBeVisible();

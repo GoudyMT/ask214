@@ -48,7 +48,10 @@ import {
 	STOPPING_LINE,
 	TYPE_BACK_LINE
 } from './copy';
+import { TASK_DEFS } from '../timeline/task-defs';
+import { createTimelineStateStore } from '../timeline/state.svelte';
 import { formatBackupDate } from './dates';
+import { MAX_NOTE_UNITS } from './note-cap';
 import { ExportFlow, type SaveHandle, type SavePicker, type SaveWritable } from './export-flow';
 import { KDF_V1 } from './kdf-params';
 import { BackupSession, type OpenPicker, type WorkerLike } from './session.svelte';
@@ -2588,4 +2591,36 @@ describe("the Make a backup row as a host's single row", () => {
 		await expect.element(text(savedLine('picked.json'))).toBeVisible();
 		expect(onsaved).toHaveBeenCalledTimes(1);
 	});
+});
+
+describe('notes too long to back up', () => {
+	// The person shortens the note by finding its task on the timeline, so the message names the task the way the
+	// timeline shows it for their leaving answer.
+	it('names the longest note by the title the timeline shows for the leaving answer', async () => {
+		await profile.save({ separationPath: new TextEncoder().encode('reserve-component') });
+		const timeline = createTimelineStateStore(db);
+		await timeline.load();
+		// Three bytes a unit, so 21 notes at the cap fill more than the file can hold; the Capstone's is the longest.
+		const wide = String.fromCharCode(0x20ac);
+		const others = TASK_DEFS.map((d) => d.id)
+			.filter((id) => id !== 'tap-capstone')
+			.slice(0, 20);
+		for (const id of others) await timeline.setNote(id, wide.repeat(MAX_NOTE_UNITS - 1));
+		await timeline.setNote('tap-capstone', wide.repeat(MAX_NOTE_UNITS));
+		const card = await mount();
+		await typedBack(card);
+		await userEvent.click(submitOf(CARD_LABELS.make));
+		await expect
+			.element(
+				text(
+					need(
+						backupMessage('E_CONTENT_TOO_LARGE', {
+							path: 'export',
+							taskTitle: 'If you are leaving active duty orders, complete your TAP Capstone'
+						})
+					)
+				)
+			)
+			.toBeVisible();
+	}, 60_000);
 });

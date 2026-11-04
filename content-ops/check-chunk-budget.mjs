@@ -518,12 +518,17 @@ const STATIC = 'static';
 //
 //   2026-10-31 re-sweep wording and decoder fixes, after a 56 B trim: page 112,578 -> 112,902 (measured 112,631 B, +2,708 B on the plan's base, margin 271 B).
 //
+//   2026-11-03 the fifth leaving answer, its task wording, the board date line and the row focus fix: precacheBytes 263,770 -> 264,004 (measured 263,975 B, +289 B on the plan's base, margin 29 B).
+//   2026-11-03 the fifth leaving answer, its task wording, the board date line and the row focus fix: routeNodes 60,813 -> 60,999 (measured 60,976 B, +222 B on the plan's base, margin 23 B).
+//
+//   2026-11-03 end check: routeNodes 60,999 -> 60,982 (measured 60,961 B, +207 B on the plan's base, margin 21 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 263_770,
+	precacheBytes: 264_004,
 	workerScripts: 147_316
 };
 
