@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 // The build-only libs must NEVER be imported by a src/ runtime module: they execute only on dev/CI (the
 // content-ops/*.mjs scripts, and axe-core in the E2E suite), so a runtime vuln in one of them cannot reach a
-// shipped user, and axe-core's 1.4 MB cannot join the client build.
+// shipped user, and none of them can join the client build.
 const BUILD_ONLY = ['linkedom', 'yaml', 'playwright', 'axe-core'];
 const QUOTES = ['"', "'"].join('');
 
@@ -33,8 +33,8 @@ describe('build-only dependency isolation', () => {
 			for (const dep of BUILD_ONLY) {
 				// Match the bare specifier, a subpath import or a Vite suffix (dep followed by a closing quote, a
 				// '/', '?' or '#'), so 'axe-core/axe.min.js' and 'axe-core?raw' are caught, not just 'axe-core'.
-				// A backtick counts only inside import(): comments use backticks to name a lib. (The deps carry
-				// no regex-special chars, so no escaping is needed.)
+				// A backtick counts only straight after import(: comments use backticks to name a lib. (The deps
+				// carry no regex-special chars, so no escaping is needed.)
 				const re = new RegExp(
 					'[' + QUOTES + ']' + dep + '([/?#' + QUOTES + '])|import[(]`' + dep + '[/?#`]'
 				);
