@@ -159,12 +159,15 @@ describe('validateInner: a file that still holds the old finder record', () => {
 	};
 
 	it.each([
-		['a good record', { schemaVersion: 1, finderSaved: [], finderCompare: [] }],
+		[
+			'a good record',
+			{ schemaVersion: 1, finderSaved: [{ id: 1, savedOn: '2026-10-21' }], finderCompare: [1] }
+		],
 		['a malformed record', { schemaVersion: 9, extra: 1 }],
 		['null', null],
 		['a list', []],
 		['a 100,000-deep array', deep()]
-	] as const)('restores with %s, and the key is dropped', (_name, record) => {
+	] as const)('passes with %s, and the key is dropped', (_name, record) => {
 		const clean = make();
 		const file = make();
 		((file as Bag).stores as Bag)['skillbridge-finder'] = record;

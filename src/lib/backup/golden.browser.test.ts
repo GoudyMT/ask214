@@ -261,4 +261,28 @@ describe('the golden v1 / 1 backup', () => {
 		expect(await restoreFile(sealed)).toStrictEqual({ ok: false, code: 'E_NEWER_VERSION' });
 		expect(await restoredRows()).toStrictEqual(before);
 	}, 30_000);
+
+	// A file from a release that still carried the search may hold its record. The whole restore takes it and writes the
+	// same rows the golden alone does, so the record goes nowhere.
+	it('a file holding the old search record restores like the same file without it', async () => {
+		const read = await readBackupFile(new File([goldenText], 'golden.ask214backup'));
+		expect(read.ok).toBe(true);
+		if (!read.ok) return;
+		const opened = await decryptEnvelope(read.envelope, await workerKey('restore'));
+		expect(opened.ok).toBe(true);
+		if (!opened.ok) return;
+		const inner = opened.inner as Row & { stores: Row };
+		const withRecord = new TextEncoder().encode(
+			JSON.stringify({
+				...inner,
+				stores: { ...inner.stores, 'skillbridge-finder': { schemaVersion: 1, finderSaved: [] } }
+			})
+		);
+		const sealed = await sealEnvelope(await workerKey('export'), withRecord, GOLDEN_SALT);
+
+		await finishedDevice();
+		expect(await restoreFile(sealed)).toStrictEqual({ ok: true });
+		const loaded = await createProfileStore(db).load();
+		expect(loaded?.setupIntent).toBe('completed');
+	}, 30_000);
 });

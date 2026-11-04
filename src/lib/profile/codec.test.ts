@@ -279,9 +279,8 @@ describe('the backup mark', () => {
 			const dec = decodeProfile(
 				new TextEncoder().encode(JSON.stringify({ ...saved, backupGenFinder: value }))
 			);
-			expect(dec.backupGenCalendar).toBe(0);
 			expect(dec).not.toHaveProperty('backupGenFinder');
-			expect(new TextDecoder().decode(encodeProfile(dec))).not.toContain('backupGenFinder');
+			expect(encodeProfile(dec)).toEqual(encodeProfile({ ...base(), ...MARK }));
 		}
 	);
 

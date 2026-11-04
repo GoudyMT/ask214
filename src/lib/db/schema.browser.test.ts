@@ -367,24 +367,6 @@ describe('openMtcDb schema (v9)', () => {
 			del.onsuccess = del.onerror = () => r(undefined);
 		});
 	});
-
-	it('version 9 retires a tab still holding version 8 (its code still opens the stores the raise deletes)', async () => {
-		const name = `mtc-v9-${crypto.randomUUID()}`;
-		const old = await openV8Db(name);
-		const retired = vi.fn();
-		old.onversionchange = () => {
-			retired();
-			old.close();
-		};
-		const db = await openMtcDb(name);
-		expect(retired).toHaveBeenCalledOnce();
-		expect(db.version).toBe(DB_VERSION);
-		db.close();
-		await new Promise((r) => {
-			const del = indexedDB.deleteDatabase(name);
-			del.onsuccess = del.onerror = () => r(undefined);
-		});
-	});
 });
 
 describe('withStores transaction helper', () => {

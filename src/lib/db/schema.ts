@@ -40,7 +40,7 @@ export const STORES = [
 export type StoreName = (typeof STORES)[number];
 
 // Stores an older release made that the app no longer has. Nothing reads them, so a raise deletes them with their rows.
-const RETIRED_STORES = ['skillbridge-finder', 'skillbridge-finder-hwm', 'skillbridge-finder-pack'];
+const DELETED_STORES = ['skillbridge-finder', 'skillbridge-finder-hwm', 'skillbridge-finder-pack'];
 
 export function openMtcDb(
 	name: string = DB_NAME,
@@ -59,7 +59,7 @@ export function openMtcDb(
 					db.createObjectStore(store, { keyPath: 'id' });
 				}
 			}
-			for (const store of RETIRED_STORES) {
+			for (const store of DELETED_STORES) {
 				if (db.objectStoreNames.contains(store)) db.deleteObjectStore(store);
 			}
 		};

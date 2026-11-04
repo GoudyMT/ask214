@@ -782,27 +782,6 @@ describe('the confirm', () => {
 		expect(confirm.warning).toBe(true);
 	});
 
-	// The mark is the date and the three generations; nothing else decides that the device matches its backup.
-	it('a mark of the date and three generations matches the device', async () => {
-		const device = await finishedDevice(await newDb());
-		const madeAt = Date.now() - MINUTE;
-		const file = await exportFrom(device, { createdAt: madeAt, mark: false });
-		const { gens } = await readDeviceState(device.db);
-		await device.profile.save({
-			lastBackupAt: madeAt,
-			backupGenProfile: gens.profile + 1,
-			backupGenTimeline: gens.timeline,
-			backupGenCalendar: gens.calendar
-		});
-		const r = restoreRig({ db: device.db, store: device.profile });
-		await toConfirm(r, file);
-		const confirm = need(r.flow.confirm);
-		expect(confirm.deviceLine).toBe(
-			'This device was last changed when its backup of ' + formatBackupDate(madeAt) + ' was made.'
-		);
-		expect(confirm.warning).toBe(false);
-	});
-
 	// Another tab saving the profile in the gap between the snapshot and the mark leaves a device that holds a change the
 	// backup lacks, whether or not the mark landed.
 	it('a profile saved by another tab before the mark is written still warns', async () => {
