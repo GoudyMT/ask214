@@ -12,7 +12,6 @@ import { encryptProfileRecord } from '../profile/crypto-boundary';
 import { zeroizeRecord } from '../profile/lifecycle';
 import { signSidecar } from '../profile/sidecars';
 import type { ProfileV1 } from '../profile/types';
-import { encryptFinderRecord } from '../skillbridge-finder/state/crypto-boundary';
 import { encryptTimelineRecord } from '../timeline/crypto-boundary';
 import { readCounterIn, writeCounterIn } from './app-lock-store';
 import { bumpIvCounter } from './iv-counter';
@@ -26,7 +25,7 @@ import { keyIdentity, signKeystore, type KeystoreRecordV1 } from './record';
  * opens with the backup's data. Either all of it is written or none of it is.
  *
  * What this cannot carry over, and says so: the API key (it is sealed under keys nobody can open), the calendar's list of
- * events handed to this phone (same reason), and the downloaded finder files and the wrong tries (cleared with the rest).
+ * events handed to this phone (same reason), and the wrong tries (cleared with the rest).
  *
  * The values read without a key (the four generations and the newest write time) are plaintext rows anyone with the phone
  * could have written, and no key can check them. They are used for two things only: to set the restored generations one
@@ -36,12 +35,7 @@ import { keyIdentity, signKeystore, type KeystoreRecordV1 } from './record';
 
 export type LockedDevice = { gens: RestoreGens; installUuid: Uint8Array; lastTs: number | null };
 
-const MARKERS = [
-	'profile-hwm',
-	'timeline-state-hwm',
-	'calendar-sync-hwm',
-	'skillbridge-finder-hwm'
-] as const;
+const MARKERS = ['profile-hwm', 'timeline-state-hwm', 'calendar-sync-hwm'] as const;
 
 type Put = { store: StoreName; value: unknown };
 
@@ -76,7 +70,7 @@ function markerOf(row: unknown): { generation: number; ts: number | null } {
 async function readPinDevice(
 	db: IDBDatabase
 ): Promise<{ device: LockedDevice; row: Extract<KeystoreRow, { mode: 'pin' }> }> {
-	const [row, profile, timeline, calendar, finder] = await withStores(
+	const [row, profile, timeline, calendar] = await withStores(
 		db,
 		['keystore', ...MARKERS],
 		'readonly',
@@ -87,14 +81,13 @@ async function readPinDevice(
 				get<KeystoreRow>('keystore'),
 				get<unknown>('profile-hwm'),
 				get<unknown>('timeline-state-hwm'),
-				get<unknown>('calendar-sync-hwm'),
-				get<unknown>('skillbridge-finder-hwm')
+				get<unknown>('calendar-sync-hwm')
 			]);
 		}
 	);
 	// A device that is not behind a PIN has nothing to be restored from here; the flow reads this as "the device changed".
 	if (!row || row.mode !== 'pin') throw new KeystoreNotInitializedError();
-	const marks = [profile, timeline, calendar, finder].map(markerOf);
+	const marks = [profile, timeline, calendar].map(markerOf);
 	const times = marks.flatMap((mark) => (mark.ts === null ? [] : [mark.ts]));
 	return {
 		row,
@@ -102,8 +95,7 @@ async function readPinDevice(
 			gens: {
 				profile: marks[0]?.generation ?? 0,
 				timeline: marks[1]?.generation ?? 0,
-				calendar: marks[2]?.generation ?? 0,
-				finder: marks[3]?.generation ?? 0
+				calendar: marks[2]?.generation ?? 0
 			},
 			installUuid: new Uint8Array(row.installUuid),
 			lastTs: times.length === 0 ? null : Math.max(...times)
@@ -191,15 +183,14 @@ async function replaceLockedDevice(
 		if (
 			device.gens.profile !== expected.gens.profile ||
 			device.gens.timeline !== expected.gens.timeline ||
-			device.gens.calendar !== expected.gens.calendar ||
-			device.gens.finder !== expected.gens.finder
+			device.gens.calendar !== expected.gens.calendar
 		) {
 			return fail('E_RESTORE_DEVICE_MOVED');
 		}
 
 		// 2. The same composer as every restore. The calendar's handed-over list cannot be read without the key.
 		const at = (opts.now ?? Date.now)();
-		const { gens, profile, timeline, calendar, finder } = composeRestore(
+		const { gens, profile, timeline, calendar } = composeRestore(
 			inner,
 			{ gens: device.gens, lastSeenAt: null, tsProfile: device.lastTs, lastAdd: undefined },
 			at,
@@ -239,8 +230,7 @@ async function replaceLockedDevice(
 		const profileBlob = await encryptProfileRecord(profile, identity, dataKey);
 		const timelineBlob = await encryptTimelineRecord(timeline, identity, dataKey, gens.timeline);
 		const calendarBlob = await encryptCalendarRecord(calendar, identity, dataKey, gens.calendar);
-		const finderBlob = await encryptFinderRecord(finder, identity, dataKey, gens.finder);
-		staged.push(profileBlob, timelineBlob, calendarBlob, finderBlob);
+		staged.push(profileBlob, timelineBlob, calendarBlob);
 		const sign = (name: (typeof MARKERS)[number], generation: number) =>
 			signSidecar(
 				name,
@@ -252,11 +242,10 @@ async function replaceLockedDevice(
 				},
 				hmacKey
 			).then((signed) => ({ id: 0, ...signed }));
-		const [profileMark, timelineMark, calendarMark, finderMark] = await Promise.all([
+		const [profileMark, timelineMark, calendarMark] = await Promise.all([
 			sign('profile-hwm', gens.profile),
 			sign('timeline-state-hwm', gens.timeline),
-			sign('calendar-sync-hwm', gens.calendar),
-			sign('skillbridge-finder-hwm', gens.finder)
+			sign('calendar-sync-hwm', gens.calendar)
 		]);
 		// Listed by store name, as the PIN rotation lists its rows: each value is ciphertext from its own boundary above.
 		const puts: Put[] = [
@@ -266,9 +255,7 @@ async function replaceLockedDevice(
 			{ store: 'timeline-state', value: { id: 0, rec: timelineBlob } },
 			{ store: 'timeline-state-hwm', value: timelineMark },
 			{ store: 'calendar-sync', value: { id: 0, rec: calendarBlob } },
-			{ store: 'calendar-sync-hwm', value: calendarMark },
-			{ store: 'skillbridge-finder', value: { id: 0, rec: finderBlob } },
-			{ store: 'skillbridge-finder-hwm', value: finderMark }
+			{ store: 'calendar-sync-hwm', value: calendarMark }
 		];
 
 		// 5. The check and the writes. The check is the transaction's first statement, so nothing can abort or change the

@@ -22,7 +22,7 @@ export type MessageContext = {
 	path: 'export' | 'restore' | 'check';
 	position?: number;
 	numbers?: boolean;
-	store?: 'profile' | 'timeline' | 'calendar' | 'finder';
+	store?: 'profile' | 'timeline' | 'calendar';
 	taskTitle?: string;
 	label?: string;
 };
@@ -192,8 +192,6 @@ function storeWords(store: MessageContext['store']): string {
 			return 'timeline';
 		case 'calendar':
 			return 'calendar settings';
-		case 'finder':
-			return 'SkillBridge finder';
 		default:
 			return bad();
 	}

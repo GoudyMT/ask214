@@ -21,17 +21,9 @@ import type { HwmRow, ProfileRow } from './store.svelte';
 
 /** What readDeviceState returns; a time is null for a sidecar that was never written. */
 export type DeviceState = {
-	gens: { profile: number; timeline: number; calendar: number; finder: number };
-	ts: {
-		profile: number | null;
-		timeline: number | null;
-		calendar: number | null;
-		finder: number | null;
-	};
-	mark: {
-		at: number;
-		gens: { profile: number; timeline: number; calendar: number; finder: number };
-	} | null;
+	gens: { profile: number; timeline: number; calendar: number };
+	ts: { profile: number | null; timeline: number | null; calendar: number | null };
+	mark: { at: number; gens: { profile: number; timeline: number; calendar: number } } | null;
 	lastSeenAt: number | null;
 };
 
@@ -40,20 +32,18 @@ const DEVICE_STATE_STORES: StoreName[] = [
 	'profile',
 	'profile-hwm',
 	'timeline-state-hwm',
-	'calendar-sync-hwm',
-	'skillbridge-finder-hwm'
+	'calendar-sync-hwm'
 ];
 
 type GenerationHwmRow = SignedSidecar<{ generation: number; ts: number }>;
 
 /**
- * One verified snapshot of the device's saved state: the profile, timeline, calendar and finder generations and write
- * times, the backup mark the profile holds (when the last backup was made or restored, and the four generations it
+ * One verified snapshot of the device's saved state: the profile, timeline and calendar generations and write
+ * times, the backup mark the profile holds (when the last backup was made or restored, and the three generations it
  * matched), and the profile's last-seen time. A later restore compares these to say whether the device holds changes
- * newer than a backup. A mark made before the finder existed has no finder generation; it reads as 0, the finder
- * being empty then.
+ * newer than a backup.
  *
- * The six rows are read in ONE readonly transaction. IndexedDB shows a readonly transaction a single state, so the
+ * The five rows are read in ONE readonly transaction. IndexedDB shows a readonly transaction a single state, so the
  * rows are a consistent cut with no lock: a write landing between two separate reads could pair a profile of one
  * moment with a timeline of another. Verifying and decrypting wait until the transaction has finished, because
  * IndexedDB commits a transaction that idles while the code awaits anything else.
@@ -66,8 +56,11 @@ type GenerationHwmRow = SignedSidecar<{ generation: number; ts: number }>;
  * KeystoreNotInitializedError instead: that device holds no saved state at all, which is not damage.
  */
 export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
-	const [ks, profileRow, profileHwmRow, timelineHwmRow, calendarHwmRow, finderHwmRow] =
-		await withStores(db, DEVICE_STATE_STORES, 'readonly', (tx) => {
+	const [ks, profileRow, profileHwmRow, timelineHwmRow, calendarHwmRow] = await withStores(
+		db,
+		DEVICE_STATE_STORES,
+		'readonly',
+		(tx) => {
 			const get = <T>(store: StoreName) =>
 				reqToPromise<T | undefined>(tx.objectStore(store).get(0));
 			return Promise.all([
@@ -75,10 +68,10 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 				get<ProfileRow>('profile'),
 				get<HwmRow>('profile-hwm'),
 				get<GenerationHwmRow>('timeline-state-hwm'),
-				get<GenerationHwmRow>('calendar-sync-hwm'),
-				get<GenerationHwmRow>('skillbridge-finder-hwm')
+				get<GenerationHwmRow>('calendar-sync-hwm')
 			]);
-		});
+		}
+	);
 	if (!ks) throw new KeystoreNotInitializedError();
 
 	let decoded: ProfileV1 | null = null;
@@ -89,7 +82,7 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 		if (!(await verifyKeystore(ks, keys))) throw new KeystoreHmacMismatchError();
 		// A sidecar that was never written reads as generation 0 with no time; one that is there must verify.
 		const verified = async (
-			store: 'profile-hwm' | 'timeline-state-hwm' | 'calendar-sync-hwm' | 'skillbridge-finder-hwm',
+			store: 'profile-hwm' | 'timeline-state-hwm' | 'calendar-sync-hwm',
 			row: { payload: { generation: number; ts: number }; mac: ArrayBuffer } | undefined
 		): Promise<{ generation: number; ts: number | null }> => {
 			if (!row) return { generation: 0, ts: null };
@@ -103,7 +96,6 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 		const profile = await verified('profile-hwm', profileHwmRow);
 		const timeline = await verified('timeline-state-hwm', timelineHwmRow);
 		const calendar = await verified('calendar-sync-hwm', calendarHwmRow);
-		const finder = await verified('skillbridge-finder-hwm', finderHwmRow);
 
 		let mark: DeviceState['mark'] = null;
 		let lastSeenAt: number | null = null;
@@ -116,15 +108,8 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 				profile.generation
 			);
 			lastSeenAt = decoded.lastSeenAt;
-			const {
-				lastBackupAt,
-				backupGenProfile,
-				backupGenTimeline,
-				backupGenCalendar,
-				backupGenFinder
-			} = decoded;
-			// Some of the four older fields without all of them is no mark: a backup is vouched for whole or not at all.
-			// The finder's is the fifth and may be missing (a mark from before the finder existed), which reads as 0.
+			const { lastBackupAt, backupGenProfile, backupGenTimeline, backupGenCalendar } = decoded;
+			// Some of the four fields without all of them is no mark: a backup is vouched for whole or not at all.
 			if (
 				lastBackupAt !== undefined &&
 				backupGenProfile !== undefined &&
@@ -136,8 +121,7 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 					gens: {
 						profile: backupGenProfile,
 						timeline: backupGenTimeline,
-						calendar: backupGenCalendar,
-						finder: backupGenFinder ?? 0
+						calendar: backupGenCalendar
 					}
 				};
 			}
@@ -146,10 +130,9 @@ export async function readDeviceState(db: IDBDatabase): Promise<DeviceState> {
 			gens: {
 				profile: profile.generation,
 				timeline: timeline.generation,
-				calendar: calendar.generation,
-				finder: finder.generation
+				calendar: calendar.generation
 			},
-			ts: { profile: profile.ts, timeline: timeline.ts, calendar: calendar.ts, finder: finder.ts },
+			ts: { profile: profile.ts, timeline: timeline.ts, calendar: calendar.ts },
 			mark,
 			lastSeenAt
 		};

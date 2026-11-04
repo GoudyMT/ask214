@@ -92,7 +92,7 @@ const linkTexts = (nav: Element) =>
 
 describe('the root layout navigation', () => {
 	// A screen reader lists landmarks: two shown "Primary" menus would read as the same menu twice.
-	it('shows the top menu and no bar at 1280 px, with no SkillBridge link until the finder ships', async () => {
+	it('shows the top menu and no bar at 1280 px', async () => {
 		await openAt(1280, 800);
 		const [only, ...others] = primaryNavs();
 		expect(others).toHaveLength(0);

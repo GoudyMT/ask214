@@ -52,7 +52,7 @@ function fileInner(): ValidInner {
 }
 
 const DEVICE: DeviceMarks = {
-	gens: { profile: 3, timeline: 4, calendar: 2, finder: 0 },
+	gens: { profile: 3, timeline: 4, calendar: 2 },
 	lastSeenAt: NOW - 10 * DAY,
 	tsProfile: NOW - 12 * DAY,
 	lastAdd: undefined
@@ -74,13 +74,12 @@ describe('composeRestore', () => {
 	it('moves every store one step past the device and marks the backup at those numbers', () => {
 		const { gens, profile } = compose(DEVICE).out;
 
-		expect(gens).toStrictEqual({ profile: 4, timeline: 5, calendar: 3, finder: 1 });
+		expect(gens).toStrictEqual({ profile: 4, timeline: 5, calendar: 3 });
 		expect(profile).toMatchObject({
 			generation: 4,
 			backupGenProfile: 4,
 			backupGenTimeline: 5,
-			backupGenCalendar: 3,
-			backupGenFinder: 1
+			backupGenCalendar: 3
 		});
 	});
 

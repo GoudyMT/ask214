@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BACKUP_MANIFEST, CARRIED_STORES, OPTIONAL_CARRIED_STORES } from '../backup/manifest';
+import { BACKUP_MANIFEST, CARRIED_STORES } from '../backup/manifest';
 import { ENCRYPTED_STORES } from '../db/registry';
 
 // The app lock's store holds this device's wrong tries and lock counter. A backup carrying it would hand a restored
@@ -44,7 +44,6 @@ describe('the app lock store and backups', () => {
 	it('is never read or written by a backup', () => {
 		expect(BACKUP_MANIFEST['app-lock']).toBe('never');
 		expect(CARRIED_STORES as readonly string[]).not.toContain('app-lock');
-		expect(OPTIONAL_CARRIED_STORES as readonly string[]).not.toContain('app-lock');
 	});
 
 	it('is a plain store, not an encrypted one', () => {

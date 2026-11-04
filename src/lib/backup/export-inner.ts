@@ -4,13 +4,6 @@ import { safeLog } from '../log/safelog';
 import { encodeProfile } from '../profile/codec';
 import { parseSeparationPath } from '../profile/separation-path';
 import type { ProfileV1 } from '../profile/types';
-import { encodeFinderRecord } from '../skillbridge-finder/state/codec';
-import type {
-	FinderFilters,
-	FinderPlace,
-	FinderRecord,
-	FinderSetup
-} from '../skillbridge-finder/state/types';
 import { encodeTimelineState } from '../timeline/state-codec';
 import { MAX_PADDED_PLAINTEXT_BYTES } from './caps';
 import { MAX_NOTE_UNITS } from './note-cap';
@@ -26,8 +19,7 @@ export type ExportInnerResult =
 const STORE_INDEX: Record<RefusedStore, number> = {
 	profile: 0,
 	timeline: 1,
-	calendar: 2,
-	finder: 3
+	calendar: 2
 };
 
 /**
@@ -70,7 +62,6 @@ function fileProfile(profile: ProfileV1): unknown {
 	delete copy.backupGenProfile;
 	delete copy.backupGenTimeline;
 	delete copy.backupGenCalendar;
-	delete copy.backupGenFinder;
 	if (copy.separationPath && !parseSeparationPath(copy.separationPath)) delete copy.separationPath;
 	return asJson(encodeProfile(copy));
 }
@@ -89,52 +80,6 @@ function fileCalendar(calendar: CalendarSyncState): unknown {
 		...(calendar.card && { card: calendar.card })
 	};
 	return asJson(encodeCalendarSyncState(fresh));
-}
-
-const filePlace = (place: FinderPlace): FinderPlace =>
-	place.kind === 'zip' ? { kind: 'zip', zip: place.zip } : { kind: 'state', state: place.state };
-
-function fileSetup(setup: FinderSetup): FinderSetup {
-	return {
-		...(setup.place && { place: filePlace(setup.place) }),
-		...(setup.radius !== undefined && { radius: setup.radius }),
-		...(setup.territories !== undefined && { territories: setup.territories }),
-		...(setup.overseas !== undefined && { overseas: setup.overseas })
-	};
-}
-
-function fileFilters(filters: FinderFilters): FinderFilters {
-	return {
-		...(filters.industries && { industries: [...filters.industries] }),
-		...(filters.branches && { branches: [...filters.branches] }),
-		...(filters.durations && { durations: [...filters.durations] }),
-		...(filters.kinds && { kinds: [...filters.kinds] }),
-		...(filters.delivery && { delivery: [...filters.delivery] })
-	};
-}
-
-// Judged on what the file would carry: the store also keeps keys a newer release added, in any shape, and the file
-// never writes them.
-export const holdsData = (finder: FinderRecord): boolean =>
-	finder.finderSaved.length > 0 ||
-	finder.finderCompare.length > 0 ||
-	Object.keys(fileSetup(finder.finderSetup ?? {})).length > 0 ||
-	Object.values(fileFilters(finder.finderFilters ?? {})).some((list) => list.length > 0);
-
-/**
- * Built field by field, never as a copy of the stored record: the store keeps any key a newer release added so an older
- * tab's save does not drop it, but the check a restore runs refuses a key it does not know, so a file carrying one
- * would not restore.
- */
-function fileFinder(finder: FinderRecord): unknown {
-	const fresh: FinderRecord = {
-		schemaVersion: finder.schemaVersion,
-		...(finder.finderSetup && { finderSetup: fileSetup(finder.finderSetup) }),
-		...(finder.finderFilters && { finderFilters: fileFilters(finder.finderFilters) }),
-		finderSaved: finder.finderSaved.map(({ id, savedOn, facts }) => ({ id, savedOn, facts })),
-		finderCompare: [...finder.finderCompare]
-	};
-	return asJson(encodeFinderRecord(fresh));
 }
 
 /**
@@ -158,17 +103,6 @@ export function buildExportInner(snap: Snapshot, createdAt: number): ExportInner
 		return { ok: false, code: 'E_EXPORT_SELF_INVALID', store };
 	};
 
-	// The key is written only for a record that holds something: a device that never used the finder, or whose finder was
-	// emptied (a restore of an older file leaves an empty record behind), makes the same file as before the finder
-	// existed, which an older app opens.
-	let finder: unknown;
-	try {
-		finder = snap.finder && holdsData(snap.finder) ? fileFinder(snap.finder) : undefined;
-	} catch {
-		// The encoder refuses a record the store itself would not read back: a fault in the app, not a failed read.
-		return selfInvalid('finder');
-	}
-
 	const inner = {
 		backupSchema: 1,
 		// Written as given: a clock that is wrong is shown as it is, never replaced with a made-up date.
@@ -177,8 +111,7 @@ export function buildExportInner(snap: Snapshot, createdAt: number): ExportInner
 		stores: {
 			profile: fileProfile(snap.profile),
 			'timeline-state': snap.timeline && asJson(encodeTimelineState(snap.timeline)),
-			'calendar-sync': snap.calendar && fileCalendar(snap.calendar),
-			...(finder !== undefined && { 'skillbridge-finder': finder })
+			'calendar-sync': snap.calendar && fileCalendar(snap.calendar)
 		}
 	};
 

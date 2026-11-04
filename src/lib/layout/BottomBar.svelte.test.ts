@@ -128,8 +128,8 @@ describe('BottomBar on a 320 px phone', () => {
 		expect(marked(container)).toEqual([[label, how]]);
 	});
 
-	// The finder's page is open but has no tab while it is not ready, so no other tab may claim it.
-	it('marks no tab on /skillbridge, a page no tab owns', async () => {
+	// A missing page belongs to no tab, so no tab may claim it.
+	it('marks no tab on a page no tab owns', async () => {
 		route.pathname = '/skillbridge';
 		const { container } = await render(BottomBar);
 		expect(marked(container)).toEqual([]);

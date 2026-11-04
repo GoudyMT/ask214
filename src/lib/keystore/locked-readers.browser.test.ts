@@ -6,8 +6,6 @@ import { deleteTestDb, openTestDb } from '../db/_test-helpers';
 import { reqToPromise, STORES, withStores, type StoreName } from '../db/schema';
 import { signSidecar } from '../profile/sidecars';
 import { createProfileStore } from '../profile/store.svelte';
-import { createFinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
-import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { bumpCounter, readCounter } from './app-lock-store';
 import { bootstrapLocalKeystore } from './bootstrap';
@@ -109,19 +107,9 @@ async function lockedDevice() {
 	const f = await pinFixture();
 	await putRaw('keystore', f.row);
 	const junk = () => ({ id: 0, rec: crypto.getRandomValues(new Uint8Array(64)) });
-	for (const store of [
-		'profile',
-		'timeline-state',
-		'calendar-sync',
-		'byok',
-		'skillbridge-finder'
-	] as const) {
+	for (const store of ['profile', 'timeline-state', 'calendar-sync', 'byok'] as const) {
 		await putRaw(store, junk());
 	}
-	await putRaw('skillbridge-finder-pack', {
-		id: 'seen',
-		rec: crypto.getRandomValues(new Uint8Array(64))
-	});
 	return f;
 }
 
@@ -138,10 +126,7 @@ describe('with a PIN row and no session, no store reads or writes', () => {
 			() => createCalendarSyncStore(db).setExclusions({ taskIds: ['t1'], categories: [] })
 		],
 		['byok read', () => createByokStore(db).readApiKey()],
-		['byok save', () => createByokStore(db).saveApiKey(KEY)],
-		['finder load', () => createFinderStore(db).load()],
-		['finder save', () => createFinderStore(db).setSetup({ radius: 50 })],
-		['pack load', () => createFinderPackStore(db).load()]
+		['byok save', () => createByokStore(db).saveApiKey(KEY)]
 	];
 
 	it.each(cases)('%s: refused as locked, every stored row byte-equal', async (_name, run) => {

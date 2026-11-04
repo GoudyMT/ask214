@@ -188,7 +188,7 @@ describe('unitRunsFor', () => {
 	});
 
 	it('still runs the server tests for prose, which policy tests scan', () => {
-		expect(unitRunsFor(['content-ops/skillbridge/README.md'])).toEqual([SERVER]);
+		expect(unitRunsFor(['content-ops/README.md'])).toEqual([SERVER]);
 	});
 
 	it('runs nothing when nothing is staged', () => {

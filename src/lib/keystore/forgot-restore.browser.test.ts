@@ -12,9 +12,6 @@ import { readDeviceState } from '../profile/device-state';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { verifySidecar, type ProfileHwmPayload, type SignedSidecar } from '../profile/sidecars';
 import { createProfileStore } from '../profile/store.svelte';
-import { CLEAN_CASES, cleanListing } from '../skillbridge-finder/fixtures/clean';
-import { createFinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
-import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { readCounter, readTries } from './app-lock-store';
@@ -73,10 +70,9 @@ const NOW = Date.now();
 const DAY = 86_400_000;
 // A generation no device record ever has, so a seam can tell the file's profile from the device's.
 const FILE_GENERATION = 41;
-const PACK = 'skillbridge-finder-pack';
 const API_KEY = 'sk-ant-forgot-test-0123456789';
 const TRIES_ROW = { id: 'tries', count: 2, waitMs: 30_000, pending: false };
-// The steps of the transaction: one clear per store, the lock counter, then the keystore row and the four pairs.
+// The steps of the transaction: one clear per store, the lock counter, then the keystore row and the three pairs.
 const STEPS: StoreName[] = [
 	...STORES,
 	'app-lock',
@@ -86,11 +82,9 @@ const STEPS: StoreName[] = [
 	'timeline-state',
 	'timeline-state-hwm',
 	'calendar-sync',
-	'calendar-sync-hwm',
-	'skillbridge-finder',
-	'skillbridge-finder-hwm'
+	'calendar-sync-hwm'
 ];
-const DEVICE = { profile: 3, timeline: 2, calendar: 2, finder: 2 };
+const DEVICE = { profile: 3, timeline: 2, calendar: 2 };
 
 let db: IDBDatabase;
 
@@ -162,9 +156,9 @@ async function snapshot(): Promise<Record<string, unknown>> {
 /** The write time in each of the four plaintext markers. */
 async function markerTimes(): Promise<number[]> {
 	return Promise.all(
-		(
-			['profile-hwm', 'timeline-state-hwm', 'calendar-sync-hwm', 'skillbridge-finder-hwm'] as const
-		).map(async (store) => (need(await readRaw(store)).payload as { ts: number }).ts)
+		(['profile-hwm', 'timeline-state-hwm', 'calendar-sync-hwm'] as const).map(
+			async (store) => (need(await readRaw(store)).payload as { ts: number }).ts
+		)
 	);
 }
 
@@ -188,7 +182,7 @@ async function pinKeys() {
 }
 
 /**
- * A device a person left behind a forgotten PIN: real saves in every store (an API key and cached finder files too), the
+ * A device a person left behind a forgotten PIN: real saves in every store (an API key too), the
  * wrong tries noted, and the shipped turn-on moving it all onto a PIN. Nothing is unlocked afterwards. The session the
  * turn-on made is handed back for the test that wants a tab that was open on the old row.
  */
@@ -212,9 +206,6 @@ async function buildPinDevice(): Promise<{ session: KeySession }> {
 	for (let i = 0; i < DEVICE.calendar; i++) {
 		await calendar.setExclusions({ taskIds: [taskId(i + 3)], categories: [] });
 	}
-	const finder = createFinderStore(db);
-	await finder.load();
-	for (let i = 0; i < DEVICE.finder; i++) await finder.setSetup({ radius: i % 2 === 0 ? 50 : 25 });
 	await createByokStore(db).saveApiKey(API_KEY);
 	await putRaw('app-lock', TRIES_ROW);
 	const keys = await pinKeys();
@@ -224,30 +215,6 @@ async function buildPinDevice(): Promise<{ session: KeySession }> {
 		kdf: { ...KDF_V1 },
 		counterBefore: await readCounter(db)
 	});
-	// The cached finder files are downloaded after the turn-on, which drops the ones from before it.
-	setSession(session);
-	try {
-		const pack = createFinderPackStore(db);
-		await pack.load();
-		await pack.swap({
-			index: {
-				v: 1,
-				pullDate: '2026-10-21',
-				baseline: false,
-				baselineDate: '2026-10-01',
-				files: [{ name: 'pacific', count: 1, bytes: 100 }]
-			},
-			regions: new Map([
-				[
-					'pacific',
-					{ v: 1, pullDate: '2026-10-21', file: 'pacific', listings: [cleanListing({ i: 1001 })] }
-				]
-			])
-		});
-	} finally {
-		dropSession();
-	}
-	expect((await rowsOf(PACK)).length).toBeGreaterThan(0);
 	return { session };
 }
 
@@ -262,13 +229,6 @@ const FILE_CALENDAR: Bag = {
 	schemaVersion: 1,
 	exclusions: { taskIds: ['will-poa'], categories: ['finance'] },
 	card: { dismissedAt: NOW, dismissCount: 2 }
-};
-const FILE_FINDER: Bag = {
-	schemaVersion: 1,
-	finderSetup: { place: { kind: 'state', state: 'TX' }, radius: 100, overseas: true },
-	finderFilters: { branches: ['Navy'], kinds: ['internship'] },
-	finderSaved: [{ id: 1013, savedOn: '2026-10-20', facts: CLEAN_CASES.multiState }],
-	finderCompare: [1013]
 };
 
 /** A backup made on another phone, run through the real validator. */
@@ -296,8 +256,7 @@ function fileInner(): ValidInner {
 				stores: {
 					profile,
 					'timeline-state': FILE_TIMELINE,
-					'calendar-sync': FILE_CALENDAR,
-					'skillbridge-finder': FILE_FINDER
+					'calendar-sync': FILE_CALENDAR
 				}
 			})
 		) as unknown
@@ -372,12 +331,7 @@ describe('readLockedDevice', () => {
 // The markers are plain rows anyone holding the phone could have written; whatever they hold, the read gives a number the
 // restore can add one to, or nothing.
 describe('markers forged on a locked device', () => {
-	const MARKS = [
-		'profile-hwm',
-		'timeline-state-hwm',
-		'calendar-sync-hwm',
-		'skillbridge-finder-hwm'
-	] as const;
+	const MARKS = ['profile-hwm', 'timeline-state-hwm', 'calendar-sync-hwm'] as const;
 
 	async function forge(store: StoreName, patch: Record<string, unknown>): Promise<void> {
 		const row = need(await readRaw(store));
@@ -406,8 +360,7 @@ describe('markers forged on a locked device', () => {
 			expect(gens).toStrictEqual({
 				profile: 1,
 				timeline: DEVICE.timeline + 1,
-				calendar: DEVICE.calendar + 1,
-				finder: DEVICE.finder + 1
+				calendar: DEVICE.calendar + 1
 			});
 		}
 	);
@@ -433,7 +386,7 @@ describe('markers forged on a locked device', () => {
 });
 
 describe('restoreLockedDevice', () => {
-	it('walks the steps in order: every store emptied, the counter, the keystore row, then the four pairs', async () => {
+	it('walks the steps in order: every store emptied, the counter, the keystore row, then the three pairs', async () => {
 		await buildPinDevice();
 		const seen: string[] = [];
 
@@ -533,8 +486,7 @@ describe('restoreLockedDevice', () => {
 			expect(gens).toStrictEqual({
 				profile: DEVICE.profile + 1,
 				timeline: DEVICE.timeline + 1,
-				calendar: DEVICE.calendar + 1,
-				finder: DEVICE.finder + 1
+				calendar: DEVICE.calendar + 1
 			});
 			// The app opens it the way a reload does.
 			const profile = createProfileStore(db);
@@ -549,10 +501,6 @@ describe('restoreLockedDevice', () => {
 			await calendar.load();
 			expect(calendar.exclusions).toEqual({ taskIds: ['will-poa'], categories: ['finance'] });
 			expect(calendar.card).toEqual({ dismissedAt: NOW, dismissCount: 2 });
-			const finder = createFinderStore(db);
-			await finder.load();
-			expect(finder.saved).toEqual(FILE_FINDER.finderSaved);
-			expect(finder.compare).toEqual(FILE_FINDER.finderCompare);
 			const state = await readDeviceState(db);
 			expect(state.gens).toStrictEqual(gens);
 			expect(state.mark?.gens).toStrictEqual(gens);
@@ -566,8 +514,7 @@ describe('restoreLockedDevice', () => {
 			const marked = [
 				['profile-hwm', gens.profile],
 				['timeline-state-hwm', gens.timeline],
-				['calendar-sync-hwm', gens.calendar],
-				['skillbridge-finder-hwm', gens.finder]
+				['calendar-sync-hwm', gens.calendar]
 			] as const;
 			for (const [store, generation] of marked) {
 				const marker = need(await readRaw(store)) as unknown as SignedSidecar<ProfileHwmPayload>;
@@ -583,11 +530,10 @@ describe('restoreLockedDevice', () => {
 			}
 		});
 
-		it('empties what a restore cannot carry over: the API key, cached finder files and wrong tries', async () => {
+		it('empties what a restore cannot carry over: the API key and wrong tries', async () => {
 			const { counterBefore } = await restoreOnce();
 
 			expect(await rowsOf('byok')).toStrictEqual([]);
-			expect(await rowsOf(PACK)).toStrictEqual([]);
 			expect(await readTries(db)).toStrictEqual({ count: 0, waitMs: 0, pending: false });
 			expect(await rowsOf('app-lock')).toStrictEqual([{ id: 'counter', value: counterBefore + 1 }]);
 		});
@@ -652,7 +598,7 @@ describe('restoreLockedDevice', () => {
 
 			await refuse(
 				{
-					gens: { profile: 0, timeline: 0, calendar: 0, finder: 0 },
+					gens: { profile: 0, timeline: 0, calendar: 0 },
 					installUuid: new Uint8Array(row.installUuid as Uint8Array)
 				},
 				'E_RESTORE_DEVICE_CHANGED'
@@ -668,7 +614,7 @@ describe('restoreLockedDevice', () => {
 			await refuse({ ...expected, installUuid: other }, 'E_RESTORE_DEVICE_CHANGED');
 		});
 
-		it.each(['profile', 'timeline', 'calendar', 'finder'] as const)(
+		it.each(['profile', 'timeline', 'calendar'] as const)(
 			'a device whose %s generation moved since the confirm',
 			async (which) => {
 				await buildPinDevice();

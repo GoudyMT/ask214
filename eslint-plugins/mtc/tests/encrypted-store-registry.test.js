@@ -36,7 +36,6 @@ describe('mtc/encrypted-store-registry', () => {
 					{ code: "tx.objectStore('profile-hwm').put(sidecar);" },
 					{ code: "tx.objectStore('timeline-state-hwm').put(sidecar);" },
 					{ code: "tx.objectStore('calendar-sync-hwm').put(sidecar);" },
-					{ code: "tx.objectStore('skillbridge-finder-hwm').put(sidecar);" },
 					{ code: "tx.objectStore('keystore').put(record);" },
 					// Reads and clears are not writes of ciphertext.
 					{ code: "tx.objectStore('profile').get(0);" },
@@ -71,14 +70,6 @@ describe('mtc/encrypted-store-registry', () => {
 					},
 					{
 						code: "tx.objectStore('byok').put({ id: 0, rec });",
-						errors: [{ messageId: 'writeUnsanctioned' }]
-					},
-					{
-						code: "tx.objectStore('skillbridge-finder').put({ id: 0, rec });",
-						errors: [{ messageId: 'writeUnsanctioned' }]
-					},
-					{
-						code: "tx.objectStore('skillbridge-finder-pack').put({ id: 1, rec });",
 						errors: [{ messageId: 'writeUnsanctioned' }]
 					}
 				]

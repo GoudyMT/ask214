@@ -2,7 +2,6 @@ import { decryptCalendarRecord, encryptCalendarRecord } from '../calendar/crypto
 import type { CalendarSyncState } from '../calendar/types';
 import { decryptRecord, encryptRecord, type RecordCtx } from '../crypto/record-crypto';
 import { rotateOrUpgrade } from '../db/locks';
-import { ENCRYPTED_STORES, type EncryptedStoreName } from '../db/registry';
 import { reqToPromise, withStores, type StoreName } from '../db/schema';
 import { decryptProfileRecord, encryptProfileRecord } from '../profile/crypto-boundary';
 import { zeroizeRecord } from '../profile/lifecycle';
@@ -13,11 +12,6 @@ import {
 	type SignedSidecar
 } from '../profile/sidecars';
 import type { ProfileV1 } from '../profile/types';
-import {
-	decryptFinderRecord,
-	encryptFinderRecord
-} from '../skillbridge-finder/state/crypto-boundary';
-import type { FinderRecord } from '../skillbridge-finder/state/types';
 import { decryptTimelineRecord, encryptTimelineRecord } from '../timeline/crypto-boundary';
 import type { TimelineState } from '../timeline/types';
 import { bumpCounterIn, clearTriesIn } from './app-lock-store';
@@ -45,7 +39,7 @@ export class RotationStoreError extends Error {
 	}
 }
 
-export type RotationResult = { session: KeySession; packHadFiles: boolean };
+export type RotationResult = { session: KeySession };
 
 type PinInput = {
 	macKey: CryptoKey;
@@ -57,7 +51,7 @@ type PinInput = {
 
 type Deps = { afterPut?: (index: number, store: StoreName) => void };
 
-type SidecarStore = 'profile' | 'timeline-state' | 'calendar-sync' | 'skillbridge-finder';
+type SidecarStore = 'profile' | 'timeline-state' | 'calendar-sync';
 type MarkStore = `${SidecarStore}-hwm`;
 type Body = { id: number; rec: Uint8Array };
 type Mark = SignedSidecar<ProfileHwmPayload> & { id: number };
@@ -65,18 +59,6 @@ type Put = { store: StoreName; value: unknown };
 
 // Wrapped keys are 32 bytes plus AES-KW's 8; the bag holds the data key, then the HMAC key.
 const WRAPPED_KEY_BYTES = 40;
-// What the move does with each encrypted store. Every registry entry must be named, so a store added to the registry
-// fails the type-check here instead of being left behind under a key that is gone. A carried store is read out and
-// sealed again by the code below; a cleared one holds public, re-downloadable rows and is emptied.
-const FATE: Record<EncryptedStoreName, 'carried' | 'cleared'> = {
-	profile: 'carried',
-	'timeline-state': 'carried',
-	'calendar-sync': 'carried',
-	byok: 'carried',
-	'skillbridge-finder': 'carried',
-	'skillbridge-finder-pack': 'cleared'
-};
-const CLEARED: StoreName[] = ENCRYPTED_STORES.filter((store) => FATE[store] === 'cleared');
 // The stored API key has no marker: one fixed generation and the context its store seals it under.
 const BYOK_CTX: RecordCtx = { storeName: 'byok', recordId: 'self', schemaVersion: 1 };
 const BYOK_GENERATION = 1;
@@ -109,10 +91,6 @@ const TIMELINE: Codec<TimelineState> = {
 const CALENDAR: Codec<CalendarSyncState> = {
 	open: decryptCalendarRecord,
 	seal: encryptCalendarRecord
-};
-const FINDER: Codec<FinderRecord> = {
-	open: decryptFinderRecord,
-	seal: encryptFinderRecord
 };
 
 /** A record read out under the old keys, with what it takes to seal it under the new ones. */
@@ -190,10 +168,7 @@ function readCut(db: IDBDatabase) {
 		'timeline-state-hwm',
 		'calendar-sync',
 		'calendar-sync-hwm',
-		'skillbridge-finder',
-		'skillbridge-finder-hwm',
-		'byok',
-		...CLEARED
+		'byok'
 	];
 	return withStores(db, stores, 'readonly', (tx) => {
 		const get = <T>(store: StoreName) => reqToPromise<T | undefined>(tx.objectStore(store).get(0));
@@ -204,12 +179,7 @@ function readCut(db: IDBDatabase) {
 			get<Mark>('timeline-state-hwm'),
 			get<Body>('calendar-sync'),
 			get<Mark>('calendar-sync-hwm'),
-			get<Body>('skillbridge-finder'),
-			get<Mark>('skillbridge-finder-hwm'),
-			get<Body>('byok'),
-			Promise.all(CLEARED.map((store) => reqToPromise<number>(tx.objectStore(store).count()))).then(
-				(counts) => counts.reduce((sum, count) => sum + count, 0)
-			)
+			get<Body>('byok')
 		]);
 	});
 }
@@ -245,8 +215,7 @@ function commit(
  * set it. Turn-on calls it on a local row; a later PIN change calls it on a PIN row with a live session.
  *
  * Either every store is on the new keys or none is: the records, their markers, the key row, the lock counter and the
- * cleared wrong tries are one commit. Each record keeps its own generation, so a backup's mark stays true. The finder's
- * downloaded files are public and are dropped, not moved.
+ * cleared wrong tries are one commit. Each record keeps its own generation, so a backup's mark stays true.
  */
 export async function rotateToPin(
 	db: IDBDatabase,
@@ -365,10 +334,7 @@ async function move(
 		timelineMark,
 		calendarBody,
 		calendarMark,
-		finderBody,
-		finderMark,
-		byokBody,
-		packRows
+		byokBody
 	] = await readCut(db);
 	const carried: Carried[] = [];
 	const add = (item: Carried | null) => {
@@ -403,15 +369,6 @@ async function move(
 			{ store: 'calendar-sync', required: false, codec: CALENDAR },
 			calendarBody,
 			calendarMark,
-			identity,
-			keys
-		)
-	);
-	add(
-		await carry(
-			{ store: 'skillbridge-finder', required: false, codec: FINDER },
-			finderBody,
-			finderMark,
 			identity,
 			keys
 		)
@@ -480,7 +437,7 @@ async function move(
 
 	// 4. One transaction. The counter goes first: if it is not the one the caller noted, the lock moved while the PIN was
 	// being made (an erase, a restore or another tab's change), and the whole move is dropped.
-	const touched = new Set<StoreName>([...puts.map((put) => put.store), ...CLEARED, 'app-lock']);
+	const touched = new Set<StoreName>([...puts.map((put) => put.store), 'app-lock']);
 	await commit(db, [...touched], async (tx) => {
 		let written = 0;
 		const counter = await bumpCounterIn(tx);
@@ -490,9 +447,8 @@ async function move(
 			tx.objectStore(put.store).put(put.value);
 			deps.afterPut?.(written++, put.store);
 		}
-		for (const store of CLEARED) tx.objectStore(store).clear();
 		clearTriesIn(tx);
 	});
 
-	return { session, packHadFiles: packRows > 0 };
+	return { session };
 }

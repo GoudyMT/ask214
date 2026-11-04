@@ -20,7 +20,6 @@ export type BusSignal = {
 		| 'relocked'
 		| 'timeline-updated'
 		| 'calendar-updated'
-		| 'skillbridge-finder-updated'
 		| 'data-replaced'
 		| 'keys-changed';
 	reason?: 'idle' | 'user';
@@ -46,7 +45,6 @@ function toBusSignal(value: unknown): BusSignal | null {
 		type !== 'relocked' &&
 		type !== 'timeline-updated' &&
 		type !== 'calendar-updated' &&
-		type !== 'skillbridge-finder-updated' &&
 		type !== 'data-replaced' &&
 		type !== 'keys-changed'
 	) {

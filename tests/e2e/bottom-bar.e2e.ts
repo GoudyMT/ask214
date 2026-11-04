@@ -86,14 +86,7 @@ test('a person on a phone reaches every page from the bottom bar, and More keeps
 		);
 	}
 
-	// The finder has no tab while it is not ready, but a saved address still opens its placeholder, which sends a
-	// person to the official site rather than leaving them at a dead end.
-	await page.goto('/skillbridge');
 	await expect(bar.getByRole('link', { name: 'SkillBridge', exact: true })).toHaveCount(0);
-	await expect(page.getByRole('link', { name: 'DoD SkillBridge site' })).toHaveAttribute(
-		'href',
-		'https://www.skillbridge.mil/'
-	);
 
 	for (const row of MORE_ROWS) {
 		await bar.getByRole('link', { name: 'More', exact: true }).click();
@@ -267,8 +260,7 @@ type AxeViolation = {
 const AXE_PAGES: { path: string; heading: string | RegExp; needsTimeline: boolean }[] = [
 	{ path: '/', heading: /military transition/i, needsTimeline: false },
 	{ path: '/timeline', heading: 'Timeline', needsTimeline: true },
-	{ path: '/more', heading: 'More', needsTimeline: false },
-	{ path: '/skillbridge', heading: 'SkillBridge', needsTimeline: false }
+	{ path: '/more', heading: 'More', needsTimeline: false }
 ];
 
 for (const width of [320, 1280]) {

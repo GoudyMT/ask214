@@ -13,9 +13,6 @@ import { readDeviceState } from '../profile/device-state';
 import { decodeEaos, encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { verifySidecar, type ProfileHwmPayload, type SignedSidecar } from '../profile/sidecars';
 import { createProfileStore } from '../profile/store.svelte';
-import { cleanListing } from '../skillbridge-finder/fixtures/clean';
-import { createFinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
-import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { KNOWN_TASK_IDS } from '../timeline/known-task-ids';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { readCounter, readTries } from './app-lock-store';
@@ -77,7 +74,6 @@ type Pin = Awaited<ReturnType<typeof pinFixture>>;
 const HMAC = { name: 'HMAC', hash: 'SHA-256', length: 256 } as const;
 const API_KEY = 'sk-ant-rotation-test-0123456789';
 const BACKUP_AT = Date.UTC(2026, 8, 1);
-const PACK = 'skillbridge-finder-pack';
 const TRIES_ROW = { id: 'tries', count: 2, waitMs: 30_000, pending: false };
 
 let db: IDBDatabase;
@@ -153,18 +149,10 @@ async function snapshot(): Promise<Record<string, unknown>> {
 	return out;
 }
 
-const packRows = () =>
-	withStores(db, PACK, 'readonly', (tx) => reqToPromise<Row[]>(tx.objectStore(PACK).getAll()));
-
-/** The write time in each of the four markers. */
+/** The write time in each of the three markers. */
 async function markerTimes(): Promise<number[]> {
 	const times: number[] = [];
-	for (const store of [
-		'profile-hwm',
-		'timeline-state-hwm',
-		'calendar-sync-hwm',
-		'skillbridge-finder-hwm'
-	] as const) {
+	for (const store of ['profile-hwm', 'timeline-state-hwm', 'calendar-sync-hwm'] as const) {
 		times.push((need(await readRaw(store)).payload as { ts: number }).ts);
 	}
 	return times;
@@ -217,27 +205,6 @@ function rotate(
 	);
 }
 
-/** The finder's downloaded files: public rows that every move of the keys empties. */
-async function fillPack(): Promise<void> {
-	const pack = createFinderPackStore(db);
-	await pack.load();
-	await pack.swap({
-		index: {
-			v: 1,
-			pullDate: '2026-10-21',
-			baseline: false,
-			baselineDate: '2026-10-01',
-			files: [{ name: 'pacific', count: 1, bytes: 100 }]
-		},
-		regions: new Map([
-			[
-				'pacific',
-				{ v: 1, pullDate: '2026-10-21', file: 'pacific', listings: [cleanListing({ i: 1001 })] }
-			]
-		])
-	});
-}
-
 /** A device built the way a person builds one: real stores and real saves, a record in every encrypted store. */
 async function buildDevice() {
 	await bootstrapLocalKeystore(db);
@@ -254,11 +221,7 @@ async function buildDevice() {
 	const calendar = createCalendarSyncStore(db);
 	await calendar.load();
 	await calendar.setExclusions({ taskIds: [taskId(3)], categories: ['finance'] });
-	const finder = createFinderStore(db);
-	await finder.load();
-	await finder.setSetup({ radius: 50 });
 	await createByokStore(db).saveApiKey(API_KEY);
-	await fillPack();
 	await putRaw('app-lock', TRIES_ROW);
 	return { profile };
 }
@@ -270,8 +233,6 @@ async function readEverything() {
 	await timeline.load();
 	const calendar = createCalendarSyncStore(db);
 	await calendar.load();
-	const finder = createFinderStore(db);
-	await finder.load();
 	return {
 		profile: {
 			eaos: decodeEaos(need(profile.eaos)),
@@ -280,7 +241,6 @@ async function readEverything() {
 		},
 		timeline: timeline.state,
 		calendar: { exclusions: calendar.exclusions, card: calendar.card },
-		finder: { setup: finder.setup, filters: finder.filters, saved: finder.saved },
 		apiKey: await createByokStore(db).readApiKey(),
 		gens: (await readDeviceState(db)).gens
 	};
@@ -292,7 +252,6 @@ const GENERATION = (gens: Awaited<ReturnType<typeof readEverything>>['gens']) =>
 		['profile', gens.profile],
 		['timeline-state', gens.timeline],
 		['calendar-sync', gens.calendar],
-		['skillbridge-finder', gens.finder],
 		['byok', 1]
 	] as const;
 
@@ -303,8 +262,7 @@ async function markBackup(profile: Awaited<ReturnType<typeof buildDevice>>['prof
 		lastBackupAt: BACKUP_AT,
 		backupGenProfile: gens.profile + 1,
 		backupGenTimeline: gens.timeline,
-		backupGenCalendar: gens.calendar,
-		backupGenFinder: gens.finder
+		backupGenCalendar: gens.calendar
 	});
 	const marked = await readDeviceState(db);
 	expect(marked.mark).toStrictEqual({ at: BACKUP_AT, gens: marked.gens });
@@ -323,20 +281,11 @@ describe('rotateToPin', () => {
 		await buildDevice();
 		const pin = await pinFixture();
 		const stores: string[] = [];
-		const cleared: string[] = [];
-		const originalClear = IDBObjectStore.prototype.clear;
-		const clearSpy = vi.spyOn(IDBObjectStore.prototype, 'clear').mockImplementation(function (
-			this: IDBObjectStore
-		) {
-			cleared.push(this.name);
-			return originalClear.call(this);
-		});
 		await rotate(pin, {}, { afterPut: (_index, store) => void stores.push(store) });
-		clearSpy.mockRestore();
-		// Every store the registry names is either put to or emptied: one added later cannot be left under a gone key.
-		expect(
-			new Set([...stores, ...cleared].filter((store) => isEncryptedStore(store)))
-		).toStrictEqual(new Set(ENCRYPTED_STORES));
+		// Every store the registry names is put to: one added later cannot be left under a gone key.
+		expect(new Set(stores.filter((store) => isEncryptedStore(store)))).toStrictEqual(
+			new Set(ENCRYPTED_STORES)
+		);
 		expect([...stores].sort()).toStrictEqual([
 			'app-lock',
 			'byok',
@@ -345,8 +294,6 @@ describe('rotateToPin', () => {
 			'keystore',
 			'profile',
 			'profile-hwm',
-			'skillbridge-finder',
-			'skillbridge-finder-hwm',
 			'timeline-state',
 			'timeline-state-hwm'
 		]);
@@ -381,20 +328,17 @@ describe('rotateToPin', () => {
 		const pin = await pinFixture();
 
 		const transactions = watchTransactions();
-		const { session, packHadFiles } = await rotate(pin);
+		const { session } = await rotate(pin);
 		transactions.stop();
 		setSession(session);
 
-		// One write transaction, durable, over everything the move changes - the counter and the pack included.
+		// One write transaction, durable, over everything the move changes - the counter included.
 		const writes = transactions.seen.filter((tx) => tx.mode !== 'readonly');
 		expect(writes).toHaveLength(1);
 		expect(writes[0]?.durability).toBe('strict');
-		expect(writes[0]?.stores).toEqual(
-			expect.arrayContaining(['keystore', 'app-lock', 'skillbridge-finder-pack'])
-		);
+		expect(writes[0]?.stores).toEqual(expect.arrayContaining(['keystore', 'app-lock']));
 		// The markers say when each record was last written, which a move does not change.
 		expect(await markerTimes()).toStrictEqual(writtenAt);
-		expect(packHadFiles).toBe(true);
 		expect(await readEverything()).toStrictEqual(before);
 		const row = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
 		expect(row).toMatchObject({ mode: 'pin', keystoreGeneration: 1, epoch: 1, ivCounter: 0 });
@@ -402,7 +346,6 @@ describe('rotateToPin', () => {
 		expect(hex(row.salt)).toBe(hex(pin.salt));
 		expect(row.kdf).toStrictEqual({ ...KDF_V1 });
 		expect(row).not.toHaveProperty('dataKeyRef');
-		expect(await packRows()).toStrictEqual([]);
 		// The row opens the way an unlock opens it, and to the same identity the session holds.
 		const unlocked = await openPinSession(row, pin, session.counter);
 		expect(unlocked.identity).toStrictEqual(session.identity);
@@ -418,10 +361,9 @@ describe('rotateToPin', () => {
 		setOnSessionMismatch(relocked);
 		const second = await pinFixture();
 
-		const { session, packHadFiles } = await rotate(second);
+		const { session } = await rotate(second);
 		setSession(session);
 
-		expect(packHadFiles).toBe(false);
 		expect(relocked).not.toHaveBeenCalled();
 		expect(await readEverything()).toStrictEqual(before);
 		const row = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
@@ -436,10 +378,9 @@ describe('rotateToPin', () => {
 		await bootstrapLocalKeystore(db);
 		const pin = await pinFixture();
 
-		const { session, packHadFiles } = await rotate(pin);
+		const { session } = await rotate(pin);
 		setSession(session);
 
-		expect(packHadFiles).toBe(false);
 		// The profile's marker was signed again under the new keys, or this load would refuse it.
 		expect(await createProfileStore(db).load()).toBeNull();
 		expect(need(await readRaw('keystore'))).toMatchObject({ mode: 'pin', keystoreGeneration: 1 });
@@ -490,18 +431,6 @@ describe('rotateToPin', () => {
 				'a byte of its record flipped',
 				async () => {
 					await flipRecordByte('timeline-state');
-				}
-			],
-			[
-				'skillbridge-finder',
-				'its marker signed over other numbers',
-				async () => {
-					const row = need(await readRaw('skillbridge-finder-hwm'));
-					const payload = row.payload as { ts: number };
-					await putRaw('skillbridge-finder-hwm', {
-						...row,
-						payload: { ...payload, ts: payload.ts + 1 }
-					});
 				}
 			],
 			[
@@ -652,14 +581,13 @@ describe('rotateToPin', () => {
 	});
 });
 
-/** A device already on a PIN, this tab holding the session, with files in the pack again and wrong tries on record. */
+/** A device already on a PIN, this tab holding the session, with wrong tries on record. */
 async function pinDevice(opts: { markBackup?: boolean } = {}) {
 	const { profile } = await buildDevice();
 	const marked = opts.markBackup ? await markBackup(profile) : null;
 	const first = await pinFixture();
 	const { session } = await rotate(first);
 	setSession(session);
-	await fillPack();
 	await putRaw('app-lock', TRIES_ROW);
 	return { first, session, marked };
 }
@@ -673,8 +601,6 @@ describe('rotateToPin, as a PIN change', () => {
 		'keystore',
 		'profile',
 		'profile-hwm',
-		'skillbridge-finder',
-		'skillbridge-finder-hwm',
 		'timeline-state',
 		'timeline-state-hwm'
 	];
@@ -727,11 +653,9 @@ describe('rotateToPin, as a PIN change', () => {
 		const old = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
 		const second = await pinFixture();
 
-		const { session, packHadFiles } = await rotate(second);
+		const { session } = await rotate(second);
 		setSession(session);
 
-		expect(packHadFiles).toBe(true);
-		expect(await packRows()).toStrictEqual([]);
 		expect(await readEverything()).toStrictEqual(before);
 		const row = need(await readRaw('keystore')) as Row & KeystoreRecordPin;
 		expect(row).toMatchObject({
@@ -780,9 +704,6 @@ async function writeUnderSession(): Promise<void> {
 	const calendar = createCalendarSyncStore(db);
 	await calendar.load();
 	await calendar.setExclusions({ taskIds: [taskId(4)], categories: [] });
-	const finder = createFinderStore(db);
-	await finder.load();
-	await finder.setSetup({ radius: 100 });
 	await createByokStore(db).saveApiKey(`${API_KEY}-2`);
 }
 
@@ -816,7 +737,7 @@ describe('removePin', () => {
 		}
 	);
 
-	it.each(['profile', 'timeline-state', 'calendar-sync', 'skillbridge-finder', 'byok'] as const)(
+	it.each(['profile', 'timeline-state', 'calendar-sync', 'byok'] as const)(
 		'%s: the record written under the PIN keeps its bytes and its marker, and opens on the local row',
 		async (store) => {
 			const { session } = await pinDevice();

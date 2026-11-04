@@ -7,13 +7,7 @@ import { readDeviceState } from './device-state';
 import { signSidecar, type ProfileHwmPayload } from './sidecars';
 import { createProfileStore } from './store.svelte';
 
-type Store =
-	| 'keystore'
-	| 'profile-hwm'
-	| 'profile'
-	| 'timeline-state-hwm'
-	| 'calendar-sync-hwm'
-	| 'skillbridge-finder-hwm';
+type Store = 'keystore' | 'profile-hwm' | 'profile' | 'timeline-state-hwm' | 'calendar-sync-hwm';
 type Row = Record<string, unknown>;
 
 // zeroizeRecord records every record the read discards, so a test can show the decoded profile was wiped. The path
@@ -70,21 +64,14 @@ describe('readDeviceState', () => {
 		backupGenTimeline: 3,
 		backupGenCalendar: 0
 	};
-	const ROWS = [
-		'keystore',
-		'profile',
-		'profile-hwm',
-		'timeline-state-hwm',
-		'calendar-sync-hwm',
-		'skillbridge-finder-hwm'
-	];
+	const ROWS = ['keystore', 'profile', 'profile-hwm', 'timeline-state-hwm', 'calendar-sync-hwm'];
 
 	beforeEach(async () => {
 		await bootstrapLocalKeystore(db);
 	});
 
 	async function putSidecar(
-		store: 'timeline-state-hwm' | 'calendar-sync-hwm' | 'skillbridge-finder-hwm',
+		store: 'timeline-state-hwm' | 'calendar-sync-hwm',
 		generation: number,
 		ts: number
 	): Promise<void> {
@@ -100,13 +87,12 @@ describe('readDeviceState', () => {
 	it('a fresh bootstrap reads all generations 0 and no mark', async () => {
 		const hwm = need(await readRow('profile-hwm'));
 		const state = await readDeviceState(db);
-		expect(state.gens).toEqual({ profile: 0, timeline: 0, calendar: 0, finder: 0 });
+		expect(state.gens).toEqual({ profile: 0, timeline: 0, calendar: 0 });
 		// Bootstrap signs the profile mark; the other sidecars do not exist yet, so they have no time.
 		expect(state.ts).toEqual({
 			profile: (hwm.payload as ProfileHwmPayload).ts,
 			timeline: null,
-			calendar: null,
-			finder: null
+			calendar: null
 		});
 		expect(state.mark).toBeNull();
 		expect(state.lastSeenAt).toBeNull();
@@ -116,12 +102,10 @@ describe('readDeviceState', () => {
 		await createProfileStore(db).save({ eaos: bytes('2027-04-15') });
 		await putSidecar('timeline-state-hwm', 5, 111);
 		await putSidecar('calendar-sync-hwm', 2, 222);
-		await putSidecar('skillbridge-finder-hwm', 4, 333);
 		const state = await readDeviceState(db);
-		expect(state.gens).toEqual({ profile: 1, timeline: 5, calendar: 2, finder: 4 });
+		expect(state.gens).toEqual({ profile: 1, timeline: 5, calendar: 2 });
 		expect(state.ts.timeline).toBe(111);
 		expect(state.ts.calendar).toBe(222);
-		expect(state.ts.finder).toBe(333);
 	});
 
 	// The profile mark and the saved record each carry a time; lastSeenAt is the record's, so give the mark another.
@@ -162,9 +146,7 @@ describe('readDeviceState', () => {
 		expect(allZero(decoded.eaos as Uint8Array)).toBe(true);
 	});
 
-	// A mark made before the finder existed has the four older fields and is still a mark: the finder it matched was
-	// empty then, so a missing finder generation reads as 0.
-	it('readDeviceState returns a mark only when the four older fields are present, and reads a missing finder generation as 0', async () => {
+	it('readDeviceState returns a mark only when its four fields are present', async () => {
 		const store = createProfileStore(db);
 		await store.save({ eaos: bytes('2027-04-15'), lastBackupAt: 5, backupGenProfile: 1 });
 		await store.save({ backupGenTimeline: 3 });
@@ -173,25 +155,9 @@ describe('readDeviceState', () => {
 		const state = await readDeviceState(db);
 		expect(state.mark).toEqual({
 			at: 5,
-			gens: { profile: 1, timeline: 3, calendar: 0, finder: 0 }
+			gens: { profile: 1, timeline: 3, calendar: 0 }
 		});
 		expect(state.gens.profile).toBe(3);
-	});
-
-	it('readDeviceState reads the finder generation a mark carries', async () => {
-		await createProfileStore(db).save({ eaos: bytes('2027-04-15'), ...MARK, backupGenFinder: 4 });
-		expect((await readDeviceState(db)).mark).toEqual({
-			at: MARK.lastBackupAt,
-			gens: { profile: 1, timeline: 3, calendar: 0, finder: 4 }
-		});
-	});
-
-	it('a tampered finder sidecar is DEVICE_DAMAGED', async () => {
-		await putSidecar('skillbridge-finder-hwm', 2, 333);
-		const row = need(await readRow('skillbridge-finder-hwm'));
-		const payload = row.payload as ProfileHwmPayload;
-		await putRow('skillbridge-finder-hwm', { ...row, payload: { ...payload, generation: 3 } });
-		await expect(readDeviceState(db)).rejects.toThrow('E_RESTORE_DEVICE_DAMAGED');
 	});
 
 	it('a tampered timeline sidecar is DEVICE_DAMAGED', async () => {

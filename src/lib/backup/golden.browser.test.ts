@@ -6,8 +6,6 @@ import { bootstrapLocalKeystore } from '../keystore/bootstrap';
 import { encodeEaos, parseEaosAtRead } from '../profile/eaos';
 import { createProfileStore, type ProfileStore } from '../profile/store.svelte';
 import type { ProfileV1 } from '../profile/types';
-import { cleanListing } from '../skillbridge-finder/fixtures/clean';
-import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { createTimelineStateStore } from '../timeline/state.svelte';
 import { decryptEnvelope, readBackupFile, sealEnvelope } from './envelope';
 import { BACKUP_MANIFEST } from './manifest';
@@ -55,8 +53,7 @@ const DEVICE_FIELDS = new Set([
 	'lastBackupAt',
 	'backupGenProfile',
 	'backupGenTimeline',
-	'backupGenCalendar',
-	'backupGenFinder'
+	'backupGenCalendar'
 ]);
 
 let db: IDBDatabase;
@@ -106,10 +103,6 @@ async function finishedDevice() {
 	const calendar = createCalendarSyncStore(db);
 	await calendar.load();
 	await calendar.setExclusions({ taskIds: ['sha-schedule'], categories: [] });
-	const finder = createFinderStore(db);
-	await finder.load();
-	await finder.setSetup({ radius: 25 });
-	await finder.save(cleanListing(), '2026-10-21');
 }
 
 /** The key worker with the real handler behind it, answering later and with the passphrase buffer detached. */
@@ -205,8 +198,7 @@ function plain(value: unknown): unknown {
 	return value;
 }
 
-// The stores a restore replaces: every one the manifest does not mark 'never' (the API key and the finder's cached
-// listings).
+// The stores a restore replaces: every one the manifest does not mark 'never' (the API key).
 const RESTORE_TOUCHES: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
 
 /** The stores a restore replaces, as the device holds them right now. */
@@ -243,29 +235,6 @@ describe('the golden v1 / 1 backup', () => {
 		expect(
 			JSON.parse(JSON.stringify({ exclusions: calendar.exclusions, card: calendar.card }))
 		).toStrictEqual(GOLDEN_EXPECTED.calendar);
-	}, 30_000);
-
-	// The golden was made before the finder existed: it must still restore, and it leaves the finder empty, not holding
-	// what this device saved since.
-	it('the golden has no finder record and restoring it leaves the finder empty, with a new marker', async () => {
-		await finishedDevice();
-		const before = await restoredRows();
-		expect(before['skillbridge-finder']).toBeDefined();
-		expect(before['skillbridge-finder-hwm']).toBeDefined();
-
-		expect(await restoreFile(goldenText)).toStrictEqual({ ok: true });
-
-		const after = await restoredRows();
-		expect(after['skillbridge-finder']).toBeDefined();
-		expect(after['skillbridge-finder']).not.toStrictEqual(before['skillbridge-finder']);
-		expect(after['skillbridge-finder-hwm']).not.toStrictEqual(before['skillbridge-finder-hwm']);
-		const finder = createFinderStore(db);
-		await finder.load();
-		expect(finder.ready).toBe(true);
-		expect(finder.setup).toEqual({});
-		expect(finder.filters).toEqual({});
-		expect(finder.saved).toEqual([]);
-		expect(finder.compare).toEqual([]);
 	}, 30_000);
 
 	it("the golden's sha256 is pinned", async () => {
