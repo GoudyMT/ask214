@@ -10,6 +10,10 @@ updates:
     # minimumReleaseAge floor, so any version Dependabot proposes already satisfies the install guard).
     cooldown:
       default-days: 7
+    # Held by hand: a new ONNX runtime only reaches a device through a renamed asset cache, which makes
+    # every on-device user download the model and runtime again. Update it for a security fix or a need.
+    ignore:
+      - dependency-name: '@huggingface/transformers'
     groups:
       svelte:
         patterns:
