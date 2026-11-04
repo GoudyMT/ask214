@@ -434,6 +434,18 @@ describe('rotateToPin', () => {
 				}
 			],
 			[
+				'calendar-sync',
+				'its marker signed over other numbers',
+				async () => {
+					const row = need(await readRaw('calendar-sync-hwm'));
+					const payload = row.payload as { ts: number };
+					await putRaw('calendar-sync-hwm', {
+						...row,
+						payload: { ...payload, ts: payload.ts + 1 }
+					});
+				}
+			],
+			[
 				'byok',
 				'a byte of the stored key flipped',
 				async () => {
