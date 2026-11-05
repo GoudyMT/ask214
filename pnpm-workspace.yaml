@@ -62,8 +62,10 @@ overrides:
   brace-expansion: '>=5.0.11'
   # Force patched ip-address (GHSA-mwp4-54f8-5fhr, SSRF + trust-boundary bypass via leading-zero octets
   # decoded as decimal, high; transitive dev-only via @lhci/cli>lighthouse>puppeteer-core>...>socks>
-  # ip-address, never in the client bundle). Floor pin - retire when that chain bundles >=10.3.1.
-  ip-address: '>=10.3.1'
+  # ip-address, never in the client bundle). Floor pin - retire when that chain bundles >=10.7.1.
+  # Raised to >=10.7.1 for GHSA-rpw4-54j3-4h4q + GHSA-2vr4-cq9g-pvrc + GHSA-j6r3-76f7-8jcv (link-local, NAT64 and
+  # cross-family subnet checks, medium; the ranges run to <=10.5.0 and <=10.7.0).
+  ip-address: '>=10.7.1'
   # Force patched devalue (GHSA-j22f-vq7h-c4qm, `stringify`/`uneval` serialize shared memory; GHSA-mcm9-63f2-9j32,
   # repeated primitive strings expand quadratically in `uneval`; GHSA-x5rw-q4pp-hg5g, `stringifyAsync` can leave an
   # unhandled rejection - all high, all up to <=5.9.2). Unlike every pin above, devalue SHIPS: it is SvelteKit's
@@ -99,6 +101,20 @@ overrides:
   # protocol, and Lighthouse drives Chrome over CDP, so the path is dormant; the Lighthouse gate proves the chain
   # still runs. Retire when chromium-bidi asks for a patched zod (Dependabot will surface it).
   'zod@<4.6.6': '4.6.6'
+  # Force patched qs (GHSA-6pq8-jhm2-2vcw, an uncaught TypeError in stringify, medium, up to <=6.16.0; transitive
+  # dev-only via @lhci/cli>express, never in the client bundle). Targeted range pin, inside the ^6 express asks
+  # for. Retire when the lockfile resolves >=6.16.1 without it.
+  'qs@<6.16.1': '6.16.1'
+  # Force patched minimatch (GHSA-g3hv-75wg-m249, DoS through globparts amplification, medium, >=7.0.0 <11.0.1;
+  # transitive dev-only via eslint, never in the client bundle). No 10.x patch exists, so this pin crosses a major,
+  # as the brace-expansion pin does; the lint gate proves eslint still runs on it. minimatch@3 sits outside the range
+  # and is left alone. Retire when eslint asks for a patched minimatch (Dependabot will surface it).
+  'minimatch@>=7.0.0 <11.0.1': '11.0.4'
+  # Force patched protobufjs (GHSA-j3f2-48v5-ccww, an infinite loop parsing .proto options, medium, >=7.5.0 <=7.6.4;
+  # via transformers>onnxruntime-web, the one runtime path, so the build proves the shipped bytes stay the same).
+  # Targeted range pin, inside the ^7.2.4 onnxruntime-web asks for. Dependabot ignores transformers, so check this by
+  # hand when transformers is next updated.
+  'protobufjs@>=7.5.0 <7.6.5': '7.6.5'
 
 # Accepted, unfixable, dev/CI-only advisories (never shipped in the client bundle): extract-zip
 # (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6; and GHSA-7pqw-9j4j-h8q3,
