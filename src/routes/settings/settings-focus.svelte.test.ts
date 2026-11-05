@@ -1,6 +1,6 @@
 import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { page, userEvent } from 'vitest/browser';
+import { cdp, page, userEvent } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
 
 const { isoFromToday, ctl } = vi.hoisted(() => ({
@@ -163,6 +163,27 @@ describe('Settings, the clock fix', () => {
 		(clockFix().element() as HTMLElement).focus();
 		await userEvent.keyboard('{Enter}');
 		await expectAppRing(() => document.getElementById('timeline-heading'));
+	});
+
+	// A control elsewhere can hand focus here during a held key, as the leaving answer's Remove does. The notice clears
+	// only on a deliberate press, so a repeat of that key must not clear it.
+	it('ignores a repeat of a key pressed on another control', async () => {
+		const cleared = vi.fn(async () => {});
+		ctl.clearClock = cleared;
+		await render(SettingsPage);
+		(clockFix().element() as HTMLElement).focus();
+		const enter = {
+			key: 'Enter',
+			code: 'Enter',
+			windowsVirtualKeyCode: 13,
+			text: String.fromCharCode(13)
+		};
+		await cdp().send('Input.dispatchKeyEvent', { type: 'keyDown', autoRepeat: true, ...enter });
+		await cdp().send('Input.dispatchKeyEvent', { type: 'keyUp', ...enter });
+		await pause(50);
+		expect(cleared).not.toHaveBeenCalled();
+		await userEvent.keyboard('{Enter}');
+		await expect.poll(() => cleared.mock.calls.length).toBe(1);
 	});
 
 	it('leaves focus alone when the person moved it while the fix ran', async () => {

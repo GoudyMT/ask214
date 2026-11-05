@@ -661,6 +661,7 @@
 								type="button"
 								aria-describedby="clock-notice-msg"
 								onclick={() => void clearClock()}
+								onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
 							>
 								I fixed my clock
 							</button>
