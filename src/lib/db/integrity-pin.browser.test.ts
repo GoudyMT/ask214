@@ -190,8 +190,8 @@ describe('integrity pin: rows an earlier build wrote are read by the real load p
 		expect(DB_VERSION).toBe(9);
 	});
 
-	// The upgrade a device on the last release runs, with its real sealed rows: the search's three stores, and a profile
-	// whose backup mark holds a generation for them. The person's data opens, the mark still matches and a save works.
+	// The upgrade a device on the last release runs, with the pinned rows above: the search's three stores, and a profile
+	// resealed here so its backup mark holds a generation for them. All the data opens, the mark matches and a save works.
 	it('a version 8 device with the search stores opens at version 9 with its data and its backup mark', async () => {
 		const name = 'mtc-test-' + crypto.randomUUID();
 		const SEARCH_STORES = [
@@ -257,6 +257,13 @@ describe('integrity pin: rows an earlier build wrote are read by the real load p
 			const state = await readDeviceState(upgraded);
 			expect(state.mark).toEqual({ at: 5, gens: state.gens });
 			expect(state.gens).toEqual({ profile: 3, timeline: 4, calendar: 5 });
+			const timeline = createTimelineStateStore(upgraded);
+			await timeline.load();
+			expect(timeline.state.tasks['task-a']).toEqual({ status: 'done' });
+			const calendar = createCalendarSyncStore(upgraded);
+			await calendar.load();
+			expect(calendar.exclusions).toEqual({ taskIds: ['task-a'], categories: ['medical'] });
+			expect(await createByokStore(upgraded).readApiKey()).toBe('fixture-api-key-not-real');
 			await store.save({ yearsOfService: 9 });
 			expect((await createProfileStore(upgraded).load())?.yearsOfService).toBe(9);
 		} finally {

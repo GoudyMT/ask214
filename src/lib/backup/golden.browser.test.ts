@@ -275,14 +275,29 @@ describe('the golden v1 / 1 backup', () => {
 		const withRecord = new TextEncoder().encode(
 			JSON.stringify({
 				...inner,
-				stores: { ...inner.stores, 'skillbridge-finder': { schemaVersion: 1, finderSaved: [] } }
+				stores: {
+					...inner.stores,
+					'skillbridge-finder': {
+						schemaVersion: 1,
+						finderSetup: { place: { kind: 'state', state: 'VA' } },
+						finderSaved: [],
+						finderCompare: [3]
+					}
+				}
 			})
 		);
 		const sealed = await sealEnvelope(await workerKey('export'), withRecord, GOLDEN_SALT);
 
 		await finishedDevice();
 		expect(await restoreFile(sealed)).toStrictEqual({ ok: true });
-		const loaded = await createProfileStore(db).load();
-		expect(loaded?.setupIntent).toBe('completed');
+		const reloaded = createProfileStore(db);
+		profile = reloaded;
+		const loaded = await reloaded.load();
+		expect(loaded).not.toBeNull();
+		if (!loaded) return;
+		expect(profileContent(loaded)).toStrictEqual(GOLDEN_EXPECTED.profile);
+		const timeline = createTimelineStateStore(db);
+		await timeline.load();
+		expect(JSON.parse(JSON.stringify(timeline.state))).toStrictEqual(GOLDEN_EXPECTED.timeline);
 	}, 30_000);
 });

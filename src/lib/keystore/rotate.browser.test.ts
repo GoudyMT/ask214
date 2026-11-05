@@ -255,7 +255,7 @@ const GENERATION = (gens: Awaited<ReturnType<typeof readEverything>>['gens']) =>
 		['byok', 1]
 	] as const;
 
-/** The mark the export writes after a backup: the date and the four generations the file matched. */
+/** The mark the export writes after a backup: the date and the three generations the file matched. */
 async function markBackup(profile: Awaited<ReturnType<typeof buildDevice>>['profile']) {
 	const { gens } = await readDeviceState(db);
 	await profile.save({

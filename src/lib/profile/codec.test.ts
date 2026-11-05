@@ -256,7 +256,7 @@ describe('the backup mark', () => {
 		eaos: null
 	});
 
-	it('the five backup-mark fields round-trip', () => {
+	it('the four backup-mark fields round-trip', () => {
 		const dec = decodeProfile(encodeProfile({ ...base(), ...MARK }));
 		expect(dec.lastBackupAt).toBe(MARK.lastBackupAt);
 		expect(dec.backupGenProfile).toBe(4);

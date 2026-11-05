@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DB_VERSION } from '../db/schema';
 import { markRaised, RAISED_KEY, takeOverIfRaised } from './take-over';
 import { isTakeOver } from './take-over-message';
 
@@ -114,6 +115,8 @@ describe('the worker of a release that raised the database takes over at once', 
 		markRaised('build-7', () => store);
 		expect(store.map.get(RAISED_KEY)).toBe('build-7');
 		expect(store.map.has('mtc:db-raised')).toBe(false);
+		// The next raise leans on this too: a fixed key would put this release's pages back in the older pages' place.
+		expect(RAISED_KEY).toContain(String(DB_VERSION));
 	});
 
 	it('marks the build that raised, and drops the mark once a new worker is in charge', async () => {
