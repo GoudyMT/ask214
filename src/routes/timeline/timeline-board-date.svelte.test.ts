@@ -88,8 +88,10 @@ describe('the Timeline for a medical board', () => {
 	});
 
 	it.each([
-		['another answer', 30, 'retirement'],
-		['no answer', 30, undefined]
+		['another answer, the date ahead', 30, 'retirement'],
+		['another answer, the date passed', -1, 'retirement'],
+		['no answer, the date ahead', 30, undefined],
+		['no answer, the date passed', -1, undefined]
 	] as const)('says nothing when %s', async (_name, days, path) => {
 		await device(days, path);
 		await render(TimelinePage);
