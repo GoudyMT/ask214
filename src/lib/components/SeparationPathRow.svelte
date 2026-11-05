@@ -26,10 +26,15 @@
 	let removeEl = $state<HTMLButtonElement | null>(null);
 
 	// Remove goes when the answer does, which another tab can do with this form open; focus on it would fall to the page.
-	// Read before the update removes it, and handed to the row once the update is done.
+	// Read before the update removes it, and handed to the row once the update is done, unless the page moved focus in
+	// that same update.
 	$effect.pre(() => {
 		if (value !== undefined || removeEl === null || document.activeElement !== removeEl) return;
-		void tick().then(() => toggleEl?.focus());
+		const gone = removeEl;
+		void tick().then(() => {
+			const active = document.activeElement;
+			if (active === document.body || active === gone) toggleEl?.focus();
+		});
 	});
 
 	// Closing unmounts the focused control; focus goes back to the row, so a keyboard user is not dropped - unless they

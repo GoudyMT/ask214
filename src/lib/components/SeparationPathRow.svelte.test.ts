@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import type { ComponentProps } from 'svelte';
 import SeparationPathRow from './SeparationPathRow.svelte';
+import SeparationPathRowFocusHost from './SeparationPathRowFocusHost.test.svelte';
 
 // Enter as a keyboard sends it: the key, its code and the carriage return it types.
 const ENTER = {
@@ -244,6 +245,19 @@ describe('SeparationPathRow', () => {
 		await new Promise((resolve) => requestAnimationFrame(resolve));
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(document.activeElement).toBe(choice);
+	});
+
+	// The page can move focus itself in the update that removes the answer; the row must not take it back.
+	it('leaves focus where the page moved it in the same update', async () => {
+		const { rerender } = await render(SeparationPathRowFocusHost, { props: { value: 'ets' } });
+		await toggle().click();
+		(page.getByRole('button', { name: 'Remove answer' }).element() as HTMLElement).focus();
+		await rerender({ value: undefined });
+		await new Promise((resolve) => requestAnimationFrame(resolve));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(document.activeElement).toBe(
+			page.getByRole('button', { name: 'Fix the clock' }).element()
+		);
 	});
 
 	// A failed save keeps the form open, so the rest of the hold lands on the form again once the save settles.
