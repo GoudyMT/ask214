@@ -18,7 +18,7 @@ vi.mock('#lib/profile/context.js', () => ({
 	setProfileApp: () => {}
 }));
 
-const LINE = 'If the board moved your separation date, update it in Settings.';
+const LINE = 'If the board moves your separation date, update it in Settings.';
 
 let db: IDBDatabase | null = null;
 
@@ -68,11 +68,15 @@ afterEach(async () => {
 	db = null;
 });
 
-// A medical board can move the separation date. Once the entered date has passed, the timeline reads the member as
-// separated and closes the required steps, so a member still in the board process needs to know to move the date.
-describe('the Timeline for a medical board once the separation date has passed', () => {
-	it('says to update the date, with the way to Settings', async () => {
-		await device(-1, 'medical');
+// A medical board can move the separation date either way. Moved earlier, steps stay timed to the old date until the
+// member changes it; moved later, the passed date closes required steps. So the line stands whatever the date is.
+describe('the Timeline for a medical board', () => {
+	it.each([
+		['the date has passed', -1],
+		['the date is today', 0],
+		['the date is ahead', 30]
+	])('says to update the date, with the way to Settings, when %s', async (_name, days) => {
+		await device(days, 'medical');
 		await render(TimelinePage);
 		await expect.element(page.getByText(LINE)).toBeVisible();
 		await expect
@@ -84,10 +88,8 @@ describe('the Timeline for a medical board once the separation date has passed',
 	});
 
 	it.each([
-		['the date is today', 0, 'medical'],
-		['the date is ahead', 30, 'medical'],
-		['another answer', -1, 'retirement'],
-		['no answer', -1, undefined]
+		['another answer', 30, 'retirement'],
+		['no answer', 30, undefined]
 	] as const)('says nothing when %s', async (_name, days, path) => {
 		await device(days, path);
 		await render(TimelinePage);
