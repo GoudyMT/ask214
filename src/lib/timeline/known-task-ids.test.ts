@@ -41,7 +41,15 @@ const SHIPPED_TASK_IDS: readonly string[] = [
 	'tsp-decision',
 	'vgli-convert',
 	'final-pay-check',
-	'va-claim-fallback'
+	'va-claim-fallback',
+	'retirement-request',
+	'sbp-election',
+	'peblo-contact',
+	'va-msc-claim',
+	'ides-review-options',
+	'tamp-check',
+	'rcsbp-election',
+	'tricare-retiree-enroll'
 ];
 
 describe('KNOWN_TASK_IDS', () => {
@@ -52,7 +60,7 @@ describe('KNOWN_TASK_IDS', () => {
 	});
 
 	it('KNOWN_TASK_IDS keeps every id it has ever held', () => {
-		expect(SHIPPED_TASK_IDS).toHaveLength(37);
+		expect(SHIPPED_TASK_IDS).toHaveLength(45);
 		expect(KNOWN_TASK_IDS.slice(0, SHIPPED_TASK_IDS.length)).toEqual(SHIPPED_TASK_IDS);
 	});
 

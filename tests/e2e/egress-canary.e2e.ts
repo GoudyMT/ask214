@@ -197,6 +197,10 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'Talk with your VA Military Service Coordinator',
 		'Learn the review and appeal steps',
 		'If the board retires you',
+		'If the board moves your',
+		'If the board finds you unfit',
+		'If you retire\\, enroll',
+		'If you retire, enroll',
 		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
 		'Retiring from the Guard or Reserve',
 		...(['medical', 'retirement', 'reserve-retirement', 'reserve-component'] as const).flatMap(
@@ -209,7 +213,8 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'retirement-request',
 		'sbp-election',
 		'tamp-check',
-		'rcsbp-election'
+		'rcsbp-election',
+		'tricare-retiree-enroll'
 	];
 	for (const request of sent) {
 		const text = [

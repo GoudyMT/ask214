@@ -76,6 +76,27 @@ function onOrders(def: TaskDef): TaskDef {
 const RETIRING_RCSBP_TITLE =
 	'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it';
 
+// A board can move the date, so a member may have less time than the window assumes. The Home row and the calendar show
+// only the title, and the title stays free of the board, so this line lives in the why.
+function forBoard(line: string, def: TaskDef, afterNote = def.afterNote): TaskDef {
+	const medical = { why: `${def.why} ${line}`, ...(afterNote && { afterNote }) };
+	return { ...def, copyFor: { ...def.copyFor, medical } };
+}
+const BOARD_MOVES_TAP =
+	'If the board moves your date up, start as soon as you can; your transition assistance office says what fits.';
+const BOARD_EXAMS =
+	'If the board finds you unfit, its exams may stand in for this one; your PEBLO can confirm.';
+const BOARD_EXAMS_AFTER =
+	"Still required unless the board's exams stand in. Ask your PEBLO or your military medical clinic.";
+
+const SBP_CHOICE =
+	'SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.';
+const RCSBP_WHY =
+	'The letter says you have the years of service for retired pay, and the Reserve Component Survivor Benefit Plan choice is due within 90 days of it. Your Guard or Reserve personnel office can say when to expect the letter.';
+
+const TRR_ANYTIME =
+	'Members who qualify can buy TRICARE Retired Reserve at any time before age 60.';
+
 const BDD_FALLBACK =
 	'A VA claim can still be filed the standard way, and an accredited VSO helps for free.';
 const BDD_WHY =
@@ -184,45 +205,51 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- TAP / counseling (federally anchored) ----
-	onOrders({
-		id: 'preseparation-counseling',
-		title: 'Complete Initial and Pre-separation Counseling',
-		category: 'admin',
-		finishBefore: 'leaving',
-		kind: 'required',
-		windowStart: -540,
-		windowEnd: -365,
-		recommendedOffset: -400,
-		why: 'TAP officially starts here, and it is required no later than 365 days out.',
-		afterNote:
-			"Still required. Contact your installation's transition assistance office to start now.",
-		windowFor: {
-			retirement: { windowStart: -730, recommendedOffset: -600 },
-			'reserve-retirement': { windowStart: -730, recommendedOffset: -600 }
-		}
-	}),
-	onOrders({
-		id: 'tap-course',
-		title: 'Attend your required TAP curriculum',
-		category: 'admin',
-		finishBefore: 'leaving',
-		kind: 'soft',
-		windowStart: -365,
-		windowEnd: -120,
-		recommendedOffset: -270,
-		why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
-	}),
-	onOrders({
-		id: 'tap-track',
-		title: 'Attend a TAP 2-day track (Employment / Education / Vocational / Entrepreneurship)',
-		category: 'admin',
-		finishBefore: 'leaving',
-		kind: 'soft',
-		windowStart: -365,
-		windowEnd: -120,
-		recommendedOffset: -240,
-		why: 'Each member picks one focused 2-day track for their path.'
-	}),
+	onOrders(
+		forBoard(BOARD_MOVES_TAP, {
+			id: 'preseparation-counseling',
+			title: 'Complete Initial and Pre-separation Counseling',
+			category: 'admin',
+			finishBefore: 'leaving',
+			kind: 'required',
+			windowStart: -540,
+			windowEnd: -365,
+			recommendedOffset: -400,
+			why: 'TAP officially starts here, and it is required no later than 365 days out.',
+			afterNote:
+				"Still required. Contact your installation's transition assistance office to start now.",
+			windowFor: {
+				retirement: { windowStart: -730, recommendedOffset: -600 },
+				'reserve-retirement': { windowStart: -730, recommendedOffset: -600 }
+			}
+		})
+	),
+	onOrders(
+		forBoard(BOARD_MOVES_TAP, {
+			id: 'tap-course',
+			title: 'Attend your required TAP curriculum',
+			category: 'admin',
+			finishBefore: 'leaving',
+			kind: 'soft',
+			windowStart: -365,
+			windowEnd: -120,
+			recommendedOffset: -270,
+			why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
+		})
+	),
+	onOrders(
+		forBoard(BOARD_MOVES_TAP, {
+			id: 'tap-track',
+			title: 'Attend a TAP 2-day track (Employment / Education / Vocational / Entrepreneurship)',
+			category: 'admin',
+			finishBefore: 'leaving',
+			kind: 'soft',
+			windowStart: -365,
+			windowEnd: -120,
+			recommendedOffset: -240,
+			why: 'Each member picks one focused 2-day track for their path.'
+		})
+	),
 
 	// ---- SkillBridge: shown only when the user's answer to the SkillBridge question shows them ----
 	{
@@ -332,30 +359,38 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- Separation health assessment + VA claim (BDD) ----
-	{
-		id: 'sha-schedule',
-		title: 'Schedule your Separation Health Assessment (SHA)',
-		category: 'medical',
-		finishBefore: 'terminal-leave',
-		kind: 'required',
-		windowStart: -180,
-		windowEnd: -90,
-		recommendedOffset: -150,
-		why: 'Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your military medical clinic.',
-		afterNote: 'Still required before you separate. Contact your military medical clinic.'
-	},
-	{
-		id: 'sha-complete',
-		title: 'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
-		category: 'medical',
-		finishBefore: 'terminal-leave',
-		kind: 'required',
-		windowStart: -150,
-		windowEnd: -90,
-		recommendedOffset: -120,
-		why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
-		afterNote: 'Still required before you separate. Contact your military medical clinic.'
-	},
+	forBoard(
+		BOARD_EXAMS,
+		{
+			id: 'sha-schedule',
+			title: 'Schedule your Separation Health Assessment (SHA)',
+			category: 'medical',
+			finishBefore: 'terminal-leave',
+			kind: 'required',
+			windowStart: -180,
+			windowEnd: -90,
+			recommendedOffset: -150,
+			why: 'Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your military medical clinic.',
+			afterNote: 'Still required before you separate. Contact your military medical clinic.'
+		},
+		BOARD_EXAMS_AFTER
+	),
+	forBoard(
+		BOARD_EXAMS,
+		{
+			id: 'sha-complete',
+			title: 'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
+			category: 'medical',
+			finishBefore: 'terminal-leave',
+			kind: 'required',
+			windowStart: -150,
+			windowEnd: -90,
+			recommendedOffset: -120,
+			why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
+			afterNote: 'Still required before you separate. Contact your military medical clinic.'
+		},
+		BOARD_EXAMS_AFTER
+	),
 	{
 		id: 'va-bdd-claim',
 		title: 'File your VA disability claim through BDD (Benefits Delivery at Discharge)',
@@ -404,7 +439,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: 0,
 		recommendedOffset: -120,
-		why: 'The SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.',
+		why: `The ${SBP_CHOICE}`,
 		afterNote:
 			'If retired pay has begun, ask your retirement services office what can still change.',
 		// 10 USC 1448(a) covers anyone who becomes entitled to retired pay, a disability retirement included. A Guard or
@@ -412,11 +447,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// Reserve one, so the title says when it applies.
 		copyFor: {
 			medical: {
-				why: 'If the board retires you, the SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.'
+				why: `If the board retires you, the ${SBP_CHOICE}`
 			},
 			'reserve-retirement': {
 				title:
-					'If you are retiring from full-time active duty, get Survivor Benefit Plan counseling and make your SBP choice'
+					'If you are retiring from full-time active duty, get Survivor Benefit Plan counseling and make your SBP choice',
+				why: `If you are retiring from full-time active duty, the ${SBP_CHOICE}`,
+				afterNote:
+					'If you are retiring from full-time active duty and retired pay has begun, ask your retirement services office what can still change.'
 			}
 		},
 		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
@@ -481,30 +519,71 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: 0,
 		recommendedOffset: -180,
-		why: 'The letter says you have the years of service for retired pay, and the Reserve Component Survivor Benefit Plan choice is due within 90 days of it. Your Guard or Reserve personnel office can say when to expect the letter.',
+		why: RCSBP_WHY,
 		// "Retiring" keeps this step for a Guard or Reserve member who answered before the Guard or Reserve retirement
 		// answer existed, so its title says when it applies.
 		copyFor: {
 			retirement: { title: RETIRING_RCSBP_TITLE },
-			'reserve-retirement': { title: RETIRING_RCSBP_TITLE }
+			// A member retiring from full-time active duty also sees the active-duty step, and only the office can say
+			// which of the two is theirs.
+			'reserve-retirement': {
+				title: RETIRING_RCSBP_TITLE,
+				why: `${RCSBP_WHY} Your retirement services office says which SBP choice applies to you.`
+			}
 		},
 		requires: { separationPath: [...GUARD_OR_RESERVE, 'retirement'] }
 	},
 
-	// ---- Capstone + final-90 ----
-	onOrders({
-		id: 'tap-capstone',
-		title: 'Complete your TAP Capstone',
-		category: 'admin',
-		finishBefore: 'leaving',
-		kind: 'required',
-		windowStart: -365,
-		windowEnd: -90,
-		recommendedOffset: -120,
-		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
+	{
+		id: 'tricare-retiree-enroll',
+		title: 'If you retire, enroll in a TRICARE plan within 90 days after your retirement date',
+		category: 'benefits',
+		finishBefore: 'separation',
+		kind: 'closes',
+		// tricare.mil counts the 90 days from the retirement date and gives no way to enroll before it.
+		windowStart: 0,
+		windowEnd: 90,
+		// tricare.mil allows a retroactive request "up to 12 months"; 365 days never runs past that.
+		finalEnd: 365,
+		why: 'Retiring changes your TRICARE coverage. To keep it with no break, enroll in TRICARE Prime or TRICARE Select within 90 days after your retirement date. A Guard or Reserve retirement works differently; tricare.mil has the steps.',
+		changeNote:
+			'If you retired, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date.',
 		afterNote:
-			"Still required before you separate. Contact your installation's transition assistance office."
-	}),
+			'If you retired, you can enroll during TRICARE Open Season or after a Qualifying Life Event; see tricare.mil.',
+		// The title stays the default for a medical board: it reaches the calendar file, and a title only that answer has
+		// would mark the file as a board member's.
+		copyFor: {
+			medical: {
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If it separates you instead, tricare.mil lists what may apply.'
+			},
+			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
+			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.
+			'reserve-retirement': {
+				title: 'Check your TRICARE plan within 90 days of your retirement date',
+				why: 'If you have TRICARE Reserve Select, it ends when you transfer to the Retired Reserve; buying TRICARE Retired Reserve within 90 days of your retirement date avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
+				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date. ${TRR_ANYTIME}`,
+				afterNote: `If you are retiring from full-time active duty, you can enroll during TRICARE Open Season or after a Qualifying Life Event. ${TRR_ANYTIME}`
+			}
+		},
+		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
+	},
+
+	// ---- Capstone + final-90 ----
+	onOrders(
+		forBoard(BOARD_MOVES_TAP, {
+			id: 'tap-capstone',
+			title: 'Complete your TAP Capstone',
+			category: 'admin',
+			finishBefore: 'leaving',
+			kind: 'required',
+			windowStart: -365,
+			windowEnd: -90,
+			recommendedOffset: -120,
+			why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
+			afterNote:
+				"Still required before you separate. Contact your installation's transition assistance office."
+		})
+	),
 	{
 		id: 'va-benefits-advisor',
 		title: 'Meet one-on-one with a VA benefits advisor',
@@ -588,7 +667,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		recommendedOffset: -14,
 		why: 'A Marketplace special enrollment period runs from 60 days before to 60 days after TRICARE (or TAMP) ends, and CHCBP enrollment within 60 days after; tricare.mil and healthcare.gov say who qualifies.',
 		afterNote:
-			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.'
+			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.',
+		// A retiree stays on TRICARE; the retiree enrollment step is theirs.
+		hideFor: ['retirement']
 	},
 	{
 		id: 'dd214-copies',
@@ -653,6 +734,6 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: 0,
 		windowEnd: 365,
 		recommendedOffset: 14,
-		why: 'If you missed the BDD window: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.'
+		why: 'If you did not file through BDD: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.'
 	}
 ];

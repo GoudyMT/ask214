@@ -1346,12 +1346,24 @@ describe('the leaving answer on the real task list', () => {
 	const TRACKS: Record<SeparationPath, string[]> = {
 		ets: [],
 		// A Guard or Reserve retirement makes the Reserve SBP choice; a board can retire a member, who then makes the SBP one.
-		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election'],
-		medical: ['peblo-contact', 'va-msc-claim', 'ides-review-options', 'sbp-election'],
+		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election', 'tricare-retiree-enroll'],
+		medical: [
+			'peblo-contact',
+			'va-msc-claim',
+			'ides-review-options',
+			'sbp-election',
+			'tricare-retiree-enroll'
+		],
 		'reserve-component': ['tamp-check', 'rcsbp-election'],
 		// A Guard or Reserve retiree makes the Reserve SBP choice, or the active-duty one when retiring from full-time
 		// active duty (10 USC 1448(a)(2)), and asks when to file.
-		'reserve-retirement': ['retirement-request', 'tamp-check', 'rcsbp-election', 'sbp-election']
+		'reserve-retirement': [
+			'retirement-request',
+			'tamp-check',
+			'rcsbp-election',
+			'sbp-election',
+			'tricare-retiree-enroll'
+		]
 	};
 	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
 	const items = (separationPath?: SeparationPath, tasks: TimelineState['tasks'] = {}) =>
@@ -1432,6 +1444,176 @@ describe('the leaving answer on the real task list', () => {
 			}
 		}
 	);
+
+	// tricare.mil: 90 days after the retirement date to enroll, a retroactive request up to 12 months from it.
+	it.each([
+		['the day before retirement', new Date(2028, 5, 29, 12), 'upcoming'],
+		['the retirement date', new Date(2028, 5, 30, 12), 'start-now'],
+		['day 90', new Date(2028, 8, 28, 12), 'closing-soon'],
+		['day 91', new Date(2028, 8, 29, 12), 'changed'],
+		['day 365', new Date(2029, 5, 30, 12), 'changed'],
+		['day 366', new Date(2029, 6, 1, 12), 'closed']
+	] as const)('reads the retiree TRICARE step on %s', (_name, today, status) => {
+		const view = generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: SEP,
+				daysUntilSeparation: 0,
+				separationPath: 'retirement'
+			},
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: {} },
+			today
+		);
+		const item = view.phases
+			.flatMap((p) => p.items)
+			.find((i) => i.def.id === 'tricare-retiree-enroll');
+		expect(item?.status).toBe(status);
+	});
+
+	it('says what a member can still do once each TRICARE edge passes', () => {
+		const def = (path: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'tricare-retiree-enroll')?.def;
+		// The title reaches the calendar file, so a title of the medical answer's own would mark the file as a board
+		// member's: the two answers share one.
+		expect(def('retirement')?.title).toBe(
+			'If you retire, enroll in a TRICARE plan within 90 days after your retirement date'
+		);
+		expect(def('medical')?.title).toBe(def('retirement')?.title);
+		// A board can separate a member instead, so neither note says flatly that they can enroll.
+		for (const path of ['retirement', 'medical'] as const) {
+			expect(def(path)?.changeNote).toMatch(
+				/^If you retired, you can ask for retroactive enrollment up to 12 months/
+			);
+			expect(def(path)?.afterNote).toMatch(
+				/^If you retired, you can enroll during TRICARE Open Season/
+			);
+		}
+		// 10 USC 1201(b)(3): 20 years of service retires a member under a 30% rating, so no rating decides this line.
+		expect(def('medical')?.why).toMatch(/^If the board retires you/);
+		expect(def('medical')?.why).toMatch(/If it separates you instead/);
+		expect(def('medical')?.why).not.toMatch(/30%/);
+		// A Guard or Reserve member can hold the Retiring answer from before their own answer existed.
+		expect(def('retirement')?.why).toMatch(/A Guard or Reserve retirement works differently/);
+		expect(def('reserve-retirement')?.title).toBe(
+			'Check your TRICARE plan within 90 days of your retirement date'
+		);
+		// This answer holds two members: one leaving full-time active duty keeps the retiree routes, a drill-status one
+		// has TRICARE Retired Reserve. Each note says which is whose.
+		for (const note of [
+			def('reserve-retirement')?.changeNote,
+			def('reserve-retirement')?.afterNote
+		]) {
+			expect(note).toMatch(/^If you are retiring from full-time active duty, you can/);
+			expect(note).toMatch(/Members who qualify can buy TRICARE Retired Reserve at any time/);
+		}
+	});
+
+	// tricare.mil gives 90 days after the retirement date and no way to enroll before it, so the step opens that day.
+	it('opens the TRICARE step on the retirement date, not before it', () => {
+		const item = items('retirement').find((i) => i.def.id === 'tricare-retiree-enroll');
+		expect(item?.def.windowStart).toBe(0);
+		expect(item?.def.recommendedOffset ?? item?.def.windowStart).toBe(0);
+	});
+
+	// A retiree stays on TRICARE, so "coverage for after TRICARE" is not their step; the others may really leave it.
+	it('hides the after-TRICARE coverage step for a retiree only', () => {
+		expect(ids('retirement')).not.toContain('tricare-elect');
+		for (const path of [
+			undefined,
+			'ets',
+			'medical',
+			'reserve-component',
+			'reserve-retirement'
+		] as const) {
+			expect(ids(path)).toContain('tricare-elect');
+		}
+	});
+
+	// 10 USC 1142(a)(3)(B): a separation not known until 365 or fewer days remain starts counseling as soon as possible.
+	const OTHER_ANSWERS = ['ets', 'retirement', 'reserve-component', 'reserve-retirement'] as const;
+	it.each(['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'])(
+		'tells a board member, and only a board member, to start %s early if the date moves up',
+		(id) => {
+			const def = (path: SeparationPath) => items(path).find((i) => i.def.id === id)?.def;
+			const line =
+				'If the board moves your date up, start as soon as you can; your transition assistance office says what fits.';
+			expect(def('medical')?.why.endsWith(line)).toBe(true);
+			expect(def('medical')?.title).toBe(def('ets')?.title);
+			for (const path of OTHER_ANSWERS) expect(def(path)?.why).not.toMatch(/board/);
+		}
+	);
+
+	it.each(['sha-schedule', 'sha-complete'])(
+		'tells a board member, and only a board member, the board exams may stand in for %s',
+		(id) => {
+			const def = (path: SeparationPath) => items(path).find((i) => i.def.id === id)?.def;
+			const line =
+				'If the board finds you unfit, its exams may stand in for this one; your PEBLO can confirm.';
+			expect(def('medical')?.why.endsWith(line)).toBe(true);
+			// The note a late card shows must not say the opposite of that line.
+			expect(def('medical')?.afterNote).toMatch(
+				/^Still required unless the board's exams stand in/
+			);
+			expect(def('medical')?.title).toBe(def('ets')?.title);
+			for (const path of OTHER_ANSWERS) {
+				expect(def(path)?.why).not.toMatch(/board/);
+				expect(def(path)?.afterNote).toMatch(/^Still required before you separate/);
+			}
+		}
+	);
+
+	// The member updated the date after a board moved it up: the steps re-time, and a step whose window has gone stays
+	// on the list as late, with what to do, rather than closed.
+	it('reads Capstone and the SHA as late once a moved date leaves too little time', () => {
+		const view = generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: '2027-01-15' as EaosString,
+				daysUntilSeparation: 76,
+				separationPath: 'medical'
+			},
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: {} },
+			TODAY
+		);
+		const moved = view.phases.flatMap((p) => p.items);
+		const notes = {
+			'tap-capstone': /^Still required before you separate/,
+			'sha-schedule': /^Still required unless the board's exams stand in/,
+			'sha-complete': /^Still required unless the board's exams stand in/
+		};
+		for (const [id, note] of Object.entries(notes)) {
+			const item = moved.find((i) => i.def.id === id);
+			expect(item?.status, id).toBe('late');
+			expect(item?.def.afterNote, id).toMatch(note);
+		}
+	});
+
+	// A drill-status retiree makes the Reserve choice, so each line of the active-duty step says when it applies.
+	it('conditions every line of the active-duty SBP step for a Guard or Reserve retiree', () => {
+		const def = items('reserve-retirement').find((i) => i.def.id === 'sbp-election')?.def;
+		expect(def?.why).toMatch(/^If you are retiring from full-time active duty, the SBP choice/);
+		expect(def?.afterNote).toMatch(
+			/^If you are retiring from full-time active duty and retired pay has begun/
+		);
+	});
+
+	// A member who has both steps needs a place to ask; the rule for full-time active duty is not settled here.
+	it('sends a Guard or Reserve retiree with both SBP steps to the office that says which applies', () => {
+		const def = (path: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'rcsbp-election')?.def;
+		const line = 'Your retirement services office says which SBP choice applies to you.';
+		expect(def('reserve-retirement')?.why.endsWith(line)).toBe(true);
+		expect(def('reserve-component')?.why).not.toContain(line);
+	});
+
+	// A member who never had BDD, such as a drill-status member, did not miss it.
+	it('does not say a member missed a BDD window they may never have had', () => {
+		const why = items().find((i) => i.def.id === 'va-claim-fallback')?.def.why;
+		expect(why).toMatch(/^If you did not file through BDD:/);
+		expect(why).not.toMatch(/missed/);
+	});
 
 	it('says when the SBP steps apply to a medical board and to a retirement', () => {
 		const def = (path: SeparationPath, id: string) => items(path).find((i) => i.def.id === id)?.def;

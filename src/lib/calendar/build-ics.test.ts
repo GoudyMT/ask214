@@ -122,9 +122,9 @@ describe('buildIcs', () => {
 	});
 
 	// A calendar file can land in a calendar others see, often a work one; a medical board is health information.
-	it('the medical board answer adds no medical-board step to the file, only the SBP step everyone retiring gets', async () => {
+	it('the medical board answer adds no title of its own to the file: all it adds, a retiring member has too', async () => {
 		const now = new Date(2026, 9, 7, 12);
-		const fileFor = async (separationPath?: 'medical') => {
+		const fileFor = async (separationPath?: 'medical' | 'retirement') => {
 			const items = generateTimeline(
 				{
 					completeness: 'eaos-only',
@@ -147,8 +147,8 @@ describe('buildIcs', () => {
 		const without = titles(await fileFor());
 		const added = [...titles(await fileFor('medical'))].filter((t) => !without.has(t));
 		expect(added.length).toBeGreaterThan(0);
-		for (const t of added)
-			expect(t).toMatch(/: Get Survivor Benefit Plan counseling and make your SBP choice$/);
+		const retiring = titles(await fileFor('retirement'));
+		for (const t of added) expect(retiring.has(t), t).toBe(true);
 	});
 });
 
