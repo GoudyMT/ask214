@@ -6,8 +6,8 @@ import { TAKE_OVER } from './take-over-message';
  * closes, and offline it serves its own cached pages, which cannot open the raised database: the person sees "The app
  * couldn't open the information saved on this device" with a Reload that cannot help. So the page that raised it marks
  * the device with its build, and every page of that build asks its own waiting worker to take over at once (the worker
- * obeys only a page of its own build). A page of any other build clears the mark: a release that raised nothing keeps
- * the usual wait, so the open tabs of the release before keep their own worker's files. The mark is a build name:
+ * obeys only a page of its own build). A page of any other build at this database version clears the mark: a release that
+ * raised nothing keeps the usual wait, so the open tabs of the release before keep their own worker's files. The mark is a build name:
  * nothing personal. Its key names the database version: a page of the release before, served offline by its own worker,
  * would otherwise clear the mark as another build's, and no later page of this build would ask.
  */

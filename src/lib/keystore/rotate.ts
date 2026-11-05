@@ -58,8 +58,9 @@ type Body = { id: number; rec: Uint8Array };
 type Mark = SignedSidecar<ProfileHwmPayload> & { id: number };
 type Put = { store: StoreName; value: unknown };
 
-// Every registry entry must be carried below, so a store added to the registry fails the type-check here instead of being
-// left behind under a key that is gone. A type alone, so it ships nothing.
+// Every registry entry must be named here, so a store added to the registry fails the type-check instead of being left
+// behind under a key that is gone. Naming it is not carrying it: readCut and move take it by hand. A type alone, so it
+// ships nothing.
 type Nothing<T extends never> = T;
 export type UncarriedStore = Nothing<Exclude<EncryptedStoreName, SidecarStore | 'byok'>>;
 
