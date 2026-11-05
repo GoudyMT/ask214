@@ -4,7 +4,10 @@ import { createTimelineStateStore } from '../timeline/state.svelte';
 import { createCalendarSyncStore } from '../calendar/store.svelte';
 import { createByokStore } from '../ask/byok/store';
 import { bootstrapLocalKeystore } from '../keystore/bootstrap';
-import { DB_VERSION, withStores } from './schema';
+import { readDeviceState } from '../profile/device-state';
+import { decryptRecord, encryptRecord, type RecordCtx } from '../crypto/record-crypto';
+import { keyIdentity, type KeystoreRecordLocal } from '../keystore/record';
+import { DB_VERSION, openMtcDb, reqToPromise, withStores, type StoreName } from './schema';
 import { deleteTestDb, openTestDb } from './_test-helpers';
 
 /**
@@ -183,7 +186,88 @@ describe('integrity pin: rows an earlier build wrote are read by the real load p
 	});
 
 	// The version is what keeps an older app from reading these bytes as damaged once they change.
-	it('is still database version 8', () => {
-		expect(DB_VERSION).toBe(8);
+	it('is still database version 9', () => {
+		expect(DB_VERSION).toBe(9);
+	});
+
+	// The upgrade a device on the last release runs, with the pinned rows above: the search's three stores, and a profile
+	// resealed here so its backup mark holds a generation for them. All the data opens, the mark matches and a save works.
+	it('a version 8 device with the search stores opens at version 9 with its data and its backup mark', async () => {
+		const name = 'mtc-test-' + crypto.randomUUID();
+		const SEARCH_STORES = [
+			'skillbridge-finder',
+			'skillbridge-finder-hwm',
+			'skillbridge-finder-pack'
+		];
+		const KEPT: StoreName[] = [
+			'keystore',
+			'profile',
+			'profile-hwm',
+			'timeline-state',
+			'timeline-state-hwm',
+			'calendar-sync',
+			'calendar-sync-hwm',
+			'byok'
+		];
+		const rows = await withStores(db, KEPT, 'readonly', (tx) =>
+			Promise.all(KEPT.map((store) => reqToPromise<unknown>(tx.objectStore(store).get(0))))
+		);
+		const keystore = rows[0] as KeystoreRecordLocal;
+		const ctx: RecordCtx = { storeName: 'profile', recordId: 'self', schemaVersion: 1 };
+		const identity = keyIdentity(keystore);
+		const dataKey = keystore.dataKeyRef;
+		const plain = await decryptRecord(ctx, fromHex(GOLDEN.profileBlob), identity, dataKey, 3);
+		const marked = {
+			...(JSON.parse(new TextDecoder().decode(plain)) as object),
+			lastBackupAt: 5,
+			backupGenProfile: 3,
+			backupGenTimeline: 4,
+			backupGenCalendar: 5,
+			backupGenFinder: 2
+		};
+		const profileRec = await encryptRecord(ctx, enc(JSON.stringify(marked)), identity, dataKey, 3);
+		const v8 = await new Promise<IDBDatabase>((resolve, reject) => {
+			const req = indexedDB.open(name, 8);
+			req.onupgradeneeded = () => {
+				for (const store of [...KEPT, ...SEARCH_STORES, 'app-lock']) {
+					req.result.createObjectStore(store, { keyPath: 'id' });
+				}
+			};
+			req.onsuccess = () => resolve(req.result);
+			req.onerror = () => reject(req.error ?? new Error('v8-open-failed'));
+		});
+		const tx = v8.transaction([...KEPT, ...SEARCH_STORES], 'readwrite');
+		KEPT.forEach((store, i) => tx.objectStore(store).put(rows[i]));
+		tx.objectStore('profile').put({ id: 0, rec: profileRec });
+		for (const store of SEARCH_STORES)
+			tx.objectStore(store).put({ id: 0, rec: new Uint8Array(32) });
+		await new Promise((resolve, reject) => {
+			tx.oncomplete = resolve;
+			tx.onerror = reject;
+		});
+		v8.close();
+
+		const upgraded = await openMtcDb(name);
+		try {
+			expect(upgraded.version).toBe(9);
+			const store = createProfileStore(upgraded);
+			const loaded = await store.load();
+			expect(loaded).toMatchObject({ generation: 3, yearsOfService: 8, backupGenCalendar: 5 });
+			expect(loaded).not.toHaveProperty('backupGenFinder');
+			const state = await readDeviceState(upgraded);
+			expect(state.mark).toEqual({ at: 5, gens: state.gens });
+			expect(state.gens).toEqual({ profile: 3, timeline: 4, calendar: 5 });
+			const timeline = createTimelineStateStore(upgraded);
+			await timeline.load();
+			expect(timeline.state.tasks['task-a']).toEqual({ status: 'done' });
+			const calendar = createCalendarSyncStore(upgraded);
+			await calendar.load();
+			expect(calendar.exclusions).toEqual({ taskIds: ['task-a'], categories: ['medical'] });
+			expect(await createByokStore(upgraded).readApiKey()).toBe('fixture-api-key-not-real');
+			await store.save({ yearsOfService: 9 });
+			expect((await createProfileStore(upgraded).load())?.yearsOfService).toBe(9);
+		} finally {
+			await deleteTestDb(upgraded);
+		}
 	});
 });

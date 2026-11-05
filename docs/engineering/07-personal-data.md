@@ -12,7 +12,7 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 
 | Layer      | Tool                        | Version  | Purpose                                 |
 | ---------- | --------------------------- | -------- | --------------------------------------- |
-| Storage    | IndexedDB, raw API          | spec     | Twelve stores                           |
+| Storage    | IndexedDB, raw API          | spec     | Nine stores                             |
 | Encryption | Web Crypto, AES-GCM 256     | spec     | Every personal record                   |
 | Integrity  | Web Crypto, HMAC-SHA-256    | spec     | Signs the key record and rollback marks |
 | Keys       | Non-extractable `CryptoKey` | spec     | Made on the device, never exportable    |
@@ -30,12 +30,10 @@ provider with each summary request. Each decision's full reasoning is kept in pr
 **What it is.** The profile holds the separation date and, optionally, rate, rank, years of service,
 anticipated disability rating, family status, intended path, destination, special situations, and SkillBridge
 and terminal leave start dates, and how the member is leaving. Beside it are the timeline's task statuses, snooze dates and notes, among them
-the answer to the SkillBridge question, the calendar choices, the SkillBridge finder's answers (a ZIP or a state,
-filters), saved programs and compare picks, and the optional API key. Each lives as ciphertext in its own
-single-row IndexedDB store; four more stores hold signed rollback marks and one holds the keys. The finder's
-downloaded listings, its seen programs and its last-seen week sit in one more store, encrypted one row per file
-and kept on this device only. A last, plain store holds the app lock's wrong-try count and a lock counter (nothing
-derived from the PIN) and never goes into a backup: twelve stores in all. Pages that show personal data render only in the browser, and a CI test fails if any server
+the answer to the SkillBridge question, the calendar choices and the optional API key. Each lives as ciphertext in
+its own single-row IndexedDB store; three more stores hold signed rollback marks and one holds the keys. A last,
+plain store holds the app lock's wrong-try count and a lock counter (nothing derived from the PIN) and never goes
+into a backup: nine stores in all. Pages that show personal data render only in the browser, and a CI test fails if any server
 file names a profile field.
 
 **Why this project uses it.** With no server copy, there is nothing to breach, sell or hand over.
@@ -55,7 +53,7 @@ decrypt. A project lint rule forbids writing to an encrypted store anywhere else
 
 **Keys.** On first run the browser generates an AES-GCM 256 key and an HMAC-SHA-256 key as non-extractable
 `CryptoKey` objects, which no script can export, and stores them with the signed key record in one
-transaction. Signed high-water marks beside the profile, timeline, calendar and finder records refuse an older copy, and
+transaction. Signed high-water marks beside the profile, timeline and calendar records refuse an older copy, and
 errors carry opaque codes, never decrypted text.
 
 **What it does not protect.** Without the optional PIN (see App lock), the key sits on the same device as the
@@ -76,7 +74,7 @@ through one sink that refuses error objects and keeps 64 entries in memory only;
 error.
 
 **Tradeoffs accepted.** Without a PIN, Unlock is one tap: the lock clears the screen, it is not access control.
-Timeline notes, the calendar record and the finder's place and saved programs are not overwritten in memory like
+Timeline notes and the calendar record are not overwritten in memory like
 the profile: plain strings cannot be zeroized, so a lock drops the reference.
 
 ---
@@ -187,8 +185,8 @@ to keep the alerts. Google Calendar sync is designed but not built.
 
 ### Backup
 
-**What it is.** The user can save the profile, the timeline's task state and notes, the calendar record and the
-SkillBridge finder's answers, saved programs and compare picks as one encrypted file, and restore it on a new phone or after the site's data was cleared. The app makes a
+**What it is.** The user can save the profile, the timeline's task state and notes and the calendar record as one
+encrypted file, and restore it on a new phone or after the site's data was cleared. The app makes a
 six-word passphrase from a list of 7,629 words, about 77 bits, and keeps it only while the backup is made. A key comes from it in two
 steps: Argon2id (128 MiB of memory, 4 passes, 2 lanes, from `@noble/hashes` 2.4.0) runs in a worker so the page
 stays responsive, then HKDF-SHA-256 turns its output into an AES-256-GCM key. Those numbers are fixed for the
@@ -201,14 +199,13 @@ the ciphertext. The check is a plain SHA-256 that only tells a damaged file from
 a security control. The reader refuses a file that is too large, not ours, from a newer version or damaged
 before it does any key work, with an opaque code.
 
-**Restore.** The user picks a file and types the passphrase. The restore replaces this device's profile, timeline,
-calendar and SkillBridge finder records in one IndexedDB transaction, under the key lock alone, and signs fresh
-rollback marks for them; a file from before the finder existed leaves the finder empty. If anything fails,
-nothing was written. Once it lands, the downloaded SkillBridge listings are dropped, since they belonged to the
-data the restore replaced.
+**Restore.** The user picks a file and types the passphrase. The restore replaces this device's profile, timeline
+and calendar records in one IndexedDB transaction, under the key lock alone, and signs fresh rollback marks for
+them. A file from a release that still carried a SkillBridge search record restores too: that record is dropped
+unread. If anything fails, nothing was written.
 
-**What a backup does not carry.** The API key, Ask's offline library, saved documents, downloaded SkillBridge
-listings and this device's settings (theme, Ask mode). The key store stays on the device. The user sets these up
+**What a backup does not carry.** The API key, Ask's offline library, saved documents and this device's
+settings (theme, Ask mode). The key store stays on the device. The user sets these up
 again in Settings.
 
 **Tradeoffs accepted.** A lost passphrase cannot be recovered: there is no server copy and no reset. Erase does

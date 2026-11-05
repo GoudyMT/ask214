@@ -11,9 +11,6 @@ import { readDeviceState, type DeviceState } from '../profile/device-state';
 import type { readLockedDevice, restoreLockedDevice } from '../keystore/forgot-restore';
 import { KeystoreNotInitializedError, readKeystoreRow } from '../keystore/read';
 import { createProfileStore, OccConflictError, type ProfileStore } from '../profile/store.svelte';
-import { cleanListing } from '../skillbridge-finder/fixtures/clean';
-import { createFinderPackStore } from '../skillbridge-finder/state/pack-store.svelte';
-import { createFinderStore } from '../skillbridge-finder/state/store.svelte';
 import { localTodayIso } from '../timeline/day-math';
 import { formatTimelineDate } from '../timeline/format-date';
 import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
@@ -229,8 +226,7 @@ async function exportFrom(device: Device, o: ExportOptions, name = OUR_NAME): Pr
 					lastBackupAt: o.createdAt,
 					backupGenProfile: snap.gens.profile + 1,
 					backupGenTimeline: snap.gens.timeline,
-					backupGenCalendar: snap.gens.calendar,
-					backupGenFinder: snap.gens.finder
+					backupGenCalendar: snap.gens.calendar
 				});
 			} catch (e) {
 				// Another tab got there first; the backup still stands, the device just carries no mark.
@@ -246,8 +242,7 @@ async function exportFrom(device: Device, o: ExportOptions, name = OUR_NAME): Pr
 // ---- rows ----------------------------------------------------------------------------------------------------------
 
 type Row = Record<string, unknown>;
-// The stores a restore replaces or clears: every one the manifest does not mark 'never' (the API key and the finder's
-// cached listings).
+// The stores a restore replaces or clears: every one the manifest does not mark 'never' (the API key).
 const RESTORE_TOUCHES: StoreName[] = STORES.filter((store) => BACKUP_MANIFEST[store] !== 'never');
 const hex = (bytes: Uint8Array): string =>
 	Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -671,7 +666,7 @@ describe('the confirm', () => {
 		expect(read).toHaveBeenCalledTimes(1);
 		expect(r.session.phase).toBe('confirm');
 		const confirm = need(r.flow.confirm);
-		expect(confirm.gens).toEqual({ profile: 0, timeline: 0, calendar: 0, finder: 0 });
+		expect(confirm.gens).toEqual({ profile: 0, timeline: 0, calendar: 0 });
 		expect(confirm.summary).toEqual({
 			madeOn: formatBackupDate(FILE_CREATED_AT),
 			label: OUR_LABEL,
@@ -787,62 +782,6 @@ describe('the confirm', () => {
 		expect(confirm.warning).toBe(true);
 	});
 
-	// The SkillBridge answers and saved programs are the person's data too: changing only those after a backup is a change
-	// the restore would replace.
-	it('a change to the finder alone after the backup warns, and the line dates the change', async () => {
-		const device = await finishedDevice(await newDb());
-		const finder = createFinderStore(device.db);
-		await finder.load();
-		await finder.setSetup({ radius: 25 });
-		const file = await exportFrom(device, { createdAt: Date.now() - MINUTE });
-		await finder.setSetup({ radius: 50 });
-		const state = await readDeviceState(device.db);
-		const r = restoreRig({ db: device.db, store: device.profile });
-		await toConfirm(r, file);
-		const confirm = need(r.flow.confirm);
-		expect(confirm.deviceLine).toBe(
-			'This device was last changed ' + deviceDate(need(state.ts.finder)) + '.'
-		);
-		expect(confirm.warning).toBe(true);
-	});
-
-	it('a device that backed up its finder and changed nothing since matches the backup', async () => {
-		const device = await finishedDevice(await newDb());
-		const finder = createFinderStore(device.db);
-		await finder.load();
-		await finder.setSetup({ radius: 25 });
-		const madeAt = Date.now() - MINUTE;
-		const file = await exportFrom(device, { createdAt: madeAt });
-		const r = restoreRig({ db: device.db, store: device.profile });
-		await toConfirm(r, file);
-		const confirm = need(r.flow.confirm);
-		expect(confirm.deviceLine).toBe(
-			'This device was last changed when its backup of ' + formatBackupDate(madeAt) + ' was made.'
-		);
-		expect(confirm.warning).toBe(false);
-	});
-
-	// A backup made before the finder existed holds a mark of four fields; the finder it matched was empty.
-	it('a mark of the four older fields still matches a device whose finder is empty', async () => {
-		const device = await finishedDevice(await newDb());
-		const madeAt = Date.now() - MINUTE;
-		const file = await exportFrom(device, { createdAt: madeAt, mark: false });
-		const { gens } = await readDeviceState(device.db);
-		await device.profile.save({
-			lastBackupAt: madeAt,
-			backupGenProfile: gens.profile + 1,
-			backupGenTimeline: gens.timeline,
-			backupGenCalendar: gens.calendar
-		});
-		const r = restoreRig({ db: device.db, store: device.profile });
-		await toConfirm(r, file);
-		const confirm = need(r.flow.confirm);
-		expect(confirm.deviceLine).toBe(
-			'This device was last changed when its backup of ' + formatBackupDate(madeAt) + ' was made.'
-		);
-		expect(confirm.warning).toBe(false);
-	});
-
 	// Another tab saving the profile in the gap between the snapshot and the mark leaves a device that holds a change the
 	// backup lacks, whether or not the mark landed.
 	it('a profile saved by another tab before the mark is written still warns', async () => {
@@ -906,12 +845,11 @@ describe('the confirm', () => {
 			const createdAt = madeAt();
 			const file = await exportFrom(source, { createdAt });
 			const crafted: DeviceState = {
-				gens: { profile: 1, timeline: timelineOffset === null ? 0 : 1, calendar: 0, finder: 0 },
+				gens: { profile: 1, timeline: timelineOffset === null ? 0 : 1, calendar: 0 },
 				ts: {
 					profile: createdAt + profileOffset,
 					timeline: timelineOffset === null ? null : createdAt + timelineOffset,
-					calendar: null,
-					finder: null
+					calendar: null
 				},
 				mark: null,
 				lastSeenAt: null
@@ -936,8 +874,8 @@ describe('the confirm', () => {
 		const savedAt = new Date(2026, 8, 15, 12).getTime();
 		expect(savedAt).toBeLessThan(BACKUP_RELEASE_DATE);
 		const crafted: DeviceState = {
-			gens: { profile: 1, timeline: 0, calendar: 0, finder: 0 },
-			ts: { profile: savedAt, timeline: null, calendar: null, finder: null },
+			gens: { profile: 1, timeline: 0, calendar: 0 },
+			ts: { profile: savedAt, timeline: null, calendar: null },
 			mark: null,
 			lastSeenAt: null
 		};
@@ -986,35 +924,6 @@ describe('Replace', () => {
 		const calendar = createCalendarSyncStore(phone.db);
 		await calendar.load();
 		expect(calendar.exclusions).toEqual({ taskIds: ['sha-schedule'], categories: ['finance'] });
-	});
-
-	// The SkillBridge answers, saved programs and compare picks travel with the backup, through the same steps a person takes.
-	it('carries the finder from one phone to another and clears what the new phone had cached', async () => {
-		const source = await finishedDevice(await newDb());
-		const sourceFinder = createFinderStore(source.db);
-		await sourceFinder.load();
-		await sourceFinder.setSetup({ place: { kind: 'state', state: 'TX' }, radius: 100 });
-		await sourceFinder.save(cleanListing(), '2026-10-21');
-		await sourceFinder.addCompare(1001);
-		const file = await exportFrom(source, { createdAt: Date.now() - MINUTE });
-		const phone = await newPhone();
-		const cache = createFinderPackStore(phone.db);
-		await cache.load();
-		await cache.markOpened([1001]);
-		const r = restoreRig(phone);
-		await toConfirm(r, file);
-
-		await r.flow.replace();
-
-		expect(r.session.phase).toBe('committed');
-		const finder = createFinderStore(phone.db);
-		await finder.load();
-		expect(finder.setup).toEqual({ place: { kind: 'state', state: 'TX' }, radius: 100 });
-		expect(finder.saved).toEqual([{ id: 1001, savedOn: '2026-10-21', facts: cleanListing() }]);
-		expect(finder.compare).toEqual([1001]);
-		const reread = createFinderPackStore(phone.db);
-		await reread.load();
-		expect(reread.seen.size).toBe(0);
 	});
 
 	// A reload that kept the note is what lets the Timeline say what happened; a replace of the location would drop it.
@@ -1407,8 +1316,8 @@ class NoMemoryWorker implements WorkerLike {
 }
 
 describe('a restore onto a device locked behind a forgotten PIN', () => {
-	const GENS = { profile: 3, timeline: 2, calendar: 2, finder: 1 };
-	const AFTER = { profile: 4, timeline: 3, calendar: 3, finder: 2 };
+	const GENS = { profile: 3, timeline: 2, calendar: 2 };
+	const AFTER = { profile: 4, timeline: 3, calendar: 3 };
 	const INSTALL = new Uint8Array(16).fill(7);
 	const CONFIRM_LINE = 'This replaces everything on this device with the backup.';
 

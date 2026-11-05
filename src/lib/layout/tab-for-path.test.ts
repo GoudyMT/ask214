@@ -8,7 +8,6 @@ describe('tabForPath', () => {
 	it.each<[string, Tab | null]>([
 		['/', 'home'],
 		['/timeline', 'timeline'],
-		['/skillbridge', 'skillbridge'],
 		['/more', 'more'],
 		['/settings', 'more'],
 		['/resources', 'more'],
@@ -20,7 +19,9 @@ describe('tabForPath', () => {
 		// Every page is top level: a missing page under a tab's address belongs to no tab.
 		['/more/zzz', null],
 		['/documents/zzz', null],
-		['/skillbridge/x', null]
+		['/timeline/zzz', null],
+		// The search page is gone, so an address saved from it is a missing page.
+		['/skillbridge', null]
 	])('maps %s to %s', (pathname, tab) => {
 		expect(tabForPath(pathname)).toBe(tab);
 	});

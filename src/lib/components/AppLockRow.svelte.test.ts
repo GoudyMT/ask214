@@ -117,7 +117,6 @@ const MISMATCH_LINE = 'The two PINs do not match.';
 const LOW_MEMORY_LINE =
 	'This phone does not have enough free memory for a PIN. Close other apps and tabs, then try again.';
 const FAILED_LINE = 'Could not turn on the PIN right now - please try again.';
-const PACK_LINE = 'Offline SkillBridge listings download again.';
 const STORE_LINE = (name: string) =>
 	`The PIN was not turned on: your saved ${name} could not be opened. Nothing was changed. Erase all data on this device starts over.`;
 const CHANGE_STORE_LINE = (name: string) =>
@@ -177,7 +176,7 @@ let macKey: CryptoKey;
 let kek: CryptoKey;
 let clock: { t: number };
 let derive: Mock<(pin: string) => Promise<{ macKey: CryptoKey; kek: CryptoKey }>>;
-let rotate: Mock<() => Promise<{ session: KeySession; packHadFiles: boolean }>>;
+let rotate: Mock<() => Promise<{ session: KeySession }>>;
 let remove: Mock<() => Promise<void>>;
 // The keys a PIN-on test's fake derive hands back for the PIN a change moves to, and for a PIN that is wrong.
 let newKeys: { macKey: CryptoKey; kek: CryptoKey };
@@ -221,7 +220,7 @@ beforeEach(async () => {
 	deriveLog = [];
 	runWaitClock = null;
 	derive = vi.fn(async () => ({ macKey, kek }));
-	rotate = vi.fn(async () => ({ session: await fakeSession(), packHadFiles: false }));
+	rotate = vi.fn(async () => ({ session: await fakeSession() }));
 	remove = vi.fn(async () => {});
 });
 
@@ -575,7 +574,7 @@ describe('turning on', () => {
 		rotate.mockImplementation(async () => {
 			const session = await fakeSession();
 			realSetTimeout(() => seams.events.push('task'), 0);
-			return { session, packHadFiles: false };
+			return { session };
 		});
 		await mount();
 		await submitAndSkip(SETUP_PIN, SETUP_PIN);
@@ -584,16 +583,12 @@ describe('turning on', () => {
 		expect(seams.events).toEqual(['setSession', 'task']);
 	});
 
-	it.each([
-		[true, true],
-		[false, false]
-	])('with a pack that held files: %s, the SkillBridge line shows: %s', async (had, shows) => {
-		rotate.mockImplementation(async () => ({ session: await fakeSession(), packHadFiles: had }));
+	it('shows no alert once the PIN is on', async () => {
 		await mount();
 		await submitAndSkip(SETUP_PIN, SETUP_PIN);
 		await until(() => summary() === 'PIN on', 'the row reading PIN on');
 
-		expect(alertText()).toBe(shows ? PACK_LINE : null);
+		expect(alertText()).toBeNull();
 	});
 });
 
@@ -646,7 +641,7 @@ describe('a Lock while Next works', () => {
 	it('holds no session, and shows the PIN lock, when a Lock lands during the move', async () => {
 		rotate.mockImplementation(async () => {
 			relockEachSync(relockables, 'user');
-			return { session: await fakeSession(), packHadFiles: false };
+			return { session: await fakeSession() };
 		});
 		await mount();
 		await submitAndSkip(SETUP_PIN, SETUP_PIN);
@@ -663,7 +658,7 @@ describe('a Lock while Next works', () => {
 	it('turns on as usual when a switch away lands during the move', async () => {
 		rotate.mockImplementation(async () => {
 			relockEachSync(relockables, 'hygiene');
-			return { session: await fakeSession(), packHadFiles: false };
+			return { session: await fakeSession() };
 		});
 		await mount();
 		await submitAndSkip(SETUP_PIN, SETUP_PIN);
@@ -679,8 +674,7 @@ describe('a turn-on that fails', () => {
 		['profile', 'profile'],
 		['timeline-state', 'timeline'],
 		['calendar-sync', 'calendar settings'],
-		['byok', 'API key'],
-		['skillbridge-finder', 'SkillBridge saves']
+		['byok', 'API key']
 	] as const;
 
 	async function failsWith(error: Error, line: string): Promise<void> {
@@ -964,7 +958,7 @@ describe('the backup step', () => {
 		if (awayDuringMove) {
 			rotate.mockImplementation(async () => {
 				relockEachSync(relockables, 'hygiene');
-				return { session: await fakeSession(), packHadFiles: false };
+				return { session: await fakeSession() };
 			});
 		}
 		await toCard();
@@ -995,7 +989,7 @@ describe('the backup step', () => {
 				await gate;
 				// A switch away during the move: a session still open would be left concealed, not cleared.
 				relockEachSync(relockables, 'hygiene');
-				return { session: await fakeSession(), packHadFiles: false };
+				return { session: await fakeSession() };
 			});
 		});
 
@@ -2111,7 +2105,7 @@ describe('changing the PIN', () => {
 			rotate.mockImplementation(async () => {
 				const session = await fakeSession();
 				realSetTimeout(() => seams.events.push('task'), 0);
-				return { session, packHadFiles: false };
+				return { session };
 			});
 			seams.events.length = 0;
 			await mount();
@@ -2122,17 +2116,13 @@ describe('changing the PIN', () => {
 			expect(seams.events).toEqual(['setSession', 'task']);
 		});
 
-		it.each([
-			[true, [CHANGED_LINE, PACK_LINE]],
-			[false, [CHANGED_LINE]]
-		])('with a pack that held files: %s, the status lines are %j', async (had, lines) => {
-			rotate.mockImplementation(async () => ({ session: await fakeSession(), packHadFiles: had }));
+		it('says the PIN changed and nothing else', async () => {
 			await mount();
 			await openForm('Change PIN');
 			await pressChange(CURRENT, NEW_PIN, NEW_PIN);
 			await until(() => statusLines().length > 0, 'the status line');
 
-			expect(statusLines()).toEqual(lines);
+			expect(statusLines()).toEqual([CHANGED_LINE]);
 		});
 	});
 
@@ -2141,8 +2131,7 @@ describe('changing the PIN', () => {
 			['profile', 'profile'],
 			['timeline-state', 'timeline'],
 			['calendar-sync', 'calendar settings'],
-			['byok', 'API key'],
-			['skillbridge-finder', 'SkillBridge saves']
+			['byok', 'API key']
 		] as const;
 
 		async function failsWith(line: string): Promise<void> {
@@ -2234,7 +2223,7 @@ describe('changing the PIN', () => {
 		it('holds no session, and shows the PIN lock, when a Lock lands during the move', async () => {
 			rotate.mockImplementation(async () => {
 				relockEachSync(relockables, 'user');
-				return { session: await fakeSession(), packHadFiles: false };
+				return { session: await fakeSession() };
 			});
 			seams.events.length = 0;
 			await mount();
@@ -2254,7 +2243,7 @@ describe('changing the PIN', () => {
 		it('changes as usual when a switch away lands during the move', async () => {
 			rotate.mockImplementation(async () => {
 				relockEachSync(relockables, 'hygiene');
-				return { session: await fakeSession(), packHadFiles: false };
+				return { session: await fakeSession() };
 			});
 			await mount();
 			await openForm('Change PIN');
@@ -2408,8 +2397,8 @@ describe('what a good current PIN says about the tries before it', () => {
 		deriveByPin();
 	});
 
-	it('shows the wrong tries between the changed line and the offline listings line', async () => {
-		rotate.mockResolvedValue({ session: await fakeSession(), packHadFiles: true });
+	it('shows the wrong tries after the changed line', async () => {
+		rotate.mockResolvedValue({ session: await fakeSession() });
 		await mount();
 		await openForm('Change PIN');
 		await pressChange(WRONG, NEW_PIN, NEW_PIN);
@@ -2417,7 +2406,7 @@ describe('what a good current PIN says about the tries before it', () => {
 		await pressChange(CURRENT, NEW_PIN, NEW_PIN);
 		await until(() => statusLines().length > 0, 'the status lines');
 
-		expect(statusLines()).toEqual([CHANGED_LINE, `2 wrong PIN tries ${SINCE}`, PACK_LINE]);
+		expect(statusLines()).toEqual([CHANGED_LINE, `2 wrong PIN tries ${SINCE}`]);
 	});
 
 	it('shows a try that did not finish after the removed line', async () => {

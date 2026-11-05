@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { markRaised, takeOverIfRaised } from './take-over';
+import { DB_VERSION } from '../db/schema';
+import { markRaised, RAISED_KEY, takeOverIfRaised } from './take-over';
 import { isTakeOver } from './take-over-message';
 
 type Listener = () => void;
 
 function memoryStore(initial?: string) {
-	const map = new Map<string, string>(initial === undefined ? [] : [['mtc:db-raised', initial]]);
+	const map = new Map<string, string>(initial === undefined ? [] : [[RAISED_KEY, initial]]);
 	return {
 		map,
 		getItem: (k: string) => map.get(k) ?? null,
@@ -104,18 +105,29 @@ describe('the worker of a release that raised the database takes over at once', 
 		await takeOverIfRaised(container, 'build-8', () => store);
 		expect(worker.postMessage).not.toHaveBeenCalled();
 		expect(registration.update).not.toHaveBeenCalled();
+		expect(store.map.has(RAISED_KEY)).toBe(false);
+	});
+
+	// A page of the older release, which its worker still serves offline, clears any mark under the key it knows. A mark it
+	// cleared would leave no page of the raising build to ask for the take-over, and the offline banner would stay.
+	it('keeps the mark where a page of an older release never looks', () => {
+		const store = memoryStore();
+		markRaised('build-7', () => store);
+		expect(store.map.get(RAISED_KEY)).toBe('build-7');
 		expect(store.map.has('mtc:db-raised')).toBe(false);
+		// The next raise leans on this too: a fixed key would put this release's pages back in the older pages' place.
+		expect(RAISED_KEY).toContain(String(DB_VERSION));
 	});
 
 	it('marks the build that raised, and drops the mark once a new worker is in charge', async () => {
 		const store = memoryStore();
 		markRaised('build-7', () => store);
-		expect(store.map.get('mtc:db-raised')).toBe('build-7');
+		expect(store.map.get(RAISED_KEY)).toBe('build-7');
 		const { container, controllerChange } = fakeContainer({ waiting: fakeWorker() });
 		await takeOverIfRaised(container, 'build-7', () => store);
-		expect(store.map.has('mtc:db-raised')).toBe(true);
+		expect(store.map.has(RAISED_KEY)).toBe(true);
 		controllerChange();
-		expect(store.map.has('mtc:db-raised')).toBe(false);
+		expect(store.map.has(RAISED_KEY)).toBe(false);
 	});
 });
 

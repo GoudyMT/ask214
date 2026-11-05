@@ -160,12 +160,6 @@ const ROWS: Row[] = [
 		restore: null
 	},
 	{
-		code: 'E_SNAPSHOT_FAILED',
-		params: { store: 'finder' },
-		export: 'Could not read your SkillBridge finder to back it up. No backup was saved.',
-		restore: null
-	},
-	{
 		code: 'E_SAVE_FAILED',
 		params: {},
 		export: 'The backup was not saved. Try again, or choose another place.',
@@ -437,7 +431,6 @@ describe('backupMessage wording', () => {
 			'your API key (kept on this device if one is saved)',
 			"Ask's offline library",
 			'saved documents',
-			'downloaded SkillBridge listings',
 			"this device's settings (theme, Ask mode)"
 		]);
 	});
@@ -447,10 +440,10 @@ describe('backupMessage wording', () => {
 	it('the lines after a restore are exact', () => {
 		expect(restoredLine('Oct 15, 2026')).toBe('Backup restored (made Oct 15, 2026).');
 		expect(notInBackupsLine(true)).toBe(
-			"Not in backups: your API key, Ask's offline library, saved documents, downloaded SkillBridge listings, this device's settings (theme, Ask mode). Set them up again in Settings."
+			"Not in backups: your API key, Ask's offline library, saved documents, this device's settings (theme, Ask mode). Set them up again in Settings."
 		);
 		expect(notInBackupsLine(false)).toBe(
-			"Not in backups: Ask's offline library, saved documents, downloaded SkillBridge listings, this device's settings (theme, Ask mode). Set them up again in Settings."
+			"Not in backups: Ask's offline library, saved documents, this device's settings (theme, Ask mode). Set them up again in Settings."
 		);
 		for (const item of NOT_IN_BACKUPS.slice(1)) {
 			expect(notInBackupsLine(false)).toContain(item);

@@ -10,7 +10,6 @@ import {
 	KeystoreNotInitializedError,
 	readKeystoreRow
 } from '../keystore/read';
-import { safeLog } from '../log/safelog';
 import { updateLastSeen } from '../profile/clock';
 import { decodeProfile, encodeProfile } from '../profile/codec';
 import { encryptProfileRecord } from '../profile/crypto-boundary';
@@ -19,9 +18,6 @@ import { zeroizeRecord } from '../profile/lifecycle';
 import { signSidecar } from '../profile/sidecars';
 import { getRow } from '../profile/store.svelte';
 import type { ProfileV1 } from '../profile/types';
-import { decodeFinderRecord, encodeFinderRecord } from '../skillbridge-finder/state/codec';
-import { encryptFinderRecord } from '../skillbridge-finder/state/crypto-boundary';
-import type { FinderRecord } from '../skillbridge-finder/state/types';
 import { decodeTimelineState, encodeTimelineState } from '../timeline/state-codec';
 import { encryptTimelineRecord } from '../timeline/crypto-boundary';
 import type { TimelineState } from '../timeline/types';
@@ -29,13 +25,9 @@ import type { ValidInner } from './validate';
 
 /**
  * The one path that replaces a person's saved data with a backup. Everything happens in ONE database step: either the
- * profile, timeline, calendar and finder hold the backup's content afterwards, re-encrypted for this device so the app
+ * profile, timeline and calendar hold the backup's content afterwards, re-encrypted for this device so the app
  * opens normally after a reload, or nothing changed at all. The device keeps its own bookkeeping: its install and keys
  * (so the stored API key still opens), its clock mark, and the calendar's list of events it handed to this phone.
- *
- * A file made before the finder existed holds no finder record, and restoring it writes an empty one: the device then
- * holds the person's data as that backup had it, not a finder saved since. Either way the finder's record is signed
- * with a fresh marker one step past this device, like the other stores, so its generation never comes round again.
  *
  * The file's content is all that is taken from it. Its generations, clock mark, sidecars and keystore never reach the
  * device: this device's own counters decide what the new generations are, which is what makes a reload accept the
@@ -45,14 +37,9 @@ import type { ValidInner } from './validate';
  * would wait on it forever). Every await ends before the write transaction opens; its first statement is the commit
  * check, and the writes follow it in the same synchronous block, so nothing can abort or change the run between the
  * check and the writes.
- *
- * After that step has committed, and still under the lock (so no download can land a row meanwhile), the finder's
- * cached listings and opened ids are cleared in a step of their own: they are public data kept for this device alone,
- * never part of a backup, and would otherwise show against data they were not cached for. They are never read. A
- * failure there is logged and does not undo the restore, since the cache downloads again.
  */
 
-export type RestoreGens = { profile: number; timeline: number; calendar: number; finder: number };
+export type RestoreGens = { profile: number; timeline: number; calendar: number };
 
 /** What the confirm was built from: the generations the person read and the install they read them on. */
 export type RestoreExpected = { gens: RestoreGens; installUuid: Uint8Array };
@@ -76,7 +63,7 @@ export type RestoreFailureCode =
 export type RestoreResult =
 	{ ok: true; gens: RestoreGens } | { ok: false; code: RestoreFailureCode };
 
-/** The nine stores a restore writes. The person's own API key (byok) is never among them. */
+/** The seven stores a restore writes. The person's own API key (byok) is never among them. */
 const WRITTEN_STORES: StoreName[] = [
 	'profile',
 	'profile-hwm',
@@ -84,12 +71,8 @@ const WRITTEN_STORES: StoreName[] = [
 	'timeline-state',
 	'timeline-state-hwm',
 	'calendar-sync',
-	'calendar-sync-hwm',
-	'skillbridge-finder',
-	'skillbridge-finder-hwm'
+	'calendar-sync-hwm'
 ];
-
-const FINDER_PACK_STORE: StoreName = 'skillbridge-finder-pack';
 
 // What a restore replaces with when the file holds no record for a store: the same record a fresh store starts from.
 const emptyTimeline = (): TimelineState => ({ schemaVersion: 1, tasks: {} });
@@ -97,15 +80,13 @@ const emptyCalendar = (): CalendarSyncState => ({
 	schemaVersion: 1,
 	exclusions: { taskIds: [], categories: [] }
 });
-const emptyFinder = (): FinderRecord => ({ schemaVersion: 1, finderSaved: [], finderCompare: [] });
 
 // The backup mark, which the device composes itself; the file never carries it.
 const MARK_FIELDS = [
 	'lastBackupAt',
 	'backupGenProfile',
 	'backupGenTimeline',
-	'backupGenCalendar',
-	'backupGenFinder'
+	'backupGenCalendar'
 ] as const;
 
 const fail = (code: RestoreFailureCode): RestoreResult => ({ ok: false, code });
@@ -175,17 +156,12 @@ export function composeRestore(
 	profile: ProfileV1;
 	timeline: TimelineState;
 	calendar: CalendarSyncState;
-	finder: FinderRecord;
 } {
-	// Each store moves one step past where this device is, so a peer's next save sees the change. The finder does too
-	// when the file holds no finder record: it is then written empty, never cleared. A cleared finder would start again
-	// at generation 0, and later saves would climb back to the number a stale tab holds, which would then pass its
-	// conflict check and write its old record over the newer one.
+	// Each store moves one step past where this device is, so a peer's next save sees the change.
 	const gens: RestoreGens = {
 		profile: device.gens.profile + 1,
 		timeline: device.gens.timeline + 1,
-		calendar: device.gens.calendar + 1,
-		finder: device.gens.finder + 1
+		calendar: device.gens.calendar + 1
 	};
 
 	const wire = new TextEncoder().encode(JSON.stringify(inner.stores.profile));
@@ -202,8 +178,7 @@ export function composeRestore(
 		lastBackupAt: Math.min(inner.createdAt, at),
 		backupGenProfile: gens.profile,
 		backupGenTimeline: gens.timeline,
-		backupGenCalendar: gens.calendar,
-		backupGenFinder: gens.finder
+		backupGenCalendar: gens.calendar
 	};
 	held.records.push(profile);
 
@@ -214,12 +189,11 @@ export function composeRestore(
 		inner.stores['calendar-sync'] ?? emptyCalendar()
 	);
 	if (device.lastAdd !== undefined) calendar.lastAdd = device.lastAdd;
-	const finder: FinderRecord = structuredClone(inner.stores['skillbridge-finder'] ?? emptyFinder());
 
 	// The writer's own check of itself, before anything is encrypted: the codecs give back exactly what is about to be
 	// written, and that holds exactly the file's content and nothing else.
-	verifyComposed(inner, profile, timeline, calendar, finder, held.records, held.staged);
-	return { gens, profile, timeline, calendar, finder };
+	verifyComposed(inner, profile, timeline, calendar, held.records, held.staged);
+	return { gens, profile, timeline, calendar };
 }
 
 /**
@@ -288,8 +262,7 @@ async function replaceStores(
 		if (
 			state.gens.profile !== expected.gens.profile ||
 			state.gens.timeline !== expected.gens.timeline ||
-			state.gens.calendar !== expected.gens.calendar ||
-			state.gens.finder !== expected.gens.finder
+			state.gens.calendar !== expected.gens.calendar
 		) {
 			return fail('E_RESTORE_DEVICE_MOVED');
 		}
@@ -305,7 +278,7 @@ async function replaceStores(
 		);
 
 		// 4. Compose what the device will hold.
-		const { gens, profile, timeline, calendar, finder } = composeRestore(
+		const { gens, profile, timeline, calendar } = composeRestore(
 			inner,
 			{ gens: state.gens, lastSeenAt: state.lastSeenAt, tsProfile: state.ts.profile, lastAdd },
 			at,
@@ -332,8 +305,7 @@ async function replaceStores(
 			keys.dataKey,
 			gens.calendar
 		);
-		const finderBlob = await encryptFinderRecord(finder, identity, keys.dataKey, gens.finder);
-		staged.push(profileBlob, timelineBlob, calendarBlob, finderBlob);
+		staged.push(profileBlob, timelineBlob, calendarBlob);
 		const sign = (name: string, generation: number) =>
 			signSidecar(
 				name,
@@ -345,22 +317,17 @@ async function replaceStores(
 				},
 				keys.hmacKey
 			);
-		const [profileMark, timelineMark, calendarMark, finderMark] = await Promise.all([
+		const [profileMark, timelineMark, calendarMark] = await Promise.all([
 			sign('profile-hwm', gens.profile),
 			sign('timeline-state-hwm', gens.timeline),
-			sign('calendar-sync-hwm', gens.calendar),
-			sign('skillbridge-finder-hwm', gens.finder)
+			sign('calendar-sync-hwm', gens.calendar)
 		]);
 
 		// 7-8. The check and the writes, one transaction, one synchronous block. A throw before the first put aborts the
-		// transaction with nothing written; a throw on any put does the same. The finder is first, so a failure on any
-		// later put shows the whole transaction takes it back with the rest.
+		// transaction with nothing written; a throw on any put does the same.
 		await withStores(db, WRITTEN_STORES, 'readwrite', (tx) => {
 			if (opts.signal.aborted || !opts.mayCommit()) throw new RunAbortedError();
 			opts.onCommitting();
-			// eslint-disable-next-line mtc/encrypted-store-registry -- the backup restore writer: ciphertext from encryptFinderRecord, one transaction with the other stores, under the exclusive keystore lock.
-			tx.objectStore('skillbridge-finder').put({ id: 0, rec: finderBlob });
-			tx.objectStore('skillbridge-finder-hwm').put({ id: 0, ...finderMark });
 			// eslint-disable-next-line mtc/encrypted-store-registry -- the backup restore writer: ciphertext from encryptProfileRecord, one transaction with the other stores, under the exclusive keystore lock.
 			tx.objectStore('profile').put({ id: 0, rec: profileBlob });
 			tx.objectStore('profile-hwm').put({ id: 0, ...profileMark });
@@ -372,7 +339,6 @@ async function replaceStores(
 			tx.objectStore('calendar-sync').put({ id: 0, rec: calendarBlob });
 			tx.objectStore('calendar-sync-hwm').put({ id: 0, ...calendarMark });
 		});
-		await dropFinderPack(db);
 		return { ok: true, gens };
 	} catch (e) {
 		// A cancelled run reports as the cancel, whatever else failed on its way out.
@@ -381,20 +347,6 @@ async function replaceStores(
 	} finally {
 		for (const bytes of staged) bytes.fill(0);
 		for (const record of records) zeroizeRecord(record);
-	}
-}
-
-/**
- * Clears every row of the finder's cache in a transaction of its own. The rows are never read, and a failure is logged
- * and swallowed: the restore has already replaced the data, and the cache is public files that download again.
- */
-async function dropFinderPack(db: IDBDatabase): Promise<void> {
-	try {
-		await withStores(db, FINDER_PACK_STORE, 'readwrite', (tx) => {
-			tx.objectStore(FINDER_PACK_STORE).clear();
-		});
-	} catch {
-		safeLog({ code: 'E_INTERNAL' });
 	}
 }
 
@@ -425,7 +377,6 @@ function verifyComposed(
 	profile: ProfileV1,
 	timeline: TimelineState,
 	calendar: CalendarSyncState,
-	finder: FinderRecord,
 	records: ProfileV1[],
 	staged: Uint8Array[]
 ): void {
@@ -437,14 +388,10 @@ function verifyComposed(
 	const timelineBytes = encodeTimelineState(timeline);
 	const calendarBytes = encodeCalendarSyncState(calendar);
 	staged.push(timelineBytes, calendarBytes);
-	// The finder's saved programs are held as text too, so its bytes are wiped with the rest.
-	const finderBytes = encodeFinderRecord(finder);
-	staged.push(finderBytes);
 	const sound =
 		sameRecord(decodedProfile, profile) &&
 		sameRecord(decodeTimelineState(timelineBytes), timeline) &&
-		sameRecord(decodeCalendarSyncState(calendarBytes), calendar) &&
-		sameRecord(decodeFinderRecord(finderBytes), finder);
+		sameRecord(decodeCalendarSyncState(calendarBytes), calendar);
 
 	// The profile is compared as the file holds it (text), written back by the shipped encoder.
 	const content: ProfileV1 = { ...profile, generation: 0, lastSeenAt: 0 };
@@ -461,8 +408,7 @@ function verifyComposed(
 	const sameContent =
 		sortedJson(JSON.parse(new TextDecoder().decode(contentBytes))) === sortedJson(fileProfile) &&
 		sameRecord(timeline, inner.stores['timeline-state'] ?? emptyTimeline()) &&
-		sameRecord(calendarContent, inner.stores['calendar-sync'] ?? emptyCalendar()) &&
-		sameRecord(finder, inner.stores['skillbridge-finder'] ?? emptyFinder());
+		sameRecord(calendarContent, inner.stores['calendar-sync'] ?? emptyCalendar());
 
 	if (!sound || !sameContent) throw new Error('E_WRITE_FAILED');
 }

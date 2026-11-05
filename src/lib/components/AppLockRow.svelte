@@ -20,14 +20,13 @@
 	const SETUP_DERIVE_MAX_MS = 5_000;
 	const SALT_BYTES = 16;
 
-	// Each store the move carries, named as a person knows it. Every encrypted store is named here except the one whose
-	// rows the move only clears, so a store added to the registry fails the type-check until it is named.
-	const CARRIED_NAME: Record<Exclude<EncryptedStoreName, 'skillbridge-finder-pack'>, string> = {
+	// Each store the move carries, named as a person knows it. Every encrypted store is named here, so a store added to
+	// the registry fails the type-check until it is named.
+	const CARRIED_NAME: Record<EncryptedStoreName, string> = {
 		profile: 'profile',
 		'timeline-state': 'timeline',
 		'calendar-sync': 'calendar settings',
-		byok: 'API key',
-		'skillbridge-finder': 'SkillBridge saves'
+		byok: 'API key'
 	};
 
 	const FORMAT_LINE = 'Use 4 to 6 digits.';
@@ -39,7 +38,6 @@
 	const REMOVE_FAILED_LINE = 'Could not remove the PIN right now - please try again.';
 	const CHANGED_LINE = 'PIN changed.';
 	const REMOVED_LINE = 'PIN removed.';
-	const PACK_LINE = 'Offline SkillBridge listings download again.';
 	const EASY_LINE = 'This PIN is easy to guess.';
 	// What a PIN leaves open, each line whole so none can be shortened into a promise the PIN does not keep.
 	const NOT_COVERED = [
@@ -427,7 +425,6 @@
 			// In PIN mode no export runs without a good PIN: one opened while the PIN was off (here or on the page's own card)
 			// ends with the move. A save that has begun is never cut short, so the session's end leaves it.
 			if (backupSession.kind === 'export') backupSession.end();
-			if (result.packHadFiles) message = PACK_LINE;
 			await toToggle();
 		} catch (err) {
 			message = fail(err, 'on');
@@ -513,7 +510,7 @@
 					setSession(result.session);
 					app.publish?.({ type: 'keys-changed' });
 				}
-				statuses = [CHANGED_LINE, ...checked.notice, ...(result.packHadFiles ? [PACK_LINE] : [])];
+				statuses = [CHANGED_LINE, ...checked.notice];
 			} else {
 				const counterBefore = await readCounter(db);
 				// A Lock during the check or before the removal starts: nothing is written and nothing is said.

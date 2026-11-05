@@ -25,9 +25,6 @@ import {
 import type { ProfileApp } from '#lib/profile/context.js';
 import { encodeEaos, parseEaosAtRead } from '#lib/profile/eaos.js';
 import { createProfileStore } from '#lib/profile/store.svelte.js';
-import { cleanListing } from '#lib/skillbridge-finder/fixtures/clean.js';
-import { createFinderPackStore } from '#lib/skillbridge-finder/state/pack-store.svelte.js';
-import { createFinderStore } from '#lib/skillbridge-finder/state/store.svelte.js';
 import { localTodayIso } from '#lib/timeline/day-math.js';
 import { KNOWN_TASK_IDS } from '#lib/timeline/known-task-ids.js';
 import { createTimelineStateStore } from '#lib/timeline/state.svelte.js';
@@ -135,8 +132,6 @@ const CANARY = {
 	timeline: 'CANARY-TIMELINE-note',
 	calendar: 'CANARY-CALENDAR-event',
 	byok: 'CANARY-BYOK-key',
-	finder: 'CANARY-FINDER-org',
-	pack: 'CANARY-PACK-org',
 	ask: 'CANARY-ASK-question'
 } as const;
 const CANARIES = Object.values(CANARY);
@@ -205,8 +200,7 @@ const readRaw = (store: StoreName) =>
 
 /**
  * A device a person turned a PIN on for: real stores and real saves under the local keys, the real turn-on moves every
- * record onto the PIN's keys, and the public pack is downloaded after it (the turn-on drops the pack). Then the tab
- * forgets its keys, as a reload does.
+ * record onto the PIN's keys. The tab holds no keys afterwards, as after a reload.
  */
 async function pinDevice(): Promise<void> {
 	db = await openTestDb();
@@ -228,9 +222,6 @@ async function pinDevice(): Promise<void> {
 		isoFromToday(0),
 		isoFromToday(0)
 	);
-	const finder = createFinderStore(db);
-	await finder.load();
-	await finder.save(cleanListing({ n: CANARY.finder }), isoFromToday(0));
 	await createByokStore(db).saveApiKey(`sk-ant-${CANARY.byok}-0123456789`);
 
 	const hmac = { name: 'HMAC', hash: 'SHA-256', length: 256 } as const;
@@ -241,36 +232,12 @@ async function pinDevice(): Promise<void> {
 			'unwrapKey'
 		])
 	};
-	const turnedOn = await rotateToPin(db, {
+	await rotateToPin(db, {
 		...keys,
 		salt: crypto.getRandomValues(new Uint8Array(16)),
 		kdf: { ...KDF_V1 },
 		counterBefore: await readCounter(db)
 	});
-	setSession(turnedOn.session);
-	const pack = createFinderPackStore(db);
-	await pack.load();
-	await pack.swap({
-		index: {
-			v: 1,
-			pullDate: isoFromToday(0),
-			baseline: false,
-			baselineDate: isoFromToday(-20),
-			files: [{ name: 'pacific', count: 1, bytes: 100 }]
-		},
-		regions: new Map([
-			[
-				'pacific',
-				{
-					v: 1,
-					pullDate: isoFromToday(0),
-					file: 'pacific',
-					listings: [cleanListing({ i: 1001, n: CANARY.pack })]
-				}
-			]
-		])
-	});
-	dropSession();
 	harness.db = Promise.resolve(db);
 }
 

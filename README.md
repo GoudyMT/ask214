@@ -134,8 +134,7 @@ pnpm lint       # Prettier + ESLint
 Ask 214 has been live at [ask214.com](https://ask214.com) since August 28, 2026. It serves
 service members of every branch, officer and enlisted, whether they are finishing their service, retiring,
 going through a medical board, or leaving the Guard or Reserve. Each release and what it changed is listed on
-the [Releases](https://github.com/GoudyMT/ask214/releases) page. A later version adds a deeper SkillBridge
-module.
+the [Releases](https://github.com/GoudyMT/ask214/releases) page.
 
 ---
 
@@ -154,8 +153,7 @@ corpus are documented in [`NOTICE`](NOTICE).
 
 Ask 214 is an independent project. It is **not** affiliated with, endorsed by, or sponsored by the U.S.
 Department of Defense, the U.S. Department of Veterans Affairs, or any branch of the U.S. military. All
-ingested content is public U.S. Government work (17 USC 105) or used under a properly attributed license;
-the SkillBridge finder shows facts, never descriptions, from the public DoD SkillBridge listings.
+ingested content is public U.S. Government work (17 USC 105) or used under a properly attributed license.
 Ask 214 does not provide legal, financial, or medical advice and does not assist with VA claims. For
 official benefits guidance, contact a VA-accredited Veteran Service Organization (DAV, VFW, American
 Legion, and others) or va.gov.

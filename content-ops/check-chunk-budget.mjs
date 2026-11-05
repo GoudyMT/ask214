@@ -523,12 +523,15 @@ const STATIC = 'static';
 //
 //   2026-11-03 end check: routeNodes 60,999 -> 60,982 (measured 60,961 B, +207 B on the plan's base, margin 21 B).
 //
+//   2026-11-04 end check: precacheBytes 264,004 -> 258,740 (measured 258,740 B, -4,946 B on the plan's base, margin 0 B).
+//   2026-11-04 end check: routeNodes 60,982 -> 60,579 (measured 60,579 B, -175 B on the plan's base, margin 0 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 264_004,
+	precacheBytes: 258_740,
 	workerScripts: 147_316
 };
 

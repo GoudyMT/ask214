@@ -4,14 +4,7 @@ import { STORES, DB_VERSION } from './schema';
 
 describe('ENCRYPTED_STORES registry', () => {
 	it('enumerates all encrypted stores for v1.0', () => {
-		expect(ENCRYPTED_STORES).toEqual([
-			'profile',
-			'timeline-state',
-			'calendar-sync',
-			'byok',
-			'skillbridge-finder',
-			'skillbridge-finder-pack'
-		]);
+		expect(ENCRYPTED_STORES).toEqual(['profile', 'timeline-state', 'calendar-sync', 'byok']);
 	});
 
 	it('isEncryptedStore returns true for registered stores', () => {
@@ -24,7 +17,6 @@ describe('ENCRYPTED_STORES registry', () => {
 		expect(isEncryptedStore('keystore')).toBe(false);
 		expect(isEncryptedStore('profile-hwm')).toBe(false);
 		expect(isEncryptedStore('timeline-state-hwm')).toBe(false);
-		expect(isEncryptedStore('skillbridge-finder-hwm')).toBe(false);
 		expect(isEncryptedStore('journal')).toBe(false);
 		expect(isEncryptedStore('meta')).toBe(false);
 	});
@@ -39,6 +31,6 @@ describe('ENCRYPTED_STORES registry', () => {
 		expect(ENCRYPTED_STORES).toContain('calendar-sync');
 		expect(STORES).toContain('byok');
 		expect(ENCRYPTED_STORES).toContain('byok');
-		expect(DB_VERSION).toBe(8);
+		expect(DB_VERSION).toBe(9);
 	});
 });

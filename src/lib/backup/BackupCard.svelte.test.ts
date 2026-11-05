@@ -365,13 +365,13 @@ async function mount(o: Mount = {}) {
 	// The locked-device pair, as stubs that record their calls and end the way the real writer does.
 	const lockedDevice = {
 		read: vi.fn<typeof readLockedDevice>(async () => ({
-			gens: { profile: 3, timeline: 2, calendar: 2, finder: 1 },
+			gens: { profile: 3, timeline: 2, calendar: 2 },
 			installUuid: new Uint8Array(16).fill(7),
 			lastTs: null
 		})),
 		write: vi.fn<typeof restoreLockedDevice>(async (_db, _inner, _expected, options) => {
 			options.onCommitting();
-			return { ok: true, gens: { profile: 4, timeline: 3, calendar: 3, finder: 2 } };
+			return { ok: true, gens: { profile: 4, timeline: 3, calendar: 3 } };
 		})
 	};
 	const propsFor = (locked: boolean) => ({

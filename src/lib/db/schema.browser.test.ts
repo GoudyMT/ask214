@@ -67,13 +67,15 @@ function openV6Db(name: string): Promise<IDBDatabase> {
 	});
 }
 
-// The v7 schema exactly as it shipped: the eleven stores before the app lock's. Frozen for the same reason as v2.
-const V7_STORES: StoreName[] = [
-	...V6_STORES,
+// The stores the SkillBridge search kept. Version 9 deletes them, so they are no longer store names the app knows.
+const RETIRED_STORES = [
 	'skillbridge-finder',
 	'skillbridge-finder-hwm',
 	'skillbridge-finder-pack'
-];
+] as unknown as StoreName[];
+
+// The v7 schema exactly as it shipped: the eleven stores before the app lock's. Frozen for the same reason as v2.
+const V7_STORES: StoreName[] = [...V6_STORES, ...RETIRED_STORES];
 
 function openV7Db(name: string): Promise<IDBDatabase> {
 	return new Promise<IDBDatabase>((resolve, reject) => {
@@ -86,11 +88,25 @@ function openV7Db(name: string): Promise<IDBDatabase> {
 	});
 }
 
-describe('openMtcDb schema (v8)', () => {
+// The v8 schema exactly as it shipped: the twelve stores before the search's three went. Frozen for the same reason as v2.
+const V8_STORES: StoreName[] = [...V7_STORES, 'app-lock'];
+
+function openV8Db(name: string): Promise<IDBDatabase> {
+	return new Promise<IDBDatabase>((resolve, reject) => {
+		const req = indexedDB.open(name, 8);
+		req.onupgradeneeded = () => {
+			for (const store of V8_STORES) req.result.createObjectStore(store, { keyPath: 'id' });
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error ?? new Error('v8-open-failed'));
+	});
+}
+
+describe('openMtcDb schema (v9)', () => {
 	it('opens at the current DB_VERSION with exactly the registered stores', async () => {
 		const db = await freshDb();
 		expect(db.version).toBe(DB_VERSION);
-		expect(db.version).toBe(8);
+		expect(db.version).toBe(9);
 		expect(Array.from(db.objectStoreNames).sort()).toEqual([
 			'app-lock',
 			'byok',
@@ -99,20 +115,45 @@ describe('openMtcDb schema (v8)', () => {
 			'keystore',
 			'profile',
 			'profile-hwm',
-			'skillbridge-finder',
-			'skillbridge-finder-hwm',
-			'skillbridge-finder-pack',
 			'timeline-state',
 			'timeline-state-hwm'
 		]);
 	});
 
-	// The upgrade every returning user runs: the finder's stores arrive and every row already on the device stays.
+	// The upgrade every device on the last release runs: the search's three stores go, and every row in every other store
+	// stays byte for byte. There is no server copy, so one lost row here is the person's data gone.
+	it('upgrades a v8 database holding a search record, deleting its three stores and keeping every other row', async () => {
+		const name = 'mtc-test-' + crypto.randomUUID();
+		const v8 = await openV8Db(name);
+		expect(v8.version).toBe(8);
+		const cipher = new Uint8Array([1, 2, 3, 250, 251, 252]);
+		await withStores(v8, V8_STORES, 'readwrite', (tx) => {
+			for (const store of V8_STORES)
+				tx.objectStore(store).put({ id: 0, marker: `row-${store}`, cipher });
+		});
+		v8.close();
+
+		const upgraded = await openMtcDb(name);
+		opened.push(upgraded);
+		expect(upgraded.version).toBe(9);
+		for (const store of RETIRED_STORES) {
+			expect(upgraded.objectStoreNames.contains(store), store).toBe(false);
+		}
+		const kept = V8_STORES.filter((store) => !RETIRED_STORES.includes(store));
+		expect(Array.from(upgraded.objectStoreNames).sort()).toEqual([...kept].sort());
+		for (const store of kept) {
+			const row = await withStores(upgraded, store, 'readonly', (tx) =>
+				reqToPromise<unknown>(tx.objectStore(store).get(0))
+			);
+			expect(row, store).toEqual({ id: 0, marker: `row-${store}`, cipher });
+		}
+	});
+
+	// The upgrade every returning user runs: every row already on the device stays.
 	it('upgrades a v6 database with a row in every old store, keeping each row', async () => {
 		const name = 'mtc-test-' + crypto.randomUUID();
 		const v6 = await openV6Db(name);
 		expect(v6.version).toBe(6);
-		expect(v6.objectStoreNames.contains('skillbridge-finder')).toBe(false);
 		await withStores(v6, V6_STORES, 'readwrite', (tx) => {
 			for (const store of V6_STORES) tx.objectStore(store).put({ id: 0, marker: `row-${store}` });
 		});
@@ -120,14 +161,7 @@ describe('openMtcDb schema (v8)', () => {
 
 		const upgraded = await openMtcDb(name);
 		opened.push(upgraded);
-		expect(upgraded.version).toBe(8);
-		for (const store of [
-			'skillbridge-finder',
-			'skillbridge-finder-hwm',
-			'skillbridge-finder-pack'
-		]) {
-			expect(upgraded.objectStoreNames.contains(store), store).toBe(true);
-		}
+		expect(upgraded.version).toBe(DB_VERSION);
 		for (const store of V6_STORES) {
 			const row = await withStores(upgraded, store, 'readonly', (tx) =>
 				reqToPromise<unknown>(tx.objectStore(store).get(0))
@@ -151,9 +185,9 @@ describe('openMtcDb schema (v8)', () => {
 
 		const upgraded = await openMtcDb(name);
 		opened.push(upgraded);
-		expect(upgraded.version).toBe(8);
+		expect(upgraded.version).toBe(DB_VERSION);
 		expect(upgraded.objectStoreNames.contains('app-lock')).toBe(true);
-		for (const store of V7_STORES) {
+		for (const store of V6_STORES) {
 			const row = await withStores(upgraded, store, 'readonly', (tx) =>
 				reqToPromise<unknown>(tx.objectStore(store).get(0))
 			);
@@ -293,9 +327,6 @@ describe('openMtcDb schema (v8)', () => {
 			'keystore',
 			'profile',
 			'profile-hwm',
-			'skillbridge-finder',
-			'skillbridge-finder-hwm',
-			'skillbridge-finder-pack',
 			'timeline-state',
 			'timeline-state-hwm'
 		]);
