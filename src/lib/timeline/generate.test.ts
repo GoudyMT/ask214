@@ -1508,6 +1508,51 @@ describe('the leaving answer on the real task list', () => {
 		}
 	});
 
+	// 10 USC 1142(a)(3)(B): a separation not known until 365 or fewer days remain starts counseling as soon as possible.
+	it.each(['preseparation-counseling', 'tap-capstone'])(
+		'tells a board member to start %s early if the date moves up',
+		(id) => {
+			const def = (path: SeparationPath) => items(path).find((i) => i.def.id === id)?.def;
+			const line =
+				'If the board moves your date up, start as soon as you can; your transition assistance office says what fits.';
+			expect(def('medical')?.why.endsWith(line)).toBe(true);
+			expect(def('retirement')?.why).not.toMatch(/board/);
+		}
+	);
+
+	it.each(['sha-schedule', 'sha-complete'])(
+		'tells a board member the board exams may stand in for %s',
+		(id) => {
+			const def = (path: SeparationPath) => items(path).find((i) => i.def.id === id)?.def;
+			const line =
+				'If the board finds you unfit, its exams may stand in for this one; your PEBLO can confirm.';
+			expect(def('medical')?.why.endsWith(line)).toBe(true);
+			expect(def('retirement')?.why).not.toMatch(/board/);
+		}
+	);
+
+	// The member updated the date after a board moved it up: the steps re-time, and a step whose window has gone stays
+	// on the list as late, with what to do, rather than closed.
+	it('reads Capstone and the SHA as late once a moved date leaves too little time', () => {
+		const view = generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: '2027-01-15' as EaosString,
+				daysUntilSeparation: 76,
+				separationPath: 'medical'
+			},
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: {} },
+			TODAY
+		);
+		const moved = view.phases.flatMap((p) => p.items);
+		for (const id of ['tap-capstone', 'sha-schedule', 'sha-complete']) {
+			const item = moved.find((i) => i.def.id === id);
+			expect(item?.status, id).toBe('late');
+			expect(item?.def.afterNote, id).toMatch(/^Still required before you separate/);
+		}
+	});
+
 	it('says when the SBP steps apply to a medical board and to a retirement', () => {
 		const def = (path: SeparationPath, id: string) => items(path).find((i) => i.def.id === id)?.def;
 		expect(def('medical', 'sbp-election')?.why).toMatch(/^If the board retires you/);

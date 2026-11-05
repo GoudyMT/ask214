@@ -76,6 +76,16 @@ function onOrders(def: TaskDef): TaskDef {
 const RETIRING_RCSBP_TITLE =
 	'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it';
 
+// A board can move the date, so a member may have less time than the window assumes. The Home row and the calendar show
+// only the title, and the title stays free of the board, so this line lives in the why.
+function forBoard(line: string, def: TaskDef): TaskDef {
+	return { ...def, copyFor: { ...def.copyFor, medical: { why: `${def.why} ${line}` } } };
+}
+const BOARD_MOVES_TAP =
+	'If the board moves your date up, start as soon as you can; your transition assistance office says what fits.';
+const BOARD_EXAMS =
+	'If the board finds you unfit, its exams may stand in for this one; your PEBLO can confirm.';
+
 const TRR_ANYTIME = 'TRICARE Retired Reserve can be bought at any time before age 60.';
 
 const BDD_FALLBACK =
@@ -186,23 +196,25 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- TAP / counseling (federally anchored) ----
-	onOrders({
-		id: 'preseparation-counseling',
-		title: 'Complete Initial and Pre-separation Counseling',
-		category: 'admin',
-		finishBefore: 'leaving',
-		kind: 'required',
-		windowStart: -540,
-		windowEnd: -365,
-		recommendedOffset: -400,
-		why: 'TAP officially starts here, and it is required no later than 365 days out.',
-		afterNote:
-			"Still required. Contact your installation's transition assistance office to start now.",
-		windowFor: {
-			retirement: { windowStart: -730, recommendedOffset: -600 },
-			'reserve-retirement': { windowStart: -730, recommendedOffset: -600 }
-		}
-	}),
+	onOrders(
+		forBoard(BOARD_MOVES_TAP, {
+			id: 'preseparation-counseling',
+			title: 'Complete Initial and Pre-separation Counseling',
+			category: 'admin',
+			finishBefore: 'leaving',
+			kind: 'required',
+			windowStart: -540,
+			windowEnd: -365,
+			recommendedOffset: -400,
+			why: 'TAP officially starts here, and it is required no later than 365 days out.',
+			afterNote:
+				"Still required. Contact your installation's transition assistance office to start now.",
+			windowFor: {
+				retirement: { windowStart: -730, recommendedOffset: -600 },
+				'reserve-retirement': { windowStart: -730, recommendedOffset: -600 }
+			}
+		})
+	),
 	onOrders({
 		id: 'tap-course',
 		title: 'Attend your required TAP curriculum',
@@ -334,7 +346,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- Separation health assessment + VA claim (BDD) ----
-	{
+	forBoard(BOARD_EXAMS, {
 		id: 'sha-schedule',
 		title: 'Schedule your Separation Health Assessment (SHA)',
 		category: 'medical',
@@ -345,8 +357,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		recommendedOffset: -150,
 		why: 'Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your military medical clinic.',
 		afterNote: 'Still required before you separate. Contact your military medical clinic.'
-	},
-	{
+	}),
+	forBoard(BOARD_EXAMS, {
 		id: 'sha-complete',
 		title: 'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
 		category: 'medical',
@@ -357,7 +369,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		recommendedOffset: -120,
 		why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
 		afterNote: 'Still required before you separate. Contact your military medical clinic.'
-	},
+	}),
 	{
 		id: 'va-bdd-claim',
 		title: 'File your VA disability claim through BDD (Benefits Delivery at Discharge)',
@@ -527,19 +539,21 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- Capstone + final-90 ----
-	onOrders({
-		id: 'tap-capstone',
-		title: 'Complete your TAP Capstone',
-		category: 'admin',
-		finishBefore: 'leaving',
-		kind: 'required',
-		windowStart: -365,
-		windowEnd: -90,
-		recommendedOffset: -120,
-		why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
-		afterNote:
-			"Still required before you separate. Contact your installation's transition assistance office."
-	}),
+	onOrders(
+		forBoard(BOARD_MOVES_TAP, {
+			id: 'tap-capstone',
+			title: 'Complete your TAP Capstone',
+			category: 'admin',
+			finishBefore: 'leaving',
+			kind: 'required',
+			windowStart: -365,
+			windowEnd: -90,
+			recommendedOffset: -120,
+			why: 'Your commander verifies you meet Career Readiness Standards no later than 90 days out.',
+			afterNote:
+				"Still required before you separate. Contact your installation's transition assistance office."
+		})
+	),
 	{
 		id: 'va-benefits-advisor',
 		title: 'Meet one-on-one with a VA benefits advisor',
