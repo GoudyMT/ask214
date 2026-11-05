@@ -210,7 +210,7 @@ describe('task-defs seed', () => {
 			...TASK_DEFS.flatMap((t) => [t.title, t.why, t.afterNote ?? '', t.changeNote ?? '']),
 			// The wording a leaving answer swaps in is shown the same way.
 			...TASK_DEFS.flatMap((t) =>
-				Object.values(t.copyFor ?? {}).flatMap((c) => [c.title, c.why, c.afterNote])
+				Object.values(t.copyFor ?? {}).flatMap((c) => [c.title, c.why, c.afterNote, c.changeNote])
 			).filter((line): line is string => line !== undefined),
 			...Object.values(TASK_AFTER_LINK).map((link) => link.label),
 			...RESOURCES.flatMap((r) => [r.title, r.description]),

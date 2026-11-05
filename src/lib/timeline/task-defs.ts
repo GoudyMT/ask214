@@ -78,20 +78,24 @@ const RETIRING_RCSBP_TITLE =
 
 // A board can move the date, so a member may have less time than the window assumes. The Home row and the calendar show
 // only the title, and the title stays free of the board, so this line lives in the why.
-function forBoard(line: string, def: TaskDef): TaskDef {
-	return { ...def, copyFor: { ...def.copyFor, medical: { why: `${def.why} ${line}` } } };
+function forBoard(line: string, def: TaskDef, afterNote = def.afterNote): TaskDef {
+	const medical = { why: `${def.why} ${line}`, ...(afterNote && { afterNote }) };
+	return { ...def, copyFor: { ...def.copyFor, medical } };
 }
 const BOARD_MOVES_TAP =
 	'If the board moves your date up, start as soon as you can; your transition assistance office says what fits.';
 const BOARD_EXAMS =
 	'If the board finds you unfit, its exams may stand in for this one; your PEBLO can confirm.';
+const BOARD_EXAMS_AFTER =
+	"Still required unless the board's exams stand in. Ask your PEBLO or your military medical clinic.";
 
 const SBP_CHOICE =
 	'SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.';
 const RCSBP_WHY =
 	'The letter says you have the years of service for retired pay, and the Reserve Component Survivor Benefit Plan choice is due within 90 days of it. Your Guard or Reserve personnel office can say when to expect the letter.';
 
-const TRR_ANYTIME = 'TRICARE Retired Reserve can be bought at any time before age 60.';
+const TRR_ANYTIME =
+	'Members who qualify can buy TRICARE Retired Reserve at any time before age 60.';
 
 const BDD_FALLBACK =
 	'A VA claim can still be filed the standard way, and an accredited VSO helps for free.';
@@ -220,28 +224,32 @@ export const TASK_DEFS: readonly TaskDef[] = [
 			}
 		})
 	),
-	onOrders({
-		id: 'tap-course',
-		title: 'Attend your required TAP curriculum',
-		category: 'admin',
-		finishBefore: 'leaving',
-		kind: 'soft',
-		windowStart: -365,
-		windowEnd: -120,
-		recommendedOffset: -270,
-		why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
-	}),
-	onOrders({
-		id: 'tap-track',
-		title: 'Attend a TAP 2-day track (Employment / Education / Vocational / Entrepreneurship)',
-		category: 'admin',
-		finishBefore: 'leaving',
-		kind: 'soft',
-		windowStart: -365,
-		windowEnd: -120,
-		recommendedOffset: -240,
-		why: 'Each member picks one focused 2-day track for their path.'
-	}),
+	onOrders(
+		forBoard(BOARD_MOVES_TAP, {
+			id: 'tap-course',
+			title: 'Attend your required TAP curriculum',
+			category: 'admin',
+			finishBefore: 'leaving',
+			kind: 'soft',
+			windowStart: -365,
+			windowEnd: -120,
+			recommendedOffset: -270,
+			why: 'Transition Day, VA Benefits and Services, and the DOL Employment Fundamentals of Career Transition course are mandatory.'
+		})
+	),
+	onOrders(
+		forBoard(BOARD_MOVES_TAP, {
+			id: 'tap-track',
+			title: 'Attend a TAP 2-day track (Employment / Education / Vocational / Entrepreneurship)',
+			category: 'admin',
+			finishBefore: 'leaving',
+			kind: 'soft',
+			windowStart: -365,
+			windowEnd: -120,
+			recommendedOffset: -240,
+			why: 'Each member picks one focused 2-day track for their path.'
+		})
+	),
 
 	// ---- SkillBridge: shown only when the user's answer to the SkillBridge question shows them ----
 	{
@@ -351,30 +359,38 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- Separation health assessment + VA claim (BDD) ----
-	forBoard(BOARD_EXAMS, {
-		id: 'sha-schedule',
-		title: 'Schedule your Separation Health Assessment (SHA)',
-		category: 'medical',
-		finishBefore: 'terminal-leave',
-		kind: 'required',
-		windowStart: -180,
-		windowEnd: -90,
-		recommendedOffset: -150,
-		why: 'Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your military medical clinic.',
-		afterNote: 'Still required before you separate. Contact your military medical clinic.'
-	}),
-	forBoard(BOARD_EXAMS, {
-		id: 'sha-complete',
-		title: 'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
-		category: 'medical',
-		finishBefore: 'terminal-leave',
-		kind: 'required',
-		windowStart: -150,
-		windowEnd: -90,
-		recommendedOffset: -120,
-		why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
-		afterNote: 'Still required before you separate. Contact your military medical clinic.'
-	}),
+	forBoard(
+		BOARD_EXAMS,
+		{
+			id: 'sha-schedule',
+			title: 'Schedule your Separation Health Assessment (SHA)',
+			category: 'medical',
+			finishBefore: 'terminal-leave',
+			kind: 'required',
+			windowStart: -180,
+			windowEnd: -90,
+			recommendedOffset: -150,
+			why: 'Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your military medical clinic.',
+			afterNote: 'Still required before you separate. Contact your military medical clinic.'
+		},
+		BOARD_EXAMS_AFTER
+	),
+	forBoard(
+		BOARD_EXAMS,
+		{
+			id: 'sha-complete',
+			title: 'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
+			category: 'medical',
+			finishBefore: 'terminal-leave',
+			kind: 'required',
+			windowStart: -150,
+			windowEnd: -90,
+			recommendedOffset: -120,
+			why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
+			afterNote: 'Still required before you separate. Contact your military medical clinic.'
+		},
+		BOARD_EXAMS_AFTER
+	),
 	{
 		id: 'va-bdd-claim',
 		title: 'File your VA disability claim through BDD (Benefits Delivery at Discharge)',
@@ -520,32 +536,33 @@ export const TASK_DEFS: readonly TaskDef[] = [
 
 	{
 		id: 'tricare-retiree-enroll',
-		title: 'Enroll in a TRICARE plan within 90 days after your retirement date',
+		title: 'If you retire, enroll in a TRICARE plan within 90 days after your retirement date',
 		category: 'benefits',
 		finishBefore: 'separation',
 		kind: 'closes',
-		windowStart: -90,
+		// tricare.mil counts the 90 days from the retirement date and gives no way to enroll before it.
+		windowStart: 0,
 		windowEnd: 90,
 		// tricare.mil allows a retroactive request "up to 12 months"; 365 days never runs past that.
 		finalEnd: 365,
-		recommendedOffset: -30,
-		why: 'Retiring changes your TRICARE coverage. To keep it with no break, enroll in TRICARE Prime or TRICARE Select within 90 days after your retirement date; tricare.mil has the steps.',
+		why: 'Retiring changes your TRICARE coverage. To keep it with no break, enroll in TRICARE Prime or TRICARE Select within 90 days after your retirement date. A Guard or Reserve retirement works differently; tricare.mil has the steps.',
 		changeNote:
-			'You can ask for retroactive enrollment up to 12 months after your retirement date; fees go back to that date.',
+			'If you retired, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date.',
 		afterNote:
-			'You can enroll during TRICARE Open Season or after a Qualifying Life Event; see tricare.mil.',
+			'If you retired, you can enroll during TRICARE Open Season or after a Qualifying Life Event; see tricare.mil.',
+		// The title stays the default for a medical board: it reaches the calendar file, and a title only that answer has
+		// would mark the file as a board member's.
 		copyFor: {
 			medical: {
-				title: 'If you retire, enroll in a TRICARE plan within 90 days after your retirement date',
-				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. Under a 30% service rating you separate instead; tricare.mil explains both.'
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If it separates you instead, tricare.mil lists what may apply.'
 			},
-			// TRICARE Retired Reserve has no enrollment deadline, so the retroactive limit is not this member's. The title
-			// holds for a drill-status retiree and for one leaving full-time active duty.
+			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
+			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.
 			'reserve-retirement': {
 				title: 'Check your TRICARE plan within 90 days of your retirement date',
-				why: 'TRICARE Reserve Select ends on your retirement date; buying TRICARE Retired Reserve within 90 days of it avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
-				changeNote: TRR_ANYTIME,
-				afterNote: TRR_ANYTIME
+				why: 'If you have TRICARE Reserve Select, it ends when you transfer to the Retired Reserve; buying TRICARE Retired Reserve within 90 days of your retirement date avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
+				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date. ${TRR_ANYTIME}`,
+				afterNote: `If you are retiring from full-time active duty, you can enroll during TRICARE Open Season or after a Qualifying Life Event. ${TRR_ANYTIME}`
 			}
 		},
 		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
