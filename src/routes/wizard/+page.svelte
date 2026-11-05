@@ -174,8 +174,8 @@
 	{:else if app.status === 'ready'}
 		<!-- A held Enter repeats, in the field or on Save, and each repeat would save again once a failed save settled:
 		     only a new press submits. Enter on a leaving choice saves nothing: a member may press it expecting it to pick,
-		     and Space or the arrow keys do. The form only filters its controls' keys; it is not a control itself, so the compiler's rule against
-		     key listeners on a non-interactive element does not fit. -->
+		     and Space or the arrow keys do. The form only filters its controls' keys; it is not a control itself, so the
+		     compiler's rule against key listeners on a non-interactive element does not fit. -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<form
 			class="wizard__form"
