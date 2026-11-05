@@ -122,7 +122,7 @@ describe('buildIcs', () => {
 	});
 
 	// A calendar file can land in a calendar others see, often a work one; a medical board is health information.
-	it('the medical board answer adds no medical-board step to the file, only the SBP step everyone retiring gets', async () => {
+	it('the medical board answer adds no medical-board step to the file, only the SBP and TRICARE steps everyone retiring gets', async () => {
 		const now = new Date(2026, 9, 7, 12);
 		const fileFor = async (separationPath?: 'medical') => {
 			const items = generateTimeline(
@@ -146,9 +146,12 @@ describe('buildIcs', () => {
 			new Set([...ics.matchAll(/SUMMARY:(.*)/g)].map((m) => m[1] ?? ''));
 		const without = titles(await fileFor());
 		const added = [...titles(await fileFor('medical'))].filter((t) => !without.has(t));
-		expect(added.length).toBeGreaterThan(0);
+		// Each step writes two events, its aim and its last day. A SUMMARY escapes its commas.
+		expect(added.length).toBe(4);
 		for (const t of added)
-			expect(t).toMatch(/: Get Survivor Benefit Plan counseling and make your SBP choice$/);
+			expect(t.split(String.fromCharCode(92)).join('')).toMatch(
+				/: (?:Get Survivor Benefit Plan counseling and make your SBP choice|If you retire, enroll in a TRICARE plan within 90 days after your retirement date)$/
+			);
 	});
 });
 

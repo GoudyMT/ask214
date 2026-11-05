@@ -76,6 +76,8 @@ function onOrders(def: TaskDef): TaskDef {
 const RETIRING_RCSBP_TITLE =
 	'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it';
 
+const TRR_ANYTIME = 'TRICARE Retired Reserve can be bought at any time before age 60.';
+
 const BDD_FALLBACK =
 	'A VA claim can still be filed the standard way, and an accredited VSO helps for free.';
 const BDD_WHY =
@@ -491,6 +493,39 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		requires: { separationPath: [...GUARD_OR_RESERVE, 'retirement'] }
 	},
 
+	{
+		id: 'tricare-retiree-enroll',
+		title: 'Enroll in a TRICARE plan within 90 days after your retirement date',
+		category: 'benefits',
+		finishBefore: 'separation',
+		kind: 'closes',
+		windowStart: -90,
+		windowEnd: 90,
+		// tricare.mil allows a retroactive request "up to 12 months"; 365 days never runs past that.
+		finalEnd: 365,
+		recommendedOffset: -30,
+		why: 'Retiring changes your TRICARE coverage. To keep it with no break, enroll in TRICARE Prime or TRICARE Select within 90 days after your retirement date; tricare.mil has the steps.',
+		changeNote:
+			'You can ask for retroactive enrollment up to 12 months after your retirement date; fees go back to that date.',
+		afterNote:
+			'You can enroll during TRICARE Open Season or after a Qualifying Life Event; see tricare.mil.',
+		copyFor: {
+			medical: {
+				title: 'If you retire, enroll in a TRICARE plan within 90 days after your retirement date',
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. Under a 30% service rating you separate instead; tricare.mil explains both.'
+			},
+			// TRICARE Retired Reserve has no enrollment deadline, so the retroactive limit is not this member's. The title
+			// holds for a drill-status retiree and for one leaving full-time active duty.
+			'reserve-retirement': {
+				title: 'Check your TRICARE plan within 90 days of your retirement date',
+				why: 'TRICARE Reserve Select ends on your retirement date; buying TRICARE Retired Reserve within 90 days of it avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
+				changeNote: TRR_ANYTIME,
+				afterNote: TRR_ANYTIME
+			}
+		},
+		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
+	},
+
 	// ---- Capstone + final-90 ----
 	onOrders({
 		id: 'tap-capstone',
@@ -588,7 +623,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		recommendedOffset: -14,
 		why: 'A Marketplace special enrollment period runs from 60 days before to 60 days after TRICARE (or TAMP) ends, and CHCBP enrollment within 60 days after; tricare.mil and healthcare.gov say who qualifies.',
 		afterNote:
-			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.'
+			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.',
+		// A retiree stays on TRICARE; the retiree enrollment step is theirs.
+		hideFor: ['retirement']
 	},
 	{
 		id: 'dd214-copies',

@@ -1346,12 +1346,24 @@ describe('the leaving answer on the real task list', () => {
 	const TRACKS: Record<SeparationPath, string[]> = {
 		ets: [],
 		// A Guard or Reserve retirement makes the Reserve SBP choice; a board can retire a member, who then makes the SBP one.
-		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election'],
-		medical: ['peblo-contact', 'va-msc-claim', 'ides-review-options', 'sbp-election'],
+		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election', 'tricare-retiree-enroll'],
+		medical: [
+			'peblo-contact',
+			'va-msc-claim',
+			'ides-review-options',
+			'sbp-election',
+			'tricare-retiree-enroll'
+		],
 		'reserve-component': ['tamp-check', 'rcsbp-election'],
 		// A Guard or Reserve retiree makes the Reserve SBP choice, or the active-duty one when retiring from full-time
 		// active duty (10 USC 1448(a)(2)), and asks when to file.
-		'reserve-retirement': ['retirement-request', 'tamp-check', 'rcsbp-election', 'sbp-election']
+		'reserve-retirement': [
+			'retirement-request',
+			'tamp-check',
+			'rcsbp-election',
+			'sbp-election',
+			'tricare-retiree-enroll'
+		]
 	};
 	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
 	const items = (separationPath?: SeparationPath, tasks: TimelineState['tasks'] = {}) =>
@@ -1432,6 +1444,69 @@ describe('the leaving answer on the real task list', () => {
 			}
 		}
 	);
+
+	// tricare.mil: 90 days after the retirement date to enroll, a retroactive request up to 12 months from it.
+	it.each([
+		['the day the window opens is ahead', new Date(2028, 0, 15, 12), 'upcoming'],
+		['the 90 days are running', new Date(2028, 7, 1, 12), 'start-now'],
+		['the 90 days have passed', new Date(2028, 11, 1, 12), 'changed'],
+		['the 12 months have passed', new Date(2029, 6, 15, 12), 'closed']
+	] as const)('reads the retiree TRICARE step when %s', (_name, today, status) => {
+		const view = generateTimeline(
+			{
+				completeness: 'eaos-only',
+				eaos: SEP,
+				daysUntilSeparation: 0,
+				separationPath: 'retirement'
+			},
+			[...TASK_DEFS],
+			{ schemaVersion: 1, tasks: {} },
+			today
+		);
+		const item = view.phases
+			.flatMap((p) => p.items)
+			.find((i) => i.def.id === 'tricare-retiree-enroll');
+		expect(item?.status).toBe(status);
+	});
+
+	it('says what a member can still do once each TRICARE edge passes', () => {
+		const def = (path: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'tricare-retiree-enroll')?.def;
+		expect(def('retirement')?.title).toBe(
+			'Enroll in a TRICARE plan within 90 days after your retirement date'
+		);
+		expect(def('retirement')?.changeNote).toMatch(/retroactive enrollment up to 12 months/);
+		expect(def('retirement')?.afterNote).toMatch(/TRICARE Open Season/);
+		// The title reaches the calendar file, where anyone who sees it would learn of the board.
+		expect(def('medical')?.title).toBe(
+			'If you retire, enroll in a TRICARE plan within 90 days after your retirement date'
+		);
+		expect(def('medical')?.why).toMatch(/30%/);
+		expect(def('reserve-retirement')?.title).toBe(
+			'Check your TRICARE plan within 90 days of your retirement date'
+		);
+		// TRICARE Retired Reserve can be bought at any time, so the retroactive limit is not this member's.
+		for (const note of [
+			def('reserve-retirement')?.changeNote,
+			def('reserve-retirement')?.afterNote
+		]) {
+			expect(note).toBe('TRICARE Retired Reserve can be bought at any time before age 60.');
+		}
+	});
+
+	// A retiree stays on TRICARE, so "coverage for after TRICARE" is not their step; the others may really leave it.
+	it('hides the after-TRICARE coverage step for a retiree only', () => {
+		expect(ids('retirement')).not.toContain('tricare-elect');
+		for (const path of [
+			undefined,
+			'ets',
+			'medical',
+			'reserve-component',
+			'reserve-retirement'
+		] as const) {
+			expect(ids(path)).toContain('tricare-elect');
+		}
+	});
 
 	it('says when the SBP steps apply to a medical board and to a retirement', () => {
 		const def = (path: SeparationPath, id: string) => items(path).find((i) => i.def.id === id)?.def;

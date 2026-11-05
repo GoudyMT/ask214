@@ -362,6 +362,15 @@ export const RESOURCES: readonly Resource[] = [
 		lastVerified: '2026-10-31'
 	},
 	{
+		id: 'tricare-retiring',
+		title: 'Retiring and TRICARE',
+		url: 'https://www.tricare.mil/LifeEvents/Retiring',
+		description:
+			'Official TRICARE information on what changes when you retire and the 90 days to enroll in a plan.',
+		displayCategory: 'health-wellbeing',
+		lastVerified: '2026-11-05'
+	},
+	{
 		id: 'ides',
 		title: 'Integrated Disability Evaluation System (IDES)',
 		url: 'https://health.mil/Military-Health-Topics/Access-Cost-Quality-and-Safety/DES/Integrated-Evaluation-System',
@@ -420,7 +429,8 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'va-msc-claim': ['ides', 'va-disability', 'va-accredited-rep'],
 	'ides-review-options': ['ides'],
 	'tamp-check': ['tamp'],
-	'rcsbp-election': ['sbp']
+	'rcsbp-election': ['sbp'],
+	'tricare-retiree-enroll': ['tricare-retiring']
 };
 
 // The TAP guides a task opens in the app's own reader, listed first under its Related resources. Curated by hand and
@@ -475,7 +485,11 @@ export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }
 	'tricare-elect': { resource: 'chcbp', label: 'CHCBP on tricare.mil' },
 	'vgli-convert': { resource: 'va-life-insurance', label: 'VA life insurance options on VA.gov' },
 	'hhg-counseling': { resource: 'mos-final-move', label: 'Your final move on Military OneSource' },
-	'sbp-election': { resource: 'sbp', label: 'The Survivor Benefit Plan on militarypay.defense.gov' }
+	'sbp-election': {
+		resource: 'sbp',
+		label: 'The Survivor Benefit Plan on militarypay.defense.gov'
+	},
+	'tricare-retiree-enroll': { resource: 'tricare-retiring', label: 'Retiring on tricare.mil' }
 };
 
 // One line shown above a task card's links: each service and command sets what its SkillBridge request needs, and
