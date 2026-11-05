@@ -526,12 +526,15 @@ const STATIC = 'static';
 //   2026-11-04 end check: precacheBytes 264,004 -> 258,740 (measured 258,740 B, -4,946 B on the plan's base, margin 0 B).
 //   2026-11-04 end check: routeNodes 60,982 -> 60,579 (measured 60,579 B, -175 B on the plan's base, margin 0 B).
 //
+//   2026-11-05 the retiree TRICARE step, its link and the row focus check: precacheBytes 258,740 -> 259,447 (measured 259,382 B, +643 B on the plan's base, margin 65 B).
+//   2026-11-05 the retiree TRICARE step, its link and the row focus check: routeNodes 60,579 -> 60,593 (measured 60,591 B, +12 B on the plan's base, margin 2 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 258_740,
+	precacheBytes: 259_447,
 	workerScripts: 147_316
 };
 
