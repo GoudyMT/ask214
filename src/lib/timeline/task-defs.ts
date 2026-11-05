@@ -86,6 +86,11 @@ const BOARD_MOVES_TAP =
 const BOARD_EXAMS =
 	'If the board finds you unfit, its exams may stand in for this one; your PEBLO can confirm.';
 
+const SBP_CHOICE =
+	'SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.';
+const RCSBP_WHY =
+	'The letter says you have the years of service for retired pay, and the Reserve Component Survivor Benefit Plan choice is due within 90 days of it. Your Guard or Reserve personnel office can say when to expect the letter.';
+
 const TRR_ANYTIME = 'TRICARE Retired Reserve can be bought at any time before age 60.';
 
 const BDD_FALLBACK =
@@ -418,7 +423,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: 0,
 		recommendedOffset: -120,
-		why: 'The SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.',
+		why: `The ${SBP_CHOICE}`,
 		afterNote:
 			'If retired pay has begun, ask your retirement services office what can still change.',
 		// 10 USC 1448(a) covers anyone who becomes entitled to retired pay, a disability retirement included. A Guard or
@@ -426,11 +431,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// Reserve one, so the title says when it applies.
 		copyFor: {
 			medical: {
-				why: 'If the board retires you, the SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.'
+				why: `If the board retires you, the ${SBP_CHOICE}`
 			},
 			'reserve-retirement': {
 				title:
-					'If you are retiring from full-time active duty, get Survivor Benefit Plan counseling and make your SBP choice'
+					'If you are retiring from full-time active duty, get Survivor Benefit Plan counseling and make your SBP choice',
+				why: `If you are retiring from full-time active duty, the ${SBP_CHOICE}`,
+				afterNote:
+					'If you are retiring from full-time active duty and retired pay has begun, ask your retirement services office what can still change.'
 			}
 		},
 		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
@@ -495,12 +503,17 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: 0,
 		recommendedOffset: -180,
-		why: 'The letter says you have the years of service for retired pay, and the Reserve Component Survivor Benefit Plan choice is due within 90 days of it. Your Guard or Reserve personnel office can say when to expect the letter.',
+		why: RCSBP_WHY,
 		// "Retiring" keeps this step for a Guard or Reserve member who answered before the Guard or Reserve retirement
 		// answer existed, so its title says when it applies.
 		copyFor: {
 			retirement: { title: RETIRING_RCSBP_TITLE },
-			'reserve-retirement': { title: RETIRING_RCSBP_TITLE }
+			// A member retiring from full-time active duty also sees the active-duty step, and only the office can say
+			// which of the two is theirs.
+			'reserve-retirement': {
+				title: RETIRING_RCSBP_TITLE,
+				why: `${RCSBP_WHY} Your retirement services office says which SBP choice applies to you.`
+			}
 		},
 		requires: { separationPath: [...GUARD_OR_RESERVE, 'retirement'] }
 	},
@@ -704,6 +717,6 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: 0,
 		windowEnd: 365,
 		recommendedOffset: 14,
-		why: 'If you missed the BDD window: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.'
+		why: 'If you did not file through BDD: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.'
 	}
 ];

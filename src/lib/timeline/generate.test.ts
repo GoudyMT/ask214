@@ -1553,6 +1553,31 @@ describe('the leaving answer on the real task list', () => {
 		}
 	});
 
+	// A drill-status retiree makes the Reserve choice, so each line of the active-duty step says when it applies.
+	it('conditions every line of the active-duty SBP step for a Guard or Reserve retiree', () => {
+		const def = items('reserve-retirement').find((i) => i.def.id === 'sbp-election')?.def;
+		expect(def?.why).toMatch(/^If you are retiring from full-time active duty, the SBP choice/);
+		expect(def?.afterNote).toMatch(
+			/^If you are retiring from full-time active duty and retired pay has begun/
+		);
+	});
+
+	// A member who has both steps needs a place to ask; the rule for full-time active duty is not settled here.
+	it('sends a Guard or Reserve retiree with both SBP steps to the office that says which applies', () => {
+		const def = (path: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'rcsbp-election')?.def;
+		const line = 'Your retirement services office says which SBP choice applies to you.';
+		expect(def('reserve-retirement')?.why.endsWith(line)).toBe(true);
+		expect(def('reserve-component')?.why).not.toContain(line);
+	});
+
+	// A member who never had BDD, such as a drill-status member, did not miss it.
+	it('does not say a member missed a BDD window they may never have had', () => {
+		const why = items().find((i) => i.def.id === 'va-claim-fallback')?.def.why;
+		expect(why).toMatch(/^If you did not file through BDD:/);
+		expect(why).not.toMatch(/missed/);
+	});
+
 	it('says when the SBP steps apply to a medical board and to a retirement', () => {
 		const def = (path: SeparationPath, id: string) => items(path).find((i) => i.def.id === id)?.def;
 		expect(def('medical', 'sbp-election')?.why).toMatch(/^If the board retires you/);
