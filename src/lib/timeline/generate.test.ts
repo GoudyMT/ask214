@@ -1578,10 +1578,15 @@ describe('the leaving answer on the real task list', () => {
 			TODAY
 		);
 		const moved = view.phases.flatMap((p) => p.items);
-		for (const id of ['tap-capstone', 'sha-schedule', 'sha-complete']) {
+		const notes = {
+			'tap-capstone': /^Still required before you separate/,
+			'sha-schedule': /^Still required unless the board's exams stand in/,
+			'sha-complete': /^Still required unless the board's exams stand in/
+		};
+		for (const [id, note] of Object.entries(notes)) {
 			const item = moved.find((i) => i.def.id === id);
 			expect(item?.status, id).toBe('late');
-			expect(item?.def.afterNote, id).toMatch(/^Still required/);
+			expect(item?.def.afterNote, id).toMatch(note);
 		}
 	});
 
