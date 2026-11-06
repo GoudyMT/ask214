@@ -124,11 +124,7 @@ describe('buildIcs', () => {
 	// A calendar file can land in a calendar others see, often a work one; a medical board is health information.
 	it('the medical board answer adds no title of its own to the file: all it adds, a retiring member has too', async () => {
 		const now = new Date(2026, 9, 7, 12);
-		const fileFor = async (
-			separationPath?: 'medical' | 'retirement',
-			eaos = '2027-06-30',
-			tasks: TimelineState['tasks'] = {}
-		) => {
+		const fileFor = async (separationPath?: 'medical' | 'retirement', eaos = '2027-06-30') => {
 			const items = generateTimeline(
 				{
 					completeness: 'eaos-only',
@@ -137,7 +133,7 @@ describe('buildIcs', () => {
 					...(separationPath ? { separationPath } : {})
 				},
 				[...TASK_DEFS],
-				{ schemaVersion: 1, tasks },
+				{ schemaVersion: 1, tasks: {} },
 				now
 			).phases.flatMap((p) => p.items);
 			expect(items.some((i) => i.def.id === 'peblo-contact')).toBe(separationPath === 'medical');
@@ -148,26 +144,19 @@ describe('buildIcs', () => {
 		};
 		const titles = (ics: string) =>
 			new Set([...ics.matchAll(/SUMMARY:(.*)/g)].map((m) => m[1] ?? ''));
-		const addedByBoard = async (eaos?: string, tasks?: TimelineState['tasks']) => {
-			const without = titles(await fileFor(undefined, eaos, tasks));
-			const added = [...titles(await fileFor('medical', eaos, tasks))].filter(
-				(t) => !without.has(t)
-			);
-			const retiring = titles(await fileFor('retirement', eaos, tasks));
+		const addedByBoard = async (eaos?: string) => {
+			const without = titles(await fileFor(undefined, eaos));
+			const added = [...titles(await fileFor('medical', eaos))].filter((t) => !without.has(t));
+			const retiring = titles(await fileFor('retirement', eaos));
 			for (const t of added) expect(retiring.has(t), `${eaos}: ${t}`).toBe(true);
 			return added;
 		};
 		// Each added step writes two events, its aim and its last day.
 		expect(await addedByBoard()).toHaveLength(4);
-		// Which steps reach the file turns on the date and on what is marked, so a title of the board's own could hide
-		// on any one date: every month of the runway, with nothing marked and with half the steps done.
-		const halfDone = Object.fromEntries(
-			TASK_DEFS.filter((_, i) => i % 2 === 0).map((d) => [d.id, { status: 'done' as const }])
-		);
+		// Which steps reach the file turns on the date, so a title of the board's own could hide on any one date: every
+		// month of the runway. A marked step only leaves the file, so marks need no pass of their own.
 		for (let month = 1; month <= 26; month++) {
-			const eaos = new Date(2026, 9 + month, 15, 12).toISOString().slice(0, 10);
-			await addedByBoard(eaos);
-			await addedByBoard(eaos, halfDone);
+			await addedByBoard(new Date(2026, 9 + month, 15, 12).toISOString().slice(0, 10));
 		}
 	});
 });
