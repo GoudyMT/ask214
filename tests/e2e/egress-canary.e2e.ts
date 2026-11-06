@@ -61,6 +61,11 @@ function decoded(text: string): string {
 	}
 }
 
+/** A string's base64 at the three offsets it can start at inside a longer value, the edge characters left off. */
+function base64Forms(text: string): string[] {
+	return [0, 1, 2].map((pad) => btoa('.'.repeat(pad) + text).slice(pad && pad + 1, -4));
+}
+
 // The SkillBridge question asks again this many days before separation (about 15 months); an early Not sure stores that day.
 const ASK_AGAIN_DAYS = 456;
 const DAYS_TO_SEPARATION = 208;
@@ -103,6 +108,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 	await page.getByRole('button', { name: /save and continue/i }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 	await expect(page.getByText(PEBLO_TITLE)).toBeVisible();
+	await expect(page.getByText(SBP_TITLE)).toBeVisible();
 	await page.goto('/settings');
 	await page.getByRole('button', { name: /skillbridge start/i }).click();
 	await page.getByLabel('SkillBridge start').fill(SKILLBRIDGE);
@@ -203,11 +209,10 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'If you retire\\, enroll',
 		'If you retire, enroll',
 		"unless the board's exams stand in",
-		'you need Part B to keep TRICARE',
-		'If the board moved your date',
+		'you also need Part B',
 		SBP_TITLE,
-		// A title travelling in the form the codec stores or inside a value already serialized once.
-		...[PEBLO_TITLE, SBP_TITLE].map((title) => btoa(title)),
+		// A title inside a value someone base64-encoded, wherever in that value it starts.
+		...[PEBLO_TITLE, SBP_TITLE].flatMap(base64Forms),
 		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
 		'Retiring from the Guard or Reserve',
 		...(['medical', 'retirement', 'reserve-retirement', 'reserve-component'] as const).flatMap(
