@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readyGlance, timelineRow } from './home-glance';
 import { selectNeedsNow } from './needs-now';
+import { makesPersonalClaim } from './personal-claim';
 import { generateTimeline, type TimelineItem, type DisplayStatus } from './generate';
 import { TASK_DEFS } from './task-defs';
 import type { EaosString } from '../profile/eaos';
@@ -237,7 +238,7 @@ describe('timelineRow', () => {
 
 	// A board can move the date, and every step is timed from it: past the date, Home is where a stale date first shows.
 	describe('a date a medical board may have moved', () => {
-		const HINT = 'If the board moved your date, update it in Settings.';
+		const HINT = 'If your date moved, update it in Settings.';
 		const today = new Date(2026, 9, 14);
 		const rowFor = (eaos: string, separationPath: SeparationPath, tasks = {}) => {
 			const persona: PersonaFilters = {
@@ -252,8 +253,13 @@ describe('timelineRow', () => {
 
 		it('adds the hint to the row once the date has passed', () => {
 			expect(rowFor('2026-10-13', 'medical')?.detail).toMatch(
-				/\. If the board moved your date, update it in Settings\.$/
+				/\. If your date moved, update it in Settings\.$/
 			);
+		});
+
+		it('names no board, since a screen can be seen, and makes no personal claim', () => {
+			expect(HINT).not.toMatch(/board|medical/i);
+			expect(makesPersonalClaim(HINT)).toBe(false);
 		});
 
 		it('says nothing on the date itself or before it', () => {

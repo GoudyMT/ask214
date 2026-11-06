@@ -23,8 +23,9 @@ export type TimelineGlance =
 	| { kind: 'ready'; items: TimelineItem[]; todayIso: string; boardDatePast?: boolean };
 
 const NAME = 'Your timeline';
-// A board can move the date and every step is timed from it, so past the date the row says where to change it.
-const BOARD_DATE_HINT = '. If the board moved your date, update it in Settings.';
+// A board can move the date and every step is timed from it, so past the date the row says where to change it. A
+// screen can be seen, so the words name no board.
+const BOARD_DATE_HINT = '. If your date moved, update it in Settings.';
 
 // The task card's own status words, for the statuses "Needs you now" can hold; After you leave / Since you left turns
 // on the task, so it is worded by `afterYouLeaveWord`.
