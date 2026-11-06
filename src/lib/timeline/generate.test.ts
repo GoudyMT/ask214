@@ -1493,8 +1493,22 @@ describe('the leaving answer on the real task list', () => {
 		expect(def('medical')?.why).toMatch(/^If the board retires you/);
 		expect(def('medical')?.why).toMatch(/If it separates you instead/);
 		expect(def('medical')?.why).not.toMatch(/30%/);
-		// A Guard or Reserve member can hold the Retiring answer from before their own answer existed.
-		expect(def('retirement')?.why).toMatch(/A Guard or Reserve retirement works differently/);
+		// tricare.mil's medical retirement page: Medicare under 65 needs Part B to keep TRICARE, and a board retiree is who
+		// most often holds it.
+		expect(def('medical')?.why).toContain(
+			'If you have Medicare before age 65, you need Part B to keep TRICARE.'
+		);
+		// A Guard or Reserve member can hold the Retiring answer from before their own answer existed, and a late card
+		// shows the note, not the why.
+		for (const text of [
+			def('retirement')?.why,
+			def('retirement')?.changeNote,
+			def('retirement')?.afterNote
+		]) {
+			expect(text).toMatch(
+				/A Guard or Reserve retirement works differently; tricare\.mil has the steps\.$/
+			);
+		}
 		expect(def('reserve-retirement')?.title).toBe(
 			'Check your TRICARE plan within 90 days of your retirement date'
 		);
@@ -1507,6 +1521,7 @@ describe('the leaving answer on the real task list', () => {
 			expect(note).toMatch(/^If you are retiring from full-time active duty, you can/);
 			expect(note).toMatch(/Members who qualify can buy TRICARE Retired Reserve at any time/);
 		}
+		expect(def('reserve-retirement')?.changeNote).toContain('any fees go back to that date');
 	});
 
 	// tricare.mil gives 90 days after the retirement date and no way to enroll before it, so the step opens that day.
@@ -1553,7 +1568,7 @@ describe('the leaving answer on the real task list', () => {
 			expect(def('medical')?.why.endsWith(line)).toBe(true);
 			// The note a late card shows must not say the opposite of that line.
 			expect(def('medical')?.afterNote).toMatch(
-				/^Still required unless the board's exams stand in/
+				/^Still required before you separate, unless the board's exams stand in/
 			);
 			expect(def('medical')?.title).toBe(def('ets')?.title);
 			for (const path of OTHER_ANSWERS) {
@@ -1580,8 +1595,8 @@ describe('the leaving answer on the real task list', () => {
 		const moved = view.phases.flatMap((p) => p.items);
 		const notes = {
 			'tap-capstone': /^Still required before you separate/,
-			'sha-schedule': /^Still required unless the board's exams stand in/,
-			'sha-complete': /^Still required unless the board's exams stand in/
+			'sha-schedule': /^Still required before you separate, unless the board's exams stand in/,
+			'sha-complete': /^Still required before you separate, unless the board's exams stand in/
 		};
 		for (const [id, note] of Object.entries(notes)) {
 			const item = moved.find((i) => i.def.id === id);

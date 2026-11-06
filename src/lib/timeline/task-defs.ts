@@ -87,7 +87,7 @@ const BOARD_MOVES_TAP =
 const BOARD_EXAMS =
 	'If the board finds you unfit, its exams may stand in for this one; your PEBLO can confirm.';
 const BOARD_EXAMS_AFTER =
-	"Still required unless the board's exams stand in. Ask your PEBLO or your military medical clinic.";
+	"Still required before you separate, unless the board's exams stand in. Ask your PEBLO or your military medical clinic.";
 
 const SBP_CHOICE =
 	'SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.';
@@ -96,6 +96,8 @@ const RCSBP_WHY =
 
 const TRR_ANYTIME =
 	'Members who qualify can buy TRICARE Retired Reserve at any time before age 60.';
+const GUARD_OR_RESERVE_DIFFERS =
+	'A Guard or Reserve retirement works differently; tricare.mil has the steps.';
 
 const BDD_FALLBACK =
 	'A VA claim can still be filed the standard way, and an accredited VSO helps for free.';
@@ -545,23 +547,21 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 90,
 		// tricare.mil allows a retroactive request "up to 12 months"; 365 days never runs past that.
 		finalEnd: 365,
-		why: 'Retiring changes your TRICARE coverage. To keep it with no break, enroll in TRICARE Prime or TRICARE Select within 90 days after your retirement date. A Guard or Reserve retirement works differently; tricare.mil has the steps.',
-		changeNote:
-			'If you retired, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date.',
-		afterNote:
-			'If you retired, you can enroll during TRICARE Open Season or after a Qualifying Life Event; see tricare.mil.',
+		why: `Retiring changes your TRICARE coverage. To keep it with no break, enroll in TRICARE Prime or TRICARE Select within 90 days after your retirement date. ${GUARD_OR_RESERVE_DIFFERS}`,
+		changeNote: `If you retired, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date. ${GUARD_OR_RESERVE_DIFFERS}`,
+		afterNote: `If you retired, you can enroll during TRICARE Open Season or after a Qualifying Life Event; see tricare.mil. ${GUARD_OR_RESERVE_DIFFERS}`,
 		// The title stays the default for a medical board: it reaches the calendar file, and a title only that answer has
 		// would mark the file as a board member's.
 		copyFor: {
 			medical: {
-				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If it separates you instead, tricare.mil lists what may apply.'
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If you have Medicare before age 65, you need Part B to keep TRICARE. If it separates you instead, tricare.mil lists what may apply.'
 			},
 			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
 			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.
 			'reserve-retirement': {
 				title: 'Check your TRICARE plan within 90 days of your retirement date',
 				why: 'If you have TRICARE Reserve Select, it ends when you transfer to the Retired Reserve; buying TRICARE Retired Reserve within 90 days of your retirement date avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
-				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date. ${TRR_ANYTIME}`,
+				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date. ${TRR_ANYTIME}`,
 				afterNote: `If you are retiring from full-time active duty, you can enroll during TRICARE Open Season or after a Qualifying Life Event. ${TRR_ANYTIME}`
 			}
 		},
