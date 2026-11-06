@@ -72,6 +72,7 @@ const QUESTION = 'What is SkillBridge?';
 const FIND_TITLE = 'Find a SkillBridge program and get an acceptance letter';
 const REQUEST_TITLE = 'Submit your SkillBridge request and get it approved';
 const PEBLO_TITLE = 'Meet your PEBLO, who guides you through the medical board';
+const SBP_TITLE = 'Get Survivor Benefit Plan counseling and make your SBP choice';
 // A made-up key in Anthropic's format; the request carrying it is answered by the mock below and never leaves.
 const TEST_KEY = 'sk-ant-test-canary-0000';
 const ANTHROPIC = 'https://api.anthropic.com/';
@@ -201,10 +202,16 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'If the board finds you unfit',
 		'If you retire\\, enroll',
 		'If you retire, enroll',
+		"unless the board's exams stand in",
+		'you need Part B to keep TRICARE',
+		'If the board moved your date',
+		SBP_TITLE,
+		// A title travelling in the form the codec stores or inside a value already serialized once.
+		...[PEBLO_TITLE, SBP_TITLE].map((title) => btoa(title)),
 		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
 		'Retiring from the Guard or Reserve',
 		...(['medical', 'retirement', 'reserve-retirement', 'reserve-component'] as const).flatMap(
-			(v) => [`"${v}"`, btoa(v)]
+			(v) => [`"${v}"`, JSON.stringify(`"${v}"`).slice(1, -1), btoa(v)]
 		),
 		'"ets"',
 		'peblo-contact',
