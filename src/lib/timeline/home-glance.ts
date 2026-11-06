@@ -19,9 +19,13 @@ export type HomeRow = {
  * failed needs none of this code: Home shows `FAILED_ROW` from `./load-home-glance`.
  */
 export type TimelineGlance =
-	{ kind: 'locked' } | { kind: 'ready'; items: TimelineItem[]; todayIso: string };
+	| { kind: 'locked' }
+	| { kind: 'ready'; items: TimelineItem[]; todayIso: string; boardDatePast?: boolean };
 
 const NAME = 'Your timeline';
+// A board can move the date and every step is timed from it, so past the date the row says where to change it. A
+// screen can be seen, so the words name no board.
+const BOARD_DATE_HINT = '. If your date moved, update it in Settings.';
 
 // The task card's own status words, for the statuses "Needs you now" can hold; After you leave / Since you left turns
 // on the task, so it is worded by `afterYouLeaveWord`.
@@ -70,7 +74,15 @@ export function readyGlance(
 ): TimelineGlance | null {
 	const view = generateTimeline(persona, [...TASK_DEFS], state, now);
 	if (!view.todayDate) return null;
-	return { kind: 'ready', items: view.phases.flatMap((p) => p.items), todayIso: view.todayDate };
+	return {
+		kind: 'ready',
+		items: view.phases.flatMap((p) => p.items),
+		todayIso: view.todayDate,
+		boardDatePast:
+			persona.completeness !== 'none' &&
+			persona.separationPath === 'medical' &&
+			persona.eaos < view.todayDate
+	};
 }
 
 /**
@@ -79,7 +91,7 @@ export function readyGlance(
  * With nothing needing attention it names the next task: one open today, else the one that opens soonest, a snoozed
  * one only when neither exists; with nothing left to act on, it says so.
  */
-export function timelineRow(glance: TimelineGlance): HomeRow {
+function glanceRow(glance: TimelineGlance): HomeRow {
 	if (glance.kind === 'locked') {
 		return { name: NAME, count: 'locked', detail: 'Unlock to see what is due' };
 	}
@@ -126,4 +138,11 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 	return glance.items.every((i) => i.status === 'done' || i.status === 'skipped')
 		? { name: NAME, count: 'all tasks done', detail: 'See what you finished' }
 		: { name: NAME, count: 'nothing left to do', detail: 'See your timeline' };
+}
+
+/** The row Home shows; past the date, a board member's says where to change it. */
+export function timelineRow(glance: TimelineGlance): HomeRow {
+	const row = glanceRow(glance);
+	if (glance.kind === 'ready' && glance.boardDatePast) row.detail += BOARD_DATE_HINT;
+	return row;
 }

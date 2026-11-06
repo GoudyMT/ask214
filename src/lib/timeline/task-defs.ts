@@ -87,7 +87,7 @@ const BOARD_MOVES_TAP =
 const BOARD_EXAMS =
 	'If the board finds you unfit, its exams may stand in for this one; your PEBLO can confirm.';
 const BOARD_EXAMS_AFTER =
-	"Still required unless the board's exams stand in. Ask your PEBLO or your military medical clinic.";
+	"Still required before you separate, unless the board's exams stand in. Ask your PEBLO or your military medical clinic.";
 
 const SBP_CHOICE =
 	'SBP choice is made before retired pay begins, and a married member needs their spouse to agree to anything less than full spouse coverage. Your retirement services office gives the counseling.';
@@ -554,14 +554,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// would mark the file as a board member's.
 		copyFor: {
 			medical: {
-				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If it separates you instead, tricare.mil lists what may apply.'
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break; if you have Medicare before age 65, you also need Part B. If it separates you instead, tricare.mil lists what may apply.'
 			},
 			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
 			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.
 			'reserve-retirement': {
 				title: 'Check your TRICARE plan within 90 days of your retirement date',
 				why: 'If you have TRICARE Reserve Select, it ends when you transfer to the Retired Reserve; buying TRICARE Retired Reserve within 90 days of your retirement date avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
-				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date. ${TRR_ANYTIME}`,
+				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date. ${TRR_ANYTIME}`,
 				afterNote: `If you are retiring from full-time active duty, you can enroll during TRICARE Open Season or after a Qualifying Life Event. ${TRR_ANYTIME}`
 			}
 		},

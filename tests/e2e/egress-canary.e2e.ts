@@ -61,6 +61,11 @@ function decoded(text: string): string {
 	}
 }
 
+/** A string's base64 at the three offsets it can start at inside a longer value, the edge characters left off. */
+function base64Forms(text: string): string[] {
+	return [0, 1, 2].map((pad) => btoa('.'.repeat(pad) + text).slice(pad && pad + 1, -4));
+}
+
 // The SkillBridge question asks again this many days before separation (about 15 months); an early Not sure stores that day.
 const ASK_AGAIN_DAYS = 456;
 const DAYS_TO_SEPARATION = 208;
@@ -72,9 +77,18 @@ const QUESTION = 'What is SkillBridge?';
 const FIND_TITLE = 'Find a SkillBridge program and get an acceptance letter';
 const REQUEST_TITLE = 'Submit your SkillBridge request and get it approved';
 const PEBLO_TITLE = 'Meet your PEBLO, who guides you through the medical board';
+const SBP_TITLE = 'Get Survivor Benefit Plan counseling and make your SBP choice';
 // A made-up key in Anthropic's format; the request carrying it is answered by the mock below and never leaves.
 const TEST_KEY = 'sk-ant-test-canary-0000';
 const ANTHROPIC = 'https://api.anthropic.com/';
+
+// The control for those forms: the rows below only assert absence, so a wrong form would pass them unseen.
+test('a base64 form is found wherever its text starts', () => {
+	for (const lead of ['', 'x', 'xy', 'xyz']) {
+		const encoded = btoa(`${lead}${PEBLO_TITLE}" and more`);
+		expect(base64Forms(PEBLO_TITLE).some((form) => encoded.includes(form))).toBe(true);
+	}
+});
 
 test('no personal value reaches an online request', async ({ page, browserName }) => {
 	const requests: Request[] = [];
@@ -102,6 +116,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 	await page.getByRole('button', { name: /save and continue/i }).click();
 	await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
 	await expect(page.getByText(PEBLO_TITLE)).toBeVisible();
+	await expect(page.getByText(SBP_TITLE)).toBeVisible();
 	await page.goto('/settings');
 	await page.getByRole('button', { name: /skillbridge start/i }).click();
 	await page.getByLabel('SkillBridge start').fill(SKILLBRIDGE);
@@ -201,10 +216,15 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'If the board finds you unfit',
 		'If you retire\\, enroll',
 		'If you retire, enroll',
+		"unless the board's exams stand in",
+		'you also need Part B',
+		SBP_TITLE,
+		// A title inside a value someone base64-encoded, wherever in that value it starts.
+		...[PEBLO_TITLE, SBP_TITLE, 'separationPath'].flatMap(base64Forms),
 		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
 		'Retiring from the Guard or Reserve',
 		...(['medical', 'retirement', 'reserve-retirement', 'reserve-component'] as const).flatMap(
-			(v) => [`"${v}"`, btoa(v)]
+			(v) => [`"${v}"`, JSON.stringify(`"${v}"`).slice(1, -1), btoa(v)]
 		),
 		'"ets"',
 		'peblo-contact',

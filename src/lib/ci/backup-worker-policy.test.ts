@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { IMPORT_PAST_COMMENTS } from './pii-policy';
 
 // The key worker ships as its own file with its own copy of the word list. These hold the edges of that: the page
 // must never carry the list (it is about 60 KB the page never needs), and the worker must never reach app code,
@@ -15,7 +16,9 @@ const IMPORT =
 	/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\.meta\.glob(?:Eager)?\s*\(\s*\[?\s*|\bimport\s+)(['"`])([^'"`\r\n]+)\1/g;
 
 function importsOf(source: string): string[] {
-	return [...source.matchAll(IMPORT)].map((match) => match[2] ?? '');
+	return [...source.matchAll(IMPORT), ...source.matchAll(IMPORT_PAST_COMMENTS)].map(
+		(match) => match[2] ?? ''
+	);
 }
 
 function isTestFile(path: string): boolean {

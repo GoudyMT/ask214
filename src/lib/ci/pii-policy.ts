@@ -132,6 +132,21 @@ export const FORBIDDEN_IMPORT_PATTERN =
 const IMPORT_SPECIFIER =
 	/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\.meta\.glob(?:Eager)?\s*\(\s*\[?\s*|\bimport\s+)(['"`])([^'"`\r\n]+)\1/g;
 
+const QUOTES = String.fromCharCode(39, 34, 96);
+const LINE_BREAKS = String.fromCharCode(10, 13);
+const WHITE_SPACE = String.fromCharCode(32, 9, 10, 11, 12, 13, 160);
+// What may sit between the words of an import: white space and comments. A block comment ends at its first close and a
+// line comment at its line end, and each alternative starts on its own character. So there is one way through a gap
+// (the scan cannot backtrack badly on a long comment) and a quote inside a comment is only part of the comment.
+export const IMPORT_GAP = `(?:[${WHITE_SPACE}]|[/][*](?:[^*]|[*](?![/]))*[*][/]|[/][/][^${LINE_BREAKS}]*[${LINE_BREAKS}])*`;
+// The pattern above, reading past a comment such as `@vite-ignore` wherever one can sit. Inside `import(` a computed
+// specifier may lead up to the string, which is what `@vite-ignore` is for; the run stops at the end of the call. A word
+// straight after a quote is a string's content, not an import.
+export const IMPORT_PAST_COMMENTS = new RegExp(
+	`(?<![A-Za-z0-9_$.${QUOTES}])(?:import[.]meta[.]glob(?:Eager)?${IMPORT_GAP}[(]${IMPORT_GAP}[[]?|import${IMPORT_GAP}[(]${IMPORT_GAP}[^${QUOTES});/]*|import|from)${IMPORT_GAP}([${QUOTES}])([^${QUOTES}${LINE_BREAKS}]+)[${QUOTES}]`,
+	'g'
+);
+
 /**
  * Scan provided file contents for imports of the personal-data modules.
  *
@@ -146,7 +161,14 @@ export function scanForPiiImports(
 ): PiiViolation[] {
 	const violations: PiiViolation[] = [];
 	for (const file of files) {
-		for (const match of file.content.matchAll(IMPORT_SPECIFIER)) {
+		// An import with no comment matches both patterns, at the same place.
+		const seen = new Set<number>();
+		for (const match of [
+			...file.content.matchAll(IMPORT_SPECIFIER),
+			...file.content.matchAll(IMPORT_PAST_COMMENTS)
+		]) {
+			if (seen.has(match.index)) continue;
+			seen.add(match.index);
 			const specifier = match[2] ?? '';
 			if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
 				const line = file.content.slice(0, match.index).split('\n').length;

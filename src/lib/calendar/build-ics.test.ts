@@ -124,11 +124,11 @@ describe('buildIcs', () => {
 	// A calendar file can land in a calendar others see, often a work one; a medical board is health information.
 	it('the medical board answer adds no title of its own to the file: all it adds, a retiring member has too', async () => {
 		const now = new Date(2026, 9, 7, 12);
-		const fileFor = async (separationPath?: 'medical' | 'retirement') => {
+		const fileFor = async (separationPath?: 'medical' | 'retirement', eaos = '2027-06-30') => {
 			const items = generateTimeline(
 				{
 					completeness: 'eaos-only',
-					eaos: '2027-06-30' as EaosString,
+					eaos: eaos as EaosString,
 					daysUntilSeparation: 266,
 					...(separationPath ? { separationPath } : {})
 				},
@@ -144,11 +144,20 @@ describe('buildIcs', () => {
 		};
 		const titles = (ics: string) =>
 			new Set([...ics.matchAll(/SUMMARY:(.*)/g)].map((m) => m[1] ?? ''));
-		const without = titles(await fileFor());
-		const added = [...titles(await fileFor('medical'))].filter((t) => !without.has(t));
-		expect(added.length).toBeGreaterThan(0);
-		const retiring = titles(await fileFor('retirement'));
-		for (const t of added) expect(retiring.has(t), t).toBe(true);
+		const addedByBoard = async (eaos?: string) => {
+			const without = titles(await fileFor(undefined, eaos));
+			const added = [...titles(await fileFor('medical', eaos))].filter((t) => !without.has(t));
+			const retiring = titles(await fileFor('retirement', eaos));
+			for (const t of added) expect(retiring.has(t), `${eaos}: ${t}`).toBe(true);
+			return added;
+		};
+		// Each added step writes two events, its aim and its last day.
+		expect(await addedByBoard()).toHaveLength(4);
+		// Which steps reach the file turns on the date, so a title of the board's own could hide on any one date: every
+		// month of the runway. A marked step only leaves the file, so marks need no pass of their own.
+		for (let month = 1; month <= 26; month++) {
+			await addedByBoard(new Date(2026, 9 + month, 15, 12).toISOString().slice(0, 10));
+		}
 	});
 });
 

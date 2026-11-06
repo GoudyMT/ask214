@@ -10,6 +10,8 @@ import {
 	scanForPiiTokens
 } from './pii-policy';
 
+const LF = String.fromCharCode(10);
+
 // Server-side SvelteKit source: anything that can execute on a server - a route's server file, hooks, any `server`
 // or `*.server` module and everything in a `server` folder outside src/routes, the rule SvelteKit itself applies. The
 // feedback endpoint is the one today; the guard covers it and any added later (PII stays on device).
@@ -303,6 +305,65 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		expect(
 			scan(['const m = await import(', "\t'#lib/profile/store.svelte'", ');'].join('\n'))
 		).toHaveLength(1);
+	});
+
+	it('flags an import with a bundler comment before its specifier, on the line it starts', () => {
+		expect(scan("const m = import(/* @vite-ignore */ '#lib/profile/store.svelte');")).toHaveLength(
+			1
+		);
+		const found = scan(
+			['', 'import(', '\t/** @vite-ignore */', '\t`#lib/keystore/x`', ')'].join('\n')
+		);
+		expect(found).toMatchObject([{ token: '#lib/keystore/x', line: 2 }]);
+	});
+
+	it.each([
+		["import (/* @vite-ignore */ '#lib/profile/x');"],
+		[['import(', "// don't bundle this", "/* c */ '#lib/profile/x'", ')'].join(LF)],
+		["import /* c */ ('#lib/profile/x');"],
+		["import { a } from /* c */ '#lib/profile/x';"],
+		["import /* c */ '#lib/profile/x';"],
+		["import.meta.glob(/* c */ '/src/lib/profile/*.ts');"],
+		["import.meta.glob([/* c */ '/src/lib/profile/*.ts']);"],
+		["import.meta.glob(/* c */ ['/src/lib/profile/*.ts']);"],
+		["import(/* @vite-ignore */ dev ? '#lib/profile/x' : './y');"],
+		["import(/* c */ base + '#lib/profile/x');"],
+		["import(/* c */ ('#lib/profile/x'));"],
+		["run('from', () => import(/* c */ '#lib/keystore/y'));"],
+		["const k = { t: 'import', load: () => import(/* c */ '#lib/profile/x') };"],
+		["import(/* it's \"quoted\" */ '#lib/profile/x');"]
+	])('reads past any comment in %s', (content) => {
+		expect(scan(content)).toHaveLength(1);
+	});
+
+	it('flags an import once, with a comment or without', () => {
+		expect(scan("import('#lib/profile/x'); import(/* c */ '#lib/keystore/y');")).toHaveLength(2);
+	});
+
+	it('leaves a quote in a comment alone', () => {
+		expect(scan(['// pulled in from', "// '#lib/profile/x' by the caller", ''].join(LF))).toEqual(
+			[]
+		);
+		expect(scan(["import( // see '#lib/profile/x'", 'url);'].join(LF))).toEqual([]);
+	});
+
+	// The scan runs in the commit hook, so a comment that made it backtrack would stall every commit.
+	it('reads a long run of comment lines in fair time', () => {
+		const lines = Array.from({ length: 200 }, () => '// see https://a.example/b');
+		const started = performance.now();
+		expect(scan(['// taken from', ...lines, 'const a = 1;'].join(LF))).toEqual([]);
+		expect(scan(`from ${'// '.repeat(200)}`)).toEqual([]);
+		expect(performance.now() - started).toBeLessThan(1000);
+	});
+
+	it('does not read past a comment into another call', () => {
+		expect(scan("import(/* @vite-ignore */ url); run('#lib/profile/store.svelte');")).toEqual([]);
+		expect(scan("import(/* c */ url); /* later note */ run('#lib/profile/store.svelte');")).toEqual(
+			[]
+		);
+		expect(
+			scan(['import(/* c */ url);', '/** Doc. */', "const P = '#lib/profile/x';"].join(LF))
+		).toEqual([]);
 	});
 
 	it('does not let a quoted word ending in "from" hide the next import', () => {
