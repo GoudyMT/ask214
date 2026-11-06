@@ -258,8 +258,11 @@ describe('timelineRow', () => {
 		});
 
 		it('names no board, since a screen can be seen, and makes no personal claim', () => {
-			expect(HINT).not.toMatch(/board|medical/i);
-			expect(makesPersonalClaim(HINT)).toBe(false);
+			const row = rowFor('2026-10-13', 'medical');
+			const hint = row?.detail.slice(row.detail.lastIndexOf('. ') + 2) ?? '';
+			expect(hint).toBe(HINT);
+			expect(hint).not.toMatch(/board|medical/i);
+			expect(makesPersonalClaim(hint)).toBe(false);
 		});
 
 		it('says nothing on the date itself or before it', () => {
