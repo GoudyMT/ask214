@@ -16,26 +16,32 @@ const QUOTES = ['"', "'"].join('');
 const LAZY_ONLY = 'pdfjs-dist';
 const LF = String.fromCharCode(10);
 
-/**
- * Whether the text imports a lib: the bare specifier, a subpath or a Vite suffix (the dep followed by a closing quote, a
- * '/', '?' or '#'), so 'axe-core/axe.min.js' and 'axe-core?raw' are caught, not just 'axe-core'. A backtick counts only
- * as the first string inside import(: comments use backticks to name a lib. (The deps carry no regex-special chars, so
- * no escaping is needed.)
- */
+// An import of a lib: the bare specifier, a subpath or a Vite suffix (the dep followed by a closing quote, a '/', '?' or
+// '#'), so 'axe-core/axe.min.js' and 'axe-core?raw' are caught, not just 'axe-core'. A backtick counts only as the first
+// string inside import(: comments use backticks to name a lib. (The deps carry no regex-special chars, so no escaping
+// is needed.)
+const BUILD_ONLY_IMPORT = new Map<string, RegExp>();
+for (const dep of BUILD_ONLY) {
+	BUILD_ONLY_IMPORT.set(
+		dep,
+		new RegExp(
+			'[' +
+				QUOTES +
+				']' +
+				dep +
+				'([/?#' +
+				QUOTES +
+				'])|import[(][^' +
+				QUOTES +
+				'`)]*`' +
+				dep +
+				'[/?#`]'
+		)
+	);
+}
+
 function importsBuildOnly(text: string, dep: string): boolean {
-	return new RegExp(
-		'[' +
-			QUOTES +
-			']' +
-			dep +
-			'([/?#' +
-			QUOTES +
-			'])|import[(][^' +
-			QUOTES +
-			'`)]*`' +
-			dep +
-			'[/?#`]'
-	).test(text);
+	return BUILD_ONLY_IMPORT.get(dep)?.test(text) ?? false;
 }
 
 /** A static import of the PDF library with a Vite suffix ships it as surely as the bare name does. */
