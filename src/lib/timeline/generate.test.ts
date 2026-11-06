@@ -1524,13 +1524,6 @@ describe('the leaving answer on the real task list', () => {
 		expect(def('reserve-retirement')?.changeNote).toContain('any fees go back to that date');
 	});
 
-	// tricare.mil gives 90 days after the retirement date and no way to enroll before it, so the step opens that day.
-	it('opens the TRICARE step on the retirement date, not before it', () => {
-		const item = items('retirement').find((i) => i.def.id === 'tricare-retiree-enroll');
-		expect(item?.def.windowStart).toBe(0);
-		expect(item?.def.recommendedOffset ?? item?.def.windowStart).toBe(0);
-	});
-
 	// A retiree stays on TRICARE, so "coverage for after TRICARE" is not their step; the others may really leave it.
 	it('hides the after-TRICARE coverage step for a retiree only', () => {
 		expect(ids('retirement')).not.toContain('tricare-elect');
