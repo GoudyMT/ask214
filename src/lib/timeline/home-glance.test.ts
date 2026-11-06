@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { timelineRow } from './home-glance';
+import { readyGlance, timelineRow } from './home-glance';
 import { selectNeedsNow } from './needs-now';
 import { generateTimeline, type TimelineItem, type DisplayStatus } from './generate';
 import { TASK_DEFS } from './task-defs';
 import type { EaosString } from '../profile/eaos';
 import type { PersonaFilters } from '../profile/persona';
+import type { SeparationPath } from '../profile/separation-path';
 
 const TODAY = '2026-10-14';
 
@@ -233,4 +234,44 @@ describe('timelineRow', () => {
 		expect(JSON.stringify(row)).not.toMatch(/Title of|20[0-9][0-9]/);
 	});
 	// The failed row needs none of this code: Home's page tests pin it, for a failed store and for code that never came.
+
+	// A board can move the date, and every step is timed from it: past the date, Home is where a stale date first shows.
+	describe('a date a medical board may have moved', () => {
+		const HINT = 'If the board moved your date, update it in Settings.';
+		const today = new Date(2026, 9, 14);
+		const rowFor = (eaos: string, separationPath: SeparationPath, tasks = {}) => {
+			const persona: PersonaFilters = {
+				completeness: 'eaos-only',
+				eaos: eaos as EaosString,
+				daysUntilSeparation: 0,
+				separationPath
+			};
+			const glance = readyGlance(persona, { schemaVersion: 1, tasks }, today);
+			return glance && timelineRow(glance);
+		};
+
+		it('adds the hint to the row once the date has passed', () => {
+			expect(rowFor('2026-10-13', 'medical')?.detail).toMatch(
+				/\. If the board moved your date, update it in Settings\.$/
+			);
+		});
+
+		it('says nothing on the date itself or before it', () => {
+			expect(rowFor('2026-10-14', 'medical')?.detail).not.toContain(HINT);
+			expect(rowFor('2027-01-15', 'medical')?.detail).not.toContain(HINT);
+		});
+
+		it('says nothing to a member with any other answer', () => {
+			expect(rowFor('2026-10-13', 'retirement')?.detail).not.toContain(HINT);
+		});
+
+		it('keeps the hint when nothing is left to act on', () => {
+			const skipped = Object.fromEntries(
+				TASK_DEFS.map((d) => [d.id, { status: 'skipped' as const }])
+			);
+			const row = rowFor('2026-10-13', 'medical', skipped);
+			expect(row?.count).toBe('all tasks done');
+			expect(row?.detail).toBe(`See what you finished. ${HINT}`);
+		});
+	});
 });

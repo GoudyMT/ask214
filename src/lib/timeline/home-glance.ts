@@ -19,9 +19,12 @@ export type HomeRow = {
  * failed needs none of this code: Home shows `FAILED_ROW` from `./load-home-glance`.
  */
 export type TimelineGlance =
-	{ kind: 'locked' } | { kind: 'ready'; items: TimelineItem[]; todayIso: string };
+	| { kind: 'locked' }
+	| { kind: 'ready'; items: TimelineItem[]; todayIso: string; boardDatePast?: boolean };
 
 const NAME = 'Your timeline';
+// A board can move the date and every step is timed from it, so past the date the row says where to change it.
+const BOARD_DATE_HINT = '. If the board moved your date, update it in Settings.';
 
 // The task card's own status words, for the statuses "Needs you now" can hold; After you leave / Since you left turns
 // on the task, so it is worded by `afterYouLeaveWord`.
@@ -70,7 +73,15 @@ export function readyGlance(
 ): TimelineGlance | null {
 	const view = generateTimeline(persona, [...TASK_DEFS], state, now);
 	if (!view.todayDate) return null;
-	return { kind: 'ready', items: view.phases.flatMap((p) => p.items), todayIso: view.todayDate };
+	return {
+		kind: 'ready',
+		items: view.phases.flatMap((p) => p.items),
+		todayIso: view.todayDate,
+		boardDatePast:
+			persona.completeness !== 'none' &&
+			persona.separationPath === 'medical' &&
+			persona.eaos < view.todayDate
+	};
 }
 
 /**
@@ -83,6 +94,7 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 	if (glance.kind === 'locked') {
 		return { name: NAME, count: 'locked', detail: 'Unlock to see what is due' };
 	}
+	const hint = glance.boardDatePast ? BOARD_DATE_HINT : '';
 	const g = selectNeedsNow(glance.items, glance.todayIso);
 	const urgent = [
 		...g.late,
@@ -104,7 +116,7 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 						: (STATUS_WORD[first.status] ?? first.status),
 				hot: first.status !== 'start-now' && first.status !== 'after-you-leave'
 			},
-			detail: first.def.title
+			detail: `${first.def.title}${hint}`
 		};
 	}
 	const later = glance.items
@@ -119,11 +131,11 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 		return {
 			name: NAME,
 			count: 'nothing needs you now',
-			detail: `Next: ${next.def.title} - ${nextWhen(next)}`
+			detail: `Next: ${next.def.title} - ${nextWhen(next)}${hint}`
 		};
 	}
 	// A task that closed unanswered was missed, not done, so "all done" waits for every task to be done or skipped.
 	return glance.items.every((i) => i.status === 'done' || i.status === 'skipped')
-		? { name: NAME, count: 'all tasks done', detail: 'See what you finished' }
-		: { name: NAME, count: 'nothing left to do', detail: 'See your timeline' };
+		? { name: NAME, count: 'all tasks done', detail: `See what you finished${hint}` }
+		: { name: NAME, count: 'nothing left to do', detail: `See your timeline${hint}` };
 }
