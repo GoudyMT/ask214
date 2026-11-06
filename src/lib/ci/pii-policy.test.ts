@@ -305,6 +305,20 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		).toHaveLength(1);
 	});
 
+	it('flags an import with a bundler comment before its specifier, on the line it starts', () => {
+		expect(scan("const m = import(/* @vite-ignore */ '#lib/profile/store.svelte');")).toHaveLength(
+			1
+		);
+		const found = scan(
+			['', 'import(', '\t/** @vite-ignore */', '\t`#lib/keystore/x`', ')'].join('\n')
+		);
+		expect(found).toMatchObject([{ token: '#lib/keystore/x', line: 2 }]);
+	});
+
+	it('does not read past the comment into another call', () => {
+		expect(scan("import(/* @vite-ignore */ url); run('#lib/profile/store.svelte');")).toEqual([]);
+	});
+
 	it('does not let a quoted word ending in "from" hide the next import', () => {
 		expect(
 			scan(["const label = 'Imported from';", "import { a } from '#lib/profile/x';"].join('\n'))

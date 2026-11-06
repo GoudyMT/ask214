@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { COMMENTED_IMPORT } from './pii-policy';
 
 // The root layout loads on every page, app-init is the code it runs at start-up, and the client hooks file runs before
 // the app starts. The backup code (the session, the flows, the word list loader) is for the Settings and wizard pages
@@ -46,7 +47,8 @@ function reachable(entries: string[]): Set<string> {
 	for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
 		if (seen.has(file)) continue;
 		seen.add(file);
-		for (const match of readFileSync(file, 'utf8').matchAll(IMPORT)) {
+		const text = readFileSync(file, 'utf8');
+		for (const match of [...text.matchAll(IMPORT), ...text.matchAll(COMMENTED_IMPORT)]) {
 			const next = localFile(match[2] ?? '', file);
 			if (next !== null) queue.push(next);
 		}

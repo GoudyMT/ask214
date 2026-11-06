@@ -132,6 +132,10 @@ export const FORBIDDEN_IMPORT_PATTERN =
 const IMPORT_SPECIFIER =
 	/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\.meta\.glob(?:Eager)?\s*\(\s*\[?\s*|\bimport\s+)(['"`])([^'"`\r\n]+)\1/g;
 
+// A bundler comment such as `@vite-ignore` can sit between `import(` and the specifier, which the pattern above does
+// not read past. The gap holds no quote or closing bracket, so the match stays inside that one call.
+export const COMMENTED_IMPORT = /import[(][^'"`)]*?[/][*].*?[*][/][^'"`)]*(['"`])([^'"` ]+)['"`]/gs;
+
 /**
  * Scan provided file contents for imports of the personal-data modules.
  *
@@ -146,7 +150,10 @@ export function scanForPiiImports(
 ): PiiViolation[] {
 	const violations: PiiViolation[] = [];
 	for (const file of files) {
-		for (const match of file.content.matchAll(IMPORT_SPECIFIER)) {
+		for (const match of [
+			...file.content.matchAll(IMPORT_SPECIFIER),
+			...file.content.matchAll(COMMENTED_IMPORT)
+		]) {
 			const specifier = match[2] ?? '';
 			if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
 				const line = file.content.slice(0, match.index).split('\n').length;
