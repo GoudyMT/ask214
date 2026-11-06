@@ -1493,21 +1493,17 @@ describe('the leaving answer on the real task list', () => {
 		expect(def('medical')?.why).toMatch(/^If the board retires you/);
 		expect(def('medical')?.why).toMatch(/If it separates you instead/);
 		expect(def('medical')?.why).not.toMatch(/30%/);
-		// tricare.mil's medical retirement page: Medicare under 65 needs Part B to keep TRICARE, and a board retiree is who
-		// most often holds it.
+		// tricare.mil's medical retirement page: Medicare under 65 needs Part B to keep TRICARE. That page is for a retiree,
+		// so the line sits inside the sentence for the board retiring a member, ahead of the separating branch.
 		expect(def('medical')?.why).toContain(
-			'If you have Medicare before age 65, you need Part B to keep TRICARE.'
+			'to keep TRICARE with no break; if you have Medicare before age 65, you also need Part B. If it separates you instead'
 		);
-		// A Guard or Reserve member can hold the Retiring answer from before their own answer existed, and a late card
-		// shows the note, not the why.
-		for (const text of [
-			def('retirement')?.why,
-			def('retirement')?.changeNote,
-			def('retirement')?.afterNote
-		]) {
-			expect(text).toMatch(
-				/A Guard or Reserve retirement works differently; tricare\.mil has the steps\.$/
-			);
+		// A Guard or Reserve member can hold the Retiring answer from before their own answer existed. The card prints the
+		// why above its note, so the line is in the why alone and a board member's notes stay free of it.
+		expect(def('retirement')?.why).toMatch(/A Guard or Reserve retirement works differently/);
+		for (const path of ['retirement', 'medical'] as const) {
+			expect(def(path)?.changeNote).not.toMatch(/works differently/);
+			expect(def(path)?.afterNote).not.toMatch(/works differently/);
 		}
 		expect(def('reserve-retirement')?.title).toBe(
 			'Check your TRICARE plan within 90 days of your retirement date'

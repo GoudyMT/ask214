@@ -96,8 +96,6 @@ const RCSBP_WHY =
 
 const TRR_ANYTIME =
 	'Members who qualify can buy TRICARE Retired Reserve at any time before age 60.';
-const GUARD_OR_RESERVE_DIFFERS =
-	'A Guard or Reserve retirement works differently; tricare.mil has the steps.';
 
 const BDD_FALLBACK =
 	'A VA claim can still be filed the standard way, and an accredited VSO helps for free.';
@@ -547,14 +545,16 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 90,
 		// tricare.mil allows a retroactive request "up to 12 months"; 365 days never runs past that.
 		finalEnd: 365,
-		why: `Retiring changes your TRICARE coverage. To keep it with no break, enroll in TRICARE Prime or TRICARE Select within 90 days after your retirement date. ${GUARD_OR_RESERVE_DIFFERS}`,
-		changeNote: `If you retired, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date. ${GUARD_OR_RESERVE_DIFFERS}`,
-		afterNote: `If you retired, you can enroll during TRICARE Open Season or after a Qualifying Life Event; see tricare.mil. ${GUARD_OR_RESERVE_DIFFERS}`,
+		why: 'Retiring changes your TRICARE coverage. To keep it with no break, enroll in TRICARE Prime or TRICARE Select within 90 days after your retirement date. A Guard or Reserve retirement works differently; tricare.mil has the steps.',
+		changeNote:
+			'If you retired, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date.',
+		afterNote:
+			'If you retired, you can enroll during TRICARE Open Season or after a Qualifying Life Event; see tricare.mil.',
 		// The title stays the default for a medical board: it reaches the calendar file, and a title only that answer has
 		// would mark the file as a board member's.
 		copyFor: {
 			medical: {
-				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If you have Medicare before age 65, you need Part B to keep TRICARE. If it separates you instead, tricare.mil lists what may apply.'
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break; if you have Medicare before age 65, you also need Part B. If it separates you instead, tricare.mil lists what may apply.'
 			},
 			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
 			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.
