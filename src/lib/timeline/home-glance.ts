@@ -90,11 +90,10 @@ export function readyGlance(
  * With nothing needing attention it names the next task: one open today, else the one that opens soonest, a snoozed
  * one only when neither exists; with nothing left to act on, it says so.
  */
-export function timelineRow(glance: TimelineGlance): HomeRow {
+function glanceRow(glance: TimelineGlance): HomeRow {
 	if (glance.kind === 'locked') {
 		return { name: NAME, count: 'locked', detail: 'Unlock to see what is due' };
 	}
-	const hint = glance.boardDatePast ? BOARD_DATE_HINT : '';
 	const g = selectNeedsNow(glance.items, glance.todayIso);
 	const urgent = [
 		...g.late,
@@ -116,7 +115,7 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 						: (STATUS_WORD[first.status] ?? first.status),
 				hot: first.status !== 'start-now' && first.status !== 'after-you-leave'
 			},
-			detail: `${first.def.title}${hint}`
+			detail: first.def.title
 		};
 	}
 	const later = glance.items
@@ -131,11 +130,18 @@ export function timelineRow(glance: TimelineGlance): HomeRow {
 		return {
 			name: NAME,
 			count: 'nothing needs you now',
-			detail: `Next: ${next.def.title} - ${nextWhen(next)}${hint}`
+			detail: `Next: ${next.def.title} - ${nextWhen(next)}`
 		};
 	}
 	// A task that closed unanswered was missed, not done, so "all done" waits for every task to be done or skipped.
 	return glance.items.every((i) => i.status === 'done' || i.status === 'skipped')
-		? { name: NAME, count: 'all tasks done', detail: `See what you finished${hint}` }
-		: { name: NAME, count: 'nothing left to do', detail: `See your timeline${hint}` };
+		? { name: NAME, count: 'all tasks done', detail: 'See what you finished' }
+		: { name: NAME, count: 'nothing left to do', detail: 'See your timeline' };
+}
+
+/** The row Home shows; past the date, a board member's says where to change it. */
+export function timelineRow(glance: TimelineGlance): HomeRow {
+	const row = glanceRow(glance);
+	if (glance.kind === 'ready' && glance.boardDatePast) row.detail += BOARD_DATE_HINT;
+	return row;
 }
