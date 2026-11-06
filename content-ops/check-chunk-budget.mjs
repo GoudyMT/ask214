@@ -531,12 +531,15 @@ const STATIC = 'static';
 //
 //   2026-11-05 the sweep's wording fixes to the retiree TRICARE and board lines: precacheBytes 259,447 -> 259,540 (measured 259,467 B, +728 B on the plan's base, margin 73 B).
 //
+//   2026-11-05 the retiree notes, the board exam note and the Home hint for a board member past the date: precacheBytes 259,540 -> 259,628 (measured 259,613 B, +146 B on the plan's base, margin 15 B).
+//   2026-11-05 the retiree notes, the board exam note and the Home hint for a board member past the date: routeNodes 60,593 -> 60,599 (measured 60,598 B, +6 B on the plan's base, margin 1 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 259_540,
+	precacheBytes: 259_628,
 	workerScripts: 147_316
 };
 
