@@ -82,6 +82,14 @@ const SBP_TITLE = 'Get Survivor Benefit Plan counseling and make your SBP choice
 const TEST_KEY = 'sk-ant-test-canary-0000';
 const ANTHROPIC = 'https://api.anthropic.com/';
 
+// The control for those forms: the rows below only assert absence, so a wrong form would pass them unseen.
+test('a base64 form is found wherever its text starts', () => {
+	for (const lead of ['', 'x', 'xy', 'xyz']) {
+		const encoded = btoa(`${lead}${PEBLO_TITLE}" and more`);
+		expect(base64Forms(PEBLO_TITLE).some((form) => encoded.includes(form))).toBe(true);
+	}
+});
+
 test('no personal value reaches an online request', async ({ page, browserName }) => {
 	const requests: Request[] = [];
 	page.on('request', (request) => requests.push(request));
@@ -212,7 +220,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'you also need Part B',
 		SBP_TITLE,
 		// A title inside a value someone base64-encoded, wherever in that value it starts.
-		...[PEBLO_TITLE, SBP_TITLE].flatMap(base64Forms),
+		...[PEBLO_TITLE, SBP_TITLE, 'separationPath'].flatMap(base64Forms),
 		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
 		'Retiring from the Guard or Reserve',
 		...(['medical', 'retirement', 'reserve-retirement', 'reserve-component'] as const).flatMap(
