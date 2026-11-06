@@ -534,6 +534,8 @@ const STATIC = 'static';
 //   2026-11-05 the retiree notes, the board exam note and the Home hint for a board member past the date: precacheBytes 259,540 -> 259,628 (measured 259,613 B, +146 B on the plan's base, margin 15 B).
 //   2026-11-05 the retiree notes, the board exam note and the Home hint for a board member past the date: routeNodes 60,593 -> 60,599 (measured 60,598 B, +6 B on the plan's base, margin 1 B).
 //
+//   2026-11-06 the sweep's copy fixes: Part B, the Home hint: routeNodes 60,599 -> 60,603 (measured 60,602 B, +10 B on the plan's base, margin 1 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
