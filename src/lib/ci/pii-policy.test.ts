@@ -325,6 +325,12 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		["import /* c */ '#lib/profile/x';"],
 		["import.meta.glob(/* c */ '/src/lib/profile/*.ts');"],
 		["import.meta.glob([/* c */ '/src/lib/profile/*.ts']);"],
+		["import.meta.glob(/* c */ ['/src/lib/profile/*.ts']);"],
+		["import(/* @vite-ignore */ dev ? '#lib/profile/x' : './y');"],
+		["import(/* c */ base + '#lib/profile/x');"],
+		["import(/* c */ ('#lib/profile/x'));"],
+		["run('from', () => import(/* c */ '#lib/keystore/y'));"],
+		["const k = { t: 'import', load: () => import(/* c */ '#lib/profile/x') };"],
 		["import(/* it's \"quoted\" */ '#lib/profile/x');"]
 	])('reads past any comment in %s', (content) => {
 		expect(scan(content)).toHaveLength(1);
@@ -332,6 +338,22 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 
 	it('flags an import once, with a comment or without', () => {
 		expect(scan("import('#lib/profile/x'); import(/* c */ '#lib/keystore/y');")).toHaveLength(2);
+	});
+
+	it('leaves a quote in a comment alone', () => {
+		expect(scan(['// pulled in from', "// '#lib/profile/x' by the caller", ''].join(LF))).toEqual(
+			[]
+		);
+		expect(scan(["import( // see '#lib/profile/x'", 'url);'].join(LF))).toEqual([]);
+	});
+
+	// The scan runs in the commit hook, so a comment that made it backtrack would stall every commit.
+	it('reads a long run of comment lines in fair time', () => {
+		const lines = Array.from({ length: 200 }, () => '// see https://a.example/b');
+		const started = performance.now();
+		expect(scan(['// taken from', ...lines, 'const a = 1;'].join(LF))).toEqual([]);
+		expect(scan(`from ${'// '.repeat(200)}`)).toEqual([]);
+		expect(performance.now() - started).toBeLessThan(1000);
 	});
 
 	it('does not read past a comment into another call', () => {

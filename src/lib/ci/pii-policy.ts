@@ -134,12 +134,16 @@ const IMPORT_SPECIFIER =
 
 const QUOTES = String.fromCharCode(39, 34, 96);
 const LINE_BREAKS = String.fromCharCode(10, 13);
-// What may sit between the words of an import: white space and comments. A block comment ends at its first close, so
-// the gap stays inside that one statement, and a quote inside a comment is only part of the comment.
-export const IMPORT_GAP = `(?:[ ${String.fromCharCode(9)}${LINE_BREAKS}]|[/][*](?:[^*]|[*](?![/]))*[*][/]|[/][/][^${LINE_BREAKS}]*)*`;
-// The pattern above, reading past a comment such as `@vite-ignore` wherever one can sit.
+const WHITE_SPACE = String.fromCharCode(32, 9, 10, 11, 12, 13, 160);
+// What may sit between the words of an import: white space and comments. A block comment ends at its first close and a
+// line comment at its line end, and each alternative starts on its own character. So there is one way through a gap
+// (the scan cannot backtrack badly on a long comment) and a quote inside a comment is only part of the comment.
+export const IMPORT_GAP = `(?:[${WHITE_SPACE}]|[/][*](?:[^*]|[*](?![/]))*[*][/]|[/][/][^${LINE_BREAKS}]*[${LINE_BREAKS}])*`;
+// The pattern above, reading past a comment such as `@vite-ignore` wherever one can sit. Inside `import(` a computed
+// specifier may lead up to the string, which is what `@vite-ignore` is for; the run stops at the end of the call. A word
+// straight after a quote is a string's content, not an import.
 export const IMPORT_PAST_COMMENTS = new RegExp(
-	`(?<![A-Za-z0-9_$.])(?:import[.]meta[.]glob(?:Eager)?${IMPORT_GAP}[(]${IMPORT_GAP}[[]?|import${IMPORT_GAP}[(]|import|from)${IMPORT_GAP}([${QUOTES}])([^${QUOTES}${LINE_BREAKS}]+)[${QUOTES}]`,
+	`(?<![A-Za-z0-9_$.${QUOTES}])(?:import[.]meta[.]glob(?:Eager)?${IMPORT_GAP}[(]${IMPORT_GAP}[[]?|import${IMPORT_GAP}[(]${IMPORT_GAP}[^${QUOTES});/]*|import|from)${IMPORT_GAP}([${QUOTES}])([^${QUOTES}${LINE_BREAKS}]+)[${QUOTES}]`,
 	'g'
 );
 

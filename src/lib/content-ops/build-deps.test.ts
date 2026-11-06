@@ -36,7 +36,9 @@ for (const dep of BUILD_ONLY) {
 				IMPORT_GAP +
 				'[(]' +
 				IMPORT_GAP +
-				'`' +
+				'[^' +
+				QUOTES +
+				'`)/]*`' +
 				dep +
 				'[/?#`]'
 		)
@@ -87,6 +89,8 @@ describe('build-only dependency isolation', () => {
 			)
 		).toBe(true);
 		expect(importsBuildOnly('import(/* see "x" (y) */ `axe-core`);', 'axe-core')).toBe(true);
+		expect(importsBuildOnly('import(dev ? `axe-core` : `./y`);', 'axe-core')).toBe(true);
+		expect(importsBuildOnly('import(base + `axe-core`);', 'axe-core')).toBe(true);
 		expect(importsBuildOnly(['import(', '// note', '`axe-core`', ')'].join(LF), 'axe-core')).toBe(
 			true
 		);
@@ -104,10 +108,13 @@ describe('build-only dependency isolation', () => {
 			"import 'pdfjs-dist?raw';",
 			"export { getDocument } from 'pdfjs-dist';",
 			"export { default } from 'pdfjs-dist/build/pdf.worker.mjs?url';",
-			['import {', '\tgetDocument,', '\tGlobalWorkerOptions', "} from 'pdfjs-dist';"].join(LF)
+			['import {', 'getDocument', "} from /* @vite-ignore */ 'pdfjs-dist';"].join(LF)
 		]) {
 			expect(importsPdfStatically(form), form).toBe(true);
 		}
+		expect(importsPdfStatically(['// loaded from', "// 'pdfjs-dist' on demand", ''].join(LF))).toBe(
+			false
+		);
 		expect(importsPdfStatically("const u = import('pdfjs-dist?url');")).toBe(false);
 		expect(importsPdfStatically("type P = typeof import('pdfjs-dist');")).toBe(false);
 	});
