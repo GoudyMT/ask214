@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { IMPORT_GAP } from '../ci/pii-policy';
 
 // The build-only libs must NEVER be imported by a src/ runtime module: they execute only on dev/CI (the
 // content-ops/*.mjs scripts, and axe-core in the E2E suite), so a runtime vuln in one of them cannot reach a
@@ -31,9 +32,11 @@ for (const dep of BUILD_ONLY) {
 				dep +
 				'([/?#' +
 				QUOTES +
-				'])|import[(][^' +
-				QUOTES +
-				'`)]*`' +
+				'])|import' +
+				IMPORT_GAP +
+				'[(]' +
+				IMPORT_GAP +
+				'`' +
 				dep +
 				'[/?#`]'
 		)
@@ -44,9 +47,11 @@ function importsBuildOnly(text: string, dep: string): boolean {
 	return BUILD_ONLY_IMPORT.get(dep)?.test(text) ?? false;
 }
 
-/** A static import of the PDF library with a Vite suffix ships it as surely as the bare name does. */
-function importsPdfWithSuffix(text: string): boolean {
-	return new RegExp('(?:from|import)[ ]*[' + QUOTES + ']' + LAZY_ONLY + '[?#]').test(text);
+/** Any static form: a re-export, a wrapped import, a subpath or a Vite suffix ships the library all the same. */
+function importsPdfStatically(text: string): boolean {
+	return new RegExp(
+		'(?:from|import)' + IMPORT_GAP + '[' + QUOTES + ']' + LAZY_ONLY + '[/?#' + QUOTES + ']'
+	).test(text);
 }
 
 function tsFiles(dir: string): string[] {
@@ -81,6 +86,10 @@ describe('build-only dependency isolation', () => {
 				'axe-core'
 			)
 		).toBe(true);
+		expect(importsBuildOnly('import(/* see "x" (y) */ `axe-core`);', 'axe-core')).toBe(true);
+		expect(importsBuildOnly(['import(', '// note', '`axe-core`', ')'].join(LF), 'axe-core')).toBe(
+			true
+		);
 	});
 
 	test('the scan leaves a comment that names a lib in backticks alone', () => {
@@ -89,10 +98,18 @@ describe('build-only dependency isolation', () => {
 		).toBe(false);
 	});
 
-	test('the pdf check reads a static import with a Vite suffix, and allows a dynamic one', () => {
-		expect(importsPdfWithSuffix("import url from 'pdfjs-dist?url';")).toBe(true);
-		expect(importsPdfWithSuffix("import 'pdfjs-dist?raw';")).toBe(true);
-		expect(importsPdfWithSuffix("const u = import('pdfjs-dist?url');")).toBe(false);
+	test('the pdf check reads every static form, and allows a dynamic one', () => {
+		for (const form of [
+			"import url from 'pdfjs-dist?url';",
+			"import 'pdfjs-dist?raw';",
+			"export { getDocument } from 'pdfjs-dist';",
+			"export { default } from 'pdfjs-dist/build/pdf.worker.mjs?url';",
+			['import {', '\tgetDocument,', '\tGlobalWorkerOptions', "} from 'pdfjs-dist';"].join(LF)
+		]) {
+			expect(importsPdfStatically(form), form).toBe(true);
+		}
+		expect(importsPdfStatically("const u = import('pdfjs-dist?url');")).toBe(false);
+		expect(importsPdfStatically("type P = typeof import('pdfjs-dist');")).toBe(false);
 	});
 
 	test('the pdf runtime is reachable only behind a dynamic import', () => {
@@ -103,7 +120,7 @@ describe('build-only dependency isolation', () => {
 			// component in the app shell means every visitor downloads and parses 450 kB of it. Only
 			// `import('pdfjs-dist')` and the type-position `typeof import('pdfjs-dist')` are permitted.
 			const statik = new RegExp('(^|\\n)\\s*import\\s[^\\n]*[\'"]' + LAZY_ONLY + '([\'"/])');
-			if (statik.test(text) || importsPdfWithSuffix(text)) {
+			if (statik.test(text) || importsPdfStatically(text)) {
 				offenders.push(`${file} -> static import of ${LAZY_ONLY}`);
 			}
 		}

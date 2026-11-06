@@ -10,6 +10,8 @@ import {
 	scanForPiiTokens
 } from './pii-policy';
 
+const LF = String.fromCharCode(10);
+
 // Server-side SvelteKit source: anything that can execute on a server - a route's server file, hooks, any `server`
 // or `*.server` module and everything in a `server` folder outside src/routes, the rule SvelteKit itself applies. The
 // feedback endpoint is the one today; the guard covers it and any added later (PII stays on device).
@@ -315,8 +317,31 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		expect(found).toMatchObject([{ token: '#lib/keystore/x', line: 2 }]);
 	});
 
-	it('does not read past the comment into another call', () => {
+	it.each([
+		["import (/* @vite-ignore */ '#lib/profile/x');"],
+		[['import(', "// don't bundle this", "/* c */ '#lib/profile/x'", ')'].join(LF)],
+		["import /* c */ ('#lib/profile/x');"],
+		["import { a } from /* c */ '#lib/profile/x';"],
+		["import /* c */ '#lib/profile/x';"],
+		["import.meta.glob(/* c */ '/src/lib/profile/*.ts');"],
+		["import.meta.glob([/* c */ '/src/lib/profile/*.ts']);"],
+		["import(/* it's \"quoted\" */ '#lib/profile/x');"]
+	])('reads past any comment in %s', (content) => {
+		expect(scan(content)).toHaveLength(1);
+	});
+
+	it('flags an import once, with a comment or without', () => {
+		expect(scan("import('#lib/profile/x'); import(/* c */ '#lib/keystore/y');")).toHaveLength(2);
+	});
+
+	it('does not read past a comment into another call', () => {
 		expect(scan("import(/* @vite-ignore */ url); run('#lib/profile/store.svelte');")).toEqual([]);
+		expect(scan("import(/* c */ url); /* later note */ run('#lib/profile/store.svelte');")).toEqual(
+			[]
+		);
+		expect(
+			scan(['import(/* c */ url);', '/** Doc. */', "const P = '#lib/profile/x';"].join(LF))
+		).toEqual([]);
 	});
 
 	it('does not let a quoted word ending in "from" hide the next import', () => {
