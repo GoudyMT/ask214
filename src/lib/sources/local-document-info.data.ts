@@ -85,7 +85,7 @@ export const LOCAL_DOCUMENT_INFO: Record<string, TapGuide & { pages: number }> =
 	},
 	tap_mental_health_families: {
 		title: 'TAP - Mental Health for Families (Resource Guide)',
-		publisher: 'DoD',
+		publisher: 'VA',
 		pages: 4
 	},
 	tap_reserve_dual_pay: {
