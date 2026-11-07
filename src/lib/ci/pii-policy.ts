@@ -147,6 +147,31 @@ export const IMPORT_PAST_COMMENTS = new RegExp(
 	'g'
 );
 
+// A glob call, past an optional type argument, and what it is given: one string, or a whole list, whose every item is
+// read below. The list stops at its first close bracket, so a long one reads in one pass.
+const GLOB_CALL = new RegExp(
+	`(?<![A-Za-z0-9_$.${QUOTES}])import[.]meta[.]glob(?:Eager)?${IMPORT_GAP}(?:<[^()]*>${IMPORT_GAP})?[(]${IMPORT_GAP}([[][^\\]]*[\\]]|[${QUOTES}][^${QUOTES}${LINE_BREAKS}]+[${QUOTES}])`,
+	'dg'
+);
+// Inside a glob list: a comment is passed over whole, so a quote inside it is never read as a string.
+const GLOB_ITEM = new RegExp(
+	`[/][*](?:[^*]|[*](?![/]))*[*][/]|[/][/][^${LINE_BREAKS}]*|([${QUOTES}])([^${QUOTES}${LINE_BREAKS}]+)[${QUOTES}]`,
+	'g'
+);
+
+/** Every string a glob call is given, with where it starts in the text. */
+function globSpecifiers(text: string): { specifier: string; at: number }[] {
+	const found: { specifier: string; at: number }[] = [];
+	for (const call of text.matchAll(GLOB_CALL)) {
+		const body = call[1] ?? '';
+		const start = call.indices?.[1]?.[0] ?? 0;
+		for (const item of body.matchAll(GLOB_ITEM)) {
+			if (item[2] !== undefined) found.push({ specifier: item[2], at: start + item.index });
+		}
+	}
+	return found;
+}
+
 /**
  * Scan provided file contents for imports of the personal-data modules.
  *
@@ -161,17 +186,28 @@ export function scanForPiiImports(
 ): PiiViolation[] {
 	const violations: PiiViolation[] = [];
 	for (const file of files) {
-		// An import with no comment matches both patterns, at the same place.
+		// One import can match several patterns; each string is counted once, by where it ends. An import is placed on the
+		// line it starts on, a later glob item on its own line.
 		const seen = new Set<number>();
-		for (const match of [
-			...file.content.matchAll(IMPORT_SPECIFIER),
-			...file.content.matchAll(IMPORT_PAST_COMMENTS)
-		]) {
-			if (seen.has(match.index)) continue;
-			seen.add(match.index);
-			const specifier = match[2] ?? '';
+		const found = [
+			...[
+				...file.content.matchAll(IMPORT_SPECIFIER),
+				...file.content.matchAll(IMPORT_PAST_COMMENTS)
+			].map((match) => ({
+				specifier: match[2] ?? '',
+				at: match.index,
+				end: match.index + match[0].length
+			})),
+			...globSpecifiers(file.content).map((g) => ({
+				...g,
+				end: g.at + g.specifier.length + 2
+			}))
+		];
+		for (const { specifier, at, end } of found) {
+			if (seen.has(end)) continue;
+			seen.add(end);
 			if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
-				const line = file.content.slice(0, match.index).split('\n').length;
+				const line = file.content.slice(0, at).split('\n').length;
 				violations.push({ path: file.path, token: specifier, line });
 			}
 		}

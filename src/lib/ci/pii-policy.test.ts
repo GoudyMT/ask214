@@ -336,6 +336,70 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		expect(scan(content)).toHaveLength(1);
 	});
 
+	// A glob can take a type argument, and its list can name the banned folder in any item, not only the first.
+	it.each([
+		["import.meta.glob<M>('/src/lib/profile/*.ts');", ['/src/lib/profile/*.ts']],
+		[
+			"import.meta.globEager<Record<string, M>>( '/src/lib/keystore/*.ts');",
+			['/src/lib/keystore/*.ts']
+		],
+		[
+			"import.meta.glob(['/src/lib/ask/*.ts', '/src/lib/profile/*.ts']);",
+			['/src/lib/profile/*.ts']
+		],
+		[
+			[
+				'import.meta.glob<M>([',
+				"\t'/src/lib/ask/*.ts',",
+				'\t// the keys',
+				"\t'#lib/keystore/*.ts'",
+				'])'
+			].join(LF),
+			['#lib/keystore/*.ts']
+		],
+		[
+			"import.meta.glob(['/src/lib/profile/*.ts', /* c */ '/src/lib/db/*.ts'], { eager: true });",
+			['/src/lib/profile/*.ts', '/src/lib/db/*.ts']
+		]
+	])('flags each banned item of the glob %s', (content, tokens) => {
+		expect(scan(content).map((v) => v.token)).toEqual(tokens);
+	});
+
+	it('names the line of a later glob item', () => {
+		const content = [
+			'import.meta.glob([',
+			"\t'/src/lib/ask/*.ts',",
+			"\t'/src/lib/profile/*.ts'",
+			'])'
+		].join(LF);
+		expect(scan(content)).toMatchObject([{ token: '/src/lib/profile/*.ts', line: 3 }]);
+	});
+
+	it('leaves a glob of allowed folders, and a plain list of strings, alone', () => {
+		expect(scan("import.meta.glob<M>(['/src/lib/ask/*.ts', '/src/lib/sources/*.ts']);")).toEqual(
+			[]
+		);
+		expect(scan("const paths = ['/src/lib/ask/x.ts', '/src/lib/profile/y.ts'];")).toEqual([]);
+		expect(
+			scan(
+				[
+					'import.meta.glob([',
+					"\t// not '/src/lib/profile/*.ts' here",
+					"\t'/src/lib/ask/*.ts'",
+					'])'
+				].join(LF)
+			)
+		).toEqual([]);
+	});
+
+	it('reads a long glob list in fair time', () => {
+		const items = Array.from({ length: 200 }, (_, i) => `\t'/src/lib/ask/${i}.ts', // note`);
+		const started = performance.now();
+		expect(scan(['import.meta.glob([', ...items, '])'].join(LF))).toEqual([]);
+		expect(scan(`import.meta.glob<${'A<'.repeat(200)}`)).toEqual([]);
+		expect(performance.now() - started).toBeLessThan(1000);
+	});
+
 	it('flags an import once, with a comment or without', () => {
 		expect(scan("import('#lib/profile/x'); import(/* c */ '#lib/keystore/y');")).toHaveLength(2);
 	});
