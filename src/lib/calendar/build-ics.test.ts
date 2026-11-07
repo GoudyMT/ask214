@@ -124,7 +124,7 @@ describe('buildIcs', () => {
 	});
 
 	// A calendar file can land in a calendar others see, often a work one; a medical board is health information.
-	it('the medical board answer adds no title of its own to the file: all it adds, a retiring member has too', async () => {
+	it('the medical board answer adds no title or event ID of its own to the file: all it adds, a retiring member has too', async () => {
 		const now = new Date(2026, 9, 7, 12);
 		const fileFor = async (
 			separationPath?: 'medical' | 'retirement',
@@ -150,8 +150,10 @@ describe('buildIcs', () => {
 				''
 			);
 		};
+		// An event's ID is a plain hash of its task's id, so an ID only the board's steps have marks the file as well as a
+		// title does: both are compared.
 		const titles = (ics: string) =>
-			new Set([...ics.matchAll(/SUMMARY:(.*)/g)].map((m) => m[1] ?? ''));
+			new Set([...ics.matchAll(/(?:SUMMARY|UID):.*/g)].map((m) => m[0]));
 		const addedByBoard = async (
 			eaos?: string,
 			more?: Parameters<typeof fileFor>[2],
@@ -165,8 +167,8 @@ describe('buildIcs', () => {
 			for (const t of added) expect(retiring.has(t), `${eaos}: ${t}`).toBe(true);
 			return added;
 		};
-		// Each added step writes two events, its aim and its last day.
-		expect(await addedByBoard()).toHaveLength(4);
+		// Each added step writes two events, its aim and its last day, each with a title and an ID.
+		expect(await addedByBoard()).toHaveLength(8);
 		// Which steps reach the file turns on the date, so a title of the board's own could hide on any one date: every
 		// month of the runway, and the year after separation. A marked step only leaves the file, so marks need no pass of
 		// their own; what adds steps does: a SkillBridge Yes adds its steps, and a leaving date moves last days in.
