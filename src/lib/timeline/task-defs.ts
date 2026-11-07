@@ -347,15 +347,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'school-apply',
-		title: 'Apply to schools and submit the FAFSA',
+		title: 'If you plan to go to school, apply and submit the FAFSA',
 		category: 'benefits',
 		finishBefore: 'separation',
 		kind: 'soft',
 		windowStart: -270,
 		windowEnd: -90,
 		recommendedOffset: -180,
-		why: 'School application and financial-aid deadlines are fixed and early.',
-		requires: { intendedPath: ['school'] }
+		why: 'School application and financial-aid deadlines are fixed and early.'
 	},
 
 	// ---- Separation health assessment + VA claim (BDD) ----

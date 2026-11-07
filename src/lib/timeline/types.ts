@@ -43,11 +43,9 @@ export type TaskKind = 'soft' | 'required' | 'closes';
 
 /**
  * Optional persona gate. No gate = universal (shows for everyone). A gated task shows
- * only when the persona field is SET and its value is in the list (hide-when-unset).
+ * only when the leaving answer is SET and its value is in the list (hide-when-unset).
  */
 export type PersonaGate = Partial<{
-	intendedPath: string[];
-	familyStatus: string[];
 	separationPath: SeparationPath[];
 }>;
 

@@ -40,18 +40,6 @@ const noRecommended: TaskDef = {
 	why: 'w'
 };
 
-const gatedSchool: TaskDef = {
-	id: 'g1',
-	title: 'School-only task',
-	category: 'career',
-	finishBefore: 'separation',
-	kind: 'soft',
-	windowStart: -365,
-	windowEnd: -180,
-	why: 'w',
-	requires: { intendedPath: ['school'] }
-};
-
 const eaosOnly: PersonaFilters = {
 	completeness: 'eaos-only',
 	eaos: EAOS,
@@ -72,20 +60,8 @@ const completeWork: PersonaFilters = { ...completeSchool, intendedPath: 'employm
 
 describe('filterAndAnchor (gate + anchor)', () => {
 	it('includes universal tasks for any persona with an EAOS', () => {
-		const ids = filterAndAnchor(eaosOnly, [universal, gatedSchool]).map((i) => i.def.id);
+		const ids = filterAndAnchor(eaosOnly, [universal]).map((i) => i.def.id);
 		expect(ids).toContain('u1');
-	});
-
-	it('hides a gated task when the persona field is unset (hide-when-unset)', () => {
-		const ids = filterAndAnchor(eaosOnly, [universal, gatedSchool]).map((i) => i.def.id);
-		expect(ids).not.toContain('g1');
-	});
-
-	it('includes a gated task only when the persona value is in the gate list', () => {
-		const match = filterAndAnchor(completeSchool, [gatedSchool]).map((i) => i.def.id);
-		const noMatch = filterAndAnchor(completeWork, [gatedSchool]).map((i) => i.def.id);
-		expect(match).toContain('g1');
-		expect(noMatch).not.toContain('g1');
 	});
 
 	it('anchors targetDate + window dates to EAOS + offsets (recommendedOffset wins)', () => {
@@ -1301,6 +1277,29 @@ describe('A soft aim from before separation', () => {
 		).phases.flatMap((p) => p.items)[0];
 		expect(u1?.status).toBe('done');
 		expect(u1?.aimLapsed).toBeUndefined();
+	});
+});
+
+describe('the school step', () => {
+	// No screen asks whether a member plans to go to school, so the step shows for every member, with the condition in
+	// its title: the Home row and the calendar show only the title.
+	it('shows for every member, with or without a leaving answer, its condition leading the title', () => {
+		for (const path of [
+			undefined,
+			'ets',
+			'retirement',
+			'reserve-retirement',
+			'medical',
+			'reserve-component'
+		] as const) {
+			const persona: PersonaFilters = { ...eaosOnly, ...(path ? { separationPath: path } : {}) };
+			const school = filterAndAnchor(persona, [...TASK_DEFS]).find(
+				(a) => a.def.id === 'school-apply'
+			);
+			expect(school?.def.title, String(path)).toBe(
+				'If you plan to go to school, apply and submit the FAFSA'
+			);
+		}
 	});
 });
 
