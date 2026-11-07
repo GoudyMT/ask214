@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-svelte';
-import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { AskState } from '#lib/ask/index.js';
 import { generateTimeline, TASK_DEFS } from '#lib/timeline/index.js';
 import { selectNeedsNow } from '#lib/timeline/needs-now.js';
@@ -230,5 +230,38 @@ describe('Home, the timeline row', () => {
 		await expect.poll(() => row()).toBeNull();
 		fake.state = { kind: 'idle' };
 		await expect.poll(() => row()).not.toBeNull();
+	});
+});
+
+// The hint turns on the date passing, and Home can be left open across that midnight: the row must pick it up then, not
+// only on a reload.
+describe('Home, a board member left open past their date', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('adds the update hint to the row once midnight passes the date', async () => {
+		vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+		const start = new Date();
+		start.setHours(23, 59, 50, 0);
+		vi.setSystemTime(start);
+		const day = localTodayIso(new Date());
+		app.store = {
+			locked: false,
+			persona: {
+				completeness: 'eaos-only',
+				eaos: day as EaosString,
+				daysUntilSeparation: 0,
+				separationPath: 'medical'
+			}
+		};
+		await render(HomePage);
+		await vi.waitFor(() => expect(row()).not.toBeNull());
+		expect(lines()[1]).not.toContain('update it in Settings');
+
+		vi.advanceTimersByTime(10_000);
+		await vi.waitFor(() =>
+			expect(lines()[1]).toContain('If your date moved, update it in Settings.')
+		);
 	});
 });
