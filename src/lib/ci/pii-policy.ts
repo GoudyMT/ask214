@@ -147,29 +147,59 @@ export const IMPORT_PAST_COMMENTS = new RegExp(
 	'g'
 );
 
-// A glob call, past an optional type argument, and what it is given: one string, or a whole list, whose every item is
-// read below. The list stops at its first close bracket, so a long one reads in one pass.
-const GLOB_CALL = new RegExp(
-	`(?<![A-Za-z0-9_$.${QUOTES}])import[.]meta[.]glob(?:Eager)?${IMPORT_GAP}(?:<[^()]*>${IMPORT_GAP})?[(]${IMPORT_GAP}([[][^\\]]*[\\]]|[${QUOTES}][^${QUOTES}${LINE_BREAKS}]+[${QUOTES}])`,
-	'dg'
-);
-// Inside a glob list: a comment is passed over whole, so a quote inside it is never read as a string.
-const GLOB_ITEM = new RegExp(
-	`[/][*](?:[^*]|[*](?![/]))*[*][/]|[/][/][^${LINE_BREAKS}]*|([${QUOTES}])([^${QUOTES}${LINE_BREAKS}]+)[${QUOTES}]`,
+// The start of a glob call, past an optional type argument (which may hold parentheses, as a function type does).
+const GLOB_START = new RegExp(
+	`(?<![A-Za-z0-9_$.${QUOTES}])import[.]meta[.]glob(?:Eager)?${IMPORT_GAP}(?:<[^;]{0,400}?>${IMPORT_GAP})?[(]`,
 	'g'
 );
+// One string, closed by the quote it opened with, or any other single character; white space and comments before it
+// are passed over whole, so a quote or a bracket inside a comment is never read.
+const STRING = [...QUOTES].map((q) => `${q}[^${q}${LINE_BREAKS}]*${q}`).join('|');
+const GLOB_TOKEN = new RegExp(`${IMPORT_GAP}(${STRING}|[^${WHITE_SPACE}])`, 'y');
+const OPENERS = '([{';
+const CLOSERS = ')]}';
 
-/** Every string a glob call is given, with where it starts in the text. */
+/**
+ * Every string a glob call is given, list items and options (a base folder) included, with where it starts in the
+ * text. The call is read to its own close parenthesis; the search for the next call goes on from there, so the whole
+ * file is read once.
+ */
 function globSpecifiers(text: string): { specifier: string; at: number }[] {
 	const found: { specifier: string; at: number }[] = [];
-	for (const call of text.matchAll(GLOB_CALL)) {
-		const body = call[1] ?? '';
-		const start = call.indices?.[1]?.[0] ?? 0;
-		for (const item of body.matchAll(GLOB_ITEM)) {
-			if (item[2] !== undefined) found.push({ specifier: item[2], at: start + item.index });
+	GLOB_START.lastIndex = 0;
+	for (let call = GLOB_START.exec(text); call; call = GLOB_START.exec(text)) {
+		GLOB_TOKEN.lastIndex = call.index + call[0].length;
+		// A sticky search that fails sets lastIndex back to 0, so the place read up to is kept apart.
+		let readTo = GLOB_TOKEN.lastIndex;
+		let depth = 0;
+		for (let token = GLOB_TOKEN.exec(text); token; token = GLOB_TOKEN.exec(text)) {
+			readTo = GLOB_TOKEN.lastIndex;
+			const value = token[1] ?? '';
+			if (value.length > 1) {
+				found.push({
+					specifier: value.slice(1, -1),
+					at: token.index + token[0].length - value.length
+				});
+			} else if (OPENERS.includes(value)) depth++;
+			else if (CLOSERS.includes(value) && depth-- === 0) break;
 		}
+		GLOB_START.lastIndex = Math.max(GLOB_START.lastIndex, readTo);
 	}
 	return found;
+}
+
+const LOCAL_SPECIFIER = /^(?:[#$]lib\/|\.\.?\/|\/src\/)/;
+// Glob wildcards, brace and bracket sets, and a template value: a local folder named by one of these is a pattern the
+// scan cannot match against the banned names, so it is refused.
+const PATTERN_CHARS = String.fromCharCode(42, 63, 91, 93, 123, 125);
+const TEMPLATE_VALUE = String.fromCharCode(36, 123);
+
+/** Whether an import or glob specifier names a banned folder, or could reach one through a pattern in its folder. */
+function isForbidden(specifier: string): boolean {
+	if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) return true;
+	if (!LOCAL_SPECIFIER.test(specifier)) return false;
+	const folder = specifier.slice(0, specifier.lastIndexOf('/') + 1);
+	return [...folder].some((c) => PATTERN_CHARS.includes(c)) || folder.includes(TEMPLATE_VALUE);
 }
 
 /**
@@ -206,7 +236,7 @@ export function scanForPiiImports(
 		for (const { specifier, at, end } of found) {
 			if (seen.has(end)) continue;
 			seen.add(end);
-			if (FORBIDDEN_IMPORT_PATTERN.test(specifier)) {
+			if (isForbidden(specifier)) {
 				const line = file.content.slice(0, at).split('\n').length;
 				violations.push({ path: file.path, token: specifier, line });
 			}

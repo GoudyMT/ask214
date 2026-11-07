@@ -370,7 +370,22 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		[
 			"import.meta.glob(['/src/lib/profile/*.ts', /* c */ '/src/lib/db/*.ts'], { eager: true });",
 			['/src/lib/profile/*.ts', '/src/lib/db/*.ts']
-		]
+		],
+		// A close bracket inside an item or a comment does not end the list.
+		["import.meta.glob(['./a/*.[jt]s', '$lib/profile/*.ts']);", ['$lib/profile/*.ts']],
+		[
+			['import.meta.glob([', "\t'./a/*.ts', // see [1]", "\t'$lib/profile/*.ts'", '])'].join(LF),
+			['$lib/profile/*.ts']
+		],
+		// A type argument may hold parentheses, and an item may hold the other kind of quote.
+		["import.meta.glob<() => Promise<string>>('$lib/profile/*.ts');", ['$lib/profile/*.ts']],
+		["import.meta.glob([\"./it's/*.ts\", '$lib/profile/*.ts']);", ['$lib/profile/*.ts']],
+		// A folder named by a pattern, or a base folder, can reach a banned folder under no name the scan can read.
+		["import.meta.glob('/src/lib/**/*.ts', { eager: true });", ['/src/lib/**/*.ts']],
+		["import.meta.glob('/src/lib/{ask,profile}/*.ts');", ['/src/lib/{ask,profile}/*.ts']],
+		["import.meta.glob('/src/lib/prof*/*.ts');", ['/src/lib/prof*/*.ts']],
+		["import.meta.glob(['./routes/[id]/*.ts']);", ['./routes/[id]/*.ts']],
+		["import.meta.glob('./*.ts', { base: '/src/lib/profile' });", ['/src/lib/profile']]
 	])('flags each banned item of the glob %s', (content, tokens) => {
 		expect(scan(content).map((v) => v.token)).toEqual(tokens);
 	});
@@ -390,6 +405,8 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 			[]
 		);
 		expect(scan("const paths = ['/src/lib/ask/x.ts', '/src/lib/profile/y.ts'];")).toEqual([]);
+		expect(scan("import.meta.glob('./*.ts', { eager: true, import: 'default' });")).toEqual([]);
+		expect(scan('const m = await import(`./parts/${name}.ts`);')).toEqual([]);
 		expect(
 			scan(
 				[
@@ -402,11 +419,19 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		).toEqual([]);
 	});
 
+	// The bundler turns a value in the folder of a dynamic import into a glob over every folder there.
+	it('flags a dynamic import whose folder is a value', () => {
+		expect(scan('const m = await import(`../${folder}/store.svelte.ts`);')).toMatchObject([
+			{ token: '../${folder}/store.svelte.ts' }
+		]);
+	});
+
 	it('reads a long glob list in fair time', () => {
 		const items = Array.from({ length: 200 }, (_, i) => `\t'/src/lib/ask/${i}.ts', // note`);
 		const started = performance.now();
 		expect(scan(['import.meta.glob([', ...items, '])'].join(LF))).toEqual([]);
 		expect(scan(`import.meta.glob<${'A<'.repeat(200)}`)).toEqual([]);
+		expect(scan("import.meta.glob(['./a/*.ts',".repeat(2000))).toEqual([]);
 		expect(performance.now() - started).toBeLessThan(1000);
 	});
 
