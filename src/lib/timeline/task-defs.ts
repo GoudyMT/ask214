@@ -553,7 +553,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// would mark the file as a board member's.
 		copyFor: {
 			medical: {
-				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break; if you have Medicare before age 65, you also need Part B. If it separates you instead, tricare.mil lists what may apply.'
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. A Guard or Reserve retirement works differently; tricare.mil has the steps. If the board separates you instead, tricare.mil lists what may apply.'
 			},
 			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
 			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.
