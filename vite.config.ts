@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
-import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm';
+import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm.ts';
 
 // The app reads today from the device clock, so both test projects run in one fixed zone: every machine and CI
 // read the same day, and a zone behind UTC makes a slip back to the UTC date fail here too. A fixed TZ also lets
