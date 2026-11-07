@@ -519,8 +519,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 0,
 		recommendedOffset: -180,
 		why: RCSBP_WHY,
-		// "Retiring" keeps this step for a Guard or Reserve member who answered before the Guard or Reserve retirement
-		// answer existed, so its title says when it applies.
+		// The answer retiring from active duty keeps this step for a Guard or Reserve member who answered it before the
+		// Guard or Reserve retirement answer existed, so its title says when it applies.
 		copyFor: {
 			retirement: { title: RETIRING_RCSBP_TITLE },
 			// A member retiring from full-time active duty also sees the active-duty step, and only the office can say
@@ -553,7 +553,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// would mark the file as a board member's.
 		copyFor: {
 			medical: {
-				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. A Guard or Reserve retirement works differently; tricare.mil has the steps. If the board separates you instead, tricare.mil lists what may apply.'
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. If the board separates you instead, or you are in the Guard or Reserve and it does not retire you, tricare.mil lists what may apply.'
 			},
 			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
 			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.

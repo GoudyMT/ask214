@@ -1435,10 +1435,11 @@ describe('the leaving answer on the real task list', () => {
 		expect(def('medical')?.why).toMatch(/If the board separates you instead/);
 		expect(def('medical')?.why).not.toMatch(/30%/);
 		// tricare.mil's Retiring page: a member eligible for Medicare must have Part B to stay eligible for TRICARE when
-		// they retire - a rule on its own, not a second step after enrolling, and in place by the retirement. A Guard or
-		// Reserve member can answer medical too, so the line that their retirement works differently is here as well.
+		// they retire - a rule on its own, not a second step after enrolling, and in place by the retirement. tricare.mil's
+		// medical retirement page gives a member the board retires the same 90 days, Guard or Reserve included, so the
+		// Guard or Reserve line points only a member the board does not retire to tricare.mil.
 		expect(def('medical')?.why).toBe(
-			'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. A Guard or Reserve retirement works differently; tricare.mil has the steps. If the board separates you instead, tricare.mil lists what may apply.'
+			'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. If the board separates you instead, or you are in the Guard or Reserve and it does not retire you, tricare.mil lists what may apply.'
 		);
 		// A Guard or Reserve member can hold the Retiring answer from before their own answer existed. The card prints the
 		// why above its note, so the line is in the why alone and a board member's notes stay free of it.
