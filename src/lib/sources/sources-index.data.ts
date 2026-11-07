@@ -198,7 +198,7 @@ export const SOURCES_INDEX: SourcesIndex = {
 		},
 		{
 			title: 'TAP - Mental Health for Families (Resource Guide)',
-			publisher: 'DoD'
+			publisher: 'VA'
 		},
 		{
 			title: 'TAP - Reserve Component Dual Payments (Resource Guide)',

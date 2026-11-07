@@ -6,6 +6,8 @@ import { TASK_DEFS } from '../timeline/task-defs';
 import { SNOOZE_DATE_MAX } from '../timeline/snooze';
 import type { EaosString } from '../profile/eaos';
 import type { TimelineState } from '../timeline/types';
+import type { LeavingDates } from '../profile/persona';
+import { SKILLBRIDGE_PLAN_KEY } from '../timeline/skillbridge-plan';
 
 const NOW = new Date('2026-10-03T12:00:00Z');
 
@@ -122,18 +124,24 @@ describe('buildIcs', () => {
 	});
 
 	// A calendar file can land in a calendar others see, often a work one; a medical board is health information.
-	it('the medical board answer adds no title of its own to the file: all it adds, a retiring member has too', async () => {
+	it('the medical board answer adds no title or event ID of its own to the file: all it adds, a retiring member has too', async () => {
 		const now = new Date(2026, 9, 7, 12);
-		const fileFor = async (separationPath?: 'medical' | 'retirement', eaos = '2027-06-30') => {
+		const fileFor = async (
+			separationPath?: 'medical' | 'retirement',
+			eaos = '2027-06-30',
+			more: { leaving?: LeavingDates } = {},
+			tasks: TimelineState['tasks'] = {}
+		) => {
 			const items = generateTimeline(
 				{
 					completeness: 'eaos-only',
 					eaos: eaos as EaosString,
 					daysUntilSeparation: 266,
+					...more,
 					...(separationPath ? { separationPath } : {})
 				},
 				[...TASK_DEFS],
-				{ schemaVersion: 1, tasks: {} },
+				{ schemaVersion: 1, tasks },
 				now
 			).phases.flatMap((p) => p.items);
 			expect(items.some((i) => i.def.id === 'peblo-contact')).toBe(separationPath === 'medical');
@@ -142,21 +150,34 @@ describe('buildIcs', () => {
 				''
 			);
 		};
+		// An event's ID is a plain hash of its task's id, so an ID only the board's steps have marks the file as well as a
+		// title does: both are compared.
 		const titles = (ics: string) =>
-			new Set([...ics.matchAll(/SUMMARY:(.*)/g)].map((m) => m[1] ?? ''));
-		const addedByBoard = async (eaos?: string) => {
-			const without = titles(await fileFor(undefined, eaos));
-			const added = [...titles(await fileFor('medical', eaos))].filter((t) => !without.has(t));
-			const retiring = titles(await fileFor('retirement', eaos));
+			new Set([...ics.matchAll(/(?:SUMMARY|UID):.*/g)].map((m) => m[0]));
+		const addedByBoard = async (
+			eaos?: string,
+			more?: Parameters<typeof fileFor>[2],
+			tasks?: TimelineState['tasks']
+		) => {
+			const without = titles(await fileFor(undefined, eaos, more, tasks));
+			const added = [...titles(await fileFor('medical', eaos, more, tasks))].filter(
+				(t) => !without.has(t)
+			);
+			const retiring = titles(await fileFor('retirement', eaos, more, tasks));
 			for (const t of added) expect(retiring.has(t), `${eaos}: ${t}`).toBe(true);
 			return added;
 		};
-		// Each added step writes two events, its aim and its last day.
-		expect(await addedByBoard()).toHaveLength(4);
+		// Each added step writes two events, its aim and its last day, each with a title and an ID.
+		expect(await addedByBoard()).toHaveLength(8);
 		// Which steps reach the file turns on the date, so a title of the board's own could hide on any one date: every
-		// month of the runway. A marked step only leaves the file, so marks need no pass of their own.
-		for (let month = 1; month <= 26; month++) {
-			await addedByBoard(new Date(2026, 9 + month, 15, 12).toISOString().slice(0, 10));
+		// month of the runway, and the year after separation. A marked step only leaves the file, so marks need no pass of
+		// their own; what adds steps does: a SkillBridge Yes adds its steps, and a leaving date moves last days in.
+		for (let month = -12; month <= 26; month++) {
+			const eaos = new Date(2026, 9 + month, 15, 12).toISOString().slice(0, 10);
+			await addedByBoard(eaos);
+			await addedByBoard(eaos, {}, { [SKILLBRIDGE_PLAN_KEY]: { status: 'done' } });
+			const leaveStart = new Date(2026, 9 + month, 15 - 60, 12).toISOString().slice(0, 10);
+			await addedByBoard(eaos, { leaving: { terminalLeaveStart: leaveStart as EaosString } });
 		}
 	});
 });

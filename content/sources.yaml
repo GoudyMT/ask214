@@ -798,13 +798,13 @@
   title: 'TAP - Mental Health for Families (Resource Guide)'
   url: 'https://www.tapevents.mil/resources/documents'
   document_url: 'https://www.tapevents.mil/Assets/ResourceContent/TAP/MLC-MHF.pdf'
-  origin: 'DoD (TAP curriculum)'
+  origin: 'VA (TAP curriculum)'
   copyright_status: us_government_work_public_domain
   legal_tier: confident_pd
   content_type: pdf
   served: true
   redistribution_cleared: true
-  license_notes: '17 USC 105 - US Government work (DoD); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
+  license_notes: '17 USC 105 - US Government work (VA); no copyright notice (S29 scan). Served without raster images except those marked Public Domain (L19) - no third-party-image redistribution. Module resource guide.'
   terms_reviewed_date: 2026-06-21
   terms_notes: 'Public TAP doc on tapevents.mil; no contractor trace found and no copyright notice on the document (2026-10-30 scan, ADR-030); agency-published. File: MLC-MHF.pdf. Offline highlight via anchor; link-out to the official doc. Unofficial; not endorsed.'
   access: open

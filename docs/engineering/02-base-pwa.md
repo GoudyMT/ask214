@@ -3,8 +3,7 @@
 ## Overview
 
 The base PWA is the shell every page of Ask 214 renders inside: design tokens and themes, the layout, the
-install manifest, the service worker, the Content Security Policy, the edge headers and the budgets. Each
-decision's full reasoning is kept in private working notes.
+install manifest, the service worker, the Content Security Policy, the edge headers and the budgets.
 
 ## Stack at a Glance
 
@@ -25,7 +24,7 @@ decision's full reasoning is kept in private working notes.
 
 **What they are.** `src/lib/styles/tokens.ts` is a typed registry of colours, spacing, radii, fonts and type
 sizes; `src/app.css` exposes the same values as CSS custom properties, so components use names, never hex
-codes. A palette change is one edit.
+codes.
 
 **Themes.** The app follows the device's light or dark setting unless the user picks one in Settings. An inline
 script in `src/app.html` applies a saved choice before the first paint, so there is no flash of the wrong
@@ -45,24 +44,20 @@ links to About, Source and Feedback, and the release version. Below 600 px the t
 fixed to the screen edge with three tabs, Home, Timeline and More, each an icon above a visible label
 (`src/lib/layout/BottomBar.svelte`). The current tab is marked by the accent colour and a 3 px bar on its top edge, so
 forced-colours mode still shows it, and by `aria-current="page"` on the tab whose own page is open; More carries
-`aria-current="true"` (the current section) while Settings, Resources, Documents, Feedback or About is open. Only one
-"Primary" navigation is ever displayed, and the page reserves room for the bar (footer padding and
-`scroll-padding-bottom`, plus the device's safe-area inset) so the footer and a focused control are never hidden
-behind it. On a phone only, the header slides away after more than 12 px of scrolling down and comes back on 4 px of
-scrolling up, at the top of the page, and when keyboard focus enters it; with reduced motion it moves with no slide.
-The version comes from `package.json`, which each release's pull request bumps; a small Vite plugin writes
-it into the layout as plain text before Svelte compiles, and it links to that release's notes. A "Skip to content"
+`aria-current="true"` (the current section) while Settings, Resources, Documents, Feedback or About is open. The
+page reserves room for the bar (footer padding, `scroll-padding-bottom` and the safe-area inset), so the footer and a
+focused control are never hidden behind it. On a phone the header slides away on scrolling down and comes back on
+scrolling up or when keyboard focus enters it; reduced motion drops the slide. The version comes from
+`package.json` and links to that release's notes. A "Skip to content"
 link comes first in keyboard order. The landmarks are plain `header`, labelled `nav`, `main` and `footer` elements,
 which carry their roles natively.
 
 **Why this project uses it.** Many users live with a disability, so keyboard and screen reader support is a
-baseline. The drifting row of example questions on the Ask screen has a pause button, pauses on hover or focus,
-and stays still when the device asks for reduced motion.
+baseline. The Ask screen's drifting example questions stop for a pause button, hover, focus and reduced motion.
 
 **Responsive design.** Every page uses one 900 px column (`src/lib/layout/shell-width.ts`) that goes full width
-on smaller screens, and headings scale with `clamp()`. Playwright checks the home page at six widths from 320 to
-1280 px and the other public pages at three phone widths, in Chromium and WebKit: the landmarks must render and
-nothing may scroll sideways.
+on smaller screens, and headings scale with `clamp()`. Playwright checks the public pages from 320 to 1280 px in
+Chromium and WebKit: the landmarks render and nothing scrolls sideways.
 
 **Tradeoffs accepted.** Wide screens are partly empty; the gain is one layout to build and test.
 
@@ -72,8 +67,8 @@ nothing may scroll sideways.
 
 **What it is.** `static/manifest.webmanifest` opens the app as a standalone window in portrait, sets the theme
 colour, and lists 192 and 512 px icons marked `any maskable`, so Android can crop them to its own shape. A
-second inline script in `app.html` keeps the browser's one-time install event, which can fire before the app
-loads, so the app can offer its own Install button later.
+second inline script in `app.html` keeps the browser's early install event, so the app can offer its own Install
+button.
 
 **Tradeoffs accepted.** That event exists only in Chromium-based browsers; elsewhere, installing goes through
 the browser's own menu.
@@ -97,7 +92,7 @@ the user's.
 **Considered alternatives.** Workbox and the Vite PWA plugin. These rules are specific enough (a cache that
 outlives releases, saved documents carried forward) that hand-written, unit-tested logic is easier to verify.
 
-**Tradeoffs accepted.** About 830 lines of caching code to maintain. A new release takes over only after every
+**Tradeoffs accepted.** About 950 lines of caching code to maintain. A new release takes over only after every
 tab of the old one has closed; there is no "update available" prompt yet.
 
 ---
@@ -105,8 +100,8 @@ tab of the old one has closed; there is no "update available" prompt yet.
 ### Content Security Policy
 
 **What it is.** SvelteKit builds the policy from `csp` in `vite.config.ts`, in hash mode: each inline
-script it writes is allowed by its SHA-256 hash, so scripts never need `'unsafe-inline'`. Of its 13 directives,
-the ones that matter most:
+script it writes is allowed by its SHA-256 hash, so scripts never need `'unsafe-inline'`. The directives
+that matter most:
 
 - `default-src 'self'`: nothing loads from another site unless a directive says so.
 - `script-src`: the app's own files, SvelteKit's hashes, two hand-pinned hashes for the scripts in `app.html`,
@@ -145,16 +140,14 @@ live site sends.
 
 ### Budgets and Lighthouse
 
-**What they are.** `size-limit` caps the gzipped JavaScript: the SvelteKit entry at 10 KB, the root layout
-loaded on every page at 9,820 bytes, and the code of all pages together at 60,579 bytes. `pnpm check:chunks` caps what
-one page downloads (112,902 bytes), the code loaded on demand (16,138 bytes) and the service worker's install set
-(88 files, 258,740 bytes), all gzipped. Lighthouse CI runs three times against `/` and `/about` on the
+**What they are.** `size-limit` caps the gzipped JavaScript of the SvelteKit entry, the root layout loaded on every
+page, and all pages' code together (`package.json`). `pnpm check:chunks` caps what one page downloads, the code loaded
+on demand and the service worker's install set, all gzipped (`content-ops/check-chunk-budget.mjs`). Lighthouse CI runs three times against `/` and `/about` on the
 production build: accessibility below 0.95 or performance below 0.9 fails the build, and best practices or SEO
 below 0.9 warns. Reports stay in a CI artifact.
 
 **Why this project uses them.** Every byte the shell ships is downloaded, stored offline and held in memory
-beside the on-device model, so growth must be a decision. Accessibility regressions are easy to miss without a
-gate.
+beside the on-device model, so growth must be a decision.
 
 **Tradeoffs accepted.** A feature that does not fit waits for a trim or an explicit decision to raise the limit,
 never a quiet raise. Lighthouse scores two pages, not all of them.
@@ -189,3 +182,4 @@ the browser enforce the privacy claims, and the budgets hold it all to a measure
 - 2026-05-26: First draft, the Phase 1 shell.
 - 2026-10-02: Updated to the shipped shell and cut to the word cap.
 - 2026-10-29: SvelteKit 3 paths and budgets.
+- 2026-11-07: Budgets point to their files.

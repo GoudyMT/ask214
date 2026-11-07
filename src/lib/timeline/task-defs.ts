@@ -347,15 +347,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'school-apply',
-		title: 'Apply to schools and submit the FAFSA',
+		title: 'If you plan to go to school, apply and submit the FAFSA',
 		category: 'benefits',
 		finishBefore: 'separation',
 		kind: 'soft',
 		windowStart: -270,
 		windowEnd: -90,
 		recommendedOffset: -180,
-		why: 'School application and financial-aid deadlines are fixed and early.',
-		requires: { intendedPath: ['school'] }
+		why: 'School application and financial-aid deadlines are fixed and early.'
 	},
 
 	// ---- Separation health assessment + VA claim (BDD) ----
@@ -520,8 +519,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 0,
 		recommendedOffset: -180,
 		why: RCSBP_WHY,
-		// "Retiring" keeps this step for a Guard or Reserve member who answered before the Guard or Reserve retirement
-		// answer existed, so its title says when it applies.
+		// The answer retiring from active duty keeps this step for a Guard or Reserve member who answered it before the
+		// Guard or Reserve retirement answer existed, so its title says when it applies.
 		copyFor: {
 			retirement: { title: RETIRING_RCSBP_TITLE },
 			// A member retiring from full-time active duty also sees the active-duty step, and only the office can say
@@ -554,7 +553,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// would mark the file as a board member's.
 		copyFor: {
 			medical: {
-				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break; if you have Medicare before age 65, you also need Part B. If it separates you instead, tricare.mil lists what may apply.'
+				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. If the board separates you instead, or you are in the Guard or Reserve and it does not retire you, tricare.mil lists what may apply.'
 			},
 			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
 			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.

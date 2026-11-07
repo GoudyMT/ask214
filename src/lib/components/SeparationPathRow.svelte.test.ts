@@ -40,7 +40,7 @@ describe('SeparationPathRow', () => {
 		const onSave = vi.fn(async () => null);
 		await row({ onSave });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).click();
 		await saveButton().click();
 		await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith('retirement'));
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'false');
@@ -107,10 +107,12 @@ describe('SeparationPathRow', () => {
 		const onSave = vi.fn(() => new Promise<string | null>((resolve) => (settle = resolve)));
 		await row({ onSave });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).click();
 		await saveButton().click();
 		await page.getByRole('radio', { name: 'A medical board' }).click();
-		await expect.element(page.getByRole('radio', { name: 'Retiring', exact: true })).toBeChecked();
+		await expect
+			.element(page.getByRole('radio', { name: 'Retiring from active duty', exact: true }))
+			.toBeChecked();
 		await expect.element(page.getByRole('radio', { name: 'A medical board' })).not.toBeChecked();
 		settle(null);
 		await vi.waitFor(() => expect(onSave).toHaveBeenCalledWith('retirement'));
@@ -124,7 +126,7 @@ describe('SeparationPathRow', () => {
 		const onRemove = vi.fn(async () => null);
 		await row({ value: 'ets', onSave, onRemove });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).click();
 		await saveButton().click();
 		await expect.element(page.getByRole('button', { name: 'Remove answer' })).toBeDisabled();
 		await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
@@ -148,7 +150,7 @@ describe('SeparationPathRow', () => {
 	it('says a failed save and keeps the form open', async () => {
 		await row({ onSave: vi.fn(async () => Promise.reject(new Error('E_LOCK_TIMEOUT'))) });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).click();
 		await saveButton().click();
 		await expect.element(page.getByText(FAILED)).toBeVisible();
 		await expect.element(toggle()).toHaveAttribute('aria-expanded', 'true');
@@ -182,11 +184,11 @@ describe('SeparationPathRow', () => {
 		);
 		await row({ onSave });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).click();
 		const target =
 			on === 'Save'
 				? saveButton().element()
-				: page.getByRole('radio', { name: 'Retiring', exact: true }).element();
+				: page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).element();
 		(target as HTMLElement).focus();
 		await hold();
 		await new Promise((resolve) => setTimeout(resolve, ms + 50));
@@ -272,11 +274,11 @@ describe('SeparationPathRow', () => {
 		);
 		await row({ onSave });
 		await toggle().click();
-		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).click();
 		const target =
 			on === 'Save'
 				? saveButton().element()
-				: page.getByRole('radio', { name: 'Retiring', exact: true }).element();
+				: page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).element();
 		(target as HTMLElement).focus();
 		await hold();
 		await expect.element(page.getByText(FAILED)).toBeVisible();

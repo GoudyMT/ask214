@@ -29,27 +29,6 @@ export type AnchoredTask = {
 };
 
 /**
- * Persona gate. A task with no `requires` is universal. A gated task shows only when
- * every gate key is satisfied: the persona field must be SET (only the 'complete' persona
- * surfaces intendedPath/familyStatus) AND its value must be in the allowed list. Any
- * unsatisfied key hides the task - conservative, never show a task we cannot confirm applies.
- */
-function includeTask(persona: PersonaFilters, def: TaskDef): boolean {
-	const gate = def.requires;
-	if (!gate) return true;
-
-	if (gate.intendedPath) {
-		if (persona.completeness !== 'complete') return false;
-		if (!gate.intendedPath.includes(persona.intendedPath)) return false;
-	}
-	if (gate.familyStatus) {
-		if (persona.completeness !== 'complete') return false;
-		if (!gate.familyStatus.includes(persona.familyStatus)) return false;
-	}
-	return true;
-}
-
-/**
  * The leaving answer, read on any completeness (it never needs the other answers). A task listed for some paths
  * shows only for a stored one of them; a task hidden for some paths still shows when there is no answer.
  */
@@ -141,7 +120,7 @@ function anchorTask(
 export function filterAndAnchor(persona: PersonaFilters, defs: TaskDef[]): AnchoredTask[] {
 	if (persona.completeness === 'none') return [];
 	return defs
-		.filter((def) => includeTask(persona, def) && includeForPath(persona, def))
+		.filter((def) => includeForPath(persona, def))
 		.map((def) => anchorTask(persona.eaos, forPath(persona, def), persona.leaving));
 }
 

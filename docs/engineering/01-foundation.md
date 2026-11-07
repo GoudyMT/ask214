@@ -107,8 +107,7 @@ administrator rights needed for global installs on Windows.
 **Considered alternatives.** nvm-windows (slower, separate binaries per version). Volta (switches from
 `package.json`, less common in CI).
 
-**Tradeoffs accepted.** One more tool, and a PowerShell profile has to load fnm when a new shell does not
-inherit its path.
+**Tradeoffs accepted.** One more tool, loaded by the PowerShell profile.
 
 ---
 

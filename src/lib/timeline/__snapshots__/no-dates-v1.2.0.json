@@ -1,6 +1,6 @@
 [
 	{
-		"total": 34,
+		"total": 35,
 		"todayMarkerIndex": 1,
 		"daysToSeparation": 208,
 		"phases": [
@@ -171,7 +171,7 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 11,
+					"toDo": 12,
 					"closed": 0
 				},
 				"collapsible": false,
@@ -183,6 +183,15 @@
 						"targetDate": "2026-11-01",
 						"windowStartDate": "2026-07-04",
 						"windowEndDate": "2027-04-30",
+						"aimDate": "2026-11-01"
+					},
+					{
+						"id": "school-apply",
+						"kind": "soft",
+						"status": "start-now",
+						"targetDate": "2026-11-01",
+						"windowStartDate": "2026-08-03",
+						"windowEndDate": "2027-01-30",
 						"aimDate": "2026-11-01"
 					},
 					{
@@ -373,7 +382,7 @@
 		]
 	},
 	{
-		"total": 34,
+		"total": 35,
 		"todayMarkerIndex": 3,
 		"daysToSeparation": 72,
 		"phases": [
@@ -544,7 +553,7 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 10,
+					"toDo": 11,
 					"closed": 1
 				},
 				"collapsible": false,
@@ -557,6 +566,15 @@
 						"windowStartDate": "2026-02-18",
 						"windowEndDate": "2026-12-15",
 						"aimDate": "2026-12-15"
+					},
+					{
+						"id": "school-apply",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-06-18",
+						"windowStartDate": "2026-03-20",
+						"windowEndDate": "2026-09-16",
+						"aimDate": "2026-09-16"
 					},
 					{
 						"id": "jst-order",
@@ -746,7 +764,7 @@
 		]
 	},
 	{
-		"total": 34,
+		"total": 35,
 		"todayMarkerIndex": 4,
 		"daysToSeparation": -64,
 		"phases": [
@@ -917,7 +935,7 @@
 					"done": 0,
 					"skipped": 0,
 					"snoozed": 0,
-					"toDo": 7,
+					"toDo": 8,
 					"closed": 4
 				},
 				"collapsible": false,
@@ -930,6 +948,15 @@
 						"windowStartDate": "2025-10-05",
 						"windowEndDate": "2026-08-01",
 						"aimDate": "2026-08-01"
+					},
+					{
+						"id": "school-apply",
+						"kind": "soft",
+						"status": "still-to-do",
+						"targetDate": "2026-02-02",
+						"windowStartDate": "2025-11-04",
+						"windowEndDate": "2026-05-03",
+						"aimDate": "2026-05-03"
 					},
 					{
 						"id": "jst-order",

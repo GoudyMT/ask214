@@ -13,8 +13,9 @@ export type LeavingDates = {
 };
 
 /**
- * Persona is a discriminated union on `completeness`; consumers MUST narrow before
- * reading optional fields (TS-strict enforces it). Pure + deterministic given `today`.
+ * Persona is a discriminated union on `completeness`: 'none' until a separation date is stored. Consumers MUST
+ * narrow before reading the date (TS-strict enforces it). Pure + deterministic given `today`. Rate, rank, family
+ * status and intended path, which an old profile can still hold, are not read: nothing in the app shows from them.
  */
 export type PersonaFilters =
 	| { completeness: 'none' }
@@ -24,31 +25,8 @@ export type PersonaFilters =
 			daysUntilSeparation: number;
 			leaving?: LeavingDates;
 			separationPath?: SeparationPath;
-	  }
-	| {
-			completeness: 'partial';
-			eaos: EaosString;
-			daysUntilSeparation: number;
-			rate?: string;
-			rank?: string;
-			leaving?: LeavingDates;
-			separationPath?: SeparationPath;
-	  }
-	| {
-			completeness: 'complete';
-			eaos: EaosString;
-			daysUntilSeparation: number;
-			rate: string;
-			rank: string;
-			familyStatus: string;
-			intendedPath: string;
-			leaving?: LeavingDates;
-			separationPath?: SeparationPath;
 	  };
 
-function decode(u8?: Uint8Array | null): string | undefined {
-	return u8 ? new TextDecoder().decode(u8) : undefined;
-}
 export function derivePersona(profile: ProfileV1 | null, today = new Date()): PersonaFilters {
 	if (!profile?.eaos) return { completeness: 'none' };
 
@@ -76,38 +54,10 @@ export function derivePersona(profile: ProfileV1 | null, today = new Date()): Pe
 	}
 	const hasLeaving = Object.keys(leaving).length > 0;
 
-	const rate = decode(profile.rate);
-	const rank = decode(profile.rank);
-	const familyStatus = decode(profile.familyStatus);
-	const intendedPath = decode(profile.intendedPath);
 	// The answer stands on its own, like the leaving dates: it never changes the completeness. It is read with a
 	// byte-order mark kept, as the backup reads it, so the timeline never acts on an answer a backup would leave out.
 	const separationPath = parseSeparationPath(profile.separationPath);
 
-	if (rate && rank && familyStatus && intendedPath) {
-		return {
-			completeness: 'complete',
-			eaos,
-			daysUntilSeparation: dus,
-			rate,
-			rank,
-			familyStatus,
-			intendedPath,
-			...(hasLeaving && { leaving }),
-			...(separationPath && { separationPath })
-		};
-	}
-	if (rate || rank || familyStatus || intendedPath) {
-		return {
-			completeness: 'partial',
-			eaos,
-			daysUntilSeparation: dus,
-			rate,
-			rank,
-			...(hasLeaving && { leaving }),
-			...(separationPath && { separationPath })
-		};
-	}
 	return {
 		completeness: 'eaos-only',
 		eaos,

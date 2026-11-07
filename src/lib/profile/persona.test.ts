@@ -44,22 +44,17 @@ describe('derivePersona', () => {
 		}
 	});
 
-	it('returns "partial" when EAOS + one identity field are present', () => {
-		const r = derivePersona(withEaos({ rate: new TextEncoder().encode('IT2') }));
-		expect(r.completeness).toBe('partial');
-		if (r.completeness === 'partial') expect(r.eaos).toBe('2027-04-15');
-	});
-
-	it('returns "complete" when EAOS + rate + rank + family + path are present', () => {
-		const r = derivePersona(
-			withEaos({
-				rate: new TextEncoder().encode('IT2'),
-				rank: new TextEncoder().encode('E-5'),
-				familyStatus: new TextEncoder().encode('married'),
-				intendedPath: new TextEncoder().encode('civilian-it')
-			})
-		);
-		expect(r.completeness).toBe('complete');
+	// Rate, rank, family status and intended path were asked by no screen; a profile can still hold them from an old
+	// backup. Nothing shows from them, so the persona drops them: they are read the same as a date alone.
+	it('reads a profile holding the four old answers exactly as one with the date alone', () => {
+		const today = new Date('2026-05-26T12:00:00Z');
+		const old = withEaos({
+			rate: new TextEncoder().encode('IT2'),
+			rank: new TextEncoder().encode('E-5'),
+			familyStatus: new TextEncoder().encode('married'),
+			intendedPath: new TextEncoder().encode('school')
+		});
+		expect(derivePersona(old, today)).toEqual(derivePersona(withEaos(), today));
 	});
 
 	describe('the leaving dates', () => {
@@ -113,21 +108,9 @@ describe('derivePersona', () => {
 	describe('the leaving answer', () => {
 		const enc = (s: string) => new TextEncoder().encode(s);
 
-		it.each([
-			['eaos-only', {}],
-			['partial', { rate: enc('IT') }],
-			[
-				'complete',
-				{
-					rate: enc('IT'),
-					rank: enc('E5'),
-					familyStatus: enc('single'),
-					intendedPath: enc('career')
-				}
-			]
-		])('carries the answer on a %s persona', (completeness, extra) => {
-			const r = derivePersona(withEaos({ ...extra, separationPath: enc('medical') }));
-			expect(r.completeness).toBe(completeness);
+		it('carries the answer beside the date', () => {
+			const r = derivePersona(withEaos({ separationPath: enc('medical') }));
+			expect(r.completeness).toBe('eaos-only');
 			if (r.completeness === 'none') return;
 			expect(r.separationPath).toBe('medical');
 		});

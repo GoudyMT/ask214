@@ -40,54 +40,13 @@ const noRecommended: TaskDef = {
 	why: 'w'
 };
 
-const gatedSchool: TaskDef = {
-	id: 'g1',
-	title: 'School-only task',
-	category: 'career',
-	finishBefore: 'separation',
-	kind: 'soft',
-	windowStart: -365,
-	windowEnd: -180,
-	why: 'w',
-	requires: { intendedPath: ['school'] }
-};
-
 const eaosOnly: PersonaFilters = {
 	completeness: 'eaos-only',
 	eaos: EAOS,
 	daysUntilSeparation: 100
 };
 
-const completeSchool: PersonaFilters = {
-	completeness: 'complete',
-	eaos: EAOS,
-	daysUntilSeparation: 100,
-	rate: 'IT',
-	rank: 'E5',
-	familyStatus: 'single',
-	intendedPath: 'school'
-};
-
-const completeWork: PersonaFilters = { ...completeSchool, intendedPath: 'employment' };
-
 describe('filterAndAnchor (gate + anchor)', () => {
-	it('includes universal tasks for any persona with an EAOS', () => {
-		const ids = filterAndAnchor(eaosOnly, [universal, gatedSchool]).map((i) => i.def.id);
-		expect(ids).toContain('u1');
-	});
-
-	it('hides a gated task when the persona field is unset (hide-when-unset)', () => {
-		const ids = filterAndAnchor(eaosOnly, [universal, gatedSchool]).map((i) => i.def.id);
-		expect(ids).not.toContain('g1');
-	});
-
-	it('includes a gated task only when the persona value is in the gate list', () => {
-		const match = filterAndAnchor(completeSchool, [gatedSchool]).map((i) => i.def.id);
-		const noMatch = filterAndAnchor(completeWork, [gatedSchool]).map((i) => i.def.id);
-		expect(match).toContain('g1');
-		expect(noMatch).not.toContain('g1');
-	});
-
 	it('anchors targetDate + window dates to EAOS + offsets (recommendedOffset wins)', () => {
 		const [item] = filterAndAnchor(eaosOnly, [universal]);
 		expect(item?.targetDate).toBe(eaosOffsetDate(EAOS, -120));
@@ -1107,46 +1066,6 @@ describe('the SkillBridge steps follow the saved answer', () => {
 		}
 	});
 
-	// Every profile level that carries a separation date reads the same saved answer: a fuller profile must neither
-	// show the steps with no answer nor lose them after a Yes.
-	const SEPARATION = '2028-06-30' as EaosString;
-	const PERSONAS: Record<string, PersonaFilters> = {
-		'eaos-only': { completeness: 'eaos-only', eaos: SEPARATION, daysUntilSeparation: 632 },
-		partial: { completeness: 'partial', eaos: SEPARATION, daysUntilSeparation: 632, rate: 'IT' },
-		complete: { ...completeSchool, eaos: SEPARATION, daysUntilSeparation: 632 }
-	};
-	const idsFor = (persona: PersonaFilters, tasks: TimelineState['tasks']) =>
-		generateTimeline(persona, [...TASK_DEFS], { schemaVersion: 1, tasks }, TODAY_EARLY)
-			.phases.flatMap((p) => p.items)
-			.map((i) => i.def.id);
-
-	it('hides both steps for every profile level with no answer, after No and after an early Not sure', () => {
-		for (const [level, persona] of Object.entries(PERSONAS)) {
-			for (const answer of [
-				undefined,
-				{ status: 'skipped' as const },
-				{ status: 'snoozed' as const, snoozeUntil: '2027-04-01' }
-			]) {
-				const shown = idsFor(persona, answer ? { [SKILLBRIDGE_PLAN_KEY]: answer } : {});
-				expect(shown.length, level).toBeGreaterThan(0);
-				for (const id of STEPS) {
-					expect(shown, `${level} ${JSON.stringify(answer)}`).not.toContain(id);
-				}
-			}
-		}
-	});
-
-	it('shows both steps for every profile level after Yes and after a Not sure from the second ask', () => {
-		for (const [level, persona] of Object.entries(PERSONAS)) {
-			for (const answer of [{ status: 'done' as const }, { status: 'snoozed' as const }]) {
-				const shown = idsFor(persona, { [SKILLBRIDGE_PLAN_KEY]: answer });
-				for (const id of STEPS) {
-					expect(shown, `${level} ${JSON.stringify(answer)}`).toContain(id);
-				}
-			}
-		}
-	});
-
 	it('a SkillBridge date alone adds no step', () => {
 		const shown = ids({}, { skillbridgeStart: '2028-01-03' });
 		for (const id of STEPS) expect(shown).not.toContain(id);
@@ -1304,6 +1223,29 @@ describe('A soft aim from before separation', () => {
 	});
 });
 
+describe('the school step', () => {
+	// No screen asks whether a member plans to go to school, so the step shows for every member, with the condition in
+	// its title: the Home row and the calendar show only the title.
+	it('shows for every member, with or without a leaving answer, its condition leading the title', () => {
+		for (const path of [
+			undefined,
+			'ets',
+			'retirement',
+			'reserve-retirement',
+			'medical',
+			'reserve-component'
+		] as const) {
+			const persona: PersonaFilters = { ...eaosOnly, ...(path ? { separationPath: path } : {}) };
+			const school = filterAndAnchor(persona, [...TASK_DEFS]).find(
+				(a) => a.def.id === 'school-apply'
+			);
+			expect(school?.def.title, String(path)).toBe(
+				'If you plan to go to school, apply and submit the FAFSA'
+			);
+		}
+	});
+});
+
 describe('the leaving answer gates its own tasks', () => {
 	const pathTask: TaskDef = { ...universal, id: 'p1', requires: { separationPath: ['medical'] } };
 	const hiddenFor: TaskDef = { ...universal, id: 'h1', hideFor: ['reserve-component'] };
@@ -1314,11 +1256,10 @@ describe('the leaving answer gates its own tasks', () => {
 	const gated = (p: PersonaFilters) =>
 		filterAndAnchor(p, [pathTask, hiddenFor]).map((i) => i.def.id);
 
-	it('shows a path task only for a stored, listed path, and on any completeness', () => {
+	it('shows a path task only for a stored, listed path', () => {
 		expect(gated(persona())).toEqual(['h1']);
 		expect(gated(persona('retirement'))).toEqual(['h1']);
 		expect(gated(persona('medical'))).toEqual(['p1', 'h1']);
-		expect(gated({ ...completeWork, separationPath: 'medical' })).toEqual(['p1', 'h1']);
 	});
 
 	it('hides a hideFor task only for a stored, listed path', () => {
@@ -1491,12 +1432,14 @@ describe('the leaving answer on the real task list', () => {
 		}
 		// 10 USC 1201(b)(3): 20 years of service retires a member under a 30% rating, so no rating decides this line.
 		expect(def('medical')?.why).toMatch(/^If the board retires you/);
-		expect(def('medical')?.why).toMatch(/If it separates you instead/);
+		expect(def('medical')?.why).toMatch(/If the board separates you instead/);
 		expect(def('medical')?.why).not.toMatch(/30%/);
-		// tricare.mil's medical retirement page: Medicare under 65 needs Part B to keep TRICARE. That page is for a retiree,
-		// so the line sits inside the sentence for the board retiring a member, ahead of the separating branch.
-		expect(def('medical')?.why).toContain(
-			'to keep TRICARE with no break; if you have Medicare before age 65, you also need Part B. If it separates you instead'
+		// tricare.mil's Retiring page: a member eligible for Medicare must have Part B to stay eligible for TRICARE when
+		// they retire - a rule on its own, not a second step after enrolling, and in place by the retirement. tricare.mil's
+		// medical retirement page gives a member the board retires the same 90 days, Guard or Reserve included, so the
+		// Guard or Reserve line points only a member the board does not retire to tricare.mil.
+		expect(def('medical')?.why).toBe(
+			'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. If the board separates you instead, or you are in the Guard or Reserve and it does not retire you, tricare.mil lists what may apply.'
 		);
 		// A Guard or Reserve member can hold the Retiring answer from before their own answer existed. The card prints the
 		// why above its note, so the line is in the why alone and a board member's notes stay free of it.
