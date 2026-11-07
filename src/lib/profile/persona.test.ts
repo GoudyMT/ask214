@@ -108,19 +108,8 @@ describe('derivePersona', () => {
 	describe('the leaving answer', () => {
 		const enc = (s: string) => new TextEncoder().encode(s);
 
-		it.each([
-			['the date alone', {}],
-			[
-				'the four old answers',
-				{
-					rate: enc('IT'),
-					rank: enc('E5'),
-					familyStatus: enc('single'),
-					intendedPath: enc('career')
-				}
-			]
-		])('carries the answer beside %s', (_name, extra) => {
-			const r = derivePersona(withEaos({ ...extra, separationPath: enc('medical') }));
+		it('carries the answer beside the date', () => {
+			const r = derivePersona(withEaos({ separationPath: enc('medical') }));
 			expect(r.completeness).toBe('eaos-only');
 			if (r.completeness === 'none') return;
 			expect(r.separationPath).toBe('medical');

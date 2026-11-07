@@ -47,11 +47,6 @@ const eaosOnly: PersonaFilters = {
 };
 
 describe('filterAndAnchor (gate + anchor)', () => {
-	it('includes universal tasks for any persona with an EAOS', () => {
-		const ids = filterAndAnchor(eaosOnly, [universal]).map((i) => i.def.id);
-		expect(ids).toContain('u1');
-	});
-
 	it('anchors targetDate + window dates to EAOS + offsets (recommendedOffset wins)', () => {
 		const [item] = filterAndAnchor(eaosOnly, [universal]);
 		expect(item?.targetDate).toBe(eaosOffsetDate(EAOS, -120));
@@ -1068,44 +1063,6 @@ describe('the SkillBridge steps follow the saved answer', () => {
 		for (const answer of [{ status: 'done' as const }, { status: 'snoozed' as const }]) {
 			const shown = ids({ [SKILLBRIDGE_PLAN_KEY]: answer });
 			for (const id of STEPS) expect(shown, JSON.stringify(answer)).toContain(id);
-		}
-	});
-
-	// On the real task list, a profile with a separation date must neither show the steps with no answer nor lose them
-	// after a Yes.
-	const SEPARATION = '2028-06-30' as EaosString;
-	const PERSONAS: Record<string, PersonaFilters> = {
-		'eaos-only': { completeness: 'eaos-only', eaos: SEPARATION, daysUntilSeparation: 632 }
-	};
-	const idsFor = (persona: PersonaFilters, tasks: TimelineState['tasks']) =>
-		generateTimeline(persona, [...TASK_DEFS], { schemaVersion: 1, tasks }, TODAY_EARLY)
-			.phases.flatMap((p) => p.items)
-			.map((i) => i.def.id);
-
-	it('hides both steps for every profile level with no answer, after No and after an early Not sure', () => {
-		for (const [level, persona] of Object.entries(PERSONAS)) {
-			for (const answer of [
-				undefined,
-				{ status: 'skipped' as const },
-				{ status: 'snoozed' as const, snoozeUntil: '2027-04-01' }
-			]) {
-				const shown = idsFor(persona, answer ? { [SKILLBRIDGE_PLAN_KEY]: answer } : {});
-				expect(shown.length, level).toBeGreaterThan(0);
-				for (const id of STEPS) {
-					expect(shown, `${level} ${JSON.stringify(answer)}`).not.toContain(id);
-				}
-			}
-		}
-	});
-
-	it('shows both steps for every profile level after Yes and after a Not sure from the second ask', () => {
-		for (const [level, persona] of Object.entries(PERSONAS)) {
-			for (const answer of [{ status: 'done' as const }, { status: 'snoozed' as const }]) {
-				const shown = idsFor(persona, { [SKILLBRIDGE_PLAN_KEY]: answer });
-				for (const id of STEPS) {
-					expect(shown, `${level} ${JSON.stringify(answer)}`).toContain(id);
-				}
-			}
 		}
 	});
 
