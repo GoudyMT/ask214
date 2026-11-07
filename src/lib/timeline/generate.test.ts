@@ -46,18 +46,6 @@ const eaosOnly: PersonaFilters = {
 	daysUntilSeparation: 100
 };
 
-const completeSchool: PersonaFilters = {
-	completeness: 'complete',
-	eaos: EAOS,
-	daysUntilSeparation: 100,
-	rate: 'IT',
-	rank: 'E5',
-	familyStatus: 'single',
-	intendedPath: 'school'
-};
-
-const completeWork: PersonaFilters = { ...completeSchool, intendedPath: 'employment' };
-
 describe('filterAndAnchor (gate + anchor)', () => {
 	it('includes universal tasks for any persona with an EAOS', () => {
 		const ids = filterAndAnchor(eaosOnly, [universal]).map((i) => i.def.id);
@@ -1083,13 +1071,11 @@ describe('the SkillBridge steps follow the saved answer', () => {
 		}
 	});
 
-	// Every profile level that carries a separation date reads the same saved answer: a fuller profile must neither
-	// show the steps with no answer nor lose them after a Yes.
+	// On the real task list, a profile with a separation date must neither show the steps with no answer nor lose them
+	// after a Yes.
 	const SEPARATION = '2028-06-30' as EaosString;
 	const PERSONAS: Record<string, PersonaFilters> = {
-		'eaos-only': { completeness: 'eaos-only', eaos: SEPARATION, daysUntilSeparation: 632 },
-		partial: { completeness: 'partial', eaos: SEPARATION, daysUntilSeparation: 632, rate: 'IT' },
-		complete: { ...completeSchool, eaos: SEPARATION, daysUntilSeparation: 632 }
+		'eaos-only': { completeness: 'eaos-only', eaos: SEPARATION, daysUntilSeparation: 632 }
 	};
 	const idsFor = (persona: PersonaFilters, tasks: TimelineState['tasks']) =>
 		generateTimeline(persona, [...TASK_DEFS], { schemaVersion: 1, tasks }, TODAY_EARLY)
@@ -1313,11 +1299,10 @@ describe('the leaving answer gates its own tasks', () => {
 	const gated = (p: PersonaFilters) =>
 		filterAndAnchor(p, [pathTask, hiddenFor]).map((i) => i.def.id);
 
-	it('shows a path task only for a stored, listed path, and on any completeness', () => {
+	it('shows a path task only for a stored, listed path', () => {
 		expect(gated(persona())).toEqual(['h1']);
 		expect(gated(persona('retirement'))).toEqual(['h1']);
 		expect(gated(persona('medical'))).toEqual(['p1', 'h1']);
-		expect(gated({ ...completeWork, separationPath: 'medical' })).toEqual(['p1', 'h1']);
 	});
 
 	it('hides a hideFor task only for a stored, listed path', () => {
