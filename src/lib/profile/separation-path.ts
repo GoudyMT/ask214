@@ -15,7 +15,7 @@ export type SeparationPath = (typeof SEPARATION_PATHS)[number];
 /** Each path in the words the setup question and the Settings row show. */
 export const SEPARATION_PATH_LABEL: Record<SeparationPath, string> = {
 	ets: 'Finishing my service',
-	retirement: 'Retiring',
+	retirement: 'Retiring from active duty',
 	'reserve-retirement': 'Retiring from the Guard or Reserve',
 	medical: 'A medical board',
 	'reserve-component': 'Leaving the Guard or Reserve'

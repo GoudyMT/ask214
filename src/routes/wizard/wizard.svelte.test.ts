@@ -153,10 +153,10 @@ describe('Wizard, how the member is leaving', () => {
 		await expect
 			.element(group)
 			.toHaveAccessibleDescription('This adds the steps for your path. It stays on this device.');
-		// The two retiring answers sit side by side, so a Guard or Reserve retiree sees theirs beside "Retiring".
+		// The two retiring answers sit side by side and each names its component, so neither reads as the other's.
 		const choices = [
 			'Finishing my service',
-			'Retiring',
+			'Retiring from active duty',
 			'Retiring from the Guard or Reserve',
 			'A medical board',
 			'Leaving the Guard or Reserve',
@@ -205,14 +205,15 @@ describe('Wizard, how the member is leaving', () => {
 
 	it.each([
 		['Not sure yet', 'Not sure yet'],
-		['Not sure yet after another pick', 'Retiring']
+		['Not sure yet after another pick', 'Retiring from active duty']
 	])('clears any earlier path for %s', async (_name, first) => {
 		// The store merges a patch over the saved record, so only a present-but-empty key clears an answer saved
 		// before (a member who came Back to this page, or another tab that set it up first).
 		store.save.mockResolvedValue({ generation: 1 });
 		await render(WizardPage);
 		await page.getByRole('radio', { name: first, exact: true }).click();
-		if (first === 'Retiring') await page.getByRole('radio', { name: 'Not sure yet' }).click();
+		if (first === 'Retiring from active duty')
+			await page.getByRole('radio', { name: 'Not sure yet' }).click();
 		await expect.element(page.getByRole('radio', { name: 'Not sure yet' })).toBeChecked();
 		await page.getByLabelText('Separation date').fill(TYPED);
 		await page.getByRole('button', { name: 'Save and continue' }).click();
@@ -224,7 +225,7 @@ describe('Wizard, how the member is leaving', () => {
 	it('wipes the picked path bytes when the save fails too', async () => {
 		store.save.mockRejectedValue(new Error('E_TEST'));
 		await render(WizardPage);
-		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).click();
 		await page.getByLabelText('Separation date').fill(TYPED);
 		await page.getByRole('button', { name: 'Save and continue' }).click();
 		await vi.waitFor(() => expect(store.save).toHaveBeenCalledTimes(1));
@@ -334,7 +335,7 @@ describe('Wizard, how the member is leaving', () => {
 
 	it('saves nothing when the member skips, whatever was picked', async () => {
 		await render(WizardPage);
-		await page.getByRole('radio', { name: 'Retiring', exact: true }).click();
+		await page.getByRole('radio', { name: 'Retiring from active duty', exact: true }).click();
 		await page.getByRole('button', { name: 'Skip for now' }).click();
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/'));
 		expect(store.save).not.toHaveBeenCalled();

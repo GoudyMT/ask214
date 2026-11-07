@@ -82,7 +82,7 @@ describe('Settings, how the member is leaving', () => {
 	it('sits in the timeline section after the SkillBridge row, with the saved answer', async () => {
 		withPath('retirement');
 		await render(SettingsPage);
-		await expect.element(row()).toHaveTextContent('How you are leaving Retiring');
+		await expect.element(row()).toHaveTextContent('How you are leaving Retiring from active duty');
 		const toggles = [...document.querySelectorAll('.settings-disclosure__toggle')].map(
 			(b) => b.textContent ?? ''
 		);
