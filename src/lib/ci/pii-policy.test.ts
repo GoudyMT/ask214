@@ -274,6 +274,16 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 	const scan = (content: string) =>
 		scanForPiiImports([{ path: 'src/lib/ask/online/x.ts', content }]);
 
+	// The scan knows one alias, `#lib/`. A second alias added to package.json (say `#data/*` for src/lib/profile) would
+	// reach a banned folder by a name the scan never reads, so the map is pinned here: a new alias changes this guard too.
+	it('reads the only import aliases package.json defines', () => {
+		const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
+			imports?: Record<string, string>;
+		};
+		expect(pkg.imports).toEqual({ '#lib': './src/lib/index.js', '#lib/*': './src/lib/*' });
+		expect(scan("import { a } from '#lib/profile/x';")).toHaveLength(1);
+	});
+
 	it.each([
 		'#lib/profile/store.svelte.js',
 		'../../profile/codec',
