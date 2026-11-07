@@ -284,6 +284,14 @@ describe('pii-policy: off-device code must not import the personal-data modules'
 		expect(scan("import { a } from '#lib/profile/x';")).toHaveLength(1);
 	});
 
+	// The bundler and SvelteKit (whose config lives in vite.config.ts) can name aliases too. The one alias there today is
+	// a test stub for the Workers runtime module, so any other is a new name the scan cannot read.
+	it('finds no alias in the bundler and SvelteKit config but the Workers test stub', () => {
+		const vite = readFileSync('vite.config.ts', 'utf8');
+		expect(vite.match(/\balias\s*:/g)).toHaveLength(1);
+		expect(vite).toMatch(/alias:\s*\{\s*'cloudflare:workers':[^}]*\}/);
+	});
+
 	it.each([
 		'#lib/profile/store.svelte.js',
 		'../../profile/codec',
