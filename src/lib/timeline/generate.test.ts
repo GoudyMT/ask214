@@ -1504,7 +1504,7 @@ describe('the leaving answer on the real task list', () => {
 			finalEnd: 60
 		});
 		expect(retiring?.why).toBe(
-			'Retirees can buy dental coverage through FEDVIP, on BENEFEDS.gov. Enrollment opens 31 days before your retirement date; enroll before that date to avoid a gap in dental coverage.'
+			'Most retirees can buy dental coverage through FEDVIP, on BENEFEDS.gov. Enrollment opens 31 days before your retirement date; enroll before that date to avoid a gap in dental coverage.'
 		);
 		expect(retiring?.changeNote).toBe(
 			'If you retired, you can still enroll within 60 days after your retirement date, with a gap in dental coverage until the plan starts.'
@@ -1512,7 +1512,7 @@ describe('the leaving answer on the real task list', () => {
 		expect(retiring?.afterNote).toBe(
 			'If you retired and missed the 60 days, you can enroll during the Federal Benefits Open Season, each November into December.'
 		);
-		expect(def('medical')?.why).toBe(`If the board retires you: ${retiring?.why}`);
+		expect(def('medical')?.why).toBe(`If the board retires you from active duty: ${retiring?.why}`);
 		// The title reaches the calendar file, so the two answers share it.
 		expect(def('medical')?.title).toBe(retiring?.title);
 		expect(def('medical')?.changeNote).toBe(retiring?.changeNote);

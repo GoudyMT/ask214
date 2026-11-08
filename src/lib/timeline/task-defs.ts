@@ -99,7 +99,7 @@ const TRR_ANYTIME =
 const ELECT_WHY =
 	'A Marketplace special enrollment period runs from 60 days before to 60 days after TRICARE (or TAMP) ends, and CHCBP enrollment within 60 days after; tricare.mil and healthcare.gov say who qualifies.';
 const FEDVIP_WHY =
-	'Retirees can buy dental coverage through FEDVIP, on BENEFEDS.gov. Enrollment opens 31 days before your retirement date; enroll before that date to avoid a gap in dental coverage.';
+	'Most retirees can buy dental coverage through FEDVIP, on BENEFEDS.gov. Enrollment opens 31 days before your retirement date; enroll before that date to avoid a gap in dental coverage.';
 const ELECT_RETIREE =
 	'check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends.';
 
@@ -592,7 +592,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// The sheet covers a member retiring from active duty, so the Guard or Reserve retirement, which may be from drill
 		// status, is left out; a board can separate a member instead of retiring them.
 		copyFor: {
-			medical: { why: `If the board retires you: ${FEDVIP_WHY}` }
+			medical: { why: `If the board retires you from active duty: ${FEDVIP_WHY}` }
 		},
 		requires: { separationPath: ['retirement', 'medical'] }
 	},
