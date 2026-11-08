@@ -1477,6 +1477,27 @@ describe('the leaving answer on the real task list', () => {
 		}
 	});
 
+	// The step lands above the retiree TRICARE step for these two answers, and either can end in a retirement that
+	// keeps TRICARE, so its first words send that member on. The title stays shared: it reaches the calendar file.
+	it('tells a board or Guard or Reserve retiree that the after-TRICARE step may not be theirs', () => {
+		const def = (path?: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'tricare-elect')?.def;
+		const base = def('ets')?.why;
+		expect(def('medical')?.why).toBe(
+			`If the board retires you, check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends. ${base}`
+		);
+		expect(def('reserve-retirement')?.why).toBe(
+			`If you are retiring, check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends. ${base}`
+		);
+		for (const path of ['medical', 'reserve-retirement'] as const) {
+			expect(def(path)?.title).toBe(def('ets')?.title);
+			expect(def(path)?.afterNote).toBe(def('ets')?.afterNote);
+		}
+		for (const path of [undefined, 'ets', 'reserve-component'] as const) {
+			expect(def(path)?.why).toBe(base);
+		}
+	});
+
 	// 10 USC 1142(a)(3)(B): a separation not known until 365 or fewer days remain starts counseling as soon as possible.
 	const OTHER_ANSWERS = ['ets', 'retirement', 'reserve-component', 'reserve-retirement'] as const;
 	it.each(['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'])(

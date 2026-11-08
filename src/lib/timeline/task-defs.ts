@@ -96,6 +96,10 @@ const RCSBP_WHY =
 
 const TRR_ANYTIME =
 	'Members who qualify can buy TRICARE Retired Reserve at any time before age 60.';
+const ELECT_WHY =
+	'A Marketplace special enrollment period runs from 60 days before to 60 days after TRICARE (or TAMP) ends, and CHCBP enrollment within 60 days after; tricare.mil and healthcare.gov say who qualifies.';
+const ELECT_RETIREE =
+	'check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends.';
 
 const BDD_FALLBACK =
 	'A VA claim can still be filed the standard way, and an accredited VSO helps for free.';
@@ -664,10 +668,16 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -60,
 		windowEnd: 60,
 		recommendedOffset: -14,
-		why: 'A Marketplace special enrollment period runs from 60 days before to 60 days after TRICARE (or TAMP) ends, and CHCBP enrollment within 60 days after; tricare.mil and healthcare.gov say who qualifies.',
+		why: ELECT_WHY,
 		afterNote:
 			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.',
-		// A retiree stays on TRICARE; the retiree enrollment step is theirs.
+		// A retiree stays on TRICARE; the retiree enrollment step is theirs. These two answers can end in a retirement or
+		// not, and the step dates before the retiree one, so its why opens by sending a retiree there. The title stays
+		// shared: it reaches the calendar file.
+		copyFor: {
+			medical: { why: `If the board retires you, ${ELECT_RETIREE} ${ELECT_WHY}` },
+			'reserve-retirement': { why: `If you are retiring, ${ELECT_RETIREE} ${ELECT_WHY}` }
+		},
 		hideFor: ['retirement']
 	},
 	{
