@@ -167,8 +167,9 @@ describe('buildIcs', () => {
 			for (const t of added) expect(retiring.has(t), `${eaos}: ${t}`).toBe(true);
 			return added;
 		};
-		// Each added step writes two events, its aim and its last day, each with a title and an ID.
-		expect(await addedByBoard()).toHaveLength(8);
+		// Each added event has a title and an ID: SBP's last day, and the opening, change and last day of the TRICARE and
+		// FEDVIP dental steps.
+		expect(await addedByBoard()).toHaveLength(14);
 		// Which steps reach the file turns on the date, so a title of the board's own could hide on any one date: every
 		// month of the runway, and the year after separation. A marked step only leaves the file, so marks need no pass of
 		// their own; what adds steps does: a SkillBridge Yes adds its steps, and a leaving date moves last days in.

@@ -1287,13 +1287,20 @@ describe('the leaving answer on the real task list', () => {
 	const TRACKS: Record<SeparationPath, string[]> = {
 		ets: [],
 		// A Guard or Reserve retirement makes the Reserve SBP choice; a board can retire a member, who then makes the SBP one.
-		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election', 'tricare-retiree-enroll'],
+		retirement: [
+			'sbp-election',
+			'retirement-request',
+			'rcsbp-election',
+			'tricare-retiree-enroll',
+			'fedvip-dental'
+		],
 		medical: [
 			'peblo-contact',
 			'va-msc-claim',
 			'ides-review-options',
 			'sbp-election',
-			'tricare-retiree-enroll'
+			'tricare-retiree-enroll',
+			'fedvip-dental'
 		],
 		'reserve-component': ['tamp-check', 'rcsbp-election'],
 		// A Guard or Reserve retiree makes the Reserve SBP choice, or the active-duty one when retiring from full-time
@@ -1474,6 +1481,58 @@ describe('the leaving answer on the real task list', () => {
 			'reserve-retirement'
 		] as const) {
 			expect(ids(path)).toContain('tricare-elect');
+		}
+	});
+
+	// BENEFEDS's fact sheet for retiring members (BEN10320 v.8): a member retiring from active duty may enroll in FEDVIP
+	// dental from 31 days before the retirement date to 60 days after; enrolling before that date avoids a gap; after
+	// the 60 days, the next open season. The sheet covers retiring from active duty, so a Guard or Reserve retirement,
+	// which may be from drill status, gets no dated window, and a board can separate a member instead of retiring them.
+	it('gives a retiring member the FEDVIP dental step with its window and what is left after each edge', () => {
+		const def = (path: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'fedvip-dental')?.def;
+		const retiring = def('retirement');
+		// The closing edges are pinned with their source in task-defs.test.ts.
+		expect(retiring).toMatchObject({
+			title: 'If you retire, enroll in FEDVIP dental before your retirement date',
+			windowStart: -31
+		});
+		expect(retiring?.why).toBe(
+			'Most retirees can buy dental coverage through FEDVIP, on BENEFEDS.gov. Enrollment opens 31 days before your retirement date; enroll before that date to avoid a gap in dental coverage.'
+		);
+		expect(retiring?.changeNote).toBe(
+			'If you retired, you can still enroll within 60 days after your retirement date, with a gap in dental coverage until the plan starts.'
+		);
+		expect(retiring?.afterNote).toBe(
+			'If you retired and missed the 60 days, you can enroll during the Federal Benefits Open Season, each November into December.'
+		);
+		expect(def('medical')?.why).toBe(`If the board retires you from active duty: ${retiring?.why}`);
+		// The title reaches the calendar file, so the two answers share it.
+		expect(def('medical')?.title).toBe(retiring?.title);
+		expect(def('medical')?.changeNote).toBe(retiring?.changeNote);
+		expect(def('medical')?.afterNote).toBe(retiring?.afterNote);
+	});
+
+	// The step lands above the retiree TRICARE step for these two answers, and either can end in a retirement that
+	// keeps TRICARE, so its first words send that member on. A drill-status retiree's TRICARE Reserve Select ends when
+	// they transfer to the Retired Reserve (tricare.mil), so this step stays theirs. The title stays shared: it reaches
+	// the calendar file.
+	it('tells a board or Guard or Reserve retiree that the after-TRICARE step may not be theirs', () => {
+		const def = (path?: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'tricare-elect')?.def;
+		const base = def('ets')?.why;
+		expect(def('medical')?.why).toBe(
+			`If the board retires you, check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends. ${base}`
+		);
+		expect(def('reserve-retirement')?.why).toBe(
+			`If you are retiring from full-time active duty, check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends. ${base}`
+		);
+		for (const path of ['medical', 'reserve-retirement'] as const) {
+			expect(def(path)?.title).toBe(def('ets')?.title);
+			expect(def(path)?.afterNote).toBe(def('ets')?.afterNote);
+		}
+		for (const path of [undefined, 'ets', 'reserve-component'] as const) {
+			expect(def(path)?.why).toBe(base);
 		}
 	});
 

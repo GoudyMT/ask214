@@ -168,6 +168,24 @@ test('no personal value reaches an online request', async ({ page, browserName }
 	await page.getByRole('button', { name: 'Send feedback' }).click();
 	await expect(page.getByText(/your feedback was sent/i)).toBeVisible();
 
+	// SvelteKit fetches its version file each time the window gains focus or the tab is shown again, with every
+	// personal value above already stored. Each event must reach the request log, so the check below covers that
+	// request too. A browser fires visibilitychange at the document and lets it bubble to the window, where SvelteKit
+	// listens.
+	const versionRequests = () => requests.filter((r) => r.url().includes('/_app/version.json'));
+	for (const fire of [
+		() => window.dispatchEvent(new Event('focus')),
+		() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+	]) {
+		// One check runs at a time, and an event during an open one joins it with no request of its own. So every
+		// earlier check is let finish first, and each event is fired once: only its own request can raise the count.
+		await Promise.all(versionRequests().map((r) => r.response()));
+		await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+		const before = versionRequests().length;
+		await page.evaluate(fire);
+		await expect.poll(() => versionRequests().length).toBe(before + 1);
+	}
+
 	const sent = await Promise.all(
 		requests.map(async (request) => ({
 			url: request.url(),
@@ -216,6 +234,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'If the board finds you unfit',
 		'If you retire\\, enroll',
 		'If you retire, enroll',
+		'enroll in FEDVIP dental',
 		"unless the board's exams stand in",
 		'you also need Part B',
 		SBP_TITLE,
@@ -234,7 +253,8 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'sbp-election',
 		'tamp-check',
 		'rcsbp-election',
-		'tricare-retiree-enroll'
+		'tricare-retiree-enroll',
+		'fedvip-dental'
 	];
 	for (const request of sent) {
 		const text = [
