@@ -1496,12 +1496,10 @@ describe('the leaving answer on the real task list', () => {
 		const def = (path: SeparationPath) =>
 			items(path).find((i) => i.def.id === 'fedvip-dental')?.def;
 		const retiring = def('retirement');
+		// The closing edges are pinned with their source in task-defs.test.ts.
 		expect(retiring).toMatchObject({
 			title: 'If you retire, enroll in FEDVIP dental before your retirement date',
-			kind: 'closes',
-			windowStart: -31,
-			windowEnd: -1,
-			finalEnd: 60
+			windowStart: -31
 		});
 		expect(retiring?.why).toBe(
 			'Most retirees can buy dental coverage through FEDVIP, on BENEFEDS.gov. Enrollment opens 31 days before your retirement date; enroll before that date to avoid a gap in dental coverage.'
