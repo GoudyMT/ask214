@@ -168,6 +168,26 @@ test('no personal value reaches an online request', async ({ page, browserName }
 	await page.getByRole('button', { name: 'Send feedback' }).click();
 	await expect(page.getByText(/your feedback was sent/i)).toBeVisible();
 
+	// SvelteKit fetches its version file each time the window gains focus or the tab is shown again, with every
+	// personal value above already stored. Each event must reach the request log, so the check below covers that
+	// request too. A browser fires visibilitychange at the document and lets it bubble to the window, where SvelteKit
+	// listens.
+	const versionChecks = () => requests.filter((r) => r.url().includes('/_app/version.json')).length;
+	for (const fire of [
+		() => window.dispatchEvent(new Event('focus')),
+		() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+	]) {
+		const before = versionChecks();
+		// One check runs at a time: an event while the last one's fetch is still open joins it, so the event is sent
+		// again until a new request is logged.
+		await expect
+			.poll(async () => {
+				await page.evaluate(fire);
+				return versionChecks();
+			})
+			.toBeGreaterThan(before);
+	}
+
 	const sent = await Promise.all(
 		requests.map(async (request) => ({
 			url: request.url(),
