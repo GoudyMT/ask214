@@ -1310,8 +1310,7 @@ describe('the leaving answer on the real task list', () => {
 			'tamp-check',
 			'rcsbp-election',
 			'sbp-election',
-			'tricare-retiree-enroll',
-			'fedvip-dental'
+			'tricare-retiree-enroll'
 		]
 	};
 	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
@@ -1491,8 +1490,8 @@ describe('the leaving answer on the real task list', () => {
 	// the calendar file.
 	// BENEFEDS's fact sheet for retiring members (BEN10320 v.8): a member retiring from active duty may enroll in FEDVIP
 	// dental from 31 days before the retirement date to 60 days after; enrolling before that date avoids a gap; after
-	// the 60 days, the next open season. The sheet covers retiring from active duty, so a Guard or Reserve retirement
-	// names that condition, and a board can separate a member instead of retiring them.
+	// the 60 days, the next open season. The sheet covers retiring from active duty, so a Guard or Reserve retirement,
+	// which may be from drill status, gets no dated window, and a board can separate a member instead of retiring them.
 	it('gives a retiring member the FEDVIP dental step with its window and what is left after each edge', () => {
 		const def = (path: SeparationPath) =>
 			items(path).find((i) => i.def.id === 'fedvip-dental')?.def;
@@ -1514,15 +1513,10 @@ describe('the leaving answer on the real task list', () => {
 			'If you retired and missed the 60 days, you can enroll during the Federal Benefits Open Season, each November into December.'
 		);
 		expect(def('medical')?.why).toBe(`If the board retires you: ${retiring?.why}`);
-		expect(def('reserve-retirement')?.why).toBe(
-			`If you are retiring from full-time active duty: ${retiring?.why} BENEFEDS.gov lists who else qualifies.`
-		);
-		// The title reaches the calendar file, so the three answers share it.
-		for (const path of ['medical', 'reserve-retirement'] as const) {
-			expect(def(path)?.title).toBe(retiring?.title);
-			expect(def(path)?.changeNote).toBe(retiring?.changeNote);
-			expect(def(path)?.afterNote).toBe(retiring?.afterNote);
-		}
+		// The title reaches the calendar file, so the two answers share it.
+		expect(def('medical')?.title).toBe(retiring?.title);
+		expect(def('medical')?.changeNote).toBe(retiring?.changeNote);
+		expect(def('medical')?.afterNote).toBe(retiring?.afterNote);
 	});
 
 	it('tells a board or Guard or Reserve retiree that the after-TRICARE step may not be theirs', () => {

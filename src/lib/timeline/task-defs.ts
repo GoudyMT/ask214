@@ -574,7 +574,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'fedvip-dental',
-		// The title reaches the calendar file, so all three answers share it.
+		// The title reaches the calendar file, so both answers share it.
 		title: 'If you retire, enroll in FEDVIP dental before your retirement date',
 		category: 'benefits',
 		finishBefore: 'separation',
@@ -589,14 +589,12 @@ export const TASK_DEFS: readonly TaskDef[] = [
 			'If you retired, you can still enroll within 60 days after your retirement date, with a gap in dental coverage until the plan starts.',
 		afterNote:
 			'If you retired and missed the 60 days, you can enroll during the Federal Benefits Open Season, each November into December.',
-		// The sheet covers a member retiring from active duty; a board can separate a member instead of retiring them.
+		// The sheet covers a member retiring from active duty, so the Guard or Reserve retirement, which may be from drill
+		// status, is left out; a board can separate a member instead of retiring them.
 		copyFor: {
-			medical: { why: `If the board retires you: ${FEDVIP_WHY}` },
-			'reserve-retirement': {
-				why: `If you are retiring from full-time active duty: ${FEDVIP_WHY} BENEFEDS.gov lists who else qualifies.`
-			}
+			medical: { why: `If the board retires you: ${FEDVIP_WHY}` }
 		},
-		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
+		requires: { separationPath: ['retirement', 'medical'] }
 	},
 
 	// ---- Capstone + final-90 ----
