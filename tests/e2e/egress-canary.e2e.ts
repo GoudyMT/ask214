@@ -234,7 +234,8 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'sbp-election',
 		'tamp-check',
 		'rcsbp-election',
-		'tricare-retiree-enroll'
+		'tricare-retiree-enroll',
+		'fedvip-dental'
 	];
 	for (const request of sent) {
 		const text = [

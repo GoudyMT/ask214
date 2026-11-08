@@ -371,6 +371,15 @@ export const RESOURCES: readonly Resource[] = [
 		lastVerified: '2026-11-05'
 	},
 	{
+		id: 'tricare-retiree-dental',
+		title: 'Dental benefits for retirees',
+		url: 'https://www.tricare.mil/CoveredServices/Dental/RetireeSurvivorBenefit',
+		description:
+			'Official TRICARE information: retirees get dental coverage through FEDVIP, enrolled on BENEFEDS.',
+		displayCategory: 'health-wellbeing',
+		lastVerified: '2026-11-07'
+	},
+	{
 		id: 'ides',
 		title: 'Integrated Disability Evaluation System (IDES)',
 		url: 'https://health.mil/Military-Health-Topics/Access-Cost-Quality-and-Safety/DES/Integrated-Evaluation-System',
@@ -430,7 +439,8 @@ export const TASK_RESOURCES: Record<string, readonly string[]> = {
 	'ides-review-options': ['ides'],
 	'tamp-check': ['tamp'],
 	'rcsbp-election': ['sbp'],
-	'tricare-retiree-enroll': ['tricare-retiring']
+	'tricare-retiree-enroll': ['tricare-retiring'],
+	'fedvip-dental': ['tricare-retiree-dental']
 };
 
 // The TAP guides a task opens in the app's own reader, listed first under its Related resources. Curated by hand and
@@ -489,7 +499,8 @@ export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }
 		resource: 'sbp',
 		label: 'The Survivor Benefit Plan on militarypay.defense.gov'
 	},
-	'tricare-retiree-enroll': { resource: 'tricare-retiring', label: 'Retiring on tricare.mil' }
+	'tricare-retiree-enroll': { resource: 'tricare-retiring', label: 'Retiring on tricare.mil' },
+	'fedvip-dental': { resource: 'tricare-retiree-dental', label: 'Retiree dental on tricare.mil' }
 };
 
 // One line shown above a task card's links: each service and command sets what its SkillBridge request needs, and

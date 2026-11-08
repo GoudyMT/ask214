@@ -49,7 +49,8 @@ const SHIPPED_TASK_IDS: readonly string[] = [
 	'ides-review-options',
 	'tamp-check',
 	'rcsbp-election',
-	'tricare-retiree-enroll'
+	'tricare-retiree-enroll',
+	'fedvip-dental'
 ];
 
 describe('KNOWN_TASK_IDS', () => {
@@ -60,7 +61,7 @@ describe('KNOWN_TASK_IDS', () => {
 	});
 
 	it('KNOWN_TASK_IDS keeps every id it has ever held', () => {
-		expect(SHIPPED_TASK_IDS).toHaveLength(45);
+		expect(SHIPPED_TASK_IDS).toHaveLength(46);
 		expect(KNOWN_TASK_IDS.slice(0, SHIPPED_TASK_IDS.length)).toEqual(SHIPPED_TASK_IDS);
 	});
 

@@ -50,5 +50,6 @@ export const KNOWN_TASK_IDS: readonly string[] = Object.freeze([
 	'ides-review-options',
 	'tamp-check',
 	'rcsbp-election',
-	'tricare-retiree-enroll'
+	'tricare-retiree-enroll',
+	'fedvip-dental'
 ]);

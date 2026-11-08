@@ -98,6 +98,8 @@ const TRR_ANYTIME =
 	'Members who qualify can buy TRICARE Retired Reserve at any time before age 60.';
 const ELECT_WHY =
 	'A Marketplace special enrollment period runs from 60 days before to 60 days after TRICARE (or TAMP) ends, and CHCBP enrollment within 60 days after; tricare.mil and healthcare.gov say who qualifies.';
+const FEDVIP_WHY =
+	'Retirees can buy dental coverage through FEDVIP, on BENEFEDS.gov. Enrollment opens 31 days before your retirement date; enroll before that date to avoid a gap in dental coverage.';
 const ELECT_RETIREE =
 	'check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends.';
 
@@ -566,6 +568,32 @@ export const TASK_DEFS: readonly TaskDef[] = [
 				why: 'If you have TRICARE Reserve Select, it ends when you transfer to the Retired Reserve; buying TRICARE Retired Reserve within 90 days of your retirement date avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
 				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date. ${TRR_ANYTIME}`,
 				afterNote: `If you are retiring from full-time active duty, you can enroll during TRICARE Open Season or after a Qualifying Life Event. ${TRR_ANYTIME}`
+			}
+		},
+		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
+	},
+	{
+		id: 'fedvip-dental',
+		// The title reaches the calendar file, so all three answers share it.
+		title: 'If you retire, enroll in FEDVIP dental before your retirement date',
+		category: 'benefits',
+		finishBefore: 'separation',
+		kind: 'closes',
+		// BENEFEDS's fact sheet for retiring members: enrollment opens 31 days before the retirement date, enrolling
+		// before that date avoids a gap, and the window closes 60 days after it.
+		windowStart: -31,
+		windowEnd: -1,
+		finalEnd: 60,
+		why: FEDVIP_WHY,
+		changeNote:
+			'If you retired, you can still enroll within 60 days after your retirement date, with a gap in dental coverage until the plan starts.',
+		afterNote:
+			'If you retired and missed the 60 days, you can enroll during the Federal Benefits Open Season, each November into December.',
+		// The sheet covers a member retiring from active duty; a board can separate a member instead of retiring them.
+		copyFor: {
+			medical: { why: `If the board retires you: ${FEDVIP_WHY}` },
+			'reserve-retirement': {
+				why: `If you are retiring from full-time active duty: ${FEDVIP_WHY} BENEFEDS.gov lists who else qualifies.`
 			}
 		},
 		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }

@@ -1287,13 +1287,20 @@ describe('the leaving answer on the real task list', () => {
 	const TRACKS: Record<SeparationPath, string[]> = {
 		ets: [],
 		// A Guard or Reserve retirement makes the Reserve SBP choice; a board can retire a member, who then makes the SBP one.
-		retirement: ['sbp-election', 'retirement-request', 'rcsbp-election', 'tricare-retiree-enroll'],
+		retirement: [
+			'sbp-election',
+			'retirement-request',
+			'rcsbp-election',
+			'tricare-retiree-enroll',
+			'fedvip-dental'
+		],
 		medical: [
 			'peblo-contact',
 			'va-msc-claim',
 			'ides-review-options',
 			'sbp-election',
-			'tricare-retiree-enroll'
+			'tricare-retiree-enroll',
+			'fedvip-dental'
 		],
 		'reserve-component': ['tamp-check', 'rcsbp-election'],
 		// A Guard or Reserve retiree makes the Reserve SBP choice, or the active-duty one when retiring from full-time
@@ -1303,7 +1310,8 @@ describe('the leaving answer on the real task list', () => {
 			'tamp-check',
 			'rcsbp-election',
 			'sbp-election',
-			'tricare-retiree-enroll'
+			'tricare-retiree-enroll',
+			'fedvip-dental'
 		]
 	};
 	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
@@ -1479,6 +1487,42 @@ describe('the leaving answer on the real task list', () => {
 
 	// The step lands above the retiree TRICARE step for these two answers, and either can end in a retirement that
 	// keeps TRICARE, so its first words send that member on. The title stays shared: it reaches the calendar file.
+	// BENEFEDS's fact sheet for retiring members (BEN10320 v.8): a member retiring from active duty may enroll in FEDVIP
+	// dental from 31 days before the retirement date to 60 days after; enrolling before that date avoids a gap; after
+	// the 60 days, the next open season. The sheet covers retiring from active duty, so a Guard or Reserve retirement
+	// names that condition, and a board can separate a member instead of retiring them.
+	it('gives a retiring member the FEDVIP dental step with its window and what is left after each edge', () => {
+		const def = (path: SeparationPath) =>
+			items(path).find((i) => i.def.id === 'fedvip-dental')?.def;
+		const retiring = def('retirement');
+		expect(retiring).toMatchObject({
+			title: 'If you retire, enroll in FEDVIP dental before your retirement date',
+			kind: 'closes',
+			windowStart: -31,
+			windowEnd: -1,
+			finalEnd: 60
+		});
+		expect(retiring?.why).toBe(
+			'Retirees can buy dental coverage through FEDVIP, on BENEFEDS.gov. Enrollment opens 31 days before your retirement date; enroll before that date to avoid a gap in dental coverage.'
+		);
+		expect(retiring?.changeNote).toBe(
+			'If you retired, you can still enroll within 60 days after your retirement date, with a gap in dental coverage until the plan starts.'
+		);
+		expect(retiring?.afterNote).toBe(
+			'If you retired and missed the 60 days, you can enroll during the Federal Benefits Open Season, each November into December.'
+		);
+		expect(def('medical')?.why).toBe(`If the board retires you: ${retiring?.why}`);
+		expect(def('reserve-retirement')?.why).toBe(
+			`If you are retiring from full-time active duty: ${retiring?.why} BENEFEDS.gov lists who else qualifies.`
+		);
+		// The title reaches the calendar file, so the three answers share it.
+		for (const path of ['medical', 'reserve-retirement'] as const) {
+			expect(def(path)?.title).toBe(retiring?.title);
+			expect(def(path)?.changeNote).toBe(retiring?.changeNote);
+			expect(def(path)?.afterNote).toBe(retiring?.afterNote);
+		}
+	});
+
 	it('tells a board or Guard or Reserve retiree that the after-TRICARE step may not be theirs', () => {
 		const def = (path?: SeparationPath) =>
 			items(path).find((i) => i.def.id === 'tricare-elect')?.def;

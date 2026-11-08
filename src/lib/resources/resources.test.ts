@@ -98,6 +98,21 @@ describe('task-to-resource mapping integrity', () => {
 		expect(before.length).toBeGreaterThan(0);
 	});
 
+	// tricare.mil's page for retiree dental names FEDVIP and links BENEFEDS, where a retiree enrolls.
+	it("sends the FEDVIP dental step to TRICARE's retiree dental page, on the card and once its date passes", () => {
+		const page = RESOURCES.find((r) => r.id === 'tricare-retiree-dental');
+		expect(page).toMatchObject({
+			url: 'https://www.tricare.mil/CoveredServices/Dental/RetireeSurvivorBenefit',
+			displayCategory: 'health-wellbeing',
+			lastVerified: '2026-11-07'
+		});
+		expect(resourcesForTask('fedvip-dental').map((r) => r.id)).toEqual(['tricare-retiree-dental']);
+		expect(TASK_AFTER_LINK['fedvip-dental']).toEqual({
+			resource: 'tricare-retiree-dental',
+			label: 'Retiree dental on tricare.mil'
+		});
+	});
+
 	it('every money task on the Timeline shows at least one official link', () => {
 		const money = TASK_DEFS.filter((t) => t.category === 'finance');
 		expect(money.length).toBeGreaterThan(0);

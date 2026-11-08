@@ -252,7 +252,10 @@ describe('firm deadlines match their official sources', () => {
 		// possible, so the task is soft with its aim at separation.
 		['reserve-affiliation', 'soft', 0, undefined],
 		// 10 USC 1448(a) - the SBP election is made before retired pay begins, which follows the retirement date.
-		['sbp-election', 'closes', 0, undefined]
+		['sbp-election', 'closes', 0, undefined],
+		// BENEFEDS's fact sheet for retiring members - enroll "prior to your military retirement date" to prevent a gap;
+		// "If you don't enroll within 60 days of your retirement date, you must wait until the next open season."
+		['fedvip-dental', 'closes', -1, 60]
 	] as const)('%s is %s with its last day at %d', (id, kind, windowEnd, finalEnd) => {
 		const t = at(id);
 		expect(t?.kind).toBe(kind);
