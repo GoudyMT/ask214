@@ -375,7 +375,7 @@ export const RESOURCES: readonly Resource[] = [
 		title: 'Dental benefits for retirees',
 		url: 'https://www.tricare.mil/CoveredServices/Dental/RetireeSurvivorBenefit',
 		description:
-			'Official TRICARE information: retirees get dental coverage through FEDVIP, enrolled on BENEFEDS.',
+			'Official TRICARE information on dental plans for retirees: an eligible retiree may enroll in a FEDVIP plan on BENEFEDS.',
 		displayCategory: 'health-wellbeing',
 		lastVerified: '2026-11-07'
 	},

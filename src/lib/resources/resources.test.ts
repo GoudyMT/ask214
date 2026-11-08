@@ -103,6 +103,9 @@ describe('task-to-resource mapping integrity', () => {
 		const page = RESOURCES.find((r) => r.id === 'tricare-retiree-dental');
 		expect(page).toMatchObject({
 			url: 'https://www.tricare.mil/CoveredServices/Dental/RetireeSurvivorBenefit',
+			// The page says an eligible retiree "may be able to enroll"; FEDVIP is voluntary and enrollee-paid.
+			description:
+				'Official TRICARE information on dental plans for retirees: an eligible retiree may enroll in a FEDVIP plan on BENEFEDS.',
 			displayCategory: 'health-wellbeing',
 			lastVerified: '2026-11-07'
 		});
