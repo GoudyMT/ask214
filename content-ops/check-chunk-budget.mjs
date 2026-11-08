@@ -536,12 +536,14 @@ const STATIC = 'static';
 //
 //   2026-11-06 the sweep's copy fixes: Part B, the Home hint: routeNodes 60,599 -> 60,603 (measured 60,602 B, +10 B on the plan's base, margin 1 B).
 //
+//   2026-11-07 the retiree FEDVIP dental step and the after-TRICARE line for retirees: precacheBytes 259,628 -> 259,883 (measured 259,843 B, +398 B on the plan's base, margin 40 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 259_628,
+	precacheBytes: 259_883,
 	workerScripts: 147_316
 };
 
