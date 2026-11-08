@@ -236,6 +236,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'If the board finds you unfit',
 		'If you retire\\, enroll',
 		'If you retire, enroll',
+		'enroll in FEDVIP dental',
 		"unless the board's exams stand in",
 		'you also need Part B',
 		SBP_TITLE,
