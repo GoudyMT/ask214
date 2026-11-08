@@ -1486,7 +1486,9 @@ describe('the leaving answer on the real task list', () => {
 	});
 
 	// The step lands above the retiree TRICARE step for these two answers, and either can end in a retirement that
-	// keeps TRICARE, so its first words send that member on. The title stays shared: it reaches the calendar file.
+	// keeps TRICARE, so its first words send that member on. A drill-status retiree's TRICARE Reserve Select ends when
+	// they transfer to the Retired Reserve (tricare.mil), so this step stays theirs. The title stays shared: it reaches
+	// the calendar file.
 	// BENEFEDS's fact sheet for retiring members (BEN10320 v.8): a member retiring from active duty may enroll in FEDVIP
 	// dental from 31 days before the retirement date to 60 days after; enrolling before that date avoids a gap; after
 	// the 60 days, the next open season. The sheet covers retiring from active duty, so a Guard or Reserve retirement
@@ -1531,7 +1533,7 @@ describe('the leaving answer on the real task list', () => {
 			`If the board retires you, check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends. ${base}`
 		);
 		expect(def('reserve-retirement')?.why).toBe(
-			`If you are retiring, check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends. ${base}`
+			`If you are retiring from full-time active duty, check the TRICARE step tied to your retirement date first: this step is for a member whose TRICARE ends. ${base}`
 		);
 		for (const path of ['medical', 'reserve-retirement'] as const) {
 			expect(def(path)?.title).toBe(def('ets')?.title);

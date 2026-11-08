@@ -699,12 +699,15 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		why: ELECT_WHY,
 		afterNote:
 			'If your coverage ended when you separated, the 60-day window has passed. TAMP coverage ends later and moves it; see tricare.mil and healthcare.gov.',
-		// A retiree stays on TRICARE; the retiree enrollment step is theirs. These two answers can end in a retirement or
-		// not, and the step dates before the retiree one, so its why opens by sending a retiree there. The title stays
+		// A retiree stays on TRICARE; the retiree enrollment step is theirs. These two answers can end in a retirement that
+		// keeps TRICARE or not, and the step dates before the retiree one, so its why opens by sending that retiree there.
+		// A drill-status retiree's TRICARE Reserve Select ends at the transfer, so this step stays theirs. The title stays
 		// shared: it reaches the calendar file.
 		copyFor: {
 			medical: { why: `If the board retires you, ${ELECT_RETIREE} ${ELECT_WHY}` },
-			'reserve-retirement': { why: `If you are retiring, ${ELECT_RETIREE} ${ELECT_WHY}` }
+			'reserve-retirement': {
+				why: `If you are retiring from full-time active duty, ${ELECT_RETIREE} ${ELECT_WHY}`
+			}
 		},
 		hideFor: ['retirement']
 	},
