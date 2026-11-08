@@ -172,20 +172,18 @@ test('no personal value reaches an online request', async ({ page, browserName }
 	// personal value above already stored. Each event must reach the request log, so the check below covers that
 	// request too. A browser fires visibilitychange at the document and lets it bubble to the window, where SvelteKit
 	// listens.
-	const versionChecks = () => requests.filter((r) => r.url().includes('/_app/version.json')).length;
+	const versionRequests = () => requests.filter((r) => r.url().includes('/_app/version.json'));
 	for (const fire of [
 		() => window.dispatchEvent(new Event('focus')),
 		() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
 	]) {
-		const before = versionChecks();
-		// One check runs at a time: an event while the last one's fetch is still open joins it, so the event is sent
-		// again until a new request is logged.
-		await expect
-			.poll(async () => {
-				await page.evaluate(fire);
-				return versionChecks();
-			})
-			.toBeGreaterThan(before);
+		// One check runs at a time, and an event during an open one joins it with no request of its own. So every
+		// earlier check is let finish first, and each event is fired once: only its own request can raise the count.
+		await Promise.all(versionRequests().map((r) => r.response()));
+		await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+		const before = versionRequests().length;
+		await page.evaluate(fire);
+		await expect.poll(() => versionRequests().length).toBe(before + 1);
 	}
 
 	const sent = await Promise.all(
