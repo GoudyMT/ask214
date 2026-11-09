@@ -93,6 +93,30 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		expect(container.textContent).toContain('Your calendar is missing 1 new event.');
 	});
 
+	// A reader moving from button to button hears what "the new ones" are.
+	it('describes Add the new ones by the count line', async () => {
+		await render(CalendarPanel, { props: props({ missing: [missing('new')] }) });
+		await expect
+			.element(page.getByRole('button', { name: 'Add the new ones' }))
+			.toHaveAccessibleDescription('Your calendar is missing 1 new event.');
+	});
+
+	// Once the old copies are deleted, the new versions are exactly what is left to add: Add the new ones adds them
+	// without a second copy of every other event.
+	it("moves focus to Add the new ones once I've deleted these saves", async () => {
+		const old = { ...missing('new'), isoDate: ahead, addedOn: ahead };
+		const p = {
+			...props({ missing: [missing('new')] }),
+			stale: [old],
+			onAcknowledge: async () => {
+				await screen.rerender({ ...p, stale: [] });
+			}
+		};
+		const screen = await render(CalendarPanel, { props: p });
+		await page.getByRole('button', { name: "I've deleted these" }).click();
+		await expect.element(page.getByRole('button', { name: 'Add the new ones' })).toHaveFocus();
+	});
+
 	it('shows no line or button when nothing is missing', async () => {
 		const { container } = await render(CalendarPanel, { props: props({ missing: [] }) });
 		expect(container.textContent).not.toContain('Your calendar is missing');

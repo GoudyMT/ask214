@@ -112,11 +112,12 @@
 	// names - or, with nothing ahead to add, to the Calendar heading, since a disabled button cannot take focus. Only
 	// when focus fell with the list, and without scrolling: a user who moved on while the save ran stays where they are.
 	// A failed save rejects before this, so focus stays and the list says why.
+	// "Add the new ones", when shown, is that step without a second copy of every other event.
 	async function acknowledge(): Promise<void> {
 		await onAcknowledge();
 		await tick();
 		if (document.activeElement === document.body)
-			(addEl && !addEl.disabled ? addEl : headingEl)?.focus({ preventScroll: true });
+			(newEl ?? (addEl && !addEl.disabled ? addEl : headingEl))?.focus({ preventScroll: true });
 	}
 
 	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
@@ -127,6 +128,7 @@
 	// missing, and a second press would hand them over again.
 	let sent = $state<string[]>([]);
 	const shown = $derived(missing.filter((e) => !sent.includes(handedOverKey(e))));
+	let newEl = $state<HTMLButtonElement | null>(null);
 
 	// "Add the new ones" goes once its events are handed over, with focus on it; focus moves to Add, the button left.
 	let newPressed = false;
@@ -177,11 +179,14 @@
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
 		{#if shown.length > 0}
 			<div class="cal-new">
-				<p class="cal-hint">
+				<p id="cal-new-count" class="cal-hint">
 					Your calendar is missing {shown.length} new {shown.length === 1 ? 'event' : 'events'}.
 				</p>
-				<!-- The same held-Enter guard as Add: each repeat would hand over another file. -->
+				<!-- The same held-Enter guard as Add: each repeat would hand over another file. The count names what "the
+				     new ones" are to a reader moving from button to button. -->
 				<button
+					bind:this={newEl}
+					aria-describedby="cal-new-count"
 					class="cal-add cal-new__add"
 					type="button"
 					aria-busy={building}
