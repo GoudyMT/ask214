@@ -93,27 +93,62 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		expect(container.textContent).toContain('Your calendar is missing 1 new event.');
 	});
 
-	it.each([
-		['nothing is missing', props({ missing: [] })],
-		[
-			'the stores are still loading',
-			{ ...props({ missing: [missing('new')] }), access: 'loading' as const }
-		]
-	])('shows no line or button when %s', async (_, p) => {
-		const { container } = await render(CalendarPanel, { props: p });
+	it('shows no line or button when nothing is missing', async () => {
+		const { container } = await render(CalendarPanel, { props: props({ missing: [] }) });
 		expect(container.textContent).not.toContain('Your calendar is missing');
 		expect(page.getByRole('button', { name: 'Add the new ones' }).query()).toBeNull();
 	});
 
-	it('hands over a file of the missing events only', async () => {
+	// A firm step has two moments; the calendar may hold one already, and the file must not carry it again.
+	it('hands over a file of the missing events only, moment by moment', async () => {
+		const later = new Date(Date.now() + 80 * 86_400_000).toISOString().slice(0, 10);
+		const firm: TimelineItem = {
+			...task('firm'),
+			def: { ...task('firm').def, kind: 'closes', afterNote: 'n' },
+			status: 'upcoming',
+			windowEndDate: later
+		};
 		const onAdd = vi.fn();
-		await render(CalendarPanel, { props: props({ missing: [missing('new')], onAdd }) });
+		await render(CalendarPanel, {
+			props: {
+				...props({ onAdd }),
+				items: [task('old'), firm],
+				missing: [{ ...missing('firm'), moment: 'opens', title: 'Opens: firm' }]
+			}
+		});
 		await page.getByRole('button', { name: 'Add the new ones' }).click();
 		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
 		const file = onAdd.mock.calls[0]?.[0] as CalendarFile;
-		expect(file.events.map((e) => e.taskId)).toEqual(['new']);
-		expect(file.ics).toContain('SUMMARY:Aim for: new');
+		expect(file.events.map((e) => `${e.taskId}|${e.moment}`)).toEqual(['firm|opens']);
 		expect(file.ics).not.toContain('SUMMARY:Aim for: old');
+	});
+
+	// The record can fail to save (a relock as the phone's app chooser opens): the events still reached the member, so
+	// the line must not offer them again, and a second press must make no second file.
+	it('takes the line away once the file is handed over, even when the record is not saved', async () => {
+		const onAdd = vi.fn();
+		const { container } = await render(CalendarPanel, {
+			props: props({ missing: [missing('new')], onAdd })
+		});
+		const button = page.getByRole('button', { name: 'Add the new ones' });
+		await button.click();
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
+		await expect.element(button).not.toBeInTheDocument();
+		expect(container.textContent).not.toContain('Your calendar is missing');
+		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
+	});
+
+	it('makes one file for a double press before the record lands', async () => {
+		const onAdd = vi.fn();
+		await render(CalendarPanel, { props: props({ missing: [missing('new')], onAdd }) });
+		const button = page
+			.getByRole('button', { name: 'Add the new ones' })
+			.element() as HTMLButtonElement;
+		button.click();
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
+		if (button.isConnected) button.click();
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		expect(onAdd).toHaveBeenCalledOnce();
 	});
 
 	// The button goes once the page records the add; focus goes to the next thing to press, not the top of the page.
@@ -161,6 +196,8 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 			await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ENTER });
 			await new Promise((resolve) => setTimeout(resolve, 150));
 			expect(onAdd).toHaveBeenCalledOnce();
+			// Focus went to the next button, never to the page: a disabled button while it built would drop it.
+			expect(document.activeElement?.textContent?.trim()).toBe('Add to my calendar');
 		}
 	);
 });

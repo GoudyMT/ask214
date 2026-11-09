@@ -4,6 +4,7 @@
 	import type { TaskCategory } from '#lib/timeline/types.js';
 	import type { DesiredEvent, HandedOverEvent, TaskExclusions } from '#lib/calendar/types.js';
 	import { buildIcs, type CalendarFile } from '#lib/calendar/build-ics.js';
+	import { handedOverKey } from '#lib/calendar/handed-over.js';
 	import StaleEvents from './StaleEvents.svelte';
 	import { computeDesiredEvents } from '#lib/calendar/desired.js';
 	import { currentDeviceHint, DELETE_FILE_HINT } from '#lib/calendar/delivery.js';
@@ -121,10 +122,16 @@
 	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
 	let addFailed = $state(false);
 
-	// "Add the new ones" goes once the add is recorded, with focus on it; focus moves to Add, the button left to press.
+	// The events handed over by "Add the new ones" in this visit. The record of them can fail to save (a relock as the
+	// phone's app chooser opens) and a save lands after the hand-over, so until it does they would still read as
+	// missing, and a second press would hand them over again.
+	let sent = $state<string[]>([]);
+	const shown = $derived(missing.filter((e) => !sent.includes(handedOverKey(e))));
+
+	// "Add the new ones" goes once its events are handed over, with focus on it; focus moves to Add, the button left.
 	let newPressed = false;
 	$effect(() => {
-		if (missing.length > 0 || !newPressed) return;
+		if (shown.length > 0 || !newPressed) return;
 		newPressed = false;
 		if (document.activeElement === document.body) addEl?.focus({ preventScroll: true });
 	});
@@ -136,21 +143,23 @@
 		building = true;
 		addFailed = false;
 		newPressed = onlyNew;
-		const only = missing;
+		const only = shown.map(handedOverKey);
 		let file: CalendarFile;
 		try {
 			file = await buildIcs(
 				items,
 				exclusions,
 				new Date(),
-				(d) => !onlyNew || only.some((e) => e.taskId === d.taskId && e.moment === d.moment)
+				(d) => !onlyNew || only.includes(handedOverKey(d))
 			);
 		} catch {
+			newPressed = false;
 			addFailed = true;
 			return;
 		} finally {
 			building = false;
 		}
+		if (onlyNew) sent = [...sent, ...file.events.map(handedOverKey)];
 		onAdd(file);
 	}
 </script>
@@ -166,10 +175,10 @@
 	     could name an event that is not out of date. -->
 	{#if ready}
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
-		{#if missing.length > 0}
+		{#if shown.length > 0}
 			<div class="cal-new">
 				<p class="cal-hint">
-					Your calendar is missing {missing.length} new {missing.length === 1 ? 'event' : 'events'}.
+					Your calendar is missing {shown.length} new {shown.length === 1 ? 'event' : 'events'}.
 				</p>
 				<!-- The same held-Enter guard as Add: each repeat would hand over another file. -->
 				<button
