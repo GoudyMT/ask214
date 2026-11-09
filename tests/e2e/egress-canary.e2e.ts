@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
+import { TASK_DEFS } from '../../src/lib/timeline/task-defs';
 
 // Every request the page sends during this flow - to our own server, to Anthropic, for any file - checked for the
 // user's own data. The guard in src/lib/ci/pii-policy.ts reads names and imports; this reads values: the separation and
@@ -78,6 +79,14 @@ const FIND_TITLE = 'Find a SkillBridge program and get an acceptance letter';
 const REQUEST_TITLE = 'Submit your SkillBridge request and get it approved';
 const PEBLO_TITLE = 'Meet your PEBLO, who guides you through the medical board';
 const SBP_TITLE = 'Get Survivor Benefit Plan counseling and make your SBP choice';
+// Every title only some leaving answers show: a step's own title when the step needs an answer, and each title an answer
+// swaps in. Read from the task list, so a step added later is forbidden without a line here.
+const PATH_TITLES = TASK_DEFS.flatMap((def) => [
+	...(def.requires?.separationPath ? [def.title] : []),
+	...Object.values(def.copyFor ?? {}).flatMap((copy) => (copy?.title ? [copy.title] : []))
+]);
+// As a calendar file writes a title: each comma escaped with a backslash.
+const BACKSLASH = String.fromCharCode(92);
 // A made-up key in Anthropic's format; the request carrying it is answered by the mock below and never leaves.
 const TEST_KEY = 'sk-ant-test-canary-0000';
 const ANTHROPIC = 'https://api.anthropic.com/';
@@ -238,6 +247,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		"unless the board's exams stand in",
 		'you also need Part B',
 		SBP_TITLE,
+		...PATH_TITLES.flatMap((title) => [title, title.replaceAll(',', `${BACKSLASH},`)]),
 		// A title inside a value someone base64-encoded, wherever in that value it starts.
 		...[PEBLO_TITLE, SBP_TITLE, 'separationPath'].flatMap(base64Forms),
 		// The base64 of "ets" is four characters any other base64 could hold, so that one is matched quoted only.
