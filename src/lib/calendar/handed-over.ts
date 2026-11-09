@@ -48,6 +48,19 @@ export function staleEvents(
 	return record.filter((e) => e.isoDate > todayIso && !current.has(handedOverKey(e)));
 }
 
+/**
+ * The events in the file whose step and moment were never handed over: a step added since the last add, or a new
+ * moment of one. A moved or retitled event is not here: the user deletes the old one and adds again.
+ */
+export function missingEvents(
+	record: HandedOverEvent[] | undefined,
+	desired: DesiredEvent[]
+): DesiredEvent[] {
+	if (!record) return [];
+	const held = new Set(record.map((e) => `${e.taskId}|${e.moment}`));
+	return desired.filter((e) => !held.has(`${e.taskId}|${e.moment}`));
+}
+
 /** The record without the entries the user said they deleted. */
 export function acknowledge(
 	record: HandedOverEvent[],
