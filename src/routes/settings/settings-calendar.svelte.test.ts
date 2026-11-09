@@ -136,6 +136,22 @@ describe('Settings, the calendar add', () => {
 		await expect.element(page.getByRole('button', { name: 'Add the new ones' })).toBeEnabled();
 	});
 
+	// Before the first add the whole file is still to come: one Add, no second button and no "missing" line.
+	it('offers nothing as missing before the first add', async () => {
+		timeline.ready = true;
+		const record = calendar.lastAdd;
+		(calendar as { lastAdd?: unknown }).lastAdd = undefined;
+		try {
+			const { container } = await render(SettingsPage);
+			await expect
+				.element(page.getByRole('button', { name: /^add to my calendar$/i }))
+				.toBeEnabled();
+			expect(container.textContent).not.toContain('Your calendar is missing');
+		} finally {
+			calendar.lastAdd = record;
+		}
+	});
+
 	it('says the saved progress could not be loaded when the timeline failed to read', async () => {
 		timeline.failed = true;
 		await render(SettingsPage);
