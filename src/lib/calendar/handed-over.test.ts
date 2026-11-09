@@ -97,13 +97,27 @@ describe('missingEvents', () => {
 		]);
 	});
 
-	it('does not list a moved or retitled event: the out-of-date list and a new add cover those', () => {
+	// The out-of-date list names the old copy to delete; this lists the new one to add, so after both steps the
+	// calendar holds exactly the file, whichever button the member presses first.
+	it('lists the new version of a moved or retitled event', () => {
 		const record = [
 			held(ev('moved', '2027-01-30')),
 			held(ev('renamed', '2026-12-15', 'Aim for: old'))
 		];
 		const desired = [ev('moved', '2026-10-31'), ev('renamed', '2026-12-15', 'Aim for: new')];
-		expect(missingEvents(record, desired)).toEqual([]);
+		expect(missingEvents(record, desired)).toEqual(desired);
+	});
+
+	// An old copy dated today or earlier is on neither list, so it must not hide its replacement.
+	it('lists an event moved from a day that has come or gone', () => {
+		const record = [held(ev('snoozed', TODAY)), held(ev('late', '2026-10-01'))];
+		const desired = [ev('snoozed', '2026-11-15'), ev('late', '2026-11-20')];
+		expect(missingEvents(record, desired)).toEqual(desired);
+	});
+
+	it('does not list an event the calendar already has as it is', () => {
+		const same = ev('same', '2026-12-01');
+		expect(missingEvents([held(same)], [same])).toEqual([]);
 	});
 });
 
