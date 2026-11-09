@@ -209,6 +209,18 @@ describe('buildIcs on the device clock', () => {
 	const none = { taskIds: [], categories: [] };
 	const unfold = (ics: string) => ics.replace(/\r\n /g, '');
 
+	it('carries only the events it is told to keep, and lists only those', async () => {
+		const file = await buildIcs(
+			[firm('old', '2026-12-01'), firm('new', '2026-12-10')],
+			none,
+			NOW,
+			(d) => d.taskId === 'new'
+		);
+		expect(file.events.map((e) => e.taskId)).toEqual(['new']);
+		expect(file.ics).toContain('SUMMARY:Last day: new');
+		expect(file.ics).not.toContain('SUMMARY:Last day: old');
+	});
+
 	it("keeps today's last day and tomorrow morning's alert on a New York evening", async () => {
 		vi.stubEnv('TZ', 'America/New_York');
 		const evening = new Date('2026-10-04T01:00:00Z');
