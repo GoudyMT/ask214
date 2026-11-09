@@ -538,12 +538,15 @@ const STATIC = 'static';
 //
 //   2026-11-07 the retiree FEDVIP dental step and the after-TRICARE line for retirees: precacheBytes 259,628 -> 259,883 (measured 259,843 B, +398 B on the plan's base, margin 40 B).
 //
+//   2026-11-08 the calendar new-events line and its Add the new ones button: precacheBytes 259,883 -> 260,174 (measured 260,145 B, +287 B on the plan's base, margin 29 B).
+//   2026-11-08 the calendar new-events line and its Add the new ones button: routeNodes 60,603 -> 60,868 (measured 60,843 B, +246 B on the plan's base, margin 25 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 259_883,
+	precacheBytes: 260_174,
 	workerScripts: 147_316
 };
 
