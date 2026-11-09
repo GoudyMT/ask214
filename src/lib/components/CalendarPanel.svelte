@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import type { TimelineItem } from '#lib/timeline/generate.js';
 	import type { TaskCategory } from '#lib/timeline/types.js';
-	import type { HandedOverEvent, TaskExclusions } from '#lib/calendar/types.js';
+	import type { DesiredEvent, HandedOverEvent, TaskExclusions } from '#lib/calendar/types.js';
 	import { buildIcs, type CalendarFile } from '#lib/calendar/build-ics.js';
 	import StaleEvents from './StaleEvents.svelte';
 	import { computeDesiredEvents } from '#lib/calendar/desired.js';
@@ -29,8 +29,19 @@
 		stale: HandedOverEvent[];
 		/** Forgets the listed events; rejects when the save fails. */
 		onAcknowledge: () => Promise<void>;
+		/** The events in the file never handed to the calendar: steps added since the last add. */
+		missing?: DesiredEvent[];
 	};
-	let { items, exclusions, access, onSetExclusions, onAdd, stale, onAcknowledge }: Props = $props();
+	let {
+		items,
+		exclusions,
+		access,
+		onSetExclusions,
+		onAdd,
+		stale,
+		onAcknowledge,
+		missing = []
+	}: Props = $props();
 	const ready = $derived(access === 'ready');
 	// What Customize's summary says while the record is not usable; a ready panel says what is kept off instead.
 	const SUMMARY: Partial<Record<PanelAccess, string>> = {
@@ -110,14 +121,30 @@
 	// A file that cannot be made says so: a tap that did nothing would read as a broken button. The next tap clears it.
 	let addFailed = $state(false);
 
+	// "Add the new ones" goes once the add is recorded, with focus on it; focus moves to Add, the button left to press.
+	let newPressed = false;
+	$effect(() => {
+		if (missing.length > 0 || !newPressed) return;
+		newPressed = false;
+		if (document.activeElement === document.body) addEl?.focus({ preventScroll: true });
+	});
+
 	// Not `disabled` while the file builds: a disabled button that holds focus drops it, so a press then is ignored.
-	async function addToCalendar(): Promise<void> {
+	// `onlyNew` narrows the file to the events the calendar is missing, read as the press builds it.
+	async function addToCalendar(onlyNew = false): Promise<void> {
 		if (building) return;
 		building = true;
 		addFailed = false;
+		newPressed = onlyNew;
+		const only = missing;
 		let file: CalendarFile;
 		try {
-			file = await buildIcs(items, exclusions, new Date());
+			file = await buildIcs(
+				items,
+				exclusions,
+				new Date(),
+				(d) => !onlyNew || only.some((e) => e.taskId === d.taskId && e.moment === d.moment)
+			);
 		} catch {
 			addFailed = true;
 			return;
@@ -139,6 +166,23 @@
 	     could name an event that is not out of date. -->
 	{#if ready}
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
+		{#if missing.length > 0}
+			<div class="cal-new">
+				<p class="cal-hint">
+					Your calendar is missing {missing.length} new {missing.length === 1 ? 'event' : 'events'}.
+				</p>
+				<!-- The same held-Enter guard as Add: each repeat would hand over another file. -->
+				<button
+					class="cal-add cal-new__add"
+					type="button"
+					aria-busy={building}
+					onclick={() => void addToCalendar(true)}
+					onkeydown={(e) => e.repeat && e.key === 'Enter' && e.preventDefault()}
+				>
+					Add the new ones
+				</button>
+			</div>
+		{/if}
 	{/if}
 
 	<!-- A held Enter repeats, and each repeat would make and hand over another file: only a new press adds. Space clicks
@@ -275,6 +319,10 @@
 	.cal-add[aria-busy='true'] {
 		background: var(--color-accent);
 		cursor: default;
+	}
+	/* The new events and their button, set apart from the Add below them. */
+	.cal-new {
+		margin-bottom: var(--space-l);
 	}
 	/* The sentence under the button: what this device does after the tap. */
 	.cal-hint--device {

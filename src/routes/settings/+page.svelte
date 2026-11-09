@@ -44,7 +44,7 @@
 	} from '#lib/ask/online-prefs.js';
 	import { handOver } from '#lib/calendar/hand-over.js';
 	import { panelAccess, timelineAccess } from '#lib/timeline/store-access.js';
-	import { staleEvents } from '#lib/calendar/handed-over.js';
+	import { missingEvents, staleEvents } from '#lib/calendar/handed-over.js';
 	import { computeDesiredEvents } from '#lib/calendar/desired.js';
 	import { localTodayIso } from '#lib/timeline/day-math.js';
 	import { LocalToday } from '#lib/timeline/local-today.svelte.js';
@@ -328,16 +328,18 @@
 		);
 	});
 
-	// The events handed to the calendar that the file would no longer carry as they are.
-	const stale = $derived.by(() => {
-		const today = localTodayIso(clock.now);
-		const exclusions = app.calendar?.exclusions ?? { taskIds: [], categories: [] };
-		return staleEvents(
-			app.calendar?.lastAdd,
-			computeDesiredEvents(calendarItems, exclusions, today),
+	// The events the file carries today, against the record of what was handed to the calendar: those it would no longer
+	// carry as they are, and those never handed over.
+	const today = $derived(localTodayIso(clock.now));
+	const desired = $derived(
+		computeDesiredEvents(
+			calendarItems,
+			app.calendar?.exclusions ?? { taskIds: [], categories: [] },
 			today
-		);
-	});
+		)
+	);
+	const stale = $derived(staleEvents(app.calendar?.lastAdd, desired, today));
+	const missing = $derived(missingEvents(app.calendar?.lastAdd, desired));
 
 	// The Lock button goes with the unlocked page; focus goes to the Unlock button that replaces it. The swap can come
 	// after the press: the profile store holds a relock until a save it is running ends.
@@ -713,6 +715,7 @@
 							: Promise.resolve()}
 					onAdd={(file) => void handOver(file, app.calendar, new Date())}
 					{stale}
+					{missing}
 					onAcknowledge={() =>
 						app.calendar
 							? app.calendar.acknowledgeStale(stale).catch(async (err) => {

@@ -120,9 +120,20 @@ describe('Settings, the calendar add', () => {
 		await expect.element(customizeSummary()).toMatchTextContent('Loading');
 		expect(container.textContent).not.toContain('could not be loaded, so adding is unavailable');
 		expect(container.textContent).not.toContain('Your calendar is out of date');
+		expect(container.textContent).not.toContain('Your calendar is missing');
 		expect(container.textContent).toContain(
 			'Changed a date? Remove the events you added before, then add again.'
 		);
+	});
+
+	// The record holds one older event; every other step the file carries today was never handed to the calendar.
+	it('offers the events the calendar never got once both stores have loaded', async () => {
+		timeline.ready = true;
+		await render(SettingsPage);
+		await expect
+			.element(page.getByText(/^Your calendar is missing \d+ new events\.$/))
+			.toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Add the new ones' })).toBeEnabled();
 	});
 
 	it('says the saved progress could not be loaded when the timeline failed to read', async () => {
