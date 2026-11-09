@@ -179,14 +179,14 @@
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
 		{#if shown.length > 0}
 			<div class="cal-new">
-				<p id="cal-new-count" class="cal-hint">
-					Your calendar is missing {shown.length} new {shown.length === 1 ? 'event' : 'events'}.
+				<p id="cal-new-n" class="cal-hint">
+					Your calendar is missing {shown.length} new event{shown.length === 1 ? '' : 's'}.
 				</p>
 				<!-- The same held-Enter guard as Add: each repeat would hand over another file. The count names what "the
 				     new ones" are to a reader moving from button to button. -->
 				<button
 					bind:this={newEl}
-					aria-describedby="cal-new-count"
+					aria-describedby="cal-new-n"
 					class="cal-add cal-new__add"
 					type="button"
 					aria-busy={building}
