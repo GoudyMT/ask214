@@ -8,7 +8,8 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, where Playwright's WebKit build cannot load (it needs libicu 74).
+    runs-on: ubuntu-24.04
     # 30, not 15: a full green run through Lighthouse is ~12-14 min, and `playwright install --with-deps`
     # apt-downloads browser system libs from a mirror that is sometimes slow (a 15-min cap flaked on it).
     timeout-minutes: 30
