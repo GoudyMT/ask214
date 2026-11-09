@@ -541,12 +541,15 @@ const STATIC = 'static';
 //   2026-11-08 the calendar new-events line and its Add the new ones button: precacheBytes 259,883 -> 260,174 (measured 260,145 B, +287 B on the plan's base, margin 29 B).
 //   2026-11-08 the calendar new-events line and its Add the new ones button: routeNodes 60,603 -> 60,868 (measured 60,843 B, +246 B on the plan's base, margin 25 B).
 //
+//   2026-11-08 the sweep's fixes to the calendar new-events line: precacheBytes 260,174 -> 260,202 (measured 260,197 B, +339 B on the plan's base, margin 5 B).
+//   2026-11-08 the sweep's fixes to the calendar new-events line: routeNodes 60,868 -> 60,911 (measured 60,905 B, +308 B on the plan's base, margin 6 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 260_174,
+	precacheBytes: 260_202,
 	workerScripts: 147_316
 };
 
