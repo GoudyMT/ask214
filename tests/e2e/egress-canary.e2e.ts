@@ -79,14 +79,16 @@ const FIND_TITLE = 'Find a SkillBridge program and get an acceptance letter';
 const REQUEST_TITLE = 'Submit your SkillBridge request and get it approved';
 const PEBLO_TITLE = 'Meet your PEBLO, who guides you through the medical board';
 const SBP_TITLE = 'Get Survivor Benefit Plan counseling and make your SBP choice';
-// Every title only some leaving answers show: a step's own title when the step needs an answer, and each title an answer
-// swaps in. Read from the task list, so a step added later is forbidden without a line here.
+// Every title only some leaving answers show: a step's own title when the step needs an answer or some answers hide it,
+// and each title an answer swaps in. Read from the task list, so a step added later is forbidden without a line here.
 const PATH_TITLES = TASK_DEFS.flatMap((def) => [
-	...(def.requires?.separationPath ? [def.title] : []),
+	...(def.requires?.separationPath || def.hideFor ? [def.title] : []),
 	...Object.values(def.copyFor ?? {}).flatMap((copy) => (copy?.title ? [copy.title] : []))
 ]);
-// As a calendar file writes a title: each comma escaped with a backslash.
+// As a calendar file writes a title: each comma escaped with a backslash, and a long line folded with a line break and a
+// space, which the scan below joins back.
 const BACKSLASH = String.fromCharCode(92);
+const FOLD = String.fromCharCode(13, 10, 32);
 // A made-up key in Anthropic's format; the request carrying it is answered by the mock below and never leaves.
 const TEST_KEY = 'sk-ant-test-canary-0000';
 const ANTHROPIC = 'https://api.anthropic.com/';
@@ -273,7 +275,9 @@ test('no personal value reaches an online request', async ({ page, browserName }
 			request.body,
 			decoded(request.body),
 			request.headers
-		].join('\n');
+		]
+			.flatMap((part) => [part, part.split(FOLD).join('')])
+			.join('\n');
 		for (const value of personal) {
 			expect(text, `${value} in ${request.url}`).not.toContain(value);
 		}
@@ -376,7 +380,9 @@ test('an early Not sure keeps its stored return date on this device', async ({
 			request.body,
 			decoded(request.body),
 			request.headers
-		].join('\n');
+		]
+			.flatMap((part) => [part, part.split(FOLD).join('')])
+			.join('\n');
 		for (const value of personal) {
 			expect(text, `${value} in ${request.url}`).not.toContain(value);
 		}
