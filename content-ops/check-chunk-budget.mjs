@@ -544,12 +544,15 @@ const STATIC = 'static';
 //   2026-11-08 the sweep's fixes to the calendar new-events line: precacheBytes 260,174 -> 260,202 (measured 260,197 B, +339 B on the plan's base, margin 5 B).
 //   2026-11-08 the sweep's fixes to the calendar new-events line: routeNodes 60,868 -> 60,911 (measured 60,905 B, +308 B on the plan's base, margin 6 B).
 //
+//   2026-11-10 the Feedback send time limit, the served documents' new names and sizes, and the worker's policy stamp: precacheBytes 260,202 -> 260,209 (measured 260,208 B, +6 B on the plan's base, margin 1 B).
+//   2026-11-10 the Feedback send time limit, the served documents' new names and sizes, and the worker's policy stamp: routeNodes 60,911 -> 60,924 (measured 60,922 B, +13 B on the plan's base, margin 2 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 260_202,
+	precacheBytes: 260_209,
 	workerScripts: 147_316
 };
 
