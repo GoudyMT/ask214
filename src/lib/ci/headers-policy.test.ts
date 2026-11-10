@@ -11,6 +11,14 @@ describe('parseHeadersFile', () => {
 		expect(parsed.get('/*')).toEqual({ 'Referrer-Policy': 'no-referrer' });
 		expect(parsed.get('/wizard')).toEqual({ 'Cache-Control': 'no-store' });
 	});
+
+	// Cloudflare applies both blocks of a path written twice; reading only the last would drop the first block's
+	// headers from every rendered page and from the preview, silently.
+	it('refuses a path written as two blocks', () => {
+		expect(() =>
+			parseHeadersFile('/docs/*\n  X-Robots-Tag: noindex\n\n/docs/*\n  Cache-Control: no-store\n')
+		).toThrow('E_HEADERS_DUPLICATE_PATH');
+	});
 });
 
 describe('headersFor', () => {
@@ -113,7 +121,8 @@ describe('_headers policy (P1b)', () => {
 			const seen = new Set<string>();
 			for (const [other, values] of headers) {
 				if (Object.keys(headersFor(new Map([[other, values]]), sample)).length === 0) continue;
-				for (const name of Object.keys(values)) {
+				// Header names are case-insensitive, so Cache-Control and cache-control are one header.
+				for (const name of Object.keys(values).map((key) => key.toLowerCase())) {
 					expect(seen.has(name), `${name} set twice for ${sample}`).toBe(false);
 					seen.add(name);
 				}
