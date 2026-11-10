@@ -8,7 +8,7 @@
 // It then checks the served documents themselves, which CI cannot compare with their captures: each one's
 // text layer is re-extracted with the reader publishing used and compared with the digest publishing took
 // from the capture (content-ops/served-pdfs.json), and every file in the documents folder is scanned for
-// content a PDF viewer would run, launch, submit or unpack.
+// content a PDF viewer would run, launch, submit or unpack, and for the metadata its makers' tools wrote.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
@@ -16,7 +16,7 @@ import { validateSourcesSchema } from '../src/lib/content-ops/sources-schema.ts'
 import { buildSourcesIndex } from '../src/lib/sources/build-index.ts';
 import { buildDocumentUrls } from '../src/lib/sources/build-document-urls.ts';
 import { buildLocalDocuments } from '../src/lib/sources/build-local-documents.ts';
-import { activeContentIn, documentsWithPictures } from './serve-pdfs-core.mjs';
+import { activeContentIn, documentsWithPictures, metadataIn } from './serve-pdfs-core.mjs';
 import {
 	MANIFEST_PATH,
 	OUTPUT_DIR,
@@ -135,10 +135,14 @@ if (moved.length > 0) {
 
 // Every file, not only the mapped ones: anything in the folder is served, whether the app links to it or not.
 const active = [];
+const described = [];
 const scanned = readdirSync(OUTPUT_DIR).sort();
 for (const file of scanned) {
-	const found = activeContentIn(readFileSync(join(OUTPUT_DIR, file)).toString('latin1'));
+	const raw = readFileSync(join(OUTPUT_DIR, file)).toString('latin1');
+	const found = activeContentIn(raw);
 	if (found.length > 0) active.push(`${file} (${found.join(' ')})`);
+	const metadata = metadataIn(raw);
+	if (metadata.length > 0) described.push(`${file} (${metadata.join(' ')})`);
 }
 if (active.length > 0) {
 	console.error(
@@ -146,9 +150,16 @@ if (active.length > 0) {
 	);
 	process.exit(1);
 }
+// What the makers' tools recorded - authors, software, the folders a file was made in - is not ours to publish.
+if (described.length > 0) {
+	console.error(
+		`[check:sources-index] FAIL: served files carry metadata: ${described.join('; ')}. Re-derive them.`
+	);
+	process.exit(1);
+}
 
 console.log(
 	`[check:sources-index] OK: artifacts match the registry (${fresh.agency.length} agency + ${fresh.tapGuides.length} TAP guides, ` +
 		`${Object.keys(freshDocs).length} document urls, ${Object.keys(freshLocal).length} served documents); ` +
-		`${Object.keys(freshLocal).length} text layers match the manifest; no active content in ${scanned.length} served files`
+		`${Object.keys(freshLocal).length} text layers match the manifest; no active content or metadata in ${scanned.length} served files`
 );
