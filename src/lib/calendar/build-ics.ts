@@ -12,13 +12,15 @@ export type CalendarFile = { ics: string; events: DesiredEvent[] };
  * Project the generated timeline into the iCalendar text the OS hands to the user's calendar app: one event per
  * moment of the shared desired-set, each with its alerts and a stable calendar ID. Shared by every surface that
  * offers the add, so they cannot drift apart in what they egress. `now` is injected for a deterministic DTSTAMP.
+ * `keep` narrows the file to some of those events (the ones a calendar is missing), never adds to them.
  */
 export async function buildIcs(
 	items: TimelineItem[],
 	exclusions: TaskExclusions,
-	now: Date
+	now: Date,
+	keep: (d: DesiredEvent) => boolean = () => true
 ): Promise<CalendarFile> {
-	const desired = computeDesiredEvents(items, exclusions, localTodayIso(now));
+	const desired = computeDesiredEvents(items, exclusions, localTodayIso(now)).filter(keep);
 	const events = await Promise.all(
 		desired.map(async (d) => ({
 			title: d.title,

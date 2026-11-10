@@ -48,6 +48,19 @@ export function staleEvents(
 	return record.filter((e) => e.isoDate > todayIso && !current.has(handedOverKey(e)));
 }
 
+/**
+ * The events in the file never handed over as they are: a step added since the last add, a new moment of one, and
+ * the new version of a moved or retitled event (its old copy is the out-of-date list's to delete).
+ */
+export function missingEvents(
+	record: HandedOverEvent[] | undefined,
+	desired: DesiredEvent[]
+): DesiredEvent[] {
+	if (!record) return [];
+	const held = new Set(record.map(handedOverKey));
+	return desired.filter((e) => !held.has(handedOverKey(e)));
+}
+
 /** The record without the entries the user said they deleted. */
 export function acknowledge(
 	record: HandedOverEvent[],
