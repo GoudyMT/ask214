@@ -222,24 +222,36 @@ export function activeContentIn(raw) {
 }
 
 /**
- * The PDF names a served copy must not carry: the document info and the two places its makers' tools keep their
- * own records - an XMP packet on any object, and private application data (often naming the folders a file was
- * made in).
+ * The PDF names a served copy must not carry: the document info, an XMP packet on any object, private application
+ * data (often naming the folders a file was made in), the edit dates and creator tags tools stamp on pages, forms
+ * and optional content, and a review note's creation date and rich text. A form field's name is its /T, so /T is
+ * left to the derivation, which keeps it only on fields. So is a note's /M: a two-character name occurs by chance
+ * in compressed data (7 of the 21 served files spell it there), and a note that has /M has /CreationDate too.
  */
-const METADATA_NAMES = new Set(['/Info', '/Metadata', '/PieceInfo']);
-
-// The JPEG segments that carry metadata: APP1 holds EXIF and XMP, APP13 the Photoshop block with IPTC.
-const METADATA_SEGMENTS = new Map([
-	[0xe1, 'APP1'],
-	[0xed, 'APP13']
+const METADATA_NAMES = new Set([
+	'/CreationDate',
+	'/CreatorInfo',
+	'/Info',
+	'/LastModified',
+	'/Metadata',
+	'/ModDate',
+	'/PieceInfo',
+	'/RC'
 ]);
+
+// The application segments a decoder may need: APP0 (JFIF), APP2 (the colour profile) and APP14 (Adobe's colour
+// transform). Every other application segment and every comment can carry a name, so it is refused.
+const JPEG_APP_FIRST = 0xe0;
+const JPEG_APP_LAST = 0xef;
+const JPEG_COMMENT = 0xfe;
+const JPEG_NEEDED_APPS = new Set([0xe0, 0xe2, 0xee]);
 const JPEG_START = String.fromCharCode(0xff, 0xd8, 0xff);
 const JPEG_START_OF_SCAN = 0xda;
 const JPEG_END = 0xd9;
 
 /**
- * The metadata a PDF carries, read from its raw bytes: the names it uses for document info, XMP and private
- * application data, and the metadata segments of each JPEG picture.
+ * The metadata a PDF carries, read from its raw bytes: the names it uses for document info, XMP, private
+ * application data and tool records, and every JPEG segment a decoder does not need.
  *
  * Names are read as `activeContentIn` reads them, so this holds only for a file without object streams, which that
  * scan refuses. A picture is found by the bytes every JPEG opens with, and its header segments are walked up to the
@@ -259,8 +271,9 @@ export function metadataIn(raw) {
 		while (at + 3 < raw.length && raw.charCodeAt(at) === 0xff) {
 			const marker = raw.charCodeAt(at + 1);
 			if (marker === JPEG_START_OF_SCAN || marker === JPEG_END) break;
-			const label = METADATA_SEGMENTS.get(marker);
-			if (label) found.add(label);
+			if (marker === JPEG_COMMENT) found.add('COM');
+			const isApp = marker >= JPEG_APP_FIRST && marker <= JPEG_APP_LAST;
+			if (isApp && !JPEG_NEEDED_APPS.has(marker)) found.add(`APP${marker - JPEG_APP_FIRST}`);
 			const length = (raw.charCodeAt(at + 2) << 8) | raw.charCodeAt(at + 3);
 			if (length < 2) break;
 			at += 2 + length;
