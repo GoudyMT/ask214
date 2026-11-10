@@ -3,6 +3,10 @@ import type { RequestHandler } from './$types';
 import { decideFeedback } from '#lib/feedback/decide.js';
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+// A Resend call that opens and then says nothing is cut here and answered as a failure, well inside the page's own
+// bound, so the page shows the server's answer rather than its own time-out. A send Resend accepted after the cut
+// may then arrive twice if the member sends again.
+const RESEND_TIMEOUT_MS = 10_000;
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	// The key + destination + sender are deployment config (a secret + vars); never committed. All
@@ -48,7 +52,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 				subject: decision.email.subject,
 				text: decision.email.text,
 				...(decision.email.replyTo ? { reply_to: decision.email.replyTo } : {})
-			})
+			}),
+			signal: AbortSignal.timeout(RESEND_TIMEOUT_MS)
 		});
 	} catch {
 		// Transport failure (DNS/TLS/timeout) - the same "upstream failed" class as a non-ok response.
