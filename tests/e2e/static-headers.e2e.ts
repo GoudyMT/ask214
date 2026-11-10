@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { headersFor, parseHeadersFile } from '../../src/lib/ci/headers-policy';
+import { policyStamp } from '../../src/lib/ci/worker-policy-stamp';
 
 // Cloudflare applies `_headers` to the static files it serves. A worker takes its content security policy from its
 // own script's response, so these files carry the only policy the workers get; the preview server must send them as
@@ -42,4 +43,15 @@ for (const [name, pathOf] of Object.entries(STATIC_FILES)) {
 
 test('the saved-documents page is never kept by a cache', async ({ request }) => {
 	expect((await request.get('/documents')).headers()['cache-control']).toBe('no-store');
+});
+
+// A browser keeps the answer worker for a year under its hashed name, with the headers it came with. The worker's
+// own bytes carry the policy's stamp, so a policy change renames the script and every device fetches it again.
+test('the on-device answer worker carries the stamp of its policy', async ({ request }) => {
+	const body = await (
+		await request.get(STATIC_FILES['the on-device answer worker']?.() ?? '')
+	).text();
+	expect(body.startsWith(policyStamp(readFileSync(join(process.cwd(), '_headers'), 'utf8')))).toBe(
+		true
+	);
 });
