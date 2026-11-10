@@ -6,6 +6,7 @@ import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm.ts';
+import { previewHeaders } from './src/lib/ci/preview-headers.ts';
 
 // The app reads today from the device clock, so both test projects run in one fixed zone: every machine and CI
 // read the same day, and a zone behind UTC makes a slip back to the UTC date fail here too. A fixed TZ also lets
@@ -119,7 +120,8 @@ export default defineConfig({
 				}
 			}
 		}),
-		basicSsl()
+		basicSsl(),
+		previewHeaders(fileURLToPath(new URL('./_headers', import.meta.url)))
 	],
 	worker: {
 		// Drops the ONNX runtime's unused fallback WASM from each worker bundle (~23 MB the embed worker never
