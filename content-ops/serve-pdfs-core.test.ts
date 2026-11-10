@@ -10,6 +10,7 @@ import {
 	unlistedServedFiles,
 	highlightPopulation,
 	documentsWithPictures,
+	metadataIn,
 	CAP_BYTES
 } from './serve-pdfs-core.mjs';
 
@@ -375,6 +376,51 @@ describe('activeContentIn', () => {
 
 // Both raw-byte scans - active content here, JPEG 2000 in the verifier - read names through this one reader,
 // so a name that one scan sees whole the other cannot see as a longer, unknown name.
+// A served copy is ours to publish, but what its makers' tools wrote into it is not: document info, XMP packets
+// and the picture data's own segments name people, software and the folders the files were made in.
+describe('metadataIn', () => {
+	const bytes = (...codes: number[]) => String.fromCharCode(...codes);
+	// A JPEG opens with SOI (FF D8); each segment is FF, its marker, a two-byte length, then its data.
+	const SOI = bytes(0xff, 0xd8);
+	const segment = (marker: number, body: string) => bytes(0xff, marker, 0, body.length + 2) + body;
+	const START_OF_SCAN = segment(0xda, 'xx');
+	const jpeg = (...segments: string[]) => SOI + segments.join('') + START_OF_SCAN + 'image data';
+
+	it('finds the document info, an XMP packet and private application data', () => {
+		expect(metadataIn('trailer\n<< /Size 9 /Root 1 0 R /Info 8 0 R >>\n')).toEqual(['/Info']);
+		expect(metadataIn('1 0 obj\n<< /Type /Catalog /Metadata 4 0 R >>\nendobj\n')).toEqual([
+			'/Metadata'
+		]);
+		expect(metadataIn('<< /Type /Page /PieceInfo << /Illustrator 5 0 R >> >>')).toEqual([
+			'/PieceInfo'
+		]);
+	});
+
+	it('reads a name the way a viewer does, with its escapes decoded', () => {
+		expect(metadataIn('<< /Meta#64ata 4 0 R >>')).toEqual(['/Metadata']);
+	});
+
+	it('finds EXIF or XMP (APP1) and IPTC (APP13) inside a picture', () => {
+		const app0 = segment(0xe0, 'JFIF');
+		expect(metadataIn(`stream\n${jpeg(app0, segment(0xe1, 'Exif'))}\nendstream`)).toEqual(['APP1']);
+		expect(metadataIn(`stream\n${jpeg(segment(0xed, 'Photoshop 3.0'))}\nendstream`)).toEqual([
+			'APP13'
+		]);
+	});
+
+	it('clears a file with none, including a picture with only its JFIF header', () => {
+		const clean = `trailer\n<< /Size 9 /Root 1 0 R /ID [<ab><cd>] >>\nstream\n${jpeg(segment(0xe0, 'JFIF'))}\n`;
+		expect(metadataIn(clean)).toEqual([]);
+	});
+
+	// Picture bytes after the scan header are image data, not segments, so nothing there is read as one.
+	it('stops reading a picture at its image data', () => {
+		expect(metadataIn(`stream\n${SOI}${START_OF_SCAN}${segment(0xe1, 'zz')}\nendstream`)).toEqual(
+			[]
+		);
+	});
+});
+
 describe('pdfNamesIn', () => {
 	const NUL = String.fromCharCode(0);
 

@@ -222,6 +222,54 @@ export function activeContentIn(raw) {
 }
 
 /**
+ * The PDF names a served copy must not carry: the document info and the two places its makers' tools keep their
+ * own records - an XMP packet on any object, and private application data (often naming the folders a file was
+ * made in).
+ */
+const METADATA_NAMES = new Set(['/Info', '/Metadata', '/PieceInfo']);
+
+// The JPEG segments that carry metadata: APP1 holds EXIF and XMP, APP13 the Photoshop block with IPTC.
+const METADATA_SEGMENTS = new Map([
+	[0xe1, 'APP1'],
+	[0xed, 'APP13']
+]);
+const JPEG_START = String.fromCharCode(0xff, 0xd8, 0xff);
+const JPEG_START_OF_SCAN = 0xda;
+const JPEG_END = 0xd9;
+
+/**
+ * The metadata a PDF carries, read from its raw bytes: the names it uses for document info, XMP and private
+ * application data, and the metadata segments of each JPEG picture.
+ *
+ * Names are read as `activeContentIn` reads them, so this holds only for a file without object streams, which that
+ * scan refuses. A picture is found by the bytes every JPEG opens with, and its header segments are walked up to the
+ * start of its image data; what follows is compressed pixels, where any byte pair can occur by chance.
+ *
+ * @param {string} raw The file's bytes, one character per byte (`latin1`).
+ * @returns {string[]} Each name or segment found, once, sorted; empty when the file carries none.
+ */
+export function metadataIn(raw) {
+	const found = new Set([...pdfNamesIn(raw)].filter((name) => METADATA_NAMES.has(name)));
+	for (
+		let start = raw.indexOf(JPEG_START);
+		start !== -1;
+		start = raw.indexOf(JPEG_START, start + 1)
+	) {
+		let at = start + 2;
+		while (at + 3 < raw.length && raw.charCodeAt(at) === 0xff) {
+			const marker = raw.charCodeAt(at + 1);
+			if (marker === JPEG_START_OF_SCAN || marker === JPEG_END) break;
+			const label = METADATA_SEGMENTS.get(marker);
+			if (label) found.add(label);
+			const length = (raw.charCodeAt(at + 2) << 8) | raw.charCodeAt(at + 3);
+			if (length < 2) break;
+			at += 2 + length;
+		}
+	}
+	return [...found].sort();
+}
+
+/**
  * Every PDF name in a file's raw bytes, each with its `#` hex escapes decoded.
  *
  * The one reader behind every raw-byte scan here and in the verifier, so what counts as a name - where it
