@@ -7,8 +7,8 @@ import { headersFor, parseHeadersFile } from './headers-policy.ts';
  *
  * The preview's own static server sends none of them, and a worker takes its content security policy from its own
  * script's response, so without this the E2E suite runs every worker with no policy and cannot see one go missing.
- * The headers are set before the static server answers; a rendered page then sets its own (its policy carries the
- * hashes of its inline scripts) over them, as it does in production, where `_headers` never reaches it.
+ * Only a file path (its last segment names an extension) gets them: in production a rendered page takes them from
+ * the server hook, never from `_headers`, so the E2E tests of rendered pages must reach the hook, not this plugin.
  *
  * @param file The `_headers` file to read, once, when the preview server starts.
  * @returns A Vite plugin that applies only to `vite preview`.
@@ -21,6 +21,7 @@ export function previewHeaders(file: string): Plugin {
 			// Added here, not in a returned hook, so it runs before the static server can answer.
 			server.middlewares.use((req, res, next) => {
 				const pathname = new URL(req.url ?? '/', 'https://preview.invalid').pathname;
+				if (!pathname.split('/').pop()?.includes('.')) return next();
 				for (const [name, value] of Object.entries(headersFor(rules, pathname))) {
 					res.setHeader(name, value);
 				}
