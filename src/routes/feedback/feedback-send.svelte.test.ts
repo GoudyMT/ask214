@@ -23,6 +23,8 @@ describe('Feedback page send', () => {
 		);
 		vi.stubGlobal('fetch', silent);
 		const { container } = await render(FeedbackPage);
+		// The bound starts with each send: one started at page load would cut every send made after it.
+		expect(timeout).not.toHaveBeenCalled();
 
 		const message = container.querySelector('#fb-msg') as HTMLTextAreaElement;
 		message.value = 'the timeline page is slow';

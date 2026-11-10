@@ -33,7 +33,10 @@ function makeEvent(
 	} as unknown as Event;
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
+});
 
 describe('POST /api/feedback', () => {
 	it('sends via Resend and returns ok for a valid submission', async () => {
@@ -112,14 +115,14 @@ describe('POST /api/feedback', () => {
 
 		const pending = POST(makeEvent({ message: 'hi' }));
 		await vi.waitFor(() => expect(silent).toHaveBeenCalledOnce());
+		// Checked before the abort, so a call made without the bound fails here rather than hanging the test.
+		expect(timeout).toHaveBeenCalledWith(10_000);
+		expect(silent.mock.calls[0]?.[1].signal).toBe(stop.signal);
 		stop.abort();
 		const res = await pending;
 
-		expect(timeout).toHaveBeenCalledWith(10_000);
-		expect(silent.mock.calls[0]?.[1].signal).toBe(stop.signal);
 		expect(res.status).toBe(502);
 		expect(await res.json()).toEqual({ ok: false });
-		timeout.mockRestore();
 	});
 
 	it('returns 502 when Resend responds non-ok (e.g. quota exhausted)', async () => {
