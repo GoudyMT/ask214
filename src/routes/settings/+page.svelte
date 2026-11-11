@@ -573,7 +573,7 @@
 			<p class="settings-hint">
 				Read the official guides behind the answers, and choose which stay on this device.
 			</p>
-			{#if older.count > 0}
+			{#if Object.values(states).some((held) => held.state === 'updated')}
 				<p class="settings-hint">
 					<strong>Your saved guides were updated.</strong> Save them again in Manage documents to read
 					their pages offline.

@@ -116,6 +116,23 @@ describe('Settings, the Documents row', () => {
 		);
 		expect(text(container)).not.toContain('Your saved guides were updated.');
 	});
+
+	// A save stores the new copy before it deletes the older one, so a failed delete or a closed tab leaves both.
+	// The guide is saved, Manage documents has nothing to save again, so Settings must not ask for it.
+	it('says nothing of an update when an older copy sits beside the current one', async () => {
+		const [sourceId = '', servedPath = ''] = Object.entries(LOCAL_DOCUMENTS)[0] ?? [];
+		const cache = await caches.open(ASK_ASSET_CACHE);
+		await cache.put(servedPath, new Response(new Uint8Array(1_000)));
+		await cache.put(`/docs/${sourceId}.0badc0de.pdf`, new Response(new Uint8Array(1_000)));
+		const { container } = await render(SettingsPage);
+
+		await vi.waitFor(() =>
+			expect(text(container.querySelector('.documents-summary span') as Element)).toMatch(
+				/^1 of .*plus 1 older copy/
+			)
+		);
+		expect(text(container)).not.toContain('Your saved guides were updated.');
+	});
 });
 
 // A person who saved a guide to read offline and never set up a profile still has data on the device, so the
