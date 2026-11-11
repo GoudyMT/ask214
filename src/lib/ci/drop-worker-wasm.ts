@@ -15,7 +15,7 @@ const ORT_WASM_NAME =
  * and the bundler writes that ~23 MB file beside the worker's script, where nothing ever requests it. That one
  * file is dropped. The fallback URL left in the worker then points at a file that does not exist. That is
  * acceptable only because `wasmPaths` is set: were it unset, transformers.js's own default would point the runtime
- * at a CDN (jsDelivr), and the worker has no CSP header of its own to block the fetch. What keeps the runtime off
+ * at a CDN (jsDelivr), which the worker's own policy would refuse, so the answer would fail. What keeps the runtime off
  * both the dropped file and the CDN is the `wasmPaths = '/wasm/'` line in embed-worker.ts.
  *
  * Only that file is dropped. A worker that really bundles its own WASM would otherwise build green and then

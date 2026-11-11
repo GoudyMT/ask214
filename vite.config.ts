@@ -6,6 +6,8 @@ import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { dropWorkerWasm } from './src/lib/ci/drop-worker-wasm.ts';
+import { previewHeaders } from './src/lib/ci/preview-headers.ts';
+import { workerPolicyStamp } from './src/lib/ci/worker-policy-stamp.ts';
 
 // The app reads today from the device clock, so both test projects run in one fixed zone: every machine and CI
 // read the same day, and a zone behind UTC makes a slip back to the UTC date fail here too. A fixed TZ also lets
@@ -119,13 +121,19 @@ export default defineConfig({
 				}
 			}
 		}),
-		basicSsl()
+		basicSsl(),
+		previewHeaders(fileURLToPath(new URL('./_headers', import.meta.url)))
 	],
 	worker: {
 		// Drops the ONNX runtime's unused fallback WASM from each worker bundle (~23 MB the embed worker never
 		// loads, because it sets `wasmPaths = '/wasm/'`) and fails the build on any other WASM; the reasoning is
 		// with the plugin.
-		plugins: () => [dropWorkerWasm()]
+		// The stamp puts the workers' content security policy into each worker's bytes, so a policy change renames the
+		// script and reaches devices holding the old one in their year-long cache.
+		plugins: () => [
+			dropWorkerWasm(),
+			workerPolicyStamp(fileURLToPath(new URL('./_headers', import.meta.url)))
+		]
 	},
 	test: {
 		expect: { requireAssertions: true },

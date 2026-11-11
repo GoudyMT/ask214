@@ -33,7 +33,10 @@ function makeEvent(
 	} as unknown as Event;
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
+});
 
 describe('POST /api/feedback', () => {
 	it('sends via Resend and returns ok for a valid submission', async () => {
@@ -93,6 +96,31 @@ describe('POST /api/feedback', () => {
 	it('returns 502 when the Resend call throws (transport failure)', async () => {
 		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNRESET')));
 		const res = await POST(makeEvent({ message: 'hi' }));
+		expect(res.status).toBe(502);
+		expect(await res.json()).toEqual({ ok: false });
+	});
+
+	// A connection to Resend that opens and then says nothing would hold the member's send open until the platform
+	// gives up. The send is cut at a bound and reads as the failure it is, well before the page's own bound.
+	it('gives up on a Resend call that never answers, and returns 502', async () => {
+		const stop = new AbortController();
+		const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(stop.signal);
+		const silent = vi.fn(
+			(_url: string, init: RequestInit) =>
+				new Promise<Response>((_resolve, reject) =>
+					init.signal?.addEventListener('abort', () => reject(new Error('TimeoutError')))
+				)
+		);
+		vi.stubGlobal('fetch', silent);
+
+		const pending = POST(makeEvent({ message: 'hi' }));
+		await vi.waitFor(() => expect(silent).toHaveBeenCalledOnce());
+		// Checked before the abort, so a call made without the bound fails here rather than hanging the test.
+		expect(timeout).toHaveBeenCalledWith(10_000);
+		expect(silent.mock.calls[0]?.[1].signal).toBe(stop.signal);
+		stop.abort();
+		const res = await pending;
+
 		expect(res.status).toBe(502);
 		expect(await res.json()).toEqual({ ok: false });
 	});

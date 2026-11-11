@@ -1,7 +1,7 @@
 {
 	"name": "ask214",
 	"private": true,
-	"version": "1.19.0",
+	"version": "1.20.0",
 	"license": "AGPL-3.0-or-later",
 	"type": "module",
 	"packageManager": "pnpm@11.2.2",
@@ -81,7 +81,7 @@
 		{
 			"name": "Lazy route nodes (sum; no single page loads all of them)",
 			"path": ".svelte-kit/output/client/_app/immutable/nodes/[1-9]*.js",
-			"limit": "60911 B",
+			"limit": "61120 B",
 			"gzip": true
 		}
 	],

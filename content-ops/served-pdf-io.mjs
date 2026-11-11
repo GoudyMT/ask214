@@ -31,7 +31,7 @@ export const MANIFEST_PATH = 'content-ops/served-pdfs.json';
  * leave stale bytes cached on every device that already has them. The publisher refuses to overwrite a
  * published name with different bytes, and refuses a candidate whose record names another version.
  */
-export const DERIVATION_VERSION = '4';
+export const DERIVATION_VERSION = '5';
 
 /**
  * @typedef {{sourceId: string, capturedPath: string, contentHash: string}} PdfSource

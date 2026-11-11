@@ -22,6 +22,9 @@
 /timeline
   Cache-Control: no-store
 
+/documents
+  Cache-Control: no-store
+
 /docs/*
   X-Robots-Tag: noindex
 
@@ -30,6 +33,9 @@
 
 /backup-kdf/*
   Content-Security-Policy: default-src 'none'
+
+/_app/immutable/workers/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'none'
 
 /.well-known/security.txt
   Content-Type: text/plain; charset=utf-8

@@ -27,7 +27,9 @@ export function parseHeadersFile(content: string): Map<string, Record<string, st
 			continue;
 		}
 		if (line.startsWith('/')) {
-			// Path line (column 0). Header lines are indented, so they never match here.
+			// Path line (column 0). Header lines are indented, so they never match here. Cloudflare applies both blocks
+			// of a path written twice, and a map keeps only the last, so a repeat is refused.
+			if (blocks.has(trimmed)) throw new Error('E_HEADERS_DUPLICATE_PATH');
 			current = trimmed;
 			blocks.set(current, {});
 		} else if (current !== null) {

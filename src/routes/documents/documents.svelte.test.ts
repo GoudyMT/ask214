@@ -4,7 +4,7 @@ import DocumentsPage from './+page.svelte';
 import { ASK_ASSET_CACHE } from '#lib/ask/asset-cache.js';
 import { CORPUS_BASE } from '#lib/ask/corpus-load.js';
 import { saveDocument, savesSettled, stopSaves } from '#lib/sources/document-cache.js';
-import { LOCAL_DOCUMENTS } from '#lib/sources/local-documents.data.js';
+import { LOCAL_DOCUMENTS, LOCAL_DOCUMENT_BYTES } from '#lib/sources/local-documents.data.js';
 import { LIBRARY_SRC, WORKER_SRC } from '#lib/sources/pdf-library-paths.js';
 import { SOURCES_INDEX } from '#lib/sources/sources-index.data.js';
 
@@ -114,7 +114,8 @@ describe('Documents page', () => {
 		const held = await (
 			await caches.open(ASK_ASSET_CACHE)
 		).match(LOCAL_DOCUMENTS['tap_vet_centers'] ?? '');
-		expect((await held?.arrayBuffer())?.byteLength).toBe(103_411);
+		// The whole served file, by the size the publish recorded and `check:sources-index` holds to the file on disk.
+		expect((await held?.arrayBuffer())?.byteLength).toBe(LOCAL_DOCUMENT_BYTES['tap_vet_centers']);
 
 		act('Remove')?.click();
 		await vi.waitFor(() =>

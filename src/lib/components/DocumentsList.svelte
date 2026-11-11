@@ -225,6 +225,11 @@
 <!-- The list whose focus is kept. The dialogs sit outside it: closing one gives focus back to the control that
      opened it, which the list then keeps. -->
 <div bind:this={root} onfocusin={remember}>
+	{#if rows.some((row) => row.state === 'updated')}
+		<p class="docs-updated">
+			<strong>Your saved guides were updated.</strong> Save them again to read their pages offline.
+		</p>
+	{/if}
 	<div class="docs-sum">
 		<!-- A live region, so a save or a removal is heard in the words the screen already shows. Focus comes here
 		     when the control holding it goes and has no row to go to. -->
@@ -385,6 +390,13 @@
 	}
 	.docs-sum__count {
 		font-weight: 600;
+	}
+	.docs-updated {
+		border: 1px solid var(--color-accent-muted);
+		border-radius: var(--radius-m);
+		padding: var(--space-s) var(--space-m);
+		margin: 0 0 var(--space-m);
+		font-size: var(--font-size-s);
 	}
 	.docs-sum__note {
 		margin: 0 0 var(--space-m);

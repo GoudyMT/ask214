@@ -59,7 +59,7 @@ SOURCES_PATH = 'content/sources.yaml'
 OUTPUT_DIR = 'content-ops/derived'
 # Must equal DERIVATION_VERSION in content-ops/served-pdf-io.mjs. The publisher rejects a candidate whose
 # record names another version, so a candidate made by older rules cannot publish under a new name.
-DERIVATION_VERSION = '4'
+DERIVATION_VERSION = '5'
 # Quality of the re-encoded images. Lower shrinks more and blurs photographs sooner; the text layer is
 # never touched at any setting, so this trades file size against how the page LOOKS, not against whether
 # the highlight resolves.
@@ -689,6 +689,8 @@ def reencode_image(writer, idnum):
             pil = with_alpha.convert('RGB')
     elif pil.mode != 'L':
         pil = pil.convert('RGB')
+    # Pillow writes a decoded picture's own comment into the new JPEG; a comment can name its maker.
+    pil.info.pop('comment', None)
     ImageFile(indirect_reference=IndirectObject(idnum, 0, writer)).replace(pil, quality=JPEG_QUALITY)
     replaced = writer._objects[idnum - 1]
     return int(replaced['/Width']), int(replaced['/Height']), composited
@@ -890,6 +892,57 @@ def drop_file_links(writer):
     return removed
 
 
+# Keys that hold a tool's record on any object: a second info dictionary, an XMP packet, private application
+# data, its edit date, and the creator tag of an optional content group.
+TOOL_RECORD_KEYS = ('/Info', '/Metadata', '/PieceInfo', '/LastModified', '/CreatorInfo')
+# Keys that hold an annotation's dates and its rich-text copy of the remark.
+ANNOTATION_RECORD_KEYS = ('/M', '/CreationDate', '/RC')
+# Annotations whose /Contents is a reviewer's remark rather than text the page shows.
+REVIEW_NOTES = ('/Text', '/Popup')
+
+
+def drop_metadata(writer):
+    """
+    Remove what the makers' tools recorded about the document: the document info, every XMP packet, the
+    private application data, edit dates and creator tags, and each annotation's author, dates and rich text,
+    with the remarks of a review note.
+
+    None of it is drawn or read by the app, and it names people, software and the folders the files were made
+    in. Some exporters also hang a second info dictionary off another object under the same /Info key. A
+    form field's /T is its name, not an author, so widgets keep theirs. The removed objects become
+    unreachable and are swept by drop_unreachable.
+
+    Args:
+        writer: The PdfWriter to edit.
+
+    Returns:
+        The number of entries removed.
+    """
+    removed = 0
+    if writer._info is not None:
+        # The setter empties the writer's own slot too, so no fresh /Producer is written in its place.
+        writer._info = None
+        removed += 1
+    for obj in writer._objects:
+        if not isinstance(obj, DictionaryObject):
+            continue
+        keys = TOOL_RECORD_KEYS
+        # Every object, not only what a page lists: a review note can sit off the page, reached from the
+        # structure tree, with its author and remarks still in it.
+        if '/Rect' in obj and '/Subtype' in obj:
+            subtype = obj.get('/Subtype')
+            keys = keys + ANNOTATION_RECORD_KEYS
+            if subtype != '/Widget':
+                keys = keys + ('/T', '/Subj')
+            if subtype in REVIEW_NOTES:
+                keys = keys + ('/Contents',)
+        for key in keys:
+            if key in obj:
+                del obj[key]
+                removed += 1
+    return removed
+
+
 def drop_unreachable(writer):
     """
     Remove every object not reachable from the document root, the document info or the file identifier.
@@ -1081,6 +1134,7 @@ def derive(src, dst):
             blanked.add(idnum)
     removed = len(blanked)
     darkened = darken_under_light_text(writer, blanked)
+    metadata = drop_metadata(writer)
 
     for page in writer.pages:
         page.compress_content_streams()
@@ -1107,6 +1161,7 @@ def derive(src, dst):
         'fileLinks': file_links,
         'thumbnails': thumbnails,
         'darkened': darkened,
+        'metadata': metadata,
         'swept': swept,
         'keptPerPage': kept_per_page,
     }

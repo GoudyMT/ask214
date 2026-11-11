@@ -4,13 +4,17 @@
 	import type { FeedbackInput } from '#lib/feedback/types.js';
 
 	const attachedRoute = readStashedRoute();
+	// A send that opens and then hears nothing is given up here and shows the failure line; the server's own bound
+	// on its mail call is shorter, so a slow mail service reads as the server's answer first.
+	const FEEDBACK_SEND_MS = 20_000;
 
 	async function submit(input: FeedbackInput): Promise<{ ok: boolean }> {
 		try {
 			const res = await fetch('/api/feedback', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(input)
+				body: JSON.stringify(input),
+				signal: AbortSignal.timeout(FEEDBACK_SEND_MS)
 			});
 			return { ok: res.ok };
 		} catch {

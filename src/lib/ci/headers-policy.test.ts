@@ -11,6 +11,14 @@ describe('parseHeadersFile', () => {
 		expect(parsed.get('/*')).toEqual({ 'Referrer-Policy': 'no-referrer' });
 		expect(parsed.get('/wizard')).toEqual({ 'Cache-Control': 'no-store' });
 	});
+
+	// Cloudflare applies both blocks of a path written twice; reading only the last would drop the first block's
+	// headers from every rendered page and from the preview, silently.
+	it('refuses a path written as two blocks', () => {
+		expect(() =>
+			parseHeadersFile('/docs/*\n  X-Robots-Tag: noindex\n\n/docs/*\n  Cache-Control: no-store\n')
+		).toThrow('E_HEADERS_DUPLICATE_PATH');
+	});
 });
 
 describe('headersFor', () => {
@@ -52,7 +60,8 @@ describe('_headers policy (P1b)', () => {
 		// PII routes must not be cached / BFCache-restored with decrypted state in memory (memory
 		// hygiene). Home '/' is included - it reads the profile store + holds the BYO-key closure.
 		// /settings/security is NOT included - it does not exist in v1.0 (passphrase route -> v1.1).
-		for (const path of ['/', '/wizard', '/settings', '/settings/*', '/timeline']) {
+		// /documents lists the guides this device saved, which is a record of what the member read.
+		for (const path of ['/', '/wizard', '/settings', '/settings/*', '/timeline', '/documents']) {
 			expect(headers.get(path)?.['Cache-Control'], `${path} must set no-store`).toBe('no-store');
 		}
 	});
@@ -93,6 +102,32 @@ describe('_headers policy (P1b)', () => {
 	// could send a passphrase out.
 	it("/backup-kdf/* has default-src 'none'", () => {
 		expect(headers.get('/backup-kdf/*')?.['Content-Security-Policy']).toBe("default-src 'none'");
+	});
+
+	// The on-device answer worker reads every question a member asks, and the page's policy does not reach it. Its
+	// own policy keeps it on this site: its chunks, the WASM runtime and the model are all served from here, and
+	// 'wasm-unsafe-eval' lets the runtime compile without allowing JavaScript eval.
+	it('keeps the on-device answer worker on this site', () => {
+		expect(headers.get('/_app/immutable/workers/*')?.['Content-Security-Policy']).toBe(
+			"default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'none'"
+		);
+	});
+
+	// The preview server and the rendered pages let a later block win, while Cloudflare may join two values for one
+	// header. With no header set twice for one path, both read the file the same way.
+	it('never sets one header in two blocks that match the same path', () => {
+		for (const path of headers.keys()) {
+			const sample = path.endsWith('/*') ? `${path.slice(0, -1)}x` : path;
+			const seen = new Set<string>();
+			for (const [other, values] of headers) {
+				if (Object.keys(headersFor(new Map([[other, values]]), sample)).length === 0) continue;
+				// Header names are case-insensitive, so Cache-Control and cache-control are one header.
+				for (const name of Object.keys(values).map((key) => key.toLowerCase())) {
+					expect(seen.has(name), `${name} set twice for ${sample}`).toBe(false);
+					seen.add(name);
+				}
+			}
+		}
 	});
 
 	// Every vendored or served static folder is named in NOTICE, with its license or its public-domain basis.

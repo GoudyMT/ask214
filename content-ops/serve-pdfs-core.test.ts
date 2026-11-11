@@ -10,6 +10,7 @@ import {
 	unlistedServedFiles,
 	highlightPopulation,
 	documentsWithPictures,
+	metadataIn,
 	CAP_BYTES
 } from './serve-pdfs-core.mjs';
 
@@ -373,8 +374,80 @@ describe('activeContentIn', () => {
 	});
 });
 
-// Both raw-byte scans - active content here, JPEG 2000 in the verifier - read names through this one reader,
-// so a name that one scan sees whole the other cannot see as a longer, unknown name.
+// A served copy is ours to publish, but what its makers' tools wrote into it is not: document info, XMP packets
+// and the picture data's own segments name people, software and the folders the files were made in.
+describe('metadataIn', () => {
+	const bytes = (...codes: number[]) => String.fromCharCode(...codes);
+	// A JPEG opens with SOI (FF D8); each segment is FF, its marker, a two-byte length, then its data.
+	const SOI = bytes(0xff, 0xd8);
+	const segment = (marker: number, body: string) => bytes(0xff, marker, 0, body.length + 2) + body;
+	const START_OF_SCAN = segment(0xda, 'xx');
+	const jpeg = (...segments: string[]) => SOI + segments.join('') + START_OF_SCAN + 'image data';
+
+	it('finds the document info, an XMP packet and private application data', () => {
+		expect(metadataIn('trailer\n<< /Size 9 /Root 1 0 R /Info 8 0 R >>\n')).toEqual(['/Info']);
+		expect(metadataIn('1 0 obj\n<< /Type /Catalog /Metadata 4 0 R >>\nendobj\n')).toEqual([
+			'/Metadata'
+		]);
+		expect(metadataIn('<< /Type /Page /PieceInfo << /Illustrator 5 0 R >> >>')).toEqual([
+			'/PieceInfo'
+		]);
+	});
+
+	// A reviewer's sticky note kept off the page still names its author's dates, and a page or form's own edit date
+	// and an optional content group's creator tag are tool records too. A form field's name is its /T, and a two-
+	// character /M occurs by chance in compressed data, so neither is refused by name; the note's creation date is.
+	it("finds a note's creation date and rich text, an edit date and a creator tag", () => {
+		const note =
+			'<< /Type /Annot /Subtype /Text /T (Reviewer) /M (D:20260123) /CreationDate (D:20260123) /RC (x) >>';
+		expect(metadataIn(note)).toEqual(['/CreationDate', '/RC']);
+		expect(metadataIn('<< /Type /Page /LastModified (D:2025) >>')).toEqual(['/LastModified']);
+		expect(metadataIn('<< /Usage << /CreatorInfo << /Creator (InDesign) >> >> >>')).toEqual([
+			'/CreatorInfo'
+		]);
+		expect(metadataIn('<< /ModDate (D:2025) >>')).toEqual(['/ModDate']);
+	});
+
+	it('reads a name the way a viewer does, with its escapes decoded', () => {
+		expect(metadataIn('<< /Meta#64ata 4 0 R >>')).toEqual(['/Metadata']);
+	});
+
+	it('finds EXIF or XMP (APP1) and IPTC (APP13) inside a picture', () => {
+		const app0 = segment(0xe0, 'JFIF');
+		expect(metadataIn(`stream\n${jpeg(app0, segment(0xe1, 'Exif'))}\nendstream`)).toEqual(['APP1']);
+		expect(metadataIn(`stream\n${jpeg(segment(0xed, 'Photoshop 3.0'))}\nendstream`)).toEqual([
+			'APP13'
+		]);
+	});
+
+	// Only the segments a decoder needs to draw the picture are allowed; a comment or any other application
+	// segment (content credentials, a camera maker's block) can carry a name.
+	it('finds a comment or any application segment a picture does not need', () => {
+		expect(metadataIn(`stream\n${jpeg(segment(0xfe, 'Created by a tool'))}\n`)).toEqual(['COM']);
+		expect(metadataIn(`stream\n${jpeg(segment(0xeb, 'jumb'))}\n`)).toEqual(['APP11']);
+	});
+
+	// The guides hold up to a dozen pictures; a name in the last one is as public as one in the first.
+	it('reads every picture in a file, not only the first', () => {
+		const pictures =
+			jpeg(segment(0xe0, 'JFIF')) + '\nendstream\nstream\n' + jpeg(segment(0xe1, 'Exif'));
+		expect(metadataIn(`stream\n${pictures}\nendstream`)).toEqual(['APP1']);
+	});
+
+	it('clears a file with none, including a picture with only the segments a decoder needs', () => {
+		const picture = jpeg(segment(0xe0, 'JFIF'), segment(0xe2, 'ICC'), segment(0xee, 'Adobe'));
+		const clean = `trailer\n<< /Size 9 /Root 1 0 R /ID [<ab><cd>] >>\nstream\n${picture}\n`;
+		expect(metadataIn(clean)).toEqual([]);
+	});
+
+	// Picture bytes after the scan header are image data, not segments, so nothing there is read as one.
+	it('stops reading a picture at its image data', () => {
+		expect(metadataIn(`stream\n${SOI}${START_OF_SCAN}${segment(0xe1, 'zz')}\nendstream`)).toEqual(
+			[]
+		);
+	});
+});
+
 describe('pdfNamesIn', () => {
 	const NUL = String.fromCharCode(0);
 
