@@ -573,6 +573,12 @@
 			<p class="settings-hint">
 				Read the official guides behind the answers, and choose which stay on this device.
 			</p>
+			{#if older.count > 0}
+				<p class="settings-hint">
+					<strong>Your saved guides were updated.</strong> Save them again in Manage documents to read
+					their pages offline.
+				</p>
+			{/if}
 		</section>
 		<!-- What a good PIN said about the tries before it, where the Unlock card stood. It is on the page from the moment the
 		     card is, so a screen reader is already listening when its lines arrive; the next unlock replaces it. -->

@@ -91,6 +91,31 @@ describe('Settings, the Documents row', () => {
 			expect(summary()).toBe(`0 of ${SERVED} saved on this device - 0.0 MB, plus 1 older copy`)
 		);
 	});
+
+	// Settings is where a person checks the device outside the Documents page, so the update is told here too.
+	it('tells the person their saved guides were updated while an older copy is held', async () => {
+		const cache = await caches.open(ASK_ASSET_CACHE);
+		await cache.put('/docs/tap_vet_centers.0badc0de.pdf', new Response(new Uint8Array(1_000)));
+		const { container } = await render(SettingsPage);
+
+		await vi.waitFor(() =>
+			expect(text(container)).toContain(
+				'Your saved guides were updated. Save them again in Manage documents to read their pages offline.'
+			)
+		);
+	});
+
+	it('says nothing of an update when only current copies are held', async () => {
+		const [servedPath = ''] = Object.values(LOCAL_DOCUMENTS);
+		const cache = await caches.open(ASK_ASSET_CACHE);
+		await cache.put(servedPath, new Response(new Uint8Array(1_000)));
+		const { container } = await render(SettingsPage);
+
+		await vi.waitFor(() =>
+			expect(text(container.querySelector('.documents-summary span') as Element)).toMatch(/^1 of /)
+		);
+		expect(text(container)).not.toContain('Your saved guides were updated.');
+	});
 });
 
 // A person who saved a guide to read offline and never set up a profile still has data on the device, so the
