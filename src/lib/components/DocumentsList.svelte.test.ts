@@ -153,12 +153,12 @@ describe('DocumentsList', () => {
 	// of what the device holds, so it is counted, freed by Remove all, and can be removed on its own.
 	describe('an older copy', () => {
 		const OLDER = { count: 1, bytes: 22_000_000 };
-		const NOTICE =
-			'Your saved guides were updated. Save them again to read their pages offline - until then they open as text.';
+		const NOTICE = 'Your saved guides were updated. Save them again to read their pages offline.';
 
 		// A person whose guides changed under them must learn why a saved guide now opens as text, before the list.
 		it('tells the person their saved guides were updated, above the summary', async () => {
-			const { container } = await render(DocumentsList, { props: props({ older: OLDER }) });
+			const { container } = await render(DocumentsList, { props: props() });
+			expect(container.querySelector('.docs-updated')).not.toBeNull();
 			const notice = container.querySelector('.docs-updated') as Element;
 			expect(text(notice)).toBe(NOTICE);
 			expect(
@@ -167,11 +167,12 @@ describe('DocumentsList', () => {
 			).toBeTruthy();
 		});
 
-		it('says nothing of an update when no saved guide was updated', async () => {
+		// An older copy beside a saved current one is counted, but there is nothing to save again.
+		it('says nothing of an update when no saved guide was updated, even with an older copy held', async () => {
 			const rows = ROWS.map((r) =>
 				r.state === 'updated' ? { ...r, state: 'unsaved' as const } : r
 			);
-			const { container } = await render(DocumentsList, { props: props({ rows }) });
+			const { container } = await render(DocumentsList, { props: props({ rows, older: OLDER }) });
 			expect(text(container)).not.toContain('Your saved guides were updated.');
 		});
 

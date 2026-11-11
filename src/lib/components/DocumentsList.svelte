@@ -227,8 +227,7 @@
 <div bind:this={root} onfocusin={remember}>
 	{#if rows.some((row) => row.state === 'updated')}
 		<p class="docs-updated">
-			<strong>Your saved guides were updated.</strong> Save them again to read their pages offline - until
-			then they open as text.
+			<strong>Your saved guides were updated.</strong> Save them again to read their pages offline.
 		</p>
 	{/if}
 	<div class="docs-sum">

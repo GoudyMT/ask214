@@ -102,7 +102,7 @@ removes one or, after a confirmation, all.
 **Why this project uses it.** Storage belongs to the user, and offline reading is a promise the app makes.
 
 **Tradeoffs accepted.** Nothing is offline until the user saves it. A guide updated after it was saved needs
-saving again; until then the older copy stays readable.
+saving again; until then the Documents page and Settings say so, and offline its pages do not open.
 
 ## How These Pieces Fit Together
 
