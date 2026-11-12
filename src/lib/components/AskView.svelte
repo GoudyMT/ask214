@@ -540,9 +540,9 @@
 		justify-content: center;
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-m);
-		padding: 0 var(--space-l);
+		padding: 0 calc(var(--space-l) - 1px);
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;
@@ -679,9 +679,9 @@
 	.ask-setup__go {
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-m);
-		padding: 10px var(--space-l);
+		padding: 9px calc(var(--space-l) - 1px);
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;

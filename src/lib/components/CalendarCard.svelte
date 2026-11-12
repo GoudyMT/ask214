@@ -94,10 +94,10 @@
 		font-size: var(--font-size-s);
 	}
 	.cal-card__add {
-		padding: var(--space-s) var(--space-l);
+		padding: calc(var(--space-s) - 1px) calc(var(--space-l) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-m);
 		font: inherit;
 		font-weight: 600;

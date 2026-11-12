@@ -1033,10 +1033,10 @@
 	/* Cancel is the prominent, focused default (filled primary) so the safe choice is the
 	   obvious one - accidental-wipe defense, especially as the profile grows. */
 	.wipe-dialog__cancel {
-		padding: var(--space-s) var(--space-l);
+		padding: calc(var(--space-s) - 1px) calc(var(--space-l) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-m);
 		font: inherit;
 		font-weight: 600;
