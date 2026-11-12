@@ -244,3 +244,40 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		}
 	);
 });
+
+describe('CalendarPanel, pressed while a category save runs', () => {
+	// A member keeps a category off and presses Add before the save lands: the file must leave that category out, as
+	// the box now shows, not carry it from the older choices.
+	it.each([
+		['Add to my calendar', [] as DesiredEvent[]],
+		['Add the new ones', [missing('old'), missing('career')]]
+	])('%s builds from the choices being saved', async (name, gaps) => {
+		const career: TimelineItem = {
+			...task('career'),
+			def: { ...task('career').def, category: 'career' }
+		};
+		const onAdd = vi.fn();
+		let land = () => {};
+		const p = {
+			...props({ missing: gaps, onAdd }),
+			items: [task('old'), career],
+			onSetExclusions: () =>
+				new Promise<void>((done) => {
+					land = () => {
+						void screen
+							.rerender({ ...p, exclusions: { taskIds: [], categories: ['admin'] } })
+							.then(done);
+					};
+				})
+		};
+		const screen = await render(CalendarPanel, { props: p });
+		await page.getByRole('button', { name: /customize/i }).click();
+		await page.getByRole('checkbox', { name: 'admin' }).click();
+		(page.getByRole('button', { name }).element() as HTMLButtonElement).click();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		land();
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
+		const file = onAdd.mock.calls[0]?.[0] as CalendarFile;
+		expect(file.events.map((e) => e.taskId)).toEqual(['career']);
+	});
+});

@@ -69,6 +69,9 @@
 	let toggleError = $state<string | null>(null);
 	// Category saves in flight. Customize is off meanwhile: closing the list would hide the line a failed save shows.
 	let saving = $state(0);
+	// Settles once every category save so far has landed or failed: a file built before then would carry a category
+	// the member has just kept off.
+	let saved: Promise<unknown> = Promise.resolve();
 
 	// Applied to the set as saved, not to `exclusions`: that prop changes only once a save lands, so quick taps
 	// would each start from the same older set and overwrite one another. A failed write puts the box back and
@@ -81,10 +84,12 @@
 		toggleError = null;
 		saving++;
 		try {
-			await onSetExclusions((current) => {
+			const write = onSetExclusions((current) => {
 				const categories = current.categories.filter((c) => c !== cat);
 				return { taskIds: current.taskIds, categories: on ? [...categories, cat] : categories };
 			});
+			saved = saved.then(() => write).catch(() => {});
+			await write;
 		} catch {
 			box.checked = !on;
 			toggleError = 'Could not update right now - please try again.';
@@ -152,6 +157,8 @@
 		building = true;
 		addFailed = false;
 		newPressed = onlyNew;
+		await saved;
+		await tick();
 		const only = shown.map(handedOverKey);
 		let file: CalendarFile;
 		try {
