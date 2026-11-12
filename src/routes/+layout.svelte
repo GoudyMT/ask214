@@ -540,9 +540,16 @@
 					if (--frames) requestAnimationFrame(check);
 					return;
 				}
-				// The header's own box, not its sliding transform: a header coming back is counted where it lands.
-				const under = (el.hasAttribute('data-hidden') ? 0 : el.offsetHeight) - top;
-				if (under > 0) return window.scrollBy(0, -Math.ceil(under));
+				// Keyboard focus only (a click lands where the pointer is), on a control whose top is still in the window: one
+				// already partly above it, or the page body the router focuses after Back or Forward, is left where it is.
+				if (top >= 0 && target.matches(':focus-visible')) {
+					// The header's own box, not its sliding transform: a header coming back is counted where it lands.
+					const hidden = el.hasAttribute('data-hidden');
+					const under = (hidden ? 0 : el.offsetHeight) - top;
+					if (under > 0) return window.scrollBy(0, -Math.ceil(under));
+					// A slid-away phone header comes back on the scroll event the focus scroll itself causes, a moment later.
+					if (hidden && --frames) requestAnimationFrame(check);
+				}
 				if (!bar || !phone.matches) return;
 				const room = bottom - bar.getBoundingClientRect().top;
 				const shift = Math.min(
