@@ -559,12 +559,14 @@ const STATIC = 'static';
 //
 //   2026-11-12 Guard and Reserve wording for the DD-214, move, pay and paperwork steps: precacheBytes 260,848 -> 261,078 (measured 261,053 B, +246 B on the plan's base, margin 25 B).
 //
+//   2026-11-12 end check: precacheBytes 261,078 -> 261,054 (measured 261,031 B, +224 B on the plan's base, margin 23 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 261_078,
+	precacheBytes: 261_054,
 	workerScripts: 147_316
 };
 
