@@ -118,11 +118,13 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		await expect.element(page.getByRole('button', { name: 'Add the new ones' })).toHaveFocus();
 	});
 
-	// The line sits in a status region from the start, so a screen reader hears it when the count appears or changes.
-	it('announces the count when it changes', async () => {
-		const p = props({ missing: [missing('new')] });
+	// The line sits in a status region already on the page, so a screen reader hears it when the count appears or changes.
+	it('announces the count when it appears and when it changes', async () => {
+		const p = props({ missing: [] });
 		const screen = await render(CalendarPanel, { props: p });
 		const region = page.getByRole('status').element();
+		await screen.rerender({ ...p, missing: [missing('new')] });
+		await expect.poll(() => page.getByRole('status').element()).toBe(region);
 		expect(region.textContent?.trim()).toBe('Your calendar is missing 1 new event.');
 		await screen.rerender({ ...p, missing: [missing('new'), missing('newer')] });
 		await expect.poll(() => page.getByRole('status').element()).toBe(region);
@@ -229,13 +231,25 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
 	});
 
-	// Add is found by its class in older tests; the new button must not answer to it, or they would press the wrong one.
-	it('gives Add the new ones a class of its own', async () => {
-		const { container } = await render(CalendarPanel, {
-			props: props({ missing: [missing('new')] })
-		});
-		expect(container.querySelectorAll('.cal-add')).toHaveLength(1);
-		expect(container.querySelector('.cal-add')?.textContent?.trim()).toBe('Add to my calendar');
+	// With nothing ahead to add, Add is off and cannot take focus: the Calendar heading takes it instead of the page.
+	it('moves focus to the Calendar heading when the button goes and Add is off', async () => {
+		const past = new Date(Date.now() - 40 * 86_400_000).toISOString().slice(0, 10);
+		const gone: TimelineItem = {
+			...task('gone'),
+			targetDate: past,
+			windowStartDate: past,
+			windowEndDate: past,
+			aimDate: past
+		};
+		const p = { ...props({ missing: [missing('new')] }), items: [gone] };
+		const screen = await render(CalendarPanel, { props: p });
+		expect(
+			(page.getByRole('button', { name: /^add to my calendar$/i }).element() as HTMLButtonElement)
+				.disabled
+		).toBe(true);
+		(screen.container.querySelector('.cal-new__add') as HTMLButtonElement).focus();
+		await screen.rerender({ ...p, missing: [] });
+		await expect.element(page.getByRole('heading', { name: 'Calendar' })).toHaveFocus();
 	});
 
 	// A held key repeats about every 40 ms. Once the add is recorded the button hands focus to Add as it goes; when the

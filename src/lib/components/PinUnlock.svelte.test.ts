@@ -1546,16 +1546,31 @@ describe('under forced colors', () => {
 });
 
 // WCAG 1.4.4 and 1.4.10: someone who scales text alone to 400 % on a 320 px phone still reaches every part of the
-// card without scrolling sideways. The app's text sizes come from these two variables.
+// card without scrolling sideways, in both of its views. Every text size in the app comes from these variables (the
+// headings' fluid sizes at their 320 px floor), each set to four times its value.
+const TEXT_AT_400: Record<string, string> = {
+	'--font-size-s': '56px',
+	'--font-size-base': '64px',
+	'--font-size-l': '72px',
+	'--font-size-xl': '88px',
+	'--font-size-xxl': '112px',
+	'--font-size-h1-fluid': '112px',
+	'--font-size-h2-fluid': '88px',
+	'--font-size-h3-fluid': '72px'
+};
+
 describe('at 400 % text on a 320 px screen', () => {
-	it('keeps every part of the card inside it', async () => {
+	it.each([
+		['the Unlock view', false],
+		['the Forgot your PIN view', true]
+	])('keeps every part of %s inside the card', async (_, forgot) => {
 		const root = document.documentElement;
 		const restore = { width: window.innerWidth, height: window.innerHeight };
 		await page.viewport(320, 640);
-		root.style.setProperty('--font-size-base', '64px');
-		root.style.setProperty('--font-size-s', '56px');
+		for (const [name, size] of Object.entries(TEXT_AT_400)) root.style.setProperty(name, size);
 		try {
 			await mount();
+			if (forgot) await openForgot();
 			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
 			const card = document.querySelector('.pin-unlock') as HTMLElement;
 			const edge = card.getBoundingClientRect().right;
@@ -1568,8 +1583,7 @@ describe('at 400 % text on a 320 px screen', () => {
 			expect(over).toEqual([]);
 			expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
 		} finally {
-			root.style.removeProperty('--font-size-base');
-			root.style.removeProperty('--font-size-s');
+			for (const name of Object.keys(TEXT_AT_400)) root.style.removeProperty(name);
 			await page.viewport(restore.width, restore.height);
 		}
 	});
