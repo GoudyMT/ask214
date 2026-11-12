@@ -187,7 +187,7 @@
 				<button
 					bind:this={newEl}
 					aria-describedby="cal-new-n"
-					class="cal-add cal-new__add"
+					class="cal-new__add"
 					type="button"
 					aria-busy={building}
 					onclick={() => void addToCalendar(true)}
@@ -310,7 +310,8 @@
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
 	}
-	.cal-add {
+	.cal-add,
+	.cal-new__add {
 		padding: calc(var(--space-s) - 1px) calc(var(--space-l) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
@@ -320,7 +321,8 @@
 		font-weight: 600;
 		cursor: pointer;
 	}
-	.cal-add:hover {
+	.cal-add:hover,
+	.cal-new__add:hover {
 		background: var(--color-accent-muted);
 	}
 	.cal-add:disabled {
@@ -330,7 +332,8 @@
 	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The label does not
 	   change either, so only aria-busy marks the work - accepted, as the work is local and usually over before it
 	   could be seen. The hover fill stays off too, as a press does nothing. */
-	.cal-add[aria-busy='true'] {
+	.cal-add[aria-busy='true'],
+	.cal-new__add[aria-busy='true'] {
 		background: var(--color-accent);
 		cursor: default;
 	}

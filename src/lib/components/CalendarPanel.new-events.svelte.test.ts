@@ -186,6 +186,15 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
 	});
 
+	// Add is found by its class in older tests; the new button must not answer to it, or they would press the wrong one.
+	it('gives Add the new ones a class of its own', async () => {
+		const { container } = await render(CalendarPanel, {
+			props: props({ missing: [missing('new')] })
+		});
+		expect(container.querySelectorAll('.cal-add')).toHaveLength(1);
+		expect(container.querySelector('.cal-add')?.textContent?.trim()).toBe('Add to my calendar');
+	});
+
 	// A held key repeats about every 40 ms. Once the add is recorded the button hands focus to Add as it goes; when the
 	// record fails it stays. Either way a repeat must reach neither button: each would make and hand over another file.
 	it.each([
