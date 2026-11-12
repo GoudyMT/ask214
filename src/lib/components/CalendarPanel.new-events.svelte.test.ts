@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
+import '../../app.css';
 import type { TimelineItem } from '#lib/timeline/generate.js';
 import type { TaskDef } from '#lib/timeline/types.js';
 import type { DesiredEvent } from '#lib/calendar/types.js';
@@ -117,9 +118,41 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		await expect.element(page.getByRole('button', { name: 'Add the new ones' })).toHaveFocus();
 	});
 
+	// The line sits in a status region from the start, so a screen reader hears it when the count appears or changes.
+	it('announces the count when it changes', async () => {
+		const p = props({ missing: [missing('new')] });
+		const screen = await render(CalendarPanel, { props: p });
+		const region = page.getByRole('status').element();
+		expect(region.textContent?.trim()).toBe('Your calendar is missing 1 new event.');
+		await screen.rerender({ ...p, missing: [missing('new'), missing('newer')] });
+		await expect.poll(() => page.getByRole('status').element()).toBe(region);
+		expect(region.textContent?.trim()).toBe('Your calendar is missing 2 new events.');
+	});
+
+	// Once the file is handed over the count goes; the same region says what happened and what is left to do, which is
+	// the member's own tap in their calendar app.
+	it('says the new events are in the file once it is handed over', async () => {
+		const onAdd = vi.fn();
+		const { container } = await render(CalendarPanel, {
+			props: props({ missing: [missing('new')], onAdd })
+		});
+		const region = page.getByRole('status').element();
+		await page.getByRole('button', { name: 'Add the new ones' }).click();
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
+		await expect
+			.poll(() => region.textContent?.trim())
+			.toBe('The new events are in the file. Add them in your calendar app.');
+		const text = textOf(container);
+		expect(makesPersonalClaim(text), text).toBe(false);
+	});
+
 	it('shows no line or button when nothing is missing', async () => {
 		const { container } = await render(CalendarPanel, { props: props({ missing: [] }) });
 		expect(container.textContent).not.toContain('Your calendar is missing');
+		const region = page.getByRole('status').element();
+		expect(region.textContent?.trim()).toBe('');
+		// The empty region keeps no room: the panel looks as it did before it had one.
+		expect(getComputedStyle(region).marginBottom).toBe('0px');
 		expect(page.getByRole('button', { name: 'Add the new ones' }).query()).toBeNull();
 	});
 

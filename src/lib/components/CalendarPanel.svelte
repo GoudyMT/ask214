@@ -191,11 +191,17 @@
 	     could name an event that is not out of date. -->
 	{#if ready}
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
+		<!-- A status region from the start, empty when there is nothing to say: a screen reader hears the count when it
+		     appears or changes, and, once the file is handed over, what is left to do. -->
+		<p id="cal-new-n" class="cal-hint cal-new__line" role="status">
+			{#if shown.length > 0}
+				Your calendar is missing {shown.length} new event{shown.length === 1 ? '' : 's'}.
+			{:else if sent.length > 0}
+				The new events are in the file. Add them in your calendar app.
+			{/if}
+		</p>
 		{#if shown.length > 0}
 			<div class="cal-new">
-				<p id="cal-new-n" class="cal-hint">
-					Your calendar is missing {shown.length} new event{shown.length === 1 ? '' : 's'}.
-				</p>
 				<!-- The same held-Enter guard as Add: each repeat would hand over another file. The count names what "the
 				     new ones" are to a reader moving from button to button. -->
 				<button
@@ -354,6 +360,10 @@
 	/* The new events and their button, set apart from the Add below them. */
 	.cal-new {
 		margin-bottom: var(--space-l);
+	}
+	/* An empty line keeps no room, so the panel looks as it did with nothing to say. */
+	.cal-new__line:empty {
+		margin: 0;
 	}
 	/* The sentence under the button: what this device does after the tap. */
 	.cal-hint--device {
