@@ -550,12 +550,15 @@ const STATIC = 'static';
 //   2026-11-10 the updated-guides notice on Documents and Settings: precacheBytes 260,209 -> 260,419 (measured 260,400 B, +198 B on the plan's base, margin 19 B).
 //   2026-11-10 the updated-guides notice on Documents and Settings: routeNodes 60,924 -> 61,120 (measured 61,100 B, +191 B on the plan's base, margin 20 B).
 //
+//   2026-11-11 forced-colours button edges, the header focus check and the calendar status line: precacheBytes 260,419 -> 260,798 (measured 260,762 B, +360 B on the plan's base, margin 36 B).
+//   2026-11-11 forced-colours button edges, the header focus check and the calendar status line: routeNodes 61,120 -> 61,230 (measured 61,218 B, +117 B on the plan's base, margin 12 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 260_419,
+	precacheBytes: 260_798,
 	workerScripts: 147_316
 };
 
