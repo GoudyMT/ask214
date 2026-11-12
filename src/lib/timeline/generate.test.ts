@@ -1403,14 +1403,14 @@ describe('the leaving answer on the real task list', () => {
 			const lead = (title: string | undefined) =>
 				`If you are leaving active duty orders, ${title?.charAt(0).toLowerCase()}${title?.slice(1)}`;
 			const DD214 =
-				'A DD-214 covers time on active duty orders, not drill status; your personnel office confirms whether one is issued.';
+				'A DD-214 covers time on active duty or full-time National Guard duty orders, not drill status; your personnel office confirms whether one is issued.';
 			for (const id of ['dd214-review', 'dd214-copies']) {
 				expect(def(id, path)?.title, id).toBe(lead(def(id)?.title));
 				expect(def(id, path)?.why, id).toBe(`${DD214} ${def(id)?.why}`);
 			}
 			expect(def('hhg-counseling', path)?.title).toBe(lead(def('hhg-counseling')?.title));
 			expect(def('hhg-counseling', path)?.why).toBe(
-				'Your orders set whether a government-paid move is covered and for how long; your transportation office confirms.'
+				'Your orders set whether a government-paid move is covered; your transportation office confirms.'
 			);
 			expect(def('hhg-counseling', path)?.afterNote).toBe(
 				'If your orders covered a move, your installation transportation office says how long it lasts.'
@@ -1419,11 +1419,11 @@ describe('the leaving answer on the real task list', () => {
 				'Verify your final pay and any terminal-leave settlement'
 			);
 			expect(def('final-pay-check', path)?.why).toBe(
-				'Leave builds during active service, not drill periods, so a leave settlement comes only with active duty orders. Final-pay errors are common and worth catching.'
+				'Leave builds during active service (active duty or full-time National Guard duty), not drill periods; your pay office settles any leave you have. Final-pay errors are common and worth catching.'
 			);
 			expect(def('separation-package', path)?.title).toBe(def('separation-package')?.title);
 			expect(def('separation-package', path)?.why).toBe(
-				'Your personnel office prepares your discharge or transfer orders, and a DD-214 if you are leaving active duty orders. Ask them early for their list and deadline.'
+				'Your personnel office prepares your discharge or transfer orders and confirms whether a DD-214 is issued. Ask them early for their list and deadline.'
 			);
 			// Every task stays shown and keeps its dates: the condition is in the words, never a hide.
 			for (const id of [

@@ -86,7 +86,7 @@ function forGuardOrReserve(
 	return { ...def, copyFor };
 }
 const DD214_ON_ORDERS =
-	'A DD-214 covers time on active duty orders, not drill status; your personnel office confirms whether one is issued.';
+	'A DD-214 covers time on active duty or full-time National Guard duty orders, not drill status; your personnel office confirms whether one is issued.';
 function dd214OnOrders(def: TaskDef): TaskDef {
 	return forGuardOrReserve(def, {
 		title: ordersLead(def.title),
@@ -683,7 +683,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		},
 		{
 			title: ordersLead('Arrange your household-goods (HHG) move'),
-			why: 'Your orders set whether a government-paid move is covered and for how long; your transportation office confirms.',
+			why: 'Your orders set whether a government-paid move is covered; your transportation office confirms.',
 			afterNote:
 				'If your orders covered a move, your installation transportation office says how long it lasts.'
 		}
@@ -702,7 +702,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 			why: 'Your admin or personnel office prepares your orders and DD-214 from it. Ask them early for their list and deadline.'
 		},
 		{
-			why: 'Your personnel office prepares your discharge or transfer orders, and a DD-214 if you are leaving active duty orders. Ask them early for their list and deadline.'
+			why: 'Your personnel office prepares your discharge or transfer orders and confirms whether a DD-214 is issued. Ask them early for their list and deadline.'
 		}
 	),
 	dd214OnOrders({
@@ -800,7 +800,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		},
 		{
 			title: 'Verify your final pay and any terminal-leave settlement',
-			why: 'Leave builds during active service, not drill periods, so a leave settlement comes only with active duty orders. Final-pay errors are common and worth catching.'
+			why: 'Leave builds during active service (active duty or full-time National Guard duty), not drill periods; your pay office settles any leave you have. Final-pay errors are common and worth catching.'
 		}
 	),
 	{
