@@ -83,6 +83,15 @@ async function clickFooterFeedback(): Promise<void> {
 	}
 }
 
+/**
+ * Focuses as the keyboard does: a key press first, so the browser treats the focus as keyboard focus (it matches
+ * :focus-visible) whatever a test before it clicked. No scroll: each test moves the page itself.
+ */
+async function keyboardFocus(el: HTMLElement): Promise<void> {
+	await userEvent.keyboard('{Shift}');
+	el.focus({ preventScroll: true });
+}
+
 const primaryNavs = () =>
 	[...document.querySelectorAll<HTMLElement>('nav[aria-label="Primary"]')].filter(
 		(n) => getComputedStyle(n).display !== 'none'
@@ -247,6 +256,176 @@ describe('the root layout navigation', () => {
 			control.focus({ preventScroll: true });
 			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
 			expect(window.scrollY).toBe(300);
+		} finally {
+			holder.remove();
+		}
+	});
+
+	// WCAG 2.4.11: Shift+Tab to a control above the window scrolls it to the window's top edge in both engines, where the
+	// shown header covers it whole (a source title on About, the date field in setup). A focus that does not scroll, on
+	// a control placed under the header, stands in for that scroll here.
+	it.each([
+		[1280, 800],
+		[320, 640]
+	])('moves a focused control out from under the shown header at %ix%i', async (width, height) => {
+		await openAt(width, height);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 24px; margin: 0">control</p>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const control = holder.querySelector('p') as HTMLElement;
+			window.scrollBy(0, control.getBoundingClientRect().top - 15);
+			if (width < 600) await expect.poll(() => header.hasAttribute('data-hidden')).toBe(true);
+			// A scroll up shows a slid-away phone header again, as a Shift+Tab scroll up does; wait until it is back in place.
+			window.scrollBy(0, -5);
+			await expect.poll(() => header.getBoundingClientRect().bottom).toBe(header.offsetHeight);
+			expect(control.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+				header.getBoundingClientRect().bottom
+			);
+			await keyboardFocus(control);
+			await expect
+				.poll(() => control.getBoundingClientRect().top >= header.getBoundingClientRect().bottom)
+				.toBe(true);
+		} finally {
+			holder.remove();
+		}
+	});
+
+	// A slid-away header covers nothing: a control at the top of the window must not pull the page down for it.
+	it('leaves the page where it is when a control sits under the hidden header at 320x640', async () => {
+		await openAt(320, 640);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 24px; margin: 0">control</p>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const control = holder.querySelector('p') as HTMLElement;
+			window.scrollBy(0, control.getBoundingClientRect().top - 10);
+			await expect.poll(() => header.getBoundingClientRect().bottom).toBeLessThanOrEqual(0);
+			const still = window.scrollY;
+			await keyboardFocus(control);
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			expect(window.scrollY).toBe(still);
+		} finally {
+			holder.remove();
+		}
+	});
+
+	// The header check is for a control the keyboard left at the window's top edge. A focus that lands while the window
+	// is scrolled must not pull the page: Back and Forward (the router focuses the page body without scrolling, after it
+	// restores the place), a click into a long passage already partly above the window, a click on a button partly under
+	// the header, and a chip that sticks under the header and so cannot move with the page.
+	describe('leaves the page where it is when focus lands at 1280 px', () => {
+		async function stillAfter(focus: (holder: HTMLElement) => Promise<void> | void, html: string) {
+			await openAt(1280, 800);
+			const holder = document.createElement('div');
+			holder.innerHTML = html;
+			(document.querySelector('main') as HTMLElement).prepend(holder);
+			try {
+				window.scrollTo(0, 600);
+				await expect.poll(() => window.scrollY).toBe(600);
+				await focus(holder);
+				for (let i = 0; i < 4; i++) await new Promise((done) => requestAnimationFrame(done));
+				expect(window.scrollY).toBe(600);
+			} finally {
+				holder.remove();
+			}
+		}
+		const spacer = '<div style="height: 400px"></div>';
+
+		it('on the page body, as after Back or Forward', async () => {
+			await stillAfter(async () => {
+				document.body.tabIndex = -1;
+				await keyboardFocus(document.body);
+			}, `${spacer}<div style="height: 1200px"></div>`);
+			document.body.removeAttribute('tabindex');
+		});
+
+		it('on a long passage already partly above the window', async () => {
+			await stillAfter(
+				(holder) => keyboardFocus(holder.querySelector('p') as HTMLElement),
+				`${spacer}<p tabindex="-1" style="height: 1200px; margin: 0">passage</p>`
+			);
+		});
+
+		// The page sits so the button's top is 30 px down the window, under the 57 px header; the click hits its lower half.
+		it('on a button clicked while partly under the header', async () => {
+			await stillAfter(async (holder) => {
+				const button = holder.querySelector('button') as HTMLButtonElement;
+				expect(button.getBoundingClientRect().top).toBe(30);
+				await userEvent.click(button, { position: { x: 5, y: 45 } });
+				expect(document.activeElement).toBe(button);
+			}, `<div style="height: 549px"></div><button style="height: 60px">press</button><div style="height: 1200px"></div>`);
+		});
+	});
+
+	// WebKit's Shift+Tab can leave a date field 10 px above the window (setup's leaving date, measured): a control that
+	// fits below the header is moved there even when its top is already off the window.
+	it('moves a control left partly above the window out from under the header at 1280x800', async () => {
+		await openAt(1280, 800);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 42px; margin: 0">control</p><div style="height: 1200px"></div>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const control = holder.querySelector('p') as HTMLElement;
+			window.scrollBy(0, control.getBoundingClientRect().top + 10);
+			expect(control.getBoundingClientRect().top).toBe(-10);
+			await keyboardFocus(control);
+			await expect
+				.poll(() => control.getBoundingClientRect().top >= header.getBoundingClientRect().bottom)
+				.toBe(true);
+		} finally {
+			holder.remove();
+		}
+	});
+
+	// WebKit scrolls a control focused by Shift+Tab to the window's top edge only after focusin: the check waits for it.
+	it('moves a control out from under the header after the browser scrolls it in late at 1280x800', async () => {
+		await openAt(1280, 800);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 24px; margin: 0">control</p><div style="height: 1200px"></div>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const control = holder.querySelector('p') as HTMLElement;
+			window.scrollBy(0, control.getBoundingClientRect().top + 300);
+			expect(control.getBoundingClientRect().bottom).toBeLessThan(0);
+			await keyboardFocus(control);
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			window.scrollBy(0, control.getBoundingClientRect().top);
+			await expect
+				.poll(() => control.getBoundingClientRect().top >= header.getBoundingClientRect().bottom)
+				.toBe(true);
+		} finally {
+			holder.remove();
+		}
+	});
+
+	// On a phone the slid-away header comes back on the scroll event the focus scroll itself causes, a moment after
+	// focusin: a control the check first saw under a hidden header is moved once the header is back over it.
+	it('moves a control out from under the header that comes back after the focus at 320x640', async () => {
+		await openAt(320, 640);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 24px; margin: 0">control</p><div style="height: 1200px"></div>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const control = holder.querySelector('p') as HTMLElement;
+			window.scrollBy(0, control.getBoundingClientRect().top - 15);
+			await expect.poll(() => header.hasAttribute('data-hidden')).toBe(true);
+			await keyboardFocus(control);
+			window.scrollBy(0, -5);
+			await expect.poll(() => header.hasAttribute('data-hidden')).toBe(false);
+			await expect
+				.poll(() => control.getBoundingClientRect().top >= header.offsetHeight)
+				.toBe(true);
 		} finally {
 			holder.remove();
 		}

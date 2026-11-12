@@ -34,7 +34,8 @@
 		display: inline-block;
 		background: var(--color-accent);
 		color: var(--color-bg);
-		padding: var(--space-s) var(--space-l);
+		padding: calc(var(--space-s) - 1px) calc(var(--space-l) - 1px);
+		border: 1px solid transparent;
 		border-radius: var(--radius-m);
 		font-weight: 600;
 		text-decoration: none;

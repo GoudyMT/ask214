@@ -771,10 +771,10 @@
 	}
 
 	.task-card__snooze-go {
-		padding: var(--space-xs) var(--space-m);
+		padding: calc(var(--space-xs) - 1px) calc(var(--space-m) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-s);
 		font: inherit;
 		font-size: var(--font-size-s);
@@ -821,10 +821,10 @@
 	}
 
 	.task-card__note-save {
-		padding: var(--space-xs) var(--space-m);
+		padding: calc(var(--space-xs) - 1px) calc(var(--space-m) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-s);
 		font: inherit;
 		font-size: var(--font-size-s);

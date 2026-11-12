@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import CalendarPanel from './CalendarPanel.svelte';
+import '../../app.css';
 import type { TimelineItem } from '#lib/timeline/generate.js';
 import type { TaskDef } from '#lib/timeline/types.js';
 import type { DesiredEvent } from '#lib/calendar/types.js';
@@ -117,9 +118,43 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		await expect.element(page.getByRole('button', { name: 'Add the new ones' })).toHaveFocus();
 	});
 
+	// The line sits in a status region already on the page, so a screen reader hears it when the count appears or changes.
+	it('announces the count when it appears and when it changes', async () => {
+		const p = props({ missing: [] });
+		const screen = await render(CalendarPanel, { props: p });
+		const region = page.getByRole('status').element();
+		await screen.rerender({ ...p, missing: [missing('new')] });
+		await expect.poll(() => page.getByRole('status').element()).toBe(region);
+		expect(region.textContent?.trim()).toBe('Your calendar is missing 1 new event.');
+		await screen.rerender({ ...p, missing: [missing('new'), missing('newer')] });
+		await expect.poll(() => page.getByRole('status').element()).toBe(region);
+		expect(region.textContent?.trim()).toBe('Your calendar is missing 2 new events.');
+	});
+
+	// Once the file is handed over the count goes; the same region says what happened and what is left to do, which is
+	// the member's own tap in their calendar app.
+	it('says the new events are in the file once it is handed over', async () => {
+		const onAdd = vi.fn();
+		const { container } = await render(CalendarPanel, {
+			props: props({ missing: [missing('new')], onAdd })
+		});
+		const region = page.getByRole('status').element();
+		await page.getByRole('button', { name: 'Add the new ones' }).click();
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
+		await expect
+			.poll(() => region.textContent?.trim())
+			.toBe('The new events are in the file. Add them in your calendar app.');
+		const text = textOf(container);
+		expect(makesPersonalClaim(text), text).toBe(false);
+	});
+
 	it('shows no line or button when nothing is missing', async () => {
 		const { container } = await render(CalendarPanel, { props: props({ missing: [] }) });
 		expect(container.textContent).not.toContain('Your calendar is missing');
+		const region = page.getByRole('status').element();
+		expect(region.textContent?.trim()).toBe('');
+		// The empty region keeps no room: the panel looks as it did before it had one.
+		expect(getComputedStyle(region).marginBottom).toBe('0px');
 		expect(page.getByRole('button', { name: 'Add the new ones' }).query()).toBeNull();
 	});
 
@@ -186,6 +221,37 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
 	});
 
+	// Another tab's add, recorded here, takes the button away while a keyboard user sits on it without pressing: focus
+	// goes to the next thing to press, not the top of the page.
+	it('moves focus to Add to my calendar when the button goes while focused but not pressed', async () => {
+		const p = props({ missing: [missing('new')] });
+		const screen = await render(CalendarPanel, { props: p });
+		(screen.container.querySelector('.cal-new__add') as HTMLButtonElement).focus();
+		await screen.rerender({ ...p, missing: [] });
+		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
+	});
+
+	// With nothing ahead to add, Add is off and cannot take focus: the Calendar heading takes it instead of the page.
+	it('moves focus to the Calendar heading when the button goes and Add is off', async () => {
+		const past = new Date(Date.now() - 40 * 86_400_000).toISOString().slice(0, 10);
+		const gone: TimelineItem = {
+			...task('gone'),
+			targetDate: past,
+			windowStartDate: past,
+			windowEndDate: past,
+			aimDate: past
+		};
+		const p = { ...props({ missing: [missing('new')] }), items: [gone] };
+		const screen = await render(CalendarPanel, { props: p });
+		expect(
+			(page.getByRole('button', { name: /^add to my calendar$/i }).element() as HTMLButtonElement)
+				.disabled
+		).toBe(true);
+		(screen.container.querySelector('.cal-new__add') as HTMLButtonElement).focus();
+		await screen.rerender({ ...p, missing: [] });
+		await expect.element(page.getByRole('heading', { name: 'Calendar' })).toHaveFocus();
+	});
+
 	// A held key repeats about every 40 ms. Once the add is recorded the button hands focus to Add as it goes; when the
 	// record fails it stays. Either way a repeat must reach neither button: each would make and hand over another file.
 	it.each([
@@ -224,4 +290,104 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 			expect(document.activeElement?.textContent?.trim()).toBe('Add to my calendar');
 		}
 	);
+});
+
+describe('CalendarPanel, pressed while a category save runs', () => {
+	// A member keeps a category off and presses Add before the save lands: the file must leave that category out, as
+	// the box now shows, not carry it from the older choices.
+	it.each([
+		['Add to my calendar', [] as DesiredEvent[]],
+		['Add the new ones', [missing('old'), missing('career')]]
+	])('%s builds from the choices being saved', async (name, gaps) => {
+		const career: TimelineItem = {
+			...task('career'),
+			def: { ...task('career').def, category: 'career' }
+		};
+		const onAdd = vi.fn();
+		let land = () => {};
+		const p = {
+			...props({ missing: gaps, onAdd }),
+			items: [task('old'), career],
+			onSetExclusions: () =>
+				new Promise<void>((done) => {
+					land = () => {
+						void screen
+							.rerender({ ...p, exclusions: { taskIds: [], categories: ['admin'] } })
+							.then(done);
+					};
+				})
+		};
+		const screen = await render(CalendarPanel, { props: p });
+		await page.getByRole('button', { name: /customize/i }).click();
+		await page.getByRole('checkbox', { name: 'admin' }).click();
+		(page.getByRole('button', { name }).element() as HTMLButtonElement).click();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		land();
+		await vi.waitFor(() => expect(onAdd).toHaveBeenCalledOnce());
+		const file = onAdd.mock.calls[0]?.[0] as CalendarFile;
+		expect(file.events.map((e) => e.taskId)).toEqual(['career']);
+	});
+
+	// The save fails and the saved choices cannot be read back: the panel stops being ready with a stand-in empty set.
+	// A file built from it would carry the categories the member keeps off, medical ones among them.
+	it('hands over nothing when the save leaves the choices unknown', async () => {
+		const onAdd = vi.fn();
+		let land = () => {};
+		const p = {
+			...props({ onAdd }),
+			exclusions: { taskIds: [], categories: ['career' as const] },
+			onSetExclusions: () =>
+				new Promise<void>((_, fail) => {
+					land = () => {
+						void screen
+							.rerender({
+								...p,
+								access: 'calendar-failed',
+								exclusions: { taskIds: [], categories: [] }
+							})
+							.then(() => fail(new Error('E_OCC_CONFLICT')));
+					};
+				})
+		};
+		const screen = await render(CalendarPanel, { props: p });
+		await page.getByRole('button', { name: /customize/i }).click();
+		await page.getByRole('checkbox', { name: 'admin' }).click();
+		(
+			page.getByRole('button', { name: /^add to my calendar$/i }).element() as HTMLButtonElement
+		).click();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		land();
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		expect(onAdd).not.toHaveBeenCalled();
+	});
+});
+// The save keeps off the last category with new events: a file with nothing in it would open the calendar app on an
+// empty import, which reads as a broken add.
+it('hands over nothing when the save leaves no new event to add', async () => {
+	const career: TimelineItem = {
+		...task('career'),
+		def: { ...task('career').def, category: 'career' }
+	};
+	const onAdd = vi.fn();
+	let land = () => {};
+	const p = {
+		...props({ missing: [missing('career')], onAdd }),
+		items: [task('old'), career],
+		onSetExclusions: () =>
+			new Promise<void>((done) => {
+				land = () => {
+					void screen
+						.rerender({ ...p, missing: [], exclusions: { taskIds: [], categories: ['career'] } })
+						.then(done);
+				};
+			})
+	};
+	const screen = await render(CalendarPanel, { props: p });
+	await page.getByRole('button', { name: /customize/i }).click();
+	await page.getByRole('checkbox', { name: 'career' }).click();
+	(page.getByRole('button', { name: 'Add the new ones' }).element() as HTMLButtonElement).click();
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	land();
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(onAdd).not.toHaveBeenCalled();
 });

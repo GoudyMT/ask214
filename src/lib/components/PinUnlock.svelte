@@ -451,6 +451,8 @@
 		border-radius: var(--radius-l);
 		padding: var(--space-l);
 		text-align: center;
+		/* At a large text size on a phone one word can be wider than the card: it breaks rather than run past the edge. */
+		overflow-wrap: anywhere;
 	}
 
 	.pin-unlock h2 {

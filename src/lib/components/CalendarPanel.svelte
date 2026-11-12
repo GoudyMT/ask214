@@ -69,6 +69,9 @@
 	let toggleError = $state<string | null>(null);
 	// Category saves in flight. Customize is off meanwhile: closing the list would hide the line a failed save shows.
 	let saving = $state(0);
+	// Settles once every category save so far has landed or failed: a file built before then would carry a category
+	// the member has just kept off.
+	let saved: Promise<unknown> = Promise.resolve();
 
 	// Applied to the set as saved, not to `exclusions`: that prop changes only once a save lands, so quick taps
 	// would each start from the same older set and overwrite one another. A failed write puts the box back and
@@ -81,10 +84,12 @@
 		toggleError = null;
 		saving++;
 		try {
-			await onSetExclusions((current) => {
+			const write = onSetExclusions((current) => {
 				const categories = current.categories.filter((c) => c !== cat);
 				return { taskIds: current.taskIds, categories: on ? [...categories, cat] : categories };
 			});
+			saved = saved.then(() => write).catch(() => {});
+			await write;
 		} catch {
 			box.checked = !on;
 			toggleError = 'Could not update right now - please try again.';
@@ -130,12 +135,19 @@
 	const shown = $derived(missing.filter((e) => !sent.includes(handedOverKey(e))));
 	let newEl = $state<HTMLButtonElement | null>(null);
 
-	// "Add the new ones" goes once its events are handed over, with focus on it; focus moves to Add, the button left.
+	// "Add the new ones" goes once its events are handed over, with focus on it; focus moves to Add, the button left
+	// (the heading, when Add is off). The same when it goes while only focused: another tab's add, recorded here. Read
+	// before the button leaves the page, while it can still hold focus.
 	let newPressed = false;
+	let newHeld = false;
+	$effect.pre(() => {
+		if (shown.length === 0) newHeld = newEl !== null && document.activeElement === newEl;
+	});
 	$effect(() => {
-		if (shown.length > 0 || !newPressed) return;
-		newPressed = false;
-		if (document.activeElement === document.body) addEl?.focus({ preventScroll: true });
+		if (shown.length > 0 || !(newPressed || newHeld)) return;
+		newPressed = newHeld = false;
+		if (document.activeElement === document.body)
+			(addEl && !addEl.disabled ? addEl : headingEl)?.focus({ preventScroll: true });
 	});
 
 	// Not `disabled` while the file builds: a disabled button that holds focus drops it, so a press then is ignored.
@@ -145,6 +157,13 @@
 		building = true;
 		addFailed = false;
 		newPressed = onlyNew;
+		await saved;
+		await tick();
+		// A failed save can leave the choices unknown (a failed re-read): never build from the stand-in empty set.
+		if (!ready) {
+			building = newPressed = false;
+			return;
+		}
 		const only = shown.map(handedOverKey);
 		let file: CalendarFile;
 		try {
@@ -160,6 +179,11 @@
 			return;
 		} finally {
 			building = false;
+		}
+		// A save while it waited can take away every event the file would carry: an empty import reads as a broken add.
+		if (file.events.length === 0) {
+			newPressed = false;
+			return;
 		}
 		if (onlyNew) sent = [...sent, ...file.events.map(handedOverKey)];
 		onAdd(file);
@@ -177,17 +201,24 @@
 	     could name an event that is not out of date. -->
 	{#if ready}
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
+		<!-- A status region from the moment the panel is ready, empty when there is nothing to say: a screen reader hears
+		     the count when it appears or changes after that, and, once the file is handed over, what is left to do. A
+		     count already there when the panel becomes ready is read with the page, not announced. -->
+		<p id="cal-new-n" class="cal-hint cal-new__line" role="status">
+			{#if shown.length > 0}
+				Your calendar is missing {shown.length} new event{shown.length === 1 ? '' : 's'}.
+			{:else if sent.length > 0}
+				The new events are in the file. Add them in your calendar app.
+			{/if}
+		</p>
 		{#if shown.length > 0}
 			<div class="cal-new">
-				<p id="cal-new-n" class="cal-hint">
-					Your calendar is missing {shown.length} new event{shown.length === 1 ? '' : 's'}.
-				</p>
 				<!-- The same held-Enter guard as Add: each repeat would hand over another file. The count names what "the
 				     new ones" are to a reader moving from button to button. -->
 				<button
 					bind:this={newEl}
 					aria-describedby="cal-new-n"
-					class="cal-add cal-new__add"
+					class="cal-new__add"
 					type="button"
 					aria-busy={building}
 					onclick={() => void addToCalendar(true)}
@@ -310,17 +341,19 @@
 		color: var(--color-fg-muted);
 		font-size: var(--font-size-s);
 	}
-	.cal-add {
-		padding: var(--space-s) var(--space-l);
+	.cal-add,
+	.cal-new__add {
+		padding: calc(var(--space-s) - 1px) calc(var(--space-l) - 1px);
 		background: var(--color-accent);
 		color: var(--color-bg);
-		border: none;
+		border: 1px solid transparent;
 		border-radius: var(--radius-m);
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;
 	}
-	.cal-add:hover {
+	.cal-add:hover,
+	.cal-new__add:hover {
 		background: var(--color-accent-muted);
 	}
 	.cal-add:disabled {
@@ -330,13 +363,18 @@
 	/* No dim while busy: a dim would fade the focus ring or the label below their contrast minimums. The label does not
 	   change either, so only aria-busy marks the work - accepted, as the work is local and usually over before it
 	   could be seen. The hover fill stays off too, as a press does nothing. */
-	.cal-add[aria-busy='true'] {
+	.cal-add[aria-busy='true'],
+	.cal-new__add[aria-busy='true'] {
 		background: var(--color-accent);
 		cursor: default;
 	}
 	/* The new events and their button, set apart from the Add below them. */
 	.cal-new {
 		margin-bottom: var(--space-l);
+	}
+	/* An empty line keeps no room, so the panel looks as it did with nothing to say. */
+	.cal-new__line:empty {
+		margin: 0;
 	}
 	/* The sentence under the button: what this device does after the tap. */
 	.cal-hint--device {
