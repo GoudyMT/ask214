@@ -54,13 +54,14 @@ export const PHASE_BUCKETS: readonly PhaseBucket[] = [
 const ON_ORDERS_WHY =
 	'For the Guard or Reserve, TAP applies on release from active duty orders, with exceptions (for example, before 180 days in a row on active duty). Your transition assistance office confirms what you need.';
 const GUARD_OR_RESERVE = ['reserve-component', 'reserve-retirement'] as const;
+const ordersLead = (title: string) =>
+	`If you are leaving active duty orders, ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
 function onOrders(def: TaskDef): TaskDef {
-	const title = def.title.charAt(0).toLowerCase() + def.title.slice(1);
 	const copyFor = { ...def.copyFor };
 	for (const path of GUARD_OR_RESERVE) {
 		copyFor[path] = {
 			...def.copyFor?.[path],
-			title: `If you are leaving active duty orders, ${title}`,
+			title: ordersLead(def.title),
 			why: `${ON_ORDERS_WHY} ${def.why}`,
 			...(def.afterNote && {
 				afterNote: def.afterNote.replace(
@@ -71,6 +72,26 @@ function onOrders(def: TaskDef): TaskDef {
 		};
 	}
 	return { ...def, copyFor };
+}
+
+// A DD-214 records a release from active duty, a paid move follows orders, and leave builds only in active service
+// (10 USC 701(a)), so a member leaving drill status has none of them. Neither Guard or Reserve answer says which
+// status the member leaves from, so the wording says when each step applies; the step never hides.
+function forGuardOrReserve(
+	def: TaskDef,
+	copy: { title?: string; why?: string; afterNote?: string }
+): TaskDef {
+	const copyFor = { ...def.copyFor };
+	for (const path of GUARD_OR_RESERVE) copyFor[path] = { ...def.copyFor?.[path], ...copy };
+	return { ...def, copyFor };
+}
+const DD214_ON_ORDERS =
+	'A DD-214 covers time on active duty orders, not drill status; your personnel office confirms whether one is issued.';
+function dd214OnOrders(def: TaskDef): TaskDef {
+	return forGuardOrReserve(def, {
+		title: ordersLead(def.title),
+		why: `${DD214_ON_ORDERS} ${def.why}`
+	});
 }
 
 const RETIRING_RCSBP_TITLE =
@@ -646,32 +667,45 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		recommendedOffset: -90,
 		why: 'You lose easy access to military pay records after you separate.'
 	},
-	{
-		id: 'hhg-counseling',
-		title: 'Arrange your household-goods (HHG) move',
-		category: 'admin',
-		finishBefore: 'separation',
-		kind: 'closes',
-		windowStart: -180,
-		windowEnd: 180,
-		recommendedOffset: -120,
-		why: 'The government-paid final move generally runs 180 days after you separate; confirm with your transportation office.',
-		afterNote:
-			'The government-paid move ends 180 days after separation unless an extension is approved; contact your installation transportation office.'
-	},
-	{
-		id: 'separation-package',
-		title: 'Turn in your separation paperwork to your admin or personnel office',
-		category: 'admin',
-		finishBefore: 'leaving',
-		countsFrom: 'leaving',
-		kind: 'soft',
-		windowStart: -270,
-		windowEnd: -120,
-		recommendedOffset: -150,
-		why: 'Your admin or personnel office prepares your orders and DD-214 from it. Ask them early for their list and deadline.'
-	},
-	{
+	forGuardOrReserve(
+		{
+			id: 'hhg-counseling',
+			title: 'Arrange your household-goods (HHG) move',
+			category: 'admin',
+			finishBefore: 'separation',
+			kind: 'closes',
+			windowStart: -180,
+			windowEnd: 180,
+			recommendedOffset: -120,
+			why: 'The government-paid final move generally runs 180 days after you separate; confirm with your transportation office.',
+			afterNote:
+				'The government-paid move ends 180 days after separation unless an extension is approved; contact your installation transportation office.'
+		},
+		{
+			title: ordersLead('Arrange your household-goods (HHG) move'),
+			why: 'Your orders set whether a government-paid move is covered and for how long; your transportation office confirms.',
+			afterNote:
+				'If your orders covered a move, your installation transportation office says how long it lasts.'
+		}
+	),
+	forGuardOrReserve(
+		{
+			id: 'separation-package',
+			title: 'Turn in your separation paperwork to your admin or personnel office',
+			category: 'admin',
+			finishBefore: 'leaving',
+			countsFrom: 'leaving',
+			kind: 'soft',
+			windowStart: -270,
+			windowEnd: -120,
+			recommendedOffset: -150,
+			why: 'Your admin or personnel office prepares your orders and DD-214 from it. Ask them early for their list and deadline.'
+		},
+		{
+			why: 'Your personnel office prepares your discharge or transfer orders, and a DD-214 if you are leaving active duty orders. Ask them early for their list and deadline.'
+		}
+	),
+	dd214OnOrders({
 		id: 'dd214-review',
 		title: 'Review your DD-2648 and DD-214 for accuracy',
 		category: 'admin',
@@ -682,7 +716,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: -15,
 		recommendedOffset: -30,
 		why: 'Check every block on your DD-214 worksheet with your personnel office before your last day; fixing it after you leave takes a separate request.'
-	},
+	}),
 
 	// ---- Near / at separation ----
 	{
@@ -709,7 +743,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		},
 		hideFor: ['retirement']
 	},
-	{
+	dd214OnOrders({
 		id: 'dd214-copies',
 		title: 'Make several certified copies of your DD-214 (member-4)',
 		category: 'admin',
@@ -719,7 +753,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 60,
 		recommendedOffset: 0,
 		why: 'You will need DD-214 copies for years of benefits, jobs, and schools.'
-	},
+	}),
 
 	// ---- After separation ----
 	{
@@ -752,17 +786,23 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		afterNote:
 			'The standard VGLI deadline (1 year and 120 days) has passed; see va.gov for life insurance options.'
 	},
-	{
-		id: 'final-pay-check',
-		title: 'Verify your final pay and terminal-leave settlement',
-		category: 'finance',
-		finishBefore: 'separation',
-		kind: 'soft',
-		windowStart: 0,
-		windowEnd: 120,
-		recommendedOffset: 30,
-		why: 'Final-pay and leave sell-back errors are common and worth catching.'
-	},
+	forGuardOrReserve(
+		{
+			id: 'final-pay-check',
+			title: 'Verify your final pay and terminal-leave settlement',
+			category: 'finance',
+			finishBefore: 'separation',
+			kind: 'soft',
+			windowStart: 0,
+			windowEnd: 120,
+			recommendedOffset: 30,
+			why: 'Final-pay and leave sell-back errors are common and worth catching.'
+		},
+		{
+			title: 'Verify your final pay and any terminal-leave settlement',
+			why: 'Leave builds during active service, not drill periods, so a leave settlement comes only with active duty orders. Final-pay errors are common and worth catching.'
+		}
+	),
 	{
 		id: 'va-claim-fallback',
 		title: 'File your VA disability claim (if you did not file through BDD)',
