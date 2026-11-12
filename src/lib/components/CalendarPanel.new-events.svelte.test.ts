@@ -347,3 +347,33 @@ describe('CalendarPanel, pressed while a category save runs', () => {
 		expect(onAdd).not.toHaveBeenCalled();
 	});
 });
+// The save keeps off the last category with new events: a file with nothing in it would open the calendar app on an
+// empty import, which reads as a broken add.
+it('hands over nothing when the save leaves no new event to add', async () => {
+	const career: TimelineItem = {
+		...task('career'),
+		def: { ...task('career').def, category: 'career' }
+	};
+	const onAdd = vi.fn();
+	let land = () => {};
+	const p = {
+		...props({ missing: [missing('career')], onAdd }),
+		items: [task('old'), career],
+		onSetExclusions: () =>
+			new Promise<void>((done) => {
+				land = () => {
+					void screen
+						.rerender({ ...p, missing: [], exclusions: { taskIds: [], categories: ['career'] } })
+						.then(done);
+				};
+			})
+	};
+	const screen = await render(CalendarPanel, { props: p });
+	await page.getByRole('button', { name: /customize/i }).click();
+	await page.getByRole('checkbox', { name: 'career' }).click();
+	(page.getByRole('button', { name: 'Add the new ones' }).element() as HTMLButtonElement).click();
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	land();
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(onAdd).not.toHaveBeenCalled();
+});

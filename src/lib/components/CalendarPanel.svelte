@@ -180,6 +180,11 @@
 		} finally {
 			building = false;
 		}
+		// A save while it waited can take away every event the file would carry: an empty import reads as a broken add.
+		if (file.events.length === 0) {
+			newPressed = false;
+			return;
+		}
 		if (onlyNew) sent = [...sent, ...file.events.map(handedOverKey)];
 		onAdd(file);
 	}
