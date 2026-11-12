@@ -557,12 +557,16 @@ const STATIC = 'static';
 //   2026-11-11 the sweep's fixes: the header check's keyboard and size bounds and the calendar's after-save checks: routeNodes 61,230 -> 61,250 (measured 61,236 B, +135 B on the plan's base, margin 14 B).
 //   2026-11-11 the sweep's fixes: the header check's keyboard and size bounds and the calendar's after-save checks: rootLayout 9,820 -> 9,849 (measured 9,841 B, +80 B on the plan's base, margin 8 B).
 //
+//   2026-11-12 Guard and Reserve wording for the DD-214, move, pay and paperwork steps: precacheBytes 260,848 -> 261,078 (measured 261,053 B, +246 B on the plan's base, margin 25 B).
+//
+//   2026-11-12 end check: precacheBytes 261,078 -> 261,054 (measured 261,031 B, +224 B on the plan's base, margin 23 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 260_848,
+	precacheBytes: 261_054,
 	workerScripts: 147_316
 };
 

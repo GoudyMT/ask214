@@ -1393,6 +1393,64 @@ describe('the leaving answer on the real task list', () => {
 		}
 	);
 
+	// A DD-214 records a release from active duty, a paid move follows orders, and leave builds only in active service
+	// (10 USC 701(a)), so a Guard or Reserve member leaving drill status has none of them. Neither answer says which
+	// status the member leaves from, so the condition leads the title (the Home row and the calendar show only that).
+	it.each(['reserve-component', 'reserve-retirement'] as const)(
+		'the %s answer says the DD-214, move and leave steps need active duty orders',
+		(path) => {
+			const def = (id: string, p?: typeof path) => items(p).find((i) => i.def.id === id)?.def;
+			const lead = (title: string | undefined) =>
+				`If you are leaving active duty orders, ${title?.charAt(0).toLowerCase()}${title?.slice(1)}`;
+			const DD214 =
+				'A DD-214 covers time on active duty or full-time National Guard duty orders, not drill status; your personnel office confirms whether one is issued.';
+			for (const id of ['dd214-review', 'dd214-copies']) {
+				expect(def(id, path)?.title, id).toBe(lead(def(id)?.title));
+				expect(def(id, path)?.why, id).toBe(`${DD214} ${def(id)?.why}`);
+			}
+			expect(def('hhg-counseling', path)?.title).toBe(lead(def('hhg-counseling')?.title));
+			expect(def('hhg-counseling', path)?.why).toBe(
+				'Your orders set whether a government-paid move is covered; your transportation office confirms.'
+			);
+			expect(def('hhg-counseling', path)?.afterNote).toBe(
+				'If your orders covered a move, your installation transportation office says how long it lasts.'
+			);
+			expect(def('final-pay-check', path)?.title).toBe(
+				'Verify your final pay and any terminal-leave settlement'
+			);
+			expect(def('final-pay-check', path)?.why).toBe(
+				'Leave builds during active service (active duty or full-time National Guard duty), not drill periods; your pay office settles any leave you have. Final-pay errors are common and worth catching.'
+			);
+			expect(def('separation-package', path)?.title).toBe(def('separation-package')?.title);
+			expect(def('separation-package', path)?.why).toBe(
+				'Your personnel office prepares your discharge or transfer orders and confirms whether a DD-214 is issued. Ask them early for their list and deadline.'
+			);
+		}
+	);
+
+	it.each(['ets', 'retirement', 'medical'] as const)(
+		'the %s answer keeps the plain DD-214, move and leave steps',
+		(path) => {
+			for (const id of [
+				'dd214-review',
+				'dd214-copies',
+				'hhg-counseling',
+				'final-pay-check',
+				'separation-package'
+			]) {
+				const shown = items(path).find((i) => i.def.id === id)?.def;
+				const plain = items().find((i) => i.def.id === id)?.def;
+				expect(shown?.title, id).toBe(plain?.title);
+				expect(shown?.why, id).toBe(plain?.why);
+				expect(shown?.afterNote, id).toBe(plain?.afterNote);
+				// The plain step is the active-duty one: no Guard or Reserve condition reaches it.
+				expect(`${shown?.title} ${shown?.why} ${shown?.afterNote ?? ''}`, id).not.toMatch(
+					/drill|active duty orders|full-time|covered a move/
+				);
+			}
+		}
+	);
+
 	// tricare.mil: 90 days after the retirement date to enroll, a retroactive request up to 12 months from it.
 	it.each([
 		['the day before retirement', new Date(2028, 5, 29, 12), 'upcoming'],
