@@ -313,4 +313,37 @@ describe('CalendarPanel, pressed while a category save runs', () => {
 		const file = onAdd.mock.calls[0]?.[0] as CalendarFile;
 		expect(file.events.map((e) => e.taskId)).toEqual(['career']);
 	});
+
+	// The save fails and the saved choices cannot be read back: the panel stops being ready with a stand-in empty set.
+	// A file built from it would carry the categories the member keeps off, medical ones among them.
+	it('hands over nothing when the save leaves the choices unknown', async () => {
+		const onAdd = vi.fn();
+		let land = () => {};
+		const p = {
+			...props({ onAdd }),
+			exclusions: { taskIds: [], categories: ['career' as const] },
+			onSetExclusions: () =>
+				new Promise<void>((_, fail) => {
+					land = () => {
+						void screen
+							.rerender({
+								...p,
+								access: 'calendar-failed',
+								exclusions: { taskIds: [], categories: [] }
+							})
+							.then(() => fail(new Error('E_OCC_CONFLICT')));
+					};
+				})
+		};
+		const screen = await render(CalendarPanel, { props: p });
+		await page.getByRole('button', { name: /customize/i }).click();
+		await page.getByRole('checkbox', { name: 'admin' }).click();
+		(
+			page.getByRole('button', { name: /^add to my calendar$/i }).element() as HTMLButtonElement
+		).click();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		land();
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		expect(onAdd).not.toHaveBeenCalled();
+	});
 });

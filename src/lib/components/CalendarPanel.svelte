@@ -159,6 +159,11 @@
 		newPressed = onlyNew;
 		await saved;
 		await tick();
+		// A failed save can leave the choices unknown (a failed re-read): never build from the stand-in empty set.
+		if (!ready) {
+			building = newPressed = false;
+			return;
+		}
 		const only = shown.map(handedOverKey);
 		let file: CalendarFile;
 		try {
