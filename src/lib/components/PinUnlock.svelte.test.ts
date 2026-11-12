@@ -1544,3 +1544,33 @@ describe('under forced colors', () => {
 		}
 	});
 });
+
+// WCAG 1.4.4 and 1.4.10: someone who scales text alone to 400 % on a 320 px phone still reaches every part of the
+// card without scrolling sideways. The app's text sizes come from these two variables.
+describe('at 400 % text on a 320 px screen', () => {
+	it('keeps every part of the card inside it', async () => {
+		const root = document.documentElement;
+		const restore = { width: window.innerWidth, height: window.innerHeight };
+		await page.viewport(320, 640);
+		root.style.setProperty('--font-size-base', '64px');
+		root.style.setProperty('--font-size-s', '56px');
+		try {
+			await mount();
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			const card = document.querySelector('.pin-unlock') as HTMLElement;
+			const edge = card.getBoundingClientRect().right;
+			const over = [...card.querySelectorAll<HTMLElement>('*')]
+				.filter((e) => e.getBoundingClientRect().right > edge + 0.5)
+				.map(
+					(e) =>
+						`${e.tagName}.${e.className} +${Math.round(e.getBoundingClientRect().right - edge)}`
+				);
+			expect(over).toEqual([]);
+			expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
+		} finally {
+			root.style.removeProperty('--font-size-base');
+			root.style.removeProperty('--font-size-s');
+			await page.viewport(restore.width, restore.height);
+		}
+	});
+});

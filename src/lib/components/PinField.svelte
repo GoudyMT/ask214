@@ -138,10 +138,12 @@
 </div>
 
 <style>
+	/* At a large text size the 10ch field is wider than a phone's card: it narrows to the room there is. */
 	.pin-field {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-s);
+		max-width: 100%;
 	}
 
 	.pin-label {
@@ -151,6 +153,7 @@
 
 	.pin {
 		width: 10ch;
+		max-width: 100%;
 		padding: var(--space-s);
 		font: inherit;
 		letter-spacing: 0.3em;
