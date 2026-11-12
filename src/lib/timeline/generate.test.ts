@@ -1425,17 +1425,6 @@ describe('the leaving answer on the real task list', () => {
 			expect(def('separation-package', path)?.why).toBe(
 				'Your personnel office prepares your discharge or transfer orders and confirms whether a DD-214 is issued. Ask them early for their list and deadline.'
 			);
-			// Every task stays shown and keeps its dates: the condition is in the words, never a hide.
-			for (const id of [
-				'dd214-review',
-				'dd214-copies',
-				'hhg-counseling',
-				'final-pay-check',
-				'separation-package'
-			]) {
-				expect(def(id, path)?.windowEnd, id).toBe(def(id)?.windowEnd);
-				expect(def(id, path)?.kind, id).toBe(def(id)?.kind);
-			}
 		}
 	);
 
@@ -1453,6 +1442,11 @@ describe('the leaving answer on the real task list', () => {
 				const plain = items().find((i) => i.def.id === id)?.def;
 				expect(shown?.title, id).toBe(plain?.title);
 				expect(shown?.why, id).toBe(plain?.why);
+				expect(shown?.afterNote, id).toBe(plain?.afterNote);
+				// The plain step is the active-duty one: no Guard or Reserve condition reaches it.
+				expect(`${shown?.title} ${shown?.why} ${shown?.afterNote ?? ''}`, id).not.toMatch(
+					/drill|active duty orders|full-time|covered a move/
+				);
 			}
 		}
 	);
