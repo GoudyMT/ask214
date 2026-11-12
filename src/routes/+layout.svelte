@@ -521,6 +521,9 @@
 		// control that starts in the window and runs under the bar is moved up, but never past its first line (the
 		// header's bottom while a move that short keeps it shown, the top of the window when the move hides it).
 		// The bar's own links stay put, and so does the page behind a modal dialog, which sits above the bar.
+		// At every width, Shift+Tab to a control above the window leaves it at the window's top edge, under the shown
+		// header, in both engines; it is moved down below the header (a slid-away header covers nothing). The skip link
+		// draws above the header.
 		const bar = document.querySelector('.bottom-bar');
 		const onFocusIn = ({ target }: FocusEvent) => {
 			if (!(target instanceof Element)) return;
@@ -528,15 +531,19 @@
 				state = startHeaderState(window.scrollY);
 				return setHidden(false);
 			}
-			if (!bar || target.closest('.bottom-bar,dialog[open]')) return;
+			if (target.closest('.bottom-bar,dialog[open],.skip-link')) return;
 			let frames = 30;
 			const check = () => {
 				if (document.activeElement !== target) return;
 				const { top, bottom } = target.getBoundingClientRect();
-				if (top >= window.innerHeight) {
+				if (top >= window.innerHeight || bottom <= 0) {
 					if (--frames) requestAnimationFrame(check);
 					return;
 				}
+				// The header's own box, not its sliding transform: a header coming back is counted where it lands.
+				const under = (el.hasAttribute('data-hidden') ? 0 : el.offsetHeight) - top;
+				if (under > 0) return window.scrollBy(0, -Math.ceil(under));
+				if (!bar || !phone.matches) return;
 				const room = bottom - bar.getBoundingClientRect().top;
 				const shift = Math.min(
 					room,
@@ -562,10 +569,10 @@
 		// Crossing 600px in either direction starts over: a header hidden on a phone must not stay hidden on a desktop.
 		const sync = () => {
 			stop();
+			document.addEventListener('focusin', onFocusIn);
 			if (!phone.matches) return;
 			state = startHeaderState(window.scrollY);
 			window.addEventListener('scroll', onScroll);
-			document.addEventListener('focusin', onFocusIn);
 			if (bar) sizer.observe(bar);
 		};
 		sync();

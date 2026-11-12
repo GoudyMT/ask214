@@ -252,6 +252,59 @@ describe('the root layout navigation', () => {
 		}
 	});
 
+	// WCAG 2.4.11: Shift+Tab to a control above the window scrolls it to the window's top edge in both engines, where the
+	// shown header covers it whole (a source title on About, the date field in setup). A focus that does not scroll, on
+	// a control placed under the header, stands in for that scroll here.
+	it.each([
+		[1280, 800],
+		[320, 640]
+	])('moves a focused control out from under the shown header at %ix%i', async (width, height) => {
+		await openAt(width, height);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 24px; margin: 0">control</p>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const control = holder.querySelector('p') as HTMLElement;
+			window.scrollBy(0, control.getBoundingClientRect().top - 15);
+			if (width < 600) await expect.poll(() => header.hasAttribute('data-hidden')).toBe(true);
+			// A scroll up shows a slid-away phone header again, as a Shift+Tab scroll up does; wait until it is back in place.
+			window.scrollBy(0, -5);
+			await expect.poll(() => header.getBoundingClientRect().bottom).toBe(header.offsetHeight);
+			expect(control.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+				header.getBoundingClientRect().bottom
+			);
+			control.focus({ preventScroll: true });
+			await expect
+				.poll(() => control.getBoundingClientRect().top >= header.getBoundingClientRect().bottom)
+				.toBe(true);
+		} finally {
+			holder.remove();
+		}
+	});
+
+	// A slid-away header covers nothing: a control at the top of the window must not pull the page down for it.
+	it('leaves the page where it is when a control sits under the hidden header at 320x640', async () => {
+		await openAt(320, 640);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 24px; margin: 0">control</p>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const control = holder.querySelector('p') as HTMLElement;
+			window.scrollBy(0, control.getBoundingClientRect().top - 10);
+			await expect.poll(() => header.getBoundingClientRect().bottom).toBeLessThanOrEqual(0);
+			const still = window.scrollY;
+			control.focus({ preventScroll: true });
+			await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+			expect(window.scrollY).toBe(still);
+		} finally {
+			holder.remove();
+		}
+	});
+
 	// WebKit scrolls a control focused from script to the window's bottom edge after focusin, without the scroll padding,
 	// so it lands partly under the bar. A scroll after the focus stands in for that engine here.
 	it('clears a control of the bar after the browser scrolls it into the window late at 320 px', async () => {
