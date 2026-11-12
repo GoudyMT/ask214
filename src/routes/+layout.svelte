@@ -523,7 +523,7 @@
 		// The bar's own links stay put, and so does the page behind a modal dialog, which sits above the bar.
 		// At every width, Shift+Tab to a control above the window leaves it at the window's top edge, under the shown
 		// header, in both engines; it is moved down below the header (a slid-away header covers nothing). The skip link
-		// draws above the header.
+		// needs no exception: it sits at the top of the page, where a move up does nothing.
 		const bar = document.querySelector('.bottom-bar');
 		const onFocusIn = ({ target }: FocusEvent) => {
 			if (!(target instanceof Element)) return;
@@ -531,7 +531,7 @@
 				state = startHeaderState(window.scrollY);
 				return setHidden(false);
 			}
-			if (target.closest('.bottom-bar,dialog[open],.skip-link')) return;
+			if (target.closest('.bottom-bar,dialog[open]')) return;
 			let frames = 30;
 			const check = () => {
 				if (document.activeElement !== target) return;
