@@ -201,8 +201,9 @@
 	     could name an event that is not out of date. -->
 	{#if ready}
 		<StaleEvents events={stale} onAcknowledge={acknowledge} />
-		<!-- A status region from the start, empty when there is nothing to say: a screen reader hears the count when it
-		     appears or changes, and, once the file is handed over, what is left to do. -->
+		<!-- A status region from the moment the panel is ready, empty when there is nothing to say: a screen reader hears
+		     the count when it appears or changes after that, and, once the file is handed over, what is left to do. A
+		     count already there when the panel becomes ready is read with the page, not announced. -->
 		<p id="cal-new-n" class="cal-hint cal-new__line" role="status">
 			{#if shown.length > 0}
 				Your calendar is missing {shown.length} new event{shown.length === 1 ? '' : 's'}.
