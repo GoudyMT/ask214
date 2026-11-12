@@ -186,6 +186,16 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
 	});
 
+	// Another tab's add, recorded here, takes the button away while a keyboard user sits on it without pressing: focus
+	// goes to the next thing to press, not the top of the page.
+	it('moves focus to Add to my calendar when the button goes while focused but not pressed', async () => {
+		const p = props({ missing: [missing('new')] });
+		const screen = await render(CalendarPanel, { props: p });
+		(screen.container.querySelector('.cal-new__add') as HTMLButtonElement).focus();
+		await screen.rerender({ ...p, missing: [] });
+		await expect.element(page.getByRole('button', { name: /^add to my calendar$/i })).toHaveFocus();
+	});
+
 	// Add is found by its class in older tests; the new button must not answer to it, or they would press the wrong one.
 	it('gives Add the new ones a class of its own', async () => {
 		const { container } = await render(CalendarPanel, {

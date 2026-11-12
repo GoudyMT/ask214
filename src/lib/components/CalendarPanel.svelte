@@ -130,12 +130,19 @@
 	const shown = $derived(missing.filter((e) => !sent.includes(handedOverKey(e))));
 	let newEl = $state<HTMLButtonElement | null>(null);
 
-	// "Add the new ones" goes once its events are handed over, with focus on it; focus moves to Add, the button left.
+	// "Add the new ones" goes once its events are handed over, with focus on it; focus moves to Add, the button left
+	// (the heading, when Add is off). The same when it goes while only focused: another tab's add, recorded here. Read
+	// before the button leaves the page, while it can still hold focus.
 	let newPressed = false;
+	let newHeld = false;
+	$effect.pre(() => {
+		if (shown.length === 0) newHeld = newEl !== null && document.activeElement === newEl;
+	});
 	$effect(() => {
-		if (shown.length > 0 || !newPressed) return;
-		newPressed = false;
-		if (document.activeElement === document.body) addEl?.focus({ preventScroll: true });
+		if (shown.length > 0 || !(newPressed || newHeld)) return;
+		newPressed = newHeld = false;
+		if (document.activeElement === document.body)
+			(addEl && !addEl.disabled ? addEl : headingEl)?.focus({ preventScroll: true });
 	});
 
 	// Not `disabled` while the file builds: a disabled button that holds focus drops it, so a press then is ignored.
