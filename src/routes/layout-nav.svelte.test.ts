@@ -362,6 +362,28 @@ describe('the root layout navigation', () => {
 		});
 	});
 
+	// WebKit's Shift+Tab can leave a date field 10 px above the window (setup's leaving date, measured): a control that
+	// fits below the header is moved there even when its top is already off the window.
+	it('moves a control left partly above the window out from under the header at 1280x800', async () => {
+		await openAt(1280, 800);
+		const header = document.querySelector('header') as HTMLElement;
+		const holder = document.createElement('div');
+		holder.innerHTML =
+			'<div style="height: 600px"></div><p tabindex="-1" style="height: 42px; margin: 0">control</p><div style="height: 1200px"></div>';
+		(document.querySelector('main') as HTMLElement).prepend(holder);
+		try {
+			const control = holder.querySelector('p') as HTMLElement;
+			window.scrollBy(0, control.getBoundingClientRect().top + 10);
+			expect(control.getBoundingClientRect().top).toBe(-10);
+			await keyboardFocus(control);
+			await expect
+				.poll(() => control.getBoundingClientRect().top >= header.getBoundingClientRect().bottom)
+				.toBe(true);
+		} finally {
+			holder.remove();
+		}
+	});
+
 	// WebKit scrolls a control focused by Shift+Tab to the window's top edge only after focusin: the check waits for it.
 	it('moves a control out from under the header after the browser scrolls it in late at 1280x800', async () => {
 		await openAt(1280, 800);

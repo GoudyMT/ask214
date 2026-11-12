@@ -540,9 +540,13 @@
 					if (--frames) requestAnimationFrame(check);
 					return;
 				}
-				// Keyboard focus only (a click lands where the pointer is), on a control whose top is still in the window: one
-				// already partly above it, or the page body the router focuses after Back or Forward, is left where it is.
-				if (top >= 0 && target.matches(':focus-visible')) {
+				// Keyboard focus only (a click lands where the pointer is), on a control that fits below the header: a long
+				// passage partly above the window, or the page body the router focuses after Back or Forward, is left where it
+				// is.
+				if (
+					bottom - top < window.innerHeight - el.offsetHeight &&
+					target.matches(':focus-visible')
+				) {
 					// The header's own box, not its sliding transform: a header coming back is counted where it lands.
 					const hidden = el.hasAttribute('data-hidden');
 					const under = (hidden ? 0 : el.offsetHeight) - top;
