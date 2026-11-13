@@ -190,7 +190,7 @@
 				{error}
 				onchange={onInput}
 				label="Separation date"
-				hint="The day your service is set to end. Ask your personnel office if you are not sure."
+				hint="The day you leave active duty or your Guard or Reserve unit. Ask your personnel office if you are not sure."
 			/>
 			<p class="wizard__today">Today on this device: {todayDisplay}</p>
 			<SeparationPathChoices

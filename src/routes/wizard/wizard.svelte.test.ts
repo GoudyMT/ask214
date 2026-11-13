@@ -129,14 +129,15 @@ describe('Wizard, a save that fails', () => {
 });
 
 // Each branch names this date differently (ETS, EAOS, DOS), and orders come late, so the hint names the day itself
-// and who to ask. "Service", not "active duty": a Guard or Reserve member leaving their own component uses it too.
+// and who to ask. A member leaving active duty may still owe Reserve time (10 USC 651(b)), so the hint names the day
+// they leave, and a Guard or Reserve member leaving their own unit uses it too.
 describe('Wizard, the separation date hint', () => {
 	it('describes the date in words every branch and component uses', async () => {
 		await render(WizardPage);
 		await expect
 			.element(page.getByLabelText('Separation date'))
 			.toHaveAccessibleDescription(
-				'The day your service is set to end. Ask your personnel office if you are not sure.'
+				'The day you leave active duty or your Guard or Reserve unit. Ask your personnel office if you are not sure.'
 			);
 	});
 });
