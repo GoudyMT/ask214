@@ -27,7 +27,8 @@ export type TaskCategory = 'medical' | 'admin' | 'benefits' | 'career' | 'financ
 /**
  * What a task must be finished before, from its source. 'separation': counted from separation alone - the two
  * leaving dates never move it. 'leaving': before the last day at the command, the day before the earlier of the
- * SkillBridge start and the terminal leave start (TAP must be complete before SkillBridge). 'terminal-leave':
+ * SkillBridge start and the terminal leave start (a service or command may require TAP before SkillBridge, so an
+ * earlier day is never late). 'terminal-leave':
  * before terminal leave only, so it may be done during SkillBridge (the separation health assessment). Required on
  * every task, so a new task cannot skip the choice.
  */

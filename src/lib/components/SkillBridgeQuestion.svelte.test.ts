@@ -119,7 +119,7 @@ describe('SkillBridgeQuestion', () => {
 		await expect
 			.element(
 				page.getByText(
-					"Also follow your unit's SkillBridge instructions: your service and command set what your request needs."
+					"Also follow your unit's SkillBridge instructions: your service and command set what your request needs, including whether TAP must be finished first."
 				)
 			)
 			.toBeVisible();

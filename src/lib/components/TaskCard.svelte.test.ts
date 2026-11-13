@@ -2018,7 +2018,7 @@ describe("the line above a SkillBridge step's links", () => {
 		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
 		const note = container.querySelector('.task-card__related-note');
 		expect(note?.textContent).toBe(
-			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs."
+			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs, including whether TAP must be finished first."
 		);
 		expect(note?.nextElementSibling?.tagName).toBe('UL');
 		expect(container.querySelectorAll('.task-card__related-list li')).toHaveLength(1);
