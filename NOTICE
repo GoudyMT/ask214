@@ -64,6 +64,11 @@ Government, which are not subject to copyright protection in the United States
 (tapevents.mil), VA guides (va.gov), and pages from militaryonesource.mil,
 tsp.gov, and dol.gov; every result links to its official source.
 
+One question is open: three TAP guides (the two DOL employment guides and the
+VA Benefits and Services participant guide) show contractor help in their file
+details. Each is published by its agency for free use and carries no copyright
+notice; DOL and VA were asked to confirm their status.
+
 The documents in static/docs/ are copies of U.S. Government PDFs from the
 same sources, served so an answer can open the cited page. Each copy keeps its
 text exactly and removes every picture whose own metadata does not state
