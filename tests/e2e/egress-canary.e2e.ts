@@ -248,6 +248,10 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		'enroll in FEDVIP dental',
 		"unless the board's exams stand in",
 		'you also need Part B',
+		'In the medical board process',
+		'If you are leaving drill status',
+		'within 1 year of your release',
+		'Retired Guard and Reserve members',
 		SBP_TITLE,
 		...PATH_TITLES.flatMap((title) => [title, title.replaceAll(',', `${BACKSLASH},`)]),
 		// A title inside a value someone base64-encoded, wherever in that value it starts.
