@@ -172,7 +172,7 @@ describe('CalendarPanel, with events the calendar is missing', () => {
 			props: {
 				...props({ onAdd }),
 				items: [task('old'), firm],
-				missing: [{ ...missing('firm'), moment: 'opens', title: 'Opens: firm' }]
+				missing: [{ ...missing('firm'), moment: 'opens', title: 'Start: firm' }]
 			}
 		});
 		await page.getByRole('button', { name: 'Add the new ones' }).click();

@@ -2,7 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cdp, page } from 'vitest/browser';
 import SkillBridgeQuestion from './SkillBridgeQuestion.svelte';
-import { RESOURCES } from '#lib/resources/index.js';
+import { COMMAND_INSTRUCTIONS, RESOURCES } from '#lib/resources/index.js';
 import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 const SKILLBRIDGE = RESOURCES.find((r) => r.id === 'skillbridge');
@@ -116,13 +116,7 @@ describe('SkillBridgeQuestion', () => {
 		const link = page.getByRole('link', { name: /About SkillBridge/ });
 		await expect.element(link).toHaveAttribute('href', SKILLBRIDGE?.url ?? 'missing');
 		await expect.element(link).toHaveAttribute('rel', 'noopener noreferrer external');
-		await expect
-			.element(
-				page.getByText(
-					"Also follow your unit's SkillBridge instructions: your service and command set what your request needs."
-				)
-			)
-			.toBeVisible();
+		await expect.element(page.getByText(COMMAND_INSTRUCTIONS)).toBeVisible();
 		const text = textOf(container);
 		expect(makesPersonalClaim(text), text).toBe(false);
 	});

@@ -3,6 +3,7 @@ import {
 	filterAndAnchor,
 	deriveStatus,
 	generateTimeline,
+	openingWord,
 	todayMarkerIndex,
 	type AnchoredTask
 } from './generate';
@@ -1310,7 +1311,8 @@ describe('the leaving answer on the real task list', () => {
 			'tamp-check',
 			'rcsbp-election',
 			'sbp-election',
-			'tricare-retiree-enroll'
+			'tricare-retiree-enroll',
+			'fedvip-dental'
 		]
 	};
 	const TAP = ['preseparation-counseling', 'tap-course', 'tap-track', 'tap-capstone'];
@@ -1428,6 +1430,82 @@ describe('the leaving answer on the real task list', () => {
 		}
 	);
 
+	// DTM 14-006 ties the exam to time on active duty (180 days, or a contingency tour over 30), and later Guard and
+	// Reserve guidance could not be read, so a Guard or Reserve member is told the step may not apply and who confirms
+	// it, never that leaving orders makes it required; every other answer keeps the plain step.
+	it.each(['reserve-component', 'reserve-retirement'] as const)(
+		'the %s answer says the separation exam may not apply and who confirms it',
+		(path) => {
+			for (const id of ['sha-schedule', 'sha-complete']) {
+				const shown = items(path).find((i) => i.def.id === id)?.def;
+				const plain = items().find((i) => i.def.id === id)?.def;
+				expect(shown?.title, id).toBe(
+					`If you need one, ${plain?.title.charAt(0).toLowerCase()}${plain?.title.slice(1)}`
+				);
+				expect(shown?.why, id).toBe(
+					`For the Guard or Reserve, whether you need a separation exam depends on your orders and how you leave; your military medical clinic confirms it. ${plain?.why}`
+				);
+				expect(shown?.afterNote, id).toBe(
+					'If you need one, it is still required before you separate. Contact your military medical clinic.'
+				);
+				expect(shown?.kind, id).toBe('required');
+				for (const other of ['ets', 'retirement'] as const) {
+					const def = items(other).find((i) => i.def.id === id)?.def;
+					expect(`${def?.title} ${def?.why} ${def?.afterNote}`, id).not.toMatch(
+						/drill|orders|If you need one/
+					);
+				}
+			}
+		}
+	);
+
+	// 38 CFR 3.400(b)(2)(i): "Day following separation from active service ... if claim is received within 1 year", where
+	// separation means from the continuous active service in which the disability was incurred or aggravated. A member
+	// leaving drill status has no separation from active service that day, so the year counts from that release.
+	it.each(['reserve-component', 'reserve-retirement'] as const)(
+		'the %s answer counts the claim year from the release from active service',
+		(path) => {
+			const def = (p?: SeparationPath) =>
+				items(p).find((i) => i.def.id === 'va-claim-fallback')?.def;
+			expect(def(path)?.why).toBe(
+				'If you did not file through BDD: for a claim VA receives within 1 year of your release from the active service in which your condition began or got worse, the effective date can be as early as the day after that release.'
+			);
+			expect(def(path)?.title).toBe(def()?.title);
+			expect(def('ets')?.why).toBe(def()?.why);
+		}
+	);
+
+	// va.gov's BDD page says IDES gives a member found unfit a proposed VA rating, and names no IDES exclusion from BDD;
+	// no source read says who picks the route, so the board member is sent to the coordinator who helps them file.
+	it('tells a board member who to ask which way to file their claim', () => {
+		const def = (p?: SeparationPath) => items(p).find((i) => i.def.id === 'va-bdd-claim')?.def;
+		const line =
+			'In the medical board process, ask your VA Military Service Coordinator which way to file; they help service members file their VA claim.';
+		expect(def('medical')?.why).toBe(`${def()?.why} ${line}`);
+		expect(def('medical')?.title).toBe(def()?.title);
+		for (const other of [undefined, 'ets', 'retirement'] as const) {
+			expect(def(other)?.why).not.toContain('Military Service Coordinator');
+		}
+	});
+
+	// No source read says every service's board runs through IDES, so the PEBLO step names IDES as one example.
+	it('names IDES as one disability evaluation process, not the only one', () => {
+		const why = items('medical').find((i) => i.def.id === 'peblo-contact')?.def.why;
+		expect(why).toBe(
+			'A Physical Evaluation Board Liaison Officer (PEBLO) guides service members through the disability evaluation process, such as the Integrated Disability Evaluation System (IDES). If the process moves your separation date, update it here.'
+		);
+	});
+
+	// The Coast Guard Pay and Personnel Center: "The tool available to all military members each payday is the Direct
+	// Access Payslip." The title reaches the calendar, so it names no one service's site.
+	it('names the pay account for every branch, the Coast Guard included', () => {
+		const def = items().find((i) => i.def.id === 'financial-docs')?.def;
+		expect(def?.title).toBe('Save your LES history, pay account access, and SGLI election');
+		expect(def?.why).toBe(
+			'You lose easy access to military pay records after you separate. Coast Guard members use Direct Access instead of myPay.'
+		);
+	});
+
 	it.each(['ets', 'retirement', 'medical'] as const)(
 		'the %s answer keeps the plain DD-214, move and leave steps',
 		(path) => {
@@ -1544,8 +1622,10 @@ describe('the leaving answer on the real task list', () => {
 
 	// BENEFEDS's fact sheet for retiring members (BEN10320 v.8): a member retiring from active duty may enroll in FEDVIP
 	// dental from 31 days before the retirement date to 60 days after; enrolling before that date avoids a gap; after
-	// the 60 days, the next open season. The sheet covers retiring from active duty, so a Guard or Reserve retirement,
-	// which may be from drill status, gets no dated window, and a board can separate a member instead of retiring them.
+	// the 60 days, the next open season. The Air Force's FEDVIP sheet adds "Retired Reserve members who are age 60 and
+	// older and under age 60 (gray area reservists)" and gives the window for "retiring from the uniformed services"
+	// without saying which date starts it for a transfer to the Retired Reserve, so that member is sent to BENEFEDS for
+	// it. A board can separate a member instead of retiring them.
 	it('gives a retiring member the FEDVIP dental step with its window and what is left after each edge', () => {
 		const def = (path: SeparationPath) =>
 			items(path).find((i) => i.def.id === 'fedvip-dental')?.def;
@@ -1569,7 +1649,30 @@ describe('the leaving answer on the real task list', () => {
 		expect(def('medical')?.title).toBe(retiring?.title);
 		expect(def('medical')?.changeNote).toBe(retiring?.changeNote);
 		expect(def('medical')?.afterNote).toBe(retiring?.afterNote);
+		const guard = def('reserve-retirement');
+		expect(guard?.why).toBe(
+			'Retired Guard and Reserve members, including those under 60 not yet drawing retired pay, can buy dental coverage through FEDVIP, on BENEFEDS.gov. For a member retiring from the uniformed services, enrollment opens 31 days before the retirement date; BENEFEDS.gov confirms which date starts your window.'
+		);
+		expect(guard?.title).toBe(retiring?.title);
+		expect(guard?.changeNote).toBe(retiring?.changeNote);
+		expect(guard?.afterNote).toBe(retiring?.afterNote);
 	});
+
+	// A source sets these openings for a member retiring from active duty only: for the Guard or Reserve retirement no
+	// source read names the day FEDVIP opens, and TRICARE Retired Reserve can be bought at any time, so that answer is
+	// told when to start, never that a window opens.
+	it.each(['fedvip-dental', 'tricare-retiree-enroll'])(
+		'says when to start %s for a Guard or Reserve retiree, and Opens for the others',
+		(id) => {
+			const def = (path: SeparationPath) => items(path).find((i) => i.def.id === id)?.def;
+			const guard = def('reserve-retirement');
+			expect(guard && openingWord(guard)).toBe('Start');
+			for (const path of ['retirement', 'medical'] as const) {
+				const shown = def(path);
+				expect(shown && openingWord(shown), path).toBe('Opens');
+			}
+		}
+	);
 
 	// The step lands above the retiree TRICARE step for these two answers, and either can end in a retirement that
 	// keeps TRICARE, so its first words send that member on. A drill-status retiree's TRICARE Reserve Select ends when
@@ -1622,7 +1725,10 @@ describe('the leaving answer on the real task list', () => {
 			expect(def('medical')?.title).toBe(def('ets')?.title);
 			for (const path of OTHER_ANSWERS) {
 				expect(def(path)?.why).not.toMatch(/board/);
-				expect(def(path)?.afterNote).toMatch(/^Still required before you separate/);
+				// A Guard or Reserve answer's note says it only if the exam applies; its own test pins that line.
+				expect(def(path)?.afterNote).toMatch(
+					/^(If you need one, it is still|Still) required before you separate\. Contact/
+				);
 			}
 		}
 	);

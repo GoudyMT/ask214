@@ -263,6 +263,29 @@ describe('firm deadlines match their official sources', () => {
 		expect(t?.finalEnd).toBe(finalEnd);
 	});
 
+	// "Opens" tells a member a window is shut until that day; it is said only where a source sets the opening, and every
+	// other task says when to start. A task joins this list only with its source and an opening that matches it.
+	it.each([
+		// va.gov pre-discharge claim - "a known separation date with 180 to 90 days left on active duty"
+		['va-bdd-claim', -180],
+		// healthcare.gov - a Marketplace period opens for coverage a person expects to lose "in the next 60 days"
+		['tricare-elect', -60],
+		// tricare.mil counts the 90 days from the retirement date and gives no way to enroll before it
+		['tricare-retiree-enroll', 0],
+		// BENEFEDS for retiring members - enroll from 31 days before the retirement date
+		['fedvip-dental', -31]
+	] as const)('says "Opens" for %s, whose opening a source sets at %d', (id, windowStart) => {
+		expect(at(id)?.opensBySource).toBe(true);
+		expect(at(id)?.windowStart).toBe(windowStart);
+	});
+
+	it('says "Opens" for no other task', () => {
+		const sourced = TASK_DEFS.filter((t) => t.opensBySource).map((t) => t.id);
+		expect(sourced.sort()).toEqual(
+			['fedvip-dental', 'tricare-elect', 'tricare-retiree-enroll', 'va-bdd-claim'].sort()
+		);
+	});
+
 	// Copy that has to carry the condition its source carries, so a later edit cannot drop it.
 	it('keeps the conditions the sources state in the coverage, move, VGLI and TAP lines', () => {
 		// tricare.mil: TAMP gives 180 more days of coverage, and the CHCBP window runs from the end of TAMP.

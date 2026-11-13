@@ -504,9 +504,10 @@ export const TASK_AFTER_LINK: Record<string, { resource: string; label: string }
 };
 
 // One line shown above a task card's links: each service and command sets what its SkillBridge request needs, and
-// the links cannot hold that.
+// the links cannot hold that. No DoD-wide rule read so far says TAP comes first; a service or command may require it,
+// so the line says who decides.
 export const COMMAND_INSTRUCTIONS =
-	"Also follow your unit's SkillBridge instructions: your service and command set what your request needs.";
+	"Also follow your unit's SkillBridge instructions: your service and command set what your request needs, including whether TAP must be finished first.";
 export const TASK_LINK_NOTE: Record<string, string> = {
 	'skillbridge-find': COMMAND_INSTRUCTIONS,
 	'skillbridge-request': COMMAND_INSTRUCTIONS

@@ -93,6 +93,20 @@ function dd214OnOrders(def: TaskDef): TaskDef {
 		why: `${DD214_ON_ORDERS} ${def.why}`
 	});
 }
+// DTM 14-006 ties the separation exam to time on active duty (180 days, or a contingency tour over 30), and later
+// Guard and Reserve guidance could not be read, so the member is told the step may not apply and who confirms it; the
+// late note keeps the step required only if it applies.
+const SHA_GUARD_RESERVE =
+	'For the Guard or Reserve, whether you need a separation exam depends on your orders and how you leave; your military medical clinic confirms it.';
+function shaForGuardOrReserve(def: TaskDef): TaskDef {
+	return forGuardOrReserve(def, {
+		title: `If you need one, ${def.title.charAt(0).toLowerCase()}${def.title.slice(1)}`,
+		why: `${SHA_GUARD_RESERVE} ${def.why}`,
+		...(def.afterNote && {
+			afterNote: def.afterNote.replace(/^Still required/, 'If you need one, it is still required')
+		})
+	});
+}
 
 const RETIRING_RCSBP_TITLE =
 	'If you are retiring from the Guard or Reserve with your 20-year letter, make your Reserve SBP choice within 90 days of it';
@@ -385,37 +399,41 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- Separation health assessment + VA claim (BDD) ----
-	forBoard(
-		BOARD_EXAMS,
-		{
-			id: 'sha-schedule',
-			title: 'Schedule your Separation Health Assessment (SHA)',
-			category: 'medical',
-			finishBefore: 'terminal-leave',
-			kind: 'required',
-			windowStart: -180,
-			windowEnd: -90,
-			recommendedOffset: -150,
-			why: 'Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your military medical clinic.',
-			afterNote: 'Still required before you separate. Contact your military medical clinic.'
-		},
-		BOARD_EXAMS_AFTER
+	shaForGuardOrReserve(
+		forBoard(
+			BOARD_EXAMS,
+			{
+				id: 'sha-schedule',
+				title: 'Schedule your Separation Health Assessment (SHA)',
+				category: 'medical',
+				finishBefore: 'terminal-leave',
+				kind: 'required',
+				windowStart: -180,
+				windowEnd: -90,
+				recommendedOffset: -150,
+				why: 'Book your separation exam early. If you file a VA claim through BDD, VA usually does this exam and shares the results with the military, and VA may also ask you to come in for exams on the conditions you claim. If you are not filing through BDD, book it through your military medical clinic.',
+				afterNote: 'Still required before you separate. Contact your military medical clinic.'
+			},
+			BOARD_EXAMS_AFTER
+		)
 	),
-	forBoard(
-		BOARD_EXAMS,
-		{
-			id: 'sha-complete',
-			title: 'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
-			category: 'medical',
-			finishBefore: 'terminal-leave',
-			kind: 'required',
-			windowStart: -150,
-			windowEnd: -90,
-			recommendedOffset: -120,
-			why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
-			afterNote: 'Still required before you separate. Contact your military medical clinic.'
-		},
-		BOARD_EXAMS_AFTER
+	shaForGuardOrReserve(
+		forBoard(
+			BOARD_EXAMS,
+			{
+				id: 'sha-complete',
+				title: 'Complete your SHA (physical, dental, audiogram) and the Part A self-assessment',
+				category: 'medical',
+				finishBefore: 'terminal-leave',
+				kind: 'required',
+				windowStart: -150,
+				windowEnd: -90,
+				recommendedOffset: -120,
+				why: 'Part A is the self-assessment your VA (BDD) claim is built on.',
+				afterNote: 'Still required before you separate. Contact your military medical clinic.'
+			},
+			BOARD_EXAMS_AFTER
+		)
 	),
 	{
 		id: 'va-bdd-claim',
@@ -423,24 +441,33 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		category: 'benefits',
 		finishBefore: 'separation',
 		kind: 'closes',
+		// va.gov: "a known separation date with 180 to 90 days left on active duty".
 		windowStart: -180,
+		opensBySource: true,
 		windowEnd: -90,
 		recommendedOffset: -120,
 		why: BDD_WHY,
 		afterNote: `BDD is no longer available. ${BDD_FALLBACK}`,
 		// va.gov: BDD is for "a service member on full-time active duty (including a member of the National Guard, Reserve,
-		// or Coast Guard)", so a member leaving drill status cannot use it.
-		copyFor: Object.fromEntries(
-			GUARD_OR_RESERVE.map((path) => [
-				path,
-				{
-					title:
-						'If you are on full-time active duty, file your VA disability claim through BDD (Benefits Delivery at Discharge)',
-					why: `BDD is for members on full-time active duty, the Guard and Reserve included. ${BDD_WHY}`,
-					afterNote: `If BDD applied to you, it is no longer available. ${BDD_FALLBACK}`
-				}
-			])
-		)
+		// or Coast Guard)", so a member leaving drill status cannot use it. The same page says IDES gives a member found
+		// unfit a proposed VA rating and names no IDES exclusion from BDD; no source read says who picks the route, so a
+		// board member is sent to the coordinator who helps them file.
+		copyFor: {
+			...Object.fromEntries(
+				GUARD_OR_RESERVE.map((path) => [
+					path,
+					{
+						title:
+							'If you are on full-time active duty, file your VA disability claim through BDD (Benefits Delivery at Discharge)',
+						why: `BDD is for members on full-time active duty, the Guard and Reserve included. ${BDD_WHY}`,
+						afterNote: `If BDD applied to you, it is no longer available. ${BDD_FALLBACK}`
+					}
+				])
+			),
+			medical: {
+				why: `${BDD_WHY} In the medical board process, ask your VA Military Service Coordinator which way to file; they help service members file their VA claim.`
+			}
+		}
 	},
 
 	// ---- Shown only for the leaving answer they belong to (10 USC 1142 and 1448; tricare.mil TAMP; health.mil IDES) ----
@@ -494,7 +521,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: -365,
 		windowEnd: 0,
 		recommendedOffset: -300,
-		why: 'A Physical Evaluation Board Liaison Officer (PEBLO) guides service members through the whole Integrated Disability Evaluation System (IDES). If the process moves your separation date, update it here.',
+		why: 'A Physical Evaluation Board Liaison Officer (PEBLO) guides service members through the disability evaluation process, such as the Integrated Disability Evaluation System (IDES). If the process moves your separation date, update it here.',
 		offCalendar: true,
 		requires: { separationPath: ['medical'] }
 	},
@@ -568,6 +595,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		kind: 'closes',
 		// tricare.mil counts the 90 days from the retirement date and gives no way to enroll before it.
 		windowStart: 0,
+		opensBySource: true,
 		windowEnd: 90,
 		// tricare.mil allows a retroactive request "up to 12 months"; 365 days never runs past that.
 		finalEnd: 365,
@@ -583,8 +611,10 @@ export const TASK_DEFS: readonly TaskDef[] = [
 				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. If the board separates you instead, or you are in the Guard or Reserve and it does not retire you, tricare.mil lists what may apply.'
 			},
 			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
-			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.
+			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose. TRICARE Retired Reserve
+			// can be bought at any time, so no source sets this answer's opening.
 			'reserve-retirement': {
+				opensBySource: false,
 				title: 'Check your TRICARE plan within 90 days of your retirement date',
 				why: 'If you have TRICARE Reserve Select, it ends when you transfer to the Retired Reserve; buying TRICARE Retired Reserve within 90 days of your retirement date avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
 				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date. ${TRR_ANYTIME}`,
@@ -595,7 +625,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'fedvip-dental',
-		// The title reaches the calendar file, so both answers share it.
+		// The title reaches the calendar file, so every answer that sees the step shares it.
 		title: 'If you retire, enroll in FEDVIP dental before your retirement date',
 		category: 'benefits',
 		finishBefore: 'separation',
@@ -603,6 +633,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// BENEFEDS's fact sheet for retiring members: enrollment opens 31 days before the retirement date, enrolling
 		// before that date avoids a gap, and the window closes 60 days after it.
 		windowStart: -31,
+		opensBySource: true,
 		windowEnd: -1,
 		finalEnd: 60,
 		why: FEDVIP_WHY,
@@ -610,12 +641,18 @@ export const TASK_DEFS: readonly TaskDef[] = [
 			'If you retired, you can still enroll within 60 days after your retirement date, with a gap in dental coverage until the plan starts.',
 		afterNote:
 			'If you retired and missed the 60 days, you can enroll during the Federal Benefits Open Season, each November into December.',
-		// The sheet covers a member retiring from active duty, so the Guard or Reserve retirement, which may be from drill
-		// status, is left out; a board can separate a member instead of retiring them.
+		// The Air Force's FEDVIP sheet names "Retired Reserve members who are age 60 and older and under age 60 (gray area
+		// reservists)" as eligible and gives the window for "retiring from the uniformed services", without saying which
+		// date starts it for a transfer to the Retired Reserve, so that member is sent to BENEFEDS for it and told when to
+		// start, not that the window opens. A board can separate a member instead of retiring them.
 		copyFor: {
-			medical: { why: `If the board retires you from active duty: ${FEDVIP_WHY}` }
+			medical: { why: `If the board retires you from active duty: ${FEDVIP_WHY}` },
+			'reserve-retirement': {
+				why: 'Retired Guard and Reserve members, including those under 60 not yet drawing retired pay, can buy dental coverage through FEDVIP, on BENEFEDS.gov. For a member retiring from the uniformed services, enrollment opens 31 days before the retirement date; BENEFEDS.gov confirms which date starts your window.',
+				opensBySource: false
+			}
 		},
-		requires: { separationPath: ['retirement', 'medical'] }
+		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
 	},
 
 	// ---- Capstone + final-90 ----
@@ -658,14 +695,16 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'financial-docs',
-		title: 'Save your LES history, myPay access, and SGLI election',
+		// The Coast Guard Pay and Personnel Center: "The tool available to all military members each payday is the Direct
+		// Access Payslip." The title reaches the calendar, so it names no one service's site.
+		title: 'Save your LES history, pay account access, and SGLI election',
 		category: 'finance',
 		finishBefore: 'separation',
 		kind: 'soft',
 		windowStart: -120,
 		windowEnd: -30,
 		recommendedOffset: -90,
-		why: 'You lose easy access to military pay records after you separate.'
+		why: 'You lose easy access to military pay records after you separate. Coast Guard members use Direct Access instead of myPay.'
 	},
 	forGuardOrReserve(
 		{
@@ -725,7 +764,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		category: 'benefits',
 		finishBefore: 'separation',
 		kind: 'closes',
+		// healthcare.gov: a Marketplace period opens for coverage a person expects to lose in the next 60 days.
 		windowStart: -60,
+		opensBySource: true,
 		windowEnd: 60,
 		recommendedOffset: -14,
 		why: ELECT_WHY,
@@ -812,6 +853,17 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowStart: 0,
 		windowEnd: 365,
 		recommendedOffset: 14,
-		why: 'If you did not file through BDD: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.'
+		why: 'If you did not file through BDD: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.',
+		// 38 CFR 3.400(b)(2)(i): "Day following separation from active service ... if claim is received within 1 year", where
+		// separation means from the continuous active service in which the disability was incurred or aggravated. A member
+		// leaving drill status has no separation from active service that day, so the year counts from that release.
+		copyFor: Object.fromEntries(
+			GUARD_OR_RESERVE.map((path) => [
+				path,
+				{
+					why: 'If you did not file through BDD: for a claim VA receives within 1 year of your release from the active service in which your condition began or got worse, the effective date can be as early as the day after that release.'
+				}
+			])
+		)
 	}
 ];

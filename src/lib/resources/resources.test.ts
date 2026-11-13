@@ -224,7 +224,7 @@ describe("the line shown above a task card's links", () => {
 
 	it('is read by task id, and absent for any other task', () => {
 		expect(linkNoteForTask('skillbridge-request')).toBe(
-			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs."
+			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs, including whether TAP must be finished first."
 		);
 		expect(linkNoteForTask('skillbridge-find')).toBe(linkNoteForTask('skillbridge-request'));
 		expect(linkNoteForTask('tap-course')).toBeUndefined();

@@ -626,7 +626,7 @@
 						id="eaos"
 						label="Separation date"
 						value={currentEaos}
-						hint="The day your service is set to end. Ask your personnel office if you are not sure."
+						hint="The day you leave active duty or your Guard or Reserve unit. Ask your personnel office if you are not sure."
 						onSave={saveEaos}
 					/>
 					<SkillBridgePlanRow

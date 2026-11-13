@@ -27,7 +27,8 @@ export type TaskCategory = 'medical' | 'admin' | 'benefits' | 'career' | 'financ
 /**
  * What a task must be finished before, from its source. 'separation': counted from separation alone - the two
  * leaving dates never move it. 'leaving': before the last day at the command, the day before the earlier of the
- * SkillBridge start and the terminal leave start (TAP must be complete before SkillBridge). 'terminal-leave':
+ * SkillBridge start and the terminal leave start (a service or command may require TAP before SkillBridge, so an
+ * earlier day is never late). 'terminal-leave':
  * before terminal leave only, so it may be done during SkillBridge (the separation health assessment). Required on
  * every task, so a new task cannot skip the choice.
  */
@@ -65,6 +66,9 @@ export type TaskDef = {
 	 *  leave". */
 	countsFrom?: 'leaving';
 	windowStart: number; // days vs EAOS, or vs the leaving day for countsFrom; negative = before it
+	/** A source sets the day the window opens, so it is worded "Opens"; elsewhere the opening is a suggested start.
+	 *  A leaving answer the source does not cover sets it false in `copyFor`. */
+	opensBySource?: boolean;
 	windowEnd: number;
 	kind: TaskKind;
 	/** A second edge, days vs EAOS: the task changes at windowEnd and closes here (VGLI). */
@@ -84,7 +88,13 @@ export type TaskDef = {
 	copyFor?: Partial<
 		Record<
 			SeparationPath,
-			{ title?: string; why?: string; afterNote?: string; changeNote?: string }
+			{
+				title?: string;
+				why?: string;
+				afterNote?: string;
+				changeNote?: string;
+				opensBySource?: false;
+			}
 		>
 	>;
 	/** Kept out of the calendar file: its title tells whoever sees that calendar about the member's health. */

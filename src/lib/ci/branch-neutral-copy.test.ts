@@ -27,8 +27,9 @@ function userFacingCopy(): Array<[string, string]> {
 		if (def.afterNote) copy.push([`task ${def.id} afterNote`, def.afterNote]);
 		if (def.changeNote) copy.push([`task ${def.id} changeNote`, def.changeNote]);
 		for (const [path, words] of Object.entries(def.copyFor ?? {})) {
+			// A path's copy also carries the opening-word flag, which is not text a member reads.
 			for (const [field, line] of Object.entries(words)) {
-				copy.push([`task ${def.id} ${field} for ${path}`, line]);
+				if (typeof line === 'string') copy.push([`task ${def.id} ${field} for ${path}`, line]);
 			}
 		}
 	}

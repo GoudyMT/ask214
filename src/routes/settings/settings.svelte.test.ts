@@ -270,3 +270,27 @@ describe('Settings, a date saved while another tab changed the profile', () => {
 		expect(store.refresh).toHaveBeenCalledTimes(1);
 	});
 });
+
+// The member edits here the date setup asked for, so the field carries setup's hint: the day they leave, not the end
+// of a service obligation that may run on in the Reserve (10 USC 651(b)).
+describe('Settings, the separation date hint', () => {
+	it('describes the date as setup does', async () => {
+		app.store = store;
+		app.timeline = {
+			ready: true,
+			failed: false,
+			locked: false,
+			state: { schemaVersion: 1, tasks: {} }
+		};
+		app.calendar = { ready: true, exclusions: { taskIds: [], categories: [] }, lastAdd: [] };
+
+		await render(SettingsPage);
+		const section = page.getByRole('region', { name: 'Transition timeline' });
+		await section.getByRole('button', { name: /^Separation date/ }).click();
+		await expect
+			.element(page.getByLabelText('Separation date', { exact: true }))
+			.toHaveAccessibleDescription(
+				'The day you leave active duty or your Guard or Reserve unit. Ask your personnel office if you are not sure.'
+			);
+	});
+});

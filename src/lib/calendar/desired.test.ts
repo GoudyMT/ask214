@@ -63,9 +63,11 @@ describe('computeDesiredEvents', () => {
 		expect(computeDesiredEvents([snoozed], NONE, TODAY)[0]?.isoDate).toBe('2026-12-01');
 	});
 
-	it('gives a firm task an "Opens" event and a "Last day" event with alerts 30, 7 and 1 days before', () => {
+	// Most firm openings are the app's suggestion, so the event says when to start; "Opens" is kept for an opening a
+	// source sets. The moment stays the same, so the event keeps its UID whichever word it carries.
+	it('gives a firm task a "Start" event and a "Last day" event with alerts 30, 7 and 1 days before', () => {
 		expect(computeDesiredEvents([item(def('b', 'closes'))], NONE, TODAY)).toEqual([
-			{ taskId: 'b', moment: 'opens', title: 'Opens: b', isoDate: '2026-11-01', alarmDays: [] },
+			{ taskId: 'b', moment: 'opens', title: 'Start: b', isoDate: '2026-11-01', alarmDays: [] },
 			{
 				taskId: 'b',
 				moment: 'last',
@@ -84,8 +86,8 @@ describe('computeDesiredEvents', () => {
 		]);
 	});
 
-	it('marks both edges of a two-edge task', () => {
-		const vgli = item(def('v', 'closes', { finalEnd: 485 }), {
+	it('marks both edges of a two-edge task, and its opening as a source sets it', () => {
+		const vgli = item(def('v', 'closes', { finalEnd: 485, opensBySource: true }), {
 			windowEndDate: '2027-09-15',
 			finalEndDate: '2028-05-17'
 		});
