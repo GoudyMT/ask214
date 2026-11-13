@@ -1,6 +1,6 @@
 import { formatTimelineDate } from './format-date';
 import { afterYouLeaveWord, selectNeedsNow } from './needs-now';
-import { generateTimeline, type DisplayStatus, type TimelineItem } from './generate';
+import { generateTimeline, openingWord, type DisplayStatus, type TimelineItem } from './generate';
 import { TASK_DEFS } from './task-defs';
 import type { TimelineState } from './types';
 import type { PersonaFilters } from '../profile/persona';
@@ -45,14 +45,13 @@ const OPENS_LATER: ReadonlySet<DisplayStatus> = new Set(['upcoming', 'after-you-
 /** The date a Next task is known by, worded as its card words it (lower case, inside a sentence). */
 function nextWhen(item: TimelineItem): string {
 	const f = formatTimelineDate;
+	const opening = `${openingWord(item.def).toLowerCase()} ${f(item.windowStartDate)}`;
 	switch (item.status) {
 		case 'upcoming':
-			return `opens ${f(item.windowStartDate)}`;
+			return opening;
 		case 'after-you-leave':
 			// An opening already past is not news once the user has left; the card drops it too.
-			return item.leftCommand?.opened
-				? 'by your separation date'
-				: `opens ${f(item.windowStartDate)}`;
+			return item.leftCommand?.opened ? 'by your separation date' : opening;
 		case 'start-now':
 			return item.def.kind === 'soft'
 				? `aim for ${f(item.aimDate ?? item.windowEndDate)}`

@@ -66,6 +66,8 @@ export type TaskDef = {
 	 *  leave". */
 	countsFrom?: 'leaving';
 	windowStart: number; // days vs EAOS, or vs the leaving day for countsFrom; negative = before it
+	/** A source sets the day the window opens, so it is worded "Opens"; elsewhere the opening is a suggested start. */
+	opensBySource?: true;
 	windowEnd: number;
 	kind: TaskKind;
 	/** A second edge, days vs EAOS: the task changes at windowEnd and closes here (VGLI). */

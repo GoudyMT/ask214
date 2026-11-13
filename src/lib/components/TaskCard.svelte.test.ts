@@ -112,13 +112,28 @@ describe('TaskCard (open states)', () => {
 		expect(rel).toContain('noreferrer');
 	});
 
-	it('upcoming: "Upcoming" + when the window opens', async () => {
+	// Most openings are the app's suggestion, so the card says when to start; "Opens" is kept for an opening a source
+	// sets, which a member may not act before.
+	it('upcoming: "Upcoming" + when to start, where no source sets the opening', async () => {
 		const { container } = await renderCard(
 			makeItem({ status: 'upcoming', windowStartDate: '2027-03-16' })
 		);
 		expect(container.querySelector('article')?.classList.contains('status-upcoming')).toBe(true);
 		expect(container.textContent).toContain('Upcoming');
+		expect(container.textContent).toContain('Start Mar 16, 2027');
+		expect(container.textContent).not.toContain('Opens');
+	});
+
+	it('upcoming: "Opens" where a source sets the opening', async () => {
+		const { container } = await renderCard(
+			makeItem({
+				def: { ...DEF, opensBySource: true },
+				status: 'upcoming',
+				windowStartDate: '2027-03-16'
+			})
+		);
 		expect(container.textContent).toContain('Opens Mar 16, 2027');
+		expect(container.textContent).not.toContain('Start Mar');
 	});
 
 	it('start-now, soft: "Start now" + "Aim for <aim date>"', async () => {
@@ -1933,7 +1948,7 @@ describe('leaving your command', () => {
 			makeItem({ def: firmDef, status: 'after-you-leave', windowStartDate: '2026-12-01' })
 		);
 		await expect.element(page.getByText('After you leave', { exact: true })).toBeVisible();
-		await expect.element(page.getByText('Opens Dec 1, 2026')).toBeVisible();
+		await expect.element(page.getByText('Start Dec 1, 2026')).toBeVisible();
 		await expect
 			.element(
 				page.getByText(
@@ -1959,7 +1974,7 @@ describe('leaving your command', () => {
 			'You have left your command. Do this by your separation date if you can.'
 		);
 		expect(box).not.toContain('Ask your command');
-		await expect.element(page.getByText('Opens Dec 1, 2026')).toBeVisible();
+		await expect.element(page.getByText('Start Dec 1, 2026')).toBeVisible();
 	});
 
 	it('once the user has left the command, the status word is "Since you left"', async () => {
@@ -1984,7 +1999,7 @@ describe('leaving your command', () => {
 				leftCommand: { opened: true }
 			})
 		);
-		expect(container.textContent).not.toContain('Opens');
+		expect(container.textContent).not.toMatch(/(Opens|Start) Dec/);
 		expect(container.textContent).not.toContain('Dec 1, 2026');
 		expect(container.querySelector('.task-card__whatnow')?.textContent).toContain(
 			'You have left your command.'

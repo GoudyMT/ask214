@@ -440,7 +440,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		category: 'benefits',
 		finishBefore: 'separation',
 		kind: 'closes',
+		// va.gov: "a known separation date with 180 to 90 days left on active duty".
 		windowStart: -180,
+		opensBySource: true,
 		windowEnd: -90,
 		recommendedOffset: -120,
 		why: BDD_WHY,
@@ -591,6 +593,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		kind: 'closes',
 		// tricare.mil counts the 90 days from the retirement date and gives no way to enroll before it.
 		windowStart: 0,
+		opensBySource: true,
 		windowEnd: 90,
 		// tricare.mil allows a retroactive request "up to 12 months"; 365 days never runs past that.
 		finalEnd: 365,
@@ -626,6 +629,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		// BENEFEDS's fact sheet for retiring members: enrollment opens 31 days before the retirement date, enrolling
 		// before that date avoids a gap, and the window closes 60 days after it.
 		windowStart: -31,
+		opensBySource: true,
 		windowEnd: -1,
 		finalEnd: 60,
 		why: FEDVIP_WHY,
@@ -755,7 +759,9 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		category: 'benefits',
 		finishBefore: 'separation',
 		kind: 'closes',
+		// healthcare.gov: a Marketplace period opens for coverage a person expects to lose in the next 60 days.
 		windowStart: -60,
+		opensBySource: true,
 		windowEnd: 60,
 		recommendedOffset: -14,
 		why: ELECT_WHY,

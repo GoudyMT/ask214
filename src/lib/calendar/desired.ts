@@ -1,4 +1,4 @@
-import type { TimelineItem } from '../timeline/generate';
+import { openingWord, type TimelineItem } from '../timeline/generate';
 import { addDays } from '../timeline/day-math';
 import type { TaskExclusions, DesiredEvent, EventMoment } from './types';
 
@@ -6,8 +6,8 @@ import type { TaskExclusions, DesiredEvent, EventMoment } from './types';
 const FIRM_ALARM_DAYS = [30, 7, 1];
 const SOFT_ALARM_DAYS = [7];
 
-const PREFIX: Record<EventMoment, string> = {
-	opens: 'Opens: ',
+// A window's first day is worded by the task: "Opens" where a source sets it, else "Start".
+const PREFIX: Record<Exclude<EventMoment, 'opens'>, string> = {
 	changes: 'Changes: ',
 	last: 'Last day: ',
 	aim: 'Aim for: ',
@@ -17,7 +17,7 @@ const PREFIX: Record<EventMoment, string> = {
 /**
  * Project the timeline into the shared desired-event set: for each pending, non-excluded task, one event per
  * moment that is today or later. A soft task gets one "Aim for" event (its snooze date while snoozed); a firm
- * task gets "Opens" while its window is still ahead and "Last day" (a two-edge task also "Changes"), and a
+ * task gets "Opens" or "Start" while its window is still ahead and "Last day" (a two-edge task also "Changes"), and a
  * snooze never moves those. A task that cannot fit before the user leaves the command gets one "Before you leave"
  * event on the last day there, and no Opens or Last day event. Alerts are kept only while still ahead, so an
  * import never fires a stale one. Pure + deterministic; `todayIso` injected.
@@ -37,7 +37,7 @@ export function computeDesiredEvents(
 		out.push({
 			taskId: it.def.id,
 			moment,
-			title: PREFIX[moment] + it.def.title,
+			title: (moment === 'opens' ? `${openingWord(it.def)}: ` : PREFIX[moment]) + it.def.title,
 			isoDate,
 			alarmDays
 		});

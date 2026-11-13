@@ -124,7 +124,11 @@ describe('timelineRow', () => {
 	it('words each kind of next date as its card does', () => {
 		const next = (i: TimelineItem) => timelineRow(ready([i])).detail;
 		expect(next(item('up', 'upcoming', { windowStartDate: '2027-01-10' }))).toBe(
-			'Next: Title of up - opens Jan 10, 2027'
+			'Next: Title of up - start Jan 10, 2027'
+		);
+		const sourced = { ...item('set', 'upcoming').def, opensBySource: true as const };
+		expect(next(item('set', 'upcoming', { def: sourced, windowStartDate: '2027-01-10' }))).toBe(
+			'Next: Title of set - opens Jan 10, 2027'
 		);
 		expect(next(item('firm', 'start-now', { windowStartDate: '2026-08-01' }))).toBe(
 			'Next: Title of firm - last day Nov 20, 2026'
@@ -147,7 +151,7 @@ describe('timelineRow', () => {
 				item('jan', 'upcoming', { windowStartDate: '2027-01-10' })
 			])
 		);
-		expect(row.detail).toBe('Next: Title of jan - opens Jan 10, 2027');
+		expect(row.detail).toBe('Next: Title of jan - start Jan 10, 2027');
 	});
 
 	it('names a soft task that opens after you leave by its opening date, against other later tasks', () => {
@@ -157,7 +161,7 @@ describe('timelineRow', () => {
 		});
 		const march = item('march', 'upcoming', { windowStartDate: '2027-03-01' });
 		expect(timelineRow(ready([march, leave])).detail).toBe(
-			'Next: Title of leave - opens Jan 10, 2027'
+			'Next: Title of leave - start Jan 10, 2027'
 		);
 	});
 
@@ -172,7 +176,7 @@ describe('timelineRow', () => {
 			'Next: Title of leave - by your separation date'
 		);
 		const notYet = { ...leave, windowStartDate: '2027-01-10', leftCommand: { opened: false } };
-		expect(timelineRow(ready([notYet])).detail).toBe('Next: Title of leave - opens Jan 10, 2027');
+		expect(timelineRow(ready([notYet])).detail).toBe('Next: Title of leave - start Jan 10, 2027');
 	});
 
 	it('names a still-to-do task with a lapsed aim without its old date', () => {
@@ -201,7 +205,7 @@ describe('timelineRow', () => {
 				item('up', 'upcoming', { windowStartDate: '2027-01-10' })
 			])
 		);
-		expect(row.detail).toBe('Next: Title of up - opens Jan 10, 2027');
+		expect(row.detail).toBe('Next: Title of up - start Jan 10, 2027');
 	});
 
 	it('says all tasks are done when every task is done or skipped', () => {

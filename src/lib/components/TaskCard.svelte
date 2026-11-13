@@ -15,7 +15,12 @@
 		linkNoteForTask
 	} from '#lib/resources/index.js';
 	import { MAX_NOTE_UNITS } from '#lib/backup/note-cap.js';
-	import { closedOnDate, isFirmWarning, type FitReason } from '#lib/timeline/generate.js';
+	import {
+		closedOnDate,
+		isFirmWarning,
+		openingWord,
+		type FitReason
+	} from '#lib/timeline/generate.js';
 	import { afterYouLeaveWord } from '#lib/timeline/needs-now.js';
 
 	let {
@@ -280,9 +285,9 @@
 		switch (item.status) {
 			case 'after-you-leave':
 				if (item.leftCommand?.opened) return { text: '' };
-				return { text: `Opens ${f(item.windowStartDate)}` };
+				return { text: `${openingWord(item.def)} ${f(item.windowStartDate)}` };
 			case 'upcoming':
-				return { text: `Opens ${f(item.windowStartDate)}` };
+				return { text: `${openingWord(item.def)} ${f(item.windowStartDate)}` };
 			case 'start-now':
 				return firm
 					? at('Last day', item.windowEndDate)

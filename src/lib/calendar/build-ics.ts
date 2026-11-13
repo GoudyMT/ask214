@@ -33,7 +33,7 @@ export async function buildIcs(
 }
 
 /** "Last day", "Aim for" and "Before you leave" keep the task's original calendar ID, so an app that matches events
- *  by ID moves the one a user already added when a task stops (or starts) fitting; "Opens" and "Changes" are new
+ *  by ID moves the one a user already added when a task stops (or starts) fitting; "Opens" (or "Start") and "Changes" are new
  *  events with IDs of their own. */
 function eventKey(d: DesiredEvent): string {
 	return d.moment === 'last' || d.moment === 'aim' || d.moment === 'leave'

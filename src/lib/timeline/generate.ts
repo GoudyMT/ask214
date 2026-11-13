@@ -247,6 +247,11 @@ export type TimelineItem = {
 	fit?: { reason: FitReason; date: string };
 };
 
+/** The word for a window's first day: "Opens" where a source sets it, else "Start", the app's suggestion. */
+export function openingWord(def: TaskDef): 'Opens' | 'Start' {
+	return def.opensBySource ? 'Opens' : 'Start';
+}
+
 /** The day a closed task closed: the one date the "Just closed" rule and its row in "Needs you now" both name. */
 export function closedOnDate(item: TimelineItem): string {
 	return item.closedOn ?? item.finalEndDate ?? item.windowEndDate;

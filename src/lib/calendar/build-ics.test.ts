@@ -328,7 +328,7 @@ describe('buildIcs on the device clock', () => {
 		// Every title in the dated file is a task title the undated file could also carry; no new kind of text.
 		const known = new Set(TASK_DEFS.map((t) => t.title));
 		for (const t of titles(withDates)) {
-			expect(known.has(t.replace(/^(Opens|Changes|Last day|Aim for): /, '')), t).toBe(true);
+			expect(known.has(t.replace(/^(Opens|Start|Changes|Last day|Aim for): /, '')), t).toBe(true);
 		}
 		expect(titles(without).length).toBeGreaterThan(0);
 	});
