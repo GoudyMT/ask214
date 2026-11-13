@@ -564,12 +564,14 @@ const STATIC = 'static';
 //   2026-11-13 the accuracy and legal pass wording: precacheBytes 261,054 -> 261,456 (measured 261,417 B, +386 B on the plan's base, margin 39 B).
 //   2026-11-13 the accuracy and legal pass wording: routeNodes 61,250 -> 61,291 (measured 61,285 B, +55 B on the plan's base, margin 6 B).
 //
+//   2026-11-13 the accuracy pass wording and its sweep fixes: precacheBytes 261,456 -> 261,544 (measured 261,497 B, +466 B on the plan's base, margin 47 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 261_456,
+	precacheBytes: 261_544,
 	workerScripts: 147_316
 };
 
