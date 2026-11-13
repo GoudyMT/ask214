@@ -269,7 +269,7 @@
 		'terminal-leave': 'before terminal leave'
 	};
 	const AFTER_YOU_LEAVE_NOTE =
-		'This opens after you leave your command. Ask your command how to fit it in.';
+		'This starts after you leave your command. Ask your command how to fit it in.';
 	const LEFT_COMMAND_NOTE =
 		'You have left your command. Do this by your separation date if you can.';
 

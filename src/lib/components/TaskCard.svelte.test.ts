@@ -8,6 +8,7 @@ import { addDays, localTodayIso } from '#lib/timeline/day-math.js';
 import { TASK_DEFS } from '#lib/timeline/index.js';
 import type { TimelineItem, TaskDef, TaskStatus } from '#lib/timeline/index.js';
 import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
+import { COMMAND_INSTRUCTIONS } from '#lib/resources/index.js';
 
 // A guide's title is the shipped document's own, so a case that needs an unbroken one sets it here; the rest read
 // the real titles.
@@ -1952,7 +1953,7 @@ describe('leaving your command', () => {
 		await expect
 			.element(
 				page.getByText(
-					/This opens after you leave your command\. Ask your command how to fit it in\./
+					/This starts after you leave your command\. Ask your command how to fit it in\./
 				)
 			)
 			.toBeVisible();
@@ -2032,9 +2033,7 @@ describe("the line above a SkillBridge step's links", () => {
 		});
 		await page.getByRole('button', { name: /^Related resources \(1\)/ }).click();
 		const note = container.querySelector('.task-card__related-note');
-		expect(note?.textContent).toBe(
-			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs, including whether TAP must be finished first."
-		);
+		expect(note?.textContent).toBe(COMMAND_INSTRUCTIONS);
 		expect(note?.nextElementSibling?.tagName).toBe('UL');
 		expect(container.querySelectorAll('.task-card__related-list li')).toHaveLength(1);
 		const text = textOf(container);

@@ -1,7 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect } from 'vitest';
 import ResourceList from './ResourceList.svelte';
-import { RESOURCES, type Resource } from '#lib/resources/index.js';
+import { COMMAND_INSTRUCTIONS, RESOURCES, type Resource } from '#lib/resources/index.js';
 import { makesPersonalClaim, textOf } from '#lib/timeline/personal-claim.js';
 
 const FIXTURE: Resource[] = [
@@ -66,8 +66,8 @@ describe('ResourceList', () => {
 	});
 
 	describe('command instructions line', () => {
-		const LINE =
-			"Also follow your unit's SkillBridge instructions: your service and command set what your request needs, including whether TAP must be finished first.";
+		// The wording is pinned once, in resources.test.ts; here the list must show that line.
+		const LINE = COMMAND_INSTRUCTIONS;
 
 		function groupOf(container: Element, heading: string): Element {
 			const h2 = [...container.querySelectorAll('h2')].find(
