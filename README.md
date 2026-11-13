@@ -48,7 +48,7 @@ the transition it is designed to help with.
 - **Resources.** A curated hub of official outbound links (VA, DoD, DOL, TSP, SkillBridge). We link to
   the real government tools with context; we never recreate or replace them.
 - **Reference library.** TAP curriculum, VA guides, and agency pages, published by U.S. Government agencies
-  for free use (see "Not affiliated" for the three guides whose status we asked about).
+  (see "Not affiliated" for the three guides whose status we asked about).
 
 ---
 
@@ -156,8 +156,8 @@ Ask 214 is an independent project. It is **not** affiliated with, endorsed by, o
 Department of Defense, the U.S. Department of Veterans Affairs, or any branch of the U.S. military.
 Ingested content is public U.S. Government work (17 USC 105) or used under a properly attributed license,
 with one open question: three TAP guides (the two DOL employment guides and the VA Benefits and Services
-participant guide) show contractor help in their file details. Each is published by its agency for free
-use and carries no copyright notice; we asked DOL and VA to confirm their status.
+participant guide) show contractor help in their file details. Each is published by its agency and
+carries no copyright notice; we asked DOL and VA to confirm their status.
 Ask 214 does not provide legal, financial, or medical advice and does not assist with VA claims. For
 official benefits guidance, contact a VA-accredited Veteran Service Organization (DAV, VFW, American
 Legion, and others) or va.gov.

@@ -58,16 +58,16 @@ Bundled / vendored runtime components
 Reference content (the offline corpus)
 ================================================================================
 
-The reference corpus in static/corpus/ is composed of works of the U.S.
-Government, which are not subject to copyright protection in the United States
-(17 U.S.C. 105). Sources include Transition Assistance Program curriculum
+The reference corpus in static/corpus/ is composed of works published by the
+U.S. Government, which we take to be free of copyright protection in the United
+States (17 U.S.C. 105), with the one open question below. Sources include Transition Assistance Program curriculum
 (tapevents.mil), VA guides (va.gov), and pages from militaryonesource.mil,
 tsp.gov, and dol.gov; every result links to its official source.
 
 One question is open: three TAP guides (the two DOL employment guides and the
 VA Benefits and Services participant guide) show contractor help in their file
-details. Each is published by its agency for free use and carries no copyright
-notice; DOL and VA were asked to confirm their status.
+details. Each is published by its agency and carries no copyright notice; DOL
+and VA were asked to confirm their status.
 
 The documents in static/docs/ are copies of U.S. Government PDFs from the
 same sources, served so an answer can open the cited page. Each copy keeps its
