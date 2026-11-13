@@ -66,8 +66,9 @@ export type TaskDef = {
 	 *  leave". */
 	countsFrom?: 'leaving';
 	windowStart: number; // days vs EAOS, or vs the leaving day for countsFrom; negative = before it
-	/** A source sets the day the window opens, so it is worded "Opens"; elsewhere the opening is a suggested start. */
-	opensBySource?: true;
+	/** A source sets the day the window opens, so it is worded "Opens"; elsewhere the opening is a suggested start.
+	 *  A leaving answer the source does not cover sets it false in `copyFor`. */
+	opensBySource?: boolean;
 	windowEnd: number;
 	kind: TaskKind;
 	/** A second edge, days vs EAOS: the task changes at windowEnd and closes here (VGLI). */
@@ -87,7 +88,13 @@ export type TaskDef = {
 	copyFor?: Partial<
 		Record<
 			SeparationPath,
-			{ title?: string; why?: string; afterNote?: string; changeNote?: string }
+			{
+				title?: string;
+				why?: string;
+				afterNote?: string;
+				changeNote?: string;
+				opensBySource?: false;
+			}
 		>
 	>;
 	/** Kept out of the calendar file: its title tells whoever sees that calendar about the member's health. */

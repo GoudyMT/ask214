@@ -249,7 +249,7 @@ test('no personal value reaches an online request', async ({ page, browserName }
 		"unless the board's exams stand in",
 		'you also need Part B',
 		'In the medical board process',
-		'If you are leaving drill status',
+		'whether you need a separation exam',
 		'within 1 year of your release',
 		'Retired Guard and Reserve members',
 		SBP_TITLE,

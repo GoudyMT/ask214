@@ -93,14 +93,15 @@ function dd214OnOrders(def: TaskDef): TaskDef {
 		why: `${DD214_ON_ORDERS} ${def.why}`
 	});
 }
-// The official pages on who needs the separation exam could not be read, so a member who may be leaving drill status
-// is told who confirms it, and the late note keeps the step required only if it applies.
-const SHA_ON_ORDERS =
-	'If you are leaving drill status, your military medical clinic confirms whether you need a separation exam.';
-function shaOnOrders(def: TaskDef): TaskDef {
+// DTM 14-006 ties the separation exam to time on active duty (180 days, or a contingency tour over 30), and later
+// Guard and Reserve guidance could not be read, so the member is told the step may not apply and who confirms it; the
+// late note keeps the step required only if it applies.
+const SHA_GUARD_RESERVE =
+	'For the Guard or Reserve, whether you need a separation exam depends on your orders and how you leave; your military medical clinic confirms it.';
+function shaForGuardOrReserve(def: TaskDef): TaskDef {
 	return forGuardOrReserve(def, {
-		title: ordersLead(def.title),
-		why: `${SHA_ON_ORDERS} ${def.why}`,
+		title: `If you need one, ${def.title.charAt(0).toLowerCase()}${def.title.slice(1)}`,
+		why: `${SHA_GUARD_RESERVE} ${def.why}`,
 		...(def.afterNote && {
 			afterNote: def.afterNote.replace(/^Still required/, 'If you need one, it is still required')
 		})
@@ -398,7 +399,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 
 	// ---- Separation health assessment + VA claim (BDD) ----
-	shaOnOrders(
+	shaForGuardOrReserve(
 		forBoard(
 			BOARD_EXAMS,
 			{
@@ -416,7 +417,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 			BOARD_EXAMS_AFTER
 		)
 	),
-	shaOnOrders(
+	shaForGuardOrReserve(
 		forBoard(
 			BOARD_EXAMS,
 			{
@@ -449,7 +450,8 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		afterNote: `BDD is no longer available. ${BDD_FALLBACK}`,
 		// va.gov: BDD is for "a service member on full-time active duty (including a member of the National Guard, Reserve,
 		// or Coast Guard)", so a member leaving drill status cannot use it. The same page says IDES gives a member found
-		// unfit a proposed VA rating and names no IDES exclusion from BDD, so a board member hears who says which applies.
+		// unfit a proposed VA rating and names no IDES exclusion from BDD; no source read says who picks the route, so a
+		// board member is sent to the coordinator who helps them file.
 		copyFor: {
 			...Object.fromEntries(
 				GUARD_OR_RESERVE.map((path) => [
@@ -463,7 +465,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 				])
 			),
 			medical: {
-				why: `${BDD_WHY} In the medical board process, your VA Military Service Coordinator says whether your claim goes through the board or BDD.`
+				why: `${BDD_WHY} In the medical board process, ask your VA Military Service Coordinator which way to file; they help service members file their VA claim.`
 			}
 		}
 	},
@@ -609,8 +611,10 @@ export const TASK_DEFS: readonly TaskDef[] = [
 				why: 'If the board retires you, enroll within 90 days after your retirement date to keep TRICARE with no break. If Medicare applies to you, you must have Part B to stay eligible when you retire. If the board separates you instead, or you are in the Guard or Reserve and it does not retire you, tricare.mil lists what may apply.'
 			},
 			// One answer, two members: a drill-status retiree has TRICARE Retired Reserve, with no enrollment deadline, and
-			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose.
+			// one leaving full-time active duty keeps the retiree routes. Each note says which is whose. TRICARE Retired Reserve
+			// can be bought at any time, so no source sets this answer's opening.
 			'reserve-retirement': {
+				opensBySource: false,
 				title: 'Check your TRICARE plan within 90 days of your retirement date',
 				why: 'If you have TRICARE Reserve Select, it ends when you transfer to the Retired Reserve; buying TRICARE Retired Reserve within 90 days of your retirement date avoids a break. At age 60, enroll in a retiree plan within 90 days of that birthday. If you are retiring from full-time active duty, tricare.mil lists your plans.',
 				changeNote: `If you are retiring from full-time active duty, you can ask for retroactive enrollment up to 12 months after your retirement date; any fees go back to that date. ${TRR_ANYTIME}`,
@@ -621,7 +625,7 @@ export const TASK_DEFS: readonly TaskDef[] = [
 	},
 	{
 		id: 'fedvip-dental',
-		// The title reaches the calendar file, so both answers share it.
+		// The title reaches the calendar file, so every answer that sees the step shares it.
 		title: 'If you retire, enroll in FEDVIP dental before your retirement date',
 		category: 'benefits',
 		finishBefore: 'separation',
@@ -639,12 +643,13 @@ export const TASK_DEFS: readonly TaskDef[] = [
 			'If you retired and missed the 60 days, you can enroll during the Federal Benefits Open Season, each November into December.',
 		// The Air Force's FEDVIP sheet names "Retired Reserve members who are age 60 and older and under age 60 (gray area
 		// reservists)" as eligible and gives the window for "retiring from the uniformed services", without saying which
-		// date starts it for a transfer to the Retired Reserve, so that member is sent to BENEFEDS for it. A board can
-		// separate a member instead of retiring them.
+		// date starts it for a transfer to the Retired Reserve, so that member is sent to BENEFEDS for it and told when to
+		// start, not that the window opens. A board can separate a member instead of retiring them.
 		copyFor: {
 			medical: { why: `If the board retires you from active duty: ${FEDVIP_WHY}` },
 			'reserve-retirement': {
-				why: 'Retired Guard and Reserve members, including those under 60 not yet drawing retired pay, can buy dental coverage through FEDVIP, on BENEFEDS.gov. For a member retiring from the uniformed services, enrollment opens 31 days before the retirement date; BENEFEDS.gov confirms which date starts your window.'
+				why: 'Retired Guard and Reserve members, including those under 60 not yet drawing retired pay, can buy dental coverage through FEDVIP, on BENEFEDS.gov. For a member retiring from the uniformed services, enrollment opens 31 days before the retirement date; BENEFEDS.gov confirms which date starts your window.',
+				opensBySource: false
 			}
 		},
 		requires: { separationPath: ['retirement', 'reserve-retirement', 'medical'] }
@@ -849,13 +854,14 @@ export const TASK_DEFS: readonly TaskDef[] = [
 		windowEnd: 365,
 		recommendedOffset: 14,
 		why: 'If you did not file through BDD: for a claim VA receives within 1 year of separation, the effective date can be as early as the day after you separate.',
-		// 38 CFR 3.400(b)(2)(i): "Day following separation from active service ... if claim is received within 1 year". A
-		// member leaving drill status has no separation from active service that day, so the year counts from the release.
+		// 38 CFR 3.400(b)(2)(i): "Day following separation from active service ... if claim is received within 1 year", where
+		// separation means from the continuous active service in which the disability was incurred or aggravated. A member
+		// leaving drill status has no separation from active service that day, so the year counts from that release.
 		copyFor: Object.fromEntries(
 			GUARD_OR_RESERVE.map((path) => [
 				path,
 				{
-					why: 'If you did not file through BDD: for a claim VA receives within 1 year of your release from active service, the effective date can be as early as the day after that release.'
+					why: 'If you did not file through BDD: for a claim VA receives within 1 year of your release from the active service in which your condition began or got worse, the effective date can be as early as the day after that release.'
 				}
 			])
 		)

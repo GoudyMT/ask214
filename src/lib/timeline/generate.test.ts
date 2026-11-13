@@ -3,6 +3,7 @@ import {
 	filterAndAnchor,
 	deriveStatus,
 	generateTimeline,
+	openingWord,
 	todayMarkerIndex,
 	type AnchoredTask
 } from './generate';
@@ -1429,19 +1430,20 @@ describe('the leaving answer on the real task list', () => {
 		}
 	);
 
-	// The official pages on who needs the separation exam could not be read, so a Guard or Reserve member is told when
-	// the step applies and who confirms it; every other answer keeps the plain step.
+	// DTM 14-006 ties the exam to time on active duty (180 days, or a contingency tour over 30), and later Guard and
+	// Reserve guidance could not be read, so a Guard or Reserve member is told the step may not apply and who confirms
+	// it, never that leaving orders makes it required; every other answer keeps the plain step.
 	it.each(['reserve-component', 'reserve-retirement'] as const)(
-		'the %s answer says when the separation exam applies and who confirms it',
+		'the %s answer says the separation exam may not apply and who confirms it',
 		(path) => {
 			for (const id of ['sha-schedule', 'sha-complete']) {
 				const shown = items(path).find((i) => i.def.id === id)?.def;
 				const plain = items().find((i) => i.def.id === id)?.def;
 				expect(shown?.title, id).toBe(
-					`If you are leaving active duty orders, ${plain?.title.charAt(0).toLowerCase()}${plain?.title.slice(1)}`
+					`If you need one, ${plain?.title.charAt(0).toLowerCase()}${plain?.title.slice(1)}`
 				);
 				expect(shown?.why, id).toBe(
-					`If you are leaving drill status, your military medical clinic confirms whether you need a separation exam. ${plain?.why}`
+					`For the Guard or Reserve, whether you need a separation exam depends on your orders and how you leave; your military medical clinic confirms it. ${plain?.why}`
 				);
 				expect(shown?.afterNote, id).toBe(
 					'If you need one, it is still required before you separate. Contact your military medical clinic.'
@@ -1457,27 +1459,28 @@ describe('the leaving answer on the real task list', () => {
 		}
 	);
 
-	// 38 CFR 3.400(b)(2)(i): "Day following separation from active service ... if claim is received within 1 year". A
-	// member leaving drill status has no separation from active service that day, so the year counts from the release.
+	// 38 CFR 3.400(b)(2)(i): "Day following separation from active service ... if claim is received within 1 year", where
+	// separation means from the continuous active service in which the disability was incurred or aggravated. A member
+	// leaving drill status has no separation from active service that day, so the year counts from that release.
 	it.each(['reserve-component', 'reserve-retirement'] as const)(
 		'the %s answer counts the claim year from the release from active service',
 		(path) => {
 			const def = (p?: SeparationPath) =>
 				items(p).find((i) => i.def.id === 'va-claim-fallback')?.def;
 			expect(def(path)?.why).toBe(
-				'If you did not file through BDD: for a claim VA receives within 1 year of your release from active service, the effective date can be as early as the day after that release.'
+				'If you did not file through BDD: for a claim VA receives within 1 year of your release from the active service in which your condition began or got worse, the effective date can be as early as the day after that release.'
 			);
 			expect(def(path)?.title).toBe(def()?.title);
 			expect(def('ets')?.why).toBe(def()?.why);
 		}
 	);
 
-	// va.gov's BDD page says IDES gives a member found unfit a proposed VA rating, and names no IDES exclusion from BDD,
-	// so the board member hears who says which route their claim takes.
-	it('tells a board member who says whether their claim goes through the board or BDD', () => {
+	// va.gov's BDD page says IDES gives a member found unfit a proposed VA rating, and names no IDES exclusion from BDD;
+	// no source read says who picks the route, so the board member is sent to the coordinator who helps them file.
+	it('tells a board member who to ask which way to file their claim', () => {
 		const def = (p?: SeparationPath) => items(p).find((i) => i.def.id === 'va-bdd-claim')?.def;
 		const line =
-			'In the medical board process, your VA Military Service Coordinator says whether your claim goes through the board or BDD.';
+			'In the medical board process, ask your VA Military Service Coordinator which way to file; they help service members file their VA claim.';
 		expect(def('medical')?.why).toBe(`${def()?.why} ${line}`);
 		expect(def('medical')?.title).toBe(def()?.title);
 		for (const other of [undefined, 'ets', 'retirement'] as const) {
@@ -1653,8 +1656,23 @@ describe('the leaving answer on the real task list', () => {
 		expect(guard?.title).toBe(retiring?.title);
 		expect(guard?.changeNote).toBe(retiring?.changeNote);
 		expect(guard?.afterNote).toBe(retiring?.afterNote);
-		expect(guard?.windowStart).toBe(-31);
 	});
+
+	// A source sets these openings for a member retiring from active duty only: for the Guard or Reserve retirement no
+	// source read names the day FEDVIP opens, and TRICARE Retired Reserve can be bought at any time, so that answer is
+	// told when to start, never that a window opens.
+	it.each(['fedvip-dental', 'tricare-retiree-enroll'])(
+		'says when to start %s for a Guard or Reserve retiree, and Opens for the others',
+		(id) => {
+			const def = (path: SeparationPath) => items(path).find((i) => i.def.id === id)?.def;
+			const guard = def('reserve-retirement');
+			expect(guard && openingWord(guard)).toBe('Start');
+			for (const path of ['retirement', 'medical'] as const) {
+				const shown = def(path);
+				expect(shown && openingWord(shown), path).toBe('Opens');
+			}
+		}
+	);
 
 	// The step lands above the retiree TRICARE step for these two answers, and either can end in a retirement that
 	// keeps TRICARE, so its first words send that member on. A drill-status retiree's TRICARE Reserve Select ends when
