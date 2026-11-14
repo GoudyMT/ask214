@@ -3,6 +3,7 @@ import { isDamagedRecord, stillDamaged } from './damaged';
 import { LockAcquisitionTimeout } from '../db/locks';
 import { AesGcmAuthError, aesGcmDecrypt } from '../crypto/aes-gcm';
 import { SidecarTamperError } from './sidecars';
+import { ProfileSchemaError } from './codec';
 import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
@@ -17,7 +18,8 @@ describe('isDamagedRecord', () => {
 		['the high-water mark fails its check', new SidecarTamperError()],
 		['the profile fails decryption', new AesGcmAuthError()],
 		['the high-water mark is missing beside its key record', new Error('E_HWM_MISSING')],
-		['the profile body is missing past its first save', new Error('E_PROFILE_BODY_MISSING')]
+		['the profile body is missing past its first save', new Error('E_PROFILE_BODY_MISSING')],
+		['the profile decrypts but a field has the wrong type', new ProfileSchemaError()]
 	])('is damage when %s', (_, e) => {
 		expect(isDamagedRecord(e)).toBe(true);
 	});
