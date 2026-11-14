@@ -571,12 +571,16 @@ const STATIC = 'static';
 //   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: routeNodes 61,291 -> 61,317 (measured 61,314 B, +29 B on the plan's base, margin 3 B).
 //   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: rootLayout 9,849 -> 9,874 (measured 9,871 B, +30 B on the plan's base, margin 3 B).
 //
+//   2026-11-14 the sweep fixes: the library's fetch guarded, the store lock checks, the key record and newer-profile checks: precacheBytes 261,578 -> 261,683 (measured 261,666 B, +163 B on the plan's base, margin 17 B).
+//   2026-11-14 the sweep fixes: the library's fetch guarded, the store lock checks, the key record and newer-profile checks: routeNodes 61,317 -> 61,337 (measured 61,332 B, +47 B on the plan's base, margin 5 B).
+//   2026-11-14 the sweep fixes: the library's fetch guarded, the store lock checks, the key record and newer-profile checks: rootLayout 9,874 -> 9,879 (measured 9,875 B, +34 B on the plan's base, margin 4 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 261_578,
+	precacheBytes: 261_683,
 	workerScripts: 147_800
 };
 
