@@ -3,7 +3,7 @@ import { isDamagedRecord, stillDamaged } from './damaged';
 import { LockAcquisitionTimeout } from '../db/locks';
 import { AesGcmAuthError, aesGcmDecrypt } from '../crypto/aes-gcm';
 import { SidecarTamperError } from './sidecars';
-import { ProfileSchemaError } from './codec';
+import { ProfileSchemaError, decodeProfile } from './codec';
 import {
 	KeystoreHmacMismatchError,
 	KeystoreNotInitializedError,
@@ -63,6 +63,35 @@ describe('isDamagedRecord', () => {
 		} finally {
 			spy.mockRestore();
 		}
+	});
+
+	// A profile a newer release wrote reads as a later schema to this one. The bytes are good, and the newer app still
+	// reads them, so this app must never offer to erase them; a version no release writes is this app's own fault.
+	// Read through the real decode, so these follow what it throws.
+	const bodyWith = (schemaVersion: unknown) =>
+		new TextEncoder().encode(
+			JSON.stringify({ schemaVersion, generation: 1, lastSeenAt: 0, setupIntent: 'completed' })
+		);
+	const decodeError = (schemaVersion: unknown) => {
+		try {
+			decodeProfile(bodyWith(schemaVersion));
+		} catch (e) {
+			return e;
+		}
+		throw new Error('E_TEST_DECODED');
+	};
+
+	it('is not damage when a newer release wrote the profile', () => {
+		expect(isDamagedRecord(decodeError(2))).toBe(false);
+	});
+
+	it.each([
+		['zero', 0],
+		['missing', undefined],
+		['text', '2'],
+		['a fraction', 1.5]
+	])('is damage when the schema version is %s', (_, version) => {
+		expect(isDamagedRecord(decodeError(version))).toBe(true);
 	});
 
 	it('is damage when the decrypt fails its authentication check', async () => {

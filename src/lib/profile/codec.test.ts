@@ -54,6 +54,7 @@ describe('encodeProfile / decodeProfile', () => {
 		expect(dec.eaos).toBeNull();
 	});
 
+	// A newer release's profile is refused as newer, not as a broken one: only a broken one is offered for erase.
 	it('rejects a schemaVersion mismatch on decode', () => {
 		const v2 = new TextEncoder().encode(
 			JSON.stringify({
@@ -65,7 +66,7 @@ describe('encodeProfile / decodeProfile', () => {
 				eaos: null
 			})
 		);
-		expect(() => decodeProfile(v2)).toThrow(/E_PROFILE_SCHEMA/);
+		expect(() => decodeProfile(v2)).toThrow(/E_PROFILE_NEWER/);
 	});
 
 	it('rejects non-JSON bytes on decode', () => {
