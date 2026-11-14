@@ -54,7 +54,8 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 // Reactive, unlike the flags in `current`: Unlock opens the profile and the page swaps its locked panel for the list at that
 // moment.
 // `reads` counts the store's re-reads: a real re-read assigns the profile again, which wakes every reader of `locked`.
-const profile = $state({ locked: false, reads: 0 });
+// `firstRunShut`: the store's own state is locked while `locked` reads false, as for a tab with no profile yet.
+const profile = $state({ locked: false, reads: 0, firstRunShut: false });
 
 // The profile is unlocked with a separation date; each test sets where the timeline's saved progress stands.
 vi.mock('#lib/profile/context.js', () => ({
@@ -64,6 +65,9 @@ vi.mock('#lib/profile/context.js', () => ({
 			get locked() {
 				void profile.reads;
 				return profile.locked;
+			},
+			get lockState() {
+				return profile.locked || profile.firstRunShut ? 'locked' : 'unlocked';
 			},
 			load: () => current.load(),
 			clockBackward: false,
@@ -163,9 +167,34 @@ describe('Timeline, its saved progress', () => {
 		afterEach(() => {
 			window.removeEventListener('unhandledrejection', onUnhandled);
 			profile.locked = false;
+			profile.firstRunShut = false;
 			current.load = async () => {};
 			current.failed = () => false;
 			current.failedSeen = [];
+		});
+
+		// Another tab erased and started again while this one unlocked: the load finds no profile yet, and a Lock that
+		// landed meanwhile leaves the store shut though `locked` (which counts a profile only) reads false.
+		it('does not read the progress when a Lock lands while the load finds no profile yet', async () => {
+			let progressReads = 0;
+			current.timeline = {
+				ready: true,
+				failed: false,
+				state: EMPTY,
+				load: () => {
+					progressReads++;
+					return Promise.resolve();
+				}
+			};
+			current.load = async () => {
+				profile.locked = false;
+				profile.firstRunShut = true;
+			};
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(progressReads).toBe(0);
 		});
 
 		// A Lock pressed while the profile decrypts keeps it closed (the load returns with it still locked): the saved

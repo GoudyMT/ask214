@@ -21,7 +21,8 @@ const { isoFromToday, ctl, reads } = vi.hoisted(() => ({
 }));
 
 // Reactive, unlike a plain flag: Unlock opens the profile and Lock closes it, and the page swaps its sections at that moment.
-const profile = $state({ locked: true });
+// `firstRunShut`: the store's own state is locked while `locked` reads false, as for a tab with no profile yet.
+const profile = $state({ locked: true, firstRunShut: false });
 const loads = vi.fn();
 vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
@@ -29,6 +30,9 @@ vi.mock('#lib/profile/context.js', () => ({
 		store: {
 			get locked() {
 				return profile.locked;
+			},
+			get lockState() {
+				return profile.locked || profile.firstRunShut ? 'locked' : 'unlocked';
 			},
 			load: () => {
 				loads();
@@ -101,6 +105,7 @@ beforeEach(() => {
 	unhandled.length = 0;
 	window.addEventListener('unhandledrejection', onUnhandled);
 	profile.locked = true;
+	profile.firstRunShut = false;
 	loads.mockClear();
 	reads.timeline = 0;
 	reads.calendar = 0;
@@ -382,6 +387,22 @@ describe('Settings, Unlock', () => {
 		expect(reads.calendar).toBe(0);
 		expect(unlockButton(container)).not.toBeNull();
 		expect(page.getByRole('alert').query()).toBeNull();
+	});
+
+	// Another tab erased and started again while this one unlocked: the load finds no profile yet, and a Lock that landed
+	// meanwhile leaves the store shut though `locked` (which counts a profile only) reads false.
+	it('reads neither the timeline nor the calendar when a Lock lands while the load finds no profile yet', async () => {
+		ctl.load = async () => {
+			profile.locked = false;
+			profile.firstRunShut = true;
+		};
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.poll(() => loads.mock.calls.length).toBe(1);
+		await pause(50);
+
+		expect(reads.timeline).toBe(0);
+		expect(reads.calendar).toBe(0);
 	});
 
 	it('reads the timeline and calendar after an Unlock that opens the profile', async () => {
