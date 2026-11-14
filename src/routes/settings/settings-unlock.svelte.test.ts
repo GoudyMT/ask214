@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
 
-const { isoFromToday, ctl } = vi.hoisted(() => ({
+const { isoFromToday, ctl, reads } = vi.hoisted(() => ({
 	isoFromToday: (days: number) => {
 		const d = new Date();
 		d.setDate(d.getDate() + days);
@@ -11,11 +11,18 @@ const { isoFromToday, ctl } = vi.hoisted(() => ({
 		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 	},
 	// What the profile store's load and relock do this test: the cases set them, beforeEach resets them.
-	ctl: { load: async (): Promise<void> => {}, relock: (): void => {} }
+	ctl: {
+		load: async (): Promise<void> => {},
+		relock: (): void => {},
+		// The layout's answer to a failed Unlock: true when it opened the damaged screen.
+		failed: (() => false) as (e: unknown) => boolean
+	},
+	reads: { timeline: 0, calendar: 0, failed: [] as unknown[] }
 }));
 
 // Reactive, unlike a plain flag: Unlock opens the profile and Lock closes it, and the page swaps its sections at that moment.
-const profile = $state({ locked: true });
+// `firstRunShut`: the store's own state is locked while `locked` reads false, as for a tab with no profile yet.
+const profile = $state({ locked: true, firstRunShut: false });
 const loads = vi.fn();
 vi.mock('#lib/profile/context.js', () => ({
 	getProfileApp: () => ({
@@ -23,6 +30,9 @@ vi.mock('#lib/profile/context.js', () => ({
 		store: {
 			get locked() {
 				return profile.locked;
+			},
+			get lockState() {
+				return profile.locked || profile.firstRunShut ? 'locked' : 'unlocked';
 			},
 			load: () => {
 				loads();
@@ -37,13 +47,19 @@ vi.mock('#lib/profile/context.js', () => ({
 			locked: false,
 			state: { schemaVersion: 1, tasks: {} },
 			refresh: () => Promise.resolve(),
-			load: () => Promise.resolve()
+			load: () => {
+				reads.timeline++;
+				return Promise.resolve();
+			}
 		},
 		calendar: {
 			ready: true,
 			failed: false,
 			locked: false,
-			load: () => Promise.resolve(),
+			load: () => {
+				reads.calendar++;
+				return Promise.resolve();
+			},
 			exclusions: { taskIds: [], categories: [] },
 			lastAdd: []
 		},
@@ -54,7 +70,11 @@ vi.mock('#lib/profile/context.js', () => ({
 		joinRelock: null,
 		publish: null,
 		reloadOnUnlock: false,
-		replacedNotice: false
+		replacedNotice: false,
+		onUnlockFailed: (e: unknown) => {
+			reads.failed.push(e);
+			return ctl.failed(e);
+		}
 	}),
 	setProfileApp: () => {}
 }));
@@ -85,7 +105,12 @@ beforeEach(() => {
 	unhandled.length = 0;
 	window.addEventListener('unhandledrejection', onUnhandled);
 	profile.locked = true;
+	profile.firstRunShut = false;
 	loads.mockClear();
+	reads.timeline = 0;
+	reads.calendar = 0;
+	reads.failed = [];
+	ctl.failed = () => false;
 	ctl.load = async () => {
 		profile.locked = false;
 	};
@@ -347,5 +372,58 @@ describe('Settings, Unlock', () => {
 
 		fail(new Error('E_TEST_LOAD'));
 		await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+	});
+
+	// A Lock pressed while the profile decrypts keeps it closed (the load returns with it still locked): the timeline and
+	// calendar must not be decrypted behind the lock card.
+	it('reads neither the timeline nor the calendar when a Lock lands while the profile decrypts', async () => {
+		ctl.load = async () => {};
+		const { container } = await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.poll(() => loads.mock.calls.length).toBe(1);
+		await pause(50);
+
+		expect(reads.timeline).toBe(0);
+		expect(reads.calendar).toBe(0);
+		expect(unlockButton(container)).not.toBeNull();
+		expect(page.getByRole('alert').query()).toBeNull();
+	});
+
+	// Another tab erased and started again while this one unlocked: the load finds no profile yet, and a Lock that landed
+	// meanwhile leaves the store shut though `locked` (which counts a profile only) reads false.
+	it('reads neither the timeline nor the calendar when a Lock lands while the load finds no profile yet', async () => {
+		ctl.load = async () => {
+			profile.locked = false;
+			profile.firstRunShut = true;
+		};
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.poll(() => loads.mock.calls.length).toBe(1);
+		await pause(50);
+
+		expect(reads.timeline).toBe(0);
+		expect(reads.calendar).toBe(0);
+	});
+
+	it('reads the timeline and calendar after an Unlock that opens the profile', async () => {
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(heading()).toBeVisible();
+
+		expect(reads.timeline).toBe(1);
+		expect(reads.calendar).toBe(1);
+	});
+
+	// Damaged data opens on no retry: the layout opens the damaged screen, and the page must not also say "try again".
+	it('hands a failed load to the layout, and shows no retry line when it opened the damaged screen', async () => {
+		const failure = new Error('E_TEST_DAMAGED');
+		ctl.load = () => Promise.reject(failure);
+		ctl.failed = () => true;
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.poll(() => reads.failed).toEqual([failure]);
+		await pause(50);
+
+		expect(page.getByRole('alert').query()).toBeNull();
 	});
 });

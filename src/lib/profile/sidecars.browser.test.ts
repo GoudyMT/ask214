@@ -57,6 +57,30 @@ describe('signSidecar / verifySidecar', () => {
 		);
 	});
 
+	// Saved bytes the app did not write: a MAC stored as something other than bytes must read as tampering (the erase is
+	// offered), not as an engine TypeError that leaves the start-up banner up on every reload.
+	it.each([
+		['a string', 'not bytes'],
+		['a number', 7],
+		['null', null],
+		['a plain object', { byteLength: 32 }]
+	])('throws SidecarTamperError when the MAC is %s', async (_, mac) => {
+		const signed = await signSidecar('profile-hwm', payload, hmacKey);
+		const tampered = { ...signed, mac } as unknown as SignedSidecar<ProfileHwmPayload>;
+		await expect(verifySidecar('profile-hwm', tampered, hmacKey)).rejects.toThrow(
+			SidecarTamperError
+		);
+	});
+
+	it('still verifies a MAC stored as a byte view', async () => {
+		const signed = await signSidecar('profile-hwm', payload, hmacKey);
+		const asView = {
+			...signed,
+			mac: new Uint8Array(signed.mac)
+		} as unknown as SignedSidecar<ProfileHwmPayload>;
+		await expect(verifySidecar('profile-hwm', asView, hmacKey)).resolves.toEqual(payload);
+	});
+
 	it('throws SidecarTamperError when the sidecar name is wrong', async () => {
 		const signed = await signSidecar('profile-hwm', payload, hmacKey);
 		await expect(verifySidecar('other-name', signed, hmacKey)).rejects.toThrow(SidecarTamperError);

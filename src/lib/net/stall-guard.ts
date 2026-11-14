@@ -32,7 +32,7 @@ type GuardOptions = {
  * @returns The guarded response. Rejects, and the body errors, with an error `isStall` recognizes.
  */
 export async function guardedFetch(
-	fetchFn: (path: string, init: RequestInit) => Promise<Response>,
+	fetchFn: (path: string, init: { signal: AbortSignal }) => Promise<Response>,
 	path: string,
 	{ idleMs, signal, onStall }: GuardOptions
 ): Promise<Response> {

@@ -10,6 +10,7 @@ import {
 	keptOnFetch,
 	LIBRARY_RESTORE_DEADLINE_MS,
 	WORKER_SCRIPT_DEADLINE_MS,
+	INSTALL_DOWNLOAD_BUDGET_MS,
 	restoreLibraries,
 	keepWorkerScripts,
 	storeOnFetch,
@@ -33,6 +34,8 @@ const ASSETS = [...immutable, ...assets].map(({ path }) => `/${path}`);
 const PRECACHE = ASSETS.filter((path) => classifyAsset(path) === 'precache');
 
 sw.addEventListener('install', (event) => {
+	// Counted from the start: the browser's own limit on the install covers the precache below as well.
+	const budget = AbortSignal.timeout(INSTALL_DOWNLOAD_BUDGET_MS);
 	event.waitUntil(
 		(async () => {
 			const cache = await caches.open(CACHE);
@@ -42,11 +45,11 @@ sw.addEventListener('install', (event) => {
 			// activation may come later with no connection. So a device holding a saved document this release still
 			// ships gets this release's PDF library here, and a device that finished setting up on-device answers
 			// (the whole model and runtime held) or holds such a document gets this release's answer library;
-			// activation tries again for any library file this could not store. The restore never throws and gives
-			// each library a deadline, so it cannot fail the install or hold it open.
+			// activation tries again for any library file this could not store. The restore never throws, and every
+			// download here shares one budget that ends before the browser would stop the install.
 			const cacheNames = await caches.keys();
-			await restoreKeptLibraries(cacheNames);
-			await keepEmbedWorkerScript(cacheNames);
+			await restoreKeptLibraries(cacheNames, budget);
+			await keepEmbedWorkerScript(cacheNames, budget);
 		})()
 	);
 });
@@ -123,8 +126,9 @@ async function pruneSupersededVersions(cacheNames: string[]): Promise<void> {
  *
  * @param cacheNames The cache names already read from caches.keys(), so an install that has never fetched a
  *   lazy asset is skipped rather than being given an empty cache by caches.open().
+ * @param budget Install's shared download budget; activation passes none.
  */
-async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
+async function restoreKeptLibraries(cacheNames: string[], budget?: AbortSignal): Promise<void> {
 	if (!cacheNames.includes(ASK_ASSET_CACHE)) return;
 	// A restore is opportunistic, like the prune: if a cache call rejects - or the browser stops the worker
 	// part-way, which can leave a two-file library half stored - the next install or retry fetches only the file
@@ -137,7 +141,8 @@ async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
 			(path, init) => fetch(path, init),
 			sw.location.origin,
 			ASSETS,
-			LIBRARY_RESTORE_DEADLINE_MS
+			LIBRARY_RESTORE_DEADLINE_MS,
+			budget
 		);
 	} catch {
 		// Intentionally ignored - see above.
@@ -156,8 +161,9 @@ async function restoreKeptLibraries(cacheNames: string[]): Promise<void> {
  *
  * @param cacheNames The cache names already read from caches.keys(), so a device that has never fetched a lazy
  *   asset is skipped rather than being given an empty cache by caches.open().
+ * @param budget Install's shared download budget; activation passes none.
  */
-async function keepEmbedWorkerScript(cacheNames: string[]): Promise<void> {
+async function keepEmbedWorkerScript(cacheNames: string[], budget?: AbortSignal): Promise<void> {
 	if (!cacheNames.includes(ASK_ASSET_CACHE)) return;
 	// Opportunistic, like the restore above: a failure leaves the script to the retry after activation, and then
 	// to the first question asked online - until one of those stores it, the device cannot answer offline after
@@ -168,7 +174,8 @@ async function keepEmbedWorkerScript(cacheNames: string[]): Promise<void> {
 			await caches.open(CACHE),
 			(path, init) => fetch(path, init),
 			sw.location.origin,
-			WORKER_SCRIPT_DEADLINE_MS
+			WORKER_SCRIPT_DEADLINE_MS,
+			budget
 		);
 	} catch {
 		// Intentionally ignored - see above.

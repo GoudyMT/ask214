@@ -490,8 +490,8 @@ const STATIC = 'static';
 //     16,091-16,097 B and precache 253,587-253,628 B (a 41 B swing as build file names change); each limit is now
 //     40 B above the highest.
 //   workerScripts 147,200. The gzip-9 total of every script under _app/immutable/workers/: the embed worker's own
-//     code, which a device downloads the first time it asks a question on-device. The worker script's download
-//     deadline (WORKER_SCRIPT_DEADLINE_MS, 20 s) assumes this size, so growth is budgeted here. Measured 147,077 B
+//     code, which a device downloads the first time it asks a question on-device, and which install keeps again
+//     under the install's shared download budget, so growth is budgeted here. Measured 147,077 B
 //     (this check's own gzip-9), 123 B of room (owner's call, 2026-09-30). A transformers.js, onnxruntime or Vite
 //     update can grow the worker past it; a raise then is expected, on a measured reason and as the owner's call,
 //     as for every limit here. The budget exists to make that growth a decision, not a surprise.
@@ -566,13 +566,22 @@ const STATIC = 'static';
 //
 //   2026-11-13 the accuracy pass wording and its sweep fixes: precacheBytes 261,456 -> 261,544 (measured 261,497 B, +466 B on the plan's base, margin 47 B).
 //
+//   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: precacheBytes 261,544 -> 261,578 (measured 261,571 B, +68 B on the plan's base, margin 7 B).
+//   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: workerScripts 147,316 -> 147,800 (measured 147,755 B, +446 B on the plan's base, margin 45 B).
+//   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: routeNodes 61,291 -> 61,317 (measured 61,314 B, +29 B on the plan's base, margin 3 B).
+//   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: rootLayout 9,849 -> 9,874 (measured 9,871 B, +30 B on the plan's base, margin 3 B).
+//
+//   2026-11-14 the sweep fixes: the library's fetch guarded, the store lock checks, the key record and newer-profile checks: precacheBytes 261,578 -> 261,683 (measured 261,666 B, +163 B on the plan's base, margin 17 B).
+//   2026-11-14 the sweep fixes: the library's fetch guarded, the store lock checks, the key record and newer-profile checks: routeNodes 61,317 -> 61,337 (measured 61,332 B, +47 B on the plan's base, margin 5 B).
+//   2026-11-14 the sweep fixes: the library's fetch guarded, the store lock checks, the key record and newer-profile checks: rootLayout 9,874 -> 9,879 (measured 9,875 B, +34 B on the plan's base, margin 4 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 261_544,
-	workerScripts: 147_316
+	precacheBytes: 261_683,
+	workerScripts: 147_800
 };
 
 /**
@@ -722,8 +731,8 @@ if (unread.length > 0) {
 	throw new Error('E_WORKER_SCRIPT_UNREAD');
 }
 
-// The worker script is fetched under its own deadline (WORKER_SCRIPT_DEADLINE_MS), which assumes the size
-// measured below; a script that grows past it can miss that deadline on a slow connection.
+// The worker script is a download every device that asks on-device makes, and install shares one budget with the
+// libraries; the size measured below keeps that download's growth a decision.
 measured.workerScripts = sizeRow(
 	'worker scripts',
 	scriptsOnDisk.map((script) => script.slice(1)),

@@ -377,12 +377,17 @@
 		unlocking = true;
 		try {
 			await store.load();
+			// A Lock that landed while the profile decrypted kept it closed; reading the others now would undo it. The
+			// store's own state, not `locked`, which reads false when the load found no profile yet.
+			if (store.lockState === 'locked') return;
 			// The secondary stores relock alongside the profile on idle/pagehide but are not part of
 			// the profile's load; without this they stay unloaded behind an unlocked UI (see the
 			// timeline route for the full reasoning). allSettled so a secondary failure leaves that
 			// store not-ready rather than blocking the unlock.
 			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
-		} catch {
+		} catch (e) {
+			// Damaged data: the layout has opened the damaged screen, where the erase is the way back.
+			if (app.onUnlockFailed?.(e)) return;
 			// The button keeps focus (it is never turned off) and the panel says so.
 			unlockError = UNLOCK_FAILED;
 			return;

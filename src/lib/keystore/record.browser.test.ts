@@ -161,6 +161,23 @@ describe('signKeystore / verifyKeystore (local mode)', () => {
 	it('rejects a row with no recordHmac', async () => {
 		expect(await verifyKeystore(baseRecord, keys())).toBe(false);
 	});
+
+	// A stored row can hold anything. A MAC that is not bytes must fail the check like a wrong MAC does - then the data
+	// counts as damaged and the erase is offered - not throw the engine's own error, which leaves only a Reload that
+	// fails the same way every time.
+	it.each([
+		['text', 'not-a-mac'],
+		['an object shaped like bytes', { byteLength: 32 }]
+	])('rejects a recordHmac that is %s, not bytes', async (_, recordHmac) => {
+		const row = { ...baseRecord, recordHmac: recordHmac as unknown as ArrayBuffer };
+		await expect(verifyKeystore(row, keys())).resolves.toBe(false);
+	});
+
+	it('still verifies a recordHmac stored as a view of the bytes', async () => {
+		const mac = new Uint8Array(await signKeystore(baseRecord, keys()));
+		const row = { ...baseRecord, recordHmac: mac as unknown as ArrayBuffer };
+		expect(await verifyKeystore(row, keys())).toBe(true);
+	});
 });
 
 // A PIN row has no key handle, so its MAC covers the salt and the wrapped bag as well: the bytes below are what every

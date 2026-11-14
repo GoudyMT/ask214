@@ -61,6 +61,10 @@ export async function verifySidecar<T>(
 	signed: SignedSidecar<T>,
 	hmacKey: CryptoKey
 ): Promise<T> {
+	// A stored MAC that is not bytes was never written by this app: it is tampering, not an engine error, so start-up
+	// offers the erase instead of a Reload that reads the same row again.
+	const mac: unknown = signed.mac;
+	if (!(mac instanceof ArrayBuffer) && !ArrayBuffer.isView(mac)) throw new SidecarTamperError();
 	const ok = await hmacVerify(hmacKey, canonical(expectedName, signed.payload), signed.mac);
 	if (!ok) throw new SidecarTamperError();
 	return signed.payload;

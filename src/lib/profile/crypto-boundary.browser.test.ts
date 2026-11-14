@@ -172,7 +172,7 @@ describe('encryptProfileRecord / decryptProfileRecord', () => {
 
 		it('wipes the decrypted buffer when decoding throws', async () => {
 			const r = baseRecord();
-			const wrongSchema = new TextEncoder().encode(JSON.stringify({ schemaVersion: 2 }));
+			const wrongSchema = new TextEncoder().encode(JSON.stringify({ schemaVersion: 0 }));
 			const blob = await encryptRecord(
 				{ storeName: 'profile', recordId: 'self', schemaVersion: 1 },
 				wrongSchema,

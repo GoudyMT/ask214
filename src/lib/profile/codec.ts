@@ -5,7 +5,8 @@ import type { ProfileV1 } from './types';
  * base64-encoded in transit through JSON and decoded back on read. Top-level
  * keys are sorted so the PLAINTEXT encoding is deterministic for identical
  * inputs (AES-GCM ciphertext is never deterministic - fresh random IV per write).
- * schemaVersion lives in the ciphertext.
+ * schemaVersion lives in the ciphertext. Raising it is not enough to mark a new format: an older app meeting the newer
+ * data must stop at DB_VERSION (schema.ts) before it reads here, so a change to what is saved raises DB_VERSION too.
  */
 export type { ProfileV1 } from './types';
 
@@ -137,9 +138,11 @@ export function decodeProfile(bytes: Uint8Array): ProfileV1 {
 	} catch {
 		throw new ProfileSchemaError();
 	}
-	if (typeof wire !== 'object' || wire === null || wire.schemaVersion !== 1) {
-		throw new ProfileSchemaError();
-	}
+	if (typeof wire !== 'object' || wire === null) throw new ProfileSchemaError();
+	const version: unknown = wire.schemaVersion;
+	// A newer release wrote it: the bytes are good, so this is not a schema failure, which would offer them for erase.
+	if (Number.isInteger(version) && (version as number) > 1) throw new Error('E_PROFILE_NEWER');
+	if (version !== 1) throw new ProfileSchemaError();
 	// Every check runs before any byte is decoded, so a record that fails leaves no decoded field behind.
 	for (const [key, isValid] of Object.entries(WIRE_TYPES)) {
 		if (Object.hasOwn(wire, key) && !isValid((wire as Record<string, unknown>)[key])) {

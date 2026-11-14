@@ -20,6 +20,9 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 	current: {
 		// What the profile store's load does; the Unlock cases set it and put it back.
 		load: async (): Promise<void> => {},
+		// The layout's answer to a failed Unlock (true: it opened the damaged screen), and the errors it was handed.
+		failed: (() => false) as (e: unknown) => boolean,
+		failedSeen: [] as unknown[],
 		firstRun: false,
 		// Days from today to the separation date.
 		daysOut: 200,
@@ -51,7 +54,8 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 // Reactive, unlike the flags in `current`: Unlock opens the profile and the page swaps its locked panel for the list at that
 // moment.
 // `reads` counts the store's re-reads: a real re-read assigns the profile again, which wakes every reader of `locked`.
-const profile = $state({ locked: false, reads: 0 });
+// `firstRunShut`: the store's own state is locked while `locked` reads false, as for a tab with no profile yet.
+const profile = $state({ locked: false, reads: 0, firstRunShut: false });
 
 // The profile is unlocked with a separation date; each test sets where the timeline's saved progress stands.
 vi.mock('#lib/profile/context.js', () => ({
@@ -61,6 +65,9 @@ vi.mock('#lib/profile/context.js', () => ({
 			get locked() {
 				void profile.reads;
 				return profile.locked;
+			},
+			get lockState() {
+				return profile.locked || profile.firstRunShut ? 'locked' : 'unlocked';
 			},
 			load: () => current.load(),
 			clockBackward: false,
@@ -81,7 +88,11 @@ vi.mock('#lib/profile/context.js', () => ({
 		joinRelock: null,
 		publish: null,
 		reloadOnUnlock: false,
-		replacedNotice: false
+		replacedNotice: false,
+		onUnlockFailed: (e: unknown) => {
+			current.failedSeen.push(e);
+			return current.failed(e);
+		}
 	}),
 	setProfileApp: () => {}
 }));
@@ -156,7 +167,70 @@ describe('Timeline, its saved progress', () => {
 		afterEach(() => {
 			window.removeEventListener('unhandledrejection', onUnhandled);
 			profile.locked = false;
+			profile.firstRunShut = false;
 			current.load = async () => {};
+			current.failed = () => false;
+			current.failedSeen = [];
+		});
+
+		// Another tab erased and started again while this one unlocked: the load finds no profile yet, and a Lock that
+		// landed meanwhile leaves the store shut though `locked` (which counts a profile only) reads false.
+		it('does not read the progress when a Lock lands while the load finds no profile yet', async () => {
+			let progressReads = 0;
+			current.timeline = {
+				ready: true,
+				failed: false,
+				state: EMPTY,
+				load: () => {
+					progressReads++;
+					return Promise.resolve();
+				}
+			};
+			current.load = async () => {
+				profile.locked = false;
+				profile.firstRunShut = true;
+			};
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(progressReads).toBe(0);
+		});
+
+		// A Lock pressed while the profile decrypts keeps it closed (the load returns with it still locked): the saved
+		// progress must not be decrypted behind the lock card.
+		it('does not read the progress when a Lock lands while the profile decrypts', async () => {
+			let progressReads = 0;
+			current.timeline = {
+				ready: true,
+				failed: false,
+				state: EMPTY,
+				load: () => {
+					progressReads++;
+					return Promise.resolve();
+				}
+			};
+			current.load = async () => {};
+			const { container } = await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(progressReads).toBe(0);
+			expect(container.querySelector('.locked-panel__unlock')).not.toBeNull();
+			expect(page.getByRole('alert').query()).toBeNull();
+		});
+
+		// Damaged data opens on no retry: the layout opens the damaged screen, and the page must not also say "try again".
+		it('hands a failed load to the layout, and shows no retry line when it opened the damaged screen', async () => {
+			const failure = new Error('E_TEST_DAMAGED');
+			current.load = () => Promise.reject(failure);
+			current.failed = () => true;
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.poll(() => current.failedSeen).toEqual([failure]);
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(page.getByRole('alert').query()).toBeNull();
 		});
 
 		it.each(timings)(

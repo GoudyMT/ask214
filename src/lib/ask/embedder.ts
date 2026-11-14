@@ -3,9 +3,9 @@ import type { EmbedRequest, EmbedResponse } from './types';
 
 /**
  * Warm-embed timeout (ms). Once the model has loaded, a reply that never comes is a bug, so we bound it.
- * The first (cold) embed is deliberately NOT timed: the one-time ~23MB model load can legitimately take
- * long on a low-bandwidth Context-1 device, and timing it out would falsely fail a slow-but-progressing
- * download.
+ * The first (cold) embed is deliberately NOT timed here: the one-time model and runtime download can
+ * legitimately take long on a low-bandwidth Context-1 device, and timing it out would falsely fail a
+ * slow-but-progressing download. The worker bounds that download itself, by silence rather than length.
  */
 const WARM_TIMEOUT_MS = 15_000;
 

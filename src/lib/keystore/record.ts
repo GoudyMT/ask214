@@ -188,12 +188,18 @@ export async function signKeystore(
 	return computeRecordHmac(row, keys.bootstrapMacKey);
 }
 
-/** False when the row has no recordHmac, has odd bytes where a PIN row needs fixed lengths, or the MAC does not verify. */
+/**
+ * False when the row has no recordHmac or one that is not bytes, has odd bytes where a PIN row needs fixed lengths, or
+ * the MAC does not verify. A stored row can hold anything; a MAC that is not bytes fails here as a wrong one does.
+ */
 export async function verifyKeystore(
 	row: KeystoreCanonicalInput & { recordHmac?: ArrayBuffer },
 	keys: MacKeys
 ): Promise<boolean> {
-	if (!row.recordHmac) return false;
+	const stored: unknown = row.recordHmac;
+	if (!(stored instanceof ArrayBuffer) && !ArrayBuffer.isView(stored)) return false;
+	// Bytes, checked above; the verify reads a view as it reads a buffer.
+	const mac = stored as ArrayBuffer;
 	if (row.mode === 'pin') {
 		let input: Uint8Array<ArrayBuffer>;
 		try {
@@ -201,9 +207,9 @@ export async function verifyKeystore(
 		} catch {
 			return false;
 		}
-		return hmacVerify(keys.bootstrapMacKey, input, row.recordHmac);
+		return hmacVerify(keys.bootstrapMacKey, input, mac);
 	}
-	return verifyRecordHmac(row, keys.bootstrapMacKey, row.recordHmac);
+	return verifyRecordHmac(row, keys.bootstrapMacKey, mac);
 }
 
 function byteHex(b: Uint8Array): string {

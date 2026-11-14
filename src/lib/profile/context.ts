@@ -97,6 +97,12 @@ export type ProfileApp = {
 	 */
 	unlockStores?: (() => Promise<void>) | null;
 	/**
+	 * A page's own Unlock (no PIN) failed with `error`. Damaged data opens no better on a retry, so it opens the damaged
+	 * screen, whose erase reads the data once more first; returns true then. Any other failure, or a PIN tab (its unlock
+	 * judges damage itself), returns false and changes nothing. Absent until app-init resolves ready.
+	 */
+	onUnlockFailed?: ((error: unknown) => boolean) | null;
+	/**
 	 * Opens the damaged screen from a ready tab: drops the plaintext, sets the status to `damaged`, and makes the erase
 	 * check first, through `check`, that the data is still damaged. The erase relocks before it checks, so `check` holds no
 	 * key, session or counter: it compares the stored bytes with the ones that failed (`checkStoredBytes`) and rejects only

@@ -553,6 +553,102 @@ describe('the root layout, an unlock that does not go through', () => {
 	});
 });
 
+// A tab with no PIN unlocks from the page's own Unlock, which reads the profile with the device's key. Damaged data
+// cannot open on any retry, so it goes to the damaged screen, as it does at start-up and after a PIN.
+describe('the root layout, an Unlock with no PIN that fails', () => {
+	/** A local-key tab, opened and then locked, as the page's Unlock finds it. */
+	async function lockedLocalApp(): Promise<ProfileApp> {
+		await localDevice();
+		await render(Layout, { children });
+		const app = await readyApp();
+		await vi.waitFor(() => expect(app.store?.locked).toBe(false));
+		app.relockAll?.();
+		expect(app.store?.locked).toBe(true);
+		return app;
+	}
+
+	async function flipLocalBody(): Promise<Uint8Array> {
+		const row = need(await readRaw('profile'));
+		const good = row.rec as Uint8Array;
+		const rec = new Uint8Array(good);
+		rec[rec.length - 1] = (rec[rec.length - 1] ?? 0) ^ 1;
+		await putRaw('profile', { ...row, rec });
+		return good;
+	}
+
+	const failedLoad = (app: ProfileApp) =>
+		need(app.store)
+			.load()
+			.then(
+				() => null,
+				(e: unknown) => e
+			);
+
+	it('opens the damaged screen for damaged data, and the erase then wipes', async () => {
+		const app = await lockedLocalApp();
+		await flipLocalBody();
+		const e = await failedLoad(app);
+
+		expect(need(app.onUnlockFailed)(e)).toBe(true);
+
+		expect(app.status).toBe('damaged');
+		await settingsErase(app);
+		expect(await readRaw('keystore')).toBeUndefined();
+	});
+
+	// The way back from a switch away re-reads every store: a profile gone bad meanwhile leaves the lock card up while the
+	// timeline and calendar open again. Behind the damaged screen they must stay shut, not open on the next way back.
+	it('shuts the timeline and calendar for good when it opens the damaged screen', async () => {
+		await localDevice();
+		await render(Layout, { children });
+		const app = await readyApp();
+		await vi.waitFor(() => expect(app.store?.locked).toBe(false));
+		setHidden(true);
+		await flipLocalBody();
+		setHidden(false);
+		await vi.waitFor(() => expect(app.timeline?.locked).toBe(false));
+
+		expect(need(app.onUnlockFailed)(await failedLoad(app))).toBe(true);
+
+		expect(app.timeline?.locked).toBe(true);
+		expect(app.calendar?.locked).toBe(true);
+	});
+
+	it('leaves the page as it is for a failure that is not damage', async () => {
+		const app = await lockedLocalApp();
+
+		expect(need(app.onUnlockFailed)(new Error('E_TEST'))).toBe(false);
+
+		expect(app.status).toBe('ready');
+		expect(await readRaw('keystore')).toBeDefined();
+	});
+
+	it('does not erase data that reads again, and reloads onto it', async () => {
+		const app = await lockedLocalApp();
+		const good = await flipLocalBody();
+		expect(need(app.onUnlockFailed)(await failedLoad(app))).toBe(true);
+		const row = need(await readRaw('profile'));
+		await putRaw('profile', { ...row, rec: good });
+		const seen = holdNavigation();
+
+		await expect(need(app.wipeAll)()).rejects.toThrow('E_NO_LONGER_DAMAGED');
+
+		expect(seen).toHaveLength(1);
+		expect(await readRaw('keystore')).toBeDefined();
+	});
+
+	// A PIN tab's damage is judged by its own unlock, which also checks the keys still fit the rows.
+	it('leaves a PIN tab to its own unlock', async () => {
+		await pinDevice(true);
+		await render(Layout, { children });
+		const app = await readyApp();
+
+		expect(need(app.onUnlockFailed)(new KeystoreHmacMismatchError())).toBe(false);
+
+		expect(app.status).toBe('ready');
+	});
+});
+
 describe('the root layout, which relocks drop the keys', () => {
 	// A file picker or a share sheet hides the page; the person has not left.
 	it('a short switch away drops the plaintext and keeps the keys, so no PIN on the way back', async () => {
