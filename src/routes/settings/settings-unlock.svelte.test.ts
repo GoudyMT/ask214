@@ -369,6 +369,30 @@ describe('Settings, Unlock', () => {
 		await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
 	});
 
+	// A Lock pressed while the profile decrypts keeps it closed (the load returns with it still locked): the timeline and
+	// calendar must not be decrypted behind the lock card.
+	it('reads neither the timeline nor the calendar when a Lock lands while the profile decrypts', async () => {
+		ctl.load = async () => {};
+		const { container } = await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.poll(() => loads.mock.calls.length).toBe(1);
+		await pause(50);
+
+		expect(reads.timeline).toBe(0);
+		expect(reads.calendar).toBe(0);
+		expect(unlockButton(container)).not.toBeNull();
+		expect(page.getByRole('alert').query()).toBeNull();
+	});
+
+	it('reads the timeline and calendar after an Unlock that opens the profile', async () => {
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.element(heading()).toBeVisible();
+
+		expect(reads.timeline).toBe(1);
+		expect(reads.calendar).toBe(1);
+	});
+
 	// Damaged data opens on no retry: the layout opens the damaged screen, and the page must not also say "try again".
 	it('hands a failed load to the layout, and shows no retry line when it opened the damaged screen', async () => {
 		const failure = new Error('E_TEST_DAMAGED');

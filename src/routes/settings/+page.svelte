@@ -377,6 +377,8 @@
 		unlocking = true;
 		try {
 			await store.load();
+			// A Lock that landed while the profile decrypted kept it closed; reading the others now would undo it.
+			if (store.locked) return;
 			// The secondary stores relock alongside the profile on idle/pagehide but are not part of
 			// the profile's load; without this they stay unloaded behind an unlocked UI (see the
 			// timeline route for the full reasoning). allSettled so a secondary failure leaves that

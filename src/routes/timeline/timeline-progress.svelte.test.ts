@@ -168,6 +168,29 @@ describe('Timeline, its saved progress', () => {
 			current.failedSeen = [];
 		});
 
+		// A Lock pressed while the profile decrypts keeps it closed (the load returns with it still locked): the saved
+		// progress must not be decrypted behind the lock card.
+		it('does not read the progress when a Lock lands while the profile decrypts', async () => {
+			let progressReads = 0;
+			current.timeline = {
+				ready: true,
+				failed: false,
+				state: EMPTY,
+				load: () => {
+					progressReads++;
+					return Promise.resolve();
+				}
+			};
+			current.load = async () => {};
+			const { container } = await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(progressReads).toBe(0);
+			expect(container.querySelector('.locked-panel__unlock')).not.toBeNull();
+			expect(page.getByRole('alert').query()).toBeNull();
+		});
+
 		// Damaged data opens on no retry: the layout opens the damaged screen, and the page must not also say "try again".
 		it('hands a failed load to the layout, and shows no retry line when it opened the damaged screen', async () => {
 			const failure = new Error('E_TEST_DAMAGED');
