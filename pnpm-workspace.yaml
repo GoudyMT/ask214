@@ -117,21 +117,3 @@ overrides:
   # the client bundle). Targeted range pin, inside the ^7.2.4 onnxruntime-web asks for. Dependabot ignores
   # transformers, so check this by hand when transformers is next updated.
   'protobufjs@>=7.5.0 <7.6.5': '7.6.5'
-
-# Accepted, unfixable, dev/CI-only advisories (never shipped in the client bundle): extract-zip
-# (GHSA-jmr9-qjv8-65gv / CVE-2026-56876, symlink path traversal, CVSS 8.6; and GHSA-7pqw-9j4j-h8q3,
-# arbitrary file writes through symlink archive entries - the same class, reported separately).
-# extract-zip is frozen at 2.0.1 since 2020. The second advisory names ">=2.0.2" as patched, but no such
-# version is published - the registry's newest is 2.0.1 - so there is still nothing to pin, and the
-# advisory's own patched-version field cannot be taken at face value.
-#
-# It is a deep transitive of the Lighthouse-CI dev tool (@lhci/cli>lighthouse>puppeteer-core>
-# @puppeteer/browsers); its only job there is unpacking the Chrome archive @puppeteer/browsers downloads
-# from Google over HTTPS - a trusted source, never attacker-controlled input, and never in the client
-# bundle. Both entries are scoped to THEIR OWN GHSA: every other high/critical still fails
-# `pnpm audit --audit-level=high`. Retire when the chain drops extract-zip (a @puppeteer/browsers>=3.0.6
-# bump replaced it with yauzl; Dependabot will surface it) or a real patch ships.
-auditConfig:
-  ignoreGhsas:
-    - GHSA-jmr9-qjv8-65gv
-    - GHSA-7pqw-9j4j-h8q3
