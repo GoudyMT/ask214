@@ -104,8 +104,11 @@ describe('the worker does its install and activate work in order', () => {
 	};
 
 	it('awaits the restore then the script keep at install, and the prune then the claim at activate, starting both retries unawaited and chaining nothing after them', () => {
+		// The budget is a timer started before any download, so all of them together end before the browser's limit.
 		expect(
 			firstOutOfOrder(handler('install'), [
+				/\n\s*const budget = AbortSignal\.timeout\(INSTALL_DOWNLOAD_BUDGET_MS\);/,
+				/\n\s*await cache\.addAll\(/,
 				/\n\s*await restoreKeptLibraries\(cacheNames, budget\);/,
 				/\n\s*await keepEmbedWorkerScript\(cacheNames, budget\);/
 			]),

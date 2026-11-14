@@ -709,6 +709,32 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 		}
 	});
 
+	// The deadline is for the whole library: time its first file took is gone from its second, or a library of two files
+	// could take twice the longest restore the install allows for.
+	it('gives a library one deadline for all its files, not one each', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache([...SET_UP, DOCUMENT, ...NEW_ANSWERS]);
+			const fetchLibrary = fetching((path, signal) =>
+				Promise.resolve(
+					path === PDF_LIBRARY[0]
+						? dripping(3, DEADLINE / 4, signal)
+						: dripping(1_000, DEADLINE / 10, signal)
+				)
+			);
+			let settled = false;
+			const done = restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(DEADLINE);
+			expect(settled).toBe(true);
+			await done;
+			expect([...stored.keys()]).toEqual([PDF_LIBRARY[0]]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('leaves no timer running once the libraries are done', async () => {
 		vi.useFakeTimers();
 		try {
@@ -1402,6 +1428,7 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 			WORKER_SCRIPT_DEADLINE_MS,
 			budget.signal
 		);
+		expect(fetchScript).not.toHaveBeenCalled();
 		expect(release.stored()).toEqual([]);
 	});
 
