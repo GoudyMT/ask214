@@ -566,13 +566,18 @@ const STATIC = 'static';
 //
 //   2026-11-13 the accuracy pass wording and its sweep fixes: precacheBytes 261,456 -> 261,544 (measured 261,497 B, +466 B on the plan's base, margin 47 B).
 //
+//   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: precacheBytes 261,544 -> 261,578 (measured 261,571 B, +68 B on the plan's base, margin 7 B).
+//   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: workerScripts 147,316 -> 147,800 (measured 147,755 B, +446 B on the plan's base, margin 45 B).
+//   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: routeNodes 61,291 -> 61,317 (measured 61,314 B, +29 B on the plan's base, margin 3 B).
+//   2026-11-14 the download silence guard in the embed worker, the shared install budget, the damaged-data hand-off at Unlock and the Lock check at Unlock: rootLayout 9,849 -> 9,874 (measured 9,871 B, +30 B on the plan's base, margin 3 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 261_544,
-	workerScripts: 147_316
+	precacheBytes: 261_578,
+	workerScripts: 147_800
 };
 
 /**
