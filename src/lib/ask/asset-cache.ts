@@ -431,7 +431,7 @@ export async function restoreLibraries(
 		return;
 	}
 	for (const paths of owed) {
-		if (paths.length === 0 || budget?.aborted) continue;
+		if (budget?.aborted) continue;
 		const bound = bounded(deadlineMs, budget);
 		try {
 			for (const path of paths) {
@@ -539,7 +539,7 @@ export async function keepWorkerScripts(
 	} catch {
 		return;
 	}
-	if (missing.length === 0 || budget?.aborted) return;
+	if (budget?.aborted) return;
 	const bound = bounded(deadlineMs, budget);
 	try {
 		for (const path of missing) {

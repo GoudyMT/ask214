@@ -31,7 +31,7 @@ const networkFetch = scope.fetch.bind(scope);
 scope.fetch = (input, init) =>
 	guardedFetch(
 		(_path, { signal }) => networkFetch(input, { ...init, signal }),
-		input instanceof Request ? input.url : String(input),
+		'',
 		init?.signal ? { idleMs: STALL_MS, signal: init.signal } : { idleMs: STALL_MS }
 	);
 
