@@ -228,7 +228,9 @@
 			// Both then fail closed on `ready`, and a timeline load that fails says so in place of the list
 			// (the store's `failed`).
 			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
-		} catch {
+		} catch (e) {
+			// Damaged data: the layout has opened the damaged screen, where the erase is the way back.
+			if (app.onUnlockFailed?.(e)) return;
 			// The button keeps focus (it is never turned off) and the panel says so.
 			unlockError = UNLOCK_FAILED;
 			return;

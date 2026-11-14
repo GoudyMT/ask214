@@ -382,7 +382,9 @@
 			// timeline route for the full reasoning). allSettled so a secondary failure leaves that
 			// store not-ready rather than blocking the unlock.
 			await Promise.allSettled([app.timeline?.load(), app.calendar?.load()]);
-		} catch {
+		} catch (e) {
+			// Damaged data: the layout has opened the damaged screen, where the erase is the way back.
+			if (app.onUnlockFailed?.(e)) return;
 			// The button keeps focus (it is never turned off) and the panel says so.
 			unlockError = UNLOCK_FAILED;
 			return;

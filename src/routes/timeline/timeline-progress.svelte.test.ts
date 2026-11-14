@@ -20,6 +20,9 @@ const { isoFromToday, current, handOver } = vi.hoisted(() => ({
 	current: {
 		// What the profile store's load does; the Unlock cases set it and put it back.
 		load: async (): Promise<void> => {},
+		// The layout's answer to a failed Unlock (true: it opened the damaged screen), and the errors it was handed.
+		failed: (() => false) as (e: unknown) => boolean,
+		failedSeen: [] as unknown[],
 		firstRun: false,
 		// Days from today to the separation date.
 		daysOut: 200,
@@ -81,7 +84,11 @@ vi.mock('#lib/profile/context.js', () => ({
 		joinRelock: null,
 		publish: null,
 		reloadOnUnlock: false,
-		replacedNotice: false
+		replacedNotice: false,
+		onUnlockFailed: (e: unknown) => {
+			current.failedSeen.push(e);
+			return current.failed(e);
+		}
 	}),
 	setProfileApp: () => {}
 }));
@@ -157,6 +164,21 @@ describe('Timeline, its saved progress', () => {
 			window.removeEventListener('unhandledrejection', onUnhandled);
 			profile.locked = false;
 			current.load = async () => {};
+			current.failed = () => false;
+			current.failedSeen = [];
+		});
+
+		// Damaged data opens on no retry: the layout opens the damaged screen, and the page must not also say "try again".
+		it('hands a failed load to the layout, and shows no retry line when it opened the damaged screen', async () => {
+			const failure = new Error('E_TEST_DAMAGED');
+			current.load = () => Promise.reject(failure);
+			current.failed = () => true;
+			await render(TimelinePage);
+			await page.getByRole('button', { name: 'Unlock' }).click();
+			await expect.poll(() => current.failedSeen).toEqual([failure]);
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(page.getByRole('alert').query()).toBeNull();
 		});
 
 		it.each(timings)(

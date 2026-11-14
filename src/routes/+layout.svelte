@@ -305,6 +305,17 @@
 						app.pinLocked = false;
 					}
 				};
+				// The device's own key read the rows inside the load's lock, so damage is the data's, as at start-up; the erase
+				// checks it again the same way before it wipes.
+				app.onUnlockFailed = (error) => {
+					if (app.keyMode === 'pin' || !isDamagedRecord(error)) return false;
+					app.enterDamaged?.(async () => {
+						const check = createProfileStore(result.db);
+						await check.load();
+						check.relockSync('user');
+					});
+					return true;
+				};
 				app.joinRelock = createJoinRelock(relockables);
 				app.publish = (s) => echo.publish(s);
 				// refresh, not load: a peer's change is not the user asking to unlock, so each store

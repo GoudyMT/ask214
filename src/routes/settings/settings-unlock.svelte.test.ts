@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
 import SettingsPage from './+page.svelte';
 
-const { isoFromToday, ctl } = vi.hoisted(() => ({
+const { isoFromToday, ctl, reads } = vi.hoisted(() => ({
 	isoFromToday: (days: number) => {
 		const d = new Date();
 		d.setDate(d.getDate() + days);
@@ -11,7 +11,13 @@ const { isoFromToday, ctl } = vi.hoisted(() => ({
 		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 	},
 	// What the profile store's load and relock do this test: the cases set them, beforeEach resets them.
-	ctl: { load: async (): Promise<void> => {}, relock: (): void => {} }
+	ctl: {
+		load: async (): Promise<void> => {},
+		relock: (): void => {},
+		// The layout's answer to a failed Unlock: true when it opened the damaged screen.
+		failed: (() => false) as (e: unknown) => boolean
+	},
+	reads: { timeline: 0, calendar: 0, failed: [] as unknown[] }
 }));
 
 // Reactive, unlike a plain flag: Unlock opens the profile and Lock closes it, and the page swaps its sections at that moment.
@@ -37,13 +43,19 @@ vi.mock('#lib/profile/context.js', () => ({
 			locked: false,
 			state: { schemaVersion: 1, tasks: {} },
 			refresh: () => Promise.resolve(),
-			load: () => Promise.resolve()
+			load: () => {
+				reads.timeline++;
+				return Promise.resolve();
+			}
 		},
 		calendar: {
 			ready: true,
 			failed: false,
 			locked: false,
-			load: () => Promise.resolve(),
+			load: () => {
+				reads.calendar++;
+				return Promise.resolve();
+			},
 			exclusions: { taskIds: [], categories: [] },
 			lastAdd: []
 		},
@@ -54,7 +66,11 @@ vi.mock('#lib/profile/context.js', () => ({
 		joinRelock: null,
 		publish: null,
 		reloadOnUnlock: false,
-		replacedNotice: false
+		replacedNotice: false,
+		onUnlockFailed: (e: unknown) => {
+			reads.failed.push(e);
+			return ctl.failed(e);
+		}
 	}),
 	setProfileApp: () => {}
 }));
@@ -86,6 +102,10 @@ beforeEach(() => {
 	window.addEventListener('unhandledrejection', onUnhandled);
 	profile.locked = true;
 	loads.mockClear();
+	reads.timeline = 0;
+	reads.calendar = 0;
+	reads.failed = [];
+	ctl.failed = () => false;
 	ctl.load = async () => {
 		profile.locked = false;
 	};
@@ -347,5 +367,18 @@ describe('Settings, Unlock', () => {
 
 		fail(new Error('E_TEST_LOAD'));
 		await expect.element(page.getByRole('alert')).toHaveTextContent(FAILED);
+	});
+
+	// Damaged data opens on no retry: the layout opens the damaged screen, and the page must not also say "try again".
+	it('hands a failed load to the layout, and shows no retry line when it opened the damaged screen', async () => {
+		const failure = new Error('E_TEST_DAMAGED');
+		ctl.load = () => Promise.reject(failure);
+		ctl.failed = () => true;
+		await render(SettingsPage);
+		await page.getByRole('button', { name: 'Unlock' }).click();
+		await expect.poll(() => reads.failed).toEqual([failure]);
+		await pause(50);
+
+		expect(page.getByRole('alert').query()).toBeNull();
 	});
 });
