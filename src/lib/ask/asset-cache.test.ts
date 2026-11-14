@@ -22,8 +22,12 @@ import {
 	APP_SHELL,
 	mayServeEarly,
 	offlineResponse,
-	networkFirst
+	networkFirst,
+	LIBRARY_RESTORE_DEADLINE_MS,
+	WORKER_SCRIPT_DEADLINE_MS,
+	INSTALL_DOWNLOAD_BUDGET_MS
 } from './asset-cache';
+import { STALL_MS } from '../net/stall-guard';
 import { KDF_WORKER_SRC } from '../backup/kdf-paths';
 
 // classifyAsset decides how the service worker caches a same-origin static asset. The heavy on-device
@@ -678,7 +682,9 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 		}
 	});
 
-	it('gives every fetch of a library the same signal, and stops at the first miss in it', async () => {
+	// Each file has its own stall guard, so each fetch has its own signal; the library's deadline still reaches the one in
+	// flight, so the stalled download is stopped, not left running behind an install that moved on.
+	it('stops at the first miss in a library, and stops that download', async () => {
 		vi.useFakeTimers();
 		try {
 			// The answer library is held, so only the PDF library is owed and its two fetches are the only ones.
@@ -696,8 +702,7 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 
 			const signals = fetchLibrary.mock.calls.map(([, init]) => init.signal);
 			expect(signals).toHaveLength(2);
-			expect(signals[0]).toBe(signals[1]);
-			expect(signals[0]?.aborted).toBe(true);
+			expect(signals[1]?.aborted).toBe(true);
 			expect([...stored.keys()]).toEqual([PDF_LIBRARY[0]]);
 		} finally {
 			vi.useRealTimers();
@@ -916,7 +921,129 @@ describe('restoreLibraries (each library gets one try within its own deadline)',
 		await restoreLibraries(cache, fetchLibrary, ORIGIN, SHIPPED, DEADLINE);
 		expect(fetchLibrary).not.toHaveBeenCalled();
 	});
+
+	// A slow link that keeps delivering: the answer library at 0.25 Mbps takes about two minutes, past the old one-minute
+	// cut, and must still be stored within the library's own deadline.
+	it('stores a library that keeps arriving slowly past one minute', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache([...SET_UP, NEW_ANSWERS[0] ?? '']);
+			const fetchLibrary = fetching((_path, signal) =>
+				Promise.resolve(dripping(6, STALL_MS - 1, signal))
+			);
+			const done = restoreLibraries(
+				cache,
+				fetchLibrary,
+				ORIGIN,
+				SHIPPED,
+				LIBRARY_RESTORE_DEADLINE_MS
+			);
+			await vi.advanceTimersByTimeAsync(6 * STALL_MS);
+			await done;
+			expect([...stored.keys()]).toEqual([NEW_ANSWERS[1]]);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// A connection that is up but silent is given up after the stall bound, not left to hold the install to the deadline.
+	it('gives a library up once nothing has arrived for the stall bound', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache(OWING_BOTH);
+			const fetchLibrary = fetching((path, signal) =>
+				path.startsWith('/pdf-worker/') ? stalled(signal) : ok(path)
+			);
+			let settled = false;
+			const done = restoreLibraries(
+				cache,
+				fetchLibrary,
+				ORIGIN,
+				SHIPPED,
+				LIBRARY_RESTORE_DEADLINE_MS
+			).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(STALL_MS - 1);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(settled).toBe(true);
+			await done;
+			expect([...stored.keys()]).toEqual(NEW_ANSWERS);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	// Install shares one budget across every download, so the whole install ends inside the browser's own limit.
+	it('stops every library once the shared budget runs out', async () => {
+		vi.useFakeTimers();
+		try {
+			const { cache, stored } = heldCache(OWING_BOTH);
+			const budget = new AbortController();
+			const fetchLibrary = fetching((_path, signal) =>
+				Promise.resolve(dripping(1_000, STALL_MS - 1, signal))
+			);
+			let settled = false;
+			const done = restoreLibraries(
+				cache,
+				fetchLibrary,
+				ORIGIN,
+				SHIPPED,
+				LIBRARY_RESTORE_DEADLINE_MS,
+				budget.signal
+			).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(STALL_MS);
+			budget.abort();
+			await vi.advanceTimersByTimeAsync(0);
+			expect(settled).toBe(true);
+			await done;
+			expect(stored.size).toBe(0);
+			// The answer library is not started on a spent budget.
+			expect(fetchLibrary.mock.calls.map(([path]) => path)).toEqual([PDF_LIBRARY[0]]);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });
+
+// Chrome stops a service worker event, install included, after five minutes; an install that runs over fails and the
+// update with it. The install's shared download budget must end well before that.
+describe('the install download budget', () => {
+	it('ends before the browser would stop the install', () => {
+		expect(INSTALL_DOWNLOAD_BUDGET_MS).toBeLessThan(5 * 60_000);
+		expect(INSTALL_DOWNLOAD_BUDGET_MS).toBeGreaterThan(STALL_MS);
+	});
+});
+
+/** A body that sends `count` pieces, one every `gapMs`, then ends; it errors when `signal` aborts, as a real one does. */
+function dripping(count: number, gapMs: number, signal: AbortSignal): Response {
+	let sent = 0;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const body = new ReadableStream<Uint8Array>({
+		start(controller) {
+			if (signal.aborted) return controller.error(new DOMException('aborted', 'AbortError'));
+			signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				controller.error(new DOMException('aborted', 'AbortError'));
+			});
+			const next = () => {
+				timer = setTimeout(() => {
+					controller.enqueue(new Uint8Array([sent]));
+					sent++;
+					if (sent === count) controller.close();
+					else next();
+				}, gapMs);
+			};
+			next();
+		}
+	});
+	return new Response(body, { status: 200 });
+}
 
 // The build list the service worker precaches leaves out the embed worker's script, so the only place this release
 // names it is the page code that starts the worker. Install reads the name from there.
@@ -1211,6 +1338,73 @@ describe('keepWorkerScripts (the embed worker script, kept for a device that set
 
 	// Activation calls this again for a script install could not store, so the second call must finish the job and
 	// the third, with the script held, must cost nothing.
+	// The script is about 147 KB on the wire: about 5 s at 0.25 Mbps, longer on a worse link that still delivers.
+	it('stores a script that keeps arriving slowly past twenty seconds', async () => {
+		vi.useFakeTimers();
+		try {
+			const release = releaseHolding(RELEASE);
+			const fetchScript = fetching((_path, signal) =>
+				Promise.resolve(dripping(3, STALL_MS - 1, signal))
+			);
+			const done = keepWorkerScripts(
+				assetsHolding(SET_UP),
+				release.cache,
+				fetchScript,
+				ORIGIN,
+				WORKER_SCRIPT_DEADLINE_MS
+			);
+			await vi.advanceTimersByTimeAsync(3 * STALL_MS);
+			await done;
+			expect(release.stored()).toEqual([SCRIPT]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('gives the script up once nothing has arrived for the stall bound', async () => {
+		vi.useFakeTimers();
+		try {
+			const release = releaseHolding(RELEASE);
+			const fetchScript = fetching((_path, signal) =>
+				Promise.resolve(dripping(1_000, 10 * STALL_MS, signal))
+			);
+			let settled = false;
+			const done = keepWorkerScripts(
+				assetsHolding(SET_UP),
+				release.cache,
+				fetchScript,
+				ORIGIN,
+				WORKER_SCRIPT_DEADLINE_MS
+			).then(() => {
+				settled = true;
+			});
+			await vi.advanceTimersByTimeAsync(STALL_MS);
+			expect(settled).toBe(true);
+			await done;
+			expect(release.stored()).toEqual([]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('stops at once when the shared install budget has run out', async () => {
+		const release = releaseHolding(RELEASE);
+		const fetchScript = fetching((_path, signal) =>
+			signal.aborted ? Promise.reject(new DOMException('aborted', 'AbortError')) : ok(SCRIPT)
+		);
+		const budget = new AbortController();
+		budget.abort();
+		await keepWorkerScripts(
+			assetsHolding(SET_UP),
+			release.cache,
+			fetchScript,
+			ORIGIN,
+			WORKER_SCRIPT_DEADLINE_MS,
+			budget.signal
+		);
+		expect(release.stored()).toEqual([]);
+	});
+
 	it('stores on a retry what the first try could not, and fetches nothing once it is held', async () => {
 		const release = releaseHolding(RELEASE);
 		const offline = fetching(() => Promise.reject(new TypeError('offline')));

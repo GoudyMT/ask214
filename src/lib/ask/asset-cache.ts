@@ -1,3 +1,5 @@
+import { guardedFetch, STALL_MS } from '../net/stall-guard';
+
 export type CacheStrategy = 'precache' | 'lazy' | 'on-use';
 
 /**
@@ -345,33 +347,60 @@ export function answerLibraryToRestore(
 }
 
 /**
- * How long the install-time restore waits on one library before giving it up.
+ * The longest one library's restore may take, however steadily it arrives.
  *
- * A bound, so a stalled download cannot hold the install - and with it the update - open. A miss is not free: the
- * files stored so far stay, but until the retry after activation, the next install or an online load stores the
- * rest, a set-up device cannot answer offline. The answer library is about 3.7 MB on the wire (its embeddings do not compress; measured from production with
- * compression on), so 60 seconds holds down to about 0.5 Mbps; this is a bound, not a measured limit.
+ * A download that goes quiet is given up sooner, after `STALL_MS` with nothing arriving; this bound is for a slow one
+ * that keeps delivering. A miss is not free: the files stored so far stay, but until the retry after activation, the
+ * next install or an online load stores the rest, a set-up device cannot answer offline. The answer library is about
+ * 3.7 MB on the wire (its embeddings do not compress; measured from production with compression on), about 118 s at
+ * 0.25 Mbps, so 4 minutes holds down to about 0.12 Mbps; this is a bound, not a measured limit.
  */
-export const LIBRARY_RESTORE_DEADLINE_MS = 60_000;
+export const LIBRARY_RESTORE_DEADLINE_MS = 240_000;
 
 /**
- * How long keeping the embed worker's script waits on its download before giving it up.
+ * The longest keeping the embed worker's script may take, however steadily it arrives.
  *
- * A bound, so a stalled download cannot hold the install - and with it the update - open. The script is about
- * 517 KB, or about 147 KB compressed on the wire, which takes about 5 seconds on a slow 0.25 Mbps link; 20 seconds
- * leaves room beyond that and still ends a stall. It is a bound, not a measured limit. A miss costs the device
- * its offline answers after an update that changed the script, until the retry after activation or the first
- * online question stores it.
+ * A download that goes quiet is given up after `STALL_MS`. The script is about 517 KB, or about 147 KB compressed on
+ * the wire, about 5 seconds at 0.25 Mbps; 2 minutes covers a link many times slower that still delivers. It is a
+ * bound, not a measured limit. A miss costs the device its offline answers after an update that changed the script,
+ * until the retry after activation or the first online question stores it.
  */
-export const WORKER_SCRIPT_DEADLINE_MS = 20_000;
+export const WORKER_SCRIPT_DEADLINE_MS = 120_000;
+
+/**
+ * The one budget every download in an install shares, counted from the install's start.
+ *
+ * Chrome stops a service worker event that runs past five minutes (`kRequestTimeout` in Chromium's
+ * service_worker_version.cc), and an install it stops fails, taking the update with it. The libraries and the script
+ * download one after another inside that one event, so their own bounds added together could pass it; this ends them
+ * all a minute before. What install could not store is tried again after activation, with each bound in full.
+ */
+export const INSTALL_DOWNLOAD_BUDGET_MS = 240_000;
+
+/** A controller that aborts after `deadlineMs`, or at once when `budget` ends first; `done` clears both. */
+function bounded(deadlineMs: number, budget: AbortSignal | undefined) {
+	const controller = new AbortController();
+	const stop = () => controller.abort();
+	const timer = setTimeout(stop, deadlineMs);
+	budget?.addEventListener('abort', stop, { once: true });
+	if (budget?.aborted) stop();
+	return {
+		signal: controller.signal,
+		done: () => {
+			clearTimeout(timer);
+			budget?.removeEventListener('abort', stop);
+		}
+	};
+}
 
 /**
  * Fetch and store the library files this device is owed, each library in its own try and within its own deadline.
  *
  * The PDF library and the answer library are separate tries: one that fails or stalls costs the device only that
- * library, and the other is still fetched. Each has an AbortController that a timer fires after `deadlineMs`; its
- * signal goes to every fetch of that library, so a download that stalls - headers or body - is cut off instead of
- * holding the install. Only a 200 response is stored. Nothing here throws, so it cannot fail the install.
+ * library, and the other is still fetched. Each library has a deadline of `deadlineMs`, cut short when `budget` ends,
+ * and each file is given up once nothing has arrived for `STALL_MS` - headers or body - so a silent link is cut off
+ * soon and a slow one that keeps delivering is not. A library is not started once `budget` has ended. Only a 200
+ * response is stored. Nothing here throws, so it cannot fail the install.
  *
  * Args:
  *   cache: ASK_ASSET_CACHE, to read the held entries from and store into
@@ -380,13 +409,15 @@ export const WORKER_SCRIPT_DEADLINE_MS = 20_000;
  *     are this app's own
  *   shipped: the pathnames this build ships
  *   deadlineMs: how long each library may take
+ *   budget: ends every download at once; install passes its shared budget, activation none
  */
 export async function restoreLibraries(
 	cache: Pick<Cache, 'keys' | 'put'>,
 	fetchLibrary: (path: string, init: { signal: AbortSignal }) => Promise<Response>,
 	origin: string,
 	shipped: readonly string[],
-	deadlineMs: number
+	deadlineMs: number,
+	budget?: AbortSignal
 ): Promise<void> {
 	let owed: string[][];
 	try {
@@ -400,11 +431,14 @@ export async function restoreLibraries(
 		return;
 	}
 	for (const paths of owed) {
-		const controller = new AbortController();
-		const timer = setTimeout(() => controller.abort(), deadlineMs);
+		if (paths.length === 0 || budget?.aborted) continue;
+		const bound = bounded(deadlineMs, budget);
 		try {
 			for (const path of paths) {
-				const response = await fetchLibrary(path, { signal: controller.signal });
+				const response = await guardedFetch(fetchLibrary, path, {
+					idleMs: STALL_MS,
+					signal: bound.signal
+				});
 				if (response.status === 200) await cache.put(path, response);
 			}
 		} catch {
@@ -412,7 +446,7 @@ export async function restoreLibraries(
 			// far kept. The other one is still tried, and this one is tried again after activation, fetching only
 			// the files still missing.
 		} finally {
-			clearTimeout(timer);
+			bound.done();
 		}
 	}
 }
@@ -461,9 +495,10 @@ export function workerScriptsNamed(chunkPath: string, text: string): string[] {
  * offline answers yet - one stopped part-way has stored a few small model files and no more - and downloads nothing
  * here.
  *
- * Each script is its own try under one deadline, and nothing throws, so it cannot fail the install or hold it open.
- * Only a 200 response is stored. A script already held is not fetched again, so the same call after activation
- * stores what install could not and costs nothing once it is held.
+ * Each script is its own try under one deadline, cut short when `budget` ends, and each is given up once nothing has
+ * arrived for `STALL_MS`; nothing throws, so it cannot fail the install or hold it open. Only a 200 response is
+ * stored. A script already held is not fetched again, so the same call after activation stores what install could
+ * not and costs nothing once it is held.
  *
  * Args:
  *   assetCache: ASK_ASSET_CACHE, read to see whether the device set up
@@ -471,13 +506,15 @@ export function workerScriptsNamed(chunkPath: string, text: string): string[] {
  *   fetchScript: the network fetch, given the path and the signal; injected by tests
  *   origin: this worker's origin; only entries under it are read
  *   deadlineMs: how long the downloads may take
+ *   budget: ends every download at once; install passes its shared budget, activation none
  */
 export async function keepWorkerScripts(
 	assetCache: Pick<Cache, 'keys'>,
 	releaseCache: Pick<Cache, 'keys' | 'match' | 'put'>,
 	fetchScript: (path: string, init: { signal: AbortSignal }) => Promise<Response>,
 	origin: string,
-	deadlineMs: number
+	deadlineMs: number,
+	budget?: AbortSignal
 ): Promise<void> {
 	let missing: string[];
 	try {
@@ -502,12 +539,15 @@ export async function keepWorkerScripts(
 	} catch {
 		return;
 	}
-	const controller = new AbortController();
-	const timer = setTimeout(() => controller.abort(), deadlineMs);
+	if (missing.length === 0 || budget?.aborted) return;
+	const bound = bounded(deadlineMs, budget);
 	try {
 		for (const path of missing) {
 			try {
-				const response = await fetchScript(path, { signal: controller.signal });
+				const response = await guardedFetch(fetchScript, path, {
+					idleMs: STALL_MS,
+					signal: bound.signal
+				});
 				if (response.status === 200) await releaseCache.put(path, response);
 			} catch {
 				// This script is given up on - a failed or stalled download, or a full disk. It is tried again after
@@ -515,7 +555,7 @@ export async function keepWorkerScripts(
 			}
 		}
 	} finally {
-		clearTimeout(timer);
+		bound.done();
 	}
 }
 

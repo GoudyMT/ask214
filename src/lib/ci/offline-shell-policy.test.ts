@@ -106,8 +106,8 @@ describe('the worker does its install and activate work in order', () => {
 	it('awaits the restore then the script keep at install, and the prune then the claim at activate, starting both retries unawaited and chaining nothing after them', () => {
 		expect(
 			firstOutOfOrder(handler('install'), [
-				/\n\s*await restoreKeptLibraries\(cacheNames\);/,
-				/\n\s*await keepEmbedWorkerScript\(cacheNames\);/
+				/\n\s*await restoreKeptLibraries\(cacheNames, budget\);/,
+				/\n\s*await keepEmbedWorkerScript\(cacheNames, budget\);/
 			]),
 			'install statement missing or out of order'
 		).toBeUndefined();
@@ -162,7 +162,7 @@ describe('the worker does its install and activate work in order', () => {
 		for (const retry of ['restoreKeptLibraries', 'keepEmbedWorkerScript']) {
 			expect(callsOf(retry), `${retry} calls in the worker`).toHaveLength(2);
 			expect(
-				handler('install').match(new RegExp(`await ${retry}\\(cacheNames\\);`, 'g')),
+				handler('install').match(new RegExp(`await ${retry}\\(cacheNames, budget\\);`, 'g')),
 				retry
 			).toHaveLength(1);
 			expect(
