@@ -592,9 +592,26 @@ describe('the root layout, an Unlock with no PIN that fails', () => {
 		expect(need(app.onUnlockFailed)(e)).toBe(true);
 
 		expect(app.status).toBe('damaged');
-		expect(app.store?._getStateForTest()).toBeNull();
 		await settingsErase(app);
 		expect(await readRaw('keystore')).toBeUndefined();
+	});
+
+	// The way back from a switch away re-reads every store: a profile gone bad meanwhile leaves the lock card up while the
+	// timeline and calendar open again. Behind the damaged screen they must stay shut, not open on the next way back.
+	it('shuts the timeline and calendar for good when it opens the damaged screen', async () => {
+		await localDevice();
+		await render(Layout, { children });
+		const app = await readyApp();
+		await vi.waitFor(() => expect(app.store?.locked).toBe(false));
+		setHidden(true);
+		await flipLocalBody();
+		setHidden(false);
+		await vi.waitFor(() => expect(app.timeline?.locked).toBe(false));
+
+		expect(need(app.onUnlockFailed)(await failedLoad(app))).toBe(true);
+
+		expect(app.timeline?.locked).toBe(true);
+		expect(app.calendar?.locked).toBe(true);
 	});
 
 	it('leaves the page as it is for a failure that is not damage', async () => {

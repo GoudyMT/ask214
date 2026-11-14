@@ -309,6 +309,8 @@
 				// checks it again the same way before it wipes.
 				app.onUnlockFailed = (error) => {
 					if (app.keyMode === 'pin' || !isDamagedRecord(error)) return false;
+					// Shut every store, as a failed PIN unlock does: the screen's own relock leaves them open to the next re-read.
+					echo.answer(() => relockEachSync(relockables, 'peer'));
 					app.enterDamaged?.(async () => {
 						const check = createProfileStore(result.db);
 						await check.load();
