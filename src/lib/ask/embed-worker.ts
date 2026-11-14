@@ -25,10 +25,11 @@ if (onnxWasm) onnxWasm.wasmPaths = '/wasm/';
 // The first setup downloads the model (through the library) and the runtime (through ORT) with this worker's fetch.
 // A connection that is up but silent never fails on its own, so the first question would wait for good: every
 // download here is given up once nothing has arrived for STALL_MS, and a slow one that keeps arriving is never cut.
-// The load then fails like a dropped download, and the page starts a fresh worker for the next question.
+// The load then fails like a dropped download, and the page starts a fresh worker for the next question. The library
+// downloads the model with its own copy of fetch, taken when it loaded, so that copy is replaced too.
 const scope = self as unknown as { fetch: typeof fetch };
 const networkFetch = scope.fetch.bind(scope);
-scope.fetch = (input, init) =>
+env.fetch = scope.fetch = (input, init) =>
 	guardedFetch(
 		(_path, { signal }) => networkFetch(input, { ...init, signal }),
 		'',

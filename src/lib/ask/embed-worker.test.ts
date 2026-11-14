@@ -75,6 +75,8 @@ describe('embed worker downloads', () => {
 	beforeEach(async () => {
 		vi.resetModules();
 		network.mockReset();
+		// The library's own copy, as it takes one when it loads: the network fetch itself.
+		env.fetch = network;
 		vi.stubGlobal('self', { postMessage: () => {}, fetch: network });
 		await import('./embed-worker');
 	});
@@ -163,10 +165,37 @@ describe('embed worker downloads', () => {
 		}).catch((error: unknown) => error);
 		stop.abort();
 
+		expect((network.mock.calls[0]?.[1] as RequestInit).signal?.aborted).toBe(true);
 		const error = await download;
 		expect(isStall(error)).toBe(false);
+		expect((error as Error).name).toBe('AbortError');
 		expect(network.mock.calls[0]?.[0]).toBe('/wasm/x.wasm');
 		expect(network.mock.calls[0]?.[1]).toMatchObject({ credentials: 'same-origin' });
+	});
+
+	// The library keeps its own copy of fetch, taken when it loads - before this worker's code runs - and downloads the
+	// model files with that copy, so the bound must reach the library's copy too, not only the worker's global.
+	it("bounds the library's own downloads, the model files among them", async () => {
+		vi.useFakeTimers();
+		network.mockImplementation(
+			(_input: unknown, init: RequestInit) =>
+				new Promise<Response>((_resolve, reject) => {
+					init.signal?.addEventListener('abort', () =>
+						reject(new DOMException('aborted', 'AbortError'))
+					);
+				})
+		);
+		const settled = vi.fn();
+		// The library asks with its own options and no stop of its own.
+		const libraryFetch = env.fetch as typeof fetch;
+		void libraryFetch('/models/Xenova/all-MiniLM-L6-v2/onnx/model_quantized.onnx', {
+			headers: {}
+		}).then(
+			() => settled('resolved'),
+			(error: unknown) => settled(isStall(error) ? 'stalled' : 'other')
+		);
+		await vi.advanceTimersByTimeAsync(STALL_MS);
+		expect(settled).toHaveBeenCalledWith('stalled');
 	});
 });
 
