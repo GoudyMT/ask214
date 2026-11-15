@@ -2,12 +2,31 @@
 
 > Private, offline-first answers for your military transition, from sources you can trust.
 
-**[Try it at ask214.com](https://ask214.com)**
+**[Try it at ask214.com](https://ask214.com)** - free, no account, no ads.
+
+**Status: complete** (v1.22.3, November 2026). Kept as it is: no new features, security fixes only.
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-3a6ea5.svg)](LICENSE)
 ![PWA: offline-first](https://img.shields.io/badge/PWA-offline--first-5a3e9e.svg)
 ![Built with SvelteKit](https://img.shields.io/badge/built%20with-SvelteKit-ff3e00.svg)
 ![TypeScript: strict](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)
+
+<table>
+  <tr>
+    <th>Ask</th>
+    <th>An answer, from the source</th>
+    <th>Your timeline</th>
+    <th>Locked with a PIN</th>
+  </tr>
+  <tr>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png"><img src="docs/images/home-light.png" width="200" alt="Home: a question box, Online or On device, and the timeline's next step"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/ask-dark.png"><img src="docs/images/ask-light.png" width="200" alt="Ask answered on the device: the passage from the official source"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/timeline-dark.png"><img src="docs/images/timeline-light.png" width="200" alt="Timeline: what needs you now, late and closing soon, with dates"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/lock-dark.png"><img src="docs/images/lock-light.png" width="200" alt="The app lock: your data is locked until you enter your PIN"></picture></td>
+  </tr>
+</table>
+
+<sub>Screenshots of the real app on a phone, with made-up sample data.</sub>
 
 **Ask 214** is a privacy-first Progressive Web App for U.S. service members navigating the roughly
 24-month window before and after separation. It consolidates the guidance that is scattered across
@@ -17,6 +36,34 @@ your personal information on your device.
 The mobile-app layer for transition support has been effectively vacant since Military.com's Transition
 App was discontinued around 2017-2018. Ask 214 fills that gap. It is built by a U.S. Navy veteran who made
 the transition it is designed to help with.
+
+---
+
+## How it works
+
+Your information stays on your phone. Only a question you choose to ask online leaves it.
+
+```mermaid
+flowchart LR
+  subgraph phone["Your phone"]
+    you(["You"])
+    data[("Profile, timeline, notes<br/>encrypted on the device")]
+    lib[("Answer library and model<br/>downloaded once, works offline")]
+  end
+  search["Search server<br/>(ask214.com, keeps no logs)"]
+  ai["AI provider<br/>(only with your own key)"]
+  you -- "saves, behind an optional PIN" --> data
+  you -- "asks on device: searches" --> lib
+  you -- "asks online: sends only the question text" --> search
+  you -- "optional summary: sends the question and the cited passages" --> ai
+```
+
+- **On device:** after a one-time download, Ask searches the official documents on your phone, with no
+  connection.
+- **Online:** after you agree once, only the words of your question go to the search server, which keeps
+  nothing.
+- **Your data:** profile, timeline and notes are encrypted on the device and never sent. They leave only in
+  a file you choose to save: an encrypted backup or a calendar file.
 
 ---
 
