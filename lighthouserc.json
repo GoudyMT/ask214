@@ -7,7 +7,8 @@
 			"numberOfRuns": 3,
 			"settings": {
 				"chromeFlags": "--ignore-certificate-errors",
-				"throttlingMethod": "simulate"
+				"throttlingMethod": "simulate",
+				"enableErrorReporting": false
 			}
 		},
 		"assert": {
