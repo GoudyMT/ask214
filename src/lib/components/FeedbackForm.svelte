@@ -129,7 +129,9 @@
 		<div class="field">
 			<label for="fb-email">Your email <span class="opt">(optional)</span></label>
 			<input id="fb-email" type="email" bind:value={replyEmail} placeholder="you@example.com" />
-			<p class="hint">Only if you'd like a reply. Leave it blank to stay anonymous.</p>
+			<p class="hint">
+				Only if you'd like a reply, which I can't promise. Leave it blank to stay anonymous.
+			</p>
 		</div>
 
 		<!-- Spam trap: off-screen + aria-hidden + not tabbable, so people never see it but naive bots

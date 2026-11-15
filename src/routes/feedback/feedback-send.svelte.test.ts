@@ -50,6 +50,8 @@ describe('Feedback page send', () => {
 		// innerText reads the page as drawn: the source's line breaks inside a paragraph collapse to spaces.
 		expect(container.innerText).toContain("can't promise a reply");
 		expect(container.innerText).not.toMatch(/get back to you|read every message/i);
+		// pin: 4 - the email hint the owner locked on 2026-11-14.
+		expect(container.innerText).toContain("Only if you'd like a reply, which I can't promise.");
 
 		const message = container.querySelector('#fb-msg') as HTMLTextAreaElement;
 		message.value = 'the timeline page is slow';
