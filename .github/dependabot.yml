@@ -1,11 +1,13 @@
 version: 2
+# The app is finished and kept as it is: routine version bumps are upkeep with no end, so a limit of 0 turns
+# version updates off. Security updates are a repository setting with their own fixed limit, so they still arrive.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     # Wait 7 days after a release before proposing it (supply-chain caution; exceeds the 24h
     # minimumReleaseAge floor, so any version Dependabot proposes already satisfies the install guard).
     cooldown:
@@ -43,6 +45,7 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
     # Wait 7 days before proposing an action bump, matching the npm ecosystem's cooldown.
     cooldown:
       default-days: 7
