@@ -75,8 +75,6 @@ accuracy checks.
 
 <img src="docs/images/blueprint-corpus.svg" width="880" alt="Corpus pipeline: a registry of 46 US Government sources, capture, human review, 1,992 passages with citation anchors, a quality gate, and two indexes: one shipped to the device, one in KV for online search">
 
-How each part is built, and why, is written up in [`docs/engineering/`](docs/engineering/).
-
 ---
 
 ## What it does
