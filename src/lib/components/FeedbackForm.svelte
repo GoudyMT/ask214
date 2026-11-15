@@ -84,7 +84,7 @@
 {#if phase === 'success'}
 	<div class="panel" role="status">
 		<h2 bind:this={panelHeading} tabindex="-1">Thanks - your feedback was sent.</h2>
-		<p>I read every message. If you left an email, I'll get back to you.</p>
+		<p>I read messages when I can, but I can't promise a reply.</p>
 		<button type="button" class="btn" onclick={(e) => backToForm(e, reset)}>Send another</button>
 	</div>
 {:else if phase === 'error'}

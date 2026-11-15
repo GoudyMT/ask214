@@ -38,4 +38,29 @@ describe('Feedback page send', () => {
 		expect(timeout).toHaveBeenCalledWith(20_000);
 		expect(silent.mock.calls[0]?.[1].signal).toBe(stop.signal);
 	});
+
+	// The app is finished and runs with no one on duty: neither the page nor the sent panel may promise a reply,
+	// or a member who left an email waits for one that never comes.
+	it('never promises a reply, before or after a send', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(null, { status: 200 }))
+		);
+		const { container } = await render(FeedbackPage);
+		// innerText reads the page as drawn: the source's line breaks inside a paragraph collapse to spaces.
+		expect(container.innerText).toContain("can't promise a reply");
+
+		const message = container.querySelector('#fb-msg') as HTMLTextAreaElement;
+		message.value = 'the timeline page is slow';
+		message.dispatchEvent(new Event('input', { bubbles: true }));
+		flushSync();
+		(container.querySelector('form') as HTMLFormElement).requestSubmit();
+
+		await vi.waitFor(() => expect(container.textContent).toContain('your feedback was sent'));
+		// pin: 4 - copy the owner locked on 2026-11-14.
+		expect(container.innerText).toContain(
+			"I read messages when I can, but I can't promise a reply."
+		);
+		expect(container.innerText).not.toMatch(/get back to you|read every message/i);
+	});
 });
