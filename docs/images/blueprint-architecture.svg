@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 560" width="980" height="560" font-family="Consolas, Menlo, monospace">
+<title>Ask 214 system architecture: the app runs in the browser; two Cloudflare Workers serve it and answer online search; personal data never leaves the device</title>
+<defs><pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#16325a" stroke-width="1"/></pattern>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9cc3ef"/></marker></defs>
+<rect width="980" height="560" fill="#0d2240"/><rect width="980" height="560" fill="url(#g)"/>
+<text x="24" y="38" font-size="20" font-weight="700" fill="#eaf3ff">System architecture</text>
+<rect x="20" y="56" width="450" height="480" rx="10" fill="#0f2a4d" stroke="#9cc3ef" stroke-width="1.5" stroke-dasharray="8 5"/>
+<text x="34" y="80" font-size="14" font-weight="700" fill="#ffd479">Your device (browser, installable PWA)</text>
+<rect x="540" y="56" width="420" height="380" rx="10" fill="#0f2a4d" stroke="#9cc3ef" stroke-width="1.5" stroke-dasharray="8 5"/>
+<text x="554" y="80" font-size="14" font-weight="700" fill="#ffd479">Cloudflare (ask214.com)</text>
+<rect x="40" y="92" width="410" height="76" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="52" y="114" font-size="14" font-weight="700" fill="#eaf3ff">App (SvelteKit 3, Svelte 5, TypeScript)</text>
+<text x="52" y="134" font-size="12" fill="#b9d2ee">Ask, Timeline, Documents, Settings</text>
+<text x="52" y="151" font-size="12" fill="#b9d2ee">Strict Content Security Policy</text>
+<rect x="40" y="186" width="196" height="92" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="52" y="208" font-size="14" font-weight="700" fill="#eaf3ff">Service worker</text>
+<text x="52" y="228" font-size="12" fill="#b9d2ee">Precaches the app</text>
+<text x="52" y="245" font-size="12" fill="#b9d2ee">Keeps model + corpus</text>
+<text x="52" y="262" font-size="12" fill="#b9d2ee">Works offline</text>
+<rect x="254" y="186" width="196" height="92" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="266" y="208" font-size="14" font-weight="700" fill="#eaf3ff">Web workers</text>
+<text x="266" y="228" font-size="12" fill="#b9d2ee">Embed: Transformers.js</text>
+<text x="266" y="245" font-size="12" fill="#b9d2ee">  + ONNX Runtime (wasm)</text>
+<text x="266" y="262" font-size="12" fill="#b9d2ee">KDF: Argon2id</text>
+<rect x="40" y="296" width="410" height="76" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="52" y="318" font-size="14" font-weight="700" fill="#eaf3ff">IndexedDB (encrypted)</text>
+<text x="52" y="338" font-size="12" fill="#b9d2ee">Profile, timeline, notes, calendar, API key</text>
+<text x="52" y="355" font-size="12" fill="#b9d2ee">AES-GCM 256, non-extractable keys</text>
+<rect x="40" y="390" width="410" height="60" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="52" y="412" font-size="14" font-weight="700" fill="#eaf3ff">Files you choose to save</text>
+<text x="52" y="432" font-size="12" fill="#b9d2ee">Encrypted backup (.ask214backup), calendar (.ics)</text>
+<rect x="560" y="92" width="380" height="76" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="572" y="114" font-size="14" font-weight="700" fill="#eaf3ff">App Worker</text>
+<text x="572" y="134" font-size="12" fill="#b9d2ee">Serves the app, model, corpus, PDFs</text>
+<text x="572" y="151" font-size="12" fill="#b9d2ee">Security headers; /api/feedback</text>
+<rect x="560" y="196" width="380" height="110" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="572" y="218" font-size="14" font-weight="700" fill="#eaf3ff">Retrieve Worker (stateless)</text>
+<text x="572" y="238" font-size="12" fill="#b9d2ee">Origin check, per-IP rate limit</text>
+<text x="572" y="255" font-size="12" fill="#b9d2ee">Daily budget breaker (Durable Object)</text>
+<text x="572" y="272" font-size="12" fill="#b9d2ee">Embeds the question: bge-small-en-v1.5</text>
+<text x="572" y="289" font-size="12" fill="#b9d2ee">Searches the index read from KV</text>
+<rect x="560" y="326" width="182" height="60" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="572" y="348" font-size="14" font-weight="700" fill="#eaf3ff">Workers AI</text>
+<text x="572" y="368" font-size="12" fill="#b9d2ee">Embedding model</text>
+<rect x="758" y="326" width="182" height="60" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="770" y="348" font-size="14" font-weight="700" fill="#eaf3ff">KV</text>
+<text x="770" y="368" font-size="12" fill="#b9d2ee">Passage index</text>
+<rect x="560" y="470" width="182" height="60" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="572" y="492" font-size="14" font-weight="700" fill="#eaf3ff">Anthropic API</text>
+<text x="572" y="512" font-size="12" fill="#b9d2ee">Your own key only</text>
+<rect x="758" y="470" width="182" height="60" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="770" y="492" font-size="14" font-weight="700" fill="#eaf3ff">Resend</text>
+<text x="770" y="512" font-size="12" fill="#b9d2ee">Feedback by email</text>
+<path d="M560,130 L452,130" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="480" y="122" font-size="12" fill="#ffd479">serves</text>
+<path d="M452,152 L558,236" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="466" y="214" font-size="12" fill="#ffd479">question</text>
+<path d="M650,306 L650,324" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M850,306 L850,324" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M940,150 L962,150 L962,500 L942,500" fill="none" stroke="#9cc3ef" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="954" y="460" font-size="12" fill="#ffd479" text-anchor="end">emails feedback</text>
+<path d="M452,164 L494,164 L494,500 L558,500" fill="none" stroke="#9cc3ef" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="478" y="450" font-size="12" fill="#ffd479">question +</text>
+<text x="40" y="478" font-size="12" fill="#b9d2ee">Never sent: profile, timeline, notes, calendar.</text>
+<text x="40" y="496" font-size="12" fill="#b9d2ee">Dashed = optional, only when you choose it.</text>
+<text x="466" y="230" font-size="12" fill="#b9d2ee">text only</text>
+<text x="478" y="466" font-size="12" fill="#b9d2ee">passages</text>
+</svg>

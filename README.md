@@ -54,6 +54,31 @@ Your information stays on your phone. Only a question you choose to ask online l
 
 ---
 
+## Under the hood
+
+Four blueprints for developers. Each arrow says what moves; dashed means it happens only when you choose it.
+
+**System architecture.** What runs on your device, what runs at Cloudflare, and what crosses between them.
+
+<img src="docs/images/blueprint-architecture.svg" width="880" alt="System architecture: the app, service worker, web workers and encrypted IndexedDB on the device; the App Worker, the Retrieve Worker, Workers AI and KV at Cloudflare; the question text alone goes to the Retrieve Worker; the question and cited passages go to the Anthropic API only with your own key; feedback is emailed through Resend">
+
+**Ask, from a question to a cited answer.** The checks, the search, the quote, and the optional summary's
+accuracy checks.
+
+<img src="docs/images/blueprint-ask.svg" width="880" alt="Ask pipeline: question, checks on the device, on-device or online ranking of 1,992 passages, the best passage quoted whole; an optional summary is checked for citations and numbers and refused if it fails">
+
+**Your data at rest.** One encryption path into storage, the optional PIN, and the backup file.
+
+<img src="docs/images/blueprint-data.svg" width="880" alt="Data at rest: every record goes through encryptRecord, AES-GCM with a fresh IV, into IndexedDB; an optional PIN goes through Argon2id and HKDF to unlock the keys; a backup is sealed with a six-word passphrase">
+
+**The reference library.** Built before release from official sources only, never on your device.
+
+<img src="docs/images/blueprint-corpus.svg" width="880" alt="Corpus pipeline: a registry of 46 US Government sources, capture, human review, 1,992 passages with citation anchors, a quality gate, and two indexes: one shipped to the device, one in KV for online search">
+
+How each part is built, and why, is written up in [`docs/engineering/`](docs/engineering/).
+
+---
+
 ## What it does
 
 - **Ask.** Type a question in plain words and get passages from official sources, with the opening of the

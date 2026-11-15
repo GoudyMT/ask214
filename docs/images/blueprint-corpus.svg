@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 360" width="980" height="360" font-family="Consolas, Menlo, monospace">
+<title>How the reference library is built: only public US Government sources, captured, reviewed by a person, cut into anchored passages, embedded twice, and gated before it ships</title>
+<defs><pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#16325a" stroke-width="1"/></pattern>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9cc3ef"/></marker></defs>
+<rect width="980" height="360" fill="#0d2240"/><rect width="980" height="360" fill="url(#g)"/>
+<text x="24" y="38" font-size="20" font-weight="700" fill="#eaf3ff">The reference library (built before release, never on your device)</text>
+<rect x="24" y="70" width="172" height="112" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="36" y="92" font-size="14" font-weight="700" fill="#eaf3ff">1. Registry</text>
+<text x="36" y="112" font-size="12" fill="#b9d2ee">46 sources</text>
+<text x="36" y="129" font-size="12" fill="#b9d2ee">US Government work</text>
+<text x="36" y="146" font-size="12" fill="#b9d2ee">  only (17 USC 105)</text>
+<text x="36" y="163" font-size="12" fill="#b9d2ee">Terms reviewed</text>
+<rect x="214" y="70" width="172" height="112" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="226" y="92" font-size="14" font-weight="700" fill="#eaf3ff">2. Capture</text>
+<text x="226" y="112" font-size="12" fill="#b9d2ee">25 web pages</text>
+<text x="226" y="129" font-size="12" fill="#b9d2ee">21 TAP guides (PDF)</text>
+<text x="226" y="146" font-size="12" fill="#b9d2ee">Two tools cross-</text>
+<text x="226" y="163" font-size="12" fill="#b9d2ee">  check PDF text</text>
+<rect x="404" y="70" width="172" height="112" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="416" y="92" font-size="14" font-weight="700" fill="#eaf3ff">3. Clean, review</text>
+<text x="416" y="112" font-size="12" fill="#b9d2ee">A person approves</text>
+<text x="416" y="129" font-size="12" fill="#b9d2ee">every edit</text>
+<rect x="594" y="70" width="172" height="112" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="606" y="92" font-size="14" font-weight="700" fill="#eaf3ff">4. Passages</text>
+<text x="606" y="112" font-size="12" fill="#b9d2ee">1,992 verbatim</text>
+<text x="606" y="129" font-size="12" fill="#b9d2ee">passages, each with</text>
+<text x="606" y="146" font-size="12" fill="#b9d2ee">a citation anchor</text>
+<rect x="784" y="70" width="172" height="112" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="796" y="92" font-size="14" font-weight="700" fill="#eaf3ff">5. Quality gate</text>
+<text x="796" y="112" font-size="12" fill="#b9d2ee">Search is measured</text>
+<text x="796" y="129" font-size="12" fill="#b9d2ee">Fails closed: a</text>
+<text x="796" y="146" font-size="12" fill="#b9d2ee">worse build stays out</text>
+<rect x="404" y="228" width="250" height="92" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="416" y="250" font-size="14" font-weight="700" fill="#eaf3ff">Device index</text>
+<text x="416" y="270" font-size="12" fill="#b9d2ee">all-MiniLM-L6-v2 (quantized)</text>
+<text x="416" y="287" font-size="12" fill="#b9d2ee">Shipped with the app;</text>
+<text x="416" y="304" font-size="12" fill="#b9d2ee">downloaded once</text>
+<rect x="680" y="228" width="276" height="92" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="692" y="250" font-size="14" font-weight="700" fill="#eaf3ff">Server index</text>
+<text x="692" y="270" font-size="12" fill="#b9d2ee">bge-small-en-v1.5</text>
+<text x="692" y="287" font-size="12" fill="#b9d2ee">Stored in KV for online search</text>
+<path d="M196,126 L212,126" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M386,126 L402,126" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M576,126 L592,126" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M766,126 L782,126" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M680,182 L560,226" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="560" y="210" font-size="12" fill="#ffd479">embeds</text>
+<path d="M700,182 L800,226" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="760" y="210" font-size="12" fill="#ffd479">embeds</text>
+<text x="24" y="236" font-size="12" fill="#b9d2ee">PDF citations open the</text>
+<text x="24" y="254" font-size="12" fill="#b9d2ee">official guide at the</text>
+<text x="24" y="272" font-size="12" fill="#b9d2ee">cited page, with the</text>
+<text x="24" y="290" font-size="12" fill="#b9d2ee">passage marked.</text>
+</svg>

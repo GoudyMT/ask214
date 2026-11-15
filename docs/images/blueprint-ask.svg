@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 440" width="980" height="440" font-family="Consolas, Menlo, monospace">
+<title>How Ask answers a question: checks first, then search on the device or online, then the source quoted whole; an optional summary must pass citation checks</title>
+<defs><pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#16325a" stroke-width="1"/></pattern>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9cc3ef"/></marker></defs>
+<rect width="980" height="440" fill="#0d2240"/><rect width="980" height="440" fill="url(#g)"/>
+<text x="24" y="38" font-size="20" font-weight="700" fill="#eaf3ff">Ask: from a question to a cited answer</text>
+<rect x="24" y="70" width="170" height="96" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="36" y="92" font-size="14" font-weight="700" fill="#eaf3ff">1. Question</text>
+<text x="36" y="112" font-size="12" fill="#b9d2ee">Typed in plain words</text>
+<text x="36" y="129" font-size="12" fill="#b9d2ee">Treated as data,</text>
+<text x="36" y="146" font-size="12" fill="#b9d2ee">never as instructions</text>
+<rect x="220" y="70" width="200" height="96" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="232" y="92" font-size="14" font-weight="700" fill="#eaf3ff">2. Checks first</text>
+<text x="232" y="112" font-size="12" fill="#b9d2ee">On the device:</text>
+<text x="232" y="129" font-size="12" fill="#b9d2ee">crisis words: crisis line</text>
+<text x="232" y="146" font-size="12" fill="#b9d2ee">online: consent asked once</text>
+<rect x="450" y="56" width="240" height="64" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="462" y="78" font-size="14" font-weight="700" fill="#eaf3ff">3a. On device</text>
+<text x="462" y="98" font-size="12" fill="#b9d2ee">A worker ranks 1,992 passages</text>
+<rect x="450" y="132" width="240" height="64" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="462" y="154" font-size="14" font-weight="700" fill="#eaf3ff">3b. Online</text>
+<text x="462" y="174" font-size="12" fill="#b9d2ee">Retrieve Worker ranks; no logs</text>
+<rect x="720" y="70" width="236" height="96" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="732" y="92" font-size="14" font-weight="700" fill="#eaf3ff">4. Answer</text>
+<text x="732" y="112" font-size="12" fill="#b9d2ee">Best passage quoted whole</text>
+<text x="732" y="129" font-size="12" fill="#b9d2ee">Every card names its source</text>
+<text x="732" y="146" font-size="12" fill="#b9d2ee">Opens the official page</text>
+<rect x="220" y="250" width="230" height="112" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="232" y="272" font-size="14" font-weight="700" fill="#eaf3ff">5. Summary (optional)</text>
+<text x="232" y="292" font-size="12" fill="#b9d2ee">Your key, browser to provider</text>
+<text x="232" y="309" font-size="12" fill="#b9d2ee">Question + passages only</text>
+<text x="232" y="326" font-size="12" fill="#b9d2ee">Own-eligibility questions</text>
+<text x="232" y="343" font-size="12" fill="#b9d2ee">  never sent (VSO, va.gov)</text>
+<rect x="480" y="250" width="236" height="112" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="492" y="272" font-size="14" font-weight="700" fill="#eaf3ff">6. Accuracy checks</text>
+<text x="492" y="292" font-size="12" fill="#b9d2ee">Each citation names a sent</text>
+<text x="492" y="309" font-size="12" fill="#b9d2ee">  passage</text>
+<text x="492" y="326" font-size="12" fill="#b9d2ee">Each number is in a cited</text>
+<text x="492" y="343" font-size="12" fill="#b9d2ee">  passage; cut-off = not shown</text>
+<rect x="744" y="250" width="212" height="112" rx="6" fill="#123058" stroke="#9cc3ef" stroke-width="1.5"/>
+<text x="756" y="272" font-size="14" font-weight="700" fill="#eaf3ff">7. Shown or refused</text>
+<text x="756" y="292" font-size="12" fill="#b9d2ee">Pass: summary above</text>
+<text x="756" y="309" font-size="12" fill="#b9d2ee">  the sources</text>
+<text x="756" y="326" font-size="12" fill="#b9d2ee">Fail: the quote stands</text>
+<text x="756" y="343" font-size="12" fill="#b9d2ee">  alone, with a note</text>
+<path d="M194,118 L218,118" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M420,104 L448,90" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M420,132 L448,162" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M690,88 L718,108" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M690,164 L718,128" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M838,168 L838,200 L335,200 L335,248" fill="none" stroke="#9cc3ef" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="350" y="222" font-size="12" fill="#ffd479">if you turned it on</text>
+<path d="M450,306 L478,306" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M716,306 L742,306" fill="none" stroke="#9cc3ef" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="24" y="400" font-size="12" fill="#b9d2ee">The answer never depends on the summary: the official text is always shown, with its source.</text>
+</svg>
