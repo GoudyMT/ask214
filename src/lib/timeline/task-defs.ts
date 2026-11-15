@@ -718,7 +718,17 @@ export const TASK_DEFS: readonly TaskDef[] = [
 			recommendedOffset: -120,
 			why: 'The government-paid final move generally runs 180 days after you separate; confirm with your transportation office.',
 			afterNote:
-				'The government-paid move ends 180 days after separation unless an extension is approved; contact your installation transportation office.'
+				'The government-paid move ends 180 days after separation unless an extension is approved; contact your installation transportation office.',
+			copyFor: Object.fromEntries(
+				(['retirement', 'medical'] as const).map((path) => [
+					path,
+					{
+						why: 'Your government-paid final move has a time limit: 180 days after you separate for many members, and often longer for retirees; your transportation office confirms yours.',
+						afterNote:
+							'Your move may still be covered: many retirees have longer than 180 days. Your installation transportation office says how long yours lasts and about extensions.'
+					}
+				])
+			)
 		},
 		{
 			title: ordersLead('Arrange your household-goods (HHG) move'),

@@ -263,6 +263,19 @@ describe('firm deadlines match their official sources', () => {
 		expect(t?.finalEnd).toBe(finalEnd);
 	});
 
+	// militaryonesource.mil - "Many retiring service members have three years to complete their final move at
+	// government expense": the 180-day line is the separating member's, so a retiring or board member is never told
+	// the move has ended at day 180.
+	it.each(['retirement', 'medical'] as const)(
+		'tells a %s member the move limit is often longer',
+		(path) => {
+			const copy = at('hhg-counseling')?.copyFor?.[path];
+			expect(copy?.why).toMatch(/often longer for retirees/);
+			expect(copy?.afterNote).toMatch(/many retirees have longer than 180 days/);
+			expect(copy?.afterNote).not.toMatch(/move ends/);
+		}
+	);
+
 	// "Opens" tells a member a window is shut until that day; it is said only where a source sets the opening, and every
 	// other task says when to start. A task joins this list only with its source and an opening that matches it.
 	it.each([
