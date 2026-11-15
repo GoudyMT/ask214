@@ -29,6 +29,15 @@ describe('About page sources copy is honest', () => {
 		expect(about).not.toMatch(/17 USC/i);
 	});
 
+	// The app is finished and kept as it is (the owner, 2026-11-14): there is no way to donate, and no one re-checks
+	// the timeline's rules, so the page claims no donations and says when the rules were last checked.
+	it('claims no donations and dates the timeline rules it no longer updates', () => {
+		expect(about).not.toMatch(/donation/i);
+		expect(about).toMatch(
+			/checked against official sources through November 2026 and are no longer updated/
+		);
+	});
+
 	it('does not imply an opt-in analytics feature (zero telemetry is built, not deferred)', () => {
 		// The opt-in analytics was dropped; no telemetry code exists. "opt-in" copy would promise a
 		// feature the app does not have, so the page must state the no-analytics reality plainly.

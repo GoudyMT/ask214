@@ -14,8 +14,11 @@
 <p>
 	A privacy-first companion that helps US transitioning service members navigate the ~24-month
 	period before and after separation. Ask a question and get answers backed by official sources, or
-	build a timeline of what to do and when. Built by a US Navy veteran. Free, donation-supported, no
-	ads ever.
+	build a timeline of what to do and when. Built by a US Navy veteran. Free, no ads ever.
+</p>
+<p>
+	The timeline's steps and dates were checked against official sources through November 2026 and are
+	no longer updated; each step's official link has the current rule.
 </p>
 
 <h2>What this is not</h2>

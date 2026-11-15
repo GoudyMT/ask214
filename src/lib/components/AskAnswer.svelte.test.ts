@@ -98,7 +98,8 @@ describe('AskAnswer', () => {
 			'keyRejected',
 			'Your API key was not accepted, so no AI summary is shown. Check it in Settings.'
 		],
-		['serviceFailed', 'No AI summary came back this time, so the document is quoted instead.'],
+		// Not "this time": the same line shows when the app's AI model is retired for good (the owner, 2026-11-14).
+		['serviceFailed', 'No AI summary came back, so the document is quoted instead.'],
 		['cutShort', 'The AI summary was cut short, so the document is quoted instead.']
 	] as const)('extractive: on %s, says why in its own words', async (note, words) => {
 		const { container } = await render(AskAnswer, {

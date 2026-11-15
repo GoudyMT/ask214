@@ -30,7 +30,8 @@
 <h1>Send feedback</h1>
 <p>
 	Found something wrong, or have an idea to make this better? Send it my way - it goes straight to
-	my inbox.
+	my inbox. Ask 214 is finished and kept as it is, so I read messages when I can but can't promise a
+	reply.
 </p>
 
 <FeedbackForm {attachedRoute} {submit} />

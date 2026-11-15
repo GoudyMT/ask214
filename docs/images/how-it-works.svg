@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 360" width="880" height="360" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>How Ask 214 works: your data stays on your phone; only a question you choose to ask online leaves it</title>
+  <rect x="0" y="0" width="880" height="360" rx="12" fill="#ffffff"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3a4a5c"/>
+    </marker>
+  </defs>
+
+  <!-- The phone -->
+  <rect x="20" y="20" width="400" height="320" rx="14" fill="#eef4fb" stroke="#1d63c0" stroke-width="2"/>
+  <text x="40" y="52" font-size="18" font-weight="700" fill="#14324f">Your phone</text>
+
+  <rect x="40" y="72" width="360" height="86" rx="10" fill="#ffffff" stroke="#9fb6d3"/>
+  <text x="58" y="102" font-size="16" font-weight="600" fill="#14324f">Profile, timeline, notes</text>
+  <text x="58" y="126" font-size="14" fill="#33475b">Encrypted on the device, behind an optional PIN.</text>
+  <text x="58" y="146" font-size="14" fill="#33475b">Never sent. Leaves only in a file you save.</text>
+
+  <rect x="40" y="176" width="360" height="86" rx="10" fill="#ffffff" stroke="#9fb6d3"/>
+  <text x="58" y="206" font-size="16" font-weight="600" fill="#14324f">Ask</text>
+  <text x="58" y="230" font-size="14" fill="#33475b">On device: searches the documents on the phone,</text>
+  <text x="58" y="250" font-size="14" fill="#33475b">with no connection. Online: only if you choose.</text>
+
+  <text x="40" y="300" font-size="14" fill="#33475b">Asking online is a choice: the arrows on the right</text>
+  <text x="40" y="320" font-size="14" fill="#33475b">happen only after you agree once.</text>
+
+  <!-- Online -->
+  <rect x="540" y="72" width="320" height="86" rx="10" fill="#f6f8fa" stroke="#8c99a6"/>
+  <text x="558" y="102" font-size="16" font-weight="600" fill="#14324f">Search server (ask214.com)</text>
+  <text x="558" y="126" font-size="14" fill="#33475b">Gets only the words of your question.</text>
+  <text x="558" y="146" font-size="14" fill="#33475b">Keeps no logs and no accounts.</text>
+
+  <rect x="540" y="196" width="320" height="86" rx="10" fill="#f6f8fa" stroke="#8c99a6" stroke-dasharray="6 4"/>
+  <text x="558" y="226" font-size="16" font-weight="600" fill="#14324f">AI provider (optional)</text>
+  <text x="558" y="250" font-size="14" fill="#33475b">Only with your own API key: the question</text>
+  <text x="558" y="270" font-size="14" fill="#33475b">and the cited passages, for a short summary.</text>
+
+  <line x1="400" y1="210" x2="536" y2="120" stroke="#3a4a5c" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="438" y="150" font-size="13" fill="#3a4a5c" transform="rotate(-33 438 150)">sends the question</text>
+  <line x1="400" y1="232" x2="536" y2="239" stroke="#3a4a5c" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="426" y="258" font-size="13" fill="#3a4a5c">question and</text>
+  <text x="426" y="274" font-size="13" fill="#3a4a5c">passages</text>
+</svg>

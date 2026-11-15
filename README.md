@@ -2,12 +2,31 @@
 
 > Private, offline-first answers for your military transition, from sources you can trust.
 
-**[Try it at ask214.com](https://ask214.com)**
+**[Try it at ask214.com](https://ask214.com)** - free, no account, no ads.
+
+**Status: complete** (v1.22.3, November 2026). Kept as it is: no new features, security fixes only.
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-3a6ea5.svg)](LICENSE)
 ![PWA: offline-first](https://img.shields.io/badge/PWA-offline--first-5a3e9e.svg)
 ![Built with SvelteKit](https://img.shields.io/badge/built%20with-SvelteKit-ff3e00.svg)
 ![TypeScript: strict](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)
+
+<table>
+  <tr>
+    <th>Ask</th>
+    <th>An answer, from the source</th>
+    <th>Your timeline</th>
+    <th>Locked with a PIN</th>
+  </tr>
+  <tr>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png"><img src="docs/images/home-light.png" width="200" alt="Home: a question box, Online or On device, and the timeline's next step"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/ask-dark.png"><img src="docs/images/ask-light.png" width="200" alt="Ask answered on the device: the passage from the official source"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/timeline-dark.png"><img src="docs/images/timeline-light.png" width="200" alt="Timeline: what needs you now, late and closing soon, with dates"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/lock-dark.png"><img src="docs/images/lock-light.png" width="200" alt="The app lock: your data is locked until you enter your PIN"></picture></td>
+  </tr>
+</table>
+
+<sub>Screenshots of the real app on a phone, with made-up sample data.</sub>
 
 **Ask 214** is a privacy-first Progressive Web App for U.S. service members navigating the roughly
 24-month window before and after separation. It consolidates the guidance that is scattered across
@@ -17,6 +36,44 @@ your personal information on your device.
 The mobile-app layer for transition support has been effectively vacant since Military.com's Transition
 App was discontinued around 2017-2018. Ask 214 fills that gap. It is built by a U.S. Navy veteran who made
 the transition it is designed to help with.
+
+---
+
+## How it works
+
+Your information stays on your phone. Only a question you choose to ask online leaves it.
+
+<img src="docs/images/how-it-works.svg" width="720" alt="Your phone holds your profile, timeline and notes, encrypted and never sent, and Ask, which searches on the phone. Only if you choose to ask online, the question goes to the search server, and with your own key the question and cited passages go to the AI provider.">
+
+- **On device:** after a one-time download, Ask searches the official documents on your phone, with no
+  connection.
+- **Online:** after you agree once, only the words of your question go to the search server, which keeps
+  nothing.
+- **Your data:** profile, timeline and notes are encrypted on the device and never sent. They leave only in
+  a file you choose to save: an encrypted backup or a calendar file.
+
+---
+
+## Under the hood
+
+Four blueprints for developers. Each arrow says what moves; dashed means it happens only when you choose it.
+
+**System architecture.** What runs on your device, what runs at Cloudflare, and what crosses between them.
+
+<img src="docs/images/blueprint-architecture.svg" width="880" alt="System architecture: the app, service worker, web workers and encrypted IndexedDB on the device; the App Worker, the Retrieve Worker, Workers AI and KV at Cloudflare; the question text alone goes to the Retrieve Worker; the question and cited passages go to the Anthropic API only with your own key; feedback is emailed through Resend">
+
+**Ask, from a question to a cited answer.** The checks, the search, the quote, and the optional summary's
+accuracy checks.
+
+<img src="docs/images/blueprint-ask.svg" width="880" alt="Ask pipeline: question, checks on the device, on-device or online ranking of 1,992 passages, the best passage quoted whole; an optional summary is checked for citations and numbers and refused if it fails">
+
+**Your data at rest.** One encryption path into storage, the optional PIN, and the backup file.
+
+<img src="docs/images/blueprint-data.svg" width="880" alt="Data at rest: every record goes through encryptRecord, AES-GCM with a fresh IV, into IndexedDB; an optional PIN goes through Argon2id and HKDF to unlock the keys; a backup is sealed with a six-word passphrase">
+
+**The reference library.** Built before release from official sources only, never on your device.
+
+<img src="docs/images/blueprint-corpus.svg" width="880" alt="Corpus pipeline: a registry of 46 US Government sources, capture, human review, 1,992 passages with citation anchors, a quality gate, and two indexes: one shipped to the device, one in KV for online search">
 
 ---
 
@@ -136,6 +193,8 @@ Ask 214 has been live at [ask214.com](https://ask214.com) since August 28, 2026.
 service members of every branch, officer and enlisted, whether they are finishing their service, retiring,
 going through a medical board, or leaving the Guard or Reserve. Each release and what it changed is listed on
 the [Releases](https://github.com/GoudyMT/ask214/releases) page.
+
+Ask 214 is complete as of November 2026 and is kept as it is: no new features, security fixes only.
 
 ---
 

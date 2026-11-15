@@ -575,12 +575,18 @@ const STATIC = 'static';
 //   2026-11-14 the sweep fixes: the library's fetch guarded, the store lock checks, the key record and newer-profile checks: routeNodes 61,317 -> 61,337 (measured 61,332 B, +47 B on the plan's base, margin 5 B).
 //   2026-11-14 the sweep fixes: the library's fetch guarded, the store lock checks, the key record and newer-profile checks: rootLayout 9,874 -> 9,879 (measured 9,875 B, +34 B on the plan's base, margin 4 B).
 //
+//   2026-11-14 the Feedback page's no-reply copy and the 1.22.3 version: precacheBytes 261,683 -> 261,706 (measured 261,702 B, +36 B on the plan's base, margin 4 B).
+//   2026-11-14 the Feedback page's no-reply copy and the 1.22.3 version: routeNodes 61,337 -> 61,369 (measured 61,361 B, +76 B on the plan's base, margin 8 B).
+//
+//   2026-11-14 the final audit's fixes: the retirees' move limit, the About notice, the AI-summary and Feedback lines: precacheBytes 261,706 -> 261,893 (measured 261,872 B, +206 B on the plan's base, margin 21 B).
+//   2026-11-14 the final audit's fixes: the retirees' move limit, the About notice, the AI-summary and Feedback lines: routeNodes 61,369 -> 61,448 (measured 61,433 B, +148 B on the plan's base, margin 15 B).
+//
 // Raise a limit only with a measured reason recorded here; never to make a run pass.
 const LIMIT = {
 	page: 112_902,
 	onDemand: 16_138,
 	precacheFiles: 88,
-	precacheBytes: 261_683,
+	precacheBytes: 261_893,
 	workerScripts: 147_800
 };
 

@@ -84,7 +84,7 @@
 {#if phase === 'success'}
 	<div class="panel" role="status">
 		<h2 bind:this={panelHeading} tabindex="-1">Thanks - your feedback was sent.</h2>
-		<p>I read every message. If you left an email, I'll get back to you.</p>
+		<p>I read messages when I can, but I can't promise a reply.</p>
 		<button type="button" class="btn" onclick={(e) => backToForm(e, reset)}>Send another</button>
 	</div>
 {:else if phase === 'error'}
@@ -129,7 +129,9 @@
 		<div class="field">
 			<label for="fb-email">Your email <span class="opt">(optional)</span></label>
 			<input id="fb-email" type="email" bind:value={replyEmail} placeholder="you@example.com" />
-			<p class="hint">Only if you'd like a reply. Leave it blank to stay anonymous.</p>
+			<p class="hint">
+				Only if you'd like a reply, which I can't promise. Leave it blank to stay anonymous.
+			</p>
 		</div>
 
 		<!-- Spam trap: off-screen + aria-hidden + not tabbable, so people never see it but naive bots

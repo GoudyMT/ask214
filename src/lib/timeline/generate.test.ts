@@ -1519,8 +1519,12 @@ describe('the leaving answer on the real task list', () => {
 				const shown = items(path).find((i) => i.def.id === id)?.def;
 				const plain = items().find((i) => i.def.id === id)?.def;
 				expect(shown?.title, id).toBe(plain?.title);
-				expect(shown?.why, id).toBe(plain?.why);
-				expect(shown?.afterNote, id).toBe(plain?.afterNote);
+				// A retiring or board member's move limit is often longer than 180 days, so that step has its own lines
+				// (checked in task-defs.test.ts); every other line is the plain one.
+				if (id !== 'hhg-counseling' || path === 'ets') {
+					expect(shown?.why, id).toBe(plain?.why);
+					expect(shown?.afterNote, id).toBe(plain?.afterNote);
+				}
 				// The plain step is the active-duty one: no Guard or Reserve condition reaches it.
 				expect(`${shown?.title} ${shown?.why} ${shown?.afterNote ?? ''}`, id).not.toMatch(
 					/drill|active duty orders|full-time|covered a move/
