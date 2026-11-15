@@ -43,20 +43,7 @@ the transition it is designed to help with.
 
 Your information stays on your phone. Only a question you choose to ask online leaves it.
 
-```mermaid
-flowchart LR
-  subgraph phone["Your phone"]
-    you(["You"])
-    data[("Profile, timeline, notes<br/>encrypted on the device")]
-    lib[("Answer library and model<br/>downloaded once, works offline")]
-  end
-  search["Search server<br/>(ask214.com, keeps no logs)"]
-  ai["AI provider<br/>(only with your own key)"]
-  you -- "saves, behind an optional PIN" --> data
-  you -- "asks on device: searches" --> lib
-  you -- "asks online: sends only the question text" --> search
-  you -- "optional summary: sends the question and the cited passages" --> ai
-```
+<img src="docs/images/how-it-works.svg" width="720" alt="Your phone holds your profile, timeline and notes, encrypted and never sent, and Ask, which searches on the phone. Only if you choose to ask online, the question goes to the search server, and with your own key the question and cited passages go to the AI provider.">
 
 - **On device:** after a one-time download, Ask searches the official documents on your phone, with no
   connection.
