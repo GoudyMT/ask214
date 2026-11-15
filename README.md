@@ -137,6 +137,8 @@ service members of every branch, officer and enlisted, whether they are finishin
 going through a medical board, or leaving the Guard or Reserve. Each release and what it changed is listed on
 the [Releases](https://github.com/GoudyMT/ask214/releases) page.
 
+Ask 214 is complete as of November 2026 and is kept as it is: no new features, security fixes only.
+
 ---
 
 ## License
