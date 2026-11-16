@@ -1,5 +1,10 @@
 # Ask 214
 
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="docs/images/ask214-tour-still.png">
+  <img src="docs/images/ask214-tour.gif" width="800" alt="A tour of Ask 214 in eight cards: ask your question across 1,992 passages from 46 U.S. Government sources; all 21 TAP guides open at the cited page; a timeline of 46 steps from 24 months out to after you leave; built for five ways to leave, every branch, officer and enlisted; on device or online; data encrypted on your phone; the app installs in 262 KB and opens offline; ask214.com, free and open source">
+</picture>
+
 > Private, offline-first answers for your military transition, from sources you can trust.
 
 **[Try it at ask214.com](https://ask214.com)** - free, no account, no ads.
